@@ -1,32 +1,20 @@
 # =========================
-# main.py — Mundo de Eldora webhook
+# main.py — Mundo de Eldora (Modo Polling)
 # =========================
 
 from __future__ import annotations
 import os
 import logging
 import asyncio
-import threading 
-from flask import Flask, request
-from telegram import Update
 from datetime import datetime, timezone, time
 from zoneinfo import ZoneInfo
 from modules import player_manager
 
+from telegram import Update
 from telegram.ext import (
-    Application,
-    ApplicationBuilder,
-    CallbackQueryHandler,
-    CommandHandler,
-    ContextTypes,
-    filters,
-    MessageHandler,
+    Application, ApplicationBuilder, CallbackQueryHandler, CommandHandler,
+    ContextTypes, filters, MessageHandler, ConversationHandler
 )
-
-# ---------------------------------------------------------------------------
-# 1. IMPORTAÇÕES DE MÓDULOS DO JOGO (HANDLERS)
-# ---------------------------------------------------------------------------
-# OTIMIZADO: Todas as importações foram centralizadas e duplicatas removidas.
 
 # Jobs e Handlers Gerais
 from handlers.jobs import regenerate_energy_job, daily_crystal_grant_job
@@ -114,9 +102,12 @@ from modules.player_manager import is_player_premium, iter_players, save_player_
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL")
-ADMIN_ID = None
+ADMIN_ID = int(os.getenv("ADMIN_ID")) if os.getenv("ADMIN_ID") else None
+
+if not TELEGRAM_TOKEN: raise ValueError("A variável de ambiente TELEGRAM_TOKEN não foi definida!")
+
 try:
     admin_id_str = os.getenv("ADMIN_ID")
     if admin_id_str:
@@ -126,10 +117,6 @@ except (ValueError, TypeError):
 
 if not TELEGRAM_TOKEN:
     raise ValueError("A variável de ambiente TELEGRAM_TOKEN não foi definida!")
-
-
-ptb_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-flask_app = Flask(__name__)
 
 ACTION_RESTORERS = {}
 
@@ -143,55 +130,26 @@ def build_action_restorers():
     if finish_travel_job: ACTION_RESTORERS["travel"] = {"fn": finish_travel_job, "data_builder": lambda st: {"dest": (st.get("details") or {}).get("destination")}}
     logging.info(f"Ações restauráveis carregadas: {list(ACTION_RESTORERS.keys())}")
 
-async def restore_scheduled_jobs(app: Application) -> None:
-    """Restaura jobs que estavam em andamento quando o bot foi desligado."""
-    build_action_restorers() # Garante que nosso dicionário de ações está pronto
-    
-    job_queue = app.job_queue
-    if not job_queue:
-        return
-
+async def restore_scheduled_jobs(app: Application):
+    build_action_restorers()
+    if not (job_queue := app.job_queue): return
     now = datetime.now(timezone.utc)
     restored_count = 0
-
-    
-
-    # 1. Itera por todos os jogadores salvos no banco de dados
     for user_id, pdata in player_manager.iter_players():
         st = pdata.get("player_state") or {}
-        action = st.get("action")
-        finish_iso = st.get("finish_time")
-        
-        # 2. Verifica se o jogador tinha uma ação em andamento que podemos restaurar
-        if not (action and finish_iso and action in ACTION_RESTORERS):
-            continue
-
+        action, finish_iso = st.get("action"), st.get("finish_time")
+        if not (action and finish_iso and action in ACTION_RESTORERS): continue
         try:
-            # 3. Calcula quanto tempo falta para a ação terminar
             finish_time = datetime.fromisoformat(finish_iso).replace(tzinfo=timezone.utc)
             delay = max(0, (finish_time - now).total_seconds())
-            
-            # 4. Pega os detalhes da ação e reagenda o job
-            restorer = ACTION_RESTORERS[action]
-            job_data = restorer["data_builder"](st)
+            restorer, job_data = ACTION_RESTORERS[action], restorer["data_builder"](st)
             chat_id = pdata.get("last_chat_id", user_id)
-            
-            job_queue.run_once(
-                restorer["fn"],
-                when=delay,
-                chat_id=chat_id,
-                user_id=user_id,
-                data=job_data,
-                name=f"{action}:{user_id}"
-            )
+            job_queue.run_once(restorer["fn"], delay, chat_id=chat_id, user_id=user_id, data=job_data, name=f"{action}:{user_id}")
             restored_count += 1
-            
         except (ValueError, TypeError):
-            logging.warning(f"Tempo de finalização inválido para ação '{action}' do jogador {user_id}. Resetando estado.")
+            logging.warning(f"Tempo de finalização inválido para {user_id}. Resetando estado.")
             pdata["player_state"] = {"action": "idle"}
             player_manager.save_player_data(user_id, pdata)
-            continue
-
     logging.info(f"[RESTORE] Jobs re-agendados: {restored_count}")
 
 async def check_premium_expirations(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -245,14 +203,6 @@ def add_if(app, handler, group=None):
     if handler:
         app.add_handler(handler, group=group)
 
-async def setup_telegram_webhook(app: Application):
-    if not WEBHOOK_URL:
-        logging.error("A variável RENDER_EXTERNAL_URL não foi encontrada!")
-        return
-    webhook_full_url = f"{WEBHOOK_URL}/{TELEGRAM_TOKEN}"
-    await app.bot.set_webhook(url=webhook_full_url, allowed_updates=Update.ALL_TYPES)
-    logging.info(f"Webhook configurado com sucesso para a URL: {webhook_full_url}")
-
 async def send_startup_message(application: Application) -> None:
     if not ADMIN_ID: return
     try:
@@ -262,19 +212,26 @@ async def send_startup_message(application: Application) -> None:
     except Exception as e:
         logging.warning(f"Não foi possível enviar mensagem de inicialização: {e}")
 
+async def post_initialization(app: Application) -> None:
+    """Roda uma vez logo após o bot se conectar."""
+    logging.info("Limpando configurações de webhook antigas...")
+    await app.bot.delete_webhook()
+    
+    await restore_scheduled_jobs(app)
+    await send_startup_message(app)
+    logging.info("Bot conectado e pronto para receber mensagens.")
+
 # ---------------------------------------------------------------------------
 # 5. SETUP DOS HANDLERS
 # ---------------------------------------------------------------------------
 def setup_bot_handlers(application: Application):
     application.bot_data["ADMIN_ID"] = ADMIN_ID
     
-    G0_CONVERSATIONS   = 0   
-    G1_ADMIN_ROUTER    = 1   
+    G0_CONVERSATIONS   = 0    
     G2_CALLBACKS_PRIM  = 2   
     G3_COMMANDS        = 3   
     G5_SECONDARY       = 5  
-    G9_PARTY           = 9  
-    G10_BACKGROUND     = 10  
+    G9_PARTY           = 9   
     G15_CHAT_LISTENER  = 15 
 
     # Conversas
@@ -433,62 +390,26 @@ def setup_bot_handlers(application: Application):
     logging.info("Handlers do bot configurados.")
 
 # ---------------------------------------------------------------------------
-# 6. ROTAS DO SERVIDOR WEB (FLASK)
-# ---------------------------------------------------------------------------
-
-# DEPOIS (O CÓDIGO CORRETO PARA FLASK >= 2.3.0)
-@flask_app.before_serving
-async def startup():
-    # ...
-    """Esta função será executada pelo Flask uma vez, antes de processar o primeiro pedido."""
-    # Ela "chama" nosso setup do bot para rodar em segundo plano.
-    asyncio.create_task(setup_application(ptb_app))
-
-
-@flask_app.route("/")
-def index() -> str: return "Bot está online e operando com webhook!"
-
-@flask_app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
-async def webhook() -> tuple[str, int]:
-    try:
-        update = Update.de_json(request.get_json(force=True), ptb_app.bot)
-        await ptb_app.process_update(update)
-        return "", 200
-    except Exception as e:
-        logging.error(f"Erro no processamento do webhook: {e}")
-        return "Error", 500
-
-# ---------------------------------------------------------------------------
 # 7. EXECUÇÃO PRINCIPAL
 # ---------------------------------------------------------------------------
-async def setup_application(app: Application) -> None:
-    """Função que executa toda a inicialização assíncrona do bot."""
-    logging.info("Iniciando configuração assíncrona do bot em uma thread...")
-    await app.initialize()
-    await setup_telegram_webhook(app)
-    # await restore_scheduled_jobs(app) # Ative se precisar
-    await app.start()
-    await send_startup_message(app)
-    logging.info(">>> Bot está totalmente pronto e operacional. <<<")
-
-def run_setup():
-    """Roda a inicialização assíncrona em um novo loop de eventos."""
-    asyncio.run(setup_application(ptb_app))
 
 def main() -> None:
-    setup_bot_handlers(ptb_app)
+    """Função principal que constrói e roda o bot."""
+    
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_initialization).build()
 
-    jq = ptb_app.job_queue
-    if jq:
-        jq.run_repeating(regenerate_energy_job, interval=300, first=10)
-        jq.run_repeating(check_premium_expirations, interval=21600, first=60)
+    setup_bot_handlers(app)
+
+    if jq := app.job_queue:
+        jq.run_repeating(regenerate_energy_job, interval=300)
+        jq.run_repeating(check_premium_expirations, interval=21600)
         
         tz_fortaleza = ZoneInfo("America/Fortaleza")
         jq.run_daily(daily_crystal_grant_job, time=time(hour=0, minute=5, tzinfo=tz_fortaleza))
         jq.run_daily(daily_pvp_entry_reset_job, time=time(hour=0, minute=10, tzinfo=tz_fortaleza))
-    
-    threading.Thread(target=run_setup).start()
-    
-    logging.info("Setup completo. O servidor Gunicorn irá gerenciar as requisições.")
 
-main()
+    logging.info("Iniciando bot em modo Polling...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+    main()
