@@ -1,0 +1,31 @@
+{
+    "display_name": "🐲 𝕯𝖗𝖆𝖈𝖔̂𝖓𝖎𝖈𝖔𝖘",
+    "leader_id": 7262799478,
+    "members": [
+        7262799478,
+        1160420540,
+        7264285511,
+        1363987006,
+        6499640658
+    ],
+    "prestige_level": 1,
+    "prestige_points": 143,
+    "creation_date": "2025-09-20T00:14:42.630707+00:00",
+    "pending_applications": [],
+    "bank": {
+        "gold": 2000
+    },
+    "logo_media": {
+        "file_id": "BAACAgEAAxkBAAEBfCJo1ufEZP6B8QXCklNkq_lZcp3GewAC3QQAAoIuuUam_RrNAsnobDYE",
+        "type": "video"
+    },
+    "active_mission": {
+        "mission_id": "weekly_hunt_goblins_batedores",
+        "type": "HUNT",
+        "target_monster_id": "goblin_batedor",
+        "target_count": 500,
+        "current_progress": 15,
+        "start_time": "2025-09-26T22:24:29.067113+00:00",
+        "end_time": "2025-10-03T22:24:29.067113+00:00"
+    }
+}

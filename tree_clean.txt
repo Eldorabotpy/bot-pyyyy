@@ -1,0 +1,4 @@
+abertura 
+           BAACAgEAAxkBAAM5aNrRNqEQEYGUN8-fmcmCdOJOa0EAAsYIAAKCq9lGZ0eFyPq7_lw2BA
+"regiao_reino_eldora": {
+    "id": "AgACAgEAAxkBAAMUaNrI17dfVsTT5hK9vbK1GBDUIhkAAiMLaxuCq9lGGA1Z0BBM1gEBAAMCAAN5AAM2BA",

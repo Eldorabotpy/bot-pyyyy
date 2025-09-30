@@ -1,0 +1,4828 @@
+{
+  "seq": 226,
+  "listings": [
+    {
+      "id": 1,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "ectoplasma",
+        "qty": 1
+      },
+      "unit_price": 25,
+      "quantity": 1,
+      "created_at": "2025-08-13T07:17:08.395615+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 2,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "cajado_fragil",
+        "qty": 3
+      },
+      "unit_price": 25,
+      "quantity": 3,
+      "created_at": "2025-08-13T14:20:02.646419+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 3,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 2
+      },
+      "unit_price": 5,
+      "quantity": 2,
+      "created_at": "2025-08-15T13:44:27.646551+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 4,
+      "seller_id": 1540827118,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 1
+      },
+      "unit_price": 5,
+      "quantity": 1,
+      "created_at": "2025-08-16T03:03:35.943414+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 5,
+      "seller_id": 1540827118,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 2
+      },
+      "unit_price": 10,
+      "quantity": 2,
+      "created_at": "2025-08-16T03:03:52.406676+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 6,
+      "seller_id": 5087293279,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 1
+      },
+      "unit_price": 10,
+      "quantity": 1,
+      "created_at": "2025-08-16T14:41:59.419560+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 7,
+      "seller_id": 7894483401,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 1
+      },
+      "unit_price": 5,
+      "quantity": 1,
+      "created_at": "2025-08-16T20:28:39.500231+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 8,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 13
+      },
+      "unit_price": 25,
+      "quantity": 13,
+      "created_at": "2025-08-17T10:31:24.540531+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 9,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 6
+      },
+      "unit_price": 25,
+      "quantity": 6,
+      "created_at": "2025-08-17T10:31:44.173332+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 10,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_reforcado",
+        "qty": 1
+      },
+      "unit_price": 25,
+      "quantity": 1,
+      "created_at": "2025-08-20T22:11:03.868915+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 11,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 1
+      },
+      "unit_price": 110,
+      "quantity": 1,
+      "created_at": "2025-08-21T02:49:55.139412+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 12,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 1
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-08-21T02:50:25.235629+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 13,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 1
+      },
+      "unit_price": 1,
+      "quantity": 1,
+      "created_at": "2025-08-21T03:40:58.672242+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 14,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 5
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-21T14:46:02.515201+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 15,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 3
+      },
+      "unit_price": 5,
+      "quantity": 0,
+      "created_at": "2025-08-21T14:46:37.922952+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 16,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 3
+      },
+      "unit_price": 5,
+      "quantity": 0,
+      "created_at": "2025-08-21T14:47:01.302163+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 17,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 18
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-21T14:48:51.450711+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 18,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 3
+      },
+      "unit_price": 5,
+      "quantity": 0,
+      "created_at": "2025-08-21T14:49:16.578432+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 19,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 2
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-21T14:49:39.223344+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 20,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 21
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-21T22:37:33.349233+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 21,
+      "seller_id": 6682982033,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_curtido",
+        "qty": 1
+      },
+      "unit_price": 40,
+      "quantity": 0,
+      "created_at": "2025-08-21T23:33:46.342972+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 22,
+      "seller_id": 6686874601,
+      "item": {
+        "type": "stack",
+        "base_id": "ectoplasma",
+        "qty": 4
+      },
+      "unit_price": 11,
+      "quantity": 0,
+      "created_at": "2025-08-21T23:41:43.485923+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 23,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 120,
+      "quantity": 0,
+      "created_at": "2025-08-22T00:45:35.682474+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 24,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 8
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-22T01:13:03.823015+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 25,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 6
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-22T01:13:19.641541+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 26,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 2
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-22T01:13:45.973085+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 27,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 4
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-22T01:37:52.923858+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 28,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 9
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-22T01:38:09.332005+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 29,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 7
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-22T01:38:24.691686+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 30,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "joia_da_criacao",
+        "qty": 5
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-22T01:38:53.877546+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 31,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "e66c37af-3c21-4509-a87a-fa5fb06500b9",
+        "item": {
+          "base_id": "botas_mithril",
+          "rarity": "lendario",
+          "durability": [
+            100,
+            100
+          ],
+          "enchantments": {
+            "dmg": {
+              "level": 1,
+              "value": 1
+            },
+            "defense": {
+              "level": 1,
+              "value": 1
+            },
+            "luck": {
+              "level": 1,
+              "value": 1
+            },
+            "initiative": {
+              "level": 1,
+              "value": 1
+            },
+            "hp": {
+              "level": 1,
+              "value": 1
+            }
+          },
+          "tier": 1,
+          "class_tag": "guerreiro"
+        }
+      },
+      "unit_price": 5000,
+      "quantity": 0,
+      "created_at": "2025-08-22T22:35:19.457126+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 32,
+      "seller_id": 7581619548,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T00:50:24.492026+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 33,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 14
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T10:49:25.637622+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 34,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T10:49:39.804683+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 35,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 12
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T10:50:14.003337+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 36,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 12
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T10:50:44.197293+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 37,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 5
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T11:00:57.397550+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 38,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 5
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T11:01:11.618050+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 39,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 5
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T11:01:25.447778+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 40,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 2
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T11:01:47.211292+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 41,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 7
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T15:19:38.498314+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 42,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 11
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T15:20:09.263154+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 43,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 8
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T15:20:29.559611+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 44,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T19:06:07.661864+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 45,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T19:06:28.851156+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 46,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T19:06:41.372195+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 47,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T19:06:54.576304+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 48,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-23T19:07:09.635939+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 49,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 11
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:33:19.622354+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 50,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 9
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:33:34.235499+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 51,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "pedra",
+        "qty": 14
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:33:48.637193+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 52,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 5
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:34:05.216664+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 53,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 12
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:34:22.108878+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 54,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:34:50.479818+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 55,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:35:04.753575+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 56,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "e66c37af-3c21-4509-a87a-fa5fb06500b9",
+        "item": {
+          "base_id": "botas_mithril",
+          "rarity": "lendario",
+          "durability": [
+            100,
+            100
+          ],
+          "enchantments": {
+            "dmg": {
+              "level": 1,
+              "value": 1
+            },
+            "defense": {
+              "level": 1,
+              "value": 1
+            },
+            "luck": {
+              "level": 1,
+              "value": 1
+            },
+            "initiative": {
+              "level": 1,
+              "value": 1
+            },
+            "hp": {
+              "level": 1,
+              "value": 1
+            }
+          },
+          "tier": 1,
+          "class_tag": "guerreiro"
+        }
+      },
+      "unit_price": 5000,
+      "quantity": 0,
+      "created_at": "2025-08-25T14:38:25.285107+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 57,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "ectoplasma",
+        "qty": 110
+      },
+      "unit_price": 710,
+      "quantity": 1,
+      "created_at": "2025-08-25T20:41:51.506563+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 58,
+      "seller_id": 1540827118,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira_rara",
+        "qty": 27
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-26T23:11:00.609245+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 59,
+      "seller_id": 7581619548,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 18
+      },
+      "unit_price": 20,
+      "quantity": 0,
+      "created_at": "2025-08-28T17:49:14.365618+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 60,
+      "seller_id": 7581619548,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 42
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-28T17:49:57.343417+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 61,
+      "seller_id": 7581619548,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 25
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-08-28T18:06:52.402549+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 62,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 10
+      },
+      "unit_price": 200,
+      "quantity": 0,
+      "created_at": "2025-08-30T13:00:04.574780+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 63,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 10
+      },
+      "unit_price": 200,
+      "quantity": 0,
+      "created_at": "2025-08-30T13:00:40.000792+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 64,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "861c6ade-9033-41ea-9f09-6f7c8de14732",
+        "item": {
+          "uuid": "f2f165e3-115d-444e-a6ce-4e4afced72b6",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-08-30T13:14:15.827282+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 65,
+      "seller_id": 1540827118,
+      "item": {
+        "type": "unique",
+        "uid": "e66c37af-3c21-4509-a87a-fa5fb06500b9",
+        "item": {
+          "base_id": "botas_mithril",
+          "rarity": "lendario",
+          "durability": [
+            100,
+            100
+          ],
+          "enchantments": {
+            "dmg": {
+              "level": 1,
+              "value": 1
+            },
+            "defense": {
+              "level": 1,
+              "value": 1
+            },
+            "luck": {
+              "level": 1,
+              "value": 1
+            },
+            "initiative": {
+              "level": 1,
+              "value": 1
+            },
+            "hp": {
+              "level": 1,
+              "value": 1
+            }
+          },
+          "tier": 1,
+          "class_tag": "guerreiro"
+        }
+      },
+      "unit_price": 5050,
+      "quantity": 0,
+      "created_at": "2025-08-30T17:24:07.664612+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 66,
+      "seller_id": 6444735164,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 10
+      },
+      "unit_price": 440,
+      "quantity": 0,
+      "created_at": "2025-08-30T22:08:06.506204+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 67,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "b0070d4e-3f0a-49cd-b20a-d3d282f59333",
+        "item": {
+          "uuid": "7afaa9ae-74a2-45e7-ac02-424bfc69c030",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 0,
+          "durability": [
+            100,
+            100
+          ],
+          "enchantments": {
+            "dmg": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro Assassino"
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-08-30T22:52:16.788560+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 68,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 500,
+      "quantity": 0,
+      "created_at": "2025-08-31T12:31:16.942457+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 69,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "a0fb3d6b-2b92-4553-935c-526174969112",
+        "item": {
+          "uuid": "d407906c-5cb0-4a4a-bbbf-01d0c5ae7132",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 1,
+      "created_at": "2025-08-31T12:50:29.396554+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 70,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "3013f2b5-fec9-47fe-9108-63000bd43ef6",
+        "item": {
+          "uuid": "7990cf80-e297-4f3a-807d-cb8dd17676c1",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            },
+            "initiative": {
+              "value": 1,
+              "source": "affix"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 1,
+      "created_at": "2025-08-31T12:51:23.630288+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 71,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "ece015eb-797f-4235-bb46-7e5b39869172",
+        "item": {
+          "uuid": "6da68614-0f5c-4e5b-962c-6e18ea16668f",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-08-31T12:53:10.550871+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 72,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "a0fb3d6b-2b92-4553-935c-526174969112",
+        "item": {
+          "uuid": "d407906c-5cb0-4a4a-bbbf-01d0c5ae7132",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-08-31T12:54:39.929278+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 73,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "9e5d552d-d219-4476-8037-5d7c1823587c",
+        "item": {
+          "uuid": "cefe040f-819b-4cfa-8fed-dbb0eff01bad",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-08-31T13:08:26.769508+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 74,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "cajado_fragil",
+        "qty": 4
+      },
+      "unit_price": 800,
+      "quantity": 0,
+      "created_at": "2025-09-01T13:17:04.704313+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 75,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "d9523e03-2cb4-4ee1-b0c9-77e08881a09b",
+        "item": {
+          "uuid": "361d6bbd-40aa-47ca-9f1d-965128780b3b",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "bushido"
+          },
+          "display_name": "Katana Laminada",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 51,
+      "quantity": 1,
+      "created_at": "2025-09-01T23:21:08.801319+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 76,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "cc782f60-e761-41cf-a30e-1d994937377f",
+        "item": {
+          "uuid": "2c00d819-7679-4d74-b403-2e2e1929d300",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 0,
+          "durability": [
+            100,
+            100
+          ],
+          "enchantments": {
+            "dmg": {
+              "value": 4,
+              "source": "primary"
+            }
+          },
+          "display_name": "Katana Laminada Samurai"
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:13:27.429226+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 77,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "f43c5b23-e00c-4d99-ae01-f3c157d9551b",
+        "item": {
+          "uuid": "08c49a2c-84cb-4826-a297-5c5fd17ab947",
+          "base_id": "espada_ferro_guerreiro",
+          "rarity": "comum",
+          "upgrade_level": 0,
+          "durability": [
+            100,
+            100
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 4,
+              "source": "primary"
+            }
+          },
+          "display_name": "Espada Ferro Guerreiro"
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:14:11.776872+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 78,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "1b0964ff-ad41-4aea-94cc-00bd6fc17fa1",
+        "item": {
+          "uuid": "cae71c5b-0e58-4ff0-868f-1a3dc1e414a8",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dano_corte": {
+              "value": 20,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 20,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "for"
+          },
+          "display_name": "Katana Laminada Samurai",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:14:36.088418+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 79,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "ba64b050-5c7b-4048-9422-04c04c49e04c",
+        "item": {
+          "uuid": "a89cb8ab-6d6e-4494-b51e-e65c1399399d",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dano_corte": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "for"
+          },
+          "display_name": "Katana Laminada",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:16:25.617710+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 80,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "b7972724-15ee-4d5b-bc4d-54505aefdf7d",
+        "item": {
+          "uuid": "31ecdecb-1ebc-4889-b77b-ce2df9bdee99",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dano_corte": {
+              "value": 1,
+              "source": "primary"
+            },
+            "bushido": {
+              "value": 1,
+              "source": "affix"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "for"
+          },
+          "display_name": "Katana Laminada",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:16:46.937929+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 81,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "0d5007e6-b86f-4e87-8690-6724064108be",
+        "item": {
+          "uuid": "1360e7e9-92f2-4810-aef8-eba837be98e1",
+          "base_id": "cajado_aprendiz_mago",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dano_corte": {
+              "value": 1,
+              "source": "primary"
+            },
+            "initiative": {
+              "value": 1,
+              "source": "affix"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "arcano",
+            "min": 15,
+            "max": 20,
+            "scales_with": "for"
+          },
+          "display_name": "Cajado de Aprendiz",
+          "class_req": [
+            "mago"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:17:29.016011+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 82,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "6f172212-c161-4c7c-b9aa-0bda1f31863e",
+        "item": {
+          "uuid": "b589cc6d-a949-41c6-9e14-7a0845953a3a",
+          "base_id": "arco_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dano_corte": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 14,
+            "max": 19,
+            "scales_with": "for"
+          },
+          "display_name": "Arco de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:17:46.891581+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 83,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "31036729-b5ee-48b5-a0cc-83aa91870e4a",
+        "item": {
+          "uuid": "e87c1733-63a0-4418-aee2-e844658076f2",
+          "base_id": "machado_rustico_berserker",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dano_corte": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 10,
+            "max": 22,
+            "scales_with": "for"
+          },
+          "display_name": "Machado Rústico do Berserker",
+          "class_req": [
+            "berserker"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:18:20.889156+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 84,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "4dbe5aeb-733b-466f-968c-f469e5ac5946",
+        "item": {
+          "uuid": "14227d53-e4a4-4682-badf-b7b07654f47c",
+          "base_id": "adaga_sorrateira_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 16,
+            "max": 18,
+            "scales_with": "for"
+          },
+          "display_name": "Adaga Sorrateira",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:18:44.868099+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 85,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "e87ae975-89a4-420a-af8c-2883270c1a35",
+        "item": {
+          "uuid": "c1dc0281-964e-41f7-b152-1a9661026476",
+          "base_id": "adaga_sorrateira_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 16,
+            "max": 18,
+            "scales_with": "bushido"
+          },
+          "display_name": "Adaga Sorrateira",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:18:59.989464+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 86,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "c7c2d700-732a-4e76-b708-c6f78d7c6025",
+        "item": {
+          "uuid": "955c59ba-80da-400d-88c8-da57c78ed642",
+          "base_id": "manoplas_iniciado_monge",
+          "rarity": "raro",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "luck": {
+              "value": 1,
+              "source": "affix"
+            },
+            "initiative": {
+              "value": 1,
+              "source": "affix"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "esmagamento",
+            "min": 13,
+            "max": 17,
+            "scales_with": "bushido"
+          },
+          "display_name": "Manoplas de Iniciado",
+          "class_req": [
+            "monge"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:19:27.262376+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 87,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "6e185ca1-8527-41d5-9801-584650fd5e65",
+        "item": {
+          "uuid": "4de4ddd1-c5a4-43b9-a8c4-d14d4c96abad",
+          "base_id": "alaude_simples_bardo",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "carisma": {
+              "value": 1,
+              "source": "affix"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "sonico",
+            "min": 10,
+            "max": 15,
+            "scales_with": "bushido"
+          },
+          "display_name": "Alaúde Simples do Bardo",
+          "class_req": [
+            "bardo"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:19:58.305580+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 88,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "c1fbe791-00d9-4963-b82c-08b85618df92",
+        "item": {
+          "uuid": "09e2e954-4f49-4631-9e04-53c2e10c904a",
+          "base_id": "espada_ferro_guerreiro",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dmg": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 12,
+            "max": 18,
+            "scales_with": "forca"
+          },
+          "display_name": "Espada de Ferro do Guerreiro",
+          "class_req": [
+            "guerreiro"
+          ]
+        }
+      },
+      "unit_price": 50,
+      "quantity": 1,
+      "created_at": "2025-09-02T03:20:10.054373+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 89,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "542a8cc0-d826-4034-a097-6b6f2337a1a1",
+        "item": {
+          "uuid": "d2664d16-a8af-4955-9df6-8deb692a3611",
+          "base_id": "cajado_aprendiz_mago",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "inteligencia": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "arcano",
+            "min": 15,
+            "max": 20,
+            "scales_with": "inteligencia"
+          },
+          "display_name": "Cajado de Aprendiz",
+          "class_req": [
+            "mago"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:20:37.035346+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 90,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "c1fbe791-00d9-4963-b82c-08b85618df92",
+        "item": {
+          "uuid": "09e2e954-4f49-4631-9e04-53c2e10c904a",
+          "base_id": "espada_ferro_guerreiro",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dmg": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 12,
+            "max": 18,
+            "scales_with": "forca"
+          },
+          "display_name": "Espada de Ferro do Guerreiro",
+          "class_req": [
+            "guerreiro"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:21:15.548594+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 91,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "7221712b-fd51-4d5c-b4b6-bd8195e06755",
+        "item": {
+          "uuid": "b32c48ea-e1eb-4435-8f52-eb7d73309c08",
+          "base_id": "machado_rustico_berserker",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "furia": {
+              "value": 1,
+              "source": "primary"
+            },
+            "luck": {
+              "value": 1,
+              "source": "affix"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 10,
+            "max": 22,
+            "scales_with": "furia"
+          },
+          "display_name": "Machado Rústico do Berserker",
+          "class_req": [
+            "berserker"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:21:36.720008+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 92,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "d9523e03-2cb4-4ee1-b0c9-77e08881a09b",
+        "item": {
+          "uuid": "361d6bbd-40aa-47ca-9f1d-965128780b3b",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "bushido"
+          },
+          "display_name": "Katana Laminada",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 1,
+      "created_at": "2025-09-02T03:21:49.682593+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 93,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "d9523e03-2cb4-4ee1-b0c9-77e08881a09b",
+        "item": {
+          "uuid": "361d6bbd-40aa-47ca-9f1d-965128780b3b",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "bushido"
+          },
+          "display_name": "Katana Laminada",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:22:15.014005+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 94,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "d38fecfe-5072-4662-8cf4-b5b9ed4bdd49",
+        "item": {
+          "uuid": "1547c860-e2f7-4080-ae6c-607d7b092adc",
+          "base_id": "cajado_aprendiz_mago",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "inteligencia": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "arcano",
+            "min": 15,
+            "max": 20,
+            "scales_with": "inteligencia"
+          },
+          "display_name": "Cajado de Aprendiz",
+          "class_req": [
+            "mago"
+          ]
+        }
+      },
+      "unit_price": 501,
+      "quantity": 0,
+      "created_at": "2025-09-02T03:22:52.720543+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 95,
+      "seller_id": 6444735164,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 320,
+      "quantity": 0,
+      "created_at": "2025-09-02T12:26:12.952852+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 96,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "c9575c63-9f88-42b3-bf87-8b315fe939bd",
+        "item": {
+          "uuid": "59a7f728-f37c-412c-9812-29fb1fb581e0",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-03T11:34:28.953363+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 97,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "c9699de4-05e9-4b13-86fe-ee52026f8e80",
+        "item": {
+          "uuid": "8eb2b3e6-659f-43e0-a8c0-f58fc7ae8db4",
+          "base_id": "adaga_sorrateira_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "letalidade": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 16,
+            "max": 18,
+            "scales_with": "letalidade"
+          },
+          "display_name": "Adaga Sorrateira",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1200,
+      "quantity": 0,
+      "created_at": "2025-09-03T16:40:14.522648+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 98,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "2042976c-5f79-4efe-83b3-54c8c112e788",
+        "item": {
+          "uuid": "dad5db95-0233-48d4-b673-e9efbe7bd19a",
+          "base_id": "cajado_aprendiz_mago",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "inteligencia": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "arcano",
+            "min": 15,
+            "max": 20,
+            "scales_with": "inteligencia"
+          },
+          "display_name": "Cajado de Aprendiz",
+          "class_req": [
+            "mago"
+          ]
+        }
+      },
+      "unit_price": 1250,
+      "quantity": 0,
+      "created_at": "2025-09-03T17:50:41.170913+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 99,
+      "seller_id": 6444735164,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-03T18:09:31.443055+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 100,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 420
+      },
+      "unit_price": 110,
+      "quantity": 0,
+      "created_at": "2025-09-03T21:04:52.562736+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 101,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "ad6bb3eb-07e7-4fac-81d7-eed126c81b97",
+        "item": {
+          "uuid": "b3b3e362-496c-4a80-b1c3-ed6d5ac333f6",
+          "base_id": "colar_laminado_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar Laminado",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-04T10:15:10.678156+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 102,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "4bdf2587-890e-4ecc-8f55-edf238fe69e0",
+        "item": {
+          "uuid": "f2ee0ead-2f63-4371-9f3d-e7db8085e651",
+          "base_id": "colar_iniciado_monge",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar de Iniciado",
+          "class_req": [
+            "monge"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-04T10:15:57.954468+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 103,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "490a4a0b-29be-4fcd-ae73-8311d48557a6",
+        "item": {
+          "uuid": "80e357e1-b3dc-4d55-b82e-e24409715840",
+          "base_id": "anel_laminado_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Laminado",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-04T10:17:23.021533+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 104,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "a23ed0dc-8aff-4188-a571-9da1c91da400",
+        "item": {
+          "uuid": "90942c95-97e8-41d3-a203-d160b5a87d02",
+          "base_id": "anel_ferro_guerreiro",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel de Ferro do Guerreiro",
+          "class_req": [
+            "guerreiro"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-04T10:18:30.694831+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 105,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "07f45ade-0e29-4a1f-a1b2-bb4c84af72a0",
+        "item": {
+          "uuid": "4a39cf95-8794-4b7b-a98c-e3fac36398f9",
+          "base_id": "anel_iniciado_monge",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel de Iniciado",
+          "class_req": [
+            "monge"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-04T10:19:26.599632+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 106,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "ectoplasma",
+        "qty": 10
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-04T19:35:34.342557+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 107,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 10
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-04T19:36:21.510194+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 108,
+      "seller_id": 6444735164,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 110,
+      "quantity": 0,
+      "created_at": "2025-09-04T23:54:58.982083+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 109,
+      "seller_id": 6444735164,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 110,
+      "quantity": 0,
+      "created_at": "2025-09-04T23:55:36.726242+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 110,
+      "seller_id": 6444735164,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 110,
+      "quantity": 0,
+      "created_at": "2025-09-04T23:56:56.319320+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 111,
+      "seller_id": 6444735164,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 110,
+      "quantity": 0,
+      "created_at": "2025-09-04T23:58:23.849577+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 112,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "be7d4d98-864e-45bf-b758-c5eb368d425e",
+        "item": {
+          "uuid": "ad547fd2-364a-407e-b6b0-ff8c8ec661e1",
+          "base_id": "brinco_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Brinco de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-05T09:28:42.818784+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 113,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "afe6c9ce-91f9-4a0d-b6cb-118b718e6e6f",
+        "item": {
+          "uuid": "a1695080-d609-4cfa-8d86-4ecaaf41fbf4",
+          "base_id": "brinco_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Brinco Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1050,
+      "quantity": 0,
+      "created_at": "2025-09-05T09:29:32.941205+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 114,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 18
+      },
+      "unit_price": 200,
+      "quantity": 0,
+      "created_at": "2025-09-06T00:22:35.981029+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 115,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 32
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-10T23:22:01.764824+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 116,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 19
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-10T23:22:18.662995+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 117,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 11
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-10T23:22:36.208872+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 118,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 1
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-10T23:34:12.962254+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 119,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 2
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-10T23:34:41.043291+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 120,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "d21ea3e9-cb68-41bb-b7e8-b2e7c80702d1",
+        "item": {
+          "uuid": "bd81d818-6a9d-40bd-a05d-b97036a89d33",
+          "base_id": "anel_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-10T23:39:45.249114+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 121,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "f8bd16e8-9f73-4dec-94da-52d90e00ca74",
+        "item": {
+          "uuid": "2c9f6eb8-dbb0-4565-85ec-921efcdab77b",
+          "base_id": "brinco_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Brinco de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-10T23:40:33.031288+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 122,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 10
+      },
+      "unit_price": 140,
+      "quantity": 1,
+      "created_at": "2025-09-11T01:43:52.228809+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 123,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "98511b3c-3103-4f2e-a477-da8ca52ff378",
+        "item": {
+          "uuid": "7ad63604-3971-4667-ab57-a877039b797d",
+          "base_id": "anel_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-11T08:45:32.444091+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 124,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 10
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-13T01:34:13.722713+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 125,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 10
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-13T01:35:12.562300+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 126,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 10
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-13T01:39:17.831795+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 127,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "ac9d92c9-1621-4b41-a541-7d18f81f0fdf",
+        "item": {
+          "uuid": "26dca38b-e63a-4deb-8754-08fb32f183f5",
+          "base_id": "brinco_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Brinco de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-13T12:29:16.526562+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 128,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "unique",
+        "uid": "ece015eb-797f-4235-bb46-7e5b39869172",
+        "item": {
+          "uuid": "6da68614-0f5c-4e5b-962c-6e18ea16668f",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-13T18:33:06.051264+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 129,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "unique",
+        "uid": "ad6bb3eb-07e7-4fac-81d7-eed126c81b97",
+        "item": {
+          "uuid": "b3b3e362-496c-4a80-b1c3-ed6d5ac333f6",
+          "base_id": "colar_laminado_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar Laminado",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-13T18:33:53.517897+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 130,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "d9aa7b40-c7ee-4fa9-abf0-9977469ffd89",
+        "item": {
+          "uuid": "a482bf3d-87f4-4e97-95e6-5977db714e9f",
+          "base_id": "colar_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1100,
+      "quantity": 0,
+      "created_at": "2025-09-13T18:49:33.552414+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 131,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 10
+      },
+      "unit_price": 500,
+      "quantity": 0,
+      "created_at": "2025-09-13T19:08:16.381286+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 132,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 10
+      },
+      "unit_price": 500,
+      "quantity": 0,
+      "created_at": "2025-09-13T19:08:59.923905+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 133,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 10
+      },
+      "unit_price": 500,
+      "quantity": 0,
+      "created_at": "2025-09-13T23:57:21.608075+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 134,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "002d2e15-764e-45ad-8f4b-a1b2e31ab9e2",
+        "item": {
+          "uuid": "535dd78d-3d64-48ba-8275-d74eb9d93e59",
+          "base_id": "espada_ferro_guerreiro",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "dmg": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 12,
+            "max": 18,
+            "scales_with": "forca"
+          },
+          "display_name": "Espada de Ferro do Guerreiro",
+          "class_req": [
+            "guerreiro"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-14T00:38:36.951467+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 135,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "082883db-1149-4203-949f-5b1e009c2e51",
+        "item": {
+          "uuid": "e83c0234-65ae-4087-8147-51231cf2912c",
+          "base_id": "colar_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-15T11:53:32.861611+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 136,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "3013f2b5-fec9-47fe-9108-63000bd43ef6",
+        "item": {
+          "uuid": "7990cf80-e297-4f3a-807d-cb8dd17676c1",
+          "base_id": "anel_sorrateiro_assassino",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            },
+            "initiative": {
+              "value": 1,
+              "source": "affix"
+            }
+          },
+          "display_name": "Anel Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1500,
+      "quantity": 0,
+      "created_at": "2025-09-15T11:54:44.243511+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 137,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "8b0235de-1568-4e26-9291-70735c29953e",
+        "item": {
+          "uuid": "f6487636-2655-4cf9-9250-ad48d157e156",
+          "base_id": "arco_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "precisao": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 14,
+            "max": 19,
+            "scales_with": "precisao"
+          },
+          "display_name": "Arco de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1010,
+      "quantity": 0,
+      "created_at": "2025-09-15T16:30:22.561968+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 138,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "f6281a18-8a1f-4fd9-b04a-7481d75cf71b",
+        "item": {
+          "uuid": "055b7081-f3af-4dfc-bc67-8500dd67d266",
+          "base_id": "adaga_sorrateira_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "letalidade": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 16,
+            "max": 18,
+            "scales_with": "letalidade"
+          },
+          "display_name": "Adaga Sorrateira",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1050,
+      "quantity": 0,
+      "created_at": "2025-09-15T16:38:51.854240+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 139,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "1519e28c-95c4-4734-8755-bd4342cdf284",
+        "item": {
+          "uuid": "f042c28d-fa71-4e9e-bfd4-d5d74a460315",
+          "base_id": "anel_osso_berserker",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Anel de Osso do Berserker",
+          "class_req": [
+            "berserker"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-15T17:36:08.371045+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 140,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "b5dd5480-706e-4b90-811f-3be237c7b129",
+        "item": {
+          "uuid": "3d1af096-8ce2-4c33-be18-939fbbf347da",
+          "base_id": "brinco_osso_berserker",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Brinco de Osso do Berserker",
+          "class_req": [
+            "berserker"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-15T17:36:50.910160+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 141,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 5
+      },
+      "unit_price": 50,
+      "quantity": 0,
+      "created_at": "2025-09-15T17:38:33.523837+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 142,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 13
+      },
+      "unit_price": 130,
+      "quantity": 0,
+      "created_at": "2025-09-15T17:39:15.395622+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 143,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 22
+      },
+      "unit_price": 1010,
+      "quantity": 0,
+      "created_at": "2025-09-15T17:45:50.409721+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 144,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "76564774-ab76-4536-a159-3d60d2561697",
+        "item": {
+          "uuid": "7843169b-f721-42b8-9ebd-4ccbbab29458",
+          "base_id": "colar_presas_berserker",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar de Presas do Berserker",
+          "class_req": [
+            "berserker"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-15T17:51:19.615489+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 145,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "b78ef85d-455c-4d50-b2d4-e862605be789",
+        "item": {
+          "uuid": "024dc1fa-b4d3-4588-9bb2-7f999117535c",
+          "base_id": "machado_rustico_berserker",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "furia": {
+              "value": 1,
+              "source": "primary"
+            },
+            "defense": {
+              "value": 1,
+              "source": "affix"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 10,
+            "max": 22,
+            "scales_with": "furia"
+          },
+          "display_name": "Machado Rústico do Berserker",
+          "class_req": [
+            "berserker"
+          ]
+        }
+      },
+      "unit_price": 3050,
+      "quantity": 0,
+      "created_at": "2025-09-15T18:40:13.719171+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 146,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 4
+      },
+      "unit_price": 120,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:26:49.493825+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 147,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "ectoplasma",
+        "qty": 52
+      },
+      "unit_price": 780,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:33:38.329702+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 148,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 42
+      },
+      "unit_price": 630,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:34:23.442678+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 149,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 26
+      },
+      "unit_price": 390,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:35:03.207828+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 150,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira_rara",
+        "qty": 19
+      },
+      "unit_price": 350,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:35:46.900854+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 151,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 29
+      },
+      "unit_price": 430,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:36:26.873673+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 152,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "essencia_de_fogo",
+        "qty": 2
+      },
+      "unit_price": 40,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:37:00.308671+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 153,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 2
+      },
+      "unit_price": 20,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:37:18.130782+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 154,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "dente_afiado",
+        "qty": 5
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-15T19:52:09.714971+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 155,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "82ac35c5-2e35-4818-b2fa-8bb90d11f9ba",
+        "item": {
+          "uuid": "f7f087e8-5efb-4ee2-91f8-44ab2923cdb4",
+          "base_id": "brinco_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Brinco Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-16T19:33:03.963391+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 156,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "297c75b4-1d26-4076-86b2-d4759604502d",
+        "item": {
+          "uuid": "48d42a8e-6447-4764-992c-51285299702d",
+          "base_id": "colar_sorrateiro_assassino",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar Sorrateiro",
+          "class_req": [
+            "assassino"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-16T19:33:47.952468+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 157,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 10
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-16T20:55:37.503231+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 158,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 6
+      },
+      "unit_price": 60,
+      "quantity": 0,
+      "created_at": "2025-09-16T20:56:11.143458+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 159,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-16T21:17:32.586623+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 160,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-17T11:52:22.700867+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 161,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 10,
+      "quantity": 1,
+      "created_at": "2025-09-17T11:52:59.265629+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 162,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-17T11:53:48.311882+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 163,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 10
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-17T11:54:19.562540+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 164,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "gema_bruta",
+        "qty": 130
+      },
+      "unit_price": 70,
+      "quantity": 1,
+      "created_at": "2025-09-18T10:52:57.470219+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 165,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "gema_bruta",
+        "qty": 130
+      },
+      "unit_price": 2210,
+      "quantity": 0,
+      "created_at": "2025-09-18T10:54:40.247554+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 166,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "asa_de_morcego",
+        "qty": 10
+      },
+      "unit_price": 310,
+      "quantity": 0,
+      "created_at": "2025-09-18T10:55:56.785962+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 167,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 10
+      },
+      "unit_price": 310,
+      "quantity": 0,
+      "created_at": "2025-09-18T11:00:17.415210+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 168,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 10
+      },
+      "unit_price": 310,
+      "quantity": 0,
+      "created_at": "2025-09-18T11:00:48.463578+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 169,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 10
+      },
+      "unit_price": 310,
+      "quantity": 0,
+      "created_at": "2025-09-18T11:01:08.393940+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 170,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 2
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-18T19:32:49.110900+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 171,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "gema_bruta",
+        "qty": 2
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-18T19:55:34.152071+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 172,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 8
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-18T19:55:52.054432+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 173,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 15
+      },
+      "unit_price": 550,
+      "quantity": 0,
+      "created_at": "2025-09-18T23:27:45.652920+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 174,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 12
+      },
+      "unit_price": 550,
+      "quantity": 0,
+      "created_at": "2025-09-18T23:28:22.080099+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 175,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 9
+      },
+      "unit_price": 180,
+      "quantity": 0,
+      "created_at": "2025-09-19T10:16:57.641667+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 176,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "esporo_de_cogumelo",
+        "qty": 37
+      },
+      "unit_price": 370,
+      "quantity": 0,
+      "created_at": "2025-09-19T10:18:01.953741+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 177,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "ectoplasma",
+        "qty": 23
+      },
+      "unit_price": 10,
+      "quantity": 1,
+      "created_at": "2025-09-19T10:18:24.401072+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 178,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "ferro",
+        "qty": 157
+      },
+      "unit_price": 3500,
+      "quantity": 0,
+      "created_at": "2025-09-19T11:13:08.737499+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 179,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "9cfd677a-0a93-47a9-9305-fb5bd3467d1d",
+        "item": {
+          "uuid": "40e456d7-6d10-4be2-80a9-3d566ff8d23b",
+          "base_id": "arco_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "precisao": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 14,
+            "max": 19,
+            "scales_with": "precisao"
+          },
+          "display_name": "Arco de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1050,
+      "quantity": 0,
+      "created_at": "2025-09-20T02:22:24.722540+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 180,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 13
+      },
+      "unit_price": 200,
+      "quantity": 0,
+      "created_at": "2025-09-20T13:53:37.596655+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 181,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira_rara",
+        "qty": 1
+      },
+      "unit_price": 40,
+      "quantity": 0,
+      "created_at": "2025-09-20T18:52:56.862515+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 182,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "asa_de_morcego",
+        "qty": 10
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-20T18:53:35.561222+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 183,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "pedreira_granito",
+        "qty": 3
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-20T18:54:03.949733+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 184,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "asa_de_morcego",
+        "qty": 1
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-20T19:24:30.209207+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 185,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "asa_de_morcego",
+        "qty": 1
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-20T19:24:56.364180+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 186,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 1
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-20T19:25:17.139922+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 187,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "pedra",
+        "qty": 1
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-20T19:26:03.069882+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 188,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "ectoplasma",
+        "qty": 1
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-20T19:26:35.677877+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 189,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 7
+      },
+      "unit_price": 140,
+      "quantity": 0,
+      "created_at": "2025-09-21T20:56:00.352628+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 190,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 12
+      },
+      "unit_price": 120,
+      "quantity": 0,
+      "created_at": "2025-09-21T20:56:20.312407+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 191,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "stack",
+        "base_id": "gema_bruta",
+        "qty": 7
+      },
+      "unit_price": 210,
+      "quantity": 0,
+      "created_at": "2025-09-21T20:56:37.423001+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 192,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "presa_de_javali",
+        "qty": 21
+      },
+      "unit_price": 500,
+      "quantity": 0,
+      "created_at": "2025-09-23T17:44:07.172625+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 193,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "5a1c9eed-0d3f-4924-aede-9ad54e042abe",
+        "item": {
+          "uuid": "3d733ccc-a055-4d43-a45f-39e34895b6ca",
+          "base_id": "colar_presas_berserker",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar de Presas do Berserker",
+          "class_req": [
+            "berserker"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-23T17:51:47.375129+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 194,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "unique",
+        "uid": "120e89fb-9617-404f-bce7-3624cf789aba",
+        "item": {
+          "uuid": "cef6b6d8-6e6a-483a-8615-198335761461",
+          "base_id": "botas_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Botas de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 750,
+      "quantity": 1,
+      "created_at": "2025-09-23T18:59:47.207992+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 195,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "unique",
+        "uid": "120e89fb-9617-404f-bce7-3624cf789aba",
+        "item": {
+          "uuid": "cef6b6d8-6e6a-483a-8615-198335761461",
+          "base_id": "botas_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Botas de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 450,
+      "quantity": 1,
+      "created_at": "2025-09-23T19:00:21.294107+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 196,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "unique",
+        "uid": "120e89fb-9617-404f-bce7-3624cf789aba",
+        "item": {
+          "uuid": "cef6b6d8-6e6a-483a-8615-198335761461",
+          "base_id": "botas_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Botas de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1050,
+      "quantity": 0,
+      "created_at": "2025-09-23T19:00:56.249011+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 197,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "unique",
+        "uid": "7edcd1ee-40d5-4040-acd1-8a4499e0ad11",
+        "item": {
+          "uuid": "640b0406-8c2a-401c-8957-792f5293a9d1",
+          "base_id": "luvas_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Luvas de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1050,
+      "quantity": 0,
+      "created_at": "2025-09-23T19:01:30.711807+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 198,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "unique",
+        "uid": "0fee54cd-fe7b-47c7-b5d7-0f85ff29b69f",
+        "item": {
+          "uuid": "9d8f52ea-4340-45bb-8add-dc1e3bc42bbb",
+          "base_id": "capuz_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Capuz de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1050,
+      "quantity": 0,
+      "created_at": "2025-09-23T19:02:03.359648+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 199,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 10
+      },
+      "unit_price": 410,
+      "quantity": 0,
+      "created_at": "2025-09-23T20:27:14.843179+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 200,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 57
+      },
+      "unit_price": 2290,
+      "quantity": 1,
+      "created_at": "2025-09-23T20:29:46.051784+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 201,
+      "seller_id": 7264285511,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_curtido",
+        "qty": 11
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-24T02:32:31.664431+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 202,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "bc7833f7-da5f-41fc-9000-9af020c18061",
+        "item": {
+          "uuid": "b14156a3-096b-4f51-ac30-e51b5a9e68d6",
+          "base_id": "brinco_ferro_guerreiro",
+          "rarity": "bom",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            },
+            "luck": {
+              "value": 1,
+              "source": "affix"
+            }
+          },
+          "display_name": "Brinco de Ferro do Guerreiro",
+          "class_req": [
+            "guerreiro"
+          ]
+        }
+      },
+      "unit_price": 5000,
+      "quantity": 0,
+      "created_at": "2025-09-24T11:47:20.308303+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 203,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "287bb9f8-c5fb-4eb6-92ad-88ce71226031",
+        "item": {
+          "uuid": "0c5e30b1-354f-4119-a97d-05eb7ed9b91a",
+          "base_id": "colar_ferro_guerreiro",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Colar de Ferro do Guerreiro",
+          "class_req": [
+            "guerreiro"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-24T12:05:37.161336+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 204,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 7
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-24T14:25:06.044787+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 205,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "unique",
+        "uid": "e99642b1-1a31-48e9-b4d7-836f0942ff42",
+        "item": {
+          "uuid": "12f38c66-03ca-46fc-9cde-6578fee13689",
+          "base_id": "calcas_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Calças de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1050,
+      "quantity": 0,
+      "created_at": "2025-09-24T15:09:37.609573+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 206,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "30ce9585-38db-44f6-bc70-dbd835708985",
+        "item": {
+          "uuid": "c1f60894-6bdd-4100-8156-c504b1863b32",
+          "base_id": "arco_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "precisao": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "perfurante",
+            "min": 14,
+            "max": 19,
+            "scales_with": "precisao"
+          },
+          "display_name": "Arco de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1000,
+      "quantity": 0,
+      "created_at": "2025-09-24T19:55:44.114016+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 207,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 4
+      },
+      "unit_price": 200,
+      "quantity": 0,
+      "created_at": "2025-09-24T20:41:37.624605+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 208,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "gema_bruta",
+        "qty": 2
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-24T20:41:58.791351+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 209,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 3
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-24T20:42:41.421004+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 210,
+      "seller_id": 7264285511,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_curtido",
+        "qty": 7
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-24T20:58:46.063544+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 211,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "unique",
+        "uid": "6de2d640-e511-41c9-8cd4-f871ec7852b7",
+        "item": {
+          "uuid": "36945976-7380-425c-b71b-ee54faa4894a",
+          "base_id": "calcas_batedor_cacador",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 1,
+              "source": "primary"
+            }
+          },
+          "display_name": "Calças de Batedor",
+          "class_req": [
+            "cacador"
+          ]
+        }
+      },
+      "unit_price": 1073,
+      "quantity": 0,
+      "created_at": "2025-09-24T21:32:11.211317+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 212,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 8
+      },
+      "unit_price": 400,
+      "quantity": 0,
+      "created_at": "2025-09-24T22:14:41.636307+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 213,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 3
+      },
+      "unit_price": 150,
+      "quantity": 0,
+      "created_at": "2025-09-24T22:15:13.533029+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 214,
+      "seller_id": 7264285511,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 4
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-25T10:29:17.203958+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 215,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_de_lobo",
+        "qty": 5
+      },
+      "unit_price": 125,
+      "quantity": 0,
+      "created_at": "2025-09-25T12:24:49.032906+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 216,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "pano_simples",
+        "qty": 2
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-09-25T12:26:20.550011+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 217,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "gema_bruta",
+        "qty": 6
+      },
+      "unit_price": 130,
+      "quantity": 0,
+      "created_at": "2025-09-25T12:31:07.876589+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 218,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "fio_de_prata",
+        "qty": 1
+      },
+      "unit_price": 20,
+      "quantity": 0,
+      "created_at": "2025-09-25T12:31:29.895200+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 219,
+      "seller_id": 1160420540,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 3
+      },
+      "unit_price": 60,
+      "quantity": 0,
+      "created_at": "2025-09-25T12:32:06.378300+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 220,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "unique",
+        "uid": "2531379a-80ea-4211-a882-494ae97df96e",
+        "item": {
+          "uuid": "1cfb52ed-7ec1-4eb3-9998-f7205001aa2b",
+          "base_id": "anel_ferro_guerreiro",
+          "rarity": "raro",
+          "upgrade_level": 8,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "hp": {
+              "value": 8,
+              "source": "primary"
+            },
+            "initiative": {
+              "value": 8,
+              "source": "affix"
+            },
+            "defense": {
+              "value": 8,
+              "source": "affix"
+            }
+          },
+          "display_name": "Anel de Ferro do Guerreiro",
+          "class_req": [
+            "guerreiro"
+          ],
+          "enh_failstacks": 0.0
+        }
+      },
+      "unit_price": 8800,
+      "quantity": 0,
+      "created_at": "2025-09-26T08:27:00.038875+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 221,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 10
+      },
+      "unit_price": 500,
+      "quantity": 0,
+      "created_at": "2025-09-26T08:28:31.210041+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 222,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_curtido",
+        "qty": 10
+      },
+      "unit_price": 500,
+      "quantity": 0,
+      "created_at": "2025-09-26T08:33:04.225594+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 223,
+      "seller_id": 6499640658,
+      "item": {
+        "type": "stack",
+        "base_id": "couro_curtido",
+        "qty": 5
+      },
+      "unit_price": 250,
+      "quantity": 0,
+      "created_at": "2025-09-26T08:34:10.800343+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 224,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 2
+      },
+      "unit_price": 100,
+      "quantity": 0,
+      "created_at": "2025-09-26T08:35:14.029848+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 225,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_Ferro",
+        "qty": 300
+      },
+      "unit_price": 1,
+      "quantity": 0,
+      "created_at": "2025-09-26T16:24:54.358137+00:00",
+      "region_key": null,
+      "active": false
+    }
+  ]
+}
