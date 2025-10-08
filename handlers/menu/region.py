@@ -7,6 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
 from modules import player_manager, game_data
+from modules.player.premium import PremiumManager
 
 # 🔎 Mídias (mapa/regiões). Suporta tanto file_id_manager quanto file_ids.
 try:
@@ -39,19 +40,18 @@ def _humanize_duration(seconds: int) -> str:
         return f"{mins} min"
     return f"{seconds} s"
 
+def _default_travel_seconds() -> int:
+    return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 600))
 
-def _get_travel_time_seconds(cur_key: str, dest_key: str, player: dict) -> int:
-    """
-    Regra:
-      - Premium → 0s (instantâneo)
-      - Free    → 600s (10min)
-    """
-    try:
-        if player_manager.is_player_premium(player):
-            return 0
-    except Exception:
-        pass
-    return 600
+def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
+    """Calcula o tempo de viagem já aplicando o perk do jogador."""
+    dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
+    base = int(dest_info.get("travel_time_seconds", _default_travel_seconds()))
+    
+    premium = PremiumManager(player_data)
+    mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
+    
+    return max(0, int(round(base * mult)))
 
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
@@ -169,15 +169,15 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
     print(">>> RASTREAMENTO: Entrou em send_region_menu")
     player_data = player_manager.get_player_data(user_id) or {}
     
-    # --- LÓGICA CORRIGIDA PARA DETERMINAR A REGIÃO ---
+    # --- LÓGICA PARA DETERMINAR A REGIÃO ---
     final_region_key = region_key
     if not final_region_key:
         final_region_key = player_data.get("current_location", "reino_eldora")
     player_data['current_location'] = final_region_key
-    # ---------------------------------------------------
-
+    
     region_info = (game_data.REGIONS_DATA or {}).get(final_region_key)
 
+    # --- Fallback para o Reino ---
     if not region_info or final_region_key == "reino_eldora":
         if show_kingdom_menu:
             fake_update = Update(
@@ -192,15 +192,22 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             await context.bot.send_message(chat_id=chat_id, text="Você está no Reino de Eldora.", parse_mode="HTML")
         return
 
+    # ======================================================
+    # --- INÍCIO DA CORREÇÃO ---
+    # 1. Instanciamos o PremiumManager uma vez para otimizar as chamadas de perks.
+    # ======================================================
+    premium = PremiumManager(player_data)
+
+    # --- Cálculos de Status ---
     total_stats = player_manager.get_player_total_stats(player_data)
     current_hp = int(player_data.get("current_hp", 0))
     max_hp = int(total_stats.get("max_hp", 0))
     current_energy = int(player_data.get("energy", 0))
-    max_energy = int(player_manager.get_player_max_energy(player_data))
+    max_energy = int(player_manager.get_player_max_energy(player_data)) # Esta função já usa o perk corretamente
 
     status_footer = (
         f"\n\n═════════════ ◆◈◆ ══════════════\n"
-        f"❤️ 𝐇𝐏: {current_hp}/{max_hp}    "
+        f"❤️ 𝐇𝐏: {current_hp}/{max_hp}      "
         f"⚡️ 𝐄𝐧𝐞𝐫𝐠𝐢𝐚: {current_energy}/{max_energy}"
     )
 
@@ -209,10 +216,10 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         f"O que deseja fazer?{status_footer}"
     )
 
+    # --- Montagem do Teclado ---
     keyboard = []
     keyboard.append([InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫 𝐌𝐨𝐧𝐬𝐭𝐫𝐨𝐬 ⚔️", callback_data=f"hunt_{final_region_key}")])
 
-    # Tenta usar uma função global para criar o botão, se não existir, cria um padrão.
     try:
         if build_region_dungeon_button:
             keyboard.append([build_region_dungeon_button(final_region_key)])
@@ -240,11 +247,18 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             profession_emoji = profession_info.get("emoji", "✋")
             
             base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-            speed_mult = float(player_manager.get_player_perk_value(player_data, "gather_speed_multiplier", 1.0))
+            
+            # ======================================================
+            # 2. CORREÇÃO: Usando o PremiumManager para buscar o perk de velocidade
+            # ======================================================
+            speed_mult = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
             duration_seconds = max(1, int(base_secs / speed_mult))
             human_time = _humanize_duration(duration_seconds)
 
-            energy_cost = int(player_manager.get_player_perk_value(player_data, "gather_energy_cost", 1))
+            # ======================================================
+            # 3. CORREÇÃO: Usando o PremiumManager para buscar o perk de custo de energia
+            # ======================================================
+            energy_cost = int(premium.get_perk_value("gather_energy_cost", 1))
             cost_txt = "grátis" if energy_cost == 0 else f"-{energy_cost} ⚡️"
 
             keyboard.append([InlineKeyboardButton(
@@ -255,11 +269,10 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
     keyboard.append([InlineKeyboardButton("🗺️ 𝕍𝕖𝕣 𝕄𝕒𝕡𝕒 🗺️", callback_data="travel")])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # --- LÓGICA DE ENVIO COM FALLBACK (PLANO B) ---
+    # --- Lógica de Envio com Fallback ---
     file_id_key = f"regiao_{final_region_key}"
     fd = media_ids.get_file_data(file_id_key) if media_ids and hasattr(media_ids, "get_file_data") else None
 
-    # Tenta enviar com mídia primeiro
     if fd and fd.get("id"):
         try:
             media_type = (fd.get("type") or "photo").lower()
@@ -273,17 +286,17 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
                     chat_id=chat_id, photo=fd["id"],
                     caption=caption, reply_markup=reply_markup, parse_mode="HTML"
                 )
-            return  # Sucesso, termina a função aqui.
+            return
         except BadRequest as e:
             logging.warning(f"Falha ao enviar mídia para '{final_region_key}' (ID: {fd['id']}). Erro: {e}. Usando fallback de texto.")
         except Exception as e:
             logging.error(f"Erro inesperado ao enviar mídia para '{final_region_key}': {e}. Usando fallback de texto.")
 
-    # PLANO B: Se não houver 'fd' ou se o envio da mídia falhar, envia só a mensagem de texto.
     await context.bot.send_message(
         chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML"
     )
-# =============================================================================
+    
+    # =============================================================================
 # Validação da viagem e início do cronômetro
 # =============================================================================
 def _is_neighbor(world_map: dict, cur: str, dest: str) -> bool:
@@ -311,9 +324,6 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = q.from_user.id
     chat_id = q.message.chat.id
 
-    # Esta função agora não é mais necessária aqui, pois a watchdog em jobs.py lida com isso.
-    # await _auto_finalize_travel_if_due(context, user_id)
-
     data = (q.data or "")
     if not data.startswith("region_"):
         await q.answer("Destino inválido.", show_alert=True)
@@ -331,21 +341,23 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Você não pode viajar direto para lá.", show_alert=True)
         return
 
-    # custo de energia
+    # Custo de energia
     travel_cost = int(((game_data.REGIONS_DATA or {}).get(dest_key, {}) or {}).get("travel_cost", 0))
     energy = int(player.get("energy", 0))
     if travel_cost > 0 and energy < travel_cost:
         await q.answer("Energia insuficiente para viajar.", show_alert=True)
         return
 
-    secs = _get_travel_time_seconds(cur, dest_key, player)
+    # 1. A chamada para a função de tempo de viagem está correta,
+    #    assumindo que _get_travel_time_seconds já foi corrigida para usar o PremiumManager.
+    secs = _get_travel_time_seconds(player, dest_key)
 
-    # debita energia
+    # Debita energia
     if travel_cost > 0:
         player["energy"] = max(0, energy - travel_cost)
 
+    # 2. Lógica de teleporte instantâneo (seu código já estava perfeito)
     if secs <= 0:
-        # teleporte instantâneo
         player["current_location"] = dest_key
         player["player_state"] = {"action": "idle"}
         player_manager.save_player_data(user_id, player)
@@ -356,10 +368,7 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_region_menu(context, user_id, chat_id)
         return
 
-    # =========================================================
-    # 👇 INÍCIO DA CORREÇÃO PARA O BUG DA VIAGEM 👇
-    # =========================================================
-    # Agora salvamos o estado no formato que a watchdog entende.
+    # 3. CORREÇÃO: O estado do jogador é salvo no formato padronizado
     finish_time = datetime.now(timezone.utc) + timedelta(seconds=secs)
     player["player_state"] = {
         "action": "travel",
@@ -369,10 +378,8 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
     }
     player_manager.save_player_data(user_id, player)
-    # =========================================================
-    # 👆 FIM DA CORREÇÃO 👆
-    # =========================================================
 
+    # Lógica para enviar a mensagem de "viajando..."
     try:
         await q.delete_message()
     except Exception:
@@ -395,7 +402,7 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await context.bot.send_message(chat_id=chat_id, text=caption, parse_mode="HTML")
 
-    # agenda a finalização da viagem
+    # Agenda a finalização da viagem
     context.job_queue.run_once(
         finish_travel_job,
         when=secs,
@@ -404,10 +411,6 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data={"dest": dest_key},
         name=f"finish_travel_{user_id}",
     )
-
-# =============================================================================
-# Job: finaliza a viagem e abre o menu da região
-
 
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
     """
