@@ -12,7 +12,7 @@ except Exception:
     file_ids = None
 
 logger = logging.getLogger(__name__)
-VIDEO_ABERTURA_ID_FALLBACK = "BAACAgEAAxkBAAImEWiRDmK5N7wcy4rzBuO64f3LGxIYAAJkBQAC-FGIRJVPRTWEVrOWNgQ"
+VIDEO_ABERTURA_ID_FALLBACK = "BAACAgEAAxkBAAM5aNrRNqEQEYGUN8-fmcmCdOJOa0EAAsYIAAKCq9lGZ0eFyPq7_lw2BA"
 INVISIBLE_CHARS = r"[\u200B-\u200D\uFEFF]"
 
 def _sanitize_name(raw: str) -> str:

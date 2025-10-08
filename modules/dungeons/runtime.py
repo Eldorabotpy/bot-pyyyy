@@ -9,26 +9,16 @@ from telegram.error import BadRequest
 from modules import player_manager, game_data, clan_manager
 from modules import player_manager, game_data
 from handlers.utils import format_combat_message
+from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER
 
 # 🔎 Mídias (batalha). Suporta tanto file_id_manager quanto file_ids.
 try:
     from modules import file_id_manager as media_ids
 except Exception:
-    try:
-        from modules import file_ids as media_ids
-    except Exception:
-        media_ids = None  # fallback mudo
+    media_ids = None
 
 logger = logging.getLogger(__name__)
 
-# ============================================================
-# UI das dificuldades (chaves de callback: facil|normal|infernal)
-# ============================================================
-DIFFICULTIES = {
-    "facil":    {"title": "🌿 Iniciante"},
-    "normal":   {"title": "🌘 Desastre"},
-    "infernal": {"title": "🔥 Infernal"},
-}
 
 # ============================================================
 # Helpers de inventário
@@ -196,16 +186,55 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
         f"Escolha a dificuldade:"
     )
 
+    # --- Lógica de Desbloqueio de Dificuldade ---
     kb = []
-    for diff, meta in DIFFICULTIES.items():
-        kb.append([InlineKeyboardButton(meta["title"], callback_data=f"dungeon_pick:{diff}:{region_key}")])
+    dungeon_progress = (pdata.get("dungeon_progress", {}) or {}).get(region_key, {})
+    highest_completed = dungeon_progress.get("highest_completed")
+    highest_completed_index = -1
+    
+    if highest_completed:
+        try:
+            # Encontra o índice da dificuldade mais alta que o jogador já completou
+            # Ex: 'iniciante' é 0, 'veterano' é 1, etc.
+            highest_completed_index = DEFAULT_DIFFICULTY_ORDER.index(highest_completed)
+        except (ValueError, TypeError):
+            pass # Se o valor guardado for inválido, ignora
+
+    # Percorre as dificuldades na ordem correta (iniciante -> veterano -> etc.)
+    for i, diff_key in enumerate(DEFAULT_DIFFICULTY_ORDER):
+        # Pega nos metadados da dificuldade do seu config.py
+        meta = DIFFICULTIES.get(diff_key)
+        if not meta: continue
+
+        # A dificuldade está desbloqueada se o seu índice for menor ou igual
+        # ao da última completada + 1. A primeira (índice 0) está sempre desbloqueada.
+        if i <= highest_completed_index + 1:
+            # Botão para dificuldade desbloqueada
+            kb.append([
+                InlineKeyboardButton(
+                    f"{meta.emoji} {meta.label}", 
+                    callback_data=f"dungeon_pick:{diff_key}:{region_key}"
+                )
+            ])
+        else:
+            # Botão para dificuldade bloqueada
+            kb.append([
+                InlineKeyboardButton(
+                    f"🔒 {meta.label}", 
+                    callback_data="dungeon_locked"
+                )
+            ])
+
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
 
     try:
+        # Tenta editar a mensagem existente
         await q.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     except Exception:
+        # Se falhar (ex: a mensagem foi apagada), envia uma nova
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
+  
 # ============================================================
 # Fluxo de run
 # ============================================================
@@ -302,18 +331,19 @@ async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, combat_details: dict, rewards_to_accumulate: dict):
     pdata = player_manager.get_player_data(user_id) or {}
-    
-    # =========================================================
-    # 👇 INTEGRAÇÃO 1: MISSÃO DE MATAR CHEFE 👇
-    # =========================================================
     clan_id = pdata.get("clan_id")
-    # Verificamos se o monstro derrotado na batalha anterior era um chefe.
+
+    # =========================================================
+    # INTEGRAÇÃO 1: MISSÃO DE MATAR CHEFE
+    # =========================================================
     if clan_id and combat_details.get("is_boss"):
-        clan_manager.update_guild_mission_progress(
+        await clan_manager.update_guild_mission_progress(
             clan_id=clan_id,
             mission_type='DUNGEON_BOSS_KILL',
-            details={'count': 1} # Apenas contamos a morte do chefe
+            details={'count': 1},
+            context=context
         )
+        
     # =========================================================
 
     run = pdata.get("player_state") or {}
@@ -353,26 +383,45 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
     # Verificação de Vitória Final
     if next_stage >= len(lineup):
         # =========================================================
-        # 👇 INTEGRAÇÃO 2: MISSÃO DE COMPLETAR CALABOUÇO 👇
+        # INTEGRAÇÃO 2: MISSÃO DE COMPLETAR CALABOUÇO
         # =========================================================
-        # Como o clan_id já foi obtido, podemos reutilizá-lo.
         if clan_id:
-            clan_manager.update_guild_mission_progress(
+            await clan_manager.update_guild_mission_progress(
                 clan_id=clan_id,
                 mission_type='DUNGEON_COMPLETE',
                 details={
-                    'dungeon_id': region_key, # O ID do calabouço é a chave da região
+                    'dungeon_id': region_key,
                     'difficulty': difficulty,
                     'count': 1
-                }
+                },
+                context=context
             )
         # =========================================================
+
+        # ATUALIZAÇÃO DO PROGRESSO DE DIFICULDADE DO JOGADOR
+        completed_diff_key = difficulty
+        pdata.setdefault("dungeon_progress", {}).setdefault(region_key, {})
+        
+        current_highest_key = pdata["dungeon_progress"][region_key].get("highest_completed")
+
+        try:
+            completed_index = DEFAULT_DIFFICULTY_ORDER.index(completed_diff_key)
+            current_highest_index = -1
+            if current_highest_key:
+                current_highest_index = DEFAULT_DIFFICULTY_ORDER.index(current_highest_key)
+
+            if completed_index > current_highest_index:
+                pdata["dungeon_progress"][region_key]["highest_completed"] = completed_diff_key
+                logger.info(f"PROGRESSO DO CALABOUÇO ATUALIZADO para user {user_id} em '{region_key}': {completed_diff_key}")
+
+        except (ValueError, TypeError):
+            logger.warning(f"Chave de dificuldade inválida durante a atualização de progresso: atual='{current_highest_key}', completada='{completed_diff_key}'")
 
         # O jogador venceu o último piso! Entregamos tudo do "saco de loot".
         final_rewards = det.get("accumulated_rewards", {})
         final_xp = final_rewards.get("xp", 0)
-        final_gold = final_rewards.get("gold", 0) + _final_gold_for(dungeon, difficulty) # Bónus de ouro final
-        final_items = final_rewards.get("items", []) # Esta é a lista de IDs de itens
+        final_gold = final_rewards.get("gold", 0) + _final_gold_for(dungeon, difficulty)
+        final_items = final_rewards.get("items", [])
 
         pdata['xp'] = int(pdata.get('xp', 0)) + final_xp
         if final_gold > 0:
@@ -380,11 +429,9 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
 
         looted_items_text = ""
         if final_items:
-            # Primeiro, adicionamos os itens ao inventário usando os IDs corretos
             for item_id in final_items:
                 player_manager.add_item_to_inventory(pdata, item_id, 1)
 
-            # Depois, preparamos o texto para a mensagem usando os nomes de exibição
             from collections import Counter
             item_names = [(game_data.ITEMS_DATA.get(item_id, {}) or {}).get('display_name', item_id) for item_id in final_items]
             looted_items_text = "\n\n<b>Tesouros Adquiridos:</b>\n"
@@ -397,8 +444,8 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
         summary_text = (
             f"🏆 <b>Calabouço Concluído!</b> 🏆\n\n"
             f"Você superou todos os desafios e reclamou suas recompensas:\n"
-            f"+{final_xp} XP\n"
-            f"+{final_gold} Ouro"
+            f"+{final_xp:,} XP\n"
+            f"+{final_gold:,} Ouro"
             f"{looted_items_text}"
         )
         
@@ -425,11 +472,10 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
     caption = format_combat_message(pdata)
     kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
            InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",   callback_data="combat_flee")]]
-    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))# ============================================================
-# Handlers (registre no main)
+    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))
+
 # ============================================================
 async def _open_menu_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # pattern: dungeon_open:<region_key>
     data = update.callback_query.data
     _, region_key = data.split(":", 1)
     await _open_menu(update, context, region_key)
@@ -447,5 +493,11 @@ async def _pick_diff_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await _start_first_fight(update, context, region_key, diff)
 
+async def _dungeon_locked_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback para quando o jogador clica numa dificuldade bloqueada."""
+    query = update.callback_query
+    await query.answer("Você precisa de completar a dificuldade anterior para desbloquear esta!", show_alert=True)
+
 dungeon_open_handler = CallbackQueryHandler(_open_menu_cb, pattern=r"^dungeon_open:[A-Za-z0-9_]+$")
-dungeon_pick_handler = CallbackQueryHandler(_pick_diff_cb, pattern=r"^dungeon_pick:(facil|normal|infernal):[A-Za-z0-9_]+$")
+dungeon_pick_handler = CallbackQueryHandler(_pick_diff_cb, pattern=r"^dungeon_pick:(iniciante|infernal|pesadelo):[A-Za-z0-9_]+$")
+dungeon_locked_handler = CallbackQueryHandler(_dungeon_locked_cb, pattern=r'^dungeon_locked$')

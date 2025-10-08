@@ -3,6 +3,7 @@
 import random
 import re
 import unicodedata
+import logging
 from datetime import datetime, timezone
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -11,6 +12,8 @@ from modules import player_manager, game_data
 from modules import file_ids as file_id_manager
 from handlers.utils import format_combat_message
 
+
+logger = logging.getLogger(__name__)
 # =========================
 # Elites
 # =========================
@@ -280,7 +283,11 @@ def _get_monster_media(mon_tpl: dict, region_key: str, is_elite: bool):
 # =========================
 # Handler principal
 # =========================
+# Em handlers/hunt_handler.py
+
 async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("\n>>> O HANDLER 'hunt_callback' FOI ATIVADO! <<<\n")
+    
     query = update.callback_query
     await query.answer()
 
@@ -326,13 +333,7 @@ async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # detalhes
     details = _build_combat_details_from_template(tpl)
     details["region_key"] = region_key
-
-    # --- INÍCIO DO CÓDIGO DE DIAGNÓSTICO ---
-    import json
-    print("\n--- DEBUG: Conteúdo de combat_details ---")
-    print(json.dumps(details, indent=2, ensure_ascii=False))
-    print("--- FIM DO DEBUG ---\n")
-# --- FIM DO CÓDIGO DE DIAGNÓSTICO ---
+    
     # estado in_combat
     pdata["player_state"] = {
         "action": "in_combat",
@@ -348,22 +349,39 @@ async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='combat_flee')]
     ])
 
-    # === MÍDIA: tenta monstro → região → texto
-    media = _get_monster_media(tpl, region_key, is_elite)
+    # Apaga a mensagem do menu anterior
     try:
         await query.delete_message()
     except Exception:
         pass
 
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    # ## INÍCIO DA LÓGICA ROBUSTA DE ENVIO DE MÍDIA ##
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    
+    media = _get_monster_media(tpl, region_key, is_elite)
+
+    # --- PLANO A: Tentar enviar com mídia ---
     if media and media.get("id"):
         fid = media["id"]
         mtype = (media.get("type") or "photo").lower()
-        if mtype == "video":
-            await context.bot.send_video(chat_id=chat_id, video=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
-        else:
-            await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
-    else:
-        await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=kb, parse_mode="HTML")
+        try:
+            if mtype == "video":
+                await context.bot.send_video(chat_id=chat_id, video=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
+            else:
+                await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
+            
+            # Se o envio com mídia foi bem-sucedido, a função termina aqui.
+            return
+        
+        except Exception as e:
+            logger.warning(f"Falha ao enviar mídia do monstro (ID: {fid}). Erro: {e}. Usando fallback de texto.")
+            # Se falhou, a execução continua para o Plano B abaixo.
 
-# Exporta o handler
+    # --- PLANO B: Fallback para mensagem de texto ---
+    # Isto só é executado se não houver mídia OU se o envio da mídia falhar.
+    await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=kb, parse_mode="HTML")
+
+    print("Checkpoint 7: Mensagem enviada (ou tentativa). Fim do handler.")
+    
 hunt_handler = CallbackQueryHandler(hunt_callback, pattern=r"^hunt_[A-Za-z0-9_]+$")

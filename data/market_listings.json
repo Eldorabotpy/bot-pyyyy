@@ -1,5 +1,5 @@
 {
-  "seq": 226,
+  "seq": 228,
   "listings": [
     {
       "id": 1,
@@ -4823,6 +4823,93 @@
       "created_at": "2025-09-26T16:24:54.358137+00:00",
       "region_key": null,
       "active": false
+    },
+    {
+      "id": 226,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "071a1469-a8c6-4517-9620-734902561fc2",
+        "item": {
+          "uuid": "9933af92-a5b4-40d4-9696-0573215261de",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 1,
+          "durability": [
+            20,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 1,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 1,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "bushido"
+          },
+          "display_name": "Katana Laminada",
+          "class_req": [
+            "samurai"
+          ]
+        }
+      },
+      "unit_price": 50,
+      "quantity": 1,
+      "created_at": "2025-10-04T18:55:33.624044+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 227,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "unique",
+        "uid": "652fe810-52a6-45f7-bc27-15f9daab8cb6",
+        "item": {
+          "uuid": "27457ab2-041c-4ea6-a806-0a885c569762",
+          "base_id": "katana_laminada_samurai",
+          "rarity": "comum",
+          "upgrade_level": 2,
+          "durability": [
+            0,
+            20
+          ],
+          "enchantments": {
+            "bushido": {
+              "value": 2,
+              "source": "primary"
+            },
+            "dmg": {
+              "value": 2,
+              "source": "primary_mirror"
+            }
+          },
+          "damage": {
+            "type": "cortante",
+            "min": 15,
+            "max": 20,
+            "scales_with": "bushido"
+          },
+          "display_name": "Katana Laminada",
+          "class_req": [
+            "samurai"
+          ],
+          "enh_failstacks": 0.0
+        }
+      },
+      "unit_price": 150,
+      "quantity": 1,
+      "created_at": "2025-10-08T02:24:58.593656+00:00",
+      "region_key": null,
+      "active": true
     }
   ]
 }

@@ -7,7 +7,24 @@ Mantenha IDs canônicos — outros módulos referenciam esses IDs diretamente.
 
 ITEMS_DATA = {
 
-    # Em modules/game_data/items.py
+    "fragmento_bravura": {
+        "display_name": "Fʀᴀɢᴍᴇɴᴛᴏ ᴅᴇ Bʀᴀᴠᴜʀᴀ",
+        "emoji": "🏅",
+        "type": "material_evento",
+        "category": "evento",
+        "description": "Um fragmento obtido ao defender o reino. Junte 100 para forjar uma recompensa.",
+        "stackable": True,
+        "media_key": "item_fragmento_bravura" # Podemos criar um file_id para ele depois
+    },
+    "ticket_defesa_reino": {
+        "display_name": "Tɪᴄᴋᴇᴛ ᴅᴇ Dᴇғᴇsᴀ ᴅᴏ Rᴇɪɴᴏ",
+        "emoji": "🎟️",
+        "type": "event_ticket",
+        "category": "evento",
+        "description": "Garante uma entrada no evento de Defesa do Reino. Válido até o fim do evento ou até você ser derrotado.",
+        "stackable": True,
+        "media_key": "item_ticket_defesa_reino" # Podemos criar um file_id para ele depois
+    },
 
     "ticket_arena": {
     "display_name": "Entrada da Arena",

@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
-
+from telegram.error import BadRequest
 from modules import player_manager, game_data
 
 # 🔎 Mídias (mapa/regiões). Suporta tanto file_id_manager quanto file_ids.
@@ -162,13 +162,23 @@ async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await send_region_menu(context, user_id, chat_id)
 
-async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int):
+async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None):
+    """
+    Envia a mensagem com a mídia (se existir) e os botões da região especificada.
+    """
     print(">>> RASTREAMENTO: Entrou em send_region_menu")
     player_data = player_manager.get_player_data(user_id) or {}
-    region_key = player_data.get("current_location", "reino_eldora")
-    region_info = (game_data.REGIONS_DATA or {}).get(region_key)
+    
+    # --- LÓGICA CORRIGIDA PARA DETERMINAR A REGIÃO ---
+    final_region_key = region_key
+    if not final_region_key:
+        final_region_key = player_data.get("current_location", "reino_eldora")
+    player_data['current_location'] = final_region_key
+    # ---------------------------------------------------
 
-    if not region_info or region_key == "reino_eldora":
+    region_info = (game_data.REGIONS_DATA or {}).get(final_region_key)
+
+    if not region_info or final_region_key == "reino_eldora":
         if show_kingdom_menu:
             fake_update = Update(
                 update_id=0,
@@ -190,7 +200,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
     status_footer = (
         f"\n\n═════════════ ◆◈◆ ══════════════\n"
-        f"❤️ 𝐇𝐏: {current_hp}/{max_hp}   "
+        f"❤️ 𝐇𝐏: {current_hp}/{max_hp}    "
         f"⚡️ 𝐄𝐧𝐞𝐫𝐠𝐢𝐚: {current_energy}/{max_energy}"
     )
 
@@ -200,20 +210,20 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
     )
 
     keyboard = []
-    keyboard.append([InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫 𝐌𝐨𝐧𝐬𝐭𝐫𝐨𝐬 ⚔️", callback_data=f"hunt_{region_key}")])
+    keyboard.append([InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫 𝐌𝐨𝐧𝐬𝐭𝐫𝐨𝐬 ⚔️", callback_data=f"hunt_{final_region_key}")])
 
-    if build_region_dungeon_button:
-        keyboard.append([build_region_dungeon_button(region_key)])
-    else:
-        keyboard.append([InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨 🏰", callback_data=f"dungeon_open:{region_key}")])
+    # Tenta usar uma função global para criar o botão, se não existir, cria um padrão.
+    try:
+        if build_region_dungeon_button:
+            keyboard.append([build_region_dungeon_button(final_region_key)])
+        else: raise NameError
+    except NameError:
+        keyboard.append([InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨 🏰", callback_data=f"dungeon_open:{final_region_key}")])
 
     keyboard.append([InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦 👤", callback_data="profile")])
     keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐫 𝐃𝐮𝐫𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞 📜", callback_data="restore_durability_menu")])
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Usar a chave da região como a única fonte de verdade para o ID do recurso.
-    resource_id = region_key
-    # --- FIM DA CORREÇÃO ---
+    resource_id = final_region_key
     
     if resource_id:
         required_profession = game_data.get_profession_for_resource(resource_id)
@@ -221,8 +231,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         player_prof = prof_data.get("type")
 
         if required_profession and required_profession == player_prof:
-            item_info = (game_data.ITEMS_DATA or {}).get(resource_id, {}) or {}
-            # Para o nome do item no botão, usamos o item que será dado, não o recurso
             profession_resources = (game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}).get('resources', {})
             item_id_yielded = profession_resources.get(resource_id, resource_id)
             item_yielded_info = (game_data.ITEMS_DATA or {}).get(item_id_yielded, {}) or {}
@@ -232,11 +240,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             profession_emoji = profession_info.get("emoji", "✋")
             
             base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-            try:
-                speed_mult = float(player_manager.get_player_perk_value(player_data, "gather_speed_multiplier", 1.0))
-            except Exception:
-                speed_mult = 1.0
-            speed_mult = max(0.25, min(4.0, speed_mult))
+            speed_mult = float(player_manager.get_player_perk_value(player_data, "gather_speed_multiplier", 1.0))
             duration_seconds = max(1, int(base_secs / speed_mult))
             human_time = _humanize_duration(duration_seconds)
 
@@ -245,17 +249,21 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
             keyboard.append([InlineKeyboardButton(
                 f"{profession_emoji} Coletar {item_name} (~{human_time}, {cost_txt})",
-                callback_data=f"collect_{region_key}"
+                callback_data=f"collect_{final_region_key}"
             )])
 
     keyboard.append([InlineKeyboardButton("🗺️ 𝕍𝕖𝕣 𝕄𝕒𝕡𝕒 🗺️", callback_data="travel")])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    file_id_key = f"regiao_{region_key}"
+    # --- LÓGICA DE ENVIO COM FALLBACK (PLANO B) ---
+    file_id_key = f"regiao_{final_region_key}"
     fd = media_ids.get_file_data(file_id_key) if media_ids and hasattr(media_ids, "get_file_data") else None
+
+    # Tenta enviar com mídia primeiro
     if fd and fd.get("id"):
         try:
-            if (fd.get("type") or "photo").lower() == "video":
+            media_type = (fd.get("type") or "photo").lower()
+            if media_type == "video":
                 await context.bot.send_video(
                     chat_id=chat_id, video=fd["id"],
                     caption=caption, reply_markup=reply_markup, parse_mode="HTML"
@@ -265,14 +273,16 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
                     chat_id=chat_id, photo=fd["id"],
                     caption=caption, reply_markup=reply_markup, parse_mode="HTML"
                 )
-            return
+            return  # Sucesso, termina a função aqui.
+        except BadRequest as e:
+            logging.warning(f"Falha ao enviar mídia para '{final_region_key}' (ID: {fd['id']}). Erro: {e}. Usando fallback de texto.")
         except Exception as e:
-            logger.debug("Falha ao enviar mídia da região (%s): %s", fd, e)
+            logging.error(f"Erro inesperado ao enviar mídia para '{final_region_key}': {e}. Usando fallback de texto.")
 
+    # PLANO B: Se não houver 'fd' ou se o envio da mídia falhar, envia só a mensagem de texto.
     await context.bot.send_message(
         chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML"
     )
-
 # =============================================================================
 # Validação da viagem e início do cronômetro
 # =============================================================================
@@ -547,8 +557,15 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 # Wrapper: abrir o menu da região atual (usado por /start e outros)
 # =============================================================================
-async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Use este código para substituir a sua função show_region_menu inteira:
+
+async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None):
+    """
+    Função de entrada para mostrar o menu de uma região.
+    Pode receber um `region_key` explícito ou usar a localização atual do jogador.
+    """
     print(">>> RASTREAMENTO: Entrou em show_region_menu (wrapper)")
+    
     query = getattr(update, "callback_query", None)
     if query:
         await query.answer()
@@ -562,17 +579,20 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         chat_id = update.effective_chat.id
 
-    await _auto_finalize_travel_if_due(context, user_id)
-
-    # se tiver helper no player_manager para finalizar outras ações, chame aqui
+    
+    await _auto_finalize_travel_if_due(context, user_id) 
     try:
         player_manager.try_finalize_timed_action_for_user(user_id)
     except Exception:
         pass
+        
+    final_region_key = region_key
+    if not final_region_key:
+        player_data = player_manager.get_player_data(user_id)
+        final_region_key = (player_data or {}).get("current_location", "reino_eldora")
 
-    await send_region_menu(context, user_id, chat_id)
 
-
+    await send_region_menu(context, user_id, chat_id, region_key=final_region_key)
 # =============================================================================
 # 👉 Menu local de RESTAURAR DURABILIDADE (somente itens equipados)
 # =============================================================================

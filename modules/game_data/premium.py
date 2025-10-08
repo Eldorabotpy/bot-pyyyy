@@ -83,3 +83,31 @@ PREMIUM_TIERS = {
         }
     }
 }
+
+# =================================================================
+# PLANOS PREMIUM À VENDA NA LOJA DE GEMAS (VERSÃO CORRIGIDA)
+# =================================================================
+# Agora, cada plano vende um TIER específico dos seus PREMIUM_TIERS.
+PREMIUM_PLANS_FOR_SALE = {
+    "premium_30d": {
+        "name": "Aventureiro Premium (30 Dias)",
+        "description": "Ativa todas as vantagens do tier Premium.",
+        "price": 120, # Preço em gemas
+        "tier": "premium", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 30
+    },
+    "vip_30d": {
+        "name": "Aventureiro VIP (30 Dias)",
+        "description": "Ativa as vantagens incríveis do tier VIP.",
+        "price": 240, # Preço em gemas
+        "tier": "vip", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 30
+    },
+    "lenda_30d": {
+        "name": "Aventureiro Lenda (30 Dias)",
+        "description": "Torne-se uma Lenda por um mês inteiro!",
+        "price": 360, # Preço em gemas
+        "tier": "lenda", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 30
+    },
+}

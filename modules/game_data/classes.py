@@ -65,6 +65,21 @@ CLASS_PRIMARY_DAMAGE = {
     "cacador":   {"stat_key": "precisao",    "type": "perfuracao", "scales_with": "precisao"},
 }
 
+
+# ✅ NOVO DICIONÁRIO ADICIONADO
+# Define o emoji específico para o atributo de dano de cada classe,
+# usado pelo item_factory para renderizar os itens.
+CLASS_DMG_EMOJI = {
+    "guerreiro": "⚔️",
+    "berserker": "🪓",
+    "cacador": "🏹",
+    "monge": "🧘",
+    "mago": "🪄",
+    "bardo": "🎶",
+    "assassino": "🔪",
+    "samurai": "🥷",
+}
+
 def get_primary_damage_profile(player_class: str) -> dict:
     """
     Retorna o perfil (atributo-chave e metadados) usado na forja/itens para

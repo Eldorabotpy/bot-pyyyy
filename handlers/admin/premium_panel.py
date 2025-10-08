@@ -152,6 +152,10 @@ async def _receive_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 # Ações do painel
 # ---------------------------------------------------------
 async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # ✅ 1. IMPORTAÇÃO LOCAL CORRETA
+    # Importamos 'utcnow' diretamente do seu local de origem
+    from modules.player.actions import utcnow
+
     if not await ensure_admin(update):
         return ConversationHandler.END
 
@@ -164,16 +168,20 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     tier = (q.data or "prem_tier:free").split(":", 1)[1]
     pdata = player_manager.get_player_data(target_uid) or {}
-    # Definimos o TIER sem mexer na expiração (admin quer só trocar o plano).
+    
     pdata["premium_tier"] = None if tier == "free" else tier
-    # Mantém expiração se já tinha; se virou free, zera expiração.
+    
     if tier == "free":
         pdata["premium_expires_at"] = None
-    # Ajusta energia ao máximo do novo plano e reseta âncora.
+        
     max_e = player_manager.get_player_max_energy(pdata)
     if int(pdata.get("energy", 0)) < max_e:
         pdata["energy"] = max_e
-    pdata["energy_last_ts"] = player_manager.utcnow().isoformat()
+        
+    # ✅ 2. CHAMADA CORRIGIDA
+    # Usamos a função 'utcnow' que acabámos de importar
+    pdata['energy_last_ts'] = utcnow().isoformat()
+    
     player_manager.save_player_data(target_uid, pdata)
 
     text = _panel_text(target_uid, pdata)
@@ -181,6 +189,7 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await q.edit_message_text(text, parse_mode="HTML", reply_markup=_panel_keyboard())
     except Exception:
         await context.bot.send_message(chat_id=q.message.chat.id, text=text, parse_mode="HTML", reply_markup=_panel_keyboard())
+        
     return ASK_NAME
 
 async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

@@ -3,23 +3,21 @@ from __future__ import annotations
 
 def get_dungeon_for_region(region_key: str) -> dict | None:
     """
-    Retorna a configuração do calabouço para a região informada.
-    Formato esperado pelo runtime/combate:
-      - display_name (str)
-      - key_item (str)                [opcional; default do runtime é "cristal_de_abertura"]
-      - difficulty_scale (dict)
-      - final_gold (dict)
-      - floors: lista de dicts com:
-          id, name, emoji, file_id_name
-          hp, attack, defense, initiative, luck
-          xp_reward, gold_drop, loot_table (opcional), is_boss (opcional)
+    Retorna a configuração completa de um calabouço para a região informada.
+    Se a região não tiver um calabouço, retorna None.
     """
+    
+    # --- CALABOUÇO 1: FLORESTA SOMBRIA ---
     if region_key == "floresta_sombria":
         return {
             "display_name": "Calabouço da Floresta Sombria",
             "key_item": "cristal_de_abertura",
-            "final_gold": {"facil": 200, "normal": 450, "infernal": 800},
-            "difficulty_scale": {"facil": 1.0, "normal": 3.0, "infernal": 5.25},
+            
+            # Multiplicadores de stats e recompensas baseados na dificuldade
+            "final_gold": {"iniciante": 200, "veterano": 450, "infernal": 800},
+            "difficulty_scale": {"iniciante": 1.0, "veterano": 3.0, "infernal": 5.25},
+            
+            # Lista de andares (monstros e chefe)
             "floors": [
                 {
                     "id": "guardiao_raizes",

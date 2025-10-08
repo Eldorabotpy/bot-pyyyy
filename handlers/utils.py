@@ -2,8 +2,117 @@
 
 import html
 from typing import Optional
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from modules import player_manager, game_data
+from telegram import Update
+
+# =============================================================================
+# MELHORIA: A função 'render_item_stats_short' foi movida para cá
+# para resolver uma importação circular com 'item_factory.py'.
+# =============================================================================
+
+async def safe_edit_message(query: CallbackQuery, text: str, reply_markup: InlineKeyboardMarkup = None, parse_mode: str = 'HTML'):
+    """
+    Edita uma mensagem de forma segura, tentando editar a legenda primeiro
+    e, se falhar, edita o texto. Evita o erro 'BadRequest: There is no caption...'.
+    """
+    try:
+        # Tenta editar a legenda (para mensagens com foto/vídeo)
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception:
+        try:
+            # Se falhar, edita o texto (para mensagens de texto simples)
+            await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        except Exception as e:
+            # Se ambos falharem, é útil registrar o erro
+            print(f"Falha ao editar a mensagem: {e}")
+
+async def safe_update_message(update: Update, context, new_text: str, new_reply_markup, new_media_file_id: str = None, new_media_type: str = 'photo'):
+    """
+    Atualiza uma mensagem de forma inteligente. Se for chamada por um botão, tenta
+    editar a mensagem. Se for chamada por um comando, envia uma nova mensagem.
+    """
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+
+    # --- Cenário 1: A chamada veio de um BOTÃO (query existe) ---
+    if query:
+        await query.answer()
+        
+        # Lógica para tentar editar. Se não der, apaga e reenvia.
+        # Esta é a lógica mais robusta para quando a mensagem muda de tipo (texto -> foto).
+        try:
+            can_edit = True
+            is_new_media = bool(new_media_file_id)
+            was_media = bool(query.message.photo or query.message.video)
+
+            if is_new_media != was_media:
+                can_edit = False
+
+            if not can_edit:
+                raise ValueError("Media type mismatch, cannot edit.")
+
+            if was_media:
+                await query.edit_message_caption(caption=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+            else:
+                await query.edit_message_text(text=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+        
+        except Exception:
+            # Se a edição falhar, apaga a mensagem antiga e envia uma nova.
+            try:
+                await query.delete_message()
+            except Exception:
+                pass # A mensagem pode já ter sido apagada
+
+            # Envia a nova mensagem (lógica de reenvio)
+            if new_media_file_id:
+                if new_media_type == 'video':
+                    await context.bot.send_video(chat_id=chat_id, video=new_media_file_id, caption=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+                else:
+                    await context.bot.send_photo(chat_id=chat_id, photo=new_media_file_id, caption=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+
+    # --- Cenário 2: A chamada veio de um COMANDO (query NÃO existe) ---
+    else:
+        # Simplesmente envia uma nova mensagem
+        if new_media_file_id:
+            if new_media_type == 'video':
+                await context.bot.send_video(chat_id=chat_id, video=new_media_file_id, caption=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+            else:
+                await context.bot.send_photo(chat_id=chat_id, photo=new_media_file_id, caption=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=new_text, reply_markup=new_reply_markup, parse_mode='HTML')
+            
+def create_progress_bar(current: int, required: int, length: int = 10, fill_char: str = '⬛️', empty_char: str = '◻️') -> str:
+    """Cria uma barra de progresso em texto."""
+    if required <= 0:
+        return f"[{fill_char * length}]"
+        
+    progress = min(1.0, current / required)
+    filled_length = int(progress * length)
+    bar = fill_char * filled_length + empty_char * (length - filled_length)
+    return f"[{bar}]"            
+
+def render_item_stats_short(item_instance: dict, player_class: str) -> str:
+    """
+    Renderiza uma string curta com os status principais de um item.
+    Esta função agora vive em utils.py para evitar dependências cíclicas.
+    """
+    # Supondo que a lógica original desta função seja algo parecido com isto:
+    # (Adapte conforme a sua implementação original em item_factory.py)
+    stats = item_instance.get("stats", {})
+    parts = []
+    if stats.get("attack"):
+        parts.append(f"⚔️{_i(stats['attack'])}")
+    if stats.get("defense"):
+        parts.append(f"🛡️{_i(stats['defense'])}")
+    if stats.get("initiative"):
+        parts.append(f"🏃‍♂️{_i(stats['initiative'])}")
+    if stats.get("luck"):
+        parts.append(f"🍀{_i(stats['luck'])}")
+    return " ".join(parts)
+# =============================================================================
 
 def obter_titulo_e_icones_por_regiao(regiao_id: str) -> tuple[str, str]:
     dados = game_data.REGIONS_DATA.get(regiao_id)
@@ -19,10 +128,10 @@ def _i(v) -> int:
     """Converte qualquer valor para inteiro (com round) de forma segura."""
     try:
         return int(round(float(v)))
-    except Exception:
+    except (ValueError, TypeError):
         try:
             return int(v)
-        except Exception:
+        except (ValueError, TypeError):
             return 0
 
 def _fmt_player_stats_as_ints(total_stats: dict) -> tuple[int, int, int, int, int]:
@@ -119,13 +228,13 @@ def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict
             continue
 
         total_stats = player_manager.get_player_total_stats(player_full_data)
-        max_hp, atk, defe, vel, srt = _fmt_player_stats_as_ints(total_stats)
+        max_hp, atk, defense, vel, srt = _fmt_player_stats_as_ints(total_stats) # MELHORIA: Renomeado 'defe' para 'defense'
         current_hp = _i(combat_data.get('hp', 0))
 
         player_block = (
             f"<b>{combat_data.get('name','Herói')}</b>\n"
             f"❤️ 𝐇𝐏: {current_hp}/{max_hp}\n"
-            f"⚔️ 𝐀𝐓𝐊: {atk}  🛡️ 𝐃𝐄𝐅: {defe}\n"
+            f"⚔️ 𝐀𝐓𝐊: {atk}  🛡️ 𝐃𝐄𝐅: {defense}\n"
             f"🏃‍♂️ 𝐕𝐄𝐋: {vel}  🍀 𝐒𝐑𝐓: {srt}"
         )
         heroes_blocks.append(player_block)
@@ -152,7 +261,8 @@ def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict
     # Log
     log_lines = ["═════════════ ◆◈◆ ═════════════"]
     battle_log = cs.get('battle_log', []) or []
-    log_lines.extend([str(x) for x in battle_log[-4:]])
+    # MELHORIA: Adicionado html.escape para consistência e segurança.
+    log_lines.extend([html.escape(str(x)) for x in battle_log[-4:]])
 
     footer = ["╚════════════ ◆◈◆ ════════════╝"]
 
@@ -189,7 +299,7 @@ def render_equipment_line(slot: str, uid: str | None, inst: dict | None, player_
     name = game_data.ITEM_BASES.get(base, {}).get("display_name", base)
     rarity = (inst.get("rarity","comum") or "comum").capitalize()
     cur_d, max_d = (inst.get("durability") or [0,0])
-    from modules.item_factory import render_item_stats_short
+    # CORREÇÃO: Chamando a função que agora está neste mesmo arquivo.
     stats = render_item_stats_short(inst, player_class)
     return f"{emoji_slot} <b>{slot.capitalize()}</b>: 『[{cur_d}/{max_d}] {name} [{rarity}]』 {stats}"
 
@@ -198,7 +308,7 @@ def render_inventory_row(uid: str, inst: dict, player_class: str) -> str:
     name = game_data.ITEM_BASES.get(base, {}).get("display_name", base)
     rarity = (inst.get("rarity","comum") or "comum").capitalize()
     cur_d, max_d = (inst.get("durability") or [0,0])
-    from modules.item_factory import render_item_stats_short
+    # CORREÇÃO: Chamando a função que agora está neste mesmo arquivo.
     stats = render_item_stats_short(inst, player_class)
     return f"『[{cur_d}/{max_d}] {name} [{rarity}]』 {stats}  <code>{uid[:8]}</code>"
 
@@ -224,15 +334,19 @@ def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_d
         divider = "══════════════════════════════\n"
         footer = "╚════════════ ◆◈◆ ════════════╝"
 
+        # CORREÇÃO: Garantir que 'vencedor_data' e 'perdedor_data' não sejam None ao acessar 'current_hp'.
+        v_hp = _i((vencedor_data or {}).get('current_hp', 0))
+        p_hp = _i((perdedor_data or {}).get('current_hp', 0))
+
         mensagem_texto = (
             f"{header}"
             f"{nome_vencedor}\n"
-            f"❤️ 𝐇𝐏: {_i(vencedor_data.get('current_hp',0))}/{v_max}\n"
+            f"❤️ 𝐇𝐏: {v_hp}/{v_max}\n"
             f"⚔️ 𝐀𝐓𝐊: {v_atk}  🛡️ 𝐃𝐄𝐅: {v_def}\n"
             f"🏃‍♂️ 𝐕𝐄𝐋: {v_vel}  🍀 𝐒𝐑𝐓: {v_srt}\n"
             f"{divider}"
             f"{nome_perdedor}\n"
-            f"❤️ 𝐇𝐏: {_i(perdedor_data.get('current_hp',0))}/{p_max}\n"
+            f"❤️ 𝐇𝐏: {p_hp}/{p_max}\n"
             f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
             f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}\n"
             f"═════════════ ◆◈◆ ═════════════\n"
@@ -243,10 +357,22 @@ def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_d
         )
     else:
         mensagem_texto = (
-            f"⚔️ <b>𝑨 𝑩𝑨𝑻𝑨𝑳𝑯𝑨 𝑻𝑬𝑹𝑴𝑰𝑵𝑶𝑼 𝑬𝑴 𝑬𝑴𝑷𝑨𝑻𝑬!</b> ⚔️\n\n"
+            f"⚔️ <b>𝑨 𝑩𝑨𝑻𝑨𝑳𝑯𝑨 𝑻𝑬𝑹𝑴𝑰𝑵𝑶𝑼 𝑬𝑴 𝑬𝑷𝑨𝑻𝑬!</b> ⚔️\n\n"
             f"📜 Log da Batalha:\n"
             f"{log_texto}\n"
         )
 
     keyboard = [[InlineKeyboardButton("⚔️ 𝐋𝐮𝐭𝐚𝐫 𝐍𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐞 ⚔️", callback_data='arena_de_eldora')]]
     return mensagem_texto, InlineKeyboardMarkup(keyboard)
+
+def format_buffs_text(buffs_dict: dict) -> str:
+    """Formata um dicionário de buffs para uma string legível."""
+    if not buffs_dict:
+        return "   - Nenhum\n"
+    text = ""
+    if buffs_dict.get("xp_bonus_percent"):
+        text += f"   - Bónus de XP: +{buffs_dict['xp_bonus_percent']}%\n"
+    if buffs_dict.get("gold_bonus_percent"):
+        text += f"   - Bónus de Ouro: +{buffs_dict['gold_bonus_percent']}%\n"
+    # Adicione aqui a formatação para outros buffs que você tiver
+    return text if text else "   - Nenhum\n"

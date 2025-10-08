@@ -7,8 +7,9 @@ from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
+from modules.player.premium import PremiumManager
 from modules import player_manager, game_data
-from modules import file_ids  # ✅ usa o gerenciador baseado no JSON
+from modules import file_ids
 
 logger = logging.getLogger(__name__)
 
@@ -132,31 +133,29 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_ini    = int(totals.get('initiative', 0))
     total_luck   = int(totals.get('luck', 0))
 
-    # clamp do HP atual ao total
-    current_hp = int(player_data.get('current_hp', total_hp_max))
-    current_hp = max(0, min(current_hp, total_hp_max))
-
-    # ===== Calcula as novas chances =====
+    current_hp = max(0, min(int(player_data.get('current_hp', total_hp_max)), total_hp_max))
     chance_esquiva = int(player_manager.get_player_dodge_chance(player_data) * 100)
     chance_ataque_duplo = int(player_manager.get_player_double_attack_chance(player_data) * 100)
 
-    # ===== outras infos (premium, xp/nível, profissão) =====
     location_key  = player_data.get('current_location', 'reino_eldora')
     location_name = (game_data.REGIONS_DATA or {}).get(location_key, {}).get('display_name', 'Lugar Desconhecido')
 
+    # =================================================================
+    # ===== BLOCO PREMIUM TOTALMENTE CORRIGIDO E MELHORADO =====
+    # =================================================================
     premium_line = ""
-    if player_manager.is_player_premium(player_data):
-        tier_raw  = (player_data.get('premium_tier') or 'Desconhecido')
-        tier_disp = tier_raw[:1].upper() + tier_raw[1:] if isinstance(tier_raw, str) else str(tier_raw)
-        exp_date_str = player_data.get('premium_expires_at')
-        try:
-            dt = datetime.fromisoformat(exp_date_str) if exp_date_str else None
-            if dt and dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            premium_line = f"\n👑 <b>Status Premium:</b> {tier_disp}" + (f"\n(Expira em: {dt.strftime('%d/%m/%Y')})" if dt else " (Ativo)")
-        except Exception:
-            premium_line = f"\n👑 <b>Status Premium:</b> {tier_disp} (Ativo)"
-
+    # Usamos a nova função correta: has_premium_plan(user_id)
+    if player_manager.has_premium_plan(user_id):
+        premium = PremiumManager(player_data)
+        tier_name = premium.tier.capitalize() if premium.tier else "Premium"
+        exp_date = premium.expiration_date
+        
+        premium_line = f"\n👑 <b>Status Premium:</b> {tier_name}"
+        if exp_date:
+            premium_line += f"\n(Expira em: {exp_date.strftime('%d/%m/%Y')})"
+        else:
+            premium_line += " (Permanente)"
+    
     max_energy   = int(player_manager.get_player_max_energy(player_data))
     combat_level = int(player_data.get('level', 1))
     combat_xp    = int(player_data.get('xp', 0))
@@ -164,31 +163,29 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         combat_next = int(game_data.get_xp_for_next_combat_level(combat_level))
     except Exception:
         combat_next = 0
-    combat_bar = _bar(combat_xp, combat_next, blocks=10, filled_char='🟧', empty_char='⬜️')
+    combat_bar = _bar(combat_xp, combat_next)
 
     prof_norm = _normalize_profession(player_data.get('profession'))
     prof_line = None
     if prof_norm:
         prof_key, prof_level, prof_xp = prof_norm
         prof_name = (game_data.PROFESSIONS_DATA or {}).get(prof_key, {}).get('display_name', prof_key)
-        try:
-            prof_next = int(game_data.get_xp_for_next_collection_level(prof_level))
-        except Exception:
-            prof_next = 0
-        prof_bar = _bar(prof_xp, prof_next, blocks=10, filled_char='🟨', empty_char='⬜️')
-        prof_line = f"💼 <b>Profissão:</b> {prof_name} — Nível {prof_level}\n<code>[{prof_bar}]</code> {prof_xp}/{prof_next} XP"
+    try:
+        prof_next = int(game_data.get_xp_for_next_collection_level(prof_level))
+    except Exception:
+        prof_next = 0
+    
+    prof_bar = _bar(prof_xp, prof_next, blocks=10, filled_char='🟨', empty_char='⬜️')
+    prof_line = f"💼 <b>Profissão:</b> {prof_name} — Nível {prof_level}\n<code>[{prof_bar}]</code> {prof_xp}/{prof_next} XP"
 
-    # Banner de classe se for hora de escolher (lvl 10+, sem classe, não-ofertado)
+    
     class_banner = ""
     if player_manager.needs_class_choice(player_data):
-        class_banner = (
-            "\n\n✨ <b>Você alcançou o nível 10!</b>\n"
-            "Escolha sua <b>Classe</b> para desbloquear habilidades únicas."
-        )
+        class_banner = "\n\n✨ <b>Escolha sua Classe!</b>"
 
     # ===== texto do perfil =====
     char_name        = player_data.get('character_name','Aventureiro(a)')
-    available_points = int(player_data.get("stat_points", 0) or 0)  # ✅ usa stat_points oficial
+    available_points = int(player_data.get("stat_points", 0) or 0)
 
     lines = [
         f"👤 <b>Pᴇʀғɪʟ ᴅᴇ {char_name}</b>{premium_line}",

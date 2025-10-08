@@ -97,40 +97,38 @@ async def update_guild_mission_progress(clan_id: str, mission_type: str, details
     
     save_clan(clan_id, clan_data)
 
-def deposit_gold_to_bank(clan_id: str, player_id: int, amount: int) -> int:
+def deposit_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     """
     Deposita ouro da conta de um jogador para o banco do clã.
-    Retorna a nova quantidade de ouro no banco.
-    Levanta um ValueError em caso de erro.
+    Retorna (True, "Mensagem de sucesso") ou (False, "Mensagem de erro").
     """
     if amount <= 0:
-        raise ValueError("A quantidade para depositar deve ser positiva.")
+        return False, "A quantidade para depositar deve ser positiva."
 
     clan_data = get_clan(clan_id)
     if not clan_data:
-        raise ValueError("Clã não encontrado.")
+        return False, "Clã não encontrado."
         
-    player_data = player_manager.get_player_data(player_id)
+    player_data = player_manager.get_player_data(user_id)
     if not player_data:
-        raise ValueError("Jogador não encontrado.")
+        return False, "Jogador não encontrado."
 
-    # Tenta gastar o ouro do jogador primeiro
-    if not player_manager.spend_gold(player_data, amount):
-        raise ValueError("Você não tem ouro suficiente para depositar essa quantia.")
-        
-    # Se o gasto foi bem-sucedido, adiciona ao banco do clã
+    # Tenta gastar o ouro do jogador
+    if player_data.get("gold", 0) < amount:
+        return False, "Você não tem ouro suficiente para depositar essa quantia."
+    
+    # Se o gasto foi bem-sucedido, executa a transação
+    player_data["gold"] -= amount
+    
     bank = clan_data.setdefault("bank", {})
-    current_gold = bank.get("gold", 0)
-    new_gold_total = current_gold + amount
-    bank["gold"] = new_gold_total
+    bank["gold"] = bank.get("gold", 0) + amount
     
     # Salva ambas as entidades
     save_clan(clan_id, clan_data)
-    player_manager.save_player_data(player_id, player_data)
+    player_manager.save_player_data(user_id, player_data)
     
-    return new_gold_total
+    return True, f"Você depositou {amount:,} de ouro com sucesso."
 
-# Adicione esta nova função ao seu modules/clan_manager.py
 
 def purchase_mission_board(clan_id: str, leader_id: int):
     """
@@ -163,42 +161,41 @@ def purchase_mission_board(clan_id: str, leader_id: int):
     # Notificação para o log do servidor (opcional)
     print(f"[CLAN] O clã '{clan_id}' comprou o quadro de missões.")
 
-def withdraw_gold_from_bank(clan_id: str, player_id: int, amount: int) -> int:
+def withdraw_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     """
-    Levanta ouro do banco do clã para a conta de um jogador.
+    Retira ouro do banco do clã para a conta de um jogador.
     Apenas o líder pode fazer isso.
-    Retorna a nova quantidade de ouro no banco.
-    Levanta um ValueError em caso de erro.
+    Retorna (True, "Mensagem de sucesso") ou (False, "Mensagem de erro").
     """
     if amount <= 0:
-        raise ValueError("A quantidade para levantar deve ser positiva.")
+        return False, "A quantidade para retirar deve ser positiva."
 
     clan_data = get_clan(clan_id)
     if not clan_data:
-        raise ValueError("Clã não encontrado.")
+        return False, "Clã não encontrado."
 
-    # Regra de permissão: só o líder pode levantar
-    if clan_data.get("leader_id") != player_id:
-        raise ValueError("Apenas o líder do clã pode levantar ouro do banco.")
+    # Regra de permissão: só o líder pode retirar
+    if clan_data.get("leader_id") != user_id:
+        return False, "Apenas o líder do clã pode retirar ouro do banco."
         
     bank = clan_data.get("bank", {})
     current_gold = bank.get("gold", 0)
     
     if current_gold < amount:
-        raise ValueError("O banco do clã não tem ouro suficiente.")
+        return False, "O banco do clã não tem ouro suficiente."
         
     # Se o banco tem ouro, transfere para o jogador
-    new_gold_total = current_gold - amount
-    bank["gold"] = new_gold_total
+    bank["gold"] = current_gold - amount
     
-    player_data = player_manager.get_player_data(player_id)
-    player_manager.add_gold(player_data, amount)
+    player_data = player_manager.get_player_data(user_id)
+    player_data["gold"] = player_data.get("gold", 0) + amount
     
     # Salva ambas as entidades
     save_clan(clan_id, clan_data)
-    player_manager.save_player_data(player_id, player_data)
+    player_manager.save_player_data(user_id, player_data)
     
-    return new_gold_total
+    return True, f"Você retirou {amount:,} de ouro com sucesso."
+
 
 def assign_mission_to_clan(clan_id: str, mission_id: str, leader_id: int):
     """
@@ -457,7 +454,7 @@ def level_up_clan(clan_id: str, leader_id: int, payment_method: str):
     save_clan(clan_id, clan_data)
     player_manager.save_player_data(leader_id, leader_data)
 
-def remove_member(clan_id: str, user_id: int):
+def remove_member(clan_id: str, user_id: int, kicked_by_leader: bool = False): # <-- Argumento adicionado
     """Remove um membro da lista de membros de um clã."""
     clan_data = get_clan(clan_id)
     if not clan_data:
@@ -465,10 +462,16 @@ def remove_member(clan_id: str, user_id: int):
 
     if "members" in clan_data and user_id in clan_data["members"]:
         if clan_data.get("leader_id") == user_id:
-            raise ValueError("O líder não pode abandonar o clã.")
-            
+            raise ValueError("O líder não pode abandonar ou ser expulso do clã.")
+
         clan_data["members"].remove(user_id)
         save_clan(clan_id, clan_data)
+
+        # Aqui você poderia adicionar lógica futura baseada em 'kicked_by_leader'
+        if kicked_by_leader:
+            print(f"[LOG] O jogador {user_id} foi expulso do clã {clan_id}.")
+        else:
+            print(f"[LOG] O jogador {user_id} saiu do clã {clan_id}.")
 
 def transfer_leadership(clan_id: str, current_leader_id: int, new_leader_id: int):
     """Transfere a liderança de um clã para um novo membro."""

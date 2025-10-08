@@ -6,12 +6,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data
 from modules import file_ids as file_id_manager  # usa seu JSON de mídias
 from handlers.menu.kingdom import show_kingdom_menu
-
-# (opcional) botão da dungeon da Floresta Sombria
-#try:
-    #from handlers.dungeons.forest_dungeon_handler import forest_dungeon_button
-#except Exception:
- #   forest_dungeon_button = None
+from modules.dungeons.registry import get_dungeon_for_region
 
 
 def _humanize_duration(seconds: int) -> str:
@@ -185,8 +180,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
     keyboard.append([InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫 𝐌𝐨𝐧𝐬𝐭𝐫𝐨𝐬 ⚔️", callback_data=f'hunt_{region_key}')])
 
-    #if region_key == 'floresta_sombria' and callable(forest_dungeon_button):
-        #keyboard.append([forest_dungeon_button()])
 
     keyboard.append([InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦 👤", callback_data='profile')])
 

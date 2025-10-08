@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from modules import player_manager, game_data, file_id_manager
 from handlers.menu.kingdom import show_kingdom_menu  # ✅ import correto
+from handlers.utils import safe_update_message 
 
 # =============================================================================
 # FUNÇÕES DE EXIBIÇÃO
@@ -32,6 +33,19 @@ def _format_enchantments(enchantments: dict) -> str:
         parts.append(f"{emoji}+{val}")
     return f" [{', '.join(parts)}]" if parts else ""
 
+def _create_progress_bar(current_val: int, max_val: int, bar_char: str = '🟧', empty_char: str = '⬜️', length: int = 10) -> tuple[str, str]:
+    """Cria uma barra de progresso e a linha de texto correspondente."""
+    current_val, max_val = int(current_val), int(max_val)
+    if max_val <= 0:
+        bar = bar_char * length
+        line = f"{current_val}/— XP (nível máximo)"
+    else:
+        ratio = max(0.0, min(1.0, current_val / float(max_val)))
+        blocks = int(round(ratio * length))
+        bar = bar_char * blocks + empty_char * (length - blocks)
+        line = f"{current_val}/{max_val} XP"
+    return f"<code>[{bar}]</code>", line
+
 async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Tela principal da Ficha de Personagem."""
     user_id = update.effective_user.id
@@ -53,7 +67,7 @@ async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYP
     caption = f"Ficha de Personagem de <b>{player_data.get('character_name','Aventureiro(a)')}</b>"
 
     keyboard = [
-        [InlineKeyboardButton("⚜️ ꧁𓊈𒆜🅲🅻🅰🅽𒆜𓊉꧂ ⚜️", callback_data="clan_menu:profile")]
+        [InlineKeyboardButton("⚜️ ꧁𓊈𒆜🅲🅻🅰🅽𒆜𓊉꧂ ⚜️", callback_data="clan_menu:profile")],
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬", callback_data='char_status')],
         [InlineKeyboardButton("🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data='char_inventory')],
         [InlineKeyboardButton("⚔️ 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨", callback_data='char_equipment')],
@@ -80,9 +94,10 @@ async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_photo(chat_id=chat_id, photo=file_id, caption=caption,
                                          reply_markup=reply_markup, parse_mode='HTML')
     else:
+        # ✅ LINHA COMPLETADA AQUI
         await context.bot.send_message(chat_id=chat_id, text=caption,
                                        reply_markup=reply_markup, parse_mode='HTML')
-
+        
 async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra status, progressões e upgrade de atributos com barras robustas."""
     query = update.callback_query
@@ -109,51 +124,24 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             line += f" ({base_value} + {bonus})"
         caption += line + "\n"
 
-    # Progressão de combate (robusta a None/0 e nível máximo)
+    # ✅ Progressão de combate usando a nova função helper
     combat_level = int(player_data.get('level', 1))
     combat_xp = int(player_data.get('xp', 0))
-    try:
-        xp_to_next_raw = game_data.get_xp_for_next_combat_level(combat_level)
-        xp_to_next = int(xp_to_next_raw) if xp_to_next_raw is not None else 0
-    except Exception:
-        xp_to_next = 0
+    xp_to_next = game_data.get_xp_for_next_combat_level(combat_level) or 0
+    combat_bar, combat_line = _create_progress_bar(combat_xp, xp_to_next, '🟧')
+    caption += f"\n🎖️ <b>Nível de Combate: {combat_level}</b>\n{combat_bar} {combat_line}\n"
 
-    if xp_to_next <= 0:
-        bar_blocks = 10
-        xp_line = f"{combat_xp}/— XP (nível máximo)"
-    else:
-        prog_ratio = max(0.0, min(1.0, combat_xp / float(xp_to_next)))
-        bar_blocks = int(round(prog_ratio * 10))
-        xp_line = f"{combat_xp}/{xp_to_next} XP"
-
-    bar = '🟧' * bar_blocks + '⬜️' * (10 - bar_blocks)
-    caption += f"\n🎖️ <b>Nível de Combate: {combat_level}</b>\n<code>[{bar}]</code> {xp_line}\n"
-
-    # Profissão (só mostra se o jogador tiver uma)
+    # ✅ Profissão usando a nova função helper
     profession_data = player_data.get('profession', {}) or {}
     prof_type = profession_data.get('type')
     if prof_type:
         prof_level = int(profession_data.get('level', 1))
         prof_xp = int(profession_data.get('xp', 0))
-
-        try:
-            nx_raw = game_data.get_xp_for_next_collection_level(prof_level)
-            xp_to_next_prof = int(nx_raw) if nx_raw is not None else 0
-        except Exception:
-            xp_to_next_prof = 0
-
-        if xp_to_next_prof <= 0:
-            pblocks = 10
-            pxp_line = f"{prof_xp}/— XP (nível máximo)"
-        else:
-            p_ratio = max(0.0, min(1.0, prof_xp / float(xp_to_next_prof)))
-            pblocks = int(round(p_ratio * 10))
-            pxp_line = f"{prof_xp}/{xp_to_next_prof} XP"
-
-        pbar = '🟨' * pblocks + '⬜️' * (10 - pblocks)
+        xp_to_next_prof = game_data.get_xp_for_next_collection_level(prof_level) or 0
+        prof_bar, prof_line = _create_progress_bar(prof_xp, xp_to_next_prof, '🟨')
         prof_name = game_data.PROFESSIONS_DATA.get(prof_type, {}).get('display_name', prof_type)
         caption += (f"\n💼 <b>Profissão: {prof_name} (Nvl. {prof_level})</b>\n"
-                    f"<code>[{pbar}]</code> {pxp_line}\n")
+                    f"{prof_bar} {prof_line}\n")
 
     available_points = int(player_data.get('stat_points', 0))
     caption += f"\n✨ <b>Pontos Disponíveis: {available_points}</b>"
@@ -176,60 +164,53 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='char_sheet_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Sempre tentar editar CAPTION (a tela anterior geralmente é mídia); se falhar, reenvia como mídia/texto
-    try:
-        await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode='HTML')
-    except Exception:
-        try:
-            await query.delete_message()
-        except Exception:
-            pass
-
-        file_id_name = "default_character_img"
-        if player_class_key:
-            file_id_name = game_data.CLASSES_DATA.get(player_class_key, {}).get('file_id_name', "default_character_img")
-        file_data = file_id_manager.get_file_data(file_id_name)
-        chat_id = query.message.chat_id
-
-        if file_data and file_data.get("id"):
-            file_id, file_type = file_data["id"], file_data.get("type")
-            if file_type == 'video':
-                await context.bot.send_video(chat_id=chat_id, video=file_id, caption=caption,
-                                             reply_markup=reply_markup, parse_mode='HTML')
-            else:
-                await context.bot.send_photo(chat_id=chat_id, photo=file_id, caption=caption,
-                                             reply_markup=reply_markup, parse_mode='HTML')
-        else:
-            await context.bot.send_message(chat_id=chat_id, text=caption,
-                                           reply_markup=reply_markup, parse_mode='HTML')
-
+    # ✅ LÓGICA DE ATUALIZAÇÃO SIMPLIFICADA
+    # A função 'safe_update_message' de utils.py lida com a complexidade
+    # de editar ou reenviar a mensagem, mantendo este código limpo.
+    file_id_name = game_data.CLASSES_DATA.get(player_class_key, {}).get('file_id_name', "default_character_img")
+    file_data = file_id_manager.get_file_data(file_id_name)
+    
+    await safe_update_message(
+        update,
+        context,
+        new_text=caption,
+        new_reply_markup=reply_markup,
+        new_media_file_id=file_data.get("id"),
+        new_media_type=file_data.get("type", "photo")
+    )
 async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Inventário simplificado com itens únicos (ITEM_BASES) e materiais (ITEMS_DATA)."""
+    """Mostra o inventário separando itens equipáveis e materiais."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     player_data = player_manager.get_player_data(user_id)
     if not player_data:
-        await query.edit_message_text("Crie um personagem com /start primeiro.")
+        # Usando safe_update_message para editar a mensagem de erro
+        await safe_update_message(update, context, "Crie um personagem com /start primeiro.", None)
         return
 
     inventory = player_data.get('inventory', {}) or {}
     equipment = player_data.get('equipment', {}) or {}
-    equipped_item_uuids = set([v for v in equipment.values() if v])
+    equipped_item_uuids = set(v for v in equipment.values() if v)
 
-    caption = "🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨\n\n"
+    caption = "🎒 <b>Inventário</b>\n\n"
     keyboard = []
 
     equipable_items_text = ""
-    materials_text = "\n𝐌𝐚𝐭𝐞𝐫𝐢𝐚𝐢𝐬 𝐞 𝐈𝐭𝐞𝐧𝐬:\n"
+    materials_text = "\n<b>Materiais e Itens:</b>\n"
+    has_equipables = False
     has_materials = False
 
+    # ✅ LÓGICA CORRIGIDA: Um único loop que separa os itens pelo seu tipo de dado (dict vs int)
     for key, value in inventory.items():
-        if isinstance(value, dict):  # item único/equipável
+        # --- Processa Itens Equipáveis (são dicionários) ---
+        if isinstance(value, dict):
+            has_equipables = True
             base_id = value.get('base_id')
             base_meta = game_data.ITEM_BASES.get(base_id, {})
             if not base_meta:
                 continue
+            
             rarity = (value.get('rarity') or 'comum').lower()
             rarity_info = game_data.RARITY_DATA.get(rarity, {'emoji': '•', 'name': rarity})
             durability = value.get('durability', [0, 0])
@@ -238,32 +219,41 @@ async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
             display_name = base_meta.get('display_name', base_id)
 
             item_line = (f"<code>[{int(durability[0])}/{int(durability[1])}]</code> "
-                         f"{rarity_info.get('emoji','•')} {display_name} [ {tier} ]{enchants_str}\n")
+                         f"{rarity_info.get('emoji','•')} {display_name} [ T{tier} ]{enchants_str}\n")
             equipable_items_text += item_line
 
+            # Adiciona botão de equipar apenas se o item não estiver equipado
             if key not in equipped_item_uuids:
                 keyboard.append([InlineKeyboardButton(f"Equipar {display_name}", callback_data=f"equip_{key}")])
-        else:
-            item_name = game_data.ITEMS_DATA.get(key, {}).get('display_name', key)
-            materials_text += f"- {item_name}: {int(value)}\n"
+        
+        # --- Processa Materiais (são números inteiros) ---
+        elif isinstance(value, int) and value > 0:
             has_materials = True
+            item_name = game_data.ITEMS_DATA.get(key, {}).get('display_name', key)
+            materials_text += f"• {item_name}: {value}\n"
 
-    if not equipable_items_text:
-        equipable_items_text = "𝑽𝒐𝒄𝒆̂ 𝒏𝒂̃𝒐 𝒑𝒐𝒔𝒔𝒖𝒊 𝒊𝒕𝒆𝒏𝒔 𝒆𝒒𝒖𝒊𝒑𝒂́𝒗𝒆𝒊𝒔.\n"
+    # --- Montagem da Mensagem Final ---
+    if not has_equipables:
+        equipable_items_text = "Você não possui itens equipáveis.\n"
     if not has_materials:
         materials_text = ""
 
     final_caption = caption + equipable_items_text + materials_text
     if not inventory:
-        final_caption = "🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨\n\nSua mochila está vazia."
+        final_caption = "🎒 <b>Inventário</b>\n\nSua mochila está vazia."
 
-    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='char_sheet_main')])
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='char_sheet_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    try:
-        await query.edit_message_caption(caption=final_caption, reply_markup=reply_markup, parse_mode='HTML')
-    except Exception:
-        await query.edit_message_text(text=final_caption, reply_markup=reply_markup, parse_mode='HTML')
+    # ✅ LÓGICA DE ATUALIZAÇÃO SIMPLIFICADA
+    # Apenas uma chamada para a nossa função segura é necessária.
+    # Ela já lida com a tentativa de editar e, se falhar, apaga e reenvia.
+    await safe_update_message(
+        update, 
+        context, 
+        new_text=final_caption, 
+        new_reply_markup=reply_markup
+    )
 
 async def show_profession_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lista de profissões para escolha."""

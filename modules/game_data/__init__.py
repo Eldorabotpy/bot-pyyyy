@@ -1,8 +1,12 @@
 # modules/game_data/__init__.py
 
+import logging
+from telegram.ext import Application
+from .premium import PREMIUM_TIERS, PREMIUM_PLANS_FOR_SALE
 # --- Constantes globais ---
 TRAVEL_TIME_MINUTES = 15
 COLLECTION_TIME_MINUTES = 10
+
 
 def get_xp_for_next_collection_level(level: int) -> int:
     return 10 * (level ** 2) + 40
@@ -10,7 +14,6 @@ def get_xp_for_next_collection_level(level: int) -> int:
 def get_xp_for_next_combat_level(level: int) -> int:
     return 20 * (level ** 2) + 80
 
-# Helpers de import robusto (evita quebrar o pacote inteiro)
 def _safe_import(modpath, names: dict, defaults: dict):
     try:
         m = __import__(modpath, fromlist=list(names.values()))
@@ -22,7 +25,7 @@ def _safe_import(modpath, names: dict, defaults: dict):
         print(f"[game_data] Aviso: falha ao importar {modpath}: {e}")
         return defaults
 
-# --- Itens / Mercado (LEGADO: usados por forja antiga) ---
+# --- Itens / Mercado ---
 _vals = _safe_import(
     "modules.game_data.items",
     names={"ITEMS_DATA": "ITEMS_DATA", "ITEM_BASES": "ITEM_BASES", "MARKET_ITEMS": "MARKET_ITEMS"},
@@ -32,6 +35,47 @@ ITEMS_DATA = _vals["ITEMS_DATA"]
 ITEM_BASES = _vals["ITEM_BASES"]
 MARKET_ITEMS = _vals["MARKET_ITEMS"]
 
+# ✅ --- Classes ---
+# Adicionada uma nova secção para importar tudo de classes.py
+_classes = _safe_import(
+    "modules.game_data.classes",
+    names={
+        "CLASSES_DATA": "CLASSES_DATA",
+        "CLASS_PRIMARY_DAMAGE": "CLASS_PRIMARY_DAMAGE",
+        "CLASS_DMG_EMOJI": "CLASS_DMG_EMOJI",
+        "get_primary_damage_profile": "get_primary_damage_profile",
+        "get_stat_modifiers": "get_stat_modifiers",
+    },
+    defaults={
+        "CLASSES_DATA": {},
+        "CLASS_PRIMARY_DAMAGE": {},
+        "CLASS_DMG_EMOJI": {},
+        "get_primary_damage_profile": lambda *_: {},
+        "get_stat_modifiers": lambda *_: {},
+    }
+)
+CLASSES_DATA = _classes["CLASSES_DATA"]
+CLASS_PRIMARY_DAMAGE = _classes["CLASS_PRIMARY_DAMAGE"]
+CLASS_DMG_EMOJI = _classes["CLASS_DMG_EMOJI"]
+get_primary_damage_profile = _classes["get_primary_damage_profile"]
+get_stat_modifiers = _classes["get_stat_modifiers"]
+
+# ✅ --- Atributos / Afixos ---
+# Adicionamos esta nova secção para carregar os dados de attributes.py
+_attrs = _safe_import(
+    "modules.game_data.attributes",
+    names={
+        "STAT_EMOJI": "ATTRIBUTE_ICONS", # Renomeia ATTRIBUTE_ICONS para STAT_EMOJI
+        "AFFIX_POOLS": "AFFIX_POOLS",
+        "AFFIXES": "AFFIXES",
+    },
+    defaults={"STAT_EMOJI": {}, "AFFIX_POOLS": {}, "AFFIXES": {}}
+)
+STAT_EMOJI = _attrs["STAT_EMOJI"]
+AFFIX_POOLS = _attrs["AFFIX_POOLS"]
+AFFIXES = _attrs["AFFIXES"]
+
+
 # --- Premium ---
 PREMIUM_TIERS = _safe_import(
     "modules.game_data.premium",
@@ -40,13 +84,13 @@ PREMIUM_TIERS = _safe_import(
 )["PREMIUM_TIERS"]
 
 # --- Profissões ---
-_vals = _safe_import(
+_vals_prof = _safe_import(
     "modules.game_data.professions",
     names={"PROFESSIONS_DATA": "PROFESSIONS_DATA", "get_profession_for_resource": "get_profession_for_resource"},
     defaults={"PROFESSIONS_DATA": {}, "get_profession_for_resource": lambda *_: None}
 )
-PROFESSIONS_DATA = _vals["PROFESSIONS_DATA"]
-get_profession_for_resource = _vals["get_profession_for_resource"]
+PROFESSIONS_DATA = _vals_prof["PROFESSIONS_DATA"]
+get_profession_for_resource = _vals_prof["get_profession_for_resource"]
 
 # --- Mundo / Regiões ---
 WORLD_MAP = _safe_import(
@@ -215,6 +259,10 @@ __all__ = [
     "get_xp_for_next_collection_level", "get_xp_for_next_combat_level",
     "TRAVEL_DEFAULT_SECONDS",
     "ITEMS_DATA", "ITEM_BASES", "MARKET_ITEMS",
+    # Novas variáveis de classes
+    "CLASSES_DATA", "CLASS_PRIMARY_DAMAGE", "CLASS_DMG_EMOJI",
+    "get_primary_damage_profile", "get_stat_modifiers",
+    # Resto da lista
     "PREMIUM_TIERS",
     "PROFESSIONS_DATA", "get_profession_for_resource",
     "WORLD_MAP", "REGIONS_DATA", "REGION_TARGET_POWER", "REGION_SCALING_ENABLED",
@@ -224,5 +272,10 @@ __all__ = [
     "item_display_name", "get_item_info",
     "BASE_STATS_BY_RARITY", "RARITY_DATA", "AFFIX_POOLS", "AFFIXES",
     "CLASS_PRIMARY_ATTRIBUTE",
+    "CLAN_CONFIG", "CLAN_PRESTIGE_LEVELS" # Adicionado para garantir que é exportado
+    "STAT_EMOJI",
+    "AFFIX_POOLS", 
+    "AFFIXES",
 ]
+
 from .clans import CLAN_CONFIG, CLAN_PRESTIGE_LEVELS

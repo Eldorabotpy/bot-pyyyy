@@ -1,5 +1,6 @@
 # handlers/refining_handler.py
 import logging 
+import telegram
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -23,44 +24,61 @@ logger = logging.getLogger(__name__)
 # =========================
 # Helpers de UI e utilitários
 # =========================
-async def _send_with_refine_media(
+async def _safe_send_with_media(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
     caption: str,
     reply_markup=None,
+    media_key: str | None = None, # <-- Argumento opcional para a imagem
+    fallback_key: str = "refino_universal", # <-- Imagem padrão se a 1ª falhar
 ):
     """
-    Envia SEMPRE com o banner universal de refino ('refino_universal').
+    Tenta enviar uma mídia com uma chave específica (media_key).
+    Se falhar, tenta enviar com uma chave de fallback (fallback_key).
+    Se tudo falhar, envia como texto simples.
     """
-    fd = file_ids.get_file_data("refino_universal")
-    if not fd or not fd.get("id"):
+    keys_to_try = []
+    if media_key:
+        keys_to_try.append(media_key)
+    if fallback_key:
+        keys_to_try.append(fallback_key)
+
+    media_sent = False
+    for key in keys_to_try:
+        fd = file_ids.get_file_data(key)
+        if not fd or not fd.get("id"):
+            continue # Pula para a próxima chave se esta não tiver ID
+
+        media_id = fd["id"]
+        ftype = (fd.get("type") or "photo").lower()
+        
+        try:
+            if ftype == "video":
+                await context.bot.send_video(
+                    chat_id=chat_id, video=media_id, caption=caption, 
+                    reply_markup=reply_markup, parse_mode="HTML"
+                )
+            else:
+                await context.bot.send_photo(
+                    chat_id=chat_id, photo=media_id, caption=caption, 
+                    reply_markup=reply_markup, parse_mode="HTML"
+                )
+            media_sent = True
+            break # Sucesso! Para o loop.
+        except telegram.error.BadRequest as e:
+            if "Wrong file identifier" in str(e):
+                logger.warning(f"ID inválido para a chave '{key}'. Tentando a próxima.")
+                continue # O ID é inválido, tenta a próxima chave
+            else:
+                logger.exception(f"BadRequest inesperado ao enviar mídia com chave '{key}'.")
+                raise e # Erro inesperado, é melhor quebrar e investigar
+    
+    # Se, depois de todas as tentativas, nenhuma mídia foi enviada...
+    if not media_sent:
+        logger.info("Nenhuma mídia válida encontrada. Enviando como texto.")
         await context.bot.send_message(
-            chat_id=chat_id,
-            text=caption,
-            reply_markup=reply_markup,
-            parse_mode="HTML"  # <- garante HTML no fallback
+            chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML"
         )
-        return
-
-    media_id = fd["id"]
-    ftype = (fd.get("type") or "photo").lower()
-    if ftype == "video":
-        await context.bot.send_video(
-            chat_id=chat_id,
-            video=media_id,
-            caption=caption,
-            reply_markup=reply_markup,
-            parse_mode="HTML"
-        )
-    else:
-        await context.bot.send_photo(
-            chat_id=chat_id,
-            photo=media_id,
-            caption=caption,
-            reply_markup=reply_markup,
-            parse_mode="HTML"
-        )
-
 
 async def _try_edit_media(query, caption: str, reply_markup=None, media_key: str = "refino_universal") -> bool:
     """
@@ -102,24 +120,31 @@ async def _safe_edit_or_send_with_media(
     chat_id: int,
     caption: str,
     reply_markup=None,
-    media_key: str = "refino_universal" # <-- O novo argumento!
+    media_key: str = "refino_universal" # A chave de mídia que a função recebe
 ):
     """
-    Fluxo robusto que agora aceita uma 'media_key' personalizada.
+    Tenta editar uma mensagem. Se falhar, apaga a antiga e envia uma nova
+    usando a nossa função centralizada e robusta _safe_send_with_media.
     """
     # Tenta editar a mensagem atual com a nova mídia
     if await _try_edit_media(query, caption, reply_markup, media_key=media_key):
         return
 
-    # Se a edição falhar, apaga a mensagem antiga e envia uma nova
+    # Se a edição falhar, apaga a mensagem antiga
     try:
         await query.delete_message()
     except Exception:
         pass
     
-    # A função _send_with_refine_media era muito específica, vamos usar a lógica geral aqui
-    await _send_with_refine_media(context, chat_id, caption, reply_markup) # Esta função já está no seu ficheiro
-
+    # 👇 AQUI ESTÁ A CORREÇÃO 👇
+    # Em vez de chamar a função antiga, chamamos a nova, passando o media_key
+    await _safe_send_with_media(
+        context,
+        chat_id,
+        caption,
+        reply_markup,
+        media_key=media_key
+    )
 
 def _fmt_minutes_or_seconds(seconds: int) -> str:
     """Formata segundos para 'X min' ou 'Ys'."""
@@ -146,9 +171,8 @@ def _fmt_item_line(item_id: str, qty: int) -> str:
 # Handlers
 # =========================
 
-# Em handlers/refining_handler.py
-
 async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("\n>>> DENTRO DO refining_main_callback! O BOTÃO DE REFINO FOI ATIVADO! <<<\n", flush=True)
     """
     Lista TODAS as receitas de refino e agora também o botão para Desmontar.
     """
@@ -550,45 +574,31 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id, chat_id = job.user_id, job.chat_id
 
-    # finish_refine já adiciona os itens ao inventário
+    # --- Bloco 1: Lógica do Jogo (permanece igual) ---
     res = finish_refine(user_id)
-    
     if isinstance(res, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ {res}")
         return
-        
     if not res:
         return
 
-    # Se a resposta for um dicionário com conteúdo, a ação foi um sucesso.
     outs = res.get("outputs") or {}
-    
-    # --- Bloco 1: Integração das Missões ---
     player_data = player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
 
     if player_data and outs:
-        # Iteramos por cada item que foi refinado
         for item_id, quantity in outs.items():
-            # 2a. Atualiza a Missão Pessoal
             mission_manager.update_mission_progress(
-                player_data,
-                'REFINE',
-                details={'item_id': item_id, 'quantity': quantity}
+                player_data, 'REFINE', details={'item_id': item_id, 'quantity': quantity}
             )
-            
-            # 2b. Atualiza a Missão de Guilda
             if clan_id:
-                clan_manager.update_guild_mission_progress(
-                    clan_id=clan_id,
-                    mission_type='REFINE',
-                    details={'item_id': item_id, 'count': quantity}
+                await clan_manager.update_guild_mission_progress(
+                    clan_id=clan_id, mission_type='REFINE',
+                    details={'item_id': item_id, 'count': quantity}, context=context
                 )
-        
-        # Salvamos os dados do jogador no final para persistir o progresso da missão pessoal.
         player_manager.save_player_data(user_id, player_data)
     
-    # --- Bloco 2: Preparação da Mensagem ---
+    # --- Bloco 2: Preparação da Mensagem (permanece igual) ---
     lines = ["✅ <b>Refino concluído!</b>", "Você obteve:"]
     for k, v in outs.items():
         lines.append(f"• {_fmt_item_line(k, v)}")
@@ -598,32 +608,24 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 à𝐬 𝐫𝐞𝐜𝐞𝐢𝐭𝐚𝐬", callback_data="ref_main")]
     ])
 
-    # --- Bloco 3: Lógica de Envio de Mídia (com imagem específica) ---
-    media_data = None
+    # --- Bloco 3: Lógica de Envio de Mídia (AGORA SUPER SIMPLES) ---
+    specific_media_key = None
     if outs:
         item_id_para_imagem = list(outs.keys())[0]
         item_info = (game_data.ITEMS_DATA or {}).get(item_id_para_imagem, {})
-        
-        media_key = item_info.get("media_key")
-        if media_key:
-            media_data = file_ids.get_file_data(media_key)
-
-    if media_data and media_data.get("id"):
-        media_id = media_data["id"]
-        media_type = (media_data.get("type") or "photo").lower()
-        
-        try:
-            if media_type == "video":
-                await context.bot.send_video(chat_id=chat_id, video=media_id, caption=caption, reply_markup=kb, parse_mode="HTML")
-            else:
-                await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=caption, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            await _send_with_refine_media(context, chat_id, caption, kb)
-    else:
-        await _send_with_refine_media(context, chat_id, caption, kb)
-        
+        specific_media_key = item_info.get("media_key") # Pode ser None se não houver
+    
+    # Fazemos uma única chamada para a nossa função robusta!
+    await _safe_send_with_media(
+        context,
+        chat_id,
+        caption,
+        kb,
+        media_key=specific_media_key # Tenta esta chave primeiro
+        # Se specific_media_key for None ou inválida, a função usará 'refino_universal'
+    )
         # =========================
-refining_main_handler = CallbackQueryHandler(refining_main_callback, pattern=r"^ref_main$")
+refining_main_handler = CallbackQueryHandler(refining_main_callback, pattern=r"^(refining_main|ref_main)$")
 ref_select_handler    = CallbackQueryHandler(ref_select_callback,   pattern=r"^ref_sel_[A-Za-z0-9_]+$")
 ref_confirm_handler   = CallbackQueryHandler(ref_confirm_callback,  pattern=r"^ref_confirm_[A-Za-z0-9_]+$")
 dismantle_list_handler = CallbackQueryHandler(show_dismantle_list_callback, pattern=r"^ref_dismantle_list(:page:\d+)?$")

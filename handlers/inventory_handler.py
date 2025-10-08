@@ -280,6 +280,8 @@ def _merge_legacy_crystals_view(inventory: dict, player_data: dict) -> dict:
 
 # ---------------------------------------------------------------------------
 
+# Em handlers/inventory_handler.py
+
 async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Inventário com abas + paginação.
@@ -316,22 +318,15 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     inventory = _merge_legacy_crystals_view(raw_inventory, player_data)
 
     # UIDs equipados (não listar)
-    equipped_uids = set()
-    eq = player_data.get("equipment", {}) or {}
-    for v in (eq.values() if isinstance(eq, dict) else []):
-        if isinstance(v, str) and v:
-            equipped_uids.add(v)
+    equipped_uids = {v for v in (player_data.get("equipment", {}) or {}).values() if isinstance(v, str) and v}
 
     # 1) Filtra por aba
     filtered_items = []
-    unknown_for_log = []
     for item_key, item_value in inventory.items():
-        # ignora moeda antiga
         if item_key in {"ouro", "gold"}:
             continue
 
         if isinstance(item_value, dict):
-            # item único/instância
             if item_key in equipped_uids:
                 continue
             base_id = item_value.get("base_id")
@@ -339,7 +334,6 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             tab = _item_tab_for(item_info, base_id or item_key, item_value)
             key_for_name = base_id or item_key
         else:
-            # empilhável
             item_info = _info_for(item_key)
             tab = _item_tab_for(item_info, item_key, item_value)
             key_for_name = item_key
@@ -347,14 +341,103 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if tab == category_key:
             filtered_items.append((key_for_name, item_value))
 
-        # log de ausência no banco (ajuda a completar ITEMS_DATA depois)
-        if not item_info:
-            unknown_for_log.append(key_for_name)
-
-    if unknown_for_log:
-        logger.debug("[INV] Itens sem entrada em ITEMS_DATA/ITEM_BASES: %s", sorted(set(unknown_for_log)))
-
     # Ordena por nome de exibição
+    def _display_name(pair):
+        k, v = pair
+        return _display_name_for_instance(k, v) if isinstance(v, dict) else _name_for_key(k)
+    filtered_items.sort(key=_display_name)
+
+    # 2) Paginação
+    total_pages = max(1, math.ceil(len(filtered_items) / ITEMS_PER_PAGE))
+    current_page = min(current_page, total_pages)
+    start = (current_page - 1) * ITEMS_PER_PAGE
+    end = start + ITEMS_PER_PAGE
+    items_on_page = filtered_items[start:end]
+
+    # 3) Texto (header)
+    gold_amt = player_manager.get_gold(player_data)
+    diamonds_amt = _get_diamonds_amount(player_data)
+    label = CATEGORIES.get(category_key, "Inventário")
+    header = (
+        f"🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 — {label} (Página {current_page}/{total_pages})\n"
+        f"🪙 𝐎𝐮𝐫𝐨: {gold_amt:,}   💎 𝐃𝐢𝐚𝐦𝐚𝐧𝐭𝐞𝐬: {diamonds_amt}\n\n"
+    )
+
+    # 4) Corpo da lista de itens
+    body_text = ""
+    if not items_on_page:
+        body_text = "Nenhum item nesta categoria."
+    else:
+        for item_key, item_value in items_on_page:
+            if isinstance(item_value, dict):
+                body_text += f"{_render_item_line_safe(item_value)}\n"
+            else:
+                qty = int(item_value)
+                info = _info_for(item_key)
+                emoji = info.get("emoji", "")
+                item_name = info.get("display_name") or _humanize_key(item_key)
+                body_text += f"• {emoji + ' ' if emoji else ''}{item_name}: <b>{qty}</b>\n"
+
+    inventory_text = header + body_text
+
+    # 5) Teclado
+    keyboard = []
+    # ... (a sua lógica de criação do teclado continua igual)
+    row_tabs = [InlineKeyboardButton(f"✅ {lbl}" if key == category_key else lbl, callback_data=f"inventory_CAT_{key}_PAGE_1") for key, lbl in CATEGORIES.items()]
+    keyboard.append(row_tabs)
+    
+    pag_buttons = []
+    if current_page > 1: pag_buttons.append(InlineKeyboardButton("◀️", callback_data=f"inventory_CAT_{category_key}_PAGE_{current_page - 1}"))
+    pag_buttons.append(InlineKeyboardButton(f"- {current_page} -", callback_data="noop_inventory"))
+    if current_page < total_pages: pag_buttons.append(InlineKeyboardButton("▶️", callback_data=f"inventory_CAT_{category_key}_PAGE_{current_page + 1}"))
+    if pag_buttons: keyboard.append(pag_buttons)
+
+    keyboard.append([InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬", callback_data="equipment_menu")])
+    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # =========================================================
+    # LÓGICA DE ENVIO ROBUSTA (PLANO A, B e C)
+    # =========================================================
+    fd = (
+        file_ids.get_file_data("img_inventario")
+        or file_ids.get_file_data("inventario_img")
+        or file_ids.get_file_data("inventory_img")
+    )
+    media_id = fd.get("id") if fd else None
+
+    # --- PLANO A: Tentar editar a mídia (se a mensagem já for uma mídia) ---
+    if media_id:
+        try:
+            media_type = (fd.get("type") or "photo").lower()
+            media_input = InputMediaVideo(media=media_id, caption=inventory_text, parse_mode="HTML") if media_type == "video" else InputMediaPhoto(media=media_id, caption=inventory_text, parse_mode="HTML")
+            await query.edit_message_media(media=media_input, reply_markup=reply_markup)
+            return  # Sucesso!
+        except Exception:
+            pass  # Se falhar, tentará o Plano B.
+
+    # --- PLANO B: Apagar a mensagem antiga e enviar uma nova ---
+    try:
+        await query.delete_message()
+    except Exception:
+        pass
+    
+    # PLANO B.1: Tentar enviar nova mensagem COM mídia
+    if media_id:
+        try:
+            media_type = (fd.get("type") or "photo").lower()
+            if media_type == "video":
+                await context.bot.send_video(chat_id=chat_id, video=media_id, caption=inventory_text, reply_markup=reply_markup, parse_mode="HTML")
+            else:
+                await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=inventory_text, reply_markup=reply_markup, parse_mode="HTML")
+            return # Sucesso!
+        except Exception as e:
+            logger.warning(f"Falha ao enviar mídia do inventário (ID: {media_id}). Erro: {e}. Usando fallback de texto.")
+            # Se falhar, continua para o Plano C.
+
+    # --- PLANO C: Fallback final para mensagem de texto simples ---
+    # Só executa se não houver mídia ou se todos os planos anteriores falharem.
+    await context.bot.send_message(chat_id=chat_id, text=inventory_text, reply_markup=reply_markup, parse_mode="HTML")    # Ordena por nome de exibição
     def _display_name(pair):
         k, v = pair
         if isinstance(v, dict):

@@ -1,58 +1,98 @@
 # handlers/crafting_handler.py
+
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+
+from telegram import (
+    Update,
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 from telegram.ext import ContextTypes, CallbackQueryHandler
+
+# --- Importação da Função de Destino ---
+# Importamos diretamente a função que deve ser chamada quando o jogador entra na forja.
+# Esta função é responsável por mostrar as profissões (Ferreiro, Artesão, etc.).
+try:
+    from .forge_handler import show_forge_professions_menu
+    # Definimos a variável `CRAFT_IMPL` para ser a nossa função de destino.
+    # Isso torna o código mais limpo e fácil de entender.
+    CRAFT_IMPL = show_forge_professions_menu
+except ImportError:
+    # Se a função não for encontrada, definimos como None e avisamos no log.
+    logging.getLogger(__name__).error(
+        "CRITICAL: A função 'show_forge_professions_menu' não foi encontrada em 'handlers/forge_handler.py'."
+    )
+    CRAFT_IMPL = None
+
+
+# --- Módulos do Jogo ---
+# Mantemos os outros imports que podem ser úteis em futuras expansões.
+from modules import player_manager, mission_manager, game_data, crafting_engine, crafting_registry, file_ids, clan_manager
+
 
 logger = logging.getLogger(__name__)
 
-# tenta importar o menu real da forja com alguns nomes comuns
-CRAFT_IMPL = None
-try:
-    # 1) se você tem menu/crafting.py
-    from .menu.crafting import show_crafting_menu as CRAFT_IMPL  # type: ignore
-except Exception:
-    try:
-        # 2) se você usa crafting_handler com função craft_main/craft_open
-        from .crafting_handler import craft_main as CRAFT_IMPL  # type: ignore
-    except Exception:
-        try:
-            from .crafting_handler import craft_open as CRAFT_IMPL  # type: ignore
-        except Exception:
-            CRAFT_IMPL = None
 
-async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
+async def _safe_edit_or_send(
+    query: CallbackQuery,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    text: str,
+    reply_markup: InlineKeyboardMarkup = None,
+    parse_mode: str = 'HTML'
+):
+    """
+    Função utilitária para editar uma mensagem existente ou enviar uma nova,
+    evitando erros caso a mensagem original não possa ser editada.
+    """
     try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return
     except Exception:
-        pass
+        pass  # Ignora erro de edição de legenda e tenta a próxima
     try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return
     except Exception:
-        pass
+        pass  # Ignora erro de edição de texto e envia uma nova mensagem
+    
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
+
 async def craft_open_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Roteia o callback do botão 'Forjar item' para a implementação real."""
-    q = update.callback_query
-    await q.answer()
-    chat_id = q.message.chat.id
+    """
+    Roteador principal para o fluxo de forja.
+
+    Esta função é acionada por um CallbackQuery e sua única responsabilidade
+    é chamar a função de implementação real da forja (`CRAFT_IMPL`).
+    """
+    query = update.callback_query
+    logger.info(f"Roteador de Forja ativado pelo callback: '{query.data}'")
+    await query.answer()
 
     if CRAFT_IMPL:
-        # chama o menu real da forja
         try:
+            # Chama a função de destino passando os argumentos padrão 'update' e 'context'.
+            # Isso garante que a função chamada tenha acesso a todo o contexto da atualização.
             await CRAFT_IMPL(update, context)
             return
-        except Exception:
-            logger.exception("Falha ao chamar a implementação real da Forja")
-            # cai no fallback abaixo
-    # fallback visual para não travar
+        except Exception as e:
+            logger.exception(f"Falha ao executar a implementação da forja (CRAFT_IMPL): {e}")
+    
+    # Mensagem de fallback caso CRAFT_IMPL não esteja definido ou ocorra um erro.
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Voltar", callback_data="navigate_reino_eldora")]
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")]
     ])
-    await _safe_edit_or_send(q, context, chat_id, "⚒️ Forja: não encontrei o handler de craft configurado.", kb)
+    error_text = "⚒️ **Erro na Forja** ⚒️\n\nNão foi possível iniciar o sistema de forja. Por favor, avise um administrador."
+    await _safe_edit_or_send(query, context, query.message.chat.id, error_text, kb)
 
-# Capture vários nomes possíveis usados no seu projeto
+
+# --- Definição do Handler ---
+# Este handler captura os diferentes callbacks que podem iniciar o fluxo de forja.
 craft_open_handler = CallbackQueryHandler(
     craft_open_router,
-    pattern=r'^(open_crafting|craft_main|craft_open|forge_craft)$'
+    # O padrão regex foi atualizado para incluir 'forge:main',
+    # que é o callback usado nos menus principais.
+    pattern=r'^(open_crafting|craft_main|craft_open|forge_craft|forge:main)$'
 )

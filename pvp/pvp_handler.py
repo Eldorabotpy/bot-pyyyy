@@ -14,24 +14,11 @@ from modules import player_manager, file_ids
 
 logger = logging.getLogger(__name__)
 
-# --- Constantes dos Botões ---
-# (Usar constantes torna o código mais fácil de manter)
+
 PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
 PVP_HISTORICO = "pvp_historico"
 
-# --- Funções dos Botões (Placeholders) ---
-
-# Em pvp/pvp_handler.py
-
-# Em pvp/pvp_handler.py
-
-# Em pvp/pvp_handler.py
-
-# (Garanta que 'random' está importado no topo do arquivo)
-import random
-
-# Em pvp/pvp_handler.py
 
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -201,7 +188,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup, parse_mode="HTML"
     )
 
-# Em pvp/pvp_handler.py
+
 
 async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
