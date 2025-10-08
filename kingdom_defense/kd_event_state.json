@@ -1,0 +1,94 @@
+{
+    "is_active": true,
+    "visual_mode": true,
+    "current_wave_num": 1,
+    "participants_status": {
+        "7262799478": {
+            "hp": 280,
+            "max_hp": 280,
+            "name": "Bastos ADM",
+            "damage_dealt": 194
+        }
+    },
+    "wave_mobs": [
+        {
+            "name": "Goblin Batedor",
+            "hp": 40,
+            "attack": 5,
+            "defense": 1,
+            "initiative": 8,
+            "luck": 5,
+            "reward": 5,
+            "media_key": "goblin_batedor_media"
+        },
+        {
+            "name": "Goblin Batedor",
+            "hp": 40,
+            "attack": 5,
+            "defense": 1,
+            "initiative": 8,
+            "luck": 5,
+            "reward": 5,
+            "media_key": "goblin_batedor_media"
+        },
+        {
+            "name": "Goblin Batedor",
+            "hp": 40,
+            "attack": 5,
+            "defense": 1,
+            "initiative": 8,
+            "luck": 5,
+            "reward": 5,
+            "media_key": "goblin_batedor_media"
+        },
+        {
+            "name": "Goblin Batedor",
+            "hp": 40,
+            "attack": 5,
+            "defense": 1,
+            "initiative": 8,
+            "luck": 5,
+            "reward": 5,
+            "media_key": "goblin_batedor_media"
+        },
+        {
+            "name": "Goblin Batedor",
+            "hp": 40,
+            "attack": 5,
+            "defense": 1,
+            "initiative": 8,
+            "luck": 5,
+            "reward": 5,
+            "media_key": "goblin_batedor_media"
+        },
+        {
+            "name": "Goblin Batedor",
+            "hp": 40,
+            "attack": 5,
+            "defense": 1,
+            "initiative": 8,
+            "luck": 5,
+            "reward": 5,
+            "media_key": "goblin_batedor_media"
+        },
+        {
+            "name": "Xamã Goblin",
+            "hp": 550,
+            "attack": 18,
+            "defense": 8,
+            "initiative": 7,
+            "luck": 6,
+            "reward": 50,
+            "media_key": "xama_goblin_media"
+        }
+    ],
+    "total_mobs_in_wave": 11,
+    "battle_log": [
+        "⚔️ Bastos ADM ataca (97 dano)!",
+        "☠️ Goblin Batedor foi derrotado!",
+        "⚡ Bastos ADM encontra um Goblin Batedor!",
+        "⚔️ Bastos ADM ataca (97 dano)!",
+        "☠️ Goblin Batedor foi derrotado!"
+    ],
+    "battle_message": {}
+}

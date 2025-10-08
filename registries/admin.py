@@ -16,6 +16,8 @@ from handlers.admin_handler import (
     admin_force_start_handler,
     admin_force_end_handler,
     admin_force_ticket_handler,
+    test_event_conv_handler,
+    get_id_command_handler,
 )
 
 # --- Handlers dos sub-paineis ---
@@ -49,3 +51,6 @@ def register_admin_handlers(application: Application):
     application.add_handler(premium_panel_handler)
     application.add_handler(reset_panel_conversation_handler)
     application.add_handler(generate_equip_conv_handler)
+    application.add_handler(test_event_conv_handler)
+    application.add_handler(get_id_command_handler)
+    

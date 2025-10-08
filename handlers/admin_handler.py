@@ -34,13 +34,38 @@ from kingdom_defense.engine import event_manager
 
 # --- Constantes ---
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-(SELECT_CACHE_ACTION, ASK_USER_FOR_CACHE_CLEAR) = range(2)
 logger = logging.getLogger(__name__)
 HTML = "HTML"
+
+(SELECT_CACHE_ACTION, ASK_USER_FOR_CACHE_CLEAR) = range(2)
+(SELECT_TEST_ACTION, ASK_WAVE_NUMBER) = range(2, 4)
 
 # =========================================================
 # MENUS E TECLADOS (Keyboards)
 # =========================================================
+
+async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    thread_id = update.effective_message.message_thread_id
+
+    # Usando formatação HTML com a tag <code> para um visual similar
+    text = (
+        f"<b>INFORMAÇÕES DE ID:</b>\n"
+        f"--------------------------\n"
+        f"ID do Grupo (chat_id): <code>{chat_id}</code>\n"
+        f"ID do Tópico (thread_id): <code>{thread_id}</code>"
+    )
+    # Trocando o parse_mode para HTML
+    await update.message.reply_text(text, parse_mode="HTML")
+
+def _admin_test_menu_kb() -> InlineKeyboardMarkup:
+    """O submenu de teste para o evento de defesa."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 Iniciar em Wave Específica", callback_data="test_start_at_wave")],
+        # Você pode adicionar mais botões de teste aqui no futuro
+        # [InlineKeyboardButton("👻 Adicionar Jogadores-Fantasma", callback_data="test_add_dummies")],
+        [InlineKeyboardButton("⬅️ Voltar ao Painel Principal", callback_data="admin_main")],
+    ])
 
 def _admin_event_menu_kb() -> InlineKeyboardMarkup:
     """O submenu de gerenciamento de eventos."""
@@ -59,6 +84,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
         [InlineKeyboardButton("👑 𓂀 ℙ𝕣𝕖𝕞𝕚𝕦𝕞 𓂀", callback_data="admin_premium")],
         [InlineKeyboardButton("🎉 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔼𝕧𝕖𝕟𝕥𝕠𝕤 𓂀 🎉", callback_data="admin_event_menu")],
+        [InlineKeyboardButton("🔬 𓂀 Painel de Teste de Evento 𓂀 🔬", callback_data="admin_test_menu")],
         [InlineKeyboardButton("📁 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔽𝕚𝕝𝕖 𝕀𝔻𝕤 𓂀", callback_data="admin_file_ids")],
         [InlineKeyboardButton("🧹 𓂀 ℝ𝕖𝕤𝕖𝕥/ℝ𝕖𝕤𝕡𝕖𝕔 𓂀", callback_data="admin_reset_menu")],
         [InlineKeyboardButton("🧽 𓂀 𝕃𝕚𝕞𝕡𝕒𝕣 ℂ𝕒𝕔𝕙𝕖 𓂀", callback_data="admin_clear_cache")],
@@ -92,6 +118,60 @@ async def _safe_edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE, te
     chat_id = update.effective_chat.id
     await context.bot.send_message(chat_id=chat_id, text=text, parse_mode=HTML, reply_markup=reply_markup)
 
+async def _handle_admin_test_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entrada para o menu de teste de evento."""
+    await _safe_answer(update)
+    await _safe_edit_text(update, context, "🔬 **Painel de Teste de Evento**\n\nO que você gostaria de fazer?", _admin_test_menu_kb())
+    return SELECT_TEST_ACTION
+
+async def _test_ask_wave_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Pede ao admin para enviar o número da wave."""
+    await _safe_answer(update)
+    await _safe_edit_text(update, context, "🔢 Por favor, envie o número da wave que você deseja testar.\n\nUse /cancelar para voltar.")
+    return ASK_WAVE_NUMBER
+
+async def _test_start_specific_wave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Inicia o evento na wave especificada pelo admin."""
+    try:
+        wave_num = int(update.message.text)
+    except (ValueError, TypeError):
+        await update.message.reply_text("❌ Isso não parece ser um número válido. Tente novamente ou use /cancelar.")
+        return ASK_WAVE_NUMBER
+    
+    await update.message.reply_text(f"🚀 Iniciando evento de teste na wave {wave_num}...")
+    
+    # Chama a nova função do engine
+    result = event_manager.start_event_at_wave(wave_num)
+
+    if "message" in result: # Trata mensagens de erro como "evento já ativo"
+        await update.message.reply_text(result["message"])
+        await _send_admin_menu(update.effective_chat.id, context)
+        return ConversationHandler.END
+
+    # Envia a mensagem do evento (código reutilizado de start_event_from_admin)
+    if file_id := result.get("file_id"):
+        message = await context.bot.send_photo(
+            chat_id=update.effective_chat.id, photo=file_id, caption=result.get("caption"),
+            reply_markup=_get_battle_keyboard(), parse_mode=HTML # Você precisa importar _get_battle_keyboard
+        )
+    else:
+        message = await context.bot.send_message(
+            chat_id=update.effective_chat.id, text=result.get("text"),
+            reply_markup=_get_battle_keyboard(), parse_mode=HTML
+        )
+    
+    if message:
+        event_manager.set_battle_message_info(message.message_id, message.chat.id)
+
+    # Retorna ao menu principal do admin
+    await _send_admin_menu(update.effective_chat.id, context)
+    return ConversationHandler.END
+
+async def _test_cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancela a operação de teste e retorna ao menu principal."""
+    await update.message.reply_text("Operação de teste cancelada.")
+    await _send_admin_menu(update.effective_chat.id, context)
+    return ConversationHandler.END
 
 # --- Funções do Painel Principal e Comandos ---
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -241,6 +321,8 @@ async def inspect_item_command(update: Update, context: ContextTypes.DEFAULT_TYP
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
 # =========================================================
 
+from kingdom_defense.handler import _get_battle_keyboard
+
 # Handlers de Comando
 admin_command_handler = CommandHandler("admin", admin_command, filters=filters.User(ADMIN_ID))
 delete_player_handler = CommandHandler("delete_player", _delete_player_command, filters=filters.User(ADMIN_ID))
@@ -256,6 +338,8 @@ admin_event_menu_handler = CallbackQueryHandler(_handle_admin_event_menu, patter
 admin_force_start_handler = CallbackQueryHandler(start_event_from_admin, pattern="^admin_event_force_start$")
 admin_force_end_handler = CallbackQueryHandler(_handle_force_end_event, pattern="^admin_event_force_end$")
 admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern="^admin_event_force_ticket$")
+get_id_command_handler = CommandHandler("get_id", get_id_command, filters=filters.User(ADMIN_ID))
+#get_id_command_handler = CommandHandler("get_id", get_id_command)
 
 # Handler de Conversa para Limpeza de Cache
 clear_cache_conv_handler = ConversationHandler(
@@ -275,3 +359,23 @@ clear_cache_conv_handler = ConversationHandler(
     ],
     per_message=False
 )
+
+test_event_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(_handle_admin_test_menu, pattern=r"^admin_test_menu$")],
+    states={
+        SELECT_TEST_ACTION: [
+            CallbackQueryHandler(_test_ask_wave_number, pattern="^test_start_at_wave$"),
+        ],
+        ASK_WAVE_NUMBER: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, _test_start_specific_wave)
+        ],
+    },
+    fallbacks=[
+        CommandHandler("cancelar", _test_cancel_conv),
+        CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$") # Voltar ao menu
+    ],
+    per_message=False,
+    # Permite que outros handlers funcionem enquanto a conversa está ativa
+    block=False 
+)
+
