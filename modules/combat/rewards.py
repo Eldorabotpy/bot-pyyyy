@@ -3,6 +3,7 @@ import logging
 import random
 from collections import Counter
 from modules import player_manager, game_data, mission_manager, clan_manager
+from modules.player.premium import PremiumManager
 
 def calculate_victory_rewards(player_data: dict, combat_details: dict) -> tuple[int, int, list]:
     """
@@ -11,9 +12,18 @@ def calculate_victory_rewards(player_data: dict, combat_details: dict) -> tuple[
     """
     clan_id = player_data.get("clan_id")
 
-    # Multiplicadores de Recompensa
-    xp_mult = float(player_manager.get_player_perk_value(player_data, 'xp_multiplier', 1.0))
-    gold_mult = float(player_manager.get_player_perk_value(player_data, 'gold_multiplier', 1.0))
+    # =================================================================
+    # --- INÍCIO DA CORREÇÃO ---
+    # 1. Instanciamos o PremiumManager com os dados do jogador
+    premium = PremiumManager(player_data)
+
+    # 2. Buscamos os perks de multiplicador usando o método correto
+    xp_mult = float(premium.get_perk_value('xp_multiplier', 1.0))
+    gold_mult = float(premium.get_perk_value('gold_multiplier', 1.0))
+    # =================================================================
+    # --- FIM DA CORREÇÃO ---
+
+    # A sua lógica de buffs de clã continua aqui, intacta e funcional!
     if clan_id:
         clan_buffs = clan_manager.get_clan_buffs(clan_id)
         xp_mult += clan_buffs.get("xp_bonus_percent", 0) / 100.0
@@ -22,7 +32,7 @@ def calculate_victory_rewards(player_data: dict, combat_details: dict) -> tuple[
     xp_reward = int(float(combat_details.get('monster_xp_reward', 0)) * xp_mult)
     gold_reward = int(float(combat_details.get('monster_gold_drop', 0)) * gold_mult)
     
-    # Loot
+    # Loot (sua lógica original, sem alterações)
     looted_items = []
     for item in combat_details.get('loot_table', []):
         if random.random() * 100 <= float(item.get('drop_chance', 0)):
