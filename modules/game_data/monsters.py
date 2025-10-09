@@ -166,7 +166,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "loot_table": [
                 {"item_id": "olho_de_basilisco", "drop_chance": 10},
-                {"item_id": "pedra_do_aprimoramento", "drop_chance": 0.5}
+              
             ],
         },
     ],
@@ -193,7 +193,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "loot_table": [
                 {"item_id": "pano_simples", "drop_chance": 5},
-                {"item_id": "joia_da_criacao", "drop_chance": 5}
+                
             ],
         },
         {
@@ -217,7 +217,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "loot_table": [
                 {"item_id": "couro_de_lobo", "drop_chance": 7},
-                {"item_id": "pedra_do_aprimoramento", "drop_chance": 10}
+                
             ],
         },
         {
@@ -229,7 +229,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "loot_table": [
                 {"item_id": "gema_bruta", "drop_chance": 5},
-                {"item_id": "joia_da_criacao", "drop_chance": 7}
+              
             ],
         },
         {
@@ -241,7 +241,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "loot_table": [
                 {"item_id": "ectoplasma", "drop_chance": 8},
-                {"item_id": "joia_da_criacao", "drop_chance": 6}
+                
             ],
         },
     ],
@@ -268,7 +268,7 @@ MONSTERS_DATA = {
             "file_id_name": "grifo_jovem_media",
             "loot_table": [
                 {"item_id": "pena", "drop_chance": 9},
-                {"item_id": "pedra_do_aprimoramento", "drop_chance": 10}
+            
             ],
         },
         {
@@ -280,7 +280,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "loot_table": [
                 {"item_id": "gema_bruta", "drop_chance": 2},
-                {"item_id": "joia_da_criacao", "drop_chance": 4}
+                
             ],
         },
         {
@@ -302,7 +302,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "file_id_name": "wyvern_filhote_media",
             "loot_table": [
-                {"item_id": "pedra_do_aprimoramento", "drop_chance": 8},
+              
                 {"item_id": "gema_bruta", "drop_chance": 10}
             ],
         },
