@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes
 from .data import WAVE_DEFINITIONS  # Importamos nossa estrutura de ondas
 from modules import player_manager # Para gerenciar dados e inventário do jogador
 from modules.player import stats as player_stats_engine
+from . import leaderboard
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,34 @@ class KingdomDefenseManager:
         return {"success": "Evento iniciado com sucesso!"}
 
     def end_event(self):
-        logger.info("Encerrando evento de Defesa do Reino.")
+        """Encerra o evento, calcula o melhor jogador e limpa os dados."""
+        logger.info("Encerrando evento de Defesa do Reino...")
+
+        # --- NOVA LÓGICA PARA SALVAR O RECORDE ---
+        top_scorer = None
+        max_damage = 0
+
+        # Itera sobre todos os estados de jogador do evento que acabou
+        for user_id_str, state in self.player_states.items():
+            if state.get('damage_dealt', 0) > max_damage:
+                max_damage = state['damage_dealt']
+                player_data = player_manager.get_player_data(int(user_id_str))
+                if player_data:
+                    top_scorer = {
+                        "user_id": int(user_id_str),
+                        "character_name": player_data.get("character_name", "Herói"),
+                        "damage": max_damage
+                    }
+        
+        # Se encontramos um jogador com dano, tentamos atualizar o recorde
+        if top_scorer:
+            leaderboard.update_top_score(
+                user_id=top_scorer["user_id"],
+                character_name=top_scorer["character_name"],
+                damage=top_scorer["damage"]
+            )
+        # --- FIM DA NOVA LÓGICA ---
+
         self.reset_event()
         return {"success": "Evento encerrado."}
 

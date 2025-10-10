@@ -20,7 +20,6 @@ WAVE_DEFINITIONS = {
         ],
         "mob_count": 10,
         "boss": {
-            # Extraído de MONSTERS_DATA["floresta_sombria"][6]
             "name": "Xamã Goblin",
             "hp": 550, # HP aumentado para o evento
             "attack": 18, # Atributos aumentados para o evento
@@ -120,5 +119,94 @@ WAVE_DEFINITIONS = {
             "reward": 500,
             "media_key": "rei_lagarto_media"
         },
+        # =================================================================
+    # WAVE 5: 30 Mobs de Nível 12 (Tema: Guardiões da Forja)
+    # =================================================================
+    4: {
+        "mobs": [
+            {
+                # Extraído de MONSTERS_DATA["forja_abandonada"][0]
+                "name": "Golem de Ferro Incompleto",
+                "hp": 495,
+                "attack": 32,
+                "defense": 44,
+                "initiative": 28,
+                "luck": 16,
+                "reward": 35,
+                "media_key": "golem_ferro_incompleto_media"
+            },
+        ],
+        "mob_count": 30,
+        "boss": {
+            # Extraído de MONSTERS_DATA["catacumba_reino"][5]
+            "name": "Rei Lagarto Soberano", # Nome adaptado
+            "hp": 12500, # HP aumentado para o evento
+            "attack": 150, # Atributos aumentados para o evento
+            "defense": 100,
+            "initiative": 14,
+            "luck": 10,
+            "reward": 500,
+            "media_key": "rei_lagarto_media"
+        },
     },
+    # =================================================================
+    # WAVE 4: 25 Mobs de Nível 9 (Tema: Guardiões da Forja)
+    # =================================================================
+    4: {
+        "mobs": [
+            {
+                # Extraído de MONSTERS_DATA["forja_abandonada"][0]
+                "name": "Golem de Ferro Incompleto",
+                "hp": 495,
+                "attack": 32,
+                "defense": 44,
+                "initiative": 28,
+                "luck": 16,
+                "reward": 35,
+                "media_key": "golem_ferro_incompleto_media"
+            },
+        ],
+        "mob_count": 35,
+        "boss": {
+            # Extraído de MONSTERS_DATA["catacumba_reino"][5]
+            "name": "Rei Lagarto Soberano", # Nome adaptado
+            "hp": 12500, # HP aumentado para o evento
+            "attack": 150, # Atributos aumentados para o evento
+            "defense": 100,
+            "initiative": 14,
+            "luck": 10,
+            "reward": 500,
+            "media_key": "rei_lagarto_media"
+        },# =================================================================
+    # WAVE 4: 25 Mobs de Nível 9 (Tema: Guardiões da Forja)
+    # =================================================================
+    4: {
+        "mobs": [
+            {
+                # Extraído de MONSTERS_DATA["forja_abandonada"][0]
+                "name": "Golem de Ferro Incompleto",
+                "hp": 495,
+                "attack": 32,
+                "defense": 44,
+                "initiative": 28,
+                "luck": 16,
+                "reward": 35,
+                "media_key": "golem_ferro_incompleto_media"
+            },
+        ],
+        "mob_count": 40,
+        "boss": {
+            # Extraído de MONSTERS_DATA["catacumba_reino"][5]
+            "name": "Rei Lagarto Soberano", # Nome adaptado
+            "hp": 12500, # HP aumentado para o evento
+            "attack": 150, # Atributos aumentados para o evento
+            "defense": 100,
+            "initiative": 14,
+            "luck": 10,
+            "reward": 500,
+            "media_key": "rei_lagarto_media"
+        },
+     },
+   },
+ }
 }
