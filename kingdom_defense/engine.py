@@ -1,360 +1,224 @@
-# Arquivo: kingdom_defense/engine.py (versão final, completa e corrigida)
+# Arquivo: kingdom_defense/engine.py (versão MARATONA PRIVADA)
 
 import random
 import logging
-import json
-from pathlib import Path
-from .data import WAVE_DEFINITIONS
-from modules import player_manager, stats_engine, file_ids
-from handlers.utils import format_dungeon_combat_message, create_progress_bar
 from telegram.ext import ContextTypes
-from modules.combat import criticals
-from .utils import format_kd_battle_message
+from .data import WAVE_DEFINITIONS  # Importamos nossa estrutura de ondas
+from modules import player_manager # Para gerenciar dados e inventário do jogador
 
 logger = logging.getLogger(__name__)
-ATTACK_ENERGY_COST = 1
-FALLBACK_IMAGE_ID = "ID_DA_SUA_IMAGEM_DE_ERRO_AQUI" 
-STATE_FILE = Path(__file__).parent / "kd_event_state.json"
+
+# --- PASSO 1: ESTRUTURA INICIAL E __init__ ---
+# A classe que vai gerenciar todo o estado e lógica do nosso novo evento.
 
 class KingdomDefenseManager:
     def __init__(self):
+        """
+        O construtor da classe. Define todas as variáveis que controlam o evento.
+        É chamado uma vez quando o bot inicia.
+        """
+        # Importa as definições do seu data.py
+        self.wave_definitions = WAVE_DEFINITIONS
+
+        # Variáveis de estado inicial. reset_event() cuida de limpá-las.
+        self.is_active = False
+        self.current_wave = 1
+        self.global_kill_count = 0
+        self.boss_mode_active = False
+        self.boss_global_hp = 0
+        self.max_concurrent_fighters = 10
+        self.active_fighters = set()
+        self.waiting_queue = []
+        self.player_states = {}
+        logger.info("Novo Gerenciador de Defesa do Reino (Maratona) inicializado.")
+
+    # --- PASSO 2: FUNÇÕES DE GERENCIAMENTO DO EVENTO ---
+    # Funções de alto nível para controlar o ciclo de vida do evento.
+
+    def start_event(self):
+        """Inicia o evento de defesa do reino."""
+        if self.is_active:
+            return {"error": "O evento já está ativo."}
+        
+        logger.info("Iniciando evento de Defesa do Reino.")
+        self.reset_event() # Garante que tudo comece do zero
+        self.is_active = True
+        return {"success": "Evento iniciado com sucesso!"}
+
+    def end_event(self):
+        """Encerra o evento e limpa todos os dados."""
+        logger.info("Encerrando evento de Defesa do Reino.")
         self.reset_event()
-        self.load_state()
-        logger.info("Gerenciador de Defesa do Reino inicializado.")
-
-    def save_state(self):
-        state = {
-            "is_active": self.is_active,
-            "visual_mode": self.visual_mode,
-            "current_wave_num": self.current_wave_num,
-            "participants_status": self.participants_status,
-            "wave_mobs": self.wave_mobs,
-            "total_mobs_in_wave": self.total_mobs_in_wave,
-            "battle_log": self.battle_log,
-            "battle_message": getattr(self, 'battle_message', {})
-        }
-        try:
-            with open(STATE_FILE, "w", encoding="utf-8") as f:
-                json.dump(state, f, ensure_ascii=False, indent=4)
-        except Exception as e:
-            logger.error(f"Falha ao salvar o estado do evento: {e}")
-
-    
-    def load_state(self):
-        if not STATE_FILE.exists(): return
-        try:
-            with open(STATE_FILE, "r", encoding="utf-8") as f:
-                state = json.load(f)
-                self.is_active = state.get("is_active", False)
-                if self.is_active:
-                    self.visual_mode = state.get("visual_mode", False)
-                    self.current_wave_num = state.get("current_wave_num", 0)
-                    self.participants_status = state.get("participants_status", {})
-                    self.wave_mobs = state.get("wave_mobs", [])
-                    self.total_mobs_in_wave = state.get("total_mobs_in_wave", 0)
-                    self.battle_log = state.get("battle_log", [])
-                    self.battle_message = state.get("battle_message", {})
-                    logger.info("Estado do evento de defesa carregado.")
-        except Exception as e:
-            logger.error(f"Falha ao carregar o estado do evento: {e}")
-            self.reset_event()
-
+        return {"success": "Evento encerrado."}
 
     def reset_event(self):
+        """Reseta todas as variáveis de estado para seus valores padrão."""
         self.is_active = False
-        self.visual_mode = False
-        self.current_wave_num = 0
-        self.participants_status = {}
-        self.wave_mobs = []
-        self.total_mobs_in_wave = 0
-        self.battle_log = []
-        self.battle_message = {}
+        self.current_wave = 1
+        self.global_kill_count = 0
+        self.boss_mode_active = False
+        self.boss_global_hp = 0
+        self.active_fighters = set()
+        self.waiting_queue = []
+        self.player_states = {}
+
+    # --- PASSO 3: LÓGICA DE ENTRADA E FILA ---
+    # Gerencia como os jogadores entram na batalha ou na fila de espera.
+
+    def get_player_status(self, user_id):
+        """Verifica se um jogador está ativo, na fila ou fora."""
+        if user_id in self.active_fighters:
+            return "active"
+        if user_id in self.waiting_queue:
+            return "waiting"
+        return "not_in_event"
+
+    def add_player_to_event(self, user_id, player_data):
+        """Adiciona um jogador à luta ou à fila."""
+        print(f"\n--- [ENGINE] Função 'add_player_to_event' chamada para user_id: {user_id} ---")
+        status = self.get_player_status(user_id)
+        if status != "not_in_event":
+            print(f"--- [ENGINE] Jogador já está no evento com status: '{status}'. Retornando. ---")
+            return status
         
-    def start_event(self):
-        """Inicia o evento e retorna a mensagem de batalha inicial."""
-        if self.is_active: 
-            return {"message": "O evento já está ativo!"}
-        
-        self.reset_event()
-        self.is_active = True
-        self.load_wave(1)
-        
-        if not self.wave_mobs:
-            self.end_event() # Não precisa de 'victory=True' aqui
-            return {"text": "Erro: Nenhuma onda definida para o evento."}
-        
-        media_key = self.wave_mobs[0].get("media_key")
-        file_id = file_ids.get_file_id(media_key)
-        
-        if file_id:
-            self.visual_mode = True
-            self.save_state() # Salva o estado após iniciar
-            return {"file_id": file_id, "caption": self.get_battle_status_text()}
+        print(f"--- [ENGINE] Verificando vagas... Ativas: {len(self.active_fighters)} / Máximo: {self.max_concurrent_fighters} ---")
+        if len(self.active_fighters) < self.max_concurrent_fighters:
+            print("--- [ENGINE] Vaga encontrada! Adicionando aos lutadores ativos. ---")
+            self.active_fighters.add(user_id)
+            self._setup_player_battle_state(user_id, player_data)
+            return "active"
         else:
-            self.visual_mode = False
-            self.save_state() # Salva o estado após iniciar
-            return {"text": self.get_battle_status_text()}
+            print("--- [ENGINE] Sem vagas! Adicionando à fila de espera. ---")
+            self.waiting_queue.append(user_id)
+            return "waiting"
 
-    def load_wave(self, wave_number):
-        """Carrega os dados de uma nova onda."""
-        wave_data = WAVE_DEFINITIONS.get(wave_number)
-        if not wave_data:
-            # Fim de todas as ondas, vitória!
-            self.is_active = False # Marca como inativo para a lógica de finalização
-            return
+    # --- PASSO 4: PREPARANDO A BATALHA ---
+    # Funções internas para configurar o estado de um jogador.
 
-        self.current_wave_num = wave_number
-        mobs = wave_data.get("mobs", [])
-        boss = wave_data.get("boss")
-        
-        self.wave_mobs = [random.choice(mobs).copy() for _ in range(wave_data.get("mob_count", 10))]
-        if boss:
-            self.wave_mobs.append(boss.copy())
-            
-        random.shuffle(self.wave_mobs)
-        self.total_mobs_in_wave = len(self.wave_mobs)
-        self._add_log(f"🌊 Horda da Onda {self.current_wave_num} aproxima-se!")
-    
-    def start_event_at_wave(self, wave_number: int):
-        """
-        Inicia o evento em MODO DE TESTE diretamente em uma wave específica.
-        """
-        if self.is_active:
-            return {"message": "Um evento já está ativo! Termine-o antes de iniciar um teste."}
-        
-        self.reset_event()
-        self.is_active = True
-        
-        # Carrega a wave específica em vez da primeira
-        self.load_wave(wave_number)
-        
-        if not self.wave_mobs:
-            self.end_event()
-            return {"text": f"Erro: A wave {wave_number} não foi encontrada ou está vazia."}
-        
-        # O resto é igual à função start_event normal
-        media_key = self.wave_mobs[0].get("media_key")
-        file_id = file_ids.get_file_id(media_key)
-        
-        if file_id:
-            self.visual_mode = True
-            self.save_state()
-            return {"file_id": file_id, "caption": self.get_battle_status_text()}
-        else:
-            self.visual_mode = False
-            self.save_state()
-            return {"text": self.get_battle_status_text()}
-
-    def start_event_at_wave(self, wave_number: int):
-        if self.is_active: return {"message": "Um evento já está ativo!"}
-        return self._start_logic(wave_number)
-    
-    def _start_logic(self, wave_number):
-        self.reset_event()
-        self.is_active = True
-        self.load_wave(wave_number)
-        
-        if not self.wave_mobs:
-            self.end_event()
-            return {"text": f"Erro: A wave {wave_number} não foi encontrada ou está vazia."}
-        
-        media_key = self.wave_mobs[0].get("media_key")
-        media_info = file_ids.get_media_info(media_key)
-        
-        if media_info and media_info.get("id"):
-            self.visual_mode = True
-            self.save_state()
-            return {
-                "file_id": media_info.get("id"), 
-                "media_type": media_info.get("type", "photo"),
-                "caption": self.get_battle_status_text()
-            }
-        else:
-            self.visual_mode = False
-            self.save_state()
-            return {"text": self.get_battle_status_text()}
-    def load_wave(self, wave_number):
-        wave_data = WAVE_DEFINITIONS.get(wave_number)
-        if not wave_data:
-            self.is_active = False
-            return
-
-        self.current_wave_num = wave_number
-        mobs = wave_data.get("mobs", [])
-        boss = wave_data.get("boss")
-        
-        self.wave_mobs = [random.choice(mobs).copy() for _ in range(wave_data.get("mob_count", 10))]
-        if boss: self.wave_mobs.append(boss.copy())
-            
-        random.shuffle(self.wave_mobs)
-        self.total_mobs_in_wave = len(self.wave_mobs)
-        self._add_log(f"🌊 Horda da Onda {self.current_wave_num} aproxima-se!")
-
-    def end_event(self, victory=False):
-        message = "Vitória! O Reino foi defendido!" if victory else "O evento foi encerrado."
-        self.reset_event()
-        self.save_state()
-        if STATE_FILE.exists():
-            try: STATE_FILE.unlink()
-            except OSError as e: logger.error(f"Erro ao deletar arquivo de estado: {e}")
-        return message
-
-    def add_participant(self, user_id: int, player_data: dict):
-        if not self.is_active: return False
-        user_id_str = str(user_id)
+    def _setup_player_battle_state(self, user_id, player_data):
+        """Prepara o estado de batalha inicial para um jogador."""
         total_stats = player_manager.get_player_total_stats(player_data)
-        max_hp = total_stats.get('max_hp', 1)
-        self.participants_status[user_id_str] = {
-            'hp': max_hp, 'max_hp': max_hp, 
-            'name': player_data.get('character_name', 'Herói'),
-            'damage_dealt': 0
+        
+        current_wave_info = self.wave_definitions[self.current_wave]
+        mob_template = random.choice(current_wave_info["mobs"])
+        
+        # Cria uma cópia do monstro para este jogador
+        mob_instance = mob_template.copy()
+        
+        self.player_states[user_id] = {
+            'player_hp': total_stats.get('max_hp', 100),
+            'player_max_hp': total_stats.get('max_hp', 100),
+            'current_mob': mob_instance,
+            'is_fighting_boss': False
         }
-        self.save_state()
-        return True
+        logger.info(f"Jogador {user_id} configurado para lutar contra {mob_instance['name']}.")
     
-    def set_battle_message_info(self, message_id: int, chat_id: int):
-        self.battle_message = {'id': message_id, 'chat_id': chat_id}
-        self.save_state()
+    # --- PASSO 5: O CORAÇÃO DO JOGO - PROCESSANDO O ATAQUE ---
+    # A função mais importante, que lida com cada clique no botão "Atacar".
 
-    def get_battle_message_info(self) -> dict:
-        return self.battle_message
+    def process_player_attack(self, user_id, player_data):
+        """Processa um turno de ataque do jogador na sua batalha privada."""
+        if not self.is_active or user_id not in self.active_fighters:
+            return {"error": "Você não está em uma batalha ativa."}
 
-    def _add_log(self, text: str):
-        """Adiciona uma entrada ao log de combate."""
-        self.battle_log.append(text)
-        if len(self.battle_log) > 5:
-            self.battle_log.pop(0)
-
-    def process_attack(self, user_id: int, player_data: dict) -> dict:
-        user_id_str = str(user_id)
-        if not self.is_active or user_id_str not in self.participants_status: 
-            return {"private_message": "Você não está participando desta batalha!"}
-
-        
-        if self.participants_status[user_id_str]['hp'] <= 0:
-            return {"private_message": "Você foi derrotado e não pode mais atacar! 💔"}
-        
-        if player_data.get('energy', 0) < ATTACK_ENERGY_COST: 
-            return {"private_message": f"Sem energia! ({ATTACK_ENERGY_COST} ⚡️)"}
-        
-        if not self.wave_mobs:
-            self.load_wave(self.current_wave_num + 1)
-            if not self.is_active:
-                self._add_log("🎉 VITÓRIA! O REINO ESTÁ A SALVO! 🎉")
-                final_caption = self.get_battle_status_text()
-                rewards = self.calculate_rewards()
-                self.end_event(victory=True)
-                return {
-                    "event_over": True, "victory": True,
-                    "final_caption": final_caption, "rewards": rewards
-                }
-
-        player_data['energy'] -= ATTACK_ENERGY_COST
-        
-        target_mob = self.wave_mobs.pop(0)
-        self._add_log(f"⚡ {player_data['character_name']} encontra um {target_mob['name']}!")
-        
+        player_state = self.player_states[user_id]
+        mob = player_state['current_mob']
         player_stats = player_manager.get_player_total_stats(player_data)
-        damage, _, _ = criticals.roll_damage(player_stats.get('attack', 5), target_mob.get('defense', 0), {})
         
-        self.participants_status[user_id_str]['damage_dealt'] += damage
-        target_mob['hp'] -= damage
-        self._add_log(f"⚔️ {player_data['character_name']} ataca ({damage} dano)!")
+        # Simplificação do dano (pode ser substituído pela sua engine de criticals)
+        player_damage = max(1, player_stats.get('attack', 10) - mob.get('defense', 0))
+        mob['hp'] -= player_damage
 
-        if target_mob['hp'] <= 0:
-            self._add_log(f"☠️ {target_mob['name']} foi derrotado!")
-            reward = target_mob.get("reward", 0)
-            if reward > 0: player_manager.add_item_to_inventory(player_data, 'fragmento_bravura', reward)
-        else:
-            damage_taken, _, _ = criticals.roll_damage(target_mob.get('attack', 5), player_stats.get('defense', 0), {})
-            self.participants_status[user_id_str]['hp'] -= damage_taken
-            self._add_log(f"🩸 {target_mob['name']} contra-ataca ({damage_taken} dano)!")
-            if self.participants_status[user_id_str]['hp'] <= 0:
-                self.participants_status[user_id_str]['hp'] = 0
-                self._add_log(f"💔 {player_data['character_name']} foi derrotado!")
-        
-        player_manager.save_player_data(user_id, player_data)
-        self.save_state()
-        
-        return {"caption" if self.visual_mode else "text": self.get_battle_status_text()}
+        action_log = f"Você ataca {mob['name']} e causa {player_damage} de dano!"
 
-    def calculate_rewards(self) -> dict:
-        rewards = {}
-        for user_id, status in self.participants_status.items():
-            if status['damage_dealt'] > 0:
-                rewards[user_id] = {'emblema_bravura': 10}
-        return rewards
-    
-    def get_leaderboard_text(self) -> str:
-        if not self.participants_status: return "Ninguém se juntou à batalha ainda."
-        sorted_participants = sorted(self.participants_status.items(), key=lambda i: i[1]['damage_dealt'], reverse=True)
-        
-        lines = ["🏆 **Ranking de Dano** 🏆\n"]
-        for i, (_, status) in enumerate(sorted_participants[:5]):
-            medal = {0: "🥇", 1: "🥈", 2: "🥉"}.get(i, "🔹")
-            lines.append(f"{medal} {status['name']}: {status['damage_dealt']:,} de dano")
-        return "\n".join(lines)
-    
-    def get_battle_status_text(self) -> str:
-        if not self.is_active: return "🎉 **VITÓRIA!** 🎉\nO Reino foi salvo!"
-        header = f"🌊 **ONDA {self.current_wave_num}** 🌊\n"
-        remaining, total = len(self.wave_mobs), self.total_mobs_in_wave
-        progress_bar = create_progress_bar(total - remaining if total > 0 else 0, total)
-        status_line = f"Monstros Restantes: {remaining}/{total}\n{progress_bar}"
-        active_heroes = sum(1 for p in self.participants_status.values() if p['hp'] > 0)
-        heroes_line = f"Heróis em Batalha: {active_heroes}"
-        log_str = "\n\n**Últimos Acontecimentos:**\n" + "\n".join(self.battle_log)
-        return f"{header}{heroes_line}\n{status_line}{log_str}"
+        # O monstro foi derrotado?
+        if mob['hp'] <= 0:
+            self.global_kill_count += 1
+            
+            # Adiciona o loot ao inventário do jogador
+            reward_amount = mob.get("reward", 0)
+            player_manager.add_item_to_inventory(player_data, 'fragmento_bravura', reward_amount)
+            player_manager.save_player_data(user_id, player_data)
 
-
-    def _get_visual_caption(self) -> str:
-        """Gera a legenda para o modo com imagem."""
-        header = f"🌊 **ONDA {self.current_wave_num}** 🌊\n"
-        remaining = len(self.wave_mobs); total = self.total_mobs_in_wave
-        progress = total - remaining if total > 0 else 0
-        progress_bar = create_progress_bar(progress, total)
-        status_linha = f"Monstros Restantes: {remaining}/{total}\n{progress_bar}"
-        
-        active_heroes = sum(1 for p in self.participants_status.values() if p['hp'] > 0)
-        heroes_linha = f"Heróis em Batalha: {active_heroes}"
-        
-        log_str = "\n\n**Últimos Acontecimentos:**\n" + "\n".join(self.battle_log)
-        return header + heroes_linha + "\n" + status_linha + log_str
-
-    def _get_text_mode_message(self) -> str:
-        """Gera o painel de texto completo usando a nova função de formatação."""
-        if not self.is_active: 
-            return "O evento de Defesa do Reino terminou."
-
-    # Prepara os dados exatamente como a nova função espera
-        participants_str_keys = {str(k): v for k, v in self.participants_status.items()}
-        monsters_dict = {f"mob_{i}": mob for i, mob in enumerate(self.wave_mobs)}
-
-        dungeon_instance = {
-            'combat_state': {
-                'participants': participants_str_keys, 
-                'monsters': monsters_dict, 
-                'battle_log': self.battle_log
+            loot_message = f"Você recebeu {reward_amount}x fragmento_bravura!"
+            
+            # Prepara o próximo monstro
+            next_mob_template = random.choice(self.wave_definitions[self.current_wave]["mobs"])
+            player_state['current_mob'] = next_mob_template.copy()
+            
+            return {
+                "monster_defeated": True,
+                "action_log": f"{action_log}\n☠️ {mob['name']} foi derrotado!",
+                "loot_message": loot_message,
+                "next_mob_data": player_state['current_mob']
             }
-        }
 
-        # Recupera os dados completos dos jogadores
-        all_players_data = {
-            int(pid): player_manager.get_player_data(int(pid)) 
-            for pid in participants_str_keys.keys()
-        }
+        # Se o monstro não foi derrotado, ele contra-ataca
+        else:
+            mob_damage = max(1, mob.get('attack', 5) - player_stats.get('defense', 0))
+            player_state['player_hp'] -= mob_damage
+            
+            action_log += f"\n🩸 {mob['name']} contra-ataca, causando {mob_damage} de dano!"
 
-        # Chama a sua nova e poderosa função de formatação!
-        return format_kd_battle_message(dungeon_instance, all_players_data)
+            # O jogador foi derrotado?
+            if player_state['player_hp'] <= 0:
+                self.active_fighters.remove(user_id)
+                del self.player_states[user_id]
+                # TODO: Promover o próximo da fila de espera
+                return { "game_over": True, "action_log": action_log }
+            
+            return {
+                "monster_defeated": False,
+                "action_log": action_log
+            }
+            
+    # --- PASSO 6: FUNÇÕES DE APOIO (GETTERS) ---
+    # Funções que o handler usará para obter informações e exibir ao jogador.
+    
+    def get_battle_data(self, user_id):
+        """Retorna os dados necessários para o handler montar a mensagem de batalha."""
+        if user_id not in self.player_states:
+            return None
+        return self.player_states[user_id]
+        
+    def get_queue_status_text(self):
+        """Retorna o texto para a tela de espera."""
+        wave_info = self.wave_definitions[self.current_wave]
+        goal = wave_info['mob_count']
+        return (
+            f"Progresso da Onda {self.current_wave}: {self.global_kill_count}/{goal}\n"
+            f"Defensores Ativos: {len(self.active_fighters)}/{self.max_concurrent_fighters}"
+        )
 
-# Instância única do gerenciador
-event_manager = KingdomDefenseManager()
+# Adicione este código NO FINAL do arquivo kingdom_defense/engine.py
 
-# Funções de job (agendador)
+# --- FUNÇÕES DE JOB (AGENDADOR) ---
+# Usadas pelo agendador do bot para iniciar/terminar o evento automaticamente.
+
 async def start_event_job(context: ContextTypes.DEFAULT_TYPE):
-    if event_manager.is_active: return
+    """Função para o agendador iniciar o evento."""
+    logger.info("Job agendado: tentando iniciar o evento...")
     event_manager.start_event()
 
 async def end_event_job(context: ContextTypes.DEFAULT_TYPE):
-    if not event_manager.is_active: return
+    """Função para o agendador encerrar o evento."""
+    logger.info("Job agendado: tentando encerrar o evento...")
     event_manager.end_event()
+
+def start_event_at_wave(self, wave_number: int):
+        """Inicia o evento em uma onda específica para testes."""
+        if self.is_active:
+            return {"error": "O evento já está ativo."}
+        
+        if wave_number not in self.wave_definitions:
+            return {"error": f"A Onda {wave_number} não existe nas definições."}
+            
+        logger.info(f"Iniciando evento de teste na Onda {wave_number}.")
+        self.reset_event()
+        self.is_active = True
+        self.current_wave = wave_number # A única diferença da função start_event()
+        
+        return {"success": f"Evento de teste iniciado na Onda {wave_number}!"}
+# --- INSTÂNCIA ÚNICA ---
+# Criamos uma única instância que será usada por todo o bot
+event_manager = KingdomDefenseManager()

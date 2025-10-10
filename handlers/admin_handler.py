@@ -29,7 +29,6 @@ from modules.player_manager import (
 )
 from modules import game_data
 from handlers.admin.utils import ensure_admin 
-from kingdom_defense.handler import start_event_from_admin
 from kingdom_defense.engine import event_manager
 
 # --- Constantes ---
@@ -131,39 +130,23 @@ async def _test_ask_wave_number(update: Update, context: ContextTypes.DEFAULT_TY
     return ASK_WAVE_NUMBER
 
 async def _test_start_specific_wave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Inicia o evento na wave especificada pelo admin."""
+    """Inicia o evento de teste na wave especificada pelo admin (no chat privado do admin)."""
     try:
         wave_num = int(update.message.text)
     except (ValueError, TypeError):
-        await update.message.reply_text("❌ Isso não parece ser um número válido. Tente novamente ou use /cancelar.")
-        return ASK_WAVE_NUMBER
+        await update.message.reply_text("❌ Isso não é um número válido. Tente novamente ou use /cancelar.")
+        return ASK_WAVE_NUMBER # Mantém na mesma etapa da conversa
     
-    await update.message.reply_text(f"🚀 Iniciando evento de teste na wave {wave_num}...")
-    
-    # Chama a nova função do engine
     result = event_manager.start_event_at_wave(wave_num)
 
-    if "message" in result: # Trata mensagens de erro como "evento já ativo"
-        await update.message.reply_text(result["message"])
-        await _send_admin_menu(update.effective_chat.id, context)
-        return ConversationHandler.END
-
-    # Envia a mensagem do evento (código reutilizado de start_event_from_admin)
-    if file_id := result.get("file_id"):
-        message = await context.bot.send_photo(
-            chat_id=update.effective_chat.id, photo=file_id, caption=result.get("caption"),
-            reply_markup=_get_battle_keyboard(), parse_mode=HTML # Você precisa importar _get_battle_keyboard
-        )
+    if "error" in result:
+        await update.message.reply_text(result["error"])
     else:
-        message = await context.bot.send_message(
-            chat_id=update.effective_chat.id, text=result.get("text"),
-            reply_markup=_get_battle_keyboard(), parse_mode=HTML
-        )
+        await update.message.reply_text(result["success"] + "\n\nO evento está ativo. Use os comandos de jogador em um chat separado para interagir.")
     
-    if message:
-        event_manager.set_battle_message_info(message.message_id, message.chat.id)
-
-    # Retorna ao menu principal do admin
+    # Encerra a conversa e mostra o menu de admin novamente
+    # (A lógica de enviar a mensagem de batalha para o admin foi removida para evitar confusão,
+    # já que a batalha agora é privada para cada jogador)
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
 
@@ -206,9 +189,34 @@ async def _handle_admin_event_menu(update: Update, context: ContextTypes.DEFAULT
     await _safe_edit_text(update, context, "🎉 **Painel de Gerenciamento de Eventos**", _admin_event_menu_kb())
 
 async def _handle_force_start_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _safe_answer(update)
-    message = event_manager.start_event()
-    await update.callback_query.answer(message, show_alert=True)
+    """Inicia o evento e anuncia no grupo principal."""
+    query = update.callback_query
+    
+    result = event_manager.start_event()
+
+    if "error" in result:
+        await query.answer(result["error"], show_alert=True)
+        return
+
+    # Se o evento iniciou com sucesso, avisa o admin e envia o anúncio no grupo
+    await query.answer("✅ Evento iniciado com sucesso!", show_alert=True)
+    
+    # Anuncia o início do evento no grupo para os jogadores
+    # (Você precisará ter as constantes ID_GRUPO_EVENTOS e ID_TOPICO_EVENTOS definidas neste arquivo ou importá-las)
+    ID_GRUPO_EVENTOS = -1002881364171  # Exemplo
+    ID_TOPICO_EVENTOS = 10340 # Exemplo
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚔️ Ver Evento ⚔️", callback_data='show_events_menu')]
+    ])
+    
+    await context.bot.send_message(
+        chat_id=ID_GRUPO_EVENTOS,
+        message_thread_id=ID_TOPICO_EVENTOS,
+        text="📢 **ATENÇÃO, HERÓIS DE ELDORA!** 📢\n\nUma nova invasão ameaça nosso reino! Preparem-se para a batalha!",
+        reply_markup=keyboard,
+        parse_mode=HTML
+    )
 
 async def _handle_force_end_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
@@ -335,7 +343,7 @@ admin_force_daily_callback_handler = CallbackQueryHandler(_handle_admin_force_da
 
 # Handlers para os botões do submenu de eventos
 admin_event_menu_handler = CallbackQueryHandler(_handle_admin_event_menu, pattern="^admin_event_menu$")
-admin_force_start_handler = CallbackQueryHandler(start_event_from_admin, pattern="^admin_event_force_start$")
+admin_force_start_handler = CallbackQueryHandler(_handle_force_start_event, pattern="^admin_event_force_start$") 
 admin_force_end_handler = CallbackQueryHandler(_handle_force_end_event, pattern="^admin_event_force_end$")
 admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern="^admin_event_force_ticket$")
 get_id_command_handler = CommandHandler("get_id", get_id_command, filters=filters.User(ADMIN_ID))

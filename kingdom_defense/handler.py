@@ -1,221 +1,170 @@
-# Arquivo: kingdom_defense/handler.py (versão final e completa)
+# Arquivo: kingdom_defense/handler.py (versão MARATONA PRIVADA)
 
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAnimation
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler, filters
 from .engine import event_manager
-from modules import player_manager
-import asyncio
+from modules import player_manager, file_ids # Assumindo que file_ids gerencia seus IDs de mídia
 
 logger = logging.getLogger(__name__)
 
-ID_GRUPO_EVENTOS = -1002881364171  
-ID_TOPICO_EVENTOS = 10340
-
-
-def _get_battle_keyboard() -> InlineKeyboardMarkup:
-    keyboard = [
-        [InlineKeyboardButton("💥 ATACAR 💥", callback_data='kd_attack_wave')],
-        [InlineKeyboardButton("📊 Status", callback_data='kd_show_status'),
-         InlineKeyboardButton("🏆 Ranking", callback_data='kd_show_leaderboard')]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-async def start_event_from_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer("Iniciando evento...")
-    
-    result = event_manager.start_event()
-
-    if "message" in result and "já está ativo" in result["message"]:
-        await query.answer(result["message"], show_alert=True)
-        return
-
-    message = None
-    file_id, media_type = result.get("file_id"), result.get("media_type")
-    caption, text = result.get("caption"), result.get("text")
-    keyboard = _get_battle_keyboard()
-
-    try:
-        if file_id:
-            send_func = context.bot.send_animation if media_type == 'animation' else context.bot.send_photo
-            message = await send_func(
-                chat_id=ID_GRUPO_EVENTOS,
-                photo=file_id, animation=file_id, caption=caption,
-                reply_markup=keyboard, parse_mode="HTML",
-                message_thread_id=ID_TOPICO_EVENTOS
-            )
-    except Exception as e:
-        logger.error(f"Falha ao enviar mídia no início do evento: {e}")
-            
-    if not message:
-        message = await context.bot.send_message(
-            chat_id=ID_GRUPO_EVENTOS,
-            text=text or caption or "O evento começou!",
-            reply_markup=keyboard, parse_mode="HTML",
-            message_thread_id=ID_TOPICO_EVENTOS
-        )
-    
-    if message:
-        event_manager.set_battle_message_info(message.message_id, message.chat.id)
-        logger.info(f"Evento iniciado. Msg ID: {message.message_id} no Chat ID: {message.chat.id}")
-    
-    await query.delete_message()
+# --- 1. FUNÇÕES NO GRUPO (ANÚNCIO E REDIRECIONAMENTO) ---
 
 async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Mostra a mensagem inicial do evento no grupo."""
     query = update.callback_query
     await query.answer()
     
-    caption = "📢 **ALERTA DE INVASÃO!**\n\nHordas de monstros se aproximam do reino. Você irá atender ao chamado para defender Eldora?" if event_manager.is_active else "Não há nenhuma invasão acontecendo no momento."
-    keyboard = [
-        [InlineKeyboardButton("⚔️ PARTICIPAR DA DEFESA ⚔️", callback_data='kd_join_event')],
-        [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='go_to_kingdom')]
-    ] if event_manager.is_active else [[InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='go_to_kingdom')]]
+    caption = "📢 **ALERTA DE INVASÃO!**\n\nHordas de monstros se aproximam do reino. Atenda ao chamado para defender Eldora!"
+    if not event_manager.is_active:
+        caption = "Não há nenhuma invasão acontecendo no momento."
+        
+    keyboard = []
+    if event_manager.is_active:
+        keyboard.append([InlineKeyboardButton("⚔️ PARTICIPAR DA DEFESA ⚔️", callback_data='kd_join_event')])
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='go_to_kingdom')])
     
     await query.edit_message_text(text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
+# Em kingdom_defense/handler.py
 async def join_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    print("\n--- [HANDLER] Função 'join_event' foi chamada! ---") # LANTERNA 1
     query = update.callback_query
     user_id = update.effective_user.id
+    
     player_data = player_manager.get_player_data(user_id)
-
     if not player_manager.has_item(player_data, 'ticket_defesa_reino'):
+        print("--- [HANDLER] ERRO: Jogador SEM ticket! Saindo da função. ---") # LANTERNA 2
         await query.answer("Você precisa de um Ticket de Defesa do Reino para participar!", show_alert=True)
         return
     
-    player_manager.remove_item_from_inventory(player_data, 'ticket_defesa_reino', 1)
+    print("--- [HANDLER] SUCESSO: Jogador TEM o ticket! Continuando... ---") # LANTERNA 3
+    
+    bot_username = context.bot.username
+    battle_url = f"https://t.me/{bot_username}?start=kd_private_battle"
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Ir para a Batalha Privada ✅", url=battle_url)]
+    ])
+    
+    await query.edit_message_text(
+        text="Você atendeu ao chamado! Sua bravura será recompensada.\n\nClique no botão abaixo para ser transportado para a linha de frente!",
+        reply_markup=keyboard
+    )
+    await query.answer()
+    
+# --- 2. FUNÇÕES NO PRIVADO (O CORAÇÃO DA BATALHA) ---
 
-    if event_manager.add_participant(user_id, player_data):
-        player_manager.save_player_data(user_id, player_data)
-        await query.answer("Você se juntou à defesa de Eldora! Boa sorte!", show_alert=True)
-        await query.delete_message()
+def _format_battle_caption(player_state: dict) -> str:
+    """Formata o texto da mensagem de batalha."""
+    mob = player_state['current_mob']
+    return (
+        f"⚔️ **{mob['name']}** ⚔️\n\n"
+        f"HP do Monstro: {mob['hp']}\n"
+        f"Seu HP: {player_state['player_hp']}/{player_state['player_max_hp']}\n\n"
+        f"{player_state.get('action_log', '')}"
+    )
 
-        msg_info = event_manager.get_battle_message_info()
-        chat_id, msg_id = msg_info.get('chat_id'), msg_info.get('id')
+def _get_battle_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton("💥 ATACAR 💥", callback_data='kd_marathon_attack')]])
 
-        if not chat_id:
-            logger.warning("Não foi possível encontrar o chat_id do evento para enviar a confirmação.")
-            return
+def _get_waiting_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Atualizar Status", callback_data='kd_check_queue_status')]])
 
-        chat_id_num = str(chat_id).replace("-100", "")
-        msg_link = f"https://t.me/c/{chat_id_num}/{msg_id}"
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Ir para a Batalha! 🚀", url=msg_link)]])
+async def start_private_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Inicia a batalha ou a fila de espera no chat privado (acionado pelo deep link)."""
+    print("\n--- [HANDLER] Função 'start_private_battle' foi chamada! (Deep Link funcionou) ---")
+    user_id = update.effective_user.id
+    player_data = player_manager.get_player_data(user_id)
+
+    if not event_manager.is_active:
+        print("--- [HANDLER] ERRO: Evento não está ativo. Saindo. ---")
+        await update.message.reply_text("A invasão já terminou. Obrigado por sua disposição, herói!")
+        return
+
+    print("--- [HANDLER] Perguntando à engine qual o status do jogador... ---")
+    status = event_manager.add_player_to_event(user_id, player_data)
+    print(f"--- [HANDLER] Engine respondeu: status = '{status}' ---")
+
+    if status == "active":
+        battle_data = event_manager.get_battle_data(user_id)
+        mob_media_key = battle_data['current_mob']['media_key']
+        file_id = file_ids.get_file_id(mob_media_key, "animation") # Busca o ID da animação
         
-        player_name = player_data.get('character_name', 'Um herói')
-        conf_text = f"⚔️ <b>{player_name}</b> atendeu ao chamado e se juntou à defesa de Eldora!"
+        caption = _format_battle_caption(battle_data)
+        await update.message.reply_animation(animation=file_id, caption=caption, reply_markup=_get_battle_keyboard(), parse_mode="HTML")
         
-        await context.bot.send_message(
-            chat_id=ID_GRUPO_EVENTOS, text=conf_text, reply_markup=keyboard,
-            parse_mode='HTML', message_thread_id=ID_TOPICO_EVENTOS
-        )
-    else:
-        player_manager.add_item_to_inventory(player_data, 'ticket_defesa_reino', 1)
-        await query.answer("Não foi possível entrar na defesa no momento. Tente novamente.", show_alert=True)
+    elif status == "waiting":
+        status_text = event_manager.get_queue_status_text()
+        text = f"🛡️ **Fila de Reforços** 🛡️\n\nA linha de frente está cheia!\n\n{status_text}\n\nAguarde. Você entrará na batalha assim que uma vaga for liberada."
+        await update.message.reply_text(text=text, reply_markup=_get_waiting_keyboard())
 
-async def attack_wave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Processa o clique no botão 'Atacar' e atualiza a mensagem de batalha."""
     query = update.callback_query
     user_id = update.effective_user.id
     player_data = player_manager.get_player_data(user_id)
 
-    if not player_data:
-        await query.answer("Erro ao encontrar seus dados!", show_alert=True)
+    result = event_manager.process_player_attack(user_id, player_data)
+    player_state = event_manager.get_battle_data(user_id)
+
+    # Caso 1: O jogador foi derrotado
+    if result.get("game_over"):
+        await query.edit_message_caption(caption=f"☠️ Você foi derrotado! ☠️\n\n{result['action_log']}", reply_markup=None)
+        await query.answer("Sua jornada na defesa termina aqui.", show_alert=True)
         return
     
-    result = event_manager.process_attack(user_id, player_data)
-    
-    if private_message := result.get("private_message"):
-        await query.answer(private_message, show_alert=True)
-        return
-    
-    if result.get("event_over"):
-        await query.answer("A batalha terminou!")
-        await _handle_event_end(update, context, result)
-        return
+    # Caso 2: O monstro foi derrotado
+    if result.get("monster_defeated"):
+        await query.answer(f"Inimigo derrotado! {result['loot_message']}", show_alert=True)
+        next_mob = result['next_mob_data']
+        file_id = file_ids.get_file_id(next_mob['media_key'], "animation")
+        
+        # Atualiza o estado do jogador com o log da ação para exibição
+        player_state['action_log'] = result['action_log']
+        caption = _format_battle_caption(player_state)
+        
+        media = InputMediaAnimation(media=file_id, caption=caption, parse_mode="HTML")
+        await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
 
-    await query.answer("Ataque realizado!")
+    # Caso 3: A batalha continua (ninguém morreu)
+    else:
+        player_state['action_log'] = result['action_log']
+        caption = _format_battle_caption(player_state)
+        await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard())
+        await query.answer()
 
-    msg_info = event_manager.get_battle_message_info()
-    msg_id, chat_id = msg_info.get('id'), msg_info.get('chat_id')
-    
-    if not msg_id or not chat_id:
-        logger.warning("Não foi encontrado um ID/CHAT_ID de mensagem de batalha para atualizar.")
-        return
-
-    try:
-        if caption := result.get("caption"):
-            await context.bot.edit_message_caption(
-                chat_id=chat_id, message_id=msg_id, caption=caption, 
-                parse_mode="HTML", reply_markup=_get_battle_keyboard()
-            )
-        elif text := result.get("text"):
-            await context.bot.edit_message_text(
-                chat_id=chat_id, message_id=msg_id, text=text, 
-                parse_mode="HTML", reply_markup=_get_battle_keyboard()
-            )
-    except Exception as e:
-        logger.error(f"Falha ao editar mensagem de batalha: {e}")
-
-async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Verifica se um jogador na fila já pode entrar na batalha."""
     query = update.callback_query
-    await query.answer(text=event_manager.get_battle_status_text(), show_alert=True)
+    user_id = update.effective_user.id
+    status = event_manager.get_player_status(user_id)
 
-async def _handle_event_end(update: Update, context: ContextTypes.DEFAULT_TYPE, result: dict):
-    msg_info = event_manager.get_battle_message_info()
-    msg_id, chat_id = msg_info.get('id'), msg_info.get('chat_id')
-    
-    final_caption = result.get("final_caption", "A batalha chegou ao fim.")
-    final_file_id = result.get("final_file_id")
+    if status == "active":
+        await query.answer("Sua vez chegou! Prepare-se!", show_alert=True)
+        battle_data = event_manager.get_battle_data(user_id)
+        file_id = file_ids.get_file_id(battle_data['current_mob']['media_key'], "animation")
+        caption = _format_battle_caption(battle_data)
+        media = InputMediaAnimation(media=file_id, caption=caption, parse_mode="HTML")
+        # Transforma a mensagem de texto em uma mensagem de mídia
+        await query.message.delete()
+        await context.bot.send_animation(chat_id=user_id, animation=file_id, caption=caption, reply_markup=_get_battle_keyboard(), parse_mode="HTML")
+    else:
+        status_text = event_manager.get_queue_status_text()
+        text = f"🛡️ **Fila de Reforços** 🛡️\n\nAinda aguardando vaga...\n\n{status_text}"
+        await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard())
+        await query.answer("Ainda não há vagas. Continue alerta!")
 
-    rewards_log = []
-    if rewards := result.get("rewards"):
-        for uid_str, u_rewards in rewards.items():
-            uid_int = int(uid_str)
-            p_data = player_manager.get_player_data(uid_int)
-            p_name = p_data.get('character_name', f"Jogador {uid_int}")
-            
-            r_texts = [f"{q}x {i}" for i, q in u_rewards.items()]
-            for item, quantity in u_rewards.items():
-                player_manager.add_item_to_inventory(p_data, item, quantity)
-            
-            player_manager.save_player_data(uid_int, p_data)
-            rewards_log.append(f"🎖️ {p_name} recebeu: {', '.join(r_texts)}")
-
-    if rewards_log: final_caption += "\n\n<b>Recompensas:</b>\n" + "\n".join(rewards_log)
-
-    try:
-        if final_file_id and msg_id:
-             media = InputMediaPhoto(media=final_file_id, caption=final_caption, parse_mode="HTML")
-             await context.bot.edit_message_media(chat_id=chat_id, message_id=msg_id, media=media)
-        elif msg_id:
-             await context.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=final_caption, parse_mode="HTML", reply_markup=None)
-        elif chat_id: await context.bot.send_message(chat_id=chat_id, text=final_caption, parse_mode="HTML", message_thread_id=ID_TOPICO_EVENTOS)
-    except Exception as e:
-        logger.error(f"Falha ao editar mensagem de final de evento: {e}")
-        if chat_id: await context.bot.send_message(chat_id=chat_id, text=final_caption, parse_mode="HTML", message_thread_id=ID_TOPICO_EVENTOS)
-
-    event_manager.end_event()
-
-async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer(text=event_manager.get_leaderboard_text(), show_alert=True)
-
-async def delete_message_after(message, seconds):
-    """Espera um tempo e depois apaga uma mensagem."""
-    await asyncio.sleep(seconds)
-    try:
-        await message.delete()
-    except Exception as e:
-        logger.info(f"Não foi possível apagar a mensagem temporária: {e}")
-
-# --- REGISTRO DOS HANDLERS ---
+# --- 3. REGISTRO DOS HANDLERS ---
 
 def register_handlers(application):
-    patterns = {
-        'show_events_menu': show_event_menu,
-        'kd_join_event': join_event,
-        'kd_attack_wave': attack_wave,
-        'kd_show_status': show_status,
-        'kd_show_leaderboard': show_leaderboard
-    }
-    for pattern, handler in patterns.items():
-        application.add_handler(CallbackQueryHandler(handler, pattern=f'^{pattern}$'))
+
+    """Registra todos os handlers necessários para o evento."""
+    # Handlers de botões (CallbackQuery)
+    application.add_handler(CallbackQueryHandler(show_event_menu, pattern='^show_events_menu$'))
+    application.add_handler(CallbackQueryHandler(join_event, pattern='^kd_join_event$'))
+    application.add_handler(CallbackQueryHandler(handle_marathon_attack, pattern='^kd_marathon_attack$'))
+    application.add_handler(CallbackQueryHandler(check_queue_status, pattern='^kd_check_queue_status$'))
+    
+    # Handler de Comando para o deep link do chat privado
+    application.add_handler(CommandHandler("start", start_private_battle, filters=filters.Regex("kd_private_battle")))
