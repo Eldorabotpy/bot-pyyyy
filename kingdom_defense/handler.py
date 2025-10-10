@@ -9,22 +9,16 @@ from modules import player_manager, file_ids
 
 logger = logging.getLogger(__name__)
 
-# --- FUNÇÕES DE LÓGICA DA BATALHA PRIVADA ---
-
-# Em kingdom_defense/handler.py
 
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
-    
-    # --- Seção do Herói ---
     total_stats = player_manager.get_player_total_stats(player_data)
     p_max_hp = int(total_stats.get('max_hp', 0))
     p_atk = int(total_stats.get('attack', 0))
     p_def = int(total_stats.get('defense', 0))
     p_vel = int(total_stats.get('initiative', 0))
     p_srt = int(total_stats.get('luck', 0))
-    
     hero_block = (
         f"<b>{player_data.get('character_name', 'Herói')}</b>\n"
         f"❤️ 𝐇𝐏: {player_state['player_hp']}/{p_max_hp}\n"
@@ -32,14 +26,12 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
         f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"
     )
 
-    # --- Seção do Inimigo ---
     m_hp = mob.get('hp', 0)
     m_max_hp = mob.get('max_hp', mob.get('hp', 0))
     m_atk = int(mob.get('attack', 0))
     m_def = int(mob.get('defense', 0))
     m_vel = int(mob.get('initiative', 0))
     m_srt = int(mob.get('luck', 0))
-
     enemy_block = (
         f"<b>{mob['name']}</b>\n"
         f"❤️ 𝐇𝐏: {m_hp}/{m_max_hp}\n"
@@ -51,14 +43,12 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     if action_log:
         log_section = html.escape(action_log)
 
-    # --- Montagem Final (COM O CONTADOR DE MONSTROS) ---
     current_wave = player_state.get('current_wave', 1)
+    progress_text = event_manager.get_queue_status_text()
     
-    # Pega os dados do progresso da onda diretamente da engine
-    progress_text = event_manager.get_queue_status_text() # Reutilizamos esta função!
+    progress_text_formatted = progress_text.replace('\n', ' | ')
     
-    # --- NOVA LINHA DE PROGRESSO ---
-    wave_progress_line = f"<blockquote>{progress_text.replace('\n', ' | ')}</blockquote>"
+    wave_progress_line = f"<blockquote>{progress_text_formatted}</blockquote>"
     
     header = f"╔═══ 🌊 ONDA {current_wave} 🌊 ═══╗"
     separator = "═════════════ 𝐕𝐒 ═════════════"
@@ -66,7 +56,7 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     
     return (
         f"{header}\n"
-        f"{wave_progress_line}\n\n"  # <-- ADICIONADO AQUI
+        f"{wave_progress_line}\n\n"
         f"{hero_block}\n\n"
         f"{separator}\n\n"
         f"{enemy_block}\n\n"
@@ -89,7 +79,6 @@ def _get_waiting_keyboard() -> InlineKeyboardMarkup:
 async def show_battle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o status geral do evento em um pop-up."""
     query = update.callback_query
-    # Reutilizamos a função que já exibe o progresso da onda e os defensores
     status_text = event_manager.get_queue_status_text()
     await query.answer(text=status_text, show_alert=True)
 
