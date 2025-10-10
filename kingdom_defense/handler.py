@@ -24,6 +24,7 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     p_def = int(total_stats.get('defense', 0))
     p_vel = int(total_stats.get('initiative', 0))
     p_srt = int(total_stats.get('luck', 0))
+    
     hero_block = (
         f"<b>{player_data.get('character_name', 'Herói')}</b>\n"
         f"❤️ 𝐇𝐏: {player_state['player_hp']}/{p_max_hp}\n"
@@ -38,6 +39,7 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     m_def = int(mob.get('defense', 0))
     m_vel = int(mob.get('initiative', 0))
     m_srt = int(mob.get('luck', 0))
+
     enemy_block = (
         f"<b>{mob['name']}</b>\n"
         f"❤️ 𝐇𝐏: {m_hp}/{m_max_hp}\n"
@@ -49,22 +51,53 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     if action_log:
         log_section = html.escape(action_log)
 
-    # --- Montagem Final ---
-    current_wave = player_state.get('current_wave', 1) # <-- Pega o número da onda
-    header = f"╔═══ 🌊 ONDA {current_wave} 🌊 ═══╗" # <-- MOSTRA O NÚMERO DA ONDA
+    # --- Montagem Final (COM O CONTADOR DE MONSTROS) ---
+    current_wave = player_state.get('current_wave', 1)
+    
+    # Pega os dados do progresso da onda diretamente da engine
+    progress_text = event_manager.get_queue_status_text() # Reutilizamos esta função!
+    
+    # --- NOVA LINHA DE PROGRESSO ---
+    wave_progress_line = f"<blockquote>{progress_text.replace('\n', ' | ')}</blockquote>"
+    
+    header = f"╔═══ 🌊 ONDA {current_wave} 🌊 ═══╗"
     separator = "═════════════ 𝐕𝐒 ═════════════"
     footer = "╚════════════ ◆◈◆ ════════════╝"
     
     return (
-        f"{header}\n\n{hero_block}\n\n{separator}\n\n{enemy_block}\n\n"
+        f"{header}\n"
+        f"{wave_progress_line}\n\n"  # <-- ADICIONADO AQUI
+        f"{hero_block}\n\n"
+        f"{separator}\n\n"
+        f"{enemy_block}\n\n"
         f"<b>Última Ação:</b>\n<code>{log_section}</code>\n\n{footer}"
     )
 
 def _get_battle_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton("💥 ATACAR 💥", callback_data='kd_marathon_attack')]])
+    keyboard = [
+        [InlineKeyboardButton("💥 ATACAR 💥", callback_data='kd_marathon_attack')],
+        [
+            InlineKeyboardButton("📊 Status", callback_data='kd_show_battle_status'),
+            InlineKeyboardButton("🏆 Ranking", callback_data='kd_show_leaderboard')
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 def _get_waiting_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Atualizar Status", callback_data='kd_check_queue_status')]])
+
+async def show_battle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra o status geral do evento em um pop-up."""
+    query = update.callback_query
+    # Reutilizamos a função que já exibe o progresso da onda e os defensores
+    status_text = event_manager.get_queue_status_text()
+    await query.answer(text=status_text, show_alert=True)
+
+async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra o ranking de dano em um pop-up."""
+    query = update.callback_query
+    leaderboard_text = event_manager.get_leaderboard_text()
+    await query.answer(text=leaderboard_text, show_alert=True)
 
 async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -200,3 +233,5 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(handle_join_and_start_battle, pattern='^kd_join_and_start$'))
     application.add_handler(CallbackQueryHandler(handle_marathon_attack, pattern='^kd_marathon_attack$'))
     application.add_handler(CallbackQueryHandler(check_queue_status, pattern='^kd_check_queue_status$'))
+    application.add_handler(CallbackQueryHandler(show_battle_status, pattern='^kd_show_battle_status$'))
+    application.add_handler(CallbackQueryHandler(show_leaderboard, pattern='^kd_show_leaderboard$'))
