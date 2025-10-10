@@ -4,11 +4,9 @@ from __future__ import annotations
 from dotenv import load_dotenv
 load_dotenv()
 import logging
-from datetime import time
+# --- IMPORTAÇÃO ADICIONADA ---
+from datetime import time, datetime, timedelta 
 from zoneinfo import ZoneInfo
-
-# --- NOVAS IMPORTAÇÕES ---
-# Precisamos de 'os' para ler a porta do servidor, 'Thread' para rodar em paralelo, e 'Flask' para o servidor web.
 import os
 from threading import Thread
 from flask import Flask
@@ -16,11 +14,9 @@ from flask import Flask
 from telegram import Update
 from telegram.ext import Application, ContextTypes
 
-# --- IMPORTAÇÕES PRINCIPAIS ---
 from config import ADMIN_ID, TELEGRAM_TOKEN, EVENT_TIMES, JOB_TIMEZONE
 from registries import register_all_handlers
 
-# Importe suas funções de jobs
 from handlers.jobs import (
     regenerate_energy_job,
     daily_crystal_grant_job,
@@ -72,12 +68,45 @@ async def send_startup_message(application: Application):
     except Exception as e:
         logging.warning("Não foi possível enviar mensagem inicial: %s", e)
 
+async def schedule_checker_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Um job de diagnóstico que roda uma vez para imprimir informações de fuso horário.
+    """
+    try:
+        tz = ZoneInfo(JOB_TIMEZONE)
+        now_utc = datetime.now(ZoneInfo("UTC"))
+        now_local = datetime.now(tz)
+
+        logging.warning("--- RELATÓRIO DE AGENDAMENTO DE HORÁRIOS ---")
+        logging.warning(f"Fuso Horário Configurado (JOB_TIMEZONE): {JOB_TIMEZONE}")
+        logging.warning(f"Hora Atual no Servidor (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        logging.warning(f"Hora Atual (convertida para local): {now_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        logging.warning("--- Verificando Horários de Eventos (EVENT_TIMES) ---")
+
+        for start_h, start_m, end_h, end_m in EVENT_TIMES:
+            local_start_time = time(hour=start_h, minute=start_m, tzinfo=tz)
+            
+            # Para PTB, o nome do fuso é o que importa. strftime pode não mostrar o nome completo.
+            logging.warning(
+                f"-> Evento agendado para as {start_h:02d}:{start_m:02d} no fuso '{JOB_TIMEZONE}'."
+            )
+        logging.warning("--- FIM DO RELATÓRIO ---")
+
+    except Exception as e:
+        logging.error(f"Erro no job de diagnóstico: {e}")
+# ====================================================================
+
 # --- FUNÇÃO DE REGISTRO DE JOBS ---
 def register_jobs(application: Application):
-    # (Seu código original desta função, sem alterações)
     logging.info("Registrando jobs...")
     j = application.job_queue
     tz = ZoneInfo(JOB_TIMEZONE)
+    
+    # --- ADIÇÃO DO JOB DE DIAGNÓSTICO ---
+    # Roda 10 segundos após o bot iniciar para nos dar o relatório.
+    j.run_once(schedule_checker_job, 10)
+    
+    # (Seu código original de registro de jobs, sem alterações)
     j.run_repeating(regenerate_energy_job, interval=60, first=5, name="regenerate_energy")
     j.run_daily(daily_crystal_grant_job, time=time(0, 0, tzinfo=tz), name="daily_crystals")
     j.run_daily(daily_pvp_entry_reset_job, time=time(0, 1, tzinfo=tz), name="daily_pvp_reset")
@@ -89,15 +118,12 @@ def register_jobs(application: Application):
         j.run_daily(end_event_job, time=time(hour=end_h, minute=end_m, tzinfo=tz), name=f"end_defense_{end_h}h{end_m:02d}")
     logging.info("Todos os jobs foram registrados com sucesso.")
 
-# --- FUNÇÃO PRINCIPAL (ATUALIZADA) ---
+# --- FUNÇÃO PRINCIPAL ---
 def main():
-    # --- INÍCIO: THREAD PARA O SERVIDOR WEB ---
-    # Inicia o servidor Flask em um processo separado (thread) para não bloquear o bot.
     logging.info("Iniciando o servidor Flask em segundo plano...")
     flask_thread = Thread(target=run_flask)
     flask_thread.start()
     
-    # --- O resto do seu código de inicialização do bot continua normalmente ---
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     application.add_error_handler(error_handler)
     
