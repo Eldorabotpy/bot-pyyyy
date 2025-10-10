@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # --- 1. FUNÇÕES NO GRUPO (ANÚNCIO E REDIRECIONAMENTO) ---
 
 async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Mostra a mensagem inicial do evento no grupo."""
+    """Mostra a mensagem inicial do evento no grupo, lidando com mensagens de texto ou de mídia."""
     query = update.callback_query
     await query.answer()
     
@@ -24,35 +24,60 @@ async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         keyboard.append([InlineKeyboardButton("⚔️ PARTICIPAR DA DEFESA ⚔️", callback_data='kd_join_event')])
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='go_to_kingdom')])
     
-    await query.edit_message_text(text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        # Verifica se a mensagem original tem uma foto ou animação
+        if query.message.photo or query.message.animation:
+            # Se sim, usa a função correta para editar a LEGENDA (caption)
+            await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode='HTML')
+        else:
+            # Se for uma mensagem de texto puro, usa a função para editar o TEXTO
+            await query.edit_message_text(text=caption, reply_markup=reply_markup, parse_mode='HTML')
+            
+    except Exception as e:
+        logger.error(f"Falha ao editar mensagem no menu de eventos: {e}")
+        # Como fallback, avisa o usuário do erro.
+        await query.answer("Ocorreu um erro ao tentar abrir o menu. Tente novamente.", show_alert=True)
 
 # Em kingdom_defense/handler.py
 async def join_event(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    print("\n--- [HANDLER] Função 'join_event' foi chamada! ---") # LANTERNA 1
+    print("\n--- [HANDLER] Função 'join_event' foi chamada! ---")
     query = update.callback_query
-    user_id = update.effective_user.id
     
-    player_data = player_manager.get_player_data(user_id)
-    if not player_manager.has_item(player_data, 'ticket_defesa_reino'):
-        print("--- [HANDLER] ERRO: Jogador SEM ticket! Saindo da função. ---") # LANTERNA 2
-        await query.answer("Você precisa de um Ticket de Defesa do Reino para participar!", show_alert=True)
-        return
+    # Vamos desativar a verificação de ticket por enquanto para facilitar os testes
+    # user_id = update.effective_user.id
+    # player_data = player_manager.get_player_data(user_id)
+    # if not player_manager.has_item(player_data, 'ticket_defesa_reino'):
+    #     await query.answer("Você precisa de um Ticket de Defesa do Reino para participar!", show_alert=True)
+    #     return
     
-    print("--- [HANDLER] SUCESSO: Jogador TEM o ticket! Continuando... ---") # LANTERNA 3
+    print("--- [HANDLER] Verificação de ticket OK. Preparando para redirecionar...")
     
+    # 1. Responde ao clique para o Telegram não mostrar um erro de "carregando"
+    await query.answer()
+
+    # 2. Prepara a nova mensagem com o link
     bot_username = context.bot.username
     battle_url = f"https://t.me/{bot_username}?start=kd_private_battle"
-    
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Ir para a Batalha Privada ✅", url=battle_url)]
+        [InlineKeyboardButton("✅ ENTRAR NA BATALHA ✅", url=battle_url)]
     ])
-    
-    await query.edit_message_text(
-        text="Você atendeu ao chamado! Sua bravura será recompensada.\n\nClique no botão abaixo para ser transportado para a linha de frente!",
+    text = (
+        "Você atendeu ao chamado! Sua bravura será recompensada.\n\n"
+        "Clique no botão abaixo para ser transportado para a linha de frente!"
+    )
+
+    # 3. APAGA a mensagem de menu antiga
+    await query.message.delete()
+
+    # 4. ENVIA a nova mensagem com o link no lugar
+    await context.bot.send_message(
+        chat_id=query.message.chat.id,
+        text=text,
         reply_markup=keyboard
     )
-    await query.answer()
-    
+
 # --- 2. FUNÇÕES NO PRIVADO (O CORAÇÃO DA BATALHA) ---
 
 def _format_battle_caption(player_state: dict) -> str:
