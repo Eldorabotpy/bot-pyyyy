@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 # --- FUNÇÕES DE LÓGICA DA BATALHA PRIVADA ---
 
+# Em kingdom_defense/handler.py
+
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
@@ -20,14 +22,13 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     p_max_hp = int(total_stats.get('max_hp', 0))
     p_atk = int(total_stats.get('attack', 0))
     p_def = int(total_stats.get('defense', 0))
-    p_vel = int(total_stats.get('initiative', 0)) # NOVO
-    p_srt = int(total_stats.get('luck', 0))       # NOVO
-    
+    p_vel = int(total_stats.get('initiative', 0))
+    p_srt = int(total_stats.get('luck', 0))
     hero_block = (
         f"<b>{player_data.get('character_name', 'Herói')}</b>\n"
         f"❤️ 𝐇𝐏: {player_state['player_hp']}/{p_max_hp}\n"
         f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"  # NOVO
+        f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"
     )
 
     # --- Seção do Inimigo ---
@@ -35,21 +36,22 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     m_max_hp = mob.get('max_hp', mob.get('hp', 0))
     m_atk = int(mob.get('attack', 0))
     m_def = int(mob.get('defense', 0))
-    m_vel = int(mob.get('initiative', 0)) # NOVO
-    m_srt = int(mob.get('luck', 0))       # NOVO
-
+    m_vel = int(mob.get('initiative', 0))
+    m_srt = int(mob.get('luck', 0))
     enemy_block = (
         f"<b>{mob['name']}</b>\n"
         f"❤️ 𝐇𝐏: {m_hp}/{m_max_hp}\n"
         f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"  # NOVO
+        f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"
     )
     
     log_section = "Aguardando sua ação..."
     if action_log:
         log_section = html.escape(action_log)
 
-    header = "╔═══════ ◆◈◆ COMBATE◆◈◆ ═══════╗"
+    # --- Montagem Final ---
+    current_wave = player_state.get('current_wave', 1) # <-- Pega o número da onda
+    header = f"╔═══ 🌊 ONDA {current_wave} 🌊 ═══╗" # <-- MOSTRA O NÚMERO DA ONDA
     separator = "═════════════ 𝐕𝐒 ═════════════"
     footer = "╚════════════ ◆◈◆ ════════════╝"
     
@@ -140,7 +142,7 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
 
     # Se o monstro foi derrotado...
     if result.get("monster_defeated"):
-        await query.answer(f"Inimigo derrotado! {result['loot_message']}", show_alert=True)
+        await query.answer(f"Inimigo derrotado! {result['loot_message']}")
         
         # --- CORREÇÃO DE SINCRONIA ---
         # Garantimos que o estado do jogador tenha os dados do PRÓXIMO monstro

@@ -157,9 +157,15 @@ class KingdomDefenseManager:
             return { "monster_defeated": False, "action_log": "\n".join(logs) }
 
     def get_battle_data(self, user_id):
+        """Retorna os dados necessários para o handler montar a mensagem de batalha."""
         if user_id not in self.player_states:
             return None
-        return self.player_states[user_id]
+        
+        # Fazemos uma cópia para adicionar a informação da onda
+        player_state_copy = self.player_states[user_id].copy()
+        player_state_copy['current_wave'] = self.current_wave # <-- ADICIONE ESTA LINHA
+        
+        return player_state_copy
         
     def get_queue_status_text(self):
         wave_info = self.wave_definitions[self.current_wave]
