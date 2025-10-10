@@ -45,10 +45,12 @@ def get_top_score_text() -> str:
     leaderboard = _load_leaderboard()
     top_score = leaderboard.get("top_damage_record")
     
-    if not top_score:
-        return "" # Retorna vazio se ainda não houver recorde
+    # Se não houver recorde ou se os dados estiverem incompletos (sem nome), não mostra nada.
+    if not top_score or not top_score.get("character_name"):
+        return "" 
         
-    name = top_score.get('character_name', 'Um Herói Misterioso')
+    name = top_score['character_name']
     damage = top_score.get('damage', 0)
     
-    return f"\n🏆 𝗥𝗲𝗰𝗼𝗿𝗱𝗶𝘀𝘁𝗮 𝗱𝗲 𝗗𝗮𝗻𝗼: <b>{name}</b> ({damage:,}) 🏆"
+    # Retorna a string completa e formatada com HTML
+    return f"🏆 𝗥𝗲𝗰𝗼𝗿𝗱𝗶𝘀𝘁𝗮 𝗱𝗲 𝗗𝗮𝗻𝗼: <b>{name}</b> ({damage:,}) 🏆"

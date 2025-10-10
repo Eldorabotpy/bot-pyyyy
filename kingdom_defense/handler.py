@@ -11,9 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
-    # ... (a primeira parte da função continua a mesma)
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
+    
+    # --- Seção do Herói (sem alterações) ---
     total_stats = player_manager.get_player_total_stats(player_data)
     p_max_hp = int(total_stats.get('max_hp', 0))
     p_atk = int(total_stats.get('attack', 0))
@@ -26,6 +27,8 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
         f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
         f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"
     )
+
+    # --- Seção do Inimigo (sem alterações) ---
     m_hp = mob.get('hp', 0)
     m_max_hp = mob.get('max_hp', mob.get('hp', 0))
     m_atk = int(mob.get('attack', 0))
@@ -38,16 +41,20 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
         f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}\n"
         f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"
     )
+    
     log_section = "Aguardando sua ação..."
     if action_log:
         log_section = html.escape(action_log)
 
-    # --- Montagem Final (COM A CORREÇÃO DE FORMATAÇÃO) ---
+    # --- Montagem Final (COM A CORREÇÃO DE SINTAXE) ---
     current_wave = player_state.get('current_wave', 1)
     progress_text = event_manager.get_queue_status_text()
     
-    # --- LINHA DE PROGRESSO AJUSTADA (sem <blockquote>) ---
-    wave_progress_line = f"<code>{progress_text.replace(':', '➜').replace('\n', ' | ')}</code>"
+    # --- CORREÇÃO APLICADA AQUI ---
+    # 1. Fazemos as substituições PRIMEIRO e guardamos em uma nova variável.
+    progress_text_formatted = progress_text.replace(':', '➜').replace('\n', ' | ')
+    # 2. Agora usamos a variável "limpa" (sem '\') dentro da f-string.
+    wave_progress_line = f"<code>{progress_text_formatted}</code>"
     
     header = f"<b>╔══════ 🌊 ONDA {current_wave} 🌊 ══════╗</b>"
     separator = "<b>═══════════ 𝐕𝐒 ═══════════</b>"
