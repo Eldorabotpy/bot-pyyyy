@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
+    # ... (a primeira parte da função continua a mesma)
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
     total_stats = player_manager.get_player_total_stats(player_data)
@@ -25,7 +26,6 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
         f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
         f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"
     )
-
     m_hp = mob.get('hp', 0)
     m_max_hp = mob.get('max_hp', mob.get('hp', 0))
     m_atk = int(mob.get('attack', 0))
@@ -38,21 +38,20 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
         f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}\n"
         f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"
     )
-    
     log_section = "Aguardando sua ação..."
     if action_log:
         log_section = html.escape(action_log)
 
+    # --- Montagem Final (COM A CORREÇÃO DE FORMATAÇÃO) ---
     current_wave = player_state.get('current_wave', 1)
     progress_text = event_manager.get_queue_status_text()
     
-    progress_text_formatted = progress_text.replace('\n', ' | ')
+    # --- LINHA DE PROGRESSO AJUSTADA (sem <blockquote>) ---
+    wave_progress_line = f"<code>{progress_text.replace(':', '➜').replace('\n', ' | ')}</code>"
     
-    wave_progress_line = f"<blockquote>{progress_text_formatted}</blockquote>"
-    
-    header = f"╔═══ 🌊 ONDA {current_wave} 🌊 ═══╗"
-    separator = "═════════════ 𝐕𝐒 ═════════════"
-    footer = "╚════════════ ◆◈◆ ════════════╝"
+    header = f"<b>╔══════ 🌊 ONDA {current_wave} 🌊 ══════╗</b>"
+    separator = "<b>═══════════ 𝐕𝐒 ═══════════</b>"
+    footer = "<b>╚═════════ ◆◈◆ ═════════╝</b>"
     
     return (
         f"{header}\n"
@@ -166,9 +165,6 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
     if result.get("monster_defeated"):
         await query.answer(f"Inimigo derrotado! {result['loot_message']}")
         
-        # --- CORREÇÃO DE SINCRONIA ---
-        # Garantimos que o estado do jogador tenha os dados do PRÓXIMO monstro
-        # antes de formatar a tela.
         next_mob_data = result['next_mob_data']
         player_state['current_mob'] = next_mob_data
         player_state['action_log'] = result['action_log']
@@ -188,7 +184,7 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
     else:
         player_state['action_log'] = result['action_log']
         caption = _format_battle_caption(player_state, player_data)
-        await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard())
+        await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
         await query.answer()
 
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):

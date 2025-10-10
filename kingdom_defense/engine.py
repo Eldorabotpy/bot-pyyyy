@@ -45,7 +45,7 @@ class KingdomDefenseManager:
         self.active_fighters = set()
         self.waiting_queue = []
         self.player_states = {}
-
+        self.max_concurrent_fighters = 10 
     def start_event_at_wave(self, wave_number: int):
         if self.is_active:
             return {"error": "O evento já está ativo."}
@@ -133,7 +133,7 @@ class KingdomDefenseManager:
                 self.current_wave += 1
                 self.global_kill_count = 0
                 self.boss_mode_active = False
-
+                self.max_concurrent_fighters = 10 + (self.current_wave - 1) * 5
                 # Verifica se ainda há ondas ou se o evento acabou
                 if self.current_wave not in self.wave_definitions:
                     self.end_event()

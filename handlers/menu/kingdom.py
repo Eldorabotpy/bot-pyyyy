@@ -1,10 +1,10 @@
-# handlers/menu/kingdom.py
+# Arquivo: handlers/menu/kingdom.py (Versão Completa e Corrigida)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from modules import player_manager, game_data, file_ids
-
+from kingdom_defense import leaderboard
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +29,23 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     p_energy = int(player_data.get('energy', 0))
     max_energy = int(player_manager.get_player_max_energy(player_data))
 
+    # Busca o texto do recorde do nosso módulo de leaderboard
+    leaderboard_text = leaderboard.get_top_score_text()
+    
     status_footer = (
         f"\n\n═════════════ ◆◈◆ ══════════════\n"
         f"❤️ 𝐇𝐏: {p_hp}/{p_max_hp}   "
         f"⚡️🔋𝐄𝐧𝐞𝐫𝐠𝐢𝐚🪫⚡️: {p_energy}/{max_energy}"
     )
 
+    # --- MONTAGEM DA LEGENDA (COM A MELHORIA) ---
     caption = (
         f"𝐎 𝐪𝐮𝐞 𝐯𝐨𝐜ê 𝐠𝐨𝐬𝐭𝐚𝐫𝐢𝐚 𝐝𝐞 𝐟𝐚𝐳𝐞𝐫 𝐧𝐨 𝐑𝐞𝐢𝐧𝐨 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚, {character_name}?"
         + status_footer
     )
+    # Só adiciona o texto do recorde se ele não for vazio, evitando linhas extras
+    if leaderboard_text:
+        caption += f"\n{leaderboard_text}"
 
     keyboard = [
         [InlineKeyboardButton("🗺 𝐕𝐢𝐚𝐣𝐚𝐫 🗺", callback_data='travel')],
@@ -54,20 +61,19 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # se veio de callback, remove a mensagem anterior
+    # Lógica para enviar a mensagem (sem alterações)
     if update.callback_query:
         try:
-            await update.callback_query.delete_message()
+            await update.callback_query.message.delete()
         except Exception as e:
             logger.debug("Não foi possível apagar mensagem anterior: %s", e)
-
-    # usa file_ids (photo/video) se existir; senão, texto
+    
     fd = file_ids.get_file_data('regiao_reino_eldora')
     if fd and fd.get("id"):
         try:
-            if (fd.get("type") or "photo").lower() == "video":
-                await context.bot.send_video(
-                    chat_id=chat_id, video=fd["id"],
+            if (fd.get("type") or "photo").lower() in ("video", "animation"):
+                await context.bot.send_animation(
+                    chat_id=chat_id, animation=fd["id"],
                     caption=caption, reply_markup=reply_markup, parse_mode='HTML'
                 )
             else:
