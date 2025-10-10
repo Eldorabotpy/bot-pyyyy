@@ -6,68 +6,91 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMe
 from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler
 from .engine import event_manager
 from modules import player_manager, file_ids
-
+import re
 logger = logging.getLogger(__name__)
 
 
+def _strip_html_for_len(text: str) -> str:
+    """Remove tags HTML para medir o comprimento real do texto."""
+    return re.sub('<[^<]+?>', '', text)
+
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
+    """
+    Formata a mensagem de combate com uma 'caixa dinâmica' que se adapta ao conteúdo.
+    """
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
     
-    # --- Seção do Herói (sem alterações) ---
+    # --- Monta os blocos de texto como listas de linhas ---
     total_stats = player_manager.get_player_total_stats(player_data)
     p_max_hp = int(total_stats.get('max_hp', 0))
     p_atk = int(total_stats.get('attack', 0))
     p_def = int(total_stats.get('defense', 0))
     p_vel = int(total_stats.get('initiative', 0))
     p_srt = int(total_stats.get('luck', 0))
-    hero_block = (
-        f"<b>{player_data.get('character_name', 'Herói')}</b>\n"
-        f"❤️ 𝐇𝐏: {player_state['player_hp']}/{p_max_hp}\n"
-        f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
+    hero_block_lines = [
+        f"<b>{player_data.get('character_name', 'Herói')}</b>",
+        f"❤️ 𝐇𝐏: {player_state['player_hp']}/{p_max_hp}",
+        f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}",
         f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"
-    )
-
-    # --- Seção do Inimigo (sem alterações) ---
+    ]
+    
     m_hp = mob.get('hp', 0)
     m_max_hp = mob.get('max_hp', mob.get('hp', 0))
     m_atk = int(mob.get('attack', 0))
     m_def = int(mob.get('defense', 0))
     m_vel = int(mob.get('initiative', 0))
     m_srt = int(mob.get('luck', 0))
-    enemy_block = (
-        f"<b>{mob['name']}</b>\n"
-        f"❤️ 𝐇𝐏: {m_hp}/{m_max_hp}\n"
-        f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}\n"
+    enemy_block_lines = [
+        f"<b>{mob['name']}</b>",
+        f"❤️ 𝐇𝐏: {m_hp}/{m_max_hp}",
+        f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}",
         f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"
-    )
+    ]
+    
+    current_wave = player_state.get('current_wave', 1)
+    progress_text = event_manager.get_queue_status_text()
+    progress_text_formatted = progress_text.replace(':', '➜').replace('\n', ' | ')
+    
+    # --- Lógica da Caixa Dinâmica ---
+    # 1. Junta todas as linhas de conteúdo que ficarão dentro da caixa
+    all_lines_in_box = [progress_text_formatted] + hero_block_lines + enemy_block_lines
+    
+    # 2. Encontra o comprimento da linha mais longa (ignorando tags HTML)
+    # Adicionamos +2 para um pequeno espaço de respiro nas laterais
+    max_width = 0
+    if all_lines_in_box:
+        max_width = max(len(_strip_html_for_len(line)) for line in all_lines_in_box) + 2
+    
+    # 3. Cria as bordas e separadores com o tamanho dinâmico
+    wave_text = f" 🌊 ONDA {current_wave} 🌊 "
+    header = f"╔{wave_text.center(max_width, '═')}╗"
+    
+    vs_separator = " 𝐕𝐒 ".center(max_width, '─')
+    
+    footer_text = " ◆◈◆ "
+    footer = f"╚{footer_text.center(max_width, '═')}╝"
     
     log_section = "Aguardando sua ação..."
     if action_log:
         log_section = html.escape(action_log)
 
-    # --- Montagem Final (COM A CORREÇÃO DE SINTAXE) ---
-    current_wave = player_state.get('current_wave', 1)
-    progress_text = event_manager.get_queue_status_text()
-    
-    # --- CORREÇÃO APLICADA AQUI ---
-    # 1. Fazemos as substituições PRIMEIRO e guardamos em uma nova variável.
-    progress_text_formatted = progress_text.replace(':', '➜').replace('\n', ' | ')
-    # 2. Agora usamos a variável "limpa" (sem '\') dentro da f-string.
-    wave_progress_line = f"<code>{progress_text_formatted}</code>"
-    
-    header = f"<b>╔══════ 🌊 ONDA {current_wave} 🌊 ══════╗</b>"
-    separator = "<b>═══════════ 𝐕𝐒 ═══════════</b>"
-    footer = "<b>╚═════════ ◆◈◆ ═════════╝</b>"
-    
-    return (
-        f"{header}\n"
-        f"{wave_progress_line}\n\n"
-        f"{hero_block}\n\n"
-        f"{separator}\n\n"
-        f"{enemy_block}\n\n"
-        f"<b>Última Ação:</b>\n<code>{log_section}</code>\n\n{footer}"
+    # --- Montagem Final ---
+    # Centraliza o texto de progresso e junta os blocos de herói/inimigo
+    full_hero_block = "\n".join(hero_block_lines)
+    full_enemy_block = "\n".join(enemy_block_lines)
+
+    # Envolve a caixa em tags <code> para tentar forçar uma fonte de largura fixa
+    final_caption = (
+        f"<code>{header}\n"
+        f"{progress_text_formatted.center(max_width)}\n\n"
+        f"{full_hero_block}\n\n"
+        f"{vs_separator}\n\n"
+        f"{full_enemy_block}\n\n"
+        f"{footer}</code>\n\n"
+        f"<b>Última Ação:</b>\n<code>{log_section}</code>"
     )
+    return final_caption
 
 def _get_battle_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
