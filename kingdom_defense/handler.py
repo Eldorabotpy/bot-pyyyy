@@ -14,30 +14,45 @@ logger = logging.getLogger(__name__)
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
+    
+    # --- Seção do Herói ---
     total_stats = player_manager.get_player_total_stats(player_data)
     p_max_hp = int(total_stats.get('max_hp', 0))
     p_atk = int(total_stats.get('attack', 0))
     p_def = int(total_stats.get('defense', 0))
+    p_vel = int(total_stats.get('initiative', 0)) # NOVO
+    p_srt = int(total_stats.get('luck', 0))       # NOVO
+    
     hero_block = (
         f"<b>{player_data.get('character_name', 'Herói')}</b>\n"
         f"❤️ 𝐇𝐏: {player_state['player_hp']}/{p_max_hp}\n"
-        f"⚔️ 𝐀𝐓𝐊: {p_atk} 🛡️ 𝐃𝐄𝐅: {p_def}"
+        f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"  # NOVO
     )
-    m_hp = mob['hp']
-    m_max_hp = mob['max_hp']
+
+    # --- Seção do Inimigo ---
+    m_hp = mob.get('hp', 0)
+    m_max_hp = mob.get('max_hp', mob.get('hp', 0))
     m_atk = int(mob.get('attack', 0))
     m_def = int(mob.get('defense', 0))
+    m_vel = int(mob.get('initiative', 0)) # NOVO
+    m_srt = int(mob.get('luck', 0))       # NOVO
+
     enemy_block = (
         f"<b>{mob['name']}</b>\n"
         f"❤️ 𝐇𝐏: {m_hp}/{m_max_hp}\n"
-        f"⚔️ 𝐀𝐓𝐊: {m_atk} 🛡️ 𝐃𝐄𝐅: {m_def}"
+        f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"  # NOVO
     )
+    
     log_section = "Aguardando sua ação..."
     if action_log:
         log_section = html.escape(action_log)
+
     header = "╔═══════ ◆◈◆ COMBATE◆◈◆ ═══════╗"
     separator = "═════════════ 𝐕𝐒 ═════════════"
     footer = "╚════════════ ◆◈◆ ════════════╝"
+    
     return (
         f"{header}\n\n{hero_block}\n\n{separator}\n\n{enemy_block}\n\n"
         f"<b>Última Ação:</b>\n<code>{log_section}</code>\n\n{footer}"
@@ -107,35 +122,48 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
         status_text = event_manager.get_queue_status_text()
         text = f"🛡️ **Fila de Reforços** 🛡️\n\nA linha de frente está cheia!\n\n{status_text}\n\nAguarde."
         await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard())
+
 async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
     player_data = player_manager.get_player_data(user_id)
     result = event_manager.process_player_attack(user_id, player_data)
+    
     if "error" in result:
         await query.answer(result["error"], show_alert=True)
         return
+        
     player_state = event_manager.get_battle_data(user_id)
-    if result.get("game_over"):
-        player_state['action_log'] = result.get('action_log', '')
-        await query.edit_message_caption(caption=f"☠️ Você foi derrotado! ☠️\n\n{player_state['action_log']}", reply_markup=None)
-        await query.answer("Sua jornada na defesa termina aqui.", show_alert=True)
+    
+    if not player_state: # O jogador pode ter sido removido após ser derrotado
         return
+
+    # Se o monstro foi derrotado...
     if result.get("monster_defeated"):
         await query.answer(f"Inimigo derrotado! {result['loot_message']}", show_alert=True)
-        next_mob = result['next_mob_data']
-        media_key = next_mob['media_key']
+        
+        # --- CORREÇÃO DE SINCRONIA ---
+        # Garantimos que o estado do jogador tenha os dados do PRÓXIMO monstro
+        # antes de formatar a tela.
+        next_mob_data = result['next_mob_data']
+        player_state['current_mob'] = next_mob_data
+        player_state['action_log'] = result['action_log']
+        
+        media_key = next_mob_data['media_key']
         file_data = file_ids.get_file_data(media_key)
+        
         if not file_data or not file_data.get("id"):
             await query.edit_message_caption(caption="Erro: Mídia do próximo monstro não encontrada.")
             return
-        player_state['action_log'] = result['action_log']
-        caption = _format_battle_caption(player_state, player_data) # <-- CORRIGIDO
+
+        caption = _format_battle_caption(player_state, player_data)
         media = InputMediaAnimation(media=file_data["id"], caption=caption, parse_mode="HTML")
         await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
+
+    # Se a batalha continua...
     else:
         player_state['action_log'] = result['action_log']
-        caption = _format_battle_caption(player_state, player_data) # <-- CORRIGIDO
+        caption = _format_battle_caption(player_state, player_data)
         await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard())
         await query.answer()
 
