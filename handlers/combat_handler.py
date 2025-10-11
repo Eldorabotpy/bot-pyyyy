@@ -179,3 +179,5 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     new_text = format_combat_message(player_data)
     kb = [[InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]]
     await _edit_caption_only(query, new_text, InlineKeyboardMarkup(kb))
+
+combat_handler = CallbackQueryHandler(combat_callback, pattern=r'^combat_(attack|flee)$')
