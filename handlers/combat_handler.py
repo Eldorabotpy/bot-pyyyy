@@ -111,7 +111,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
       
         player_attack = int(player_total_stats.get('attack', 5))
         monster_defense = int(combat_details.get('monster_defense', 0))
-        params = criticals.get_crit_params_for_player(player_data, player_total_stats)
+        params = criticals.get_crit_params(player_total_stats)
         player_damage, is_crit, is_mega = criticals.roll_damage(player_attack, monster_defense, params)
         log.append(f"➡️ {player_data.get('character_name','Você')} ataca e causa {player_damage} de dano.")
         combat_details['monster_hp'] = int(combat_details.get('monster_hp', 0)) - player_damage
