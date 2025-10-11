@@ -147,68 +147,65 @@ def _fmt_player_stats_as_ints(total_stats: dict) -> tuple[int, int, int, int, in
 
 # ---------- Mensagem de combate (sempre inteiros) ----------
 def format_combat_message(player_data: dict) -> str:
-    """
-    Formata a mensagem de combate usando os stats TOTAIS do jogador
-    e os detalhes salvos em player_state.details. Usa a regiao para
-    montar o titulo e icones dinamicamente. Exibe SEMPRE inteiros.
-    """
-    # --- Jogador ---
-    player_name = player_data.get('character_name', 'Jogador')
-    p_hp = _i(player_data.get('current_hp', 0))
-
-    total_stats = player_manager.get_player_total_stats(player_data)
-    p_max_hp, p_atk, p_def, p_vel, p_srt = _fmt_player_stats_as_ints(total_stats)
-
-    # --- Região ---
+    """Formata a mensagem de combate com um layout de duas colunas e log separado."""
+    
+    state = player_data.get('player_state', {})
+    details = state.get('details', {})
+    log = details.get('battle_log', [])
+    
+    # --- Dados da Região ---
     regiao_id = player_data.get("current_location", "floresta_sombria")
-    titulo, icones = obter_titulo_e_icones_por_regiao(regiao_id)
+    # Usa a tua função helper que já existe!
+    titulo, icones = obter_titulo_e_icones_por_regiao(regiao_id) 
 
-    # --- Monstro ---
-    combat_details = (player_data.get('player_state', {}) or {}).get('details', {}) or {}
+    # --- Dados do Jogador ---
+    player_stats = player_manager.get_player_total_stats(player_data)
+    p_name = player_data.get('character_name', 'Herói')
+    p_hp = f"❤️ HP: {_i(player_data.get('current_hp', 0))}/{_i(player_stats.get('max_hp', 0))}"
+    p_atk = f"⚔️ ATK: {_i(player_stats.get('attack', 0))}"
+    p_def = f"🛡️ DEF: {_i(player_stats.get('defense', 0))}"
+    p_vel = f"🏃‍♂️ VEL: {_i(player_stats.get('initiative', 0))}"
+    p_srt = f"🍀 SRT: {_i(player_stats.get('luck', 0))}"
 
-    monster_name = combat_details.get('monster_name') or combat_details.get('name', 'Monstro')
-    m_hp   = _i(combat_details.get('monster_hp', combat_details.get('hp', 0)))
-    m_max  = _i(combat_details.get('monster_max_hp', combat_details.get('max_hp', 0)))
-    m_atk  = _i(combat_details.get('monster_attack', combat_details.get('attack', 0)))
-    m_def  = _i(combat_details.get('monster_defense', combat_details.get('defense', 0)))
-    m_vel  = _i(combat_details.get('monster_initiative', combat_details.get('initiative', 0)))
-    m_srt  = _i(combat_details.get('monster_luck', combat_details.get('luck', 0)))
+    # --- Dados do Monstro ---
+    m_name = details.get('monster_name', 'Inimigo')
+    m_hp = f"❤️ HP: {_i(details.get('monster_hp', 0))}/{_i(details.get('monster_max_hp', 0))}"
+    m_atk = f"⚔️ ATK: {_i(details.get('monster_attack', 0))}"
+    m_def = f"🛡️ DEF: {_i(details.get('monster_defense', 0))}"
+    m_vel = f"🏃‍♂️ VEL: {_i(details.get('monster_initiative', 0))}"
+    m_srt = f"🍀 SRT: {_i(details.get('monster_luck', 0))}"
 
-    # --- Log (últimas 4 entradas) ---
-    def encurtar_log(x, max_len=48):
-        s = str(x)
-        return (s[:max_len] + '…') if len(s) > max_len else s
+    # --- Montagem do Layout em Colunas ---
+    # Define a largura da primeira coluna para alinhamento
+    largura_coluna = 15
 
-    log_entries = list(combat_details.get('battle_log', []))[-4:]
-    log_final = "\n".join(html.escape(encurtar_log(x)) for x in log_entries)
+    stats_block_lines = [
+        f"{p_name.ljust(largura_coluna)} │ {m_name}",
+        f"{p_hp.ljust(largura_coluna)} │ {m_hp}",
+        f"{p_atk.ljust(largura_coluna)} │ {m_atk}",
+        f"{p_def.ljust(largura_coluna)} │ {m_def}",
+        f"{p_vel.ljust(largura_coluna)} │ {m_vel}",
+        f"{p_srt.ljust(largura_coluna)} │ {m_srt}",
+    ]
+    stats_block = "\n".join(stats_block_lines)
+    
+    # --- Montagem do Log (SEM CORTES) ---
+    # Apenas pega as últimas 4 linhas e escapa caracteres especiais de HTML
+    log_block = "\n".join([html.escape(str(line)) for line in log[-4:]])
+    if not log_block:
+        log_block = "Aguardando sua ação..."
 
-    # --- Seções ---
-    secao_jogador = (
-        f"<b>{player_name}</b>\n"
-        f"❤️ 𝐇𝐏: {p_hp}/{p_max_hp}\n"
-        f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"
+    # --- Mensagem Final ---
+    final_message = (
+        f"{titulo}\n\n"  # Usa o título gerado pela tua função helper
+        f"╔═════════ ⚔️ VS ⚔️ ═════════╗\n"
+        f"<code>{stats_block}</code>\n"
+        f"╚═══════════ 📜 ═══════════╝\n\n"
+        f"<b>Últimas Ações:</b>\n"
+        f"<code>{log_block}</code>"
     )
-    secao_monstro = (
-        f"<b>{monster_name}</b>\n"
-        f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
-        f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"
-    )
-
-    frame = (
-        f"🏞️ <b>{titulo}</b>\n"
-        f"{icones}\n"
-        f"╔════════════ ◆◈◆ ════════════╗\n"
-        f"{secao_jogador}\n"
-        f"══════════════════════════════\n"
-        f"{secao_monstro}\n"
-        f"═════════════ ◆◈◆ ═════════════\n"
-        f"{log_final}\n"
-        f"╚════════════ ◆◈◆ ════════════╝"
-    )
-
-    return frame
+    
+    return final_message
 
 # ---------- Mensagem de dungeon (sempre inteiros) ----------
 def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict) -> str:
