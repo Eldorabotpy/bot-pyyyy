@@ -52,7 +52,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _edit_caption_only(query, "Você não está em combate.")
         return
 
-    # --- SETUP DO COMBATE (sem alterações) ---
     player_data["user_id"] = user_id
     combat_details = dict(state.get('details', {}))
     log = list(combat_details.get('battle_log', []))
@@ -66,7 +65,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     }
     in_dungeon = "dungeon_ctx" in combat_details
 
-    # --- LÓGICA DE FUGA (sem alterações) ---
     if action == 'combat_flee':
         flee_chance = 0.5 
         
@@ -85,7 +83,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             log.append("🏃 𝑺𝒖𝒂 𝒕𝒆𝒏𝒕𝒂𝒕𝒊𝒗𝒂 𝒅𝒆 𝒇𝒖𝒈𝒂 𝒇𝒂𝒍𝒉𝒐𝒖!")
             
             monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_total_stats, {})
-            log.append(f"🩸 𝑽𝒐𝒄𝒆̂ 𝒓𝒆𝒄𝒆𝒃𝒆 {monster_damage} 𝒅𝒆 𝒅𝒂𝒏𝒐.")
+            log.append(f"⬅️ {monster_stats['monster_name']} ataca\ne causa {monster_damage} de dano.")
 
             # --- NOVO: Mensagens de Crítico do Monstro ---
             if m_is_mega:
@@ -109,7 +107,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 except Exception: pass
                 await context.bot.send_message(
                     chat_id=chat_id, text=defeat_summary, parse_mode='HTML',
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ Continuar", callback_data='continue_after_action')]])
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ ℂ𝕠𝕟𝕥𝕚𝕟𝕦𝕒𝕣", callback_data='continue_after_action')]])
                 )
                 return
 
@@ -121,17 +119,17 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         double_attack_chance = player_manager.get_player_double_attack_chance(player_data)
         if random.random() < double_attack_chance:
             num_attacks = 2
-            log.append("⚡ <b>ATAQUE DUPLO!</b>")
+            log.append("⚡ 𝐀𝐓𝐀𝐐𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
 
         for i in range(num_attacks):
             player_damage, is_crit, is_mega = criticals.roll_damage(player_total_stats, monster_stats, {})
-            log.append(f"➡️ {player_data.get('character_name','Você')} ataca e causa {player_damage} de dano.")
+            log.append(f"➡️ {player_data.get('character_name','Você')} ataca \ne causa {player_damage} de dano.")
             
             # --- NOVO: Mensagens de Crítico ---
             if is_mega:
-                log.append("💥💥 <b>MEGA CRÍTICO!</b>")
+                log.append("💥💥 𝐌𝐄𝐆𝐀 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!")
             elif is_crit:
-                log.append("💥 <b>DANO CRÍTICO!</b>")
+                log.append("💥 𝐃𝐀𝐍𝐎 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!")
 
             combat_details['monster_hp'] = int(combat_details.get('monster_hp', 0)) - player_damage
             combat_details["used_weapon"] = True
@@ -156,23 +154,23 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 except Exception: pass
                 await context.bot.send_message(
                     chat_id=chat_id, text=victory_summary, parse_mode='HTML',
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data='continue_after_action')]])
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data='continue_after_action')]])
                 )
                 return
 
         # --- NOVO: Lógica de Esquiva ---
         dodge_chance = player_manager.get_player_dodge_chance(player_data)
         if random.random() < dodge_chance:
-            log.append("💨 Você se esquivou do contra-ataque!")
+            log.append("💨 Você se esquivou do ataque!")
         else:
             monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_total_stats, {})
-            log.append(f"⬅️ {monster_stats['monster_name']} contra-ataca e causa {monster_damage} de dano.")
+            log.append(f"⬅️ {monster_stats['monster_name']} ataca \ne causa {monster_damage} de dano.")
 
             # --- NOVO: Mensagens de Crítico do Monstro ---
             if m_is_mega:
-                log.append("‼️ <b>MEGA CRÍTICO inimigo!</b>")
+                log.append("‼️ 𝕄𝔼𝔾𝔸 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
             elif m_is_crit:
-                log.append("❗️ <b>DANO CRÍTICO inimigo!</b>")
+                log.append("❗️ 𝔻𝔸ℕ𝕆 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
             
             player_data['current_hp'] = int(player_data.get('current_hp', 0)) - monster_damage
             combat_details["took_damage"] = True
@@ -190,17 +188,16 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 except Exception: pass
                 await context.bot.send_message(
                     chat_id=chat_id, text=defeat_summary, parse_mode='HTML',
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ Continuar", callback_data='continue_after_action')]])
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ ℂ𝕠𝕟𝕥𝕚𝕟𝕦𝕒𝕣", callback_data='continue_after_action')]])
                 )
                 return
             
-    # --- FINAL DA FUNÇÃO (sem alterações) ---
     combat_details['battle_log'] = log
     player_data['player_state']['details'] = combat_details
     player_manager.save_player_data(user_id, player_data)
 
     new_text = format_combat_message(player_data)
-    kb = [[InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]]
+    kb = [[InlineKeyboardButton("⚔️ 𝔸𝕥𝕒𝕔𝕒𝕣", callback_data='combat_attack'), InlineKeyboardButton("🏃 𝔽𝕦𝕘𝕚𝕣", callback_data='combat_flee')]]
     await _edit_caption_only(query, new_text, InlineKeyboardMarkup(kb))
 
 combat_handler = CallbackQueryHandler(combat_callback, pattern=r'^combat_(attack|flee)$')

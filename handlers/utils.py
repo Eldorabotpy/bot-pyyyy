@@ -145,62 +145,70 @@ def _fmt_player_stats_as_ints(total_stats: dict) -> tuple[int, int, int, int, in
     p_srt    = _i(total_stats.get('luck', 0))
     return p_max_hp, p_atk, p_def, p_ini, p_srt
 
-# ---------- Mensagem de combate (sempre inteiros) ----------
+
+# Em handlers/utils.py
+# SUBSTITUA a sua função format_combat_message por esta versão final
+
 def format_combat_message(player_data: dict) -> str:
-    """Formata a mensagem de combate com um layout de duas colunas e log separado."""
+    """Formata a mensagem de combate com layout de colunas, emojis e espaçamento ajustável."""
     
     state = player_data.get('player_state', {})
     details = state.get('details', {})
     log = details.get('battle_log', [])
     
-    # --- Dados da Região ---
     regiao_id = player_data.get("current_location", "floresta_sombria")
-    # Usa a tua função helper que já existe!
-    titulo, icones = obter_titulo_e_icones_por_regiao(regiao_id) 
+    titulo, _ = obter_titulo_e_icones_por_regiao(regiao_id) 
 
-    # --- Dados do Jogador ---
     player_stats = player_manager.get_player_total_stats(player_data)
-    p_name = player_data.get('character_name', 'Herói')
-    p_hp = f"❤️ HP: {_i(player_data.get('current_hp', 0))}/{_i(player_stats.get('max_hp', 0))}"
-    p_atk = f"⚔️ ATK: {_i(player_stats.get('attack', 0))}"
-    p_def = f"🛡️ DEF: {_i(player_stats.get('defense', 0))}"
-    p_vel = f"🏃‍♂️ VEL: {_i(player_stats.get('initiative', 0))}"
-    p_srt = f"🍀 SRT: {_i(player_stats.get('luck', 0))}"
-
-    # --- Dados do Monstro ---
-    m_name = details.get('monster_name', 'Inimigo')
-    m_hp = f"❤️ HP: {_i(details.get('monster_hp', 0))}/{_i(details.get('monster_max_hp', 0))}"
-    m_atk = f"⚔️ ATK: {_i(details.get('monster_attack', 0))}"
-    m_def = f"🛡️ DEF: {_i(details.get('monster_defense', 0))}"
-    m_vel = f"🏃‍♂️ VEL: {_i(details.get('monster_initiative', 0))}"
-    m_srt = f"🍀 SRT: {_i(details.get('monster_luck', 0))}"
-
-    # --- Montagem do Layout em Colunas ---
-    # Define a largura da primeira coluna para alinhamento
-    largura_coluna = 15
-
-    stats_block_lines = [
-        f"{p_name.ljust(largura_coluna)} │ {m_name}",
-        f"{p_hp.ljust(largura_coluna)} │ {m_hp}",
-        f"{p_atk.ljust(largura_coluna)} │ {m_atk}",
-        f"{p_def.ljust(largura_coluna)} │ {m_def}",
-        f"{p_vel.ljust(largura_coluna)} │ {m_vel}",
-        f"{p_srt.ljust(largura_coluna)} │ {m_srt}",
-    ]
-    stats_block = "\n".join(stats_block_lines)
     
-    # --- Montagem do Log (SEM CORTES) ---
-    # Apenas pega as últimas 4 linhas e escapa caracteres especiais de HTML
+    # --- Trunca nomes longos ---
+    p_name_raw = player_data.get('character_name', 'Herói')
+    m_name_raw = details.get('monster_name', 'Inimigo')
+    p_name = (p_name_raw[:15] + '…') if len(p_name_raw) > 15 else p_name_raw
+    m_name = (m_name_raw[:17] + '…') if len(m_name_raw) > 17 else m_name_raw
+
+    # --- NOVO: CONTROLO DE ESPAÇAMENTO ---
+    # Altere os espaços aqui (" ") para ajustar a distância entre as colunas
+    gap = " " 
+
+    # --- Lógica de Alinhamento com Emojis ---
+    label_w = 8  # Aumentado para acomodar os emojis
+    value_w = 11
+
+    p_hp_str = f"{_i(player_data.get('current_hp', 0))}/{_i(player_stats.get('max_hp', 0))}"
+    p_hp  = f"{'❤️ HP:'.ljust(label_w)}{p_hp_str.ljust(value_w)}"
+    p_atk = f"{'⚔️ ATK:'.ljust(label_w)}{str(_i(player_stats.get('attack', 0))).ljust(value_w)}"
+    p_def = f"{'🛡️ DEF:'.ljust(label_w)}{str(_i(player_stats.get('defense', 0))).ljust(value_w)}"
+    p_vel = f"{'🏃‍♂️ VEL:'.ljust(label_w)}{str(_i(player_stats.get('initiative', 0))).ljust(value_w)}"
+    p_srt = f"{'🍀 SRT:'.ljust(label_w)}{str(_i(player_stats.get('luck', 0))).ljust(value_w)}"
+    
+    m_hp_str = f"{_i(details.get('monster_hp', 0))}/{_i(details.get('monster_max_hp', 0))}"
+    m_hp  = f"{'❤️ HP:'.ljust(label_w)}{m_hp_str.ljust(value_w)}"
+    m_atk = f"{'⚔️ ATK:'.ljust(label_w)}{str(_i(details.get('monster_attack', 0))).ljust(value_w)}"
+    m_def = f"{'🛡️ DEF:'.ljust(label_w)}{str(_i(details.get('monster_defense', 0))).ljust(value_w)}"
+    m_vel = f"{'🏃‍♂️ VEL:'.ljust(label_w)}{str(_i(details.get('monster_initiative', 0))).ljust(value_w)}"
+    m_srt = f"{'🍀 SRT:'.ljust(label_w)}{str(_i(details.get('monster_luck', 0))).ljust(value_w)}"
+
+    col_width = label_w + value_w
+    stats_lines = [
+        f"{p_name.ljust(col_width)}{gap}║{gap}{m_name}",
+        f"{p_hp}{gap}║{gap}{m_hp}",
+        f"{p_atk}{gap}║{gap}{m_atk}",
+        f"{p_def}{gap}║{gap}{m_def}",
+        f"{p_vel}{gap}║{gap}{m_vel}",
+        f"{p_srt}{gap}║{gap}{m_srt}",
+    ]
+    stats_block = "\n".join(stats_lines)
+    
     log_block = "\n".join([html.escape(str(line)) for line in log[-4:]])
     if not log_block:
         log_block = "Aguardando sua ação..."
 
-    # --- Mensagem Final ---
     final_message = (
-        f"{titulo}\n\n"  # Usa o título gerado pela tua função helper
-        f"╔════════════ ⚔️ VS ⚔️ ════════════╗\n"
+        f"<b>{titulo}</b>\n\n"
+        f"╔══════════════ ⚔️ VS ⚔️ ══════════════╗\n"
         f"<code>{stats_block}</code>\n"
-        f"╚═══════════════ 📜 ═══════════════╝\n\n"
+        f"╚════════════════ 📜 ════════════════╝\n\n"
         f"<b>Últimas Ações:</b>\n"
         f"<code>{log_block}</code>"
     )
