@@ -52,27 +52,25 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _edit_caption_only(query, "Você não está em combate.")
         return
 
+    # --- SETUP DO COMBATE (sem alterações) ---
     player_data["user_id"] = user_id
     combat_details = dict(state.get('details', {}))
     log = list(combat_details.get('battle_log', []))
     action = query.data
-    
-    # --- DADOS PRINCIPAIS PARA O COMBATE ---
     player_total_stats = player_manager.get_player_total_stats(player_data)
-    # Criamos um dicionário de stats para o monstro para padronizar
     monster_stats = {
         'attack': combat_details.get('monster_attack', 1),
         'defense': combat_details.get('monster_defense', 0),
         'luck': combat_details.get('monster_luck', 5),
-        'monster_name': combat_details.get('monster_name', 'Inimigo') # Identificador
+        'monster_name': combat_details.get('monster_name', 'Inimigo')
     }
     in_dungeon = "dungeon_ctx" in combat_details
 
+    # --- LÓGICA DE FUGA (sem alterações) ---
     if action == 'combat_flee':
-        flee_chance = 0.5
+        flee_chance = 0.5 
         
         if random.random() <= flee_chance:
-            # (Lógica de fuga bem-sucedida - sem alterações)
             durability.apply_end_of_battle_wear(player_data, combat_details, log)
             try: await query.delete_message()
             except Exception: pass
@@ -86,16 +84,19 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         else:
             log.append("🏃 𝑺𝒖𝒂 𝒕𝒆𝒏𝒕𝒂𝒕𝒊𝒗𝒂 𝒅𝒆 𝒇𝒖𝒈𝒂 𝒇𝒂𝒍𝒉𝒐𝒖!")
             
-            # --- CORREÇÃO 1: Ataque do monstro após fuga falhada ---
-            # Passamos os dicionários completos para a função roll_damage
-            monster_damage, _, _ = criticals.roll_damage(monster_stats, player_total_stats, {})
-            
-            player_data['current_hp'] = int(player_data.get('current_hp', 0)) - monster_damage
-            combat_details["took_damage"] = True
+            monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_total_stats, {})
             log.append(f"🩸 𝑽𝒐𝒄𝒆̂ 𝒓𝒆𝒄𝒆𝒃𝒆 {monster_damage} 𝒅𝒆 𝒅𝒂𝒏𝒐.")
 
+            # --- NOVO: Mensagens de Crítico do Monstro ---
+            if m_is_mega:
+                log.append("‼️ <b>MEGA CRÍTICO inimigo!</b>")
+            elif m_is_crit:
+                log.append("❗️ <b>DANO CRÍTICO inimigo!</b>")
+
+            player_data['current_hp'] = int(player_data.get('current_hp', 0)) - monster_damage
+            combat_details["took_damage"] = True
+
             if player_data['current_hp'] <= 0:
-                # (Lógica de derrota - sem alterações)
                 durability.apply_end_of_battle_wear(player_data, combat_details, log)
                 if in_dungeon:
                     await dungeons_runtime.fail_dungeon_run(context, user_id, chat_id, "Você foi derrotado")
@@ -112,19 +113,33 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
                 return
 
-
+    # --- LÓGICA DE ATAQUE (ATUALIZADA) ---
     elif action == 'combat_attack':
         
-        # --- CORREÇÃO 2: Ataque do jogador ---
-        # Passamos os dicionários completos para a função roll_damage
-        player_damage, is_crit, is_mega = criticals.roll_damage(player_total_stats, monster_stats, {})
-        
-        log.append(f"➡️ {player_data.get('character_name','Você')} ataca e causa {player_damage} de dano.")
-        combat_details['monster_hp'] = int(combat_details.get('monster_hp', 0)) - player_damage
-        combat_details["used_weapon"] = True
+        # --- NOVO: Lógica de Ataque Duplo ---
+        num_attacks = 1
+        double_attack_chance = player_manager.get_player_double_attack_chance(player_data)
+        if random.random() < double_attack_chance:
+            num_attacks = 2
+            log.append("⚡ <b>ATAQUE DUPLO!</b>")
 
+        for i in range(num_attacks):
+            player_damage, is_crit, is_mega = criticals.roll_damage(player_total_stats, monster_stats, {})
+            log.append(f"➡️ {player_data.get('character_name','Você')} ataca e causa {player_damage} de dano.")
+            
+            # --- NOVO: Mensagens de Crítico ---
+            if is_mega:
+                log.append("💥💥 <b>MEGA CRÍTICO!</b>")
+            elif is_crit:
+                log.append("💥 <b>DANO CRÍTICO!</b>")
+
+            combat_details['monster_hp'] = int(combat_details.get('monster_hp', 0)) - player_damage
+            combat_details["used_weapon"] = True
+            
+            if combat_details['monster_hp'] <= 0:
+                break 
+        
         if combat_details['monster_hp'] <= 0:
-            # (Lógica de vitória - sem alterações)
             durability.apply_end_of_battle_wear(player_data, combat_details, log)
             xp_reward, gold_reward, looted_items_list = rewards.calculate_victory_rewards(player_data, combat_details)
             if in_dungeon:
@@ -145,33 +160,41 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
                 return
 
-        # --- CORREÇÃO 3: Contra-ataque do monstro ---
-        # Passamos os dicionários completos para a função roll_damage
-        monster_damage, _, _ = criticals.roll_damage(monster_stats, player_total_stats, {})
+        # --- NOVO: Lógica de Esquiva ---
+        dodge_chance = player_manager.get_player_dodge_chance(player_data)
+        if random.random() < dodge_chance:
+            log.append("💨 Você se esquivou do contra-ataque!")
+        else:
+            monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_total_stats, {})
+            log.append(f"⬅️ {monster_stats['monster_name']} contra-ataca e causa {monster_damage} de dano.")
 
-        log.append(f"⬅️ {combat_details.get('monster_name','Inimigo')} contra-ataca e causa {monster_damage} de dano.")
-        player_data['current_hp'] = int(player_data.get('current_hp', 0)) - monster_damage
-        combat_details["took_damage"] = True
-
-        if player_data['current_hp'] <= 0:
-            # (Lógica de derrota - sem alterações)
-            durability.apply_end_of_battle_wear(player_data, combat_details, log)
-            if in_dungeon:
-                await dungeons_runtime.fail_dungeon_run(context, user_id, chat_id, "Você foi derrotado")
-                return
-            defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
-            player_data['current_hp'] = int(player_total_stats.get('max_hp', 50))
-            player_data['player_state'] = {'action': 'idle'}
-            player_manager.save_player_data(user_id, player_data)
-            try: await query.delete_message()
-            except Exception: pass
-            await context.bot.send_message(
-                chat_id=chat_id, text=defeat_summary, parse_mode='HTML',
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ Continuar", callback_data='continue_after_action')]])
-            )
-            return
+            # --- NOVO: Mensagens de Crítico do Monstro ---
+            if m_is_mega:
+                log.append("‼️ <b>MEGA CRÍTICO inimigo!</b>")
+            elif m_is_crit:
+                log.append("❗️ <b>DANO CRÍTICO inimigo!</b>")
             
-    # (Final da função - sem alterações)
+            player_data['current_hp'] = int(player_data.get('current_hp', 0)) - monster_damage
+            combat_details["took_damage"] = True
+
+            if player_data['current_hp'] <= 0:
+                durability.apply_end_of_battle_wear(player_data, combat_details, log)
+                if in_dungeon:
+                    await dungeons_runtime.fail_dungeon_run(context, user_id, chat_id, "Você foi derrotado")
+                    return
+                defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
+                player_data['current_hp'] = int(player_total_stats.get('max_hp', 50))
+                player_data['player_state'] = {'action': 'idle'}
+                player_manager.save_player_data(user_id, player_data)
+                try: await query.delete_message()
+                except Exception: pass
+                await context.bot.send_message(
+                    chat_id=chat_id, text=defeat_summary, parse_mode='HTML',
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ Continuar", callback_data='continue_after_action')]])
+                )
+                return
+            
+    # --- FINAL DA FUNÇÃO (sem alterações) ---
     combat_details['battle_log'] = log
     player_data['player_state']['details'] = combat_details
     player_manager.save_player_data(user_id, player_data)
