@@ -41,16 +41,14 @@ def update_top_score(user_id: int, character_name: str, damage: int):
         print(f"NOVO RECORDE DE DANO ESTABELECIDO: {character_name} com {damage} de dano!")
 
 def get_top_score_text() -> str:
-    """Retorna uma string formatada do recorde atual para exibição."""
+    print("\n--- [DEBUG LEITURA] Buscando recorde para o menu do reino...")
     leaderboard = _load_leaderboard()
+    print(f"--- [DEBUG LEITURA] 1. JSON carregado: {leaderboard}")
     top_score = leaderboard.get("top_damage_record")
-    
-    # Se não houver recorde ou se os dados estiverem incompletos (sem nome), não mostra nada.
     if not top_score or not top_score.get("character_name"):
+        print("--- [DEBUG LEITURA] 2. Nenhum recorde válido encontrado.")
         return "" 
-        
     name = top_score['character_name']
     damage = top_score.get('damage', 0)
-    
-    # Retorna a string completa e formatada com HTML
-    return f"🏆 𝗥𝗲𝗰𝗼𝗿𝗱𝗶𝘀𝘁𝗮 𝗱𝗲 𝗗𝗮𝗻𝗼: <b>{name}</b> ({damage:,}) 🏆"
+    print(f"--- [DEBUG LEITURA] 2. Recorde encontrado: {name} com {damage} de dano.")
+    return f"\n🏆 𝗥𝗲𝗰𝗼𝗿𝗱𝗶𝘀𝘁𝗮 𝗱𝗲 𝗗𝗮𝗻𝗼: <b>{name}</b> ({damage:,}) 🏆"

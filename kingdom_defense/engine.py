@@ -311,9 +311,35 @@ async def start_event_job(context: ContextTypes.DEFAULT_TYPE):
     event_manager.start_event()
 
 
-async def end_event_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Job agendado que APENAS desativa o evento.
-    """
-    logger.info("Job agendado: Encerrando o evento de defesa do reino...")
-    event_manager.end_event()
+def end_event(self):
+        logger.info("Encerrando evento de Defesa do Reino...")
+        print("\n--- [DEBUG SALVAMENTO] Função end_event iniciada.")
+        top_scorer = None
+        max_damage = -1 # Usamos -1 para garantir que qualquer dano seja maior
+        
+        print(f"--- [DEBUG SALVAMENTO] 1. Verificando {len(self.player_states)} participantes.")
+        for user_id_str, state in self.player_states.items():
+            damage_dealt = state.get('damage_dealt', 0)
+            if damage_dealt > max_damage:
+                max_damage = damage_dealt
+                player_data = player_manager.get_player_data(int(user_id_str))
+                if player_data:
+                    top_scorer = {
+                        "user_id": int(user_id_str),
+                        "character_name": player_data.get("character_name", "Herói"),
+                        "damage": max_damage
+                    }
+        
+        print(f"--- [DEBUG SALVAMENTO] 2. Melhor jogador da rodada: {top_scorer}")
+        if top_scorer:
+            print("--- [DEBUG SALVAMENTO] 3. Enviando para leaderboard.update_top_score...")
+            leaderboard.update_top_score(
+                user_id=top_scorer["user_id"],
+                character_name=top_scorer["character_name"],
+                damage=top_scorer["damage"]
+            )
+        else:
+            print("--- [DEBUG SALVAMENTO] 3. Nenhum jogador causou dano, nada a salvar.")
+            
+        self.reset_event()
+        return {"success": "Evento encerrado."}
