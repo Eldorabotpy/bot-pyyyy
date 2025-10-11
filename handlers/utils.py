@@ -198,9 +198,9 @@ def format_combat_message(player_data: dict) -> str:
     # --- Mensagem Final ---
     final_message = (
         f"{titulo}\n\n"  # Usa o título gerado pela tua função helper
-        f"╔═════════ ⚔️ VS ⚔️ ═════════╗\n"
+        f"╔════════════ ⚔️ VS ⚔️ ════════════╗\n"
         f"<code>{stats_block}</code>\n"
-        f"╚═══════════ 📜 ═══════════╝\n\n"
+        f"╚═══════════════ 📜 ═══════════════╝\n\n"
         f"<b>Últimas Ações:</b>\n"
         f"<code>{log_block}</code>"
     )
