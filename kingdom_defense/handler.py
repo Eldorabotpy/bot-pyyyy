@@ -7,6 +7,8 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from .engine import event_manager
 from modules import player_manager, file_ids
 import re
+import time
+import traceback
 from handlers.menu.kingdom import show_kingdom_menu
 logger = logging.getLogger(__name__)
 
@@ -146,21 +148,24 @@ async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         logger.warning(f"Não foi possível editar a mensagem no menu de eventos: {e}")
 
 
+# Em kingdom_defense/handler.py
+
 async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
     player_data = player_manager.get_player_data(user_id)
     
-    # --- LÓGICA DE VERIFICAÇÃO DO TICKET (NOVA) ---
-    ticket_id = 'ticket_defesa_reino' # Defina o ID do seu item aqui
+    # --- LÓGICA DO TICKET (CORRIGIDA) ---
+    ticket_id = 'ticket_defesa_reino'
     player_inventory = player_data.get('inventory', {})
     
-    # Verifica se o jogador tem o ticket
-    if ticket_id not in player_inventory or player_inventory[ticket_id].get('quantity', 0) <= 0:
+    # CORREÇÃO: Verificamos o valor diretamente, pois ele é um número.
+    # O .get(ticket_id, 0) trata os casos em que o jogador não tem o item (retorna 0).
+    if player_inventory.get(ticket_id, 0) <= 0:
         await query.answer("Você precisa de um Ticket da Defesa para entrar!", show_alert=True)
-        return # Para a execução aqui se não tiver o ticket
+        return
 
-    # --- FIM DA LÓGICA DE VERIFICAÇÃO ---
+    # --- FIM DA CORREÇÃO ---
 
     await query.answer("Ticket validado! Verificando seu lugar na linha de frente...")
 
@@ -168,16 +173,15 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
         await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
         return
 
+    # --- COBRANÇA DO TICKET ---
     player_manager.remove_item_from_inventory(player_data, ticket_id, 1)
-    player_manager.save_player_data(user_id, player_data) # Salva a alteração no inventário
+    player_manager.save_player_data(user_id, player_data)
     
-    # --- FIM DA LÓGICA DE COBRANÇA ---
-
+    # --- O resto da função continua igual ---
     status = event_manager.add_player_to_event(user_id, player_data)
     
     if status == "active":
         battle_data = event_manager.get_battle_data(user_id)
-        # Segurança: se por algum motivo não houver dados, não quebra
         if not battle_data:
             await query.edit_message_text("Ocorreu um erro ao buscar seus dados de batalha. Tente novamente.", reply_markup=_get_game_over_keyboard())
             return
@@ -203,30 +207,38 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
 
 async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = update.effective_user.id
     
-    # Trava para evitar cliques duplos
-    if context.user_data.get('is_attacking', False):
-        await query.answer("Aguarde o resultado do seu último ataque!", cache_time=2)
+    # --- NOVO: Trava baseada em tempo (mais segura) ---
+    # Impede que o jogador clique mais de uma vez a cada 2 segundos.
+    # Esta trava não fica "presa" como a anterior.
+    now = time.time()
+    last_attack_time = context.user_data.get('kd_last_attack_time', 0)
+    
+    if now - last_attack_time < 2.0:
+        await query.answer("Aguarde um momento antes de atacar novamente!", cache_time=1)
         return
-    context.user_data['is_attacking'] = True
 
+    context.user_data['kd_last_attack_time'] = now
+    
+    # --- ADICIONADO: Captura de erros detalhada ("Debug") ---
     try:
-        user_id = update.effective_user.id
         player_data = player_manager.get_player_data(user_id)
+        
+        # Chama o motor do evento para processar o ataque
         result = event_manager.process_player_attack(user_id, player_data)
         
+        # --- A TUA LÓGICA ORIGINAL (sem alterações) ---
         if "error" in result:
             await query.answer(result["error"], show_alert=True)
             return
         
-        # _# CORRIGIDO: Lógica para lidar com a derrota do jogador #_
         if result.get("game_over"):
             final_log = result.get('action_log', 'Você foi derrotado em combate.')
             caption = f"☠️ **FIM DE JOGO** ☠️\n\nSua jornada na defesa do reino chegou ao fim.\n\n<b>Última Ação:</b>\n<code>{html.escape(final_log)}</code>"
             
-            # Tenta editar a mídia para uma imagem de derrota, se falhar, edita o texto
             try:
-                defeat_anim_id = file_ids.get_file_id('game_over_skull') # Precisa ter essa ID no seu file_ids
+                defeat_anim_id = file_ids.get_file_id('game_over_skull')
                 media = InputMediaAnimation(media=defeat_anim_id, caption=caption, parse_mode="HTML")
                 await query.edit_message_media(media=media, reply_markup=_get_game_over_keyboard())
             except Exception:
@@ -236,7 +248,6 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
         player_state = event_manager.get_battle_data(user_id)
         
         if not player_state:
-            # Se o jogador não tem mais estado, provavelmente foi derrotado ou o evento acabou
             await query.edit_message_text("Sua batalha terminou.", reply_markup=_get_game_over_keyboard())
             return
 
@@ -263,8 +274,13 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
             await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
             await query.answer()
 
-    finally:
-        context.user_data['is_attacking'] = False
+    except Exception as e:
+        # Se qualquer erro acontecer, ele será impresso na consola!
+        print(f"!!!!!!!! ERRO CRÍTICO EM handle_marathon_attack !!!!!!!!!!")
+        traceback.print_exc() # Imprime o erro completo para debug
+        print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # Avisa o jogador que algo deu errado
+        await query.answer("Ocorreu um erro ao processar seu ataque. Avise um administrador.", show_alert=True)
         
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
