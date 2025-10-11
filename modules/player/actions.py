@@ -1,11 +1,16 @@
 # Em modules/player/actions.py
+
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import time
-from typing import Optional
+from typing import Optional, Tuple
+import random
 
-from .premium import PremiumManager 
+# --- IMPORTAÇÕES ADICIONADAS ---
+from .premium import PremiumManager
 from .core import get_player_data, save_player_data
+from .inventory import add_item_to_inventory
+from modules import game_data
 
 # ========================================
 # FUNÇÕES AUXILIARES DE TEMPO E TIPO
@@ -15,23 +20,51 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 def _parse_iso(dt_str: str) -> Optional[datetime]:
-    if not dt_str:
-        return None
+    if not dt_str: return None
     try:
         dt = datetime.fromisoformat(dt_str)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+        if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
         return dt
-    except Exception:
-        return None
+    except Exception: return None
 
 def _ival(x, default=0):
     try: return int(x)
     except Exception: return int(default)
 
-# ========================================
-# ENERGIA
-# ========================================
+def _calculate_gathering_rewards(player_data: dict, details: dict) -> tuple[int, list[tuple[str, int]], str]:
+    """
+    Calcula as recompensas para um job de coleta, aplicando bónus premium.
+    Retorna (xp_ganho, lista_de_itens, mensagem_de_sumário).
+    """
+    premium = PremiumManager(player_data)
+    
+    # --- Obtém os Bónus Premium ---
+    xp_mult = float(premium.get_perk_value('gather_xp_multiplier', 1.0))
+    
+    # --- Calcula XP ---
+    base_xp = _ival(details.get('xp', 5)) # Dá 5 de XP base se não especificado
+    final_xp = int(base_xp * xp_mult)
+
+    # --- Calcula Itens ---
+    base_item_id = details.get('resource_id')
+    if not base_item_id:
+        return final_xp, [], "Coleta finalizada."
+
+    base_quantity = _ival(details.get('quantity', 1))
+    final_quantity = base_quantity
+    
+    looted_items = [(base_item_id, final_quantity)]
+    
+    # --- Formata a Mensagem ---
+    item_info = game_data.ITEMS_DATA.get(base_item_id, {})
+    item_name = item_info.get('display_name', base_item_id)
+    summary_msg = (
+        f"Você coletou com sucesso!\n\n"
+        f"✨ +{final_xp} XP de Profissão\n"
+        f"획득 +{final_quantity}x {item_name}"
+    )
+
+    return final_xp, looted_items, summary_msg
 
 def get_player_max_energy(player_data: dict) -> int:
     """Calcula a energia máxima de um jogador, incluindo o bônus de perks."""
@@ -124,34 +157,61 @@ def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | N
         pdata["last_chat_id"] = int(chat_id)
     return pdata
 
-def try_finalize_timed_action_for_user(user_id: int) -> bool:
+def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
+    """
+    # --- FUNÇÃO ATUALIZADA ---
+    Verifica e finaliza uma ação.
+    Retorna (True/False se a ação terminou, Mensagem de resultado ou None).
+    """
     player_data = get_player_data(user_id)
     state = player_data.get("player_state") or {}
     action = state.get("action")
 
     actions_com_timer = ("refining", "crafting", "collecting", "exploring", "travel")
     if action not in actions_com_timer:
-        return False
+        return False, None
     
     try:
         finish_time_iso = state.get("finish_time")
-        hora_de_termino = datetime.fromisoformat(finish_time_iso).timestamp()
-        
-        if time.time() >= hora_de_termino:
-            if action == "travel":
-                dest = state.get("travel_dest") or (state.get("details") or {}).get("destination")
-                if dest:
-                    player_data["current_location"] = dest
-            
+        if not finish_time_iso:
             player_data["player_state"] = {"action": "idle"}
             save_player_data(user_id, player_data)
-            return True
-    except Exception:
+            return True, "Sua ação foi finalizada devido a um erro de tempo."
+
+        hora_de_termino = _parse_iso(finish_time_iso)
+        
+        if utcnow() >= hora_de_termino:
+            reward_summary = f"Ação '{action}' finalizada com sucesso."
+
+            # --- LÓGICA DE RECOMPENSAS ADICIONADA AQUI ---
+            if action == "collecting":
+                xp_gained, items_gained, summary = _calculate_gathering_rewards(player_data, state.get("details", {}))
+                
+                # Aplica as recompensas
+                prof = player_data.setdefault("profession", {})
+                prof["xp"] = prof.get("xp", 0) + xp_gained
+                for item_id, qty in items_gained:
+                    add_item_to_inventory(player_data, item_id, qty)
+                
+                reward_summary = summary
+
+            elif action == "travel":
+                dest = (state.get("details") or {}).get("destination")
+                if dest:
+                    player_data["current_location"] = dest
+                reward_summary = f"Você chegou ao seu destino!"
+            
+            # Zera o estado do jogador e salva
+            player_data["player_state"] = {"action": "idle"}
+            save_player_data(user_id, player_data)
+            return True, reward_summary
+
+    except Exception as e:
         player_data["player_state"] = {"action": "idle"}
         save_player_data(user_id, player_data)
-        return True
+        return True, f"Sua ação foi finalizada devido a um erro: {e}"
     
-    return False
+    return False, None
 
 # ========================================
 # ENTRADAS DE PVP

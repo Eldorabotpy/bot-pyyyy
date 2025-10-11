@@ -151,11 +151,27 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
     user_id = update.effective_user.id
     player_data = player_manager.get_player_data(user_id)
     
-    await query.answer("Verificando seu lugar na linha de frente...")
+    # --- LÓGICA DE VERIFICAÇÃO DO TICKET (NOVA) ---
+    ticket_id = 'ticket_defesa_reino' # Defina o ID do seu item aqui
+    player_inventory = player_data.get('inventory', {})
+    
+    # Verifica se o jogador tem o ticket
+    if ticket_id not in player_inventory or player_inventory[ticket_id].get('quantity', 0) <= 0:
+        await query.answer("Você precisa de um Ticket da Defesa para entrar!", show_alert=True)
+        return # Para a execução aqui se não tiver o ticket
+
+    # --- FIM DA LÓGICA DE VERIFICAÇÃO ---
+
+    await query.answer("Ticket validado! Verificando seu lugar na linha de frente...")
 
     if not event_manager.is_active:
         await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
         return
+
+    player_manager.remove_item_from_inventory(player_data, ticket_id, 1)
+    player_manager.save_player_data(user_id, player_data) # Salva a alteração no inventário
+    
+    # --- FIM DA LÓGICA DE COBRANÇA ---
 
     status = event_manager.add_player_to_event(user_id, player_data)
     
@@ -184,7 +200,6 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
         status_text = event_manager.get_queue_status_text()
         text = f"🛡️ **Fila de Reforços** 🛡️\n\nA linha de frente está cheia!\n\n{status_text}\n\nAguarde sua vez."
         await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard(), parse_mode='HTML')
-
 
 async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

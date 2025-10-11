@@ -26,6 +26,6 @@ JOB_TIMEZONE = os.getenv("JOB_TIMEZONE", "America/Sao_Paulo")
 
 # Seus horários de eventos (isto pode ficar no código, pois não é um segredo)
 EVENT_TIMES = [
-    (10, 0, 11, 0),   
+    (10, 11, 11, 0),   
     (14, 0, 14, 30), #horarios
 ]
