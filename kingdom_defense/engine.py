@@ -8,6 +8,7 @@ from modules import player_manager # Para gerenciar dados e inventário do jogad
 from modules.player import stats as player_stats_engine
 from . import leaderboard
 from modules.combat import criticals
+from modules.game_data import items as game_items
 
 logger = logging.getLogger(__name__)
 
@@ -205,16 +206,20 @@ class KingdomDefenseManager:
             else:
                 self.global_kill_count += 1
 
-            # Dá o loot para o jogador
+            # Lógica de Loot com nome de exibição correto
             reward_amount = mob.get("reward", 0)
-            player_manager.add_item_to_inventory(player_data, 'fragmento_bravura', reward_amount)
-            loot_message = f"Você recebeu {reward_amount}x fragmento_bravura!"
-        
+            item_id = 'fragmento_bravura' 
+            loot_message = ""
+            if reward_amount > 0:
+                player_manager.add_item_to_inventory(player_data, item_id, reward_amount)
+                item_info = game_items.ITEMS_DATA.get(item_id, {})
+                item_name = item_info.get('display_name', item_id)
+                loot_message = f"Você recebeu {reward_amount}x {item_name}!"
+            
             # PREPARA O PRÓXIMO INIMIGO
             current_wave_info = self.wave_definitions[self.current_wave]
             goal = current_wave_info['mob_count']
-        
-            # Se a meta de abates foi atingida, ativa o modo chefe
+         
             if self.global_kill_count >= goal and not self.boss_mode_active:
                 self.boss_mode_active = True
                 boss_template = current_wave_info["boss"]
@@ -222,7 +227,6 @@ class KingdomDefenseManager:
                 self.boss_global_hp = boss_template['hp']
                 logs.append(f"🚨 O CHEFE DA ONDA, {boss_template['name']}, APARECEU! 🚨")
         
-            # Atualiza o estado do jogador com o novo inimigo (seja mob ou chefe)
             self._setup_player_battle_state(user_id, player_data)
             player_manager.save_player_data(user_id, player_data)
 
@@ -251,7 +255,6 @@ class KingdomDefenseManager:
         
             player_manager.save_player_data(user_id, player_data)
             return { "monster_defeated": False, "action_log": "\n".join(logs) }
-
     def get_battle_data(self, user_id):
         """Retorna os dados necessários para o handler montar a mensagem de batalha."""
         if user_id not in self.player_states:

@@ -14,55 +14,46 @@ def _strip_html_for_len(text: str) -> str:
     """Remove tags HTML para medir o comprimento real do texto."""
     return re.sub('<[^<]+?>', '', text)
 
+# Em kingdom_defense/handler.py
+
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
-    """
-    Formata a mensagem de combate com uma 'caixa dinâmica' que se adapta ao conteúdo.
-    """
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
     
-    # --- Monta os blocos de texto como listas de linhas ---
+    # --- Monta os blocos de texto em colunas ---
     total_stats = player_manager.get_player_total_stats(player_data)
-    p_max_hp = int(total_stats.get('max_hp', 0))
-    p_atk = int(total_stats.get('attack', 0))
-    p_def = int(total_stats.get('defense', 0))
-    p_vel = int(total_stats.get('initiative', 0))
-    p_srt = int(total_stats.get('luck', 0))
-    hero_block_lines = [
-        f"<b>{player_data.get('character_name', 'Herói')}</b>",
-        f"❤️ 𝐇𝐏: {player_state['player_hp']}/{p_max_hp}",
-        f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}",
-        f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}"
-    ]
     
-    m_hp = mob.get('hp', 0)
-    m_max_hp = mob.get('max_hp', mob.get('hp', 0))
-    m_atk = int(mob.get('attack', 0))
-    m_def = int(mob.get('defense', 0))
-    m_vel = int(mob.get('initiative', 0))
-    m_srt = int(mob.get('luck', 0))
-    enemy_block_lines = [
-        f"<b>{mob['name']}</b>",
-        f"❤️ 𝐇𝐏: {m_hp}/{m_max_hp}",
-        f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}",
-        f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"
-    ]
+    p_name = player_data.get('character_name', 'Herói')
+    p_hp_str = f"❤️ HP: {player_state['player_hp']}/{int(total_stats.get('max_hp', 0))}"
+    p_atk_str = f"⚔️ ATK: {int(total_stats.get('attack', 0))}"
+    p_def_str = f"🛡️ DEF: {int(total_stats.get('defense', 0))}"
+    p_vel_str = f"🏃‍♂️ VEL: {int(total_stats.get('initiative', 0))}"
+    p_srt_str = f"🍀 SRT: {int(total_stats.get('luck', 0))}"
+
+    m_name = mob['name']
+    m_hp_str = f"❤️ HP: {mob.get('hp', 0)}/{mob.get('max_hp', 0)}"
+    m_atk_str = f"⚔️ ATK: {int(mob.get('attack', 0))}"
+    m_def_str = f"🛡️ DEF: {int(mob.get('defense', 0))}"
+    m_vel_str = f"🏃‍♂️ VEL: {int(mob.get('initiative', 0))}"
+    m_srt_str = f"🍀 SRT: {int(mob.get('luck', 0))}"
     
+    # Define a largura das colunas
+    col_width = 17 # Largura de cada coluna
+    p_row1 = f"{p_hp_str.ljust(col_width)}{p_atk_str.ljust(col_width)}"
+    p_row2 = f"{p_def_str.ljust(col_width)}{p_vel_str.ljust(col_width)}"
+    p_row3 = f"{p_srt_str.ljust(col_width)}"
+
+    m_row1 = f"{m_hp_str.ljust(col_width)}{m_atk_str.ljust(col_width)}"
+    m_row2 = f"{m_def_str.ljust(col_width)}{m_vel_str.ljust(col_width)}"
+    m_row3 = f"{m_srt_str.ljust(col_width)}"
+
     current_wave = player_state.get('current_wave', 1)
-    progress_text = event_manager.get_queue_status_text()
-    progress_text_formatted = progress_text.replace(':', '➜').replace('\n', ' | ')
-    
+    progress_text = event_manager.get_queue_status_text().replace(':', '➜').replace('\n', ' | ')
+
     # --- Lógica da Caixa Dinâmica ---
-    # 1. Junta todas as linhas de conteúdo que ficarão dentro da caixa
-    all_lines_in_box = [progress_text_formatted] + hero_block_lines + enemy_block_lines
+    # Mede a largura total necessária (2 colunas + espaço)
+    max_width = (col_width * 2) 
     
-    # 2. Encontra o comprimento da linha mais longa (ignorando tags HTML)
-    # Adicionamos +2 para um pequeno espaço de respiro nas laterais
-    max_width = 0
-    if all_lines_in_box:
-        max_width = max(len(_strip_html_for_len(line)) for line in all_lines_in_box) + 2
-    
-    # 3. Cria as bordas e separadores com o tamanho dinâmico
     wave_text = f" 🌊 ONDA {current_wave} 🌊 "
     header = f"╔{wave_text.center(max_width, '═')}╗"
     
@@ -76,17 +67,20 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
         log_section = html.escape(action_log)
 
     # --- Montagem Final ---
-    # Centraliza o texto de progresso e junta os blocos de herói/inimigo
-    full_hero_block = "\n".join(hero_block_lines)
-    full_enemy_block = "\n".join(enemy_block_lines)
-
-    # Envolve a caixa em tags <code> para tentar forçar uma fonte de largura fixa
+    # Envolve a caixa em tags <code> para forçar fonte de largura fixa
     final_caption = (
         f"<code>{header}\n"
-        f"{progress_text_formatted.center(max_width)}\n\n"
-        f"{full_hero_block}\n\n"
+        f"{progress_text.center(max_width)}\n"
+        f"{'─' * (max_width + 2)}\n" # Separador
+        f"{p_name.center(max_width)}\n"
+        f"{p_row1}\n"
+        f"{p_row2}\n"
+        f"{p_row3}\n\n"
         f"{vs_separator}\n\n"
-        f"{full_enemy_block}\n\n"
+        f"{m_name.center(max_width)}\n"
+        f"{m_row1}\n"
+        f"{m_row2}\n"
+        f"{m_row3}\n"
         f"{footer}</code>\n\n"
         f"<b>Última Ação:</b>\n<code>{log_section}</code>"
     )
@@ -177,46 +171,67 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
         await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard())
 
 async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # --- LÓGICA DA TRAVA E DEBUG ---
+    print("\n--- [DEBUG] Clique em ATACAR recebido! ---")
     query = update.callback_query
-    user_id = update.effective_user.id
-    player_data = player_manager.get_player_data(user_id)
-    result = event_manager.process_player_attack(user_id, player_data)
     
-    if "error" in result:
-        await query.answer(result["error"], show_alert=True)
-        return
-        
-    player_state = event_manager.get_battle_data(user_id)
-    
-    if not player_state: # O jogador pode ter sido removido após ser derrotado
+    is_attacking_flag = context.user_data.get('is_attacking', False)
+    print(f"--- [DEBUG] Verificando trava de ataque. Status atual: {is_attacking_flag} ---")
+
+    if is_attacking_flag:
+        print("--- [DEBUG] ATAQUE BLOQUEADO PELA TRAVA! Função encerrada. ---")
+        await query.answer("Aguarde o resultado do seu último ataque!", cache_time=1)
         return
 
-    # Se o monstro foi derrotado...
-    if result.get("monster_defeated"):
-        await query.answer(f"Inimigo derrotado! {result['loot_message']}")
+    context.user_data['is_attacking'] = True
+    print("--- [DEBUG] Trava ativada. Processando o ataque... ---")
+    # --- FIM DA LÓGICA DA TRAVA ---
+
+    try:
+        user_id = update.effective_user.id
+        player_data = player_manager.get_player_data(user_id)
+        result = event_manager.process_player_attack(user_id, player_data)
         
-        next_mob_data = result['next_mob_data']
-        player_state['current_mob'] = next_mob_data
-        player_state['action_log'] = result['action_log']
+        if "error" in result:
+            await query.answer(result["error"], show_alert=True)
+            return
+            
+        player_state = event_manager.get_battle_data(user_id)
         
-        media_key = next_mob_data['media_key']
-        file_data = file_ids.get_file_data(media_key)
-        
-        if not file_data or not file_data.get("id"):
-            await query.edit_message_caption(caption="Erro: Mídia do próximo monstro não encontrada.")
+        if not player_state: # O jogador pode ter sido removido após ser derrotado
             return
 
-        caption = _format_battle_caption(player_state, player_data)
-        media = InputMediaAnimation(media=file_data["id"], caption=caption, parse_mode="HTML")
-        await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
+        # Se o monstro foi derrotado...
+        if result.get("monster_defeated"):
+            await query.answer(f"Inimigo derrotado! {result['loot_message']}")
+            
+            next_mob_data = result['next_mob_data']
+            player_state['current_mob'] = next_mob_data
+            player_state['action_log'] = result['action_log']
+            
+            media_key = next_mob_data['media_key']
+            file_data = file_ids.get_file_data(media_key)
+            
+            if not file_data or not file_data.get("id"):
+                await query.edit_message_caption(caption="Erro: Mídia do próximo monstro não encontrada.")
+                return
 
-    # Se a batalha continua...
-    else:
-        player_state['action_log'] = result['action_log']
-        caption = _format_battle_caption(player_state, player_data)
-        await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
-        await query.answer()
+            caption = _format_battle_caption(player_state, player_data)
+            media = InputMediaAnimation(media=file_data["id"], caption=caption, parse_mode="HTML")
+            await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
 
+        # Se a batalha continua...
+        else:
+            player_state['action_log'] = result['action_log']
+            caption = _format_battle_caption(player_state, player_data)
+            await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
+            await query.answer()
+
+    finally:
+        # --- BLOCO FINALLY PARA GARANTIR QUE A TRAVA SEJA LIBERADA ---
+        print("--- [DEBUG] Trava liberada no bloco FINALLY. ---")
+        context.user_data['is_attacking'] = False
+        
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
