@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler
 from .engine import event_manager
 from modules import player_manager, file_ids
 import re
+from handlers.menu.kingdom import show_kingdom_menu 
 logger = logging.getLogger(__name__)
 
 
@@ -111,17 +112,38 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     leaderboard_text = event_manager.get_leaderboard_text()
     await query.answer(text=leaderboard_text, show_alert=True)
 
-async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def back_to_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Função de callback para o botão 'Voltar'.
+    Chama diretamente a função que exibe o menu principal do reino.
+    """
     query = update.callback_query
     await query.answer()
-    caption = "📢 **ALERTA DE INVASÃO!**\n\nHordas se aproximam. Você irá atender ao chamado para defender Eldora?"
-    if not event_manager.is_active:
-        caption = "Não há nenhuma invasão acontecendo no momento."
+    
+    # Chama a função importada do outro arquivo
+    await show_kingdom_menu(update, context)
+
+async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Mostra o menu do evento, com o botão de participar SE o evento estiver ativo."""
+    query = update.callback_query
+    await query.answer()
+    
+    caption = "📢 **EVENTOS ESPECIAIS**\n\n"
+    if event_manager.is_active:
+        caption += "Uma invasão ameaça o reino! Você irá atender ao chamado para a defesa?"
+    else:
+        caption += "Não há nenhuma invasão acontecendo no momento."
+        
     keyboard = []
     if event_manager.is_active:
         keyboard.append([InlineKeyboardButton("⚔️ PARTICIPAR DA DEFESA ⚔️", callback_data='kd_join_and_start')])
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='go_to_kingdom')])
+    
+    # Este botão é importante para o jogador poder sair do menu de eventos
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='kd_back_to_kingdom')])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Lógica inteligente para editar a mensagem, seja ela de texto ou de mídia
     if query.message.photo or query.message.animation:
         await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode='HTML')
     else:
@@ -265,3 +287,4 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(check_queue_status, pattern='^kd_check_queue_status$'))
     application.add_handler(CallbackQueryHandler(show_battle_status, pattern='^kd_show_battle_status$'))
     application.add_handler(CallbackQueryHandler(show_leaderboard, pattern='^kd_show_leaderboard$'))
+    application.add_handler(CallbackQueryHandler(back_to_kingdom_menu, pattern='^kd_back_to_kingdom$'))

@@ -304,9 +304,16 @@ class KingdomDefenseManager:
 event_manager = KingdomDefenseManager()
 
 async def start_event_job(context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Job agendado: tentando iniciar o evento...")
+    """
+    Job agendado que APENAS ativa o evento. Não envia nenhuma mensagem.
+    """
+    logger.info("Job agendado: Ativando o evento de defesa do reino...")
     event_manager.start_event()
 
+
 async def end_event_job(context: ContextTypes.DEFAULT_TYPE):
-    logger.info("Job agendado: tentando encerrar o evento...")
+    """
+    Job agendado que APENAS desativa o evento.
+    """
+    logger.info("Job agendado: Encerrando o evento de defesa do reino...")
     event_manager.end_event()
