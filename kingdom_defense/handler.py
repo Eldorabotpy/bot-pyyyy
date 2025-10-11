@@ -1,27 +1,26 @@
-# Arquivo: kingdom_defense/handler.py (VERSÃO FINAL E CORRIGIDA)
+# Arquivo: kingdom_defense/handler.py (VERSÃO CORRIGIDA)
 
 import logging
 import html
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAnimation
-from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler
 from .engine import event_manager
 from modules import player_manager, file_ids
 import re
-from handlers.menu.kingdom import show_kingdom_menu 
+from handlers.menu.kingdom import show_kingdom_menu
 logger = logging.getLogger(__name__)
 
+# ... (as funções _strip_html_for_len, _format_battle_caption, _get_battle_keyboard, etc.
+# permanecem exatamente as mesmas até handle_marathon_attack)
 
 def _strip_html_for_len(text: str) -> str:
     """Remove tags HTML para medir o comprimento real do texto."""
     return re.sub('<[^<]+?>', '', text)
 
-# Em kingdom_defense/handler.py
-
 def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
     
-    # --- Monta os blocos de texto em colunas ---
     total_stats = player_manager.get_player_total_stats(player_data)
     
     p_name = player_data.get('character_name', 'Herói')
@@ -38,8 +37,7 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     m_vel_str = f"🏃‍♂️ VEL: {int(mob.get('initiative', 0))}"
     m_srt_str = f"🍀 SRT: {int(mob.get('luck', 0))}"
     
-    # Define a largura das colunas
-    col_width = 17 # Largura de cada coluna
+    col_width = 17 
     p_row1 = f"{p_hp_str.ljust(col_width)}{p_atk_str.ljust(col_width)}"
     p_row2 = f"{p_def_str.ljust(col_width)}{p_vel_str.ljust(col_width)}"
     p_row3 = f"{p_srt_str.ljust(col_width)}"
@@ -49,10 +47,8 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     m_row3 = f"{m_srt_str.ljust(col_width)}"
 
     current_wave = player_state.get('current_wave', 1)
-    progress_text = event_manager.get_queue_status_text().replace(':', '➜').replace('\n', ' | ')
+    progress_text = event_manager.get_queue_status_text().replace('\n', ' | ')
 
-    # --- Lógica da Caixa Dinâmica ---
-    # Mede a largura total necessária (2 colunas + espaço)
     max_width = (col_width * 2) 
     
     wave_text = f" 🌊 ONDA {current_wave} 🌊 "
@@ -67,18 +63,16 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     if action_log:
         log_section = html.escape(action_log)
 
-    # --- Montagem Final ---
-    # Envolve a caixa em tags <code> para forçar fonte de largura fixa
     final_caption = (
         f"<code>{header}\n"
-        f"{progress_text.center(max_width)}\n"
-        f"{'─' * (max_width + 2)}\n" # Separador
-        f"{p_name.center(max_width)}\n"
+        f"{progress_text.center(max_width + 2)}\n"
+        f"{'─' * (max_width + 2)}\n"
+        f"{p_name.center(max_width + 2)}\n"
         f"{p_row1}\n"
         f"{p_row2}\n"
         f"{p_row3}\n\n"
         f"{vs_separator}\n\n"
-        f"{m_name.center(max_width)}\n"
+        f"{m_name.center(max_width + 2)}\n"
         f"{m_row1}\n"
         f"{m_row2}\n"
         f"{m_row3}\n"
@@ -100,60 +94,59 @@ def _get_battle_keyboard() -> InlineKeyboardMarkup:
 def _get_waiting_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Atualizar Status", callback_data='kd_check_queue_status')]])
 
+# _# NOVO: Teclado simples para o fim de jogo #_
+def _get_game_over_keyboard() -> InlineKeyboardMarkup:
+    keyboard = [
+        [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='kd_back_to_kingdom')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def show_battle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o status geral do evento em um pop-up."""
     query = update.callback_query
     status_text = event_manager.get_queue_status_text()
-    await query.answer(text=status_text, show_alert=True)
+    await query.answer(text=status_text, show_alert=True, cache_time=5) # Adicionado cache_time
 
 async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o ranking de dano em um pop-up."""
     query = update.callback_query
     leaderboard_text = event_manager.get_leaderboard_text()
-    await query.answer(text=leaderboard_text, show_alert=True)
+    await query.answer(text=leaderboard_text, show_alert=True, cache_time=5) # Adicionado cache_time
 
 async def back_to_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Função de callback para o botão 'Voltar'.
-    Chama diretamente a função que exibe o menu principal do reino.
-    """
     query = update.callback_query
     await query.answer()
-    
-    # Chama a função importada do outro arquivo
     await show_kingdom_menu(update, context)
 
 async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Mostra o menu do evento, com o botão de participar SE o evento estiver ativo."""
     query = update.callback_query
-    await query.answer()
+    if query:
+        await query.answer()
     
-    caption = "📢 **EVENTOS ESPECIAIS**\n\n"
+    caption = "📢 **EVENTO: DEFESA DO REINO**\n\n"
+    keyboard = []
+
     if event_manager.is_active:
-        caption += "Uma invasão ameaça o reino! Você irá atender ao chamado para a defesa?"
+        caption += "Uma invasão ameaça o reino! Você irá atender ao chamado para a defesa?\n\n"
+        caption += event_manager.get_queue_status_text()
+        keyboard.append([InlineKeyboardButton("⚔️ PARTICIPAR DA DEFESA ⚔️", callback_data='kd_join_and_start')])
     else:
         caption += "Não há nenhuma invasão acontecendo no momento."
         
-    keyboard = []
-    if event_manager.is_active:
-        keyboard.append([InlineKeyboardButton("⚔️ PARTICIPAR DA DEFESA ⚔️", callback_data='kd_join_and_start')])
-    
-    # Este botão é importante para o jogador poder sair do menu de eventos
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data='kd_back_to_kingdom')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Lógica inteligente para editar a mensagem, seja ela de texto ou de mídia
-    if query.message.photo or query.message.animation:
-        await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode='HTML')
-    else:
-        await query.edit_message_text(text=caption, reply_markup=reply_markup, parse_mode='HTML')
+    # Lógica para editar a mensagem, seja ela de texto, foto ou animação
+    # Usa try-except para evitar erros se a mensagem já foi deletada
+    try:
+        if query and (query.message.photo or query.message.animation):
+            await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode='HTML')
+        elif query:
+            await query.edit_message_text(text=caption, reply_markup=reply_markup, parse_mode='HTML')
+    except Exception as e:
+        logger.warning(f"Não foi possível editar a mensagem no menu de eventos: {e}")
+
 
 async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    FUNÇÃO TUDO-EM-UM: Chamada pelo clique em 'PARTICIPAR'.
-    Registra o jogador e transforma a tela em batalha ou espera.
-    """
     query = update.callback_query
     user_id = update.effective_user.id
     player_data = player_manager.get_player_data(user_id)
@@ -161,19 +154,21 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
     await query.answer("Verificando seu lugar na linha de frente...")
 
     if not event_manager.is_active:
-        await query.edit_message_text("A invasão já terminou.")
+        await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
         return
 
-    # A engine faz a lógica de adicionar à batalha ou à fila
     status = event_manager.add_player_to_event(user_id, player_data)
     
-    # Se entrou na batalha, transforma a mensagem em uma animação de combate
     if status == "active":
         battle_data = event_manager.get_battle_data(user_id)
+        # Segurança: se por algum motivo não houver dados, não quebra
+        if not battle_data:
+            await query.edit_message_text("Ocorreu um erro ao buscar seus dados de batalha. Tente novamente.", reply_markup=_get_game_over_keyboard())
+            return
+            
         media_key = battle_data['current_mob']['media_key']
         file_data = file_ids.get_file_data(media_key)
         
-        # Rede de segurança para evitar crashes se a mídia não for encontrada
         if not file_data or not file_data.get("id"):
             logger.error(f"MEDIA NÃO ENCONTRADA PARA A CHAVE: {media_key}")
             await query.edit_message_text(
@@ -181,33 +176,24 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
             )
             return
 
-        battle_data['current_mob']['max_hp'] = battle_data['current_mob']['hp']
         caption = _format_battle_caption(battle_data, player_data)
         media = InputMediaAnimation(media=file_data["id"], caption=caption, parse_mode="HTML")
         await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
         
-    # Se entrou na fila, transforma a mensagem em um texto de espera
     elif status == "waiting":
         status_text = event_manager.get_queue_status_text()
-        text = f"🛡️ **Fila de Reforços** 🛡️\n\nA linha de frente está cheia!\n\n{status_text}\n\nAguarde."
-        await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard())
+        text = f"🛡️ **Fila de Reforços** 🛡️\n\nA linha de frente está cheia!\n\n{status_text}\n\nAguarde sua vez."
+        await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard(), parse_mode='HTML')
+
 
 async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # --- LÓGICA DA TRAVA E DEBUG ---
-    print("\n--- [DEBUG] Clique em ATACAR recebido! ---")
     query = update.callback_query
     
-    is_attacking_flag = context.user_data.get('is_attacking', False)
-    print(f"--- [DEBUG] Verificando trava de ataque. Status atual: {is_attacking_flag} ---")
-
-    if is_attacking_flag:
-        print("--- [DEBUG] ATAQUE BLOQUEADO PELA TRAVA! Função encerrada. ---")
-        await query.answer("Aguarde o resultado do seu último ataque!", cache_time=1)
+    # Trava para evitar cliques duplos
+    if context.user_data.get('is_attacking', False):
+        await query.answer("Aguarde o resultado do seu último ataque!", cache_time=2)
         return
-
     context.user_data['is_attacking'] = True
-    print("--- [DEBUG] Trava ativada. Processando o ataque... ---")
-    # --- FIM DA LÓGICA DA TRAVA ---
 
     try:
         user_id = update.effective_user.id
@@ -217,15 +203,30 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
         if "error" in result:
             await query.answer(result["error"], show_alert=True)
             return
-            
-        player_state = event_manager.get_battle_data(user_id)
         
-        if not player_state: # O jogador pode ter sido removido após ser derrotado
+        # _# CORRIGIDO: Lógica para lidar com a derrota do jogador #_
+        if result.get("game_over"):
+            final_log = result.get('action_log', 'Você foi derrotado em combate.')
+            caption = f"☠️ **FIM DE JOGO** ☠️\n\nSua jornada na defesa do reino chegou ao fim.\n\n<b>Última Ação:</b>\n<code>{html.escape(final_log)}</code>"
+            
+            # Tenta editar a mídia para uma imagem de derrota, se falhar, edita o texto
+            try:
+                defeat_anim_id = file_ids.get_file_id('game_over_skull') # Precisa ter essa ID no seu file_ids
+                media = InputMediaAnimation(media=defeat_anim_id, caption=caption, parse_mode="HTML")
+                await query.edit_message_media(media=media, reply_markup=_get_game_over_keyboard())
+            except Exception:
+                 await query.edit_message_caption(caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
             return
 
-        # Se o monstro foi derrotado...
+        player_state = event_manager.get_battle_data(user_id)
+        
+        if not player_state:
+            # Se o jogador não tem mais estado, provavelmente foi derrotado ou o evento acabou
+            await query.edit_message_text("Sua batalha terminou.", reply_markup=_get_game_over_keyboard())
+            return
+
         if result.get("monster_defeated"):
-            await query.answer(f"Inimigo derrotado! {result['loot_message']}")
+            await query.answer(f"Inimigo derrotado! {result['loot_message']}", cache_time=1)
             
             next_mob_data = result['next_mob_data']
             player_state['current_mob'] = next_mob_data
@@ -235,14 +236,12 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
             file_data = file_ids.get_file_data(media_key)
             
             if not file_data or not file_data.get("id"):
-                await query.edit_message_caption(caption="Erro: Mídia do próximo monstro não encontrada.")
+                await query.edit_message_caption(caption="Erro: Mídia do próximo monstro não encontrada.", reply_markup=_get_game_over_keyboard())
                 return
 
             caption = _format_battle_caption(player_state, player_data)
             media = InputMediaAnimation(media=file_data["id"], caption=caption, parse_mode="HTML")
             await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
-
-        # Se a batalha continua...
         else:
             player_state['action_log'] = result['action_log']
             caption = _format_battle_caption(player_state, player_data)
@@ -250,35 +249,53 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
             await query.answer()
 
     finally:
-        # --- BLOCO FINALLY PARA GARANTIR QUE A TRAVA SEJA LIBERADA ---
-        print("--- [DEBUG] Trava liberada no bloco FINALLY. ---")
         context.user_data['is_attacking'] = False
         
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
+    
+    if not event_manager.is_active:
+        await query.answer("O evento já terminou.", show_alert=True)
+        await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
+        return
+
     status = event_manager.get_player_status(user_id)
+    
     if status == "active":
         await query.answer("Sua vez chegou! Prepare-se!", show_alert=True)
-        player_data = player_manager.get_player_data(user_id) # <-- CORRIGIDO
+        
+        player_data = player_manager.get_player_data(user_id)
         battle_data = event_manager.get_battle_data(user_id)
-        media_key = battle_data['current_mob']['media_key']
-        file_data = file_ids.get_file_data(media_key) # <-- CORRIGIDO
-        if not file_data or not file_data.get("id"):
-            await query.message.delete()
-            await context.bot.send_message(chat_id=user_id, text="Erro: Mídia do monstro não encontrada.")
+        
+        if not battle_data: # Segurança
+            await query.edit_message_text("Erro ao iniciar sua batalha. Tente entrar novamente.", reply_markup=_get_game_over_keyboard())
             return
-        caption = _format_battle_caption(battle_data, player_data) # <-- CORRIGIDO
+            
+        media_key = battle_data['current_mob']['media_key']
+        file_data = file_ids.get_file_data(media_key)
+        
+        if not file_data or not file_data.get("id"):
+            await query.message.edit_text("Erro: Mídia do monstro não encontrada.")
+            return
+
+        caption = _format_battle_caption(battle_data, player_data)
+        
+        # Substitui a mensagem de texto por uma animação
         await query.message.delete()
         await context.bot.send_animation(
             chat_id=user_id, animation=file_data["id"], caption=caption, 
             reply_markup=_get_battle_keyboard(), parse_mode="HTML"
         )
-    else:
+    elif status == "waiting":
         status_text = event_manager.get_queue_status_text()
-        text = f"🛡️ Fila de Reforços 🛡️\n\nAinda aguardando vaga...\n\n{status_text}"
-        await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard())
+        text = f"🛡️ **Fila de Reforços** 🛡️\n\nAinda aguardando vaga...\n\n{status_text}"
+        await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard(), parse_mode='HTML')
         await query.answer("Ainda não há vagas. Continue alerta!")
+    else: # not_in_event
+         await query.answer("Você não está mais na fila.", show_alert=True)
+         await show_event_menu(update, context)
+
 
 def register_handlers(application):
     application.add_handler(CallbackQueryHandler(show_event_menu, pattern='^show_events_menu$'))

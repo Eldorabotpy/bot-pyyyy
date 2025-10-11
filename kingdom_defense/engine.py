@@ -39,31 +39,28 @@ class KingdomDefenseManager:
         """Encerra o evento, calcula o melhor jogador e limpa os dados."""
         logger.info("Encerrando evento de Defesa do Reino...")
 
-        # --- NOVA LÓGICA PARA SALVAR O RECORDE ---
         top_scorer = None
         max_damage = 0
 
-        # Itera sobre todos os estados de jogador do evento que acabou
         for user_id_str, state in self.player_states.items():
+            user_id = int(user_id_str) # Garante que user_id é int
             if state.get('damage_dealt', 0) > max_damage:
                 max_damage = state['damage_dealt']
-                player_data = player_manager.get_player_data(int(user_id_str))
+                player_data = player_manager.get_player_data(user_id)
                 if player_data:
                     top_scorer = {
-                        "user_id": int(user_id_str),
+                        "user_id": user_id,
                         "character_name": player_data.get("character_name", "Herói"),
                         "damage": max_damage
                     }
         
-        # Se encontramos um jogador com dano, tentamos atualizar o recorde
         if top_scorer:
             leaderboard.update_top_score(
                 user_id=top_scorer["user_id"],
                 character_name=top_scorer["character_name"],
                 damage=top_scorer["damage"]
             )
-        # --- FIM DA NOVA LÓGICA ---
-
+            
         self.reset_event()
         return {"success": "Evento encerrado."}
 
@@ -101,17 +98,16 @@ class KingdomDefenseManager:
         status = self.get_player_status(user_id)
         if status != "not_in_event": return status
         
-        wave_info = self.wave_definitions.get(self.current_wave, {})
-        mob_goal = wave_info.get('mob_count', 10)
-    
-        self.max_concurrent_fighters = min(15, 10 + (self.current_wave -1))
+        # Garante que as vagas aumentam com as ondas
+        self.max_concurrent_fighters = min(15, 10 + (self.current_wave - 1))
 
         if len(self.active_fighters) < self.max_concurrent_fighters:
             self.active_fighters.add(user_id)
             self._setup_player_battle_state(user_id, player_data)
             return "active"
         else:
-            self.waiting_queue.append(user_id)
+            if user_id not in self.waiting_queue:
+                self.waiting_queue.append(user_id)
             return "waiting"
 
     def _setup_player_battle_state(self, user_id, player_data):
@@ -125,7 +121,6 @@ class KingdomDefenseManager:
         
         mob_instance = mob_template.copy()
         
-        # Se for o chefe, usamos o HP global. Senão, o HP individual.
         if self.boss_mode_active:
             mob_instance['hp'] = self.boss_global_hp
             mob_instance['max_hp'] = self.boss_max_hp
@@ -138,14 +133,21 @@ class KingdomDefenseManager:
             'player_hp': total_stats.get('max_hp', 100),
             'player_max_hp': total_stats.get('max_hp', 100),
             'current_mob': mob_instance,
-            'damage_dealt': 0
+            'damage_dealt': self.player_states.get(user_id, {}).get('damage_dealt', 0) # Mantém o dano
         }
         logger.info(f"Jogador {user_id} configurado para lutar contra {mob_instance['name']}.")
 
+    def _promote_next_player(self):
+        """Tira o próximo jogador da fila e o coloca na batalha."""
+        if self.waiting_queue and len(self.active_fighters) < self.max_concurrent_fighters:
+            next_player_id = self.waiting_queue.pop(0)
+            player_data = player_manager.get_player_data(next_player_id)
+            if player_data:
+                self.active_fighters.add(next_player_id)
+                self._setup_player_battle_state(next_player_id, player_data)
+                logger.info(f"Jogador {next_player_id} promovido da fila para a batalha.")
+                
     def process_player_attack(self, user_id, player_data):
-        """
-        Processa um turno de ataque, com lógica completa para mobs normais e Raid Boss global.
-        """
         if not self.is_active or user_id not in self.active_fighters:
             return {"error": "Você não está em uma batalha ativa."}
 
@@ -156,7 +158,6 @@ class KingdomDefenseManager:
         player_full_stats = player_manager.get_player_total_stats(player_data)
         logs, num_attacks = [], 1
     
-        # --- LÓGICA DE ATAQUE DO JOGADOR (COM ATAQUE DUPLO E CRÍTICO) ---
         double_attack_chance = player_stats_engine.get_player_double_attack_chance(player_data)
         if random.random() < double_attack_chance:
             num_attacks = 2
@@ -169,44 +170,35 @@ class KingdomDefenseManager:
                 logs.append("💥 DANO CRÍTICO! 💥")
             logs.append(f"Você ataca {mob['name']} e causa {damage} de dano.")
             total_damage_dealt_in_turn += damage
-        
-            # Aplica o dano ao alvo correto (HP global do chefe ou HP individual do mob)
+            
             if is_boss_fight:
                 self.boss_global_hp -= damage
             else:
                 mob['hp'] -= damage
             
-            # Para o loop de ataque duplo se o alvo morrer no primeiro golpe
             if (is_boss_fight and self.boss_global_hp <= 0) or (not is_boss_fight and mob['hp'] <= 0):
                 break
 
         player_state['damage_dealt'] += total_damage_dealt_in_turn
     
-        # --- VERIFICA O RESULTADO DA BATALHA ---
-    
-        # CASO 1: O ALVO FOI DERROTADO (SEJA MOB OU CHEFE)
         mob_is_defeated = (is_boss_fight and self.boss_global_hp <= 0) or (not is_boss_fight and mob['hp'] <= 0)
     
         if mob_is_defeated:
             logs.append(f"☠️ {mob['name']} foi derrotado!")
         
-            # Se era o CHEFE GLOBAL, avança a onda para todos
             if is_boss_fight:
                 logs.append(f"🎉 A ONDA {self.current_wave} FOI CONCLUÍDA! 🎉")
                 self.current_wave += 1
                 self.global_kill_count = 0
                 self.boss_mode_active = False
-                self.max_concurrent_fighters = 10 + (self.current_wave - 1) * 2 # Escalonamento de vagas
+                self.max_concurrent_fighters = min(15, 10 + (self.current_wave - 1))
             
                 if self.current_wave not in self.wave_definitions:
                     self.end_event()
                     return {"event_over": True, "action_log": "\n".join(logs)}
-        
-            # Se era um MOB NORMAL, incrementa o contador global
             else:
                 self.global_kill_count += 1
 
-            # Lógica de Loot com nome de exibição correto
             reward_amount = mob.get("reward", 0)
             item_id = 'fragmento_bravura' 
             loot_message = ""
@@ -216,11 +208,10 @@ class KingdomDefenseManager:
                 item_name = item_info.get('display_name', item_id)
                 loot_message = f"Você recebeu {reward_amount}x {item_name}!"
             
-            # PREPARA O PRÓXIMO INIMIGO
             current_wave_info = self.wave_definitions[self.current_wave]
-            goal = current_wave_info['mob_count']
-         
-            if self.global_kill_count >= goal and not self.boss_mode_active:
+            goal = current_wave_info.get('mob_count', float('inf'))
+        
+            if not self.boss_mode_active and self.global_kill_count >= goal:
                 self.boss_mode_active = True
                 boss_template = current_wave_info["boss"]
                 self.boss_max_hp = boss_template['hp']
@@ -234,8 +225,6 @@ class KingdomDefenseManager:
                 "monster_defeated": True, "action_log": "\n".join(logs),
                 "loot_message": loot_message, "next_mob_data": self.player_states[user_id]['current_mob']
             }
-
-        # CASO 2: O ALVO SOBREVIVEU, HÁ CONTRA-ATAQUE
         else:
             dodge_chance = player_stats_engine.get_player_dodge_chance(player_data)
             if random.random() < dodge_chance:
@@ -248,71 +237,90 @@ class KingdomDefenseManager:
                 logs.append(f"🩸 {mob['name']} contra-ataca, causando {mob_damage} de dano!")
 
             if player_state['player_hp'] <= 0:
+                logs.append("\nVOCÊ FOI DERROTADO!")
                 self.active_fighters.remove(user_id)
-                del self.player_states[user_id]
-                # TODO: Promover o próximo da fila de espera
+                # NOTA: Não removemos o player_state daqui para manter o score de dano.
+                # Apenas o tiramos da luta ativa.
+                
+                # _# CORRIGIDO: Chama a função para promover o próximo da fila #_
+                self._promote_next_player()
+                
+                # _# CORRIGIDO: Retorna um estado claro de 'game_over' #_
                 return { "game_over": True, "action_log": "\n".join(logs) }
         
             player_manager.save_player_data(user_id, player_data)
             return { "monster_defeated": False, "action_log": "\n".join(logs) }
+        
     def get_battle_data(self, user_id):
-        """Retorna os dados necessários para o handler montar a mensagem de batalha."""
         if user_id not in self.player_states:
             return None
         
-        # Fazemos uma cópia para adicionar a informação da onda
         player_state_copy = self.player_states[user_id].copy()
-        player_state_copy['current_wave'] = self.current_wave # <-- ADICIONE ESTA LINHA
+        player_state_copy['current_wave'] = self.current_wave
         
+        # _# MELHORIA: Atualiza o HP do chefe para todos os jogadores #_
+        if player_state_copy['current_mob'].get('is_boss'):
+             player_state_copy['current_mob']['hp'] = self.boss_global_hp
+
         return player_state_copy
         
     def get_queue_status_text(self):
-        wave_info = self.wave_definitions[self.current_wave]
-        goal = wave_info['mob_count']
+        wave_info = self.wave_definitions.get(self.current_wave)
+        if not wave_info: return "Aguardando informações da próxima onda..."
+
+        status_line = ""
+        if self.boss_mode_active:
+            # Mostra a vida do chefe
+            status_line = f"Chefe: {self.boss_global_hp}/{self.boss_max_hp} HP"
+        else:
+            # Mostra o progresso de abates
+            goal = wave_info.get('mob_count', 0)
+            status_line = f"Progresso da Onda {self.current_wave}: {self.global_kill_count}/{goal}"
+
         return (
-            f"Progresso da Onda {self.current_wave}: {self.global_kill_count}/{goal}\n"
-            f"Defensores Ativos: {len(self.active_fighters)}/{self.max_concurrent_fighters}"
+            f"{status_line}\n"
+            f"Defensores Ativos: {len(self.active_fighters)}/{self.max_concurrent_fighters}\n"
+            f"Heróis na Fila: {len(self.waiting_queue)}"
         )
+    
     def get_leaderboard_text(self) -> str:
         """Gera o texto do ranking de dano do evento."""
-        if not self.active_fighters:
-            return "Nenhum herói está na batalha para formar um ranking."
+        # Combina lutadores ativos e jogadores derrotados que participaram
+        all_participants_ids = set(self.active_fighters) | set(self.player_states.keys())
 
-        # Pega os dados de nome e dano de todos os jogadores ativos
+        if not all_participants_ids:
+            return "Nenhum herói participou do evento ainda."
+
         leaderboard_data = []
-        for user_id_str in self.active_fighters:
-            state = self.player_states.get(user_id_str)
-            # Precisamos do player_data para pegar o nome
-            player_data = player_manager.get_player_data(user_id_str)
-            if state and player_data:
+        for user_id in all_participants_ids:
+            state = self.player_states.get(user_id)
+            player_data = player_manager.get_player_data(user_id)
+            if state and player_data and state.get('damage_dealt', 0) > 0:
                 leaderboard_data.append({
                     "name": player_data.get('character_name', 'Herói'),
                     "damage": state.get('damage_dealt', 0)
                 })
         
-        # Ordena os jogadores por dano, do maior para o menor
+        if not leaderboard_data:
+            return "Ninguém causou dano ainda."
+
         sorted_participants = sorted(leaderboard_data, key=lambda i: i['damage'], reverse=True)
         
-        lines = ["🏆 **Ranking de Dano da Onda** 🏆\n"]
+        lines = ["🏆 **Ranking de Dano do Evento** 🏆\n"]
         for i, status in enumerate(sorted_participants[:5]): # Pega o Top 5
             medal = {0: "🥇", 1: "🥈", 2: "🥉"}.get(i, "🔹")
             lines.append(f"{medal} {status['name']}: {status['damage']:,} de dano")
             
         return "\n".join(lines)
-
+    
 # --- INSTÂNCIA ÚNICA ---
 event_manager = KingdomDefenseManager()
 
 async def start_event_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Job agendado que APENAS ativa o evento nos bastidores.
-    """
     logger.info("Job agendado: Ativando o evento de defesa do reino...")
     event_manager.start_event()
 
+
 async def end_event_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Job agendado que desativa o evento chamando o método da engine.
-    """
     logger.info("Job agendado: Encerrando o evento de defesa do reino...")
-    event_manager.end_event() # Chama o "motor" que faz o trabalho pesado
+    event_manager.end_event()
