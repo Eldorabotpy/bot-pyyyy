@@ -290,24 +290,29 @@ def process_player_attack(self, user_id, player_data):
 
         return player_state_copy
         
-    def get_queue_status_text(self):
-        wave_info = self.wave_definitions.get(self.current_wave)
-        if not wave_info: return "Aguardando informações da próxima onda..."
+    # Em kingdom_defense/engine.py, dentro da classe KingdomDefenseManager
 
-        status_line = ""
-        if self.boss_mode_active:
-            # Mostra a vida do chefe
-            status_line = f"Chefe: {self.boss_global_hp}/{self.boss_max_hp} HP"
-        else:
-            # Mostra o progresso de abates
-            goal = wave_info.get('mob_count', 0)
-            status_line = f"Progresso da Onda {self.current_wave}: {self.global_kill_count}/{goal}"
+def get_queue_status_text(self):
+    """Gera o texto de status para o menu e a fila de espera."""
+    wave_info = self.wave_definitions.get(self.current_wave)
+    if not wave_info:
+        return "Aguardando informações da próxima onda..."
 
-        return (
-            f"{status_line}\n"
-            f"Defensores Ativos: {len(self.active_fighters)}/{self.max_concurrent_fighters}\n"
-            f"Heróis na Fila: {len(self.waiting_queue)}"
-        )
+    status_line = ""
+    # Se o chefe estiver ativo, mostra a vida dele
+    if self.boss_mode_active and self.boss_max_hp > 0:
+        percent_hp = (self.boss_global_hp / self.boss_max_hp) * 100
+        status_line = f"Vida do Chefe: {self.boss_global_hp:,}/{self.boss_max_hp:,} ({percent_hp:.1f}%)"
+    # Senão, mostra o progresso de abates
+    else:
+        goal = wave_info.get('mob_count', 0)
+        status_line = f"Progresso da Onda {self.current_wave}: {self.global_kill_count}/{goal}"
+
+    return (
+        f"{status_line}\n"
+        f"Defensores Ativos: {len(self.active_fighters)}/{self.max_concurrent_fighters}\n"
+        f"Heróis na Fila: {len(self.waiting_queue)}"
+    )
     
     def get_leaderboard_text(self) -> str:
         """Gera o texto do ranking de dano do evento."""
