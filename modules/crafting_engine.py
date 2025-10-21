@@ -42,31 +42,24 @@ def _as_tuple_2(val: Any, fallback: Tuple[int, int] = (1, 1)) -> Tuple[int, int]
     return fallback
 
 def _seconds_with_perks(player_data: dict, base_seconds: int) -> int:
-    # 1. Pega o multiplicador base dos perks (ex: Premium)
-    mult = float(player_manager.get_player_perk_value(
-        player_data, "craft_speed_multiplier",
-        player_manager.get_player_perk_value(player_data, "refine_speed_multiplier", 1.0)
-    ))
-
-    # ===============================================
-    # ## INÍCIO DA CORREÇÃO: APLICAR BUFF DO CLÃ ##
-    # ===============================================
+    user_id = player_data['user_id']
+    
+    craft_mult = player_manager.get_perk_value(user_id, "craft_speed_multiplier", None)
+    
+    
+    if craft_mult is None:
+        mult = float(player_manager.get_perk_value(user_id, "refine_speed_multiplier", 1.0))
+    else:
+        mult = float(craft_mult)
     clan_id = player_data.get("clan_id")
     if clan_id:
         clan_buffs = clan_manager.get_clan_buffs(clan_id)
         speed_bonus_percent = clan_buffs.get("crafting_speed_percent", 0)
         if speed_bonus_percent > 0:
-            # Adiciona o bónus do clã ao multiplicador
-            # Ex: 1.0 (base) + 0.05 (bónus de 5%) = 1.05
             mult += (speed_bonus_percent / 100.0)
-    # ===============================================
-    # ## FIM DA CORREÇÃO ##
-    # ===============================================
-    
-    # Garante que o multiplicador está dentro de limites razoáveis
     mult = max(0.25, min(4.0, mult))
     
-    # Retorna o tempo final, dividido pelo multiplicador total
+    
     return max(1, int(base_seconds / mult))
 
 def _has_materials(player_data: dict, inputs: dict) -> bool:

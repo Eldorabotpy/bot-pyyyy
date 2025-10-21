@@ -773,7 +773,7 @@ ITEMS_DATA = {
 
     
     # ================================
-    # RESULTADOS — BARDO T2
+    # RESULTADOS — BARDO T2 continua
     # ================================
     "alaude_ornamentado_bardo": {
         "display_name": "Alaúde Ornamentado do Bardo", "emoji": "🎻",
