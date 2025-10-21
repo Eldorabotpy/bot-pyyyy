@@ -38,14 +38,22 @@ def get_player_data(user_id: int) -> dict | None:
 
     data = raw_data
     data["user_id"] = user_id
+    is_newly_updated = False
+    if 'mana' not in data:    
+        data['mana'] = 50 
+        data['max_mana'] = 50 
+        is_newly_updated = True
+        
+    if 'skills' not in data:
+        data['skills'] = [] 
+        is_newly_updated = True
 
-    # Sincronizações importantes
     changed_by_energy = actions._apply_energy_autoregen_inplace(data)
     changed_by_sync = stats._sync_all_stats_inplace(data)
 
-    if changed_by_energy or changed_by_sync:
+    if changed_by_energy or changed_by_sync or is_newly_updated:
         save_player_data(user_id, data)
-        
+            
     return data
 
 def save_player_data(user_id: int, player_info: dict) -> None:

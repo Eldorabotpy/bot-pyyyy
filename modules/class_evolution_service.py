@@ -1,42 +1,31 @@
-# modules/class_evolution_service.py
+# modules/class_evolution_service.py (VERSÃO ATUALIZADA PARA O "PLANO MESTRE")
 from __future__ import annotations
 from typing import Dict, Tuple, Optional
 
 from modules.game_data.class_evolution import EVOLUTIONS
+# --- CORREÇÃO: Importa o teu módulo real ---
+from modules import player_manager
 
-# === TODO: adapte estes helpers para o seu projeto ===
-def _get_player(user_id: int) -> Dict:
-    """
-    Carrega o player dict. Troque para suas funções reais.
-    """
-    from modules.player_manager import load_player_data  # se existir; senão adapte
-    return load_player_data(user_id)
-
-def _save_player(user_id: int, pdata: Dict) -> None:
-    from modules.player_manager import save_player_data
-    save_player_data(user_id, pdata)
-
-def _inventory_has_and_consume(pdata: Dict, required_items: Dict[str, int]) -> bool:
-    """
-    Verifica e consome itens do inventário do player.
-    Adapte para suas APIs de inventário (ex.: modules.inventory).
-    """
-    inv = pdata.get("inventory") or {}
-    # checar
-    for item_id, qty in required_items.items():
-        if inv.get(item_id, 0) < qty:
-            return False
-    # consumir
-    for item_id, qty in required_items.items():
-        inv[item_id] = inv.get(item_id, 0) - qty
-        if inv[item_id] <= 0:
-            inv.pop(item_id, None)
-    pdata["inventory"] = inv
-    return True
+# ================================================
+# Funções de acesso a dados (CORRIGIDAS)
 # ================================================
 
+def _inventory_has(pdata: Dict, required_items: Dict[str, int]) -> bool:
+    """Verifica se o jogador tem os itens, usando o player_manager."""
+    for item_id, qty in required_items.items():
+        if not player_manager.has_item(pdata, item_id, qty):
+            return False
+    return True
+
+def _consume_items(pdata: Dict, required_items: Dict[str, int]) -> None:
+    """Consome os itens do inventário, usando o player_manager."""
+    for item_id, qty in required_items.items():
+        player_manager.remove_item_from_inventory(pdata, item_id, qty)
+
+# ================================================
 
 def _find_evolution_option(current_class: str, target_class: str) -> Optional[Dict]:
+    """Encontra a definição de uma evolução específica."""
     curr = (current_class or "").lower()
     data = EVOLUTIONS.get(curr)
     if not data:
@@ -49,11 +38,11 @@ def _find_evolution_option(current_class: str, target_class: str) -> Optional[Di
 
 
 def can_evolve_to(user_id: int, target_class: str) -> Tuple[bool, str, Optional[Dict]]:
-    """
-    Checa se o jogador pode evoluir para 'target_class'.
-    Retorna (ok, msg, opt_dict).
-    """
-    pdata = _get_player(user_id)
+    """Checa se o jogador pode evoluir para 'target_class'."""
+    pdata = player_manager.get_player_data(user_id)
+    if not pdata:
+        return False, "Jogador não encontrado.", None
+        
     current_class = (pdata.get("class") or "").lower()
     level = int(pdata.get("level") or 1)
 
@@ -61,47 +50,69 @@ def can_evolve_to(user_id: int, target_class: str) -> Tuple[bool, str, Optional[
     if not opt:
         return False, "Evolução inválida para sua classe atual.", None
 
-    # se exigir 'from_any_of', precisa já ser uma dessas classes
     req_from = opt.get("from_any_of")
     if isinstance(req_from, list) and current_class not in req_from:
-        return False, "Essa evolução requer que você tenha feito uma especialização anterior específica.", opt
+        return False, "Essa evolução requer uma especialização anterior específica.", opt
 
     min_lvl = int(opt.get("min_level") or 0)
     if level < min_lvl:
         return False, f"Requer nível {min_lvl}.", opt
 
-    # checagem de itens (sem consumir aqui)
-    inv = (pdata.get("inventory") or {})
-    req = (opt.get("required_items") or {})
-    for item_id, qty in req.items():
-        if inv.get(item_id, 0) < qty:
-            return False, f"Faltam itens: {item_id} x{qty}.", opt
+    req_items = opt.get("required_items") or {}
+    if not _inventory_has(pdata, req_items):
+        return False, "Faltam itens necessários.", opt
 
     return True, "Requisitos atendidos.", opt
 
 
-def apply_evolution(user_id: int, target_class: str) -> Tuple[bool, str]:
+# --- FUNÇÃO PRINCIPAL MODIFICADA ---
+def start_evolution_trial(user_id: int, target_class: str) -> dict:
     """
-    Consome itens e altera a classe do jogador.
+    Verifica os requisitos, consome os itens e retorna as informações
+    para o handler iniciar a Batalha de Provação.
     """
-    pdata = _get_player(user_id)
-    current_class = (pdata.get("class") or "").lower()
-
+    pdata = player_manager.get_player_data(user_id)
+    
     ok, msg, opt = can_evolve_to(user_id, target_class)
     if not ok or not opt:
-        return False, msg
+        return {'success': False, 'message': msg}
 
-    # consumir itens
-    req = opt.get("required_items") or {}
-    if not _inventory_has_and_consume(pdata, req):
-        return False, "Itens insuficientes no momento da evolução."
+    # Consome os itens necessários
+    req_items = opt.get("required_items") or {}
+    _consume_items(pdata, req_items)
+    
+    player_manager.save_player_data(user_id, pdata)
 
-    # aplicar classe
+    # Retorna as instruções para o handler
+    return {
+        'success': True,
+        'message': 'Você entregou os materiais e está pronto para a sua provação!',
+        'trial_monster_id': opt.get('trial_monster_id') # Ex: "guardian_of_the_oath"
+    }
+
+
+# --- NOVA FUNÇÃO PARA FINALIZAR A EVOLUÇÃO ---
+def finalize_evolution(user_id: int, target_class: str) -> Tuple[bool, str]:
+    """
+    Esta função é chamada APÓS o jogador vencer a batalha de provação.
+    Ela efetivamente muda a classe e adiciona a nova habilidade.
+    """
+    pdata = player_manager.get_player_data(user_id)
+    opt = _find_evolution_option((pdata.get("class") or "").lower(), target_class)
+    
+    if not pdata or not opt:
+        return False, "Erro ao finalizar a evolução. Dados não encontrados."
+
+    # 1. Altera a classe do jogador
     pdata["class"] = target_class
-    # (opcional) marcar tier/caminho percorrido
-    evo_path = pdata.get("evolution_path") or []
-    evo_path.append({"from": current_class, "to": target_class})
-    pdata["evolution_path"] = evo_path
-
-    _save_player(user_id, pdata)
-    return True, f"Parabéns! Você evoluiu para {target_class}."
+    
+    # 2. Adiciona a nova habilidade (se existir)
+    new_skill_id = opt.get("unlocks_skill")
+    if new_skill_id:
+        if "skills" not in pdata:
+            pdata["skills"] = []
+        if new_skill_id not in pdata["skills"]:
+            pdata["skills"].append(new_skill_id)
+            
+    player_manager.save_player_data(user_id, pdata)
+    return True, f"Parabéns! Você provou o seu valor e evoluiu para {target_class.title()}!"

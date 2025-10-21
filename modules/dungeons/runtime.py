@@ -80,7 +80,7 @@ def _difficulty_scale(dungeon_cfg: dict, diff: str) -> float:
             return float(ds[diff])
         except Exception:
             pass
-    return {"facil": 1.9, "normal": 4.0, "infernal": 5.25}.get(diff, 1.0)
+    return {"iniciante": 1.9, "infernal": 4.0, "pesadelo": 5.25}.get(diff, 1.0)
 
 def _final_gold_for(dungeon_cfg: dict, diff: str) -> int:
     fg = (dungeon_cfg.get("final_gold") or {})
@@ -254,35 +254,22 @@ def _new_run_state(region_key: str, difficulty: str) -> dict:
         }
     }
 def _build_combat_details(floor: dict, region_key: str, difficulty: str, stage: int) -> dict:
-    atk = int(floor.get("attack", floor.get("atk", 5)))
-    dfn = int(floor.get("defense", floor.get("def", 2)))
-    ini = int(floor.get("initiative", floor.get("ini", 5)))
-    hp  = int(floor.get("hp", 10))
-    luck = int(floor.get("luck", 5))
-
     name  = floor.get("name") or floor.get("display") or str(floor.get("id") or "Inimigo")
     emoji = floor.get("emoji", "")
-
     return {
         "monster_name": f"{emoji} {name}".strip(),
-        "monster_hp": hp,
-        "monster_max_hp": hp,           # para UI correta
-        "attack": atk,
-        "defense": dfn,
-        "initiative": ini,
-        "luck": luck,                   # críticos do monstro corretos
+        "monster_hp": int(floor.get("hp", 0)),
+        "monster_max_hp": int(floor.get("hp", 0)),
+        "monster_attack": int(floor.get("attack", 0)),
+        "monster_defense": int(floor.get("defense", 0)),
+        "monster_initiative": int(floor.get("initiative", 0)),
+        "monster_luck": int(floor.get("luck", 0)),
         "monster_xp_reward": int(floor.get("xp_reward", 10)),
         "monster_gold_drop": int(floor.get("gold_drop", 5)),
         "loot_table": list(floor.get("loot_table") or []),
         "battle_log": [f"Você avança no calabouço ({difficulty})."],
-        # flags/metadados para o combat_handler e avanço
-        "region_key": region_key,
-        "difficulty": difficulty,
-        "dungeon_ctx": True,
-        "dungeon_run": True,
-        "dungeon_next_on_victory": True,
-        "dungeon_stage": stage,
-        "file_id_name": floor.get("file_id_name"),     # usado para vídeo/foto
+        "region_key": region_key, "difficulty": difficulty, "dungeon_ctx": True,
+        "dungeon_stage": stage, "file_id_name": floor.get("file_id_name"),
         "is_boss": bool(floor.get("is_boss")),
     }
 
@@ -327,7 +314,32 @@ async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE,
            InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",   callback_data="combat_flee")]]
     await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))
 
-# Em modules/dungeons/runtime.py
+async def fail_dungeon_run(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, reason: str):
+    """
+    Função chamada quando o jogador falha um calabouço (derrotado ou foge).
+    """
+    from handlers.menu.region import send_region_menu
+
+    player_data = player_manager.get_player_data(user_id)
+    if not player_data: return
+
+    # Restaura a vida do jogador para o máximo
+    total_stats = player_manager.get_player_total_stats(player_data)
+    player_data['current_hp'] = total_stats.get('max_hp', 50)
+    
+    # Limpa o estado do jogador para "idle"
+    player_data['player_state'] = {'action': 'idle'}
+    player_manager.save_player_data(user_id, player_data)
+    
+    # Envia a mensagem de falha e o botão para continuar
+    summary_text = f"❌ **Você falhou no calabouço!**\n\nMotivo: {reason}."
+    keyboard = [[InlineKeyboardButton("➡️ Continuar", callback_data="continue_after_action")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await context.bot.send_message(
+        chat_id=chat_id, text=summary_text,
+        parse_mode="HTML", reply_markup=reply_markup
+    )
 
 async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, combat_details: dict, rewards_to_accumulate: dict):
     pdata = player_manager.get_player_data(user_id) or {}

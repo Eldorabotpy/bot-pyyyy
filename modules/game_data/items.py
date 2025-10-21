@@ -6,11 +6,69 @@ Mantenha IDs canônicos — outros módulos referenciam esses IDs diretamente.
 
 
 ITEMS_DATA = {
+    # Em modules/game_data/items.py, dentro do dicionário ITEMS_DATA
 
+    # --- NOVOS INGREDIENTES DE ALQUIMIA ---
+    "frasco_com_agua": {
+        "display_name": "Frasco com Água",
+        "emoji": "💧",
+        "type": "reagent",
+        "description": "A base para a maioria das poções."
+    },
+    "folha_sombria": {
+        "display_name": "Folha Sombria",
+        "emoji": "🌿",
+        "type": "reagent",
+        "description": "Uma erva com propriedades curativas que cresce na Floresta Sombria."
+    },
+    "geleia_slime": {
+        "display_name": "Geleia de Slime",
+        "emoji": "🟢",
+        "type": "reagent",
+        "description": "Uma substância viscosa com uma energia vital peculiar."
+    },
+
+    # --- NOVAS POÇÕES ---
+    "pocao_cura_leve": {
+        "display_name": "Poção de Cura Leve",
+        "emoji": "❤️",
+        "type": "potion",
+        "description": "Recupera 50 pontos de vida instantaneamente.",
+        "effects": {
+            "heal": 50
+        }
+    },
+    "pocao_cura_media": {
+        "display_name": "Poção de Cura Média", # <--- ESTA LINHA FALTAVA
+        "emoji": "❤️‍🩹",
+        "type": "potion",
+        "description": "Recupera 150 pontos de vida instantaneamente.",
+        "effects": {
+            "heal": 150
+        }
+    },
+    "pocao_energia_fraca": {
+        "display_name": "Poção de Energia Fraca",
+        "emoji": "⚡️",
+        "type": "potion",
+        "description": "Recupera 10 pontos de energia instantaneamente.",
+        "effects": {
+            "add_energy": 10
+        }
+    },
+    "frasco_sabedoria": {
+        "display_name": "Frasco de Sabedoria",
+        "emoji": "🧠",
+        "type": "potion",
+        "description": "Concede 100 pontos de experiência de combate.",
+        "effects": {
+            "add_xp": 100
+        }
+    },
     "fragmento_bravura": {
         "display_name": "Fʀᴀɢᴍᴇɴᴛᴏ ᴅᴇ Bʀᴀᴠᴜʀᴀ",
         "emoji": "🏅",
-        "type": "material_evento",
+        "type": "especial",
         "category": "evento",
         "description": "Um fragmento obtido ao defender o reino. Junte 100 para forjar uma recompensa.",
         "stackable": True,
@@ -520,7 +578,7 @@ ITEMS_DATA = {
         "display_name": "Adaga Sorrateira", "emoji": "🔪",
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Arma letal do Conjunto Sorrateiro do Assassino.",
-        "media_key": "item_adaga_sorrteira_assassino",
+        "media_key": "item_adaga_sorrateira_assassino",
         "class_req": ["assassino"]
     },
     "mascara_sorrateira_assassino": {
@@ -548,7 +606,7 @@ ITEMS_DATA = {
         "display_name": "Botas Sorrateiras", "emoji": "🥾",
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas reforçadas para movimentação silenciosa.",
-        "media_key": "item_mascara_sorrateira_assassino",
+        "media_key": "item_bota_sorrateira_assassino",
         "class_req": ["assassino"]
     },
     "luvas_sorrateiras_assassino": {
@@ -622,7 +680,7 @@ ITEMS_DATA = {
         "display_name": "Luvas da Sombra", "emoji": "🧤",
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Empunhadura firme sem um ruído.",
-        "media_key": "item_vuvas_sombra_assassino",
+        "media_key": "item_luvas_sombra_assassino",
         "class_req": ["assassino"]
     },
     "anel_sombra_assassino": {

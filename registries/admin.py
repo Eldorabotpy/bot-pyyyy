@@ -1,26 +1,11 @@
-# Arquivo: registries/admin.py (versão final e corrigida)
+# Arquivo: registries/admin.py (VERSÃO FINAL E CORRIGIDA)
 
 from telegram.ext import Application
 
-# --- Handlers do painel de admin principal ---
-from handlers.admin_handler import (
-    admin_command_handler,
-    force_daily_handler,
-    delete_player_handler,
-    clear_cache_conv_handler,
-    inspect_item_handler,
-    # Handlers de botão individuais (aqui está a correção)
-    admin_main_handler,
-    admin_force_daily_callback_handler,
-    admin_event_menu_handler,
-    admin_force_start_handler,
-    admin_force_end_handler,
-    admin_force_ticket_handler,
-    test_event_conv_handler,
-    get_id_command_handler,
-)
+# --- 1. Importa a lista completa de handlers do ficheiro principal de admin ---
+from handlers.admin_handler import all_admin_handlers
 
-# --- Handlers dos sub-paineis ---
+# --- 2. Importa os handlers dos outros ficheiros de sub-painel ---
 from handlers.admin.file_id_conv import file_id_conv_handler
 from handlers.admin.premium_panel import premium_panel_handler, premium_command_handler
 from handlers.admin.reset_panel import reset_panel_conversation_handler
@@ -29,28 +14,13 @@ from handlers.admin.generate_equip import generate_equip_conv_handler
 def register_admin_handlers(application: Application):
     """Regista todos os handlers relacionados à administração."""
 
-    # Handlers de Comando
-    application.add_handler(admin_command_handler)
-    application.add_handler(force_daily_handler)
-    application.add_handler(delete_player_handler)
-    application.add_handler(premium_command_handler)
-    application.add_handler(inspect_item_handler)
-
-    # Handlers de CallbackQuery (Botões)
-    # A linha que causava o erro foi removida e substituída por estas
-    application.add_handler(admin_main_handler)
-    application.add_handler(admin_force_daily_callback_handler)
-    application.add_handler(admin_event_menu_handler)
-    application.add_handler(admin_force_start_handler)
-    application.add_handler(admin_force_end_handler)
-    application.add_handler(admin_force_ticket_handler)
+    # PASSO 1: Regista TODOS os handlers do admin_handler.py de uma só vez.
+    # Isto inclui o /admin, /delete_player, /fixme, menus de cache, etc.
+    application.add_handlers(all_admin_handlers)
     
-    # Handlers de Conversa
-    application.add_handler(clear_cache_conv_handler)
+    # PASSO 2: Regista os handlers dos outros ficheiros que não estão na lista.
     application.add_handler(file_id_conv_handler)
     application.add_handler(premium_panel_handler)
+    application.add_handler(premium_command_handler)
     application.add_handler(reset_panel_conversation_handler)
     application.add_handler(generate_equip_conv_handler)
-    application.add_handler(test_event_conv_handler)
-    application.add_handler(get_id_command_handler)
-    

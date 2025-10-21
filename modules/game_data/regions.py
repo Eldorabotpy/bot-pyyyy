@@ -64,15 +64,91 @@ def get_region_profile(region_id: str) -> dict:
     mods["_difficulty"] = r.get("difficulty", "normal")
     return mods
 
+# modules/game_data/regions.py (VERSÃO UNIFICADA E CORRIGIDA)
+
 REGIONS_DATA = {
-    'reino_eldora':     {'display_name': 'Reino de Eldora',      'resource': None,     'emoji': '🏰', 'file_id_name': 'regiao_reino_eldora'},
-    'floresta_sombria': {'display_name': 'Floresta Sombria',     'resource': 'madeira','emoji': '🌳', 'file_id_name': 'regiao_floresta_sombria', 'ambush_chance': 0.20},
-    'pedreira_granito': {'display_name': 'Pedreira de Granito',  'resource': 'pedra',  'emoji': '🪨', 'file_id_name': 'regiao_pedreira_granito'},
-    'campos_linho':     {'display_name': 'Campos de Linho',      'resource': 'linho',  'emoji': '🌾', 'file_id_name': 'regiao_campos_linho'},
-    'pico_grifo':       {'display_name': 'Pico do Grifo',        'resource': 'pena',   'emoji': '🦅', 'file_id_name': 'regiao_pico_grifo', 'ambush_chance': 0.25},
-    'mina_ferro':       {'display_name': 'Mina de Ferro',        'resource': 'ferro',  'emoji': '⛏️', 'file_id_name': 'regiao_mina_ferro'},
-    'forja_abandonada': {'display_name': 'Forja Abandonada',     'resource': None,     'emoji': '🔥', 'file_id_name': 'regiao_forja_abandonada'},
-    'pantano_maldito':  {'display_name': 'Pântano Maldito',      'resource': 'sangue', 'emoji': '🩸', 'file_id_name': 'regiao_pantano_maldito', 'ambush_chance': 0.30},
+    'reino_eldora': {
+        'display_name': 'Reino de Eldora',
+        'emoji': '🏰',
+        'description': "O coração pulsante do mundo, um refúgio seguro para todos os aventureiros. Aqui podes descansar, comerciar e preparar-te para a tua próxima jornada.",
+        'resource': None,
+        'file_id_name': 'regiao_reino_eldora',
+    },
+    'floresta_sombria': {
+        'display_name': 'Floresta Sombria',
+        'emoji': '🌳',
+        'description': "Uma floresta densa e antiga, envolta em mistério. As suas árvores retorcidas são uma fonte valiosa de madeira, mas cuidado com as criaturas que se escondem nas sombras.",
+        'resource': 'madeira',
+        'file_id_name': 'regiao_floresta_sombria',
+        'ambush_chance': 0.20,
+        'level_range': (6, 20),
+    },
+    'pedreira_granito': {
+        'display_name': 'Pedreira de Granito',
+        'emoji': '🪨',
+        'description': "Uma enorme pedreira a céu aberto, rica em pedra de alta qualidade. O som de picaretas ecoa durante o dia, mas à noite, criaturas rochosas vagueiam livremente.",
+        'resource': 'pedra',
+        'file_id_name': 'regiao_pedreira_granito',
+    },
+    'campos_linho': {
+        'display_name': 'Campos de Linho',
+        'emoji': '🌾',
+        'description': "Vastas planícies cobertas por linho dourado. É um local relativamente pacífico, ideal para colhedores experientes reunirem fibras para tecelagem.",
+        'resource': 'linho',
+        'file_id_name': 'regiao_campos_linho',
+    },
+    'pico_grifo': {
+        'display_name': 'Pico do Grifo',
+        'emoji': '🦅',
+        'description': "Uma montanha alta e ventosa, cujo cume está acima das nuvens. É o lar de grifos majestosos e outras feras aladas, cujas penas são muito cobiçadas.",
+        'resource': 'pena',
+        'file_id_name': 'regiao_pico_grifo',
+        'ambush_chance': 0.25,
+    },
+    'mina_ferro': {
+        'display_name': 'Mina de Ferro',
+        'emoji': '⛏️',
+        'description': "Uma rede de túneis escuros e profundos, rica em veios de minério de ferro. O perigo espreita em cada sombra, mas a recompensa para os mineiros corajosos é grande.",
+        'resource': 'ferro',
+        'file_id_name': 'regiao_mina_ferro',
+    },
+    'forja_abandonada': {
+        'display_name': 'Forja Abandonada',
+        'emoji': '🔥',
+        'description': "As ruínas de uma antiga forja elemental. O calor ainda emana das suas bigornas esquecidas, e diz-se que espíritos de fogo e golens de ferro ainda guardam o local.",
+        'resource': None,
+        'file_id_name': 'regiao_forja_abandonada',
+    },
+    'pantano_maldito': {
+        'display_name': 'Pântano Maldito',
+        'emoji': '🩸',
+        'description': "Um pântano sombrio e enevoado, onde o ar é pesado e a água tem uma cor estranha. É um local perigoso, mas rico em ingredientes alquímicos raros, como o sangue de criaturas do pântano.",
+        'resource': 'sangue',
+        'file_id_name': 'regiao_pantano_maldito',
+        'ambush_chance': 0.30,
+    },
+    # Adicionei as regiões que faltavam da tua outra lista
+    "pradaria_inicial": {
+        "display_name": "Pradaria Inicial",
+        "emoji": '🌱', 
+        'description': "Campos verdes e tranquilos que rodeiam o Reino. É o local perfeito para novos aventureiros darem os seus primeiros passos e enfrentarem criaturas mais fracas.",
+        'resource': None,
+        "level_range": (1, 10),
+    },
+    "picos_gelados": {
+        "display_name": "Picos Gelados",
+        "emoji": '🏔️', 
+        'description': "Montanhas cobertas de neve eterna, onde o frio corta até aos ossos. Apenas os aventureiros mais bem preparados ousam enfrentar as feras de gelo que habitam aqui.",
+        'resource': None,
+        "level_range": (15, 35),
+    },
+    "deserto_ancestral": {
+        "display_name": "Deserto Ancestral",
+        "emoji": '🏜️',
+        'description': "Um vasto deserto de areias douradas, pontilhado por ruínas de uma civilização há muito esquecida. Segredos e perigos ancestrais aguardam sob o sol escaldante.",
+        'resource': None,
+        "level_range": (30, 60),
+    },
 }
 
 REGION_TARGET_POWER = {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import os
+import io
 import logging
 import json
 from typing import Optional
@@ -25,12 +26,17 @@ from modules.player_manager import (
     get_player_data, 
     add_item_to_inventory, 
     save_player_data,
-    find_player_by_name
+    find_player_by_name,
+    allowed_points_for_level,
+    compute_spent_status_points,
 )
 from modules import game_data
 from handlers.admin.utils import ensure_admin 
 from kingdom_defense.engine import event_manager
-
+# No topo de admin_handler.py
+from modules.player.core import _player_cache, players_collection
+# No topo de admin_handler.py
+from modules.player.queries import _normalize_char_name
 # --- Constantes ---
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 logger = logging.getLogger(__name__)
@@ -42,6 +48,77 @@ HTML = "HTML"
 # =========================================================
 # MENUS E TECLADOS (Keyboards)
 # =========================================================
+
+async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id_to_check = None
+    try:
+        user_id_to_check = int(context.args[0])
+    except (IndexError, ValueError):
+        await update.message.reply_text("Por favor, fornece um ID de utilizador. Uso: /debug_player <user_id>")
+        return
+        
+    report = [f"🕵️ **Relatório de Diagnóstico para o Jogador `{user_id_to_check}`** 🕵️\n"]
+
+    # 1. Verifica a Cache em Memória
+    if user_id_to_check in _player_cache:
+        player_cache_data = _player_cache[user_id_to_check]
+        char_name = player_cache_data.get('character_name', 'Nome não encontrado')
+        report.append(f"✅ **Cache em Memória:** Encontrado! (Nome: `{char_name}`)")
+    else:
+        report.append("❌ **Cache em Memória:** Vazio.")
+
+    # 2. Verifica a Base de Dados MongoDB
+    if players_collection is not None:
+        try:
+            player_doc = players_collection.find_one({"_id": user_id_to_check})
+            if player_doc:
+                char_name = player_doc.get('character_name', 'Nome não encontrado')
+                report.append(f"✅ **MongoDB:** Encontrado! (Nome: `{char_name}`)")
+            else:
+                report.append("❌ **MongoDB:** Não encontrado.")
+        except Exception as e:
+            report.append(f"⚠️ **MongoDB:** Erro ao aceder à base de dados: {e}")
+    else:
+        report.append("🚫 **MongoDB:** Conexão com a base de dados não existe (está a `None`).")
+
+    await update.message.reply_text("\n".join(report), parse_mode="HTML")
+
+# Em handlers/admin_handler.py
+
+async def find_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando de admin para encontrar um jogador pelo nome do personagem.
+    Uso: /find_player <nome do personagem>
+    """
+    user_id = update.effective_user.id
+    # if user_id not in ADMIN_IDS: return
+
+    if not context.args:
+        await update.message.reply_text("Por favor, especifica um nome. Uso: /find_player <nome>")
+        return
+
+    char_name_to_find = " ".join(context.args)
+    normalized_name = _normalize_char_name(char_name_to_find)
+
+    # --- CORREÇÃO APLICADA AQUI ---
+    if players_collection is None:
+        await update.message.reply_text("Erro: Conexão com a base de dados não disponível.")
+        return
+
+    player_doc = players_collection.find_one({"character_name_normalized": normalized_name})
+
+    if player_doc:
+        found_id = player_doc.get('_id')
+        found_name = player_doc.get('character_name', 'Nome não encontrado')
+        report = (
+            f"✅ **Jogador Encontrado!**\n\n"
+            f"👤 **Nome:** `{found_name}`\n"
+            f"🆔 **User ID:** `{found_id}`"
+        )
+        await update.message.reply_text(report, parse_mode="HTML")
+    else:
+        await update.message.reply_text(f"❌ Nenhum jogador encontrado com o nome '{char_name_to_find}'.")
+
 
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -324,6 +401,69 @@ async def inspect_item_command(update: Update, context: ContextTypes.DEFAULT_TYP
     info_str = json.dumps(item_info, indent=2, ensure_ascii=False)
     await update.message.reply_text(f"<b>DEBUG PARA '{item_id}':</b>\n\n<pre>{info_str}</pre>", parse_mode=HTML)
 
+async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Corrige o estado de um jogador afetado por bugs de level up anteriores.
+    1. Zera o XP atual para um começo limpo no nível.
+    2. Recalcula os pontos de atributo disponíveis.
+    """
+    user_id = update.effective_user.id
+
+    # Usa o ADMIN_ID do ficheiro em vez de um valor fixo
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("Você não tem permissão para usar este comando.")
+        return
+
+    player_data = get_player_data(user_id)
+    if not player_data:
+        await update.message.reply_text("Erro: Jogador não encontrado.")
+        return
+
+    # AÇÃO 1: Zerar o XP atual
+    player_data['xp'] = 0
+    
+    # AÇÃO 2: Recalcular os pontos de atributo
+    allowed = allowed_points_for_level(player_data)
+    spent = compute_spent_status_points(player_data)
+    player_data['stat_points'] = max(0, allowed - spent)
+    
+    save_player_data(user_id, player_data)
+
+    await update.message.reply_text(
+        f"✅ Personagem corrigido!\n"
+        f"XP foi zerado e os pontos de atributo foram recalculados.\n"
+        f"Use o comando de perfil para ver o resultado."
+    )
+
+async def my_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Envia os dados do jogador como um ficheiro JSON para diagnóstico,
+    evitando o limite de caracteres da mensagem.
+    """
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        return
+
+    player_data = get_player_data(user_id)
+    if not player_data:
+        await update.message.reply_text("Não foi possível carregar os seus dados.")
+        return
+        
+    player_data.pop('_id', None)
+    
+    # Converte os dados para uma string formatada
+    data_str = json.dumps(player_data, indent=2, ensure_ascii=False)
+    
+    # Prepara a string para ser enviada como um ficheiro em memória
+    json_bytes = data_str.encode('utf-8')
+    input_file = io.BytesIO(json_bytes)
+    
+    # Envia o ficheiro como um documento
+    await update.message.reply_document(
+        document=input_file,
+        filename="seus_dados.json",
+        caption="Aqui estão os seus dados brutos. Por favor, partilhe o conteúdo deste ficheiro."
+    )
 
 # =========================================================
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
@@ -336,18 +476,21 @@ admin_command_handler = CommandHandler("admin", admin_command, filters=filters.U
 delete_player_handler = CommandHandler("delete_player", _delete_player_command, filters=filters.User(ADMIN_ID))
 inspect_item_handler = CommandHandler("inspect_item", inspect_item_command, filters=filters.User(ADMIN_ID))
 force_daily_handler = CommandHandler("forcar_cristais", force_daily_crystals_cmd, filters=filters.User(ADMIN_ID))
-
+my_data_handler = CommandHandler("mydata", my_data_command, filters=filters.User(ADMIN_ID))
 # Handlers de CallbackQuery (Botões)
 admin_main_handler = CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
 admin_force_daily_callback_handler = CallbackQueryHandler(_handle_admin_force_daily, pattern="^admin_force_daily$")
 
 # Handlers para os botões do submenu de eventos
+find_player_handler = CommandHandler("find_player", find_player_command)
+debug_player_handler = CommandHandler("debug_player", debug_player_data)
 admin_event_menu_handler = CallbackQueryHandler(_handle_admin_event_menu, pattern="^admin_event_menu$")
 admin_force_start_handler = CallbackQueryHandler(_handle_force_start_event, pattern="^admin_event_force_start$") 
 admin_force_end_handler = CallbackQueryHandler(_handle_force_end_event, pattern="^admin_event_force_end$")
 admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern="^admin_event_force_ticket$")
 get_id_command_handler = CommandHandler("get_id", get_id_command, filters=filters.User(ADMIN_ID))
 #get_id_command_handler = CommandHandler("get_id", get_id_command)
+fixme_handler = CommandHandler("fixme", fix_my_character, filters=filters.User(ADMIN_ID))
 
 # Handler de Conversa para Limpeza de Cache
 clear_cache_conv_handler = ConversationHandler(
@@ -387,3 +530,22 @@ test_event_conv_handler = ConversationHandler(
     block=False 
 )
 
+all_admin_handlers = [
+    admin_command_handler,
+    delete_player_handler,
+    inspect_item_handler,
+    force_daily_handler,
+    find_player_handler,
+    debug_player_handler,
+    get_id_command_handler,
+    fixme_handler, # Novo
+    admin_main_handler,
+    admin_force_daily_callback_handler,
+    admin_event_menu_handler,
+    admin_force_start_handler,
+    admin_force_end_handler,
+    admin_force_ticket_handler,
+    clear_cache_conv_handler,
+    test_event_conv_handler,
+    my_data_handler,
+]

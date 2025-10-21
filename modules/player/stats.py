@@ -1,23 +1,25 @@
-# Em modules/player/stats.py
+# modules/player/stats.py (VERSÃO FINAL COMPLETA)
+
 from __future__ import annotations
 from typing import Dict, Optional, Tuple
 
 from modules import game_data, clan_manager
+from modules.game_data.class_evolution import get_evolution_options
 
 # ========================================
 # CONSTANTES DE PROGRESSÃO DE CLASSE
 # ========================================
 
 CLASS_PROGRESSIONS = {
-    "guerreiro": { "BASE": {"max_hp": 52, "attack": 5, "defense": 4, "initiative": 4, "luck": 3}, "PER_LVL": {"max_hp": 8, "attack": 1, "defense": 2, "initiative": 0, "luck": 0}, "FREE_POINTS_PER_LVL": 1 },
-    "berserker": { "BASE": {"max_hp": 55, "attack": 6, "defense": 3, "initiative": 5, "luck": 3}, "PER_LVL": {"max_hp": 9, "attack": 2, "defense": 0, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1 },
-    "cacador": { "BASE": {"max_hp": 48, "attack": 6, "defense": 3, "initiative": 6, "luck": 4}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 0, "initiative": 2, "luck": 1}, "FREE_POINTS_PER_LVL": 1 },
-    "monge": { "BASE": {"max_hp": 50, "attack": 5, "defense": 4, "initiative": 6, "luck": 3}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 2, "initiative": 2, "luck": 0}, "FREE_POINTS_PER_LVL": 1 },
-    "mago": { "BASE": {"max_hp": 45, "attack": 7, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1 },
-    "bardo": { "BASE": {"max_hp": 47, "attack": 5, "defense": 3, "initiative": 5, "luck": 6}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 2}, "FREE_POINTS_PER_LVL": 1 },
-    "assassino": { "BASE": {"max_hp": 47, "attack": 6, "defense": 2, "initiative": 7, "luck": 5}, "PER_LVL": {"max_hp": 5, "attack": 2, "defense": 0, "initiative": 3, "luck": 1}, "FREE_POINTS_PER_LVL": 1 },
-    "samurai": { "BASE": {"max_hp": 50, "attack": 6, "defense": 4, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 7, "attack": 2, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1 },
-    "_default": { "BASE": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1 },
+    "guerreiro": { "BASE": {"max_hp": 52, "attack": 5, "defense": 4, "initiative": 4, "luck": 3}, "PER_LVL": {"max_hp": 8, "attack": 1, "defense": 2, "initiative": 0, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
+    "berserker": { "BASE": {"max_hp": 55, "attack": 6, "defense": 3, "initiative": 5, "luck": 3}, "PER_LVL": {"max_hp": 9, "attack": 2, "defense": 0, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
+    "cacador": { "BASE": {"max_hp": 48, "attack": 6, "defense": 3, "initiative": 6, "luck": 4}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 0, "initiative": 2, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
+    "monge": { "BASE": {"max_hp": 50, "attack": 5, "defense": 4, "initiative": 6, "luck": 3}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 2, "initiative": 2, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
+    "mago": { "BASE": {"max_hp": 45, "attack": 7, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "attack" },
+    "bardo": { "BASE": {"max_hp": 47, "attack": 5, "defense": 3, "initiative": 5, "luck": 6}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 2}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
+    "assassino": { "BASE": {"max_hp": 47, "attack": 6, "defense": 2, "initiative": 7, "luck": 5}, "PER_LVL": {"max_hp": 5, "attack": 2, "defense": 0, "initiative": 3, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
+    "samurai": { "BASE": {"max_hp": 50, "attack": 6, "defense": 4, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 7, "attack": 2, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "defense" },
+    "_default": { "BASE": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
 }
 
 CLASS_POINT_GAINS = {
@@ -34,10 +36,6 @@ CLASS_POINT_GAINS = {
 
 _BASELINE_KEYS = ("max_hp", "attack", "defense", "initiative", "luck")
 
-# ========================================
-# FUNÇÕES AUXILIARES
-# ========================================
-
 def _ival(x, default=0):
     try: return int(x)
     except Exception: return int(default)
@@ -47,10 +45,6 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
     if isinstance(ck, str) and ck.strip():
         return ck.strip().lower()
     return None
-
-# ========================================
-# FUNÇÕES DE CÁLCULO DE STATS
-# ========================================
 
 def get_player_total_stats(player_data: dict) -> dict:
     total = {
@@ -84,7 +78,14 @@ def get_player_total_stats(player_data: dict) -> dict:
             total['defense'] = int(total['defense'] * percent_bonus)
         if "flat_hp_bonus" in clan_buffs:
             total['max_hp'] += clan_buffs["flat_hp_bonus"]
-            
+
+    class_key = _get_class_key_normalized(player_data)
+    class_prog = CLASS_PROGRESSIONS.get(class_key) or CLASS_PROGRESSIONS["_default"]
+    mana_attribute_name = class_prog.get("mana_stat", "luck") 
+    mana_attribute_value = total.get(mana_attribute_name, 0)
+    mana_base = 10
+    mana_por_ponto = 5
+    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)           
     return total
 
 def get_player_dodge_chance(player_data: dict) -> float:
@@ -99,10 +100,6 @@ def get_player_double_attack_chance(player_data: dict) -> float:
     double_attack_chance = (initiative * 0.25) / 100.0
     return min(double_attack_chance, 0.50)
 
-# ========================================
-# LÓGICA DE LEVEL UP, PONTOS E RESPEC
-# ========================================
-
 def allowed_points_for_level(pdata: dict) -> int:
     lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
@@ -111,23 +108,34 @@ def allowed_points_for_level(pdata: dict) -> int:
     return per_lvl * max(0, lvl - 1)
 
 def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
+    """Opção A: XP Excedente (Carry-over)"""
     levels_gained, points_gained = 0, 0
+    current_xp = int(player_data.get('xp', 0))
+
     while True:
         current_level = int(player_data.get('level', 1))
         xp_needed = int(game_data.get_xp_for_next_combat_level(current_level))
-        current_xp = int(player_data.get('xp', 0))
-        if current_xp < xp_needed: break
         
-        player_data['xp'] -= xp_needed
+        if xp_needed <= 0 or current_xp < xp_needed:
+            break
+        
+        current_xp -= xp_needed
+        
         old_allowed = allowed_points_for_level(player_data)
         player_data['level'] = current_level + 1
         new_allowed = allowed_points_for_level(player_data)
         
         delta_points = max(0, new_allowed - old_allowed)
-        player_data['stat_points'] = int(player_data.get('stat_points', 0)) + delta_points
         
         levels_gained += 1
         points_gained += delta_points
+
+    if levels_gained > 0:
+        player_data['xp'] = current_xp
+        
+        allowed = allowed_points_for_level(player_data)
+        spent = compute_spent_status_points(player_data)
+        player_data['stat_points'] = max(0, allowed - spent)
 
     level_up_message = ""
     if levels_gained > 0:
@@ -137,6 +145,7 @@ def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
             f"\n\n✨ <b>Parabéns!</b> Você subiu {levels_gained} {nivel_txt} "
             f"(agora Nv. {player_data['level']}) e ganhou {points_gained} {ponto_txt} de atributo."
         )
+        
     return levels_gained, points_gained, level_up_message
 
 def needs_class_choice(player_data: dict) -> bool:
@@ -160,18 +169,30 @@ def _get_point_gains_for_class(ckey: Optional[str]) -> dict:
     return full
 
 def compute_spent_status_points(pdata: dict) -> int:
-    base = pdata.get("base_stats") or _get_default_baseline_from_new_player()
+    """Calcula quantos pontos de atributo o jogador já gastou manualmente."""
+    lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
+    
+    class_baseline = _compute_class_baseline_for_level(ckey, lvl)
     gains = _get_point_gains_for_class(ckey)
     spent = 0
-    for k in _BASELINE_KEYS:
-        cur = _ival(pdata.get(k), base[k])
-        delta = cur - _ival(base.get(k))
-        if delta <= 0: continue
-        gp = max(1, int(gains.get(k, 1)))
-        spent += (delta + gp - 1) // gp
-    return spent
     
+    for k in _BASELINE_KEYS:
+        current_stat_value = _ival(pdata.get(k), class_baseline.get(k))
+        baseline_stat_value = _ival(class_baseline.get(k))
+        
+        delta = current_stat_value - baseline_stat_value
+        
+        if delta <= 0:
+            continue
+            
+        gain_per_point = max(1, int(gains.get(k, 1)))
+        
+        points_for_this_stat = (delta + gain_per_point - 1) // gain_per_point
+        spent += points_for_this_stat
+            
+    return spent
+
 def reset_stats_and_refund_points(pdata: dict) -> int:
     _ensure_base_stats_block_inplace(pdata)
     base = pdata["base_stats"]
@@ -187,10 +208,6 @@ def reset_stats_and_refund_points(pdata: dict) -> int:
         pdata["current_hp"] = max(1, min(_ival(pdata.get("current_hp"), max_hp), max_hp))
     except Exception: pass
     return spent_before
-
-# ========================================
-# FUNÇÕES INTERNAS DE SINCRONIZAÇÃO E MIGRAÇÃO
-# ========================================
 
 def _sync_all_stats_inplace(pdata: dict) -> bool:
     """Função mestra que executa todas as sincronizações de stats."""
@@ -244,9 +261,7 @@ def _ensure_base_stats_block_inplace(pdata: dict) -> bool:
         if out != b:
             pdata["base_stats"] = out
             changed = True
-
     return changed
-
 
 def _compute_class_baseline_for_level(class_key: Optional[str], level: int) -> dict:
     lvl = max(1, int(level or 1))
@@ -265,32 +280,26 @@ def _compute_class_baseline_for_level(class_key: Optional[str], level: int) -> d
 
 def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
     delta = {}
+    base_stats = pdata.get("base_stats", {})
+    
     for k in _BASELINE_KEYS:
-        cur = _ival(pdata.get(k), baseline.get(k))
+        cur = _ival(base_stats.get(k), baseline.get(k))
         base = _ival(baseline.get(k))
         d = cur - base
         delta[k] = max(0, d)
     return delta
 
-
 def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
+    """VERSÃO CORRIGIDA: Não sobrescreve os stats principais."""
     changed = False
     lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
 
-    invested_delta = _current_invested_delta_over_baseline(pdata, class_baseline)
-
-    cur_bs = pdata.get("base_stats") or {}
-    if any(_ival(cur_bs.get(k)) != _ival(class_baseline.get(k)) for k in _BASELINE_KEYS):
+    current_base_stats = pdata.get("base_stats") or {}
+    if any(_ival(current_base_stats.get(k)) != _ival(class_baseline.get(k)) for k in _BASELINE_KEYS):
         pdata["base_stats"] = {k: _ival(class_baseline.get(k)) for k in _BASELINE_KEYS}
         changed = True
-
-    for k in _BASELINE_KEYS:
-        desired = _ival(class_baseline.get(k)) + _ival(invested_delta.get(k))
-        if _ival(pdata.get(k)) != desired:
-            pdata[k] = desired
-            changed = True
 
     try:
         totals = get_player_total_stats(pdata)
@@ -305,7 +314,6 @@ def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
 
     return changed
 
-
 def _sync_stat_points_to_level_cap_inplace(pdata: dict) -> bool:
     allowed = allowed_points_for_level(pdata)
     spent = compute_spent_status_points(pdata)
@@ -317,18 +325,31 @@ def _sync_stat_points_to_level_cap_inplace(pdata: dict) -> bool:
     return False
 
 def has_completed_dungeon(player_data: dict, dungeon_id: str, difficulty: str) -> bool:
-    """Verifica se um jogador já completou uma certa dificuldade de um calabouço."""
     completions = player_data.get("dungeon_completions", {})
     return difficulty in completions.get(dungeon_id, [])
 
+def can_see_evolution_menu(player_data: dict) -> bool:
+    current_class = player_data.get("class")
+    if not current_class:
+        return False
+
+    player_level = player_data.get("level", 1)
+    all_options = get_evolution_options(current_class, player_level, show_locked=True)
+
+    if not all_options:
+        return False
+
+    for option in all_options:
+        if player_level >= option.get("min_level", 999):
+            return True
+    return False
+
 def mark_dungeon_as_completed(player_data: dict, dungeon_id: str, difficulty: str):
-    """Marca uma dificuldade de um calabouço como concluída para o jogador."""
     if "dungeon_completions" not in player_data:
         player_data["dungeon_completions"] = {}
     
     if dungeon_id not in player_data["dungeon_completions"]:
         player_data["dungeon_completions"][dungeon_id] = []
         
-    # Adiciona a dificuldade à lista de concluídas, sem duplicados
     if difficulty not in player_data["dungeon_completions"][dungeon_id]:
         player_data["dungeon_completions"][dungeon_id].append(difficulty)

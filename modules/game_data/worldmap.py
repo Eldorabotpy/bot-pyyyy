@@ -1,16 +1,52 @@
 # modules/game_data/world.py
 
 WORLD_MAP = {
-    'reino_eldora': ['floresta_sombria', 'campos_linho'],
-    'floresta_sombria': ['reino_eldora', 'pedreira_granito'],
-    'pedreira_granito': ['floresta_sombria', 'mina_ferro'],
-    'campos_linho': ['reino_eldora', 'pico_grifo'],
-    'pico_grifo': ['campos_linho', 'pantano_maldito'],
-    'mina_ferro': ['pedreira_granito', 'forja_abandonada'],
-    'forja_abandonada': ['mina_ferro'],
-    'pantano_maldito': ['pico_grifo'],
+    # Ponto de Partida
+    "reino_eldora": [
+        "pradaria_inicial"
+    ],
+    
+    # Caminho Principal
+    "pradaria_inicial": [
+        "reino_eldora", 
+        "floresta_sombria"
+    ],
+    "floresta_sombria": [
+        "pradaria_inicial",
+        "campos_linho"
+    ],
+    "campos_linho": [
+        "floresta_sombria",
+        "pedreira_granito"
+    ],
+    "pedreira_granito": [
+        "campos_linho",
+        "pico_grifo"
+    ],
+    "pico_grifo": [
+        "pedreira_granito",
+        "mina_ferro"
+    ],
+    "mina_ferro": [
+        "pico_grifo",
+        "forja_abandonada"
+    ],
+    "forja_abandonada": [
+        "mina_ferro",
+        "pantano_maldito"
+    ],
+    "pantano_maldito": [
+        "forja_abandonada",
+        "picos_gelados"
+    ],
+    "picos_gelados": [
+        "pantano_maldito",
+        "deserto_ancestral"
+    ],
+    "deserto_ancestral": [
+        "picos_gelados" 
+    ],
 }
-
 # Pontos de poder “alvo” por região (para calibrar a dificuldade)
 REGION_TARGET_POWER = {
     "floresta_sombria": 80,     # Tier 1

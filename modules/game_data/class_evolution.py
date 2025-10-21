@@ -1,292 +1,213 @@
-# modules/game_data/class_evolution.py
+# modules/game_data/class_evolution.py (VERSÃO COMPLETA PARA O "PLANO MESTRE")
+
 from __future__ import annotations
 from typing import Dict, Any, List
 
-"""
-EVOLUTIONS:
-- Mapa de evolução por classe-base -> opções de evolução T2 e T3.
-- Cada entrada define: nível mínimo, itens necessários, descrição e preview de bônus.
-- "to": nome da classe-alvo (deve existir nas suas classes ou você pode exibir como "classe nova").
-- "media_key": chave para buscar mídia (video/foto) em assets/file_ids.json via modules.file_ids
-"""
-
 EVOLUTIONS: Dict[str, Dict[str, Any]] = {
-    # =========================
-    # GUERREIRO
-    # =========================
+    # ========================= # GUERREIRO # =========================
     "guerreiro": {
         "tier2": [
             {
-                "to": "cavaleiro",
-                "min_level": 25,
+                "to": "cavaleiro", "min_level": 25,
                 "required_items": {"emblema_guerreiro": 25, "essencia_guardia": 25}, 
                 "desc": "Defesa elevada e proteção de aliados.",
-                "preview_mods": {"hp": "+25%", "defense": "+22%", "attack": "+15%"},
-                "media_key": "evo_guerreiro_to_cavaleiro_video",
+                "unlocks_skill": "passive_bulwark", "trial_monster_id": "guardian_of_the_aegis",
             },
             {
-                "to": "gladiador",
-                "min_level": 35,
+                "to": "gladiador", "min_level": 35,
                 "required_items": {"emblema_guerreiro": 35, "essencia_furia": 35},
                 "desc": "Ofensiva agressiva e golpes em área.",
-                "preview_mods": {"attack": "+24%", "hp": "+20%", "initiative": "+16%"},
-                "media_key": "evo_guerreiro_to_gladiador_video",
+                "unlocks_skill": "active_whirlwind", "trial_monster_id": "phantom_of_the_arena",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["cavaleiro", "gladiador"],
-                "to": "templario",
-                "min_level": 60,
+                "from_any_of": ["cavaleiro", "gladiador"], "to": "templario", "min_level": 60,
                 "required_items": {"selo_sagrado": 50, "essencia_luz": 50},
-                "desc": "Paladino sagrado: defesa + suporte.",
-                "preview_mods": {"defense": "+32%", "hp": "+20%", "luck": "+12%"},
-                "media_key": "evo_guerreiro_to_templario_video",
+                "desc": "Paladino sagrado que combina defesa com suporte divino.",
+                "unlocks_skill": "active_holy_blessing", "trial_monster_id": "aspect_of_the_divine",
             },
         ],
     },
 
-    # =========================
-    # BERSERKER
-    # =========================
+    # ========================= # BERSERKER # =========================
     "berserker": {
         "tier2": [
             {
-                "to": "barbaro",
-                "min_level": 25,
+                "to": "barbaro", "min_level": 25,
                 "required_items": {"emblema_berserker": 25, "essencia_furia": 25},
-                "desc": "Dano bruto e resistência à quebra de controle.",
-                "preview_mods": {"attack": "+26%", "hp": "+16%"},
-                "media_key": "evo_berserker_to_barbaro_video",
+                "desc": "Dano bruto e resistência a controlo.",
+                "unlocks_skill": "passive_unstoppable", "trial_monster_id": "primal_spirit_of_rage",
             },
             {
-                "to": "juggernaut",
-                "min_level": 35,
+                "to": "juggernaut", "min_level": 35,
                 "required_items": {"emblema_berserker": 35, "essencia_guardia": 35},
-                "desc": "Avanços imparáveis e mitigação.",
-                "preview_mods": {"hp": "+24%", "defense": "+15%", "attack": "+36%"},
-                "media_key": "evo_berserker_to_juggernaut_video",
+                "desc": "Avanços imparáveis e mitigação de dano.",
+                "unlocks_skill": "active_unbreakable_charge", "trial_monster_id": "guardian_of_the_mountain",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["barbaro", "juggernaut"],
-                "to": "ira_primordial",
-                "min_level": 60,
+                "from_any_of": ["barbaro", "juggernaut"], "to": "ira_primordial", "min_level": 60,
                 "required_items": {"totem_ancestral": 50, "essencia_furia": 50},
                 "desc": "Forma ancestral que amplifica dano conforme a vida cai.",
-                "preview_mods": {"attack": "+38%", "initiative": "+18%"},
-                "media_key": "evo_berserker_to_ira_primordial_video",
+                "unlocks_skill": "passive_last_stand", "trial_monster_id": "avatar_of_primal_wrath",
             }
         ],
     },
 
-    # =========================
-    # CACADOR
-    # =========================
+    # ========================= # CAÇADOR # =========================
     "cacador": {
         "tier2": [
             {
-                "to": "arqueiro_sombrio",
-                "min_level": 25,
-                "required_items": {"emblema_cacador": 25, "essencia_sombra": 25},
-                "desc": "DPS à distância e debuffs de escuridão.",
-                "preview_mods": {"initiative": "+20%", "attack": "+25%", "luck": "+16%"},
-                "media_key": "evo_cacador_to_arqueiro_sombrio_video",
+                "to": "patrulheiro", "min_level": 25,
+                "required_items": {"emblema_cacador": 25, "essencia_fera": 25},
+                "desc": "Mestre da sobrevivência que luta ao lado de um companheiro animal.",
+                "unlocks_skill": "passive_animal_companion", "trial_monster_id": "spirit_of_the_alpha_wolf",
             },
             {
-                "to": "sniper",
-                "min_level": 35,
+                "to": "franco_atirador", "min_level": 35,
                 "required_items": {"emblema_cacador": 35, "essencia_precisao": 35},
-                "desc": "Críticos elevados contra alvos isolados.",
-                "preview_mods": {"attack": "+25%", "luck": "+16%"},
-                "media_key": "evo_cacador_to_sniper_video",
+                "desc": "Especialista em tiros à distância com dano crítico devastador.",
+                "unlocks_skill": "active_deadeye_shot", "trial_monster_id": "phantom_of_the_watchtower",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["arqueiro_sombrio", "sniper"],
-                "to": "mestre_caçador",
-                "min_level": 60,
+                "from_any_of": ["patrulheiro", "franco_atirador"], "to": "mestre_da_selva", "min_level": 60,
                 "required_items": {"marca_predador": 50, "essencia_fera": 50},
-                "desc": "Controle de feras e bônus contra monstros raros.",
-                "preview_mods": {"initiative": "+25%", "attack": "+32%"},
-                "media_key": "evo_cacador_to_mestre_cacador_video",
+                "desc": "O predador alfa, capaz de domar as feras mais selvagens.",
+                "unlocks_skill": "passive_apex_predator", "trial_monster_id": "aspect_of_the_world_tree",
             }
         ],
     },
 
-    # =========================
-    # MONGE
-    # =========================
+    # ========================= # MONGE # =========================
     "monge": {
         "tier2": [
             {
-                "to": "guardiao",
-                "min_level": 25,
+                "to": "guardiao_do_templo", "min_level": 25,
                 "required_items": {"emblema_monge": 25, "essencia_guardia": 25},
-                "desc": "Escudos de ki e contra-ataques.",
-                "preview_mods": {"defense": "+35%", "hp": "+25%"},
-                "media_key": "evo_monge_to_guardiao_video",
+                "desc": "Mestre da defesa que usa o Ki para criar barreiras e contra-atacar.",
+                "unlocks_skill": "active_iron_skin", "trial_monster_id": "statue_of_the_serene_fist",
             },
             {
-                "to": "mestre_do_ki",
-                "min_level": 35,
+                "to": "punho_elemental", "min_level": 35,
                 "required_items": {"emblema_monge": 35, "essencia_ki": 35},
-                "desc": "Canalização de ki para dano e cura.",
-                "preview_mods": {"attack": "+30%", "initiative": "+38%", "luck": "+35%"},
-                "media_key": "evo_monge_to_mestre_do_ki_video",
+                "desc": "Lutador que canaliza a fúria dos elementos nos seus punhos.",
+                "unlocks_skill": "passive_elemental_strikes", "trial_monster_id": "avatar_of_the_four_elements",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["guardiao", "mestre_do_ki"],
-                "to": "santo_asceta",
-                "min_level": 60,
-                "required_items": {"reliquia_mistica": 50, "essencia_luz": 50, "essencia_ki": 50},
-                "desc": "Mitigação em equipe e cura periódica.",
-                "preview_mods": {"defense": "+40%", "hp": "+32%"},
-                "media_key": "evo_monge_to_santo_asceta_video",
+                "from_any_of": ["guardiao_do_templo", "punho_elemental"], "to": "ascendente", "min_level": 60,
+                "required_items": {"reliquia_mistica": 50, "essencia_ki": 50},
+                "desc": "Atingiu a transcendência, movendo-se como o vento e golpeando como o trovão.",
+                "unlocks_skill": "active_transcendence", "trial_monster_id": "echo_of_the_grandmaster",
             }
         ],
     },
 
-    # =========================
-    # MAGO
-    # =========================
+    # ========================= # MAGO # =========================
     "mago": {
         "tier2": [
             {
-                "to": "feiticeiro",
-                "min_level": 25,
+                "to": "feiticeiro", "min_level": 25,
                 "required_items": {"emblema_mago": 25, "essencia_arcana": 25},
-                "desc": "Controle + dano contínuo (DoT).",
-                "preview_mods": {"attack": "+24%", "luck": "+16%"},
-                "media_key": "evo_mago_to_feiticeiro_video",
+                "desc": "Mestre das maldições e do dano contínuo (DoT).",
+                "unlocks_skill": "active_curse_of_weakness", "trial_monster_id": "shade_of_the_forbidden_library",
             },
             {
-                "to": "elementalista",
-                "min_level": 35,
+                "to": "elementalista", "min_level": 35,
                 "required_items": {"emblema_mago": 35, "essencia_elemental": 35},
-                "desc": "Explosões elementais (fogo, gelo, raio).",
-                "preview_mods": {"attack": "+22%", "initiative": "+18%"},
-                "media_key": "evo_mago_to_elementalista_video",
+                "desc": "Especialista em dano elemental massivo e em área.",
+                "unlocks_skill": "passive_elemental_attunement", "trial_monster_id": "raging_elemental_vortex",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["feiticeiro", "elementalista"],
-                "to": "arquimago",
-                "min_level": 60,
+                "from_any_of": ["feiticeiro", "elementalista"], "to": "arquimago", "min_level": 60,
                 "required_items": {"grimorio_arcano": 50, "essencia_arcana": 50},
-                "desc": "Amplificação de dano mágico e redução do custo.",
-                "preview_mods": {"attack": "+28%", "luck": "+18%"},
-                "media_key": "evo_mago_to_arquimago_video",
+                "desc": "Um canal de poder arcano puro, capaz de alterar a realidade.",
+                "unlocks_skill": "active_meteor_swarm", "trial_monster_id": "essence_of_pure_magic",
             }
         ],
     },
 
-    # =========================
-    # BARDO
-    # =========================
+    # ========================= # BARDO # =========================
     "bardo": {
         "tier2": [
             {
-                "to": "menestrel",
-                "min_level": 25,
+                "to": "menestrel", "min_level": 25,
                 "required_items": {"emblema_bardo": 25, "essencia_harmonia": 25},
-                "desc": "Buffs de grupo e amplificação de cura.",
-                "preview_mods": {"luck": "+22%", "initiative": "+16%"},
-                "media_key": "evo_bardo_to_menestrel_video",
+                "desc": "Focado em canções que curam e fortalecem os aliados.",
+                "unlocks_skill": "active_song_of_valor", "trial_monster_id": "echo_of_the_first_ballad",
             },
             {
-                "to": "encantador",
-                "min_level": 35,
+                "to": "encantador", "min_level": 35,
                 "required_items": {"emblema_bardo": 35, "essencia_encanto": 35},
-                "desc": "Controle mental e debuffs rítmicos.",
-                "preview_mods": {"luck": "+25%", "attack": "+18%"},
-                "media_key": "evo_bardo_to_encantador_video",
+                "desc": "Usa melodias para confundir e debilitar os inimigos.",
+                "unlocks_skill": "active_dissonant_melody", "trial_monster_id": "siren_of_the_lost_stage",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["menestrel", "encantador"],
-                "to": "maestro",
-                "min_level": 60,
+                "from_any_of": ["menestrel", "encantador"], "to": "maestro", "min_level": 60,
                 "required_items": {"batuta_maestria": 50, "essencia_harmonia": 50},
-                "desc": "Orquestra sinérgica que encadeia buffs.",
-                "preview_mods": {"luck": "+34%", "initiative": "+28%"},
-                "media_key": "evo_bardo_to_maestro_video",
+                "desc": "Rege o campo de batalha com sinfonias de poder.",
+                "unlocks_skill": "passive_symphony_of_power", "trial_monster_id": "avatar_of_the_grand_orchestra",
             }
         ],
     },
 
-    # =========================
-    # ASSASSINO
-    # =========================
+    # ========================= # ASSASSINO # =========================
     "assassino": {
         "tier2": [
             {
-                "to": "ninja",
-                "min_level": 25,
+                "to": "sombra", "min_level": 25,
                 "required_items": {"emblema_assassino": 25, "essencia_sombra": 25},
-                "desc": "Furtividade e múltiplos acertos rápidos.",
-                "preview_mods": {"initiative": "+22%", "luck": "+18%"},
-                "media_key": "evo_assassino_to_ninja_video",
+                "desc": "Mestre da furtividade e de ataques surpresa devastadores.",
+                "unlocks_skill": "active_shadow_strike", "trial_monster_id": "doppelganger_of_the_throne",
             },
             {
-                "to": "duelista",
-                "min_level": 35,
+                "to": "venefico", "min_level": 35,
                 "required_items": {"emblema_assassino": 35, "essencia_letal": 35},
-                "desc": "Foco em 1x1 e contra-golpes.",
-                "preview_mods": {"attack": "+25%", "initiative": "+16%"},
-                "media_key": "evo_assassino_to_duelista_video",
+                "desc": "Especialista em venenos e toxinas que causam dano ao longo do tempo.",
+                "unlocks_skill": "passive_potent_toxins", "trial_monster_id": "spirit_of_the_swamp_adder",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["ninja", "duelista"],
-                "to": "sombra_inexoravel",
-                "min_level": 60,
+                "from_any_of": ["sombra", "venefico"], "to": "mestre_das_laminas", "min_level": 60,
                 "required_items": {"manto_eterno": 50, "essencia_sombra": 50},
-                "desc": "Velocidade máxima e críticos ampliados.",
-                "preview_mods": {"initiative": "+36%", "luck": "+30%"},
-                "media_key": "evo_assassino_to_sombra_inexoravel_video",
+                "desc": "Um vulto letal cuja velocidade é inigualável.",
+                "unlocks_skill": "active_dance_of_a_thousand_cuts", "trial_monster_id": "specter_of_the_silent_kill",
             }
         ],
     },
 
-    # =========================
-    # SAMURAI
-    # =========================
+    # ========================= # SAMURAI # =========================
     "samurai": {
         "tier2": [
             {
-                "to": "ronin",
-                "min_level": 25,
+                "to": "kensei", "min_level": 25,
                 "required_items": {"emblema_samurai": 25, "essencia_corte": 25},
-                "desc": "Golpes independentes com foco em autonomia.",
-                "preview_mods": {"attack": "+32%", "defense": "+16%"},
-                "media_key": "evo_samurai_to_ronin_video",
+                "desc": "O Santo da Espada, focado na perfeição técnica de cada golpe.",
+                "unlocks_skill": "passive_iai_stance", "trial_monster_id": "phantom_of_the_dojo",
             },
             {
-                "to": "kensei",
-                "min_level": 35,
+                "to": "ronin", "min_level": 35,
                 "required_items": {"emblema_samurai": 35, "essencia_disciplina": 35},
-                "desc": "Precisão técnica e janelas de contra-ataque.",
-                "preview_mods": {"attack": "+30%", "initiative": "+28%"},
-                "media_key": "evo_samurai_to_kensei_video",
+                "desc": "Um guerreiro solitário, mestre do contra-ataque e da sobrevivência.",
+                "unlocks_skill": "active_parry_and_riposte", "trial_monster_id": "spirit_of_the_wandering_warrior",
             },
         ],
         "tier3": [
             {
-                "from_any_of": ["ronin", "kensei"],
-                "to": "iaijutsu",
-                "min_level": 60,
+                "from_any_of": ["kensei", "ronin"], "to": "shogun", "min_level": 60,
                 "required_items": {"lamina_sagrada": 50, "essencia_disciplina": 50},
-                "desc": "Execuções instantâneas e rupturas de postura.",
-                "preview_mods": {"attack": "+36%", "initiative": "+30%"},
-                "media_key": "evo_samurai_to_iaijutsu_video",
+                "desc": "Um líder no campo de batalha, cujas ordens inspiram os aliados.",
+                "unlocks_skill": "active_banner_of_command", "trial_monster_id": "avatar_of_the_first_emperor",
             }
         ],
     },

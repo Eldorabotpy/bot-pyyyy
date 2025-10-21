@@ -3,13 +3,16 @@
 import logging
 import unicodedata
 import re
+import json
+import html
 from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 
 from modules.player.premium import PremiumManager
 from modules import player_manager, game_data
 from modules import file_ids
+from modules.game_data.skins import SKIN_CATALOG
 
 logger = logging.getLogger(__name__)
 
@@ -23,29 +26,39 @@ def _slugify(text: str) -> str:
     norm = re.sub(r"[^a-z0-9_]", "", norm)
     return norm
 
+# Em handlers/profile_handler.py
+
 def _get_class_media(player_data: dict, purpose: str = "personagem"):
     """
-    Encontra mídia no file_ids.json para a classe do jogador.
-    Prioriza 'classe_<slug>_media'. Evita chaves com 'abertura'.
-    Retorna {'id': str, 'type': 'photo'|'video'} ou None.
+    Encontra mídia para a classe do jogador, dando prioridade à skin equipada.
     """
     raw_cls = (player_data.get("class") or player_data.get("class_tag") or "").strip()
     cls = _slugify(raw_cls)
     purpose = (purpose or "").strip().lower()
 
     candidates = []
-
-    # 1) chaves vindas de CLASSES_DATA (se existir)
+    
+    # --- LÓGICA DE SKIN ---
+    # 1. Primeiro, tenta encontrar a media_key da skin equipada
+    equipped_skin_id = player_data.get("equipped_skin")
+    if equipped_skin_id and equipped_skin_id in SKIN_CATALOG:
+        skin_info = SKIN_CATALOG[equipped_skin_id]
+        # Garante que a skin pertence à classe do jogador
+        if skin_info.get('class') == raw_cls or skin_info.get('class') == cls:
+             candidates.append(skin_info['media_key'])
+    # --- FIM DA LÓGICA DE SKIN ---
+            
+    # 2) Se não encontrar skin, continua com a lógica original de procurar a mídia padrão
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(cls) or {}
     for k in ("profile_file_id_key", "profile_media_key", "file_id_name", "status_file_id_key", "file_id_key"):
         if cls_cfg and cls_cfg.get(k):
             candidates.append(cls_cfg[k])
 
-    # 2) padrões por classe
+    # 3) Padrões por classe
     if cls:
         candidates += [
-            f"classe_{cls}_media",   # ✅ padrão preferido
+            f"classe_{cls}_media",
             f"class_{cls}_media",
             f"{cls}_media",
             f"perfil_video_{cls}",
@@ -57,9 +70,10 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
             f"{cls}_{purpose}",
         ]
 
-    # 3) fallbacks genéricos
+    # 4) Fallbacks genéricos
     candidates += ["perfil_video", "personagem_video", "profile_video", "perfil_foto", "profile_photo"]
 
+    # 5) Procura pelo primeiro file_id válido na lista de candidatos
     tried = []
     for key in [k for k in candidates if k and "abertura" not in k.lower()]:
         tried.append(key)
@@ -83,11 +97,14 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 def _bar(current: int, total: int, blocks: int = 10, filled_char: str = '🟧', empty_char: str = '⬜️') -> str:
+    """Gera uma barra de progresso de texto."""
     if total <= 0:
         filled = blocks
     else:
+        # Garante que o rácio está sempre entre 0.0 e 1.0
         ratio = max(0.0, min(1.0, float(current) / float(total)))
-        filled = int(round(ratio * blocks))
+        # Apenas converte para inteiro, truncando o decimal (ex: 4.53 vira 4)
+        filled = int(ratio * blocks)
     return filled_char * filled + empty_char * (blocks - filled)
 
 def _normalize_profession(raw):
@@ -113,7 +130,6 @@ def _class_key_from_player(player_data: dict) -> str:
     return _slugify(raw) or "_default"
 
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ao clicar em Personagem/Profile: envia o VÍDEO/FOTO da classe (se houver) já com o perfil."""
     query = update.callback_query
     await query.answer()
 
@@ -124,7 +140,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not player_data:
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado. Use /start para começar.")
         return
-
+    
     # ===== totais (base + equipamentos) =====
     totals = player_manager.get_player_total_stats(player_data)
     total_hp_max = int(totals.get('max_hp', 50))
@@ -144,9 +160,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ===== BLOCO PREMIUM TOTALMENTE CORRIGIDO E MELHORADO =====
     # =================================================================
     premium_line = ""
-    # Usamos a nova função correta: has_premium_plan(user_id)
-    if player_manager.has_premium_plan(user_id):
-        premium = PremiumManager(player_data)
+    premium = PremiumManager(player_data) # Instancia o manager
+    if premium.is_premium(): # Usa o método correto para verificar
         tier_name = premium.tier.capitalize() if premium.tier else "Premium"
         exp_date = premium.expiration_date
         
@@ -165,19 +180,24 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         combat_next = 0
     combat_bar = _bar(combat_xp, combat_next)
 
+    prof_line = "" 
     prof_norm = _normalize_profession(player_data.get('profession'))
-    prof_line = None
+
+    # Apenas entra aqui se o jogador TIVER uma profissão
     if prof_norm:
+        # Todas as variáveis e cálculos relacionados à profissão
+        # agora ficam DENTRO deste bloco 'if'.
         prof_key, prof_level, prof_xp = prof_norm
         prof_name = (game_data.PROFESSIONS_DATA or {}).get(prof_key, {}).get('display_name', prof_key)
-    try:
-        prof_next = int(game_data.get_xp_for_next_collection_level(prof_level))
-    except Exception:
-        prof_next = 0
     
-    prof_bar = _bar(prof_xp, prof_next, blocks=10, filled_char='🟨', empty_char='⬜️')
-    prof_line = f"💼 <b>Profissão:</b> {prof_name} — Nível {prof_level}\n<code>[{prof_bar}]</code> {prof_xp}/{prof_next} XP"
-
+        try:
+            prof_next = int(game_data.get_xp_for_next_collection_level(prof_level))
+        except Exception:
+            prof_next = 0
+    
+        # A criação da barra e da linha de texto agora está no sítio certo
+        prof_bar = _bar(prof_xp, prof_next, blocks=10, filled_char='🟨', empty_char='⬜️')
+        prof_line = f"\n💼 <b>Profissão:</b> {prof_name} — Nível {prof_level}\n<code>[{prof_bar}]</code> {prof_xp}/{prof_next} XP"
     
     class_banner = ""
     if player_manager.needs_class_choice(player_data):
@@ -228,6 +248,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬", callback_data='status_open')],
         [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬", callback_data='equipment_menu')],
         [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 𝐂𝐨𝐦𝐩𝐥𝐞𝐭𝐨", callback_data='inventory_CAT_equipamento_PAGE_1')],
+        [InlineKeyboardButton("🧪 Usar Consumível", callback_data='potion_menu')],
+        [InlineKeyboardButton("🎨 Mudar Aparência", callback_data='skin_menu')],
         [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='continue_after_action')],
     ])
     reply_markup = InlineKeyboardMarkup(keyboard)

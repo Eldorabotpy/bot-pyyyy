@@ -50,8 +50,8 @@ def _resolve_user_id(text: str) -> int | None:
 # Ponto de Entrada: Mostra o menu principal de reset
 async def _entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
-    await query.answer()
-
+    if query:
+        await query.answer()
     text = (
         "🔧 <b>Painel de Reset (ADM)</b>\n\n"
         "Selecione uma ferramenta de reset. Use com cuidado."
@@ -65,7 +65,15 @@ async def _entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         [InlineKeyboardButton("⬅️ Voltar ao Menu Admin", callback_data="admin_main")]
     ]
     
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Se veio de um botão, edita a mensagem.
+    if query:
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+    # Se veio de uma mensagem de texto (update.message existe), envia uma nova.
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
+        
     return MAIN_MENU
 
 # Pede o ID do jogador para resetar STATS/CLASSE/PROF

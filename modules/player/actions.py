@@ -11,6 +11,7 @@ from .premium import PremiumManager
 from .core import get_player_data, save_player_data
 from .inventory import add_item_to_inventory
 from modules import game_data
+from .stats import get_player_total_stats
 
 # ========================================
 # FUNÇÕES AUXILIARES DE TEMPO E TIPO
@@ -235,3 +236,36 @@ def use_pvp_entry(player_data: dict) -> bool:
 def add_pvp_entries(player_data: dict, amount: int):
     current_entries = get_pvp_entries(player_data)
     player_data["pvp_entries_left"] = current_entries + amount
+
+# ======================================================
+# --- NOVO: EFEITOS DE CONSUMÍVEIS (POÇÕES, ETC.) ---
+# ======================================================
+
+def heal_player(player_data: dict, amount: int):
+    """Cura o jogador, sem ultrapassar o HP máximo."""
+    total_stats = get_player_total_stats(player_data)
+    max_hp = total_stats.get('max_hp', 1)
+    current_hp = player_data.get('current_hp', 0)
+    
+    player_data['current_hp'] = min(max_hp, current_hp + amount)
+    # Garante que o HP não fica negativo por acidente
+    if player_data['current_hp'] < 0:
+        player_data['current_hp'] = 0
+
+def add_buff(player_data: dict, buff_info: dict):
+    """Adiciona um novo buff à lista de buffs ativos do jogador."""
+    if 'active_buffs' not in player_data or not isinstance(player_data['active_buffs'], list):
+        player_data['active_buffs'] = []
+    
+    # TODO: No futuro, podemos adicionar aqui lógica para acumular 
+    # ou substituir buffs do mesmo tipo. Por agora, apenas adicionamos.
+    
+    new_buff = {
+        "stat": buff_info.get("stat"),
+        "value": buff_info.get("value"),
+        "turns_left": buff_info.get("duration_turns")
+    }
+    
+    # Adiciona o novo buff apenas se ele for válido
+    if new_buff["stat"] and new_buff["turns_left"]:
+        player_data['active_buffs'].append(new_buff)

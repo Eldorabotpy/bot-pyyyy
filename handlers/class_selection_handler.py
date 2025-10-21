@@ -61,6 +61,7 @@ def _normalize_class_entry(class_key: str, cfg: dict) -> dict:
         "description": str(desc),
         "stat_modifiers": dict(mods) if isinstance(mods, dict) else {},
         "file_id_name": file_id_name if isinstance(file_id_name, str) else None,
+        "tier": cfg.get("tier", 1)
     }
 
 def _load_classes_dict() -> dict:
@@ -88,10 +89,11 @@ def _load_classes_list() -> list[dict]:
         out = []
         for k, v in raw.items():
             if isinstance(v, dict):
-                out.append(_normalize_class_entry(k, v))
-        # Ordena por nome
-        out.sort(key=lambda e: e["display_name"].lower())
+                if v.get('tier')  == 1:
+                    out.append(_normalize_class_entry(k, v))
         if out:
+            out.sort(key=lambda e: e["display_name"].lower())
+        
             return out
 
     # Fallback mínimo

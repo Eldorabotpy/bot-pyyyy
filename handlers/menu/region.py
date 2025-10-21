@@ -8,6 +8,14 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
 from modules import player_manager, game_data
 from modules.player.premium import PremiumManager
+from handlers.world_boss.engine import world_boss_manager, BOSS_STATS
+from modules.game_data.worldmap import WORLD_MAP
+from modules import file_ids as file_id_manager
+from handlers.menu.kingdom import show_kingdom_menu
+from modules.dungeons.registry import get_dungeon_for_region
+from modules.game_data.worldmap import WORLD_MAP
+from modules.game_data import monsters as monsters_data
+logger = logging.getLogger(__name__)
 
 # 🔎 Mídias (mapa/regiões). Suporta tanto file_id_manager quanto file_ids.
 try:
@@ -40,19 +48,16 @@ def _humanize_duration(seconds: int) -> str:
         return f"{mins} min"
     return f"{seconds} s"
 
+
 def _default_travel_seconds() -> int:
-    return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 600))
+    return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 30))
 
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
-    """Calcula o tempo de viagem já aplicando o perk do jogador."""
     dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
     base = int(dest_info.get("travel_time_seconds", _default_travel_seconds()))
-    
     premium = PremiumManager(player_data)
     mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
-    
     return max(0, int(round(base * mult)))
-
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     """
@@ -79,17 +84,14 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
 async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
+    
     user_id = query.from_user.id
-    chat_id = query.message.chat_id
-
-    # Finaliza viagem vencida (segurança pós-restart)
-    await _auto_finalize_travel_if_due(context, user_id)
-
+    chat_id = query.message.chat_id # <--- GARANTE QUE ESTA LINHA EXISTE
     player_data = player_manager.get_player_data(user_id) or {}
     current_location = player_data.get("current_location", "reino_eldora")
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
-    possible_destinations = (game_data.WORLD_MAP or {}).get(current_location, [])
+    
+    possible_destinations = WORLD_MAP.get(current_location, [])
 
     caption = (
         f"𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒆𝒎 <b>{region_info.get('display_name','Desconhecido')}</b>.\n"
@@ -98,14 +100,14 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = []
     for dest_key in possible_destinations:
-        dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {}) or {}
+        dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
         button = InlineKeyboardButton(
             f"{dest_info.get('emoji', '')} {dest_info.get('display_name', dest_key)}",
             callback_data=f"region_{dest_key}",
         )
         keyboard.append([button])
 
-    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data=f'open_region:{current_location}')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     try:
@@ -135,12 +137,6 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# =============================================================================
-# Constrói e envia o menu da REGIÃO (pós-viagem/teleporte).
-# =============================================================================
-# Em handlers/menu/region.py
-# SUBSTITUA a sua função send_region_menu por esta:
-
 async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -162,182 +158,235 @@ async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await send_region_menu(context, user_id, chat_id)
 
+async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        region_key = query.data.split(':')[1]
+    except IndexError:
+        await query.answer("Região não especificada.", show_alert=True)
+        return
+        
+    region_info = game_data.REGIONS_DATA.get(region_key, {})
+    if not region_info:
+        await query.answer("Informação da região não encontrada.", show_alert=True)
+        return
+        
+    # --- Monta a Mensagem de Informação ---
+    info_parts = [
+        f"ℹ️ <b>Sobre: {region_info.get('display_name', region_key)}</b>",
+        f"<i>{region_info.get('description', 'Nenhuma descrição disponível.')}</i>\n"
+    ]
+    
+    info_parts.append("<b>Ações Possíveis:</b>")
+    
+    # --- LÓGICA INTELIGENTE ---
+    # Se for o Reino, mostra as ações do Reino
+    if region_key == 'reino_eldora':
+        info_parts.append(" 🏇 - Viajar para outras regiões")
+        info_parts.append(" 🔰 - Aceder à Guilda")
+        info_parts.append(" 🛒 - Visitar o Mercados")
+        info_parts.append(" ⚒️ - Refino e Forja")
+        info_parts.append(" 👤 - Gerir o teu Personagem")
+        info_parts.append(" 🧧 - Participar em Eventos")
+    
+    # Se for outra região, mostra as ações de exploração
+    else:
+        monsters_in_region = monsters_data.MONSTERS_DATA.get(region_key, [])
+        
+        if region_info.get('resource'):
+            info_parts.append("- Coletar recursos")
+        
+        # Só mostra 'Caçar' se houver monstros
+        if monsters_in_region:
+            info_parts.append("- Caçar monstros")
+            
+        if get_dungeon_for_region(region_key):
+            info_parts.append("- Entrar em Calabouço")
+            
+        # Exemplo para o NPC, podes adicionar mais 'if's para outros NPCs
+        if region_key == 'floresta_sombria':
+            info_parts.append("- Visitar a Tenda do Alquimista")
+    
+    info_parts.append("") # Linha em branco
+
+    # --- Lógica para listar os monstros (só para regiões de caça) ---
+    if region_key != 'reino_eldora':
+        info_parts.append("<b>Criaturas na Região:</b>")
+        monsters_in_region = monsters_data.MONSTERS_DATA.get(region_key, [])
+        if not monsters_in_region:
+            info_parts.append("- <i>Nenhuma criatura catalogada.</i>")
+        else:
+            for monster in monsters_in_region:
+                info_parts.append(f"- {monster.get('name', 'Criatura Desconhecida')}")
+            
+    text = "\n".join(info_parts)
+    
+    # O callback do botão "Voltar" depende de onde o jogador está
+    back_callback = 'continue_after_action' if region_key == 'reino_eldora' else f"open_region:{region_key}"
+    keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data=back_callback)]]
+    
+    # Edita a mensagem para mostrar as informações
+    # Usamos try/except para o caso de a mensagem anterior não ter legenda (ser só texto)
+    try:
+        await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    except BadRequest:
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None):
     """
-    Envia a mensagem com a mídia (se existir) e os botões da região especificada.
+    Envia a mensagem com a mídia e os botões da região especificada.
     """
     print(">>> RASTREAMENTO: Entrou em send_region_menu")
     player_data = player_manager.get_player_data(user_id) or {}
     
-    # --- LÓGICA PARA DETERMINAR A REGIÃO ---
-    final_region_key = region_key
-    if not final_region_key:
-        final_region_key = player_data.get("current_location", "reino_eldora")
+    final_region_key = region_key or player_data.get("current_location", "reino_eldora")
     player_data['current_location'] = final_region_key
     
     region_info = (game_data.REGIONS_DATA or {}).get(final_region_key)
 
-    # --- Fallback para o Reino ---
     if not region_info or final_region_key == "reino_eldora":
         if show_kingdom_menu:
-            fake_update = Update(
-                update_id=0,
-                message=type("Message", (), {
-                    "from_user": type("User", (), {"id": user_id})(),
-                    "chat": type("Chat", (), {"id": chat_id})()
-                })()
-            )
+            fake_update = Update(update_id=0, message=type("Message", (), {"from_user": type("User", (), {"id": user_id})(), "chat": type("Chat", (), {"id": chat_id})()})())
             await show_kingdom_menu(fake_update, context)
         else:
             await context.bot.send_message(chat_id=chat_id, text="Você está no Reino de Eldora.", parse_mode="HTML")
         return
 
-    # ======================================================
-    # --- INÍCIO DA CORREÇÃO ---
-    # 1. Instanciamos o PremiumManager uma vez para otimizar as chamadas de perks.
-    # ======================================================
-    premium = PremiumManager(player_data)
+    # --- LÓGICA DO WORLD BOSS ---
+    is_boss_active = world_boss_manager.is_active
+    boss_location = world_boss_manager.boss_location
 
-    # --- Cálculos de Status ---
-    total_stats = player_manager.get_player_total_stats(player_data)
-    current_hp = int(player_data.get("current_hp", 0))
-    max_hp = int(total_stats.get("max_hp", 0))
-    current_energy = int(player_data.get("energy", 0))
-    max_energy = int(player_manager.get_player_max_energy(player_data)) # Esta função já usa o perk corretamente
+    if is_boss_active and final_region_key == boss_location:
+        # Se o boss está ativo NESTA região, mostra o menu especial
+        caption = (
+            f"‼️ **PERIGO IMINENTE** ‼️\n\n"
+            f"O **Demônio Dimensional** está nesta região!\n\n"
+            f"{world_boss_manager.get_status_text()}"
+        )
+        keyboard = [
+            [InlineKeyboardButton("⚔️ ATACAR O DEMÔNIO ⚔️", callback_data='wb_attack')],
+            [InlineKeyboardButton("👤 Personagem", callback_data='profile')],
+            [InlineKeyboardButton("🗺️ Ver Mapa", callback_data='travel')],
 
-    status_footer = (
-        f"\n\n═════════════ ◆◈◆ ══════════════\n"
-        f"❤️ 𝐇𝐏: {current_hp}/{max_hp}      "
-        f"⚡️ 𝐄𝐧𝐞𝐫𝐠𝐢𝐚: {current_energy}/{max_energy}"
-    )
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        file_data = media_ids.get_file_data(BOSS_STATS.get("media_key"))
+        if not file_data or not file_data.get("id"):
+            file_data = media_ids.get_file_data(f"regiao_{final_region_key}")
 
-    caption = (
-        f"Você está em <b>{region_info.get('display_name', 'Região Desconhecida')}</b>.\n"
-        f"O que deseja fazer?{status_footer}"
-    )
+    else:
+        # --- SENÃO, mostra o menu normal da região ---
+        premium = PremiumManager(player_data)
+        total_stats = player_manager.get_player_total_stats(player_data)
+        current_hp = int(player_data.get("current_hp", 0))
+        max_hp = int(total_stats.get("max_hp", 0))
+        current_energy = int(player_data.get("energy", 0))
+        max_energy = int(player_manager.get_player_max_energy(player_data))
+        status_footer = (
+            f"\n\n═════════════ ◆◈◆ ══════════════\n"
+            f"❤️ HP: {current_hp}/{max_hp}      "
+            f"⚡️ Energia: {current_energy}/{max_energy}"
+        )
+        caption = (
+            f"Você está em <b>{region_info.get('display_name', 'Região Desconhecida')}</b>.\n"
+            f"O que deseja fazer?{status_footer}"
+        )
 
-    # --- Montagem do Teclado ---
-    keyboard = []
-    keyboard.append([InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫 𝐌𝐨𝐧𝐬𝐭𝐫𝐨𝐬 ⚔️", callback_data=f"hunt_{final_region_key}")])
+        keyboard = []
 
-    try:
+        # --- NOVO: Botão do NPC Alquimista ---
+        # Se o jogador estiver na Floresta Sombria, mostra o botão do NPC
+        if final_region_key == 'floresta_sombria':
+            keyboard.append([InlineKeyboardButton("⛺ Visitar Tenda do Alquimista", callback_data='npc_trade:alquimista_floresta')])
+        
+        keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstros", callback_data=f"hunt_{final_region_key}")])
+        if PremiumManager(player_data).is_premium():
+            keyboard.append([InlineKeyboardButton("👑 Auto-Caça", callback_data="autohunt_start")]),
+        
         if build_region_dungeon_button:
-            keyboard.append([build_region_dungeon_button(final_region_key)])
-        else: raise NameError
-    except NameError:
-        keyboard.append([InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨 🏰", callback_data=f"dungeon_open:{final_region_key}")])
+            try:
+                keyboard.append([build_region_dungeon_button(final_region_key)])
+            except Exception:
+                keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
 
-    keyboard.append([InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦 👤", callback_data="profile")])
-    keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐫 𝐃𝐮𝐫𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞 📜", callback_data="restore_durability_menu")])
+        keyboard.append([InlineKeyboardButton("👤 Personagem", callback_data="profile")])
+        keyboard.append([InlineKeyboardButton("📜 Restaurar Durabilidade", callback_data="restore_durability_menu")])
+        keyboard.append([InlineKeyboardButton("ℹ️ Sobre a Região", callback_data=f"region_info:{final_region_key}")])
+        resource_id = final_region_key
+        if resource_id:
+            required_profession = game_data.get_profession_for_resource(resource_id)
+            player_prof = (player_data.get("profession", {}) or {}).get("type")
+            if required_profession and required_profession == player_prof:
+                profession_resources = (game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}).get('resources', {})
+                item_id_yielded = profession_resources.get(resource_id, resource_id)
+                item_yielded_info = (game_data.ITEMS_DATA or {}).get(item_id_yielded, {}) or {}
+                item_name = item_yielded_info.get("display_name", item_id_yielded.capitalize())
+                profession_info = (game_data.PROFESSIONS_DATA or {}).get(required_profession, {}) or {}
+                profession_emoji = profession_info.get("emoji", "✋")
+                
+                base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
+                speed_mult = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
+                duration_seconds = max(1, int(base_secs / max(0.25, speed_mult)))
+                human_time = _humanize_duration(duration_seconds)
+                energy_cost = int(premium.get_perk_value("gather_energy_cost", 1))
+                cost_txt = "grátis" if energy_cost == 0 else f"-{energy_cost} ⚡️"
 
-    resource_id = final_region_key
-    
-    if resource_id:
-        required_profession = game_data.get_profession_for_resource(resource_id)
-        prof_data = player_data.get("profession", {}) or {}
-        player_prof = prof_data.get("type")
+                keyboard.append([InlineKeyboardButton(
+                    f"{profession_emoji} Coletar {item_name} (~{human_time}, {cost_txt})",
+                    callback_data=f"collect_{final_region_key}"
+                )])
 
-        if required_profession and required_profession == player_prof:
-            profession_resources = (game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}).get('resources', {})
-            item_id_yielded = profession_resources.get(resource_id, resource_id)
-            item_yielded_info = (game_data.ITEMS_DATA or {}).get(item_id_yielded, {}) or {}
-            item_name = item_yielded_info.get("display_name", item_id_yielded.capitalize())
-            
-            profession_info = (game_data.PROFESSIONS_DATA or {}).get(required_profession, {}) or {}
-            profession_emoji = profession_info.get("emoji", "✋")
-            
-            base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-            
-            # ======================================================
-            # 2. CORREÇÃO: Usando o PremiumManager para buscar o perk de velocidade
-            # ======================================================
-            speed_mult = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
-            duration_seconds = max(1, int(base_secs / speed_mult))
-            human_time = _humanize_duration(duration_seconds)
+        keyboard.append([InlineKeyboardButton("🗺️ Ver Mapa", callback_data="travel")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        file_data = media_ids.get_file_data(f"regiao_{final_region_key}")
 
-            # ======================================================
-            # 3. CORREÇÃO: Usando o PremiumManager para buscar o perk de custo de energia
-            # ======================================================
-            energy_cost = int(premium.get_perk_value("gather_energy_cost", 1))
-            cost_txt = "grátis" if energy_cost == 0 else f"-{energy_cost} ⚡️"
-
-            keyboard.append([InlineKeyboardButton(
-                f"{profession_emoji} Coletar {item_name} (~{human_time}, {cost_txt})",
-                callback_data=f"collect_{final_region_key}"
-            )])
-
-    keyboard.append([InlineKeyboardButton("🗺️ 𝕍𝕖𝕣 𝕄𝕒𝕡𝕒 🗺️", callback_data="travel")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # --- Lógica de Envio com Fallback ---
-    file_id_key = f"regiao_{final_region_key}"
-    fd = media_ids.get_file_data(file_id_key) if media_ids and hasattr(media_ids, "get_file_data") else None
-
-    if fd and fd.get("id"):
-        try:
-            media_type = (fd.get("type") or "photo").lower()
+    # --- Lógica de Envio (comum para ambos os menus) ---
+    try:
+        if file_data and file_data.get("id"):
+            media_type = (file_data.get("type") or "photo").lower()
             if media_type == "video":
-                await context.bot.send_video(
-                    chat_id=chat_id, video=fd["id"],
-                    caption=caption, reply_markup=reply_markup, parse_mode="HTML"
-                )
+                await context.bot.send_video(chat_id=chat_id, video=file_data["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
             else:
-                await context.bot.send_photo(
-                    chat_id=chat_id, photo=fd["id"],
-                    caption=caption, reply_markup=reply_markup, parse_mode="HTML"
-                )
-            return
-        except BadRequest as e:
-            logging.warning(f"Falha ao enviar mídia para '{final_region_key}' (ID: {fd['id']}). Erro: {e}. Usando fallback de texto.")
-        except Exception as e:
-            logging.error(f"Erro inesperado ao enviar mídia para '{final_region_key}': {e}. Usando fallback de texto.")
+                await context.bot.send_photo(chat_id=chat_id, photo=file_data["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            raise ValueError("No valid media found, falling back to text.")
+    except Exception as e:
+        logger.warning(f"Falha ao enviar menu da região '{final_region_key}'. Erro: {e}. Usando fallback de texto.")
+        await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
 
-    await context.bot.send_message(
-        chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML"
-    )
     
     # =============================================================================
 # Validação da viagem e início do cronômetro
 # =============================================================================
 def _is_neighbor(world_map: dict, cur: str, dest: str) -> bool:
+    """Verifica se há uma rota de 'cur' para 'dest' no mapa principal."""
     if cur == dest:
         return True
-    neigh = (world_map or {}).get(cur, []) or []
-    if dest in neigh:
-        return True
-    cur_info = (game_data.REGIONS_DATA or {}).get(cur, {}) or {}
-    if dest in (cur_info.get("neighbors") or []):
-        return True
-    return False
-
+    neighbors_of_current_location = (world_map or {}).get(cur, [])
+    return dest in neighbors_of_current_location
 
 # Em handlers/menu/region.py
 
 async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Callback 'region_<id>': valida e inicia a viagem temporizada.
-    Se o tempo for 0 (premium), teleporta na hora.
-    """
     q = update.callback_query
     await q.answer()
-
     user_id = q.from_user.id
-    chat_id = q.message.chat.id
-
+    chat_id = q.message.chat_id
     data = (q.data or "")
     if not data.startswith("region_"):
         await q.answer("Destino inválido.", show_alert=True)
         return
-    dest_key = data.replace("region_", "", 1)
-
+    dest_key = (q.data or "").replace("region_", "", 1)
     player = player_manager.get_player_data(user_id) or {}
     cur = player.get("current_location", "reino_eldora")
 
     if dest_key not in (game_data.REGIONS_DATA or {}):
         await q.answer("Região desconhecida.", show_alert=True)
         return
-
-    if not _is_neighbor(getattr(game_data, "WORLD_MAP", {}), cur, dest_key):
+    
+    if not _is_neighbor(WORLD_MAP, cur, dest_key):
         await q.answer("Você não pode viajar direto para lá.", show_alert=True)
         return
 
@@ -690,3 +739,5 @@ open_region_handler = CallbackQueryHandler(open_region_callback, pattern=r"^open
 # Atalhos locais de durabilidade
 restore_durability_menu_handler = CallbackQueryHandler(show_restore_durability_menu, pattern=r"^restore_durability_menu$")
 restore_durability_fix_handler  = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_.+$")
+
+region_info_handler = CallbackQueryHandler(region_info_callback, pattern=r"^region_info:.*$")

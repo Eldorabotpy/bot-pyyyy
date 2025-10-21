@@ -4,13 +4,18 @@ import random
 import re
 import unicodedata
 import logging
+import asyncio
 from datetime import datetime, timezone
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+# --- IMPORTAÇÕES CORRIGIDAS ---
+from typing import Optional
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, CallbackQuery
 from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.error import BadRequest
 
 from modules import player_manager, game_data
 from modules import file_ids as file_id_manager
 from handlers.utils import format_combat_message
+from modules.player.premium import PremiumManager
 
 
 logger = logging.getLogger(__name__)
@@ -197,18 +202,19 @@ def _build_combat_details_from_template(mon: dict) -> dict:
 # =========================
 def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
     """
-    Custo de energia para caçar:
-      - 1) padrão global: game_data.HUNT_ENERGY_COST (default = 1)
-      - 2) override por região: REGIONS_DATA[region]['hunt_energy_cost']
-      - 3) override por perk: 'hunt_energy_cost' (por plano premium)
+    Custo de energia para caçar, agora com bónus premium a funcionar.
     """
     base = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
     base = int(((getattr(game_data, "REGIONS_DATA", {}) or {}).get(region_key, {}) or {}).get("hunt_energy_cost", base))
-    try:
-        perk_val = int(player_manager.get_player_perk_value(player_data, "hunt_energy_cost", base))
-    except Exception:
-        perk_val = base
+
+    # --- CORREÇÃO APLICADA AQUI ---
+    # Usamos o PremiumManager para obter o perk
+    premium = PremiumManager(player_data)
+    perk_val = int(premium.get_perk_value("hunt_energy_cost", base))
+    # --- FIM DA CORREÇÃO ---
+
     return max(0, perk_val)
+
 
 # =========================
 # Mídia do monstro
@@ -282,106 +288,72 @@ def _get_monster_media(mon_tpl: dict, region_key: str, is_elite: bool):
 
 # =========================
 # Handler principal
-# =========================
-# Em handlers/hunt_handler.py
 
-async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("\n>>> O HANDLER 'hunt_callback' FOI ATIVADO! <<<\n")
+
+async def start_hunt(user_id: int, chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_auto_mode: bool, region_key: str, query: Optional[CallbackQuery] = None):
+    """Função núcleo que inicia uma única caçada, seja manual ou automática."""
+    from handlers.combat.main_handler import combat_callback
     
-    query = update.callback_query
-    await query.answer()
-
-    user_id = query.from_user.id
-    chat_id = query.message.chat_id
-
     pdata = player_manager.get_player_data(user_id)
-    if not pdata:
-        await context.bot.send_message(chat_id, "Crie um personagem com /start.")
-        return
-
-    st = pdata.get("player_state") or {"action": "idle"}
-    if st.get("action") not in (None, "idle"):
-        await query.answer("Você está ocupado em outra ação no momento.", show_alert=True)
-        return
-
-    region_key = (query.data or "").replace("hunt_", "", 1)
-    if region_key not in (getattr(game_data, "REGIONS_DATA", {}) or {}):
-        await query.answer("Região inválida para caça.", show_alert=True)
-        return
-
-    # ====== DEBITO DE ENERGIA ======
+    
     cost = _hunt_energy_cost(pdata, region_key)
     if cost > 0:
         if not player_manager.spend_energy(pdata, cost):
-            await query.answer(f"Energia insuficiente para caçar (precisa de {cost}).", show_alert=True)
+            if is_auto_mode:
+                pdata['player_state'] = {'action': 'idle'}
+                player_manager.save_player_data(user_id, pdata)
+                await context.bot.send_message(chat_id, "⚡️ Sua energia acabou! Caça automática finalizada.")
+            elif query:
+                await query.answer(f"Energia insuficiente para caçar (precisa de {cost}).", show_alert=True)
             return
-        # salva o débito imediatamente
         player_manager.save_player_data(user_id, pdata)
 
-    total_stats = player_manager.get_player_total_stats(pdata)
-    luck_stat = int(total_stats.get("luck", 5))
-    player_level = int(pdata.get("level", 1))
-
-    # escolhe monstro
-    tpl = _pick_monster_template(region_key, player_level)
-
-    # rola elite
-    is_elite = _roll_is_elite(luck_stat)
+    tpl = _pick_monster_template(region_key, int(pdata.get("level", 1)))
+    is_elite = _roll_is_elite(int(player_manager.get_player_total_stats(pdata).get("luck", 5)))
     if is_elite:
         tpl = _apply_elite_scaling(tpl)
 
-    # detalhes
     details = _build_combat_details_from_template(tpl)
     details["region_key"] = region_key
+    if is_auto_mode:
+        details["auto_mode"] = True
     
-    # estado in_combat
-    pdata["player_state"] = {
-        "action": "in_combat",
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "details": details,
-    }
-    pdata["last_chat_id"] = chat_id
+    pdata["player_state"] = {"action": "in_combat", "details": details}
     player_manager.save_player_data(user_id, pdata)
-
+    
     caption = format_combat_message(pdata)
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data='combat_attack'),
-         InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='combat_flee')]
-    ])
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🛑 PARAR AUTO-CAÇA", callback_data='autohunt_stop')]]) if is_auto_mode else InlineKeyboardMarkup([[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data='combat_attack'), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='combat_flee')]])
 
-    # Apaga a mensagem do menu anterior
-    try:
-        await query.delete_message()
-    except Exception:
-        pass
+    if query:
+        try: await query.delete_message()
+        except Exception: pass
 
-    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    # ## INÍCIO DA LÓGICA ROBUSTA DE ENVIO DE MÍDIA ##
-    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    
-    media = _get_monster_media(tpl, region_key, is_elite)
-
-    # --- PLANO A: Tentar enviar com mídia ---
+    media = _get_monster_media(tpl, region_key, details.get("is_elite", False))
     if media and media.get("id"):
-        fid = media["id"]
-        mtype = (media.get("type") or "photo").lower()
         try:
-            if mtype == "video":
-                await context.bot.send_video(chat_id=chat_id, video=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
+            if (media.get("type") or "photo").lower() == "video":
+                await context.bot.send_video(chat_id=chat_id, video=media["id"], caption=caption, reply_markup=kb, parse_mode="HTML")
             else:
-                await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
-            
-            # Se o envio com mídia foi bem-sucedido, a função termina aqui.
-            return
-        
+                await context.bot.send_photo(chat_id=chat_id, photo=media["id"], caption=caption, reply_markup=kb, parse_mode="HTML")
         except Exception as e:
-            logger.warning(f"Falha ao enviar mídia do monstro (ID: {fid}). Erro: {e}. Usando fallback de texto.")
-            # Se falhou, a execução continua para o Plano B abaixo.
+            logger.warning(f"Falha ao enviar mídia do monstro: {e}. Usando fallback.")
+            await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=kb, parse_mode="HTML")
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=kb, parse_mode="HTML")
 
-    # --- PLANO B: Fallback para mensagem de texto ---
-    # Isto só é executado se não houver mídia OU se o envio da mídia falhar.
-    await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=kb, parse_mode="HTML")
+    if is_auto_mode:
+        fake_update = Update(update_id=0, callback_query=query)
+        await asyncio.sleep(2)
+        await combat_callback(fake_update, context, action='combat_attack')
 
-    print("Checkpoint 7: Mensagem enviada (ou tentativa). Fim do handler.")
+async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler que é chamado pelo botão 'Caçar' manual."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    chat_id = query.message.chat.id
+    region_key = (query.data or "").replace("hunt_", "", 1)
     
-hunt_handler = CallbackQueryHandler(hunt_callback, pattern=r"^hunt_[A-Za-z0-9_]+$")
+    await start_hunt(user_id, chat_id, context, is_auto_mode=False, region_key=region_key, query=query)
+
+hunt_handler = CallbackQueryHandler(hunt_callback, pattern=r"^hunt_")

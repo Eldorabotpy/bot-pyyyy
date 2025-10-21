@@ -1,6 +1,5 @@
 # handlers/class_evolution_handler.py
 from __future__ import annotations
-
 import logging
 from typing import Dict, Any, List, Tuple
 
@@ -8,8 +7,16 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from modules import player_manager
-from modules import file_ids  # ✅ para buscar vídeo/foto cadastrados
+from modules import file_ids
 
+# --- IMPORTAÇÕES DE DADOS ATUALIZADAS ---
+from modules.game_data import classes as classes_data
+from modules.game_data import items as items_data
+from modules.game_data import class_evolution as evo_data
+from modules.game_data import skills as skills_data 
+from handlers.utils import format_combat_message
+from modules import class_evolution_service
+from modules.game_data import monsters as monsters_data
 # Tabelas base
 try:
     from modules.game_data.classes import CLASSES_DATA as _CLASSES_DATA
@@ -102,6 +109,8 @@ def _all_options_for_class(curr_class_key: str) -> List[dict]:
 
 # ============ Renders ============
 
+# Em handlers/class_evolution_handler.py
+
 async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_new: bool = False) -> None:
     user_id = update.effective_user.id
     pdata = player_manager.get_player_data(user_id) or {}
@@ -122,22 +131,25 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         ""
     ]
 
+    # Bloco para quando não há evoluções disponíveis
     if not opts:
         text = "\n".join(header + [
             "Não há ramos de evolução configurados para sua classe atual.",
         ])
-        if update.callback_query and not as_new:
+        query = update.callback_query
+        if query and not as_new:
             try:
-                await update.callback_query.edit_message_text(
-                    text, reply_markup=_footer_keyboard(), parse_mode="HTML"
-                )
+                await query.edit_message_text(text, reply_markup=_footer_keyboard(), parse_mode="HTML")
                 return
             except Exception:
                 pass
         await update.effective_chat.send_message(text, reply_markup=_footer_keyboard(), parse_mode="HTML")
         return
 
-    intro_sent = False
+    # Constrói uma única mensagem com todas as opções
+    full_text_parts = header
+    full_keyboard = []
+
     for op in opts:
         to_key = op["to"]
         to_cfg = _CLASSES_DATA.get(to_key, {})
@@ -148,40 +160,46 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
             pdata, dict(op.get("required_items") or {}), int(op.get("min_level", 0))
         )
 
-        block: List[str] = []
-        if not intro_sent:
-            block.extend(header)
-            intro_sent = True
-
-        block.append("— — — — —")
-        block.append(f"{to_emoji} <b>{to_name}</b>  <i>({op.get('tier', '').upper()})</i>")
+        full_text_parts.append("──────────")
+        full_text_parts.append(f"{to_emoji} <b>{to_name}</b> <i>({op.get('tier', '').upper()})</i>")
         if op.get("desc"):
-            block.append(f"• {op['desc']}")
-        prev = op.get("preview_mods") or {}
-        if prev:
-            pv = ", ".join([f"{k}: {v}" for k, v in prev.items()])
-            block.append(f"• Prévia: {pv}")
-        block.append("• Requisitos:")
-        block.extend([f"   {ln}" for ln in req_lines])
+            full_text_parts.append(f"• {op['desc']}")
 
-        kb = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("⚡ Evoluir", callback_data=f"evo_do:{to_key}")]]
-            if eligible else
-            [[InlineKeyboardButton("❌ Requisitos pendentes", callback_data="evo_refresh")]]
-        )
-
-        text = "\n".join(block)
-
-        if update.callback_query and not as_new:
-            try:
-                await update.callback_query.edit_message_text(text, reply_markup=kb, parse_mode="HTML")
-            except Exception:
-                await update.effective_chat.send_message(text, reply_markup=kb, parse_mode="HTML")
+        # Mostra a nova habilidade desbloqueada
+        skill_id = op.get("unlocks_skill")
+        if skill_id and skill_id in skills_data.SKILL_DATA:
+            skill_info = skills_data.SKILL_DATA[skill_id]
+            skill_name = skill_info.get("display_name", "Habilidade")
+            skill_desc = skill_info.get("description", "")
+            full_text_parts.append(f"🎁 <b>Habilidade:</b> {skill_name} - <i>{skill_desc}</i>")
+        
+        full_text_parts.append("\n<b>Requisitos:</b>")
+        full_text_parts.extend([f"  {ln}" for ln in req_lines])
+        
+        if eligible:
+            full_keyboard.append([InlineKeyboardButton(f"⚡ Evoluir para {to_name}", callback_data=f"evo_do:{to_key}")])
         else:
-            await update.effective_chat.send_message(text, reply_markup=kb, parse_mode="HTML")
+            full_keyboard.append([InlineKeyboardButton("❌ Requisitos Pendentes", callback_data="evo_refresh")])
+        
+        full_text_parts.append("") # Espaçamento
 
-    await update.effective_chat.send_message("— — —", reply_markup=_footer_keyboard(), parse_mode="HTML")
+    full_text_parts.append("──────────")
+    full_keyboard.extend(_footer_keyboard().inline_keyboard)
 
+    final_text = "\n".join(full_text_parts)
+    final_keyboard = InlineKeyboardMarkup(full_keyboard)
+
+    # Lógica para enviar ou editar a mensagem única
+    query = update.callback_query
+    if query and not as_new:
+        try:
+            await query.edit_message_text(final_text, reply_markup=final_keyboard, parse_mode="HTML")
+        except Exception:
+            try: await query.delete_message()
+            except Exception: pass
+            await update.effective_chat.send_message(final_text, reply_markup=final_keyboard, parse_mode="HTML")
+    else:
+        await update.effective_chat.send_message(final_text, reply_markup=final_keyboard, parse_mode="HTML")
 
 # ============ Actions ============
 
@@ -219,83 +237,76 @@ async def _send_evolution_media(chat, class_key: str, caption: str | None = None
             logger.warning("[EVOL_MEDIA] Falha ao enviar %s (%s): %s", key, fd.get("type"), e)
     return False
 
-
 async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    if q:
-        await q.answer()
+    query = update.callback_query
+    await query.answer()
     user_id = update.effective_user.id
-    pdata = player_manager.get_player_data(user_id) or {}
-    lvl = _level(pdata)
-    curr_key = (pdata.get("class") or pdata.get("class_tag") or "").lower()
+    chat_id = update.effective_chat.id
 
-    data = (q.data if q else "") or ""
-    _, to_key = data.split(":", 1)
+    _, to_key = query.data.split(":", 1)
 
-    # Validação final (por nível/itens)
-    target = None
-    for op in get_evolution_options(curr_key, lvl):
-        if op.get("to") == to_key:
-            target = op
+    # 1. Chama o nosso serviço para iniciar a provação (ele consome os itens)
+    result = class_evolution_service.start_evolution_trial(user_id, to_key)
+
+    # Se falhar (falta de itens, etc.), avisa o jogador
+    if not result.get("success"):
+        await query.answer(result.get("message", "Não foi possível iniciar a provação."), show_alert=True)
+        return
+
+    # 2. Se for bem-sucedido, prepara a batalha de teste
+    monster_id = result.get("trial_monster_id")
+    if not monster_id:
+        await query.answer("Erro: Monstro da provação não configurado.", show_alert=True)
+        return
+        
+    # Procura o monstro no nosso arquivo de monstros
+    monster_template = None
+    for mob in monsters_data.MONSTERS_DATA.get("_evolution_trials", []):
+        if mob.get("id") == monster_id:
+            monster_template = mob
             break
-    if not target:
-        await update.effective_chat.send_message(
-            "❌ Opção de evolução não disponível no seu nível atual.",
-            reply_markup=_footer_keyboard(),
-            parse_mode="HTML",
-        )
+    
+    if not monster_template:
+        await query.answer(f"Erro: Monstro de provação '{monster_id}' não encontrado nos dados.", show_alert=True)
         return
 
-    ok, _ = _req_check(
-        pdata, dict(target.get("required_items") or {}), int(target.get("min_level", 0))
-    )
-    if not ok:
-        await update.effective_chat.send_message(
-            "❌ Requisitos não atendidos.", reply_markup=_footer_keyboard(), parse_mode="HTML"
-        )
-        return
+    # 3. Inicia o combate
+    pdata = player_manager.get_player_data(user_id)
+    
+    # Monta os detalhes do combate com a "marcação" especial
+    combat_details = {
+        "monster_name":       monster_template.get("name", "Guardião"),
+        "monster_hp":         int(monster_template.get("hp", 100)),
+        "monster_max_hp":     int(monster_template.get("hp", 100)),
+        "monster_attack":     int(monster_template.get("attack", 10)),
+        "monster_defense":    int(monster_template.get("defense", 10)),
+        "monster_initiative": int(monster_template.get("initiative", 10)),
+        "monster_luck":       int(monster_template.get("luck", 10)),
+        "battle_log":         ["Você enfrenta o guardião da sua nova classe em uma batalha de provação!"],
+        
+        # A "marcação" especial que o combat_handler vai procurar
+        "evolution_trial": {
+            "target_class": to_key
+        }
+    }
 
-    # Debita itens
-    req = dict(target.get("required_items") or {})
-    inv = pdata.get("inventory") or pdata.get("inventario") or {}
-    if isinstance(inv, dict):
-        for iid, need in req.items():
-            inv[iid] = max(0, int(inv.get(iid, 0)) - int(need))
-        pdata["inventory"] = inv
-    elif isinstance(inv, list):
-        for iid, need in req.items():
-            rest = int(need)
-            for st in inv:
-                sid = st.get("id") or st.get("item_id")
-                if sid != iid:
-                    continue
-                qtty = int(st.get("qty", 1))
-                take = min(qtty, rest)
-                st["qty"] = qtty - take
-                rest -= take
-                if rest <= 0:
-                    break
-        pdata["inventory"] = [s for s in inv if int(s.get("qty", 0)) > 0]
-
-    # Aplica classe nova
-    pdata["class"] = to_key
-    pdata["class_tag"] = to_key
+    pdata["player_state"] = {"action": "in_combat", "details": combat_details}
     player_manager.save_player_data(user_id, pdata)
+    
+    # Envia a mensagem de combate
+    caption = format_combat_message(pdata)
+    kb = [
+        [InlineKeyboardButton("⚔️ Atacar", callback_data="combat_attack"), InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu")],
+        InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"),
+        [InlineKeyboardButton("🏃 Fugir", callback_data="combat_flee")]
+    ]
 
-    # 🎬 Tenta mandar o vídeo de evolução
-    to_cfg = _CLASSES_DATA.get(to_key, {})
-    pretty = f"{to_cfg.get('emoji','✨')} <b>{to_cfg.get('display_name', to_key.title())}</b>"
-    sent = await _send_evolution_media(update.effective_chat, to_key, caption=f"🎉 Evolução concluída: {pretty}")
-
-    # Mensagem de texto (sempre manda)
-    await update.effective_chat.send_message(
-        f"🎉 Você evoluiu para {pretty}!",
-        parse_mode="HTML",
-    )
-
-    # Reabre o menu
-    await _render_menu(update, context, as_new=True)
-
+    try:
+      await query.delete_message()
+    except Exception:
+      pass
+      
+    await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 # ============ Exports (handlers) ============
 

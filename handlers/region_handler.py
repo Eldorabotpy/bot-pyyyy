@@ -1,13 +1,17 @@
-# handlers/menu/region.py
+# handlers/region_handler.py
 
+import logging
 import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data
-from modules import file_ids as file_id_manager  # usa seu JSON de mídias
+from modules import file_ids as file_id_manager
 from handlers.menu.kingdom import show_kingdom_menu
 from modules.dungeons.registry import get_dungeon_for_region
+from modules.player.premium import PremiumManager
+from world_boss.engine import world_boss_manager, BOSS_STATS
 
+logger = logging.getLogger(__name__)
 
 def _humanize_duration(seconds: int) -> str:
     seconds = int(seconds)
@@ -24,13 +28,12 @@ def _default_travel_seconds() -> int:
 def _get_travel_time_seconds(cur_key: str, dest_key: str, player: dict) -> int:
     dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {}) or {}
     base = int(dest_info.get("travel_time_seconds", _default_travel_seconds()))
-    try:
-        mult = float(player_manager.get_player_perk_value(player, "travel_time_multiplier", 1.0))
-    except Exception:
-        mult = 1.0
+    
+    premium = PremiumManager(player)
+    mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
+
     secs = max(0, int(round(base * mult)))
     return secs
-
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     """
@@ -114,6 +117,8 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 # Constrói e envia o menu da REGIÃO (pós-viagem/teleporte).
 # =============================================================================
+# Em handlers/menu/region.py
+
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int):
     # Sempre tenta destravar antes de mostrar a região
     await _auto_finalize_travel_if_due(context, user_id)
@@ -123,7 +128,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
     region_info = (game_data.REGIONS_DATA or {}).get(region_key)
 
     if not region_info or region_key == 'reino_eldora':
-        # fallback: volta pro menu do reino
+        # fallback para o menu do reino (código original inalterado)
         fake_update = Update(
             update_id=0,
             message=type('Message', (), {
@@ -134,70 +139,92 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         await show_kingdom_menu(fake_update, context)
         return
 
-    total_stats = player_manager.get_player_total_stats(player_data)
-    current_hp = int(player_data.get('current_hp', 0))
-    max_hp = int(total_stats.get('max_hp', 0))
-    current_energy = int(player_data.get('energy', 0))
-    max_energy = int(player_manager.get_player_max_energy(player_data))
+    # --- NOVO: LÓGICA DO WORLD BOSS ---
+    is_boss_active = world_boss_manager.is_active
+    boss_location = world_boss_manager.boss_location
 
-    status_bar = f"\n\n❤️ 𝐇𝐏: {current_hp}/{max_hp}   ⚡️ 𝐄𝐧𝐞𝐫𝐠𝐢𝐚: {current_energy}/{max_energy}"
-
-    caption = (
-        f"Você está em <b>{region_info.get('display_name', 'Região Desconhecida')}</b>.\n"
-        f"O que deseja fazer?{status_bar}"
-    )
-
-    keyboard = []
-    resource_id = region_info.get('resource')
-    collect_row = None
-    if resource_id:
-        required_profession = game_data.get_profession_for_resource(resource_id)
-        prof_data = player_data.get('profession', {}) or {}
-        player_prof = prof_data.get('type')
-
-        if required_profession and required_profession == player_prof:
-            item_info = (game_data.ITEMS_DATA or {}).get(resource_id, {}) or {}
-            item_name = item_info.get('display_name', resource_id.capitalize())
-            profession_info = (game_data.PROFESSIONS_DATA or {}).get(required_profession, {}) or {}
-            profession_emoji = profession_info.get('emoji', '✋')
-
-            base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-            try:
-                speed_mult = float(player_manager.get_player_perk_value(player_data, 'gather_speed_multiplier', 1.0))
-            except Exception:
-                speed_mult = 1.0
-            speed_mult = max(0.25, min(4.0, speed_mult))
-            duration_seconds = max(1, int(base_secs / speed_mult))
-            human_time = _humanize_duration(duration_seconds)
-
-            energy_cost = int(player_manager.get_player_perk_value(player_data, 'gather_energy_cost', 1))
-            cost_txt = "grátis" if energy_cost == 0 else f"-{energy_cost} ⚡️"
-
-            collect_row = [InlineKeyboardButton(
-                f"{profession_emoji} Coletar {item_name} (~{human_time}, {cost_txt})",
-                callback_data=f"collect_{region_key}"
-            )]
-
-    keyboard.append([InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫 𝐌𝐨𝐧𝐬𝐭𝐫𝐨𝐬 ⚔️", callback_data=f'hunt_{region_key}')])
-
-
-    keyboard.append([InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦 👤", callback_data='profile')])
-
-    if collect_row:
-        keyboard.append(collect_row)
-
-    keyboard.append([InlineKeyboardButton("🗺️ 𝐕𝐞𝐫 𝐌𝐚𝐩𝐚 🗺️", callback_data='travel')])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    file_id_key = f"regiao_{region_key}"
-    file_data = file_id_manager.get_file_data(file_id_key)
-
-    if file_data and file_data.get("id"):
-        await context.bot.send_photo(
-            chat_id=chat_id, photo=file_data["id"],
-            caption=caption, reply_markup=reply_markup, parse_mode='HTML'
+    # Se o boss está ativo NESTA região, mostra o menu especial
+    if is_boss_active and region_key == boss_location:
+        caption = (
+            f"‼️ **PERIGO IMINENTE** ‼️\n\n"
+            f"O **Demônio Dimensional** está nesta região!\n\n"
+            f"{world_boss_manager.get_status_text()}"
         )
+        keyboard = [
+            [InlineKeyboardButton("⚔️ ATACAR O DEMÔNIO ⚔️", callback_data='wb_attack')],
+            [InlineKeyboardButton("👤 Personagem", callback_data='profile')],
+            [InlineKeyboardButton("🗺️ Ver Mapa", callback_data='travel')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Tenta obter a media do boss; se não houver, usa a da região como fallback
+        file_data = file_id_manager.get_file_data(BOSS_STATS.get("media_key"))
+        if not file_data or not file_data.get("id"):
+            file_data = file_id_manager.get_file_data(f"regiao_{region_key}")
+
+    # --- SENÃO, mostra o menu normal da região ---
     else:
+        total_stats = player_manager.get_player_total_stats(player_data)
+        current_hp = int(player_data.get('current_hp', 0))
+        max_hp = int(total_stats.get('max_hp', 0))
+        current_energy = int(player_data.get('energy', 0))
+        max_energy = int(player_manager.get_player_max_energy(player_data))
+        status_bar = f"\n\n❤️ HP: {current_hp}/{max_hp}   ⚡️ Energia: {current_energy}/{max_energy}"
+        caption = (
+            f"Você está em <b>{region_info.get('display_name', 'Região Desconhecida')}</b>.\n"
+            f"O que deseja fazer?{status_bar}"
+        )
+
+        keyboard = []
+        # Botão de Caça Normal
+        keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstros", callback_data=f'hunt_{region_key}')])
+
+        # Botão de Coleta (com correção de bug)
+        resource_id = region_info.get('resource')
+        if resource_id:
+            required_profession = game_data.get_profession_for_resource(resource_id)
+            player_prof = (player_data.get('profession', {}) or {}).get('type')
+            
+            if required_profession and required_profession == player_prof:
+                item_info = (game_data.ITEMS_DATA or {}).get(resource_id, {}) or {}
+                item_name = item_info.get('display_name', resource_id.capitalize())
+                profession_info = (game_data.PROFESSIONS_DATA or {}).get(required_profession, {}) or {}
+                profession_emoji = profession_info.get('emoji', '✋')
+                
+                # --- CORREÇÃO DE BUG: Usa PremiumManager para perks de coleta ---
+                premium = PremiumManager(player_data)
+                base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
+                speed_mult = float(premium.get_perk_value('gather_speed_multiplier', 1.0))
+                duration_seconds = max(1, int(base_secs / max(0.25, speed_mult)))
+                human_time = _humanize_duration(duration_seconds)
+
+                energy_cost = int(premium.get_perk_value('gather_energy_cost', 1))
+                cost_txt = "grátis" if energy_cost == 0 else f"-{energy_cost}⚡️"
+
+                keyboard.append([InlineKeyboardButton(
+                    f"{profession_emoji} Coletar {item_name} (~{human_time}, {cost_txt})",
+                    callback_data=f"collect_{region_key}"
+                )])
+        
+        keyboard.append([InlineKeyboardButton("👤 Personagem", callback_data='profile')])
+        keyboard.append([InlineKeyboardButton("🗺️ Ver Mapa", callback_data='travel')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        file_data = file_id_manager.get_file_data(f"regiao_{region_key}")
+
+    # --- Lógica de envio da mensagem (comum para ambos os menus) ---
+    try:
+        if file_data and file_data.get("id"):
+            await context.bot.send_photo(
+                chat_id=chat_id, photo=file_data["id"],
+                caption=caption, reply_markup=reply_markup, parse_mode='HTML'
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode='HTML'
+            )
+    except Exception as e:
+        # Fallback final se o envio com foto falhar por algum motivo
+        logger.warning(f"Falha ao enviar menu da região '{region_key}'. Erro: {e}. Usando fallback de texto.")
         await context.bot.send_message(
             chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode='HTML'
         )

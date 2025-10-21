@@ -15,6 +15,7 @@ from handlers.menu.region import (
     open_region_handler,
     restore_durability_menu_handler,
     restore_durability_fix_handler,
+    region_info_handler,
 )
 
 # --- Grupo 3: Calabouços (Dungeons) - Usando o sistema unificado ---
@@ -23,6 +24,7 @@ from modules.dungeons.runtime import (
     dungeon_pick_handler,
 )
 
+from handlers.npc_handler import all_npc_handlers
 
 def register_regions_handlers(application: Application):
     """Regista os handlers de regiões, viagens, coleta e calabouços."""
@@ -38,7 +40,12 @@ def register_regions_handlers(application: Application):
     application.add_handler(open_region_handler)
     application.add_handler(restore_durability_menu_handler)
     application.add_handler(restore_durability_fix_handler)
-    
+    application.add_handler(region_info_handler)
+
     # --- Grupo 3: Calabouços (Dungeons) ---
     application.add_handler(dungeon_open_handler)
     application.add_handler(dungeon_pick_handler)
+
+    for handler in all_npc_handlers:
+        application.add_handler(handler)
+

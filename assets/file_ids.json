@@ -1,7 +1,15 @@
 {
+  "/cancelar": {
+    "id": "BAACAgEAAxkBAAINh2jvxBZ1yVdDz_ytG7kYC349FxmoAAIwBgACuOeARz786Hc_DkhPNgQ",
+    "type": "video"
+  },
   "/menu": {
     "id": "AgACAgEAAxkBAAIBLGja_hvVzvFFISYfX7YJVDzuvwAB3gACSq8xG_i5wUSUviFeVBjGXwEAAwIAA3kAAzYE",
     "type": "video"
+  },
+  "VICTORY_PHOTO_ID": {
+    "id": "AgACAgEAAxkBAAIW52jztXfEWirRJSoo9yUx5pjGQ7u_AAInC2sbR-agR7yizwIUvB1jAQADAgADeQADNgQ",
+    "type": "photo"
   },
   "abelha_gigante_rainha_media": {
     "id": "BAACAgEAAxkBAAIFuGjoUhuHyBN6waO5MlPRYzqrulj_AALpBwACcR8gREORl4iFsSjJNgQ",
@@ -12,11 +20,11 @@
     "type": "video"
   },
   "anciao_floresta_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAIK52jt8mnfCc6nEEPbrnxnUIObi-jQAAL4BgACVVNwR8nurLkjmVqDNgQ",
     "type": "video"
   },
   "aranha_gigante_da_tocaia_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAIK32jt8dgfsLcCYhDFntkTlb_sZBy_AAL3BgACVVNwR4-_XkgsH6ZuNgQ",
     "type": "video"
   },
   "automato_defeito": {
@@ -52,11 +60,11 @@
     "type": "video"
   },
   "classe_berserker_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAIOjmjwI5se1_h9uUeWVCD-WED02u1BAAKDBgACuOeAR2g5olqYGpKRNgQ",
     "type": "video"
   },
   "classe_cacador_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAINjWjvxFlBGENfKh5H-QSLxVt8n2fiAAIxBgACuOeAR_KZk-L0bNdQNgQ",
     "type": "video"
   },
   "classe_guerreiro_media": {
@@ -115,8 +123,12 @@
     "id": "file_ids",
     "type": "video"
   },
+  "demonio_dimensional_media": {
+    "id": "AgACAgEAAxkBAAIIsWjsRCWXOVakS3EK_udBmBYxQCviAAImC2sb8kVgR3VFLO9qwm7UAQADAgADeQADNgQ",
+    "type": "photo"
+  },
   "desmontagem_menu_image": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIIDGjrE6kT7O3K0YeOTc4uJN1a_ur5AAJpC2sb-3VYR7QGf2YrGwUVAQADAgADeQADNgQ",
     "type": "photo"
   },
   "dragao_negro_media": {
@@ -140,11 +152,11 @@
     "type": "video"
   },
   "ent_protetor_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAIK12jt8X5sgKBra8_FA5n4pjQQ6CXgAAL2BgACVVNwR4hKLWUHkrkiNgQ",
     "type": "video"
   },
   "enxame_de_vagalumes_cortantes_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAIKwGjt73gcjvmPDqzUsIBC7_UB8Qb7AALzBgACVVNwR4bFhWRJCTHsNgQ",
     "type": "video"
   },
   "espantalho_vivo_media": {
@@ -183,6 +195,10 @@
     "id": "BAACAgEAAxkBAAOZaNrfYTpw4BC9iEiTb4huLfrHk7EAAvUEAAL6kslHIb5ZWYRF2d02BA",
     "type": "video"
   },
+  "goblin_rei_media": {
+    "id": "AgACAgEAAxkBAAIWmmjzlEI9nM64ipddJhk4Nx4bAcpKAAIcC2sbagiZR37kzpZZztMuAQADAgADeQADNgQ",
+    "type": "photo"
+  },
   "golem_de_lava_media": {
     "id": "file_ids",
     "type": "video"
@@ -204,39 +220,255 @@
     "type": "video"
   },
   "guardiao_raizes_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAIKuGjt7uY82j6h1BtJ12a6vAEB-fFQAALxBgACVVNwR_xELP9nIMplNgQ",
     "type": "video"
   },
   "harpia_saqueadora_media": {
     "id": "BAACAgEAAxkBAAIFkGjoT8so8EcFey2Iw40qTY1vHbpjAAJ4BQACW3gZRGaf6deCCL_sNgQ",
     "type": "video"
   },
-  "img_inventario": {
-    "id": "file_ids",
+  "imagem_linho": {
+    "id": "AgACAgEAAxkBAAIaLmj1rFyeh9mECjd4Ir4dfQiYJtqIAAJmC2sbjxWxR0vBe3Z0NczZAQADAgADeQADNgQ",
     "type": "photo"
   },
-  "item_adaga_sorrteira_assassino": {
-    "id": "file_ids",
+  "imagem_madeira_coletada": {
+    "id": "AgACAgEAAxkBAAIaHGj1q4L9AlC2oCL5r5ktbb00gX8HAAJjC2sbjxWxR1bX5DmKRcl1AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "imagem_minerio_de_ferro": {
+    "id": "AgACAgEAAxkBAAIaKGj1rASXAeF8Ip7Axj_m10HK4TIcAAJlC2sbjxWxRxDzG2e4rRArAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "imagem_pedra": {
+    "id": "AgACAgEAAxkBAAIaImj1q7Po2J7ADQuLFq63nmaWoYO4AAJkC2sbjxWxR0rBPf2SaAS9AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "imagem_pena": {
+    "id": "AgACAgEAAxkBAAIaMmj1rLIahF6XqeO0pJ7wBJ1y9i-EAAJnC2sbjxWxR0n9WHmRMYZ7AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "imagem_sangue": {
+    "id": "AgACAgEAAxkBAAIaO2j1rQABuDmHnxyPFC97E5bcUUIAAQQAAmgLaxuPFbFH6NppDciMTAUBAAMCAAN5AAM2BA",
+    "type": "photo"
+  },
+  "img_inventario": {
+    "id": "AgACAgEAAxkBAAIcMmj2VkDxx8xUNqqnYGy2T_lNDhrNAAIBDGsbjxWxRy4ajEmil_kPAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_adaga_sorrateira_assassino": {
+    "id": "AgACAgEAAxkBAAIeSGj3aSY-JMmVGUsjEmj686V6dIl7AAJ9C2sbAgK4R-BuooheQX94AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_anel_sorrateiro_assassino": {
+    "id": "AgACAgEAAxkBAAIeb2j3chys9_TKA5EcT_yYvrr3MAHXAAJ2C2sbAgK4R_xga57lxFtZAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_asa_de_morcego": {
+    "id": "AgACAgEAAxkBAAIdjGj3CZ0xQmN2LCoU3vDsAvnCWPR-AAJtC2sbjxW5R9XYto8P1qDeAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_barra_de_aco": {
+    "id": "AgACAgEAAxkBAAIdymj3D0Os4oEP6hX9LHhzDe2TQ7olAAJ3C2sbjxW5RxhYgzoY6D51AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_barra_de_bronze": {
+    "id": "AgACAgEAAxkBAAIeCGj3GEYXKNUUTUuJzqPQhWvEg7s8AAKBC2sbjxW5R4VEEcm1m1YtAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_barra_de_ferro": {
+    "id": "AgACAgEAAxkBAAIeCGj3GEYXKNUUTUuJzqPQhWvEg7s8AAKBC2sbjxW5R4VEEcm1m1YtAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_barra_de_prata": {
+    "id": "AgACAgEAAxkBAAIeAmj3Fax-C9id2qUQqqMC_8zP4h4aAAKAC2sbjxW5Rzvgt3HE7tY1AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_botas_sorrateira_assassino": {
+    "id": "AgACAgEAAxkBAAIeY2j3cNYMMK3hYaBIZDqXOgNvrTLRAAJ5C2sbAgK4R4k1ta-bvP-RAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_brinco_sorrateiro_assassino": {
+    "id": "AgACAgEAAxkBAAIee2j3cq7geuc44-E4gdt00GWvZ-nAAAJ1C2sbAgK4R-CEzxoyKCM8AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_calcas_sorrateira_assassino": {
+    "id": "AgACAgEAAxkBAAIeVWj3bQwH3PNadwoCQooB2-giv0wlAAJ6C2sbAgK4R_3oMT1jxTQRAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_carapaca_de_pedra": {
+    "id": "AgACAgEAAxkBAAIahGj1xawSLZ9WdJpxYtPnvL3FWNMoAAJ2C2sbjxWxR4IYGbnTueOoAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_colar_sorrateiro_assassino": {
+    "id": "AgACAgEAAxkBAAIedWj3cknfanpwKWZZ-yRhi2H-RgQdAAJ3C2sbAgK4R3g5hKAStq2TAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_coracao_de_magma": {
+    "id": "AgACAgEAAxkBAAIalmj1yWAvrs8h2bX97qA4pYn0ZELeAAJ6C2sbjxWxR7sGSSAodxTfAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_couraca_sorrateira_assassino": {
+    "id": "AgACAgEAAxkBAAIeTmj3a9jnMkNLjF3PoLPhtKLRCso2AAJ7C2sbAgK4R55yOLKapy6BAQADAgADeQADNgQ",
     "type": "photo"
   },
   "item_couro_curtido": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIeFGj3GQbV9YAXoHtYbP7XyhSem3NcAAKCC2sbjxW5R9fkXKzpvzlEAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_couro_de_lobo": {
+    "id": "AgACAgEAAxkBAAIaYGj1v_9szPw8U3zU0aeYu-3FviaxAAJwC2sbjxWxRyuUa_f8nIeUAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_couro_de_lobo_alfa": {
+    "id": "AgACAgEAAxkBAAIaZmj1wJw2FjOBSZkG1MCb0OgWVoklAAJxC2sbjxWxR0PakHPDnmhTAQADAgADeQADNgQ",
     "type": "photo"
   },
   "item_couro_reforcado": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAId7Gj3E4Vu53EBqVxNugSzZGvLzvHxAAJ8C2sbjxW5R7Le2pcED5xvAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_dente_afiado": {
+    "id": "AgACAgEAAxkBAAIeKmj3GkNW3o3C5v_d1wAB5dTbafxytgAChQtrG48VuUeZVvrMk_94jQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "item_dente_afiado_superior": {
+    "id": "AgACAgEAAxkBAAId0Gj3EJ0agr75qp7BDFvLwBaZlg7oAAJ4C2sbjxW5R7mczG6YnvX0AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_ectoplasma": {
+    "id": "AgACAgEAAxkBAAIacmj1whasZLOqT6PY-AF3WrWw6tMrAAJzC2sbjxWxR-83oBhvIMIhAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_engrenagem_usada": {
+    "id": "AgACAgEAAxkBAAIdsmj3DU4OE0o_DWpIMVPusNPNFKlYAAJzC2sbjxW5RxfUXWg4UIqeAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_escama_de_salamandra": {
+    "id": "AgACAgEAAxkBAAIakGj1yB5nmarYpNR_2-7Bi3kWjLP4AAJ5C2sbjxWxR7bZHz0B2SV-AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_escama_incandescente": {
+    "id": "AgACAgEAAxkBAAIdvmj3Dk4Fmi3LY3-uIZBmc4WxZnjKAAJ1C2sbjxW5R76_e8GXn3wcAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_esporo_de_cogumelo": {
+    "id": "AgACAgEAAxkBAAIaWWj1tVo2mtQtIRh84xBVJiJkrRenAAJtC2sbjxWxR7x-TsE483_AAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_essencia_de_fogo": {
+    "id": "AgACAgEAAxkBAAIdxGj3Dsba8JJZA7uhDYJtgm75NZeTAAJ2C2sbjxW5RyLsoeuVyyBTAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_fio_de_prata": {
+    "id": "AgACAgEAAxkBAAIeNmj3GxwdaybihUPgZ6aXkbpfKRQ7AAKHC2sbjxW5Rxk17sZ-AAEewQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "item_fragmento_bravura": {
+    "id": "AgACAgEAAxkBAAIaAWj1o6L19Jf3D-VZrOp93Me4gnHwAAJdC2sbjxWxR-8pl3ZXzmPwAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_fragmento_gargula": {
+    "id": "AgACAgEAAxkBAAIeMGj3GrjPbvKJZE7TNLyCyNonEInKAAKGC2sbjxW5R8dh5nBnhDzbAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_gema_bruta": {
+    "id": "AgACAgEAAxkBAAIaR2j1sPWTK9qP-3NFulLqnYqAFsZ6AAJqC2sbjxWxR9O2h6QAAT0ImgEAAwIAA3kAAzYE",
     "type": "photo"
   },
   "item_gema_polida": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIeImj3GchwrTUhk5vng8KfesHkyB-JAAKEC2sbjxW5R5Z7BRg5j_PoAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_joia_da_criacao": {
+    "id": "AgACAgEAAxkBAAIafmj1w5YXT7Gn5ET7xc8E86eeLbX1AAJ1C2sbjxWxR1pTGfPiA2K9AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_luvas_sorrateiras_assassino": {
+    "id": "AgACAgEAAxkBAAIeaWj3cZg8zs2Ze2qyoZKXo7CF5A0tAAJ4C2sbAgK4Rwh3zpPzhMzmAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_madeira_rara": {
+    "id": "AgACAgEAAxkBAAIaTWj1sk0u0eYkRB1l4GJT8wpDmEgZAAJrC2sbjxWxR3cZkHRgwhNXAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_martelo_enfrrujado": {
+    "id": "AgACAgEAAxkBAAIduGj3DcXk1O7KRg_yQ8Wyy5E7fH-zAAJ0C2sbjxW5R91pLpyX99U7AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_mascara_sorrateira_assassino": {
+    "id": "AgACAgEAAxkBAAIePGj3aCmfAkeTiHvHgqePjaQyxEB4AAJ8C2sbAgK4R7GjJbSFxQ2TAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_membrana_de_couro_fino": {
+    "id": "AgACAgEAAxkBAAId_Gj3FS_39IkE6l3Z76DlNSPJbLAPAAJ_C2sbjxW5R7AHw34lYdq7AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_minerio_stanho": {
+    "id": "AgACAgEAAxkBAAIaQWj1r4fibzFCOOuz1RYbfyqjasMnAAJpC2sbjxWxRzOQg5U5nFdTAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_nucleo_de_golem": {
+    "id": "AgACAgEAAxkBAAIaimj1xvrkMw757bRu6zvz6jWSvlfNAAJ4C2sbjxWxR717QNRToE9eAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_nucleo_de_magma": {
+    "id": "AgACAgEAAxkBAAIdoGj3C7dSice2dZTxHRERbVJwtBmVAAJwC2sbjxW5RyT-kQ-y5yrkAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_olho_de_basilisco": {
+    "id": "AgACAgEAAxkBAAIdgGj3Bx19HFh18whWROkG5Abrk-4VAAJrC2sbjxW5R9gX4VS0ySfDAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_pano_simples": {
+    "id": "AgACAgEAAxkBAAIaU2j1s5j-qHWBrZCQzuBrLo_gNnGzAAJsC2sbjxWxR9w8bgLOj5h6AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_pedra_vulcanica": {
+    "id": "AgACAgEAAxkBAAIdpmj3DDHao9TBz84ETpoHbh6ycGi2AAJxC2sbjxW5RwWN2BxAeBQAAQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "item_pele_de_troll": {
+    "id": "AgACAgEAAxkBAAIdlGj3CdIQ38KtvOoC7VR5a6SK4ICEAAJuC2sbjxW5Rz3pcYX7cbB7AQADAgADeQADNgQ",
     "type": "photo"
   },
   "item_pele_troll_regenerativa": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAId9Gj3FEAipHUwSAGVcicgL9f-80eZAAJ-C2sbjxW5R5LKRAENu4boAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_poeira_magica": {
+    "id": "AgACAgEAAxkBAAIdemj3BdJfPY6sNKtVcWHSf2YOdyGHAAJpC2sbjxW5Ryhf3XIWrQhuAQADAgADeQADNgQ",
     "type": "photo"
   },
   "item_ponta_de_osso_afiada": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAId1mj3EMX7RC0QKjlyyplRPE9eC75xAAJ5C2sbjxW5R_Dl699As7cEAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_presa_de_javali": {
+    "id": "AgACAgEAAxkBAAIaeGj1wqwaa1iQsfSzori3vMzi7T_zAAJ0C2sbjxWxR2G4-HRSUYTJAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_rolo_de_pano_simples": {
+    "id": "AgACAgEAAxkBAAIeHGj3GXNgXWxdQhDgFztw3PZNFksfAAKDC2sbjxW5R5XMF6WbX4mSAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_sangue_regenerativo": {
+    "id": "AgACAgEAAxkBAAIdmmj3CuUtfJKyRKRDi3zA4fLiuVp3AAJvC2sbjxW5R3-VNomrKyt3AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_seiva_de_ent": {
+    "id": "AgACAgEAAxkBAAIabGj1wXO44X5AKBCdj6QFG_BsgcWhAAJyC2sbjxWxRxwbVTS6iZXwAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_semente_encantada": {
+    "id": "AgACAgEAAxkBAAIdrGj3DM4QIm1uqVxfPVsVCNYlJMgMAAJyC2sbjxW5R3gWEgAB-HGW6gEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "item_ticket_defesa_reino": {
+    "id": "AgACAgEAAxkBAAIaFmj1pppznZTwxMdC-Io9pdtS2uewAAJeC2sbjxWxR9-zQUO6CDC7AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "item_veludo_runico": {
+    "id": "AgACAgEAAxkBAAId3mj3EfsDfM65F_EbtakLasdNq8_QAAJ6C2sbjxW5R9nbpFjt5JonAQADAgADeQADNgQ",
     "type": "photo"
   },
   "javali_com_presas_media": {
@@ -256,7 +488,7 @@
     "type": "video"
   },
   "lobo_alfa_da_matilha_media": {
-    "id": "BAACAgEAAxkBAAEBKcloynQK-Iyz2E5Oc4RISnN91xcEsAACmwYAAsLaUUbE6rPCBOp0WjYE",
+    "id": "BAACAgEAAxkBAAIKyGjt8CWl_R6ZNp-qU71IStvAVsQdAAL0BgACVVNwR-WIX2sL-l8lNgQ",
     "type": "video"
   },
   "lobo_alfa_media": {
@@ -276,11 +508,11 @@
     "type": "photo"
   },
   "menu_forja_principal": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIL92juPnsB2V4VvU0qCOk3z3BOxlj4AAJlC2sbVVNwR72XVMazMW2dAQADAgADeQADNgQ",
     "type": "photo"
   },
   "menu_guilda_generico": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIL_2juRYq6HMnP5XgDUuujQ6B8oetOAAJoC2sbVVNwR_7XbNdEMGPaAQADAgADeQADNgQ",
     "type": "photo"
   },
   "mercado_aventureiro": {
@@ -295,6 +527,166 @@
     "id": "BAACAgEAAxkBAAIFzWjoUu3y2R16MPQiVkXgtajtCYngAALqBwACcR8gRBFYfgPPuL-_NgQ",
     "type": "video"
   },
+  "npc_alquimista_tenda_media": {
+    "id": "BAACAgEAAxkBAAIKIWjtvzJseilDih9xmzSSEDVbGcGEAALCBgACVVNwR3EXhbN0inYGNgQ",
+    "type": "video"
+  },
+  "ond1_rei_slime_media": {
+    "id": "AgACAgEAAxkBAAIWAmjzebpwM5y5YJ8lu_ouT1-xjkAfAAJ8C2sbagiJRwQ-7OkAATz-BgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "ond1_slime_azul_media": {
+    "id": "AgACAgEAAxkBAAITImjyg5vIKy8CZJ_nj9rqAAEOCieeOgACdgtrG2oIiUcVREEOaErrkgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "ond1_slime_brilhante_media": {
+    "id": "AgACAgEAAxkBAAIV9mjzeJ86hL_mUHwrmrd1aJ-OLZfNAAJ4C2sbagiJR0D-dq9ElvIJAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "ond1_slime_eletrico_media": {
+    "id": "AgACAgEAAxkBAAITO2jyhmQnl8C8le0wrIUsHiSq0ZkRAAJ7C2sbagiJR11BZZWTUNRcAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "ond1_slime_escuridao_media": {
+    "id": "AgACAgEAAxkBAAIQbGjxF13zD9i6yGC04iqXfmjkmSuOAAJbC2sbuOeIR0FtTLMZot6yAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "ond1_slime_magma_media": {
+    "id": "AgACAgEAAxkBAAITKGjyg8eX88sEAgo114UFb-CToWDUAAJ0C2sbagiJRy7BSHg3OrWsAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "ond1_slime_pequeno_media": {
+    "id": "AgACAgEAAxkBAAITFmjygxbbZJy6X4SDGAQPFUNTUa2WAAJyC2sbagiJR8Jh-3WMimyVAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "ond1_slime_terra_media": {
+    "id": "AgACAgEAAxkBAAIQVGjxEpZMUjO2oDPn4urRNTYOICwQAAJXC2sbuOeIR-kr1wZ1rjOAAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "ond1_slime_venenoso_media": {
+    "id": "AgACAgEAAxkBAAITNWjyhDxMrWYoPhf2KQfVeMxUp8PwAAJzC2sbagiJR0qggU1q-xm5AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "ond1_slime_verde_media": {
+    "id": "AgACAgEAAxkBAAITHGjyg1NUwieBjr9MERR6jjcwCJrhAAJ1C2sbagiJR54Mg3QQSXoFAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_bruto_reanimado_media": {
+    "id": "AgACAgEAAxkBAAIWMGjzgkJefWOz2N_Yb3S0Qht2LSAhAAKCC2sbagiJR1WVeSRtvRmGAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_amaldicoado_media": {
+    "id": "AgACAgEAAxkBAAIWTmjzhFjW3iAKaot1Lywr6qZs5A4IAAKIC2sbagiJR2gZfxQIXJgXAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_arqueiro_media": {
+    "id": "AgACAgEAAxkBAAIWKmjzggePO_PzFYVi5JN-_wKrFoH5AAKBC2sbagiJR9WWmFWdf3wOAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_campeao_media": {
+    "id": "AgACAgEAAxkBAAIWCGjzek-hyFj-upjEmC8LHM77qGpyAAKFC2sbagiJRwSNT92uWPPOAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_espadachim_media": {
+    "id": "AgACAgEAAxkBAAIWPGjzgzYJkoIndvBBRalr1Bg_AAH42QACfgtrG2oIiUdAoVX4h7hZlgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "onda2_esqueleto_lacaio_media": {
+    "id": "AgACAgEAAxkBAAIWJGjzgb7toKSoNfNri2wBqIjrxmpoAAKEC2sbagiJRzI_TCAb8-ynAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_legionario_media": {
+    "id": "AgACAgEAAxkBAAIWQmjzg3N3hy5ofiVR4AoSlpt-xezwAAKGC2sbagiJR4O_z_YSOWCLAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_lobo_media": {
+    "id": "AgACAgEAAxkBAAIWSGjzg7p97O3T4YjkPCLUIt0P6KXbAAJ_C2sbagiJRyFDTxDVZUxkAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_mago_media": {
+    "id": "AgACAgEAAxkBAAIWNmjzgoVE0T25q7G6ozkPaUd3Lmv7AAKAC2sbagiJR23bqnBhImnNAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda2_esqueleto_soldado_media": {
+    "id": "AgACAgEAAxkBAAIWCGjzek-hyFj-upjEmC8LHM77qGpyAAKFC2sbagiJRwSNT92uWPPOAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_ardilheiro_media": {
+    "id": "AgACAgEAAxkBAAIWgmjzk21wfcp_6GDp4zrtC7N_KMbKAAIkC2sbagiZRyQpSWr2Lg4eAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_atirador_media": {
+    "id": "AgACAgEAAxkBAAIWcGjzknszWSoKeP23D_Xq6zSve2MqAAIjC2sbagiZR5pNqBYrgJs0AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_bombardeiro_media": {
+    "id": "AgACAgEAAxkBAAIWjmjzk9wqpe0IyP7ggE8VOqw4rBmwAAIfC2sbagiZR_FA4aseVBSpAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_brutamontes_media": {
+    "id": "AgACAgEAAxkBAAIWdmjzkp_qDPfyfzGP2oBPIoxmSUbIAAIeC2sbagiZR9-78Rp7K0uQAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_catador_media": {
+    "id": "AgACAgEAAxkBAAIWZGjzkYbHJFWwPxiHLQABBVuE2DGlMAACJQtrG2oImUfaue6b8F7t_QEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "onda3_goblin_chefe_media": {
+    "id": "AgACAgEAAxkBAAIWlGjzlB-kwf1kUM2e3RHeESRUmG7gAAIiC2sbagiZR7LboVK2FN_UAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_fura_pe_media": {
+    "id": "AgACAgEAAxkBAAIWamjzkhxlZfPFWZHzw5qAOH8SkdIaAAIdC2sbagiZRxlSIxlKOjUTAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_montador_lobo_media": {
+    "id": "AgACAgEAAxkBAAIWiGjzk5z454_52KedBuuJx_SnrsmPAAIhC2sbagiZR64qsTjgogvvAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda3_goblin_xama_media": {
+    "id": "AgACAgEAAxkBAAIWfGjzkyDaqqWaZi6pSRbvm_8csEKRAAIgC2sbagiZR5e_QEoXOJvbAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_armadilheiro_media": {
+    "id": "AgACAgEAAxkBAAIWvGjzr200qzgxoYAT5Q28N4yJqkWOAAJHC2sbWdiZR2fLgbQnXKT1AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_atirador_media": {
+    "id": "AgACAgEAAxkBAAIWsGjzrsefLjzEfQW5ZFGlxO77UZRcAAJLC2sbWdiZR045tDYuaLSGAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_batedor_media": {
+    "id": "AgACAgEAAxkBAAIWtmjzrzjKcLgOetdnUphkhr8firM4AAJCC2sbWdiZRxZ2wQ7P_6e8AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_geomante_media": {
+    "id": "AgACAgEAAxkBAAIWwmjzr8Rn_pxSAzO2XfZ6LZ4zTkGuAAJEC2sbWdiZR4AOza1sCKRXAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_guarda_ninhada_media": {
+    "id": "AgACAgEAAxkBAAIWyGjzsAv3CIXhVIHDyae-B7g8EjuuAAJIC2sbWdiZRzgBAAH4WkiWsAEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "onda4_kobold_guerreiro_escamadura_media": {
+    "id": "AgACAgEAAxkBAAIWzmjzsEBOr8X-GWpAW5vliLAIE6X7AAJKC2sbWdiZR9mLC5TTOIj2AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_lanceiro_media": {
+    "id": "AgACAgEAAxkBAAIWqmjzrnqbWN7i_nui6TN8kKjKmweZAAJFC2sbWdiZR5NNAyYSzl_2AQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_mineiro_media": {
+    "id": "AgACAgEAAxkBAAIWpGjzrkwUTWPDEU2XdxyXlLEePuINAAJJC2sbWdiZR9NziyxSwHjJAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_porta_estandarte_media": {
+    "id": "AgACAgEAAxkBAAIW1GjzsGyfGMQjfIvJOyrOTz-ASjwXAAJDC2sbWdiZRzPMN6rAkvhvAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "onda4_kobold_prole_dragao_media": {
+    "id": "AgACAgEAAxkBAAIW2mjzsJWNO1iFF0nbGRnA56gR-dTNAAJGC2sbWdiZR6yI4Ae1gF1yAQADAgADeQADNgQ",
+    "type": "photo"
+  },
   "passaro_roc_gigante_media": {
     "id": "file_ids",
     "type": "video"
@@ -308,7 +700,7 @@
     "type": "photo"
   },
   "refino_universal": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIH-2jrEBCsuRUbRYLIr3aNLqlDwc1iAAIgC2sbj-NZRyxiliYG0C2sAQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_campos_linho": {
@@ -316,27 +708,35 @@
     "type": "photo"
   },
   "regiao_floresta_sombria": {
-    "id": "AgACAgEAAxkBAAMfaNrK7O8FWFiquyDQJHI2yLzW1VsAAigLaxuCq9lGLYR7GW2kL0YBAAMCAAN5AAM2BA",
+    "id": "AgACAgEAAxkBAAId5Gj3EnaF7dfwjfLwS1WQbwYhyyVbAAJ7C2sbjxW5R_t5tdS5Sut2AQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_forja_abandonada": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAILpWjuL9ZAXy4SMG1Jk54ge6Nbh6tcAAJaC2sbVVNwR614GI3gVpg8AQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_mina_ferro": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAILnWjuLlIr4wpTbxb5XvDSE8wZYODRAAJZC2sbVVNwR9WIkhhVXGoKAQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_pantano_maldito": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAILrmjuM0NHWGFqRP70N2L1cWbsZSluAAJbC2sbVVNwRyD04YvPxnP-AQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_pedreira_granito": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIDLGjmww2mAlidmS-Py1HrohrKX9ZnAAJ0rjEbW3gRRBu_kv7vS-yRAQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_pico_grifo": {
     "id": "AgACAgEAAxkBAAIFgGjoTZz_PVO-FLnLbZ1-RHMP6eOHAAKKrzEbxKC4R78hJF-z3zQxAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "regiao_picos_gelados": {
+    "id": "AgACAgEAAxkBAAIL1mjuNXai07HKETyWynY0I4pefofuAAJeC2sbVVNwR5XbXWqJTkYaAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "regiao_pradaria_inicial": {
+    "id": "AgACAgEAAxkBAAIOzmjwODsUJWKwOBpMp_qSbWAw-b20AAJkC2sbuOeAR5a9ZBIz2vvFAQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_reino_eldora": {
@@ -347,6 +747,10 @@
     "id": "file_ids",
     "type": "video"
   },
+  "rei_slime_media": {
+    "id": "AgACAgEAAxkBAAIRC2jxNzmNAAGsrlBE_YEefOTXmTkMxAACbgtrG7jniEfwUzQgfouZjgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
   "salamandra_fogo": {
     "id": "BAACAgEAA...SUBSTITUA...",
     "type": "video"
@@ -355,9 +759,45 @@
     "id": "BAACAgEAAxkBAAIBnGjbBURj_r4V4VmsEJIGPK08Qd1YAAJaBQACW3gZREiZRn1vk3QONgQ",
     "type": "video"
   },
+  "slime_azul_media": {
+    "id": "AgACAgEAAxkBAAIQ0mjxNJ9AB6ZEuqIp96Iltc59tSxNAAJmC2sbuOeIR3zICswSLTxBAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "slime_brilhante_media": {
+    "id": "AgACAgEAAxkBAAIQ-2jxNf_sv2kP6AQrEKd8nQ3GIWouAAJrC2sbuOeIR0beg8CBf08yAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "slime_eletrico_media": {
+    "id": "AgACAgEAAxkBAAIQ82jxNcX7Amjf9ZxDiyGTEaX-yfcvAAJqC2sbuOeIRyPhMertXrPVAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "slime_escuridao_media": {
+    "id": "AgACAgEAAxkBAAIRA2jxNv5DUQJQZH7X_7zqbRA1fIEYAAJsC2sbuOeIR8qAyZE-KGDgAQADAgADeQADNgQ",
+    "type": "photo"
+  },
   "slime_ferrugem_media": {
     "id": "BAACAgEAAxkBAAIGNmjoW5GJQpIcKunvUzdCcoD_hZ_hAALsBwACcR8gRIdLzMMHURYkNgQ",
     "type": "video"
+  },
+  "slime_magma_media": {
+    "id": "AgACAgEAAxkBAAIQ2mjxNNGn_Mg7dbNBcmbxXssiGjwZAAJnC2sbuOeIR36o1hoBznKwAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "slime_pequeno_media": {
+    "id": "AgACAgEAAxkBAAIQwmjxNBE_kbcnxoTe3Q5Try0f1BpwAAJkC2sbuOeIR9EnYIxfbpEuAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "slime_terra_media": {
+    "id": "AgACAgEAAxkBAAIQ4GjxNSmHQxaI_Xgvho8g6obzkhqIAAJoC2sbuOeIR1DaYNrIys5lAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "slime_venenoso_media": {
+    "id": "AgACAgEAAxkBAAIQ62jxNZeuRonEmkYYQhLnRe1jVYAgAAJpC2sbuOeIR3iKRS81i2sbAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "slime_verde_media": {
+    "id": "AgACAgEAAxkBAAIQymjxNF8KTr28LfNH9ip0QD_G_P9pAAJlC2sbuOeIR1RIqT2xlASHAQADAgADeQADNgQ",
+    "type": "photo"
   },
   "tatu_rocha_media": {
     "id": "BAACAgEAAxkBAAIBfGjbAvt5WQGD2tcuJrqYReYM0yAJAAJ9BQACW3gRRCa4EQABSsQFPTYE",

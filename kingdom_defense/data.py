@@ -1,124 +1,74 @@
 # Em kingdom_defense/data.py
 
+# Em kingdom_defense/data.py (VERSÃO "BARALHO DE MONSTROS")
+
 WAVE_DEFINITIONS = {
-    # =================================================================
-    # WAVE 1: 10 Mobs de Nível 0 (Tema: Goblins da Floresta)
-    # =================================================================
+    # --- ONDA 1 (Total: 9 Mobs + 1 Chefe) ---
     1: {
-        "mobs": [
-            {
-                # Extraído de MONSTERS_DATA["floresta_sombria"][0]
-                "name": "Goblin Batedor",
-                "hp": 40,
-                "attack": 5,
-                "defense": 1,
-                "initiative": 8,
-                "luck": 5,
-                "reward": 5,  # Recompensa em 'fragmento_bravura' (ou item do evento)
-                "media_key": "goblin_batedor_media" 
-            },
+        'display_name': "Onda 1",
+        # Define exatamente quais e quantos monstros compõem a onda
+        'mob_pool': [
+            'ond1_pequeno_slime', 'ond1_slime_verde', 'ond1_slime_azul',
+            'ond1_slime_magma', 'ond1_slime_terra',                     
+            'ond1_slime_venenoso', 'ond1_slime_eletrico', 'ond1_slime_brilhante',   
+            'ond1_slime_escuridao',                                     
         ],
-        "mob_count": 10,
-        "boss": {
-            "name": "Xamã Goblin",
-            "hp": 550, # HP aumentado para o evento
-            "attack": 18, # Atributos aumentados para o evento
-            "defense": 8,
-            "initiative": 7,
-            "luck": 6,
-            "reward": 50,
-            "media_key": "xama_goblin_media"
-        },
+        'boss_id': 'ond1_rei_slime'
     },
-    # =================================================================
-    # WAVE 2: 15 Mobs de Nível 3 (Tema: Criaturas da Pedreira)
-    # =================================================================
+    # --- ONDA 2 (Total: 14 Mobs + 1 Chefe) ---
     2: {
-        "mobs": [
-            {
-                # Extraído de MONSTERS_DATA["pedreira_granito"][0]
-                "name": "Kobold Escavador",
-                "hp": 125,
-                "attack": 18,
-                "defense": 24,
-                "initiative": 15,
-                "luck": 15,
-                "reward": 10,
-                "media_key": "kobold_escavador_media"
-            },
+        'display_name': "Onda 2",
+        'mob_pool': [
+            'onda2_soldado_esqueletico', 'onda2_lacaio_reanimado', 
+            'onda2_arqueiro_esqueletico', 'onda2_bruto_reanimado',
+            'onda2_mago_esqueletico', 'onda2_espadachim_ossudo', 
+            'onda2_legionario_caido', 'onda2_lobo_esqueletico',
+            'onda2_esqueleto_amaldicoado', 'onda2_soldado_esqueletico',                
+            'onda2_legionario_caido', 'onda2_espadachim_ossudo',
+            'onda2_mago_esqueletico', 'onda2_lobo_esqueletico',         # 2x
         ],
-        "mob_count": 15,
-        "boss": {
-            # Extraído de MONSTERS_DATA["pedreira_granito"][2]
-            "name": "Golem de Pedra", # Nome adaptado
-            "hp": 3200, # HP aumentado para o evento
-            "attack": 50, # Atributos aumentados para o evento
-            "defense": 45,
-            "initiative": 10,
-            "luck": 2,
-            "reward": 100,
-            "media_key": "golem_pedra_pequeno_media"
-        },
+        'boss_id': 'onda2_campeao_do_sepulcro'
     },
-    # =================================================================
-    # WAVE 3: 20 Mobs de Nível 6 (Tema: Horrores das Minas)
-    # =================================================================
     3: {
-        "mobs": [
-            {
-                # Extraído de MONSTERS_DATA["mina_ferro"][0]
-                "name": "Morcego das Minas",
-                "hp": 258,
-                "attack": 27,
-                "defense": 28,
-                "initiative": 38,
-                "luck": 19,
-                "reward": 20,
-                "media_key": "morcego_minas_media"
-            },
+        'display_name': "Onda 3",
+        'mob_pool': [
+            'onda3_goblin_catador', 'onda3_goblin_fura_pe', 
+            'onda3_atirador_goblin', 'onda3_brutamontes_goblin',
+            'onda3_goblin_ardilheiro', 'onda3_goblin_xama', 
+            'onda3_montador_de_lobo', 'onda3_goblin_bombardeiro',
+            'onda3_chefe_goblin', 'onda3_goblin_fura_pe',                
+            'onda3_goblin_catador', 'onda3_atirador_goblin',
+            'onda3_goblin_ardilheiro', 'onda3_brutamontes_goblin',
+            'onda3_montador_de_lobo', 'onda3_goblin_xama',
+            'onda3_chefe_goblin', 'onda3_atirador_goblin',
+            'onda3_goblin_bombardeiro', 'onda3_goblin_bombardeiro',
         ],
-        "mob_count": 20,
-        "boss": {
-            # Extraído de MONSTERS_DATA["mina_ferro"][3]
-            "name": "Troll da Caverna Ancião", # Nome adaptado
-            "hp": 7000, # HP aumentado para o evento
-            "attack": 90, # Atributos aumentados para o evento
-            "defense": 65,
-            "initiative": 27,
-            "luck": 25,
-            "reward": 250,
-            "media_key": "troll_caverna_media"
-        },
+        'boss_id': 'onda3_rei_goblin'
     },
-    # =================================================================
-    # WAVE 4: 25 Mobs de Nível 9 (Tema: Guardiões da Forja)
-    # =================================================================
     4: {
-        "mobs": [
-            {
-                # Extraído de MONSTERS_DATA["forja_abandonada"][0]
-                "name": "Golem de Ferro Incompleto",
-                "hp": 495,
-                "attack": 32,
-                "defense": 44,
-                "initiative": 28,
-                "luck": 16,
-                "reward": 35,
-                "media_key": "golem_ferro_incompleto_media"
-            },
+        'display_name': "Onda 4",
+        'mob_pool': [
+            'onda4_mineiro_kobold', 'onda4_lanceiro_kobold', 
+            'onda4_atirador_de_dardo', 'onda4_batedor_draconiano',
+            'onda4_armadilheiro_kobold', 'onda4_geomante_kobold', 
+            'onda4_guarda_da_ninhada', 'onda4_guerreiro_escamadura',
+            'onda4_porta_estandarte_kobold', 'onda4_mineiro_kobold',                
+            'onda4_atirador_de_dardo', 'onda4_lanceiro_kobold',
+            'onda4_armadilheiro_kobold', 'onda4_geomante_kobold',
+            'onda4_porta_estandarte_kobold', 'onda4_guerreiro_escamadura',
+            'onda4_atirador_de_dardo', 'onda4_lanceiro_kobold',
+            'onda4_porta_estandarte_kobold', 'onda4_geomante_kobold',
+            'onda4_armadilheiro_kobold', 'onda4_geomante_kobold', 
+            'onda4_guarda_da_ninhada', 'onda4_guerreiro_escamadura',
+            'onda4_porta_estandarte_kobold',
         ],
-        "mob_count": 25,
-        "boss": {
-            # Extraído de MONSTERS_DATA["catacumba_reino"][5]
-            "name": "Rei Lagarto Soberano", # Nome adaptado
-            "hp": 12500, # HP aumentado para o evento
-            "attack": 150, # Atributos aumentados para o evento
-            "defense": 100,
-            "initiative": 14,
-            "luck": 10,
-            "reward": 500,
-            "media_key": "rei_lagarto_media"
-        
-     },
-   },
- }
+        'boss_id': 'onda4_prole_de_dragao'
+    },
+    
+    # Adiciona a Onda 3, 4, etc. aqui...
+}
+
+SCORE_PER_WAVE = { 1: 10, 2: 15, 3:20, 4:25, } # Ajusta como quiseres
+
+
+

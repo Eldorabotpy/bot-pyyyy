@@ -1,13 +1,17 @@
 # Arquivo: main.py
 
 from __future__ import annotations
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from dotenv import load_dotenv
 load_dotenv()
 import logging
 # --- IMPORTAÇÃO ADICIONADA ---
 from datetime import time, datetime, timedelta 
 from zoneinfo import ZoneInfo
-import os
+
 from threading import Thread
 from flask import Flask
 
@@ -25,17 +29,13 @@ from handlers.jobs import (
 )
 from handlers.daily_jobs import daily_pvp_entry_reset_job
 from kingdom_defense.engine import start_event_job, end_event_job
-
+from handlers.world_boss.engine import agendador_mestre_do_boss
 # --- CONFIGURAÇÃO DE LOGGING ---
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 
-# ======================================================
-# --- CÓDIGO DO SERVIDOR WEB (FLASK) ---
-# Esta seção cria a 'porta da frente' para o Uptime Robot.
-# ======================================================
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
@@ -116,6 +116,10 @@ def register_jobs(application: Application):
     for start_h, start_m, end_h, end_m in EVENT_TIMES:
         j.run_daily(start_event_job, time=time(hour=start_h, minute=start_m, tzinfo=tz), name=f"start_defense_{start_h}h{start_m:02d}")
         j.run_daily(end_event_job, time=time(hour=end_h, minute=end_m, tzinfo=tz), name=f"end_defense_{end_h}h{end_m:02d}")
+    
+    logging.info("Agendando o sorteador do Demônio Dimensional...")
+    j.run_daily(agendador_mestre_do_boss, time=time(hour=0, minute=5, tzinfo=tz), name="agendador_mestre_do_boss")
+    
     logging.info("Todos os jobs foram registrados com sucesso.")
 
 # --- FUNÇÃO PRINCIPAL ---
