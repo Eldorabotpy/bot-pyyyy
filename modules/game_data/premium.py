@@ -96,6 +96,20 @@ PREMIUM_PLANS_FOR_SALE = {
         "tier": "premium", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
         "days": 30
     },
+    "premium_15d": {
+        "name": "Aventureiro Premium (15 Dias)",
+        "description": "Ativa todas as vantagens do tier Premium.",
+        "price": 90, # Preço em gemas
+        "tier": "premium", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 15
+    },
+    "premium_7d": {
+        "name": "Aventureiro Premium (7 Dias)",
+        "description": "Ativa todas as vantagens do tier Premium.",
+        "price": 40, # Preço em gemas
+        "tier": "premium", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 7
+    },
     "vip_30d": {
         "name": "Aventureiro VIP (30 Dias)",
         "description": "Ativa as vantagens incríveis do tier VIP.",
@@ -103,11 +117,39 @@ PREMIUM_PLANS_FOR_SALE = {
         "tier": "vip", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
         "days": 30
     },
+    "vip_15d": {
+        "name": "Aventureiro VIP (15 Dias)",
+        "description": "Ativa as vantagens incríveis do tier VIP.",
+        "price": 130, # Preço em gemas
+        "tier": "vip", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 15
+    },
+    "vip_7d": {
+        "name": "Aventureiro VIP (7 Dias)",
+        "description": "Ativa as vantagens incríveis do tier VIP.",
+        "price": 70, # Preço em gemas
+        "tier": "vip", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 7
+    },
     "lenda_30d": {
         "name": "Aventureiro Lenda (30 Dias)",
         "description": "Torne-se uma Lenda por um mês inteiro!",
         "price": 360, # Preço em gemas
         "tier": "lenda", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
         "days": 30
+    },
+    "lenda_15d": {
+        "name": "Aventureiro Lenda (15 Dias)",
+        "description": "Torne-se uma Lenda por um mês inteiro!",
+        "price": 190, # Preço em gemas
+        "tier": "lenda", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 15
+    },
+    "lenda_7d": {
+        "name": "Aventureiro Lenda (7 Dias)",
+        "description": "Torne-se uma Lenda por um mês inteiro!",
+        "price": 100, # Preço em gemas
+        "tier": "lenda", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "days": 7
     },
 }

@@ -24,3 +24,4 @@ def register_admin_handlers(application: Application):
     application.add_handler(premium_command_handler)
     application.add_handler(reset_panel_conversation_handler)
     application.add_handler(generate_equip_conv_handler)
+    

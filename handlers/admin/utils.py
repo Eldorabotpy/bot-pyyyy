@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 import os
+import sys
+import logging
 from telegram import Update
+from modules import player_manager
 
 # Pega o ID e converte para número
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+admin_id_str = os.getenv("ADMIN_ID")
+ADMIN_ID = None
+
+if not admin_id_str:
+    logging.critical("A variável de ambiente ADMIN_ID não foi definida! O bot não pode iniciar sem ela.")
+    sys.exit("ERRO: ADMIN_ID não definido.")
+try:
+    ADMIN_ID = int(admin_id_str)
+except (ValueError, TypeError):
+    logging.critical(f"O valor de ADMIN_ID ('{admin_id_str}') não é um número válido!")
+    sys.exit("ERRO: ADMIN_ID inválido.")
 
 async def ensure_admin(update: Update) -> bool:
     """Verifica se o usuário é o admin e imprime logs de debug detalhados."""
@@ -48,3 +61,25 @@ async def ensure_admin(update: Update) -> bool:
         return False
         
     return True
+
+async def find_player_from_input(text_input: str) -> tuple | None:
+    """
+    Encontra um jogador a partir de um input de texto,
+    que pode ser um User ID ou um nome de personagem.
+    Retorna uma tupla (user_id, player_data) ou None se não encontrar.
+    """
+    text_input = text_input.strip()
+    try:
+        # Tenta encontrar por ID
+        user_id = int(text_input)
+        pdata = player_manager.get_player_data(user_id)
+        if pdata:
+            return user_id, pdata
+    except ValueError:
+        # Se não for um ID, tenta encontrar por nome
+        found = player_manager.find_player_by_name(text_input)
+        if found:
+            return found
+    
+    # Se não encontrou de nenhuma forma
+    return None

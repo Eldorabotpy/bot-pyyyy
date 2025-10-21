@@ -6,7 +6,7 @@ import io
 import logging
 import json
 from typing import Optional
-
+from handlers.admin.grant_item import grant_item_conv_handler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     CallbackQueryHandler, 
@@ -29,10 +29,13 @@ from modules.player_manager import (
     find_player_by_name,
     allowed_points_for_level,
     compute_spent_status_points,
+
+
 )
 from modules import game_data
 from handlers.admin.utils import ensure_admin 
 from kingdom_defense.engine import event_manager
+from handlers.admin.sell_gems import sell_gems_conv_handler
 # No topo de admin_handler.py
 from modules.player.core import _player_cache, players_collection
 # No topo de admin_handler.py
@@ -156,6 +159,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
     """Menu principal do admin, agora com o botão para o submenu de eventos."""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎁 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕀𝕥𝕖𝕟𝕤 (Stackable) 𓂀", callback_data="admin_grant_item")],
+        [InlineKeyboardButton("💎 𓂀 𝕍𝕖𝕟𝕕𝕖𝕣 𝔾𝕖𝕞𝕒𝕤 𓂀", callback_data="admin_sell_gems")],
         [InlineKeyboardButton("🛠️ 𓂀 𝔾𝕖𝕣𝕒𝕣 𝔼𝕢𝕦𝕚𝕡𝕒𝕞𝕖𝕟𝕥𝕠 𓂀", callback_data="admin_generate_equip")],
         [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
         [InlineKeyboardButton("👑 𓂀 ℙ𝕣𝕖𝕞𝕚𝕦𝕞 𓂀", callback_data="admin_premium")],
@@ -547,5 +551,7 @@ all_admin_handlers = [
     admin_force_ticket_handler,
     clear_cache_conv_handler,
     test_event_conv_handler,
+    grant_item_conv_handler,
+    sell_gems_conv_handler,
     my_data_handler,
 ]
