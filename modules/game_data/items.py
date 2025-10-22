@@ -773,7 +773,7 @@ ITEMS_DATA = {
 
     
     # ================================
-    # RESULTADOS — BARDO T2 continua
+    # RESULTADOS — BARDO T2
     # ================================
     "alaude_ornamentado_bardo": {
         "display_name": "Alaúde Ornamentado do Bardo", "emoji": "🎻",
@@ -992,7 +992,7 @@ ITEMS_DATA = {
 
     },
 # ================================
-# EQUIPAMENTOS T2 — CAÇADOR
+# EQUIPAMENTOS T2 — CAÇADOR continua 
 # ================================
 "arco_patrulheiro_cacador": {
     "display_name": "Arco de Patrulheiro",

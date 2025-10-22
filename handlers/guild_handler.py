@@ -69,9 +69,11 @@ from handlers.guild.management import (
 )
 from handlers.guild.missions import (
     missions_menu_handler, mission_claim_handler, mission_reroll_handler,
-    clan_mission_start_handler, clan_mission_confirm_handler, clan_board_purchase_handler,
+    clan_mission_start_handler, clan_board_purchase_handler,
     clan_guild_mission_details_handler,
     clan_mission_details_handler,
+    clan_mission_preview_handler,
+    clan_mission_accept_handler,
 )
 from handlers.guild.bank import (
     clan_bank_menu_handler, clan_deposit_conv_handler, clan_withdraw_conv_handler,
@@ -90,7 +92,9 @@ all_guild_handlers = [
     clan_handler,
     clan_manage_menu_handler, clan_kick_menu_handler, clan_kick_confirm_handler,
     clan_kick_do_handler, missions_menu_handler, mission_claim_handler,
-    mission_reroll_handler, clan_mission_start_handler, clan_mission_confirm_handler,
+    mission_reroll_handler, clan_mission_start_handler,
     clan_board_purchase_handler, clan_guild_mission_details_handler,
     clan_bank_menu_handler, clan_upgrade_menu_handler, clan_upgrade_confirm_handler, clan_mission_details_handler,
+    clan_mission_preview_handler,
+    clan_mission_accept_handler,
 ]

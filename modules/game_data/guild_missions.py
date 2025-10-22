@@ -1,9 +1,16 @@
 # Ficheiro: modules/game_data/guild_missions.py
 
+# Ficheiro: modules/game_data/guild_missions.py
+# VERSÃO ATUALIZADA COM LORE (HISTÓRIA)
+
 """
 Este ficheiro serve como um catálogo central para todas as possíveis
 missões que uma guilda pode receber. A estrutura é um dicionário para
 facilitar a busca de uma missão pelo seu ID.
+
+Novos Campos:
+- story: A narrativa ou "lore" que dá contexto à missão.
+- objective: A instrução clara do que a guilda precisa fazer.
 
 Estrutura da Recompensa:
   - guild_xp: Pontos de prestígio que são adicionados ao clã.
@@ -16,7 +23,13 @@ GUILD_MISSIONS_CATALOG = {
     
     "weekly_hunt_goblins_batedores": {
         "title": "Guerra aos Goblins",
-        "description": "Uma infestação de Goblins Batedores ameaça a Floresta Sombria. A sua guilda foi contratada para erradicar a ameaça.",
+        "story": (
+            "O Capitão da Guarda, Valerius, bate com o punho na mesa. \"Outra caravana... "
+            "perdida! A Floresta Sombria está infestada de Goblins Batedores. Eles estão "
+            "mais ousados, atacando à luz do dia! Precisamos de uma guilda forte para "
+            "dar um basta nisso. Limpem a floresta, em nome de Eldora!\""
+        ),
+        "objective": "A sua guilda foi contratada para erradicar 500 Goblins Batedores da Floresta Sombria.",
         "type": "HUNT",
         "target_monster_id": "goblin_batedor",
         "target_count": 500,
@@ -30,7 +43,13 @@ GUILD_MISSIONS_CATALOG = {
     
     "weekly_hunt_kobolds_escavadores": {
         "title": "Limpeza na Pedreira",
-        "description": "Os Kobolds Escavadores estão a sabotar as operações na Pedreira de Granito. Acabem com eles.",
+        "story": (
+            "\"Eles estão por toda parte!\" grita o Mestre Mineiro Durin. \"Esses malditos Kobolds "
+            "Escavadores estão a sabotar nossos túneis na Pedreira de Granito, roubando "
+            "ferramentas e causando desmoronamentos. Se não os pararmos, a produção de "
+            "pedra para a capital vai parar!\""
+        ),
+        "objective": "Os Kobolds Escavadores estão a sabotar as operações na Pedreira de Granito. Acabem com 400 deles.",
         "type": "HUNT",
         "target_monster_id": "kobold_escavador",
         "target_count": 400,
@@ -43,7 +62,13 @@ GUILD_MISSIONS_CATALOG = {
 
     "weekly_hunt_lobos_alfa": {
         "title": "A Alcateia Sombria",
-        "description": "Uma alcateia de Lobos Alfa anormalmente agressiva está a aterrorizar os viajantes. Cace os líderes da alcateia.",
+        "story": (
+            "Um caçador local chega à guilda, pálido e ofegante. \"Não é uma alcateia comum... "
+            "os olhos deles... brilham com uma malícia sombria. Os Lobos Alfa estão "
+            "maiores, mais rápidos e anormalmente agressivos. Eles não estão caçando "
+            "por comida, estão caçando por esporte. Os viajantes não têm chance.\""
+        ),
+        "objective": "Uma alcateia de Lobos Alfa agressiva está a aterrorizar os viajantes. Cace 100 dos líderes da alcateia.",
         "type": "HUNT",
         "target_monster_id": "lobo_alfa",
         "target_count": 100,
@@ -57,8 +82,14 @@ GUILD_MISSIONS_CATALOG = {
 
     # --- Missões de Elite (Mais difíceis, mas mais rápidas) ---
     "daily_hunt_elite_basiliscos": {
-        "title": "Desafio do Dia: Basiliscos",
-        "description": "Um Basilisco Jovem foi avistado na Pedreira. Derrotem-no como um esforço de equipa antes que cresça.",
+        "title": "Desafio do Dia: Olhar Petrificante",
+        "story": (
+            "Um erudito da Torre de Marfim enviou um pedido urgente. \"Um Basilisco Jovem "
+            "foi avistado na Pedreira! Precisamos de espécimes antes que ele amadureça "
+            "e se torne uma ameaça de nível 'catástrofe'. Uma guilda rápida e "
+            "coordenada pode dar conta do recado. Mas cuidado com seus olhos!\""
+        ),
+        "objective": "Um Basilisco Jovem foi avistado na Pedreira. Derrotem 10 deles como um esforço de equipa antes que cresçam.",
         "type": "HUNT",
         "target_monster_id": "basilisco_jovem", # Assumindo que este é um monstro de elite
         "target_count": 10,
