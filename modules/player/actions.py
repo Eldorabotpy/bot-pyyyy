@@ -237,6 +237,35 @@ def add_pvp_entries(player_data: dict, amount: int):
     current_entries = get_pvp_entries(player_data)
     player_data["pvp_entries_left"] = current_entries + amount
 
+def get_pvp_points(player_data: dict) -> int:
+    """
+    Retorna a pontuação PvP (Elo) atual do jogador.
+    """
+    # O .get("pvp_points", 0) garante que, se o jogador ainda não tiver
+    # essa chave, a função retorna 0 em vez de dar erro.
+    return _ival(player_data.get("pvp_points"), 0)
+
+def add_pvp_points(player_data: dict, amount: int):
+    """
+    Adiciona ou remove (se 'amount' for negativo) pontos PvP de um jogador.
+    Garante que os pontos nunca ficam abaixo de 0.
+    """
+    # 1. Obtém os pontos atuais
+    current_points = get_pvp_points(player_data)
+    
+    # 2. Calcula os novos pontos
+    new_points = current_points + amount
+    
+    # 3. Garante que os pontos não ficam negativos
+    if new_points < 0:
+        new_points = 0
+        
+    # 4. Salva os novos pontos no dicionário
+    player_data["pvp_points"] = new_points
+    
+    # 5. Retorna os novos pontos (opcional, mas útil)
+    return new_points
+
 # ======================================================
 # --- NOVO: EFEITOS DE CONSUMÍVEIS (POÇÕES, ETC.) ---
 # ======================================================

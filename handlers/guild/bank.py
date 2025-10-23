@@ -50,6 +50,7 @@ async def show_clan_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             InlineKeyboardButton("💰 Depositar Ouro", callback_data="clan_deposit_start"),
             InlineKeyboardButton("💸 Retirar Ouro", callback_data="clan_withdraw_start"),
         ],
+        [InlineKeyboardButton("📖 Ver Histórico", callback_data="clan_bank_log")],
         [InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data="clan_menu")],
     ]
     
@@ -61,6 +62,39 @@ async def show_clan_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 # --- Lógica de Depósito e Retirada ---
+async def show_bank_log(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra o histórico de transações do banco."""
+    print(">>> DEBUG: Função show_bank_log FOI CHAMADA!")
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    clan_id = player_manager.get_player_data(user_id).get("clan_id")
+    clan_data = clan_manager.get_clan(clan_id)
+    
+    bank_log = clan_data.get("bank_log", [])
+    
+    caption = "📖 <b>Histórico do Banco</b> 📖\n\n"
+    
+    if not bank_log:
+        caption += "Nenhuma transação registrada ainda."
+    else:
+        # Mostra as últimas 10 transações
+        for entry in bank_log[:10]:
+            action_emoji = "💰" if entry['action'] == 'depositou' else "💸"
+            caption += (
+                f"<code>[{entry['timestamp']}]</code>\n"
+                f"{action_emoji} {entry['player_name']} {entry['action']} "
+                f"<b>{entry['amount']:,}</b> 🪙\n\n"
+            )
+            
+    keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Banco", callback_data="clan_bank_menu")]]
+    
+    await safe_edit_message(
+        query,
+        text=caption,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='HTML'
+    )
 
 async def start_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Inicia a conversa para depositar ouro."""
@@ -68,6 +102,8 @@ async def start_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await query.answer()
     await safe_edit_message(query, text="Quanto ouro você gostaria de depositar?\nEnvie um número ou use /cancelar.")
     return ASKING_DEPOSIT_AMOUNT
+
+# Em handlers/guild/bank.py
 
 async def receive_deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Processa a quantia de ouro a ser depositada."""
@@ -79,31 +115,35 @@ async def receive_deposit_amount(update: Update, context: ContextTypes.DEFAULT_T
         amount = int(update.message.text)
         if amount <= 0:
             await update.message.reply_text("Por favor, envie um número positivo.")
-            return ASKING_DEPOSIT_AMOUNT
+            return ASKING_DEPOSIT_AMOUNT # Permanece na conversa
     except ValueError:
         await update.message.reply_text("Entrada inválida. Por favor, envie apenas números.")
-        return ASKING_DEPOSIT_AMOUNT
+        return ASKING_DEPOSIT_AMOUNT # Permanece na conversa
 
-    if player_data.get("gold", 0) < amount:
-        await update.message.reply_text("Você não tem ouro suficiente para depositar essa quantia.")
-        return ConversationHandler.END
-
-    clan_manager.deposit_gold(clan_id, user_id, amount)
+    # --- ADICIONEI O DEBUG AQUI ---
+    # Vamos ver o que o bot acha que você tem, ANTES de tentar depositar.
+    print(f"[DEBUG BANCO] Tentando depositar: {amount}. Ouro do jogador (lido pelo bank.py): {player_data.get('gold', 0)}")
+    # -----------------------------------
     
-    # ✅ 1. CRIAÇÃO DO BOTÃO "VOLTAR"
+    # Agora chamamos o 'cérebro' (clan_manager) para fazer a lógica
+    success, message = clan_manager.deposit_gold(clan_id, user_id, amount)
+
     keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Banco", callback_data="clan_bank_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ✅ 2. MENSAGEM DE SUCESSO COM O BOTÃO
-    await update.message.reply_text(
-        f"✅ Você depositou {amount:,} 🪙 de ouro no banco do clã com sucesso!",
-        reply_markup=reply_markup
-    )
-    
-    # ✅ 3. REMOÇÃO DA CHAMADA AUTOMÁTICA
-    # await show_clan_bank_menu(update, context) 
+    if success:
+        await update.message.reply_text(
+            f"✅ {message}", # A mensagem de sucesso agora vem do clan_manager
+            reply_markup=reply_markup
+        )
+    else:
+        # Se falhar (ex: sem ouro), avisa o erro
+        await update.message.reply_text(
+            f"❌ Erro: {message}",
+            reply_markup=reply_markup
+        )
+        
     return ConversationHandler.END
-
 
 async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Inicia a conversa para retirar ouro."""
@@ -160,7 +200,7 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
 # --- Definição dos Handlers ---
 
 clan_bank_menu_handler = CallbackQueryHandler(show_clan_bank_menu, pattern=r'^clan_bank_menu$')
-
+clan_bank_log_handler = CallbackQueryHandler(show_bank_log, pattern=r'^clan_bank_log$')
 clan_deposit_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(start_deposit, pattern=r'^clan_deposit_start$')],
     states={

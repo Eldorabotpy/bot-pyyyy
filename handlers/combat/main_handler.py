@@ -9,6 +9,7 @@ from telegram.error import BadRequest
 
 # Importações dos seus módulos
 from modules import player_manager, game_data, class_evolution_service
+from modules import clan_manager
 from handlers.menu.region import send_region_menu
 from handlers.utils import format_combat_message
 from modules.combat import durability, criticals, rewards
@@ -149,6 +150,26 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 return
 
             # VITÓRIA NORMAL
+            print(f"[DEBUG MISSÃO DE GUILDA] Detalhes do combate: {combat_details}")
+            clan_id = player_data.get("clan_id")
+            monster_id = combat_details.get("id") # Pega o ID do monstro derrotado
+            
+            print(f"[DEBUG MISSÃO DE GUILDA] Clan ID: {clan_id}, Monster ID: {monster_id}")
+
+            # Se o jogador tem um clã E o monstro tem um ID
+            if clan_id and monster_id:
+                try:
+                    # Avisa o clan_manager para registar a morte
+                    await clan_manager.update_guild_mission_progress(
+                        clan_id=clan_id,
+                        mission_type="HUNT", # Tipo da nossa missão
+                        details={"monster_id": monster_id, "count": 1}, # Detalhes
+                        context=context # Passa o 'context' para enviar notificações
+                    )
+                except Exception as e:
+                    # Loga o erro, mas não quebra o combate
+                    logger.error(f"Falha ao atualizar progresso da missão de guilda para o clã {clan_id}: {e}")
+
             victory_summary = await rewards.apply_and_format_victory(player_data, combat_details, context)
             _, _, level_up_msg = player_manager.check_and_apply_level_up(player_data)
             if level_up_msg:

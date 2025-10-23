@@ -1,8 +1,5 @@
 # Em pvp/pvp_config.py
 
-# Em pvp/pvp_config.py
-
-# Dicionário com os limites de pontos para cada Elo
 ELO_THRESHOLDS = {
     "Bronze": 0,
     "Prata": 1500,
@@ -43,12 +40,19 @@ ARENA_MODIFIERS = {
         "effect": "agility_day",
         "description": "A chance de Esquiva e Ataque Duplo de todos os jogadores é aumentada em 15%."
     },
+    # =========================================================
+    # 👇 [CORREÇÃO DE BALANCEAMENTO] 👇
+    # =========================================================
     # Quarta-feira (weekday() == 2)
     2: {
         "name": "Dia da Muralha 🛡️",
         "effect": "wall_day",
-        "description": "A Defesa de todos os jogadores é dobrada, mas o Ataque é reduzido em 25%."
+        # Alterado de "Defesa dobrada / Ataque -25%"
+        "description": "A Defesa de todos os jogadores aumenta em 50%, mas o Ataque é reduzido em 20%."
     },
+    # =========================================================
+    # 👆 [FIM DA CORREÇÃO] 👆
+    # =========================================================
     # Quinta-feira (weekday() == 3)
     3: {
         "name": "Dia da Sorte Crítica 🍀",

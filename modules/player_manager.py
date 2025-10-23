@@ -1,5 +1,3 @@
-# Em modules/player_manager.py
-
 from __future__ import annotations
 
 # --- 1. Funções do Core ---
@@ -66,6 +64,12 @@ from .player.actions import (
     add_pvp_entries,
     heal_player, 
     add_buff, 
+    
+    # ==================================
+    # 👇 FUNÇÕES DE PVP ADICIONADAS 👇
+    # ==================================
+    get_pvp_points,
+    add_pvp_points,
 )
 
 # =================================================================

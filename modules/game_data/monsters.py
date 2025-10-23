@@ -507,7 +507,7 @@ MONSTERS_DATA = {
             "id": "goblin_batedor",
             "name": "Goblin Batedor",
             "hp": 40, "attack": 5, "defense": 1, "initiative": 8, "luck": 5,
-            "xp_reward": 1, "ambush_chance": 0.25,
+            "xp_reward": 1, "ambush_chance": 1.25,
             "file_id_name": "goblin_batedor_media",
             "gold_drop": 1,
             "loot_table": [

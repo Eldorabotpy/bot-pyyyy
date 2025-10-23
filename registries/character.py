@@ -49,11 +49,11 @@ from handlers.profession_handler import (
 def register_character_handlers(application: Application):
     """Regista todos os handlers relacionados ao personagem."""
 
-    handlers_to_add = [
-        # Início e Criação
+    # Handlers normais (irão para o group=0 por padrão)
+    normal_handlers = [
+        # Início e Criação (exceto o ladrão)
         start_command_handler,
         name_command_handler,
-        character_creation_handler,
         # Status, Perfil, Inventário
         status_command_handler,
         status_open_handler,
@@ -78,4 +78,11 @@ def register_character_handlers(application: Application):
         job_pick_handler,
     ]
 
-    application.add_handlers(handlers_to_add)
+    # --- CORREÇÃO APLICADA AQUI ---
+    # Registramos os handlers normais primeiro
+    application.add_handlers(normal_handlers)
+
+    # Registramos o 'character_creation_handler' SEPARADAMENTE
+    # e o colocamos no group=1 (prioridade menor)
+    application.add_handler(character_creation_handler, group=1)
+    # --- FIM DA CORREÇÃO ---

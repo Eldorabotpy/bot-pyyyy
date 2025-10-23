@@ -8,7 +8,7 @@ from .pvp_config import ARENA_MODIFIERS
 from . import pvp_battle
 from . import pvp_config
 from . import pvp_utils
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from modules import player_manager, file_ids
 
@@ -19,7 +19,6 @@ PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
 PVP_HISTORICO = "pvp_historico"
 
-
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Procurando um oponente digno...")
@@ -29,11 +28,20 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     # 1. Lógica do Sistema de Entradas (Tickets)
     if not player_manager.use_pvp_entry(player_data):
         remaining_entries = player_manager.get_pvp_entries(player_data)
-        # <<< NOTA: A resposta aqui deve ser editada na mensagem, não no "answer" que some. >>>
         await context.bot.answer_callback_query(query.id, f"Você não tem mais entradas de PvP hoje! ({remaining_entries}/10)", show_alert=True)
         return
     
     player_manager.save_player_data(user_id, player_data)
+
+    # =========================================================
+    # 👇 LÓGICA: LER O MODIFICADOR DO DIA 👇
+    # =========================================================
+    today_weekday = datetime.datetime.now().weekday()
+    modifier = ARENA_MODIFIERS.get(today_weekday)
+    current_effect = None
+    if modifier:
+        current_effect = modifier.get("effect")
+    # =========================================================
 
     # 2. Lógica de Matchmaking Flexível
     my_points = player_manager.get_pvp_points(player_data)
@@ -42,7 +50,6 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     same_elo_opponents = []
     lower_elo_opponents = []
 
-    # Este iterador pode ser lento. Para um jogo maior, considere uma base de dados.
     for opponent_id, opp_data in player_manager.iter_players():
         if opponent_id == user_id: continue
         
@@ -63,56 +70,147 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
     # 4. Inicia a Batalha ou Informa que não encontrou
     if final_opponent_id:
-        await query.edit_message_caption(caption=f"⚔️ Oponente encontrado! Simulando batalha...")
-        
-        # CHAMA O SIMULADOR DE BATALHA
-        vencedor_id, log_completo = pvp_battle.simular_batalha_completa(user_id, final_opponent_id)
-        
-        elo_ganho = 25
-        elo_perdido = 15
-        
-        log_final = list(log_completo)
         
         opponent_data = player_manager.get_player_data(final_opponent_id)
-
-        if vencedor_id == user_id:
-            # Recompensas para o jogador que iniciou
-            player_manager.add_pvp_points(player_data, elo_ganho)
-            player_manager.add_pvp_points(opponent_data, -elo_perdido) # O oponente perde pontos
-            log_final.append(f"\n🏆 Você ganhou <b>+{elo_ganho}</b> pontos de Elo!")
-
-            # =========================================================
-            # 👇 INTEGRAÇÃO COM MISSÕES DE GUILDA (PVP_WIN) 👇
-            # =========================================================
-            clan_id = player_data.get("clan_id")
-            if clan_id:
-                clan_manager.update_guild_mission_progress(
-                    clan_id=clan_id,
-                    mission_type='PVP_WIN',
-                    details={'count': 1}
-                )
-            # =========================================================
-
-        elif vencedor_id == final_opponent_id:
-            # Penalidades para o jogador que iniciou
-            player_manager.add_pvp_points(player_data, -elo_perdido)
-            player_manager.add_pvp_points(opponent_data, elo_ganho) # O oponente ganha pontos
-            log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
         
-        # Salva os dados de ambos os jogadores
-        player_manager.save_player_data(user_id, player_data)
-        player_manager.save_player_data(final_opponent_id, opponent_data)
+        # =========================================================
+        # 👇 [CORREÇÃO 1 e 2] Definir caption ANTES e tratar classe Nula 👇
+        # =========================================================
+        
+        # Define a caption aqui para que o 'except' a possa aceder
+        caption_batalha = "⚔️ Oponente encontrado! Simulando batalha..."
+        
+        # Bloco de Lógica para editar a mensagem ANTES da batalha
+        try:
+            # .get("class") or "default" trata chaves em falta E valores None
+            opponent_class = opponent_data.get("class") or "default"
+            video_key = f"class_video_{opponent_class.lower()}"
+            media_data = file_ids.get_file_data(video_key)
 
-        # Formata e exibe o resultado final
-        resultado_final = "\n".join(log_final)
-        keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Arena", callback_data="pvp_arena")]]
-        await query.edit_message_caption(caption=resultado_final, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            if media_data and media_data.get("id"):
+                new_media = InputMediaVideo(
+                    media=media_data["id"],
+                    caption=caption_batalha,
+                    parse_mode="HTML"
+                )
+                await query.edit_message_media(media=new_media)
+            else:
+                logger.warning(f"Vídeo '{video_key}' não encontrado. Usando edit_caption.")
+                await query.edit_message_caption(caption=caption_batalha, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Falha ao trocar mídia/caption: {e}")
+            try:
+                # Agora 'caption_batalha' está definida e isto funcionará
+                await query.edit_message_text(text=caption_batalha, parse_mode="HTML")
+            except Exception as e2:
+                logger.error(f"Falha ao editar texto como fallback: {e2}")
+        # =========================================================
+        # 👆 FIM DAS CORREÇÕES 1 e 2 👆
+        # =========================================================
+        
+        # =========================================================
+        # 👇 INÍCIO DO BLOCO DE SEGURANÇA DA BATALHA 👇
+        # =========================================================
+        try:
+            vencedor_id, log_completo = pvp_battle.simular_batalha_completa(
+                user_id, 
+                final_opponent_id,
+                modifier_effect=current_effect
+            )
+            
+            # Valores base de Elo
+            elo_ganho_base = 25
+            elo_perdido_base = 15
+            
+            log_final = list(log_completo)
+            
+            # Aplicar efeitos de recompensa (Prestígio)
+            if current_effect == "prestige_day":
+                elo_ganho = int(elo_ganho_base * 1.5)
+                elo_perdido = int(elo_perdido_base * 1.5)
+                log_final.append("\n🏆 <b>Dia do Prestígio!</b> Pontos de Elo ganhos/perdidos aumentados em 50%!")
+            else:
+                elo_ganho = elo_ganho_base
+                elo_perdido = elo_perdido_base
+            
+            if vencedor_id == user_id:
+                player_manager.add_pvp_points(player_data, elo_ganho)
+                player_manager.add_pvp_points(opponent_data, -elo_perdido)
+                log_final.append(f"\n🏆 Você ganhou <b>+{elo_ganho}</b> pontos de Elo!")
+                
+                if current_effect == "greed_day":
+                    log_final.append("💰 <b>Dia da Ganância!</b> Recompensas em Ouro da vitória são dobradas!")
+
+                # =========================================================
+                # 👇 [CORREÇÃO 3] Passar 'context' para a função 👇
+                # =========================================================
+                clan_id = player_data.get("clan_id")
+                if clan_id:
+                    clan_manager.update_guild_mission_progress(
+                        clan_id=clan_id,
+                        mission_type='PVP_WIN',
+                        details={'count': 1},
+                        context=context  # <-- Argumento 'context' adicionado
+                    )
+                # =========================================================
+                # 👆 FIM DA CORREÇÃO 3 👆
+                # =========================================================
+
+            elif vencedor_id == final_opponent_id:
+                player_manager.add_pvp_points(player_data, -elo_perdido)
+                player_manager.add_pvp_points(opponent_data, elo_ganho)
+                log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
+            
+            # Salva os dados de ambos os jogadores
+            player_manager.save_player_data(user_id, player_data)
+            player_manager.save_player_data(final_opponent_id, opponent_data)
+
+            # Formata e exibe o resultado final
+            resultado_final = "\n".join(log_final)
+            keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Arena", callback_data="pvp_arena")]]
+            
+            # Lógica robusta de exibição de resultado
+            try:
+                await query.edit_message_caption(caption=resultado_final, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            except Exception:
+                await query.edit_message_text(
+                    text=resultado_final, 
+                    reply_markup=InlineKeyboardMarkup(keyboard), 
+                    parse_mode="HTML"
+                )
+        
+        except Exception as e_battle:
+            # Bloco de Captura de Erro da Batalha
+            logger.error(f"Erro CRÍTICO durante a simulação da batalha: {e_battle}", exc_info=True)
+            
+            # Devolve a entrada ao jogador
+            player_manager.add_pvp_entries(player_data, 1) 
+            player_manager.save_player_data(user_id, player_data)
+            
+            # Informa o usuário da falha
+            error_message = (
+                "🛡️ **Falha na Batalha** 🛡️\n\n"
+                "Ocorreu um erro inesperado ao simular a batalha.\n"
+                "Sua entrada de PvP foi devolvida. Tente novamente."
+            )
+            keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Arena", callback_data="pvp_arena")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            try:
+                await query.edit_message_caption(caption=error_message, reply_markup=reply_markup, parse_mode="HTML")
+            except Exception:
+                await query.edit_message_text(text=error_message, reply_markup=reply_markup, parse_mode="HTML")
         
     else:
-        await query.edit_message_caption(caption=f"🛡️ Nenhum oponente encontrado no momento. Tente novamente mais tarde.")
+        # Se não achou oponente, devolve a entrada (com fallback)
+        try:
+            await query.edit_message_caption(caption=f"🛡️ Nenhum oponente encontrado no momento. Tente novamente mais tarde.")
+        except Exception:
+            await query.edit_message_text(text=f"🛡️ Nenhum oponente encontrado no momento. Tente novamente mais tarde.")
+            
         player_manager.add_pvp_entries(player_data, 1) # Devolve a entrada
         player_manager.save_player_data(user_id, player_data)
-
+                
 async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Função 'Ranking' ainda em construção!", show_alert=True)
@@ -120,11 +218,6 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Função 'Histórico' ainda em construção!", show_alert=True)
-
-
-# --- Função Principal do Menu da Arena ---
-
-# Em pvp/pvp_handler.py
 
 async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Responde ao comando /pvp ou a um botão para abrir o menu da arena."""
@@ -134,9 +227,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not player_manager.get_player_data(user_id):
         await context.bot.send_message(chat_id, "Você precisa criar um personagem primeiro com /start.")
         return
-
-    # --- NOVA LÓGICA DO MODIFICADOR DIÁRIO ---
-    # Pega o dia da semana atual (Segunda = 0, Terça = 1, ...)
+    
     today_weekday = datetime.datetime.now().weekday()
     modifier = ARENA_MODIFIERS.get(today_weekday)
 

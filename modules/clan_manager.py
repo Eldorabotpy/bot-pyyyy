@@ -7,13 +7,13 @@ import unicodedata
 from datetime import datetime, timezone, timedelta
 import random
 
-# --- IMPORTS DE DADOS DO JOGO ---
+
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS, CLAN_CONFIG
-# Este ficheiro precisará de ser criado no próximo passo
+
 from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG 
 from modules import player_manager
 from telegram.ext import ContextTypes
-# --- CONSTANTES ---
+
 CLANS_DIR_PATH = "data/clans/"
 
 
@@ -97,6 +97,28 @@ async def update_guild_mission_progress(clan_id: str, mission_type: str, details
     
     save_clan(clan_id, clan_data)
 
+def _add_bank_log_entry(clan_data: dict, user_id: int, action: str, amount: int):
+    """Adiciona uma entrada ao log do banco do clã."""
+    if "bank_log" not in clan_data:
+        clan_data["bank_log"] = []
+    
+    player_name = player_manager.get_player_data(user_id).get("character_name", f"ID: {user_id}")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    
+    log_entry = {
+        "timestamp": timestamp,
+        "player_name": player_name,
+        "action": action, # ex: "depositou" ou "retirou"
+        "amount": amount
+    }
+    
+    # Adiciona a nova entrada no início da lista
+    clan_data["bank_log"].insert(0, log_entry)
+    
+    # Mantém o log com um limite (ex: últimas 50 transações)
+    if len(clan_data["bank_log"]) > 50:
+        clan_data["bank_log"] = clan_data["bank_log"][:50]
+
 def deposit_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     """
     Deposita ouro da conta de um jogador para o banco do clã.
@@ -112,6 +134,8 @@ def deposit_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     player_data = player_manager.get_player_data(user_id)
     if not player_data:
         return False, "Jogador não encontrado."
+    
+    print(f"[DEBUG BANCO] Tentando depositar: {amount}. Ouro do jogador: {player_data.get('gold', 0)}")
 
     # Tenta gastar o ouro do jogador
     if player_data.get("gold", 0) < amount:
@@ -122,7 +146,8 @@ def deposit_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     
     bank = clan_data.setdefault("bank", {})
     bank["gold"] = bank.get("gold", 0) + amount
-    
+    _add_bank_log_entry(clan_data, user_id, "depositou", amount)
+
     # Salva ambas as entidades
     save_clan(clan_id, clan_data)
     player_manager.save_player_data(user_id, player_data)
@@ -189,7 +214,8 @@ def withdraw_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     
     player_data = player_manager.get_player_data(user_id)
     player_data["gold"] = player_data.get("gold", 0) + amount
-    
+    _add_bank_log_entry(clan_data, user_id, "retirou", amount)
+
     # Salva ambas as entidades
     save_clan(clan_id, clan_data)
     player_manager.save_player_data(user_id, player_data)
