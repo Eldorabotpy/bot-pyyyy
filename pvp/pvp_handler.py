@@ -70,23 +70,17 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         
         opponent_data = player_manager.get_player_data(final_opponent_id)
         
-        # Define a caption aqui para que o 'except' a possa aceder
         caption_batalha = "⚔️ Oponente encontrado! Simulando batalha..."
         
         # Bloco de Lógica para editar a mensagem ANTES da batalha
         try:
-            # =========================================================
-            # 👇 [CORREÇÃO 1] Lógica "Inteligente" para encontrar a classe 👇
-            # (Igual à que vimos no teu stats.py)
-            # =========================================================
             opponent_class_key = (
                 opponent_data.get("class_key") or
                 opponent_data.get("class") or
                 opponent_data.get("classe") or
                 opponent_data.get("class_type") or
-                "default"  # Se tudo falhar, usa "default"
+                "default"
             )
-            # =========================================================
             
             video_key = f"classe_{opponent_class_key.lower()}_media"
             media_data = file_ids.get_file_data(video_key)
@@ -99,28 +93,20 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 )
                 await query.edit_message_media(media=new_media)
             else:
-                logger.warning(f"Vídeo '{video_key}' não encontrado. Usando edit_caption.")
+                logger.warning(f"Vídeo/Mídia '{video_key}' não encontrado. Usando edit_caption.")
                 await query.edit_message_caption(caption=caption_batalha, parse_mode="HTML")
         
         except Exception as e:
-            # =========================================================
-            # 👇 [CORREÇÃO 2] Lógica de Fallback melhorada 👇
-            # =========================================================
+            # Lógica de Fallback melhorada
             logger.error(f"Falha ao trocar mídia/caption: {e}")
             try:
-                # O Fallback principal deve ser editar a LEGENDA,
-                # pois a mensagem original (arena) é uma foto.
                 await query.edit_message_caption(caption=caption_batalha, parse_mode="HTML")
             except Exception as e2:
-                # Se ISTO falhar (ex: a foto da arena falhou e o menu é texto-puro)
-                # Tenta editar como texto.
                 logger.error(f"Falha ao editar caption como fallback: {e2}")
                 try:
                     await query.edit_message_text(text=caption_batalha, parse_mode="HTML")
                 except Exception as e3:
                      logger.error(f"Falha ao editar texto como fallback final: {e3}")
-            # =========================================================
-
         
         # Bloco de Segurança da Batalha (try...except e_battle)
         try:
@@ -159,7 +145,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                         clan_id=clan_id,
                         mission_type='PVP_WIN',
                         details={'count': 1},
-                        context=context  # Corrigido
+                        context=context
                     )
 
             elif vencedor_id == final_opponent_id:
@@ -174,16 +160,42 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             # Formata e exibe o resultado final
             resultado_final = "\n".join(log_final)
             keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Arena", callback_data="pvp_arena")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # =========================================================
+            # 👇 [CORREÇÃO] Lógica para Logs de Batalha Longos 👇
+            # =========================================================
             
-            # Lógica robusta de exibição de resultado (mantida)
-            try:
-                await query.edit_message_caption(caption=resultado_final, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-            except Exception:
-                await query.edit_message_text(
-                    text=resultado_final, 
-                    reply_markup=InlineKeyboardMarkup(keyboard), 
+            # Limite de segurança do Telegram para legendas é 1024
+            if len(resultado_final) > 1020:
+                # Se o log for muito longo, não podemos usar edit_caption.
+                # A melhor solução é apagar a mídia e enviar um novo texto.
+                logger.warning("Log de batalha muito longo (>1024). Enviando como nova mensagem.")
+                try:
+                    await query.delete_message()
+                except Exception as del_e:
+                    logger.error(f"Falha ao deletar mídia antes de enviar log longo: {del_e}")
+                
+                # Envia o resultado como uma nova mensagem de texto (limite 4096)
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text=resultado_final[:4090], # Trunca por segurança
+                    reply_markup=reply_markup,
                     parse_mode="HTML"
                 )
+            else:
+                # Se o log for curto, usa a lógica antiga (robusta)
+                try:
+                    await query.edit_message_caption(caption=resultado_final, reply_markup=reply_markup, parse_mode="HTML")
+                except Exception:
+                    await query.edit_message_text(
+                        text=resultado_final, 
+                        reply_markup=reply_markup, 
+                        parse_mode="HTML"
+                    )
+            # =========================================================
+            # 👆 [FIM DA CORREÇÃO] 👆
+            # =========================================================
         
         except Exception as e_battle:
             # Bloco de Captura de Erro da Batalha (mantido)
@@ -211,7 +223,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             
         player_manager.add_pvp_entries(player_data, 1) 
         player_manager.save_player_data(user_id, player_data)
-
+        
 async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Função 'Ranking' ainda em construção!", show_alert=True)
