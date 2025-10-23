@@ -33,15 +33,12 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     
     player_manager.save_player_data(user_id, player_data)
 
-    # =========================================================
-    # 👇 LÓGICA: LER O MODIFICADOR DO DIA 👇
-    # =========================================================
+    # Lógica do Modificador do Dia
     today_weekday = datetime.datetime.now().weekday()
     modifier = ARENA_MODIFIERS.get(today_weekday)
     current_effect = None
     if modifier:
         current_effect = modifier.get("effect")
-    # =========================================================
 
     # 2. Lógica de Matchmaking Flexível
     my_points = player_manager.get_pvp_points(player_data)
@@ -73,18 +70,25 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         
         opponent_data = player_manager.get_player_data(final_opponent_id)
         
-        # =========================================================
-        # 👇 [CORREÇÃO 1 e 2] Definir caption ANTES e tratar classe Nula 👇
-        # =========================================================
-        
         # Define a caption aqui para que o 'except' a possa aceder
         caption_batalha = "⚔️ Oponente encontrado! Simulando batalha..."
         
         # Bloco de Lógica para editar a mensagem ANTES da batalha
         try:
-            # .get("class") or "default" trata chaves em falta E valores None
-            opponent_class = opponent_data.get("class") or "default"
-            video_key = f"class_video_{opponent_class.lower()}"
+            # =========================================================
+            # 👇 [CORREÇÃO 1] Lógica "Inteligente" para encontrar a classe 👇
+            # (Igual à que vimos no teu stats.py)
+            # =========================================================
+            opponent_class_key = (
+                opponent_data.get("class_key") or
+                opponent_data.get("class") or
+                opponent_data.get("classe") or
+                opponent_data.get("class_type") or
+                "default"  # Se tudo falhar, usa "default"
+            )
+            # =========================================================
+            
+            video_key = f"classe_{opponent_class_key.lower()}_media"
             media_data = file_ids.get_file_data(video_key)
 
             if media_data and media_data.get("id"):
@@ -97,20 +101,28 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             else:
                 logger.warning(f"Vídeo '{video_key}' não encontrado. Usando edit_caption.")
                 await query.edit_message_caption(caption=caption_batalha, parse_mode="HTML")
+        
         except Exception as e:
+            # =========================================================
+            # 👇 [CORREÇÃO 2] Lógica de Fallback melhorada 👇
+            # =========================================================
             logger.error(f"Falha ao trocar mídia/caption: {e}")
             try:
-                # Agora 'caption_batalha' está definida e isto funcionará
-                await query.edit_message_text(text=caption_batalha, parse_mode="HTML")
+                # O Fallback principal deve ser editar a LEGENDA,
+                # pois a mensagem original (arena) é uma foto.
+                await query.edit_message_caption(caption=caption_batalha, parse_mode="HTML")
             except Exception as e2:
-                logger.error(f"Falha ao editar texto como fallback: {e2}")
-        # =========================================================
-        # 👆 FIM DAS CORREÇÕES 1 e 2 👆
-        # =========================================================
+                # Se ISTO falhar (ex: a foto da arena falhou e o menu é texto-puro)
+                # Tenta editar como texto.
+                logger.error(f"Falha ao editar caption como fallback: {e2}")
+                try:
+                    await query.edit_message_text(text=caption_batalha, parse_mode="HTML")
+                except Exception as e3:
+                     logger.error(f"Falha ao editar texto como fallback final: {e3}")
+            # =========================================================
+
         
-        # =========================================================
-        # 👇 INÍCIO DO BLOCO DE SEGURANÇA DA BATALHA 👇
-        # =========================================================
+        # Bloco de Segurança da Batalha (try...except e_battle)
         try:
             vencedor_id, log_completo = pvp_battle.simular_batalha_completa(
                 user_id, 
@@ -118,13 +130,12 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 modifier_effect=current_effect
             )
             
-            # Valores base de Elo
+            # ... (Lógica de Elo base) ...
             elo_ganho_base = 25
             elo_perdido_base = 15
-            
             log_final = list(log_completo)
             
-            # Aplicar efeitos de recompensa (Prestígio)
+            # ... (Lógica do Modificador de Prestígio) ...
             if current_effect == "prestige_day":
                 elo_ganho = int(elo_ganho_base * 1.5)
                 elo_perdido = int(elo_perdido_base * 1.5)
@@ -133,6 +144,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 elo_ganho = elo_ganho_base
                 elo_perdido = elo_perdido_base
             
+            # Lógica de Vitória/Derrota
             if vencedor_id == user_id:
                 player_manager.add_pvp_points(player_data, elo_ganho)
                 player_manager.add_pvp_points(opponent_data, -elo_perdido)
@@ -141,27 +153,21 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 if current_effect == "greed_day":
                     log_final.append("💰 <b>Dia da Ganância!</b> Recompensas em Ouro da vitória são dobradas!")
 
-                # =========================================================
-                # 👇 [CORREÇÃO 3] Passar 'context' para a função 👇
-                # =========================================================
                 clan_id = player_data.get("clan_id")
                 if clan_id:
                     clan_manager.update_guild_mission_progress(
                         clan_id=clan_id,
                         mission_type='PVP_WIN',
                         details={'count': 1},
-                        context=context  # <-- Argumento 'context' adicionado
+                        context=context  # Corrigido
                     )
-                # =========================================================
-                # 👆 FIM DA CORREÇÃO 3 👆
-                # =========================================================
 
             elif vencedor_id == final_opponent_id:
                 player_manager.add_pvp_points(player_data, -elo_perdido)
                 player_manager.add_pvp_points(opponent_data, elo_ganho)
                 log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
             
-            # Salva os dados de ambos os jogadores
+            # Salva os dados
             player_manager.save_player_data(user_id, player_data)
             player_manager.save_player_data(final_opponent_id, opponent_data)
 
@@ -169,7 +175,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             resultado_final = "\n".join(log_final)
             keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Arena", callback_data="pvp_arena")]]
             
-            # Lógica robusta de exibição de resultado
+            # Lógica robusta de exibição de resultado (mantida)
             try:
                 await query.edit_message_caption(caption=resultado_final, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             except Exception:
@@ -180,14 +186,10 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 )
         
         except Exception as e_battle:
-            # Bloco de Captura de Erro da Batalha
+            # Bloco de Captura de Erro da Batalha (mantido)
             logger.error(f"Erro CRÍTICO durante a simulação da batalha: {e_battle}", exc_info=True)
-            
-            # Devolve a entrada ao jogador
             player_manager.add_pvp_entries(player_data, 1) 
             player_manager.save_player_data(user_id, player_data)
-            
-            # Informa o usuário da falha
             error_message = (
                 "🛡️ **Falha na Batalha** 🛡️\n\n"
                 "Ocorreu um erro inesperado ao simular a batalha.\n"
@@ -195,22 +197,21 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             )
             keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Arena", callback_data="pvp_arena")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-
             try:
                 await query.edit_message_caption(caption=error_message, reply_markup=reply_markup, parse_mode="HTML")
             except Exception:
                 await query.edit_message_text(text=error_message, reply_markup=reply_markup, parse_mode="HTML")
         
     else:
-        # Se não achou oponente, devolve a entrada (com fallback)
+        # Se não achou oponente (mantido)
         try:
             await query.edit_message_caption(caption=f"🛡️ Nenhum oponente encontrado no momento. Tente novamente mais tarde.")
         except Exception:
             await query.edit_message_text(text=f"🛡️ Nenhum oponente encontrado no momento. Tente novamente mais tarde.")
             
-        player_manager.add_pvp_entries(player_data, 1) # Devolve a entrada
+        player_manager.add_pvp_entries(player_data, 1) 
         player_manager.save_player_data(user_id, player_data)
-                
+
 async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Função 'Ranking' ainda em construção!", show_alert=True)

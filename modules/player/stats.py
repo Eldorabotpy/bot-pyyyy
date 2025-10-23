@@ -47,13 +47,36 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
     return None
 
 def get_player_total_stats(player_data: dict) -> dict:
-    total = {
-        'max_hp': _ival(player_data.get('max_hp')),
-        'attack': _ival(player_data.get('attack')),
-        'defense': _ival(player_data.get('defense')),
-        'initiative': _ival(player_data.get('initiative')),
-        'luck': _ival(player_data.get('luck'))
-    }
+    
+    # =========================================================
+    # 👇 [CORREÇÃO DEFINITIVA] 👇
+    # =========================================================
+    
+    # 1. Calcula os stats base (de classe + nível)
+    lvl = _ival(player_data.get("level"), 1)
+    ckey = _get_class_key_normalized(player_data)
+    class_baseline = _compute_class_baseline_for_level(ckey, lvl)
+
+    # 2. Inicia o 'total' com os stats corretos
+    total = {}
+    for k in _BASELINE_KEYS:
+        # Pega o valor (base + investido) do top-level
+        current_val = _ival(player_data.get(k))
+        # Pega o valor (base)
+        baseline_val = _ival(class_baseline.get(k))
+        
+        # Se o valor top-level for 0 ou menor que a base (erro de sync),
+        # usa a base como ponto de partida. Caso contrário, usa o valor
+        # que já lá está (que é base + investido).
+        if current_val < baseline_val:
+            total[k] = baseline_val
+        else:
+            total[k] = current_val
+    # =========================================================
+    # 👆 [FIM DA CORREÇÃO] 👆
+    # =========================================================
+
+    # 3. Adiciona Stats de Equipamentos
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
     
@@ -68,6 +91,7 @@ def get_player_total_stats(player_data: dict) -> dict:
             elif stat_key == 'hp': total['max_hp'] += val
             elif stat_key in ('defense', 'initiative', 'luck'): total[stat_key] += val
     
+    # 4. Adiciona Buffs de Clã
     clan_id = player_data.get("clan_id")
     if clan_id:
         clan_buffs = clan_manager.get_clan_buffs(clan_id)
@@ -79,13 +103,15 @@ def get_player_total_stats(player_data: dict) -> dict:
         if "flat_hp_bonus" in clan_buffs:
             total['max_hp'] += clan_buffs["flat_hp_bonus"]
 
-    class_key = _get_class_key_normalized(player_data)
+    # 5. Calcula Mana
+    class_key = _get_class_key_normalized(player_data) # (Já foi calculado, mas repetimos para manter a lógica)
     class_prog = CLASS_PROGRESSIONS.get(class_key) or CLASS_PROGRESSIONS["_default"]
     mana_attribute_name = class_prog.get("mana_stat", "luck") 
     mana_attribute_value = total.get(mana_attribute_name, 0)
     mana_base = 10
     mana_por_ponto = 5
-    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)           
+    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto) 
+    
     return total
 
 def get_player_dodge_chance(player_data: dict) -> float:

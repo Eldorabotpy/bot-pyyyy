@@ -55,8 +55,8 @@ def _roll_damage(attacker_stats: dict, defender_stats: dict, crit_params: dict) 
     #    Estamos a adicionar +50 a ambos para testar a fórmula.
     #    Se os teus stats forem 0, o 'ataque' será 50 e a 'defesa' será 50.
     
-    attacker_atk = float(attacker_stats.get('ataque', 0)) + 50.0
-    defender_def = float(defender_stats.get('defesa', 0)) + 50.0 
+    attacker_atk = float(attacker_stats.get('ataque', 0))
+    defender_def = float(defender_stats.get('defesa', 0))
     
     # =========================================================
     
