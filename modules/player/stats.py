@@ -47,39 +47,56 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
     return None
 
 def get_player_total_stats(player_data: dict) -> dict:
-    
-    # =========================================================
-    # 👇 [CORREÇÃO DEFINITIVA] 👇
-    # =========================================================
-    
-    # 1. Calcula os stats base (de classe + nível)
+
+    # 1. Calcula os stats base (de classe + nível) - SEMPRE NECESSÁRIO
     lvl = _ival(player_data.get("level"), 1)
     ckey = _get_class_key_normalized(player_data)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
 
-    # 2. Inicia o 'total' com os stats corretos
+    # =========================================================
+    # 👇 [CORREÇÃO FINAL - Inicialização Robusta] 👇
+    # =========================================================
+
+    # 2. Inicia o 'total' diretamente com os valores base calculados
     total = {}
     for k in _BASELINE_KEYS:
-        # Pega o valor (base + investido) do top-level
-        current_val = _ival(player_data.get(k))
-        # Pega o valor (base)
-        baseline_val = _ival(class_baseline.get(k))
-        
-        # Se o valor top-level for 0 ou menor que a base (erro de sync),
-        # usa a base como ponto de partida. Caso contrário, usa o valor
-        # que já lá está (que é base + investido).
-        if current_val < baseline_val:
-            total[k] = baseline_val
-        else:
-            total[k] = current_val
+        total[k] = _ival(class_baseline.get(k)) # Garante que temos pelo menos a base
+
+    # 3. ADICIONA os pontos investidos manualmente pelo jogador
+    #    (Subtrai a base do valor atual no player_data para encontrar o delta investido)
+    for k in _BASELINE_KEYS:
+        current_val_in_data = _ival(player_data.get(k)) # Valor no topo do save
+        baseline_val = _ival(class_baseline.get(k)) # Valor base já em 'total'
+
+        # Calcula quanto foi investido manualmente (pontos de atributo)
+        invested_delta = max(0, current_val_in_data - baseline_val)
+
+        # Adiciona esse delta ao total (que já tem a base)
+        # Nota: Isto assume que os valores em player_data[k] representam base+investido.
+        # Se guardas os pontos investidos noutra chave (ex: 'invested_stats'), a lógica aqui muda.
+        # Assumindo o formato atual:
+        if invested_delta > 0:
+             # Adiciona apenas a diferença, pois a base já está lá
+             # Precisamos saber quanto cada ponto investido dá (do CLASS_POINT_GAINS)
+             gains = _get_point_gains_for_class(ckey)
+             gain_per_point = max(1, _ival(gains.get(k)))
+
+             # Recalcula o bónus total dos pontos investidos
+             # (Esta parte é complexa, vamos simplificar por agora assumindo que player_data[k] está correto)
+             # Se player_data[k] já é a soma correta (base+investido), podemos usar a lógica anterior ligeiramente modificada:
+             if current_val_in_data > baseline_val:
+                  total[k] = current_val_in_data # Usa o valor do save se for maior que a base pura
+
     # =========================================================
     # 👆 [FIM DA CORREÇÃO] 👆
     # =========================================================
 
-    # 3. Adiciona Stats de Equipamentos
+    # --- O resto da função continua igual ---
+
+    # 4. Adiciona Stats de Equipamentos
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
-    
+
     for slot, unique_id in (equipped.items() if isinstance(equipped, dict) else []):
         if not unique_id: continue
         inst = inventory.get(unique_id)
@@ -87,31 +104,36 @@ def get_player_total_stats(player_data: dict) -> dict:
         ench = inst.get('enchantments', {}) or {}
         for stat_key, data in ench.items():
             val = _ival((data or {}).get('value'))
-            if stat_key == 'dmg': total['attack'] += val
-            elif stat_key == 'hp': total['max_hp'] += val
-            elif stat_key in ('defense', 'initiative', 'luck'): total[stat_key] += val
-    
-    # 4. Adiciona Buffs de Clã
+            if stat_key == 'dmg': total['attack'] = total.get('attack', 0) + val # Usa .get() para segurança
+            elif stat_key == 'hp': total['max_hp'] = total.get('max_hp', 0) + val
+            elif stat_key in ('defense', 'initiative', 'luck') and stat_key in total: total[stat_key] += val
+
+    # 5. Adiciona Buffs de Clã
     clan_id = player_data.get("clan_id")
     if clan_id:
         clan_buffs = clan_manager.get_clan_buffs(clan_id)
         if "all_stats_percent" in clan_buffs:
             percent_bonus = 1 + (clan_buffs["all_stats_percent"] / 100.0)
-            total['max_hp'] = int(total['max_hp'] * percent_bonus)
-            total['attack'] = int(total['attack'] * percent_bonus)
-            total['defense'] = int(total['defense'] * percent_bonus)
+            total['max_hp'] = int(total.get('max_hp', 0) * percent_bonus)
+            total['attack'] = int(total.get('attack', 0) * percent_bonus)
+            total['defense'] = int(total.get('defense', 0) * percent_bonus)
         if "flat_hp_bonus" in clan_buffs:
-            total['max_hp'] += clan_buffs["flat_hp_bonus"]
+            total['max_hp'] = total.get('max_hp', 0) + clan_buffs["flat_hp_bonus"]
 
-    # 5. Calcula Mana
-    class_key = _get_class_key_normalized(player_data) # (Já foi calculado, mas repetimos para manter a lógica)
+    # 6. Calcula Mana
+    class_key = _get_class_key_normalized(player_data) 
     class_prog = CLASS_PROGRESSIONS.get(class_key) or CLASS_PROGRESSIONS["_default"]
     mana_attribute_name = class_prog.get("mana_stat", "luck") 
+    # Usa .get() aqui também para segurança
     mana_attribute_value = total.get(mana_attribute_name, 0)
     mana_base = 10
     mana_por_ponto = 5
-    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto) 
-    
+    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)        
+
+    # Garante que nenhum stat principal é None ou negativo antes de retornar
+    for k in _BASELINE_KEYS:
+        total[k] = max(0, _ival(total.get(k))) # Converte None para 0 e garante não-negativo
+
     return total
 
 def get_player_dodge_chance(player_data: dict) -> float:

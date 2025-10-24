@@ -1,5 +1,6 @@
 # handlers/admin/grant_item.py
 
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
@@ -11,7 +12,7 @@ from telegram.ext import (
 )
 from modules import player_manager, game_data
 from handlers.admin.utils import ensure_admin
-
+logger = logging.getLogger(__name__)
 # --- Estados da Conversa ---
 (SELECT_CATEGORY, BROWSE_ITEMS, ASK_QUANTITY, ASK_TARGET_PLAYER, CONFIRM_GRANT) = range(5)
 ITEMS_PER_PAGE = 10
@@ -166,26 +167,63 @@ async def receive_target_player(update: Update, context: ContextTypes.DEFAULT_TY
     return CONFIRM_GRANT
 
 async def dispatch_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Executa a entrega do item após a confirmação."""
     query = update.callback_query
     await query.answer()
 
     user_id = context.user_data['grant_target_id']
     item_id = context.user_data['grant_item_id']
     quantity = context.user_data['grant_quantity']
-    
+
+    print(f"\n>>> DEBUG GRANT: Tentando entregar {quantity}x '{item_id}' para {user_id}") # <-- NOVO
+
     pdata = player_manager.get_player_data(user_id)
-    
-    # Usa a função do player_manager para adicionar o item
-    player_manager.add_item_to_inventory(pdata, item_id, quantity)
-    player_manager.save_player_data(user_id, pdata)
-    
-    item_name = game_data.ITEMS_DATA[item_id].get('display_name', item_id)
-    target_name = context.user_data['grant_target_name']
-    
+    if not pdata:
+         print(f">>> DEBUG GRANT: ERRO - pdata não encontrado para {user_id}") # <-- NOVO
+         await query.edit_message_text("❌ Erro crítico: Não foi possível carregar os dados do jogador para adicionar o item.")
+         context.user_data.clear()
+         return ConversationHandler.END
+
+    # Mostra o inventário ANTES
+    inventory_before = pdata.get('inventory', {}).copy() # Copia para evitar problemas de referência
+    print(f">>> DEBUG GRANT: Inventário ANTES de add_item: {inventory_before.get(item_id, 0)} (Total keys: {len(inventory_before)})") # <-- NOVO
+
+    try: # Adiciona try/except para a adição
+        # CHAMA A FUNÇÃO PARA ADICIONAR
+        player_manager.add_item_to_inventory(pdata, item_id, quantity)
+
+        # Mostra o inventário DEPOIS (no dicionário pdata)
+        inventory_after = pdata.get('inventory', {})
+        print(f">>> DEBUG GRANT: Inventário DEPOIS de add_item (em pdata): {inventory_after.get(item_id, 0)} (Total keys: {len(inventory_after)})") # <-- NOVO
+
+    except Exception as e_add:
+        logger.error(f"Erro durante add_item_to_inventory: {e_add}", exc_info=True)
+        print(f">>> DEBUG GRANT: ERRO em add_item_to_inventory: {e_add}") # <-- NOVO
+        await query.edit_message_text(f"❌ Erro ao tentar adicionar o item ao inventário: {e_add}")
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    try: # Adiciona try/except para o save
+        # CHAMA A FUNÇÃO PARA SALVAR
+        print(f">>> DEBUG GRANT: Chamando save_player_data para {user_id}...") # <-- NOVO
+        player_manager.save_player_data(user_id, pdata)
+        print(f">>> DEBUG GRANT: save_player_data concluído.") # <-- NOVO
+
+        # Podes adicionar uma verificação extra lendo do DB novamente aqui, se necessário
+
+    except Exception as e_save:
+        logger.error(f"Erro durante save_player_data: {e_save}", exc_info=True)
+        print(f">>> DEBUG GRANT: ERRO em save_player_data: {e_save}") # <-- NOVO
+        await query.edit_message_text(f"❌ Erro ao tentar salvar os dados do jogador: {e_save}")
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    # --- Mensagem de sucesso ---
+    item_name = game_data.ITEMS_DATA.get(item_id, {}).get('display_name', item_id) # Mais seguro
+    target_name = context.user_data.get('grant_target_name', f"ID: {user_id}") # Mais seguro
+
     await query.edit_message_text(f"✅ Sucesso! {quantity}x '{item_name}' foram entregues a {target_name}.")
-    
-    # Limpa os dados da conversa
+    print(f">>> DEBUG GRANT: Mensagem de sucesso enviada.") # <-- NOVO
+
     context.user_data.clear()
     return ConversationHandler.END
 

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import time
 from typing import Optional, Tuple
 import random
+import logging # <<< ADICIONADO PARA LOG DE AVISO
 
 # --- IMPORTAÇÕES ADICIONADAS ---
 from .premium import PremiumManager
@@ -16,6 +17,8 @@ from .stats import get_player_total_stats
 # ========================================
 # FUNÇÕES AUXILIARES DE TEMPO E TIPO
 # ========================================
+
+logger = logging.getLogger(__name__) # <<< ADICIONADO PARA LOG DE AVISO
 
 def utcnow():
     return datetime.now(timezone.utc)
@@ -32,40 +35,33 @@ def _ival(x, default=0):
     try: return int(x)
     except Exception: return int(default)
 
+# ===================================================================
+# <<< INÍCIO DA CORREÇÃO >>>
+# ===================================================================
+
 def _calculate_gathering_rewards(player_data: dict, details: dict) -> tuple[int, list[tuple[str, int]], str]:
     """
-    Calcula as recompensas para um job de coleta, aplicando bónus premium.
-    Retorna (xp_ganho, lista_de_itens, mensagem_de_sumário).
+    <<< FUNÇÃO OBSOLETA / CORRIGIDA >>>
+    
+    Esta função não deve ser usada. A lógica de recompensas de coleta
+    é tratada exclusivamente por 'finish_collection_job' em job_handler.py
+    para calcular corretamente níveis, crits e bónus de profissão.
     """
-    premium = PremiumManager(player_data)
-    
-    # --- Obtém os Bónus Premium ---
-    xp_mult = float(premium.get_perk_value('gather_xp_multiplier', 1.0))
-    
-    # --- Calcula XP ---
-    base_xp = _ival(details.get('xp', 5)) # Dá 5 de XP base se não especificado
-    final_xp = int(base_xp * xp_mult)
+    # Esta função é mantida para evitar erros de importação,
+    # mas não deve ser chamada.
+    try:
+        user_id_log = player_data.get('user_id', '???')
+        logger.warning(f"Função obsoleta _calculate_gathering_rewards foi chamada para user_id {user_id_log}")
+    except Exception:
+        logger.warning("Função obsoleta _calculate_gathering_rewards foi chamada.")
+        
+    # Retorna valores vazios para não dar recompensas duplicadas
+    return 0, [], "Coleta finalizada (lógica obsoleta)."
 
-    # --- Calcula Itens ---
-    base_item_id = details.get('resource_id')
-    if not base_item_id:
-        return final_xp, [], "Coleta finalizada."
+# ===================================================================
+# <<< FIM DA CORREÇÃO >>>
+# ===================================================================
 
-    base_quantity = _ival(details.get('quantity', 1))
-    final_quantity = base_quantity
-    
-    looted_items = [(base_item_id, final_quantity)]
-    
-    # --- Formata a Mensagem ---
-    item_info = game_data.ITEMS_DATA.get(base_item_id, {})
-    item_name = item_info.get('display_name', base_item_id)
-    summary_msg = (
-        f"Você coletou com sucesso!\n\n"
-        f"✨ +{final_xp} XP de Profissão\n"
-        f"획득 +{final_quantity}x {item_name}"
-    )
-
-    return final_xp, looted_items, summary_msg
 
 def get_player_max_energy(player_data: dict) -> int:
     """Calcula a energia máxima de um jogador, incluindo o bônus de perks."""
@@ -160,15 +156,22 @@ def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | N
 
 def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
     """
-    # --- FUNÇÃO ATUALIZADA ---
-    Verifica e finaliza uma ação.
-    Retorna (True/False se a ação terminou, Mensagem de resultado ou None).
+    # --- FUNÇÃO ATUALIZADA E CORRIGIDA ---
+    
+    Verifica e finaliza uma ação "presa" que não tem um job de finalização.
+    NÃO calcula mais recompensas de coleta (isso é feito pelo job_handler).
+    Apenas finaliza a VIAGEM (travel) ou EXPLORAÇÃO (exploring).
     """
     player_data = get_player_data(user_id)
     state = player_data.get("player_state") or {}
     action = state.get("action")
 
-    actions_com_timer = ("refining", "crafting", "collecting", "exploring", "travel")
+    # <<< CORREÇÃO PRINCIPAL >>>
+    # Removidas 'refining', 'crafting', 'collecting' desta lista.
+    # Essas ações têm os seus próprios 'finish_..._job' no job_handler
+    # e não devem ser finalizadas por esta função "faxineira".
+    actions_com_timer = ("exploring", "travel")
+    
     if action not in actions_com_timer:
         return False, None
     
@@ -184,24 +187,20 @@ def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
         if utcnow() >= hora_de_termino:
             reward_summary = f"Ação '{action}' finalizada com sucesso."
 
-            # --- LÓGICA DE RECOMPENSAS ADICIONADA AQUI ---
-            if action == "collecting":
-                xp_gained, items_gained, summary = _calculate_gathering_rewards(player_data, state.get("details", {}))
-                
-                # Aplica as recompensas
-                prof = player_data.setdefault("profession", {})
-                prof["xp"] = prof.get("xp", 0) + xp_gained
-                for item_id, qty in items_gained:
-                    add_item_to_inventory(player_data, item_id, qty)
-                
-                reward_summary = summary
+            # --- LÓGICA DE RECOMPENSAS REMOVIDA PARA 'collecting' ---
+            # O bloco 'if action == "collecting":' foi completamente removido
+            # pois 'collecting' não está mais na lista 'actions_com_timer'.
 
-            elif action == "travel":
+            if action == "travel":
                 dest = (state.get("details") or {}).get("destination")
                 if dest:
                     player_data["current_location"] = dest
                 reward_summary = f"Você chegou ao seu destino!"
             
+            elif action == "exploring":
+                # Adicione qualquer lógica de finalização de exploração aqui, se houver
+                reward_summary = f"Você terminou de explorar."
+
             # Zera o estado do jogador e salva
             player_data["player_state"] = {"action": "idle"}
             save_player_data(user_id, player_data)

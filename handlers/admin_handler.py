@@ -33,6 +33,7 @@ from modules.player_manager import (
 
 )
 from modules import game_data
+from handlers.jobs import reset_pvp_season
 from handlers.admin.utils import ensure_admin 
 from kingdom_defense.engine import event_manager
 from handlers.admin.sell_gems import sell_gems_conv_handler
@@ -51,6 +52,23 @@ HTML = "HTML"
 # =========================================================
 # MENUS E TECLADOS (Keyboards)
 # =========================================================
+
+async def _reset_pvp_now_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando de admin para resetar imediatamente os pontos PvP."""
+    if not await ensure_admin(update): # Verifica se é admin
+         # Se ensure_admin já envia msg de erro, não precisa fazer nada aqui
+         # Senão, adiciona: await update.message.reply_text("Sem permissão.")
+         return
+
+    await update.message.reply_text("⏳ **Iniciando reset manual da temporada PvP...**\nIsso pode levar um momento.")
+
+    try:
+        # Chama a função de reset que já existe em jobs.py
+        await reset_pvp_season(context)
+        await update.message.reply_text("✅ Reset da temporada PvP concluído com sucesso!")
+    except Exception as e:
+        logger.error(f"Erro ao executar reset manual de PvP: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Ocorreu um erro durante o reset manual: {e}")
 
 async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id_to_check = None
@@ -484,7 +502,7 @@ my_data_handler = CommandHandler("mydata", my_data_command, filters=filters.User
 # Handlers de CallbackQuery (Botões)
 admin_main_handler = CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
 admin_force_daily_callback_handler = CallbackQueryHandler(_handle_admin_force_daily, pattern="^admin_force_daily$")
-
+reset_pvp_now_handler = CommandHandler("resetpvpnow", _reset_pvp_now_command) # Podes escolher outro nome de comando
 # Handlers para os botões do submenu de eventos
 find_player_handler = CommandHandler("find_player", find_player_command)
 debug_player_handler = CommandHandler("debug_player", debug_player_data)
@@ -554,4 +572,5 @@ all_admin_handlers = [
     grant_item_conv_handler,
     sell_gems_conv_handler,
     my_data_handler,
+    reset_pvp_now_handler,
 ]

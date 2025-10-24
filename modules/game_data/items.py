@@ -88,7 +88,8 @@ ITEMS_DATA = {
     "display_name": "Entrada da Arena",
     "emoji": "🎟️",
     "description": "Um ticket que concede uma entrada extra para as batalhas ranqueadas da Arena de Eldora. Pode ser usado a qualquer momento.",
-    "type": "consumable",    # É um item consumível
+    "type": "event_ticke",
+    "category": "evento",        # É um item consumível
     "stackable": True,      # O jogador pode ter vários
     
     # Efeito especial ao usar o item do inventário

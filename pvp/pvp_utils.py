@@ -3,9 +3,8 @@
 import unicodedata
 import re
 from modules import file_ids
+from .pvp_config import ELO_THRESHOLDS, ELO_DISPLAY
 
-# Importamos nossas regras de Elo do arquivo de configuração
-from .pvp_config import ELO_THRESHOLDS
 
 # --- FERRAMENTAS DE TEXTO ---
 
@@ -44,3 +43,19 @@ def get_player_elo(player_points: int) -> str:
             break # Para no primeiro que encontrar (o mais alto)
             
     return elo_name
+
+def get_player_elo_details(points: int) -> tuple[str, str]:
+    """Retorna o nome interno do Elo E o nome de exibição."""
+    current_elo = "Bronze" # Elo padrão
+    # Ordena os limites do maior para o menor para facilitar a verificação
+    sorted_thresholds = sorted(ELO_THRESHOLDS.items(), key=lambda item: item[1], reverse=True)
+
+    for elo_name, min_points in sorted_thresholds:
+        if points >= min_points:
+            current_elo = elo_name
+            break # Encontrou o Elo correto
+
+    # Pega o nome de exibição (ex: "🥉 Bronze")
+    display_name = ELO_DISPLAY.get(current_elo, current_elo) # Usa o nome interno como fallback
+
+    return current_elo, display_name

@@ -24,19 +24,19 @@ except Exception:
     try:
         from modules import file_ids as media_ids
     except Exception:
-        media_ids = None  # fallback mudo
+        media_ids = None # fallback mudo
 
 # Menu principal do reino (fallback)
 try:
     from handlers.menu.kingdom import show_kingdom_menu
 except Exception:
-    show_kingdom_menu = None  # será checado antes de usar
+    show_kingdom_menu = None # será checado antes de usar
 
 # Botão utilitário do calabouço (se o runtime existir)
 try:
     from modules.dungeons.runtime import build_region_dungeon_button
 except Exception:
-    build_region_dungeon_button = None  # fallback: usaremos InlineKeyboardButton
+    build_region_dungeon_button = None # fallback: usaremos InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,22 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
     player = player_manager.get_player_data(user_id) or {}
     state = player.get("player_state") or {}
     if state.get("action") == "travel":
+        # <<< CORREÇÃO: Tenta ler o finish_time padronizado >>>
+        finish_iso = state.get("finish_time")
+        if finish_iso:
+            try:
+                finish_dt = datetime.fromisoformat(finish_iso)
+                if datetime.now(timezone.utc) >= finish_dt:
+                    dest = (state.get("details") or {}).get("destination")
+                    if dest and dest in (game_data.REGIONS_DATA or {}):
+                        player["current_location"] = dest
+                    player["player_state"] = {"action": "idle"}
+                    player_manager.save_player_data(user_id, player)
+                    return True
+            except Exception:
+                pass # Ignora se o formato for inválido
+                
+        # Fallback para o formato antigo (timestamp float)
         finish_ts = float(state.get("travel_finish_ts") or 0)
         if finish_ts > 0 and time.time() >= finish_ts:
             dest = state.get("travel_dest")
@@ -86,7 +102,7 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     user_id = query.from_user.id
-    chat_id = query.message.chat_id # <--- GARANTE QUE ESTA LINHA EXISTE
+    chat_id = query.message.chat_id
     player_data = player_manager.get_player_data(user_id) or {}
     current_location = player_data.get("current_location", "reino_eldora")
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
@@ -248,8 +264,20 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
     if not region_info or final_region_key == "reino_eldora":
         if show_kingdom_menu:
-            fake_update = Update(update_id=0, message=type("Message", (), {"from_user": type("User", (), {"id": user_id})(), "chat": type("Chat", (), {"id": chat_id})()})())
-            await show_kingdom_menu(fake_update, context)
+            # Tenta criar um objeto 'Update' simulado
+            try:
+                # Objeto Usuário simulado
+                user_obj = type("User", (), {"id": user_id})()
+                # Objeto Chat simulado
+                chat_obj = type("Chat", (), {"id": chat_id})()
+                # Objeto Mensagem simulado
+                msg_obj = type("Message", (), {"from_user": user_obj, "chat": chat_obj})()
+                # Objeto Update simulado
+                fake_update = Update(update_id=0, message=msg_obj)
+                await show_kingdom_menu(fake_update, context)
+            except Exception as e_fake:
+                logger.error(f"Falha ao criar fake_update para show_kingdom_menu: {e_fake}")
+                await context.bot.send_message(chat_id=chat_id, text="Você está no Reino de Eldora.", parse_mode="HTML")
         else:
             await context.bot.send_message(chat_id=chat_id, text="Você está no Reino de Eldora.", parse_mode="HTML")
         return
@@ -286,7 +314,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         max_energy = int(player_manager.get_player_max_energy(player_data))
         status_footer = (
             f"\n\n═════════════ ◆◈◆ ══════════════\n"
-            f"❤️ HP: {current_hp}/{max_hp}      "
+            f"❤️ HP: {current_hp}/{max_hp}      "
             f"⚡️ Energia: {current_energy}/{max_energy}"
         )
         caption = (
@@ -302,30 +330,49 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             keyboard.append([InlineKeyboardButton("⛺ Visitar Tenda do Alquimista", callback_data='npc_trade:alquimista_floresta')])
         
         keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstros", callback_data=f"hunt_{final_region_key}")])
-        if PremiumManager(player_data).is_premium():
-            keyboard.append([InlineKeyboardButton("👑 Auto-Caça", callback_data="autohunt_start")]),
-        
+
         if build_region_dungeon_button:
             try:
-                keyboard.append([build_region_dungeon_button(final_region_key)])
+                # Tenta construir o botão (pode falhar se o calabouço não existir)
+                dungeon_button = build_region_dungeon_button(final_region_key)
+                if dungeon_button:
+                     keyboard.append([dungeon_button])
+                else:
+                    # Fallback se a função retornar None (ex: calabouço não existe)
+                    keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
             except Exception:
+                # Fallback em caso de erro na função
                 keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
+        else:
+             keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
+
 
         keyboard.append([InlineKeyboardButton("👤 Personagem", callback_data="profile")])
         keyboard.append([InlineKeyboardButton("📜 Restaurar Durabilidade", callback_data="restore_durability_menu")])
         keyboard.append([InlineKeyboardButton("ℹ️ Sobre a Região", callback_data=f"region_info:{final_region_key}")])
-        resource_id = final_region_key
+        
+        # ===================================================================
+        # <<< INÍCIO DA CORREÇÃO (BOTÃO DE COLETA) >>>
+        # ===================================================================
+        
+        # 1. Pega o ID do RECURSO (item) da configuração da região
+        resource_id = region_info.get("resource")
+
+        # 2. Só continua se um 'resource' (item) estiver definido para esta região
         if resource_id:
             required_profession = game_data.get_profession_for_resource(resource_id)
             player_prof = (player_data.get("profession", {}) or {}).get("type")
+            
             if required_profession and required_profession == player_prof:
                 profession_resources = (game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}).get('resources', {})
+                # 3. 'item_id_yielded' é baseado no resource_id (correto)
                 item_id_yielded = profession_resources.get(resource_id, resource_id)
                 item_yielded_info = (game_data.ITEMS_DATA or {}).get(item_id_yielded, {}) or {}
                 item_name = item_yielded_info.get("display_name", item_id_yielded.capitalize())
                 profession_info = (game_data.PROFESSIONS_DATA or {}).get(required_profession, {}) or {}
                 profession_emoji = profession_info.get("emoji", "✋")
                 
+                # Cálculo de tempo (usa o PremiumManager importado)
                 base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
                 speed_mult = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
                 duration_seconds = max(1, int(base_secs / max(0.25, speed_mult)))
@@ -335,8 +382,12 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
                 keyboard.append([InlineKeyboardButton(
                     f"{profession_emoji} Coletar {item_name} (~{human_time}, {cost_txt})",
-                    callback_data=f"collect_{final_region_key}"
+                    # 4. O callback agora envia o ID do RECURSO (item), não o ID da REGIÃO
+                    callback_data=f"collect_{resource_id}"
                 )])
+        # ===================================================================
+        # <<< FIM DA CORREÇÃO (BOTÃO DE COLETA) >>>
+        # ===================================================================
 
         keyboard.append([InlineKeyboardButton("🗺️ Ver Mapa", callback_data="travel")])
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -397,15 +448,14 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Energia insuficiente para viajar.", show_alert=True)
         return
 
-    # 1. A chamada para a função de tempo de viagem está correta,
-    #    assumindo que _get_travel_time_seconds já foi corrigida para usar o PremiumManager.
+    # 1. A chamada para a função de tempo de viagem está correta
     secs = _get_travel_time_seconds(player, dest_key)
 
     # Debita energia
     if travel_cost > 0:
         player["energy"] = max(0, energy - travel_cost)
 
-    # 2. Lógica de teleporte instantâneo (seu código já estava perfeito)
+    # 2. Lógica de teleporte instantâneo
     if secs <= 0:
         player["current_location"] = dest_key
         player["player_state"] = {"action": "idle"}
@@ -474,7 +524,7 @@ async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
     state = player.get("player_state", {})
 
     # Verificação de segurança: A tarefa só deve ser executada se o jogador
-    # ainda estiver no estado 'travel'. Isto previne execuções duplicadas.
+    # ainda estiver no estado 'travel'.
     if state.get("action") != "travel":
         return
 
@@ -483,11 +533,12 @@ async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
     player["player_state"] = {"action": "idle"}
     player_manager.save_player_data(user_id, player)
 
-    # Agora, com a certeza de que somos os únicos a processar, enviamos o menu.
-    # A sua função `send_region_menu` já foi corrigida para usar a `current_location`
-    # que acabámos de salvar, então não precisamos de passar o `dest` aqui.
     await send_region_menu(context, user_id, chat_id)
 
+
+# ===================================================================
+# <<< INÍCIO DA CORREÇÃO (CALLBACK DE COLETA) >>>
+# ===================================================================
 async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -499,23 +550,26 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not data.startswith("collect_"):
         await q.answer("Ação inválida.", show_alert=True)
         return
-    region_key = data.replace("collect_", "", 1)
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # O ID do recurso é o próprio ID da região.
-    resource_id = region_key
-    # --- FIM DA CORREÇÃO ---
-
-    if resource_id not in (game_data.REGIONS_DATA or {}):
-        await q.answer("Região desconhecida.", show_alert=True)
+    # 1. O que recebemos agora é o 'resource_id' (ex: "madeira_sombria")
+    resource_id = data.replace("collect_", "", 1)
+    
+    # 2. Verifica se o item (recurso) existe
+    if resource_id not in (game_data.ITEMS_DATA or {}):
+        await q.answer("Recurso desconhecido.", show_alert=True)
         return
 
     player = player_manager.get_player_data(user_id) or {}
     cur_loc = player.get("current_location", "reino_eldora")
-    if cur_loc != region_key:
-        await q.answer("Você precisa estar nesta região para coletar.", show_alert=True)
+    
+    # 3. Verifica se a localização atual do jogador ('cur_loc')
+    #    tem este 'resource_id'
+    current_region_info = (game_data.REGIONS_DATA or {}).get(cur_loc, {})
+    if current_region_info.get("resource") != resource_id:
+        await q.answer("Você não pode coletar este recurso nesta região.", show_alert=True)
         return
 
+    # O resto das verificações usa 'resource_id', que agora está correto.
     required_profession = game_data.get_profession_for_resource(resource_id)
     prof_data = player.get("profession", {}) or {}
     player_prof = prof_data.get("type")
@@ -523,27 +577,36 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Sua profissão não permite coletar aqui.", show_alert=True)
         return
 
+    # Tenta usar o PremiumManager (que é importado no topo)
     try:
-        energy_cost = int(player_manager.get_player_perk_value(player, "gather_energy_cost", 1))
+        premium = PremiumManager(player)
+        energy_cost = int(premium.get_perk_value("gather_energy_cost", 1))
+        speed_mult = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
     except Exception:
-        energy_cost = 1
+        # Fallback para o get_player_perk_value (que pode estar obsoleto)
+        logger.warning(f"Falha ao usar PremiumManager em collect_callback para {user_id}. Usando fallback.")
+        try:
+            energy_cost = int(player_manager.get_player_perk_value(player, "gather_energy_cost", 1))
+        except Exception:
+            energy_cost = 1
+        try:
+            speed_mult = float(player_manager.get_player_perk_value(player, "gather_speed_multiplier", 1.0))
+        except Exception:
+            speed_mult = 1.0
+
     cur_energy = int(player.get("energy", 0))
     if energy_cost > 0 and cur_energy < energy_cost:
         await q.answer("Energia insuficiente para coletar.", show_alert=True)
         return
 
     base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-    try:
-        speed_mult = float(player_manager.get_player_perk_value(player, "gather_speed_multiplier", 1.0))
-    except Exception:
-        speed_mult = 1.0
     speed_mult = max(0.25, min(4.0, speed_mult))
     duration_seconds = max(1, int(base_secs / speed_mult))
 
     if energy_cost > 0:
         player["energy"] = max(0, cur_energy - energy_cost)
     
-    # Descobre o item a ser dado para guardar no player_state
+    # Descobre o item a ser dado (baseado no resource_id, que está correto)
     profession_resources = (game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}).get('resources', {})
     item_id_yielded = profession_resources.get(resource_id, resource_id)
 
@@ -553,7 +616,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "action": "collecting",
         "finish_time": finish_time.isoformat(),
         "details": {
-            "resource_id": resource_id,
+            "resource_id": resource_id, # <-- CORRETO
             "item_id_yielded": item_id_yielded,
             "energy_cost": energy_cost,
             "speed_mult": speed_mult,
@@ -595,7 +658,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id=user_id,
             chat_id=chat_id,
             data={
-                "resource_id": resource_id,
+                "resource_id": resource_id, # <-- CORRETO
                 "item_id_yielded": item_id_yielded,
                 "energy_cost": energy_cost,
                 "charged": True,
@@ -605,6 +668,10 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         logger.warning("Falha ao agendar finish_collection_job: %s", e)
+# ===================================================================
+# <<< FIM DA CORREÇÃO (CALLBACK DE COLETA) >>>
+# ===================================================================
+
 
 # =============================================================================
 # Wrapper: abrir o menu da região atual (usado por /start e outros)
@@ -634,6 +701,7 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, r
     
     await _auto_finalize_travel_if_due(context, user_id) 
     try:
+        # Tenta finalizar ações 'travel' ou 'exploring' (se actions.py foi corrigido)
         player_manager.try_finalize_timed_action_for_user(user_id)
     except Exception:
         pass
@@ -695,7 +763,10 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
     if not any_repairable:
         lines.append("<i>Nenhum equipamento equipado precisa de reparo.</i>")
 
-    kb_rows.append([InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data="continue_after_action")])
+    # <<< CORREÇÃO: Botão "Voltar" deve ir para a região atual, não 'continue_after_action' >>>
+    current_location = pdata.get("current_location", "reino_eldora")
+    back_callback = f"open_region:{current_location}"
+    kb_rows.append([InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data=back_callback)])
 
     try:
         await q.edit_message_caption(caption="\n".join(lines), reply_markup=InlineKeyboardMarkup(kb_rows), parse_mode="HTML")
@@ -731,13 +802,13 @@ async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE
 # =============================================================================
 # Exports (registre no main)
 # =============================================================================
-region_handler  = CallbackQueryHandler(region_callback, pattern=r"^region_[A-Za-z0-9_]+$")
-travel_handler  = CallbackQueryHandler(show_travel_menu, pattern=r"^travel$")
+region_handler = CallbackQueryHandler(region_callback, pattern=r"^region_[A-Za-z0-9_]+$")
+travel_handler = CallbackQueryHandler(show_travel_menu, pattern=r"^travel$")
 collect_handler = CallbackQueryHandler(collect_callback, pattern=r"^collect_[A-Za-z0-9_]+$")
 open_region_handler = CallbackQueryHandler(open_region_callback, pattern=r"^open_region:")
 
 # Atalhos locais de durabilidade
 restore_durability_menu_handler = CallbackQueryHandler(show_restore_durability_menu, pattern=r"^restore_durability_menu$")
-restore_durability_fix_handler  = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_.+$")
+restore_durability_fix_handler = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_.+$")
 
 region_info_handler = CallbackQueryHandler(region_info_callback, pattern=r"^region_info:.*$")

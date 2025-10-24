@@ -5,7 +5,7 @@ from typing import Dict, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
-
+from modules.player.core import clear_player_cache
 # Importe tudo que é necessário
 from modules import player_manager, game_data
 from modules.player.premium import PremiumManager
@@ -234,11 +234,12 @@ async def gem_shop_premium_execute(update: Update, context: ContextTypes.DEFAULT
     premium.grant_days(tier=plan['tier'], days=plan['days'])
     player_manager.save_player_data(user_id, premium.player_data)
     
+    clear_player_cache(user_id) # <<< 2. ADICIONE ESTA LINHA
+
     await _safe_edit_or_send(q, context, q.message.chat_id,
         f"✅ Compra concluída!\n\nVocê adquiriu o <b>{plan['name']}</b>.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_shop_premium")]])
     )
-
 # ----------------------------------------------------------------------
 # --- EXPORTS DE HANDLERS (TODOS JUNTOS) ---
 # ----------------------------------------------------------------------

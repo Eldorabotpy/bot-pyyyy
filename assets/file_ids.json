@@ -1,4 +1,8 @@
 {
+  "\"classe_default_media\"": {
+    "id": "BAACAgEAAxkBAAIkBWj6ehpcXQMvvQS1IBAUIMl3AXKBAALgBQACsQfYRxH1mITF23I1NgQ",
+    "type": "video"
+  },
   "/cancelar": {
     "id": "BAACAgEAAxkBAAINh2jvxBZ1yVdDz_ytG7kYC349FxmoAAIwBgACuOeARz786Hc_DkhPNgQ",
     "type": "video"
@@ -65,6 +69,10 @@
   },
   "classe_cacador_media": {
     "id": "BAACAgEAAxkBAAINjWjvxFlBGENfKh5H-QSLxVt8n2fiAAIxBgACuOeAR_KZk-L0bNdQNgQ",
+    "type": "video"
+  },
+  "classe_default_media": {
+    "id": "BAACAgEAAxkBAAIkBWj6ehpcXQMvvQS1IBAUIMl3AXKBAALgBQACsQfYRxH1mITF23I1NgQ",
     "type": "video"
   },
   "classe_guerreiro_media": {
@@ -692,7 +700,7 @@
     "type": "video"
   },
   "pvp_arena_media": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAIi1Wj6UiotqR4cBUqDYqoC5cMmNenyAAInC2sbsQfQR6jiYKtlldtlAQADAgADeQADNgQ",
     "type": "photo"
   },
   "pvp_entry_imagem_png": {

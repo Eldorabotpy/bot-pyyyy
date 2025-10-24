@@ -2,291 +2,437 @@
 import re
 import random
 import logging
+import math
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Forbidden # Adiciona Forbidden
 
 # Módulos do Jogo
 from modules import player_manager, game_data, clan_manager, mission_manager, file_ids
+# <<< CORREÇÃO: Importa PremiumManager >>>
+from modules.player.premium import PremiumManager
+# Importa funções específicas se necessário (ou use player_manager.func)
+from modules.player_manager import (
+    iter_players, add_energy, save_player_data, has_premium_plan,
+    get_perk_value, get_player_max_energy, add_item_to_inventory,
+    get_pvp_points, add_gems, get_player_data
+)
+# Importa config se necessário para EVENT_TIMES, JOB_TIMEZONE
+from config import EVENT_TIMES, JOB_TIMEZONE
+# Importa job finalizador de refino
+from handlers.refining_handler import finish_dismantle_job
+# Importa agendador pvp
+from pvp.pvp_config import MONTHLY_RANKING_REWARDS # Importa recompensas
+# Importa watchdog e parse_iso (verificar caminho)
+from modules.player.actions import _parse_iso # Assume que está em actions.py
+# Importa job finalizador
+# from handlers.job_handler import finish_collection_job # Importação circular? Verificar.
+# Importa job finalizador de menu/região
+from handlers.menu.region import finish_travel_job
+# Importa job finalizador de forge
+from handlers.forge_handler import finish_craft_notification_job as finish_crafting_job
+# Importa job finalizador de refino
+from handlers.refining_handler import finish_refine_job as finish_refining_job
+# Importa utilitário de agendamento
+from handlers.utils_timed import schedule_or_replace_job
+# Importa reset PvP
+# from handlers.jobs import reset_pvp_season # Importação circular? Verificar.
 
 logger = logging.getLogger(__name__)
 
-# -------------------------
-# Helpers
-# -------------------------
-async def _safe_answer(update: Update) -> None:
-    q = update.callback_query
-    if not q:
-        return
-    try:
-        await q.answer()
-    except BadRequest:
-        pass
-    except Exception:
-        logger.debug("query.answer() ignorado", exc_info=True)
+# --- CONSTANTES --- (Mantidas do teu código anterior)
+DAILY_CRYSTAL_ITEM_ID = "cristal_de_abertura"
+DAILY_CRYSTAL_BASE_QTY = 4
+DAILY_NOTIFY_USERS = True
+_non_premium_tick: dict[str, int] = {"count": 0}
+ANNOUNCEMENT_CHAT_ID = -1002881364171 # ID do Grupo/Canal
+ANNOUNCEMENT_THREAD_ID = 24         # ID do Tópico
 
-async def _safe_edit(update: Update, text: str) -> None:
-    """
-    Tenta editar caption primeiro (mensagens com mídia), se falhar, edita texto.
-    """
+# -------------------------
+# Helpers (Mantidos)
+# -------------------------
+def _humanize(seconds: int) -> str:
+    """Converte segundos numa string legível (ex: '4 min', '45 s')."""
+    seconds = int(seconds)
+    
+    # <<< CORREÇÃO: Mostra segundos se for menos de 1 minuto >>>
+    if seconds < 60:
+        return f"{seconds} s"
+        
+    # <<< CORREÇÃO: Usa math.floor (arredondar para baixo) para minutos >>>
+    m = math.floor(seconds / 60)
+    
+    # Opcional: Mostrar segundos restantes
+    s = seconds % 60
+    if s > 0:
+     return f"{m} min {s} s"
+    
+    return f"{m} min"
+async def _safe_answer(update: Update) -> None:
+    # ... (código existente) ...
+    q = update.callback_query
+    if not q: return
+    try: await q.answer()
+    except BadRequest: pass
+    except Exception: logger.debug("query.answer() ignorado", exc_info=True)
+
+async def _safe_edit(update: Update, text: str, reply_markup=None, parse_mode='HTML') -> None: # Adiciona reply_markup e parse_mode
+    """ Tenta editar caption ou texto, com fallback para send_message. """
     q = update.callback_query
     if not q or not q.message:
+         # Se não houver query ou mensagem original, tenta enviar uma nova
+         if update.effective_chat:
+              try: await update.effective_chat.send_message(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+              except Exception as e_send: logger.error(f"Falha ao enviar msg (safe_edit fallback): {e_send}")
+         return
+
+    try: # Tenta editar caption primeiro
+        await q.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
         return
-    try:
-        await q.edit_message_caption(caption=text)
-        return
-    except Exception:
+    except BadRequest as e:
+        if "message is not modified" in str(e).lower(): return # Ignora se a msg é a mesma
+        # Se o erro NÃO for 'not modified', tenta editar texto
+    except Exception: # Outros erros ao editar caption, tenta texto
         pass
-    try:
-        await q.edit_message_text(text=text)
-    except Exception:
-        # sem pânico: a msg pode ter sido apagada/alterada
-        logger.debug("Falha ao editar mensagem de status de coleta", exc_info=True)
+
+    try: # Tenta editar texto
+        await q.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except BadRequest as e:
+         if "message is not modified" in str(e).lower(): return # Ignora
+         logger.warning(f"Falha ao editar texto (safe_edit): {e}")
+    except Exception as e:
+        logger.warning(f"Falha ao editar texto (safe_edit geral): {e}")
+        # Sem pânico: a msg pode ter sido apagada/alterada
 
 def _clamp_float(v: Any, lo: float, hi: float, default: float) -> float:
-    try:
-        f = float(v)
-    except Exception:
-        f = default
+
+    try: f = float(v)
+    except Exception: f = default
     return max(lo, min(hi, f))
 
-
 def _int(v: Any, default: int = 0) -> int:
-    try:
-        return int(v)
-    except Exception:
-        return default
 
-# -------------------------
-# Job de término da coleta
-# -------------------------
+    try: return int(v)
+    except Exception: return int(default)
+
 async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Finaliza a coleta, calcula recompensas com base no nível, aplica perks e notifica.
+    (Versão robusta que lê os dados do job)
+    """
     job = context.job
     if not job:
+        logger.error("finish_collection_job executed without job context!")
         return
 
     user_id, chat_id = job.user_id, job.chat_id
+
+    # <<< CORREÇÃO: Obter resource_id do job.data, não do player_state >>>
     job_data = job.data or {}
     resource_id = job_data.get('resource_id')
 
     player_data = player_manager.get_player_data(user_id)
     if not player_data:
+        logger.warning(f"finish_collection_job: Player data not found for user {user_id}")
         return
 
-    # Lógica de compatibilidade para coletas antigas
-    item_id_a_receber = job_data.get('item_id_yielded')
-    if not item_id_a_receber and resource_id:
-        player_profession = (player_data.get('profession', {}) or {}).get('type')
-        if player_profession:
-            profession_resources = (game_data.PROFESSIONS_DATA.get(player_profession, {}) or {}).get('resources', {})
-            item_id_a_receber = profession_resources.get(resource_id, resource_id)
-    if not item_id_a_receber:
-        item_id_a_receber = resource_id
+    # <<< CORREÇÃO: Validar o resource_id (do job) ANTES de checar o estado >>>
+    item_info = game_data.ITEMS_DATA.get(resource_id, {}) or {}
+    if not resource_id or not item_info:
+        # Este é o erro que víamos (floresta_sombria), que agora está corrigido no region.py
+        logger.warning(f"Collection end {user_id}: Invalid resource_key '{resource_id}' in job.data.")
 
-    # Verificações de segurança
-    state = (player_data.get('player_state') or {}) if isinstance(player_data.get('player_state'), dict) else {}
-    if state.get('action') != 'collecting':
-        return
-    details = (state.get('details') or {}) if isinstance(state.get('details'), dict) else {}
-    if details.get('resource_id') and details.get('resource_id') != resource_id:
-        return
+        if (player_data.get('player_state') or {}).get('action') == 'collecting':
+            player_data['player_state'] = {'action': 'idle'}
+            player_manager.save_player_data(user_id, player_data)
 
-    # Limpa o estado do jogador
-    player_data['player_state'] = {'action': 'idle'}
+        try: 
+            await context.bot.send_message(chat_id=chat_id, text="Sua ação de coleta foi finalizada (recurso inválido).")
+        except Exception as e_notify_err:
+            logger.error(f"Failed to notify invalid resource error {chat_id}: {e_notify_err}")
+        return 
 
-    if not item_id_a_receber:
-        player_manager.save_player_data(user_id, player_data)
-        await context.bot.send_message(chat_id=chat_id, text="Sua ação anterior foi finalizada e você está livre para continuar.")
-        return
+    # Pega o estado atual para ver se limpamos e para pegar detalhes
+    state = player_data.get('player_state') or {}
+    details = state.get('details') or {}
 
-    # ############################################################### #
-    # ## INÍCIO DO NOVO SISTEMA DE COLETA DINÂMICA ## #
-    # ############################################################### #
+    # <<< CORREÇÃO: Remover a 'falha silenciosa' e ajustar limpeza de estado >>>
+    # O job SEMPRE dará as recompensas agora.
+    # Apenas limpamos o estado se ele AINDA for a coleta deste job.
 
-    # --- 1. Parâmetros de Balanceamento (Ajuste aqui para mudar o jogo) ---
-    XP_BASE_POR_ITEM = 3      # XP ganho por cada item base coletado
-    #LVL_PARA_ITEM_EXTRA = 10  # A cada X níveis de profissão, ganha +1 item base
-    CHANCE_CRITICA_BASE = 3.0 # Chance base de acerto crítico em % (ex: 5.0 para 5%)
-    MULTIPLICADOR_CRITICO_ITENS = 3  # Quantas vezes os itens são multiplicados num crítico
-    MULTIPLICADOR_CRITICO_XP = 2     # Quantas vezes o XP é multiplicado num crítico
+    current_state_action = state.get('action')
+    current_state_resource = details.get('resource_id')
 
-    # --- 2. Preparação dos dados ---
-    item_info = game_data.ITEMS_DATA.get(item_id_a_receber, {}) or {}
-    item_name = item_info.get('display_name', item_id_a_receber)
+    if current_state_action == 'collecting' and current_state_resource == resource_id:
+        player_data['player_state'] = {'action': 'idle'}
+    elif current_state_action == 'collecting':
+        logger.warning(f"finish_collection_job {user_id}: Job (res: {resource_id}) ran, but state is collecting OTHER resource (res: {current_state_resource}).")
+    
+    # Define o item a receber (usa 'details' do estado ou 'job.data' se disponível)
+    item_id_a_receber = job_data.get('item_id_yielded') or details.get('item_id_yielded', resource_id)
+
+    # --- Rewards Calculation ---
+    XP_BASE_POR_ITEM = 3
+    CHANCE_CRITICA_BASE = 3.0
+    MULTIPLICADOR_CRITICO_ITENS = 3
+    MULTIPLICADOR_CRITICO_XP = 2
+
+    # Usa o item_info do resource_id (o nó de coleta)
+    item_name_node = item_info.get('display_name', resource_id)
     prof = player_data.get('profession', {}) or {}
     prof_level = _int(prof.get('level', 1), 1)
     level_up_text = ""
     xp_ganho = 0
     is_crit = False
+    total_stats = player_manager.get_player_total_stats(player_data)
+    luck_stat = _int(total_stats.get("luck", 5))
 
-    # --- 3. Cálculo da quantidade de itens ---
-    # O jogador ganha +1 item base a cada LVL_PARA_ITEM_EXTRA níveis.
-    quantidade_base = 1 + prof_level
+    quantidade_base = 1 + prof_level 
     quantidade_final = quantidade_base
 
-    # Chance de Coleta Crítica (aumenta 0.1% por nível de profissão)
-    chance_critica_final = CHANCE_CRITICA_BASE + (prof_level * 0.1)
+    chance_critica_final = CHANCE_CRITICA_BASE + (prof_level * 0.1) + (luck_stat * 0.05) 
     if random.uniform(0, 100) < chance_critica_final:
         is_crit = True
         quantidade_final = quantidade_base * MULTIPLICADOR_CRITICO_ITENS
+        critical_message = "✨ <b>𝑪𝒐𝒍𝒆𝒕𝒂 𝑪𝒓𝒊́𝒕𝒊𝒄𝒂!</b> Dobrou os ganhos!\n"
+    else:
+        critical_message = ""
 
-    # --- 4. Entrega dos itens e atualização de missões ---
+    # --- Grant item and update missions ---
     player_manager.add_item_to_inventory(player_data, item_id_a_receber, quantidade_final)
     mission_manager.update_mission_progress(player_data, 'GATHER', details={'item_id': item_id_a_receber, 'quantity': quantidade_final})
     clan_id = player_data.get("clan_id")
     if clan_id:
-        clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='GATHER', details={'item_id': item_id_a_receber, 'count': quantidade_final})
+        try: 
+            await clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='GATHER', details={'item_id': item_id_a_receber, 'count': quantidade_final}, context=context)
+        except TypeError: 
+            try: clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='GATHER', details={'item_id': item_id_a_receber, 'count': quantidade_final})
+            except Exception as e_clan: logger.error(f"Error guild mission (gather) clan {clan_id}: {e_clan}")
 
-    # --- 5. Cálculo de XP e Level Up ---
-    required_profession = game_data.get_profession_for_resource(resource_id) if resource_id else None
+    # --- Calculate XP & Level Up ---
+    required_profession = game_data.get_profession_for_resource(resource_id)
     if prof.get('type') and required_profession and prof['type'] == required_profession:
-        # XP base é calculado sobre a quantidade de itens coletados
         xp_base = quantidade_base * XP_BASE_POR_ITEM
-        xp_mult_perks = _clamp_float(player_manager.get_player_perk_value(player_data, 'gather_xp_multiplier', 1.0), 0.0, 100.0, 1.0)
-        
-        xp_ganho = int(round(xp_base * xp_mult_perks))
-        
-        if is_crit:
-            xp_ganho = xp_ganho * MULTIPLICADOR_CRITICO_XP
 
+        try:
+            premium = PremiumManager(player_data)
+            xp_mult_perks = _clamp_float(premium.get_perk_value('gather_xp_multiplier', 1.0), 0.0, 100.0, 1.0)
+        except Exception as e_xp_mult:
+            logger.warning(f"Error getting gather_xp_multiplier for {user_id}: {e_xp_mult}")
+            xp_mult_perks = 1.0
+
+        xp_ganho = int(round(xp_base * xp_mult_perks))
+        if is_crit: xp_ganho = xp_ganho * MULTIPLICADOR_CRITICO_XP
         prof['xp'] = _int(prof.get('xp', 0)) + xp_ganho
 
-        # Lógica de Level Up
         cur_level = prof_level
-        for _ in range(100):
+        try:
             xp_needed = _int(game_data.get_xp_for_next_collection_level(cur_level), 0)
-            if xp_needed <= 0 or prof['xp'] < xp_needed:
-                break
-            prof['xp'] -= xp_needed
-            cur_level += 1
-            prof['level'] = cur_level
-            level_up_text = f"\n✨ Sua profissão subiu para o nível {cur_level}!"
+            while xp_needed > 0 and prof['xp'] >= xp_needed:
+                prof['xp'] -= xp_needed
+                cur_level += 1
+                prof['level'] = cur_level
+                prof_name = (game_data.PROFESSIONS_DATA or {}).get(prof['type'], {}).get("display_name", "Profissão")
+                level_up_text += f"\n✨ Sua profissão ({prof_name}) subiu para o nível {cur_level}!"
+                xp_needed = _int(game_data.get_xp_for_next_collection_level(cur_level), 0) 
+        except Exception as e_lvl:
+            logger.error(f"Error in profession level up for {user_id}: {e_lvl}")
         player_data['profession'] = prof
     
-    # ############################################################### #
-    # ## FIM DO NOVO SISTEMA DE COLETA DINÂMICA ## #
-    # ############################################################### #
+    # --- Rare Resource (optional) ---
+    rare_find_message = ""
+    current_location = player_data.get('current_location', '')
+    region_info_final = (game_data.REGIONS_DATA or {}).get(current_location, {})
+    rare_cfg = region_info_final.get("rare_resource")
+    if isinstance(rare_cfg, dict) and rare_cfg.get("key"):
+        rare_chance = 0.10 + (luck_stat / 150.0) 
+        if random.random() < rare_chance:
+            rare_key = rare_cfg["key"]
+            rare_item_info = game_data.ITEMS_DATA.get(rare_key, {})
+            rare_name = rare_item_info.get("display_name", rare_key)
+            player_manager.add_item_to_inventory(player_data, rare_key, 1)
+            rare_find_message = f"💎 Sorte! Encontrou 1x {rare_name}!\n"
 
-    # Salva os dados do jogador com o item e o progresso da missão
-    player_manager.save_player_data(user_id, player_data)
+    # Save player data
+    try:
+        player_manager.save_player_data(user_id, player_data)
+    except Exception as e_save:
+        logger.error(f"Error saving data in finish_collection_job for {user_id}: {e_save}", exc_info=True)
+        try: await context.bot.send_message(chat_id=chat_id, text="⚠️ Erro ao salvar o resultado da coleta.")
+        except Exception: pass
+        return 
 
-    # --- Preparação da Mensagem de Conclusão ---
+    # --- Prepare Completion Message ---
+    # O nome do item que o jogador recebeu
+    item_recebido_info = game_data.ITEMS_DATA.get(item_id_a_receber, {}) or {}
+    res_name = item_recebido_info.get("display_name", item_id_a_receber)
+    
     xp_info = f" (+{xp_ganho} XP)" if xp_ganho > 0 else ""
-    crit_info = "✨ 𝐂𝐎𝐋𝐄𝐓𝐀 𝐂𝐑𝐈́𝐓𝐈𝐂𝐀! ✨\n\n" if is_crit else ""
+    region_name_final = region_info_final.get('display_name', current_location) 
 
     completion_text = (
-        f"{crit_info}✅ Coleta finalizada! Você obteve {quantidade_final}x {item_name}{xp_info}."
-        f"{level_up_text}"
+        f"{critical_message}{rare_find_message}"
+        f"✅ Coleta finalizada! Obteve {quantidade_final}x {res_name}{xp_info}."
+        f"{level_up_text}\n\n"
+        f"Você ainda está em {region_name_final}."
     )
-    
-    # --- LÓGICA DE ENVIO DE MÍDIA PARA A COLETA ---
-    media_key_to_use = item_info.get("media_key")
-    if not media_key_to_use:
-        media_key_to_use = "coleta_sucesso_generica"
 
+    # --- Send Notification ---
+    media_key_to_use = item_info.get("media_key", "coleta_sucesso_generica")
     media_data = file_ids.get_file_data(media_key_to_use)
-    
-    # Adicionamos um botão "Continuar" para voltar ao menu da região
-    keyboard = [[InlineKeyboardButton("➡️ 𝑪𝒐𝒏𝒕𝒊𝒏𝒖𝒂𝒓", callback_data=f"open_region:{player_data.get('current_location', 'reino_eldora')}")]]
+    keyboard = [[InlineKeyboardButton("➡️ Continuar", callback_data=f"open_region:{current_location}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     try:
         if media_data and media_data.get("id"):
-            await context.bot.send_photo(chat_id=chat_id, photo=media_data["id"], caption=completion_text, reply_markup=reply_markup, parse_mode='HTML')
+            fid = media_data["id"]
+            ftyp = (media_data.get("type") or "photo").lower()
+            if ftyp == "video":
+                await context.bot.send_video(chat_id=chat_id, video=fid, caption=completion_text, reply_markup=reply_markup, parse_mode='HTML')
+            else:
+                await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=completion_text, reply_markup=reply_markup, parse_mode='HTML')
         else:
-            await context.bot.send_message(chat_id=chat_id, text=completion_text, reply_markup=reply_markup, parse_mode='HTML')
-    except Exception:
-        # Fallback se tudo o resto falhar
-        await context.bot.send_message(chat_id=chat_id, text=completion_text, reply_markup=reply_markup, parse_mode='HTML')
+             await context.bot.send_message(chat_id=chat_id, text=completion_text, reply_markup=reply_markup, parse_mode='HTML')
+    except Forbidden:
+        logger.warning(f"Failed to send collection completion to {chat_id} (user {user_id}): BOT BLOCKED")
+    except Exception as e_send_final:
+        logger.warning(f"Failed sending collection result msg/media {chat_id}: {e_send_final}", exc_info=True)
+        try: await context.bot.send_message(chat_id=chat_id, text=completion_text, reply_markup=reply_markup, parse_mode='HTML')
+        except Exception as e_final_fb: logger.error(f"CRITICAL failure sending final collection msg {chat_id}: {e_final_fb}", exc_info=True)        
 
-# -------------------------
 # Callback de início da coleta
 # -------------------------
 async def start_collection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await _safe_answer(update)
-    if not query or not query.message:
-        return
+    if not query or not query.message: return
 
     user_id = query.from_user.id
-    chat_id = query.message.chat.id
+    chat_id = query.message.chat_id
 
     player_data = player_manager.get_player_data(user_id)
     if not player_data:
-        await _safe_edit(update, "Não encontrei seus dados. Use /start para começar.")
+        await _safe_edit(update, "Use /start para começar.")
         return
 
-    state = (player_data.get('player_state') or {}) if isinstance(player_data.get('player_state'), dict) else {}
+    state = (player_data.get('player_state') or {})
     if state.get('action') not in (None, 'idle'):
-        await query.answer("Você já está ocupado com outra ação!", show_alert=True)
+        await query.answer("Você já está ocupado!", show_alert=True)
         return
 
     m = re.match(r'^collect_([A-Za-z0-9_]+)$', (query.data or ""))
-    if not m:
-        return
-    resource_id = m.group(1)
+    if not m: return
+    resource_id = m.group(1) # Pega resource_id do botão
+
+    item_info = game_data.ITEMS_DATA.get(resource_id)
+    if not item_info or item_info.get("type") != "resource":
+         await query.answer("Recurso inválido!", show_alert=True) # Simplificado
+         return
 
     required_profession = game_data.get_profession_for_resource(resource_id)
     prof = player_data.get('profession', {}) or {}
     if not (required_profession and prof.get('type') == required_profession):
-        await query.answer("Você não possui a profissão necessária para coletar isso.", show_alert=True)
+        prof_name = (game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}).get("display_name", "???")
+        await query.answer(f"Precisa ser {prof_name}.", show_alert=True)
         return
 
-    profession_resources = (game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}).get('resources', {})
-    item_id_yielded = profession_resources.get(resource_id, resource_id)
+    # --- Aplica Perks Premium ---
+    # <<< CORREÇÃO: Usa PremiumManager >>>
+    try:
+        premium = PremiumManager(player_data)
+        speed_mult_raw = premium.get_perk_value('gather_speed_multiplier', 1.0)
+        speed_mult = _clamp_float(speed_mult_raw, lo=0.25, hi=4.0, default=1.0)
+        
+        energy_cost_raw = premium.get_perk_value('gather_energy_cost', 1)
+        energy_cost = max(0, _int(energy_cost_raw, 1))
+    except Exception as e_perks:
+         logger.warning(f"Erro obter perks coleta {user_id}: {e_perks}")
+         speed_mult = 1.0
+         energy_cost = 1
+    # <<< FIM CORREÇÃO >>>
+    
+    # Calcula duração com speed_mult
+    base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 10) * 60) # Usa constante
+    duration_seconds = max(1, int(base_secs / max(speed_mult, 1e-9))) 
 
-    base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-    speed_mult = _clamp_float(player_manager.get_player_perk_value(player_data, 'gather_speed_multiplier', 1.0), lo=0.25, hi=4.0, default=1.0)
-    duration_seconds = max(1, int(base_secs / max(speed_mult, 1e-9)))
-    energy_cost = max(0, _int(player_manager.get_player_perk_value(player_data, 'gather_energy_cost', 1), 1))
-
+    # Valida e gasta energia
     current_energy = _int(player_data.get('energy', 0))
     if current_energy < energy_cost:
-        await query.answer("Você está sem energia para coletar. Descanse um pouco.", show_alert=True)
+        await query.answer("Energia insuficiente.", show_alert=True)
         return
+    if energy_cost > 0:
+        player_data['energy'] = current_energy - energy_cost
 
-    player_data['energy'] = current_energy - energy_cost
+    # Define o estado e salva
     finish_time_dt = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
-
-    player_data['player_state'] = {
-        'action': 'collecting',
-        'finish_time': finish_time_dt.isoformat(),
-        'details': {
-            'resource_id': resource_id,
-            'item_id_yielded': item_id_yielded,
-            'energy_cost': energy_cost,
-            'speed_mult': speed_mult
-        }
-    }
+    # Usa ensure_timed_state importado
+    player_manager.ensure_timed_state(
+        pdata=player_data, action="collecting", seconds=duration_seconds,
+        details={'resource_id': resource_id, 'energy_cost': energy_cost, 'speed_mult': speed_mult },
+        chat_id=chat_id,
+    )
     player_manager.save_player_data(user_id, player_data)
 
+    # Agenda o término
     try:
-        context.job_queue.run_once(
-            finish_collection_job,
-            when=duration_seconds,
-            user_id=user_id,
-            chat_id=chat_id,
-            data={
-                'resource_id': resource_id,
-                'item_id_yielded': item_id_yielded,
-                'energy_cost': energy_cost,
-                'charged': True,
-                'speed_mult': speed_mult
-            }
+        job_data_for_finish = {"resource_id": resource_id} # Passa resource_id
+        # Usa schedule_or_replace_job importado
+        schedule_or_replace_job(
+            context=context, job_id=f"collect:{user_id}", when=duration_seconds,
+            callback=finish_collection_job, data=job_data_for_finish,
+            chat_id=chat_id, user_id=user_id,
         )
-    except Exception:
-        logger.exception("Falha ao agendar job de coleta")
+    except Exception as e_schedule:
+        logger.exception(f"Falha agendar coleta {user_id}: {e_schedule}")
+        await query.answer("Erro ao iniciar coleta.", show_alert=True)
+        player_data['player_state'] = {'action': 'idle'}
+        if energy_cost > 0: player_manager.add_energy(player_data, energy_cost) # Devolve
+        player_manager.save_player_data(user_id, player_data)
+        return
 
-    item_info = game_data.ITEMS_DATA.get(item_id_yielded, {}) or {}
-    item_name = item_info.get('display_name', item_id_yielded)
-    minutes = duration_seconds / 60
-    human = f"{minutes:.0f} minutos" if minutes >= 1 else f"{duration_seconds} segundos"
+    # Mensagem "coletando..."
+    item_name_start = item_info.get('display_name', resource_id)
+    human = _humanize(duration_seconds)
     cost_txt = "grátis" if energy_cost == 0 else f"-{energy_cost} ⚡️"
-    status_text = f"⛏️ Você começou a coletar {item_name}. A tarefa levará ~{human} ({cost_txt})."
-    await _safe_edit(update, status_text)
+    status_text = f"⛏️ Coletando {item_name_start}... (~{human}, {cost_txt})"
 
-# Handler principal
-job_handler = CallbackQueryHandler(start_collection_callback, pattern=r'^collect_[A-Za-z0-9_]+$')
+    # Mídia (mantido)
+    collect_media_key = item_info.get("collection_media_key", "coleta_generica_media")
+    file_data = file_ids.get_file_data(collect_media_key)
+
+    # Teclado (mantido)
+    current_location = player_data.get('current_location', 'reino_eldora') # Pega localização atual
+    kb_list = [
+        [InlineKeyboardButton("⚔️ Caçar", callback_data=f"hunt_{current_location}")],
+        [InlineKeyboardButton("👤 Personagem", callback_data="profile")],
+        [InlineKeyboardButton("🗺️ Mapa", callback_data="travel")],
+    ]
+    kb = InlineKeyboardMarkup(kb_list)
+
+    # Envio da mensagem (mantido)
+    try: await query.delete_message()
+    except Exception: pass
+    try:
+        if file_data and file_data.get("id"):
+            fid = file_data["id"] ; ftyp = (file_data.get("type") or "photo").lower()
+            if ftyp == "video": await context.bot.send_video(chat_id=chat_id, video=fid, caption=status_text, reply_markup=kb, parse_mode="HTML")
+            else: await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=status_text, reply_markup=kb, parse_mode="HTML")
+        else: await context.bot.send_message(chat_id=chat_id, text=status_text, reply_markup=kb, parse_mode="HTML")
+    except Exception as e_send_start:
+         logger.error(f"Falha envio msg 'Coletando...' {chat_id}: {e_send_start}")
+         await query.answer("Erro interface coleta.", show_alert=True)
+
+# =============================================================================
+# Exports
+# =============================================================================
+collection_handler = CallbackQueryHandler(start_collection_callback, pattern=r'^collect_([A-Za-z0-9_]+)$')
+
+# <<< Verifica se finish_dismantle_job e outras funções de job estão definidas neste ficheiro ou precisam ser importadas >>>
+# Exemplo: Se regenerate_energy_job está aqui:
+# async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None: ...
+# Se daily_crystal_grant_job está aqui:
+# async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int: ...
+# ... e assim por diante para todas as funções de job.

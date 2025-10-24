@@ -10,6 +10,7 @@ from typing import Dict, Optional
 from telegram.ext import ContextTypes
 from telegram.error import Forbidden
 
+from modules import player_manager
 # Módulos do player
 from modules.player_manager import (
     iter_players,
@@ -19,21 +20,24 @@ from modules.player_manager import (
     get_perk_value,
     get_player_max_energy,
     add_item_to_inventory,
+    get_pvp_points,
+    add_gems,
 )
 from config import EVENT_TIMES, JOB_TIMEZONE
 
 from handlers.refining_handler import finish_dismantle_job
-
+from pvp.pvp_config import MONTHLY_RANKING_REWARDS
 logger = logging.getLogger(__name__)
 
 # --- CONSTANTES ---
 DAILY_CRYSTAL_ITEM_ID = "cristal_de_abertura"
 DAILY_CRYSTAL_BASE_QTY = 4
-#DAILY_TZ = "America/Sao_Paulo"
 DAILY_NOTIFY_USERS = True
-#DAILY_NOTIFY_TEXT = f"🎁 Você recebeu {DAILY_CRYSTAL_BASE_QTY}× Cristal de Abertura (recompensa diária)."
 _non_premium_tick: Dict[str, int] = {"count": 0}
 
+# <<< IDs PARA ANÚNCIOS >>>
+ANNOUNCEMENT_CHAT_ID = -1002881364171 # ID do Grupo/Canal
+ANNOUNCEMENT_THREAD_ID = 24         # ID do Tópico
 
 # --- HELPERS ---
 def _today_str(tzname: str = JOB_TIMEZONE) -> str:
@@ -185,79 +189,270 @@ async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> in
     logger.info("[JOB_LEMBRETE] Lembrete de evento enviado para %s jogadores.", notified)
     return notified
 
-# --- WATCHDOG ---
-# NOTA: O dicionário ACTION_FINISHERS foi REMOVIDO daqui.
-
 async def timed_actions_watchdog(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Verifica todos os jogadores e finaliza ações cronometradas que já
-    deveriam ter terminado (especialmente útil após um reinício do bot).
-    """
-    # Passo 1: As importações são feitas aqui dentro para quebrar os ciclos.
+    """Verifica ações terminadas e reagenda a finalização."""
+    # Importações das funções finalizadoras (movidas para o topo da função)
+    from modules import player_manager
+    # <<< CORREÇÃO: Importa _parse_iso (nome correto) de actions.py >>>
+    from modules.player.actions import _parse_iso
     from handlers.job_handler import finish_collection_job
     from handlers.menu.region import finish_travel_job
     from handlers.forge_handler import finish_craft_notification_job as finish_crafting_job
     from handlers.refining_handler import finish_refine_job as finish_refining_job
+    from handlers.refining_handler import finish_dismantle_job
 
-    # Passo 2: O dicionário é definido aqui dentro, usando as funções que acabámos de importar.
     ACTION_FINISHERS = {
-        "collecting": {
-            "fn": finish_collection_job,
-            "data_builder": lambda st: {
-                'resource_id': (st.get("details") or {}).get("resource_id"),
-                'item_id_yielded': (st.get("details") or {}).get("item_id_yielded"),
-                'energy_cost': (st.get("details") or {}).get("energy_cost", 1),
-                'speed_mult': (st.get("details") or {}).get("speed_mult", 1.0)
-            }
-        },
-        "travel": {
-            "fn": finish_travel_job,
-            "data_builder": lambda st: {"dest": (st.get("details") or {}).get("destination")}
-        },
-        "crafting": {
-            "fn": finish_crafting_job,
-            "data_builder": lambda st: {"recipe_id": (st.get("details") or {}).get("recipe_id")}
-        },
-        "refining": {
-            "fn": finish_refining_job,
-            "data_builder": lambda st: {"recipe_id": (st.get("details") or {}).get("recipe_id")}
-        },
-        "dismantling": {
-            "fn": finish_dismantle_job,
-        },    
+         "collecting": {"fn": finish_collection_job, "data_builder": lambda st: {'resource_id': (st.get("details") or {}).get("resource_id"),'item_id_yielded': (st.get("details") or {}).get("item_id_yielded"),'energy_cost': (st.get("details") or {}).get("energy_cost", 1),'speed_mult': (st.get("details") or {}).get("speed_mult", 1.0)}},
+         "travel": {"fn": finish_travel_job, "data_builder": lambda st: {"dest": (st.get("details") or {}).get("destination")}},
+         "crafting": {"fn": finish_crafting_job, "data_builder": lambda st: {"recipe_id": (st.get("details") or {}).get("recipe_id")}},
+         "refining": {"fn": finish_refining_job, "data_builder": lambda st: {"recipe_id": (st.get("details") or {}).get("recipe_id")}},
+         "dismantling": {"fn": finish_dismantle_job, "data_builder": lambda st: {}},
     }
 
+    # print("\n>>> DEBUG WATCHDOG: Iniciando verificação...") # DEBUG Removido
     now = datetime.datetime.now(datetime.timezone.utc)
+    # print(f">>> DEBUG WATCHDOG: Hora Atual (UTC): {now.isoformat()}") # DEBUG Removido
+
     fired = 0
-    for user_id, pdata in iter_players():
-        try:
-            st = pdata.get("player_state") or {}
-            action = st.get("action")
-            if not action or action not in ACTION_FINISHERS:
-                continue
-            
-            ft = _parse_iso_utc(st.get("finish_time"))
-            if not ft or ft > now:
-                continue
-            
-            config = ACTION_FINISHERS[action]
-            finalizer_fn = config.get("fn")
-            if not finalizer_fn:
-                continue
-            
-            job_data = config["data_builder"](st) if config.get("data_builder") else {}
-            chat_id = pdata.get("last_chat_id", user_id)
+    checked_players = 0
 
-            # Reagenda a finalização para ser executada imediatamente
-            context.job_queue.run_once(
-                finalizer_fn, when=0, chat_id=chat_id, user_id=user_id,
-                data=job_data, name=f"{action}:{user_id}",
-            )
-            fired += 1
-            logger.info("[WATCHDOG] Finalização da ação '%s' para user %s foi reagendada.", action, user_id)
-        except Exception as e:
-            logger.warning("[WATCHDOG] Erro ao verificar jogador %s: %s", user_id, e)
-    
-    if fired:
+    try:
+        player_iterator = player_manager.iter_players()
+        if isinstance(player_iterator, dict): player_iterator = player_iterator.items()
+
+        for user_id, pdata in player_iterator:
+            checked_players += 1
+            try:
+                st = pdata.get("player_state") or {}
+                action = st.get("action")
+
+                if not action or action not in ACTION_FINISHERS:
+                    continue
+
+                ft_str = st.get("finish_time")
+                # <<< CORREÇÃO: Usa a função importada _parse_iso >>>
+                ft = _parse_iso(ft_str)
+
+                # <<< Verificação de fuso horário (importante!) >>>
+                # A função _parse_iso já adiciona UTC se não houver fuso.
+                # Garantimos que 'now' também está em UTC.
+
+                # Compara as horas
+                if not ft or ft > now:
+                    continue
+
+                # --- Se chegou aqui, a ação foi encontrada e TERMINOU ---
+                # print(f">>> DEBUG WATCHDOG: Ação '{action}' TERMINADA encontrada para User {user_id} (Finish: {ft_str})") # DEBUG Removido
+
+                config = ACTION_FINISHERS[action]
+                finalizer_fn = config.get("fn")
+                if not finalizer_fn:
+                    # print(f">>> DEBUG WATCHDOG: ERRO - Finalizer 'fn' não encontrado para action '{action}'!") # DEBUG Removido
+                    continue
+
+                job_data = {}
+                if "data_builder" in config and callable(config["data_builder"]):
+                     job_data = config["data_builder"](st)
+
+                chat_id = pdata.get("last_chat_id", user_id)
+                job_name = f"{action}:{user_id}"
+
+                # Reagenda a finalização
+                context.job_queue.run_once(
+                    finalizer_fn, when=0, chat_id=chat_id, user_id=user_id,
+                    data=job_data, name=job_name,
+                )
+                fired += 1
+                # print(f">>> DEBUG WATCHDOG: Job '{job_name}' agendado para execução imediata.") # DEBUG Removido
+
+            except Exception as e_player:
+                logger.warning("[WATCHDOG] Erro ao verificar jogador %s: %s", user_id, e_player)
+                # print(f">>> DEBUG WATCHDOG: ERRO ao processar jogador {user_id}: {e_player}") # DEBUG Removido
+
+    except Exception as e_loop:
+         logger.error(f"[WATCHDOG] Erro CRÍTICO durante o loop: {e_loop}", exc_info=True)
+         # print(f">>> DEBUG WATCHDOG: ERRO CRÍTICO no loop principal: {e_loop}") # DEBUG Removido
+
+    # Log final da execução (mantido)
+    if fired > 0:
         logger.info("[WATCHDOG] Disparadas %s finalizações de ações vencidas.", fired)
+    # print(f">>> DEBUG WATCHDOG: Verificação concluída. {checked_players} jogadores verificados, {fired} finalizações agendadas.") # DEBUG Removido
 
+async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
+    """Distribui recompensas de Gemas (Dimas) para o Top N do ranking PvP,
+       usando as configurações de MONTHLY_RANKING_REWARDS."""
+    logger.info("Iniciando distribuição de recompensas PvP...")
+    print(">>> JOB: Iniciando distribuição de recompensas PvP...") # Para debug
+
+    # 1. Buscar todos os jogadores com pontos PvP > 0
+    all_players_ranked = []
+    try:
+        # Usa .items() se iter_players retorna um dict, ou apenas o iterador se for direto
+        player_iterator = player_manager.iter_players()
+        if isinstance(player_iterator, dict):
+            player_iterator = player_iterator.items()
+
+        for p_id, p_data in player_iterator:
+            pvp_points = player_manager.get_pvp_points(p_data)
+            if pvp_points > 0: # Apenas quem tem pontos positivos
+               all_players_ranked.append({
+                   "user_id": p_id,
+                   "name": p_data.get("character_name", f"ID: {p_id}"),
+                   "points": pvp_points,
+                   # Guarda p_data para adicionar gemas diretamente (precisa copiar?)
+                   # Fazer cópia profunda pode ser mais seguro se p_data for modificado em outro lugar
+                   "_pdata": p_data.copy() # Faz uma cópia para segurança
+               })
+    except Exception as e:
+         logger.error(f"Erro ao buscar jogadores para recompensas PvP: {e}", exc_info=True)
+         print(f">>> JOB ERROR: Erro ao buscar jogadores para recompensas PvP: {e}")
+         return # Aborta a tarefa se houver erro
+
+    # 2. Ordenar por pontos
+    all_players_ranked.sort(key=lambda p: p["points"], reverse=True)
+
+    # =========================================================
+    # 👇 [CORREÇÃO] Usando MONTHLY_RANKING_REWARDS importado 👇
+    # =========================================================
+
+    # 3. Distribuir recompensas com base no dicionário importado
+    winners_info = [] # Para log ou anúncio
+    if not MONTHLY_RANKING_REWARDS:
+         logger.warning("MONTHLY_RANKING_REWARDS não está definido ou está vazio em pvp_config. Nenhuma recompensa distribuída.")
+         print(">>> JOB WARNING: MONTHLY_RANKING_REWARDS vazio. Nenhuma recompensa.")
+    else:
+        # Itera sobre os jogadores já ordenados
+        for i, player in enumerate(all_players_ranked):
+            rank = i + 1
+            # Pega a recompensa do dicionário importado. Retorna None se o rank não tiver prémio.
+            reward_amount = MONTHLY_RANKING_REWARDS.get(rank)
+
+            if reward_amount:
+                user_id = player["user_id"]
+                # IMPORTANTE: Busca os dados MAIS RECENTES antes de modificar e salvar
+                p_data_current = player_manager.get_player_data(user_id)
+                if not p_data_current:
+                     logger.error(f"Não foi possível obter dados atuais para o vencedor PvP Rank {rank} ({user_id})")
+                     print(f">>> JOB ERROR: Não achou p_data para vencedor {user_id}")
+                     continue # Pula este jogador
+
+                player_name = p_data_current.get("character_name", f"ID: {user_id}") # Usa nome atual
+
+                try:
+                    # Adiciona as gemas aos dados atuais
+                    player_manager.add_gems(p_data_current, reward_amount)
+                    # Salva os dados atualizados
+                    player_manager.save_player_data(user_id, p_data_current)
+
+                    log_msg = f"Recompensa PvP Rank {rank}: {reward_amount} Gemas para {player_name} ({user_id})."
+                    logger.info(log_msg)
+                    print(f">>> JOB: {log_msg}") # Debug
+                    winners_info.append(f"{rank}º: {player_name} (+{reward_amount}💎)")
+
+                    # Opcional: Notificar o jogador diretamente
+                    try:
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=f"Parabéns! Você terminou em {rank}º lugar no ranking PvP mensal e recebeu {reward_amount} Gemas (Dimas) como recompensa!"
+                        )
+                    except Forbidden:
+                        logger.warning(f"Bot bloqueado pelo vencedor PvP {user_id}, não notificado.")
+                    except Exception as e_notify:
+                         logger.warning(f"Falha ao notificar vencedor PvP {user_id}: {e_notify}")
+
+                except Exception as e_grant:
+                     err_msg = f"Erro ao conceder recompensa PvP Rank {rank} para {player_name} ({user_id}): {e_grant}"
+                     logger.error(err_msg, exc_info=True)
+                     print(f">>> JOB ERROR: {err_msg}")
+            else:
+                 # Otimização: Se chegámos a um rank sem prémio e os ranks são sequenciais (1, 2, 3...),
+                 # podemos parar o loop mais cedo.
+                 if rank > max(MONTHLY_RANKING_REWARDS.keys(), default=0):
+                      break
+    
+    
+    # =========================================================
+    # 👆 [FIM DA CORREÇÃO] 👆
+    # =========================================================
+
+    # 5. Opcional: Anunciar os vencedores num canal/grupo
+    if winners_info:
+         announcement = "🏆 **Recompensas do Ranking PvP Mensal Distribuídas!** 🏆\n\nParabéns aos melhores combatentes deste ciclo:\n" + "\n".join(winners_info)
+         try:
+             await context.bot.send_message(
+                 chat_id=ANNOUNCEMENT_CHAT_ID,
+                 message_thread_id=ANNOUNCEMENT_THREAD_ID, # Envia para o tópico
+                 text=announcement,
+                 parse_mode="HTML"
+             )
+             logger.info(f"Anúncio dos vencedores PvP enviado para o tópico {ANNOUNCEMENT_THREAD_ID} no chat {ANNOUNCEMENT_CHAT_ID}.")
+             print(f">>> JOB: Anúncio dos vencedores enviado para Tópico ID {ANNOUNCEMENT_THREAD_ID}.")
+         except Exception as e_announce:
+               print(">>> JOB: Anúncio dos vencedores (simulado):")
+               print(announcement) # Debug
+
+    logger.info("Distribuição de recompensas PvP concluída.")
+    print(">>> JOB: Distribuição de recompensas PvP concluída.") # Debug
+
+async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
+    """Reseta os pontos PvP de todos os jogadores, iniciando uma nova temporada."""
+    logger.info("Iniciando reset da temporada PvP...")
+    print(">>> JOB: Iniciando reset da temporada PvP...") # Para debug
+
+    reset_count = 0
+    try:
+        # Itera sobre todos os jogadores
+        player_iterator = player_manager.iter_players()
+        if isinstance(player_iterator, dict):
+            player_iterator = player_iterator.items()
+
+        for user_id, p_data in player_iterator:
+            if "pvp_points" in p_data and p_data["pvp_points"] != 0:
+                try:
+                    # Opcional: Guardar histórico aqui antes de zerar, se desejado
+                    previous_points = p_data.get("pvp_points", 0)
+                    p_data.setdefault("pvp_history", []).append({"date": datetime.datetime.now(datetime.timezone.utc).isoformat(), "points": previous_points})
+
+                    # Reseta os pontos para 0 (ou outro valor base, se preferir)
+                    p_data["pvp_points"] = 0
+
+                    # Salva os dados atualizados
+                    player_manager.save_player_data(user_id, p_data)
+                    reset_count += 1
+
+                    # Opcional: Notificar o jogador sobre o reset
+                    try:
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text="⚔️ Uma nova temporada PvP começou! Seus pontos de Elo foram resetados. Boa sorte na arena!"
+                        )
+                        await asyncio.sleep(0.1) # Pequeno delay
+                    except Exception:
+                        pass # Ignora se não puder notificar
+
+                except Exception as e_player_reset:
+                     logger.error(f"Erro ao resetar PvP para jogador {user_id}: {e_player_reset}", exc_info=True)
+                     print(f">>> JOB ERROR: Erro ao resetar PvP para {user_id}: {e_player_reset}")
+
+    except Exception as e_iter:
+         logger.error(f"Erro CRÍTICO durante a iteração para reset PvP: {e_iter}", exc_info=True)
+         print(f">>> JOB ERROR: Erro CRÍTICO durante a iteração para reset PvP: {e_iter}")
+         # A tarefa falhou, mas tentará novamente no próximo ciclo
+
+    logger.info(f"Reset da temporada PvP concluído. Pontos de {reset_count} jogadores foram resetados.")
+    print(f">>> JOB: Reset da temporada PvP concluído. {reset_count} jogadores resetados.") # Debug
+
+    announcement = "⚔️ **Nova Temporada PvP Iniciada!** ⚔️\n\nTodos os pontos de Elo foram resetados. Que comecem as batalhas pela glória na Arena!"
+    try:
+        await context.bot.send_message(
+            chat_id=ANNOUNCEMENT_CHAT_ID,
+            message_thread_id=ANNOUNCEMENT_THREAD_ID, # Envia para o tópico
+            text=announcement,
+            parse_mode="HTML"
+        )
+        logger.info(f"Anúncio de nova temporada PvP enviado para o tópico {ANNOUNCEMENT_THREAD_ID} no chat {ANNOUNCEMENT_CHAT_ID}.")
+        print(f">>> JOB: Anúncio de nova temporada enviado para Tópico ID {ANNOUNCEMENT_THREAD_ID}.")
+    except Exception as e_announce:
+         logger.error(f"Falha ao anunciar nova temporada PvP no tópico {ANNOUNCEMENT_THREAD_ID}: {e_announce}")
+         print(f">>> JOB ERROR: Falha ao anunciar nova temporada PvP: {e_announce}")
+         
