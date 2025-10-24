@@ -65,6 +65,43 @@ def _get_player_info_text(pdata: dict) -> str:
     except Exception as e:
         logger.error(f"Erro ao montar _get_player_info_text: {e}")
         return "Erro ao carregar dados. O que deseja alterar?"
+
+def create_admin_edit_player_handler() -> ConversationHandler: # <<< VERIFIQUE ESTE NOME
+    """Cria o ConversationHandler para o painel de edição de jogador."""
+
+    admin_filter = filters.User(ADMIN_LIST)
+
+    conv_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("editplayer", admin_edit_player_start, filters=admin_filter),
+            CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$")
+        ],
+        states={
+            STATE_GET_USER_ID: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & admin_filter, admin_get_user_id)
+            ],
+            STATE_SHOW_MENU: [
+                CallbackQueryHandler(admin_choose_action, pattern=r"^edit_(prof_type|prof_lvl|char_lvl|cancel)$"),
+                CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$")
+            ],
+            STATE_AWAIT_PROFESSION: [
+                CallbackQueryHandler(admin_set_profession_type, pattern=r"^set_prof:"),
+                CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$")
+            ],
+            STATE_AWAIT_CHAR_LEVEL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & admin_filter, admin_set_char_level)
+            ],
+            STATE_AWAIT_PROF_LEVEL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & admin_filter, admin_set_prof_level)
+            ],
+        },
+        fallbacks=[
+            CallbackQueryHandler(admin_edit_cancel, pattern=r"^edit_cancel$"),
+            CommandHandler("cancel", admin_edit_cancel, filters=admin_filter)
+        ],
+        per_message=False
+    )
+    return conv_handler
     
 async def _send_or_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     """Envia ou edita a mensagem principal do menu de edição."""
