@@ -10,7 +10,7 @@ from handlers.admin.file_id_conv import file_id_conv_handler
 from handlers.admin.premium_panel import premium_panel_handler, premium_command_handler
 from handlers.admin.reset_panel import reset_panel_conversation_handler
 from handlers.admin.generate_equip import generate_equip_conv_handler
-
+from handlers.admin.player_edit_panel import create_admin_edit_player_handler
 def register_admin_handlers(application: Application):
     """Regista todos os handlers relacionados à administração."""
 
@@ -24,4 +24,4 @@ def register_admin_handlers(application: Application):
     application.add_handler(premium_command_handler)
     application.add_handler(reset_panel_conversation_handler)
     application.add_handler(generate_equip_conv_handler)
-    
+    application.add_handler(create_admin_edit_player_handler())
