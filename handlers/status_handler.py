@@ -24,38 +24,46 @@ def _slugify(text: str) -> str:
 def _get_class_media(player_data: dict, purpose: str = "status"):
     """Busca a mídia (video/foto) associada à classe do jogador."""
     raw_cls = (player_data.get("class") or "").strip()
-    # Usa a classe base se for uma subclasse (ex: Guerreiro -> guerreiro)
-    base_cls_key = raw_cls.lower() # Adapte se sua estrutura de dados for diferente
-    cls_slug = _slugify(base_cls_key) # Usa slugify para consistência
+    base_cls_key = raw_cls.lower()
+    cls_slug = _slugify(base_cls_key)
+    logger.debug(f"[_get_class_media] Raw Class: '{raw_cls}', Base Key: '{base_cls_key}', Slug: '{cls_slug}'") # <<< DEBUG LOG 1
 
-    # Tenta buscar config da classe (pode não existir se for classe base)
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(base_cls_key) or {}
 
-    # Lista de chaves candidatas para procurar no file_ids
     candidates = []
-    # 1. Chave específica definida na config da classe (se houver)
     if cls_cfg.get("status_file_id_key"):
          candidates.append(cls_cfg["status_file_id_key"])
-    # 2. Nomes padronizados baseados no slug da classe
     if cls_slug:
         candidates.extend([
-            f"status_video_{cls_slug}", # status_video_guerreiro
-            f"status_{cls_slug}",      # status_guerreiro
-            f"class_{cls_slug}_status", # class_guerreiro_status
-            f"classe_{cls_slug}_media" # classe_guerreiro_media (do seu código original)
+            f"status_video_{cls_slug}",
+            f"status_{cls_slug}",
+            f"class_{cls_slug}_status",
+            f"classe_{cls_slug}_media" # <<< SUA CHAVE ESTÁ AQUI
         ])
-    # 3. Fallback genérico
-    candidates.append("status_video") # status_video (genérico)
+    candidates.append("status_video")
 
-    # Procura a primeira chave válida no file_ids
-    for key in filter(None, candidates): # filter(None, ...) remove chaves vazias/nulas
-        fd = file_ids.get_file_data(key)
-        if fd and fd.get("id"):
-            logger.info(f"Mídia de status encontrada para classe '{raw_cls}' (slug: '{cls_slug}') usando a chave: '{key}'")
-            return fd # Retorna o primeiro encontrado
-    logger.warning(f"Nenhuma mídia de status encontrada para classe '{raw_cls}' (slug: '{cls_slug}'). Chaves tentadas: {candidates}")
-    return None # Retorna None se nada for encontrado
+    # Remove duplicates and None values just in case
+    unique_candidates = list(filter(None, dict.fromkeys(candidates)))
+    logger.debug(f"[_get_class_media] Candidate Keys: {unique_candidates}") # <<< DEBUG LOG 2
+
+    for key in unique_candidates:
+        logger.debug(f"[_get_class_media] Trying key: '{key}'") # <<< DEBUG LOG 3
+        try:
+            fd = file_ids.get_file_data(key)
+            # Check if fd is not None AND has a non-empty 'id'
+            if fd and fd.get("id"):
+                logger.info(f"[_get_class_media] Success! Found media for class '{raw_cls}' using key: '{key}' -> ID: {fd.get('id')}") # <<< SUCCESS LOG
+                return fd # Return the found data
+            else:
+                # Log if the key was found but data was invalid (None or no 'id')
+                 logger.debug(f"[_get_class_media] Key '{key}' found, but data is invalid or missing 'id'. Data: {fd}") # <<< DEBUG LOG 4
+        except Exception as e:
+            # Log any error during the file_ids lookup
+             logger.error(f"[_get_class_media] Error looking up key '{key}': {e}", exc_info=True) # <<< ERROR LOG
+
+    logger.warning(f"[_get_class_media] No valid media found for class '{raw_cls}' after trying all keys.") # <<< FINAL WARNING
+    return None # Return None if nothing was found after checking all keys
 
 def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMarkup]:
     """Gera o texto e o teclado do menu de status."""
