@@ -12,6 +12,7 @@ from telegram.ext import (
     filters
 )
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from modules.player_manager import find_player_by_name
 from modules import player_manager, game_data
 try:
@@ -325,47 +326,67 @@ async def admin_edit_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     context.user_data.pop('edit_target_id', None)
     return ConversationHandler.END
 
-# --- Montagem do Handler ---
+async def admin_edit_player_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Inicia a conversa para editar um jogador.
+    Pede ID ou Nome do Personagem.
+    (Versão com fallback robusto para edição)
+    """
+    text = "Insira o <b>ID do usuário</b> ou o <b>Nome exato do personagem</b> que você deseja editar:"
 
-def create_admin_edit_player_handler() -> ConversationHandler:
-    """Cria o ConversationHandler para o painel de edição de jogador."""
+    query = update.callback_query
+    if query:
+        await query.answer() # Responde ao clique primeiro
 
-    admin_filter = filters.User(ADMIN_LIST)
+        # --- CORREÇÃO: Tenta editar caption OU texto ---
+        message_to_edit = query.message
+        edited = False
+        if message_to_edit:
+            try:
+                # Tenta editar caption primeiro (se a msg tiver mídia)
+                await message_to_edit.edit_caption(caption=text, parse_mode=ParseMode.HTML)
+                edited = True
+            except BadRequest as e_caption:
+                if "message is not modified" in str(e_caption).lower():
+                     edited = True # Considera editado se for a mesma msg
+                elif "message to edit not found" in str(e_caption).lower():
+                     pass # Mensagem foi deletada, não podemos editar
+                elif "message can't be edited" in str(e_caption).lower():
+                     pass # Mensagem muito antiga ou outro erro, não podemos editar
+                else:
+                    # Se não for caption, tenta editar texto
+                    try:
+                        await message_to_edit.edit_text(text, parse_mode=ParseMode.HTML)
+                        edited = True
+                    except BadRequest as e_text:
+                         if "message is not modified" in str(e_text).lower():
+                              edited = True
+                         elif "message to edit not found" in str(e_text).lower():
+                              pass
+                         elif "message can't be edited" in str(e_text).lower():
+                             pass
+                         else:
+                              # Se ambos falharam por outros motivos, loga
+                              logger.warning(f"Falha ao editar msg (caption/texto) em admin_edit_player_start: {e_caption} / {e_text}")
+                    except Exception as e_generic_text:
+                         logger.warning(f"Erro genérico ao editar texto em admin_edit_player_start: {e_generic_text}")
+            except Exception as e_generic_caption:
+                 logger.warning(f"Erro genérico ao editar caption em admin_edit_player_start: {e_generic_caption}")
 
-    conv_handler = ConversationHandler(
-        entry_points=[
-            # Ponto de entrada via comando /editplayer
-            CommandHandler("editplayer", admin_edit_player_start, filters=admin_filter),
-            # Ponto de entrada via botão 'admin_edit_player' do menu admin
-            CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$") # <<< ADICIONADO AQUI
-        ],
-        states={
-            STATE_GET_USER_ID: [
-                # Espera por uma mensagem de texto (ID ou Nome) do admin
-                MessageHandler(filters.TEXT & ~filters.COMMAND & admin_filter, admin_get_user_id)
-            ],
-            STATE_SHOW_MENU: [
-                CallbackQueryHandler(admin_choose_action, pattern=r"^edit_(prof_type|prof_lvl|char_lvl|cancel)$"),
-                # Adiciona um fallback caso o usuário clique de novo no botão de entrada
-                CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$")
-            ],
-            STATE_AWAIT_PROFESSION: [
-                CallbackQueryHandler(admin_set_profession_type, pattern=r"^set_prof:"),
-                CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$")
-            ],
-            STATE_AWAIT_CHAR_LEVEL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & admin_filter, admin_set_char_level)
-            ],
-            STATE_AWAIT_PROF_LEVEL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & admin_filter, admin_set_prof_level)
-            ],
-        },
-        fallbacks=[
-            CallbackQueryHandler(admin_edit_cancel, pattern=r"^edit_cancel$"),
-            CommandHandler("cancel", admin_edit_cancel, filters=admin_filter)
-        ],
-        per_message=False
-        # <<< IMPORTANTE >>> Considere adicionar um timeout
-        # conversation_timeout=timedelta(minutes=5) # Ex: Cancela após 5 mins de inatividade
-    )
-    return conv_handler
+        # --- Fallback: Envia nova mensagem se a edição falhou ---
+        if not edited:
+            chat_id = update.effective_chat.id
+            if chat_id:
+                try:
+                    await context.bot.send_message(chat_id=chat_id, text=text, parse_mode=ParseMode.HTML)
+                except Exception as e_send:
+                     logger.error(f"Falha CRÍTICA ao enviar msg fallback em admin_edit_player_start: {e_send}")
+            else:
+                 logger.error("Não foi possível enviar msg fallback em admin_edit_player_start: chat_id desconhecido.")
+
+    # Se veio de um comando /editplayer (sem query)
+    else:
+        if update.message: # Garante que message existe
+            await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+    return STATE_GET_USER_ID

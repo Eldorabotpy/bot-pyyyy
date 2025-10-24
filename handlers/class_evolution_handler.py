@@ -251,28 +251,38 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Se falhar (falta de itens, etc.), avisa o jogador
     if not result.get("success"):
         await query.answer(result.get("message", "Não foi possível iniciar a provação."), show_alert=True)
+        # <<< MELHORIA: Atualiza o menu para mostrar os requisitos novamente >>>
+        await _render_menu(update, context)
         return
 
     # 2. Se for bem-sucedido, prepara a batalha de teste
     monster_id = result.get("trial_monster_id")
     if not monster_id:
         await query.answer("Erro: Monstro da provação não configurado.", show_alert=True)
+        await _render_menu(update, context) # Volta ao menu
         return
-        
+
     # Procura o monstro no nosso arquivo de monstros
     monster_template = None
-    for mob in monsters_data.MONSTERS_DATA.get("_evolution_trials", []):
+    # <<< MELHORIA: Acessa os dados dos monstros de forma mais segura >>>
+    evolution_monsters = (getattr(monsters_data, "MONSTERS_DATA", {}) or {}).get("_evolution_trials", [])
+    for mob in evolution_monsters:
         if mob.get("id") == monster_id:
             monster_template = mob
             break
-    
+
     if not monster_template:
         await query.answer(f"Erro: Monstro de provação '{monster_id}' não encontrado nos dados.", show_alert=True)
+        await _render_menu(update, context) # Volta ao menu
         return
 
     # 3. Inicia o combate
     pdata = player_manager.get_player_data(user_id)
-    
+    if not pdata: # <<< ADICIONADO: Verificação se pdata foi carregado >>>
+         await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
+         return
+
+
     # Monta os detalhes do combate com a "marcação" especial
     combat_details = {
         "monster_name":       monster_template.get("name", "Guardião"),
@@ -283,7 +293,7 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "monster_initiative": int(monster_template.get("initiative", 10)),
         "monster_luck":       int(monster_template.get("luck", 10)),
         "battle_log":         ["Você enfrenta o guardião da sua nova classe em uma batalha de provação!"],
-        
+
         # A "marcação" especial que o combat_handler vai procurar
         "evolution_trial": {
             "target_class": to_key
@@ -292,22 +302,43 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pdata["player_state"] = {"action": "in_combat", "details": combat_details}
     player_manager.save_player_data(user_id, pdata)
-    
+
     # Envia a mensagem de combate
-    caption = format_combat_message(pdata)
+    caption = format_combat_message(pdata) # Assume que esta função existe e funciona
+
+    # =========================================================
+    # <<< INÍCIO DA CORREÇÃO >>>
+    # =========================================================
+    # Remove o botão "Poções" duplicado e garante que kb é lista de listas
     kb = [
         [InlineKeyboardButton("⚔️ Atacar", callback_data="combat_attack"), InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu")],
-        InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"),
+        # A linha duplicada foi removida daqui
         [InlineKeyboardButton("🏃 Fugir", callback_data="combat_flee")]
     ]
+    # =========================================================
+    # <<< FIM DA CORREÇÃO >>>
+    # =========================================================
 
     try:
       await query.delete_message()
     except Exception:
       pass
-      
-    await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
+    # Tenta enviar a mensagem de combate
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Erro ao enviar mensagem de combate de evolução para {user_id}: {e}", exc_info=True)
+        # Tenta avisar o jogador sobre o erro
+        try:
+             await context.bot.send_message(chat_id=chat_id, text="Ocorreu um erro ao iniciar a batalha de provação.")
+             # Tenta reverter o estado do jogador para idle
+             pdata["player_state"] = {"action": "idle"}
+             # NÃO devolve os itens consumidos aqui, pois a lógica pode ficar complexa.
+             # O ideal é o serviço `start_evolution_trial` ser robusto ou ter um "commit/rollback".
+             player_manager.save_player_data(user_id, pdata)
+        except Exception as e_fallback:
+             logger.error(f"Erro CRÍTICO ao tentar reverter estado após falha em do_evolution: {e_fallback}")
 # ============ Exports (handlers) ============
 
 status_evolution_open_handler = CallbackQueryHandler(open_evolution, pattern=r"^status_evolution_open$")
