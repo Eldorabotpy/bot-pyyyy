@@ -46,18 +46,9 @@ from modules.player.core import _player_cache, players_collection
 # No topo de admin_handler.py
 from modules.player.queries import _normalize_char_name
 # <<< ADICIONADO >>> Importa a função de início da conversa de edição
-from handlers.admin.player_edit_panel import admin_edit_player_start, STATE_GET_USER_ID # <<< CORRIGIDO >>> Importa o estado
 
-# =========================================================
-# <<< INÍCIO DA CORREÇÃO >>>
-# =========================================================
-logger = logging.getLogger(__name__) # <<< ADICIONADO >>> Define o logger
-# =========================================================
-# <<< FIM DA CORREÇÃO >>>
-# =========================================================
+logger = logging.getLogger(__name__) 
 
-# --- Constantes ---
-# <<< ADICIONADO >>> Certifique-se que ADMIN_LIST é importado ou definido
 try:
     from config import ADMIN_LIST
 except ImportError:
@@ -311,21 +302,6 @@ async def _handle_admin_main(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not await ensure_admin(update): return # Adicionado filtro
     await _safe_answer(update)
     await _safe_edit_text(update, context, "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:", _admin_menu_kb())
-
-# <<< ADICIONADO >>> Função que lida com o clique no botão "Editar Jogador"
-async def _handle_admin_edit_player_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int | None:
-    """Inicia a conversa de edição a partir do botão do menu principal."""
-    if not await ensure_admin(update): return ConversationHandler.END # Retorna END se não for admin
-    query = update.callback_query
-    await query.answer()
-
-    # Usa a função de início da conversa importada
-    await query.edit_message_text(
-        "Insira o <b>ID do usuário</b> que você deseja editar:",
-        parse_mode=ParseMode.HTML
-    )
-    # Retorna o primeiro estado da CONVERSA de edição, não deste handler
-    return STATE_GET_USER_ID # Usa o estado definido em player_edit_panel.py
 
 async def _delete_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando de admin para apagar um jogador."""
@@ -665,7 +641,7 @@ admin_event_menu_handler = CallbackQueryHandler(_handle_admin_event_menu, patter
 admin_force_start_handler = CallbackQueryHandler(_handle_force_start_event, pattern="^admin_event_force_start$")
 admin_force_end_handler = CallbackQueryHandler(_handle_force_end_event, pattern="^admin_event_force_end$")
 admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern="^admin_event_force_ticket$")
-admin_edit_player_button_handler = CallbackQueryHandler(_handle_admin_edit_player_button, pattern="^admin_edit_player$") # <<< ADICIONADO >>>
+
 
 # Handler de Conversa para Limpeza de Cache (filtros aplicados nos entry points e message handlers)
 clear_cache_conv_handler = ConversationHandler(
@@ -728,7 +704,6 @@ all_admin_handlers = [
     sell_gems_conv_handler, # A conversa de vender gemas
     my_data_handler,
     reset_pvp_now_handler,
-    admin_edit_player_button_handler, # O botão para iniciar a edição
     # <<< ADICIONADO >>> Os outros handlers de conversa que você tinha importado
     generate_equip_conv_handler,
     file_id_conv_handler,

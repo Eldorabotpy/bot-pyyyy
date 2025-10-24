@@ -1,6 +1,7 @@
 # handlers/admin/player_edit_panel.py
 
 import logging
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes, 
@@ -11,10 +12,21 @@ from telegram.ext import (
     filters
 )
 from telegram.constants import ParseMode
-
+from modules.player_manager import find_player_by_name
 from modules import player_manager, game_data
-from config import ADMIN_LIST # Importe a sua lista de IDs de administradores
-
+try:
+    from config import ADMIN_LIST
+except ImportError:
+    logger = logging.getLogger(__name__) # Define logger aqui se precisar
+    logger.warning("ADMIN_LIST não encontrada em config.py no player_edit_panel, usando ADMIN_ID.")
+    try:
+        # Tenta pegar ADMIN_ID do ambiente se ADMIN_LIST falhou
+        ADMIN_ID = int(os.getenv("ADMIN_ID"))
+        ADMIN_LIST = [ADMIN_ID]
+    except (TypeError, ValueError):
+        logger.error("ADMIN_ID não definido nas variáveis de ambiente! Painel de edição pode não funcionar.")
+        ADMIN_LIST = []
+        
 logger = logging.getLogger(__name__)
 
 # Definição dos estados da conversa
@@ -35,7 +47,7 @@ def _get_player_info_text(pdata: dict) -> str:
         prof_type = (pdata.get('profession', {}) or {}).get('type', 'Nenhuma')
         prof_level = int((pdata.get('profession', {}) or {}).get('level', 1))
         char_name = pdata.get('character_name', 'Sem Nome')
-        user_id = pdata.get('user_id', '???')
+        user_id = pdata.get('user_id', '???') # Garante que user_id está nos dados
 
         # Busca o nome de exibição da profissão
         prof_display = (game_data.PROFESSIONS_DATA.get(prof_type) or {}).get('display_name', prof_type)
@@ -52,7 +64,7 @@ def _get_player_info_text(pdata: dict) -> str:
     except Exception as e:
         logger.error(f"Erro ao montar _get_player_info_text: {e}")
         return "Erro ao carregar dados. O que deseja alterar?"
-
+    
 async def _send_or_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     """Envia ou edita a mensagem principal do menu de edição."""
     kb = InlineKeyboardMarkup([
@@ -61,47 +73,98 @@ async def _send_or_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE,
         [InlineKeyboardButton("🎖️ Definir Nível de Personagem", callback_data="edit_char_lvl")],
         [InlineKeyboardButton("❌ Cancelar Edição", callback_data="edit_cancel")]
     ])
-    
+
     query = update.callback_query
+    message = query.message if query else update.message # Obtém a mensagem correta
+
+    # Tenta editar primeiro
     if query:
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+            return
         except Exception:
-            # Fallback se a mensagem não puder ser editada (ex: foi excluída)
-            await query.message.reply_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
-    else:
-        # Se for a primeira vez (via /editplayer)
-        await update.message.reply_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+            # Fallback se a mensagem não puder ser editada
+            pass
 
-# --- Etapas da Conversa ---
+    # Fallback para enviar nova mensagem ou responder
+    if message:
+        try:
+             # Tenta responder à mensagem original para manter o contexto
+             await message.reply_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+        except Exception:
+             # Fallback final se responder falhar (ex: msg deletada)
+             await context.bot.send_message(message.chat_id, text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    else:
+         # Se não houver mensagem original (raro, mas possível)
+         await context.bot.send_message(update.effective_chat.id, text, reply_markup=kb, parse_mode=ParseMode.HTML)
 
 async def admin_edit_player_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Inicia a conversa para editar um jogador."""
-    await update.message.reply_text(
-        "Insira o <b>ID do usuário</b> que você deseja editar:",
-        parse_mode=ParseMode.HTML
-    )
+    """
+    Inicia a conversa para editar um jogador.
+    Pede ID ou Nome do Personagem.
+    """
+    # Atualiza a mensagem para pedir ID ou Nome
+    text = "Insira o <b>ID do usuário</b> ou o <b>Nome exato do personagem</b> que você deseja editar:"
+
+    query = update.callback_query
+    if query:
+        await query.answer()
+        try:
+            await query.edit_message_text(text, parse_mode=ParseMode.HTML)
+        except Exception as e:
+            logger.warning(f"Falha ao editar msg em admin_edit_player_start: {e}")
+            if query.message: # Garante que message existe
+                 await query.message.reply_text(text, parse_mode=ParseMode.HTML)
+    else:
+        if update.message: # Garante que message existe
+            await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
     return STATE_GET_USER_ID
 
 async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Recebe o ID do usuário e mostra o menu de edição."""
+    """
+    Recebe o ID ou Nome, encontra o jogador e mostra o menu de edição.
+    """
+    user_input = update.message.text
+    target_user_id = None
+    pdata = None
+    found_by = "ID/Nome" # Para a mensagem de erro
+
+    # 1. Tenta encontrar por ID
     try:
-        target_user_id = int(update.message.text)
+        target_user_id = int(user_input)
+        pdata = player_manager.get_player_data(target_user_id)
+        found_by = "ID"
+        if pdata:
+             pdata['user_id'] = target_user_id # Garante que o ID está nos dados para exibição
     except ValueError:
-        await update.message.reply_text("ID inválido. Deve ser um número. Tente novamente:")
-        return STATE_GET_USER_ID
+        # 2. Se não for ID, tenta encontrar por Nome
+        try:
+            found = find_player_by_name(user_input)
+            if found:
+                target_user_id, pdata = found
+                found_by = "Nome"
+                if pdata:
+                     pdata['user_id'] = target_user_id # Garante que o ID está nos dados
+        except Exception as e:
+             logger.error(f"Erro ao buscar jogador por nome '{user_input}': {e}")
+             await update.message.reply_text("Ocorreu um erro ao buscar pelo nome. Tente novamente ou use o ID.")
+             return STATE_GET_USER_ID # Pede novamente
 
-    pdata = player_manager.get_player_data(target_user_id)
-    if not pdata:
-        await update.message.reply_text(f"Jogador com ID <code>{target_user_id}</code> não encontrado. Conversa encerrada.", parse_mode=ParseMode.HTML)
-        return ConversationHandler.END
+    # 3. Verifica se encontrou
+    if not pdata or not target_user_id:
+        await update.message.reply_text(
+            f"Jogador não encontrado pelo {found_by} <code>{user_input}</code>. Verifique se digitou corretamente e tente novamente:",
+            parse_mode=ParseMode.HTML
+        )
+        return STATE_GET_USER_ID # Pede novamente
 
-    # Salva o ID do jogador-alvo no context para uso futuro
+    # 4. Salva o ID encontrado e mostra o menu
     context.user_data['edit_target_id'] = target_user_id
-    
+
     info_text = _get_player_info_text(pdata)
     await _send_or_edit_menu(update, context, info_text)
-    
+
     return STATE_SHOW_MENU
 
 async def admin_show_menu_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -266,17 +329,25 @@ async def admin_edit_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 def create_admin_edit_player_handler() -> ConversationHandler:
     """Cria o ConversationHandler para o painel de edição de jogador."""
-    
+
     admin_filter = filters.User(ADMIN_LIST)
-    
+
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("editplayer", admin_edit_player_start, filters=admin_filter)],
+        entry_points=[
+            # Ponto de entrada via comando /editplayer
+            CommandHandler("editplayer", admin_edit_player_start, filters=admin_filter),
+            # Ponto de entrada via botão 'admin_edit_player' do menu admin
+            CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$") # <<< ADICIONADO AQUI
+        ],
         states={
             STATE_GET_USER_ID: [
+                # Espera por uma mensagem de texto (ID ou Nome) do admin
                 MessageHandler(filters.TEXT & ~filters.COMMAND & admin_filter, admin_get_user_id)
             ],
             STATE_SHOW_MENU: [
-                CallbackQueryHandler(admin_choose_action, pattern=r"^edit_(prof_type|prof_lvl|char_lvl|cancel)$")
+                CallbackQueryHandler(admin_choose_action, pattern=r"^edit_(prof_type|prof_lvl|char_lvl|cancel)$"),
+                # Adiciona um fallback caso o usuário clique de novo no botão de entrada
+                CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$")
             ],
             STATE_AWAIT_PROFESSION: [
                 CallbackQueryHandler(admin_set_profession_type, pattern=r"^set_prof:"),
@@ -294,5 +365,7 @@ def create_admin_edit_player_handler() -> ConversationHandler:
             CommandHandler("cancel", admin_edit_cancel, filters=admin_filter)
         ],
         per_message=False
+        # <<< IMPORTANTE >>> Considere adicionar um timeout
+        # conversation_timeout=timedelta(minutes=5) # Ex: Cancela após 5 mins de inatividade
     )
     return conv_handler
