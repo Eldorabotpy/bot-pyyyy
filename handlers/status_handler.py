@@ -188,7 +188,6 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     player_data["stat_points"] = pool - 1
     inc = 3 if profile_stat == "max_hp" else 1
     player_data[profile_stat] = int(player_data.get(profile_stat, 0)) + inc
-    # Se aumentou HP max, cura o jogador pelo mesmo valor
     if profile_stat == "max_hp":
         player_data["current_hp"] = int(player_data.get("current_hp", 0)) + inc
 
@@ -198,34 +197,43 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # Atualiza a mensagem
     status_text, reply_markup = _get_status_content(player_data)
 
-    # =========================================================
-    # <<< INÍCIO DA CORREÇÃO (Tratamento de Erro) >>>
-    # =========================================================
+    # --- Tenta editar Caption ou Texto ---
     try:
         # Tenta editar caption primeiro (se a mensagem atual tiver mídia)
         await query.edit_message_caption(caption=status_text, reply_markup=reply_markup, parse_mode='HTML')
     except BadRequest as e_caption:
-        # Se falhou porque não era caption ou por outro erro, tenta editar texto
-        if "message has no caption" in str(e_caption).lower() or \
-           "message can't be edited" in str(e_caption).lower() or \
-           "message to edit not found" in str(e_caption).lower():
+        error_str = str(e_caption).lower()
+
+        # =========================================================
+        # <<< INÍCIO DA CORREÇÃO >>>
+        # =========================================================
+        # Verifica as mensagens de erro comuns que indicam que devemos tentar edit_message_text
+        if "message has no caption" in error_str or \
+           "there is no caption" in error_str or \
+           "message can't be edited" in error_str or \
+           "message to edit not found" in error_str:
+        # =========================================================
+        # <<< FIM DA CORREÇÃO >>>
+        # =========================================================
             try:
+                # Tenta editar o texto da mensagem
                 await query.edit_message_text(text=status_text, reply_markup=reply_markup, parse_mode='HTML')
             except BadRequest as e_text:
-                # Ignora o erro "Message is not modified"
+                # Ignora o erro "Message is not modified" silenciosamente
                 if "message is not modified" not in str(e_text).lower():
                     logger.error(f"Falha ao editar menu de status (texto) após fallback: {e_text}")
             except Exception as e_generic_text:
                  logger.error(f"Erro genérico ao editar menu de status (texto) após fallback: {e_generic_text}", exc_info=True)
-        # Ignora o erro "Message is not modified" para caption também
-        elif "message is not modified" not in str(e_caption).lower():
-             logger.error(f"Falha ao editar menu de status (caption): {e_caption}")
-    except Exception as e_generic_caption:
-         logger.error(f"Erro genérico ao editar menu de status (caption): {e_generic_caption}", exc_info=True)
-    # =========================================================
-    # <<< FIM DA CORREÇÃO (Tratamento de Erro) >>>
-    # =========================================================
 
+        # Se o erro do caption NÃO for um dos acima E NÃO for "not modified", loga o erro do caption
+        elif "message is not modified" not in error_str:
+             logger.error(f"Falha ao editar menu de status (caption): {e_caption}")
+             # Poderia tentar enviar uma nova mensagem aqui como último recurso, se necessário
+             # await context.bot.send_message(update.effective_chat.id, status_text, reply_markup=reply_markup, parse_mode='HTML')
+
+    except Exception as e_generic_caption:
+         # Captura outros erros inesperados ao tentar editar o caption
+         logger.error(f"Erro genérico ao editar menu de status (caption): {e_generic_caption}", exc_info=True)
 
 async def close_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Fecha (apaga) a mensagem de status."""
