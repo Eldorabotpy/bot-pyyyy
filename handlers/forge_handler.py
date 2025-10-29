@@ -138,9 +138,11 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
     """
     query = update.callback_query
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
-    
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+
     profession_info = "Você ainda não tem uma profissão de criação."
+    # Lógica síncrona para verificar a profissão
     if player_prof := (player_data or {}).get("profession"):
         if prof_id := player_prof.get("type"):
             prof_data = (getattr(game_data, "PROFESSIONS_DATA", {}) or {}).get(prof_id, {})
@@ -149,7 +151,7 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
                 prof_display_name = prof_data.get("display_name", prof_id.capitalize())
                 profession_info = f"Sua Profissão: *{_md_escape(prof_display_name)} (Nível {prof_level})*"
 
-    # Constrói o teclado de botões
+    # Construção síncrona do teclado
     keyboard = [[InlineKeyboardButton("🛠️ Aprimorar & Durabilidade", callback_data="enhance_menu")]]
     row = []
     all_professions = getattr(game_data, "PROFESSIONS_DATA", {}) or {}
@@ -164,13 +166,11 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
         keyboard.append(row)
     keyboard.append([InlineKeyboardButton("↩️ Voltar ao Reino", callback_data="show_kingdom_menu")])
 
-    # Prepara texto e imagem
     text = f"{profession_info}\n\n🔥 *Forja de Eldora*\nEscolha uma profissão para ver as receitas:"
-    photo_source = _get_image_source("menu_forja_principal")
+    photo_source = _get_image_source("menu_forja_principal") # Síncrono
 
-    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard))
-
-# Em handlers/forge_handler.py, substitua a função inteira por esta:
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard)) # Chama função async
 
 async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, profession_id: str, page: int):
     """
@@ -178,49 +178,43 @@ async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTyp
     (VERSÃO COM LOGS DE DEBUG)
     """
     logger.info(f"--- INICIANDO DEBUG: FORJA PARA PROFISSÃO '{profession_id}' ---")
-    
+
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
-    
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+
+    # Lógica síncrona
     player_prof = (player_data or {}).get("profession", {})
     player_prof_type = player_prof.get("type")
     player_prof_level = int(player_prof.get("level", 1))
 
-    # <<< LOG ADICIONADO
     logger.info(f"DADOS DO JOGADOR: Profissão Ativa='{player_prof_type}', Nível={player_prof_level}")
     logger.info(f"DADOS DO MENU: Profissão Requisitada='{profession_id}'")
 
     available_recipes = []
-    
-    # Verificação principal da profissão
     if player_prof_type != profession_id:
-        # <<< LOG ADICIONADO
         logger.warning(f"FALHA NA VERIFICAÇÃO DE PROFISSÃO: Ativa ('{player_prof_type}') != Requisitada ('{profession_id}')")
-    
+
+    # Lógica síncrona
     if player_prof_type == profession_id:
         all_recipes = crafting_registry.all_recipes()
-        # <<< LOG ADICIONADO
         logger.info(f"REGISTRO DE RECEITAS: {len(all_recipes)} receitas encontradas no total.")
-        
         recipes_for_this_prof = 0
         for recipe_id, recipe_data in all_recipes.items():
             if recipe_data.get("profession") == profession_id:
                 recipes_for_this_prof += 1
                 if player_prof_level >= recipe_data.get("level_req", 1):
                     available_recipes.append((recipe_id, recipe_data))
-
-        # <<< LOG ADICIONADO
         logger.info(f"FILTRO DE RECEITAS: Encontradas {recipes_for_this_prof} receitas para '{profession_id}'.")
         logger.info(f"FILTRO DE NÍVEL: {len(available_recipes)} receitas passaram no filtro de nível (Nível do Jogador: {player_prof_level}).")
-        
+
     available_recipes.sort(key=lambda r: r[1].get("level_req", 1))
-    
-    # O resto da função continua igual...
+
     items_per_page = 5
     start_index = (page - 1) * items_per_page
     end_index = page * items_per_page
     paginated_recipes = available_recipes[start_index:end_index]
-    
+
     keyboard = []
     for recipe_id, recipe_data in paginated_recipes:
         emoji = recipe_data.get("emoji", "🔧")
@@ -237,67 +231,58 @@ async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTyp
         keyboard.append(nav_row)
 
     prof_name = (getattr(game_data, "PROFESSIONS_DATA", {}) or {}).get(profession_id, {}).get("display_name", "Desconhecida")
-    
+
     if not available_recipes:
         text = (f"🔥 *Forja — {prof_name}*\n\n"
                 "Você não tem o nível necessário para nenhuma receita, ou esta não é sua profissão ativa.")
         keyboard = [[InlineKeyboardButton("↩️ Voltar", callback_data="forge:main")]]
     else:
         text = f"🔥 *Forja — Receitas de {_md_escape(prof_name)} (Pág. {page})*\n\nEscolha um item para forjar:"
-        
-    photo_source = _get_image_source(f"profissao_{profession_id}_menu") or _get_image_source("menu_forja_principal")
-    
-    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard))
-    logger.info("--- FIM DO DEBUG: FORJA ---")
 
+    photo_source = _get_image_source(f"profissao_{profession_id}_menu") or _get_image_source("menu_forja_principal") # Síncrono
+
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard)) # Chama função async
+    logger.info("--- FIM DO DEBUG: FORJA ---")
 
 async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, recipe_id: str):
     """Mostra os detalhes de uma receita, materiais e o botão de confirmação."""
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
-    
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+
+    # Assumindo síncrono
     recipe_data = crafting_registry.get_recipe(recipe_id)
     if not recipe_data:
         await query.answer("Receita não encontrada.", show_alert=True)
         return
 
+    # Assumindo síncrono
     preview = crafting_engine.preview_craft(recipe_id, player_data)
     if not preview:
         await query.answer("Erro ao pré-visualizar a receita.", show_alert=True)
         return
 
-    # Monta o texto da pré-visualização
+    # Montagem síncrona do texto
     display_name = _md_escape(preview.get("display_name", "Item"))
     minutes = preview.get("duration_seconds", 0) // 60
-    
     lines = [
         "🔥 *Forja - Confirmar Criação*", "",
         f"Item: *{preview.get('emoji','🛠')} {display_name}*",
         f"Tempo: *{minutes} minutos*", "",
         "Materiais Necessários:"
     ]
-    
     inventory = (player_data or {}).get("inventory", {})
     inputs = preview.get("inputs") or {}
-    
     for item_id, need in inputs.items():
-        # <<< INÍCIO DA CORREÇÃO >>>
-        # Esta nova lógica verifica se o item no inventário é um dicionário ou um número.
         item_in_inventory = inventory.get(item_id)
         have = 0
-        if isinstance(item_in_inventory, dict):
-            # Se for um dicionário, pegamos a chave "quantity"
-            have = item_in_inventory.get("quantity", 0)
-        elif isinstance(item_in_inventory, int):
-            # Se for um número, ele já é a quantidade
-            have = item_in_inventory
-        # <<< FIM DA CORREÇÃO >>>
-        
+        if isinstance(item_in_inventory, dict): have = item_in_inventory.get("quantity", 0)
+        elif isinstance(item_in_inventory, int): have = item_in_inventory
         lines.append(_fmt_need_line(item_id, have, need))
-    
     text = "\n".join(lines)
 
-    # Monta os botões
+    # Montagem síncrona dos botões
     keyboard = []
     back_button = InlineKeyboardButton("↩️ Voltar", callback_data=f"forge:prof:{recipe_data.get('profession')}:1")
     if preview.get("can_craft"):
@@ -305,12 +290,13 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
     else:
         keyboard.append([back_button])
         text += "\n\n*Você não possui os materiais ou o nível/profissão necessários.*"
-        
+
     output_item_id = recipe_data.get("output_item_id", recipe_id)
-    image_key = _get_media_key_for_item(output_item_id)
-    photo_source = _get_image_source(image_key)
-    
-    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard))
+    image_key = _get_media_key_for_item(output_item_id) # Síncrono
+    photo_source = _get_image_source(image_key) # Síncrono
+
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard)) # Chama função async
 
 # =====================================================
 # Lógica de Início e Término da Forja
@@ -319,33 +305,36 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
 async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
     """Inicia o processo de forja e agenda a notificação de conclusão."""
     user_id = query.from_user.id
+    # Assumindo start_craft síncrono
     result = crafting_engine.start_craft(user_id, recipe_id)
 
-    if isinstance(result, str):  # Se for uma string, é uma mensagem de erro
+    if isinstance(result, str):
         await query.answer(result, show_alert=True)
         return
 
+    # Lógica síncrona
     duration = result.get("duration_seconds", 0)
     job_name = f"craft_{user_id}_{recipe_id}"
     context.job_queue.run_once(
-        finish_craft_notification_job, 
-        duration, 
-        chat_id=query.message.chat_id, 
-        user_id=user_id, 
-        name=job_name
+        finish_craft_notification_job, # Nome da função async
+        duration,
+        chat_id=query.message.chat_id,
+        user_id=user_id,
+        name=job_name,
+        # Passa recipe_id para o job poder atualizar missões
+        data={"recipe_id": recipe_id}
     )
 
     recipe_name = (crafting_registry.get_recipe(recipe_id) or {}).get("display_name", "item")
     text = (f"🔥 *Forja Iniciada!*\n\n"
             f"Seu(sua) *{_md_escape(recipe_name)}* está sendo forjado.\n"
             f"Ele ficará pronto em *{duration // 60} minutos*.")
-            
-    # Remove os botões da mensagem
-    await _send_or_edit_photo(query, context, photo_source="", caption=text, reply_markup=None)
 
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    # Passa photo_source vazio para garantir que a foto é removida ou texto é editado
+    await _send_or_edit_photo(query, context, photo_source="", caption=text, reply_markup=None) # Chama função async
 
-# Em handlers/forge_handler.py
-
+# <<< CORREÇÃO 8: Adiciona async def >>>
 async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Job que é executado quando a forja termina. Entrega o item ao jogador
@@ -354,7 +343,9 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id = job.user_id
     chat_id = job.chat_id
-    
+    recipe_id = (job.data or {}).get("recipe_id") # Pega recipe_id do job.data
+
+    # Assumindo finish_craft síncrono
     result = crafting_engine.finish_craft(user_id)
     if not isinstance(result, dict) or "item_criado" not in result:
         error_msg = f"⚠️ Erro ao finalizar a forja: {result}"
@@ -363,56 +354,57 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
         return
 
     item_criado = result["item_criado"]
-    player_data = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 9: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+
+    # Atualiza missões (síncrono localmente, async para clã)
     if player_data and (base_id := item_criado.get("base_id")):
-        # Atualiza a missão pessoal
-        mission_manager.update_mission_progress(player_data, "CRAFT", {"item_id": base_id, "quantity": 1})
-        
-        # Atualiza a missão do clã
+        mission_manager.update_mission_progress(player_data, "CRAFT", {"item_id": base_id, "quantity": 1}) # Síncrono
+
         if clan_id := player_data.get("clan_id"):
-            # <<< CORREÇÃO FINAL AQUI >>>
-            # Adicionamos 'await' para garantir que a função do clã seja executada.
-            await clan_manager.update_guild_mission_progress(
-                clan_id=clan_id,
-                mission_type='CRAFT',
-                details={"item_id": base_id, "quantity": 1},
-                context=context
-            )
-        
-        player_manager.save_player_data(user_id, player_data)
-        
-    item_txt = formatar_item_para_exibicao(item_criado)
+             try: # Adiciona try/except para missão de clã
+                # <<< CORREÇÃO 10: Adiciona await >>>
+                await clan_manager.update_guild_mission_progress(
+                    clan_id=clan_id,
+                    mission_type='CRAFT',
+                    # Passa recipe_id se a missão precisar dele
+                    details={"item_id": base_id, "quantity": 1, "recipe_id": recipe_id},
+                    context=context
+                )
+             except Exception as e_clan_craft:
+                  logger.error(f"Erro ao atualizar missão de guilda CRAFT para clã {clan_id}: {e_clan_craft}")
+
+
+        # <<< CORREÇÃO 11: Adiciona await >>>
+        await player_manager.save_player_data(user_id, player_data)
+
+    # Formatação e envio (síncrono + async)
+    item_txt = formatar_item_para_exibicao(item_criado) # Síncrono
     text = f"✨ *Forja Concluída!*\n\nVocê obteve:\n{item_txt}"
-    
+
     base_id = item_criado.get("base_id")
-    image_key = _get_media_key_for_item(base_id)
-    photo_source = _get_image_source(image_key)
-    
+    image_key = _get_media_key_for_item(base_id) # Síncrono
+    photo_source = _get_image_source(image_key) # Síncrono
+
     reply_markup = InlineKeyboardMarkup([[
         InlineKeyboardButton("↩️ Voltar para a Forja", callback_data="forge:main")
     ]])
 
     try:
-        # Apenas tenta enviar foto se uma fonte de imagem válida for encontrada
         if photo_source:
+            # <<< CORREÇÃO 12: Adiciona await >>>
             await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=photo_source,
-                caption=text,
-                parse_mode="Markdown",
-                reply_markup=reply_markup,
+                chat_id=chat_id, photo=photo_source, caption=text,
+                parse_mode="Markdown", reply_markup=reply_markup,
             )
         else:
-            # Se não houver foto, envia diretamente como texto
             raise ValueError("Fonte da foto não encontrada")
-            
     except Exception as e:
         logger.error(f"Falha ao enviar foto do item criado ({e}). Enviando como texto.")
+        # <<< CORREÇÃO 13: Adiciona await >>>
         await context.bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            parse_mode="Markdown",
-            reply_markup=reply_markup,
+            chat_id=chat_id, text=text,
+            parse_mode="Markdown", reply_markup=reply_markup,
         )
         
 # =====================================================
@@ -422,45 +414,51 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
 async def forge_callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Captura e roteia todos os callbacks que começam com 'forge:'.
-    Ex: 'forge:main', 'forge:prof:ferreiro:1', 'forge:recipe:espada_curta'
     """
     query = update.callback_query
     await query.answer()
-    
+
     data = query.data
     parts = data.split(":")
     logger.info(f"Roteador da Forja recebeu callback: {data}")
 
     try:
         action = parts[1]
-        
+
         if action == "main":
+            # <<< CORREÇÃO 14: Adiciona await >>>
             await show_forge_professions_menu(update, context)
-        
+
         elif action == "prof":
             profession_id = parts[2]
             page = int(parts[3])
+            # <<< CORREÇÃO 15: Adiciona await >>>
             await show_profession_recipes_menu(query, context, profession_id, page)
-            
+
         elif action == "recipe":
             recipe_id = parts[2]
+            # <<< CORREÇÃO 16: Adiciona await >>>
             await show_recipe_preview(query, context, recipe_id)
-            
+
         elif action == "confirm":
             recipe_id = parts[2]
+            # <<< CORREÇÃO 17: Adiciona await >>>
             await confirm_craft_start(query, recipe_id, context)
-            
+
         else:
             logger.warning(f"Ação desconhecida no roteador da forja: {action}")
+            # <<< CORREÇÃO 18: Adiciona await >>>
             await query.edit_message_text("❌ Ação da forja desconhecida.")
 
     except (IndexError, ValueError) as e:
         logger.error(f"Erro de formato no callback da forja: '{data}'. Erro: {e}")
+        # <<< CORREÇÃO 19: Adiciona await >>>
         await query.edit_message_text("❌ Callback com formato inválido.")
     except Exception as e:
         logger.exception(f"Erro fatal ao processar callback da forja '{data}':")
+        # <<< CORREÇÃO 20: Adiciona await >>>
         await query.edit_message_text("❌ Ocorreu um erro interno na forja. Tente novamente.")
-
+        
 # =====================================================
 # Registro do Handler
 # =====================================================

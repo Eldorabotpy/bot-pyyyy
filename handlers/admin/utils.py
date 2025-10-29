@@ -72,12 +72,18 @@ async def find_player_from_input(text_input: str) -> tuple | None:
     try:
         # Tenta encontrar por ID
         user_id = int(text_input)
-        pdata = player_manager.get_player_data(user_id)
+        
+        # <<< CORREÇÃO 1: Adiciona await >>>
+        pdata = await player_manager.get_player_data(user_id)
+        
         if pdata:
             return user_id, pdata
     except ValueError:
         # Se não for um ID, tenta encontrar por nome
-        found = player_manager.find_player_by_name(text_input)
+        
+        # <<< CORREÇÃO 2: Adiciona await >>>
+        found = await player_manager.find_player_by_name(text_input)
+        
         if found:
             return found
     

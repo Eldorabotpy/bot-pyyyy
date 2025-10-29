@@ -7,7 +7,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 from telegram.error import BadRequest
 from modules import player_manager, game_data, clan_manager
-from modules import player_manager, game_data
 from handlers.utils import format_combat_message
 from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER
 
@@ -162,22 +161,27 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
             await q.answer()
         except BadRequest:
             pass
-
+    
+    # Garante que temos um chat_id, seja de query ou mensagem
     chat_id = update.effective_chat.id
+    if not chat_id:
+         logger.error("_open_menu: Não foi possível determinar o chat_id.")
+         return
 
     try:
-        dungeon = _load_region_dungeon(region_key)
+        dungeon = _load_region_dungeon(region_key) # Síncrono
     except RuntimeError as e:
         msg = "Calabouço desta região não está configurado." if str(e) == "dungeon_not_found" else "Sistema de calabouços não instalado (registry)."
         await context.bot.send_message(chat_id=chat_id, text=msg)
         return
 
-    key_item = _key_item_for(dungeon)
+    key_item = _key_item_for(dungeon) # Síncrono
     key_obj = (game_data.ITEMS_DATA or {}).get(key_item, {})
     key_name = f"{key_obj.get('emoji','🔹')} {key_obj.get('display_name', key_item)}"
 
-    pdata = player_manager.get_player_data(update.effective_user.id) or {}
-    have = int((_inv(pdata)).get(key_item, 0))
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    pdata = await player_manager.get_player_data(update.effective_user.id) or {}
+    have = int((_inv(pdata)).get(key_item, 0)) # Síncrono
 
     caption = (
         f"<b>{dungeon.get('display_name','Calabouço')}</b>\n"
@@ -186,30 +190,20 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
         f"Escolha a dificuldade:"
     )
 
-    # --- Lógica de Desbloqueio de Dificuldade ---
+    # --- Lógica de Desbloqueio (Síncrona) ---
     kb = []
     dungeon_progress = (pdata.get("dungeon_progress", {}) or {}).get(region_key, {})
     highest_completed = dungeon_progress.get("highest_completed")
     highest_completed_index = -1
-    
     if highest_completed:
         try:
-            # Encontra o índice da dificuldade mais alta que o jogador já completou
-            # Ex: 'iniciante' é 0, 'veterano' é 1, etc.
             highest_completed_index = DEFAULT_DIFFICULTY_ORDER.index(highest_completed)
         except (ValueError, TypeError):
-            pass # Se o valor guardado for inválido, ignora
-
-    # Percorre as dificuldades na ordem correta (iniciante -> veterano -> etc.)
+            pass 
     for i, diff_key in enumerate(DEFAULT_DIFFICULTY_ORDER):
-        # Pega nos metadados da dificuldade do seu config.py
         meta = DIFFICULTIES.get(diff_key)
         if not meta: continue
-
-        # A dificuldade está desbloqueada se o seu índice for menor ou igual
-        # ao da última completada + 1. A primeira (índice 0) está sempre desbloqueada.
         if i <= highest_completed_index + 1:
-            # Botão para dificuldade desbloqueada
             kb.append([
                 InlineKeyboardButton(
                     f"{meta.emoji} {meta.label}", 
@@ -217,27 +211,24 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
                 )
             ])
         else:
-            # Botão para dificuldade bloqueada
             kb.append([
                 InlineKeyboardButton(
                     f"🔒 {meta.label}", 
                     callback_data="dungeon_locked"
                 )
             ])
+    # --- Fim Desbloqueio ---
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
 
+    # Lógica de envio (já usava await)
     try:
-        # Tenta editar a mensagem existente
         await q.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     except Exception:
-        # Se falhar (ex: a mensagem foi apagada), envia uma nova
+        try: await q.delete_message() # Tenta apagar se edit falhar
+        except Exception: pass
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
-  
-# ============================================================
-# Fluxo de run
-# ============================================================
 def _new_run_state(region_key: str, difficulty: str) -> dict:
     return {
         "action": "dungeon_run",
@@ -276,62 +267,69 @@ def _build_combat_details(floor: dict, region_key: str, difficulty: str, stage: 
 async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str, difficulty: str):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
+    query = update.callback_query # Pega a query para responder
 
-    dungeon = _load_region_dungeon(region_key)
-    key_item = _key_item_for(dungeon)
+    dungeon = _load_region_dungeon(region_key) # Síncrono
+    key_item = _key_item_for(dungeon) # Síncrono
 
-    pdata = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id) or {}
 
-    # chave
+    # Consumo de chave (síncrono)
     if not _has_key(pdata, key_item) or not _consume_key(pdata, key_item):
         try:
-            await context.bot.answer_callback_query(update.callback_query.id, text="Você precisa de 1× chave para entrar.", show_alert=True)
+            await context.bot.answer_callback_query(query.id, text="Você precisa de 1× chave para entrar.", show_alert=True)
         except Exception:
             await context.bot.send_message(chat_id=chat_id, text="Você precisa de 1× chave para entrar.")
         return
 
-    floors: List[dict] = list(dungeon.get("floors") or [])
+    floors: List[dict] = list(dungeon.get("floors") or []) # Síncrono
     if not floors:
         await context.bot.send_message(chat_id=chat_id, text="Este calabouço não tem andares configurados.")
         return
 
+    # Síncrono
     scale = _difficulty_scale(dungeon, difficulty)
     lineup = [_scale_floor(f, scale) for f in floors]
 
+    # <<< CORREÇÃO 3: Adiciona await >>>
     # salvar consumo da chave
-    player_manager.save_player_data(user_id, pdata)
+    await player_manager.save_player_data(user_id, pdata)
 
-    # estado inicial + primeiro combate
+    # estado inicial + primeiro combate (síncrono)
     state = _new_run_state(region_key, difficulty)
     combat = _build_combat_details(lineup[0], region_key, difficulty, 0)
     state["action"] = "in_combat"
     state["details"] = combat
     pdata["player_state"] = state
-    player_manager.save_player_data(user_id, pdata)
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    await player_manager.save_player_data(user_id, pdata) # Salva estado de combate
 
-    caption = format_combat_message(pdata)
+    caption = format_combat_message(pdata) # Síncrono
     kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
-           InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",   callback_data="combat_flee")]]
-    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))
+           InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",  callback_data="combat_flee")]]
+           
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb)) # Chama função async
 
 async def fail_dungeon_run(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, reason: str):
     """
     Função chamada quando o jogador falha um calabouço (derrotado ou foge).
     """
-    from handlers.menu.region import send_region_menu
+    # from handlers.menu.region import send_region_menu # Import desnecessário aqui
 
-    player_data = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    # Restaura a vida do jogador para o máximo
+    # Restaura a vida (síncrono)
     total_stats = player_manager.get_player_total_stats(player_data)
     player_data['current_hp'] = total_stats.get('max_hp', 50)
     
-    # Limpa o estado do jogador para "idle"
     player_data['player_state'] = {'action': 'idle'}
-    player_manager.save_player_data(user_id, player_data)
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
     
-    # Envia a mensagem de falha e o botão para continuar
     summary_text = f"❌ **Você falhou no calabouço!**\n\nMotivo: {reason}."
     keyboard = [[InlineKeyboardButton("➡️ Continuar", callback_data="continue_after_action")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -339,15 +337,14 @@ async def fail_dungeon_run(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
     await context.bot.send_message(
         chat_id=chat_id, text=summary_text,
         parse_mode="HTML", reply_markup=reply_markup
-    )
+    ) # Já usava await
 
 async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, combat_details: dict, rewards_to_accumulate: dict):
-    pdata = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 8: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id) or {}
     clan_id = pdata.get("clan_id")
 
-    # =========================================================
-    # INTEGRAÇÃO 1: MISSÃO DE MATAR CHEFE
-    # =========================================================
+    # Missão de Chefe (já usava await)
     if clan_id and combat_details.get("is_boss"):
         await clan_manager.update_guild_mission_progress(
             clan_id=clan_id,
@@ -356,102 +353,84 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
             context=context
         )
         
-    # =========================================================
-
+    # Acumula recompensas (síncrono)
     run = pdata.get("player_state") or {}
     det = (run.get("details") or {})
-
-    # Acumula as recompensas da batalha que acabámos de vencer
     current_rewards = det.get("accumulated_rewards", {"xp": 0, "gold": 0, "items": []})
     current_rewards["xp"] += rewards_to_accumulate.get("xp", 0)
     current_rewards["gold"] += rewards_to_accumulate.get("gold", 0)
     current_rewards["items"].extend(rewards_to_accumulate.get("items", []))
     det["accumulated_rewards"] = current_rewards
-
+    
+    # Lógica síncrona de dungeon/andar
     region_key = str(det.get("region_key") or combat_details.get("region_key") or "")
     difficulty = str(det.get("difficulty") or combat_details.get("difficulty") or "normal")
-
     try:
         dungeon = _load_region_dungeon(region_key)
     except Exception:
         pdata["player_state"] = {"action": "idle"}
-        player_manager.save_player_data(user_id, pdata)
+        # <<< CORREÇÃO 9: Adiciona await >>>
+        await player_manager.save_player_data(user_id, pdata)
         await context.bot.send_message(chat_id=chat_id, text="Calabouço foi encerrado.")
         return
-
     floors: List[dict] = list(dungeon.get("floors") or [])
     if not floors:
         pdata["player_state"] = {"action": "idle"}
-        player_manager.save_player_data(user_id, pdata)
+        # <<< CORREÇÃO 10: Adiciona await >>>
+        await player_manager.save_player_data(user_id, pdata)
         await context.bot.send_message(chat_id=chat_id, text="Calabouço sem andares. Encerrado.")
         return
 
+    # Lógica síncrona de próximo andar
     scale = _difficulty_scale(dungeon, difficulty)
     lineup = [_scale_floor(f, scale) for f in floors]
     cur_stage = int(det.get("dungeon_stage", 0))
     next_stage = cur_stage + 1
-    det["dungeon_stage"] = next_stage # Atualiza o piso atual
+    det["dungeon_stage"] = next_stage
 
     # Verificação de Vitória Final
     if next_stage >= len(lineup):
-        # =========================================================
-        # INTEGRAÇÃO 2: MISSÃO DE COMPLETAR CALABOUÇO
-        # =========================================================
+        # Missão de Completar (já usava await)
         if clan_id:
             await clan_manager.update_guild_mission_progress(
                 clan_id=clan_id,
                 mission_type='DUNGEON_COMPLETE',
-                details={
-                    'dungeon_id': region_key,
-                    'difficulty': difficulty,
-                    'count': 1
-                },
+                details={'dungeon_id': region_key, 'difficulty': difficulty, 'count': 1},
                 context=context
             )
-        # =========================================================
-
-        # ATUALIZAÇÃO DO PROGRESSO DE DIFICULDADE DO JOGADOR
+        
+        # Atualização de progresso (síncrono)
         completed_diff_key = difficulty
         pdata.setdefault("dungeon_progress", {}).setdefault(region_key, {})
-        
         current_highest_key = pdata["dungeon_progress"][region_key].get("highest_completed")
-
         try:
             completed_index = DEFAULT_DIFFICULTY_ORDER.index(completed_diff_key)
             current_highest_index = -1
-            if current_highest_key:
-                current_highest_index = DEFAULT_DIFFICULTY_ORDER.index(current_highest_key)
-
+            if current_highest_key: current_highest_index = DEFAULT_DIFFICULTY_ORDER.index(current_highest_key)
             if completed_index > current_highest_index:
                 pdata["dungeon_progress"][region_key]["highest_completed"] = completed_diff_key
                 logger.info(f"PROGRESSO DO CALABOUÇO ATUALIZADO para user {user_id} em '{region_key}': {completed_diff_key}")
-
         except (ValueError, TypeError):
-            logger.warning(f"Chave de dificuldade inválida durante a atualização de progresso: atual='{current_highest_key}', completada='{completed_diff_key}'")
+            logger.warning(f"Chave de dificuldade inválida: atual='{current_highest_key}', completada='{completed_diff_key}'")
 
-        # O jogador venceu o último piso! Entregamos tudo do "saco de loot".
+        # Aplicação de recompensas (síncrono)
         final_rewards = det.get("accumulated_rewards", {})
         final_xp = final_rewards.get("xp", 0)
         final_gold = final_rewards.get("gold", 0) + _final_gold_for(dungeon, difficulty)
         final_items = final_rewards.get("items", [])
-
         pdata['xp'] = int(pdata.get('xp', 0)) + final_xp
-        if final_gold > 0:
-            player_manager.add_gold(pdata, final_gold)
-
+        if final_gold > 0: player_manager.add_gold(pdata, final_gold)
         looted_items_text = ""
         if final_items:
-            for item_id in final_items:
-                player_manager.add_item_to_inventory(pdata, item_id, 1)
-
+            for item_id in final_items: player_manager.add_item_to_inventory(pdata, item_id, 1)
             from collections import Counter
             item_names = [(game_data.ITEMS_DATA.get(item_id, {}) or {}).get('display_name', item_id) for item_id in final_items]
             looted_items_text = "\n\n<b>Tesouros Adquiridos:</b>\n"
-            for name, count in Counter(item_names).items():
-                looted_items_text += f"- {count}x {name}\n"
+            for name, count in Counter(item_names).items(): looted_items_text += f"- {count}x {name}\n"
 
         pdata["player_state"] = {"action": "idle"}
-        player_manager.save_player_data(user_id, pdata)
+        # <<< CORREÇÃO 11: Adiciona await >>>
+        await player_manager.save_player_data(user_id, pdata) # Salva tudo
 
         summary_text = (
             f"🏆 <b>Calabouço Concluído!</b> 🏆\n\n"
@@ -460,31 +439,23 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
             f"+{final_gold:,} Ouro"
             f"{looted_items_text}"
         )
-        
-        keyboard = [[
-            InlineKeyboardButton("➡️ 𝐂𝐨𝐧𝐭𝐢𝐧𝐮𝐚𝐫", callback_data="continue_after_action")
-        ]]
+        keyboard = [[InlineKeyboardButton("➡️ 𝐂𝐨𝐧𝐭𝐢𝐧𝐮𝐚𝐫", callback_data="continue_after_action")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=summary_text,
-            parse_mode="HTML",
-            reply_markup=reply_markup
-        )
+        await context.bot.send_message(chat_id=chat_id, text=summary_text, parse_mode="HTML", reply_markup=reply_markup) # Já usava await
         return
 
-    # Se não for o último piso, continua para o próximo combate
+    # Próximo combate (síncrono + async save)
     combat = _build_combat_details(lineup[next_stage], region_key, difficulty, next_stage)
     run["action"] = "in_combat"
     run["details"] = combat
     pdata["player_state"] = run
-    player_manager.save_player_data(user_id, pdata)
+    # <<< CORREÇÃO 12: Adiciona await >>>
+    await player_manager.save_player_data(user_id, pdata) # Salva o estado para o próximo combate
 
-    caption = format_combat_message(pdata)
+    caption = format_combat_message(pdata) # Síncrono
     kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
-           InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",   callback_data="combat_flee")]]
-    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))
+           InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",  callback_data="combat_flee")]]
+    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb)) # Já usava await
 
 # ============================================================
 async def _open_menu_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):

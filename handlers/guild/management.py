@@ -19,10 +19,14 @@ async def show_clan_management_menu(update: Update, context: ContextTypes.DEFAUL
     """Mostra o menu de gestão para o líder do clã."""
     query = update.callback_query
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
 
-    # ✅ 2. VERIFICAÇÃO DE PERMISSÃO DE LÍDER
     if not clan_data or clan_data.get("leader_id") != user_id:
         await query.answer("Apenas o líder do clã pode aceder a este menu.", show_alert=True)
         return
@@ -35,10 +39,7 @@ async def show_clan_management_menu(update: Update, context: ContextTypes.DEFAUL
         [InlineKeyboardButton("👑 Transferir Liderança", callback_data='clan_transfer_leader_start')],
         [InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data='clan_menu')]
     ]
-    # ✅ 3. USAR A FUNÇÃO DE EDIÇÃO SEGURA
     await safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-
-# --- Lógica de Convidar Membro ---
 
 async def start_invite_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Inicia a conversa para convidar um novo membro."""
@@ -56,8 +57,13 @@ async def show_kick_member_menu(update: Update, context: ContextTypes.DEFAULT_TY
     """Mostra a lista de membros para expulsar."""
     query = update.callback_query
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
 
     if not clan_data or clan_data.get("leader_id") != user_id:
         await query.answer("Apenas o líder pode expulsar membros.", show_alert=True)
@@ -68,9 +74,10 @@ async def show_kick_member_menu(update: Update, context: ContextTypes.DEFAULT_TY
     keyboard = []
     
     for member_id in clan_data.get("members", []):
-        if member_id != user_id:  # O líder não pode se expulsar
-            member_data = player_manager.get_player_data(member_id)
-            if member_data: # Garante que o membro existe
+        if member_id != user_id:
+            # <<< CORREÇÃO 5: Adiciona await >>>
+            member_data = await player_manager.get_player_data(member_id)
+            if member_data: 
                 member_name = member_data.get("character_name", f"ID: {member_id}")
                 keyboard.append([InlineKeyboardButton(f"❌ {member_name}", callback_data=f'clan_kick_confirm:{member_id}')])
 
@@ -82,9 +89,10 @@ async def show_kick_confirm_menu(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
     member_id_to_kick = int(query.data.split(':')[1])
-    member_data = player_manager.get_player_data(member_id_to_kick)
     
-    # Verificação de segurança
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    member_data = await player_manager.get_player_data(member_id_to_kick)
+    
     if not member_data:
         await query.answer("Este jogador não foi encontrado.", show_alert=True)
         return
@@ -104,24 +112,32 @@ async def do_kick_member_callback(update: Update, context: ContextTypes.DEFAULT_
     """Executa a expulsão do membro."""
     query = update.callback_query
     leader_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(leader_id).get("clan_id")
+    
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    player_data = await player_manager.get_player_data(leader_id)
+    clan_id = player_data.get("clan_id")
     member_id_to_kick = int(query.data.split(':')[1])
     
     try:
-        # Segurança: buscar dados do jogador a ser expulso
-        kicked_player_data = player_manager.get_player_data(member_id_to_kick)
+        # <<< CORREÇÃO 8: Adiciona await >>>
+        kicked_player_data = await player_manager.get_player_data(member_id_to_kick)
         if not kicked_player_data:
             raise ValueError("Jogador a ser expulso não encontrado.")
 
         member_name = kicked_player_data.get("character_name", "O jogador")
-        clan_manager.remove_member(clan_id, member_id_to_kick)
+        
+        # <<< CORREÇÃO 9: Adiciona await >>>
+        await clan_manager.remove_member(clan_id, member_id_to_kick)
 
         kicked_player_data["clan_id"] = None
-        player_manager.save_player_data(member_id_to_kick, kicked_player_data)
+        
+        # <<< CORREÇÃO 10: Adiciona await >>>
+        await player_manager.save_player_data(member_id_to_kick, kicked_player_data)
         
         await query.answer(f"{member_name} foi expulso do clã.", show_alert=True)
         
-        clan_name = clan_manager.get_clan(clan_id).get("display_name")
+        # <<< CORREÇÃO 11: Adiciona await >>>
+        clan_name = (await clan_manager.get_clan(clan_id)).get("display_name")
         try:
             await context.bot.send_message(chat_id=member_id_to_kick, text=f"Você foi expulso do clã '{clan_name}' pelo líder.")
         except Exception as e:
@@ -130,17 +146,21 @@ async def do_kick_member_callback(update: Update, context: ContextTypes.DEFAULT_
     except ValueError as e:
         await query.answer(f"Erro: {e}", show_alert=True)
     
-    # Recarrega o menu de expulsão
+    # <<< CORREÇÃO 12: Adiciona await (chamada a função async) >>>
     await show_kick_member_menu(update, context)
-
 
 # --- Lógica de Transferência de Liderança (Conversation) ---
 
 async def start_transfer_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 13: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 14: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
 
     if not clan_data or clan_data.get("leader_id") != user_id:
         await query.answer("Apenas o líder pode transferir a liderança.", show_alert=True)
@@ -153,15 +173,22 @@ async def start_transfer_conversation(update: Update, context: ContextTypes.DEFA
 async def receive_transfer_target_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     leader_id = update.effective_user.id
     target_name = update.message.text
-    target_info = player_manager.find_player_by_character_name(target_name)
+    
+    # <<< CORREÇÃO 15: Adiciona await >>>
+    target_info = await player_manager.find_player_by_character_name(target_name)
     
     if not target_info:
         await update.message.reply_text(f"Nenhum personagem com o nome '{target_name}' foi encontrado. Tente novamente.")
         return ASKING_LEADER_TARGET
 
     target_id = target_info['user_id']
-    clan_id = player_manager.get_player_data(leader_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 16: Adiciona await >>>
+    player_data_leader = await player_manager.get_player_data(leader_id)
+    clan_id = player_data_leader.get("clan_id")
+    
+    # <<< CORREÇÃO 17: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
 
     if target_id not in clan_data.get("members", []):
         await update.message.reply_text(f"'{target_name}' não é membro do seu clã.")
@@ -186,13 +213,22 @@ async def do_transfer_leadership(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
     leader_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(leader_id).get("clan_id")
+    
+    # <<< CORREÇÃO 18: Adiciona await >>>
+    player_data_leader = await player_manager.get_player_data(leader_id)
+    clan_id = player_data_leader.get("clan_id")
     target_id = context.user_data.get('transfer_target_id')
 
     try:
-        clan_manager.transfer_leadership(clan_id, leader_id, target_id)
-        clan_name = clan_manager.get_clan(clan_id).get("display_name")
-        target_name = player_manager.get_player_data(target_id).get("character_name")
+        # <<< CORREÇÃO 19: Adiciona await >>>
+        await clan_manager.transfer_leadership(clan_id, leader_id, target_id)
+        
+        # <<< CORREÇÃO 20: Adiciona await >>>
+        clan_name = (await clan_manager.get_clan(clan_id)).get("display_name")
+        
+        # <<< CORREÇÃO 21: Adiciona await >>>
+        target_name = (await player_manager.get_player_data(target_id)).get("character_name")
+        
         await query.edit_message_text(f"A liderança do clã '{clan_name}' foi transferida para {target_name}.")
         try:
             await context.bot.send_message(chat_id=target_id, text=f"👑 Você é o novo líder do clã '{clan_name}'!")
@@ -214,8 +250,13 @@ async def cancel_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def start_logo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 22: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 23: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
 
     if not clan_data or clan_data.get("leader_id") != user_id:
         await query.answer("Apenas o líder pode alterar a logo.", show_alert=True)
@@ -228,7 +269,10 @@ async def start_logo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def receive_clan_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
+    
+    # <<< CORREÇÃO 24: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
     
     media_data = {}
     if update.message.photo:
@@ -242,7 +286,8 @@ async def receive_clan_media(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ASKING_CLAN_LOGO
 
     try:
-        clan_manager.set_clan_media(clan_id, user_id, media_data)
+        # <<< CORREÇÃO 25: Adiciona await >>>
+        await clan_manager.set_clan_media(clan_id, user_id, media_data)
         await update.message.reply_text("✅ Logo do clã atualizada com sucesso!")
     except ValueError as e:
         await update.message.reply_text(f"❌ Erro: {e}")
@@ -253,8 +298,6 @@ async def cancel_logo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("Upload da logo cancelado.")
     return ConversationHandler.END
 
-# Cole estas duas novas funções no seu arquivo handlers/guild/management.py
-
 async def receive_invitee_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Recebe o nome do personagem a ser convidado, valida e envia o convite.
@@ -262,17 +305,17 @@ async def receive_invitee_name(update: Update, context: ContextTypes.DEFAULT_TYP
     inviter_id = update.effective_user.id
     target_name = update.message.text
 
-    # 1. Encontrar o jogador alvo pelo nome do personagem
-    target_info = player_manager.find_player_by_character_name(target_name)
+    # <<< CORREÇÃO 26: Adiciona await >>>
+    target_info = await player_manager.find_player_by_character_name(target_name)
 
-    # 2. Validações
     if not target_info:
         await update.message.reply_text(f"Nenhum personagem com o nome '{target_name}' foi encontrado. Tente novamente.")
-        # Mantém o usuário no mesmo passo da conversa para tentar de novo
         return ASKING_INVITEE
 
     target_id = target_info['user_id']
-    target_data = player_manager.get_player_data(target_id)
+    
+    # <<< CORREÇÃO 27: Adiciona await >>>
+    target_data = await player_manager.get_player_data(target_id)
 
     if target_data.get("clan_id"):
         await update.message.reply_text(f"'{target_name}' já faz parte de um clã.")
@@ -282,10 +325,12 @@ async def receive_invitee_name(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("Você não pode convidar a si mesmo.")
         return ASKING_INVITEE
 
-    # 3. Enviar o convite para o jogador alvo
-    inviter_data = player_manager.get_player_data(inviter_id)
+    # <<< CORREÇÃO 28: Adiciona await >>>
+    inviter_data = await player_manager.get_player_data(inviter_id)
     clan_id = inviter_data.get("clan_id")
-    clan_name = clan_manager.get_clan(clan_id).get("display_name", "um clã")
+    
+    # <<< CORREÇÃO 29: Adiciona await >>>
+    clan_name = (await clan_manager.get_clan(clan_id)).get("display_name", "um clã")
     inviter_name = inviter_data.get("character_name", "um líder")
 
     invite_text = (
@@ -308,7 +353,6 @@ async def receive_invitee_name(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         await update.message.reply_text(f"❌ Não foi possível enviar o convite. O jogador pode ter bloqueado o bot. Erro: {e}")
 
-    # 4. Finalizar a conversa
     return ConversationHandler.END
 
 

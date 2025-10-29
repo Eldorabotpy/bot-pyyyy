@@ -175,11 +175,13 @@ async def show_enhance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
 
     text = "<b>✨ 𝐀𝐩𝐫𝐢𝐦𝐨𝐫𝐚𝐦𝐞𝐧𝐭𝐨 & 𝐃𝐮𝐫𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞</b>\n𝑺𝒆𝒍𝒆𝒄𝒊𝒐𝒏𝒆 𝒖𝒎 𝒊𝒕𝒆𝒎 <u>equipado</u>:\n"
     kb = []
     found_any = False
+    # _equip_list é síncrono
     for _, uid, label, _inst in _equip_list(pdata):
         found_any = True
         btn_text = label if len(label) <= 64 else (label[:61] + "…")
@@ -189,20 +191,24 @@ async def show_enhance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "\n<i>𝑵𝒆𝒏𝒉𝒖𝒎 𝒆𝒒𝒖𝒊𝒑𝒂𝒎𝒆𝒏𝒕𝒐 𝒖́𝒏𝒊𝒄𝒐 𝒆𝒔𝒕𝒂́ 𝒆𝒒𝒖𝒊𝒑𝒂𝒅𝒐.</i>\n"
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
-    await _edit_caption_or_text(q, text, InlineKeyboardMarkup(kb))
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    await _edit_caption_or_text(q, text, InlineKeyboardMarkup(kb)) # Chama função async
 
 async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
     uid = q.data.replace("enh_sel_", "")
-    pdata = player_manager.get_player_data(user_id)
-    inv = pdata.get('inventory', {}) or {}
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
+    inv = pdata.get('inventory', {}) or {} # Síncrono
     inst = inv.get(uid)
     if not isinstance(inst, dict) or not inst.get('base_id'):
         await q.answer("Item inválido.", show_alert=True)
+        # Consider adding await show_enhance_menu(update, context) here to refresh
         return
 
+    # Síncrono
     base = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(inst.get('base_id'), {})
     name = base.get('display_name', inst.get('base_id'))
     rarity = str(inst.get('rarity', 'comum')).lower()
@@ -213,7 +219,6 @@ async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cap = int(caps.get(rarity, 5))
     at_cap = (up >= cap)
 
-    # Custos: simples (sem Sigilo) / com Sigilo
     costs_simple = _compute_upgrade_costs_from_recipe(inst, include_joia_forja=True, include_sigilo=False)
     costs_with_sigilo = _compute_upgrade_costs_from_recipe(inst, include_joia_forja=True, include_sigilo=True)
 
@@ -229,7 +234,7 @@ async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_lines = [
         f"<b>{name}</b>",
         f"𝑹𝒂𝒓𝒊𝒅𝒂𝒅𝒆: <b>{rarity.capitalize()}</b>",
-        f"𝑵𝒊́𝒗𝒆𝒍 𝒂𝒕𝒖𝒂𝒍: <b>+{up}</b>  →  𝑷𝒓𝒐́𝒙𝒊𝒎𝒐: <b>+{up+1}</b>  (Cap: <b>+{cap}</b>)",
+        f"𝑵𝒊́𝒗𝒆𝒍 𝒂𝒕𝒖𝒂𝒍: <b>+{up}</b>   →   𝑷𝒓𝒐́𝒙𝒊𝒎𝒐: <b>+{up+1}</b>   (Cap: <b>+{cap}</b>)", # Corrigido espaçamento
         f"𝑫𝒖𝒓𝒂𝒃𝒊𝒍𝒊𝒅𝒂𝒅𝒆: <b>{cur}/{mx}</b>",
         "",
     ]
@@ -252,7 +257,8 @@ async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb.append([InlineKeyboardButton("📜 𝑹𝒆𝒔𝒕𝒂𝒖𝒓𝒂𝒓 𝑫𝒖𝒓𝒂𝒃𝒊𝒍𝒊𝒅𝒂𝒅𝒆", callback_data=f"enh_rest_{uid}")])
     kb.append([InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓", callback_data="enhance_menu")])
 
-    await _edit_caption_or_text(q, "\n".join(text_lines), InlineKeyboardMarkup(kb))
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    await _edit_caption_or_text(q, "\n".join(text_lines), InlineKeyboardMarkup(kb)) # Chama função async
 
 # =========================
 # Ações
@@ -264,7 +270,8 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
 
     data = q.data
     # === APRIMORAR ===
@@ -276,30 +283,28 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         use_joia = (flag == "joia")
+        # Assumindo enhance_item síncrono
         res = enhance_item(pdata, uid, use_joia=use_joia)
         if isinstance(res, dict) and res.get("error"):
             await q.answer(res["error"], show_alert=True)
-            await enhance_item_menu(update, context)
+            # <<< CORREÇÃO 6: Adiciona await >>>
+            await enhance_item_menu(update, context) # Chama função async
             return
-            
-        # --- INÍCIO DA ADIÇÃO DO GATILHO DE MISSÃO ---
-        # Verificamos se o aprimoramento foi bem-sucedido
+
+        # --- GATILHO DE MISSÃO (síncrono localmente) ---
         if res.get("success"):
-            # Adicionamos o user_id para a função da missão
-            pdata["user_id"] = user_id
-            
-            # Chamamos o gatilho da missão com os dados que já temos
+            pdata["user_id"] = user_id # Adiciona ID para mission manager
             mission_manager.update_mission_progress(
                 pdata,
                 event_type="ENHANCE_SUCCESS",
-                details={"quantity": 1} # Para missões "aprimore X itens"
+                details={"quantity": 1}
             )
-        # --- FIM DA ADIÇÃO DO GATILHO DE MISSÃO ---
+        # --- FIM DO GATILHO DE MISSÃO ---
 
-        # Persistir TODAS as alterações (item aprimorado E progresso da missão)
-        player_manager.save_player_data(user_id, pdata)
+        # <<< CORREÇÃO 7: Adiciona await (SALVA APÓS ENHANCE E MISSÃO) >>>
+        await player_manager.save_player_data(user_id, pdata)
 
-        # O resto da função continua igual para mostrar o resultado ao jogador
+        # Prepara mensagem de resultado (síncrono)
         inv = pdata.get("inventory", {}) or {}
         inst = inv.get(uid)
         base = (getattr(game_data, "ITEMS_DATA", {}) or {}).get((inst or {}).get('base_id', ''), {})
@@ -310,13 +315,13 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if res.get("success"):
             header = "✅ <b>𝐀𝐩𝐫𝐢𝐦𝐨𝐫𝐚𝐦𝐞𝐧𝐭𝐨 𝐛𝐞𝐦-𝐬𝐮𝐜𝐞𝐝𝐢𝐝𝐨!</b>"
             body = f"{name} 𝒂𝒈𝒐𝒓𝒂 𝒆𝒔𝒕𝒂́ 𝒆𝒎 <b>+{up}</b>."
-        else:
+        else: # Falhou
             if res.get("protected"):
                 header = "⚠️ <b>𝑭𝒂𝒍𝒉𝒐𝒖, 𝒎𝒂𝒔 𝒑𝒓𝒐𝒕𝒆𝒈𝒊𝒅𝒐.</b>"
-                body = f"𝐎 ✨ 𝐒𝐢𝐠𝐢𝐥𝐨 𝐝𝐞 𝐏𝐫𝐨𝐭𝐞𝐜̧𝐚̃𝐨 𝐦𝐚𝐧𝐭𝐞𝐯𝐞 𝐨 𝐧𝐢́𝐯𝐞𝐥 𝐞𝐦 <b>+{up}</b>."
-            else:
+                body = f"𝐎 ✨ 𝐒𝐢𝐠𝐢𝐥𝐨 𝐝𝐞 𝐏𝐫𝐨𝐭𝐞𝐜̧𝐚̃𝒐 𝐦𝐚𝐧𝐭𝐞𝐯𝐞 𝐨 𝐧𝐢́𝐯𝐞𝐥 𝐞𝐦 <b>+{up}</b>."
+            else: # Falhou e não estava protegido
                 header = "❌⚠️ <b>𝑨𝒑𝒓𝒊𝒎𝒐𝒓𝒂𝒎𝒆𝒏𝒕𝒐 𝒇𝒂𝒍𝒉𝒐𝒖.</b>"
-                body = f"𝑶 𝒏𝒊́𝒗𝒆𝒍 𝒄𝒂𝒊𝒖 𝒑𝒂𝒓𝒂 <b>+{up}</b>."
+                body = f"𝑶 𝒏𝒊́𝒗𝒆𝒍 𝒄𝒂𝒊𝒖 𝒑𝒂𝒓𝒂 <b>+{up}</b>." # Mostra o novo nível após cair
 
         text = "\n".join([
             header,
@@ -330,19 +335,25 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔁 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚 𝐦𝐞𝐥𝐡𝐨𝐫𝐚𝐫 𝐞𝐬𝐭𝐞 𝐢𝐭𝐞𝐦", callback_data=f"enh_sel_{uid}")],
             [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨𝐬 𝐞𝐪𝐮𝐢𝐩𝐚𝐝𝐨𝐬", callback_data="enhance_menu")],
         ])
-        await _edit_caption_or_text(q, text, kb)
+        # <<< CORREÇÃO 8: Adiciona await >>>
+        await _edit_caption_or_text(q, text, kb) # Chama função async
         return
 
     # === RESTAURAR DURABILIDADE ===
     if data.startswith("enh_rest_"):
-        # ... (esta parte da sua função continua igual, sem alterações)
         uid = data.replace("enh_rest_", "")
+        # Assumindo restore_durability síncrono
         res = restore_durability(pdata, uid)
         if isinstance(res, dict) and res.get("error"):
             await q.answer(res["error"], show_alert=True)
-            await enhance_item_menu(update, context)
+            # <<< CORREÇÃO 9: Adiciona await >>>
+            await enhance_item_menu(update, context) # Chama função async
             return
-        player_manager.save_player_data(user_id, pdata)
+
+        # <<< CORREÇÃO 10: Adiciona await (SALVA APÓS RESTORE) >>>
+        await player_manager.save_player_data(user_id, pdata)
+
+        # Prepara mensagem de resultado (síncrono)
         inv = pdata.get("inventory", {}) or {}
         inst = inv.get(uid, {})
         base = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(inst.get('base_id', ''), {})
@@ -356,10 +367,9 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔧 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚 𝐦𝐞𝐥𝐡𝐨𝐫𝐚𝐫 𝐞𝐬𝐭𝐞 𝐢𝐭𝐞𝐦", callback_data=f"enh_sel_{uid}")],
             [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨𝐬 𝐞𝐪𝐮𝐢𝐩𝐚𝐝𝐨𝐬", callback_data="enhance_menu")],
         ])
-        await _edit_caption_or_text(q, text, kb)
-# =========================
-# Handlers (exports)
-# =========================
+        # <<< CORREÇÃO 11: Adiciona await >>>
+        await _edit_caption_or_text(q, text, kb) # Chama função async
+        
 enhance_menu_handler   = CallbackQueryHandler(show_enhance_menu, pattern=r'^enhance_menu$')
 enhance_select_handler = CallbackQueryHandler(enhance_item_menu, pattern=r'^enh_sel_')
 enhance_action_handler = CallbackQueryHandler(do_enhance, pattern=r'^enh_(go|rest)_')

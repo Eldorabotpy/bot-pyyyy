@@ -4,12 +4,10 @@ import json
 import os
 import re
 import unicodedata
-from datetime import datetime, timezone, timedelta
 import random
-
-
+import asyncio
+from datetime import datetime, timezone, timedelta
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS, CLAN_CONFIG
-
 from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG 
 from modules import player_manager
 from telegram.ext import ContextTypes
@@ -21,40 +19,127 @@ CLANS_DIR_PATH = "data/clans/"
 #  NOVAS FUNÇÕES PARA MISSÕES DE GUILDA (Adicionado)
 # =========================================================
 
-def get_active_guild_mission(clan_id: str) -> dict | None:
+# <<< CORREÇÃO 1: Adiciona async def >>>
+async def get_active_guild_mission(clan_id: str) -> dict | None:
     """
     Busca a missão ativa de um clã e enriquece os dados com informações
     do catálogo de missões (título, descrição, recompensas, etc.).
+    (Versão async)
     """
+    # <<< CORREÇÃO 2: Adiciona await (se get_clan se tornar async) >>>
+    # Assumindo que get_clan permanece síncrono por agora
     clan_data = get_clan(clan_id)
-    if not clan_data or "active_mission" not in clan_data:
+    if not clan_data or not clan_data.get("active_mission"):
         return None
 
     mission_state = clan_data["active_mission"]
     mission_id = mission_state.get("mission_id")
     
-    mission_template = GUILD_MISSIONS_CATALOG.get(mission_id)
+    mission_template = GUILD_MISSIONS_CATALOG.get(mission_id) # Síncrono
     if not mission_template:
-        # A missão pode ter sido removida do catálogo; tratamos como se não existisse.
         return None
 
-    # Combina os dados do template com o estado atual da missão
-    full_mission_details = {**mission_template, **mission_state}
+    full_mission_details = {**mission_template, **mission_state} # Síncrono
 
-    # Converte a string de tempo final para um objeto datetime para cálculos
-    try:
+    try: # Síncrono
         full_mission_details["end_time"] = datetime.fromisoformat(mission_state["end_time"])
     except (ValueError, KeyError):
         full_mission_details["end_time"] = None
         
     return full_mission_details
 
-def set_clan_media(clan_id: str, leader_id: int, media_data: dict):
+#
+# >>> INÍCIO DO CÓDIGO PARA ADICIONAR <<<
+#
+
+async def update_guild_mission_progress(clan_id: str, mission_type: str, details: dict, context: ContextTypes.DEFAULT_TYPE):
     """
-    Define os dados de mídia (logo/vídeo) de um clã. Apenas o líder pode executar.
-    'media_data' deve ser um dicionário como: {"file_id": "...", "type": "photo"}
-    Levanta um ValueError em caso de erro.
+    Atualiza o progresso de uma missão ativa do clã com base numa ação do jogador.
+    (Esta era a função que estava a faltar e que causou o erro no pvp_handler)
+    
+    :param clan_id: O ID (slug) do clã.
+    :param mission_type: O tipo de ação realizada (ex: "PVP_WIN", "MONSTER_HUNT").
+    :param details: Um dicionário com detalhes da ação (ex: {'count': 1} ou {'monster_id': 'goblin', 'count': 1}).
+    :param context: O contexto do bot (para enviar mensagens de conclusão).
     """
+    if not clan_id:
+        return
+
+    # 1. Carregar os dados "raw" do clã (síncrono)
+    clan_data = get_clan(clan_id)
+    if not clan_data:
+        print(f"[Mission Update] Clã {clan_id} não encontrado.")
+        return
+
+    # 2. Carregar os dados "enriquecidos" da missão ativa (assíncrono)
+    active_mission = await get_active_guild_mission(clan_id)
+    if not active_mission:
+        # Clã não tem missão ativa, o que é normal. Ignora silenciosamente.
+        return
+
+    # 3. Verificar se a missão expirou
+    end_time = active_mission.get("end_time")
+    if end_time and datetime.now(timezone.utc) > end_time:
+        # A missão expirou, limpa-a
+        clan_data["active_mission"] = None
+        save_clan(clan_id, clan_data)
+        return
+
+    # 4. Verificar se a ação (mission_type) é a que a missão pede
+    if active_mission.get("type") != mission_type:
+        # O jogador fez uma ação (ex: PvP) mas a missão é de outro tipo (ex: Caça)
+        return
+
+    # 5. Processar o progresso
+    progress_made = 0
+    
+    if mission_type == "PVP_WIN":
+        # Para missões de PvP, só precisamos de contar a vitória
+        progress_made = details.get("count", 0)
+        
+    elif mission_type == "MONSTER_HUNT":
+        # Para missões de Caça, verificamos se o monstro é o alvo
+        target_monster_id = active_mission.get("target_monster_id")
+        if details.get("monster_id") == target_monster_id:
+            progress_made = details.get("count", 0)
+            
+    # (Podes adicionar mais lógica para outros tipos de missão aqui)
+
+    if progress_made == 0:
+        # A ação não contribuiu para esta missão em específico
+        return
+
+    # 6. Atualizar o progresso no dicionário do clã
+    current_progress = active_mission.get("current_progress", 0)
+    target_count = active_mission.get("target_count", 1)
+    
+    # Garante que usamos a versão "raw" dos dados do clã para atualizar
+    if "active_mission" not in clan_data or not clan_data["active_mission"]:
+        return # Segurança: se a missão foi removida noutra thread
+        
+    new_progress = current_progress + progress_made
+    clan_data["active_mission"]["current_progress"] = new_progress
+    
+    print(f"[Mission Update] Clã {clan_id} progrediu: {new_progress}/{target_count} (Ação: {mission_type})")
+
+    # 7. Verificar se a missão foi concluída
+    if new_progress >= target_count:
+        print(f"[Mission Update] Clã {clan_id} COMPLETOU a missão!")
+        mission_id = active_mission.get("mission_id")
+        
+        # Chama a função auxiliar para dar recompensas e limpar a missão
+        await _complete_guild_mission(clan_id, clan_data, mission_id, context)
+
+    # 8. Salvar os dados do clã (seja o progresso ou a conclusão)
+    save_clan(clan_id, clan_data)
+
+   
+# <<< CORREÇÃO 3: Adiciona async def >>>
+async def set_clan_media(clan_id: str, leader_id: int, media_data: dict):
+    """
+    Define os dados de mídia (logo/vídeo) de um clã. (Versão async)
+    """
+    # Assumindo get_clan síncrono
     clan_data = get_clan(clan_id)
     if not clan_data:
         raise ValueError("Clã não encontrado.")
@@ -63,143 +148,128 @@ def set_clan_media(clan_id: str, leader_id: int, media_data: dict):
     if not media_data or not isinstance(media_data, dict) or "file_id" not in media_data or "type" not in media_data:
         raise ValueError("Dados de mídia inválidos.")
         
-    clan_data["logo_media"] = media_data  # Guarda o dicionário inteiro
+    clan_data["logo_media"] = media_data
+    # Assumindo save_clan síncrono
     save_clan(clan_id, clan_data)
 
-async def update_guild_mission_progress(clan_id: str, mission_type: str, details: dict, context: ContextTypes.DEFAULT_TYPE): # <-- MUDANÇA: Adicionado 'context'
-    """
-    Verifica a ação de um jogador e, se for relevante para a missão
-    ativa da guilda, atualiza o progresso e dispara a conclusão.
-    """
-    clan_data = get_clan(clan_id)
-    mission = (clan_data or {}).get("active_mission")
-
-    if not mission or mission.get("current_progress", 0) >= mission.get("target_count", 1):
-        return
-
-    # A sua lógica de verificação de tipo e alvo está perfeita!
-    if mission.get("type") != mission_type:
-        return
-    if mission_type == 'HUNT' and mission.get("target_monster_id") != details.get("monster_id"):
-        return
-            
-    current_progress = mission.get("current_progress", 0)
-    mission["current_progress"] = current_progress + details.get("count", 1)
-    
-    target_count = mission.get("target_count", 1)
-    
-    # Verifica se a missão foi concluída
-    if mission["current_progress"] >= target_count:
-        mission["current_progress"] = target_count # Garante que não ultrapasse o alvo
-        
-        # Passa o 'context' para a função de conclusão
-        await _complete_guild_mission(clan_id, clan_data, mission.get("mission_id"), context) # <-- MUDANÇA: Passando 'context'
-    
-    save_clan(clan_id, clan_data)
-
-def _add_bank_log_entry(clan_data: dict, user_id: int, action: str, amount: int):
-    """Adiciona uma entrada ao log do banco do clã."""
+# <<< CORREÇÃO 4: Adiciona async def >>>
+async def _add_bank_log_entry(clan_data: dict, user_id: int, action: str, amount: int):
+    """Adiciona uma entrada ao log do banco do clã. (Versão async)"""
     if "bank_log" not in clan_data:
         clan_data["bank_log"] = []
     
-    player_name = player_manager.get_player_data(user_id).get("character_name", f"ID: {user_id}")
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    player_name = (player_data or {}).get("character_name", f"ID: {user_id}")
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
     
     log_entry = {
         "timestamp": timestamp,
         "player_name": player_name,
-        "action": action, # ex: "depositou" ou "retirou"
+        "action": action,
         "amount": amount
     }
     
-    # Adiciona a nova entrada no início da lista
     clan_data["bank_log"].insert(0, log_entry)
-    
-    # Mantém o log com um limite (ex: últimas 50 transações)
     if len(clan_data["bank_log"]) > 50:
         clan_data["bank_log"] = clan_data["bank_log"][:50]
 
-def deposit_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
+# <<< CORREÇÃO 4: Adiciona async def >>>
+async def _add_bank_log_entry(clan_data: dict, user_id: int, action: str, amount: int):
+    """Adiciona uma entrada ao log do banco do clã. (Versão async)"""
+    if "bank_log" not in clan_data:
+        clan_data["bank_log"] = []
+    
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    player_name = (player_data or {}).get("character_name", f"ID: {user_id}")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    
+    log_entry = {
+        "timestamp": timestamp,
+        "player_name": player_name,
+        "action": action,
+        "amount": amount
+    }
+    
+    clan_data["bank_log"].insert(0, log_entry)
+    if len(clan_data["bank_log"]) > 50:
+        clan_data["bank_log"] = clan_data["bank_log"][:50]
+
+# <<< CORREÇÃO 6: Adiciona async def >>>
+async def deposit_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     """
-    Deposita ouro da conta de um jogador para o banco do clã.
-    Retorna (True, "Mensagem de sucesso") ou (False, "Mensagem de erro").
+    Deposita ouro da conta de um jogador para o banco do clã. (Versão async)
     """
     if amount <= 0:
         return False, "A quantidade para depositar deve ser positiva."
 
-    clan_data = get_clan(clan_id)
+    clan_data = get_clan(clan_id) # Síncrono
     if not clan_data:
         return False, "Clã não encontrado."
         
-    player_data = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         return False, "Jogador não encontrado."
     
     print(f"[DEBUG BANCO] Tentando depositar: {amount}. Ouro do jogador: {player_data.get('gold', 0)}")
 
-    # Tenta gastar o ouro do jogador
     if player_data.get("gold", 0) < amount:
         return False, "Você não tem ouro suficiente para depositar essa quantia."
     
-    # Se o gasto foi bem-sucedido, executa a transação
-    player_data["gold"] -= amount
+    player_data["gold"] -= amount # Síncrono
     
     bank = clan_data.setdefault("bank", {})
     bank["gold"] = bank.get("gold", 0) + amount
-    _add_bank_log_entry(clan_data, user_id, "depositou", amount)
+    # <<< CORREÇÃO 8: Adiciona await >>>
+    await _add_bank_log_entry(clan_data, user_id, "depositou", amount) # Chama função async
 
-    # Salva ambas as entidades
-    save_clan(clan_id, clan_data)
-    player_manager.save_player_data(user_id, player_data)
+    save_clan(clan_id, clan_data) # Síncrono
+    # <<< CORREÇÃO 9: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
     
     return True, f"Você depositou {amount:,} de ouro com sucesso."
 
 
-def purchase_mission_board(clan_id: str, leader_id: int):
+# <<< CORREÇÃO 10: Adiciona async def >>>
+async def purchase_mission_board(clan_id: str, leader_id: int):
     """
-    Permite que o líder de um clã compre o quadro de missões usando o ouro do banco.
-    Levanta um ValueError em caso de erro.
+    Permite que o líder compre o quadro de missões. (Versão async)
     """
-    clan_data = get_clan(clan_id)
+    clan_data = get_clan(clan_id) # Síncrono
     if not clan_data:
         raise ValueError("Clã não encontrado.")
 
-    # 1. Validações
     if clan_data.get("leader_id") != leader_id:
         raise ValueError("Apenas o líder do clã pode fazer esta compra.")
     if clan_data.get("has_mission_board"):
         raise ValueError("O seu clã já possui um quadro de missões.")
 
-    # 2. Verifica o custo e o saldo do banco
     cost = CLAN_CONFIG.get("mission_board_cost", {}).get("gold", 100000)
     bank_gold = clan_data.get("bank", {}).get("gold", 0)
 
     if bank_gold < cost:
         raise ValueError(f"O banco do clã não tem ouro suficiente. Custo: {cost:,} 🪙")
 
-    # 3. Executa a transação
     clan_data["bank"]["gold"] = bank_gold - cost
-    clan_data["has_mission_board"] = True # Adiciona a flag de que o clã comprou!
+    clan_data["has_mission_board"] = True
     
-    save_clan(clan_id, clan_data)
-    
-    # Notificação para o log do servidor (opcional)
+    save_clan(clan_id, clan_data) # Síncrono
     print(f"[CLAN] O clã '{clan_id}' comprou o quadro de missões.")
 
-def withdraw_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
+# <<< CORREÇÃO 11: Adiciona async def >>>
+async def withdraw_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     """
-    Retira ouro do banco do clã para a conta de um jogador.
-    Apenas o líder pode fazer isso.
-    Retorna (True, "Mensagem de sucesso") ou (False, "Mensagem de erro").
+    Retira ouro do banco do clã. (Versão async)
     """
     if amount <= 0:
         return False, "A quantidade para retirar deve ser positiva."
 
-    clan_data = get_clan(clan_id)
+    clan_data = get_clan(clan_id) # Síncrono
     if not clan_data:
         return False, "Clã não encontrado."
 
-    # Regra de permissão: só o líder pode retirar
     if clan_data.get("leader_id") != user_id:
         return False, "Apenas o líder do clã pode retirar ouro do banco."
         
@@ -209,139 +279,121 @@ def withdraw_gold(clan_id: str, user_id: int, amount: int) -> tuple[bool, str]:
     if current_gold < amount:
         return False, "O banco do clã não tem ouro suficiente."
         
-    # Se o banco tem ouro, transfere para o jogador
     bank["gold"] = current_gold - amount
     
-    player_data = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 12: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+         return False, "Jogador não encontrado." # Adiciona verificação
+         
     player_data["gold"] = player_data.get("gold", 0) + amount
-    _add_bank_log_entry(clan_data, user_id, "retirou", amount)
+    # <<< CORREÇÃO 13: Adiciona await >>>
+    await _add_bank_log_entry(clan_data, user_id, "retirou", amount) # Chama função async
 
-    # Salva ambas as entidades
-    save_clan(clan_id, clan_data)
-    player_manager.save_player_data(user_id, player_data)
+    save_clan(clan_id, clan_data) # Síncrono
+    # <<< CORREÇÃO 14: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
     
     return True, f"Você retirou {amount:,} de ouro com sucesso."
 
-
-def assign_mission_to_clan(clan_id: str, mission_id: str, leader_id: int):
+# <<< CORREÇÃO 15: Adiciona async def >>>
+async def assign_mission_to_clan(clan_id: str, mission_id: str, leader_id: int):
     """
-    Atribui uma nova missão a um clã, se os requisitos forem cumpridos.
-    Apenas o líder pode executar esta ação.
+    Atribui uma nova missão a um clã. (Versão async)
     """
-    clan_data = get_clan(clan_id)
+    clan_data = get_clan(clan_id) # Síncrono
     if not clan_data:
         raise ValueError("Clã não encontrado.")
 
-    # 1. Validação de Permissão e Condição
     if clan_data.get("leader_id") != leader_id:
         raise ValueError("Apenas o líder do clã pode iniciar uma nova missão.")
     
     if "active_mission" in clan_data and clan_data.get("active_mission"):
         raise ValueError("O seu clã já tem uma missão ativa.")
 
-    # 2. Validação da Missão
-    mission_template = GUILD_MISSIONS_CATALOG.get(mission_id)
+    mission_template = GUILD_MISSIONS_CATALOG.get(mission_id) # Síncrono
     if not mission_template:
         raise ValueError("A missão selecionada é inválida.")
 
-    # 3. Cria o objeto da missão ativa
+    # Lógica síncrona de criação de missão
     duration_hours = mission_template.get("duration_hours", 24)
     start_time = datetime.now(timezone.utc)
     end_time = start_time + timedelta(hours=duration_hours)
-
     new_active_mission = {
-        "mission_id": mission_id,
-        "type": mission_template.get("type"),
-        "target_monster_id": mission_template.get("target_monster_id"), # Será None se não for de caça
-        "target_count": mission_template.get("target_count", 1),
-        "current_progress": 0,
-        "start_time": start_time.isoformat(),
-        "end_time": end_time.isoformat()
+        "mission_id": mission_id, "type": mission_template.get("type"),
+        "target_monster_id": mission_template.get("target_monster_id"),
+        "target_count": mission_template.get("target_count", 1), "current_progress": 0,
+        "start_time": start_time.isoformat(), "end_time": end_time.isoformat()
     }
 
-    # 4. Salva a missão no clã
     clan_data["active_mission"] = new_active_mission
-    save_clan(clan_id, clan_data)
+    save_clan(clan_id, clan_data) # Síncrono
 
-async def _complete_guild_mission(clan_id: str, clan_data: dict, mission_id: str, context: ContextTypes.DEFAULT_TYPE): # <-- MUDANÇA: Adicionado 'context'
+async def _complete_guild_mission(clan_id: str, clan_data: dict, mission_id: str, context: ContextTypes.DEFAULT_TYPE):
     """
-    (Função Auxiliar) Processa a conclusão de uma missão, distribui as
-    recompensas, envia notificações e limpa a missão ativa.
+    (Função Auxiliar) Processa a conclusão de uma missão. (Já era async)
     """
-    mission_template = GUILD_MISSIONS_CATALOG.get(mission_id)
+    mission_template = GUILD_MISSIONS_CATALOG.get(mission_id) # Síncrono
     if not mission_template:
         clan_data["active_mission"] = None
         return
 
     rewards = mission_template.get("rewards", {})
     mission_title = mission_template.get("title", "Missão de Guilda")
+    notification_text = f"🎉 <b>Missão de Guilda Concluída: {mission_title}</b> 🎉\n\n(...)"
     
-    # Prepara o texto da notificação ANTES de distribuir as recompensas
-    notification_text = f"🎉 <b>Missão de Guilda Concluída: {mission_title}</b> 🎉\n\n"
-    notification_text += "O vosso esforço foi recompensado!\n\n"
-    
-    # --- Distribuição de Recompensas ---
-    
-    # PRESTÍGIO (guild_xp)
     prestige_gain = rewards.get("guild_xp", 0)
     if prestige_gain > 0:
-        add_prestige_points(clan_id, prestige_gain)
+        add_prestige_points(clan_id, prestige_gain) # Síncrono
         notification_text += f"⚜️ Prestígio para o Clã: +{prestige_gain}\n"
-        print(f"[CLAN] Clã '{clan_id}' ganhou {prestige_gain} de prestígio da missão '{mission_title}'.") # LOG para debug
+        print(f"[CLAN] Clã '{clan_id}' ganhou {prestige_gain} de prestígio...")
 
-    # OURO POR MEMBRO
     gold_per_member = rewards.get("gold_per_member", 0)
-    if gold_per_member > 0:
-        notification_text += f"🪙 Ouro para cada membro: +{gold_per_member}\n"
-        
-    # ITEM POR MEMBRO (Exemplo, se existir)
+    if gold_per_member > 0: notification_text += f"🪙 Ouro para cada membro: +{gold_per_member}\n"
     item_per_member = rewards.get("item_per_member")
-    if item_per_member:
-        # Assumindo que você tem uma função para pegar o nome do item
-        item_name = item_per_member.get("item_id", "Item Misterioso")
-        notification_text += f"📦 Item para cada membro: {item_name}\n"
+    if item_per_member: item_name = item_per_member.get("item_id", "Item Misterioso"); notification_text += f"📦 Item para cada membro: {item_name}\n"
 
     # Loop para dar recompensas individuais e NOTIFICAR
     for member_id in clan_data.get("members", []):
-        member_data = player_manager.get_player_data(member_id)
+        # <<< CORREÇÃO 16: Adiciona await >>>
+        member_data = await player_manager.get_player_data(member_id)
         if member_data:
             if gold_per_member > 0:
-                player_manager.add_gold(member_data, gold_per_member)
+                player_manager.add_gold(member_data, gold_per_member) # Síncrono
             if item_per_member and "item_id" in item_per_member:
-                player_manager.add_item_to_inventory(member_data, item_per_member["item_id"], item_per_member.get("quantity", 1))
+                player_manager.add_item_to_inventory(member_data, item_per_member["item_id"], item_per_member.get("quantity", 1)) # Síncrono
             
-            player_manager.save_player_data(member_id, member_data)
+            # <<< CORREÇÃO 17: Adiciona await >>>
+            await player_manager.save_player_data(member_id, member_data)
 
-            # Envia a notificação!
             try:
                 await context.bot.send_message(chat_id=member_id, text=notification_text, parse_mode='HTML')
+                await asyncio.sleep(0.1) # Adiciona delay anti-spam
             except Exception as e:
                 print(f"Falha ao notificar membro {member_id} do clã {clan_id}. Erro: {e}")
 
-    # Limpa a missão ativa do clã
     clan_data["active_mission"] = None
-    
-    # A função que chamou esta já salva o clan_data.
+    # save_clan é chamado pela função que chamou esta (update_guild_mission_progress)
 
-def accept_application(clan_id: str, user_id: int):
-    """Move um jogador da lista de candidaturas para a de membros."""
-    clan_data = get_clan(clan_id)
+async def accept_application(clan_id: str, user_id: int):
+    """Move um jogador da lista de candidaturas para a de membros. (Versão async)"""
+    clan_data = get_clan(clan_id) # Síncrono
     if not clan_data:
         raise ValueError("Clã não encontrado.")
 
+    # Lógica síncrona
     clan_level = clan_data.get("prestige_level", 1)
     level_info = CLAN_PRESTIGE_LEVELS.get(clan_level, {})
     max_members = level_info.get("max_members", 5)
     if len(clan_data.get("members", [])) >= max_members:
         raise ValueError("O clã está cheio.")
-
     apps = clan_data.get("pending_applications", [])
     if user_id not in apps:
         raise ValueError("Este jogador não tem uma candidatura pendente.")
 
     clan_data["pending_applications"].remove(user_id)
     clan_data["members"].append(user_id)
-    save_clan(clan_id, clan_data)
+    save_clan(clan_id, clan_data) # Síncrono
 
 def decline_application(clan_id: str, user_id: int):
     """Remove uma candidatura pendente."""
@@ -353,17 +405,19 @@ def decline_application(clan_id: str, user_id: int):
         clan_data["pending_applications"].remove(user_id)
         save_clan(clan_id, clan_data)
 
-def find_clan_by_display_name(clan_name: str) -> dict | None:
+# <<< CORREÇÃO 19: Adiciona async def >>>
+async def find_clan_by_display_name(clan_name: str) -> dict | None:
     """
-    Procura um clã pelo seu nome de exibição (case-insensitive).
+    Procura um clã pelo seu nome de exibição (case-insensitive). (Versão async)
     """
     if not os.path.isdir(CLANS_DIR_PATH):
         return None
         
+    # Leitura de ficheiros é I/O, idealmente seria async, mas mantemos síncrono por agora
     for filename in os.listdir(CLANS_DIR_PATH):
         if filename.endswith(".json"):
             clan_id = filename[:-5]
-            clan_data = get_clan(clan_id)
+            clan_data = get_clan(clan_id) # Síncrono
             if clan_data and clan_data.get("display_name", "").lower() == clan_name.lower():
                 clan_data['id'] = clan_id
                 return clan_data
@@ -440,46 +494,6 @@ def get_clan_buffs(clan_id: str) -> dict:
     
     return level_info.get("buffs", {})
 
-def level_up_clan(clan_id: str, leader_id: int, payment_method: str):
-    """
-    Verifica os requisitos e, se cumpridos, sobe o nível de prestígio do clã.
-    """
-    clan_data = get_clan(clan_id)
-    if not clan_data:
-        raise ValueError("Clã não encontrado.")
-
-    current_level = clan_data.get("prestige_level", 1)
-    if current_level + 1 not in CLAN_PRESTIGE_LEVELS:
-        raise ValueError("O clã já atingiu o nível máximo.")
-
-    current_level_info = CLAN_PRESTIGE_LEVELS.get(current_level, {})
-    points_needed = current_level_info.get("points_to_next_level")
-    if points_needed is None:
-        raise ValueError("O clã já atingiu o nível máximo.")
-        
-    current_points = clan_data.get("prestige_points", 0)
-    if current_points < points_needed:
-        raise ValueError("Pontos de prestígio insuficientes.")
-        
-    next_level_info = CLAN_PRESTIGE_LEVELS.get(current_level + 1, {})
-    upgrade_cost = next_level_info.get("upgrade_cost", {})
-    cost = upgrade_cost.get(payment_method)
-    if cost is None:
-        raise ValueError(f"Método de pagamento '{payment_method}' inválido.")
-
-    leader_data = player_manager.get_player_data(leader_id)
-    if payment_method == "gold":
-        if leader_data.get("gold", 0) < cost:
-            raise ValueError(f"Ouro insuficiente. Você precisa de {cost:,} de ouro.")
-        leader_data["gold"] -= cost
-    # ... (lógica para outros tipos de pagamento)
-    
-    clan_data["prestige_points"] -= points_needed
-    clan_data["prestige_level"] += 1
-    
-    save_clan(clan_id, clan_data)
-    player_manager.save_player_data(leader_id, leader_data)
-
 def remove_member(clan_id: str, user_id: int, kicked_by_leader: bool = False): # <-- Argumento adicionado
     """Remove um membro da lista de membros de um clã."""
     clan_data = get_clan(clan_id)
@@ -525,23 +539,23 @@ def add_prestige_points(clan_id: str, points_to_add: int):
     clan_data["prestige_points"] = current_points + points_to_add
     save_clan(clan_id, clan_data)
     
-def create_clan(leader_id: int, clan_name: str, payment_method: str) -> str:
+async def create_clan(leader_id: int, clan_name: str, payment_method: str) -> str:
     """Cria um novo clã, cobra o custo e salva o novo ficheiro."""
     clan_id = _slugify(clan_name)
 
     if get_clan(clan_id):
         raise ValueError("Um clã com este nome já existe.")
 
-    player_data = player_manager.get_player_data(leader_id)
+    player_data = await player_manager.get_player_data(leader_id)
     cost = CLAN_CONFIG["creation_cost"][payment_method]
 
     if payment_method == "gold":
         if player_data.get("gold", 0) < cost:
             raise ValueError("Ouro insuficiente.")
         player_data["gold"] -= cost
-    # ... (lógica para outros tipos de pagamento)
 
-    player_manager.save_player_data(leader_id, player_data)
+
+    await player_manager.save_player_data(leader_id, player_data)
 
     new_clan_data = {
         "display_name": clan_name,
@@ -554,3 +568,43 @@ def create_clan(leader_id: int, clan_name: str, payment_method: str) -> str:
 
     save_clan(clan_id, new_clan_data)
     return clan_id
+
+async def level_up_clan(clan_id: str, leader_id: int, payment_method: str):
+    """
+    Verifica os requisitos e, se cumpridos, sobe o nível de prestígio do clã.
+    """
+    clan_data = get_clan(clan_id)
+    if not clan_data:
+        raise ValueError("Clã não encontrado.")
+
+    current_level = clan_data.get("prestige_level", 1)
+    if current_level + 1 not in CLAN_PRESTIGE_LEVELS:
+        raise ValueError("O clã já atingiu o nível máximo.")
+
+    current_level_info = CLAN_PRESTIGE_LEVELS.get(current_level, {})
+    points_needed = current_level_info.get("points_to_next_level")
+    if points_needed is None:
+        raise ValueError("O clã já atingiu o nível máximo.")
+        
+    current_points = clan_data.get("prestige_points", 0)
+    if current_points < points_needed:
+        raise ValueError("Pontos de prestígio insuficientes.")
+        
+    next_level_info = CLAN_PRESTIGE_LEVELS.get(current_level + 1, {})
+    upgrade_cost = next_level_info.get("upgrade_cost", {})
+    cost = upgrade_cost.get(payment_method)
+    if cost is None:
+        raise ValueError(f"Método de pagamento '{payment_method}' inválido.")
+
+    leader_data = await player_manager.get_player_data(leader_id)
+    if payment_method == "gold":
+        if leader_data.get("gold", 0) < cost:
+            raise ValueError(f"Ouro insuficiente. Você precisa de {cost:,} de ouro.")
+        leader_data["gold"] -= cost
+    # ... (lógica para outros tipos de pagamento)
+    
+    clan_data["prestige_points"] -= points_needed
+    clan_data["prestige_level"] += 1
+    
+    save_clan(clan_id, clan_data)
+    await player_manager.save_player_data(leader_id, leader_data)

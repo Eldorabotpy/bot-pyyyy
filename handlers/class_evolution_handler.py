@@ -1,4 +1,5 @@
-# handlers/class_evolution_handler.py
+# handlers/class_evolution_handler.py (VERSÃO CORRIGIDA)
+
 from __future__ import annotations
 import logging
 from typing import Dict, Any, List, Tuple
@@ -90,38 +91,64 @@ def _footer_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data="status_open")],
     ])
 
-
+#
+# >>> INÍCIO DA CORREÇÃO <<<
+# Esta função foi reescrita para procurar evoluções T3
+# mesmo quando a classe atual é T2 (ex: Ronin)
+#
 def _all_options_for_class(curr_class_key: str) -> List[dict]:
     """
-    Retorna TODAS as opções de evolução da classe atual,
-    sem filtrar por nível/itens — apenas respeitando 'from_any_of'.
+    Retorna TODAS as opções de evolução da classe atual.
+    Procura em TODAS as classes base por evoluções
+    que listam 'curr_class_key' em 'from_any_of'.
     """
-    data = _EVOS.get(curr_class_key) or {}
     out: List[dict] = []
-    for tier in ("tier2", "tier3"):
-        for opt in data.get(tier, []) or []:
-            req_from = opt.get("from_any_of")
-            if isinstance(req_from, list) and curr_class_key not in req_from:
-                continue
-            out.append({"tier": tier, **opt})
-    return out
+    
+    # 1. Procura por evoluções T2 (se a classe atual for T1)
+    # Ex: Se curr_class_key == "samurai", encontra "kensei" e "ronin"
+    base_data = _EVOS.get(curr_class_key)
+    if base_data:
+        for opt in base_data.get("tier2", []):
+            # T2 não tem 'from_any_of', evolui direto
+            out.append({"tier": "tier2", **opt})
 
+    # 2. Procura por evoluções T3+ (que vêm de T2, como 'ronin')
+    # Ex: Se curr_class_key == "ronin"
+    # Itera por CADA classe base no dicionário (samurai, guerreiro, etc.)
+    for base_class_key, base_class_data in _EVOS.items():
+        # Itera por 'tier3' (e 'tier4', 'tier5' se existissem)
+        for tier in ("tier3",): # Pode ser expandido para mais tiers no futuro
+            tier_options = base_class_data.get(tier, [])
+            if not isinstance(tier_options, list): continue
+                
+            for opt in tier_options:
+                req_from = opt.get("from_any_of")
+                
+                # Verifica se 'from_any_of' existe e se a nossa classe está lá
+                if isinstance(req_from, list) and curr_class_key in req_from:
+                    # Encontramos uma evolução! (Ex: Shogun vem de Ronin)
+                    out.append({"tier": tier, **opt})
+    
+    return out
+#
+# >>> FIM DA CORREÇÃO <<<
+#
 
 # ============ Renders ============
 
-# Em handlers/class_evolution_handler.py
-
 async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_new: bool = False) -> None:
     user_id = update.effective_user.id
-    pdata = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id) or {}
 
+    # Síncrono
     curr_key = (pdata.get("class") or pdata.get("class_tag") or "").lower()
     curr_cfg = _CLASSES_DATA.get(curr_key, {})
     curr_emoji = curr_cfg.get("emoji", "🧬")
     curr_name = curr_cfg.get("display_name", (pdata.get("class") or "—").title())
     lvl = _level(pdata)
 
-    opts = _all_options_for_class(curr_key)
+    opts = _all_options_for_class(curr_key) # Síncrono (AGORA CORRIGIDO)
     logger.info("[EVOL] user=%s class=%s lvl=%s options_all=%s", user_id, curr_key, lvl, len(opts))
 
     header = [
@@ -131,7 +158,6 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         ""
     ]
 
-    # Bloco para quando não há evoluções disponíveis
     if not opts:
         text = "\n".join(header + [
             "Não há ramos de evolução configurados para sua classe atual.",
@@ -139,17 +165,26 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         query = update.callback_query
         if query and not as_new:
             try:
-                await query.edit_message_text(text, reply_markup=_footer_keyboard(), parse_mode="HTML")
+                # --- CORREÇÃO DE LÓGICA: Tenta editar 'caption' primeiro ---
+                await query.edit_message_caption(text, reply_markup=_footer_keyboard(), parse_mode="HTML")
                 return
             except Exception:
-                pass
+                try:
+                    await query.edit_message_text(text, reply_markup=_footer_keyboard(), parse_mode="HTML")
+                    return
+                except Exception:
+                    pass
+        # Fallback se a edição falhar ou for 'as_new'
+        if query:
+             try: await query.delete_message()
+             except Exception: pass
         await update.effective_chat.send_message(text, reply_markup=_footer_keyboard(), parse_mode="HTML")
         return
 
-    # Constrói uma única mensagem com todas as opções
     full_text_parts = header
     full_keyboard = []
 
+    # Síncrono
     for op in opts:
         to_key = op["to"]
         to_cfg = _CLASSES_DATA.get(to_key, {})
@@ -165,62 +200,77 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         if op.get("desc"):
             full_text_parts.append(f"• {op['desc']}")
 
-        # Mostra a nova habilidade desbloqueada
         skill_id = op.get("unlocks_skill")
         if skill_id and skill_id in skills_data.SKILL_DATA:
             skill_info = skills_data.SKILL_DATA[skill_id]
             skill_name = skill_info.get("display_name", "Habilidade")
             skill_desc = skill_info.get("description", "")
             full_text_parts.append(f"🎁 <b>Habilidade:</b> {skill_name} - <i>{skill_desc}</i>")
-        
+
         full_text_parts.append("\n<b>Requisitos:</b>")
-        full_text_parts.extend([f"  {ln}" for ln in req_lines])
-        
+        full_text_parts.extend([f"   {ln}" for ln in req_lines])
+
         if eligible:
             full_keyboard.append([InlineKeyboardButton(f"⚡ Evoluir para {to_name}", callback_data=f"evo_do:{to_key}")])
         else:
             full_keyboard.append([InlineKeyboardButton("❌ Requisitos Pendentes", callback_data="evo_refresh")])
-        
-        full_text_parts.append("") # Espaçamento
+
+        full_text_parts.append("")
 
     full_text_parts.append("──────────")
-    full_keyboard.extend(_footer_keyboard().inline_keyboard)
+    full_keyboard.extend(_footer_keyboard().inline_keyboard) # Síncrono
 
     final_text = "\n".join(full_text_parts)
     final_keyboard = InlineKeyboardMarkup(full_keyboard)
 
-    # Lógica para enviar ou editar a mensagem única
     query = update.callback_query
     if query and not as_new:
         try:
-            await query.edit_message_text(final_text, reply_markup=final_keyboard, parse_mode="HTML")
+            # --- CORREÇÃO DE LÓGICA: Tenta editar 'caption' primeiro ---
+            await query.edit_message_caption(final_text, reply_markup=final_keyboard, parse_mode="HTML")
         except Exception:
+            try:
+                await query.edit_message_text(final_text, reply_markup=final_keyboard, parse_mode="HTML")
+            except Exception:
+                try: await query.delete_message()
+                except Exception: pass
+                await update.effective_chat.send_message(final_text, reply_markup=final_keyboard, parse_mode="HTML")
+    else:
+        # Se for mensagem nova (as_new=True), apaga a anterior se for callback
+        if query:
             try: await query.delete_message()
             except Exception: pass
-            await update.effective_chat.send_message(final_text, reply_markup=final_keyboard, parse_mode="HTML")
-    else:
         await update.effective_chat.send_message(final_text, reply_markup=final_keyboard, parse_mode="HTML")
-
+        
 # ============ Actions ============
 
 async def open_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Apaga a mensagem anterior (Status, que tem mídia) e envia o 
+    menu de evolução (texto) como uma nova mensagem.
+    """
+    query = update.callback_query
+    if query:
+        await query.answer() # Responde ao clique
+        try:
+            # 1. Apaga a mensagem de Status (com a foto/vídeo)
+            await query.delete_message()
+        except Exception as e:
+            logger.debug(f"Falha ao apagar msg em open_evolution: {e}")
+            
+    # 2. Renderiza o menu de evolução como uma NOVA mensagem
     await _render_menu(update, context, as_new=True)
-
 
 async def refresh_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     if q:
         await q.answer()
-    await _render_menu(update, context)
+    await _render_menu(update, context, as_new=False) # 'as_new=False' para editar
 
 
 async def _send_evolution_media(chat, class_key: str, caption: str | None = None) -> bool:
     """
     Tenta enviar um vídeo/foto para a classe resultante da evolução.
-    Ordem de busca:
-      1) evolution_video_<classe>
-      2) classe_<classe>_media
-    Retorna True se alguma mídia foi enviada.
     """
     keys = [f"evolution_video_{class_key}", f"classe_{class_key}_media"]
     for key in keys:
@@ -246,12 +296,11 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _, to_key = query.data.split(":", 1)
 
     # 1. Chama o nosso serviço para iniciar a provação (ele consome os itens)
-    result = class_evolution_service.start_evolution_trial(user_id, to_key)
+    result = await class_evolution_service.start_evolution_trial(user_id, to_key)
 
     # Se falhar (falta de itens, etc.), avisa o jogador
     if not result.get("success"):
         await query.answer(result.get("message", "Não foi possível iniciar a provação."), show_alert=True)
-        # <<< MELHORIA: Atualiza o menu para mostrar os requisitos novamente >>>
         await _render_menu(update, context)
         return
 
@@ -264,7 +313,6 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Procura o monstro no nosso arquivo de monstros
     monster_template = None
-    # <<< MELHORIA: Acessa os dados dos monstros de forma mais segura >>>
     evolution_monsters = (getattr(monsters_data, "MONSTERS_DATA", {}) or {}).get("_evolution_trials", [])
     for mob in evolution_monsters:
         if mob.get("id") == monster_id:
@@ -277,11 +325,10 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 3. Inicia o combate
-    pdata = player_manager.get_player_data(user_id)
-    if not pdata: # <<< ADICIONADO: Verificação se pdata foi carregado >>>
-         await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
-         return
-
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata: 
+        await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
+        return
 
     # Monta os detalhes do combate com a "marcação" especial
     combat_details = {
@@ -301,44 +348,33 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     pdata["player_state"] = {"action": "in_combat", "details": combat_details}
-    player_manager.save_player_data(user_id, pdata)
+    await player_manager.save_player_data(user_id, pdata)
 
     # Envia a mensagem de combate
-    caption = format_combat_message(pdata) # Assume que esta função existe e funciona
+    caption = format_combat_message(pdata) 
 
-    # =========================================================
-    # <<< INÍCIO DA CORREÇÃO >>>
-    # =========================================================
-    # Remove o botão "Poções" duplicado e garante que kb é lista de listas
     kb = [
         [InlineKeyboardButton("⚔️ Atacar", callback_data="combat_attack"), InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu")],
-        # A linha duplicada foi removida daqui
         [InlineKeyboardButton("🏃 Fugir", callback_data="combat_flee")]
     ]
-    # =========================================================
-    # <<< FIM DA CORREÇÃO >>>
-    # =========================================================
 
     try:
-      await query.delete_message()
+        await query.delete_message()
     except Exception:
-      pass
+        pass
 
     # Tenta enviar a mensagem de combate
     try:
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     except Exception as e:
         logger.error(f"Erro ao enviar mensagem de combate de evolução para {user_id}: {e}", exc_info=True)
-        # Tenta avisar o jogador sobre o erro
         try:
-             await context.bot.send_message(chat_id=chat_id, text="Ocorreu um erro ao iniciar a batalha de provação.")
-             # Tenta reverter o estado do jogador para idle
-             pdata["player_state"] = {"action": "idle"}
-             # NÃO devolve os itens consumidos aqui, pois a lógica pode ficar complexa.
-             # O ideal é o serviço `start_evolution_trial` ser robusto ou ter um "commit/rollback".
-             player_manager.save_player_data(user_id, pdata)
+            await context.bot.send_message(chat_id=chat_id, text="Ocorreu um erro ao iniciar a batalha de provação.")
+            pdata["player_state"] = {"action": "idle"}
+            player_manager.save_player_data(user_id, pdata)
         except Exception as e_fallback:
-             logger.error(f"Erro CRÍTICO ao tentar reverter estado após falha em do_evolution: {e_fallback}")
+            logger.error(f"Erro CRÍTICO ao tentar reverter estado após falha em do_evolution: {e_fallback}")
+
 # ============ Exports (handlers) ============
 
 status_evolution_open_handler = CallbackQueryHandler(open_evolution, pattern=r"^status_evolution_open$")

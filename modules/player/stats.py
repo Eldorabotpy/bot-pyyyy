@@ -46,24 +46,15 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
         return ck.strip().lower()
     return None
 
-def get_player_total_stats(player_data: dict) -> dict:
+async def get_player_total_stats(player_data: dict) -> dict:
 
     # 1. Calcula os stats base (de classe + nível) - SEMPRE NECESSÁRIO
     lvl = _ival(player_data.get("level"), 1)
     ckey = _get_class_key_normalized(player_data)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
-
-    # =========================================================
-    # 👇 [CORREÇÃO FINAL - Inicialização Robusta] 👇
-    # =========================================================
-
-    # 2. Inicia o 'total' diretamente com os valores base calculados
     total = {}
     for k in _BASELINE_KEYS:
-        total[k] = _ival(class_baseline.get(k)) # Garante que temos pelo menos a base
-
-    # 3. ADICIONA os pontos investidos manualmente pelo jogador
-    #    (Subtrai a base do valor atual no player_data para encontrar o delta investido)
+        total[k] = _ival(class_baseline.get(k))
     for k in _BASELINE_KEYS:
         current_val_in_data = _ival(player_data.get(k)) # Valor no topo do save
         baseline_val = _ival(class_baseline.get(k)) # Valor base já em 'total'
@@ -71,29 +62,15 @@ def get_player_total_stats(player_data: dict) -> dict:
         # Calcula quanto foi investido manualmente (pontos de atributo)
         invested_delta = max(0, current_val_in_data - baseline_val)
 
-        # Adiciona esse delta ao total (que já tem a base)
-        # Nota: Isto assume que os valores em player_data[k] representam base+investido.
-        # Se guardas os pontos investidos noutra chave (ex: 'invested_stats'), a lógica aqui muda.
-        # Assumindo o formato atual:
         if invested_delta > 0:
              # Adiciona apenas a diferença, pois a base já está lá
              # Precisamos saber quanto cada ponto investido dá (do CLASS_POINT_GAINS)
              gains = _get_point_gains_for_class(ckey)
              gain_per_point = max(1, _ival(gains.get(k)))
 
-             # Recalcula o bónus total dos pontos investidos
-             # (Esta parte é complexa, vamos simplificar por agora assumindo que player_data[k] está correto)
-             # Se player_data[k] já é a soma correta (base+investido), podemos usar a lógica anterior ligeiramente modificada:
              if current_val_in_data > baseline_val:
                   total[k] = current_val_in_data # Usa o valor do save se for maior que a base pura
 
-    # =========================================================
-    # 👆 [FIM DA CORREÇÃO] 👆
-    # =========================================================
-
-    # --- O resto da função continua igual ---
-
-    # 4. Adiciona Stats de Equipamentos
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
 
@@ -136,14 +113,14 @@ def get_player_total_stats(player_data: dict) -> dict:
 
     return total
 
-def get_player_dodge_chance(player_data: dict) -> float:
-    total_stats = get_player_total_stats(player_data)
+async def get_player_dodge_chance(player_data: dict) -> float:
+    total_stats = await get_player_total_stats(player_data)
     initiative = total_stats.get('initiative', 0)
     dodge_chance = (initiative * 0.4) / 100.0
     return min(dodge_chance, 0.75)
 
-def get_player_double_attack_chance(player_data: dict) -> float:
-    total_stats = get_player_total_stats(player_data)
+async def get_player_double_attack_chance(player_data: dict) -> float:
+    total_stats = await get_player_total_stats(player_data)
     initiative = total_stats.get('initiative', 0)
     double_attack_chance = (initiative * 0.25) / 100.0
     return min(double_attack_chance, 0.50)
@@ -202,12 +179,12 @@ def needs_class_choice(player_data: dict) -> bool:
     already_offered = bool(player_data.get("class_choice_offered"))
     return (lvl >= 10) and (not already_has_class) and (not already_offered)
 
-def mark_class_choice_offered(user_id: int):
+async def mark_class_choice_offered(user_id: int):
     from .core import get_player_data, save_player_data
-    pdata = get_player_data(user_id)
+    pdata = await get_player_data(user_id)
     if not pdata: return
     pdata["class_choice_offered"] = True
-    save_player_data(user_id, pdata)
+    await save_player_data(user_id, pdata)
     
 def _get_point_gains_for_class(ckey: Optional[str]) -> dict:
     gains = CLASS_POINT_GAINS.get((ckey or "").lower()) or CLASS_POINT_GAINS["_default"]
@@ -241,7 +218,7 @@ def compute_spent_status_points(pdata: dict) -> int:
             
     return spent
 
-def reset_stats_and_refund_points(pdata: dict) -> int:
+async def reset_stats_and_refund_points(pdata: dict) -> int:
     _ensure_base_stats_block_inplace(pdata)
     base = pdata["base_stats"]
     spent_before = compute_spent_status_points(pdata)
@@ -251,18 +228,20 @@ def reset_stats_and_refund_points(pdata: dict) -> int:
     if isinstance(pdata.get("invested"), dict):
         pdata["invested"] = {k: 0 for k in _BASELINE_KEYS}
     try:
-        totals = get_player_total_stats(pdata)
+        totals = await get_player_total_stats(pdata)
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
         pdata["current_hp"] = max(1, min(_ival(pdata.get("current_hp"), max_hp), max_hp))
     except Exception: pass
     return spent_before
 
-def _sync_all_stats_inplace(pdata: dict) -> bool:
+# <<< CORREÇÃO 12: Adiciona async def >>>
+async def _sync_all_stats_inplace(pdata: dict) -> bool:
     """Função mestra que executa todas as sincronizações de stats."""
-    mig = _migrate_point_pool_to_stat_points_inplace(pdata)
-    base_changed = _ensure_base_stats_block_inplace(pdata)
-    cls_sync = _apply_class_progression_sync_inplace(pdata)
-    synced = _sync_stat_points_to_level_cap_inplace(pdata)
+    mig = _migrate_point_pool_to_stat_points_inplace(pdata) # Síncrono
+    base_changed = _ensure_base_stats_block_inplace(pdata) # Síncrono
+    cls_sync = await _apply_class_progression_sync_inplace(pdata) 
+    
+    synced = _sync_stat_points_to_level_cap_inplace(pdata) # Síncrono
     return any([mig, base_changed, cls_sync, synced])
 
 def _migrate_point_pool_to_stat_points_inplace(pdata: dict) -> bool:
@@ -337,12 +316,13 @@ def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
         delta[k] = max(0, d)
     return delta
 
-def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
+# <<< CORREÇÃO 14: Adiciona async def >>>
+async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
     """VERSÃO CORRIGIDA: Não sobrescreve os stats principais."""
     changed = False
     lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
-    class_baseline = _compute_class_baseline_for_level(ckey, lvl)
+    class_baseline = _compute_class_baseline_for_level(ckey, lvl) # Síncrono
 
     current_base_stats = pdata.get("base_stats") or {}
     if any(_ival(current_base_stats.get(k)) != _ival(class_baseline.get(k)) for k in _BASELINE_KEYS):
@@ -350,7 +330,8 @@ def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
         changed = True
 
     try:
-        totals = get_player_total_stats(pdata)
+        # <<< CORREÇÃO 15: Adiciona await >>>
+        totals = await get_player_total_stats(pdata) # Chama função async
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
         cur_hp = _ival(pdata.get("current_hp"), max_hp)
         new_hp = min(max_hp, max(1, cur_hp))

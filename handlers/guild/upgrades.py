@@ -1,15 +1,18 @@
 # handlers/guild/upgrades.py (Versão Corrigida)
 
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, clan_manager
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS
+from ..utils import safe_edit_message
 
 # ✅ 1. IMPORTAÇÕES CORRIGIDAS: Funções vêm do ficheiro central de utilitários.
 from ..utils import create_progress_bar, format_buffs_text
 
 # --- Lógica de Aprimoramento do Clã ---
+
 
 async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o menu de aprimoramento, com custos e benefícios do próximo nível."""
@@ -17,12 +20,16 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     user_id = update.effective_user.id
     
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
     if not clan_id:
-        await query.edit_message_caption(caption="Você não está em um clã.")
+        # Usar safe_edit_message aqui também
+        await safe_edit_message(query, text="Você não está em um clã.")
         return
         
-    clan_data = clan_manager.get_clan(clan_id)
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
     
     # Apenas o líder pode ver este menu
     if clan_data.get("leader_id") != user_id:
@@ -39,14 +46,12 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
     caption += f"<b>Nível de Prestígio Atual:</b> {current_level} ({current_level_info.get('title', '')})\n"
     
     caption += "<b>Buffs Ativos:</b>\n"
-    # ✅ 2. NOMES DE FUNÇÕES ATUALIZADOS (sem underscore)
     caption += format_buffs_text(current_level_info.get("buffs", {}))
     
     keyboard = []
     
     if next_level_info:
         points_needed = current_level_info.get("points_to_next_level", 999999)
-        # ✅ 2. NOMES DE FUNÇÕES ATUALIZADOS (sem underscore)
         progress_bar = create_progress_bar(current_points, points_needed)
         
         caption += f"\n<b>Progresso para o Nível {current_level + 1}:</b>\n"
@@ -54,7 +59,7 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
         
         caption += "\n<b>Benefícios do Próximo Nível:</b>\n"
         caption += f"   - Membros: {next_level_info.get('max_members', 0)}\n"
-        caption += format_buffs_text(next_level_info.get("buffs", {}))
+        caption += format_buffs_text(next_level_info.get("buffs", {})) # Já estava correto
 
         upgrade_cost = next_level_info.get("upgrade_cost", {})
         cost_gold = upgrade_cost.get("gold", 0)
@@ -70,26 +75,31 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
                 InlineKeyboardButton("🪙 Aprimorar com Ouro", callback_data='clan_upgrade_confirm:gold'),
                 InlineKeyboardButton("💎 Aprimorar com Dimas", callback_data='clan_upgrade_confirm:dimas'),
             ])
-    else:
-        caption += "\n<b>O seu clã já atingiu o nível máximo de prestígio!</b>"
+    else: # Sem next_level_info, significa nível máximo
+        caption += "\n<b>O seu clã já atingiu o nível máximo de prestígio!</b>" # Mensagem corrigida
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='clan_manage_menu')])
     
-    await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-
+    # Usar safe_edit_message aqui em vez de edit_message_caption
+    await safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
 async def confirm_clan_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa o clique no botão para subir o nível do clã."""
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
+    
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
     payment_method = query.data.split(':')[1]
     
     try:
-        clan_manager.level_up_clan(clan_id, user_id, payment_method)
+        # <<< CORREÇÃO 4: Adiciona await >>>
+        await clan_manager.level_up_clan(clan_id, user_id, payment_method)
         
-        clan_data = clan_manager.get_clan(clan_id)
+        # <<< CORREÇÃO 5: Adiciona await >>>
+        clan_data = await clan_manager.get_clan(clan_id)
         clan_name = clan_data.get("display_name")
         new_level = clan_data.get("prestige_level")
 
@@ -111,10 +121,11 @@ async def confirm_clan_upgrade_callback(update: Update, context: ContextTypes.DE
 
     except ValueError as e:
         await context.bot.answer_callback_query(query.id, str(e), show_alert=True)
-        
-    # ✅ 3. IMPORTAÇÃO LOCAL: Mais segura para evitar erros de importação circular.
+        # Se falhar, não tenta mostrar o dashboard, pois pode dar erro
+        return # Adicionado return para sair após erro
+
     from handlers.guild.dashboard import show_clan_dashboard
-    # Atualiza o painel do clã para refletir o novo nível
+    # <<< CORREÇÃO 6: Adiciona await >>>
     await show_clan_dashboard(update, context)
 
 # --- Definição dos Handlers ---

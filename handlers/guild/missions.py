@@ -77,29 +77,32 @@ async def claim_reward_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     user_id = update.effective_user.id
     mission_index = int(query.data.split(':')[1])
-    
-    player_data = player_manager.get_player_data(user_id)
-    rewards = mission_manager.claim_reward(player_data, mission_index)
-    
+
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    rewards = mission_manager.claim_reward(player_data, mission_index) # Assume que claim_reward é síncrono
+
     if rewards:
-        player_manager.save_player_data(user_id, player_data)
-        
+        # <<< CORREÇÃO 2: Adiciona await >>>
+        await player_manager.save_player_data(user_id, player_data)
+
         rewards_text = "<b>Recompensas Recebidas:</b>\n"
         if "xp" in rewards: rewards_text += f"- {rewards['xp']} XP ✨\n"
         if "gold" in rewards: rewards_text += f"- {rewards['gold']} Ouro 🪙\n"
-        
+
         try:
             await query.delete_message()
         except Exception:
             pass
         await context.bot.send_message(
-            chat_id=user_id,
+            chat_id=user_id, # Usar user_id em vez de chat_id aqui faz mais sentido para DM
             text=f"✅ <b>Missão Concluída!</b>\n\n{rewards_text}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📜 Ver Novas Missões", callback_data="guild_missions")]]),
             parse_mode='HTML'
         )
     else:
         await context.bot.answer_callback_query(query.id, "Recompensa já reclamada ou missão incompleta.", show_alert=True)
+        # <<< CORREÇÃO 3: Adiciona await >>>
         await show_missions_menu(update, context)
         
 async def claim_reward_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -137,6 +140,9 @@ async def reroll_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     """Processa a troca de uma missão diária."""
     query = update.callback_query
     mission_index = int(query.data.split(':')[1])
+    
+    # Assumindo que mission_manager.reroll_mission é síncrono ou já foi corrigido para async
+    # Se for async, adicione await aqui: success = await mission_manager.reroll_mission(...)
     success = mission_manager.reroll_mission(update.effective_user.id, mission_index)
     
     if success:
@@ -144,17 +150,21 @@ async def reroll_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     else:
         await context.bot.answer_callback_query(query.id, "Não foi possível atualizar a missão.", show_alert=True)
 
+    # <<< CORREÇÃO 4: Adiciona await >>>
     await show_missions_menu(update, context)
-
-# --- Lógica de Missões de Guilda (Clã) ---
 
 async def handle_clan_mission_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Roteador: Verifica se o clã pode pegar missões ou se precisa comprar o quadro primeiro."""
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
 
     if clan_data.get("has_mission_board"):
         await show_mission_selection_menu(update, context)
@@ -185,10 +195,14 @@ async def handle_board_purchase_callback(update: Update, context: ContextTypes.D
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
+    
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
 
     try:
-        clan_manager.purchase_mission_board(clan_id, user_id)
+        # <<< CORREÇÃO 8: Adiciona await >>>
+        await clan_manager.purchase_mission_board(clan_id, user_id)
         await context.bot.answer_callback_query(query.id, "Quadro de Missões comprado com sucesso!", show_alert=True)
         await show_mission_selection_menu(update, context)
     except ValueError as e:
@@ -198,8 +212,13 @@ async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFA
     """Mostra 3 missões aleatórias para o líder escolher."""
     query = update.callback_query
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 9: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 10: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
 
     if "active_mission" in clan_data and clan_data.get("active_mission"):
         await context.bot.answer_callback_query(query.id, "O seu clã já tem uma missão ativa.", show_alert=True)
@@ -213,7 +232,6 @@ async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFA
     keyboard = []
     for mission_id in random_mission_ids:
         mission = GUILD_MISSIONS_CATALOG[mission_id]
-        # ATUALIZADO: Chama a tela de preview (confirmação) em vez de aceitar direto
         keyboard.append([InlineKeyboardButton(f"📜 {mission['title']}", callback_data=f"clan_mission_preview:{mission_id}")])
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='clan_manage_menu')])
@@ -224,17 +242,22 @@ async def accept_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    mission_id = query.data.split(':')[1] # Agora ouve 'clan_mission_accept'
+    
+    # <<< CORREÇÃO 11: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    mission_id = query.data.split(':')[1]
 
     try:
-        clan_manager.assign_mission_to_clan(clan_id, mission_id, user_id)
+        # <<< CORREÇÃO 12: Adiciona await >>>
+        await clan_manager.assign_mission_to_clan(clan_id, mission_id, user_id)
         mission_title = GUILD_MISSIONS_CATALOG[mission_id]['title']
         await context.bot.answer_callback_query(query.id, f"Missão '{mission_title}' iniciada!", show_alert=True)
     except ValueError as e:
         await context.bot.answer_callback_query(query.id, str(e), show_alert=True)
     
     from handlers.guild.dashboard import show_clan_dashboard
+    # <<< CORREÇÃO 13: Adiciona await >>>
     await show_clan_dashboard(update, context)
 
 async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -242,8 +265,13 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    active_mission = clan_manager.get_active_guild_mission(clan_id)
+    
+    # <<< CORREÇÃO 14: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 15: Adiciona await >>>
+    active_mission = await clan_manager.get_active_guild_mission(clan_id)
     
     if not active_mission:
         await _safe_edit_message(
@@ -256,7 +284,6 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     progress = active_mission.get("current_progress", 0)
     target = active_mission.get("target_count", 1)
     
-    # --- Lógica de História Adicionada ---
     title = active_mission.get("title", "Missão Misteriosa")
     story = active_mission.get("story", "Uma tarefa aguarda...")
     objective = active_mission.get("objective", "Complete a tarefa.")
@@ -265,7 +292,6 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     caption += f"<i>{story}</i>\n\n"
     caption += f"🎯 <b>Objetivo:</b> {objective}\n\n"
     caption += f"<b>Progresso:</b> {create_progress_bar(progress, target)} {progress}/{target}\n"
-    # --- Fim da Lógica de História ---
     
     rewards = active_mission.get("rewards", {})
     if rewards:

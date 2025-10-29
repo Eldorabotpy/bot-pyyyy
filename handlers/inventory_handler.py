@@ -296,7 +296,7 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # tenta finalizar ações vencidas (se util existir)
     await _auto_finalize_safe(user_id, context)
 
-    player_data = player_manager.get_player_data(user_id)
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         try:
             await query.edit_message_text("Não encontrei seus dados. Use /start para começar.")

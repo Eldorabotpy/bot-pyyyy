@@ -2,14 +2,16 @@
 from __future__ import annotations
 import re as _re
 import unicodedata
-from typing import Iterator, Tuple, Optional
-
+from typing import AsyncIterator, Iterator, Tuple, Optional
+import logging
 # Importa as funções essenciais do nosso novo módulo 'core'
 from .core import players_collection, get_player_data, save_player_data, clear_player_cache
 
 # ========================================
 # FUNÇÕES AUXILIARES DE NORMALIZAÇÃO
 # ========================================
+
+logger = logging.getLogger(__name__)
 
 def _normalize_char_name(_s: str) -> str:
     if not isinstance(_s, str):
@@ -46,7 +48,7 @@ def _emoji_variants(s: str):
 # CICLO DE VIDA DO JOGADOR
 # ========================================
 
-def create_new_player(user_id: int, character_name: str) -> dict:
+async def create_new_player(user_id: int, character_name: str) -> dict:
     from .actions import utcnow  # Importação local para evitar ciclos
     
     new_player_data = {
@@ -82,13 +84,13 @@ def create_new_player(user_id: int, character_name: str) -> dict:
         "class_choice_offered": False,
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
     }
-    save_player_data(user_id, new_player_data)
+    await save_player_data(user_id, new_player_data)
     return new_player_data
 
-def get_or_create_player(user_id: int, default_name: str = "Aventureiro") -> dict:
+async def get_or_create_player(user_id: int, default_name: str = "Aventureiro") -> dict:
     pdata = get_player_data(user_id)
     if pdata is None:
-        pdata = create_new_player(user_id, default_name)
+        pdata = await create_new_player(user_id, default_name)
     return pdata
 
 def delete_player(user_id: int) -> bool:
@@ -102,7 +104,7 @@ def delete_player(user_id: int) -> bool:
 # FUNÇÕES DE BUSCA (QUERIES)
 # ========================================
 
-def find_player_by_name(name: str) -> Optional[Tuple[int, dict]]:
+async def find_player_by_name(name: str) -> Optional[Tuple[int, dict]]:
     target_normalized = _normalize_char_name(name)
     if not target_normalized or players_collection is None:
         return None
@@ -110,11 +112,11 @@ def find_player_by_name(name: str) -> Optional[Tuple[int, dict]]:
     doc = players_collection.find_one({"character_name_normalized": target_normalized})
     if doc:
         user_id = doc['_id']
-        full_data = get_player_data(user_id)
+        full_data = await get_player_data(user_id)
         return (user_id, full_data) if full_data else None
     return None
 
-def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
+async def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
     if players_collection is None:
         return None
 
@@ -127,11 +129,11 @@ def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
     
     if doc:
         user_id = doc['_id']
-        full_data = get_player_data(user_id)
+        full_data = await get_player_data(user_id)
         return (user_id, full_data) if full_data else None
     return None
 
-def find_players_by_name_partial(query: str) -> list:
+async def find_players_by_name_partial(query: str) -> list:
     nq = _normalize_char_name(query)
     if not nq or not players_collection:
         return []
@@ -140,12 +142,12 @@ def find_players_by_name_partial(query: str) -> list:
     out = []
     for doc in cursor:
         uid = doc["_id"]
-        full_data = get_player_data(uid)
+        full_data = await get_player_data(uid)
         if full_data:
             out.append((uid, full_data))
     return out
 
-def find_by_username(username: str) -> Optional[dict]:
+async def find_by_username(username: str) -> Optional[dict]:
     u = (username or "").lstrip("@").strip().lower()
     if not u or not players_collection:
         return None
@@ -156,7 +158,7 @@ def find_by_username(username: str) -> Optional[dict]:
     
     if doc:
         user_id = doc['_id']
-        return get_player_data(user_id)
+        return await get_player_data(user_id)
     return None
 
 # ========================================
@@ -169,10 +171,36 @@ def iter_player_ids() -> Iterator[int]:
     for doc in players_collection.find({}, {"_id": 1}):
         yield doc["_id"]
 
-def iter_players() -> Iterator[Tuple[int, dict]]:
+# Em modules/player/queries.py
+
+async def iter_players() -> AsyncIterator[Tuple[int, dict]]:
     if players_collection is None:
+        logger.warning("[ITER_DEBUG] players_collection é None, iter_players não pode executar.")
         return
+    
+    logger.debug("[ITER_DEBUG] Iniciando iteração sobre player IDs...")
+    count = 0
+    # iter_player_ids é síncrono
     for user_id in iter_player_ids():
-        player_data = get_player_data(user_id)
-        if player_data:
-            yield user_id, player_data
+        try:
+             count += 1
+             logger.debug(f"[ITER_DEBUG] Processando ID #{count}: {user_id}")
+             player_data = await get_player_data(user_id) # Chama a função com logs
+             
+             # Loga o que get_player_data retornou ANTES do if
+             logger.debug(f"[ITER_DEBUG] get_player_data retornou para {user_id}: Tipo={type(player_data)}")
+             
+             if player_data is not None and isinstance(player_data, dict): # Verifica explicitamente se é dict
+                 logger.debug(f"[ITER_DEBUG] Yielding dados VÁLIDOS para {user_id}")
+                 yield user_id, player_data
+             else:
+                  # Loga se os dados foram filtrados (None ou tipo errado)
+                  logger.warning(f"[ITER_DEBUG] Dados inválidos ou None recebidos para {user_id}. FILTRANDO.")
+                  
+        except Exception as e:
+             # Loga erros durante a iteração de um ID específico
+             logger.error(f"[ITER_DEBUG] Erro ao processar user_id {user_id} dentro de iter_players: {e}", exc_info=True)
+             # Continua para o próximo ID
+             continue 
+             
+    logger.debug(f"[ITER_DEBUG] Fim da iteração. Total de IDs processados: {count}")

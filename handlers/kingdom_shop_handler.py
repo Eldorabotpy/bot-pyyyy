@@ -102,15 +102,17 @@ def _build_kingdom_keyboard(selected_base: str, qty: int) -> InlineKeyboardMarku
 async def market_kingdom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    chat_id = update.effective_chat.id
+    chat_id = update.effective_chat.id # Pega chat_id aqui
+    user_id = q.from_user.id # Pega user_id aqui
 
-    st = _king_state(context)
+    st = _king_state(context) # Síncrono
     base_id, qty = st["base_id"], max(1, int(st.get("qty", 1)))
-    name = (KINGDOM_SHOP[base_id][0] or _item_label_from_base(base_id))
-    unit_price = KINGDOM_SHOP[base_id][1]
+    name = (KINGDOM_SHOP[base_id][0] or _item_label_from_base(base_id)) # Síncrono
+    unit_price = KINGDOM_SHOP[base_id][1] # Síncrono
 
     lines = ["🏰 <b>Loja do Reino</b>"]
     lines.append("Itens oficiais do reino (selecione um):\n")
+    # Loop síncrono
     for b_id, (n_over, price) in KINGDOM_SHOP.items():
         n = n_over or _item_label_from_base(b_id)
         mark = "•" if b_id != base_id else "• <b>"
@@ -119,31 +121,35 @@ async def market_kingdom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines.append("")
     lines.append(f"Selecionado: <b>{name}</b> — {unit_price} 🪙/un")
 
-    kb = _build_kingdom_keyboard(base_id, qty)
+    kb = _build_kingdom_keyboard(base_id, qty) # Síncrono
 
-    keys = ["loja_do_reino", "img_loja_reino", "market_kingdom", "kingdom_store_img"]
+    keys = ["loja_do_reino", "img_loja_reino", "market_kingdom", "kingdom_store_img"] # Síncrono
     try:
         await q.delete_message()
     except Exception:
         pass
-    await _send_with_media(chat_id, context, "\n".join(lines), kb, keys)
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    await _send_with_media(chat_id, context, "\n".join(lines), kb, keys) # Chama função async
 
 async def kingdom_set_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     base_id = q.data.replace("king_set_", "")
+    # Verificação síncrona
     if base_id not in KINGDOM_SHOP:
         await q.answer("Item indisponível.", show_alert=True); return
 
-    st = _king_state(context)
+    st = _king_state(context) # Síncrono
     st["base_id"] = base_id
-    context.user_data["kingdom_shop"] = st
-    await market_kingdom(update, context)
+    context.user_data["kingdom_shop"] = st # Síncrono
+
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    await market_kingdom(update, context) # Chama função async
 
 async def kingdom_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    st = _king_state(context)
+    st = _king_state(context) # Síncrono
     qty = max(1, int(st.get("qty", 1)))
 
     if q.data == "king_q_minus":
@@ -152,19 +158,22 @@ async def kingdom_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
         qty = qty + 1
 
     st["qty"] = qty
-    context.user_data["kingdom_shop"] = st
-    await market_kingdom(update, context)
+    context.user_data["kingdom_shop"] = st # Síncrono
+
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    await market_kingdom(update, context) # Chama função async
 
 async def market_kingdom_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     buyer_id = q.from_user.id
-    chat_id = update.effective_chat.id
+    chat_id = update.effective_chat.id # Pega chat_id aqui
 
-    st = _king_state(context)
+    st = _king_state(context) # Síncrono
     base_id = st["base_id"]
     qty = max(1, int(st.get("qty", 1)))
 
+    # Verificação síncrona
     if base_id not in KINGDOM_SHOP:
         await q.answer("Item não disponível na loja.", show_alert=True); return
 
@@ -172,20 +181,26 @@ async def market_kingdom_buy(update: Update, context: ContextTypes.DEFAULT_TYPE)
     name = name_override or _item_label_from_base(base_id)
     total = unit_price * qty
 
-    buyer = player_manager.get_player_data(buyer_id)
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    buyer = await player_manager.get_player_data(buyer_id)
     if not buyer:
         await q.answer("Jogador não encontrado.", show_alert=True); return
 
+    # Verificação síncrona
     if _gold(buyer) < total:
         await q.answer("Gold insuficiente.", show_alert=True); return
 
+    # Modificações síncronas
     _set_gold(buyer, _gold(buyer) - total)
     player_manager.add_item_to_inventory(buyer, base_id, qty)
-    player_manager.save_player_data(buyer_id, buyer)
 
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    await player_manager.save_player_data(buyer_id, buyer)
+
+    # <<< CORREÇÃO 6: Adiciona await >>>
     await _safe_edit_or_send(q, context, chat_id, f"✅ Você comprou {qty}× {name} por {total} 🪙.", InlineKeyboardMarkup([
         [InlineKeyboardButton("⬅️ Voltar", callback_data="market_kingdom")]
-    ]))
+    ])) # Chama função async
 
 async def market_kingdom_buy_legacy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -196,12 +211,14 @@ async def market_kingdom_buy_legacy(update: Update, context: ContextTypes.DEFAUL
         qty = int(qty_s)
     except Exception:
         await q.answer("Pedido inválido.", show_alert=True); return
+    # Verificação síncrona
     if base_id not in KINGDOM_SHOP or qty <= 0:
         await q.answer("Item/quantidade inválidos.", show_alert=True); return
 
-    context.user_data["kingdom_shop"] = {"base_id": base_id, "qty": qty}
-    await market_kingdom_buy(update, context)
+    context.user_data["kingdom_shop"] = {"base_id": base_id, "qty": qty} # Síncrono
 
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    await market_kingdom_buy(update, context) # Chama função async
 
 # ==============================
 #  Handlers (exports para este arquivo)

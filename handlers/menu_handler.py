@@ -105,7 +105,7 @@ async def continue_after_action_callback(update: Update, context: ContextTypes.D
     await query.answer()
     user_id = query.from_user.id
     
-    player_data = player_manager.get_player_data(user_id)
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         await query.edit_message_text("Jogador não encontrado. Use /start.")
         return
@@ -159,7 +159,7 @@ async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     # --- estado do jogador ---
-    player_data = player_manager.get_player_data(user_id)
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         await _error_fallback(update, context, "Não encontrei seus dados. Use /start para começar.")
         return

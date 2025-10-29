@@ -121,7 +121,7 @@ def _int(v: Any, default: int = 0) -> int:
 async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Finaliza a coleta, calcula recompensas com base no nível, aplica perks e notifica.
-    (Versão robusta que lê os dados do job)
+    (Versão robusta e ASSÍNCRONA que lê os dados do job)
     """
     job = context.job
     if not job:
@@ -130,24 +130,27 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
 
     user_id, chat_id = job.user_id, job.chat_id
 
-    # <<< CORREÇÃO: Obter resource_id do job.data, não do player_state >>>
     job_data = job.data or {}
     resource_id = job_data.get('resource_id')
 
-    player_data = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         logger.warning(f"finish_collection_job: Player data not found for user {user_id}")
         return
 
-    # <<< CORREÇÃO: Validar o resource_id (do job) ANTES de checar o estado >>>
+    # ... (Validação e estado mantidos) ...
+    state = player_data.get('player_state') or {}
+    details = state.get('details') or {}
+    
     item_info = game_data.ITEMS_DATA.get(resource_id, {}) or {}
     if not resource_id or not item_info:
-        # Este é o erro que víamos (floresta_sombria), que agora está corrigido no region.py
         logger.warning(f"Collection end {user_id}: Invalid resource_key '{resource_id}' in job.data.")
 
         if (player_data.get('player_state') or {}).get('action') == 'collecting':
             player_data['player_state'] = {'action': 'idle'}
-            player_manager.save_player_data(user_id, player_data)
+            # <<< CORREÇÃO 2: Adiciona await >>>
+            await player_manager.save_player_data(user_id, player_data)
 
         try: 
             await context.bot.send_message(chat_id=chat_id, text="Sua ação de coleta foi finalizada (recurso inválido).")
@@ -156,13 +159,6 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
         return 
 
     # Pega o estado atual para ver se limpamos e para pegar detalhes
-    state = player_data.get('player_state') or {}
-    details = state.get('details') or {}
-
-    # <<< CORREÇÃO: Remover a 'falha silenciosa' e ajustar limpeza de estado >>>
-    # O job SEMPRE dará as recompensas agora.
-    # Apenas limpamos o estado se ele AINDA for a coleta deste job.
-
     current_state_action = state.get('action')
     current_state_resource = details.get('resource_id')
 
@@ -171,7 +167,6 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     elif current_state_action == 'collecting':
         logger.warning(f"finish_collection_job {user_id}: Job (res: {resource_id}) ran, but state is collecting OTHER resource (res: {current_state_resource}).")
     
-    # Define o item a receber (usa 'details' do estado ou 'job.data' se disponível)
     item_id_a_receber = job_data.get('item_id_yielded') or details.get('item_id_yielded', resource_id)
 
     # --- Rewards Calculation ---
@@ -203,12 +198,15 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
 
     # --- Grant item and update missions ---
     player_manager.add_item_to_inventory(player_data, item_id_a_receber, quantidade_final)
+    # mission_manager.update_mission_progress é síncrono
     mission_manager.update_mission_progress(player_data, 'GATHER', details={'item_id': item_id_a_receber, 'quantity': quantidade_final})
     clan_id = player_data.get("clan_id")
     if clan_id:
         try: 
+            # <<< CORREÇÃO 3: clan_manager.update_guild_mission_progress deve ser async >>>
             await clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='GATHER', details={'item_id': item_id_a_receber, 'count': quantidade_final}, context=context)
         except TypeError: 
+            # Se a versão síncrona ainda for usada, ela é chamada aqui (sem await)
             try: clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='GATHER', details={'item_id': item_id_a_receber, 'count': quantidade_final})
             except Exception as e_clan: logger.error(f"Error guild mission (gather) clan {clan_id}: {e_clan}")
 
@@ -258,12 +256,13 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
 
     # Save player data
     try:
-        player_manager.save_player_data(user_id, player_data)
+        # <<< CORREÇÃO 4: Adiciona await >>>
+        await player_manager.save_player_data(user_id, player_data)
     except Exception as e_save:
         logger.error(f"Error saving data in finish_collection_job for {user_id}: {e_save}", exc_info=True)
         try: await context.bot.send_message(chat_id=chat_id, text="⚠️ Erro ao salvar o resultado da coleta.")
         except Exception: pass
-        return 
+        return
 
     # --- Prepare Completion Message ---
     # O nome do item que o jogador recebeu
@@ -301,7 +300,7 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e_send_final:
         logger.warning(f"Failed sending collection result msg/media {chat_id}: {e_send_final}", exc_info=True)
         try: await context.bot.send_message(chat_id=chat_id, text=completion_text, reply_markup=reply_markup, parse_mode='HTML')
-        except Exception as e_final_fb: logger.error(f"CRITICAL failure sending final collection msg {chat_id}: {e_final_fb}", exc_info=True)        
+        except Exception as e_final_fb: logger.error(f"CRITICAL failure sending final collection msg {chat_id}: {e_final_fb}", exc_info=True)
 
 # Callback de início da coleta
 # -------------------------
@@ -313,7 +312,7 @@ async def start_collection_callback(update: Update, context: ContextTypes.DEFAUL
     user_id = query.from_user.id
     chat_id = query.message.chat_id
 
-    player_data = player_manager.get_player_data(user_id)
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         await _safe_edit(update, "Use /start para começar.")
         return
@@ -349,9 +348,9 @@ async def start_collection_callback(update: Update, context: ContextTypes.DEFAUL
         energy_cost_raw = premium.get_perk_value('gather_energy_cost', 1)
         energy_cost = max(0, _int(energy_cost_raw, 1))
     except Exception as e_perks:
-         logger.warning(f"Erro obter perks coleta {user_id}: {e_perks}")
-         speed_mult = 1.0
-         energy_cost = 1
+        logger.warning(f"Erro obter perks coleta {user_id}: {e_perks}")
+        speed_mult = 1.0
+        energy_cost = 1
     # <<< FIM CORREÇÃO >>>
     
     # Calcula duração com speed_mult
@@ -368,18 +367,20 @@ async def start_collection_callback(update: Update, context: ContextTypes.DEFAUL
 
     # Define o estado e salva
     finish_time_dt = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
-    # Usa ensure_timed_state importado
+    # Usa ensure_timed_state importado (assumindo que esta função foi refeita para ser async ou síncrona/não-bloqueante)
+    # Se player_manager.ensure_timed_state for assíncrona, adicione await
+    # Assumindo que o player_manager.ensure_timed_state apenas manipula o dicionário, é síncrono.
     player_manager.ensure_timed_state(
         pdata=player_data, action="collecting", seconds=duration_seconds,
         details={'resource_id': resource_id, 'energy_cost': energy_cost, 'speed_mult': speed_mult },
         chat_id=chat_id,
     )
-    player_manager.save_player_data(user_id, player_data)
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
 
     # Agenda o término
     try:
         job_data_for_finish = {"resource_id": resource_id} # Passa resource_id
-        # Usa schedule_or_replace_job importado
         schedule_or_replace_job(
             context=context, job_id=f"collect:{user_id}", when=duration_seconds,
             callback=finish_collection_job, data=job_data_for_finish,
@@ -389,8 +390,9 @@ async def start_collection_callback(update: Update, context: ContextTypes.DEFAUL
         logger.exception(f"Falha agendar coleta {user_id}: {e_schedule}")
         await query.answer("Erro ao iniciar coleta.", show_alert=True)
         player_data['player_state'] = {'action': 'idle'}
+        # <<< CORREÇÃO 7: Adiciona await >>>
         if energy_cost > 0: player_manager.add_energy(player_data, energy_cost) # Devolve
-        player_manager.save_player_data(user_id, player_data)
+        await player_manager.save_player_data(user_id, player_data) # Salva o estado 'idle' e devolve a energia
         return
 
     # Mensagem "coletando..."

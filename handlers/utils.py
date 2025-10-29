@@ -1,31 +1,53 @@
 # handlers/utils.py
-
+import logging
 import html
+from telegram import Update
+from telegram.error import BadRequest
 from typing import Optional
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from modules import player_manager, game_data
 from telegram import Update
 
+
+logger = logging.getLogger(__name__)
 # =============================================================================
 # MELHORIA: A função 'render_item_stats_short' foi movida para cá
 # para resolver uma importação circular com 'item_factory.py'.
 # =============================================================================
 
-async def safe_edit_message(query: CallbackQuery, text: str, reply_markup: InlineKeyboardMarkup = None, parse_mode: str = 'HTML'):
-    """
-    Edita uma mensagem de forma segura, tentando editar a legenda primeiro
-    e, se falhar, edita o texto. Evita o erro 'BadRequest: There is no caption...'.
-    """
+async def safe_edit_message(query, text, reply_markup=None, parse_mode='HTML'):
+    """Tenta editar a caption, fallback para text, ignora erros comuns."""
+    if not query or not query.message:
+        logger.warning("safe_edit_message: query ou query.message inválido.")
+        return
+
     try:
-        # Tenta editar a legenda (para mensagens com foto/vídeo)
+        # Tenta editar caption primeiro
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
-    except Exception:
-        try:
-            # Se falhar, edita o texto (para mensagens de texto simples)
-            await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-        except Exception as e:
-            # Se ambos falharem, é útil registrar o erro
-            print(f"Falha ao editar a mensagem: {e}")
+    except BadRequest as e_caption:
+        # Se falhar porque não é caption ou erro comum, tenta editar texto
+        if "message is not modified" in str(e_caption).lower():
+            pass # Ignora, já está igual
+        elif "message can't be edited" in str(e_caption).lower() or \
+             "message to edit not found" in str(e_caption).lower():
+             logger.debug(f"Não foi possível editar a mensagem (caption): {e_caption}")
+             # Não tenta editar texto se a msg não pode ser editada ou não foi encontrada
+        else:
+            # Se foi outro erro de caption (ex: não tinha mídia), tenta texto
+            try:
+                await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            except BadRequest as e_text:
+                if "message is not modified" in str(e_text).lower():
+                    pass # Ignora
+                elif "message can't be edited" in str(e_text).lower() or \
+                     "message to edit not found" in str(e_text).lower():
+                     logger.debug(f"Não foi possível editar a mensagem (text): {e_text}")
+                else:
+                    logger.error(f"Erro inesperado ao editar mensagem (caption falhou, text falhou): {e_text}")
+            except Exception as e_generic_text:
+                 logger.error(f"Erro genérico ao editar texto: {e_generic_text}", exc_info=True)
+    except Exception as e_generic_caption:
+        logger.error(f"Erro genérico ao editar caption: {e_generic_caption}", exc_info=True)
 
 async def safe_update_message(update: Update, context, new_text: str, new_reply_markup, new_media_file_id: str = None, new_media_type: str = 'photo'):
     """
@@ -92,26 +114,49 @@ def create_progress_bar(current: int, required: int, length: int = 10, fill_char
     progress = min(1.0, current / required)
     filled_length = int(progress * length)
     bar = fill_char * filled_length + empty_char * (length - filled_length)
-    return f"[{bar}]"            
+    return f"[{bar}]"
+            
+def _i(v) -> int:
+    """Converte qualquer valor para inteiro (com round) de forma segura."""
+    try:
+        return int(round(float(v)))
+    except (ValueError, TypeError):
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return 0
 
 def render_item_stats_short(item_instance: dict, player_class: str) -> str:
     """
     Renderiza uma string curta com os status principais de um item.
     Esta função agora vive em utils.py para evitar dependências cíclicas.
     """
-    # Supondo que a lógica original desta função seja algo parecido com isto:
-    # (Adapte conforme a sua implementação original em item_factory.py)
     stats = item_instance.get("stats", {})
+    enchants = item_instance.get("enchantments", {}) # Considera encantamentos também
     parts = []
-    if stats.get("attack"):
-        parts.append(f"⚔️{_i(stats['attack'])}")
-    if stats.get("defense"):
-        parts.append(f"🛡️{_i(stats['defense'])}")
-    if stats.get("initiative"):
-        parts.append(f"🏃‍♂️{_i(stats['initiative'])}")
-    if stats.get("luck"):
-        parts.append(f"🍀{_i(stats['luck'])}")
+    
+    # Mapeamento de emojis (pode ser movido para o topo se preferir)
+    emoji_map = {
+        'attack': '⚔️', 'defense': '🛡️', 'initiative': '🏃‍♂️', 'luck': '🍀', 'max_hp': '❤️'
+    }
+
+    # Combina stats base e encantamentos
+    combined_stats = {}
+    for stat, value in stats.items():
+        if stat in emoji_map:
+            combined_stats[stat] = combined_stats.get(stat, 0) + _i(value)
+            
+    for stat, data in enchants.items():
+        if stat in emoji_map:
+             combined_stats[stat] = combined_stats.get(stat, 0) + _i((data or {}).get('value', 0))
+
+    # Formata a saída
+    for stat, value in combined_stats.items():
+         if value > 0:
+            parts.append(f"{emoji_map[stat]}{value}")
+            
     return " ".join(parts)
+
 # =============================================================================
 
 def obter_titulo_e_icones_por_regiao(regiao_id: str) -> tuple[str, str]:
@@ -137,6 +182,7 @@ def _i(v) -> int:
 def _fmt_player_stats_as_ints(total_stats: dict) -> tuple[int, int, int, int, int]:
     """
     Converte o dict retornado por get_player_total_stats em inteiros para exibição.
+    (Mantido)
     """
     p_max_hp = _i(total_stats.get('max_hp', 0))
     p_atk    = _i(total_stats.get('attack', 0))
@@ -145,76 +191,95 @@ def _fmt_player_stats_as_ints(total_stats: dict) -> tuple[int, int, int, int, in
     p_srt    = _i(total_stats.get('luck', 0))
     return p_max_hp, p_atk, p_def, p_ini, p_srt
 
-
-# Em handlers/utils.py
 # SUBSTITUA a sua função format_combat_message por esta versão final
-
-def format_combat_message(player_data: dict) -> str:
-    """Formata a mensagem de combate com layout de colunas, emojis e espaçamento ajustável."""
+def _format_log_line(line: str) -> str:
+    """Formata linhas de log de batalha para caberem na caixa estilizada."""
     
+    # Substituições para simplificar o log
+    line = line.replace("💥💥 𝐌𝐄𝐆𝐀 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!", "💥💥 MEGA CRÍTICO!")
+    line = line.replace("💥 𝐃𝐀𝐍𝐎 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!", "💥 CRÍTICO!")
+    line = line.replace("‼️ 𝕄𝔼𝔾𝔸 ℂℝ𝕀́𝐓𝐈ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!", "‼️ MEGA CRÍTICO I.")
+    line = line.replace("❗️ 𝔻𝔸𝐍𝐎 ℂℝ𝕀́𝐓𝐈ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!", "❗️ CRÍTICO I.")
+    line = line.replace("⚡ 𝐀𝐓𝐀𝐐𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!", "⚡ ATAQUE DUPLO!")
+    line = line.replace("ataca e causa", "causa")
+    line = line.replace("recebe", "recebe")
+    
+    return html.escape(line) # Garante que o HTML é seguro para o bloco <code>
+
+async def format_combat_message(player_data: dict, player_stats: dict | None = None) -> str:
+    """
+    Formata o estado atual do combate com a estrutura original e async correto.
+    """
+    if not player_data: return "Erro: Dados do jogador não encontrados."
     state = player_data.get('player_state', {})
+    if state.get("action") != "in_combat": return "Você não está em combate."
     details = state.get('details', {})
-    log = details.get('battle_log', [])
-    
-    regiao_id = player_data.get("current_location", "floresta_sombria")
-    titulo, _ = obter_titulo_e_icones_por_regiao(regiao_id) 
+    log_raw = details.get('battle_log', [])
 
-    player_stats = player_manager.get_player_total_stats(player_data)
-    
-    # --- Trunca nomes longos ---
-    p_name_raw = player_data.get('character_name', 'Herói')
-    m_name_raw = details.get('monster_name', 'Inimigo')
-    p_name = (p_name_raw[:15] + '…') if len(p_name_raw) > 15 else p_name_raw
-    m_name = (m_name_raw[:17] + '…') if len(m_name_raw) > 17 else m_name_raw
+    # 1. Carrega Stats Totais (se não passados)
+    if player_stats is None:
+        player_stats = await player_manager.get_player_total_stats(player_data)
+        if not player_stats: return "Erro: Não foi possível carregar stats do jogador."
 
-    # --- NOVO: CONTROLO DE ESPAÇAMENTO ---
-    # Altere os espaços aqui (" ") para ajustar a distância entre as colunas
-    gap = " " 
+    # 2. Obter Dados da Região e Nomes
+    regiao_id = details.get('region_key', 'reino_eldora')
+    region_info = (game_data.REGIONS_DATA or {}).get(regiao_id, {})
+    titulo = f"{region_info.get('emoji', '🗺️')} <b>{region_info.get('display_name', 'Região')}</b>"
 
-    # --- Lógica de Alinhamento com Emojis ---
-    label_w = 8  # Aumentado para acomodar os emojis
-    value_w = 11
+    p_name = player_data.get('character_name', 'Herói')
+    m_name = details.get('monster_name', 'Inimigo')
 
-    p_hp_str = f"{_i(player_data.get('current_hp', 0))}/{_i(player_stats.get('max_hp', 0))}"
-    p_hp  = f"{'❤️ HP:'.ljust(label_w)}{p_hp_str.ljust(value_w)}"
-    p_atk = f"{'⚔️ ATK:'.ljust(label_w)}{str(_i(player_stats.get('attack', 0))).ljust(value_w)}"
-    p_def = f"{'🛡️ DEF:'.ljust(label_w)}{str(_i(player_stats.get('defense', 0))).ljust(value_w)}"
-    p_vel = f"{'🏃‍♂️ VEL:'.ljust(label_w)}{str(_i(player_stats.get('initiative', 0))).ljust(value_w)}"
-    p_srt = f"{'🍀 SRT:'.ljust(label_w)}{str(_i(player_stats.get('luck', 0))).ljust(value_w)}"
-    
-    m_hp_str = f"{_i(details.get('monster_hp', 0))}/{_i(details.get('monster_max_hp', 0))}"
-    m_hp  = f"{'❤️ HP:'.ljust(label_w)}{m_hp_str.ljust(value_w)}"
-    m_atk = f"{'⚔️ ATK:'.ljust(label_w)}{str(_i(details.get('monster_attack', 0))).ljust(value_w)}"
-    m_def = f"{'🛡️ DEF:'.ljust(label_w)}{str(_i(details.get('monster_defense', 0))).ljust(value_w)}"
-    m_vel = f"{'🏃‍♂️ VEL:'.ljust(label_w)}{str(_i(details.get('monster_initiative', 0))).ljust(value_w)}"
-    m_srt = f"{'🍀 SRT:'.ljust(label_w)}{str(_i(details.get('monster_luck', 0))).ljust(value_w)}"
+    # 3. Status do Jogador (Usa os stats já carregados ou passados)
+    p_max_hp, p_atk, p_def, p_ini, p_srt = _fmt_player_stats_as_ints(player_stats)
+    p_current_hp = max(0, min(_i(player_data.get('current_hp', p_max_hp)), p_max_hp))
 
-    col_width = label_w + value_w
-    stats_lines = [
-        f"{p_name.ljust(col_width)}{gap}║{gap}{m_name}",
-        f"{p_hp}{gap}║{gap}{m_hp}",
-        f"{p_atk}{gap}║{gap}{m_atk}",
-        f"{p_def}{gap}║{gap}{m_def}",
-        f"{p_vel}{gap}║{gap}{m_vel}",
-        f"{p_srt}{gap}║{gap}{m_srt}",
-    ]
-    stats_block = "\n".join(stats_lines)
-    
-    log_block = "\n".join([html.escape(str(line)) for line in log[-4:]])
-    if not log_block:
-        log_block = "Aguardando sua ação..."
+    # 4. Status do Monstro
+    m_hp = _i(details.get('monster_hp', 0))
+    m_max = _i(details.get('monster_max_hp', 0))
+    m_atk = _i(details.get('monster_attack', 0))
+    m_def = _i(details.get('monster_defense', 0))
+    m_ini = _i(details.get('monster_initiative', 0))
+    m_srt = _i(details.get('monster_luck', 0))
 
-    final_message = (
-        f"<b>{titulo}</b>\n\n"
-        f"╔══════════════ ⚔️ VS ⚔️ ══════════════╗\n"
-        f"<code>{stats_block}</code>\n"
-        f"╚════════════════ 📜 ════════════════╝\n\n"
-        f"<b>Últimas Ações:</b>\n"
-        f"<code>{log_block}</code>"
+    # 5. Blocos de Status Consolidados
+    player_block = (
+        f"<b>{p_name}</b>\n"
+        f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
+        f"⚔️ 𝐀𝐓𝐊: {p_atk} | 🛡 𝐃𝐄𝐅: {p_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini} | 🍀 𝐒𝐑𝐓: {p_srt}"
     )
-    
-    return final_message
 
+    monster_block = (
+        f"<b>{m_name}</b>\n"
+        f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
+        f"⚔️ 𝐀𝐓𝐊: {m_atk} | 🛡 𝐃𝐄𝐅: {m_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini} | 🍀 𝐒𝐑𝐓: {m_srt}"
+    )
+
+    # 6. Montagem do Log
+    log_lines = [_format_log_line(line) for line in log_raw[-4:]] # Pega as últimas 4 linhas
+    log_block = "\n".join(log_lines)
+    # Mensagem padrão se o log estiver vazio (início do combate)
+    if not log_block:
+         log_block = "Aguardando sua ação..."
+
+    # 7. Construção da Caixa Final (Usando a tua estrutura original)
+    final_message = (
+        f"{titulo}\n"
+        f"⚔️ 𝑽𝑺 <b>{m_name}</b>\n"
+        "╔════════════ ◆◈◆ ════════════╗\n"
+        # Bloco do Jogador
+        f"{player_block}\n"
+        "══════════════════════════════\n"
+        # Bloco do Monstro
+        f"{monster_block}\n"
+        "═════════════ 📜 ═════════════\n"
+        # Log formatado dentro de <code>
+        f"<code>{log_block}</code>\n"
+        "╚════════════ ◆◈◆ ════════════╝"
+    )
+
+    return final_message
 # ---------- Mensagem de dungeon (sempre inteiros) ----------
 def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict) -> str:
     """
@@ -322,13 +387,15 @@ def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_d
     """
     Formata o resultado de uma batalha PvP no estilo visual do bot.
     Retorna (texto, teclado inline). Exibe tudo como inteiros.
+    (Esta função assume que vencedor_data e perdedor_data JÁ FORAM CARREGADOS com await)
     """
-    log_texto = "\n".join([str(x) for x in resultado.get('log', [])])
+    log_texto = "\n".join([html.escape(str(x)) for x in resultado.get('log', [])]) # Aplica html.escape
 
-    nome_vencedor = vencedor_data.get('character_name', 'Aventureiro(a)') if vencedor_data else None
-    nome_perdedor = perdedor_data.get('character_name', 'Oponente') if perdedor_data else None
+    nome_vencedor = (vencedor_data or {}).get('character_name', 'Aventureiro(a)')
+    nome_perdedor = (perdedor_data or {}).get('character_name', 'Oponente')
 
     if resultado.get('vencedor_id'):
+        # <<< CORREÇÃO: Chama get_player_total_stats em dicionários válidos >>>
         vstats = player_manager.get_player_total_stats(vencedor_data or {})
         pstats = player_manager.get_player_total_stats(perdedor_data or {})
 
@@ -339,35 +406,36 @@ def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_d
         divider = "══════════════════════════════\n"
         footer = "╚════════════ ◆◈◆ ════════════╝"
 
-        # CORREÇÃO: Garantir que 'vencedor_data' e 'perdedor_data' não sejam None ao acessar 'current_hp'.
+        # Garante que os dados não são None antes de aceder ao 'current_hp'
         v_hp = _i((vencedor_data or {}).get('current_hp', 0))
         p_hp = _i((perdedor_data or {}).get('current_hp', 0))
 
         mensagem_texto = (
             f"{header}"
-            f"{nome_vencedor}\n"
+            f"<b>{html.escape(nome_vencedor)}</b>\n" # Adiciona html.escape
             f"❤️ 𝐇𝐏: {v_hp}/{v_max}\n"
             f"⚔️ 𝐀𝐓𝐊: {v_atk}  🛡️ 𝐃𝐄𝐅: {v_def}\n"
             f"🏃‍♂️ 𝐕𝐄𝐋: {v_vel}  🍀 𝐒𝐑𝐓: {v_srt}\n"
             f"{divider}"
-            f"{nome_perdedor}\n"
+            f"<b>{html.escape(nome_perdedor)}</b>\n" # Adiciona html.escape
             f"❤️ 𝐇𝐏: {p_hp}/{p_max}\n"
             f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
             f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}\n"
             f"═════════════ ◆◈◆ ═════════════\n"
             f"📜 Log da Batalha:\n"
-            f"{log_texto}\n"
-            f"\n🎉 <b>{nome_vencedor} 𝒗𝒆𝒏𝒄𝒆𝒖 𝒂 𝒃𝒂𝒕𝒂𝒍𝒉𝒂!</b>\n"
+            f"<code>{log_texto}</code>\n" # Envolve o log em <code>
+            f"\n🎉 <b>{html.escape(nome_vencedor)} 𝒗𝒆𝒏𝒄𝒆𝒖 𝒂 𝒃𝒂𝒕𝒂𝒍𝒉𝒂!</b>\n"
             f"{footer}"
         )
     else:
         mensagem_texto = (
-            f"⚔️ <b>𝑨 𝑩𝑨𝑻𝑨𝑳𝑯𝑨 𝑻𝑬𝑹𝑴𝑰𝑵𝑶𝑼 𝑬𝑴 𝑬𝑷𝑨𝑻𝑬!</b> ⚔️\n\n"
+            f"⚔️ <b>𝑨 𝑩𝑨𝑻𝑨𝑳𝑯𝑨 𝑻𝑬𝑹𝑴𝑰𝑵𝑶𝑼 𝑬𝑴 𝑬𝑴IMATE!</b> ⚔️\n\n"
             f"📜 Log da Batalha:\n"
-            f"{log_texto}\n"
+            f"<code>{log_texto}</code>\n" # Envolve o log em <code>
         )
 
-    keyboard = [[InlineKeyboardButton("⚔️ 𝐋𝐮𝐭𝐚𝐫 𝐍𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐞 ⚔️", callback_data='arena_de_eldora')]]
+    # <<< CORREÇÃO: O callback 'arena_de_eldora' deve ser o 'pvp_arena' que definimos no kingdom.py >>>
+    keyboard = [[InlineKeyboardButton("⚔️ 𝐋𝐮𝐭𝐚𝐫 𝐍𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐞 ⚔️", callback_data='pvp_arena')]]
     return mensagem_texto, InlineKeyboardMarkup(keyboard)
 
 def format_buffs_text(buffs_dict: dict) -> str:

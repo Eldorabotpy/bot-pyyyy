@@ -24,7 +24,7 @@
     "type": "video"
   },
   "anciao_floresta_media": {
-    "id": "BAACAgEAAxkBAAIK52jt8mnfCc6nEEPbrnxnUIObi-jQAAL4BgACVVNwR8nurLkjmVqDNgQ",
+    "id": "BAACAgEAAxkDAAIYLmj1PM0jA9RaDIklsCEYOAyoAtQrAALCBgACVVNwR3EXhbN0inYGNgQ",
     "type": "video"
   },
   "aranha_gigante_da_tocaia_media": {
@@ -230,6 +230,10 @@
   "guardiao_raizes_media": {
     "id": "BAACAgEAAxkBAAIKuGjt7uY82j6h1BtJ12a6vAEB-fFQAALxBgACVVNwR_xELP9nIMplNgQ",
     "type": "video"
+  },
+  "guild_dashboard_media": {
+    "id": "AgACAgEAAxkBAAI53Gj_tvHr1BodojH5SxKIONfci462AAICC2sbXPsAAUR3qz0idvnJhgEAAwIAA3kAAzYE",
+    "type": "photo"
   },
   "harpia_saqueadora_media": {
     "id": "BAACAgEAAxkBAAIFkGjoT8so8EcFey2Iw40qTY1vHbpjAAJ4BQACW3gZRGaf6deCCL_sNgQ",
@@ -508,7 +512,11 @@
     "type": "video"
   },
   "loja_do_reino": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAI4a2j-0biiLAZzDHT0mCXJMoI9UximAAJiC2sbKhr5R68thiNM6csSAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "loja_gemas": {
+    "id": "AgACAgEAAxkBAAI4lGj-3XKuyJW4v2DZDy2h6ep0idjOAAJmC2sbKhr5R8w-UdKFVg85AQADAgADeQADNgQ",
     "type": "photo"
   },
   "mapa_mundo": {
@@ -520,11 +528,15 @@
     "type": "photo"
   },
   "menu_guilda_generico": {
-    "id": "AgACAgEAAxkBAAIL_2juRYq6HMnP5XgDUuujQ6B8oetOAAJoC2sbVVNwR_7XbNdEMGPaAQADAgADeQADNgQ",
+    "id": "AgACAgEAAxkBAAI4UWj-yUkeHDbIlQIdHiB5EvcBxxExAAJoC2sbVVNwR_7XbNdEMGPaAQADAgADeQADNgQ",
     "type": "photo"
   },
   "mercado_aventureiro": {
-    "id": "file_ids",
+    "id": "AgACAgEAAxkBAAI4SGj-yKvI5KPmDf_sZpiVBBqI89AMAAIaC2sbqsXQR0uxjpA-PP6ZAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "mercado_principal": {
+    "id": "AgACAgEAAxkBAAI4gmj-2b936QmRxlgV73Tb9-dYP_DbAAJlC2sbKhr5R94ir7q85J0jAQADAgADeQADNgQ",
     "type": "photo"
   },
   "morcego_gigante_media": {
@@ -536,7 +548,7 @@
     "type": "video"
   },
   "npc_alquimista_tenda_media": {
-    "id": "BAACAgEAAxkBAAIKIWjtvzJseilDih9xmzSSEDVbGcGEAALCBgACVVNwR3EXhbN0inYGNgQ",
+    "id": "BAACAgEAAxkDAAIYLmj1PM0jA9RaDIklsCEYOAyoAtQrAALCBgACVVNwR3EXhbN0inYGNgQ",
     "type": "video"
   },
   "ond1_rei_slime_media": {
@@ -712,7 +724,7 @@
     "type": "photo"
   },
   "regiao_campos_linho": {
-    "id": "AgACAgEAAxkBAAIE9GjoLaaPVGT3IPrkK2Qoek0NuhzlAAI2DGsbY5VARx8DFfTeykcDAQADAgADeQADNgQ",
+    "id": "AgACAgEAAxkBAAIzvWj8-NXFcyuAkcFNquiHNvquZOZsAAIKC2sb6QPpR6xoDV5F3EOOAQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_floresta_sombria": {
@@ -732,11 +744,11 @@
     "type": "photo"
   },
   "regiao_pedreira_granito": {
-    "id": "AgACAgEAAxkBAAIDLGjmww2mAlidmS-Py1HrohrKX9ZnAAJ0rjEbW3gRRBu_kv7vS-yRAQADAgADeQADNgQ",
+    "id": "AgACAgEAAxkBAAI032j9Rc8QR9VjMCogXwnnei_3VKVGAAIgC2sb6QPpR8HGVKykX6QYAQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_pico_grifo": {
-    "id": "AgACAgEAAxkBAAIFgGjoTZz_PVO-FLnLbZ1-RHMP6eOHAAKKrzEbxKC4R78hJF-z3zQxAQADAgADeQADNgQ",
+    "id": "AgACAgEAAxkBAAI072j9T_2b1X-E0me_Ggsv9RfmlaUfAAIjC2sb6QPpR5gsNJU_LqJhAQADAgADeQADNgQ",
     "type": "photo"
   },
   "regiao_picos_gelados": {

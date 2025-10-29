@@ -3,8 +3,9 @@
 from __future__ import annotations
 import os
 import io
-import logging # <- O import já estava
+import logging 
 import json
+import sys
 from typing import Optional
 from handlers.admin.grant_item import grant_item_conv_handler # Já estava
 from handlers.admin.sell_gems import sell_gems_conv_handler # Já estava
@@ -25,27 +26,25 @@ from telegram.ext import (
 from telegram.error import BadRequest
 from telegram.constants import ParseMode # <<< ADICIONADO >>>
 
-# --- Imports dos Módulos do Bot ---
 from modules.player_manager import (
-    delete_player,
-    clear_player_cache,
-    clear_all_player_cache,
-    get_player_data,
-    add_item_to_inventory,
-    save_player_data,
-    find_player_by_name,
-    allowed_points_for_level,
-    compute_spent_status_points,
+    delete_player, # Assumindo que esta pode ser ASYNC
+    clear_player_cache, # Assumindo SÍNCRONO
+    clear_all_player_cache, # Assumindo SÍNCRONO
+    get_player_data, # ASYNC
+    add_item_to_inventory, # SÍNCRONO
+    save_player_data, # ASYNC
+    find_player_by_name, # ASYNC
+    allowed_points_for_level, # SÍNCRONO
+    compute_spent_status_points, # SÍNCRONO
+   
 )
 from modules import game_data
 from handlers.jobs import reset_pvp_season, force_grant_daily_crystals # <<< CORRIGIDO >>> Importa force_grant_daily_crystals
 from handlers.admin.utils import ensure_admin
 from kingdom_defense.engine import event_manager
-# No topo de admin_handler.py
 from modules.player.core import _player_cache, players_collection
-# No topo de admin_handler.py
 from modules.player.queries import _normalize_char_name
-# <<< ADICIONADO >>> Importa a função de início da conversa de edição
+
 
 logger = logging.getLogger(__name__) 
 
@@ -86,7 +85,7 @@ async def _reset_pvp_now_command(update: Update, context: ContextTypes.DEFAULT_T
 
 async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando de admin para diagnosticar cache e DB para um jogador."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    if not await ensure_admin(update): return 
 
     user_id_to_check = None
     try:
@@ -205,6 +204,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("👤 𓂀 𝔼𝕕𝕚𝕥𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣 𓂀", callback_data="admin_edit_player")], # <<< ADICIONADO >>>
         [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
         [InlineKeyboardButton("👑 𓂀 ℙ𝕣𝕖𝕞𝕚𝕦𝕞 𓂀", callback_data="admin_premium")],
+        [InlineKeyboardButton("⚔️ Painel PvP", callback_data="admin_pvp_menu")],
         [InlineKeyboardButton("🎉 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔼𝕧𝕖𝕟𝕥𝕠𝕤 𓂀 🎉", callback_data="admin_event_menu")],
         [InlineKeyboardButton("🔬 𓂀 Painel de Teste de Evento 𓂀 🔬", callback_data="admin_test_menu")],
         [InlineKeyboardButton("📁 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔽𝕚𝕝𝕖 𝕀𝔻𝕤 𓂀", callback_data="admin_file_ids")],
@@ -248,42 +248,48 @@ async def _safe_edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE, te
 # --- Lógica do Painel de Teste (ConversationHandler) ---
 async def _handle_admin_test_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Entrada para o menu de teste de evento."""
-    if not await ensure_admin(update): return ConversationHandler.END # Adicionado filtro
+    # <<< CORREÇÃO 47: Adiciona await >>>
+    if not await ensure_admin(update): return ConversationHandler.END
+    # <<< CORREÇÃO 48: Adiciona await >>>
     await _safe_answer(update)
-    await _safe_edit_text(update, context, "🔬 <b>Painel de Teste de Evento</b>\n\nO que você gostaria de fazer?", _admin_test_menu_kb()) # Corrigido para HTML
+    # <<< CORREÇÃO 49: Adiciona await >>>
+    await _safe_edit_text(update, context, "🔬 <b>Painel de Teste de Evento</b>\n\nO que você gostaria de fazer?", _admin_test_menu_kb())
     return SELECT_TEST_ACTION
 
 async def _test_ask_wave_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Pede ao admin para enviar o número da wave."""
-    if not await ensure_admin(update): return ConversationHandler.END # Adicionado filtro
+    # <<< CORREÇÃO 50: Adiciona await >>>
+    if not await ensure_admin(update): return ConversationHandler.END
+    # <<< CORREÇÃO 51: Adiciona await >>>
     await _safe_answer(update)
+    # <<< CORREÇÃO 52: Adiciona await >>>
     await _safe_edit_text(update, context, "🔢 Por favor, envie o número da wave que você deseja testar.\n\nUse /cancelar para voltar.")
     return ASK_WAVE_NUMBER
 
 async def _test_start_specific_wave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Inicia o evento de teste na wave especificada pelo admin."""
-    # O filtro já foi aplicado no MessageHandler que chama esta função
     try:
         wave_num = int(update.message.text)
-        if wave_num <= 0: raise ValueError("Wave deve ser positiva") # Adiciona validação
+        if wave_num <= 0: raise ValueError("Wave deve ser positiva")
     except (ValueError, TypeError):
         await update.message.reply_text("❌ Isso não é um número válido (deve ser maior que 0). Tente novamente ou use /cancelar.")
-        return ASK_WAVE_NUMBER # Mantém na mesma etapa da conversa
+        return ASK_WAVE_NUMBER
 
-    result = event_manager.start_event_at_wave(wave_num)
+    result = event_manager.start_event_at_wave(wave_num) # SÍNCRONO
 
     if "error" in result:
         await update.message.reply_text(result["error"])
     else:
         await update.message.reply_text(result["success"] + "\n\nO evento está ativo. Use os comandos de jogador em um chat separado para interagir.")
 
+    # <<< CORREÇÃO 53: Adiciona await >>>
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
 
 async def _test_cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancela a operação de teste e retorna ao menu principal."""
-    # O filtro já foi aplicado no CommandHandler que chama esta função
     await update.message.reply_text("Operação de teste cancelada.")
+    # <<< CORREÇÃO 54: Adiciona await >>>
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
 
@@ -299,119 +305,174 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _handle_admin_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Atualiza a mensagem para mostrar o painel principal do admin."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    # <<< CORREÇÃO 14: Adiciona await >>>
+    if not await ensure_admin(update): return
+    # <<< CORREÇÃO 15: Adiciona await >>>
     await _safe_answer(update)
+    # <<< CORREÇÃO 16: Adiciona await >>>
     await _safe_edit_text(update, context, "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:", _admin_menu_kb())
 
 async def _delete_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando de admin para apagar um jogador."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    if not await ensure_admin(update): return
 
     if not context.args:
         await update.message.reply_text("Uso: /delete_player <user_id>")
         return
     try:
         user_id_to_delete = int(context.args[0])
-        if delete_player(user_id_to_delete):
+        # <<< CORREÇÃO 8: Adiciona await (assumindo que delete_player é async) >>>
+        deleted_ok = await delete_player(user_id_to_delete)
+        if deleted_ok:
             await update.message.reply_text(f"✅ Jogador com ID {user_id_to_delete} foi apagado com sucesso.")
         else:
             await update.message.reply_text(f"⚠️ Jogador com ID {user_id_to_delete} não foi encontrado.")
     except (ValueError, IndexError):
         await update.message.reply_text("Por favor, forneça um ID de usuário numérico válido.")
     except Exception as e:
-        logger.error(f"Erro ao deletar jogador {context.args[0]}: {e}", exc_info=True) # Loga o erro completo
+        logger.error(f"Erro ao deletar jogador {context.args[0]}: {e}", exc_info=True)
         await update.message.reply_text(f"Ocorreu um erro ao tentar apagar o jogador.")
 
 # --- Funções de Eventos ---
 async def _handle_admin_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o submenu de gerenciamento de eventos."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    # <<< CORREÇÃO 17: Adiciona await >>>
+    if not await ensure_admin(update): return
+    # <<< CORREÇÃO 18: Adiciona await >>>
     await _safe_answer(update)
-    await _safe_edit_text(update, context, "🎉 <b>Painel de Gerenciamento de Eventos</b>", _admin_event_menu_kb(), parse_mode=HTML) # Adicionado parse_mode
+    # <<< CORREÇÃO 19: Adiciona await >>>
+    await _safe_edit_text(update, context, "🎉 <b>Painel de Gerenciamento de Eventos</b>", _admin_event_menu_kb())
 
 async def _handle_force_start_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Inicia o evento e anuncia no grupo principal."""
-    if not await ensure_admin(update): return # Adicionado filtro
-    query = update.callback_query
-
-    result = event_manager.start_event()
-
-    if "error" in result:
-        await query.answer(result["error"], show_alert=True)
+    """Apenas força o início do evento Kingdom Defense internamente."""
+    query = None
+    if update.callback_query:
+        query = update.callback_query
+        user_id = query.from_user.id
+        # Garante que ensure_admin seja await se for async
+        if not await ensure_admin(update): return # Usa apenas 'update'
+        await query.answer("Processando...") # Responde ao clique inicial
+    elif update.message:
+        user_id = update.message.from_user.id
+        if not await ensure_admin(update): return # Usa apenas 'update'
+    else:
+        logger.warning("Não foi possível determinar o usuário em _handle_force_start_event")
         return
 
-    await query.answer("✅ Evento iniciado com sucesso!", show_alert=True)
+    logger.info(f"Admin {user_id} forçando início do evento Kingdom Defense.")
 
-    # Tenta importar IDs do config, com fallback para None
-    try:
-        from config import ANNOUNCEMENT_CHAT_ID as ID_GRUPO_EVENTOS, ANNOUNCEMENT_THREAD_ID as ID_TOPICO_EVENTOS
-        if not isinstance(ID_GRUPO_EVENTOS, int): ID_GRUPO_EVENTOS = None # Garante que é int ou None
-        if not isinstance(ID_TOPICO_EVENTOS, int): ID_TOPICO_EVENTOS = None # Garante que é int ou None
-    except ImportError:
-        logger.warning("IDs de grupo/tópico de anúncios (ANNOUNCEMENT_CHAT_ID, ANNOUNCEMENT_THREAD_ID) não encontrados na config!")
-        ID_GRUPO_EVENTOS = None
-        ID_TOPICO_EVENTOS = None
+    # Chama start_event (que agora é async)
+    result = await event_manager.start_event()
 
-    if ID_GRUPO_EVENTOS:
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚔️ Ver Evento ⚔️", callback_data='show_events_menu')]
-        ])
+    # Verifica o resultado
+    if not isinstance(result, dict):
+        logger.error(f"start_event retornou um tipo inesperado: {type(result)}")
+        error_msg = "❌ Ocorreu um erro inesperado ao iniciar o evento."
+        if query:
+            # Edita a mensagem do botão se falhar
+            await query.edit_message_text(error_msg)
+        elif update.message:
+            await update.message.reply_text(error_msg)
+        return
 
-        try:
-             await context.bot.send_message(
-                chat_id=ID_GRUPO_EVENTOS,
-                message_thread_id=ID_TOPICO_EVENTOS,
-                text="📢 <b>ATENÇÃO, HERÓIS DE ELDORA!</b> 📢\n\nUma nova invasão ameaça nosso reino! Preparem-se para a batalha!",
-                reply_markup=keyboard,
-                parse_mode=HTML
-            )
-        except Exception as e:
-             logger.error(f"Falha ao anunciar evento no grupo {ID_GRUPO_EVENTOS} (tópico: {ID_TOPICO_EVENTOS}): {e}")
-    else:
-        logger.warning("Não foi possível anunciar o início do evento (IDs de grupo/tópico não configurados).")
+    if "error" in result:
+        error_msg = f"⚠️ Erro: {result['error']}"
+        if query:
+            # Mostra o erro como alerta se veio de um botão
+            await query.answer(result["error"], show_alert=True)
+            # Opcional: editar a mensagem original do botão para mostrar o erro
+            # await query.edit_message_text(error_msg)
+        elif update.message:
+            await update.message.reply_text(error_msg)
+        return
 
+    # Se chegou aqui, teve sucesso
+    success_msg = result.get("success", "✅ Evento iniciado com sucesso!")
+    if query:
+        # Mostra sucesso como alerta se veio de um botão
+        await query.answer(success_msg, show_alert=True)
+        # Opcional: Editar a mensagem original para confirmar
+        # await query.edit_message_text(success_msg)
+    elif update.message:
+        await update.message.reply_text(success_msg)
+        
 
 async def _handle_force_end_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Termina o evento manualmente."""
-    if not await ensure_admin(update): return # Adicionado filtro
-    await update.callback_query.answer()
-    message = event_manager.end_event()
-    await update.callback_query.answer(message, show_alert=True)
+    query = update.callback_query # Assume que sempre vem de um botão
+    user_id = query.from_user.id
+
+    # Garante que ensure_admin seja await se for async
+    if not await ensure_admin(update): return # Usa apenas 'update'
+    await query.answer("Processando...") # Responde ao clique inicial
+
+    logger.info(f"Admin {user_id} forçando fim do evento Kingdom Defense.")
+
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    result = await event_manager.end_event(context) # Passa context se a função end_event precisar dele
+
+    # <<< CORREÇÃO 2: Extrai a mensagem do dicionário retornado >>>
+    if not isinstance(result, dict):
+        logger.error(f"end_event retornou um tipo inesperado: {type(result)}")
+        message = "❌ Ocorreu um erro inesperado ao terminar o evento."
+    elif "error" in result:
+        message = f"⚠️ Erro: {result['error']}"
+    else:
+        # Pega a mensagem de sucesso ou uma padrão
+        message = result.get("success", "✅ Evento encerrado com sucesso!")
+
+    # Mostra a mensagem final como alerta
+    await query.answer(message, show_alert=True)
+
+    #Opcional: Editar a mensagem do painel de admin para refletir o fim
+    try:
+        await query.edit_message_text("Evento Kingdom Defense encerrado.")
+    except Exception as e:
+        logger.warning(f"Não foi possível editar mensagem após forçar fim do evento: {e}")
 
 async def _handle_force_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Entrega um ticket de defesa ao admin."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    # <<< CORREÇÃO 22: Adiciona await >>>
+    if not await ensure_admin(update): return
+    # <<< CORREÇÃO 23: Adiciona await >>>
     await _safe_answer(update)
-    user_id = update.effective_user.id # O próprio admin
-    player_data = get_player_data(user_id)
+    user_id = update.effective_user.id
+
+    # <<< CORREÇÃO 24: Adiciona await >>>
+    player_data = await get_player_data(user_id)
     if not player_data:
         await update.callback_query.answer("Erro: Não foi possível carregar seus dados.", show_alert=True)
         return
 
     item_id = 'ticket_defesa_reino'
     try:
-        add_item_to_inventory(player_data, item_id, 1)
-        save_player_data(user_id, player_data)
+        add_item_to_inventory(player_data, item_id, 1) # SÍNCRONO
+        # <<< CORREÇÃO 25: Adiciona await >>>
+        await save_player_data(user_id, player_data)
         await update.callback_query.answer(f"🎟️ Você recebeu 1x {item_id}!", show_alert=True)
     except Exception as e:
         logger.error(f"Erro ao entregar ticket para admin {user_id}: {e}", exc_info=True)
         await update.callback_query.answer(f"Erro ao entregar o item '{item_id}'.", show_alert=True)
 
-
 # --- Funções de Cristais Diários ---
 async def _handle_admin_force_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Força a entrega dos cristais diários (via botão)."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    # <<< CORREÇÃO 26: Adiciona await >>>
+    if not await ensure_admin(update): return
+    # <<< CORREÇÃO 27: Adiciona await >>>
     await _safe_answer(update)
+    # <<< CORREÇÃO 28: Adiciona await >>>
     await _safe_edit_text(update, context, "⏳ Processando entrega de cristais diários...")
     try:
-        granted_count = await force_grant_daily_crystals(context)
+        granted_count = await force_grant_daily_crystals(context) # Já usava await
         feedback_text = f"✅ Executado! <b>{granted_count}</b> jogadores receberam os cristais diários."
     except Exception as e:
         logger.error(f"Erro ao forçar cristais diários via botão: {e}", exc_info=True)
         feedback_text = f"❌ Erro ao processar: {e}"
 
-    await _safe_edit_text(update, context, feedback_text, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]), parse_mode=HTML) # Adicionado parse_mode
+    # <<< CORREÇÃO 29: Adiciona await >>>
+    await _safe_edit_text(update, context, feedback_text, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
 
 async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Envia o menu principal do admin (usado como fallback)."""
@@ -427,10 +488,11 @@ async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def force_daily_crystals_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Força a entrega dos cristais diários (via comando)."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    # <<< CORREÇÃO 10: Adiciona await >>>
+    if not await ensure_admin(update): return
     await update.effective_message.reply_text("⏳ Processando entrega forçada de cristais...")
     try:
-        granted_count = await force_grant_daily_crystals(context)
+        granted_count = await force_grant_daily_crystals(context) # Já usava await
         await update.effective_message.reply_text(f"✅ Executado! <b>{granted_count}</b> jogadores receberam os cristais.", parse_mode=HTML)
     except Exception as e:
         logger.error(f"Erro ao forçar cristais diários via comando: {e}", exc_info=True)
@@ -439,51 +501,63 @@ async def force_daily_crystals_cmd(update: Update, context: ContextTypes.DEFAULT
 # --- Lógica da Conversa de Limpeza de Cache ---
 async def _cache_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Entrada para o menu de limpeza de cache."""
-    if not await ensure_admin(update): return ConversationHandler.END # Adicionado filtro
+    # <<< CORREÇÃO 30: Adiciona await >>>
+    if not await ensure_admin(update): return ConversationHandler.END
     keyboard = [
         [InlineKeyboardButton("👤 Limpar cache de UM jogador", callback_data="cache_clear_one")],
         [InlineKeyboardButton("🗑️ Limpar TODO o cache (Cuidado!)", callback_data="cache_clear_all_confirm")],
-        [InlineKeyboardButton("❌ Cancelar", callback_data="admin_main")], # Leva de volta ao menu principal
+        [InlineKeyboardButton("❌ Cancelar", callback_data="admin_main")],
     ]
-    text = "🧽 <b>Gerenciamento de Cache</b>\n\nEscolha uma opção:" # Corrigido para HTML
+    text = "🧽 <b>Gerenciamento de Cache</b>\n\nEscolha uma opção:"
+    # <<< CORREÇÃO 31: Adiciona await >>>
     await _safe_edit_text(update, context, text, InlineKeyboardMarkup(keyboard))
     return SELECT_CACHE_ACTION
 
 async def _cache_ask_for_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Pede o ID ou nome do jogador para limpar o cache."""
-    if not await ensure_admin(update): return ConversationHandler.END # Adicionado filtro
+    # <<< CORREÇÃO 32: Adiciona await >>>
+    if not await ensure_admin(update): return ConversationHandler.END
+    # <<< CORREÇÃO 33: Adiciona await >>>
     await _safe_answer(update)
-    await _safe_edit_text(update, context, "👤 Por favor, envie o <b>User ID</b> ou o <b>nome exato do personagem</b>.\n\nUse /cancelar para voltar.", parse_mode=HTML) # Corrigido para HTML
+    # <<< CORREÇÃO 34: Adiciona await >>>
+    await _safe_edit_text(update, context, "👤 Por favor, envie o <b>User ID</b> ou o <b>nome exato do personagem</b>.\n\nUse /cancelar para voltar.")
     return ASK_USER_FOR_CACHE_CLEAR
 
 async def _cache_clear_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Limpa o cache do jogador especificado."""
-    # O filtro já foi aplicado no MessageHandler que chama esta função
     target_input = update.message.text
     user_id, pdata, found_by = None, None, "ID/Nome"
     try:
         user_id = int(target_input)
-        pdata = get_player_data(user_id) # Tenta carregar para obter o nome
+        # <<< CORREÇÃO 35: Adiciona await >>>
+        pdata = await get_player_data(user_id)
         found_by = "ID"
     except ValueError:
-        found = find_player_by_name(target_input)
-        if found:
-            user_id, pdata = found
-            found_by = "Nome"
-    except Exception as e:
-        logger.error(f"Erro ao buscar jogador '{target_input}' em _cache_clear_user: {e}")
-        await update.message.reply_text("Ocorreu um erro ao buscar o jogador.")
-        await _send_admin_menu(update.effective_chat.id, context)
-        return ConversationHandler.END
+        try:
+             # <<< CORREÇÃO 36: Adiciona await >>>
+            found = await find_player_by_name(target_input)
+            # OU, se usar a função específica por nome:
+            # found_info = await find_player_by_character_name(target_input)
+            # found = (found_info['user_id'], found_info) if found_info else None
 
-    if pdata and user_id: # Garante que temos um ID para limpar
-        char_name = pdata.get('character_name', f'ID {user_id}') # Usa ID se nome não estiver disponível
-        was_in_cache = clear_player_cache(user_id)
-        msg = f"✅ Cache para <b>{char_name}</b> (<code>{user_id}</code>) foi limpo." if was_in_cache else f"ℹ️ Jogador <b>{char_name}</b> (<code>{user_id}</code>) encontrado, mas não estava no cache." # Corrigido para HTML
-        await update.message.reply_text(msg, parse_mode=HTML) # Corrigido para HTML
+            if found:
+                user_id, pdata = found
+                found_by = "Nome"
+        except Exception as e:
+            logger.error(f"Erro ao buscar jogador '{target_input}' em _cache_clear_user: {e}")
+            await update.message.reply_text("Ocorreu um erro ao buscar o jogador.")
+            await _send_admin_menu(update.effective_chat.id, context) # Já usa await
+            return ConversationHandler.END
+
+    if pdata and user_id:
+        char_name = pdata.get('character_name', f'ID {user_id}')
+        was_in_cache = clear_player_cache(user_id) # SÍNCRONO
+        msg = f"✅ Cache para <b>{char_name}</b> (<code>{user_id}</code>) foi limpo." if was_in_cache else f"ℹ️ Jogador <b>{char_name}</b> (<code>{user_id}</code>) encontrado, mas não estava no cache."
+        await update.message.reply_text(msg, parse_mode=HTML)
     else:
         await update.message.reply_text(f"❌ Não foi possível encontrar um jogador com o {found_by} fornecido.")
 
+    # <<< CORREÇÃO 37: Adiciona await >>>
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
 
@@ -500,36 +574,41 @@ async def _cache_confirm_clear_all(update: Update, context: ContextTypes.DEFAULT
 
 async def _cache_do_clear_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Limpa todo o cache de jogadores."""
-    if not await ensure_admin(update): return ConversationHandler.END # Adicionado filtro
+    # <<< CORREÇÃO 41: Adiciona await >>>
+    if not await ensure_admin(update): return ConversationHandler.END
+    # <<< CORREÇÃO 42: Adiciona await >>>
     await _safe_answer(update)
     try:
-        count = clear_all_player_cache()
-        await _safe_edit_text(update, context, f"🗑️ Cache completo foi limpo.\n({count} jogadores removidos da memória).") # Mensagem de sucesso simples
+        count = clear_all_player_cache() # SÍNCRONO
+        # <<< CORREÇÃO 43: Adiciona await >>>
+        await _safe_edit_text(update, context, f"🗑️ Cache completo foi limpo.\n({count} jogadores removidos da memória).")
     except Exception as e:
         logger.error(f"Erro ao limpar todo o cache: {e}", exc_info=True)
+        # <<< CORREÇÃO 44: Adiciona await >>>
         await _safe_edit_text(update, context, f"❌ Erro ao limpar o cache: {e}")
 
-    await _send_admin_menu(update.effective_chat.id, context) # Volta ao menu principal
+    # <<< CORREÇÃO 45: Adiciona await >>>
+    await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
 
 async def _cache_cancel_conv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancela a conversa de limpeza de cache."""
-    # O filtro já foi aplicado no CommandHandler que chama esta função
     await update.message.reply_text("Operação cancelada.")
+    # <<< CORREÇÃO 46: Adiciona await >>>
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
 
 # --- Comando de Inspeção de Itens ---
 async def inspect_item_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando de admin para inspecionar dados de um item."""
-    if not await ensure_admin(update): return # Adicionado filtro
+    # <<< CORREÇÃO 9: Adiciona await >>>
+    if not await ensure_admin(update): return
     if not context.args:
         await update.message.reply_text("Uso: /inspect_item <item_id>")
         return
     item_id = context.args[0]
-    # Usa .get() com fallback e garante que é um dict
     item_data_source = getattr(game_data, "ITEMS_DATA", {}) or {}
-    item_info = item_data_source.get(item_id)
+    item_info = item_data_source.get(item_id) # SÍNCRONO
     if item_info is None:
         info_str = f"ITEM '{item_id}' NÃO ENCONTRADO."
     else:
@@ -543,29 +622,26 @@ async def inspect_item_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # --- Comando FixMe ---
 async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Corrige o estado de um jogador afetado por bugs de level up anteriores.
-    """
+    """Corrige o estado de um jogador afetado por bugs de level up anteriores."""
     user_id = update.effective_user.id
     if user_id not in ADMIN_LIST:
         await update.message.reply_text("Você não tem permissão para usar este comando.")
         return
 
-    player_data = get_player_data(user_id)
+    # <<< CORREÇÃO 12: Adiciona await >>>
+    player_data = await get_player_data(user_id)
     if not player_data:
         await update.message.reply_text("Erro: Jogador não encontrado.")
         return
 
     try:
-        # AÇÃO 1: Zerar o XP atual
-        player_data['xp'] = 0
+        player_data['xp'] = 0 # SÍNCRONO
+        allowed = allowed_points_for_level(player_data) # SÍNCRONO
+        spent = compute_spent_status_points(player_data) # SÍNCRONO
+        player_data['stat_points'] = max(0, allowed - spent) # SÍNCRONO
 
-        # AÇÃO 2: Recalcular os pontos de atributo
-        allowed = allowed_points_for_level(player_data)
-        spent = compute_spent_status_points(player_data)
-        player_data['stat_points'] = max(0, allowed - spent)
-
-        save_player_data(user_id, player_data)
+        # <<< CORREÇÃO 13: Adiciona await >>>
+        await save_player_data(user_id, player_data)
 
         await update.message.reply_text(
             f"✅ Personagem corrigido!\n"
@@ -576,47 +652,40 @@ async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Erro ao executar /fixme para {user_id}: {e}", exc_info=True)
         await update.message.reply_text(f"Ocorreu um erro ao corrigir o personagem: {e}")
 
-
 # --- Comando MyData ---
 async def my_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Envia os dados do jogador como um ficheiro JSON para diagnóstico.
-    """
+    """Envia os dados do jogador como um ficheiro JSON para diagnóstico."""
     user_id = update.effective_user.id
-    if user_id not in ADMIN_LIST:
-        return # Sem mensagem para não alertar não-admins
+    if user_id not in ADMIN_LIST: return
 
-    player_data = get_player_data(user_id)
+    # <<< CORREÇÃO 11: Adiciona await >>>
+    player_data = await get_player_data(user_id)
     if not player_data:
         await update.message.reply_text("Não foi possível carregar os seus dados.")
         return
 
-    player_data_copy = player_data.copy() # Trabalha com uma cópia
+    player_data_copy = player_data.copy()
     player_data_copy.pop('_id', None)
 
-    # Converte os dados para uma string formatada
     try:
-        data_str = json.dumps(player_data_copy, indent=2, ensure_ascii=False)
+        data_str = json.dumps(player_data_copy, indent=2, ensure_ascii=False) # SÍNCRONO
     except Exception as e:
         logger.error(f"Erro ao serializar dados do jogador {user_id}: {e}")
         await update.message.reply_text("Erro ao formatar seus dados.")
         return
 
-    # Prepara a string para ser enviada como um ficheiro em memória
     json_bytes = data_str.encode('utf-8')
     input_file = io.BytesIO(json_bytes)
 
-    # Envia o ficheiro como um documento
     try:
-        await update.message.reply_document(
+        await update.message.reply_document( # Já usava await
             document=input_file,
-            filename=f"dados_{user_id}.json", # Nome de ficheiro mais específico
+            filename=f"dados_{user_id}.json",
             caption="Aqui estão os seus dados brutos para diagnóstico."
         )
     except Exception as e:
         logger.error(f"Erro ao enviar documento mydata para {user_id}: {e}")
         await update.message.reply_text("Erro ao enviar o ficheiro de dados.")
-
 
 # =========================================================
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
