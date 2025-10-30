@@ -69,24 +69,24 @@ async def craft_open_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     query = update.callback_query
     logger.info(f"Roteador de Forja ativado pelo callback: '{query.data}'")
-    await query.answer()
+    await query.answer() # Já estava correto
 
     if CRAFT_IMPL:
         try:
-            # Chama a função de destino passando os argumentos padrão 'update' e 'context'.
-            # Isso garante que a função chamada tenha acesso a todo o contexto da atualização.
+            # <<< CORREÇÃO: Adiciona await AQUI >>>
+            # CRAFT_IMPL (show_forge_professions_menu) é uma função async
             await CRAFT_IMPL(update, context)
-            return
+            return # Sai se a função foi chamada com sucesso
         except Exception as e:
             logger.exception(f"Falha ao executar a implementação da forja (CRAFT_IMPL): {e}")
-    
+
     # Mensagem de fallback caso CRAFT_IMPL não esteja definido ou ocorra um erro.
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")]
     ])
     error_text = "⚒️ **Erro na Forja** ⚒️\n\nNão foi possível iniciar o sistema de forja. Por favor, avise um administrador."
+    # <<< CORREÇÃO: Adiciona await AQUI >>> (já estava correto na definição)
     await _safe_edit_or_send(query, context, query.message.chat.id, error_text, kb)
-
 
 # --- Definição do Handler ---
 # Este handler captura os diferentes callbacks que podem iniciar o fluxo de forja.

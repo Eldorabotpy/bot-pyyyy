@@ -39,10 +39,10 @@ def _reset_class_one(p: dict) -> None:
 def _reset_prof_one(p: dict) -> None:
     p["profession"] = {}
 
-def _resolve_user_id(text: str) -> int | None:
+async def _resolve_user_id(text: str) -> int | None:
     text = (text or "").strip()
     if text.isdigit(): return int(text)
-    uid, _ = player_manager.find_player_by_name_norm(text) or (None, None)
+    uid, _ = await player_manager.find_player_by_name_norm(text) or (None, None)
     return uid
 
 # --- Funções da Conversa ---
@@ -103,14 +103,14 @@ async def _ask_player_for_idle_reset(update: Update, context: ContextTypes.DEFAU
 
 # Recebe o texto, encontra o jogador e executa o RESPEC
 async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    target_id = _resolve_user_id(update.message.text)
+    target_id = await _resolve_user_id(update.message.text)
     action = context.user_data.get('reset_action')
 
     if not target_id or not action:
         await update.message.reply_text("❌ Jogador não encontrado ou ação inválida. Tente novamente.")
         return ASKING_PLAYER_RESPEC
 
-    pdata = player_manager.get_player_data(target_id)
+    pdata = await player_manager.get_player_data(target_id)
     if not pdata:
         await update.message.reply_text("❌ Jogador não encontrado.")
         return ASKING_PLAYER_RESPEC
@@ -126,7 +126,7 @@ async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAU
         _reset_prof_one(pdata)
         summary.append("profissão")
 
-    player_manager.save_player_data(target_id, pdata)
+    await player_manager.save_player_data(target_id, pdata)
     await update.message.reply_text(f"✅ Reset de `{', '.join(summary)}` aplicado para o jogador `{target_id}`.")
     
     context.user_data.pop('reset_action', None)
@@ -136,12 +136,12 @@ async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAU
 
 # Recebe o texto, encontra o jogador e pede CONFIRMAÇÃO para destravar
 async def _receive_player_for_idle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    target_id = _resolve_user_id(update.message.text)
+    target_id = await _resolve_user_id(update.message.text)
     if not target_id:
         await update.message.reply_text("❌ Jogador não encontrado. Tente novamente.")
         return ASKING_PLAYER_IDLE
 
-    pdata = player_manager.get_player_data(target_id)
+    pdata = await player_manager.get_player_data(target_id)
     if not pdata:
         await update.message.reply_text("❌ Jogador não encontrado.")
         return ASKING_PLAYER_IDLE
@@ -168,9 +168,9 @@ async def _execute_idle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("❌ Erro: Alvo perdido. Comece novamente.")
         return ConversationHandler.END
 
-    pdata = player_manager.get_player_data(target_id)
+    pdata = await player_manager.get_player_data(target_id)
     pdata["player_state"] = {"action": "idle"}
-    player_manager.save_player_data(target_id, pdata)
+    await player_manager.save_player_data(target_id, pdata)
     
     await query.edit_message_text(f"✅ Estado do jogador <code>{target_id}</code> foi resetado para 'livre'.")
     context.user_data.pop('reset_target_id', None)
@@ -202,7 +202,7 @@ async def _reset_all_points_execute(update: Update, context: ContextTypes.DEFAUL
     total_recovered = 0
     for uid, pdata in player_manager.iter_players():
         total_recovered += _reset_points_one(pdata)
-        player_manager.save_player_data(uid, pdata)
+        await player_manager.save_player_data(uid, pdata)
         changed += 1
     
     await query.edit_message_text(f"✅ Pontos de <b>{changed}</b> jogadores foram resetados. Total recuperado: {total_recovered} pontos.")

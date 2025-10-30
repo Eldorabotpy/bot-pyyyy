@@ -14,20 +14,26 @@ async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     
-    player_data = player_manager.get_player_data(user_id)
-    player_class = player_data.get("class")
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+         # Adiciona um fallback se os dados do jogador não forem encontrados
+         await query.edit_message_caption(caption="Erro ao carregar dados. Tente /start.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]]))
+         return
+         
+    player_class = player_data.get("class") # Síncrono
     
     if not player_class:
         await query.answer("Você precisa de ter uma classe para mudar de aparência!", show_alert=True)
         return
 
+    # Lógica síncrona
     unlocked_skins = player_data.get("unlocked_skins", [])
     equipped_skin = player_data.get("equipped_skin")
     
     caption = "🎨 **Mudar Aparência**\n\nSelecione uma aparência que já desbloqueou para a equipar."
     keyboard = []
     
-    # Filtra o catálogo para mostrar apenas skins da classe do jogador que ele já desbloqueou
     available_skins = {skin_id: data for skin_id, data in SKIN_CATALOG.items() if data['class'] == player_class and skin_id in unlocked_skins}
     
     if not available_skins:
@@ -43,7 +49,16 @@ async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")])
-    await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    # Await já estava correto aqui
+    try:
+         await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    except Exception as e:
+         # Fallback se a mensagem original não tiver mídia
+         logger.warning(f"Falha ao editar caption em show_skin_menu (provavelmente era texto): {e}")
+         try:
+              await query.edit_message_text(text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+         except Exception as e_text:
+              logger.error(f"Falha crítica ao editar menu de skin: {e_text}")
 
 async def equip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -55,20 +70,26 @@ async def equip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.answer("Erro: Skin não especificada.", show_alert=True)
         return
         
-    player_data = player_manager.get_player_data(user_id)
-    
-    # Segurança: verifica se o jogador realmente possui a skin
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+         await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
+         return
+
+    # Segurança (síncrona)
     if skin_id_to_equip not in player_data.get("unlocked_skins", []):
         await query.answer("Você não possui esta aparência!", show_alert=True)
         return
         
-    player_data["equipped_skin"] = skin_id_to_equip
-    player_manager.save_player_data(user_id, player_data)
+    player_data["equipped_skin"] = skin_id_to_equip # Síncrono
+    
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
     
     await query.answer("Aparência equipada com sucesso!", show_alert=True)
     
-    # Atualiza o menu para mostrar o "✅" no sítio certo
-    await show_skin_menu(update, context)
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    await show_skin_menu(update, context) # Chama a função async
 
 # --- REGISTO DOS HANDLERS ---
 skin_menu_handler = CallbackQueryHandler(show_skin_menu, pattern=r"^skin_menu$")

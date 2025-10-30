@@ -64,26 +64,33 @@ def spend_gems(player_data: dict, amount: int) -> bool:
     set_gems(player_data, cur - amt)
     return True
 
-def _sanitize_and_migrate_gold(player_data: dict) -> None:
+async def _sanitize_and_migrate_gold(player_data: dict) -> bool:
+    """Migra ouro/gemas legados do inventário para campos de topo."""
     inv = player_data.get("inventory", {}) or {}
+    changed = False  # <<< ESTA LINHA CORRIGE O ERRO "changed" não está definido
+    
     raw_gold = inv.get(GOLD_KEY)
     
     try:
         player_data["gold"] = int(player_data.get("gold", 0))
     except Exception:
         player_data["gold"] = 0
+        
     if isinstance(raw_gold, (int, float)):
-        add_gold(player_data, int(raw_gold))
+        add_gold(player_data, int(raw_gold)) # Síncrono
         inv.pop(GOLD_KEY, None)
+        changed = True # Marca que mudou
 
     for gk in GEM_KEYS:
         raw_gems = inv.get(gk)
         if isinstance(raw_gems, (int, float)):
-            set_gems(player_data, get_gems(player_data) + int(raw_gems))
+            set_gems(player_data, get_gems(player_data) + int(raw_gems)) # Síncrono
             inv.pop(gk, None)
+            changed = True # Marca que mudou
 
     player_data["inventory"] = inv
-    
+    return changed
+
 # ========================================
 # INVENTÁRIO E ITENS
 # ========================================
@@ -208,13 +215,16 @@ def _get_unique_item_from_inventory(player_data: dict, unique_id: str) -> Option
     val = inv.get(unique_id)
     return val if is_unique_item_entry(val) else None
 
-def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot: Optional[str] = None) -> Tuple[bool, str]:
-    from .core import get_player_data, save_player_data # Importação local para evitar ciclos
+# <<< CORREÇÃO 1: Adiciona async def >>>
+async def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot: Optional[str] = None) -> Tuple[bool, str]:
+    from .core import get_player_data, save_player_data # Importação local (mantida)
     
-    pdata = get_player_data(user_id)
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    pdata = await get_player_data(user_id)
     if not pdata:
         return False, "Jogador não encontrado."
 
+    # Lógica síncrona
     item = _get_unique_item_from_inventory(pdata, unique_id)
     if not item:
         return False, "Item não encontrado no inventário."
@@ -238,6 +248,7 @@ def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot: Opti
     eq = pdata.setdefault("equipment", {})
     eq[slot_from_item] = unique_id
 
-    save_player_data(user_id, pdata)
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    await save_player_data(user_id, pdata)
     name = item.get("display_name") or base_id or "Item"
     return True, f"Equipado {name} em {slot_from_item}."

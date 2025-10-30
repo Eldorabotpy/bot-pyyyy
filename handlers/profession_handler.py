@@ -25,29 +25,31 @@ async def show_profession_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = q.from_user.id
     chat_id = q.message.chat_id
 
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        await _safe_edit_or_send(q, context, chat_id, "❌ Não encontrei seus dados. Use /start.")
+        await _safe_edit_or_send(q, context, chat_id, "❌ Não encontrei seus dados. Use /start.") # Já usa await
         return
 
+    # Síncrono (lê do pdata já carregado)
     if (pdata.get('profession') or {}).get('type'):
-        # Já tem profissão → não permite trocar, só informa
+        # Já tem profissão
         cur = pdata['profession']['type']
         name = game_data.PROFESSIONS_DATA.get(cur, {}).get('display_name', cur)
         txt = f"💼 Você já escolheu sua profissão: <b>{name}</b>."
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 Voltar ao Personagem", callback_data="profile")]])
-        await _safe_edit_or_send(q, context, chat_id, txt, kb)
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 Voltar ao Personagem", callback_data="profile")]]) # Assume 'profile'
+        await _safe_edit_or_send(q, context, chat_id, txt, kb) # Já usa await
         return
 
+    # Síncrono (construção de menu)
     title = "💼 <b>Escolher Profissão</b>\nSelecione uma profissão para desbloquear coletas e bônus.\n"
     kb = []
     for key, data in (game_data.PROFESSIONS_DATA or {}).items():
-        # só mostre as de coleta, se quiser (ou comente essa linha para listar todas)
-        # if data.get('category') != 'gathering': continue
+        # if data.get('category') != 'gathering': continue # Descomentar para filtrar
         kb.append([InlineKeyboardButton(_prof_label(key, data), callback_data=f"job_pick_{key}")])
-    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="profile")])
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]) # Assume 'profile'
 
-    await _safe_edit_or_send(q, context, chat_id, title, InlineKeyboardMarkup(kb))
+    await _safe_edit_or_send(q, context, chat_id, title, InlineKeyboardMarkup(kb)) # Já usa await
 
 async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Define a profissão (somente se ainda não houver uma) e volta ao Perfil."""
@@ -56,11 +58,13 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
     user_id = q.from_user.id
     chat_id = q.message.chat_id
 
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        await _safe_edit_or_send(q, context, chat_id, "❌ Não encontrei seus dados. Use /start.")
+        await _safe_edit_or_send(q, context, chat_id, "❌ Não encontrei seus dados. Use /start.") # Já usa await
         return
 
+    # Verificação síncrona
     if (pdata.get('profession') or {}).get('type'):
         await q.answer("Você já possui uma profissão.", show_alert=True)
         return
@@ -71,18 +75,21 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
         return
     prof_key = data[len(prefix):]
 
+    # Verificação síncrona
     if prof_key not in (game_data.PROFESSIONS_DATA or {}):
         await q.answer("Profissão inválida.", show_alert=True)
         return
 
+    # Modificação síncrona local
     pdata['profession'] = {"type": prof_key, "level": 1, "xp": 0}
-    player_manager.save_player_data(user_id, pdata)
+    
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    await player_manager.save_player_data(user_id, pdata)
 
     name = game_data.PROFESSIONS_DATA[prof_key].get('display_name', prof_key.capitalize())
     txt = f"✅ Profissão definida: <b>{name}</b>!"
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 Voltar ao Personagem", callback_data="profile")]])
-    await _safe_edit_or_send(q, context, chat_id, txt, kb)
-
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 Voltar ao Personagem", callback_data="profile")]]) # Assume 'profile'
+    await _safe_edit_or_send(q, context, chat_id, txt, kb) # Já usa await
 # exports
 job_menu_handler = CallbackQueryHandler(show_profession_menu, pattern=r'^job_menu$')
 job_pick_handler = CallbackQueryHandler(pick_profession_callback, pattern=r'^job_pick_[A-Za-z0-9_]+$')

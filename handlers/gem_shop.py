@@ -151,7 +151,7 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     base_id = st["base_id"]
     qty = max(1, int(st.get("qty", 1)))
 
-    pdata = player_manager.get_player_data(user_id) or {}
+    pdata = await player_manager.get_player_data(user_id) or {}
     gems_now = _gems(pdata)
 
     name = _label_for(base_id)
@@ -215,38 +215,44 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     buyer_id = q.from_user.id
-    chat_id = update.effective_chat.id
+    chat_id = update.effective_chat.id # Pega chat_id aqui
 
-    st = _state(context, buyer_id)
+    st = _state(context, buyer_id) # Síncrono
     base_id = st["base_id"]
     qty = max(1, int(st.get("qty", 1)))
 
+    # Verificação síncrona
     if base_id not in EVOLUTION_ITEMS:
         await q.answer("Item indisponível na loja de gemas.", show_alert=True); return
 
-    unit_price = _price_for(base_id)
+    unit_price = _price_for(base_id) # Síncrono
     total = unit_price * qty
 
-    buyer = player_manager.get_player_data(buyer_id)
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    buyer = await player_manager.get_player_data(buyer_id)
     if not buyer:
         await q.answer("Jogador não encontrado.", show_alert=True); return
 
+    # Verificação síncrona
     if _gems(buyer) < total:
         await q.answer("Gemas insuficientes.", show_alert=True); return
 
-    # cobra e entrega
+    # cobra e entrega (síncrono localmente)
     if not _spend_gems(buyer, total):
         await q.answer("Falha ao cobrar gemas.", show_alert=True); return
 
-    player_manager.add_item_to_inventory(buyer, base_id, qty)
-    player_manager.save_player_data(buyer_id, buyer)
+    player_manager.add_item_to_inventory(buyer, base_id, qty) # Síncrono
 
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    await player_manager.save_player_data(buyer_id, buyer)
+
+    # Usa edit_message_text diretamente
     await q.edit_message_text(
         text=f"✅ Você comprou {qty}× {_label_for(base_id)} por {total} 💎.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_shop")]]),
         parse_mode="HTML"
     )
-
+    
 # -------------------------------
 # Exports de handlers
 # -------------------------------

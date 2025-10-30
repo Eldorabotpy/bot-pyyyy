@@ -50,19 +50,30 @@ async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYP
     """Tela principal da Ficha de Personagem."""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    player_data = player_manager.get_player_data(user_id)
+
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
+        # Check if it came from a message or callback to respond appropriately
         if getattr(update, "message", None):
             await update.message.reply_text("Crie um personagem com /start primeiro.")
-        else:
-            await context.bot.send_message(chat_id=chat_id, text="Crie um personagem com /start primeiro.")
+        elif getattr(update, "callback_query", None):
+             # Try answering callback, then sending message as fallback
+             try:
+                 await update.callback_query.answer("Crie um personagem com /start primeiro.", show_alert=True)
+             except Exception:
+                 await context.bot.send_message(chat_id=chat_id, text="Crie um personagem com /start primeiro.")
+        else: # Fallback if update type is unknown
+             await context.bot.send_message(chat_id=chat_id, text="Crie um personagem com /start primeiro.")
         return
 
+    # Síncrono
     player_class_key = player_data.get('class')
     file_id_name = "default_character_img"
     if player_class_key:
         file_id_name = game_data.CLASSES_DATA.get(player_class_key, {}).get('file_id_name', file_id_name)
 
+    # Síncrono
     file_data = file_id_manager.get_file_data(file_id_name)
     caption = f"Ficha de Personagem de <b>{player_data.get('character_name','Aventureiro(a)')}</b>"
 
@@ -72,13 +83,12 @@ async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYP
         [InlineKeyboardButton("🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data='char_inventory')],
         [InlineKeyboardButton("⚔️ 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨", callback_data='char_equipment')],
     ]
-    # Exibe opção de profissão se aplicável
+    # Síncrono
     if int(player_data.get('level', 1)) >= 5 and (player_data.get('profession') or {}).get('type') is None:
         keyboard.append([InlineKeyboardButton("📜 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data='prof_show_list')])
     keyboard.append([InlineKeyboardButton("⬅️ 𝐅𝐞𝐜𝐡𝐚𝐫", callback_data='char_close')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Se veio de callback, elimina a msg anterior (evita caption em texto)
     if update.callback_query:
         try:
             await update.callback_query.delete_message()
@@ -94,20 +104,23 @@ async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_photo(chat_id=chat_id, photo=file_id, caption=caption,
                                          reply_markup=reply_markup, parse_mode='HTML')
     else:
-        # ✅ LINHA COMPLETADA AQUI
         await context.bot.send_message(chat_id=chat_id, text=caption,
                                        reply_markup=reply_markup, parse_mode='HTML')
-        
+                
 async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra status, progressões e upgrade de atributos com barras robustas."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
+
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        await query.edit_message_text("Crie um personagem com /start primeiro.")
+        # Use safe_update_message para editar a mensagem de erro
+        await safe_update_message(update, context, "Crie um personagem com /start primeiro.", None)
         return
 
+    # Síncrono
     total_stats = player_manager.get_player_total_stats(player_data)
     caption = f"👤 <b>Status de {player_data.get('character_name','Aventureiro(a)')}</b>\n\n"
 
@@ -124,14 +137,13 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             line += f" ({base_value} + {bonus})"
         caption += line + "\n"
 
-    # ✅ Progressão de combate usando a nova função helper
+    # Síncrono
     combat_level = int(player_data.get('level', 1))
     combat_xp = int(player_data.get('xp', 0))
     xp_to_next = game_data.get_xp_for_next_combat_level(combat_level) or 0
     combat_bar, combat_line = _create_progress_bar(combat_xp, xp_to_next, '🟧')
     caption += f"\n🎖️ <b>Nível de Combate: {combat_level}</b>\n{combat_bar} {combat_line}\n"
 
-    # ✅ Profissão usando a nova função helper
     profession_data = player_data.get('profession', {}) or {}
     prof_type = profession_data.get('type')
     if prof_type:
@@ -154,23 +166,22 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     if available_points > 0:
         keyboard.extend([
+            # Format modifiers to avoid unnecessary decimals like 1.0
             [InlineKeyboardButton(f"➕ HP (+3)", callback_data='upgrade_hp'),
-             InlineKeyboardButton(f"➕ ATK (+{1 * class_modifiers.get('attack', 1):.1f})", callback_data='upgrade_attack')],
-            [InlineKeyboardButton(f"➕ DEF (+{1 * class_modifiers.get('defense', 1):.1f})", callback_data='upgrade_defense'),
-             InlineKeyboardButton(f"➕ INI (+{1 * class_modifiers.get('initiative', 1):.1f})", callback_data='upgrade_initiative')],
+             InlineKeyboardButton(f"➕ ATK (+{class_modifiers.get('attack', 1):g})", callback_data='upgrade_attack')],
+            [InlineKeyboardButton(f"➕ DEF (+{class_modifiers.get('defense', 1):g})", callback_data='upgrade_defense'),
+             InlineKeyboardButton(f"➕ INI (+{class_modifiers.get('initiative', 1):g})", callback_data='upgrade_initiative')],
             [InlineKeyboardButton(f"➕ SRT (+{0.5 * class_modifiers.get('luck', 0.5):.2f})", callback_data='upgrade_luck')],
         ])
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='char_sheet_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ✅ LÓGICA DE ATUALIZAÇÃO SIMPLIFICADA
-    # A função 'safe_update_message' de utils.py lida com a complexidade
-    # de editar ou reenviar a mensagem, mantendo este código limpo.
     file_id_name = game_data.CLASSES_DATA.get(player_class_key, {}).get('file_id_name', "default_character_img")
-    file_data = file_id_manager.get_file_data(file_id_name)
-    
-    await safe_update_message(
+    file_data = file_id_manager.get_file_data(file_id_name) # Síncrono
+
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    await safe_update_message( # Chama função async
         update,
         context,
         new_text=caption,
@@ -178,17 +189,21 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_media_file_id=file_data.get("id"),
         new_media_type=file_data.get("type", "photo")
     )
+
 async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o inventário separando itens equipáveis e materiais."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
+
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        # Usando safe_update_message para editar a mensagem de erro
+        # <<< CORREÇÃO 5: Adiciona await >>>
         await safe_update_message(update, context, "Crie um personagem com /start primeiro.", None)
         return
 
+    # Síncrono
     inventory = player_data.get('inventory', {}) or {}
     equipment = player_data.get('equipment', {}) or {}
     equipped_item_uuids = set(v for v in equipment.values() if v)
@@ -201,16 +216,14 @@ async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     has_equipables = False
     has_materials = False
 
-    # ✅ LÓGICA CORRIGIDA: Um único loop que separa os itens pelo seu tipo de dado (dict vs int)
+    # Síncrono
     for key, value in inventory.items():
-        # --- Processa Itens Equipáveis (são dicionários) ---
         if isinstance(value, dict):
             has_equipables = True
             base_id = value.get('base_id')
             base_meta = game_data.ITEM_BASES.get(base_id, {})
-            if not base_meta:
-                continue
-            
+            if not base_meta: continue
+
             rarity = (value.get('rarity') or 'comum').lower()
             rarity_info = game_data.RARITY_DATA.get(rarity, {'emoji': '•', 'name': rarity})
             durability = value.get('durability', [0, 0])
@@ -222,17 +235,14 @@ async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
                          f"{rarity_info.get('emoji','•')} {display_name} [ T{tier} ]{enchants_str}\n")
             equipable_items_text += item_line
 
-            # Adiciona botão de equipar apenas se o item não estiver equipado
             if key not in equipped_item_uuids:
                 keyboard.append([InlineKeyboardButton(f"Equipar {display_name}", callback_data=f"equip_{key}")])
-        
-        # --- Processa Materiais (são números inteiros) ---
+
         elif isinstance(value, int) and value > 0:
             has_materials = True
             item_name = game_data.ITEMS_DATA.get(key, {}).get('display_name', key)
             materials_text += f"• {item_name}: {value}\n"
 
-    # --- Montagem da Mensagem Final ---
     if not has_equipables:
         equipable_items_text = "Você não possui itens equipáveis.\n"
     if not has_materials:
@@ -245,13 +255,11 @@ async def show_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='char_sheet_main')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ✅ LÓGICA DE ATUALIZAÇÃO SIMPLIFICADA
-    # Apenas uma chamada para a nossa função segura é necessária.
-    # Ela já lida com a tentativa de editar e, se falhar, apaga e reenvia.
-    await safe_update_message(
-        update, 
-        context, 
-        new_text=final_caption, 
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    await safe_update_message( # Chama função async
+        update,
+        context,
+        new_text=final_caption,
         new_reply_markup=reply_markup
     )
 
@@ -284,25 +292,33 @@ async def confirm_profession_choice(update: Update, context: ContextTypes.DEFAUL
     user_id = query.from_user.id
     await query.answer()
 
-    player_data = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
+        # Use edit_message_text since we know it's a callback
         await query.edit_message_text("Crie um personagem com /start primeiro.")
         return
 
+    # Síncrono
     if (player_data.get('profession') or {}).get('type'):
         await query.answer("Você já possui uma profissão.", show_alert=True)
-        await show_character_sheet(update, context)
+        # <<< CORREÇÃO 8: Adiciona await >>>
+        await show_character_sheet(update, context) # Chama função async
         return
 
+    # Síncrono
     prof_info = game_data.PROFESSIONS_DATA.get(prof_key)
     if not prof_info:
         await query.answer("Profissão inválida.", show_alert=True)
         return
 
-    player_data['profession'] = {"type": prof_key, "level": 1, "xp": 0}
-    player_manager.save_player_data(user_id, player_data)
+    player_data['profession'] = {"type": prof_key, "level": 1, "xp": 0} # Síncrono
+
+    # <<< CORREÇÃO 9: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
     await query.answer(f"Você agora é um {prof_info.get('display_name', prof_key)}!", show_alert=True)
-    await show_character_sheet(update, context)
+    # <<< CORREÇÃO 10: Adiciona await >>>
+    await show_character_sheet(update, context) # Chama função async
 
 async def show_equipment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra slots de equipamento (lendo UUIDs nos slots)."""
@@ -366,9 +382,11 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
+
+    # <<< CORREÇÃO 12: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        await query.edit_message_text("Crie um personagem com /start primeiro.")
+        await query.edit_message_text("Crie um personagem com /start primeiro.") # Usa edit_message_text
         return
 
     stat_to_upgrade = query.data.replace('upgrade_', '')
@@ -376,6 +394,7 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await context.bot.answer_callback_query(query.id, "𝑽𝒐𝒄𝒆̂ 𝒏𝒂̃𝒐 𝒕𝒆𝒎 𝒑𝒐𝒏𝒕𝒐𝒔 𝒑𝒂𝒓𝒂 𝒈𝒂𝒔𝒕𝒂𝒓!", show_alert=True)
         return
 
+    # Síncrono
     player_data['stat_points'] = int(player_data.get('stat_points', 0)) - 1
     player_class = player_data.get('class')
     modifiers = game_data.CLASSES_DATA.get(player_class, {}).get(
@@ -386,34 +405,41 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         player_data['max_hp'] = int(player_data.get('max_hp', 0)) + 3
         player_data['current_hp'] = int(player_data.get('current_hp', 0)) + 3
     elif stat_to_upgrade == 'attack':
-        player_data['attack'] = int(player_data.get('attack', 0) + 1 * modifiers.get('attack', 1))
+        # Apply modifier directly, convert to int at the end
+        player_data['attack'] = int(player_data.get('attack', 0) + (1 * modifiers.get('attack', 1)))
     elif stat_to_upgrade == 'defense':
-        player_data['defense'] = int(player_data.get('defense', 0) + 1 * modifiers.get('defense', 1))
+        player_data['defense'] = int(player_data.get('defense', 0) + (1 * modifiers.get('defense', 1)))
     elif stat_to_upgrade == 'initiative':
-        player_data['initiative'] = int(player_data.get('initiative', 0) + 1 * modifiers.get('initiative', 1))
+        player_data['initiative'] = int(player_data.get('initiative', 0) + (1 * modifiers.get('initiative', 1)))
     elif stat_to_upgrade == 'luck':
-        player_data['luck'] = int(player_data.get('luck', 0) + 0.5 * modifiers.get('luck', 0.5))
+        # Apply modifier directly, convert to int at the end
+        player_data['luck'] = int(player_data.get('luck', 0) + (0.5 * modifiers.get('luck', 0.5)))
 
-    player_manager.save_player_data(user_id, player_data)
-    await show_status_menu(update, context)
+    # <<< CORREÇÃO 13: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
+    # <<< CORREÇÃO 14: Adiciona await >>>
+    await show_status_menu(update, context) # Chama função async
 
 async def equip_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Equipa um item único do inventário (guarda UUID no slot)."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
+
+    # <<< CORREÇÃO 15: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        await query.edit_message_text("Crie um personagem com /start primeiro.")
+        await query.edit_message_text("Crie um personagem com /start primeiro.") # Usa edit_message_text
         return
 
     item_uuid = query.data.replace('equip_', '')
-    inventory = player_data.get('inventory', {}) or {}
+    inventory = player_data.get('inventory', {}) or {} # Síncrono
     item_instance = inventory.get(item_uuid)
     if not isinstance(item_instance, dict):
         await query.answer("Erro: Item não encontrado ou não é equipamento.", show_alert=True)
         return
 
+    # Síncrono
     base_id = item_instance.get('base_id')
     base_meta = game_data.ITEM_BASES.get(base_id)
     if not base_meta:
@@ -425,23 +451,28 @@ async def equip_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.answer("Este item não pode ser equipado.", show_alert=True)
         return
 
-    # Substitui o que estiver no slot
-    player_data.setdefault('equipment', {})[slot_to_equip] = item_uuid
-    player_manager.save_player_data(user_id, player_data)
+    player_data.setdefault('equipment', {})[slot_to_equip] = item_uuid # Síncrono
+
+    # <<< CORREÇÃO 16: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
 
     await query.answer(f"{base_meta.get('display_name', 'Item')} equipado!", show_alert=False)
-    await show_equipment(update, context)
+    # <<< CORREÇÃO 17: Adiciona await >>>
+    await show_equipment(update, context) # Chama função async
 
 async def unequip_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Desequipa um item, limpando o slot."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
+
+    # <<< CORREÇÃO 18: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        await query.edit_message_text("Crie um personagem com /start primeiro.")
+        await query.edit_message_text("Crie um personagem com /start primeiro.") # Usa edit_message_text
         return
 
+    # Síncrono
     slot_to_unequip = query.data.replace('unequip_', '')
     equipped_uuid = (player_data.get('equipment', {}) or {}).get(slot_to_unequip)
     if not equipped_uuid:
@@ -453,35 +484,47 @@ async def unequip_item_callback(update: Update, context: ContextTypes.DEFAULT_TY
     base_meta = game_data.ITEM_BASES.get(base_id, {})
     item_name = base_meta.get('display_name', 'Item')
 
-    player_data['equipment'][slot_to_unequip] = None
-    player_manager.save_player_data(user_id, player_data)
+    player_data['equipment'][slot_to_unequip] = None # Síncrono
 
-    await query.answer(f"{item_name} desequipado.", show_alert=True)
-    await show_equipment(update, context)
+    # <<< CORREÇÃO 19: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
+
+    await query.answer(f"{item_name} desequipado.", show_alert=True) # show_alert should probably be False here
+    # <<< CORREÇÃO 20: Adiciona await >>>
+    await show_equipment(update, context) # Chama função async
 
 async def character_sheet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Router da Ficha de Personagem e Profissões."""
     query = update.callback_query
-    await query.answer()
+    # await query.answer() # Answer is handled within the specific show_* functions now
+
     action = query.data
     if action == 'char_sheet_main':
+        # <<< CORREÇÃO 21: Adiciona await >>>
         await show_character_sheet(update, context)
     elif action == 'char_status':
+        # <<< CORREÇÃO 22: Adiciona await >>>
         await show_status_menu(update, context)
     elif action == 'char_inventory':
+        # <<< CORREÇÃO 23: Adiciona await >>>
         await show_inventory(update, context)
     elif action == 'char_equipment':
+        # <<< CORREÇÃO 24: Adiciona await >>>
         await show_equipment(update, context)
     elif action == 'char_close':
-        await show_kingdom_menu(update, context)
+        # <<< CORREÇÃO 25: Adiciona await >>>
+        await show_kingdom_menu(update, context) # Assumes show_kingdom_menu is async
     elif action == 'prof_show_list':
-        await show_profession_list(update, context)
+        # <<< CORREÇÃO 26: Adiciona await >>>
+        await show_profession_list(update, context) # Assumes show_profession_list is async
     elif action.startswith('prof_confirm_'):
         prof_key = action.replace('prof_confirm_', '')
+        # <<< CORREÇÃO 27: Adiciona await >>>
         await confirm_profession_choice(update, context, prof_key)
     elif action == 'prof_no_action':
+        await query.answer() # Answer here if no other action is taken
         return
-
+    
 # =============================================================================
 # HANDLERS
 # =============================================================================

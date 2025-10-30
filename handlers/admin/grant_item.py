@@ -126,10 +126,12 @@ async def receive_target_player(update: Update, context: ContextTypes.DEFAULT_TY
     # Tenta encontrar por ID primeiro
     try:
         user_id = int(target_input)
-        pdata = player_manager.get_player_data(user_id)
+        # <<< CORREÇÃO 1: Adiciona await >>>
+        pdata = await player_manager.get_player_data(user_id)
     except ValueError:
         # Se não for ID, tenta por nome
-        found = player_manager.find_player_by_name(target_input)
+        # <<< CORREÇÃO 2: Adiciona await >>>
+        found = await player_manager.find_player_by_name(target_input)
         if found:
             user_id, pdata = found
         else:
@@ -174,55 +176,54 @@ async def dispatch_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     item_id = context.user_data['grant_item_id']
     quantity = context.user_data['grant_quantity']
 
-    print(f"\n>>> DEBUG GRANT: Tentando entregar {quantity}x '{item_id}' para {user_id}") # <-- NOVO
+    print(f"\n>>> DEBUG GRANT: Tentando entregar {quantity}x '{item_id}' para {user_id}")
 
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-         print(f">>> DEBUG GRANT: ERRO - pdata não encontrado para {user_id}") # <-- NOVO
-         await query.edit_message_text("❌ Erro crítico: Não foi possível carregar os dados do jogador para adicionar o item.")
-         context.user_data.clear()
-         return ConversationHandler.END
+        print(f">>> DEBUG GRANT: ERRO - pdata não encontrado para {user_id}")
+        await query.edit_message_text("❌ Erro crítico: Não foi possível carregar os dados do jogador para adicionar o item.")
+        context.user_data.clear()
+        return ConversationHandler.END
 
-    # Mostra o inventário ANTES
-    inventory_before = pdata.get('inventory', {}).copy() # Copia para evitar problemas de referência
-    print(f">>> DEBUG GRANT: Inventário ANTES de add_item: {inventory_before.get(item_id, 0)} (Total keys: {len(inventory_before)})") # <-- NOVO
+    inventory_before = pdata.get('inventory', {}).copy()
+    print(f">>> DEBUG GRANT: Inventário ANTES de add_item: {inventory_before.get(item_id, 0)} (Total keys: {len(inventory_before)})")
 
-    try: # Adiciona try/except para a adição
-        # CHAMA A FUNÇÃO PARA ADICIONAR
+    try: 
+        # (Isto está CORRETO - add_item_to_inventory é síncrono, só mexe no pdata)
         player_manager.add_item_to_inventory(pdata, item_id, quantity)
 
-        # Mostra o inventário DEPOIS (no dicionário pdata)
         inventory_after = pdata.get('inventory', {})
-        print(f">>> DEBUG GRANT: Inventário DEPOIS de add_item (em pdata): {inventory_after.get(item_id, 0)} (Total keys: {len(inventory_after)})") # <-- NOVO
+        print(f">>> DEBUG GRANT: Inventário DEPOIS de add_item (em pdata): {inventory_after.get(item_id, 0)} (Total keys: {len(inventory_after)})")
 
     except Exception as e_add:
         logger.error(f"Erro durante add_item_to_inventory: {e_add}", exc_info=True)
-        print(f">>> DEBUG GRANT: ERRO em add_item_to_inventory: {e_add}") # <-- NOVO
+        print(f">>> DEBUG GRANT: ERRO em add_item_to_inventory: {e_add}")
         await query.edit_message_text(f"❌ Erro ao tentar adicionar o item ao inventário: {e_add}")
         context.user_data.clear()
         return ConversationHandler.END
 
-    try: # Adiciona try/except para o save
-        # CHAMA A FUNÇÃO PARA SALVAR
-        print(f">>> DEBUG GRANT: Chamando save_player_data para {user_id}...") # <-- NOVO
-        player_manager.save_player_data(user_id, pdata)
-        print(f">>> DEBUG GRANT: save_player_data concluído.") # <-- NOVO
-
-        # Podes adicionar uma verificação extra lendo do DB novamente aqui, se necessário
+    try: 
+        print(f">>> DEBUG GRANT: Chamando save_player_data para {user_id}...")
+        
+        # <<< CORREÇÃO 4: Adiciona await (O ERRO PRINCIPAL ESTAVA AQUI) >>>
+        await player_manager.save_player_data(user_id, pdata)
+        
+        print(f">>> DEBUG GRANT: save_player_data concluído.")
 
     except Exception as e_save:
         logger.error(f"Erro durante save_player_data: {e_save}", exc_info=True)
-        print(f">>> DEBUG GRANT: ERRO em save_player_data: {e_save}") # <-- NOVO
+        print(f">>> DEBUG GRANT: ERRO em save_player_data: {e_save}")
         await query.edit_message_text(f"❌ Erro ao tentar salvar os dados do jogador: {e_save}")
         context.user_data.clear()
         return ConversationHandler.END
 
     # --- Mensagem de sucesso ---
-    item_name = game_data.ITEMS_DATA.get(item_id, {}).get('display_name', item_id) # Mais seguro
-    target_name = context.user_data.get('grant_target_name', f"ID: {user_id}") # Mais seguro
+    item_name = game_data.ITEMS_DATA.get(item_id, {}).get('display_name', item_id)
+    target_name = context.user_data.get('grant_target_name', f"ID: {user_id}")
 
     await query.edit_message_text(f"✅ Sucesso! {quantity}x '{item_name}' foram entregues a {target_name}.")
-    print(f">>> DEBUG GRANT: Mensagem de sucesso enviada.") # <-- NOVO
+    print(f">>> DEBUG GRANT: Mensagem de sucesso enviada.")
 
     context.user_data.clear()
     return ConversationHandler.END

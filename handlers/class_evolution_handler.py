@@ -109,19 +109,19 @@ def _all_options_for_class(curr_class_key: str) -> List[dict]:
 
 # ============ Renders ============
 
-# Em handlers/class_evolution_handler.py
-
 async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_new: bool = False) -> None:
     user_id = update.effective_user.id
-    pdata = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id) or {}
 
+    # Síncrono
     curr_key = (pdata.get("class") or pdata.get("class_tag") or "").lower()
     curr_cfg = _CLASSES_DATA.get(curr_key, {})
     curr_emoji = curr_cfg.get("emoji", "🧬")
     curr_name = curr_cfg.get("display_name", (pdata.get("class") or "—").title())
     lvl = _level(pdata)
 
-    opts = _all_options_for_class(curr_key)
+    opts = _all_options_for_class(curr_key) # Síncrono
     logger.info("[EVOL] user=%s class=%s lvl=%s options_all=%s", user_id, curr_key, lvl, len(opts))
 
     header = [
@@ -131,7 +131,6 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         ""
     ]
 
-    # Bloco para quando não há evoluções disponíveis
     if not opts:
         text = "\n".join(header + [
             "Não há ramos de evolução configurados para sua classe atual.",
@@ -146,10 +145,10 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         await update.effective_chat.send_message(text, reply_markup=_footer_keyboard(), parse_mode="HTML")
         return
 
-    # Constrói uma única mensagem com todas as opções
     full_text_parts = header
     full_keyboard = []
 
+    # Síncrono
     for op in opts:
         to_key = op["to"]
         to_cfg = _CLASSES_DATA.get(to_key, {})
@@ -165,31 +164,29 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         if op.get("desc"):
             full_text_parts.append(f"• {op['desc']}")
 
-        # Mostra a nova habilidade desbloqueada
         skill_id = op.get("unlocks_skill")
         if skill_id and skill_id in skills_data.SKILL_DATA:
             skill_info = skills_data.SKILL_DATA[skill_id]
             skill_name = skill_info.get("display_name", "Habilidade")
             skill_desc = skill_info.get("description", "")
             full_text_parts.append(f"🎁 <b>Habilidade:</b> {skill_name} - <i>{skill_desc}</i>")
-        
+
         full_text_parts.append("\n<b>Requisitos:</b>")
-        full_text_parts.extend([f"  {ln}" for ln in req_lines])
-        
+        full_text_parts.extend([f"   {ln}" for ln in req_lines])
+
         if eligible:
             full_keyboard.append([InlineKeyboardButton(f"⚡ Evoluir para {to_name}", callback_data=f"evo_do:{to_key}")])
         else:
             full_keyboard.append([InlineKeyboardButton("❌ Requisitos Pendentes", callback_data="evo_refresh")])
-        
-        full_text_parts.append("") # Espaçamento
+
+        full_text_parts.append("")
 
     full_text_parts.append("──────────")
-    full_keyboard.extend(_footer_keyboard().inline_keyboard)
+    full_keyboard.extend(_footer_keyboard().inline_keyboard) # Síncrono
 
     final_text = "\n".join(full_text_parts)
     final_keyboard = InlineKeyboardMarkup(full_keyboard)
 
-    # Lógica para enviar ou editar a mensagem única
     query = update.callback_query
     if query and not as_new:
         try:
@@ -199,8 +196,12 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
             except Exception: pass
             await update.effective_chat.send_message(final_text, reply_markup=final_keyboard, parse_mode="HTML")
     else:
+        # Se for mensagem nova (as_new=True), apaga a anterior se for callback
+        if query:
+             try: await query.delete_message()
+             except Exception: pass
         await update.effective_chat.send_message(final_text, reply_markup=final_keyboard, parse_mode="HTML")
-
+        
 # ============ Actions ============
 
 async def open_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -246,7 +247,7 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _, to_key = query.data.split(":", 1)
 
     # 1. Chama o nosso serviço para iniciar a provação (ele consome os itens)
-    result = class_evolution_service.start_evolution_trial(user_id, to_key)
+    result = await class_evolution_service.start_evolution_trial(user_id, to_key)
 
     # Se falhar (falta de itens, etc.), avisa o jogador
     if not result.get("success"):
@@ -277,7 +278,7 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 3. Inicia o combate
-    pdata = player_manager.get_player_data(user_id)
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata: # <<< ADICIONADO: Verificação se pdata foi carregado >>>
          await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
          return
@@ -301,7 +302,7 @@ async def do_evolution(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     pdata["player_state"] = {"action": "in_combat", "details": combat_details}
-    player_manager.save_player_data(user_id, pdata)
+    await player_manager.save_player_data(user_id, pdata)
 
     # Envia a mensagem de combate
     caption = format_combat_message(pdata) # Assume que esta função existe e funciona

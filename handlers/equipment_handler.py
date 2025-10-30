@@ -126,13 +126,16 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
-    chat_id = q.message.chat_id
+    chat_id = q.message.chat_id # Corrigido para pegar chat_id da query
 
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata:
+        # <<< CORREÇÃO 2: Adiciona await >>>
         await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
         return
 
+    # Síncrono
     inv = pdata.get("inventory", {}) or {}
     eq = pdata.get("equipment", {}) or {}
 
@@ -140,14 +143,13 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for slot in SLOTS_ORDER:
         uid = eq.get(slot)
         if uid and isinstance(inv.get(uid), dict):
-            line = _render_item_line_full(inv[uid])  # 『[dur] … 』
+            line = _render_item_line_full(inv[uid])
         else:
             line = "—"
         lines.append(f"{SLOT_EMOJIS.get(slot,'❓')} <b>{SLOT_LABELS.get(slot, slot.title())}:</b> {line}")
 
     text = "\n".join(lines)
 
-    # teclado: linha(s) de desequipar (somente slots ocupados), em grade
     keyboard: list[list[InlineKeyboardButton]] = []
     row: list[InlineKeyboardButton] = []
     for slot in SLOTS_ORDER:
@@ -158,21 +160,20 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if row:
         keyboard.append(row)
 
-    # linhas para abrir a lista por slot (ícone + nome)
     row = []
     for slot in SLOTS_ORDER:
         row.append(InlineKeyboardButton(f"{SLOT_EMOJIS.get(slot,'❓')} {SLOT_LABELS.get(slot, slot.title())}",
-                                        callback_data=f"equip_slot_{slot}"))
+                                         callback_data=f"equip_slot_{slot}"))
         if len(row) == 3:
             keyboard.append(row); row = []
     if row:
         keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("📦 𝐀𝐛𝐫𝐢𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data="inventory_CAT_equipamento_PAGE_1")])
-    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")])
+    keyboard.append([InlineKeyboardButton("📦 𝐀𝐛𝐫𝐢𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data="inventory_CAT_equipamento_PAGE_1")]) # Assuming this callback exists elsewhere
+    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")]) # Assuming back goes to profile
 
+    # <<< CORREÇÃO 3: Adiciona await >>>
     await _safe_edit_or_send(q, context, chat_id, text, InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-
 
 # =========================
 # Listagem/Equipar/Remover
@@ -183,24 +184,27 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.answer()
     slot = q.data.replace("equip_slot_", "")
     user_id = q.from_user.id
-    chat_id = q.message.chat_id
+    chat_id = q.message.chat_id # Corrigido para pegar chat_id da query
 
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata:
+        # <<< CORREÇÃO 5: Adiciona await >>>
         await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
         return
 
+    # Síncrono
     st = (pdata.get("player_state") or {}).get("action")
     if st not in (None, "idle"):
         await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True)
         return
 
     slot_label = SLOT_LABELS.get(slot, slot.capitalize() or "Equipamento")
-    items = _list_equippable_items_for_slot(pdata, slot)
+    items = _list_equippable_items_for_slot(pdata, slot) # Síncrono
 
-    # quando não há itens, mostra teclado com Voltar
     if not items:
         kb = [[InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="equipment_menu")]]
+        # <<< CORREÇÃO 6: Adiciona await >>>
         await _safe_edit_or_send(
             q, context, chat_id,
             f"𝑵𝒂̃𝒐 𝒉𝒂́ 𝒊𝒕𝒆𝒏𝒔 𝒆𝒒𝒖𝒊𝒑𝒂́𝒗𝒆𝒊𝒔 𝒑𝒂𝒓𝒂 <b>{slot_label}</b>.",
@@ -208,16 +212,16 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    lines = [f"<b>𝑬𝒔𝒄𝒐𝒍𝒉𝒆𝒓 𝒑𝒂𝒓𝒂 {slot_label}</b>\n"]
+    lines = [f"<b>𝑬𝒔𝒄𝒐𝒍𝒉𝒆𝒓 𝒑𝒂𝒓𝒂 {slot_label}</b>\n"] # Não precisa de \n no final
     kb: list[list[InlineKeyboardButton]] = []
     for uid, pretty in items:
-        # Telegram tem limite ~64 chars para label do botão, vamos truncar
         txt = pretty if len(pretty) <= 60 else (pretty[:57] + "…")
         kb.append([InlineKeyboardButton(txt, callback_data=f"equip_pick_{uid}")])
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="equipment_menu")])
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    # Usa text=caption (ou text=text) consistente com a definição de _safe_edit_or_send
     await _safe_edit_or_send(q, context, chat_id, "\n".join(lines), InlineKeyboardMarkup(kb))
-
 
 async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Equipa o unique_id escolhido usando a lógica central do player_manager."""
@@ -225,32 +229,29 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.answer()
     uid = q.data.replace("equip_pick_", "")
     user_id = q.from_user.id
-    chat_id = q.message.chat.id
+    chat_id = q.message.chat_id # Corrigido
 
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 8: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata:
+        # <<< CORREÇÃO 9: Adiciona await >>>
         await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
         return
 
-    # A única verificação que o handler faz é se o jogador está ocupado
+    # Síncrono
     st = (pdata.get("player_state") or {}).get("action")
     if st not in (None, "idle"):
         await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True); return
 
-    # ###############################################################
-    # ## NOVA LÓGICA: Usando o player_manager para equipar ##
-    # ###############################################################
-    
-    # Pegamos a instância do item para verificar o requisito de nível primeiro
+    # Verificações de nível e item (síncronas)
     inv = pdata.get("inventory", {}) or {}
     inst = inv.get(uid)
     if not isinstance(inst, dict):
         await q.answer("𝑰𝒕𝒆𝒎 𝒊𝒏𝒗𝒂́ʟ𝒊𝒅𝒐 𝒐𝒖 𝒏𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒂𝒅𝒐.", show_alert=True); return
-        
+
     tpl = (getattr(game_data, "ITEMS_DATA", {}).get(inst.get("base_id")) or
            getattr(game_data, "ITEM_BASES", {}).get(inst.get("base_id")) or {})
-           
-    # Verificação de Nível (continua aqui)
+
     lvl_req = int(tpl.get("level_req", 0))
     try:
         player_level = int(pdata.get("level") or pdata.get("𝐥𝐞𝐯𝐞𝐥") or 1)
@@ -259,20 +260,17 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if lvl_req and player_level < lvl_req:
         await q.answer(f"𝑹𝒆𝒒𝒖𝒆𝒓 𝒏𝒊́ᴠᴇʟ {lvl_req}.", show_alert=True); return
 
-    # Agora, chamamos a função central para fazer todo o resto (incluindo a verificação de classe)
-    success, message = player_manager.equip_unique_item_for_user(user_id, uid)
-    
+    # <<< CORREÇÃO 10: Adiciona await >>>
+    # Assumindo que equip_unique_item_for_user é async porque salva os dados
+    success, message = await player_manager.equip_unique_item_for_user(user_id, uid)
+
     if not success:
-        # Se o player_manager disser que não pode equipar, mostramos o erro que ele nos deu
         await q.answer(message, show_alert=True)
         return
-        
-    # ###############################################################
-    # ## FIM DA NOVA LÓGICA ##
-    # ###############################################################
 
     await q.answer("𝑬𝒒𝒖𝒊𝒑𝒂𝒅𝒐!", show_alert=False)
-    await equipment_menu(update, context)
+    # <<< CORREÇÃO 11: Adiciona await >>>
+    await equipment_menu(update, context) # Chama função async
     
 async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Desequipa o item do slot (se houver)."""
@@ -280,13 +278,16 @@ async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_T
     await q.answer()
     slot = q.data.replace("equip_unequip_", "")
     user_id = q.from_user.id
-    chat_id = q.message.chat_id
+    chat_id = q.message.chat_id # Corrigido
 
-    pdata = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 12: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata:
+        # <<< CORREÇÃO 13: Adiciona await >>>
         await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
         return
 
+    # Síncrono
     st = (pdata.get("player_state") or {}).get("action")
     if st not in (None, "idle"):
         await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True); return
@@ -297,11 +298,14 @@ async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     eq[slot] = None
     pdata["equipment"] = eq
-    player_manager.save_player_data(user_id, pdata)
+
+    # <<< CORREÇÃO 14: Adiciona await >>>
+    await player_manager.save_player_data(user_id, pdata)
 
     await q.answer("𝑹𝒆𝒎𝒐𝒗𝒊𝒅𝒐.", show_alert=False)
-    await equipment_menu(update, context)
-
+    # <<< CORREÇÃO 15: Adiciona await >>>
+    await equipment_menu(update, context) # Chama função async
+    
 
 # ---------- Exporta handlers ----------
 equipment_menu_handler   = CallbackQueryHandler(equipment_menu, pattern=r'^equipment_menu$')

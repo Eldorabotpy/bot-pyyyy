@@ -10,7 +10,9 @@ async def combat_potion_menu_callback(update: Update, context: ContextTypes.DEFA
     """Mostra a lista de poções disponíveis em combate."""
     query = update.callback_query
     await query.answer()
-    player_data = player_manager.get_player_data(query.from_user.id)
+    
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    player_data = await player_manager.get_player_data(query.from_user.id)
     inventory = player_data.get("inventory", {})
     
     potion_buttons = []
@@ -36,12 +38,14 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
         await query.answer("Erro ao usar o item.", show_alert=True)
         return
 
-    player_data = player_manager.get_player_data(user_id)
+    # <<< CORREÇÃO 2: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     
     # Etapa 1: Tenta consumir o item ANTES de aplicar o efeito.
     if not player_manager.remove_item_from_inventory(player_data, item_id_to_use, 1):
         await query.answer("Você não tem este item para usar!", show_alert=True)
         # Atualiza o menu caso o item tenha acabado
+        # <<< CORREÇÃO 3: Adiciona await (pois está a chamar uma função async) >>>
         await combat_potion_menu_callback(update, context) 
         return
 
@@ -64,7 +68,6 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
     elif 'add_xp' in effects:
         xp_amount = effects['add_xp']
         player_data['xp'] = player_data.get('xp', 0) + xp_amount
-        # ✨ CORREÇÃO: Chama a verificação de level up ✨
         niveis, pontos, level_up_msg = player_manager.check_and_apply_level_up(player_data)
         
         feedback_message = f"Você usou {item_info.get('display_name')} e ganhou {xp_amount} XP!"
@@ -81,7 +84,9 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
         await query.answer("Esta poção não tem um efeito reconhecido.", show_alert=True)
         # Devolve o item, já que não teve efeito
         player_manager.add_item_to_inventory(player_data, item_id_to_use, 1)
-        player_manager.save_player_data(user_id, player_data)
+        
+        # <<< CORREÇÃO 4: Adiciona await >>>
+        await player_manager.save_player_data(user_id, player_data)
         return
 
     # Adiciona a ação ao log de combate
@@ -90,12 +95,14 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
         state['details']['battle_log'].append(f"✨ {feedback_message.splitlines()[0]}")
 
     # Salva os dados do jogador com os efeitos aplicados
-    player_manager.save_player_data(user_id, player_data)
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    await player_manager.save_player_data(user_id, player_data)
     
     # Mostra um pop-up de feedback para o jogador
     await query.answer(feedback_message, show_alert=True)
     
     # Redesenha a tela de combate principal com os stats atualizados
+    # (Esta função síncrona agora recebe o pdata correto)
     new_text = format_combat_message(player_data)
     kb = [
         [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu')],

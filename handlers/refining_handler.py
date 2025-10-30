@@ -181,25 +181,23 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     user_id = q.from_user.id
     chat_id = q.message.chat.id
 
-    pdata = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 1: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id) or {}
 
-    # Título atualizado para incluir a nova funcionalidade
     lines = ["🛠️ <b>Refino & Desmontagem</b>\n"]
     kb: list[list[InlineKeyboardButton]] = []
 
-    # =========================================================
-    # 👇 ADIÇÃO DO NOVO BOTÃO NO TOPO DO MENU 👇
-    # =========================================================
     kb.append([InlineKeyboardButton("♻️ Desmontar Equipamento", callback_data="ref_dismantle_list")])
-    # =========================================================
 
     any_recipe = False
+    # Assumindo REFINING_RECIPES é síncrono
     for rid, rec in game_data.REFINING_RECIPES.items():
+        # Assumindo preview_refine é síncrono
         prev = preview_refine(rid, pdata)
         if not prev:
             continue
         any_recipe = True
-        mins = _fmt_minutes_or_seconds(int(prev.get("duration_seconds", 0)))
+        mins = _fmt_minutes_or_seconds(int(prev.get("duration_seconds", 0))) # Síncrono
         tag = "✅" if prev.get("can_refine") else "⛔"
         lines.append(f"{tag} <b>{rec.get('display_name', rid)}</b> • ⏳ ~{mins}")
         kb.append([
@@ -215,9 +213,8 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="continue_after_action")])
     caption = "\n".join(lines)
 
+    # <<< CORREÇÃO 2: Adiciona await >>>
     await _safe_edit_or_send_with_media(q, context, chat_id, caption, InlineKeyboardMarkup(kb))
-
-# Em handlers/refining_handler.py
 
 async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -228,48 +225,48 @@ async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEF
     user_id = q.from_user.id
     chat_id = q.message.chat.id
 
-    player_data = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id) or {}
 
-    # --- Lógica de Paginação ---
+    # --- Lógica de Paginação (existente e correta) ---
     page = 0
-    # Verifica se o clique veio de um botão de página (ex: "ref_dismantle_list:page:1")
     if q.data and ':page:' in q.data:
         try:
             page = int(q.data.split(':page:')[1])
         except (ValueError, IndexError):
             page = 0
 
-    # 1. Busca e filtra todos os itens desmontáveis (sua lógica original está ótima)
-    inventory = player_data.get("inventory", {})
-    equipped_uids = {v for k, v in player_data.get("equipment", {}).items()}
-    
+    inventory = player_data.get("inventory", {}) # Síncrono
+    equipped_uids = {v for k, v in player_data.get("equipment", {}).items()} # Síncrono
+
     all_dismantleable_items = []
+    # Loop síncrono
     for item_uid, item_data in inventory.items():
         if isinstance(item_data, dict) and item_uid not in equipped_uids:
             base_id = item_data.get("base_id")
+            # Assumindo crafting_registry síncrono
             if base_id and crafting_registry.get_recipe_by_item_id(base_id):
                 all_dismantleable_items.append((item_uid, item_data))
-    
-    # Ordena alfabeticamente para uma exibição consistente
-    all_dismantleable_items.sort(key=lambda x: x[1].get("display_name", ""))
 
-    # 2. Calcula os itens para a página atual
+    all_dismantleable_items.sort(key=lambda x: x[1].get("display_name", "")) # Síncrono
+
     start_index = page * ITEMS_PER_PAGE
     end_index = start_index + ITEMS_PER_PAGE
     items_on_page = all_dismantleable_items[start_index:end_index]
     total_pages = (len(all_dismantleable_items) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
 
-    # 3. Monta a legenda (caption) - agora muito mais curta e limpa!
     caption = (
         "♻️ <b>Desmontar Equipamento</b>\n\n"
         "Selecione um item do seu inventário para desmontar. Itens equipados não são mostrados."
     )
 
     keyboard = []
-    if not items_on_page:
-        caption += "\n\nVocê não possui nenhum equipamento desmontável no seu inventário."
+    if not items_on_page: # Corrigido para verificar items_on_page
+        if page == 0: # Só mostra mensagem de 'nenhum item' na primeira página
+             caption += "\n\nVocê não possui nenhum equipamento desmontável no seu inventário."
+        else: # Se não for a primeira página e estiver vazia, apenas não mostra itens
+             caption += "\n\nNão há mais itens para mostrar nesta página."
     else:
-        # Cria um botão para cada item NA PÁGINA ATUAL
         for item_uid, item_data in items_on_page:
             item_name = item_data.get("display_name", "Item Desconhecido")
             keyboard.append([
@@ -279,11 +276,9 @@ async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEF
                 )
             ])
 
-    # 4. Monta os botões de navegação da página
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"ref_dismantle_list:page:{page - 1}"))
-        
     if end_index < len(all_dismantleable_items):
         nav_buttons.append(InlineKeyboardButton("Próxima ➡️", callback_data=f"ref_dismantle_list:page:{page + 1}"))
 
@@ -291,21 +286,12 @@ async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEF
         keyboard.append(nav_buttons)
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="ref_main")])
-    
+
     if total_pages > 1:
         caption += f"\n\n<i>Página {page + 1} de {total_pages}</i>"
 
-    # Envia a mensagem com a sua função segura
+    # <<< CORREÇÃO 4: Adiciona await >>>
     await _safe_edit_or_send_with_media(q, context, chat_id, caption, InlineKeyboardMarkup(keyboard), media_key='desmontagem_menu_image')
-
-
-# Em handlers/refining_handler.py
-
-# Em handlers/refining_handler.py
-# SUBSTITUA a sua função antiga por esta versão completa:
-
-# Em handlers/refining_handler.py
-# SUBSTITUA a sua função antiga por esta nova versão dinâmica:
 
 async def show_dismantle_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -319,53 +305,45 @@ async def show_dismantle_preview_callback(update: Update, context: ContextTypes.
 
     unique_item_id = q.data.split(':')[1]
 
-    player_data = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id) or {}
     inventory = player_data.get("inventory", {})
     item_to_dismantle = inventory.get(unique_item_id)
 
     if not item_to_dismantle:
         await q.answer("O item já não se encontra no seu inventário.", show_alert=True)
-        await show_dismantle_list_callback(update, context)
+        # <<< CORREÇÃO 6: Adiciona await >>>
+        await show_dismantle_list_callback(update, context) # Chama função async
         return
-        
+
     base_id = item_to_dismantle.get("base_id")
+    # Assumindo crafting_registry síncrono
     original_recipe = crafting_registry.get_recipe_by_item_id(base_id)
 
     if not original_recipe:
+        # <<< CORREÇÃO 7: Adiciona await >>>
         await _safe_edit_or_send_with_media(q, context, chat_id, "Este item não pode ser desmontado (não foi encontrada a receita original).")
         return
 
-    # --- LÓGICA PARA OBTER A IMAGEM DO ITEM ---
+    # --- LÓGICA PARA OBTER A IMAGEM DO ITEM (síncrona) ---
     item_media_key = None
-    # Primeiro, tentamos obter a chave da mídia a partir da informação base do item
     item_info = (game_data.ITEMS_DATA or {}).get(base_id, {})
     if item_info and item_info.get("media_key"):
         item_media_key = item_info["media_key"]
-    
-    # Se não encontrarmos uma imagem específica para o item, usamos a imagem padrão de desmontagem
     final_media_key = item_media_key or 'desmontagem_menu_image'
     # --- FIM DA LÓGICA DA IMAGEM ---
 
-    # (O resto da lógica para calcular materiais continua igual)
-    ITENS_NAO_RETORNAVEIS = {
-        "nucleo_forja_fraco", 
-        # Adicione aqui outros IDs se necessário, por exemplo: "martelo_de_ferreiro"
-    }
-
+    # (Cálculo de materiais síncrono)
+    ITENS_NAO_RETORNAVEIS = {"nucleo_forja_fraco"}
     returned_materials = {}
     original_inputs = original_recipe.get("inputs", {})
     for material_id, needed_qty in original_inputs.items():
-        # >>> A MÁGICA ACONTECE AQUI <<<
-        # Se o material estiver na nossa lista negra, nós simplesmente o ignoramos.
-        if material_id in ITENS_NAO_RETORNAVEIS:
-            continue # Pula para o próximo item do loop
-
+        if material_id in ITENS_NAO_RETORNAVEIS: continue
         return_qty = needed_qty // 2
-        if return_qty == 0 and needed_qty > 0:
-            return_qty = 1
-        if return_qty > 0:
-            returned_materials[material_id] = return_qty
-    full_item_text = display_utils.formatar_item_para_exibicao(item_to_dismantle)
+        if return_qty == 0 and needed_qty > 0: return_qty = 1
+        if return_qty > 0: returned_materials[material_id] = return_qty
+
+    full_item_text = display_utils.formatar_item_para_exibicao(item_to_dismantle) # Síncrono
     caption_lines = [
         f"♻️ <b>Confirmar Desmontagem</b> ♻️",
         f"\nVocê está prestes a destruir o item:",
@@ -376,9 +354,9 @@ async def show_dismantle_preview_callback(update: Update, context: ContextTypes.
         caption_lines.append(" - Nenhum material será recuperado.")
     else:
         for mat_id, mat_qty in returned_materials.items():
-            caption_lines.append(f"• {_fmt_item_line(mat_id, mat_qty)}")
+            caption_lines.append(f"• {_fmt_item_line(mat_id, mat_qty)}") # Síncrono
     caption_lines.append("\n⚠️ <b>Esta ação é irreversível!</b>")
-    
+
     caption = "\n".join(caption_lines)
 
     keyboard = [
@@ -386,7 +364,7 @@ async def show_dismantle_preview_callback(update: Update, context: ContextTypes.
         [InlineKeyboardButton("⬅️ Voltar", callback_data="ref_dismantle_list")]
     ]
 
-    # A chamada final agora usa a nossa chave de mídia dinâmica
+    # <<< CORREÇÃO 8: Adiciona await >>>
     await _safe_edit_or_send_with_media(q, context, chat_id, caption, InlineKeyboardMarkup(keyboard), media_key=final_media_key)
 
 async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -400,26 +378,28 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
     chat_id = q.message.chat.id
     unique_item_id = q.data.split(':')[1]
 
-    # Chama a nova função de INÍCIO do nosso motor de desmontagem
-    result = dismantle_engine.start_dismantle(user_id, unique_item_id)
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+         await q.answer("Erro ao carregar dados do jogador!", show_alert=True)
+         return
+
+    # <<< CORREÇÃO: Adiciona 'await' assumindo que start_dismantle é async >>>
+    result = await dismantle_engine.start_dismantle(pdata, unique_item_id)
     
     if isinstance(result, str):
-        # Se o resultado for uma string, é uma mensagem de erro
         await context.bot.answer_callback_query(q.id, result, show_alert=True)
         return
 
-    # Se o início foi bem-sucedido, o resultado é um dicionário com os detalhes do job
+    # O resto da função continua igual...
     duration = result.get("duration_seconds", 60)
     item_name = result.get("item_name", "item")
     base_id = result.get("base_id")
     
-    # Agenda a execução da função de finalização para quando o tempo acabar
     context.job_queue.run_once(
-        finish_dismantle_job,
+        finish_dismantle_job, # Esta função precisa ser async
         when=duration,
         chat_id=chat_id,
         user_id=user_id,
-        # AQUI ESTÁ A CORREÇÃO: Adicionamos o base_id aos dados do job.
         data={
             "unique_item_id": unique_item_id, 
             "item_name": item_name,
@@ -428,60 +408,61 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
         name=f"dismantle_{user_id}"
     )
     
-    # Envia uma mensagem a informar que o processo começou
     mins = _fmt_minutes_or_seconds(duration)
     await _safe_edit_or_send_with_media(
         q, context, chat_id,
         f"♻️ A desmontar <b>{item_name}</b>... O processo levará ~{mins}."
     )
-
-    # Adicione esta nova função ao handlers/refining_handler.py
-
-# VERSÃO CORRIGIDA
+    
+# <<< CORREÇÃO: Adiciona async def >>>
 async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id, chat_id = job.user_id, job.chat_id
-    
-    # AQUI ESTÁ A CORREÇÃO: Usamos job.data em vez de ler o player_state.
-    # 'job.data' contém a informação "congelada" do momento em que a ação começou.
     job_details = job.data
-    
+
+    # Assumindo finish_dismantle é síncrono
     result = dismantle_engine.finish_dismantle(user_id, job_details)
-    
+
     if isinstance(result, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ Erro ao finalizar desmontagem: {result}")
         return
-        
+
     item_name, returned_materials = result
-    
-    # Integração com Missões
-    player_data = player_manager.get_player_data(user_id)
+
+    # <<< CORREÇÃO 10: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     if player_data:
+        # Assumindo update_mission_progress síncrono
         mission_manager.update_mission_progress(player_data, 'DISMANTLE', details={'count': 1})
         clan_id = player_data.get("clan_id")
         if clan_id:
-            # Precisamos de passar o 'context' para a função de missão de clã
-            await clan_manager.update_guild_mission_progress(
-                clan_id=clan_id,
-                mission_type='DISMANTLE',
-                details={'count': 1},
-                context=context
-            )
-        player_manager.save_player_data(user_id, player_data)
+            try: # Adiciona try/except para missão de clã
+                # <<< CORREÇÃO 11: Adiciona await >>>
+                await clan_manager.update_guild_mission_progress(
+                    clan_id=clan_id,
+                    mission_type='DISMANTLE',
+                    details={'count': 1},
+                    context=context
+                )
+            except Exception as e_clan_dismantle:
+                 logger.error(f"Erro ao atualizar missão de guilda DISMANTLE para clã {clan_id}: {e_clan_dismantle}")
 
-    # Mensagem de Sucesso
+        # <<< CORREÇÃO 12: Adiciona await >>>
+        await player_manager.save_player_data(user_id, player_data)
+
+    # Mensagem de Sucesso (síncrona)
     caption_lines = [f"♻️ <b>{item_name}</b> foi desmontado com sucesso!", "\nVocê recuperou:"]
     if not returned_materials:
         caption_lines.append(" - Nenhum material foi recuperado.")
     else:
         for mat_id, mat_qty in returned_materials.items():
             caption_lines.append(f"• {_fmt_item_line(mat_id, mat_qty)}")
-            
+
     keyboard = [
         [InlineKeyboardButton("⬅️ Voltar para Refino/Desmontagem", callback_data="ref_main")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
     await context.bot.send_message(
         chat_id=chat_id,
         text="\n".join(caption_lines),
@@ -499,17 +480,18 @@ async def ref_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = q.message.chat.id
 
     rid = q.data.replace("ref_sel_", "", 1)
-    pdata = player_manager.get_player_data(user_id) or {}
+    # <<< CORREÇÃO 13: Adiciona await >>>
+    pdata = await player_manager.get_player_data(user_id) or {}
+    # Assumindo preview_refine síncrono
     prev = preview_refine(rid, pdata)
 
     if not prev:
         await q.answer("Receita inválida.", show_alert=True)
         return
 
-    # Entradas com emoji/nomes bonitos
+    # Formatação síncrona
     ins = "\n".join(_fmt_item_line(k, v) for k, v in (prev.get("inputs") or {}).items()) or "—"
     outs = "\n".join(_fmt_item_line(k, v) for k, v in (prev.get("outputs") or {}).items()) or "—"
-
     mins = _fmt_minutes_or_seconds(int(prev.get("duration_seconds", 0)))
     title = game_data.REFINING_RECIPES.get(rid, {}).get("display_name", rid)
 
@@ -525,12 +507,13 @@ async def ref_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         kb.append([InlineKeyboardButton("✅ Refinar", callback_data=f"ref_confirm_{rid}")])
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="ref_main")])
 
+    # <<< CORREÇÃO 14: Adiciona await >>>
     await _safe_edit_or_send_with_media(q, context, chat_id, txt, InlineKeyboardMarkup(kb))
-
 
 async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Confirma o refino e agenda a finalização.
+    (Versão corrigida para chamar o novo engine async)
     """
     q = update.callback_query
     await q.answer()
@@ -538,18 +521,25 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_id = q.message.chat.id
 
     rid = q.data.replace("ref_confirm_", "", 1)
-    pdata = player_manager.get_player_data(user_id) or {}
+    
+    # Carrega os dados do jogador UMA VEZ
+    pdata = await player_manager.get_player_data(user_id) or {}
     state = pdata.get("player_state", {})
 
     if state.get("action") not in (None, "idle"):
         await q.answer("Você já está ocupado com outra ação!", show_alert=True)
         return
 
-    res = start_refine(user_id, rid)
+    # <<< CORREÇÃO: Chama 'await' e passa 'pdata', não 'user_id' >>>
+    res = await start_refine(pdata, rid)
+    
     if isinstance(res, str):
         await q.answer(res, show_alert=True)
+        # Se falhou, não precisa salvar, pois o engine não salvou
         return
 
+    # O 'start_refine' já salvou os dados, não precisamos salvar aqui.
+    
     secs = int(res.get("duration_seconds", 0))
     mins = _fmt_minutes_or_seconds(secs)
     title = game_data.REFINING_RECIPES.get(rid, {}).get("display_name", rid)
@@ -561,44 +551,66 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Agenda a finalização
     context.job_queue.run_once(
-        finish_refine_job,
+        finish_refine_job, # Esta é a função async abaixo
         when=secs,
         user_id=user_id,
         chat_id=chat_id,
-        data={"rid": rid},
+        data={"rid": rid}, # 'rid' é mantido para o log de missões
+        name=f"refining:{user_id}" # Nome do job corrigido
     )
 
-
-
+# <<< CORREÇÃO: Adiciona async def >>>
 async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Job que finaliza o refino.
+    (Versão corrigida para carregar 'pdata' e passar para o engine)
+    """
     job = context.job
     user_id, chat_id = job.user_id, job.chat_id
+    job_data = job.data
+    recipe_id = job_data.get("rid") # Pega o 'rid' dos dados do job
 
-    # --- Bloco 1: Lógica do Jogo (permanece igual) ---
-    res = finish_refine(user_id)
+    # Carrega os dados do jogador UMA VEZ
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        logger.error(f"finish_refine_job: Não foi possível carregar pdata para {user_id}")
+        await context.bot.send_message(chat_id=chat_id, text="❗ Erro ao finalizar refino: dados do jogador não encontrados.")
+        return
+
+    # <<< CORREÇÃO: Chama 'await' e passa 'pdata' >>>
+    res = await finish_refine(pdata)
+    
     if isinstance(res, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ {res}")
         return
     if not res:
+        logger.warning(f"finish_refine_job para user {user_id}: finish_refine retornou {res}.")
         return
 
+    # O 'finish_refine' já salvou os dados (estado, itens, xp).
+    
     outs = res.get("outputs") or {}
-    player_data = player_manager.get_player_data(user_id)
-    clan_id = player_data.get("clan_id")
+    clan_id = pdata.get("clan_id") # pdata está atualizado
 
-    if player_data and outs:
+    # Atualiza missões (isto deve ser síncrono, pois mexe com 'pdata' em memória)
+    if outs:
         for item_id, quantity in outs.items():
             mission_manager.update_mission_progress(
-                player_data, 'REFINE', details={'item_id': item_id, 'quantity': quantity}
+                pdata, 'REFINE', details={'item_id': item_id, 'quantity': quantity}
             )
             if clan_id:
-                await clan_manager.update_guild_mission_progress(
-                    clan_id=clan_id, mission_type='REFINE',
-                    details={'item_id': item_id, 'count': quantity}, context=context
-                )
-        player_manager.save_player_data(user_id, player_data)
+                try:
+                    await clan_manager.update_guild_mission_progress(
+                        clan_id=clan_id, mission_type='REFINE',
+                        details={'item_id': item_id, 'count': quantity}, context=context
+                    )
+                except Exception as e_clan_refine:
+                    logger.error(f"Erro ao atualizar missão de guilda REFINE para clã {clan_id}: {e_clan_refine}")
+        
+        # Salva UMA VEZ no final, após as missões terem modificado 'pdata'
+        await player_manager.save_player_data(user_id, pdata)
     
-    # --- Bloco 2: Preparação da Mensagem (permanece igual) ---
+    # --- Bloco de Mensagem (sem alterações) ---
     lines = ["✅ <b>Refino concluído!</b>", "Você obteve:"]
     for k, v in outs.items():
         lines.append(f"• {_fmt_item_line(k, v)}")
@@ -608,22 +620,20 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 à𝐬 𝐫𝐞𝐜𝐞𝐢𝐭𝐚𝐬", callback_data="ref_main")]
     ])
 
-    # --- Bloco 3: Lógica de Envio de Mídia (AGORA SUPER SIMPLES) ---
+    # --- Bloco de Mídia (sem alterações) ---
     specific_media_key = None
     if outs:
         item_id_para_imagem = list(outs.keys())[0]
         item_info = (game_data.ITEMS_DATA or {}).get(item_id_para_imagem, {})
-        specific_media_key = item_info.get("media_key") # Pode ser None se não houver
+        specific_media_key = item_info.get("media_key")
     
-    # Fazemos uma única chamada para a nossa função robusta!
     await _safe_send_with_media(
         context,
         chat_id,
         caption,
         kb,
-        media_key=specific_media_key # Tenta esta chave primeiro
-        # Se specific_media_key for None ou inválida, a função usará 'refino_universal'
-    )
+        media_key=specific_media_key
+    )    
         # =========================
 refining_main_handler = CallbackQueryHandler(refining_main_callback, pattern=r"^(refining_main|ref_main)$")
 ref_select_handler    = CallbackQueryHandler(ref_select_callback,   pattern=r"^ref_sel_[A-Za-z0-9_]+$")

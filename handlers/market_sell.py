@@ -57,7 +57,7 @@ async def open_sell_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     - Gera callback_data compatível: market_pick_unique_{uid} / market_pick_stack_{base_id}
     """
     user_id = update.effective_user.id
-    pdata = player_manager.get_player_data(user_id) or {}
+    pdata = await player_manager.get_player_data(user_id) or {}
     pclass = _player_class_key(pdata)
 
     inv = pdata.get("inventory", {}) or {}

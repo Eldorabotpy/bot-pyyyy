@@ -135,11 +135,11 @@ def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
 # ========================================
 # AÇÕES TEMPORIZADAS E ESTADO
 # ========================================
-def set_last_chat_id(user_id: int, chat_id: int):
-    pdata = get_player_data(user_id)
+async def set_last_chat_id(user_id: int, chat_id: int):
+    pdata = await get_player_data(user_id)
     if not pdata: return
     pdata["last_chat_id"] = int(chat_id)
-    save_player_data(user_id, pdata)
+    await save_player_data(user_id, pdata)
 
 def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | None, chat_id: int | None):
     start = utcnow().replace(microsecond=0)
@@ -154,22 +154,19 @@ def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | N
         pdata["last_chat_id"] = int(chat_id)
     return pdata
 
-def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
+# <<< CORREÇÃO 4: Adiciona async def >>>
+async def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
     """
     # --- FUNÇÃO ATUALIZADA E CORRIGIDA ---
-    
-    Verifica e finaliza uma ação "presa" que não tem um job de finalização.
-    NÃO calcula mais recompensas de coleta (isso é feito pelo job_handler).
-    Apenas finaliza a VIAGEM (travel) ou EXPLORAÇÃO (exploring).
+    Verifica e finaliza uma ação "presa" (TRAVEL ou EXPLORING).
     """
-    player_data = get_player_data(user_id)
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    player_data = await get_player_data(user_id)
+    if not player_data: return False, None # Adicionado 'if not'
+
     state = player_data.get("player_state") or {}
     action = state.get("action")
 
-    # <<< CORREÇÃO PRINCIPAL >>>
-    # Removidas 'refining', 'crafting', 'collecting' desta lista.
-    # Essas ações têm os seus próprios 'finish_..._job' no job_handler
-    # e não devem ser finalizadas por esta função "faxineira".
     actions_com_timer = ("exploring", "travel")
     
     if action not in actions_com_timer:
@@ -179,17 +176,14 @@ def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
         finish_time_iso = state.get("finish_time")
         if not finish_time_iso:
             player_data["player_state"] = {"action": "idle"}
-            save_player_data(user_id, player_data)
+            # <<< CORREÇÃO 6: Adiciona await >>>
+            await save_player_data(user_id, player_data)
             return True, "Sua ação foi finalizada devido a um erro de tempo."
 
-        hora_de_termino = _parse_iso(finish_time_iso)
+        hora_de_termino = _parse_iso(finish_time_iso) # Síncrono
         
         if utcnow() >= hora_de_termino:
             reward_summary = f"Ação '{action}' finalizada com sucesso."
-
-            # --- LÓGICA DE RECOMPENSAS REMOVIDA PARA 'collecting' ---
-            # O bloco 'if action == "collecting":' foi completamente removido
-            # pois 'collecting' não está mais na lista 'actions_com_timer'.
 
             if action == "travel":
                 dest = (state.get("details") or {}).get("destination")
@@ -198,17 +192,18 @@ def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
                 reward_summary = f"Você chegou ao seu destino!"
             
             elif action == "exploring":
-                # Adicione qualquer lógica de finalização de exploração aqui, se houver
                 reward_summary = f"Você terminou de explorar."
 
-            # Zera o estado do jogador e salva
             player_data["player_state"] = {"action": "idle"}
-            save_player_data(user_id, player_data)
+            # <<< CORREÇÃO 7: Adiciona await >>>
+            await save_player_data(user_id, player_data)
             return True, reward_summary
 
     except Exception as e:
+        logger.error(f"Erro em try_finalize_timed_action para {user_id}: {e}", exc_info=True) # Log de erro melhorado
         player_data["player_state"] = {"action": "idle"}
-        save_player_data(user_id, player_data)
+        # <<< CORREÇÃO 8: Adiciona await >>>
+        await save_player_data(user_id, player_data)
         return True, f"Sua ação foi finalizada devido a um erro: {e}"
     
     return False, None

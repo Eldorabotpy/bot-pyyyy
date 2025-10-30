@@ -128,13 +128,15 @@ async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Tenta encontrar por ID primeiro
     try:
         user_id_int = int(target_input)
-        pdata_found = player_manager.get_player_data(user_id_int)
+        # <<< CORREÇÃO 1: Adiciona await >>>
+        pdata_found = await player_manager.get_player_data(user_id_int)
         if pdata_found:
             user_id = user_id_int
             pdata = pdata_found
     except ValueError:
         # Se não for ID, tenta por nome
-        found_by_name = player_manager.find_player_by_name(target_input)
+        # <<< CORREÇÃO 2: Adiciona await >>>
+        found_by_name = await player_manager.find_player_by_name(target_input)
         if found_by_name:
             user_id, pdata = found_by_name
 
@@ -170,22 +172,25 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     new_tier = (query.data or "prem_tier:free").split(":", 1)[1]
 
     try:
-        pdata = player_manager.get_player_data(target_uid)
+        # <<< CORREÇÃO 3: Adiciona await >>>
+        pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Dados do jogador não encontrados.")
 
         premium = PremiumManager(pdata)
         premium.set_tier(new_tier) # Usa o método set_tier
 
-        player_manager.save_player_data(target_uid, premium.player_data)
+        # <<< CORREÇÃO 4: Adiciona await >>>
+        await player_manager.save_player_data(target_uid, premium.player_data)
 
         # Recarrega dados para exibir painel atualizado
-        updated_pdata = player_manager.get_player_data(target_uid) or pdata
+        # <<< CORREÇÃO 5: Adiciona await >>>
+        updated_pdata = (await player_manager.get_player_data(target_uid)) or pdata
         text = _panel_text(target_uid, updated_pdata)
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=_panel_keyboard())
 
     except Exception as e:
-         logger.error(f"Erro ao definir tier premium para {target_uid}: {e}", exc_info=True)
-         await query.answer(f"❌ Erro ao definir tier: {e}", show_alert=True)
+        logger.error(f"Erro ao definir tier premium para {target_uid}: {e}", exc_info=True)
+        await query.answer(f"❌ Erro ao definir tier: {e}", show_alert=True)
 
     return ASK_NAME
 
@@ -210,26 +215,30 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await query.answer(f"Adicionando {days} dias...")
 
     try:
-        pdata = player_manager.get_player_data(target_uid)
+        # <<< CORREÇÃO 6: Adiciona await >>>
+        pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Dados do jogador não encontrados.")
 
+        # (O código aqui está correto, assume "premium" se for "free")
         current_tier = pdata.get("premium_tier") or "premium"
         if current_tier == "free": current_tier = "premium"
 
         premium = PremiumManager(pdata)
         premium.grant_days(tier=current_tier, days=days) # Usa grant_days
 
-        player_manager.save_player_data(target_uid, premium.player_data)
+        # <<< CORREÇÃO 7: Adiciona await >>>
+        await player_manager.save_player_data(target_uid, premium.player_data)
 
-        updated_pdata = player_manager.get_player_data(target_uid) or pdata
+        # <<< CORREÇÃO 8: Adiciona await >>>
+        updated_pdata = (await player_manager.get_player_data(target_uid)) or pdata
         text = _panel_text(target_uid, updated_pdata)
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=_panel_keyboard())
 
     except Exception as e:
-         logger.error(f"Erro ao adicionar dias premium para {target_uid}: {e}", exc_info=True)
-         # Tenta editar a msg com erro, fallback para answer
-         try: await query.edit_message_text(f"❌ Ocorreu um erro ao adicionar dias: {e}")
-         except Exception: await query.answer(f"❌ Erro ao adicionar dias: {e}", show_alert=True)
+        logger.error(f"Erro ao adicionar dias premium para {target_uid}: {e}", exc_info=True)
+        # Tenta editar a msg com erro, fallback para answer
+        try: await query.edit_message_text(f"❌ Ocorreu um erro ao adicionar dias: {e}")
+        except Exception: await query.answer(f"❌ Erro ao adicionar dias: {e}", show_alert=True)
 
     return ASK_NAME
 
@@ -238,7 +247,7 @@ async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
     target_uid = _get_user_target(context)
-    target_name = context.user_data.get("premium_target_name", f"ID {target_uid}") # Pega nome do context
+    target_name = context.user_data.get("premium_target_name", f"ID {target_uid}")
     if not target_uid:
         await query.answer("Erro: Alvo não definido. Use 'Trocar Usuário'.", show_alert=True)
         return ASK_NAME
@@ -246,25 +255,27 @@ async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await query.answer(f"Revogando premium de {target_name}...")
 
     try:
-        pdata = player_manager.get_player_data(target_uid)
+        # <<< CORREÇÃO 9: Adiciona await >>>
+        pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Dados do jogador não encontrados.")
 
         premium = PremiumManager(pdata)
         premium.revoke() # Chama o método revoke()
 
-        player_manager.save_player_data(target_uid, premium.player_data)
+        # <<< CORREÇÃO 10: Adiciona await >>>
+        await player_manager.save_player_data(target_uid, premium.player_data)
 
         # Recarrega dados para exibir painel atualizado
-        updated_pdata = player_manager.get_player_data(target_uid) or pdata
+        # <<< CORREÇÃO 11: Adiciona await >>>
+        updated_pdata = (await player_manager.get_player_data(target_uid)) or pdata
         text = _panel_text(target_uid, updated_pdata)
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=_panel_keyboard())
 
     except Exception as e:
-         logger.error(f"Erro ao revogar premium para {target_uid}: {e}", exc_info=True)
-         try: await query.edit_message_text(f"❌ Ocorreu um erro ao revogar o premium: {e}")
-         except Exception: await query.answer(f"❌ Erro ao revogar: {e}", show_alert=True)
+        logger.error(f"Erro ao revogar premium para {target_uid}: {e}", exc_info=True)
+        try: await query.edit_message_text(f"❌ Ocorreu um erro ao revogar o premium: {e}")
+        except Exception: await query.answer(f"❌ Erro ao revogar: {e}", show_alert=True)
 
-    # Não limpa user_data aqui, permite continuar gerenciando o mesmo user
     return ASK_NAME
 
 async def _action_change_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -303,7 +314,8 @@ async def _premium_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ID inválido.")
         return
 
-    pdata = player_manager.get_player_data(uid)
+    # <<< CORREÇÃO 12: Adiciona await >>>
+    pdata = await player_manager.get_player_data(uid)
     if not pdata:
         await update.message.reply_text("Jogador não encontrado.")
         return
@@ -311,9 +323,9 @@ async def _premium_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_name = pdata.get("character_name", f"ID: {uid}")
     _set_user_target(context, uid, player_name) # Define o alvo
     await update.message.reply_text(_panel_text(uid, pdata), parse_mode="HTML", reply_markup=_panel_keyboard())
-    # NOTA: Isto NÃO inicia a ConversationHandler. As ações podem não funcionar.
-    # É melhor guiar o admin para usar o /admin e o painel.
-
+    
+    # NOTA: Como o seu código original já aponta, isto NÃO inicia o ConversationHandler.
+    # Os botões neste painel não funcionarão. É apenas para visualização.
 # ---------------------------------------------------------
 # Exports
 # ---------------------------------------------------------

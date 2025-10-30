@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes, 
@@ -162,32 +163,41 @@ async def admin_edit_player_start(update: Update, context: ContextTypes.DEFAULT_
 async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Recebe o ID ou Nome, encontra o jogador e mostra o menu de edição.
+    (Com logs de temporização)
     """
+    start_time = time.time() # <<< DEBUG TEMPORIZAÇÃO
+
     user_input = update.message.text
     target_user_id = None
     pdata = None
-    found_by = "ID/Nome" # Para a mensagem de erro
+    found_by = "ID/Nome"
 
     # 1. Tenta encontrar por ID
     try:
         target_user_id = int(user_input)
-        pdata = player_manager.get_player_data(target_user_id)
+        # <<< CORREÇÃO 1: Adiciona await >>>
+        pdata = await player_manager.get_player_data(target_user_id)
         found_by = "ID"
         if pdata:
-             pdata['user_id'] = target_user_id # Garante que o ID está nos dados para exibição
+            pdata['user_id'] = target_user_id
     except ValueError:
         # 2. Se não for ID, tenta encontrar por Nome
         try:
-            found = find_player_by_name(user_input)
+            # <<< CORREÇÃO 2: Adiciona await >>>
+            found = await find_player_by_name(user_input)
             if found:
                 target_user_id, pdata = found
                 found_by = "Nome"
                 if pdata:
-                     pdata['user_id'] = target_user_id # Garante que o ID está nos dados
+                    pdata['user_id'] = target_user_id
         except Exception as e:
-             logger.error(f"Erro ao buscar jogador por nome '{user_input}': {e}")
-             await update.message.reply_text("Ocorreu um erro ao buscar pelo nome. Tente novamente ou use o ID.")
-             return STATE_GET_USER_ID # Pede novamente
+            logger.error(f"Erro ao buscar jogador por nome '{user_input}': {e}")
+            await update.message.reply_text("Ocorreu um erro ao buscar pelo nome. Tente novamente ou use o ID.")
+            return STATE_GET_USER_ID
+
+    end_time = time.time() # <<< DEBUG TEMPORIZAÇÃO
+    elapsed = end_time - start_time
+    logger.info(f"[DEBUG_TEMP] Buscando jogador '{user_input}' levou {elapsed:.3f} segundos.") # <<< DEBUG TEMPORIZAÇÃO
 
     # 3. Verifica se encontrou
     if not pdata or not target_user_id:
@@ -195,7 +205,7 @@ async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             f"Jogador não encontrado pelo {found_by} <code>{user_input}</code>. Verifique se digitou corretamente e tente novamente:",
             parse_mode=ParseMode.HTML
         )
-        return STATE_GET_USER_ID # Pede novamente
+        return STATE_GET_USER_ID
 
     # 4. Salva o ID encontrado e mostra o menu
     context.user_data['edit_target_id'] = target_user_id
@@ -216,7 +226,8 @@ async def admin_show_menu_dispatch(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text("Erro: ID do jogador alvo perdido. Encerrando.")
         return ConversationHandler.END
 
-    pdata = player_manager.get_player_data(target_user_id)
+    # <<< CORREÇÃO 3: Adiciona await >>>
+    pdata = await player_manager.get_player_data(target_user_id)
     info_text = _get_player_info_text(pdata)
     await _send_or_edit_menu(update, context, info_text)
     
@@ -276,7 +287,8 @@ async def admin_set_profession_type(update: Update, context: ContextTypes.DEFAUL
         await query.answer("Profissão inválida.", show_alert=True)
         return STATE_AWAIT_PROFESSION
 
-    pdata = player_manager.get_player_data(target_user_id)
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    pdata = await player_manager.get_player_data(target_user_id)
     
     # Define a profissão, resetando nível e XP
     pdata.setdefault('profession', {})
@@ -284,7 +296,8 @@ async def admin_set_profession_type(update: Update, context: ContextTypes.DEFAUL
     pdata['profession']['level'] = 1
     pdata['profession']['xp'] = 0
     
-    player_manager.save_player_data(target_user_id, pdata)
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    await player_manager.save_player_data(target_user_id, pdata)
     
     await query.answer("Profissão alterada!")
     
@@ -308,13 +321,15 @@ async def admin_set_char_level(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("Erro: ID do jogador alvo perdido. Encerrando.")
         return ConversationHandler.END
 
-    pdata = player_manager.get_player_data(target_user_id)
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    pdata = await player_manager.get_player_data(target_user_id)
     
     # Define o nível e reseta o XP
     pdata['level'] = new_level
     pdata['xp'] = 0
     
-    player_manager.save_player_data(target_user_id, pdata)
+    # <<< CORREÇÃO 7: Adiciona await >>>
+    await player_manager.save_player_data(target_user_id, pdata)
     
     info_text = _get_player_info_text(pdata)
     await update.message.reply_text(f"✅ Nível de personagem atualizado para <b>{new_level}</b>.", parse_mode=ParseMode.HTML)
@@ -336,7 +351,8 @@ async def admin_set_prof_level(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("Erro: ID do jogador alvo perdido. Encerrando.")
         return ConversationHandler.END
 
-    pdata = player_manager.get_player_data(target_user_id)
+    # <<< CORREÇÃO 8: Adiciona await >>>
+    pdata = await player_manager.get_player_data(target_user_id)
     
     # Define o nível e reseta o XP da profissão
     pdata.setdefault('profession', {})
@@ -345,7 +361,9 @@ async def admin_set_prof_level(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         pdata['profession']['level'] = new_level
         pdata['profession']['xp'] = 0
-        player_manager.save_player_data(target_user_id, pdata)
+        
+        # <<< CORREÇÃO 9: Adiciona await >>>
+        await player_manager.save_player_data(target_user_id, pdata)
         await update.message.reply_text(f"✅ Nível de profissão atualizado para <b>{new_level}</b>.", parse_mode=ParseMode.HTML)
 
     info_text = _get_player_info_text(pdata)

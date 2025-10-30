@@ -100,16 +100,29 @@ async def dispatch_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     quantity = context.user_data['gem_quantity']
     target_name = context.user_data['gem_target_name']
     
-    # --- Lógica de entrega que já existia ---
-    pdata = player_manager.get_player_data(user_id)
+    # --- Lógica de entrega CORRIGIDA ---
+    
+    # <<< CORREÇÃO 1: Adiciona await para LER os dados >>>
+    pdata = await player_manager.get_player_data(user_id)
+    
+    # Adicionámos uma verificação para garantir que o jogador foi carregado
+    if not pdata:
+        await query.edit_message_text(f"❌ Erro crítico! Não foi possível carregar os dados de {target_name} para a entrega.")
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    # Esta função é síncrona (só mexe no dicionário pdata), está correta.
     player_manager.add_gems(pdata, quantity)
-    player_manager.save_player_data(user_id, pdata)
+    
+    # <<< CORREÇÃO 2: Adiciona await para SALVAR os dados >>>
+    await player_manager.save_player_data(user_id, pdata)
     
     # --- Confirmação para o ADMIN (já existia) ---
     await query.edit_message_text(f"✅ Sucesso! {quantity} 💎 Gemas foram entregues a {target_name}.")
     
     # =======================================================
     # === INÍCIO DO NOVO CÓDIGO: NOTIFICAÇÃO PARA O JOGADOR ===
+    # (O teu código aqui já estava perfeito!)
     # =======================================================
     try:
         # 1. Montamos a mensagem para o jogador
