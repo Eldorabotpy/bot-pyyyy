@@ -20,14 +20,14 @@ async def show_clan_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Mostra o menu do banco do clã."""
     query = update.callback_query
     user_id = update.effective_user.id
-    player_data = player_manager.get_player_data(user_id)
+    player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
     
     if not clan_id:
         await query.answer("Erro: Não foi possível encontrar seu clã.", show_alert=True)
         return
 
-    clan_data = clan_manager.get_clan(clan_id)
+    clan_data = await clan_manager.get_clan(clan_id)
 
     if not clan_data:
         await query.answer("Você não está em um clã.", show_alert=True)
@@ -68,8 +68,13 @@ async def show_bank_log(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
-    clan_data = clan_manager.get_clan(clan_id)
+    
+    # <<< CORREÇÃO 3: Adiciona await e separa a lógica >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
+    
+    # <<< CORREÇÃO 4: Adiciona await >>>
+    clan_data = await clan_manager.get_clan(clan_id)
     
     bank_log = clan_data.get("bank_log", [])
     
@@ -103,41 +108,38 @@ async def start_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await safe_edit_message(query, text="Quanto ouro você gostaria de depositar?\nEnvie um número ou use /cancelar.")
     return ASKING_DEPOSIT_AMOUNT
 
-# Em handlers/guild/bank.py
-
 async def receive_deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Processa a quantia de ouro a ser depositada."""
     user_id = update.effective_user.id
-    player_data = player_manager.get_player_data(user_id)
+    
+    # <<< CORREÇÃO 5: Adiciona await >>>
+    player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
 
     try:
         amount = int(update.message.text)
         if amount <= 0:
             await update.message.reply_text("Por favor, envie um número positivo.")
-            return ASKING_DEPOSIT_AMOUNT # Permanece na conversa
+            return ASKING_DEPOSIT_AMOUNT
     except ValueError:
         await update.message.reply_text("Entrada inválida. Por favor, envie apenas números.")
-        return ASKING_DEPOSIT_AMOUNT # Permanece na conversa
+        return ASKING_DEPOSIT_AMOUNT
 
-    # --- ADICIONEI O DEBUG AQUI ---
-    # Vamos ver o que o bot acha que você tem, ANTES de tentar depositar.
     print(f"[DEBUG BANCO] Tentando depositar: {amount}. Ouro do jogador (lido pelo bank.py): {player_data.get('gold', 0)}")
-    # -----------------------------------
     
-    # Agora chamamos o 'cérebro' (clan_manager) para fazer a lógica
-    success, message = clan_manager.deposit_gold(clan_id, user_id, amount)
+    # <<< CORREÇÃO 6: Adiciona await >>>
+    # (deposit_gold precisa ser async pois lê/escreve no player E no clã)
+    success, message = await clan_manager.deposit_gold(clan_id, user_id, amount)
 
     keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Banco", callback_data="clan_bank_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if success:
         await update.message.reply_text(
-            f"✅ {message}", # A mensagem de sucesso agora vem do clan_manager
+            f"✅ {message}", 
             reply_markup=reply_markup
         )
     else:
-        # Se falhar (ex: sem ouro), avisa o erro
         await update.message.reply_text(
             f"❌ Erro: {message}",
             reply_markup=reply_markup
@@ -155,7 +157,10 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def receive_withdraw_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Processa a quantia de ouro a ser retirada."""
     user_id = update.effective_user.id
-    clan_id = player_manager.get_player_data(user_id).get("clan_id")
+    
+    # <<< CORREÇÃO 7: Adiciona await e separa a lógica >>>
+    player_data = await player_manager.get_player_data(user_id)
+    clan_id = player_data.get("clan_id")
 
     try:
         amount = int(update.message.text)
@@ -166,9 +171,10 @@ async def receive_withdraw_amount(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("Entrada inválida. Por favor, envie apenas números.")
         return ASKING_WITHDRAW_AMOUNT
 
-    success, message = clan_manager.withdraw_gold(clan_id, user_id, amount)
+    # <<< CORREÇÃO 8: Adiciona await >>>
+    # (withdraw_gold precisa ser async)
+    success, message = await clan_manager.withdraw_gold(clan_id, user_id, amount)
 
-    # ✅ MESMA LÓGICA APLICADA À RETIRADA
     keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Banco", callback_data="clan_bank_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 

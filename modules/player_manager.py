@@ -77,28 +77,12 @@ from .player.actions import (
 # =================================================================
 # Agora, importamos a CLASSE, não as funções antigas.
 from .player.premium import PremiumManager
+from typing import Awaitable 
 
-def has_premium_plan(user_id: int) -> bool:
-    """
-    Verifica se um jogador tem um plano premium ativo.
-    Esta é a "ponte" simplificada que o resto do código usará.
-    """
-    pdata = get_player_data(user_id)
-    if not pdata:
-        return False
-    # A mágica acontece aqui: usamos o Manager internamente.
+def has_premium_plan(pdata: dict) -> bool: # <<< RECEBE pdata
+    """Verifica se um jogador tem um plano premium ativo."""
     return PremiumManager(pdata).is_premium()
 
-def get_perk_value(user_id: int, perk_name: str, default=1):
-    """
-    Obtém o valor de um perk específico para o jogador, já considerando seu tier.
-    Interface simplificada para consultar vantagens.
-    """
-    pdata = get_player_data(user_id)
-    if not pdata:
-        return default
+def get_perk_value(pdata: dict, perk_name: str, default=1): # <<< RECEBE pdata
+    """Obtém o valor de um perk específico para o jogador."""
     return PremiumManager(pdata).get_perk_value(perk_name, default)
-
-# Nota: Não exportamos mais 'grant_premium_status' daqui.
-# As partes do código que concedem premium (loja, painel admin) devem
-# importar e usar o PremiumManager diretamente, pois é uma ação complexa.

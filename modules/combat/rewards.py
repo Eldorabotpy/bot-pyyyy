@@ -6,6 +6,8 @@ from modules import player_manager, game_data, mission_manager, clan_manager
 from modules.player.premium import PremiumManager
 from modules.game_data import xp as xp_manager
 
+logger = logging.getLogger(__name__)
+
 def calculate_victory_rewards(player_data: dict, combat_details: dict) -> tuple[int, int, list]:
     """
     Apenas CALCULA o XP, ouro e itens de uma vitória, mas não os aplica ao jogador.
@@ -47,23 +49,25 @@ async def apply_and_format_victory(player_data: dict, combat_details: dict, cont
     Aplica as recompensas de uma caça NORMAL, atualiza missões, verifica level up
     e formata a mensagem final de vitória.
     """
-    user_id = player_data["user_id"]
+    # Verifica se user_id está em player_data, se não, busca no contexto (embora deva estar)
+    user_id = player_data.get("user_id")
+    if not user_id:
+         # Fallback muito improvável, mas seguro
+         logger.warning("apply_and_format_victory foi chamada sem user_id em player_data.")
+         return "Erro ao aplicar recompensas: ID do jogador não encontrado."
+         
     clan_id = player_data.get("clan_id")
 
+    # Síncrono (usa pdata)
     xp_reward, gold_reward, looted_items = calculate_victory_rewards(player_data, combat_details)
 
-    # --- INÍCIO DA CORREÇÃO ---
-
-    # 1. Adicionamos o XP e processamos o level up usando a função centralizada do xp.py
+    # Lógica de XP e Level Up (Síncrono, assumindo que xp_manager.add_combat_xp_inplace é síncrono)
     level_up_result = xp_manager.add_combat_xp_inplace(player_data, xp_reward)
-    
-    # 2. Construímos a mensagem de level up com base no resultado
     level_up_msg = ""
     if level_up_result.get("levels_gained", 0) > 0:
         levels_gained = level_up_result["levels_gained"]
         points_gained = level_up_result["points_awarded"]
         new_level = level_up_result["new_level"]
-        
         nivel_txt = "nível" if levels_gained == 1 else "níveis"
         ponto_txt = "ponto" if points_gained == 1 else "pontos"
         level_up_msg = (
@@ -71,21 +75,26 @@ async def apply_and_format_victory(player_data: dict, combat_details: dict, cont
             f"(agora Nv. {new_level}) e ganhou {points_gained} {ponto_txt} de atributo."
         )
 
-    # --- FIM DA CORREÇÃO ---
-
-    # O resto da lógica continua, mas já não mexe no XP nem chama check_and_apply_level_up
+    # Missões Pessoais (Síncrono)
     mission_manager.update_mission_progress(player_data, 'HUNT', details=combat_details)
     if combat_details.get('is_elite', False):
         mission_manager.update_mission_progress(player_data, 'HUNT_ELITE', details=combat_details)
-    if clan_id:
-        await clan_manager.update_guild_mission_progress(clan_id, 'HUNT', details=combat_details, context=context)
 
-    # Adiciona ouro e itens (isto continua igual)
+    # Missão de Clã (Assíncrono)
+    if clan_id:
+        try:
+            # <<< CORREÇÃO: Adiciona await >>>
+            await clan_manager.update_guild_mission_progress(clan_id, 'HUNT', details=combat_details, context=context)
+        except Exception as e_clan_hunt:
+             logger.error(f"Erro ao atualizar missão de guilda HUNT para clã {clan_id}: {e_clan_hunt}")
+
+
+    # Adiciona ouro e itens (Síncrono)
     player_manager.add_gold(player_data, gold_reward)
     for item_id in looted_items:
         player_manager.add_item_to_inventory(player_data, item_id)
     
-    # Monta a mensagem final
+    # Monta a mensagem final (Síncrono)
     monster_name = combat_details.get('monster_name', 'inimigo')
     summary = (f"✅ Você derrotou {monster_name}!\n"
                f"+{xp_reward} XP, +{gold_reward} ouro.")

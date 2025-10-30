@@ -21,10 +21,10 @@ def _strip_html_for_len(text: str) -> str:
     """Remove tags HTML para medir o comprimento real do texto."""
     return re.sub('<[^<]+?>', '', text)
 
-def _format_battle_caption(player_state: dict, player_data: dict) -> str:
+def _format_battle_caption(player_state: dict, player_data: dict, total_stats: dict) -> str:
+    # ... (CÓDIGO DA FUNÇÃO DE FORMATAÇÃO MANTIDO) ...
     mob = player_state['current_mob']
     action_log = player_state.get('action_log', '')
-    total_stats = player_manager.get_player_total_stats(player_data)
     
     p_name = player_data.get('character_name', 'Herói')
     p_hp_str = f"❤️ HP: {player_state['player_hp']}/{int(total_stats.get('max_hp', 0))}"
@@ -41,10 +41,10 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     m_vel_str = f"🏃‍♂️ VEL: {int(mob.get('initiative', 0))}"
     m_srt_str = f"🍀 SRT: {int(mob.get('luck', 0))}"
     
-    col_width = 17 
+    col_width = 16 
     p_row1 = f"{p_hp_str.ljust(col_width)}{p_mp_str.ljust(col_width)}"
     p_row2 = f"{p_atk_str.ljust(col_width)}{p_def_str.ljust(col_width)}"
-    p_row3 = f"{p_vel_str.ljust(col_width)}{p_srt_str.ljust(col_width)}" # Ajustado para VEL e SRT
+    p_row3 = f"{p_vel_str.ljust(col_width)}{p_srt_str.ljust(col_width)}"
 
     m_row1 = f"{m_hp_str.ljust(col_width)}{m_atk_str.ljust(col_width)}"
     m_row2 = f"{m_def_str.ljust(col_width)}{m_vel_str.ljust(col_width)}"
@@ -83,6 +83,7 @@ def _format_battle_caption(player_state: dict, player_data: dict) -> str:
     return final_caption
 
 def _get_battle_keyboard() -> InlineKeyboardMarkup:
+
     keyboard = [
         [
             InlineKeyboardButton("💥 Atacar", callback_data='kd_marathon_attack'),
@@ -104,10 +105,53 @@ def _get_game_over_keyboard() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
-#
-# ADICIONE ESTA FUNÇÃO COMPLETA AO SEU handler.py
-#
+async def _get_target_selection_keyboard(user_id: int, skill_id: str) -> InlineKeyboardMarkup:
+    """Gera um teclado com os aliados ativos como alvos de uma skill (por HP atual)."""
+    
+    active_fighters_ids = list(event_manager.active_fighters)
+    
+    keyboard = []
+    
+    # Ordenar por HP percentual para que os alvos mais feridos apareçam primeiro (melhor para cura)
+    target_list = []
+    for fighter_id in active_fighters_ids:
+        player_data = await player_manager.get_player_data(fighter_id)
+        player_state = event_manager.get_battle_data(fighter_id)
+        
+        if not player_data or not player_state: continue
+        
+        current_hp = player_state.get('player_hp', 0)
+        max_hp = player_state.get('player_max_hp', 1)
+        
+        # Calcular HP percentual para ordenação (100 = cheio, 0 = vazio)
+        hp_percent = (current_hp / max_hp) * 100 if max_hp > 0 else 0
+        
+        target_list.append({
+            "id": fighter_id,
+            "name": player_data.get('character_name', f'Herói {fighter_id}'),
+            "hp_str": f"HP: {current_hp}/{max_hp}",
+            "hp_percent": hp_percent
+        })
+
+    # Ordenar pelos mais feridos (menor HP percentual)
+    sorted_targets = sorted(target_list, key=lambda t: t['hp_percent'])
+    
+    for target in sorted_targets:
+        # Se for uma skill de cura, é útil saber o HP
+        button_text = f"🛡️ {target['name']} ({target['hp_str']})"
+        
+        # Callback para a função apply_skill_handler com o alvo
+        callback_data = f"apply_skill:{skill_id}:{target['id']}"
+        
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+        
+    # Adiciona botão de voltar
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="show_skill_menu")])
+    
+    return InlineKeyboardMarkup(keyboard)
+
 async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, result: dict):
+    # ... (CÓDIGO DE RESOLUÇÃO MANTIDO E CORRIGIDO) ...
     user_id = query.from_user.id
     
     if "aoe_results" in result:
@@ -116,15 +160,19 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
             if affected_id == user_id: continue
             try:
                 message_to_edit_id = query.message.message_id 
+                affected_player_data = await player_manager.get_player_data(affected_id) 
+                affected_player_state = event_manager.get_battle_data(affected_id)
+                
+                if not affected_player_data or not affected_player_state: continue
+                
+                affected_player_stats = await player_manager.get_player_total_stats(affected_player_data)
+
                 if event["was_defeated"]:
                     caption = "☠️ <b>FIM DE JOGO</b> ☠️\n\nVocê foi derrotado por um ataque em área do chefe."
                     await context.bot.edit_message_caption(chat_id=affected_id, message_id=message_to_edit_id, caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
                 else:
-                    affected_player_data = player_manager.get_player_data(affected_id)
-                    affected_player_state = event_manager.get_battle_data(affected_id)
-                    if affected_player_data and affected_player_state:
-                        new_caption = _format_battle_caption(affected_player_state, affected_player_data)
-                        await context.bot.edit_message_caption(chat_id=affected_id, message_id=message_to_edit_id, caption=new_caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
+                    new_caption = _format_battle_caption(affected_player_state, affected_player_data, affected_player_stats) 
+                    await context.bot.edit_message_caption(chat_id=affected_id, message_id=message_to_edit_id, caption=new_caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
             except Exception as e:
                 logger.error(f"Falha ao notificar jogador passivo {affected_id} sobre o AoE: {e}")
 
@@ -137,42 +185,53 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
 
     is_player_defeated = result.get("game_over") or ("aoe_results" in result and any(e['user_id'] == user_id and e['was_defeated'] for e in result["aoe_results"]))
     if is_player_defeated:
-        final_log = result.get('action_log', 'Você foi derrotado.')
-        caption = f"☠️ <b>FIM DE JOGO</b> ☠️\n\nSua jornada na defesa chegou ao fim.\n\n<b>Última Ação:</b>\n<code>{html.escape(final_log)}</code>"
-        try:
-            defeat_media_id = file_ids.get_file_id('game_over_skull')
-            media = InputMediaPhoto(media=defeat_media_id, caption=caption, parse_mode="HTML")
-            await query.edit_message_media(media=media, reply_markup=_get_game_over_keyboard())
-        except Exception:
-            await query.edit_message_caption(caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
+        final_log = result.get('action_log', 'Você foi derrotado.'); caption = f"☠️ <b>FIM DE JOGO</b> ☠️\n\nSua jornada na defesa chegou ao fim.\n\n<b>Última Ação:</b>\n<code>{html.escape(final_log)}</code>";
+        try: defeat_media_id = file_ids.get_file_id('game_over_skull'); media = InputMediaPhoto(media=defeat_media_id, caption=caption, parse_mode="HTML"); await query.edit_message_media(media=media, reply_markup=_get_game_over_keyboard())
+        except Exception: await query.edit_message_caption(caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
         return
+
+    player_data = await player_manager.get_player_data(user_id) 
+    player_full_stats = await player_manager.get_player_total_stats(player_data)
 
     if result.get("monster_defeated"):
         await query.answer(f"Inimigo derrotado! {result.get('loot_message', '')}", cache_time=1)
-        player_data = player_manager.get_player_data(user_id)
-        player_state = event_manager.get_battle_data(user_id)
-        player_state['action_log'] = result.get('action_log', '')
-        media_key = player_state['current_mob']['media_key']
-        file_data = file_ids.get_file_data(media_key)
         
-        caption = _format_battle_caption(player_state, player_data)
-        media = InputMediaPhoto(media=file_data["id"], caption=caption, parse_mode="HTML")
-        await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
+        player_state = event_manager.get_battle_data(user_id)
+        
+        if not player_data or not player_state:
+             await query.edit_message_caption(caption="Erro ao carregar dados pós-vitória.", reply_markup=_get_game_over_keyboard())
+             return
+             
+        player_state['action_log'] = result.get('action_log', '')
+        media_key = player_state['current_mob'].get('media_key')
+        file_data = file_ids.get_file_data(media_key) if media_key else None
+        
+        caption = _format_battle_caption(player_state, player_data, player_full_stats) 
+        
+        if file_data and file_data.get("id"):
+             media = InputMediaPhoto(media=file_data["id"], caption=caption, parse_mode="HTML")
+             await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
+        else:
+             await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
         return
     
     else:
-        player_data = player_manager.get_player_data(user_id)
         player_state = event_manager.get_battle_data(user_id)
-        if player_state:
+        if player_state and player_data:
             player_state['action_log'] = result.get('action_log', '')
-            caption = _format_battle_caption(player_state, player_data)
+            caption = _format_battle_caption(player_state, player_data, player_full_stats) 
             await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
+        elif not player_state:
+             await query.edit_message_caption(caption="A batalha terminou.", reply_markup=_get_game_over_keyboard())
 
 async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
+    
+    player_data = await player_manager.get_player_data(user_id) 
+    if not player_data: return
+
     player_skill_ids = player_data.get("skills", [])
     active_skills = [skill_id for skill_id in player_skill_ids if SKILL_DATA.get(skill_id, {}).get("type") == "active"]
 
@@ -181,48 +240,76 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard, current_mana = [], player_data.get("mana", 0)
+    
+    # -------------------------------------------------------------
+    # NOVO: Lógica para redirecionar skills de alvo único (single target)
+    # -------------------------------------------------------------
     for skill_id in active_skills:
         skill_info = SKILL_DATA[skill_id]
         mana_cost = skill_info.get('mana_cost', 0)
-        button_text = f"{skill_info['display_name']} ({mana_cost} MP)"
-        if current_mana < mana_cost:
-            button_text = f"❌ {button_text}"
-        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"use_skill:{skill_id}")])
+        
+        # Define se a skill precisa de seleção de alvo (aqui: se é 'support_heal' e tem 'target':'single')
+        # Precisamos de uma lógica mais robusta. No momento, assumimos que 'active_holy_blessing' é de alvo único.
+        # VAMOS USAR UM MÉTODO MAIS GERAL PARA SKILLS DE ALVO ÚNICO NO GRUPO
+        
+        is_single_target_support = skill_info.get("type") == "support_heal" and skill_info.get("target") == "single"
+        
+        button_text_base = f"{skill_info['display_name']} ({mana_cost} MP)"
+        
+        if is_single_target_support:
+            # Redireciona para a seleção de alvo
+            if current_mana < mana_cost:
+                 button_text = f"❌ {button_text_base}"
+            else:
+                 button_text = f"🎯 {button_text_base}"
+            
+            # Novo callback para seleção
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"select_target:{skill_id}")])
+            
+        else:
+            # Uso direto (ataque, party-heal/buff, self-buff)
+            if current_mana < mana_cost:
+                button_text = f"❌ {button_text_base}"
+            else:
+                button_text = button_text_base
+            
+            # Callback para uso imediato (o target_id será None)
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"use_skill:{skill_id}")])
     
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="back_to_battle")])
-    await query.edit_message_caption(caption="Escolha uma habilidade para usar:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.edit_message_caption(caption="Escolha uma habilidade para usar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
-async def back_to_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def select_skill_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    player_data = player_manager.get_player_data(user_id)
-    battle_data = event_manager.get_battle_data(user_id)
-    if not battle_data:
-        await query.edit_message_caption(caption="A batalha terminou.", reply_markup=_get_game_over_keyboard())
-        return
-    caption = _format_battle_caption(battle_data, player_data)
-    await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode="HTML")
-
-async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    now = time.time()
-    last_action_time = context.user_data.get('kd_last_action_time', 0)
-    if now - last_action_time < 2.0:
-        await query.answer("Aguarde um momento!", cache_time=1)
-        return
-    context.user_data['kd_last_action_time'] = now
-    await query.answer()
     
     try:
-        player_data = player_manager.get_player_data(user_id)
-        if not player_data: return
-        result = event_manager.process_player_attack(user_id, player_data)
-        await _resolve_battle_turn(query, context, result)
-    except Exception:
-        traceback.print_exc()
-        await query.answer("Ocorreu um erro crítico.", show_alert=True)
+        # Padrão: select_target:skill_id
+        skill_id = query.data.split(':')[1]
+    except IndexError:
+        await query.answer("Erro: Skill não encontrada.", show_alert=True)
+        return
+    
+    skill_info = SKILL_DATA.get(skill_id)
+    if not skill_info:
+        await query.answer("Erro: Habilidade desconhecida.", show_alert=True)
+        return
+        
+    # Verifica se o jogador tem mana suficiente (para desabilitar o botão de voltar)
+    player_data = await player_manager.get_player_data(user_id)
+    mana_cost = skill_info.get("mana_cost", 0)
+    if player_data.get("mana", 0) < mana_cost:
+        await query.answer("Mana insuficiente!", show_alert=True)
+        # Não retorna, apenas mostra a tela sem mana suficiente
+        
+    # Gera o teclado de seleção de alvo (ASYNC)
+    target_keyboard = await _get_target_selection_keyboard(user_id, skill_id)
+    
+    caption = f"🛡️ **{skill_info['display_name']}** ({mana_cost} MP)\n\nEscolha o aliado para curar ou dar suporte:"
+    
+    await query.edit_message_caption(caption=caption, reply_markup=target_keyboard, parse_mode="HTML")
+
 
 async def back_to_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Redesenha a tela de batalha principal ao sair do menu de skills."""
@@ -230,23 +317,104 @@ async def back_to_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
 
-    player_data = player_manager.get_player_data(user_id)
-    # Precisamos dos dados da batalha para redesenhar a tela
+    player_data = await player_manager.get_player_data(user_id)
+    total_stats = await player_manager.get_player_total_stats(player_data)
     battle_data = event_manager.get_battle_data(user_id)
 
-    if not battle_data:
-        # Se por algum motivo a batalha terminou enquanto o jogador olhava as skills
+    if not battle_data or not player_data:
         await query.edit_message_caption(caption="A batalha terminou.", reply_markup=_get_game_over_keyboard())
         return
 
-    # Formata a legenda da batalha e edita a mensagem de volta para a tela principal
-    caption = _format_battle_caption(battle_data, player_data)
+    caption = _format_battle_caption(battle_data, player_data, total_stats) 
     await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode="HTML")
 
-#
-# SUBSTITUA SUA FUNÇÃO use_skill_handler PELA VERSÃO COMPLETA ABAIXO
-#
+# Arquivo: kingdom_defense/handler.py
+
+async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = update.effective_user.id
+
+    # 1. Verifica delay (síncrono)
+    now = time.time()
+    last_attack_time = context.user_data.get('kd_last_attack_time', 0)
+
+    if now - last_attack_time < 2.0:
+        await query.answer("Aguarde um momento antes de atacar novamente!", cache_time=1)
+        return
+    context.user_data['kd_last_attack_time'] = now
+    await query.answer()
+
+    try:
+        # 2. Carrega player_data e total_stats (ASYNC)
+        player_data = await player_manager.get_player_data(user_id) 
+        if not player_data:
+            await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
+            return
+
+        player_full_stats = await player_manager.get_player_total_stats(player_data) 
+
+        # 3. Processa o ataque no Engine (que deve ser ASYNC)
+        result = await event_manager.process_player_attack(user_id, player_data, player_full_stats) 
+
+        if result is None:
+            logger.error(f"process_player_attack retornou None para user_id {user_id}")
+            await query.answer("Erro interno: O estado da batalha não foi retornado corretamente.", show_alert=True)
+            return
+
+        if "error" in result:
+            await query.answer(result["error"], show_alert=True)
+            return
+
+        # --- BLOCO DE NOTIFICAÇÃO AOE ---
+        if "aoe_results" in result:
+            for event in result["aoe_results"]:
+                affected_id = event["user_id"]
+                if affected_id == user_id: continue 
+                try:
+                    # --- INÍCIO DA CORREÇÃO (Bug 2: AoE) ---
+                    affected_player_data = await player_manager.get_player_data(affected_id)
+                    affected_player_state = event_manager.get_battle_data(affected_id)
+ 
+                    if not affected_player_data or not affected_player_state:
+                        continue
+
+                    # Busca o ID da mensagem guardado no estado do JOGADOR AFETADO
+                    message_to_edit_id = affected_player_state.get('message_id')
+
+                    if not message_to_edit_id:
+                        logger.warning(f"Não foi possível encontrar o message_id para o jogador passivo {affected_id}")
+                        continue
+                    # --- FIM DA CORREÇÃO ---
+
+                    # O CÓDIGO ANTIGO (incorreto) era:
+                    # message_to_edit_id = query.message.message_id 
+
+                    affected_player_stats = await player_manager.get_player_total_stats(affected_player_data)
+
+                    if event["was_defeated"]:
+                        caption = "☠️ FIM DE JOGO ☠️\n\nVocê foi derrotado por um ataque em área do chefe."
+                        # Usa o chat_id (affected_id) e o message_id (message_to_edit_id) corretos
+                        await context.bot.edit_message_caption(chat_id=affected_id, message_id=message_to_edit_id, caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
+                    else:
+                        new_caption = _format_battle_caption(affected_player_state, affected_player_data, affected_player_stats) 
+                        # Usa o chat_id (affected_id) e o message_id (message_to_edit_id) corretos
+                        await context.bot.edit_message_caption(chat_id=affected_id, message_id=message_to_edit_id, caption=new_caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
+                except Exception as e:
+                     logger.error(f"Falha ao notificar jogador passivo {affected_id} sobre o AoE: {e}")
+        # --- FIM DO BLOCO DE NOTIFICAÇÃO AOE ---
+
+        # 4. Resolve o Turno (vitória ou contra-ataque)
+        await _resolve_battle_turn(query, context, result) 
+
+    except Exception as e:
+        print(f"!!!!!!!! ERRO CRÍTICO EM handle_marathon_attack !!!!!!!!!!")
+        traceback.print_exc()
+        print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        logger.error(f"Erro CRÍTICO em handle_marathon_attack: {e}", exc_info=True)
+        await query.answer("Ocorreu um erro ao processar seu ataque. Avise um administrador.", show_alert=True)
+
 async def use_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     query = update.callback_query
     user_id = query.from_user.id
     now = time.time()
@@ -259,10 +427,13 @@ async def use_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         skill_id = query.data.split(':')[1]
     except IndexError:
+        await query.answer("Erro: Skill não encontrada.", show_alert=True)
         return
 
-    player_data = player_manager.get_player_data(user_id)
-    if not player_data: return
+    player_data = await player_manager.get_player_data(user_id) 
+    if not player_data: 
+         await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
+         return
 
     skill_info = SKILL_DATA.get(skill_id)
     if not skill_info:
@@ -274,7 +445,8 @@ async def use_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await query.answer()
-    result = event_manager.process_player_skill(user_id, player_data, skill_id)
+    # O target_id é None aqui, pois esta função só lida com self/party/monstro (uso direto)
+    result = await event_manager.process_player_skill(user_id, player_data, skill_id)
     await _resolve_battle_turn(query, context, result)
 
 async def apply_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -290,11 +462,45 @@ async def apply_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         _, skill_id, target_id_str = query.data.split(':')
         target_id = int(target_id_str)
-        player_data = player_manager.get_player_data(user_id)
-        if not player_data: return
+        # CORREÇÃO: Adiciona await
+        player_data = await player_manager.get_player_data(user_id)
+        if not player_data: 
+             await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
+             return
 
         await query.answer()
-        result = event_manager.process_player_skill(user_id, player_data, skill_id, target_id=target_id)
+        # CORREÇÃO: Adiciona await
+        result = await event_manager.process_player_skill(user_id, player_data, skill_id, target_id=target_id)
+        # CORREÇÃO: Adiciona await
+        await _resolve_battle_turn(query, context, result)
+    except Exception:
+        traceback.print_exc()
+        await query.answer("Ocorreu um erro ao aplicar a skill.", show_alert=True)
+
+async def apply_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    user_id = query.from_user.id
+    now = time.time()
+    last_action_time = context.user_data.get('kd_last_action_time', 0)
+    if now - last_action_time < 2.0:
+        await query.answer("Aguarde um momento!", cache_time=1)
+        return
+    context.user_data['kd_last_action_time'] = now
+
+    try:
+        # Padrao: apply_skill:skill_id:target_id
+        _, skill_id, target_id_str = query.data.split(':')
+        target_id = int(target_id_str)
+        
+        player_data = await player_manager.get_player_data(user_id)
+        if not player_data: 
+             await query.answer("Erro ao carregar dados do jogador.", show_alert=True)
+             return
+
+        await query.answer()
+        # O target_id agora é passado corretamente!
+        result = await event_manager.process_player_skill(user_id, player_data, skill_id, target_id=target_id)
         await _resolve_battle_turn(query, context, result)
     except Exception:
         traceback.print_exc()
@@ -307,7 +513,8 @@ async def show_battle_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    leaderboard_text = event_manager.get_leaderboard_text()
+    # CORREÇÃO: Adiciona await para o método async
+    leaderboard_text = await event_manager.get_leaderboard_text() 
     await query.answer(text=leaderboard_text, show_alert=True, cache_time=5)
 
 async def back_to_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -345,8 +552,13 @@ async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
-    player_data = player_manager.get_player_data(user_id)
     
+    # 1. Carrega player_data e verifica ticket (Mantido)
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+         await query.answer("Erro ao carregar dados. Tente /start.", show_alert=True)
+         return
+         
     ticket_id = 'ticket_defesa_reino'
     player_inventory = player_data.get('inventory', {})
     
@@ -360,184 +572,91 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
         await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
         return
 
+    # Consome ticket e salva (correto)
     player_manager.remove_item_from_inventory(player_data, ticket_id, 1)
-    player_manager.save_player_data(user_id, player_data)
+    await player_manager.save_player_data(user_id, player_data)
     
-    status = event_manager.add_player_to_event(user_id, player_data)
+    # 2. Chama add_player_to_event (que é async e configura o estado)
+    status = await event_manager.add_player_to_event(user_id, player_data) 
     
     if status == "active":
+        # CORREÇÃO PRINCIPAL: CARREGA total_stats AQUI
+        total_stats = await player_manager.get_player_total_stats(player_data) 
         battle_data = event_manager.get_battle_data(user_id)
+        
         if not battle_data:
-            await query.edit_message_text("Ocorreu um erro ao buscar seus dados de batalha. Tente novamente.", reply_markup=_get_game_over_keyboard())
-            return
-            
-        media_key = battle_data['current_mob']['media_key']
-        file_data = file_ids.get_file_data(media_key)
+             await query.edit_message_caption(caption="Ocorreu um erro ao buscar seus dados de batalha. Tente novamente.", reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
+             return
+        
+        media_key = battle_data['current_mob'].get('media_key')
+        file_data = file_ids.get_file_data(media_key) if media_key else None
         
         if not file_data or not file_data.get("id"):
-            logger.error(f"MEDIA NÃO ENCONTRADA PARA A CHAVE: {media_key}")
-            await query.edit_message_text(
-                f"⚠️ Erro de configuração!\n\nA mídia para '{media_key}' não foi encontrada. Avise um administrador."
-            )
-            return
+             logger.error(f"MEDIA NÃO ENCONTRADA PARA A CHAVE: {media_key}")
+             await query.edit_message_text(f"⚠️ Erro de configuração!\n\nA mídia para '{media_key}' não foi encontrada. Avise um administrador.")
+             return
 
-        caption = _format_battle_caption(battle_data, player_data)
-        media = InputMediaPhoto(media=file_data["id"], caption=caption, parse_mode="HTML")
-        await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
+        # 3. Formata e Envia, PASSANDO total_stats
+        caption = _format_battle_caption(battle_data, player_data, total_stats)
         
+        media = InputMediaPhoto(media=file_data["id"], caption=caption, parse_mode="HTML")
+        edited_message = await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
+        # Guarda o ID da mensagem editada
+        event_manager.store_player_message_id(user_id, edited_message.message_id)
+    
     elif status == "waiting":
         status_text = event_manager.get_queue_status_text()
         text = f"🛡️ Fila de Reforços 🛡️\n\nA linha de frente está cheia!\n\n{status_text}\n\nAguarde sua vez."
         await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard(), parse_mode='HTML')
 
-async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = update.effective_user.id # ID do jogador que clicou no botão
-    
-    now = time.time()
-    last_attack_time = context.user_data.get('kd_last_attack_time', 0)
-    
-    if now - last_attack_time < 2.0:
-        await query.answer("Aguarde um momento antes de atacar novamente!", cache_time=1)
-        return
-
-    context.user_data['kd_last_attack_time'] = now
-    
-    try:
-        player_data = player_manager.get_player_data(user_id)
-        result = event_manager.process_player_attack(user_id, player_data)
-        
-        if "error" in result:
-            await query.answer(result["error"], show_alert=True)
-            return
-
-        # --- INÍCIO DO NOVO BLOCO DE NOTIFICAÇÃO AOE ---
-        if "aoe_results" in result:
-            # Notifica todos os jogadores que foram afetados, EXCETO o que atacou
-            for event in result["aoe_results"]:
-                affected_id = event["user_id"]
-                if affected_id == user_id:
-                    continue # Pula o jogador que atacou, pois a tela dele será atualizada no final
-
-                try:
-                    message_to_edit_id = query.message.message_id 
-
-                    if event["was_defeated"]:
-                        caption = "☠️ FIM DE JOGO ☠️\n\nVocê foi derrotado por um ataque em área do chefe."
-                        await context.bot.edit_message_caption(chat_id=affected_id, message_id=message_to_edit_id, caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
-                    else:
-                        affected_player_data = player_manager.get_player_data(affected_id)
-                        affected_player_state = event_manager.get_battle_data(affected_id)
-                        if affected_player_data and affected_player_state:
-                            new_caption = _format_battle_caption(affected_player_state, affected_player_data)
-                            await context.bot.edit_message_caption(chat_id=affected_id, message_id=message_to_edit_id, caption=new_caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
-                except Exception as e:
-                    logger.error(f"Falha ao notificar jogador passivo {affected_id} sobre o AoE: {e}")
-        # --- FIM DO NOVO BLOCO DE NOTIFICAÇÃO AOE ---
-
-        if result.get("event_over"):
-            final_log = result.get("action_log", "")
-            victory_caption = (
-                f"🏆 VITÓRIA! 🏆\n\n"
-                f"O reino está a salvo graças à sua bravura!\n"
-                f"Todos os inimigos foram derrotados.\n\n"
-                f"<i>Últimas ações:\n{html.escape(final_log)}</i>"
-            )
-            media_victory = InputMediaPhoto(
-                media=VICTORY_PHOTO_ID,
-                caption=victory_caption,
-                parse_mode='HTML'
-            )
-            await query.edit_message_media(media=media_victory, reply_markup=_get_game_over_keyboard())
-            return
-        
-        # --- BLOCO DE FIM DE JOGO (AJUSTADO PARA INCLUIR DERROTA POR AOE) ---
-        is_player_defeated = result.get("game_over") or (
-            "aoe_results" in result and any(e['user_id'] == user_id and e['was_defeated'] for e in result["aoe_results"])
-        )
-        if is_player_defeated:
-            final_log = result.get('action_log', 'Você foi derrotado em combate.')
-            caption = f"☠️ FIM DE JOGO ☠️\n\nSua jornada na defesa do reino chegou ao fim.\n\n<b>Última Ação:</b>\n<code>{html.escape(final_log)}</code>"
-            
-            try:
-                defeat_media_id = file_ids.get_file_id('game_over_skull')
-                media = InputMediaPhoto(media=defeat_media_id, caption=caption, parse_mode="HTML")
-                await query.edit_message_media(media=media, reply_markup=_get_game_over_keyboard())
-            except Exception:
-                await query.edit_message_caption(caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
-            return
-        # --- FIM DO BLOCO DE FIM DE JOGO ---
-
-        player_state = event_manager.get_battle_data(user_id)
-        if not player_state:
-            await query.edit_message_caption(caption="Sua batalha terminou.", reply_markup=_get_game_over_keyboard())
-            return
-
-        if result.get("monster_defeated"):
-            await query.answer(f"Inimigo derrotado! {result['loot_message']}", cache_time=1)
-            
-            next_mob_data = result['next_mob_data']
-            player_state['current_mob'] = next_mob_data
-            player_state['action_log'] = result['action_log']
-            
-            media_key = next_mob_data['media_key']
-            file_data = file_ids.get_file_data(media_key)
-            
-            if not file_data or not file_data.get("id"):
-                await query.edit_message_caption(caption="Erro: Mídia do próximo monstro não encontrada.", reply_markup=_get_game_over_keyboard())
-                return
-
-            caption = _format_battle_caption(player_state, player_data)
-            media = InputMediaPhoto(media=file_data["id"], caption=caption, parse_mode="HTML")
-            await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
-        else:
-            player_state['action_log'] = result['action_log']
-            caption = _format_battle_caption(player_state, player_data)
-            await query.edit_message_caption(caption=caption, reply_markup=_get_battle_keyboard(), parse_mode='HTML')
-            await query.answer()
-
-    except Exception as e:
-        print(f"!!!!!!!! ERRO CRÍTICO EM handle_marathon_attack !!!!!!!!!!")
-        traceback.print_exc()
-        print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        await query.answer("Ocorreu um erro ao processar seu ataque. Avise um administrador.", show_alert=True)
-
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
-    
+
     if not event_manager.is_active:
         await query.answer("O evento já terminou.", show_alert=True)
         await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
         return
 
     status = event_manager.get_player_status(user_id)
-    
+
     if status == "active":
         await query.answer("Sua vez chegou! Prepare-se!", show_alert=True)
-        
-        player_data = player_manager.get_player_data(user_id)
+
+        # CORREÇÃO: Adiciona await
+        player_data = await player_manager.get_player_data(user_id)
+        # CORREÇÃO: Carrega total_stats
+        total_stats = await player_manager.get_player_total_stats(player_data)
         battle_data = event_manager.get_battle_data(user_id)
-        
-        if not battle_data:
+
+        if not player_data or not battle_data:
             await query.edit_message_text("Erro ao iniciar sua batalha. Tente entrar novamente.", reply_markup=_get_game_over_keyboard())
             return
-            
-        media_key = battle_data['current_mob']['media_key']
-        file_data = file_ids.get_file_data(media_key)
-        
+
+        media_key = battle_data['current_mob'].get('media_key')
+        file_data = file_ids.get_file_data(media_key) if media_key else None
+
         if not file_data or not file_data.get("id"):
             await query.message.edit_text("Erro: Mídia do monstro não encontrada.")
             return
 
-        caption = _format_battle_caption(battle_data, player_data)
-        
+        # CORREÇÃO: Passa total_stats para a função de formatação
+        caption = _format_battle_caption(battle_data, player_data, total_stats)
+
+        # Apaga a mensagem "Aguarde na fila"
         await query.message.delete()
-        # Mudei para send_photo para garantir compatibilidade
-        await context.bot.send_photo(
+
+        # Envia a nova mensagem de batalha e guarda a resposta
+        new_message = await context.bot.send_photo(
             chat_id=user_id, photo=file_data["id"], caption=caption, 
             reply_markup=_get_battle_keyboard(), parse_mode="HTML"
         )
+
+        # --- INÍCIO DA CORREÇÃO (Bug 2: AoE) ---
+        # Armazena o ID da nova mensagem no estado do jogador
+        event_manager.store_player_message_id(user_id, new_message.message_id)
+        # --- FIM DA CORREÇÃO ---
+
     elif status == "waiting":
         status_text = event_manager.get_queue_status_text()
         text = f"🛡️ Fila de Reforços 🛡️\n\nAinda aguardando vaga...\n\n{status_text}"
@@ -559,3 +678,4 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(back_to_battle, pattern='^back_to_battle$'))
     application.add_handler(CallbackQueryHandler(use_skill_handler, pattern='^use_skill:'))
     application.add_handler(CallbackQueryHandler(apply_skill_handler, pattern='^apply_skill:'))
+    application.add_handler(CallbackQueryHandler(select_skill_target, pattern='^select_target:'))

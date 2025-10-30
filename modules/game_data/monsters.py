@@ -120,19 +120,19 @@ MONSTERS_DATA = {
         {
             "id": "ond1_pequeno_slime",
             "name": "Pequeno Slime",
-            "hp": 15, "attack": 2, "defense": 1, "initiative": 5, "luck": 1,
+            "hp": 10, "attack": 2, "defense": 1, "initiative": 5, "luck": 1,
             "media_key": "ond1_slime_pequeno_media"
         },
         {
             "id": "ond1_slime_verde",
             "name": "Slime Verde",
-            "hp": 25, "attack": 3, "defense": 2, "initiative": 3, "luck": 2,
+            "hp": 20, "attack": 3, "defense": 2, "initiative": 3, "luck": 2,
             "media_key": "ond1_slime_verde_media"
         },
         {
             "id": "ond1_slime_azul",
             "name": "Slime Azul", # Mais defensivo
-            "hp": 35, "attack": 2, "defense": 4, "initiative": 2, "luck": 2,
+            "hp": 30, "attack": 2, "defense": 4, "initiative": 2, "luck": 2,
             "media_key": "ond1_slime_azul_media"
         },
         {
@@ -144,31 +144,31 @@ MONSTERS_DATA = {
         {
             "id": "ond1_slime_terra",
             "name": "Slime Terra",
-            "hp": 45, "attack": 4, "defense": 3, "initiative": 1, "luck": 3,
+            "hp": 50, "attack": 4, "defense": 3, "initiative": 1, "luck": 3,
             "media_key": "ond1_slime_terra_media"
         },
         {
             "id": "ond1_slime_venenoso",
             "name": "Slime Venenoso", 
-            "hp": 50, "attack": 3, "defense": 2, "initiative": 12, "luck": 5,
+            "hp": 60, "attack": 3, "defense": 2, "initiative": 12, "luck": 5,
             "media_key": "ond1_slime_venenoso_media"
         },
         {
             "id": "ond1_slime_eletrico",
             "name": "Slime Eeletrico", # Causa um pouco de dano extra
-            "hp": 55, "attack": 4, "defense": 3, "initiative": 4, "luck": 4,
+            "hp": 70, "attack": 4, "defense": 3, "initiative": 4, "luck": 4,
             "media_key": "ond1_slime_eletrico_media"
         },
         {
             "id": "ond1_slime_brilhante",
             "name": "Slime Brilhante", # Raro, dá mais ouro
-            "hp": 60, "attack": 1, "defense": 1, "initiative": 20, "luck": 10,
+            "hp": 75, "attack": 1, "defense": 1, "initiative": 20, "luck": 10,
             "media_key": "ond1_slime_brilhante_media"
         },
         {
             "id": "ond1_slime_escuridao",
             "name": "Slime da Escuridão", # Raro, muito defensivo
-            "hp": 65, "attack": 3, "defense": 15, "initiative": 1, "luck": 5,
+            "hp": 80, "attack": 3, "defense": 15, "initiative": 1, "luck": 5,
             "media_key": "ond1_slime_escuridao_media"
         },
 
@@ -176,7 +176,7 @@ MONSTERS_DATA = {
             "id": "ond1_rei_slime",
             "name": "Rei Slime",
             "is_boss": True,
-            "hp": 1150, "attack": 30, "defense": 8, "initiative": 5, "luck": 10,
+            "hp": 1150, "attack": 20, "defense": 8, "initiative": 5, "luck": 10,
             "special_attack": {
                 "name": "Esmagamento Real",
                 "damage_multiplier": 2.5,
@@ -246,7 +246,7 @@ MONSTERS_DATA = {
             "id": "onda2_campeao_do_sepulcro",
             "name": "Campeão do Sepulcro",
             "is_boss": True,
-            "hp": 1300, "attack": 55, "defense": 20, "initiative": 20, "luck": 15,
+            "hp": 1300, "attack": 50, "defense": 20, "initiative": 20, "luck": 15,
             "special_attack": {
                 "name": "Golpe Sepulcral",
                 "damage_multiplier": 3.0,
@@ -320,7 +320,7 @@ MONSTERS_DATA = {
             "id": "onda3_rei_goblin",
             "name": "Rei Goblin",
             "is_boss": True,
-            "hp": 1500, "attack": 80, "defense": 25, "initiative": 20, "luck": 20,
+            "hp": 1500, "attack": 60, "defense": 25, "initiative": 20, "luck": 20,
             "special_attack": {
                 "name": "Chamado da Horda!",
                 "damage_multiplier": 3.5,
@@ -395,7 +395,7 @@ MONSTERS_DATA = {
             "name": "Prole de Dragão",
             "is_boss": True,
             "hp": 2000, 
-            "attack": 110, "defense": 28, "initiative": 25, "luck": 22,
+            "attack": 60, "defense": 28, "initiative": 25, "luck": 22,
             "special_attack": {
                 "name": "Sopro Dracônico",
                 "damage_multiplier": 4.0,

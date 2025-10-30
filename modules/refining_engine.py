@@ -58,6 +58,7 @@ def _consume_materials(player_data: dict, inputs: dict) -> None:
 # ------------------- API principal -------------------
 
 def preview_refine(recipe_id: str, player_data: dict) -> dict | None:
+    """(Esta função permanece síncrona, o que está correto)"""
     rec = game_data.REFINING_RECIPES.get(recipe_id)
     if not rec: return None
 
@@ -73,8 +74,11 @@ def preview_refine(recipe_id: str, player_data: dict) -> dict | None:
         "outputs": dict(rec.get("outputs", {})),
     }
 
-def start_refine(user_id: int, recipe_id: str) -> dict | str:
-    pdata = player_manager.get_player_data(user_id)
+async def start_refine(pdata: dict, recipe_id: str) -> dict | str:
+    """
+    Inicia o refino, modificando 'pdata' e salvando-o.
+    Agora é 'async' e recebe 'pdata' diretamente.
+    """
     rec = game_data.REFINING_RECIPES.get(recipe_id)
 
     if not pdata or not rec:
@@ -97,23 +101,77 @@ def start_refine(user_id: int, recipe_id: str) -> dict | str:
         "finish_time": finish_dt.isoformat(),
         "details": {"recipe_id": recipe_id},
     }
-    player_manager.save_player_data(user_id, pdata)
+    
+    user_id = pdata.get("user_id")
+    if user_id:
+        await player_manager.save_player_data(user_id, pdata)
+    else:
+        return "Erro: user_id não encontrado em pdata."
+
 
     return {"duration_seconds": duration, "finish_time": finish_dt.isoformat()}
 
-def finish_refine(user_id: int) -> dict | str:
-    pdata = player_manager.get_player_data(user_id)
+async def start_refine(pdata: dict, recipe_id: str) -> dict | str:
+    """
+    Inicia o refino, modificando 'pdata' e salvando-o.
+    Agora é 'async' e recebe 'pdata' diretamente.
+    """
+    rec = game_data.REFINING_RECIPES.get(recipe_id)
+
+    if not pdata or not rec:
+        return "Receita de refino inválida."
+
+    prof_type, prof_lvl = _norm_profession(pdata)
+    if not _is_crafting_profession(prof_type):
+        return "Você precisa ter uma profissão de criação para refinar."
+    if prof_lvl < int(rec.get("level_req", 1)):
+        return "Nível de profissão insuficiente para esta receita."
+    if not _has_materials(pdata, rec.get("inputs", {})):
+        return "Materiais insuficientes."
+
+    duration = _seconds_with_perks(pdata, int(rec.get("time_seconds", 60)))
+    _consume_materials(pdata, rec.get("inputs", {}))
+
+    finish_dt = datetime.now(timezone.utc) + timedelta(seconds=duration)
+    pdata["player_state"] = {
+        "action": "refining",
+        "finish_time": finish_dt.isoformat(),
+        "details": {"recipe_id": recipe_id},
+    }
+    
+    # <<< CORREÇÃO 2: Adiciona 'await' (e usa o user_id de 'pdata') >>>
+    user_id = pdata.get("user_id")
+    if user_id:
+        await player_manager.save_player_data(user_id, pdata)
+    else:
+        return "Erro: user_id não encontrado em pdata."
+
+
+    return {"duration_seconds": duration, "finish_time": finish_dt.isoformat()}
+
+
+async def finish_refine(pdata: dict) -> dict | str:
+    """
+    Finaliza o refino, modificando 'pdata' e salvando-o.
+    Agora é 'async' e recebe 'pdata' diretamente.
+    """
     if not pdata: return "Jogador não encontrado."
 
     state = pdata.get("player_state", {}) or {}
     if state.get("action") != "refining":
-        return {}
+        return {} # Já finalizado, não faz nada
 
     rid = (pdata.get("player_state", {}).get("details") or {}).get("recipe_id")
     rec = game_data.REFINING_RECIPES.get(rid)
+    user_id = pdata.get("user_id") # Pega o user_id para salvar
+    
+    if not user_id:
+        return "Erro fatal: user_id não encontrado em pdata ao finalizar."
+
     if not rec:
         pdata["player_state"] = {"action": "idle"}
-        player_manager.save_player_data(user_id, pdata)
+        # <<< CORREÇÃO 4: Adiciona 'await' >>>
+        await player_manager.save_player_data(user_id, pdata)
         return "Receita não encontrada ao concluir."
 
     for item_id, qty in (rec.get("outputs", {}) or {}).items():
@@ -137,6 +195,7 @@ def finish_refine(user_id: int) -> dict | str:
         pdata["profession"] = prof
 
     pdata["player_state"] = {"action": "idle"}
-    player_manager.save_player_data(user_id, pdata)
+    # <<< CORREÇÃO 5: Adiciona 'await' >>>
+    await player_manager.save_player_data(user_id, pdata)
 
     return {"status": "success", "outputs": dict(rec.get("outputs", {}))}
