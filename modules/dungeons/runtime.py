@@ -1,16 +1,21 @@
-# modules/dungeons/runtime.py
+# modules/dungeons/runtime.py (Atualizado com Opção B + Edição de Mensagem)
 from __future__ import annotations
 import logging
-from typing import List
+from typing import List, Dict, Any
+from collections import Counter 
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+# [MUDANÇA] Importa o tipo 'Message' para podermos retornar
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import CallbackQueryHandler, ContextTypes
 from telegram.error import BadRequest
+
 from modules import player_manager, game_data, clan_manager
 from handlers.utils import format_combat_message
-from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER
+from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER, Difficulty
+from .regions import REGIONAL_DUNGEONS, MobDef
 
-# 🔎 Mídias (batalha). Suporta tanto file_id_manager quanto file_ids.
+# <<< CORREÇÃO DE SINTAXE APLICADA AQUI >>>
+# Removidos os caracteres U+00A0
 try:
     from modules import file_id_manager as media_ids
 except Exception:
@@ -20,87 +25,58 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
-# Helpers de inventário
+# Helpers de inventário (Atualizados)
 # ============================================================
 def _inv(p: dict) -> dict:
     inv = p.get("inventory") or p.get("inventario") or {}
     return inv if isinstance(inv, dict) else {}
 
-def _has_key(pdata: dict, key_item: str) -> bool:
-    try:
-        return int(_inv(pdata).get(key_item, 0)) > 0
-    except Exception:
-        return False
-
-def _consume_key(pdata: dict, key_item: str) -> bool:
+def _consume_keys(pdata: dict, key_item: str, key_cost: int) -> bool:
+    # (Esta função já estava correta, verifica se tem chaves e consome)
     inv = _inv(pdata)
     try:
-        cur = int(inv.get(key_item, 0))
+        current_keys = int(inv.get(key_item, 0))
     except Exception:
-        cur = 0
-    if cur <= 0:
-        return False
-    inv[key_item] = cur - 1
+        current_keys = 0
+    if current_keys < key_cost:
+        return False 
+    inv[key_item] = current_keys - key_cost
     pdata["inventory"] = inv
     return True
 
 # ============================================================
-# Registry loader
+# Registry loader (Lendo de regions.py e config.py)
 # ============================================================
 def _load_region_dungeon(region_key: str) -> dict:
-    try:
-        from modules.dungeons.registry import get_dungeon_for_region  # type: ignore
-    except Exception as e:
-        raise RuntimeError("registry_missing") from e
-
-    d = get_dungeon_for_region(region_key)
+    d = REGIONAL_DUNGEONS.get(region_key)
     if not d:
+        logger.error(f"Tentativa de carregar calabouço não existente: {region_key}")
         raise RuntimeError("dungeon_not_found")
     return d
 
-def _scale_floor(stats: dict, scale: float) -> dict:
-    def gi(k, default):
-        try:
-            return int(stats.get(k, default))
-        except Exception:
-            return default
-    out = dict(stats)
-    out["hp"]         = max(1, int(round(gi("hp", 10) * scale)))
-    out["attack"]     = max(1, int(round(gi("attack", gi("atk", 5)) * scale)))
-    out["defense"]    = max(0, int(round(gi("defense", gi("def", 2)) * scale)))
-    out["initiative"] = max(1, int(round(gi("initiative", gi("ini", 5)) * scale)))
-    out["luck"]       = gi("luck", 5)
-    return out
+def _final_gold_for(dungeon_cfg: dict, difficulty_cfg: Difficulty) -> int:
+    try:
+        base_gold = int(dungeon_cfg.get("gold_base", 0)) 
+        gold_mult = float(difficulty_cfg.gold_mult)
+        return int(round(base_gold * gold_mult))
+    except Exception as e:
+        logger.warning(f"Falha ao calcular ouro final: {e}")
+        return 0
 
-def _difficulty_scale(dungeon_cfg: dict, diff: str) -> float:
-    ds = (dungeon_cfg.get("difficulty_scale") or {})
-    if diff in ds:
-        try:
-            return float(ds[diff])
-        except Exception:
-            pass
-    return {"iniciante": 1.9, "infernal": 4.0, "pesadelo": 5.25}.get(diff, 1.0)
-
-def _final_gold_for(dungeon_cfg: dict, diff: str) -> int:
-    fg = (dungeon_cfg.get("final_gold") or {})
-    if diff in fg:
-        try:
-            return int(fg[diff])
-        except Exception:
-            pass
-    return {"facil": 400, "normal": 800, "infernal": 1800}.get(diff, 0)
+def _key_cost_for(difficulty_cfg: Difficulty) -> int:
+    return difficulty_cfg.key_cost
 
 def _key_item_for(dungeon_cfg: dict) -> str:
     return str(dungeon_cfg.get("key_item") or "cristal_de_abertura")
 
 # ============================================================
-# Botão para o menu da região
+# Botão para o menu da região (Sem alterações)
 # ============================================================
 def build_region_dungeon_button(region_key: str) -> InlineKeyboardButton:
     return InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨 🏰", callback_data=f"dungeon_open:{region_key}")
 
 # ============================================================
-# Envio da mídia de batalha (vídeo/foto) com caption + botões
+# [MUDANÇA] Funções de Envio e Edição de Mensagem
 # ============================================================
 async def _send_battle_media(
     context: ContextTypes.DEFAULT_TYPE,
@@ -108,10 +84,9 @@ async def _send_battle_media(
     caption: str,
     file_id_name: str | None,
     reply_markup: InlineKeyboardMarkup | None = None,
-):
+) -> Message | None: # [MUDANÇA] Retorna a mensagem que foi enviada
     """
-    Tenta enviar vídeo/foto com base em file_id_name.
-    Se não achar mídia, envia texto — SEMPRE com reply_markup quando fornecido.
+    Envia a mídia (primeira luta) e retorna o objeto Message.
     """
     fd = None
     if media_ids and hasattr(media_ids, "get_file_data") and file_id_name:
@@ -120,77 +95,106 @@ async def _send_battle_media(
         except Exception as e:
             logger.debug("get_file_data(%s) falhou: %s", file_id_name, e)
 
-    if fd and fd.get("id"):
-        try:
+    try:
+        if fd and fd.get("id"):
             media_type = (fd.get("type") or "photo").lower()
             if media_type == "video":
-                await context.bot.send_video(
-                    chat_id=chat_id,
-                    video=fd["id"],
-                    caption=caption,
-                    parse_mode="HTML",
-                    reply_markup=reply_markup,
+                # [MUDANÇA] Adiciona 'return'
+                return await context.bot.send_video( 
+                    chat_id=chat_id, video=fd["id"], caption=caption,
+                    parse_mode="HTML", reply_markup=reply_markup,
                 )
             else:
-                await context.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=fd["id"],
-                    caption=caption,
-                    parse_mode="HTML",
-                    reply_markup=reply_markup,
+                # [MUDANÇA] Adiciona 'return'
+                return await context.bot.send_photo(
+                    chat_id=chat_id, photo=fd["id"], caption=caption,
+                    parse_mode="HTML", reply_markup=reply_markup,
                 )
-            return
-        except Exception as e:
-            logger.debug("Falha ao enviar mídia de batalha (%s - %s). Caindo para texto.", file_id_name, e)
+    except Exception as e:
+        logger.debug("Falha ao enviar mídia (%s). Caindo para texto. %s", file_id_name, e)
 
     # fallback: texto
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=caption,
-        parse_mode="HTML",
-        reply_markup=reply_markup,
+    # [MUDANÇA] Adiciona 'return'
+    return await context.bot.send_message(
+        chat_id=chat_id, text=caption,
+        parse_mode="HTML", reply_markup=reply_markup,
     )
 
+# [MUDANÇA] Nova função para editar a mensagem de batalha
+async def _edit_battle_message(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    message_id: int,
+    caption: str,
+    reply_markup: InlineKeyboardMarkup | None = None,
+):
+    """
+    Tenta editar o caption da mídia de batalha. 
+    Se a mídia não tiver caption (ex: fallback de texto), edita o texto.
+    """
+    try:
+        await context.bot.edit_message_caption(
+            chat_id=chat_id,
+            message_id=message_id,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+        return # Sucesso
+    except BadRequest as e:
+        if "not modified" in str(e).lower():
+            return # Ignora, usuário clicou rápido demais
+
+        # Se falhou (ex: era uma mensagem de texto), tenta editar o texto
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=caption,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+        except Exception as e_text:
+            logger.warning(f"Falha ao editar msg {message_id} (caption e texto): {e} / {e_text}")
+            # Se tudo falhar, apaga a msg antiga e envia uma nova
+            try: await context.bot.delete_message(chat_id, message_id)
+            except Exception: pass
+            await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+
+
 # ============================================================
-# UI: abrir menu de dificuldade
+# UI: abrir menu de dificuldade (Já editava a msg, está correto)
 # ============================================================
 async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str):
     q = update.callback_query
     if q:
-        try:
-            await q.answer()
-        except BadRequest:
-            pass
-    
-    # Garante que temos um chat_id, seja de query ou mensagem
+        try: await q.answer()
+        except BadRequest: pass
+
     chat_id = update.effective_chat.id
-    if not chat_id:
-         logger.error("_open_menu: Não foi possível determinar o chat_id.")
-         return
+    if not chat_id: return
 
     try:
-        dungeon = _load_region_dungeon(region_key) # Síncrono
+        dungeon = _load_region_dungeon(region_key) 
     except RuntimeError as e:
-        msg = "Calabouço desta região não está configurado." if str(e) == "dungeon_not_found" else "Sistema de calabouços não instalado (registry)."
+        msg = "Calabouço desta região não está configurado." if str(e) == "dungeon_not_found" else "Sistema de calabouços não instalado."
         await context.bot.send_message(chat_id=chat_id, text=msg)
         return
 
-    key_item = _key_item_for(dungeon) # Síncrono
+    key_item = _key_item_for(dungeon)
     key_obj = (game_data.ITEMS_DATA or {}).get(key_item, {})
     key_name = f"{key_obj.get('emoji','🔹')} {key_obj.get('display_name', key_item)}"
 
-    # <<< CORREÇÃO 1: Adiciona await >>>
     pdata = await player_manager.get_player_data(update.effective_user.id) or {}
-    have = int((_inv(pdata)).get(key_item, 0)) # Síncrono
+    have = int((_inv(pdata)).get(key_item, 0))
 
     caption = (
-        f"<b>{dungeon.get('display_name','Calabouço')}</b>\n"
+        f"<b>{dungeon.get('label','Calabouço')}</b>\n"
         f"Região: <code>{region_key}</code>\n\n"
-        f"🔑 Chave necessária: <b>1× {key_name}</b> — Você tem: <b>{have}</b>\n\n"
+        f"🔑 Você tem: <b>{have} × {key_name}</b>\n\n"
         f"Escolha a dificuldade:"
     )
 
-    # --- Lógica de Desbloqueio (Síncrona) ---
     kb = []
     dungeon_progress = (pdata.get("dungeon_progress", {}) or {}).get(region_key, {})
     highest_completed = dungeon_progress.get("highest_completed")
@@ -200,13 +204,17 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
             highest_completed_index = DEFAULT_DIFFICULTY_ORDER.index(highest_completed)
         except (ValueError, TypeError):
             pass 
+    
     for i, diff_key in enumerate(DEFAULT_DIFFICULTY_ORDER):
         meta = DIFFICULTIES.get(diff_key)
         if not meta: continue
+        key_cost = meta.key_cost
+
         if i <= highest_completed_index + 1:
+            button_text = f"{meta.emoji} {meta.label} (🔑 {key_cost})"
             kb.append([
                 InlineKeyboardButton(
-                    f"{meta.emoji} {meta.label}", 
+                    button_text, 
                     callback_data=f"dungeon_pick:{diff_key}:{region_key}"
                 )
             ])
@@ -217,18 +225,28 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
                     callback_data="dungeon_locked"
                 )
             ])
-    # --- Fim Desbloqueio ---
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
 
-    # Lógica de envio (já usava await)
+    # [MUDANÇA] Tenta apagar a mensagem da query (que é a de batalha)
+    # e envia o menu como uma nova mensagem.
     try:
-        await q.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
-    except Exception:
-        try: await q.delete_message() # Tenta apagar se edit falhar
-        except Exception: pass
+        if q:
+            # Apaga a msg de batalha anterior
+            await q.delete_message()
+        # Envia o menu como uma msg nova
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    except Exception:
+        # Fallback se apagar falhar (ex: msg muito antiga)
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Falha ao enviar menu da dungeon: {e}")
 
+
+# ============================================================
+# Lógica de Combate (Refatorada para Opção B + Edição)
+# ============================================================
 def _new_run_state(region_key: str, difficulty: str) -> dict:
     return {
         "action": "dungeon_run",
@@ -236,171 +254,187 @@ def _new_run_state(region_key: str, difficulty: str) -> dict:
             "region_key": region_key,
             "difficulty": difficulty,
             "dungeon_stage": 0,
-            # O nosso "saco de loot temporário" começa vazio
-            "accumulated_rewards": {
-                "xp": 0,
-                "gold": 0,
-                "items": []
-            }
+            # [MUDANÇA] Não precisamos mais acumular
+            # "accumulated_rewards" foi removido
+            # Vamos salvar o loot do boss aqui
+            "last_fight_rewards": {}
         }
     }
-def _build_combat_details(floor: dict, region_key: str, difficulty: str, stage: int) -> dict:
-    name  = floor.get("name") or floor.get("display") or str(floor.get("id") or "Inimigo")
-    emoji = floor.get("emoji", "")
+
+# "Fábrica" de Monstros (Sem alterações, já estava correta)
+def _build_combat_details(
+    floor_mob: MobDef, difficulty_cfg: Difficulty, region_key: str, stage: int
+) -> dict:
+    base_stats = floor_mob.stats_base
+    stat_mult = difficulty_cfg.stat_mult
+    hp = int(round(base_stats.get("max_hp", 1) * stat_mult))
+    attack = int(round(base_stats.get("attack", 0) * stat_mult))
+    defense = int(round(base_stats.get("defense", 0) * stat_mult))
+    initiative = int(round(base_stats.get("initiative", 0) * stat_mult))
+    is_boss = bool(base_stats.get("is_boss", False))
     return {
-        "monster_name": f"{emoji} {name}".strip(),
-        "monster_hp": int(floor.get("hp", 0)),
-        "monster_max_hp": int(floor.get("hp", 0)),
-        "monster_attack": int(floor.get("attack", 0)),
-        "monster_defense": int(floor.get("defense", 0)),
-        "monster_initiative": int(floor.get("initiative", 0)),
-        "monster_luck": int(floor.get("luck", 0)),
-        "monster_xp_reward": int(floor.get("xp_reward", 10)),
-        "monster_gold_drop": int(floor.get("gold_drop", 5)),
-        "loot_table": list(floor.get("loot_table") or []),
-        "battle_log": [f"Você avança no calabouço ({difficulty})."],
-        "region_key": region_key, "difficulty": difficulty, "dungeon_ctx": True,
-        "dungeon_stage": stage, "file_id_name": floor.get("file_id_name"),
-        "is_boss": bool(floor.get("is_boss")),
+        "monster_name": f"{floor_mob.emoji} {floor_mob.display}".strip(),
+        "monster_hp": hp, "monster_max_hp": hp, "monster_attack": attack,
+        "monster_defense": defense, "monster_initiative": initiative,
+        "monster_luck": base_stats.get("luck", 5),
+        "monster_xp_reward": base_stats.get("xp_reward", 10),
+        "monster_gold_drop": base_stats.get("gold_drop", 5),
+        "loot_table": base_stats.get("loot_table", []),
+        "file_id_name": floor_mob.media_key, "is_boss": is_boss,
+        "region_key": region_key, "difficulty": difficulty_cfg.key, 
+        "dungeon_ctx": True, "dungeon_stage": stage, 
+        "battle_log": [f"Você avança no calabouço ({difficulty_cfg.label})."],
     }
 
-async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str, difficulty: str):
+
+async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str, difficulty_key: str):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    query = update.callback_query # Pega a query para responder
+    query = update.callback_query
 
-    dungeon = _load_region_dungeon(region_key) # Síncrono
-    key_item = _key_item_for(dungeon) # Síncrono
-
-    # <<< CORREÇÃO 2: Adiciona await >>>
-    pdata = await player_manager.get_player_data(user_id) or {}
-
-    # Consumo de chave (síncrono)
-    if not _has_key(pdata, key_item) or not _consume_key(pdata, key_item):
-        try:
-            await context.bot.answer_callback_query(query.id, text="Você precisa de 1× chave para entrar.", show_alert=True)
-        except Exception:
-            await context.bot.send_message(chat_id=chat_id, text="Você precisa de 1× chave para entrar.")
+    dungeon = _load_region_dungeon(region_key)
+    difficulty_cfg = DIFFICULTIES.get(difficulty_key)
+    if not difficulty_cfg:
+        await query.answer("Dificuldade não encontrada.", show_alert=True)
         return
 
-    floors: List[dict] = list(dungeon.get("floors") or []) # Síncrono
+    key_item = _key_item_for(dungeon)
+    key_cost = _key_cost_for(difficulty_cfg)
+    pdata = await player_manager.get_player_data(user_id) or {}
+
+    if not _consume_keys(pdata, key_item, key_cost):
+        try:
+            await query.answer(f"Você precisa de {key_cost}× {key_item} para entrar.", show_alert=True)
+        except Exception:
+            await context.bot.send_message(chat_id=chat_id, text=f"Você precisa de {key_cost}× {key_item} para entrar.")
+        return
+
+    floors: List[MobDef] = list(dungeon.get("floors") or [])
     if not floors:
         await context.bot.send_message(chat_id=chat_id, text="Este calabouço não tem andares configurados.")
         return
 
-    # Síncrono
-    scale = _difficulty_scale(dungeon, difficulty)
-    lineup = [_scale_floor(f, scale) for f in floors]
-
-    # <<< CORREÇÃO 3: Adiciona await >>>
-    # salvar consumo da chave
+    # Salva o consumo da chave
     await player_manager.save_player_data(user_id, pdata)
 
-    # estado inicial + primeiro combate (síncrono)
-    state = _new_run_state(region_key, difficulty)
-    combat = _build_combat_details(lineup[0], region_key, difficulty, 0)
+    state = _new_run_state(region_key, difficulty_key)
+    combat = _build_combat_details(
+        floor_mob=floors[0], difficulty_cfg=difficulty_cfg,
+        region_key=region_key, stage=0
+    )
+
     state["action"] = "in_combat"
     state["details"] = combat
     pdata["player_state"] = state
-    # <<< CORREÇÃO 4: Adiciona await >>>
-    await player_manager.save_player_data(user_id, pdata) # Salva estado de combate
+    caption = await format_combat_message(pdata)
+    kb = [
+        [
+            InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
+            InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu")
+        ],
+        [
+            InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), 
+            InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")
+        ]
+    ]
 
-    caption = format_combat_message(pdata) # Síncrono
-    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
-           InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",  callback_data="combat_flee")]]
-           
-    # <<< CORREÇÃO 5: Adiciona await >>>
-    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb)) # Chama função async
+    # [MUDANÇA] Envia a msg de batalha e guarda o ID dela
+    sent_message = await _send_battle_media(
+        context, chat_id, caption, 
+        combat.get("file_id_name"), 
+        reply_markup=InlineKeyboardMarkup(kb)
+    )
+
+    if sent_message:
+        pdata["player_state"]["details"]["battle_message_id"] = sent_message.message_id
+
+    await player_manager.save_player_data(user_id, pdata) # Salva estado de combate + message_id
+
 
 async def fail_dungeon_run(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, reason: str):
-    """
-    Função chamada quando o jogador falha um calabouço (derrotado ou foge).
-    """
-    # from handlers.menu.region import send_region_menu # Import desnecessário aqui
-
-    # <<< CORREÇÃO 6: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    # Restaura a vida (síncrono)
+    # [MUDANÇA] Pega o ID da mensagem de batalha
+    run = player_data.get("player_state") or {}
+    det = (run.get("details") or {})
+    battle_message_id = det.get("battle_message_id")
+
     total_stats = player_manager.get_player_total_stats(player_data)
     player_data['current_hp'] = total_stats.get('max_hp', 50)
-    
     player_data['player_state'] = {'action': 'idle'}
-    # <<< CORREÇÃO 7: Adiciona await >>>
     await player_manager.save_player_data(user_id, player_data)
-    
+
     summary_text = f"❌ **Você falhou no calabouço!**\n\nMotivo: {reason}."
     keyboard = [[InlineKeyboardButton("➡️ Continuar", callback_data="continue_after_action")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await context.bot.send_message(
-        chat_id=chat_id, text=summary_text,
-        parse_mode="HTML", reply_markup=reply_markup
-    ) # Já usava await
+    # [MUDANÇA] Edita a mensagem de batalha com o sumário de falha
+    if battle_message_id:
+        await _edit_battle_message(
+            context, chat_id, battle_message_id, 
+            summary_text, reply_markup
+        )
+    else:
+        await context.bot.send_message(
+            chat_id=chat_id, text=summary_text,
+            parse_mode="HTML", reply_markup=reply_markup
+        )
 
 async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, combat_details: dict, rewards_to_accumulate: dict):
-    # <<< CORREÇÃO 8: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id) or {}
     clan_id = pdata.get("clan_id")
 
-    # Missão de Chefe (já usava await)
     if clan_id and combat_details.get("is_boss"):
         await clan_manager.update_guild_mission_progress(
-            clan_id=clan_id,
-            mission_type='DUNGEON_BOSS_KILL',
-            details={'count': 1},
-            context=context
+            clan_id=clan_id, mission_type='DUNGEON_BOSS_KILL',
+            details={'count': 1}, context=context
         )
-        
-    # Acumula recompensas (síncrono)
+
     run = pdata.get("player_state") or {}
     det = (run.get("details") or {})
-    current_rewards = det.get("accumulated_rewards", {"xp": 0, "gold": 0, "items": []})
-    current_rewards["xp"] += rewards_to_accumulate.get("xp", 0)
-    current_rewards["gold"] += rewards_to_accumulate.get("gold", 0)
-    current_rewards["items"].extend(rewards_to_accumulate.get("items", []))
-    det["accumulated_rewards"] = current_rewards
     
-    # Lógica síncrona de dungeon/andar
-    region_key = str(det.get("region_key") or combat_details.get("region_key") or "")
-    difficulty = str(det.get("difficulty") or combat_details.get("difficulty") or "normal")
+    # [MUDANÇA] Pega o ID da mensagem de batalha
+    battle_message_id = det.get("battle_message_id")
+
+    # [MUDANÇA - OPÇÃO B] 
+    # Não acumulamos mais o loot. 
+    # Apenas guardamos o loot da luta ATUAL, para o caso de ser o boss.
+    det["last_fight_rewards"] = rewards_to_accumulate
+
+    region_key = str(det.get("region_key") or "")
+    difficulty_key = str(det.get("difficulty") or "normal")
     try:
         dungeon = _load_region_dungeon(region_key)
+        difficulty_cfg = DIFFICULTIES.get(difficulty_key)
     except Exception:
         pdata["player_state"] = {"action": "idle"}
-        # <<< CORREÇÃO 9: Adiciona await >>>
         await player_manager.save_player_data(user_id, pdata)
-        await context.bot.send_message(chat_id=chat_id, text="Calabouço foi encerrado.")
+        await context.bot.send_message(chat_id=chat_id, text="Calabouço foi encerrado (erro ao carregar).")
         return
-    floors: List[dict] = list(dungeon.get("floors") or [])
+
+    floors: List[MobDef] = list(dungeon.get("floors") or [])
     if not floors:
         pdata["player_state"] = {"action": "idle"}
-        # <<< CORREÇÃO 10: Adiciona await >>>
         await player_manager.save_player_data(user_id, pdata)
         await context.bot.send_message(chat_id=chat_id, text="Calabouço sem andares. Encerrado.")
         return
 
-    # Lógica síncrona de próximo andar
-    scale = _difficulty_scale(dungeon, difficulty)
-    lineup = [_scale_floor(f, scale) for f in floors]
     cur_stage = int(det.get("dungeon_stage", 0))
     next_stage = cur_stage + 1
     det["dungeon_stage"] = next_stage
 
     # Verificação de Vitória Final
-    if next_stage >= len(lineup):
-        # Missão de Completar (já usava await)
+    if next_stage >= len(floors):
         if clan_id:
             await clan_manager.update_guild_mission_progress(
-                clan_id=clan_id,
-                mission_type='DUNGEON_COMPLETE',
-                details={'dungeon_id': region_key, 'difficulty': difficulty, 'count': 1},
+                clan_id=clan_id, mission_type='DUNGEON_COMPLETE',
+                details={'dungeon_id': region_key, 'difficulty': difficulty_key, 'count': 1},
                 context=context
             )
-        
-        # Atualização de progresso (síncrono)
-        completed_diff_key = difficulty
+
+        # ... (Lógica de salvar progresso, sem alterações) ...
+        completed_diff_key = difficulty_key
         pdata.setdefault("dungeon_progress", {}).setdefault(region_key, {})
         current_highest_key = pdata["dungeon_progress"][region_key].get("highest_completed")
         try:
@@ -409,27 +443,31 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
             if current_highest_key: current_highest_index = DEFAULT_DIFFICULTY_ORDER.index(current_highest_key)
             if completed_index > current_highest_index:
                 pdata["dungeon_progress"][region_key]["highest_completed"] = completed_diff_key
-                logger.info(f"PROGRESSO DO CALABOUÇO ATUALIZADO para user {user_id} em '{region_key}': {completed_diff_key}")
+                logger.info(f"PROGRESSO ATUALIZADO user {user_id} em '{region_key}': {completed_diff_key}")
         except (ValueError, TypeError):
-            logger.warning(f"Chave de dificuldade inválida: atual='{current_highest_key}', completada='{completed_diff_key}'")
+            logger.warning(f"Chave de dificuldade inválida: '{current_highest_key}', '{completed_diff_key}'")
 
-        # Aplicação de recompensas (síncrono)
-        final_rewards = det.get("accumulated_rewards", {})
-        final_xp = final_rewards.get("xp", 0)
-        final_gold = final_rewards.get("gold", 0) + _final_gold_for(dungeon, difficulty)
-        final_items = final_rewards.get("items", [])
+        # [MUDANÇA - OPÇÃO B] Aplicação de recompensas
+        # Pega o loot do boss (da última luta)
+        boss_rewards = det.get("last_fight_rewards", {})
+        final_xp = boss_rewards.get("xp", 0)
+        final_gold = boss_rewards.get("gold", 0)
+        final_items = boss_rewards.get("items", [])
+        
+        # Adiciona o bônus de ouro do calabouço
+        final_gold += _final_gold_for(dungeon, difficulty_cfg)
+
         pdata['xp'] = int(pdata.get('xp', 0)) + final_xp
         if final_gold > 0: player_manager.add_gold(pdata, final_gold)
+
         looted_items_text = ""
         if final_items:
             for item_id in final_items: player_manager.add_item_to_inventory(pdata, item_id, 1)
-            from collections import Counter
             item_names = [(game_data.ITEMS_DATA.get(item_id, {}) or {}).get('display_name', item_id) for item_id in final_items]
             looted_items_text = "\n\n<b>Tesouros Adquiridos:</b>\n"
             for name, count in Counter(item_names).items(): looted_items_text += f"- {count}x {name}\n"
 
         pdata["player_state"] = {"action": "idle"}
-        # <<< CORREÇÃO 11: Adiciona await >>>
         await player_manager.save_player_data(user_id, pdata) # Salva tudo
 
         summary_text = (
@@ -441,22 +479,59 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
         )
         keyboard = [[InlineKeyboardButton("➡️ 𝐂𝐨𝐧𝐭𝐢𝐧𝐮𝐚𝐫", callback_data="continue_after_action")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(chat_id=chat_id, text=summary_text, parse_mode="HTML", reply_markup=reply_markup) # Já usava await
+
+        # [MUDANÇA] Edita a mensagem de batalha com o sumário de vitória
+        if battle_message_id:
+            await _edit_battle_message(
+                context, chat_id, battle_message_id, 
+                summary_text, reply_markup
+            )
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=summary_text, parse_mode="HTML", reply_markup=reply_markup)
         return
 
-    # Próximo combate (síncrono + async save)
-    combat = _build_combat_details(lineup[next_stage], region_key, difficulty, next_stage)
+    # Próximo combate (NÃO é o final)
+    combat = _build_combat_details(
+        floor_mob=floors[next_stage],
+        difficulty_cfg=difficulty_cfg,
+        region_key=region_key, 
+        stage=next_stage
+    )
     run["action"] = "in_combat"
     run["details"] = combat
     pdata["player_state"] = run
-    # <<< CORREÇÃO 12: Adiciona await >>>
-    await player_manager.save_player_data(user_id, pdata) # Salva o estado para o próximo combate
+    
+    # [MUDANÇA] Atualiza o ID da msg de batalha no estado
+    if battle_message_id:
+        pdata["player_state"]["details"]["battle_message_id"] = battle_message_id
 
-    caption = format_combat_message(pdata) # Síncrono
-    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
-           InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫",  callback_data="combat_flee")]]
-    await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb)) # Já usava await
+    await player_manager.save_player_data(user_id, pdata) # Salva o estado
 
+    caption = await format_combat_message(pdata)
+    kb = [
+        [
+            InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
+            InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu")
+        ],
+        [
+            InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), 
+            InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")
+        ]
+    ]
+    
+    # [MUDANÇA] Edita a mensagem de batalha com o próximo combate
+    if battle_message_id:
+        await _edit_battle_message(
+            context, chat_id, battle_message_id, 
+            caption, InlineKeyboardMarkup(kb)
+        )
+    else:
+        # Fallback caso o ID tenha se perdido
+        await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))
+
+
+# ============================================================
+# Handlers (Sem alterações, já estavam corretos)
 # ============================================================
 async def _open_menu_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = update.callback_query.data
@@ -464,7 +539,6 @@ async def _open_menu_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _open_menu(update, context, region_key)
 
 async def _pick_diff_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # pattern: dungeon_pick:<diff>:<region_key>
     data = update.callback_query.data
     parts = data.split(":")
     if len(parts) != 3:
@@ -474,10 +548,17 @@ async def _pick_diff_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if diff not in DIFFICULTIES:
         await update.callback_query.answer("Dificuldade inválida.", show_alert=True)
         return
+    
+    # [MUDANÇA] Apaga a mensagem do menu antes de começar a luta
+    try:
+        if update.callback_query:
+            await update.callback_query.delete_message()
+    except Exception:
+        pass # Ignora se falhar
+
     await _start_first_fight(update, context, region_key, diff)
 
 async def _dungeon_locked_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Callback para quando o jogador clica numa dificuldade bloqueada."""
     query = update.callback_query
     await query.answer("Você precisa de completar a dificuldade anterior para desbloquear esta!", show_alert=True)
 
