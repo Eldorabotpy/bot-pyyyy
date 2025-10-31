@@ -35,7 +35,7 @@ async def _edit_caption_only(query, caption_text: str, reply_markup=None):
             pass 
 
 async def _return_to_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, msg: str | None = None):
-    player = await player_manager.get_player_data(user_id) or {}
+    player = player_manager.get_player_data(user_id) or {}
     player['player_state'] = {'action': 'idle'}
     await player_manager.save_player_data(user_id, player) 
     if msg:
@@ -46,10 +46,11 @@ async def _return_to_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: in
 # Substitua a função inteira no teu ficheiro handlers/combat/main_handler.py
 #
 
+# A função de combate completa e corrigida
 async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str = None) -> None:
     query = update.callback_query
-
-    if action is None and query:
+    
+    if action is None:
         action = query.data
     elif action is None and not query:
         logger.error("combat_callback chamado sem query e sem action!")
@@ -59,7 +60,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     chat_id = query.message.chat.id if query else update.effective_chat.id
 
     if action == 'combat_attack_menu':
-        if not query: return
         await _safe_answer(query)
 
         # <<< MUDANÇA: Adicionado o botão "Skills" ao menu de voltar >>>
@@ -79,36 +79,21 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             logger.debug(f"Falha ao editar markup para menu de ataque: {e}")
         return
 
-    if query:
-        await _safe_answer(query)
+    await _safe_answer(query)
+    player_data = player_manager.get_player_data(user_id)
 
-    player_data = await player_manager.get_player_data(user_id) 
     if not player_data:
-        error_msg = "Não encontrei seus dados. Use /start."
-        if query: await _edit_caption_only(query, error_msg)
-        else: await context.bot.send_message(chat_id, error_msg)
+        await _edit_caption_only(query, "Não encontrei seus dados. Use /start.")
         return
 
     state = player_data.get('player_state', {})
-    # [MUDANÇA] Definindo is_auto_mode mais cedo
-    combat_details = dict(state.get('details', {}))
-    is_auto_mode = combat_details.get('auto_mode', False)
-
-    if state.get('action') not in ['in_combat']:
-         idle_msg = "Você não está em combate."
-         if not (action == 'combat_attack' and is_auto_mode):
-             if query: await _edit_caption_only(query, idle_msg)
-         return
-
-    if not combat_details:
-        error_msg = "Erro: Detalhes do combate não encontrados."
-        if query: await _edit_caption_only(query, error_msg)
-        else: await context.bot.send_message(chat_id, error_msg)
-        player_data['player_state'] = {'action': 'idle'}
-        await player_manager.save_player_data(user_id, player_data)
+    if state.get('action') not in ['in_combat', 'auto_hunting']:
+        await _edit_caption_only(query, "Você não está em combate.")
         return
 
     player_data["user_id"] = user_id
+    combat_details = dict(state.get('details', {}))
+    is_auto_mode = combat_details.get('auto_mode', False)
     log = list(combat_details.get('battle_log', []))
     player_total_stats = await player_manager.get_player_total_stats(player_data) 
     monster_stats = {
@@ -155,65 +140,8 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
     # --- LÓGICA DE ATAQUE ---
     elif action == 'combat_attack':
- 
-        # <<< MUDANÇA (INÍCIO): Lógica de Skill >>>
-
-        # 1. Verifica se uma skill foi "preparada" pelo skill_handler
-        skill_id = combat_details.pop('skill_to_use', None) # Pega e remove a skill
-        skill_info = SKILL_DATA.get(skill_id) if skill_id else None
-        skill_effects = skill_info.get("effects", {}) if skill_info else {}
-        
-        if skill_info:
-            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>!")
-
-        # 2. Prepara os modificadores do ataque
-        # Copia os stats para podermos modificá-los temporariamente
-        attacker_stats_modified = player_total_stats.copy()
-        target_stats_modified = monster_stats.copy()
-
-        # Pega os efeitos da skill, ou valores padrão
-        damage_mult = float(skill_effects.get("damage_multiplier", 1.0))
-        num_attacks = int(skill_effects.get("multi_hit", 0))
-        defense_penetration = float(skill_effects.get("defense_penetration", 0.0))
-        bonus_crit_chance = float(skill_effects.get("bonus_crit_chance", 0.0))
-
-        # Se não for skill, usa o ataque duplo
-        if num_attacks == 0:
-            num_attacks = 2 if random.random() < (await player_manager.get_player_double_attack_chance(player_data)) else 1
-            if num_attacks == 2 and not skill_id: # Só loga se não for skill
-                log.append("⚡ 𝐀𝐓𝐀𝐐𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
-
-        # Efeito: Penetração de Defesa (ex: Ataque Furtivo)
-        if defense_penetration > 0:
-            target_stats_modified['defense'] = int(target_stats_modified['defense'] * (1.0 - defense_penetration))
-            log.append(f"💨 Você ignora {defense_penetration*100}% da defesa!")
-
-        # Efeito: Bônus de Crítico (ex: Flecha Precisa)
-        if bonus_crit_chance > 0:
-            # Hack: Aumenta a sorte temporariamente para simular bônus de crítico
-            # (Uma forma simples, mas eficaz, de integrar com criticals.py)
-            # Cada 100 de sorte "falsa" adiciona ~63% de chance. 50% = ~70 de sorte.
-            extra_luck = int(bonus_crit_chance * 140) 
-            attacker_stats_modified['luck'] += extra_luck
-            log.append(f"🎯 Mirando um ponto vital...")
-
-        # Efeito: Dano baseado em HP baixo (ex: Golpe Selvagem)
-        if "low_hp_dmg_boost" in skill_effects:
-            player_hp_percent = player_data.get('current_hp', 1) / attacker_stats_modified.get('max_hp', 1)
-            if player_hp_percent < 0.3: # Se HP < 30%
-                damage_mult *= (1.0 + skill_effects.get("low_hp_dmg_boost", 0.0))
-                log.append(f"🩸 Fúria Selvagem!")
-
-        # Efeito: Debuff (ex: Corte Perfurante)
-        if "debuff_target" in skill_effects:
-            debuff = skill_effects["debuff_target"]
-            # (Lógica de aplicar debuffs de longa duração seria aqui)
-            if debuff.get("stat") == "defense":
-                reduction = abs(float(debuff.get("value", 0.0)))
-                target_stats_modified['defense'] = int(target_stats_modified['defense'] * (1.0 - reduction))
-                log.append(f"🛡️ A defesa do inimigo foi reduzida neste turno!")
-        
-        monster_defeated_in_turn = False
+        num_attacks = 2 if random.random() < player_manager.get_player_double_attack_chance(player_data) else 1
+        if num_attacks == 2: log.append("⚡ 𝐀𝐓𝐀𝐐𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
         for i in range(num_attacks):
             player_damage, is_crit, is_mega = criticals.roll_damage(player_total_stats, monster_stats, {})
             log.append(f"➡️ {player_data.get('character_name','Você')} ataca e causa {player_damage} de dano.")
@@ -297,44 +225,30 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 await context.bot.send_message(chat_id=chat_id, text=victory_summary, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data='continue_after_action')]]))
                 return
 
-        # --- TURNO DO MONSTRO (se sobreviveu) ---
-        else: 
-            active_cooldowns = combat_details.setdefault("skill_cooldowns", {})
-            skills_off_cooldown = []
-            if active_cooldowns:
-                for skill_id_cd, turns_left in list(active_cooldowns.items()):
-                    active_cooldowns[skill_id_cd] = turns_left - 1
-                    if active_cooldowns[skill_id_cd] <= 0:
-                        skills_off_cooldown.append(skill_id_cd)
- 
-                for skill_id_cd in skills_off_cooldown:
-                    del active_cooldowns[skill_id_cd]
-                    skill_name = SKILL_DATA.get(skill_id_cd, {}).get('display_name', 'Habilidade')
-                    log.append(f"🔔 <b>{skill_name}</b> está pronta para ser usada!")
-            dodge_chance = await player_manager.get_player_dodge_chance(player_data)
-            if random.random() < dodge_chance: 
-                log.append("💨 Você se esquivou do ataque!")
-            else:
-                monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_total_stats, {})
-                log.append(f"⬅️ {monster_stats['monster_name']} ataca e causa {monster_damage} de dano.")
-                if m_is_mega: log.append("‼️ 𝕄𝔼𝔾𝔸 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
-                elif m_is_crit: log.append("❗️ 𝔻𝔸ℕ𝕆 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
-                player_data['current_hp'] = int(player_data.get('current_hp', 0)) - monster_damage
-                combat_details["took_damage"] = True
-                if player_data['current_hp'] <= 0: # Derrota
-                    durability.apply_end_of_battle_wear(player_data, combat_details, log)
-                    if in_dungeon:
-                        await dungeons_runtime.fail_dungeon_run(context, user_id, chat_id, "Você foi derrotado")
-                        return
-                    defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
-                    player_data['current_hp'] = 1
-                    player_data['player_state'] = {'action': 'idle'}
-                    await player_manager.save_player_data(user_id, player_data)
-                    if query:
-                         try: await query.delete_message()
-                         except Exception: pass
-                    await context.bot.send_message(chat_id=chat_id, text=defeat_summary, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ ℂ𝕠𝕟𝕥𝕚𝕟𝕦𝕒𝕣", callback_data='continue_after_action')]]))
+        # TURNO DO MONSTRO (se ele sobreviveu)
+        if random.random() < player_manager.get_player_dodge_chance(player_data):
+            log.append("💨 Você se esquivou do ataque!")
+        else:
+            monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_total_stats, {})
+            log.append(f"⬅️ {monster_stats['monster_name']} ataca e causa {monster_damage} de dano.")
+            if m_is_mega: log.append("‼️ 𝕄𝔼𝔾𝔸 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
+            elif m_is_crit: log.append("❗️ 𝔻𝔸ℕ𝕆 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
+            player_data['current_hp'] = int(player_data.get('current_hp', 0)) - monster_damage
+            combat_details["took_damage"] = True
+            
+            if player_data['current_hp'] <= 0:
+                durability.apply_end_of_battle_wear(player_data, combat_details, log)
+                if in_dungeon:
+                    await dungeons_runtime.fail_dungeon_run(context, user_id, chat_id, "Você foi derrotado")
                     return
+                defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
+                player_data['current_hp'] = int(player_total_stats.get('max_hp', 50))
+                player_data['player_state'] = {'action': 'idle'}
+                player_manager.save_player_data(user_id, player_data)
+                try: await query.delete_message()
+                except Exception: pass
+                await context.bot.send_message(chat_id=chat_id, text=defeat_summary, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("➡️ ℂ𝕠𝕟𝕥𝕚𝕟𝕦𝕒𝕣", callback_data='continue_after_action')]]))
+                return
 
     # --- FIM DA LÓGICA DE AÇÃO ---
 

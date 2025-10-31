@@ -1,17 +1,25 @@
 # handlers/character_handler.py
 
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
-
 from modules import player_manager, game_data, file_id_manager
 from handlers.menu.kingdom import show_kingdom_menu  # ✅ import correto
 from handlers.utils import safe_update_message 
+from modules.game_data import skills as skills_data
+from telegram.constants import ParseMode
+import html
+from telegram.error import BadRequest
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # FUNÇÕES DE EXIBIÇÃO
 # =============================================================================
+MAX_EQUIPPED_SKILLS = 4
+
 def _format_enchantments(enchantments: dict) -> str:
     """Formata encantamentos com emojis e usa o VALUE do encanto."""
     if not enchantments:
@@ -45,6 +53,269 @@ def _create_progress_bar(current_val: int, max_val: int, bar_char: str = '🟧',
         bar = bar_char * blocks + empty_char * (length - blocks)
         line = f"{current_val}/{max_val} XP"
     return f"<code>[{bar}]</code>", line
+
+# Adiciona estas 4 funções no teu character_handler.py
+
+# Função auxiliar _safe_edit_or_send (Adapta se já tiveres uma similar)
+async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode=ParseMode.HTML):
+    """Tenta editar caption, depois texto, depois envia nova mensagem."""
+    if query: # Tenta editar se veio de um callback
+        try:
+            # Tenta editar caption primeiro (se a mensagem original tiver mídia)
+            await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            return
+        except BadRequest as e:
+            if "message is not modified" in str(e).lower(): return # Ignora se não mudou
+            if "message can't be edited" in str(e).lower() or \
+               "message to edit not found" in str(e).lower() or \
+               "message has no caption" in str(e).lower() or \
+               "there is no caption" in str(e).lower():
+                pass # Continua para tentar editar texto
+            else:
+                logger.warning(f"Erro ao editar caption em _safe_edit_or_send: {e}")
+        except Exception as e:
+             logger.warning(f"Erro inesperado ao editar caption em _safe_edit_or_send: {e}")
+
+        try:
+            # Tenta editar o texto (se for mensagem de texto ou fallback do caption)
+            await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            return
+        except BadRequest as e:
+            if "message is not modified" in str(e).lower(): return # Ignora se não mudou
+            else:
+                 logger.warning(f"Erro ao editar texto em _safe_edit_or_send: {e}")
+        except Exception as e:
+             logger.warning(f"Erro inesperado ao editar texto em _safe_edit_or_send: {e}")
+
+    # Fallback: Envia nova mensagem se não conseguiu editar ou se não veio de query
+    try:
+        if query: await query.delete_message() # Tenta apagar a anterior se veio de query
+    except Exception: pass
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as e:
+        logger.error(f"Erro CRÍTICO ao enviar mensagem em _safe_edit_or_send para chat {chat_id}: {e}", exc_info=True)
+
+
+async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra a lista de habilidades ativas e passivas do jogador."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
+        return
+
+    player_skill_ids = player_data.get("skills", [])
+    if not player_skill_ids:
+        text = "📚 <b>Suas Habilidades</b>\n\nVocê ainda não aprendeu nenhuma habilidade."
+        kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="char_sheet_main")]] # Volta para char_sheet_main
+        await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
+        return
+
+    active_skills_lines = []
+    passive_skills_lines = []
+
+    for skill_id in player_skill_ids:
+        skill_info = skills_data.SKILL_DATA.get(skill_id)
+        if not skill_info:
+            logger.warning(f"Skill ID '{skill_id}' encontrado nos dados do jogador {user_id} mas não existe em SKILL_DATA.")
+            continue
+
+        name = skill_info.get("display_name", skill_id)
+        desc = skill_info.get("description", "Sem descrição.")
+        mana_cost = skill_info.get("mana_cost")
+        skill_type = skill_info.get("type", "unknown")
+
+        line = f"• <b>{name}</b>"
+        if mana_cost is not None:
+            line += f" ({mana_cost} MP)"
+        line += f": <i>{html.escape(desc)}</i>"
+
+        if skill_type == "active" or skill_type.startswith("support"):
+            active_skills_lines.append(line)
+        elif skill_type == "passive":
+            passive_skills_lines.append(line)
+
+    text_parts = ["📚 <b>Suas Habilidades</b>\n"]
+
+    if active_skills_lines:
+        text_parts.append("✨ <b><u>Habilidades Ativas</u></b> ✨")
+        text_parts.extend(active_skills_lines)
+        text_parts.append(f"(Você pode equipar até {MAX_EQUIPPED_SKILLS} skills ativas para usar em combate)")
+        text_parts.append("")
+
+    if passive_skills_lines:
+        text_parts.append("🛡️ <b><u>Habilidades Passivas</u></b> 🛡️")
+        text_parts.extend(passive_skills_lines)
+        text_parts.append("")
+
+    kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="char_sheet_main")]] # Volta para char_sheet_main
+
+    if active_skills_lines:
+        kb.insert(0, [InlineKeyboardButton("⚙️ Equipar Skills Ativas", callback_data="skills_equip_menu")])
+
+    final_text = "\n".join(text_parts)
+    reply_markup = InlineKeyboardMarkup(kb)
+
+    await _safe_edit_or_send(query, context, chat_id, final_text, reply_markup)
+
+
+async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra o menu para equipar/desequipar skills ativas."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
+        return
+
+    all_skill_ids = player_data.get("skills", [])
+    equipped_ids = player_data.setdefault("equipped_skills", []) # Usa setdefault para criar se não existir
+    if not isinstance(equipped_ids, list): # Garante que é uma lista
+        equipped_ids = []
+        player_data["equipped_skills"] = equipped_ids
+
+    active_skill_ids = [
+        skill_id for skill_id in all_skill_ids
+        if skills_data.SKILL_DATA.get(skill_id, {}).get("type") == "active" or
+           skills_data.SKILL_DATA.get(skill_id, {}).get("type", "").startswith("support")
+    ]
+
+    if not active_skill_ids:
+        text = "⚙️ Equipar Skills Ativas\n\nVocê não possui nenhuma skill ativa para equipar."
+        kb = [[InlineKeyboardButton("⬅️ Voltar (Habilidades)", callback_data="skills_menu_open")]]
+        await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
+        return
+
+    text_parts = [f"⚙️ <b>Equipar Skills Ativas</b> (Limite: {len(equipped_ids)}/{MAX_EQUIPPED_SKILLS})\n"]
+    kb_rows = []
+
+    text_parts.append("✅ <b><u>Equipadas Atualmente</u></b> ✅")
+    if not equipped_ids:
+        text_parts.append("<i>Nenhuma skill ativa equipada.</i>")
+    else:
+        for skill_id in equipped_ids:
+            skill_info = skills_data.SKILL_DATA.get(skill_id)
+            if not skill_info: continue
+            name = skill_info.get("display_name", skill_id)
+            mana_cost = skill_info.get("mana_cost")
+            line = f"• <b>{name}</b>"
+            if mana_cost is not None: line += f" ({mana_cost} MP)"
+            text_parts.append(line)
+            kb_rows.append([InlineKeyboardButton(f"➖ Desequipar {name}", callback_data=f"unequip_skill:{skill_id}")])
+
+    text_parts.append("\n" + ("─" * 20) + "\n")
+    text_parts.append("➕ <b><u>Disponíveis para Equipar</u></b> ➕")
+    slots_free = MAX_EQUIPPED_SKILLS - len(equipped_ids)
+    available_to_equip_found = False
+
+    for skill_id in active_skill_ids:
+        if skill_id not in equipped_ids:
+            available_to_equip_found = True
+            skill_info = skills_data.SKILL_DATA.get(skill_id)
+            if not skill_info: continue
+            name = skill_info.get("display_name", skill_id)
+            mana_cost = skill_info.get("mana_cost")
+            line = f"• <b>{name}</b>"
+            if mana_cost is not None: line += f" ({mana_cost} MP)"
+            text_parts.append(line)
+
+            if slots_free > 0:
+                kb_rows.append([InlineKeyboardButton(f"➕ Equipar {name}", callback_data=f"equip_skill:{skill_id}")])
+            else:
+                kb_rows.append([InlineKeyboardButton(f"🚫 Limite Atingido", callback_data="noop")])
+
+    if not available_to_equip_found:
+         text_parts.append("<i>Não há outras skills ativas disponíveis ou todas já estão equipadas.</i>")
+
+    kb_rows.append([InlineKeyboardButton("⬅️ Voltar (Habilidades)", callback_data="skills_menu_open")])
+
+    final_text = "\n".join(text_parts)
+    reply_markup = InlineKeyboardMarkup(kb_rows)
+
+    await _safe_edit_or_send(query, context, chat_id, final_text, reply_markup)
+
+
+async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Equipa uma skill ativa se houver espaço."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    try:
+        skill_id = query.data.split(":", 1)[1]
+    except IndexError:
+        logger.error(f"Callback equip_skill inválido: {query.data}")
+        await query.answer("Erro ao processar a ação.", show_alert=True)
+        return
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await query.answer("Erro: Personagem não encontrado.", show_alert=True)
+        return
+
+    equipped_skills = player_data.setdefault("equipped_skills", [])
+    if not isinstance(equipped_skills, list):
+        equipped_skills = []
+        player_data["equipped_skills"] = equipped_skills
+
+    if skill_id in equipped_skills:
+        await query.answer("Essa skill já está equipada.", show_alert=True)
+        await show_equip_skills_menu(update, context) # Atualiza menu
+        return
+
+    if len(equipped_skills) >= MAX_EQUIPPED_SKILLS:
+        await query.answer(f"Limite de {MAX_EQUIPPED_SKILLS} skills equipadas atingido!", show_alert=True)
+        await show_equip_skills_menu(update, context) # Atualiza menu
+        return
+
+    equipped_skills.append(skill_id)
+    await player_manager.save_player_data(user_id, player_data)
+    await show_equip_skills_menu(update, context) # Atualiza menu
+
+
+async def unequip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Desequipa uma skill ativa."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    try:
+        skill_id = query.data.split(":", 1)[1]
+    except IndexError:
+        logger.error(f"Callback unequip_skill inválido: {query.data}")
+        await query.answer("Erro ao processar a ação.", show_alert=True)
+        return
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await query.answer("Erro: Personagem não encontrado.", show_alert=True)
+        return
+
+    equipped_skills = player_data.setdefault("equipped_skills", [])
+    if not isinstance(equipped_skills, list):
+        equipped_skills = []
+        player_data["equipped_skills"] = equipped_skills
+
+    if skill_id in equipped_skills:
+        equipped_skills.remove(skill_id)
+        await player_manager.save_player_data(user_id, player_data)
+    else:
+        await query.answer("Essa skill não estava equipada.", show_alert=True) # Avisa se não encontrou
+
+    await show_equip_skills_menu(update, context) # Atualiza menu
+
+async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback que não faz nada, usado para botões desativados."""
+    query = update.callback_query
+    await query.answer("Limite de skills equipadas atingido!") # Dá um feedback visual
 
 async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Tela principal da Ficha de Personagem."""
@@ -82,6 +353,7 @@ async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYP
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬", callback_data='char_status')],
         [InlineKeyboardButton("🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data='char_inventory')],
         [InlineKeyboardButton("⚔️ 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨", callback_data='char_equipment')],
+        [InlineKeyboardButton("📚 Habilidades", callback_data='skills_menu_open')],
     ]
     # Síncrono
     if int(player_data.get('level', 1)) >= 5 and (player_data.get('profession') or {}).get('type') is None:

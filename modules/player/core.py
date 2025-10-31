@@ -1,12 +1,12 @@
-# Em modules/player/core.py
+# Em modules/player/core.py (VERSÃO CORRIGIDA E LIMPA)
 
 import os
 import logging
 import pymongo
-from pymongo.errors import ConnectionFailure
+from pymongo.errors import ConnectionFailure, ConfigurationError # Importa o ConfigurationError
 from typing import Optional, Dict, Any, TYPE_CHECKING
-import asyncio # <<< IMPORTADO: Essencial para a execução assíncrona moderna
-import certifi
+import asyncio # Essencial para a execução assíncrona moderna
+import certifi # Mantém a importação do certifi
 
 # --- Configuração de Variáveis Globais ---
 players_collection: Optional[pymongo.collection.Collection] = None
@@ -23,7 +23,7 @@ if not MONGO_CONNECTION_STRING:
     logger.error("CRÍTICO: MONGO_CONNECTION_STRING não definida!")
 else:
     try:
-        # <<< CORREÇÃO AQUI >>>
+        # <<< ESTA É A VERSÃO CORRETA (HEAD) >>>
         # Obtém o caminho para o ficheiro de certificados do certifi
         ca = certifi.where()
         # Adiciona tlsCAFile=ca à chamada do MongoClient
@@ -48,7 +48,6 @@ else:
 # ====================================================================
 # FUNÇÕES SÍNCRONAS (EXECUÇÃO DE BLOQUEIO)
 # ====================================================================
-
 def _load_player_from_db_sync(user_id: int) -> dict | None:
     """Função SÍNCRONA: Carrega dados do MongoDB."""
     if players_collection is None: return None
@@ -90,23 +89,23 @@ async def get_player_data(user_id: int) -> dict | None:
     else:
         logger.debug(f"[CACHE_DEBUG] Não encontrado no cache. Buscando no DB para {user_id}...") # Log 3: Cache Miss
         try:
-             # Chama a função síncrona numa thread separada
-             raw_data = await asyncio.to_thread(_load_player_from_db_sync, user_id) 
-             
-             # <<< LOG IMPORTANTE AQUI >>>
-             logger.debug(f"[DB_DEBUG] Resultado de _load_player_from_db_sync para {user_id}: Tipo={type(raw_data)}, Valor={repr(raw_data)[:200]}") # Log 4: Resultado DB
-             
-             if raw_data is not None and isinstance(raw_data, dict): # Verifica se é um dict válido
-                 _player_cache[user_id] = raw_data.copy() # Guarda no cache SÓ SE FOR VÁLIDO
-                 logger.debug(f"[CACHE_DEBUG] Adicionado ao cache: {user_id}") # Log 5: Adicionado ao Cache
-             elif raw_data is not None:
-                  logger.warning(f"[DB_DEBUG] _load_player_from_db_sync retornou tipo inesperado para {user_id}: {type(raw_data)}") # AVISO se não for dict
-                  # Decide o que fazer: retornar None ou tentar corrigir? Por agora, retornamos None.
-                  raw_data = None 
-                  
+            # Chama a função síncrona numa thread separada
+            raw_data = await asyncio.to_thread(_load_player_from_db_sync, user_id) 
+            
+            # <<< LOG IMPORTANTE AQUI >>>
+            logger.debug(f"[DB_DEBUG] Resultado de _load_player_from_db_sync para {user_id}: Tipo={type(raw_data)}, Valor={repr(raw_data)[:200]}") # Log 4: Resultado DB
+            
+            if raw_data is not None and isinstance(raw_data, dict): # Verifica se é um dict válido
+                _player_cache[user_id] = raw_data.copy() # Guarda no cache SÓ SE FOR VÁLIDO
+                logger.debug(f"[CACHE_DEBUG] Adicionado ao cache: {user_id}") # Log 5: Adicionado ao Cache
+            elif raw_data is not None:
+                logger.warning(f"[DB_DEBUG] _load_player_from_db_sync retornou tipo inesperado para {user_id}: {type(raw_data)}") # AVISO se não for dict
+                # Decide o que fazer: retornar None ou tentar corrigir? Por agora, retornamos None.
+                raw_data = None 
+                
         except Exception as e:
-             logger.error(f"[DB_DEBUG] Erro ao carregar {user_id} do DB via thread: {e}", exc_info=True) # Log de Erro na Thread
-             raw_data = None # Garante None em caso de exceção
+            logger.error(f"[DB_DEBUG] Erro ao carregar {user_id} do DB via thread: {e}", exc_info=True) # Log de Erro na Thread
+            raw_data = None # Garante None em caso de exceção
 
     # Verifica se raw_data é None (seja por não encontrar ou por erro/tipo inválido)
     if raw_data is None: 
