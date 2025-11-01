@@ -6,7 +6,8 @@ import time
 from typing import Optional, Tuple
 import random
 import logging # <<< ADICIONADO PARA LOG DE AVISO
-
+import asyncio
+from . import core
 # --- IMPORTAÇÕES ADICIONADAS ---
 from .premium import PremiumManager
 from .core import get_player_data, save_player_data
@@ -62,7 +63,22 @@ def _calculate_gathering_rewards(player_data: dict, details: dict) -> tuple[int,
 # <<< FIM DA CORREÇÃO >>>
 # ===================================================================
 
+async def get_player_max_mana(player_data: dict, total_stats: dict | None = None) -> int:
+    """Calcula a mana máxima de um jogador, lendo dos stats totais."""
+    if total_stats is None:
+        # <<< CORREÇÃO: Adiciona await >>>
+        total_stats = await get_player_total_stats(player_data)
+            
+    return _ival(total_stats.get('max_mana'), 50)
 
+
+async def add_mana(player_data: dict, amount: int, total_stats: dict | None = None):
+    """Adiciona mana ao jogador, sem ultrapassar o máximo."""
+    max_m = await get_player_max_mana(player_data, total_stats)
+    cur = _ival(player_data.get('current_mp'))
+    new_val = min(cur + int(amount), max_m)
+    player_data['current_mp'] = max(0, new_val)
+    
 def get_player_max_energy(player_data: dict) -> int:
     """Calcula a energia máxima de um jogador, incluindo o bônus de perks."""
     base_max = _ival(player_data.get('max_energy'), 20)
@@ -139,7 +155,7 @@ async def set_last_chat_id(user_id: int, chat_id: int):
     pdata = await get_player_data(user_id)
     if not pdata: return
     pdata["last_chat_id"] = int(chat_id)
-    await save_player_data(user_id, pdata)
+    await core.save_player_data(user_id, pdata)
 
 def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | None, chat_id: int | None):
     start = utcnow().replace(microsecond=0)
@@ -264,9 +280,9 @@ def add_pvp_points(player_data: dict, amount: int):
 # --- NOVO: EFEITOS DE CONSUMÍVEIS (POÇÕES, ETC.) ---
 # ======================================================
 
-def heal_player(player_data: dict, amount: int):
+async def heal_player(player_data: dict, amount: int):
     """Cura o jogador, sem ultrapassar o HP máximo."""
-    total_stats = get_player_total_stats(player_data)
+    total_stats = await get_player_total_stats(player_data)
     max_hp = total_stats.get('max_hp', 1)
     current_hp = player_data.get('current_hp', 0)
     
@@ -292,3 +308,28 @@ def add_buff(player_data: dict, buff_info: dict):
     # Adiciona o novo buff apenas se ele for válido
     if new_buff["stat"] and new_buff["turns_left"]:
         player_data['active_buffs'].append(new_buff)
+        
+async def get_player_max_mana(player_data: dict, total_stats: dict | None = None) -> int:
+    """Calcula a mana máxima de um jogador, lendo dos stats totais."""
+    if total_stats is None:
+        # <<< [MUDANÇA] Adiciona 'await' >>>
+        total_stats = await get_player_total_stats(player_data)
+            
+    return _ival(total_stats.get('max_mana'), 50)  
+
+def spend_mana(player_data: dict, amount: int) -> bool:
+    """Consome a mana do jogador. Retorna True se foi bem-sucedido."""
+    amount = max(0, int(amount))
+    cur = _ival(player_data.get('current_mp'))
+    if cur < amount: 
+        return False # Não tem mana suficiente
+    player_data['current_mp'] = cur - amount
+    return True
+      
+async def add_mana(player_data: dict, amount: int, total_stats: dict | None = None):
+    """Adiciona mana ao jogador, sem ultrapassar o máximo."""
+    # <<< [MUDANÇA] Adiciona 'await' >>>
+    max_m = await get_player_max_mana(player_data, total_stats)
+    cur = _ival(player_data.get('current_mp'))
+    new_val = min(cur + int(amount), max_m)
+    player_data['current_mp'] = max(0, new_val)      

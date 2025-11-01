@@ -332,12 +332,25 @@ async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
     try:
         # <<< CORREÇÃO 15: Adiciona await >>>
         totals = await get_player_total_stats(pdata) # Chama função async
+
+        # --- Sincronização de HP (Já estava correta) ---
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
         cur_hp = _ival(pdata.get("current_hp"), max_hp)
         new_hp = min(max_hp, max(1, cur_hp))
         if new_hp != cur_hp:
             pdata["current_hp"] = new_hp
             changed = True
+
+        # --- 👇 LÓGICA DE MANA ADICIONADA 👇 ---
+        max_mp = _ival(totals.get("max_mana"), 10) # Pega o max_mana
+        cur_mp = _ival(pdata.get("current_mp"), max_mp) # Pega o current_mp (ou enche)
+        new_mp = min(max_mp, max(0, cur_mp)) # Garante que está dentro dos limites
+        
+        if new_mp != cur_mp or "current_mp" not in pdata:
+            pdata["current_mp"] = new_mp
+            changed = True
+    # --- 👆 FIM DA LÓGICA DE MANA 👆 ---
+
     except Exception:
         pass
 

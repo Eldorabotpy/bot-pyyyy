@@ -1,4 +1,4 @@
-# handlers/profile_handler.py (VERSÃO COMPLETA E CORRIGIDA)
+# handlers/profile_handler.py (VERSÃO FINALÍSSIMA CORRIGIDA)
 
 import logging
 import unicodedata
@@ -29,7 +29,6 @@ def _slugify(text: str) -> str:
     norm = re.sub(r"[^a-z0-9_]", "", norm)
     return norm
 
-# (Esta função _get_class_media está correta, sem alterações)
 def _get_class_media(player_data: dict, purpose: str = "personagem"):
     raw_cls = (player_data.get("class") or player_data.get("class_tag") or "").strip()
     cls = _slugify(raw_cls)
@@ -63,28 +62,11 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
     logger.info("[PROFILE_MEDIA] purpose=%s class=%s slug=%s chosen=None tried=%s", purpose, raw_cls, cls, tried)
     return None
 
-# (Esta função _safe_edit_or_send está correta, sem alterações)
-async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
-    try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
-    try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
-    # Fallback: se tudo falhar, envia uma nova mensagem
-    try:
-        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-    except Exception as e:
-        logger.error(f"Falha ao enviar mensagem em _safe_edit_or_send: {e}")
-
-# (Todas as funções de skills e utils (_bar, _normalize_profession, etc.) estão corretas, sem alterações)
 async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    chat_id = query.message.chat_id
+    chat_id = query.message.chat.id
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
@@ -254,6 +236,20 @@ async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Limite de skills equipadas atingido!")
 
+async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
+    try:
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+    except Exception:
+        pass
+    try:
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+    except Exception:
+        pass
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as e:
+        logger.error(f"Falha ao enviar mensagem em _safe_edit_or_send: {e}")
+
 def _bar(current: int, total: int, blocks: int = 10, filled_char: str = '🟧', empty_char: str = '⬜️') -> str:
     if total <= 0:
         filled = blocks
@@ -284,10 +280,6 @@ def _class_key_from_player(player_data: dict) -> str:
     raw = (player_data.get("class") or "").strip()
     return _slugify(raw) or "_default"
 
-# ====================================================================
-# <<< INÍCIO DA CORREÇÃO PRINCIPAL >>>
-# ====================================================================
-
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Função unificada para lidar com /personagem (comando) e 'profile' (botão).
@@ -296,11 +288,9 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    # Responde ao clique do botão, se for um
     if query:
         await query.answer()
 
-    # <<< CORREÇÃO: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
 
     if not player_data:
@@ -313,7 +303,6 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ===== totais (base + equipamentos) =====
     
-    # <<< CORREÇÃO: Adiciona await >>>
     totals = await player_manager.get_player_total_stats(player_data)
     
     total_hp_max = int(totals.get('max_hp', 50))
@@ -324,9 +313,9 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     current_hp = max(0, min(int(player_data.get('current_hp', total_hp_max)), total_hp_max))
     
-    # <<< CORREÇÃO: Adiciona await >>>
+    # <<< CORREÇÃO 1: Adiciona await AQUI >>>
     chance_esquiva = int((await player_manager.get_player_dodge_chance(player_data)) * 100)
-    # <<< CORREÇÃO: Adiciona await >>>
+    # <<< CORREÇÃO 2: Adiciona await AQUI >>>
     chance_ataque_duplo = int((await player_manager.get_player_double_attack_chance(player_data)) * 100)
 
     location_key = player_data.get('current_location', 'reino_eldora')
@@ -345,8 +334,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             premium_line += " (Permanente)"
     
     # ===== XP, Profissão, Classe =====
-    # <<< CORREÇÃO: Adiciona await >>>
-    max_energy  = int(await player_manager.get_player_max_energy(player_data))
+    # <<< CORREÇÃO 3: Remove await AQUI >>>
+    max_energy  = int(player_manager.get_player_max_energy(player_data))
     combat_level = int(player_data.get('level', 1))
     combat_xp = int(player_data.get('xp', 0))
     try:
@@ -414,14 +403,14 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("💼 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data='job_menu')])
 
     keyboard.extend([
-        [InlineKeyboardButton("꧁𓊈𒆜🅲🅻🅰🅽𒆜𓊉꧂", callback_data='clan_menu:profile')],
-        [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬", callback_data='status_open')],
-        [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬", callback_data='equipment_menu')],
-        [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 𝐂𝐨𝐦𝐩𝐥𝐞to", callback_data='inventory_CAT_equipamento_PAGE_1')],
-        [InlineKeyboardButton("🧪 𝐔𝐬𝐚𝐫 𝐂𝐨𝐧𝐬𝐮𝐦𝐢́𝐯𝐞𝐥", callback_data='potion_menu')],
-        [InlineKeyboardButton("📚 𝐇𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞𝐬", callback_data='skills_menu_open')],
-        [InlineKeyboardButton("🎨 𝐌𝐮𝐝𝐚𝐫 𝐀𝐩𝐚𝐫𝐞̂𝐧𝐜𝐢𝐚", callback_data='skin_menu')],
-        [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='continue_after_action')],
+        [InlineKeyboardButton("🔰⚜️𝐂𝐋𝐀𝐍⚜️🔰", callback_data='clan_menu:profile')],
+        [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬 📊", callback_data='status_open')],
+        [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬 🧰", callback_data='equipment_menu')],
+        [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 𝐂𝐨𝐦𝐩𝐥𝐞𝐭𝐨 🎒", callback_data='inventory_CAT_equipamento_PAGE_1')],
+        [InlineKeyboardButton("🧪 𝐔𝐬𝐚𝐫 𝐂𝐨𝐧𝐬𝐮𝐦𝐢́𝐯𝐞𝐥 🧪", callback_data='potion_menu')],
+        [InlineKeyboardButton("📚 𝐇𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞𝐬 📚", callback_data='skills_menu_open')],
+        [InlineKeyboardButton("🎨 𝐌𝐮𝐝𝐚𝐫 𝐀𝐩𝐚𝐫𝐞̂𝐧𝐜𝐢𝐚 🎨", callback_data='skin_menu')],
+        [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 ⬅️", callback_data='continue_after_action')],
     ])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -429,10 +418,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     media = _get_class_media(player_data, "personagem")
     if media and media.get("id"):
         try:
-            # Tenta deletar a mensagem antiga (se for um callback)
             if query:
                 await query.delete_message()
-
             fid  = media["id"]
             ftyp = (media.get("type") or "photo").lower()
             if ftyp == "video":
@@ -442,20 +429,13 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return 
         except Exception as e:
             logger.error(f"Falha ao enviar mídia do perfil para user {user_id}: {e}")
-            # Continua para o fallback de texto
 
-    # Fallback: sem mídia (ou se a mídia falhou)
+    # Fallback: sem mídia
     if query:
-        # Se veio de um botão, edita a mensagem atual
         await _safe_edit_or_send(query, context, chat_id, profile_text, reply_markup=reply_markup, parse_mode='HTML')
     else:
         # Se veio de um comando (/personagem), envia uma nova mensagem
         await context.bot.send_message(chat_id=chat_id, text=profile_text, reply_markup=reply_markup, parse_mode="HTML")
-
-# ====================================================================
-# <<< FIM DA CORREÇÃO PRINCIPAL >>>
-# ====================================================================
-
 
 # ====================================================================
 # <<< INÍCIO DAS EXPORTAÇÕES DE HANDLER (O QUE FALTAVA) >>>
@@ -473,7 +453,3 @@ skills_equip_menu_handler = CallbackQueryHandler(show_equip_skills_menu, pattern
 equip_skill_handler = CallbackQueryHandler(equip_skill_callback, pattern=r'^equip_skill:')
 unequip_skill_handler = CallbackQueryHandler(unequip_skill_callback, pattern=r'^unequip_skill:')
 noop_handler = CallbackQueryHandler(noop_callback, pattern=r'^noop$')
-
-# ====================================================================
-# <<< FIM DAS EXPORTAÇÕES DE HANDLER >>>
-# ====================================================================

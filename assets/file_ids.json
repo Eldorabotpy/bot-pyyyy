@@ -24,7 +24,7 @@
     "type": "video"
   },
   "anciao_floresta_media": {
-    "id": "BAACAgEAAxkDAAIYLmj1PM0jA9RaDIklsCEYOAyoAtQrAALCBgACVVNwR3EXhbN0inYGNgQ",
+    "id": "BAACAgEAAxkBAAJJmGkFQcFmPd9r-WLpxL73aQ0mE79zAAKQBAAC2n0oRI_KN6wy3WARNgQ",
     "type": "video"
   },
   "aranha_gigante_da_tocaia_media": {
@@ -521,6 +521,18 @@
   },
   "mapa_mundo": {
     "id": "AgACAgEAAxkBAAIBLGja_hvVzvFFISYfX7YJVDzuvwAB3gACSq8xG_i5wUSUviFeVBjGXwEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "media_calabouco_floresta_sombria": {
+    "id": "AgACAgEAAyEFAASrviDLAAIufGkFSXs9lD4AAY8rU_FK-tchX1XrQgACWwtrG1tZKEQgP0fs_tH7FgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "media_dungeon_defeat": {
+    "id": "AgACAgEAAyEFAASrviDLAAIuemkFSXvwsuHLnO4AAZ0WAS2vhjU6GAACWQtrG1tZKETYR-CHNkBUfQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "media_dungeon_victory": {
+    "id": "AgACAgEAAyEFAASrviDLAAIue2kFSXvYJdX-AUbYIPg6_6FExIxMAAJaC2sbW1koRJiNYh9s98eCAQADAgADeQADNgQ",
     "type": "photo"
   },
   "menu_forja_principal": {

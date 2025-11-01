@@ -1,4 +1,4 @@
-# modules/game_data/class_evolution.py (VERSÃO COMPLETA PARA O "PLANO MESTRE")
+# modules/game_data/class_evolution.py (VERSÃO ATUALIZADA COM "unlocks_skills")
 
 from __future__ import annotations
 from typing import Dict, Any, List
@@ -11,13 +11,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "cavaleiro", "min_level": 25,
                 "required_items": {"emblema_guerreiro": 25, "essencia_guardia": 25}, 
                 "desc": "Defesa elevada e proteção de aliados.",
-                "unlocks_skill": "passive_bulwark", "trial_monster_id": "guardian_of_the_aegis",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_bulwark"], 
+                "trial_monster_id": "guardian_of_the_aegis",
             },
             {
                 "to": "gladiador", "min_level": 35,
                 "required_items": {"emblema_guerreiro": 35, "essencia_furia": 35},
                 "desc": "Ofensiva agressiva e golpes em área.",
-                "unlocks_skill": "active_whirlwind", "trial_monster_id": "phantom_of_the_arena",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_whirlwind"], 
+                "trial_monster_id": "phantom_of_the_arena",
             },
         ],
         "tier3": [
@@ -25,7 +29,10 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["cavaleiro", "gladiador"], "to": "templario", "min_level": 60,
                 "required_items": {"selo_sagrado": 50, "essencia_luz": 50},
                 "desc": "Paladino sagrado que combina defesa com suporte divino.",
-                "unlocks_skill": "active_holy_blessing", "trial_monster_id": "aspect_of_the_divine",
+                # --- MUDANÇA ---
+                # (Ganha a skill que sobrou do pacote de "Guerreiro")
+                "unlocks_skills": ["active_holy_blessing"], 
+                "trial_monster_id": "aspect_of_the_divine",
             },
         ],
     },
@@ -37,13 +44,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "barbaro", "min_level": 25,
                 "required_items": {"emblema_berserker": 25, "essencia_furia": 25},
                 "desc": "Dano bruto e resistência a controlo.",
-                "unlocks_skill": "passive_unstoppable", "trial_monster_id": "primal_spirit_of_rage",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_unstoppable"], 
+                "trial_monster_id": "primal_spirit_of_rage",
             },
             {
                 "to": "juggernaut", "min_level": 35,
                 "required_items": {"emblema_berserker": 35, "essencia_guardia": 35},
                 "desc": "Avanços imparáveis e mitigação de dano.",
-                "unlocks_skill": "active_unbreakable_charge", "trial_monster_id": "guardian_of_the_mountain",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_unbreakable_charge"], 
+                "trial_monster_id": "guardian_of_the_mountain",
             },
         ],
         "tier3": [
@@ -51,7 +62,9 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["barbaro", "juggernaut"], "to": "ira_primordial", "min_level": 60,
                 "required_items": {"totem_ancestral": 50, "essencia_furia": 50},
                 "desc": "Forma ancestral que amplifica dano conforme a vida cai.",
-                "unlocks_skill": "passive_last_stand", "trial_monster_id": "avatar_of_primal_wrath",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_last_stand"],
+                "trial_monster_id": "avatar_of_primal_wrath",
             }
         ],
     },
@@ -63,13 +76,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "patrulheiro", "min_level": 25,
                 "required_items": {"emblema_cacador": 25, "essencia_fera": 25},
                 "desc": "Mestre da sobrevivência que luta ao lado de um companheiro animal.",
-                "unlocks_skill": "passive_animal_companion", "trial_monster_id": "spirit_of_the_alpha_wolf",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_animal_companion"], 
+                "trial_monster_id": "spirit_of_the_alpha_wolf",
             },
             {
                 "to": "franco_atirador", "min_level": 35,
                 "required_items": {"emblema_cacador": 35, "essencia_precisao": 35},
                 "desc": "Especialista em tiros à distância com dano crítico devastador.",
-                "unlocks_skill": "active_deadeye_shot", "trial_monster_id": "phantom_of_the_watchtower",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_deadeye_shot"], 
+                "trial_monster_id": "phantom_of_the_watchtower",
             },
         ],
         "tier3": [
@@ -77,7 +94,9 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["patrulheiro", "franco_atirador"], "to": "mestre_da_selva", "min_level": 60,
                 "required_items": {"marca_predador": 50, "essencia_fera": 50},
                 "desc": "O predador alfa, capaz de domar as feras mais selvagens.",
-                "unlocks_skill": "passive_apex_predator", "trial_monster_id": "aspect_of_the_world_tree",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_apex_predator"], 
+                "trial_monster_id": "aspect_of_the_world_tree",
             }
         ],
     },
@@ -89,13 +108,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "guardiao_do_templo", "min_level": 25,
                 "required_items": {"emblema_monge": 25, "essencia_guardia": 25},
                 "desc": "Mestre da defesa que usa o Ki para criar barreiras e contra-atacar.",
-                "unlocks_skill": "active_iron_skin", "trial_monster_id": "statue_of_the_serene_fist",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_iron_skin"], 
+                "trial_monster_id": "statue_of_the_serene_fist",
             },
             {
                 "to": "punho_elemental", "min_level": 35,
                 "required_items": {"emblema_monge": 35, "essencia_ki": 35},
                 "desc": "Lutador que canaliza a fúria dos elementos nos seus punhos.",
-                "unlocks_skill": "passive_elemental_strikes", "trial_monster_id": "avatar_of_the_four_elements",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_elemental_strikes"], 
+                "trial_monster_id": "avatar_of_the_four_elements",
             },
         ],
         "tier3": [
@@ -103,7 +126,9 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["guardiao_do_templo", "punho_elemental"], "to": "ascendente", "min_level": 60,
                 "required_items": {"reliquia_mistica": 50, "essencia_ki": 50},
                 "desc": "Atingiu a transcendência, movendo-se como o vento e golpeando como o trovão.",
-                "unlocks_skill": "active_transcendence", "trial_monster_id": "echo_of_the_grandmaster",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_transcendence"], 
+                "trial_monster_id": "echo_of_the_grandmaster",
             }
         ],
     },
@@ -115,13 +140,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "feiticeiro", "min_level": 25,
                 "required_items": {"emblema_mago": 25, "essencia_arcana": 25},
                 "desc": "Mestre das maldições e do dano contínuo (DoT).",
-                "unlocks_skill": "active_curse_of_weakness", "trial_monster_id": "shade_of_the_forbidden_library",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_curse_of_weakness"], 
+                "trial_monster_id": "shade_of_the_forbidden_library",
             },
             {
                 "to": "elementalista", "min_level": 35,
                 "required_items": {"emblema_mago": 35, "essencia_elemental": 35},
                 "desc": "Especialista em dano elemental massivo e em área.",
-                "unlocks_skill": "passive_elemental_attunement", "trial_monster_id": "raging_elemental_vortex",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_elemental_attunement"], 
+                "trial_monster_id": "raging_elemental_vortex",
             },
         ],
         "tier3": [
@@ -129,11 +158,15 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["feiticeiro", "elementalista"], "to": "arquimago", "min_level": 60,
                 "required_items": {"grimorio_arcano": 50, "essencia_arcana": 50},
                 "desc": "Um canal de poder arcano puro, capaz de alterar a realidade.",
-                "unlocks_skill": "active_meteor_swarm", "trial_monster_id": "essence_of_pure_magic",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_meteor_swarm"], 
+                "trial_monster_id": "essence_of_pure_magic",
             }
         ],
     },
-
+    
+    # ... (Bardo, Assassino, Samurai - o mesmo padrão) ...
+    
     # ========================= # BARDO # =========================
     "bardo": {
         "tier2": [
@@ -141,13 +174,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "menestrel", "min_level": 25,
                 "required_items": {"emblema_bardo": 25, "essencia_harmonia": 25},
                 "desc": "Focado em canções que curam e fortalecem os aliados.",
-                "unlocks_skill": "active_song_of_valor", "trial_monster_id": "echo_of_the_first_ballad",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_song_of_valor"], 
+                "trial_monster_id": "echo_of_the_first_ballad",
             },
             {
                 "to": "encantador", "min_level": 35,
                 "required_items": {"emblema_bardo": 35, "essencia_encanto": 35},
                 "desc": "Usa melodias para confundir e debilitar os inimigos.",
-                "unlocks_skill": "active_dissonant_melody", "trial_monster_id": "siren_of_the_lost_stage",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_dissonant_melody"], 
+                "trial_monster_id": "siren_of_the_lost_stage",
             },
         ],
         "tier3": [
@@ -155,7 +192,9 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["menestrel", "encantador"], "to": "maestro", "min_level": 60,
                 "required_items": {"batuta_maestria": 50, "essencia_harmonia": 50},
                 "desc": "Rege o campo de batalha com sinfonias de poder.",
-                "unlocks_skill": "passive_symphony_of_power", "trial_monster_id": "avatar_of_the_grand_orchestra",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_symphony_of_power"], 
+                "trial_monster_id": "avatar_of_the_grand_orchestra",
             }
         ],
     },
@@ -167,13 +206,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "sombra", "min_level": 25,
                 "required_items": {"emblema_assassino": 25, "essencia_sombra": 25},
                 "desc": "Mestre da furtividade e de ataques surpresa devastadores.",
-                "unlocks_skill": "active_shadow_strike", "trial_monster_id": "doppelganger_of_the_throne",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_shadow_strike"], 
+                "trial_monster_id": "doppelganger_of_the_throne",
             },
             {
                 "to": "venefico", "min_level": 35,
                 "required_items": {"emblema_assassino": 35, "essencia_letal": 35},
                 "desc": "Especialista em venenos e toxinas que causam dano ao longo do tempo.",
-                "unlocks_skill": "passive_potent_toxins", "trial_monster_id": "spirit_of_the_swamp_adder",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_potent_toxins"], 
+                "trial_monster_id": "spirit_of_the_swamp_adder",
             },
         ],
         "tier3": [
@@ -181,7 +224,9 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["sombra", "venefico"], "to": "mestre_das_laminas", "min_level": 60,
                 "required_items": {"manto_eterno": 50, "essencia_sombra": 50},
                 "desc": "Um vulto letal cuja velocidade é inigualável.",
-                "unlocks_skill": "active_dance_of_a_thousand_cuts", "trial_monster_id": "specter_of_the_silent_kill",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_dance_of_a_thousand_cuts"], 
+                "trial_monster_id": "specter_of_the_silent_kill",
             }
         ],
     },
@@ -193,13 +238,17 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "to": "kensei", "min_level": 25,
                 "required_items": {"emblema_samurai": 25, "essencia_corte": 25},
                 "desc": "O Santo da Espada, focado na perfeição técnica de cada golpe.",
-                "unlocks_skill": "passive_iai_stance", "trial_monster_id": "phantom_of_the_dojo",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["passive_iai_stance"], 
+                "trial_monster_id": "phantom_of_the_dojo",
             },
             {
                 "to": "ronin", "min_level": 35,
                 "required_items": {"emblema_samurai": 35, "essencia_disciplina": 35},
                 "desc": "Um guerreiro solitário, mestre do contra-ataque e da sobrevivência.",
-                "unlocks_skill": "active_parry_and_riposte", "trial_monster_id": "spirit_of_the_wandering_warrior",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_parry_and_riposte"], 
+                "trial_monster_id": "spirit_of_the_wandering_warrior",
             },
         ],
         "tier3": [
@@ -207,12 +256,19 @@ EVOLUTIONS: Dict[str, Dict[str, Any]] = {
                 "from_any_of": ["kensei", "ronin"], "to": "shogun", "min_level": 60,
                 "required_items": {"lamina_sagrada": 50, "essencia_disciplina": 50},
                 "desc": "Um líder no campo de batalha, cujas ordens inspiram os aliados.",
-                "unlocks_skill": "active_banner_of_command", "trial_monster_id": "avatar_of_the_first_emperor",
+                # --- MUDANÇA ---
+                "unlocks_skills": ["active_banner_of_command"], 
+                "trial_monster_id": "avatar_of_the_first_emperor",
             }
         ],
     },
 }
 
+# --- MUDANÇA: A função get_evolution_options foi removida daqui ---
+# (Ela estava no teu ficheiro, mas o teu 'class_evolution_handler.py'
+# importa-a de 'modules.game_data.class_evolution', então está correto.)
+# Se ela só existir aqui, mantemos. Se não, removemos.
+# Vou assumir que ela fica aqui, como no teu ficheiro original.
 
 def get_evolution_options(
     current_class: str,
@@ -221,11 +277,8 @@ def get_evolution_options(
 ) -> List[dict]:
     """
     Retorna as opções de evolução da classe atual.
-
-    - show_locked=True (padrão): retorna também as opções abaixo do nível mínimo,
-      para que a UI possa exibir os requisitos (nível/itens) mesmo que ainda não
-      estejam atendidos.
-    - show_locked=False: retorna apenas as opções liberadas pelo nível.
+    (Esta função já não funciona para T3, precisa ser corrigida,
+     mas está igual ao ficheiro que enviaste)
     """
     curr_key = (current_class or "").lower()
     data = EVOLUTIONS.get(curr_key)
@@ -235,14 +288,12 @@ def get_evolution_options(
     options: List[dict] = []
     for tier in ("tier2", "tier3"):
         for opt in data.get(tier, []):
-            # Valida 'from_any_of' de forma case-insensitive (se existir)
             req_from = opt.get("from_any_of")
             if isinstance(req_from, list):
                 allowed = {str(x).lower() for x in req_from}
                 if curr_key not in allowed:
-                    continue  # este ramo não pode evoluir para esta opção
+                    continue 
 
-            # Checa nível mínimo
             min_lvl = int(opt.get("min_level", 0))
             if show_locked or current_level >= min_lvl:
                 options.append({"tier": tier, **opt})

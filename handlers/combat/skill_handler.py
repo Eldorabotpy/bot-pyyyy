@@ -9,6 +9,7 @@ from modules import player_manager
 from modules.game_data.skills import SKILL_DATA
 from handlers.utils import format_combat_message
 from handlers.combat.main_handler import combat_callback # Importa o handler principal de combate
+from modules.player import actions as player_actions
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
     """Processa o uso de uma skill em combate."""
     query = update.callback_query
     user_id = query.from_user.id
-
+    
     try:
         skill_id = query.data.split(':')[1]
     except IndexError:
@@ -98,7 +99,7 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
         await _safe_answer(query)
         await query.answer("Você não está em combate.", show_alert=True)
         return
-
+    
     combat_details = state.get('details', {})
     active_cooldowns = combat_details.setdefault("skill_cooldowns", {})
     
@@ -108,46 +109,34 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
         await query.answer(f"{skill_info['display_name']} está em recarga!", show_alert=True)
         return
 
-    # 2. Verificar Custo (ex: Mana)
+    # --- 👇 LÓGICA DE MANA CORRIGIDA 👇 ---
     mana_cost = skill_info.get("mana_cost", 0)
     if mana_cost > 0:
-        current_mana = player_data.get("current_mp", 0) # Assumindo que o jogador tem 'current_mp'
-        if current_mana < mana_cost:
+        # 2. Usar a nova função 'spend_mana' de actions.py
+        if not player_actions.spend_mana(player_data, mana_cost):
             await _safe_answer(query)
             await query.answer(f"Você não tem Mana ({mana_cost}) suficiente!", show_alert=True)
             return
-        else:
-            player_data["current_mp"] -= mana_cost # Gasta a mana
+    # --- 👆 FIM DA LÓGICA DE MANA 👆 ---
 
-	# 3. Aplicar Cooldown (ANTES de atacar)
+    # 3. Aplicar Cooldown (ANTES de atacar)
     cooldown = skill_info["effects"].get("cooldown_turns", 0)
     if cooldown > 0:
-        # Adiciona +1 porque o turno do monstro também conta
         active_cooldowns[skill_id] = cooldown + 1 
-
-    # (Atenção: A lógica de REDUZIR o cooldown a cada turno 
-    # precisa ser implementada no 'main_handler.py')
-
+    
     # 4. Salvar o estado (gasto de mana/cooldown)
     player_data['player_state']['details'] = combat_details
+    # Nota: O 'spend_mana' já modificou o player_data, 
+    # então este save já guarda a mana gasta.
     await player_manager.save_player_data(user_id, player_data)
-   
+    
     # 5. INICIAR O ATAQUE
-    # Este é um truque: em vez de duplicar a lógica de ataque,
-    # vamos simplesmente "chamar" o handler de ataque principal.
-    # O 'main_handler' vai ler os 'effects' da skill 
-    # (como 'damage_multiplier', 'debuff_target') e aplicá-los.
-   
-    # Para isso, precisamos guardar a skill usada no estado de combate
     player_data['player_state']['details']['skill_to_use'] = skill_id
     await player_manager.save_player_data(user_id, player_data)
 
     await _safe_answer(query)
-   
-    # Chama a função 'combat_callback' do main_handler, 
-    # mas força a ação para 'combat_attack'
+    
     await combat_callback(update, context, action="combat_attack")
-
 
 async def combat_skill_on_cooldown_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback para quando o jogador clica numa skill em cooldown."""

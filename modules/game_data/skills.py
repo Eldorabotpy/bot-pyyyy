@@ -1,11 +1,10 @@
-# modules/game_data/skills.py (VERSÃO COMPLETA)
+# modules/game_data/skills.py (VERSÃO COM MANA)
 
 SKILL_DATA = {
 
      #===================================================================
      # ================> HABILIDADES DE EVOLUCAO <=======================
      #===================================================================
-     
      # --- Habilidades de Evolução do Guerreiro ---
     "passive_bulwark": {
         "display_name": "Baluarte", "type": "passive", 
@@ -13,10 +12,12 @@ SKILL_DATA = {
         "effects": {"stat_add_mult": {"defense": 0.05}}},
     "active_whirlwind": {
         "display_name": "Redemoinho de Aço", "type": "active", 
+        "mana_cost": 20, # <<< ADICIONADO
         "description": "Um ataque giratório que atinge múltiplos alvos.", 
         "effects": {"cooldown_turns": 3}},
     "active_holy_blessing": {
         "display_name": "Bênção Sagrada", "type": "active", 
+        "mana_cost": 15, # <<< ADICIONADO
         "description": "Invoca poder divino para curar levemente os aliados.", 
         "effects": {"cooldown_turns": 5}
     },
@@ -28,6 +29,7 @@ SKILL_DATA = {
         "effects": {"resistance": "stun"}},
     "active_unbreakable_charge": {
         "display_name": "Investida Inquebrável", "type": "active", 
+        "mana_cost": 15, # <<< ADICIONADO
         "description": "Avança, ignorando parte do dano no próximo turno.", 
         "effects": {"cooldown_turns": 4}},
     "passive_last_stand": {
@@ -42,6 +44,7 @@ SKILL_DATA = {
         "effects": {"companion_attack": {"damage": 20, "chance": 0.3}}},
     "active_deadeye_shot": {
         "display_name": "Tiro de Mira Mortal", "type": "active", 
+        "mana_cost": 10, # <<< ADICIONADO
         "description": "Aumenta massivamente a chance de crítico do próximo ataque.", 
         "effects": {"cooldown_turns": 3, "next_hit_crit_chance_boost": 0.75}},
     "passive_apex_predator": {
@@ -52,8 +55,9 @@ SKILL_DATA = {
 
     # --- Habilidades de Evolução do Monge ---
     "active_iron_skin": {
-        "display_name": "Pele de Ferro", "type": "active", "description": 
-        "Endurece o corpo com Ki, reduzindo o dano recebido por 2 turnos.", 
+        "display_name": "Pele de Ferro", "type": "active", 
+        "mana_cost": 20, # <<< ADICIONADO
+        "description": "Endurece o corpo com Ki, reduzindo o dano recebido por 2 turnos.", 
         "effects": {"cooldown_turns": 5, "self_buff": {"effect": "damage_reduction", "value": 0.5, "duration_turns": 2}}},
     "passive_elemental_strikes": {
         "display_name": "Golpes Elementais", "type": "passive", 
@@ -61,6 +65,7 @@ SKILL_DATA = {
         "effects": {"chance_on_hit": {"effect": "extra_elemental_damage", "value": 25, "chance": 0.2}}},
     "active_transcendence": {
         "display_name": "Transcendência", "type": "active", 
+        "mana_cost": 10, # <<< ADICIONADO
         "description": "Medita por um turno para recuperar uma grande quantidade de HP e Energia.", 
         "effects": {"cooldown_turns": 6, "channel_heal_energy": {"hp": 100, "energy": 20}}
     },
@@ -68,6 +73,7 @@ SKILL_DATA = {
     # --- Habilidades de Evolução do Mago ---
     "active_curse_of_weakness": {
         "display_name": "Maldição da Fraqueza", "type": "active", 
+        "mana_cost": 15, # <<< ADICIONADO
         "description": "Amaldiçoa o alvo, reduzindo o seu ataque por 3 turnos.", 
         "effects": {"cooldown_turns": 4, "debuff_target": {"stat": "attack", "value": -0.20, "duration_turns": 3}}},
     "passive_elemental_attunement": {
@@ -76,6 +82,7 @@ SKILL_DATA = {
         "effects": {"stat_add_mult": {"attack": 0.10}}},
     "active_meteor_swarm": {
         "display_name": "Chuva de Meteoros", "type": "active", 
+        "mana_cost": 30, # <<< ADICIONADO
         "description": "Invoca uma chuva de meteoros que atinge todos os inimigos.", 
         "effects": {"cooldown_turns": 5}
     },
@@ -83,10 +90,12 @@ SKILL_DATA = {
     # --- Habilidades de Evolução do Bardo ---
     "active_song_of_valor": {
         "display_name": "Canção do Valor", "type": "active", 
+        "mana_cost": 15, # <<< ADICIONADO
         "description": "Inspira os aliados, aumentando o ataque de todos no grupo por 3 turnos.", 
         "effects": {"cooldown_turns": 4, "party_buff": {"stat": "attack", "value": 0.15, "duration_turns": 3}}},
     "active_dissonant_melody": {
         "display_name": "Melodia Dissonante", "type": "active", 
+        "mana_cost": 10, # <<< ADICIONADO
         "description": "Confunde o inimigo, com uma chance de o fazer perder o próximo turno.", 
         "effects": {"cooldown_turns": 4, "chance_to_stun": 0.25}},
     "passive_symphony_of_power": {
@@ -98,6 +107,7 @@ SKILL_DATA = {
     # --- Habilidades de Evolução do Assassino ---
     "active_shadow_strike": {
         "display_name": "Golpe Sombrio", "type": "active", 
+        "mana_cost": 15, # <<< ADICIONADO
         "description": "Um ataque rápido das sombras que não pode ser esquivado.", 
         "effects": {"cooldown_turns": 3, "guaranteed_hit": True}},
     "passive_potent_toxins": {
@@ -106,6 +116,7 @@ SKILL_DATA = {
         "effects": {"chance_on_hit": {"effect": "poison", "damage": 15, "duration_turns": 3, "chance": 0.3}}},
     "active_dance_of_a_thousand_cuts": {
         "display_name": "Dança das Mil Lâminas", "type": "active", 
+        "mana_cost": 25, # <<< ADICIONADO
         "description": "Desfere uma rajada de 3 a 5 golpes rápidos.", 
         "effects": {"cooldown_turns": 5}
     },
@@ -116,23 +127,23 @@ SKILL_DATA = {
         "description": "O primeiro ataque em cada combate tem uma chance de crítico muito aumentada.", "effects": {"first_hit_crit_chance_boost": 0.50}},
     "active_parry_and_riposte": {
         "display_name": "Aparar e Ripostar", "type": "active", 
+        "mana_cost": 10, # <<< ADICIONADO
         "description": "Assume uma postura defensiva. Se for atacado, anula o dano e contra-ataca.", "effects": {"cooldown_turns": 4}},
     "active_banner_of_command": {
         "display_name": "Estandarte de Comando", "type": "active", 
+        "mana_cost": 20, # <<< ADICIONADO
         "description": "Ergue um estandarte que aumenta a defesa de todos os aliados próximos.", 
         "effects": {"cooldown_turns": 5, "party_buff": {"stat": "defense", "value": 0.20, "duration_turns": 3}}
     },
     
-
-
-
     #====================================================================
-    # HABILIDADES BASICAS (Adiquiridas via Evento/Drop)
-    #====================================================================
+    # HABILIDADES BASICAS (Adiquiridas via Evento/Drop
+    # #====================================================================
+    # (Estas já estavam corretas e com 'mana_cost')
     "guerreiro_corte_perfurante": {
         "display_name": "Corte Perfurante", "type": "active", "mana_cost": 10,
         "description": "Um golpe focado que perfura a armadura do inimigo, causando dano e reduzindo sua defesa por 3 turnos.",
-        "effects": {"cooldown_turns": 0, "damage_multiplier": 1.2, "debuff_target": {"stat": "defense", "value": -0.20, "duration_turns": 3}}
+         "effects": {"cooldown_turns": 0, "damage_multiplier": 1.2, "debuff_target": {"stat": "defense", "value": -0.20, "duration_turns": 3}}
     },
     "berserker_golpe_selvagem": {
         "display_name": "Golpe Selvagem", "type": "active", "mana_cost": 12,

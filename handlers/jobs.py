@@ -19,7 +19,7 @@ from modules.player_manager import (
 )
 from config import EVENT_TIMES, JOB_TIMEZONE
 
-# <<< CORREÇÃO 1: Importa as funções finalizadoras NECESSÁRIAS >>>
+from kingdom_defense.engine import event_manager
 from handlers.refining_handler import finish_dismantle_job, finish_refine_job # Adiciona finish_refine_job
 from handlers.forge_handler import finish_craft_notification_job as finish_crafting_job # Assumindo que usa esta
 from handlers.job_handler import finish_collection_job # Importa o job de coleta
@@ -441,3 +441,125 @@ async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Anúncio de nova temporada PvP enviado para o tópico {ANNOUNCEMENT_THREAD_ID} no chat {ANNOUNCEMENT_CHAT_ID}.")
     except Exception as e_announce:
         logger.error(f"Falha ao anunciar nova temporada PvP: {e_announce}")
+        
+        async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
+            """Inicia o evento Defesa do Reino."""
+    try:
+        # Pega o nome do job (ex: 'kd_start_09:00')
+        job_name = context.job.name 
+        logger.info(f"Iniciando job: {job_name}")
+        
+        # 'event_duration_minutes' é passado como parte do 'job_data'
+        duration = context.job.data.get("event_duration_minutes", 30) 
+        
+        success, message = await event_manager.start_event(duration_minutes=duration)
+        
+        if success:
+            logger.info(f"Evento de Defesa do Reino INICIADO. Duração: {duration} min.")
+            # Envia o anúncio global
+            await context.bot.send_message(
+                chat_id=ANNOUNCEMENT_CHAT_ID,
+                message_thread_id=ANNOUNCEMENT_THREAD_ID,
+                text=f"⚔️ <b>INVASÃO IMINENTE!</b> ⚔️\n\n{message}\n\nA defesa durará {duration} minutos. Defensores, ao reino!",
+                parse_mode="HTML"
+            )
+        else:
+            logger.warning(f"Não foi possível iniciar o evento: {message}")
+            
+    except Exception as e:
+        logger.error(f"Erro crítico ao tentar iniciar o evento Defesa do Reino: {e}", exc_info=True)
+        
+async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
+    """Inicia o evento Defesa do Reino."""
+    try:
+        job_name = context.job.name 
+        logger.info(f"Iniciando job: {job_name}")
+        
+        duration = context.job.data.get("event_duration_minutes", 30) 
+        
+        success, message = await event_manager.start_event(duration_minutes=duration)
+        
+        if success:
+            logger.info(f"Evento de Defesa do Reino INICIADO. Duração: {duration} min.")
+            await context.bot.send_message(
+                chat_id=ANNOUNCEMENT_CHAT_ID,
+                message_thread_id=ANNOUNCEMENT_THREAD_ID,
+                text=f"⚔️ <b>INVASÃO IMINENTE!</b> ⚔️\n\n{message}\n\nA defesa durará {duration} minutos. Defensores, ao reino!",
+                parse_mode="HTML"
+            )
+        else:
+            logger.warning(f"Não foi possível iniciar o evento: {message}")
+            
+    except Exception as e:
+        logger.error(f"Erro crítico ao tentar iniciar o evento Defesa do Reino: {e}", exc_info=True)
+
+async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
+    """Finaliza o evento Defesa do Reino."""
+    try:
+        job_name = context.job.name
+        logger.info(f"Iniciando job: {job_name}")
+        
+        if not event_manager.is_active:
+            logger.info("Job de finalização executado, mas o evento já estava inativo.")
+            return
+
+        success, message = await event_manager.end_event()
+        
+        if success:
+            logger.info("Evento de Defesa do Reino FINALIZADO.")
+            await context.bot.send_message(
+                chat_id=ANNOUNCEMENT_CHAT_ID,
+                message_thread_id=ANNOUNCEMENT_THREAD_ID,
+                text=f"🛡️ <b>A INVASÃO TERMINOU!</b> 🛡️\n\n{message}",
+                parse_mode="HTML"
+            )
+        else:
+            logger.warning(f"Não foi possível finalizar o evento: {message}")
+
+    except Exception as e:
+        logger.error(f"Erro crítico ao tentar finalizar o evento Defesa do Reino: {e}", exc_info=True)
+
+# <<< [MUDANÇA] ADICIONADO O NOVO JOB DE TICKET DA ARENA >>>
+async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Concede 10 Tickets da Arena (item) para todos os jogadores diariamente.
+    """
+    today = _today_str()
+    granted = 0
+    TICKET_ID = "ticket_arena" # <<< ID DO ITEM
+    TICKET_QTY = 10            # <<< QUANTIDADE
+
+    logger.info(f"[DAILY_ARENA] Iniciando job de entrega de {TICKET_QTY}x {TICKET_ID}...")
+    
+    try:
+        async for user_id, pdata in player_manager.iter_players():
+            try:
+                if not pdata: continue
+                
+                daily = pdata.get("daily_awards") or {}
+                
+                if daily.get("last_arena_ticket_date") == today: 
+                    continue # Já recebeu hoje
+                
+                _safe_add_stack(pdata, TICKET_ID, TICKET_QTY)
+                
+                daily["last_arena_ticket_date"] = today
+                pdata["daily_awards"] = daily
+                
+                await save_player_data(user_id, pdata)
+                granted += 1
+                
+                try: 
+                    await context.bot.send_message(chat_id=user_id, text=f"🎟️ Você recebeu seus {TICKET_QTY} Tickets da Arena diários!")
+                    await asyncio.sleep(0.1) # Delay anti-spam
+                except Forbidden: pass
+                except Exception: pass
+                
+            except Exception as e:
+                logger.warning(f"[DAILY_ARENA] Falha ao conceder tickets para {user_id}: {e}")
+                
+    except Exception as e_iter:
+        logger.error(f"Erro crítico ao iterar jogadores em daily_arena_ticket_job: {e_iter}", exc_info=True)
+            
+    logger.info(f"[DAILY_ARENA] {granted} jogadores receberam tickets da arena.")
+    return granted

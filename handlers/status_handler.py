@@ -1,4 +1,4 @@
-# handlers/status_handler.py (VERSÃO FINAL E CORRIGIDA)
+# handlers/status_handler.py (VERSÃO COM LÓGICA DE UPGRADE CORRIGIDA)
 
 import logging
 import re
@@ -6,67 +6,51 @@ import unicodedata
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.error import BadRequest
-# <<< MUDANÇA: Importa os erros de conexão >>>
 from pymongo.errors import ConnectionFailure, ConfigurationError
-import certifi # <<< MUDANÇA: Mantém a importação do certifi
+import certifi
 
 from modules import player_manager, game_data, file_ids
+
+# <<< [MUDANÇA] Importa as funções de stats necessárias >>>
+from modules.player.stats import (
+    _get_point_gains_for_class, 
+    _get_class_key_normalized,
+    get_player_total_stats # Precisamos desta para a cura do HP
+)
 
 logger = logging.getLogger(__name__)
 
 PROFILE_KEYS = ['max_hp', 'attack', 'defense', 'initiative', 'luck']
 
+# ... (Funções _slugify e _get_class_media estão corretas) ...
 def _slugify(text: str) -> str:
     if not text: return ""
-    # Normaliza, remove acentos, converte para minúsculas, substitui espaços, remove caracteres inválidos
     norm = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-    norm = re.sub(r"[^\w\s-]", "", norm).strip().lower() # Permite hífens também
-    norm = re.sub(r"[-\s]+", "_", norm) # Substitui hífens e espaços por underscore
+    norm = re.sub(r"[^\w\s-]", "", norm).strip().lower()
+    norm = re.sub(r"[-\s]+", "_", norm)
     return norm
 
 def _get_class_media(player_data: dict, purpose: str = "status"):
-    """Busca a mídia (video/foto) associada à classe do jogador."""
     raw_cls = (player_data.get("class") or "").strip()
-    base_cls_key = raw_cls.lower() # Ex: 'ronin'
-    cls_slug = _slugify(base_cls_key) # Ex: 'ronin'
+    base_cls_key = raw_cls.lower()
+    cls_slug = _slugify(base_cls_key)
     logger.debug(f"[_get_class_media] Raw Class: '{raw_cls}', Base Key: '{base_cls_key}', Slug: '{cls_slug}'")
-
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
-    # Obtém a configuração da classe atual (ex: dados do Ronin)
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(base_cls_key) or {}
-
     candidates = []
-
-    # =========================================================
-    # <<< INÍCIO DA CORREÇÃO >>>
-    # =========================================================
-    # 1. Tenta a chave definida em 'file_id_name' PRIMEIRO
     file_id_name_from_class = cls_cfg.get("file_id_name")
     if file_id_name_from_class:
-        candidates.append(file_id_name_from_class) # Ex: 'classe_samurai_media'
-    # =========================================================
-    # <<< FIM DA CORREÇÃO >>>
-    # =========================================================
-
-    # 2. Tenta a chave específica para status definida na config da classe
+        candidates.append(file_id_name_from_class)
     if cls_cfg.get("status_file_id_key"):
         candidates.append(cls_cfg["status_file_id_key"])
-
-    # 3. Tenta nomes padronizados baseados no slug da classe ATUAL ('ronin')
     if cls_slug:
         candidates.extend([
-            f"status_video_{cls_slug}", # status_video_ronin
-            f"status_{cls_slug}", # status_ronin
-            f"class_{cls_slug}_status", # class_ronin_status
-            f"classe_{cls_slug}_media" # classe_ronin_media
+            f"status_video_{cls_slug}", f"status_{cls_slug}",
+            f"class_{cls_slug}_status", f"classe_{cls_slug}_media"
         ])
-    # 4. Fallback genérico
     candidates.append("status_video")
-
-    # Remove duplicates e None values
     unique_candidates = list(filter(None, dict.fromkeys(candidates)))
-    logger.debug(f"[_get_class_media] Candidate Keys (Order: file_id_name -> specific -> slugged -> fallback): {unique_candidates}")
-
+    logger.debug(f"[_get_class_media] Candidate Keys: {unique_candidates}")
     for key in unique_candidates:
         logger.debug(f"[_get_class_media] Trying key: '{key}'")
         try:
@@ -77,15 +61,13 @@ def _get_class_media(player_data: dict, purpose: str = "status"):
             else:
                 logger.debug(f"[_get_class_media] Key '{key}' found, but data is invalid or missing 'id'. Data: {fd}")
         except Exception as e:
-            logger.error(f"[_get_class_media] Error looking up key '{key}': {e}", exc_info=False) # exc_info=False para logs menos verbosos no caso normal
-
+            logger.error(f"[_get_class_media] Error looking up key '{key}': {e}", exc_info=False)
     logger.warning(f"[_get_class_media] No valid media found for class '{raw_cls}' after trying all keys.")
     return None
 
 async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMarkup]:
     """Gera o texto e o teclado do menu de status."""
     
-    # --- CORREÇÃO 1: Adiciona 'await' aqui ---
     total_stats = await player_manager.get_player_total_stats(player_data)
     
     char_name = player_data.get('character_name', 'Aventureiro(a)')
@@ -95,14 +77,8 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
 
     for stat in PROFILE_KEYS:
         raw_val = total_stats.get(stat, 0)
-        
-        # --- CORREÇÃO 2: Lógica para mostrar decimais (float) ---
-        if stat == 'luck':
-            val_str = f"{raw_val:.1f}"
-        else:
-            val_str = str(int(raw_val))
-        # --- Fim da Correção 2 ---
-            
+        # Formata tudo como inteiro
+        val_str = str(int(raw_val))
         status_text += f"{emoji_map[stat]} <b>{name_map[stat]}:</b> {val_str}\n"
 
     available_points = int(player_data.get('stat_points', 0) or 0)
@@ -110,32 +86,32 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
 
     keyboard_rows = []
     if available_points > 0:
-        # Botões de upgrade (duas colunas)
-        row1 = [InlineKeyboardButton("➕ HP (+3)", callback_data='upgrade_max_hp')]
-        if 'attack' in PROFILE_KEYS: row1.append(InlineKeyboardButton("➕ ATK (+1)", callback_data='upgrade_attack'))
+        ckey = _get_class_key_normalized(player_data)
+        gains = _get_point_gains_for_class(ckey)
+
+        row1 = [InlineKeyboardButton(f"➕ HP (+{gains['max_hp']})", callback_data='upgrade_max_hp')]
+        if 'attack' in PROFILE_KEYS: 
+            row1.append(InlineKeyboardButton(f"➕ ATK (+{gains['attack']})", callback_data='upgrade_attack'))
         keyboard_rows.append(row1)
 
         row2 = []
-        if 'defense' in PROFILE_KEYS: row2.append(InlineKeyboardButton("➕ DEF (+1)", callback_data='upgrade_defense'))
-        if 'initiative' in PROFILE_KEYS: row2.append(InlineKeyboardButton("➕ INI (+1)", callback_data='upgrade_initiative'))
+        if 'defense' in PROFILE_KEYS: 
+            row2.append(InlineKeyboardButton(f"➕ DEF (+{gains['defense']})", callback_data='upgrade_defense'))
+        if 'initiative' in PROFILE_KEYS: 
+            row2.append(InlineKeyboardButton(f"➕ INI (+{gains['initiative']})", callback_data='upgrade_initiative'))
         if row2: keyboard_rows.append(row2)
 
         if 'luck' in PROFILE_KEYS:
-            keyboard_rows.append([InlineKeyboardButton("➕ SORTE (+1)", callback_data='upgrade_luck')])
+            keyboard_rows.append([InlineKeyboardButton(f"➕ SORTE (+{gains['luck']})", callback_data='upgrade_luck')])
 
-    # Botões de Ação
     keyboard_rows.append([InlineKeyboardButton("🎐 𝐄𝐯𝐨𝐥𝐮çã𝐨 𝐝𝐞 𝐂𝐥𝐚𝐬𝐬𝐞", callback_data="status_evolution_open")])
     keyboard_rows.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='profile')]) 
 
     return status_text, InlineKeyboardMarkup(keyboard_rows)
 
 async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Mostra a tela de status, funcionando para comando /status e botão.
-    """
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id 
-
     player_data = await player_manager.get_player_data(user_id) 
 
     if not player_data:
@@ -150,21 +126,16 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if update.message: await update.message.reply_text(text)
         return
 
-    # <<< MUDANÇA: Mantida a versão 'await' (do GitHub) >>>
     status_text, reply_markup = await _get_status_content(player_data)
 
-    # --- Lógica para CallbackQuery (Botão) ---
     if update.callback_query:
         query = update.callback_query
         await query.answer() 
-
         try:
             await query.delete_message()
         except Exception as e_del:
             logger.debug(f"Não foi possível apagar mensagem anterior em show_status_menu: {e_del}")
-
         media = _get_class_media(player_data, "status")
-
         try:
             if media and media.get("id") and chat_id:
                 media_id = media["id"]
@@ -173,24 +144,23 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_video(chat_id=chat_id, video=media_id, caption=status_text, reply_markup=reply_markup, parse_mode='HTML')
                 else:
                     await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=status_text, reply_markup=reply_markup, parse_mode='HTML')
-            elif chat_id: # Fallback se não houver mídia
+            elif chat_id:
                 await context.bot.send_message(chat_id=chat_id, text=status_text, reply_markup=reply_markup, parse_mode='HTML')
             else:
                 logger.error("show_status_menu (callback): chat_id inválido.")
         except Exception as e_send:
             logger.error(f"Erro ao enviar menu de status (callback) para {user_id}: {e_send}", exc_info=True)
             if chat_id: await context.bot.send_message(chat_id, "Ocorreu um erro ao exibir o menu de status.")
-
-    # --- Lógica para Comando /status ---
     else:
-        if update.message and chat_id: # Garante que temos uma mensagem e chat_id
+        if update.message and chat_id:
             await update.message.reply_text(text=status_text, reply_markup=reply_markup, parse_mode='HTML')
         else:
             logger.error("show_status_menu (comando): update.message ou chat_id inválido.")
 
+
+# <<< [MUDANÇA] Lógica de upgrade_stat_callback CORRIGIDA (V6) >>>
 async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # <<< MUDANÇA: Mantido o docstring eficiente (do GitHub) >>>
-    """Aplica o upgrade de stat, salva, e edita a mensagem usando os dados locais."""
+    """Aplica o ganho de stat correto (ex: +2, +3) ao stat base."""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -202,7 +172,6 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception: pass
         return
 
-    # Lógica síncrona de verificação
     pool = int(player_data.get("stat_points", 0) or 0)
     if pool <= 0:
         await query.answer("Você não tem pontos de atributo para gastar!", show_alert=True)
@@ -215,34 +184,35 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception: pass
         return
 
-    # --- 2. Aplica o upgrade (Modifica o 'player_data' localmente) ---
+    # --- 2. Aplica o upgrade (LÓGICA CORRIGIDA) ---
     player_data["stat_points"] = pool - 1
     
-    player_class = player_data.get('class')
-    modifiers = game_data.CLASSES_DATA.get(player_class, {}).get(
-        'stat_modifiers', {'attack': 1, 'defense': 1, 'initiative': 1, 'luck': 0.5}
-    )
+    # Pega a classe do jogador
+    ckey = _get_class_key_normalized(player_data)
+    # Pega os ganhos corretos (ex: +2 Def, +4 HP) de 'stats.py'
+    gains = _get_point_gains_for_class(ckey) 
+    
+    # Pega o valor de ganho para o atributo específico
+    # (Usa 1 como fallback)
+    increment = gains.get(profile_stat, 1)
 
-    # <<< MUDANÇA: Mantida a lógica de stats correta (do GitHub) >>>
-    if profile_stat == 'attack':
-        player_data['attack'] = int(player_data.get('attack', 0) + (1 * modifiers.get('attack', 1)))
+    # <<< [MUDANÇA] APLICA O INCREMENTO CORRETO (ex: +2, +4) >>>
+    # O 'player_data' armazena o valor base + investido
+    player_data[profile_stat] = int(player_data.get(profile_stat, 0)) + int(increment)
     
-    elif profile_stat == 'defense':
-        player_data['defense'] = int(player_data.get('defense', 0) + (1 * modifiers.get('defense', 1)))
-    
-    elif profile_stat == 'initiative':
-        player_data['initiative'] = int(player_data.get('initiative', 0) + (1 * modifiers.get('initiative', 1)))
-    
-    elif profile_stat == 'luck':
-        player_data['luck'] = player_data.get('luck', 0) + (1 * modifiers.get('luck', 0.5))
-    
-    elif profile_stat == 'max_hp':
-        inc = 3
+    # Lógica especial para HP (curar o jogador)
+    if profile_stat == 'max_hp':
         current_hp = int(player_data.get("current_hp", 0))
-        player_data['max_hp'] = int(player_data.get('max_hp', 0)) + inc
-        new_max_hp = player_data['max_hp']
+        
+        # Recalcula os stats totais AGORA para saber o novo máximo
+        # Passa uma cópia para get_player_total_stats recalcular
+        player_data_copy = player_data.copy()
+        total_stats = await get_player_total_stats(player_data_copy)
+        new_max_hp = int(total_stats.get('max_hp'))
+        
+        # Cura o jogador no mesmo valor que ganhou (o 'increment')
         if current_hp < new_max_hp:
-            player_data["current_hp"] = min(current_hp + inc, new_max_hp)
+            player_data["current_hp"] = min(current_hp + int(increment), new_max_hp)
 
     # --- 3. Salva os dados modificados ---
     try:
@@ -250,12 +220,10 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e_save:
         logger.error(f"Falha ao salvar dados após upgrade de stat para {user_id}: {e_save}", exc_info=True)
         await query.answer("Erro ao salvar o upgrade.", show_alert=True)
-        # Reverte a mudança de pontos localmente se o save falhar
-        player_data["stat_points"] = pool 
+        player_data["stat_points"] = pool # Devolve o ponto se falhar
         return
 
-    # --- 4. Gera o conteúdo COM os dados que acabámos de modificar ---
-    # <<< MUDANÇA: Mantida a lógica eficiente (do GitHub) >>>
+    # --- 4. Gera o conteúdo COM os dados atualizados ---
     try:
         status_text, reply_markup = await _get_status_content(player_data) 
     except Exception as e_get_content:
@@ -282,8 +250,8 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e_generic_caption:
         logger.error(f"Erro genérico ao editar menu de status (caption): {e_generic_caption}", exc_info=True)
 
+# ... (close_status_callback está correto) ...
 async def close_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Fecha (apaga) a mensagem de status."""
     query = update.callback_query
     await query.answer()
     try:
@@ -298,4 +266,4 @@ async def close_status_callback(update: Update, context: ContextTypes.DEFAULT_TY
 status_command_handler = CommandHandler("status", show_status_menu)
 status_open_handler = CallbackQueryHandler(show_status_menu, pattern=r'^status_open$')
 status_callback_handler = CallbackQueryHandler(upgrade_stat_callback, pattern=r'^upgrade_')
-close_status_handler = CallbackQueryHandler(close_status_callback, pattern=r'^close_status$') # Assume que você tem um botão para fechar
+close_status_handler = CallbackQueryHandler(close_status_callback, pattern=r'^close_status$')

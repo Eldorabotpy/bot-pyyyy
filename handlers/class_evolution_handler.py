@@ -121,6 +121,8 @@ def _all_options_for_class(curr_class_key: str) -> List[dict]:
 
 # ============ Renders ============
 
+# Em handlers/class_evolution_handler.py
+
 async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_new: bool = False) -> None:
     user_id = update.effective_user.id
     pdata = await player_manager.get_player_data(user_id) or {}
@@ -131,7 +133,7 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
     curr_name = curr_cfg.get("display_name", (pdata.get("class") or "—").title())
     lvl = _level(pdata)
 
-    opts = _all_options_for_class(curr_key) # Síncrono (CORRIGIDO)
+    opts = _all_options_for_class(curr_key) # Síncrono
     logger.info("[EVOL] user=%s class=%s lvl=%s options_all=%s", user_id, curr_key, lvl, len(opts))
 
     header = [
@@ -156,7 +158,6 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
                     return
                 except Exception:
                     pass
-        # Fallback se a edição falhar ou for 'as_new'
         if query:
             try: await query.delete_message()
             except Exception: pass
@@ -181,15 +182,29 @@ async def _render_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, as_ne
         if op.get("desc"):
             full_text_parts.append(f"• {op['desc']}")
 
-        skill_id = op.get("unlocks_skill")
-        if skill_id and skill_id in skills_data.SKILL_DATA:
-            skill_info = skills_data.SKILL_DATA[skill_id]
-            skill_name = skill_info.get("display_name", "Habilidade")
-            skill_desc = skill_info.get("description", "")
-            full_text_parts.append(f"🎁 <b>Habilidade:</b> {skill_name} - <i>{skill_desc}</i>")
+        # --- 👇 INÍCIO DA MUDANÇA (LER A LISTA DE SKILLS) 👇 ---
+        
+        # Lê a chave nova (plural) OU a chave antiga (singular) por segurança
+        skill_ids = op.get("unlocks_skills", [])
+        if not skill_ids and op.get("unlocks_skill"):
+            skill_ids = [op.get("unlocks_skill")] # Converte a singular para lista
+
+        if skill_ids:
+            # Mostra o título só se houver skills
+            full_text_parts.append(f"🎁 <b>Habilidades Desbloqueadas:</b>")
+            
+            for skill_id in skill_ids:
+                if skill_id in skills_data.SKILL_DATA:
+                    skill_info = skills_data.SKILL_DATA[skill_id]
+                    skill_name = skill_info.get("display_name", "Habilidade")
+                    skill_desc = skill_info.get("description", "")
+                    # Mostra cada skill numa linha separada
+                    full_text_parts.append(f"   • <b>{skill_name}</b> - <i>{skill_desc}</i>")
+        
+        # --- 👆 FIM DA MUDANÇA 👆 ---
 
         full_text_parts.append("\n<b>Requisitos:</b>")
-        full_text_parts.extend([f"   {ln}" for ln in req_lines])
+        full_text_parts.extend([f"   {ln}" for ln in req_lines])
 
         if eligible:
             full_keyboard.append([InlineKeyboardButton(f"⚡ Evoluir para {to_name}", callback_data=f"evo_do:{to_key}")])
