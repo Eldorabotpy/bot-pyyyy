@@ -62,7 +62,7 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         [InlineKeyboardButton("🆅🆂 𝐀𝐫𝐞𝐧𝐚 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 🆅🆂", callback_data='pvp_arena')], 
         [InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬 𝐄𝐬𝐩𝐞𝐜𝐢𝐚𝐢𝐬 💀", callback_data='show_events_menu')],
         [InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦 👤", callback_data='profile')],
-        [InlineKeyboardButton("ℹ️ Sobre o Reino", callback_data='region_info:reino_eldora')],
+        [InlineKeyboardButton("ℹ️ 𝐒𝐨𝐛𝐫𝐞 𝐨 𝐑𝐞𝐢𝐧𝐨", callback_data='region_info:reino_eldora')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 

@@ -144,7 +144,7 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
     caption = (
         f"<b>{dungeon.get('label','Calabouço')}</b>\n"
         f"Região: <code>{region_key}</code>\n\n"
-        f"🔑 Você tem: <b>{have} × {key_name}</b>\n\n"
+        f"🔹 Você tem: <b>{have} × {key_name}</b>\n\n"
         f"Escolha a dificuldade:"
     )
 
@@ -165,7 +165,7 @@ async def _open_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_
         key_cost = meta.key_cost
         
         if i <= highest_completed_index + 1:
-            button_text = f"{meta.emoji} {meta.label} (🔑 {key_cost})"
+            button_text = f"{meta.emoji} {meta.label} ( 🔹{key_cost})"
             kb.append([
                 InlineKeyboardButton(
                     button_text, 
@@ -304,9 +304,9 @@ async def fail_dungeon_run(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    total_stats = await player_manager.get_player_total_stats(player_data) # <--- CORRIGIDO
+    total_stats = await player_manager.get_player_total_stats(player_data) 
     player_data['current_hp'] = total_stats.get('max_hp', 50)
-    player_data['player_state'] = {'action': 'idle'}
+    player_data['current_mp'] = total_stats.get('max_mana', 10)
     await player_manager.save_player_data(user_id, player_data)
 
 
@@ -404,7 +404,10 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
             item_names = [(game_data.ITEMS_DATA.get(item_id, {}) or {}).get('display_name', item_id) for item_id in final_items]
             looted_items_text = "\n\n<b>Tesouros Adquiridos:</b>\n"
             for name, count in Counter(item_names).items(): looted_items_text += f"- {count}x {name}\n"
-
+        
+        total_stats = await player_manager.get_player_total_stats(pdata)
+        pdata['current_hp'] = total_stats.get('max_hp', 50)
+        pdata['current_mp'] = total_stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(user_id, pdata) # Salva tudo
 

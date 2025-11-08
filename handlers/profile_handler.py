@@ -118,28 +118,40 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     user_id = query.from_user.id
     chat_id = query.message.chat.id
+    
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
         return
+
+    # --- 👇 CORREÇÃO 1: Obter a classe do jogador 👇 ---
+    # Usamos .get("class_key") que é o ID (ex: 'mago', 'guerreiro')
+    player_class_key = (player_data.get("class_key") or "").lower()
+    # --- 👆 FIM DA CORREÇÃO 1 👆 ---
+
     all_skill_ids = player_data.get("skills", [])
     equipped_ids = player_data.get("equipped_skills", [])
     if not isinstance(equipped_ids, list):
         equipped_ids = []
         player_data["equipped_skills"] = equipped_ids
-    active_skill_ids = [
-        skill_id for skill_id in all_skill_ids
-        if skills_data.SKILL_DATA.get(skill_id, {}).get("type") == "active" or
-           skills_data.SKILL_DATA.get(skill_id, {}).get("type", "").startswith("support")
-    ]
+
+    active_skill_ids = []
+    # Filtra as skills ativas que o jogador APRENDEU
+    for skill_id in all_skill_ids:
+        skill_type = skills_data.SKILL_DATA.get(skill_id, {}).get("type", "unknown")
+        if skill_type == "active" or skill_type.startswith("support"):
+            active_skill_ids.append(skill_id)
+
     if not active_skill_ids:
         text = "⚙️ Equipar Skills Ativas\n\nVocê não possui nenhuma skill ativa para equipar."
         kb = [[InlineKeyboardButton("⬅️ Voltar (Habilidades)", callback_data="skills_menu_open")]]
         await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
         return
+    
     text_parts = [f"⚙️ <b>Equipar Skills Ativas</b> (Limite: {len(equipped_ids)}/{MAX_EQUIPPED_SKILLS})\n"]
     kb_rows = []
     text_parts.append("✅ <b><u>Equipadas Atualmente</u></b> ✅")
+    
     if not equipped_ids:
         text_parts.append("<i>Nenhuma skill ativa equipada.</i>")
     else:
@@ -152,60 +164,105 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
             if mana_cost is not None: line += f" ({mana_cost} MP)"
             text_parts.append(line)
             kb_rows.append([InlineKeyboardButton(f"➖ Desequipar {name}", callback_data=f"unequip_skill:{skill_id}")])
+
     text_parts.append("\n" + ("─" * 20) + "\n")
     text_parts.append("➕ <b><u>Disponíveis para Equipar</u></b> ➕")
+    
     slots_free = MAX_EQUIPPED_SKILLS - len(equipped_ids)
     available_to_equip_found = False
+ 
     for skill_id in active_skill_ids:
         if skill_id not in equipped_ids:
-            available_to_equip_found = True
             skill_info = skills_data.SKILL_DATA.get(skill_id)
             if not skill_info: continue
+
+            # --- 👇 CORREÇÃO 2: Verificação de Classe (Exibição) 👇 ---
+            # Aqui estamos a usar a informação que acabámos de adicionar!
+            allowed_classes = skill_info.get("allowed_classes", [])
+            # Se a lista de classes permitidas NÃO estiver vazia E a classe do jogador NÃO estiver nela...
+            if allowed_classes and player_class_key not in allowed_classes:
+                continue # ...pula esta skill, nem mostra o botão.
+            # --- 👆 FIM DA CORREÇÃO 2 👆 ---
+
+            available_to_equip_found = True
             name = skill_info.get("display_name", skill_id)
             mana_cost = skill_info.get("mana_cost")
             line = f"• <b>{name}</b>"
             if mana_cost is not None: line += f" ({mana_cost} MP)"
             text_parts.append(line)
+            
             if slots_free > 0:
                 kb_rows.append([InlineKeyboardButton(f"➕ Equipar {name}", callback_data=f"equip_skill:{skill_id}")])
             else:
                 kb_rows.append([InlineKeyboardButton(f"🚫 Limite Atingido", callback_data="noop")])
+
     if not available_to_equip_found:
-       text_parts.append("<i>Não há outras skills ativas disponíveis ou todas já estão equipadas.</i>")
+        text_parts.append("<i>Não há outras skills ativas disponíveis (ou que a sua classe possa usar).</i>")
+    
     kb_rows.append([InlineKeyboardButton("⬅️ Voltar (Habilidades)", callback_data="skills_menu_open")])
     final_text = "\n".join(text_parts)
     reply_markup = InlineKeyboardMarkup(kb_rows)
     await _safe_edit_or_send(query, context, chat_id, final_text, reply_markup)
 
+# Em: handlers/profile_handler.py
+
 async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+
     try:
         skill_id = query.data.split(":", 1)[1]
     except IndexError:
         logger.error(f"Callback equip_skill inválido: {query.data}")
         await query.answer("Erro ao processar a ação.", show_alert=True)
         return
+
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         await query.answer("Erro: Personagem não encontrado.", show_alert=True)
         return
+
+    # --- Verificação de Classe (Validação Final) ---
+    # (Assume que 'skills_data' foi importado no topo do ficheiro)
+    skill_info = skills_data.SKILL_DATA.get(skill_id)
+    if not skill_info:
+        await query.answer("Erro: Skill não encontrada nos dados do jogo.", show_alert=True)
+        return
+
+    # Pega a 'class_key' (ex: 'mago')
+    player_class_key = (player_data.get("class_key") or "").lower()
+    # Pega a lista de classes permitidas da skill (ex: ['mago'])
+    allowed_classes = skill_info.get("allowed_classes", [])
+    
+    # Se a lista NÃO estiver vazia E a classe do jogador NÃO estiver nela...
+    if allowed_classes and player_class_key not in allowed_classes:
+        # ...bloqueia a ação.
+        await query.answer("Sua classe não pode equipar esta habilidade!", show_alert=True)
+        await show_equip_skills_menu(update, context) # Recarrega o menu
+        return
+    # --- Fim da Verificação ---
+
     equipped_skills = player_data.setdefault("equipped_skills", [])
     if not isinstance(equipped_skills, list):
         equipped_skills = []
         player_data["equipped_skills"] = equipped_skills
+    
     if skill_id in equipped_skills:
         await query.answer("Essa skill já está equipada.", show_alert=True)
         await show_equip_skills_menu(update, context)
         return
+    
     if len(equipped_skills) >= MAX_EQUIPPED_SKILLS:
         await query.answer(f"Limite de {MAX_EQUIPPED_SKILLS} skills equipadas atingido!", show_alert=True)
         await show_equip_skills_menu(update, context)
         return
+   
     equipped_skills.append(skill_id)
     await player_manager.save_player_data(user_id, player_data)
-    await show_equip_skills_menu(update, context)
+    
+    # Erro de digitação 'a' removido daqui
+    await show_equip_skills_menu(update, context) # Recarrega o menu
 
 async def unequip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -302,7 +359,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ===== totais (base + equipamentos) =====
-    
+
     totals = await player_manager.get_player_total_stats(player_data)
     
     total_hp_max = int(totals.get('max_hp', 50))
@@ -310,8 +367,12 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_def = int(totals.get('defense', 0))
     total_ini = int(totals.get('initiative', 0))
     total_luck = int(totals.get('luck', 0))
+    # --- ADICIONADO MANA ---
+    total_mp_max = int(totals.get('max_mana', 10)) # Puxa o Mana Máximo
 
     current_hp = max(0, min(int(player_data.get('current_hp', total_hp_max)), total_hp_max))
+    # --- ADICIONADO MANA ---
+    current_mp = max(0, min(int(player_data.get('current_mp', total_mp_max)), total_mp_max))
     
     # <<< CORREÇÃO 1: Adiciona await AQUI >>>
     chance_esquiva = int((await player_manager.get_player_dodge_chance(player_data)) * 100)
@@ -372,9 +433,10 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = [
         f"👤 <b>Pᴇʀғɪʟ ᴅᴇ {char_name}</b>{premium_line}",
         f"{class_emoji} <b>Classe:</b> {class_name}", 
-        f"📍 <b>𝑳𝒐𝒄𝒂𝒍𝒊𒞛𝒂𝒄̧𝒂̃𝒐 𝑨𝒕𝒖𝒂𝒍:</b> {location_name}",
+        f"📍 <b>𝑳𝒐𝒄𝒂𝒍𝒊𝒛𝒂𝒄̧𝒂̃𝒐 𝑨𝒕𝒖𝒂𝒍:</b> {location_name}",
         "",
         f"❤️ <b>𝐇𝐏:</b> {current_hp} / {total_hp_max}",
+        f"💙 <b>𝐌𝐚𝐧𝐚:</b> {current_mp} / {total_mp_max}",
         f"⚡️ <b>𝐄𝐧𝐞𝐫𝐠𝐢𝐚:</b> {int(player_data.get('energy', 0))} / {max_energy}",
         "",
         f"🧡 <b>𝐇𝐏 𝐌𝐚́𝐱𝐢𝐦𝐨:</b> {total_hp_max}",

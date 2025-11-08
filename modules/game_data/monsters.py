@@ -412,7 +412,7 @@ MONSTERS_DATA = {
             "id": "pequeno_slime",
             "name": "Pequeno Slime",
             "hp": 15, "attack": 2, "defense": 1, "initiative": 5, "luck": 1,
-            "xp_reward": 3, "gold_drop": 2,
+            "xp_reward": 5, "gold_drop": 2,
            # "loot_table": [{"item_id": "geleia_comum", "drop_chance": 60.0}],
             "media_key": "slime_pequeno_media"
         },
@@ -507,7 +507,7 @@ MONSTERS_DATA = {
             "id": "goblin_batedor",
             "name": "Goblin Batedor",
             "hp": 40, "attack": 5, "defense": 1, "initiative": 8, "luck": 5,
-            "xp_reward": 1, "ambush_chance": 1.25,
+            "xp_reward": 5, "ambush_chance": 1.25,
             "file_id_name": "goblin_batedor_media",
             "gold_drop": 1,
             "loot_table": [
@@ -518,7 +518,7 @@ MONSTERS_DATA = {
             "id": "lobo_magro",
             "name": "Lobo Magro",
             "hp": 25, "attack": 4, "defense": 2, "initiative": 7, "luck": 3,
-            "xp_reward": 1, "ambush_chance": 0.0,
+            "xp_reward": 6, "ambush_chance": 0.0,
             "file_id_name": "lobo_magro_media",
             "gold_drop": 1,
             "loot_table": [
@@ -529,7 +529,7 @@ MONSTERS_DATA = {
             "id": "cogumelo_gigante",
             "name": "Cogumelo Gigante",
             "hp": 30, "attack": 4, "defense": 4, "initiative": 2, "luck": 1,
-            "xp_reward": 2, "ambush_chance": 0.0,
+            "xp_reward": 5, "ambush_chance": 0.0,
             "file_id_name": "cogumelo_gigante_media",
             "gold_drop": 1,
             "loot_table": [
@@ -540,7 +540,7 @@ MONSTERS_DATA = {
             "id": "javali_com_presas",
             "name": "Javali com Presas",
             "hp": 35, "attack": 6, "defense": 3, "initiative": 5, "luck": 4,
-            "xp_reward": 1, "ambush_chance": 0.0,
+            "xp_reward": 8, "ambush_chance": 0.0,
             "file_id_name": "javali_com_presas_media",
             "gold_drop": 1,
             "loot_table": [
@@ -551,7 +551,7 @@ MONSTERS_DATA = {
             "id": "ent_jovem",
             "name": "Ent Jovem",
             "hp": 40, "attack": 5, "defense": 5, "initiative": 3, "luck": 2,
-            "xp_reward": 3, "ambush_chance": 0.0,
+            "xp_reward": 10, "ambush_chance": 0.0,
             "file_id_name": "ent_jovem_media",
             "gold_drop": 1,
             "loot_table": [
@@ -564,7 +564,7 @@ MONSTERS_DATA = {
             "id": "espectro_do_bosque",
             "name": "Espectro do Bosque",
             "hp": 45, "attack": 8, "defense": 2, "initiative": 6, "luck": 8,
-            "xp_reward": 3, "ambush_chance": 0.0,
+            "xp_reward": 13, "ambush_chance": 0.0,
             "file_id_name": "espectro_bosque_media",
             "gold_drop": 1,
             "loot_table": [
@@ -576,7 +576,7 @@ MONSTERS_DATA = {
             "id": "xama_goblin",
             "name": "Xamã Goblin",
             "hp": 55, "attack": 10, "defense": 3, "initiative": 7, "luck": 6,
-            "xp_reward": 5, "ambush_chance": 0.0,
+            "xp_reward": 15, "ambush_chance": 0.0,
             "file_id_name": "xama_goblin_media",
             "gold_drop": 1,
             "loot_table": [
@@ -587,7 +587,7 @@ MONSTERS_DATA = {
             "id": "lobo_alfa",
             "name": "Lobo Alfa",
             "hp": 70, "attack": 15, "defense": 7, "initiative": 10, "luck": 15,
-            "xp_reward": 6, "ambush_chance": 0.0,
+            "xp_reward": 26, "ambush_chance": 0.0,
             "file_id_name": "lobo_alfa_media",
             "gold_drop": 1,
             "loot_table": [

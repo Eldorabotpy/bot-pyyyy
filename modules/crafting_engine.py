@@ -41,31 +41,31 @@ def _as_tuple_2(val: Any, fallback: Tuple[int, int] = (1, 1)) -> Tuple[int, int]
         pass
     return fallback
 
-# <<< CORREÇÃO 1: Adiciona async def >>>
+# Em modules/crafting_engine.py
+
 async def _seconds_with_perks(player_data: dict, base_seconds: int) -> int:
-    user_id = player_data['user_id']
-    
-    # <<< CORREÇÃO 2: Adiciona await (Assumindo que get_perk_value é async) >>>
-    # Se for síncrono (como em premium.py), remova o await.
-    # Mas é mais seguro assumir que é async se chama o player_manager.
-    craft_mult_raw = await player_manager.get_perk_value(user_id, "craft_speed_multiplier", None)
-    
+    # user_id = player_data['user_id']  <-- Correto, não precisamos disto
+
+    # Passa 'player_data' (Corrigido)
+    craft_mult_raw = player_manager.get_perk_value(player_data, "craft_speed_multiplier", None)
+
     if craft_mult_raw is None:
-        # <<< CORREÇÃO 3: Adiciona await >>>
-        mult = float(await player_manager.get_perk_value(user_id, "refine_speed_multiplier", 1.0))
+    # Passa 'player_data' (Corrigido)
+        mult = float(player_manager.get_perk_value(player_data, "refine_speed_multiplier", 1.0))
     else:
         mult = float(craft_mult_raw)
-        
+
     clan_id = player_data.get("clan_id")
     if clan_id:
-        # <<< CORREÇÃO 4: Adiciona await >>>
-        clan_buffs = await clan_manager.get_clan_buffs(clan_id) # Chama função async
+        # <<< [ESTA É A CORREÇÃO] >>>
+        # Remove 'await'. Esta função é síncrona (def) e não async.
+        clan_buffs = clan_manager.get_clan_buffs(clan_id) 
         speed_bonus_percent = clan_buffs.get("crafting_speed_percent", 0)
         if speed_bonus_percent > 0:
             mult += (speed_bonus_percent / 100.0)
-            
+
     mult = max(0.25, min(4.0, mult)) # Síncrono
-    
+ 
     return max(1, int(base_seconds / mult)) # Síncrono
 
 def _has_materials(player_data: dict, inputs: dict) -> bool:

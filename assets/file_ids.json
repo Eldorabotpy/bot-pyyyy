@@ -31,6 +31,14 @@
     "id": "BAACAgEAAxkBAAIK32jt8dgfsLcCYhDFntkTlb_sZBy_AAL3BgACVVNwR4-_XkgsH6ZuNgQ",
     "type": "video"
   },
+  "autohunt_defeat_media": {
+    "id": "AgACAgEAAxkBAAJmPWkL4gwuGdtV3scfjhDXi1EQvB0kAAIWC2sbHulgRJnwDR7LQYwIAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "autohunt_victory_media": {
+    "id": "AgACAgEAAxkBAAJmNmkL4fhk4tdcm6JV7d11XRRxbUzCAAIVC2sbHulgRHDAvWr9XrY7AQADAgADeQADNgQ",
+    "type": "photo"
+  },
   "automato_defeito": {
     "id": "BAACAgEAA...SUBSTITUA...",
     "type": "video"
@@ -55,6 +63,10 @@
     "id": "BAACAgEAAxkBAAIGSWjoX42HoBcjRcAXwrxIE9SvqILSAALuBwACcR8gRKZ6eMcXx7mkNgQ",
     "type": "video"
   },
+  "casa_leiloes": {
+    "id": "AgACAgEAAxkBAAKEr2kOzVz-X3e9uOlK7v7LEWlyC9ggAAIrC2sby2N5RKEK4ZbEj1uAAQADAgADeQADNgQ",
+    "type": "photo"
+  },
   "classe_assassino_media": {
     "id": "BAACAgEAAxkBAAIGbmjo3AhlUrNNxDQzmTIoexP1uCo0AAJjBwACGhnYRi-PA1quX7GbNgQ",
     "type": "video"
@@ -75,8 +87,16 @@
     "id": "BAACAgEAAxkBAAIkBWj6ehpcXQMvvQS1IBAUIMl3AXKBAALgBQACsQfYRxH1mITF23I1NgQ",
     "type": "video"
   },
+  "classe_guerreiro_armadura_negra_media": {
+    "id": "BAACAgEAAxkBAAJq5WkMtdJsWFJv-SjnbNMBq3uOT55lAAJTBgACuwFhRNXBl50am5YuNgQ",
+    "type": "video"
+  },
   "classe_guerreiro_media": {
     "id": "BAACAgEAAxkBAAIGjWjo3VS3bwvDs2B92ycuKCRY1S56AALbBgACOEhIRyAAAROz9BTmZzYE",
+    "type": "video"
+  },
+  "classe_guerreiro_placas_douradas_media": {
+    "id": "BAACAgEAAxkBAAJq62kMtfwIXMlVk5OQaKklfM5jBKlCAAJSBgACuwFhRCggJgW0Xjc6NgQ",
     "type": "video"
   },
   "classe_mago_media": {
@@ -85,6 +105,14 @@
   },
   "classe_monge_media": {
     "id": "BAACAgEAAxkBAAIGl2jo4ByTTU_mt3CODkdAP5LF-RIeAAJmBwACGhnYRsGymtH8XHDYNgQ",
+    "type": "video"
+  },
+  "classe_samurai_armadura_demoniaca_media": {
+    "id": "BAACAgEAAxkBAAJq92kMu2a_Z3bZay6KWSydwmui5hIXAAJWBgACuwFhRIlDUrOHqzNFNgQ",
+    "type": "video"
+  },
+  "classe_samurai_encarnacao_sangrenta_media": {
+    "id": "BAACAgEAAxkBAAJpJWkMNnO6bbDOxYQoNlnBSiKmtWJGAALMCAACHulgRKTHp8grjKgxNgQ",
     "type": "video"
   },
   "classe_samurai_media": {
@@ -527,12 +555,20 @@
     "id": "AgACAgEAAyEFAASrviDLAAIufGkFSXs9lD4AAY8rU_FK-tchX1XrQgACWwtrG1tZKEQgP0fs_tH7FgEAAwIAA3kAAzYE",
     "type": "photo"
   },
+  "media_derrota_cacada": {
+    "id": "AgACAgEAAxkBAAJ8WWkOQtzOwCNKUVuqIZVNS17yvyrMAAIJC2sby2N5RGvNA0X8xHl0AQADAgADeQADNgQ",
+    "type": "photo"
+  },
   "media_dungeon_defeat": {
     "id": "AgACAgEAAyEFAASrviDLAAIuemkFSXvwsuHLnO4AAZ0WAS2vhjU6GAACWQtrG1tZKETYR-CHNkBUfQEAAwIAA3kAAzYE",
     "type": "photo"
   },
   "media_dungeon_victory": {
     "id": "AgACAgEAAyEFAASrviDLAAIue2kFSXvYJdX-AUbYIPg6_6FExIxMAAJaC2sbW1koRJiNYh9s98eCAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "media_fuga_sucesso": {
+    "id": "AgACAgEAAxkBAAJ8X2kOQwqiP3uTpDEIeQYCcClIWAXNAAIKC2sby2N5RH-DNEHEXjW_AQADAgADeQADNgQ",
     "type": "photo"
   },
   "menu_forja_principal": {

@@ -142,27 +142,49 @@ def _find_primary_key(item_inst: dict) -> str | None:
                 return k
     return None
 
-# =========================
-# Sincronização de atributos com upgrade_level
-# =========================
 def _sync_attrs_to_upgrade(item_inst: dict) -> None:
+    """
+    (CORRIGIDO) Sincroniza TODOS os atributos (primário, afixos E o espelho 'dmg')
+    com o 'upgrade_level' atual do item.
+    """
     if not isinstance(item_inst, dict):
         return
+    
     ench = item_inst.setdefault("enchantments", {}) or {}
-    up = int(item_inst.get("upgrade_level", 1))
+    # 'up' é o novo nível de aprimoramento, ex: 3
+    up = int(item_inst.get("upgrade_level", 1)) 
 
+    primary_key_found = None
+
+    # Loop 1: Atualiza todos os atributos (primário E afixos)
     for k, v in list(ench.items()):
-        if k == "dmg":
+        if not isinstance(v, dict):
             continue
-        if isinstance(v, dict):
-            v["value"] = up
-            ench[k] = v
+        
+        source = str(v.get("source", ""))
+        
+        # --- ESTA É A CORREÇÃO ---
+        # Ignora APENAS o 'mirror' (espelho).
+        # O 'dmg' (se for primário, source='primary') NÃO será ignorado.
+        if source == "primary_mirror":
+            continue
+            
+        # Atualiza o valor do atributo (seja 'forca' ou 'dmg' primário)
+        v["value"] = up
+        ench[k] = v
+        
+        # Guarda a chave do primário que acabámos de atualizar
+        if source == "primary":
+            primary_key_found = k
 
+    # Loop 2: Garante que o espelho 'dmg' (se existir) também é atualizado
     if _is_weapon(item_inst):
-        prim = _find_primary_key(item_inst)
-        if prim and prim != "dmg":
+        # Se o primário for (por exemplo) 'forca' (e não 'dmg'),
+        # então 'dmg' é o espelho e deve ser atualizado para o mesmo valor 'up'.
+        if primary_key_found and primary_key_found != "dmg":
             ench["dmg"] = {"value": up, "source": "primary_mirror"}
-
+        
+        
 # =========================
 # Localizar receita do item (para custo de upgrade)
 # =========================
@@ -331,7 +353,7 @@ def _set_dur(item: dict, cur: int, mx: int) -> None:
 # =========================
 # Aprimoramento (+1 em TODOS os atributos visíveis)
 # =========================
-def enhance_item(player_data: dict, unique_id: str, use_joia: bool = False) -> dict:
+async def enhance_item(player_data: dict, unique_id: str, use_joia: bool = False) -> dict:
     inv = player_data.get('inventory', {}) or {}
 
     item = inv.get(unique_id)
@@ -376,7 +398,7 @@ def enhance_item(player_data: dict, unique_id: str, use_joia: bool = False) -> d
     fs_bonus = min(FAILSTACK_MAX, fs * FAILSTACK_STEP)
 
     # Perks: mantemos sua sorte/nível de profissão como bônus leve (+0.1% por ponto, opcional)
-    total = player_manager.get_player_total_stats(player_data)
+    total = await player_manager.get_player_total_stats(player_data)
     luck = int(total.get('luck', 5))
     prof = player_data.get('profession', {}) or {}
     plevel = int(prof.get('level', 1))

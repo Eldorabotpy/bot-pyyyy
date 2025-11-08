@@ -213,7 +213,7 @@ def get_dungeon_for_region(region_key: str) -> dict | None:
                 },
             ],
         }
-    elif region_key == "campos_linho":
+    elif region_key == "campos_linho": 
         return {
             "display_name": "Calabouço Campos de Linho",
             "key_item": "cristal_de_abertura", 

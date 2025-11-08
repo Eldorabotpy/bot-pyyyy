@@ -30,6 +30,8 @@ from handlers.inventory_handler import (
     noop_inventory_handler,
 )
 
+from handlers.skin_handler import all_skin_handlers
+
 # 3. Do painel de equipamentos
 from handlers.equipment_handler import (
     equipment_menu_handler,
@@ -101,7 +103,7 @@ def register_character_handlers(application: Application):
         job_menu_handler,
         job_pick_handler,
     ]
-
+    normal_handlers.extend(all_skin_handlers)
     # --- CORREÇÃO APLICADA AQUI ---
     # Registramos os handlers normais primeiro
     application.add_handlers(normal_handlers)

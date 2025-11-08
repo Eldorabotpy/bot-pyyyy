@@ -258,12 +258,11 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
         return
 
     # Assumindo síncrono
-    preview = crafting_engine.preview_craft(recipe_id, player_data)
+    preview = await crafting_engine.preview_craft(recipe_id, player_data)
     if not preview:
         await query.answer("Erro ao pré-visualizar a receita.", show_alert=True)
         return
 
-    # Montagem síncrona do texto
     display_name = _md_escape(preview.get("display_name", "Item"))
     minutes = preview.get("duration_seconds", 0) // 60
     lines = [
@@ -306,7 +305,7 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     """Inicia o processo de forja e agenda a notificação de conclusão."""
     user_id = query.from_user.id
     # Assumindo start_craft síncrono
-    result = crafting_engine.start_craft(user_id, recipe_id)
+    result = await crafting_engine.start_craft(user_id, recipe_id)
 
     if isinstance(result, str):
         await query.answer(result, show_alert=True)
@@ -346,7 +345,7 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     recipe_id = (job.data or {}).get("recipe_id") # Pega recipe_id do job.data
 
     # Assumindo finish_craft síncrono
-    result = crafting_engine.finish_craft(user_id)
+    result = await crafting_engine.finish_craft(user_id)
     if not isinstance(result, dict) or "item_criado" not in result:
         error_msg = f"⚠️ Erro ao finalizar a forja: {result}"
         logger.error(error_msg)

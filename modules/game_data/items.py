@@ -1,9 +1,23 @@
 # modules/game_data/items.py
+# Em modules/game_data/items.py
+
 """
 Tabela base de itens de inventário (materiais, consumíveis, insumos, etc).
 Mantenha IDs canônicos — outros módulos referenciam esses IDs diretamente.
 """
 
+# --- (NOVO) COLA ESTE BLOCO DE CÓDIGO AQUI ---
+try:
+    from .skills import SKILL_DATA
+except ImportError:
+    SKILL_DATA = {}
+    print("AVISO: modules/game_data/skills.py não encontrado.")
+
+try:
+    from .skins import SKIN_CATALOG
+except ImportError:
+    SKIN_CATALOG = {}
+    print("AVISO: modules/game_data/skins.py não encontrado.")
 
 ITEMS_DATA = {
     # Em modules/game_data/items.py, dentro do dicionário ITEMS_DATA
@@ -1792,12 +1806,53 @@ if "chave_da_catacumba" in ITEMS_DATA:
     ITEMS_DATA["chave_da_catacumba"]["description"] = "Chave da Catacumba do Reino."
 
 # ============================================================
-# Itens de Evolução de Classe (Tier 2 e Tier 3)
-# - Compatível com o schema deste arquivo
-# - Merge seguro: não sobrescreve se o ID já existir
-# - Atualiza MARKET_ITEMS se for dict (com preço) ou list (apenas exibição)
+# (NOVO) Itens Consumíveis (Tomos de Skill)
 # ============================================================
+# Este loop lê o teu SKILL_DATA e cria um "Tomo" para cada skill
+for skill_id, skill_info in SKILL_DATA.items():
+    item_id = f"tomo_{skill_id}" # Ex: tomo_active_whirlwind
+    if item_id not in ITEMS_DATA: # Evita duplicatas
+        ITEMS_DATA[item_id] = {
+            "display_name": f"Tomo: {skill_info.get('display_name', skill_id)}",
+            "emoji": "📚",
+            "type": "consumable", # Define como consumível
+            "category": "consumivel", # Categoria para o Mercado de Gemas
+            "description": f"Tomo selado. Ao ler, ensina a habilidade: {skill_info.get('display_name', skill_id)}.",
+            "stackable": True, # Tomos podem ser empilhados
+            "tradable": True,  # Pode ser vendido
+            "market_currency": "gems", # Define que é vendido por gemas
+            
+            # --- O EFEITO DE USO ---
+            "on_use": {
+                "effect": "grant_skill",
+                "skill_id": skill_id # O ID que o 'grant_skill' usa
+            }
+        }
 
+# ============================================================
+# (NOVO) Itens Consumíveis (Caixas de Skin)
+# ============================================================
+# Este loop lê o teu SKIN_CATALOG e cria uma "Caixa" para cada skin
+for skin_id, skin_info in SKIN_CATALOG.items():
+    item_id = f"caixa_{skin_id}" # Ex: caixa_guerreiro_armadura_negra
+    if item_id not in ITEMS_DATA: # Evita duplicatas
+        ITEMS_DATA[item_id] = {
+            "display_name": f"Caixa: {skin_info.get('display_name', skin_id)}",
+            "emoji": "🎨",
+            "type": "consumable", # Define como consumível
+            "category": "consumivel", # Categoria para o Mercado de Gemas
+            "description": f"Caixa selada. Ao abrir, liberta a skin: {skin_info.get('display_name', skin_id)}.",
+            "stackable": True, # Caixas podem ser empilhadas
+            "tradable": True,  # Pode ser vendido
+            "market_currency": "gems", # Define que é vendido por gemas
+            
+            # --- O EFEITO DE USO ---
+            "on_use": {
+                "effect": "grant_skin",
+                "skin_id": skin_id # O ID que o 'grant_skin' usa
+            }
+        }
+        
 def _register_item_safe(item_id: str, data: dict, market_price: int | None = None):
     """Adiciona o item se ainda não existir. Opcionalmente registra no MARKET_ITEMS."""
     if item_id not in ITEMS_DATA:

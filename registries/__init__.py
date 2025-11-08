@@ -2,6 +2,10 @@
 
 import logging
 from telegram.ext import Application
+from telegram import Update
+from telegram.ext import Application, TypeHandler, ContextTypes
+from modules import player_manager
+from datetime import datetime, timezone
 
 # Importa as funções de registo de cada módulo
 from .admin import register_admin_handlers
@@ -19,10 +23,34 @@ from handlers.potion_handler import all_potion_handlers
 #from handlers.autohunt_handler import all_autohunt_handlers
 from kingdom_defense.handler import register_handlers as register_kingdom_defense_handlers
 
+async def update_last_seen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handler global (Middleware) que atualiza 'last_seen' para CADA interação do jogador.
+    """
+    if not update.effective_user:
+        return # Ignora se não conseguirmos identificar o utilizador
+        
+    user_id = update.effective_user.id
+    
+    # Tenta pegar os dados do cache (rápido)
+    pdata = await player_manager.get_player_data(user_id) 
+    
+    if pdata:
+        # Atualiza o timestamp
+        pdata['last_seen'] = datetime.now(timezone.utc).isoformat()
+        # Salva (o save_player_data vai atualizar o cache e o DB)
+        await player_manager.save_player_data(user_id, pdata)
+    
+    # Nota: Se pdata for None (jogador não existe/nunca deu /start), 
+    # não fazemos nada. O 'created_at' e 'last_seen' serão definidos no /start.
+
+# --- 👆 FIM DA NOVA FUNÇÃO 👆 ---
 
 def register_all_handlers(application: Application):
     """Chama todas as funções de registo de cada categoria na ordem correta."""
     logging.info("Iniciando o registo de todos os handlers...")
+
+    application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
     
     # --- Registo por Módulos ---
     register_admin_handlers(application)

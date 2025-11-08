@@ -67,5 +67,29 @@ SKIN_CATALOG = {
         'media_key': 'classe_samurai_armadura_shogun_media',
         'description': 'Uma armadura de batalha ornamentada, símbolo de liderança e poder.'
     },
+    'samurai_armadura_demoniaca': {
+        'display_name': 'Armadura do demonio',
+        'class': 'samurai',
+        'media_key': 'classe_samurai_armadura_demoniaca_media',
+        'description': 'Uma armadura de batalha ornamentada, símbolo de liderança e poder.'
+    },
+    'samurai_encarnacao_sangrenta': {
+        'display_name': 'Encanação Sangrenta',
+        'class': 'samurai',
+        'media_key': 'classe_samurai_encarnacao_sangrenta_media',
+        'description': 'Uma armadura de batalha ornamentada, símbolo de liderança e poder.'
+    },
+    'samurai_guardiao_celestial': {
+        'display_name': 'Guardião Celestial',
+        'class': 'samurai',
+        'media_key': 'classe_samurai_guardiao_celestial_media',
+        'description': 'Uma armadura de batalha ornamentada, símbolo de liderança e poder.'
+    },
+    'samurai_chama_aniquiladora': {
+        'display_name': 'Chama Aniquiladora',
+        'class': 'samurai',
+        'media_key': 'classe_samurai_chama_aniquiladora_media',
+        'description': 'Uma armadura de batalha ornamentada, símbolo de liderança e poder.'
+    },
 }
     # Adiciona aqui outras skins para as tuas outras classes...

@@ -24,62 +24,97 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
 
     player_data = await player_manager.get_player_data(query.from_user.id)
    
-    # Pega as skills que o jogador APRENDEU
-    learned_skills = player_data.get("learned_skills", [])
+    # Pega apenas as skills EQUIPADAS (Corrigido)
+    equipped_skills = player_data.get("equipped_skills", [])
 
-    # Pega o estado do combate para verificar cooldowns
     state = player_data.get('player_state', {})
     combat_details = state.get('details', {})
     active_cooldowns = combat_details.get("skill_cooldowns", {})
 
-    skill_buttons = []
-    for skill_id in learned_skills:
+    # --- 👇 MUDANÇA: 'skill_buttons' agora é 'keyboard_rows' 👇 ---
+    keyboard_rows = [] 
+    
+    for skill_id in equipped_skills: 
         skill_info = SKILL_DATA.get(skill_id)
 
-        # Mostra apenas skills ATIVAS no menu
-        if not skill_info or skill_info.get("type") != "active":
+        # Filtro de segurança (Corrigido)
+        if not skill_info or skill_info.get("type") not in ("active", "support"):
             continue
 
         skill_name = skill_info.get("display_name", skill_id)
-        mana_cost = skill_info.get("mana_cost", 0) # Pega o custo de mana
-
-        # Verifica se a skill está em cooldown
+        mana_cost = skill_info.get("mana_cost", 0) 
         turns_left = active_cooldowns.get(skill_id, 0)
+
+        # --- 👇 MUDANÇA: Criação dos botões de 'Usar' e 'Info' 👇 ---
+        use_button = None
+        info_button = InlineKeyboardButton("ℹ️ Info", callback_data=f"combat_info_skill:{skill_id}")
 
         if turns_left > 0:
             # Botão Desativado (Em Cooldown)
-            skill_buttons.append(
-            InlineKeyboardButton(f"⏳ {skill_name} ({turns_left}t)", callback_data=f"combat_skill_on_cooldown")
-            )
+            use_button = InlineKeyboardButton(f"⏳ {skill_name} ({turns_left}t)", callback_data=f"combat_skill_on_cooldown")
         else:
             # Botão Ativado
             button_text = f"✨ {skill_name}"
             if mana_cost > 0:
                 button_text += f" (MP: {mana_cost})"
- 
-            skill_buttons.append(
-                InlineKeyboardButton(button_text, callback_data=f"combat_use_skill:{skill_id}")
-            )
+            use_button = InlineKeyboardButton(button_text, callback_data=f"combat_use_skill:{skill_id}")
+        
+        # Adiciona a linha [Botão de Usar] [Botão de Info]
+        keyboard_rows.append([use_button, info_button])
+        # --- 👆 FIM DA MUDANÇA 👆 ---
 
-    if not skill_buttons:
-        skill_buttons.append(InlineKeyboardButton("Você não tem skills ativas.", callback_data="noop"))
+    if not keyboard_rows: # Se 'keyboard_rows' estiver vazia
+        keyboard_rows.append([InlineKeyboardButton("Você não tem skills equipadas.", callback_data="noop")])
 
-    keyboard = [[btn] for btn in skill_buttons]
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar à Batalha", callback_data="combat_attack_menu")])
+    keyboard_rows.append([InlineKeyboardButton("⬅️ Voltar à Batalha", callback_data="combat_attack_menu")])
 
-    # Edita apenas os botões, mantendo o caption (texto) da batalha
     try:
-       await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard_rows))
     except BadRequest as e:
         if "not modified" not in str(e):
             logger.warning(f"Erro ao editar markup para menu de skills: {e}")
 
+# --- 👇 NOVA FUNÇÃO (Callback do botão 'Info') 👇 ---
+async def combat_skill_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra um pop-up (alert) com a descrição da skill."""
+    query = update.callback_query
+    
+    try:
+        skill_id = query.data.split(':', 1)[1]
+        skill_info = SKILL_DATA.get(skill_id)
+    except Exception:
+        await query.answer("Erro: Skill não encontrada.", show_alert=True)
+        return
+
+    if not skill_info:
+        await query.answer("Erro: Skill não encontrada.", show_alert=True)
+        return
+
+    # Pega as informações
+    name = skill_info.get("display_name", skill_id)
+    desc = skill_info.get("description", "Sem descrição.")
+    cost = skill_info.get("mana_cost", 0)
+    cooldown = skill_info.get("effects", {}).get("cooldown_turns", 0)
+    
+    # Formata o texto do pop-up
+    popup_text = [
+        f"ℹ️ {name}",
+        f"Custo: {cost} MP",
+    ]
+    if cooldown > 0:
+        popup_text.append(f"Recarga: {cooldown} turnos")
+    
+    popup_text.append(f"\n{desc}")
+    
+    # Mostra o pop-up (alert=True faz a caixa grande)
+    await query.answer("\n".join(popup_text), show_alert=True)
+# --- 👆 FIM DA NOVA FUNÇÃO 👆 ---
 
 async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa o uso de uma skill em combate."""
     query = update.callback_query
     user_id = query.from_user.id
-    
+
     try:
         skill_id = query.data.split(':')[1]
     except IndexError:
@@ -99,43 +134,40 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
         await _safe_answer(query)
         await query.answer("Você não está em combate.", show_alert=True)
         return
-    
+
     combat_details = state.get('details', {})
     active_cooldowns = combat_details.setdefault("skill_cooldowns", {})
-    
+   
     # 1. Verificar Cooldown
     if active_cooldowns.get(skill_id, 0) > 0:
         await _safe_answer(query)
         await query.answer(f"{skill_info['display_name']} está em recarga!", show_alert=True)
         return
 
-    # --- 👇 LÓGICA DE MANA CORRIGIDA 👇 ---
+    # 2. Lógica de Verificação de Mana (Corrigido)
     mana_cost = skill_info.get("mana_cost", 0)
     if mana_cost > 0:
-        # 2. Usar a nova função 'spend_mana' de actions.py
-        if not player_actions.spend_mana(player_data, mana_cost):
+        total_stats = await player_manager.get_player_total_stats(player_data)
+        max_mp = total_stats.get('max_mana', 10)
+        current_mp = player_data.get('current_mp', max_mp)
+
+        if current_mp < mana_cost:
             await _safe_answer(query)
             await query.answer(f"Você não tem Mana ({mana_cost}) suficiente!", show_alert=True)
             return
-    # --- 👆 FIM DA LÓGICA DE MANA 👆 ---
 
     # 3. Aplicar Cooldown (ANTES de atacar)
-    cooldown = skill_info["effects"].get("cooldown_turns", 0)
+    cooldown = skill_info.get("effects", {}).get("cooldown_turns", 0)
     if cooldown > 0:
         active_cooldowns[skill_id] = cooldown + 1 
-    
-    # 4. Salvar o estado (gasto de mana/cooldown)
-    player_data['player_state']['details'] = combat_details
-    # Nota: O 'spend_mana' já modificou o player_data, 
-    # então este save já guarda a mana gasta.
-    await player_manager.save_player_data(user_id, player_data)
-    
-    # 5. INICIAR O ATAQUE
-    player_data['player_state']['details']['skill_to_use'] = skill_id
-    await player_manager.save_player_data(user_id, player_data)
 
-    await _safe_answer(query)
+    # 4. Preparar o estado para o 'main_handler'
+    combat_details['skill_to_use'] = skill_id
+    player_data['player_state']['details'] = combat_details
     
+    await _safe_answer(query)
+
+    # 5. Chamar o handler principal para EXECUTAR o ataque
     await combat_callback(update, context, action="combat_attack")
 
 async def combat_skill_on_cooldown_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -147,3 +179,4 @@ async def combat_skill_on_cooldown_callback(update: Update, context: ContextType
 combat_skill_menu_handler = CallbackQueryHandler(combat_skill_menu_callback, pattern=r'^combat_skill_menu$')
 combat_use_skill_handler = CallbackQueryHandler(combat_use_skill_callback, pattern=r'^combat_use_skill:.*$')
 combat_skill_on_cooldown_handler = CallbackQueryHandler(combat_skill_on_cooldown_callback, pattern=r'^combat_skill_on_cooldown$')
+combat_skill_info_handler = CallbackQueryHandler(combat_skill_info_callback, pattern=r'^combat_info_skill:.*$')

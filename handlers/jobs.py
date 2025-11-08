@@ -287,32 +287,43 @@ async def _process_watchdog_for_player(context: ContextTypes.DEFAULT_TYPE, user_
         return 0
         
 async def timed_actions_watchdog(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Verifica ações terminadas e reagenda a finalização (Watchdog Assíncrono)."""
-    ACTION_FINISHERS: Dict[str, Any] = {
-       "collecting": {"fn": finish_collection_job, "data_builder": lambda st: {'resource_id': (st.get("details") or {}).get("resource_id"),'item_id_yielded': (st.get("details") or {}).get("item_id_yielded"),'energy_cost': (st.get("details") or {}).get("energy_cost", 1),'speed_mult': (st.get("details") or {}).get("speed_mult", 1.0)}},
-       "travel": {"fn": finish_travel_job, "data_builder": lambda st: {"dest": (st.get("details") or {}).get("destination")}},
-       "crafting": {"fn": finish_crafting_job, "data_builder": lambda st: {"recipe_id": (st.get("details") or {}).get("recipe_id")}},
-       "refining": {"fn": finish_refine_job, "data_builder": lambda st: {"recipe_id": (st.get("details") or {}).get("recipe_id")}},
-       "dismantling": {"fn": finish_dismantle_job, "data_builder": lambda st: {}},
-    }
-    now = datetime.datetime.now(datetime.timezone.utc)
+    """
+    Verifica ações terminadas e reagenda a finalização (Watchdog Assíncrono).
     
+    ATENÇÃO: Este watchdog (Vigilante 2) foi DESATIVADO (lista vazia)
+    porque o Vigilante 1 (check_stale_actions_on_startup em actions.py)
+    já lida com o reagendamento de jobs de coleta, forja e viagem.
+    Manter este ativo estava a causar uma "competição" (race condition)
+    e a fazer com que os jobs originais falhassem.
+    """
+    
+    # --- CORREÇÃO: Esvaziar o dicionário ---
+    ACTION_FINISHERS: Dict[str, Any] = {
+        # "crafting": ... (TUDO REMOVIDO PARA EVITAR O BUG DA FORJA)
+    }
+    # --- FIM DA CORREÇÃO ---
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    # Se a lista estiver vazia, podemos parar a função mais cedo.
+    if not ACTION_FINISHERS:
+        # logger.info("[WATCHDOG] O Vigilante 2 (jobs.py) está desativado (lista vazia).")
+        return
+
     tasks = []
     try:
-        # <<< CORREÇÃO: Usa 'async for' >>>
-        # Como _process_watchdog_for_player carrega os dados, só precisamos do ID.
         async for user_id, _ in player_manager.iter_players(): 
             try:
                 tasks.append(_process_watchdog_for_player(context, user_id, now, ACTION_FINISHERS))
             except Exception as e_player:
-                 logger.warning(f"[WATCHDOG] Erro ao preparar task para {user_id}: {e_player}")
+                logger.warning(f"[WATCHDOG] Erro ao preparar task para {user_id}: {e_player}")
 
         if tasks:
             results = await asyncio.gather(*tasks)
             fired = sum(results)
             if fired > 0:
                 logger.info("[WATCHDOG] Disparadas %s finalizações de ações vencidas.", fired)
-        
+
     except Exception as e_loop:
         logger.error(f"[WATCHDOG] Erro CRÍTICO durante o loop: {e_loop}", exc_info=True)
 
@@ -474,25 +485,21 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     try:
         job_name = context.job.name 
         logger.info(f"Iniciando job: {job_name}")
-        
-        duration = context.job.data.get("event_duration_minutes", 30) 
-        
-        success, message = await event_manager.start_event(duration_minutes=duration)
-        
-        if success:
-            logger.info(f"Evento de Defesa do Reino INICIADO. Duração: {duration} min.")
-            await context.bot.send_message(
-                chat_id=ANNOUNCEMENT_CHAT_ID,
-                message_thread_id=ANNOUNCEMENT_THREAD_ID,
-                text=f"⚔️ <b>INVASÃO IMINENTE!</b> ⚔️\n\n{message}\n\nA defesa durará {duration} minutos. Defensores, ao reino!",
-                parse_mode="HTML"
-            )
-        else:
-            logger.warning(f"Não foi possível iniciar o evento: {message}")
+        duration = (context.job.data or {}).get("event_duration_minutes", 30) 
+        await event_manager.start_event()
+        logger.info(f"Evento de Defesa do Reino INICIADO (Chamada ao event_manager bem-sucedida). Duração: {duration} min.")
+        message_para_anunciar = "As hordas de monstros estão a atacar o reino!"
+
+        await context.bot.send_message(
+            chat_id=ANNOUNCEMENT_CHAT_ID,
+            message_thread_id=ANNOUNCEMENT_THREAD_ID,
+            text=f"⚔️ <b>INVASÃO IMINENTE!</b> ⚔️\n\n{message_para_anunciar}\n\nA defesa durará {duration} minutos. Defensores, ao reino!",
+            parse_mode="HTML"
+        )
             
     except Exception as e:
         logger.error(f"Erro crítico ao tentar iniciar o evento Defesa do Reino: {e}", exc_info=True)
-
+        
 async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     """Finaliza o evento Defesa do Reino."""
     try:

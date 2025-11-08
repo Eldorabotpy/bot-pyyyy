@@ -1,4 +1,5 @@
 # handlers/adventurer_market_handler.py
+# (VERSÃO COM INDENTAÇÃO CORRIGIDA)
 
 import logging
 from typing import List, Dict
@@ -36,6 +37,7 @@ EVOLUTION_ITEMS: set[str] = {
     "emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria",
     "emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno",
     "emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada",
+
 }
 
 EVOL_BLOCK_MSG = (
@@ -43,7 +45,42 @@ EVOL_BLOCK_MSG = (
     "<b>Mercado do Aventureiro</b> por ouro.\n"
     "Use a <b>Loja de Gemas</b> (moeda premium) para negociar esse tipo de item."
 )
+SKILL_DATA: set[str] = {
+    "passive_bulwark", "active_whirlwind", "active_holy_blessing", "passive_unstoppable",
+    "active_unbreakable_charge", "passive_last_stand", "passive_animal_companion",
+    "active_deadeye_shot", "passive_apex_predator", "active_iron_skin",
+    "passive_elemental_strikes", "active_transcendence", "active_curse_of_weakness", 
+    "passive_elemental_attunement", "active_meteor_swarm", "active_song_of_valor",
+    "active_dissonant_melody", "passive_symphony_of_power", "active_shadow_strike", 
+    "passive_potent_toxins", "active_dance_of_a_thousand_cuts", "passive_iai_stance",
+    "active_parry_and_riposte", "active_banner_of_command", 
 
+    "guerreiro_corte_perfurante", "berserker_golpe_selvagem", "cacador_flecha_precisa",
+    "monge_rajada_de_punhos", "mago_bola_de_fogo", "bardo_melodia_restauradora",
+    "assassino_ataque_furtivo", "samurai_corte_iaijutsu",
+
+}
+
+SKILL_DATA_BLOCK_MSG = (
+    "🚫 Este é um <b>item de skill </b> e não pode ser vendido no "
+    "<b>Mercado do Aventureiro</b> por ouro.\n"
+    "Use a <b>COMERCIO DE RELIQUIAS</b> (moeda premium) para negociar esse tipo de item."
+)
+
+SKIN_CATALOG = {
+    'guerreiro_armadura_negra','guerreiro_placas_douradas',
+    'mago_traje_arcano', 'assassino_manto_espectral', 'cacador_patrulheiro_elfico',
+    'berserker_pele_urso', 'monge_quimono_dragao', 'bardo_traje_maestro',
+    'samurai_armadura_shogun', 'samurai_armadura_demoniaca', 'samurai_encarnacao_sangrenta',
+    'samurai_guardiao_celestial', 'samurai_chama_aniquiladora', 
+
+}
+
+SKIN_CATALOG_BLOCK_MSG = (
+    "🚫 Este é um <b>item de skill </b> e não pode ser vendido no "
+    "<b>Mercado do Aventureiro</b> por ouro.\n"
+    "Use a <b>COMERCIO DE RELIKIAS</b> (moeda premium) para negociar esse tipo de item."
+)
 # ==============================
 #  Utils básicos
 # ==============================
@@ -83,15 +120,30 @@ def _cut_middle(s: str, maxlen: int = 56) -> str:
     s = (s or "").strip()
     return s if len(s) <= maxlen else s[:maxlen//2 - 1] + "… " + s[-maxlen//2:]
 
+# Em handlers/adventurer_market_handler.py
+
+# Em handlers/adventurer_market_handler.py
+
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
     try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return # Sucesso
+    except Exception as e:
+        # <<< CORREÇÃO AQUI >>>
+        if "message is not modified" in str(e).lower():
+            return # Para a execução, está tudo bem.
+        pass # Erro real (ex: era texto), tenta o próximo.
+    
     try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return # Sucesso
+    except Exception as e:
+        # <<< CORREÇÃO AQUI >>>
+        if "message is not modified" in str(e).lower():
+            return # Para a execução, está tudo bem.
+        pass # Erro real (ex: era media), tenta o próximo.
+    
+    # Se AMBOS falharam (ex: mensagem foi apagada), envia uma nova.
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 async def _send_with_media(chat_id: int, context: ContextTypes.DEFAULT_TYPE, caption: str, kb: InlineKeyboardMarkup, media_keys: List[str]):
@@ -360,26 +412,26 @@ async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
             uid = it.get("uid")
             inst = it.get("item")
             if uid and inst: 
-                 inv = pdata.get("inventory", {}) or {}
-                 new_uid = uid 
-                 count = 0
-                 while new_uid in inv: 
-                     count += 1
-                     new_uid = f"{uid}_ret_{count}"
-                     if count > 5: break 
-                 
-                 if new_uid not in inv:
-                     inv[new_uid] = inst
-                     pdata["inventory"] = inv
-                 else:
-                      logger.error(f"Não foi possível devolver o item único {uid} ao cancelar listagem {lid} (conflito UID).")
-                      await context.bot.send_message(chat_id, f"⚠️ Erro ao devolver o item da listagem #{lid}. Contacte um admin.")
+                inv = pdata.get("inventory", {}) or {}
+                new_uid = uid 
+                count = 0
+                while new_uid in inv: 
+                    count += 1
+                    new_uid = f"{uid}_ret_{count}"
+                    if count > 5: break 
+                
+                if new_uid not in inv:
+                    inv[new_uid] = inst
+                    pdata["inventory"] = inv
+                else:
+                    logger.error(f"Não foi possível devolver o item único {uid} ao cancelar listagem {lid} (conflito UID).")
+                    await context.bot.send_message(chat_id, f"⚠️ Erro ao devolver o item da listagem #{lid}. Contacte um admin.")
         else:
-             logger.error(f"Tipo de item desconhecido ou inválido ao cancelar listagem {lid}: {item_type}")
-             await context.bot.send_message(chat_id, f"⚠️ Erro ao processar o item da listagem #{lid}. Contacte um admin.")
+            logger.error(f"Tipo de item desconhecido ou inválido ao cancelar listagem {lid}: {item_type}")
+            await context.bot.send_message(chat_id, f"⚠️ Erro ao processar o item da listagem #{lid}. Contacte um admin.")
     else: 
-         logger.error(f"Estrutura de item inválida na listagem {lid} ao cancelar: {repr(it)}")
-         await context.bot.send_message(chat_id, f"⚠️ Erro crítico ao ler o item da listagem #{lid}. Contacte um admin.")
+        logger.error(f"Estrutura de item inválida na listagem {lid} ao cancelar: {repr(it)}")
+        await context.bot.send_message(chat_id, f"⚠️ Erro crítico ao ler o item da listagem #{lid}. Contacte um admin.")
 
     await player_manager.save_player_data(user_id, pdata)
     
@@ -402,7 +454,8 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("ID de listagem inválido.", show_alert=True)
         return
 
-    listing = market_manager.get_listing(lid) # Síncrono (corrigido antes)
+    # --- ETAPA 1: Obter a Listagem ---
+    listing = market_manager.get_listing(lid) # Síncrono
 
     if not listing or not listing.get("active"):
         await q.answer("Listagem não está mais ativa.", show_alert=True)
@@ -411,16 +464,14 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Você não pode comprar sua própria listagem.", show_alert=True)
         return
 
-    # Carrega dados do comprador
+    # --- ETAPA 2: Carregar Jogadores ---
     buyer = await player_manager.get_player_data(buyer_id)
     
-    # <<< CORREÇÃO DE SEGURANÇA APLICADA AQUI >>>
-    # Verifica se o comprador é premium ANTES de carregar o vendedor ou processar
+    # Verifica se o comprador é premium
     if not player_manager.has_premium_plan(buyer):
          await q.answer("Apenas Apoiadores Premium podem comprar itens.", show_alert=True)
-         return # Para a execução
+         return
          
-    # Se chegou aqui, o comprador É premium. Continua a lógica normal.
     seller_id = listing.get("seller_id")
     seller = None
     if seller_id:
@@ -432,9 +483,19 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Erro ao carregar dados do comprador ou vendedor.", show_alert=True)
         return
 
+    # --- ETAPA 3: CORREÇÃO - Verificar Ouro ANTES ---
+    total_price = int(listing.get("unit_price", 0)) * 1 # (Assumindo quantity=1)
+    buyer_gold = _gold(buyer) # Usa o helper _gold
+
+    if buyer_gold < total_price:
+        await q.answer(f"Ouro insuficiente. Você tem {buyer_gold} 🪙, mas precisa de {total_price} 🪙.", show_alert=True)
+        return
+
+    # --- ETAPA 4: Processar a Compra (Atualizar JSON) ---
     try:
-        # Chama a compra (síncrona)
-        updated_listing, total_price = market_manager.purchase_listing(
+        # Tenta "reservar" o item no market_manager
+        # (Isto remove o item do JSON)
+        updated_listing, total_price_check = market_manager.purchase_listing(
             buyer_id=buyer_id, listing_id=lid, quantity=1 
         )
     except market_manager.MarketError as e:
@@ -445,72 +506,72 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await q.answer("Ocorreu um erro ao processar a compra.", show_alert=True)
          return
 
-    # Recarrega os dados APÓS a compra
-    buyer_after = await player_manager.get_player_data(buyer_id)
-    seller_after = await player_manager.get_player_data(seller_id)
-    if not buyer_after or not seller_after:
-         logger.error(f"Falha ao recarregar dados de B{buyer_id} ou S{seller_id} após compra de L{lid}")
-         await _safe_edit_or_send(q, context, chat_id, f"✅ Compra concluída (#{lid}), mas ocorreu um erro ao atualizar os dados locais. Verifique seu inventário/ouro.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]]))
-         return
+    # --- ETAPA 5: CORREÇÃO - Fazer a Transação e Entrega ---
+    # Se chegámos aqui, a compra no JSON foi bem-sucedida.
+    # Agora modificamos os dados dos jogadores EM MEMÓRIA.
+    
+    # 5a. Transferir o Ouro (Usando os helpers _set_gold)
+    _set_gold(buyer, buyer_gold - total_price)
+    _set_gold(seller, _gold(seller) + total_price)
 
-    # Entrega o item ao comprador
+    # 5b. Entregar o item ao comprador (Usando o 'buyer' original)
     it = listing.get("item") 
     if isinstance(it, dict):
-         item_type = it.get("type")
-         if item_type == "stack":
-             base_id = it.get("base_id")
-             pack_qty = int(it.get("qty", 1))
-             if base_id:
-                 player_manager.add_item_to_inventory(buyer_after, base_id, pack_qty)
-         elif item_type == "unique":
-             uid = it.get("uid")
-             inst = it.get("item")
-             if uid and inst:
-                 inv = buyer_after.get("inventory", {}) or {}
-                 new_uid = uid 
-                 count = 0
-                 while new_uid in inv: 
+        item_type = it.get("type")
+        if item_type == "stack":
+            base_id = it.get("base_id")
+            pack_qty = int(it.get("qty", 1))
+            if base_id:
+                player_manager.add_item_to_inventory(buyer, base_id, pack_qty) # < MUDADO
+        elif item_type == "unique":
+            uid = it.get("uid")
+            inst = it.get("item")
+            if uid and inst:
+                inv = buyer.get("inventory", {}) or {} # < MUDADO
+                new_uid = uid 
+                count = 0
+                while new_uid in inv: 
                      count += 1
                      new_uid = f"{uid}_buy_{count}"
                      if count > 5: break
-                 
-                 if new_uid not in inv:
-                      inv[new_uid] = inst
-                      buyer_after["inventory"] = inv
-                 else:
-                      logger.error(f"Não foi possível entregar o item único {uid} da L{lid} (conflito UID).")
-                      await context.bot.send_message(chat_id, f"⚠️ Erro CRÍTICO ao entregar o item da compra #{lid}! Contacte um admin.")
+                
+                if new_uid not in inv:
+                     inv[new_uid] = inst
+                     buyer["inventory"] = inv # < MUDADO
+                else:
+                     logger.error(f"Não foi possível entregar o item único {uid} da L{lid} (conflito UID).")
+                     await context.bot.send_message(chat_id, f"⚠️ Erro CRÍTICO ao entregar o item da compra #{lid}! Contacte um admin.")
     else: 
         logger.error(f"Estrutura de item inválida na listagem {lid} durante a compra: {repr(it)}")
         await context.bot.send_message(chat_id, f"⚠️ Erro CRÍTICO ao processar o item da compra #{lid}! Contacte um admin.")
 
-    # Atualiza Missões (para 'seller_after')
-    seller_after["user_id"] = seller_id 
-    await mission_manager.update_mission_progress(
-        seller_after,
+    # 5c. Atualizar Missões (para 'seller')
+    seller["user_id"] = seller_id # Garante que o ID está no dict para o mission_manager
+    mission_manager.update_mission_progress(
+        seller, # < MUDADO
         event_type="MARKET_SELL",
         details={ "item_id": it.get("base_id") if isinstance(it, dict) else None, "quantity": 1 } 
     )
-    clan_id = seller_after.get("clan_id")
+    clan_id = seller.get("clan_id") # < MUDADO
     if clan_id:
         try:
-             await clan_manager.update_guild_mission_progress(
-                 clan_id=clan_id,
-                 mission_type='MARKET_SELL',
-                 details={
-                     "item_id": it.get("base_id") if isinstance(it, dict) else None, 
-                     "quantity": 1, "gold_value": total_price
-                 },
-                 context=context 
-             )
+            await clan_manager.update_guild_mission_progress(
+                clan_id=clan_id,
+                mission_type='MARKET_SELL',
+                details={
+                    "item_id": it.get("base_id") if isinstance(it, dict) else None, 
+                    "quantity": 1, "gold_value": total_price
+                },
+                context=context 
+            )
         except Exception as e_clan_mission:
              logger.error(f"Erro ao atualizar missão de guilda MARKET_SELL para clã {clan_id}: {e_clan_mission}")
 
-    # Salva dados
-    await player_manager.save_player_data(buyer_id, buyer_after)
-    await player_manager.save_player_data(seller_id, seller_after)
+    # 5d. Salvar dados
+    await player_manager.save_player_data(buyer_id, buyer) # < MUDADO
+    await player_manager.save_player_data(seller_id, seller) # < MUDADO
 
-    # Confirmação
+    # 5e. Confirmação
     remaining_lots = int(updated_listing.get("quantity", 0)) if updated_listing.get("active") else 0
     suffix = f" Restam {remaining_lots} lote(s)." if remaining_lots > 0 else " Não restam lotes."
     await _safe_edit_or_send(q, context, chat_id, f"✅ Compra concluída (#{lid}). {total_price} 🪙 transferidos.{suffix}", InlineKeyboardMarkup([
@@ -585,18 +646,24 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard_rows.append([InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market_adventurer")])
     await _safe_edit_or_send(query, context, chat_id, caption, InlineKeyboardMarkup(keyboard_rows))
 
+# Em handlers/adventurer_market_handler.py
+
 def _render_price_spinner(price: int) -> InlineKeyboardMarkup:
     price = max(1, int(price))
     return InlineKeyboardMarkup([
         [
+            # <<< BOTÃO ADICIONADO >>>
+            InlineKeyboardButton("−1k",  callback_data="mktp_dec_1000"), 
             InlineKeyboardButton("−100", callback_data="mktp_dec_100"),
             InlineKeyboardButton("−10",  callback_data="mktp_dec_10"),
             InlineKeyboardButton("−1",   callback_data="mktp_dec_1"),
-            InlineKeyboardButton(f"💰 {price} 🪙", callback_data="noop"),
             InlineKeyboardButton("+1",   callback_data="mktp_inc_1"),
             InlineKeyboardButton("+10",  callback_data="mktp_inc_10"),
             InlineKeyboardButton("+100", callback_data="mktp_inc_100"),
+            # <<< BOTÃO ADICIONADO >>>
+            InlineKeyboardButton("+1k",  callback_data="mktp_inc_1000"), 
         ],
+        [InlineKeyboardButton(f"💰 {price} 🪙", callback_data="noop")],
         [InlineKeyboardButton("✅ Confirmar", callback_data="mktp_confirm")],
         [InlineKeyboardButton("❌ Cancelar",  callback_data="market_cancel_new")]
     ])
@@ -605,6 +672,234 @@ async def _show_price_spinner(q, context, chat_id: int, caption_prefix: str = "D
     price = max(1, int(context.user_data.get("market_price", 50)))
     kb = _render_price_spinner(price)
     await _safe_edit_or_send(q, context, chat_id, f"{caption_prefix} <b>{price} 🪙</b>", kb)
+
+# Em handlers/adventurer_market_handler.py
+# (Cole isto antes de _render_lote_qty_spinner)
+
+# Em handlers/adventurer_market_handler.py
+
+def _render_pack_qty_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
+    """Renderiza o spinner para o TAMANHO DO LOTE (Itens por Lote)."""
+    qty = max(1, int(qty))
+    max_qty = max(1, int(max_qty))
+    
+    current_qty = max(1, min(int(qty), max_qty))
+    
+    return InlineKeyboardMarkup([
+        [
+            # <<< BOTÕES ADICIONADOS >>>
+            InlineKeyboardButton("−100", callback_data="mkt_pack_dec_100"),
+            InlineKeyboardButton("−10", callback_data="mkt_pack_dec_10"),
+            InlineKeyboardButton("−1",  callback_data="mkt_pack_dec_1"),
+            InlineKeyboardButton("+1",  callback_data="mkt_pack_inc_1"),
+            InlineKeyboardButton("+10", callback_data="mkt_pack_inc_10"),
+            # <<< BOTÕES ADICIONADOS >>>
+            InlineKeyboardButton("+100", callback_data="mkt_pack_inc_100"),
+        ],
+        [InlineKeyboardButton(f"📦 {current_qty} / {max_qty} Itens por Lote", callback_data="noop")],
+        [InlineKeyboardButton("✅ Confirmar Tamanho do Lote", callback_data="mkt_pack_confirm")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
+    ])
+
+async def _show_pack_qty_spinner(q, context, chat_id: int, caption_prefix: str = "Defina quantos itens por lote:"):
+    """
+    Mostra o spinner de TAMANHO do lote (itens por lote).
+    """
+    pending = context.user_data.get("market_pending")
+    if not pending or pending.get("type") != "stack":
+        await market_cancel_new(q, context)
+        return
+
+    qty_have = int(pending.get("qty_have", 0)) # Total que tens (ex: 100)
+    
+    # Pega a quantidade atual do spinner (default 1)
+    current_pack_qty = max(1, int(pending.get("qty", 1))) # 'qty' agora é o pack_qty
+    current_pack_qty = min(current_pack_qty, qty_have)
+    
+    # Atualiza o pending com o valor atual
+    pending["qty"] = current_pack_qty
+    context.user_data["market_pending"] = pending
+
+    kb = _render_pack_qty_spinner(current_pack_qty, qty_have)
+    
+    item_label = _item_label_from_base(pending["base_id"])
+    caption = (
+        f"Item: <b>{item_label}</b> (Você tem {qty_have} no total)\n\n"
+        f"{caption_prefix}"
+    )
+    
+    await _safe_edit_or_send(q, context, chat_id, caption, kb)
+
+async def market_pack_qty_spin(update, context):
+    """Handler para os botões +1, -1, +10 do spinner de TAMANHO DE LOTE."""
+    q = update.callback_query
+    await q.answer()
+    chat_id = update.effective_chat.id
+    
+    pending = context.user_data.get("market_pending")
+    if not pending:
+        await market_cancel_new(update, context); return
+
+    cur = max(1, int(pending.get("qty", 1)))
+    max_qty = max(1, int(pending.get("qty_have", 1)))
+    
+    action = q.data
+    if action.startswith("mkt_pack_inc_"):
+        step = int(action.split("_")[-1])
+        cur = min(max_qty, cur + step)
+    elif action.startswith("mkt_pack_dec_"):
+        step = int(action.split("_")[-1])
+        cur = max(1, cur - step)
+        
+    pending["qty"] = cur
+    context.user_data["market_pending"] = pending # Salva a atualização
+
+    # Atualiza a mensagem
+    item_label = _item_label_from_base(pending["base_id"])
+    caption = (
+        f"Item: <b>{item_label}</b> (Você tem {max_qty} no total)\n\n"
+        f"Defina quantos itens por lote:"
+    )
+    kb = _render_pack_qty_spinner(cur, max_qty)
+    await _safe_edit_or_send(q, context, chat_id, caption, kb)
+
+async def market_pack_qty_confirm(update, context):
+    """Confirma o TAMANHO do lote e avança para o spinner de QUANTIDADE de lotes."""
+    q = update.callback_query
+    await q.answer()
+    chat_id = update.effective_chat.id
+    
+    # O tamanho do lote (pack_qty) já está em context.user_data["market_pending"]["qty"]
+    
+    # Prepara o spinner de *quantidade de lotes* (default 1)
+    context.user_data["market_lote_qty"] = 1 
+    
+    await _show_lote_qty_spinner(q, context, chat_id, "Defina a <b>quantidade de lotes</b>:")
+
+
+# Em handlers/adventurer_market_handler.py
+
+def _render_lote_qty_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
+    """Renderiza o spinner para a QUANTIDADE DE LOTES."""
+    qty = max(1, int(qty))
+    max_qty = max(1, int(max_qty))
+    
+    current_qty = max(1, min(int(qty), max_qty))
+    
+    return InlineKeyboardMarkup([
+        [
+            # <<< BOTÕES ADICIONADOS >>>
+            InlineKeyboardButton("−100", callback_data="mkt_lote_dec_100"),
+            InlineKeyboardButton("−10", callback_data="mkt_lote_dec_10"),
+            InlineKeyboardButton("−1",  callback_data="mkt_lote_dec_1"),
+            InlineKeyboardButton("+1",  callback_data="mkt_lote_inc_1"),
+            InlineKeyboardButton("+10", callback_data="mkt_lote_inc_10"),
+            # <<< BOTÕES ADICIONADOS >>>
+            InlineKeyboardButton("+100", callback_data="mkt_lote_inc_100"),
+        ],
+        [InlineKeyboardButton(f"📦 {current_qty} / {max_qty} Lotes", callback_data="noop")],
+        [InlineKeyboardButton("✅ Confirmar Lotes", callback_data="mkt_lote_confirm")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
+    ])
+
+async def _show_lote_qty_spinner(q, context, chat_id: int, caption_prefix: str = "Defina a quantidade de lotes:"):
+    """
+    Mostra o spinner de quantidade de lotes, calculando o máximo
+    de lotes que o jogador pode vender.
+    """
+    pending = context.user_data.get("market_pending")
+    if not pending or pending.get("type") != "stack":
+        await market_cancel_new(q, context) # Cancela se o estado for inválido
+        return
+
+    qty_have = int(pending.get("qty_have", 0))  # Total de itens que tem (ex: 100)
+    pack_qty = int(pending.get("qty", 1))     # Itens por lote (ex: 10)
+    
+    # Calcula o máximo de lotes que pode vender
+    max_lotes = max(1, qty_have // pack_qty)
+    
+    # Guarda o máximo no user_data para o spin handler usar
+    context.user_data["market_lote_max"] = max_lotes
+    
+    # Pega a quantidade atual do spinner (default 1)
+    current_lotes = max(1, int(context.user_data.get("market_lote_qty", 1)))
+    # Garante que não excede o máximo
+    current_lotes = min(current_lotes, max_lotes)
+    context.user_data["market_lote_qty"] = current_lotes
+
+    kb = _render_lote_qty_spinner(current_lotes, max_lotes)
+    
+    # Mostra o item sendo vendido
+    item_label = _item_label_from_base(pending["base_id"])
+    caption = (
+        f"Item: <b>{item_label} ×{pack_qty}</b> (Você tem {qty_have} no total)\n\n"
+        f"{caption_prefix}"
+    )
+    
+    await _safe_edit_or_send(q, context, chat_id, caption, kb)
+
+async def market_lote_qty_spin(update, context):
+    """Handler para os botões +1, -1, +10, -10 do spinner de LOTES."""
+    q = update.callback_query
+    await q.answer()
+    chat_id = update.effective_chat.id
+
+    cur = max(1, int(context.user_data.get("market_lote_qty", 1)))
+    max_qty = max(1, int(context.user_data.get("market_lote_max", 1)))
+    
+    action = q.data
+    if action.startswith("mkt_lote_inc_"):
+        step = int(action.split("_")[-1])
+        cur = min(max_qty, cur + step) # Não pode passar do máximo
+    elif action.startswith("mkt_lote_dec_"):
+        step = int(action.split("_")[-1])
+        cur = max(1, cur - step) # Não pode ser menor que 1
+        
+    context.user_data["market_lote_qty"] = cur
+
+    # Simplesmente atualiza a mensagem
+    pending = context.user_data.get("market_pending")
+    item_label = _item_label_from_base(pending["base_id"])
+    pack_qty = int(pending.get("qty", 1))
+    qty_have = int(pending.get("qty_have", 0))
+
+    caption = (
+        f"Item: <b>{item_label} ×{pack_qty}</b> (Você tem {qty_have} no total)\n\n"
+        f"Defina a quantidade de lotes:"
+    )
+    kb = _render_lote_qty_spinner(cur, max_qty)
+    await _safe_edit_or_send(q, context, chat_id, caption, kb)
+
+
+async def market_lote_qty_confirm(update, context):
+    """Confirma a quantidade de lotes e avança para o spinner de PREÇO."""
+    q = update.callback_query
+    await q.answer()
+    chat_id = update.effective_chat.id
+    
+    # A quantidade de lotes já está em context.user_data["market_lote_qty"]
+    # Apenas avançamos para o spinner de preço
+    
+    pending = context.user_data.get("market_pending")
+    item_label = _item_label_from_base(pending["base_id"])
+    pack_qty = int(pending.get("qty", 1))
+    lote_qty = int(context.user_data.get("market_lote_qty", 1))
+
+    # Preço inicial (podes mudar)
+    context.user_data["market_price"] = 10 
+    
+    caption_prefix = (
+        f"Item: <b>{item_label} ×{pack_qty}</b>\n"
+        f"Lotes: <b>{lote_qty}</b>\n\n"
+        f"Defina o <b>preço por lote</b>:"
+    )
+    
+    await _show_price_spinner(q, context, chat_id, caption_prefix)
+
+# =================================================================
+# <<< CORREÇÃO DE INDENTAÇÃO COMEÇA AQUI >>>
+# Todas as funções abaixo estavam com espaços a mais
+# =================================================================
 
 async def market_price_spin(update, context):
     q = update.callback_query
@@ -654,21 +949,23 @@ async def market_pick_unique(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Remove o item do inventário ANTES de mostrar o preço
     if uid in inv:
-      del inv[uid]
-      pdata["inventory"] = inv
-      # <<< CORREÇÃO 20: Adiciona await >>>
-      await player_manager.save_player_data(user_id, pdata)
+        del inv[uid]
+        pdata["inventory"] = inv
+        # <<< CORREÇÃO 20: Adiciona await >>>
+        await player_manager.save_player_data(user_id, pdata)
     else:
-       # Se o item já não estava no inventário (talvez removido em outra aba?), avisa erro.
-       await q.answer("Erro: Item não encontrado no inventário.", show_alert=True)
-       # Limpa o estado pendente e retorna ao menu de venda
-       context.user_data.pop("market_pending", None)
-       await market_sell(update, context)
-       return
+        # Se o item já não estava no inventário (talvez removido em outra aba?), avisa erro.
+        await q.answer("Erro: Item não encontrado no inventário.", show_alert=True)
+        # Limpa o estado pendente e retorna ao menu de venda
+        context.user_data.pop("market_pending", None)
+        await market_sell(update, context)
+        return
 
     context.user_data["market_price"] = 50 # Preço inicial
     # <<< CORREÇÃO 21: Adiciona await >>>
     await _show_price_spinner(q, context, chat_id, "Defina o <b>preço</b> deste item único:")
+
+# Em handlers/adventurer_market_handler.py
 
 async def market_pick_stack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -681,28 +978,25 @@ async def market_pick_stack(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Itens de evolução não podem ser vendidos aqui.", show_alert=True)
         return
 
-    # <<< CORREÇÃO 22: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id)
     inv = pdata.get("inventory", {}) or {}
     qty_have = int(inv.get(base_id, 0))
-    if qty_have <= 0: # Simplificado: verifica se tem algum
+    if qty_have <= 0:
         await q.answer("Quantidade insuficiente.", show_alert=True); return
 
-    context.user_data["market_pending"] = {"type": "stack", "base_id": base_id, "qty_have": qty_have}
-
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("×1", callback_data="market_qty_1"),
-         InlineKeyboardButton("×5", callback_data="market_qty_5"),
-         InlineKeyboardButton("×10", callback_data="market_qty_10"),
-         InlineKeyboardButton(f"×{qty_have} (Tudo)", callback_data="market_qty_all")],
-        [InlineKeyboardButton("⬅️ Voltar", callback_data=f"market_sell:{context.user_data.get('market_sell_page', 1)}")] # Volta para a página atual
-    ])
+    # Prepara o estado pendente
+    context.user_data["market_pending"] = {
+        "type": "stack", 
+        "base_id": base_id, 
+        "qty_have": qty_have,
+        "qty": 1  # 'qty' agora é o "tamanho do lote", começa em 1
+    }
     
-    # <<< CORREÇÃO 23: Adiciona await >>>
-    await _safe_edit_or_send(
+    # --- MUDANÇA PRINCIPAL ---
+    # Chama o novo spinner de TAMANHO de lote
+    await _show_pack_qty_spinner(
         q, context, chat_id,
-        f"Quanto deseja colocar por <b>lote</b> em <b>{_item_label_from_base(base_id)}</b>? Você possui {qty_have}.",
-        kb
+        f"Quanto deseja colocar por <b>lote</b> em <b>{_item_label_from_base(base_id)}</b>?"
     )
 
 async def market_choose_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -711,29 +1005,32 @@ async def market_choose_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     pending = context.user_data.get("market_pending") or {}
     if pending.get("type") != "stack":
-        # Se o estado pendente for inválido, cancela a operação
         await market_cancel_new(update, context)
         return
 
     qty_have = int(pending.get("qty_have", 0))
     data = q.data
     if data == "market_qty_all":
+        # Se escolheu 'Tudo', o tamanho do lote é a quantidade total
+        # e o número de lotes será 1.
         qty = qty_have
     else:
-        try: # Adiciona try-except para o int()
+        try:
             qty = int(data.replace("market_qty_", ""))
             if qty <= 0 or qty > qty_have:
                  await q.answer("Quantidade inválida.", show_alert=True); return
         except ValueError:
              await q.answer("Quantidade inválida.", show_alert=True); return
 
-
-    pending["qty"] = qty
+    pending["qty"] = qty # 'qty' aqui é o TAMANHO DO LOTE (pack_qty)
     context.user_data["market_pending"] = pending
-    context.user_data["market_price"] = 10 # Preço inicial por lote
     
-    # <<< CORREÇÃO 24: Adiciona await >>>
-    await _show_price_spinner(q, context, chat_id, "Defina o <b>preço por lote</b>:")
+    # Prepara o spinner de quantidade de lotes (default 1)
+    context.user_data["market_lote_qty"] = 1 
+
+    # --- MUDANÇA AQUI ---
+    # Em vez de chamar o spinner de PREÇO, chamamos o spinner de LOTES
+    await _show_lote_qty_spinner(q, context, chat_id, "Defina a <b>quantidade de lotes</b>:")
 
 async def market_cancel_new(update, context):
     q = update.callback_query
@@ -759,15 +1056,17 @@ async def market_cancel_new(update, context):
         [InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]
     ]))
 
+# Em handlers/adventurer_market_handler.py
+
 async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, price: int):
     logger.info("[market_finalize_listing] start price=%s has_cb=%s",
-                price, bool(update.callback_query))
+                 price, bool(update.callback_query))
 
-    query_obj = None # Inicializa query_obj
+    query_obj = None 
     if update.callback_query:
         user_id = update.callback_query.from_user.id
-        chat_id = update.effective_chat.id # Usa effective_chat para garantir
-        query_obj = update.callback_query # Guarda a query para _safe_edit_or_send
+        chat_id = update.effective_chat.id
+        query_obj = update.callback_query
     else:
         user_id = update.effective_user.id
         chat_id = update.effective_chat.id
@@ -775,87 +1074,115 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
     pending = context.user_data.get("market_pending")
     if not pending:
         logger.warning("[market_finalize_listing] NADA pendente em user_data")
-        # Envia mensagem diretamente pois pode não haver query
         await context.bot.send_message(chat_id=chat_id, text="Nada pendente para vender. Volte e selecione o item novamente.")
         return
 
-    # Carrega pdata UMA VEZ
     pdata = await player_manager.get_player_data(user_id)
-    # Se pdata não for carregado, não podemos continuar
     if not pdata:
          await context.bot.send_message(chat_id=chat_id, text="Erro ao carregar dados do jogador.")
-         context.user_data.pop("market_pending", None) # Limpa estado
+         context.user_data.pop("market_pending", None)
          context.user_data.pop("market_price", None)
+         context.user_data.pop("market_lote_qty", None) # Limpa novo estado
+         context.user_data.pop("market_lote_max", None) # Limpa novo estado
          return
 
-    inv = pdata.get("inventory", {}) or {} # Garante que é um dict
+    inv = pdata.get("inventory", {}) or {}
 
     try:
+        # --- LÓGICA DE LOTES (lote_qty) ---
+        # Para 'unique', a quantidade de lotes é sempre 1.
+        # Para 'stack', lemos o valor do user_data.
+        lote_qty_to_sell = 1
+        if pending["type"] == "stack":
+            lote_qty_to_sell = max(1, int(context.user_data.get("market_lote_qty", 1)))
+        
+        
         if pending["type"] == "unique":
-            # Verifica item de evolução ANTES de criar
-            base_id = (pending["item"] or {}).get("base_id") # Pega base_id
+            base_id = (pending["item"] or {}).get("base_id")
             if base_id in EVOLUTION_ITEMS:
                 await context.bot.send_message(chat_id=chat_id, text=EVOL_BLOCK_MSG, parse_mode="HTML")
-                # Devolve o item único que foi removido prematuramente
-                inv = pdata.get("inventory", {}) or {} # Recarrega inv caso tenha mudado
+                # Devolve o item
+                inv = pdata.get("inventory", {}) or {}
                 uid = pending["uid"]
                 new_uid = uid if uid not in inv else f"{uid}_back_evol"
                 inv[new_uid] = pending["item"]
                 pdata["inventory"] = inv
-                await player_manager.save_player_data(user_id, pdata) # Salva devolução
+                await player_manager.save_player_data(user_id, pdata)
+                
+                # Limpa estado e sai
                 context.user_data.pop("market_pending", None)
                 context.user_data.pop("market_price", None)
-                return # Interrompe a função
+                return 
 
             item_payload = {"type": "unique", "uid": pending["uid"], "item": pending["item"]}
             
-            # <<< CORREÇÃO APLICADA AQUI: REMOVIDO 'await' >>>
-            listing = market_manager.create_listing(seller_id=user_id, item_payload=item_payload, unit_price=price, quantity=1)
+            # Para 'unique', 'quantity' (nº de lotes) é sempre 1
+            listing = market_manager.create_listing(
+                seller_id=user_id, 
+                item_payload=item_payload, 
+                unit_price=price, 
+                quantity=1 # Fixo
+            )
         
         else: # type == "stack"
             base_id = pending["base_id"]
-            # Verifica item de evolução ANTES de modificar inventário
             if base_id in EVOLUTION_ITEMS:
                 await context.bot.send_message(chat_id=chat_id, text=EVOL_BLOCK_MSG, parse_mode="HTML")
                 context.user_data.pop("market_pending", None)
                 context.user_data.pop("market_price", None)
-                return # Interrompe a função
+                context.user_data.pop("market_lote_qty", None)
+                context.user_data.pop("market_lote_max", None)
+                return
 
-            pack_qty = int(pending.get("qty", 0))
-            # Usa 'pdata' já carregado para verificar quantidade
-            have = int((pdata.get("inventory", {}) or {}).get(base_id, 0)) # Verifica no pdata atual
+            pack_qty = int(pending.get("qty", 0)) # Itens por lote (ex: 10)
             
-            if pack_qty <= 0 or have < pack_qty:
-                logger.warning("[market_finalize_listing] qty inválida: pack=%s have=%s", pack_qty, have)
+            # --- MUDANÇA AQUI ---
+            # Total a remover = (Itens por Lote) * (Nº de Lotes)
+            total_to_remove = pack_qty * lote_qty_to_sell 
+            
+            have = int((pdata.get("inventory", {}) or {}).get(base_id, 0))
+            
+            # Verifica se tem o total_to_remove
+            if total_to_remove <= 0 or have < total_to_remove:
+                logger.warning("[market_finalize_listing] qty inválida: total_remove=%s (pack=%s lote_qty=%s) have=%s",
+                             total_to_remove, pack_qty, lote_qty_to_sell, have)
                 await context.bot.send_message(chat_id=chat_id, text="Quantidade inválida ou insuficiente.")
                 context.user_data.pop("market_pending", None)
                 context.user_data.pop("market_price", None)
+                context.user_data.pop("market_lote_qty", None)
+                context.user_data.pop("market_lote_max", None)
                 return
 
-            # Remove do inventário (modifica 'pdata' em memória)
-            inv = pdata.get("inventory", {}) or {} # Pega o inventário novamente para garantir
-            inv[base_id] = have - pack_qty
+            # Remove do inventário
+            inv = pdata.get("inventory", {}) or {}
+            inv[base_id] = have - total_to_remove # Remove o total
             if inv[base_id] <= 0:
                  del inv[base_id]
-            pdata["inventory"] = inv # Atualiza pdata em memória
+            pdata["inventory"] = inv
             
-            # Salva pdata AGORA, APÓS remover o item
             await player_manager.save_player_data(user_id, pdata)
 
             item_payload = {"type": "stack", "base_id": base_id, "qty": pack_qty}
             
-            # <<< CORREÇÃO APLICADA AQUI: REMOVIDO 'await' >>>
-            listing = market_manager.create_listing(seller_id=user_id, item_payload=item_payload, unit_price=price, quantity=1)
+            # --- MUDANÇA AQUI ---
+            # Passa a quantidade de lotes (lote_qty_to_sell) para o market_manager
+            listing = market_manager.create_listing(
+                seller_id=user_id, 
+                item_payload=item_payload, 
+                unit_price=price, 
+                quantity=lote_qty_to_sell # Passa o nº de lotes
+            )
 
-        # Limpa o estado pendente APÓS a criação bem-sucedida
+        # Limpa o estado pendente
         context.user_data.pop("market_pending", None)
         context.user_data.pop("market_price", None)
+        context.user_data.pop("market_lote_qty", None) # Limpa novo estado
+        context.user_data.pop("market_lote_max", None) # Limpa novo estado
 
         text = f"✅ Listagem #{listing['id']} criada."
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 Minhas Listagens", callback_data="market_my")],
-                                   [InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]])
+                                     [InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]])
 
-        # Envia a confirmação (edita se possível, senão envia nova)
         if query_obj:
             await _safe_edit_or_send(query_obj, context, chat_id, text, kb)
         else:
@@ -865,57 +1192,70 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
 
     except Exception as e:
         logger.exception("[market_finalize_listing] erro: %s", e)
-        # Tenta enviar mensagem de erro
         try:
              await context.bot.send_message(chat_id=chat_id, text="Falha ao criar a listagem. Tente novamente.")
         except Exception:
-             pass # Ignora se até o envio da msg de erro falhar
+             pass 
 
-        # Tenta devolver o item único se a criação falhou E se era um item único
         if pending and pending.get("type") == "unique":
-            try:
-                # Recarrega pdata para garantir que temos o estado mais recente
-                pdata_reloaded = await player_manager.get_player_data(user_id)
-                inv_reloaded = (pdata_reloaded or {}).get("inventory", {}) or {}
-                uid = pending["uid"]
-                # Adiciona de volta apenas se não existir já (evita duplicar se save falhou antes)
-                if uid not in inv_reloaded:
-                     new_uid = uid # Tenta usar o UID original primeiro
-                     # Se já existir algo com UID original (improvável), usa um sufixo
-                     count = 0
-                     while new_uid in inv_reloaded:
-                         count += 1
-                         new_uid = f"{uid}_fail_ret_{count}"
-                         if count > 5: break # Limite para evitar loop infinito
-                     
-                     if new_uid not in inv_reloaded:
-                         inv_reloaded[new_uid] = pending["item"]
-                         pdata_reloaded["inventory"] = inv_reloaded
-                         await player_manager.save_player_data(user_id, pdata_reloaded)
-                         logger.info(f"Item único {uid} (como {new_uid}) devolvido após falha ao criar listagem.")
-                     else:
-                          logger.error(f"Não foi possível devolver o item único {uid} após falha (conflito de UID mesmo com sufixo).")
-                else:
-                     logger.warning(f"Item único {uid} já estava no inventário ao tentar devolver após falha.")
-                     
-            except Exception as e_ret:
-                logger.error(f"Erro CRÍTICO ao tentar devolver item único {pending.get('uid')} após falha: {e_ret}")
+             try:
+                 pdata_reloaded = await player_manager.get_player_data(user_id)
+                 inv_reloaded = (pdata_reloaded or {}).get("inventory", {}) or {}
+                 uid = pending["uid"]
+                 if uid not in inv_reloaded:
+                      new_uid = uid 
+                      count = 0
+                      while new_uid in inv_reloaded:
+                           count += 1
+                           new_uid = f"{uid}_fail_ret_{count}"
+                           if count > 5: break
+                      
+                      if new_uid not in inv_reloaded:
+                           inv_reloaded[new_uid] = pending["item"]
+                           pdata_reloaded["inventory"] = inv_reloaded
+                           await player_manager.save_player_data(user_id, pdata_reloaded)
+                           logger.info(f"Item único {uid} (como {new_uid}) devolvido após falha ao criar listagem.")
+                      else:
+                            logger.error(f"Não foi possível devolver o item único {uid} após falha (conflito de UID mesmo com sufixo).")
+                 else:
+                      logger.warning(f"Item único {uid} já estava no inventário ao tentar devolver após falha.")
+                 
+             except Exception as e_ret:
+                 logger.error(f"Erro CRÍTICO ao tentar devolver item único {pending.get('uid')} após falha: {e_ret}")
         
-        # Limpa o estado pendente de qualquer forma em caso de erro
         context.user_data.pop("market_pending", None) 
-        context.user_data.pop("market_price", None)        
+        context.user_data.pop("market_price", None) 
+        context.user_data.pop("market_lote_qty", None) # Limpa novo estado
+        context.user_data.pop("market_lote_max", None) # Limpa novo estado
+
+# Em: handlers/adventurer_market_handler.py
+# (No final do ficheiro)
+
 # ==============================
 #  Handlers (exports para este arquivo)
 # ==============================
 market_adventurer_handler = CallbackQueryHandler(market_adventurer, pattern=r'^market_adventurer$')
-market_list_handler       = CallbackQueryHandler(market_list, pattern=r'^market_list$')
-market_my_handler         = CallbackQueryHandler(market_my, pattern=r'^market_my$')
-market_sell_handler       = CallbackQueryHandler(market_sell, pattern=r'^market_sell(:(\d+))?$')
-market_buy_handler        = CallbackQueryHandler(market_buy, pattern=r'^market_buy_\d+$')
-market_cancel_handler     = CallbackQueryHandler(market_cancel, pattern=r'^market_cancel_\d+$')
+market_list_handler = CallbackQueryHandler(market_list, pattern=r'^market_list$')
+market_my_handler = CallbackQueryHandler(market_my, pattern=r'^market_my$')
+market_sell_handler = CallbackQueryHandler(market_sell, pattern=r'^market_sell(:(\d+))?$')
+market_buy_handler = CallbackQueryHandler(market_buy, pattern=r'^market_buy_\d+$')
+market_cancel_handler = CallbackQueryHandler(market_cancel, pattern=r'^market_cancel_\d+$')
 market_pick_unique_handler= CallbackQueryHandler(market_pick_unique, pattern=r'^market_pick_unique_')
-market_pick_stack_handler = CallbackQueryHandler(market_pick_stack,  pattern=r'^market_pick_stack_')
-market_qty_handler        = CallbackQueryHandler(market_choose_qty,  pattern=r'^market_qty_')
-market_price_spin_handler    = CallbackQueryHandler(market_price_spin,    pattern=r'^mktp_(inc|dec)_[0-9]+$')
+market_pick_stack_handler = CallbackQueryHandler(market_pick_stack, pattern=r'^market_pick_stack_')
+
+# <<< market_qty_handler FOI REMOVIDO >>>
+
+# Handlers do Spinner de TAMANHO de Lote (NOVO)
+market_pack_qty_spin_handler = CallbackQueryHandler(market_pack_qty_spin, pattern=r'^mkt_pack_(inc|dec)_[0-9]+$')
+market_pack_qty_confirm_handler = CallbackQueryHandler(market_pack_qty_confirm, pattern=r'^mkt_pack_confirm$')
+
+# Handlers do Spinner de Preço
+market_price_spin_handler = CallbackQueryHandler(market_price_spin,    pattern=r'^mktp_(inc|dec)_[0-9]+$')
 market_price_confirm_handler = CallbackQueryHandler(market_price_confirm, pattern=r'^mktp_confirm$')
+
+# Handlers do Spinner de Lotes (existente)
+market_lote_qty_spin_handler = CallbackQueryHandler(market_lote_qty_spin, pattern=r'^mkt_lote_(inc|dec)_[0-9]+$')
+market_lote_qty_confirm_handler = CallbackQueryHandler(market_lote_qty_confirm, pattern=r'^mkt_lote_confirm$')
+
+# Handler de Cancelar Venda
 market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^market_cancel_new$')

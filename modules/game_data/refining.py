@@ -12,7 +12,7 @@ REFINING_RECIPES = {
         "time_seconds": 6 * 60,
         "inputs": {"couro_de_lobo": 2},
         "outputs": {"couro_curtido": 1},
-        "xp_gain": 2
+        "xp_gain": 5
     },
     "ref_couro_reforcado": {
         "display_name": "🐺🔥 Curtimento de Couro Reforçado",

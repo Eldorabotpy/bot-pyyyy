@@ -68,14 +68,14 @@ def get_region_profile(region_id: str) -> dict:
 
 REGIONS_DATA = {
     'reino_eldora': {
-        'display_name': 'Reino de Eldora',
+        'display_name': '𝐑𝐞𝐢𝐧𝐨 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚',
         'emoji': '🏰',
         'description': "O coração pulsante do mundo, um refúgio seguro para todos os aventureiros. Aqui podes descansar, comerciar e preparar-te para a tua próxima jornada.",
         'resource': None,
         'file_id_name': 'regiao_reino_eldora',
     },
     'floresta_sombria': {
-        'display_name': 'Floresta Sombria',
+        'display_name': '𝐅𝐥𝐨𝐫𝐞𝐬𝐭𝐚 𝐒𝐨𝐦𝐛𝐫𝐢𝐚',
         'emoji': '🌳',
         'description': "Uma floresta densa e antiga, envolta em mistério. As suas árvores retorcidas são uma fonte valiosa de madeira, mas cuidado com as criaturas que se escondem nas sombras.",
         'resource': 'madeira',
@@ -84,21 +84,21 @@ REGIONS_DATA = {
         'level_range': (6, 20),
     },
     'pedreira_granito': {
-        'display_name': 'Pedreira de Granito',
+        'display_name': '𝐏𝐞𝐝𝐫𝐞𝐢𝐫𝐚 𝐝𝐞 𝐆𝐫𝐚𝐧𝐢𝐭𝐨',
         'emoji': '🪨',
         'description': "Uma enorme pedreira a céu aberto, rica em pedra de alta qualidade. O som de picaretas ecoa durante o dia, mas à noite, criaturas rochosas vagueiam livremente.",
         'resource': 'pedra',
         'file_id_name': 'regiao_pedreira_granito',
     },
     'campos_linho': {
-        'display_name': 'Campos de Linho',
+        'display_name': '𝐂𝐚𝐦𝐩𝐨𝐬 𝐝𝐞 𝐋𝐢𝐧𝐡𝐨',
         'emoji': '🌾',
         'description': "Vastas planícies cobertas por linho dourado. É um local relativamente pacífico, ideal para colhedores experientes reunirem fibras para tecelagem.",
         'resource': 'linho',
         'file_id_name': 'regiao_campos_linho',
     },
     'pico_grifo': {
-        'display_name': 'Pico do Grifo',
+        'display_name': '𝐏𝐢𝐜𝐨 𝐝𝐨 𝐆𝐫𝐢𝐟𝐨',
         'emoji': '🦅',
         'description': "Uma montanha alta e ventosa, cujo cume está acima das nuvens. É o lar de grifos majestosos e outras feras aladas, cujas penas são muito cobiçadas.",
         'resource': 'pena',
@@ -106,21 +106,21 @@ REGIONS_DATA = {
         'ambush_chance': 0.25,
     },
     'mina_ferro': {
-        'display_name': 'Mina de Ferro',
+        'display_name': '𝐌𝐢𝐧𝐚 𝐝𝐞 𝐅𝐞𝐫𝐫𝐨',
         'emoji': '⛏️',
         'description': "Uma rede de túneis escuros e profundos, rica em veios de minério de ferro. O perigo espreita em cada sombra, mas a recompensa para os mineiros corajosos é grande.",
         'resource': 'ferro',
         'file_id_name': 'regiao_mina_ferro',
     },
     'forja_abandonada': {
-        'display_name': 'Forja Abandonada',
+        'display_name': '𝐅𝐨𝐫𝐣𝐚 𝐀𝐛𝐚𝐧𝐝𝐨𝐧𝐚𝐝𝐚',
         'emoji': '🔥',
         'description': "As ruínas de uma antiga forja elemental. O calor ainda emana das suas bigornas esquecidas, e diz-se que espíritos de fogo e golens de ferro ainda guardam o local.",
         'resource': None,
         'file_id_name': 'regiao_forja_abandonada',
     },
     'pantano_maldito': {
-        'display_name': 'Pântano Maldito',
+        'display_name': '𝐏𝐚̂𝐧𝐭𝐚𝐧𝐨 𝐌𝐚𝐥𝐝𝐢𝐭𝐨',
         'emoji': '🩸',
         'description': "Um pântano sombrio e enevoado, onde o ar é pesado e a água tem uma cor estranha. É um local perigoso, mas rico em ingredientes alquímicos raros, como o sangue de criaturas do pântano.",
         'resource': 'sangue',
@@ -129,21 +129,21 @@ REGIONS_DATA = {
     },
     # Adicionei as regiões que faltavam da tua outra lista
     "pradaria_inicial": {
-        "display_name": "Pradaria Inicial",
+        "display_name": "𝐏𝐫𝐚𝐝𝐚𝐫𝐢𝐚 𝐈𝐧𝐢𝐜𝐢𝐚𝐥",
         "emoji": '🌱', 
         'description': "Campos verdes e tranquilos que rodeiam o Reino. É o local perfeito para novos aventureiros darem os seus primeiros passos e enfrentarem criaturas mais fracas.",
         'resource': None,
         "level_range": (1, 10),
     },
     "picos_gelados": {
-        "display_name": "Picos Gelados",
+        "display_name": "𝐏𝐢𝐜𝐨𝐬 𝐆𝐞𝐥𝐚𝐝𝐨𝐬",
         "emoji": '🏔️', 
         'description': "Montanhas cobertas de neve eterna, onde o frio corta até aos ossos. Apenas os aventureiros mais bem preparados ousam enfrentar as feras de gelo que habitam aqui.",
         'resource': None,
         "level_range": (15, 35),
     },
     "deserto_ancestral": {
-        "display_name": "Deserto Ancestral",
+        "display_name": "𝐃𝐞𝐬𝐞𝐫𝐭𝐨 𝐀𝐧𝐜𝐞𝐬𝐭𝐫𝐚𝐥",
         "emoji": '🏜️',
         'description': "Um vasto deserto de areias douradas, pontilhado por ruínas de uma civilização há muito esquecida. Segredos e perigos ancestrais aguardam sob o sol escaldante.",
         'resource': None,

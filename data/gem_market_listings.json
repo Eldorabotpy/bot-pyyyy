@@ -1,0 +1,44 @@
+{
+  "seq": 4,
+  "listings": [
+    {
+      "id": 1,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "evo_item",
+        "base_id": "essencia_fera",
+        "qty": 1
+      },
+      "unit_price_gems": 10,
+      "quantity": 1,
+      "created_at": "2025-11-08T04:43:01.062371+00:00",
+      "active": false
+    },
+    {
+      "id": 2,
+      "seller_id": 7262799478,
+      "item": {
+        "type": "evo_item",
+        "base_id": "essencia_elemental",
+        "qty": 1
+      },
+      "unit_price_gems": 5,
+      "quantity": 1,
+      "created_at": "2025-11-08T04:43:57.560711+00:00",
+      "active": false
+    },
+    {
+      "id": 3,
+      "seller_id": 1363987006,
+      "item": {
+        "type": "evo_item",
+        "base_id": "batuta_maestria",
+        "qty": 12
+      },
+      "unit_price_gems": 36,
+      "quantity": 1,
+      "created_at": "2025-11-08T09:41:37.252482+00:00",
+      "active": true
+    }
+  ]
+}

@@ -7,6 +7,7 @@ from telegram import (
     InlineKeyboardMarkup,
     InputMediaPhoto,
     InputMediaVideo,
+    CallbackQuery,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import mission_manager
@@ -30,12 +31,13 @@ async def _safe_send_with_media(
     caption: str,
     reply_markup=None,
     media_key: str | None = None, # <-- Argumento opcional para a imagem
-    fallback_key: str = "refino_universal", # <-- Imagem padrão se a 1ª falhar
+   fallback_key: str = "refino_universal", # <-- Imagem padrão se a 1ª falhar
 ):
     """
     Tenta enviar uma mídia com uma chave específica (media_key).
     Se falhar, tenta enviar com uma chave de fallback (fallback_key).
     Se tudo falhar, envia como texto simples.
+    AGORA: Retorna o objeto Message se for bem-sucedido.
     """
     keys_to_try = []
     if media_key:
@@ -44,6 +46,8 @@ async def _safe_send_with_media(
         keys_to_try.append(fallback_key)
 
     media_sent = False
+    sent_message = None # <-- NOVO: Variável para guardar a mensagem
+
     for key in keys_to_try:
         fd = file_ids.get_file_data(key)
         if not fd or not fd.get("id"):
@@ -51,15 +55,17 @@ async def _safe_send_with_media(
 
         media_id = fd["id"]
         ftype = (fd.get("type") or "photo").lower()
-        
+
         try:
             if ftype == "video":
-                await context.bot.send_video(
+                # v-- NOVO: guarda a mensagem
+                sent_message = await context.bot.send_video(
                     chat_id=chat_id, video=media_id, caption=caption, 
                     reply_markup=reply_markup, parse_mode="HTML"
                 )
             else:
-                await context.bot.send_photo(
+                # v-- NOVO: guarda a mensagem
+                sent_message = await context.bot.send_photo(
                     chat_id=chat_id, photo=media_id, caption=caption, 
                     reply_markup=reply_markup, parse_mode="HTML"
                 )
@@ -72,50 +78,20 @@ async def _safe_send_with_media(
             else:
                 logger.exception(f"BadRequest inesperado ao enviar mídia com chave '{key}'.")
                 raise e # Erro inesperado, é melhor quebrar e investigar
-    
+
     # Se, depois de todas as tentativas, nenhuma mídia foi enviada...
     if not media_sent:
         logger.info("Nenhuma mídia válida encontrada. Enviando como texto.")
-        await context.bot.send_message(
+        # v-- NOVO: guarda a mensagem
+        sent_message = await context.bot.send_message(
             chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML"
         )
 
-async def _try_edit_media(query, caption: str, reply_markup=None, media_key: str = "refino_universal") -> bool:
-    """
-    Tenta TROCAR a mídia da mensagem atual.
-    AGORA aceita uma 'media_key' para usar mídias diferentes.
-    """
-    # Se nenhuma media_key for fornecida, ele usa a de refino como padrão.
-    fd = file_ids.get_file_data(media_key)
-    if not fd or not fd.get("id"):
-        # Se a chave de mídia for inválida, tentamos editar só o texto e o teclado
-        try:
-            await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode="HTML")
-            return True
-        except Exception:
-            return False # Falhou, deixa a função principal reenviar
-
-    media_id = fd["id"]
-    ftype = (fd.get("type") or "photo").lower()
-    try:
-        if ftype == "video":
-            await query.edit_message_media(
-                media=InputMediaVideo(media=media_id, caption=caption, parse_mode="HTML"),
-                reply_markup=reply_markup
-            )
-        else:
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=media_id, caption=caption, parse_mode="HTML"),
-                reply_markup=reply_markup
-            )
-        return True
-    except Exception as e:
-        logger.debug("[_try_edit_media] Falhou: %s", e)
-        return False
+    return sent_message # <-- NOVO: Retorna a mensagem enviada
 
 
 async def _safe_edit_or_send_with_media(
-    query,
+    query: CallbackQuery, # Recebe a query (clique)
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
     caption: str,
@@ -123,28 +99,31 @@ async def _safe_edit_or_send_with_media(
     media_key: str = "refino_universal" # A chave de mídia que a função recebe
 ):
     """
-    Tenta editar uma mensagem. Se falhar, apaga a antiga e envia uma nova
-    usando a nossa função centralizada e robusta _safe_send_with_media.
+    Apaga a mensagem anterior e envia uma nova com a mídia correta.
+    AGORA: Retorna o objeto Message da nova mensagem.
     """
-    # Tenta editar a mensagem atual com a nova mídia
-    if await _try_edit_media(query, caption, reply_markup, media_key=media_key):
-        return
-
-    # Se a edição falhar, apaga a mensagem antiga
-    try:
-        await query.delete_message()
-    except Exception:
-        pass
     
-    # 👇 AQUI ESTÁ A CORREÇÃO 👇
-    # Em vez de chamar a função antiga, chamamos a nova, passando o media_key
-    await _safe_send_with_media(
+    # 1. Apaga a mensagem anterior
+    try:
+       await query.delete_message()
+    except Exception as e:
+        # Se falhar (ex: mensagem já apagada), regista mas não para
+        logger.debug(f"Falha ao apagar mensagem em _safe_edit_or_send: {e}")
+
+    # 2. Envia a nova mensagem (usando a tua outra função 'helper')
+    # (Esta função já sabe como lidar com mídias e texto)
+    
+    # v-- NOVO: Captura a mensagem retornada pela função _safe_send
+    sent_message = await _safe_send_with_media(
         context,
         chat_id,
         caption,
         reply_markup,
-        media_key=media_key
+        media_key=media_key,
+        fallback_key="refino_universal" # Garante que temos um fallback
     )
+    
+    return sent_message # <-- NOVO: Retorna a nova mensagem
 
 def _fmt_minutes_or_seconds(seconds: int) -> str:
     """Formata segundos para 'X min' ou 'Ys'."""
@@ -394,7 +373,21 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
     duration = result.get("duration_seconds", 60)
     item_name = result.get("item_name", "item")
     base_id = result.get("base_id")
+
+    # --- NOVO: Envia a mensagem de "em progresso" PRIMEIRO ---
+    mins = _fmt_minutes_or_seconds(duration)
+    # v-- NOVO: Captura a mensagem (graças às nossas alterações anteriores)
+    sent_in_progress_message = await _safe_edit_or_send_with_media(
+        q, context, chat_id,
+        f"♻️ A desmontar <b>{item_name}</b>... O processo levará ~{mins}."
+    )
     
+    # Pega o ID da mensagem "A desmontar..."
+    message_id_to_delete = None
+    if sent_in_progress_message: # Garante que a mensagem foi enviada
+        message_id_to_delete = sent_in_progress_message.message_id
+    # --- FIM DO BLOCO NOVO ---
+
     context.job_queue.run_once(
         finish_dismantle_job, # Esta função precisa ser async
         when=duration,
@@ -403,41 +396,52 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
         data={
             "unique_item_id": unique_item_id, 
             "item_name": item_name,
-            "base_id": base_id
+            "base_id": base_id,
+            "message_id_to_delete": message_id_to_delete # <-- NOVO: Passa o ID
         },
         name=f"dismantle_{user_id}"
     )
-    
-    mins = _fmt_minutes_or_seconds(duration)
-    await _safe_edit_or_send_with_media(
-        q, context, chat_id,
-        f"♻️ A desmontar <b>{item_name}</b>... O processo levará ~{mins}."
-    )
-    
-# <<< CORREÇÃO: Adiciona async def >>>
+
 async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id, chat_id = job.user_id, job.chat_id
     job_details = job.data
+    
+    message_id_to_delete = job_details.get("message_id_to_delete")
+    if message_id_to_delete:
+        try:
+            await context.bot.delete_message(chat_id, message_id_to_delete)
+        except Exception as e:
+            # Não faz mal se falhar (ex: msg já foi apagada)
+            logger.debug(f"Falha ao apagar msg de progresso (dismantle): {e}")
+    # --- FIM DA CORREÇÃO ---
 
-    # Assumindo finish_dismantle é síncrono
-    result = dismantle_engine.finish_dismantle(user_id, job_details)
+    # <<< [CORREÇÃO 1] Carrega o 'pdata' primeiro
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        logger.error(f"finish_dismantle_job: Não foi possível carregar pdata para {user_id}")
+        await context.bot.send_message(chat_id=chat_id, text="❗ Erro ao finalizar desmontagem: dados do jogador não encontrados.")
+        return
+
+    # <<< [CORREÇÃO 2] Adiciona 'await' e passa 'player_data'
+    result = await dismantle_engine.finish_dismantle(player_data, job_details)
 
     if isinstance(result, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ Erro ao finalizar desmontagem: {result}")
         return
 
+    # Se 'result' não for uma string, esperamos que seja a tupla
     item_name, returned_materials = result
 
-    # <<< CORREÇÃO 10: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
+    # <<< [CORREÇÃO 3] Remove a linha 'player_data = ...' (já o temos)
+    # player_data = await player_manager.get_player_data(user_id) # <-- APAGÁMOS ESTA LINHA
+
     if player_data:
         # Assumindo update_mission_progress síncrono
         mission_manager.update_mission_progress(player_data, 'DISMANTLE', details={'count': 1})
         clan_id = player_data.get("clan_id")
         if clan_id:
-            try: # Adiciona try/except para missão de clã
-                # <<< CORREÇÃO 11: Adiciona await >>>
+            try: 
                 await clan_manager.update_guild_mission_progress(
                     clan_id=clan_id,
                     mission_type='DISMANTLE',
@@ -445,12 +449,12 @@ async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
                     context=context
                 )
             except Exception as e_clan_dismantle:
-                 logger.error(f"Erro ao atualizar missão de guilda DISMANTLE para clã {clan_id}: {e_clan_dismantle}")
+                logger.error(f"Erro ao atualizar missão de guilda DISMANTLE para clã {clan_id}: {e_clan_dismantle}")
 
-        # <<< CORREÇÃO 12: Adiciona await >>>
+        # O 'finish_dismantle' já mexeu no 'player_data', agora só salvamos.
         await player_manager.save_player_data(user_id, player_data)
 
-    # Mensagem de Sucesso (síncrona)
+    # Mensagem de Sucesso
     caption_lines = [f"♻️ <b>{item_name}</b> foi desmontado com sucesso!", "\nVocê recuperou:"]
     if not returned_materials:
         caption_lines.append(" - Nenhum material foi recuperado.")
@@ -532,22 +536,30 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # <<< CORREÇÃO: Chama 'await' e passa 'pdata', não 'user_id' >>>
     res = await start_refine(pdata, rid)
-    
+
     if isinstance(res, str):
         await q.answer(res, show_alert=True)
         # Se falhou, não precisa salvar, pois o engine não salvou
         return
 
     # O 'start_refine' já salvou os dados, não precisamos salvar aqui.
-    
+
     secs = int(res.get("duration_seconds", 0))
     mins = _fmt_minutes_or_seconds(secs)
     title = game_data.REFINING_RECIPES.get(rid, {}).get("display_name", rid)
 
-    await _safe_edit_or_send_with_media(
+    # --- NOVO: Envia a mensagem de "em progresso" PRIMEIRO ---
+    # v-- NOVO: Captura a mensagem
+    sent_in_progress_message = await _safe_edit_or_send_with_media(
         q, context, chat_id,
         f"🔧 Refinando <b>{title}</b>... (~{mins})"
     )
+
+    # Pega o ID da mensagem "Refinando..."
+    message_id_to_delete = None
+    if sent_in_progress_message: # Garante que a mensagem foi enviada
+        message_id_to_delete = sent_in_progress_message.message_id
+    # --- FIM DO BLOCO NOVO ---
 
     # Agenda a finalização
     context.job_queue.run_once(
@@ -555,20 +567,30 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         when=secs,
         user_id=user_id,
         chat_id=chat_id,
-        data={"rid": rid}, # 'rid' é mantido para o log de missões
+        data={
+            "rid": rid, # 'rid' é mantido para o log de missões
+            "message_id_to_delete": message_id_to_delete # <-- NOVO: Passa o ID
+        }, 
         name=f"refining:{user_id}" # Nome do job corrigido
     )
 
-# <<< CORREÇÃO: Adiciona async def >>>
+# Em: handlers/refining_handler.py
+
 async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Job que finaliza o refino.
-    (Versão corrigida para carregar 'pdata' e passar para o engine)
+    (VERSÃO FINAL E LIMPA)
     """
     job = context.job
     user_id, chat_id = job.user_id, job.chat_id
     job_data = job.data
-    recipe_id = job_data.get("rid") # Pega o 'rid' dos dados do job
+    
+    message_id_to_delete = job_data.get("message_id_to_delete")
+    if message_id_to_delete:
+        try:
+            await context.bot.delete_message(chat_id, message_id_to_delete)
+        except Exception as e:
+            logger.debug(f"Falha ao apagar msg de progresso: {e}")
 
     # Carrega os dados do jogador UMA VEZ
     pdata = await player_manager.get_player_data(user_id)
@@ -577,7 +599,7 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=chat_id, text="❗ Erro ao finalizar refino: dados do jogador não encontrados.")
         return
 
-    # <<< CORREÇÃO: Chama 'await' e passa 'pdata' >>>
+    # Chama 'await' e passa 'pdata'
     res = await finish_refine(pdata)
     
     if isinstance(res, str):
@@ -590,9 +612,10 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
     # O 'finish_refine' já salvou os dados (estado, itens, xp).
     
     outs = res.get("outputs") or {}
-    clan_id = pdata.get("clan_id") # pdata está atualizado
+    xp_gained = res.get("xp_gained", 0) # Lê o XP ganho
+    clan_id = pdata.get("clan_id") 
 
-    # Atualiza missões (isto deve ser síncrono, pois mexe com 'pdata' em memória)
+    # Atualiza missões
     if outs:
         for item_id, quantity in outs.items():
             mission_manager.update_mission_progress(
@@ -607,20 +630,23 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e_clan_refine:
                     logger.error(f"Erro ao atualizar missão de guilda REFINE para clã {clan_id}: {e_clan_refine}")
         
-        # Salva UMA VEZ no final, após as missões terem modificado 'pdata'
+        # Salva UMA VEZ no final
         await player_manager.save_player_data(user_id, pdata)
     
-    # --- Bloco de Mensagem (sem alterações) ---
+    # --- Bloco de Mensagem ---
     lines = ["✅ <b>Refino concluído!</b>", "Você obteve:"]
     for k, v in outs.items():
         lines.append(f"• {_fmt_item_line(k, v)}")
-    
+        
+    if xp_gained > 0:
+        lines.append(f"✨ <b>+{xp_gained} XP</b> de Profissão")
+        
     caption = "\n".join(lines)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 à𝐬 𝐫𝐞𝐜𝐞𝐢𝐭𝐚𝐬", callback_data="ref_main")]
     ])
 
-    # --- Bloco de Mídia (sem alterações) ---
+    # --- Bloco de Mídia ---
     specific_media_key = None
     if outs:
         item_id_para_imagem = list(outs.keys())[0]
@@ -633,7 +659,7 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
         caption,
         kb,
         media_key=specific_media_key
-    )    
+    )
         # =========================
 refining_main_handler = CallbackQueryHandler(refining_main_callback, pattern=r"^(refining_main|ref_main)$")
 ref_select_handler    = CallbackQueryHandler(ref_select_callback,   pattern=r"^ref_sel_[A-Za-z0-9_]+$")

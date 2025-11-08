@@ -232,7 +232,9 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
     # 3. Status do Jogador (Usa os stats já carregados ou passados)
     p_max_hp, p_atk, p_def, p_ini, p_srt = _fmt_player_stats_as_ints(player_stats)
     p_current_hp = max(0, min(_i(player_data.get('current_hp', p_max_hp)), p_max_hp))
-
+    p_max_mp = _i(player_stats.get('max_mana', 10))
+    p_current_mp = max(0, min(_i(player_data.get('current_mp', p_max_mp)), p_max_mp))
+    
     # 4. Status do Monstro
     m_hp = _i(details.get('monster_hp', 0))
     m_max = _i(details.get('monster_max_hp', 0))
@@ -245,15 +247,16 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
     player_block = (
         f"<b>{p_name}</b>\n"
         f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
+        f"💙 𝐌𝐏: {p_current_mp}/{p_max_mp}\n"
         f"⚔️ 𝐀𝐓𝐊: {p_atk} | 🛡 𝐃𝐄𝐅: {p_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini} | 🍀 𝐒𝐑𝐓: {p_srt}"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini}  | 🍀 𝐒𝐑𝐓: {p_srt}"
     )
 
     monster_block = (
         f"<b>{m_name}</b>\n"
         f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
         f"⚔️ 𝐀𝐓𝐊: {m_atk} | 🛡 𝐃𝐄𝐅: {m_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini} | 🍀 𝐒𝐑𝐓: {m_srt}"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini}  | 🍀 𝐒𝐑𝐓: {m_srt}"
     )
 
     # 6. Montagem do Log
@@ -281,10 +284,13 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
 
     return final_message
 # ---------- Mensagem de dungeon (sempre inteiros) ----------
-def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict) -> str:
+# Em: handlers/utils.py
+
+
+async def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict) -> str:
     """
     Formata a mensagem de combate para dungeons (multi-participantes).
-    Exibe SEMPRE inteiros.
+    (VERSÃO CORRIGIDA E LIMPA)
     """
     cs = dungeon_instance.get('combat_state', {})
 
@@ -297,15 +303,18 @@ def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict
         if not player_full_data:
             continue
 
-        total_stats = player_manager.get_player_total_stats(player_full_data)
-        max_hp, atk, defense, vel, srt = _fmt_player_stats_as_ints(total_stats) # MELHORIA: Renomeado 'defe' para 'defense'
+        total_stats = await player_manager.get_player_total_stats(player_full_data)
+        max_hp, atk, defense, vel, srt = _fmt_player_stats_as_ints(total_stats)
         current_hp = _i(combat_data.get('hp', 0))
-
+        max_mp = _i(total_stats.get('max_mana', 10))
+        current_mp = _i(combat_data.get('mp', max_mp)) # Assume que o 'mp' do combate está em combat_data
+        
         player_block = (
             f"<b>{combat_data.get('name','Herói')}</b>\n"
             f"❤️ 𝐇𝐏: {current_hp}/{max_hp}\n"
-            f"⚔️ 𝐀𝐓𝐊: {atk}  🛡️ 𝐃𝐄𝐅: {defense}\n"
-            f"🏃‍♂️ 𝐕𝐄𝐋: {vel}  🍀 𝐒𝐑𝐓: {srt}"
+            f"💙 𝐌𝐏: {current_mp}/{max_mp}\n"
+            f"⚔️ 𝐀𝐓𝐊: {atk} 🛡️ 𝐃𝐄𝐅: {defense}\n"
+            f"🏃‍♂️ 𝐕𝐄𝐋: {vel} 🍀 𝐒𝐑𝐓: {srt}"
         )
         heroes_blocks.append(player_block)
 
@@ -313,30 +322,29 @@ def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict
     enemies_blocks = []
     for monster_key, monster_data in (cs.get('monsters', {}) or {}).items():
         if _i(monster_data.get('hp', 0)) > 0:
-            m_hp   = _i(monster_data.get('hp', 0))
-            m_max  = _i(monster_data.get('max_hp', 0))
-            m_atk  = _i(monster_data.get('attack', 0))
-            m_def  = _i(monster_data.get('defense', 0))
-            m_vel  = _i(monster_data.get('initiative', 0))
-            m_srt  = _i(monster_data.get('luck', 0))
+            m_hp = _i(monster_data.get('hp', 0))
+            m_max = _i(monster_data.get('max_hp', 0))
+            m_atk = _i(monster_data.get('attack', 0))
+            m_def = _i(monster_data.get('defense', 0))
+            m_vel = _i(monster_data.get('initiative', 0))
+            m_srt = _i(monster_data.get('luck', 0))
 
             monster_block = (
                 f"<b>{monster_data.get('name','Inimigo')}</b>\n"
                 f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
-                f"⚔️ 𝐀𝐓𝐊: {m_atk}  🛡️ 𝐃𝐄𝐅: {m_def}\n"
-                f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel}  🍀 𝐒𝐑𝐓: {m_srt}"
+                f"⚔️ 𝐀𝐓𝐊: {m_atk} 🛡️ 𝐃𝐄𝐅: {m_def}\n"
+                f"🏃‍♂️ 𝐕𝐄𝐋: {m_vel} 🍀 𝐒𝐑𝐓: {m_srt}"
             )
             enemies_blocks.append(monster_block)
 
     # Log
     log_lines = ["═════════════ ◆◈◆ ═════════════"]
     battle_log = cs.get('battle_log', []) or []
-    # MELHORIA: Adicionado html.escape para consistência e segurança.
     log_lines.extend([html.escape(str(x)) for x in battle_log[-4:]])
 
     footer = ["╚════════════ ◆◈◆ ════════════╝"]
 
-    heroes_section  = "\n\n".join(heroes_blocks)
+    heroes_section = "\n\n".join(heroes_blocks)
     enemies_section = "═════════════════════════════\n" + "\n\n".join(enemies_blocks)
 
     return "\n".join(header + [heroes_section, enemies_section] + log_lines + footer)
@@ -369,7 +377,6 @@ def render_equipment_line(slot: str, uid: str | None, inst: dict | None, player_
     name = game_data.ITEM_BASES.get(base, {}).get("display_name", base)
     rarity = (inst.get("rarity","comum") or "comum").capitalize()
     cur_d, max_d = (inst.get("durability") or [0,0])
-    # CORREÇÃO: Chamando a função que agora está neste mesmo arquivo.
     stats = render_item_stats_short(inst, player_class)
     return f"{emoji_slot} <b>{slot.capitalize()}</b>: 『[{cur_d}/{max_d}] {name} [{rarity}]』 {stats}"
 
@@ -378,52 +385,60 @@ def render_inventory_row(uid: str, inst: dict, player_class: str) -> str:
     name = game_data.ITEM_BASES.get(base, {}).get("display_name", base)
     rarity = (inst.get("rarity","comum") or "comum").capitalize()
     cur_d, max_d = (inst.get("durability") or [0,0])
-    # CORREÇÃO: Chamando a função que agora está neste mesmo arquivo.
     stats = render_item_stats_short(inst, player_class)
     return f"『[{cur_d}/{max_d}] {name} [{rarity}]』 {stats}  <code>{uid[:8]}</code>"
 
 # ---------- PvP (inteiros) ----------
-def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_data: Optional[dict]) -> tuple[str, InlineKeyboardMarkup]:
+
+async def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_data: Optional[dict]) -> tuple[str, InlineKeyboardMarkup]:
     """
     Formata o resultado de uma batalha PvP no estilo visual do bot.
-    Retorna (texto, teclado inline). Exibe tudo como inteiros.
-    (Esta função assume que vencedor_data e perdedor_data JÁ FORAM CARREGADOS com await)
+    (VERSÃO CORRIGIDA COM MANA e ASYNC)
     """
-    log_texto = "\n".join([html.escape(str(x)) for x in resultado.get('log', [])]) # Aplica html.escape
+    log_texto = "\n".join([html.escape(str(x)) for x in resultado.get('log', [])]) 
 
     nome_vencedor = (vencedor_data or {}).get('character_name', 'Aventureiro(a)')
     nome_perdedor = (perdedor_data or {}).get('character_name', 'Oponente')
 
     if resultado.get('vencedor_id'):
-        # <<< CORREÇÃO: Chama get_player_total_stats em dicionários válidos >>>
-        vstats = player_manager.get_player_total_stats(vencedor_data or {})
-        pstats = player_manager.get_player_total_stats(perdedor_data or {})
+    
+        vstats = await player_manager.get_player_total_stats(vencedor_data or {})
+        pstats = await player_manager.get_player_total_stats(perdedor_data or {})
 
-        v_max, v_atk, v_def, v_vel, v_srt = _fmt_player_stats_as_ints(vstats)
-        p_max, p_atk, p_def, p_vel, p_srt = _fmt_player_stats_as_ints(pstats)
+        v_max_hp, v_atk, v_def, v_vel, v_srt = _fmt_player_stats_as_ints(vstats)
+        p_max_hp, p_atk, p_def, p_vel, p_srt = _fmt_player_stats_as_ints(pstats)
+
+
+        v_max_mp = _i(vstats.get('max_mana', 10))
+        p_max_mp = _i(pstats.get('max_mana', 10))
+        
+        v_hp = _i((vencedor_data or {}).get('current_hp', v_max_hp))
+        p_hp = _i((perdedor_data or {}).get('current_hp', p_max_hp))
+        
+        v_mp = _i((vencedor_data or {}).get('current_mp', v_max_mp))
+        p_mp = _i((perdedor_data or {}).get('current_mp', p_max_mp))
+   
 
         header = "╔════════════ ◆◈◆ ════════════╗\n"
         divider = "══════════════════════════════\n"
         footer = "╚════════════ ◆◈◆ ════════════╝"
 
-        # Garante que os dados não são None antes de aceder ao 'current_hp'
-        v_hp = _i((vencedor_data or {}).get('current_hp', 0))
-        p_hp = _i((perdedor_data or {}).get('current_hp', 0))
-
         mensagem_texto = (
             f"{header}"
-            f"<b>{html.escape(nome_vencedor)}</b>\n" # Adiciona html.escape
-            f"❤️ 𝐇𝐏: {v_hp}/{v_max}\n"
-            f"⚔️ 𝐀𝐓𝐊: {v_atk}  🛡️ 𝐃𝐄𝐅: {v_def}\n"
-            f"🏃‍♂️ 𝐕𝐄𝐋: {v_vel}  🍀 𝐒𝐑𝐓: {v_srt}\n"
+            f"<b>{html.escape(nome_vencedor)}</b>\n"
+            f"❤️ 𝐇𝐏: {v_hp}/{v_max_hp}\n"
+            f"💙 𝐌𝐏: {v_mp}/{v_max_mp}\n" 
+            f"⚔️ 𝐀𝐓𝐊: {v_atk} 🛡️ 𝐃𝐄𝐅: {v_def}\n"
+            f"🏃‍♂️ 𝐕𝐄𝐋: {v_vel} 🍀 𝐒𝐑𝐓: {v_srt}\n"
             f"{divider}"
-            f"<b>{html.escape(nome_perdedor)}</b>\n" # Adiciona html.escape
-            f"❤️ 𝐇𝐏: {p_hp}/{p_max}\n"
-            f"⚔️ 𝐀𝐓𝐊: {p_atk}  🛡️ 𝐃𝐄𝐅: {p_def}\n"
-            f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel}  🍀 𝐒𝐑𝐓: {p_srt}\n"
+            f"<b>{html.escape(nome_perdedor)}</b>\n"
+            f"❤️ 𝐇𝐏: {p_hp}/{p_max_hp}\n"
+            f"💙 𝐌𝐏: {p_mp}/{p_max_mp}\n" 
+            f"⚔️ 𝐀𝐓𝐊: {p_atk} 🛡️ 𝐃𝐄𝐅: {p_def}\n"
+            f"🏃‍♂️ 𝐕𝐄𝐋: {p_vel} 🍀 𝐒𝐑𝐓: {p_srt}\n"
             f"═════════════ ◆◈◆ ═════════════\n"
             f"📜 Log da Batalha:\n"
-            f"<code>{log_texto}</code>\n" # Envolve o log em <code>
+            f"<code>{log_texto}</code>\n"
             f"\n🎉 <b>{html.escape(nome_vencedor)} 𝒗𝒆𝒏𝒄𝒆𝒖 𝒂 𝒃𝒂𝒕𝒂𝒍𝒉𝒂!</b>\n"
             f"{footer}"
         )
@@ -431,13 +446,12 @@ def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_d
         mensagem_texto = (
             f"⚔️ <b>𝑨 𝑩𝑨𝑻𝑨𝑳𝑯𝑨 𝑻𝑬𝑹𝑴𝑰𝑵𝑶𝑼 𝑬𝑴 𝑬𝑴IMATE!</b> ⚔️\n\n"
             f"📜 Log da Batalha:\n"
-            f"<code>{log_texto}</code>\n" # Envolve o log em <code>
+            f"<code>{log_texto}</code>\n"
         )
 
-    # <<< CORREÇÃO: O callback 'arena_de_eldora' deve ser o 'pvp_arena' que definimos no kingdom.py >>>
     keyboard = [[InlineKeyboardButton("⚔️ 𝐋𝐮𝐭𝐚𝐫 𝐍𝐨𝐯𝐚𝐦𝐞𝐧𝐭𝐞 ⚔️", callback_data='pvp_arena')]]
     return mensagem_texto, InlineKeyboardMarkup(keyboard)
-
+    
 def format_buffs_text(buffs_dict: dict) -> str:
     """Formata um dicionário de buffs para uma string legível."""
     if not buffs_dict:
@@ -449,3 +463,82 @@ def format_buffs_text(buffs_dict: dict) -> str:
         text += f"   - Bónus de Ouro: +{buffs_dict['gold_bonus_percent']}%\n"
     # Adicione aqui a formatação para outros buffs que você tiver
     return text if text else "   - Nenhum\n"
+
+# Em: handlers/utils.py
+
+# ... (imports no topo) ...
+# ... (função _format_log_line) ...
+
+
+# --- 👇 ADICIONE ESTA NOVA FUNÇÃO COMPLETA 👇 ---
+
+async def format_combat_message_from_cache(battle_cache: dict) -> str:
+    """
+    Formata a mensagem de combate (para Caçadas) lendo os dados 
+    diretamente do 'battle_cache' (context.user_data['battle_cache']).
+    """
+    if not battle_cache:
+        return "Erro: Cache de batalha não encontrado."
+
+    # 1. Obter Dados da Região e Nomes
+    region_key = battle_cache.get('region_key', 'reino_eldora')
+    region_info = (game_data.REGIONS_DATA or {}).get(region_key, {})
+    titulo = f"{region_info.get('emoji', '🗺️')} <b>{region_info.get('display_name', 'Região')}</b>"
+
+    p_name = battle_cache.get('player_name', 'Herói')
+    m_stats = battle_cache.get('monster_stats', {})
+    m_name = m_stats.get('name', 'Inimigo')
+
+    # 2. Status do Jogador (lido do cache)
+    p_stats = battle_cache.get('player_stats', {})
+    p_max_hp, p_atk, p_def, p_ini, p_srt = _fmt_player_stats_as_ints(p_stats)
+    p_current_hp = max(0, min(_i(battle_cache.get('player_hp', p_max_hp)), p_max_hp))
+    p_max_mp = _i(p_stats.get('max_mana', 10))
+    p_current_mp = max(0, min(_i(battle_cache.get('player_mp', p_max_mp)), p_max_mp))
+    
+    # 3. Status do Monstro (lido do cache)
+    m_hp = _i(m_stats.get('hp', 0))
+    m_max = _i(m_stats.get('max_hp', 0))
+    m_atk = _i(m_stats.get('attack', 0))
+    m_def = _i(m_stats.get('defense', 0))
+    m_ini = _i(m_stats.get('initiative', 0))
+    m_srt = _i(m_stats.get('luck', 0))
+
+    # 4. Blocos de Status Consolidados
+    player_block = (
+        f"<b>{p_name}</b>\n"
+        f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
+        f"💙 𝐌𝐏: {p_current_mp}/{p_max_mp}\n"
+        f"⚔️ 𝐀𝐓𝐊: {p_atk} | 🛡 𝐃𝐄𝐅: {p_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini} | 🍀 𝐒𝐑𝐓: {p_srt}"
+    )
+
+    monster_block = (
+        f"<b>{m_name}</b>\n"
+        f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
+        f"⚔️ 𝐀𝐓𝐊: {m_atk} | 🛡 𝐃𝐄𝐅: {m_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini} | 🍀 𝐒𝐑𝐓: {m_srt}"
+    )
+
+    # 5. Montagem do Log
+    log_raw = battle_cache.get('battle_log', [])
+    log_lines = [_format_log_line(line) for line in log_raw[-4:]] # Pega as últimas 4 linhas
+    log_block = "\n".join(log_lines)
+    if not log_block:
+        log_block = "Aguardando sua ação..."
+
+    # 6. Construção da Caixa Final
+    final_message = (
+        f"{titulo}\n"
+        f"⚔️ 𝑽𝑺 <b>{m_name}</b>\n"
+        "╔════════════ ◆◈◆ ════════════╗\n"
+        f"{player_block}\n"
+        "══════════════════════════════\n"
+        f"{monster_block}\n"
+        "═════════════ 📜 ═════════════\n"
+        f"<code>{log_block}</code>\n"
+        "╚════════════ ◆◈◆ ════════════╝"
+    )
+
+    return final_message
+
