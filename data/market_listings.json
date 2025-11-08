@@ -1,5 +1,5 @@
 {
-  "seq": 273,
+  "seq": 274,
   "listings": [
     {
       "id": 1,
@@ -5801,6 +5801,20 @@
       "unit_price": 3010,
       "quantity": 0,
       "created_at": "2025-11-08T13:26:59.737580+00:00",
+      "region_key": null,
+      "active": false
+    },
+    {
+      "id": 273,
+      "seller_id": 7808354685,
+      "item": {
+        "type": "stack",
+        "base_id": "barra_de_ferro",
+        "qty": 8
+      },
+      "unit_price": 10,
+      "quantity": 0,
+      "created_at": "2025-11-08T19:05:41.191420+00:00",
       "region_key": null,
       "active": false
     }
