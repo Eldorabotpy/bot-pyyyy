@@ -13,7 +13,10 @@ from handlers.admin.generate_equip import generate_equip_conv_handler # <<< ADIC
 from handlers.admin.file_id_conv import file_id_conv_handler # <<< ADICIONADO (Assumindo que existe)
 from handlers.admin.premium_panel import premium_panel_handler # <<< ADICIONADO (Assumindo que existe)
 from handlers.admin.reset_panel import reset_panel_conversation_handler # <<< ADICIONADO (Assumindo que existe)
-
+from handlers.admin.grant_skill import grant_skill_conv_handler
+from handlers.admin.grant_skin import grant_skin_conv_handler
+from handlers.admin.player_management_handler import player_management_conv_handler
+from modules.player.queries import _normalize_char_name
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     CallbackQueryHandler,
@@ -48,16 +51,7 @@ from modules.player.queries import _normalize_char_name
 
 logger = logging.getLogger(__name__) 
 
-try:
-    from config import ADMIN_LIST
-except ImportError:
-    logger.warning("ADMIN_LIST não encontrada em config.py, usando apenas ADMIN_ID.")
-    try:
-        ADMIN_ID = int(os.getenv("ADMIN_ID"))
-        ADMIN_LIST = [ADMIN_ID]
-    except (TypeError, ValueError):
-        logger.error("ADMIN_ID não definido nas variáveis de ambiente! Painel admin pode não funcionar.")
-        ADMIN_LIST = [] # Lista vazia se nada for encontrado
+from handlers.admin.utils import ADMIN_LIST, ensure_admin
 
 HTML = "HTML" # Já estava, mas confirmado
 
@@ -201,6 +195,9 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎁 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕀𝕥𝕖𝕟𝕤 (Stackable) 𓂀", callback_data="admin_grant_item")],
         [InlineKeyboardButton("💎 𓂀 𝕍𝕖𝕟𝕕𝕖𝕣 𝔾𝕖𝕞𝕒𝕤 𓂀", callback_data="admin_sell_gems")],
         [InlineKeyboardButton("🛠️ 𓂀 𝔾𝕖𝕣𝕒𝕣 𝔼𝕢𝕦𝕚𝕡𝕒𝕞𝕖𝕟𝕥𝕠 𓂀", callback_data="admin_generate_equip")],
+        [InlineKeyboardButton("📚 𓂀 𝔼𝕟𝕤𝕚𝕟𝕒𝕣 ℍ𝕒𝕓𝕚𝕝𝕚𝕕𝕒𝕕𝕖 (Skill) 𓂀", callback_data="admin_grant_skill")],
+        [InlineKeyboardButton("🎨 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝔸𝕡𝕒𝕣𝕖̂𝕟𝕔𝕚𝕒 (Skin) 𓂀", callback_data="admin_grant_skin")],
+        [InlineKeyboardButton("👥 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤 𓂀", callback_data="admin_pmanage_main")],
         [InlineKeyboardButton("👤 𓂀 𝔼𝕕𝕚𝕥𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣 𓂀", callback_data="admin_edit_player")], # <<< ADICIONADO >>>
         [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
         [InlineKeyboardButton("👑 𓂀 ℙ𝕣𝕖𝕞𝕚𝕦𝕞 𓂀", callback_data="admin_premium")],
@@ -778,4 +775,7 @@ all_admin_handlers = [
     file_id_conv_handler,
     premium_panel_handler,
     reset_panel_conversation_handler,
+    grant_skill_conv_handler,
+    grant_skin_conv_handler,
+    player_management_conv_handler,
 ]

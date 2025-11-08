@@ -52,25 +52,32 @@ def is_weapon_broken(player_data: dict) -> tuple[bool, str | None, tuple[int, in
     cur, mx = _dur_tuple(inst.get("durability"))
     return (cur <= 0, w_uid, (cur, mx))
 
+# Em modules/combat/durability.py
+
 def apply_end_of_battle_wear(player_data: dict, combat_details: dict, log: list[str]) -> bool:
+    """
+    Aplica 1 de desgaste a TODOS os itens equipados (arma + armadura)
+    no final de uma batalha (vitória, derrota ou fuga).
+    """
     changed = False
-    if bool(combat_details.get("used_weapon")):
-        w_uid = _get_equipped_uid(player_data, _WEAPON_SLOTS)
-        if w_uid:
-            cur, mx, broke_now = consume_durability(player_data, w_uid, 1)
+    
+    # --- Desgaste da Arma ---
+    w_uid = _get_equipped_uid(player_data, _WEAPON_SLOTS)
+    if w_uid:
+        cur, mx, broke_now = consume_durability(player_data, w_uid, 1)
+        changed = True
+        if broke_now:
+            log.append(f"⚠️ 𝑺𝒖𝒂 𝒂𝒓𝒎𝒂 𝒒𝒖𝒆𝒃𝒓𝒐𝒖 ({cur}/{mx}).")
+
+    # --- Desgaste da Armadura ---
+    for slot in _ARMOR_SLOTS:
+        uid_to_damage = _get_equipped_uid(player_data, [slot])
+        if uid_to_damage:
+            cur, mx, broke_now = consume_durability(player_data, uid_to_damage, 1)
             changed = True
             if broke_now:
-                log.append(f"⚠️ 𝑺𝒖𝒂 𝒂𝒓𝒎𝒂 𝒒𝒖𝒆𝒃𝒓𝒐𝒖 ({cur}/{mx}).")
+                item_inst = _get_unique_inst(player_data, uid_to_damage)
+                item_name = (item_inst or {}).get("display_name", "Seu equipamento")
+                log.append(f"⚠️ {item_name} 𝒒𝒖𝒆𝒃𝒓𝒐𝒖 ({cur}/{mx}).")
 
-    if bool(combat_details.get("took_damage")):
-        for slot in _ARMOR_SLOTS:
-            uid_to_damage = _get_equipped_uid(player_data, [slot])
-            if uid_to_damage:
-                cur, mx, broke_now = consume_durability(player_data, uid_to_damage, 1)
-                changed = True
-                if broke_now:
-                    item_inst = _get_unique_inst(player_data, uid_to_damage)
-                    item_name = (item_inst or {}).get("display_name", "Sua armadura")
-                    log.append(f"⚠️ {item_name} 𝒒𝒖𝒆𝒃𝒓𝒐𝒖 ({cur}/{mx}).")
-    
     return changed

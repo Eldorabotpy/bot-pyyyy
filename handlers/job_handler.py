@@ -14,12 +14,6 @@ from telegram.error import BadRequest, Forbidden # Adiciona Forbidden
 from modules import player_manager, game_data, clan_manager, mission_manager, file_ids
 # <<< CORREÇÃO: Importa PremiumManager >>>
 from modules.player.premium import PremiumManager
-# Importa funções específicas se necessário (ou use player_manager.func)
-from modules.player_manager import (
-    iter_players, add_energy, save_player_data, has_premium_plan,
-    get_perk_value, get_player_max_energy, add_item_to_inventory,
-    get_pvp_points, add_gems, get_player_data
-)
 # Importa config se necessário para EVENT_TIMES, JOB_TIMEZONE
 from config import EVENT_TIMES, JOB_TIMEZONE
 # Importa job finalizador de refino
@@ -27,7 +21,7 @@ from handlers.refining_handler import finish_dismantle_job
 # Importa agendador pvp
 from pvp.pvp_config import MONTHLY_RANKING_REWARDS # Importa recompensas
 # Importa watchdog e parse_iso (verificar caminho)
-from modules.player.actions import _parse_iso # Assume que está em actions.py
+#from modules.player.actions import _parse_iso # Assume que está em actions.py
 # Importa job finalizador
 # from handlers.job_handler import finish_collection_job # Importação circular? Verificar.
 # Importa job finalizador de menu/região
@@ -182,7 +176,7 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     level_up_text = ""
     xp_ganho = 0
     is_crit = False
-    total_stats = player_manager.get_player_total_stats(player_data)
+    total_stats = await player_manager.get_player_total_stats(player_data)
     luck_stat = _int(total_stats.get("luck", 5))
 
     quantidade_base = 1 + prof_level 
@@ -431,10 +425,3 @@ async def start_collection_callback(update: Update, context: ContextTypes.DEFAUL
 # Exports
 # =============================================================================
 collection_handler = CallbackQueryHandler(start_collection_callback, pattern=r'^collect_([A-Za-z0-9_]+)$')
-
-# <<< Verifica se finish_dismantle_job e outras funções de job estão definidas neste ficheiro ou precisam ser importadas >>>
-# Exemplo: Se regenerate_energy_job está aqui:
-# async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None: ...
-# Se daily_crystal_grant_job está aqui:
-# async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int: ...
-# ... e assim por diante para todas as funções de job.

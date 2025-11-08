@@ -16,8 +16,8 @@ class Difficulty:
 # ✅ 3 dificuldades com a nova progressão
 DIFFICULTIES: Dict[str, Difficulty] = {
     "iniciante":  Difficulty("iniciante",  "Iniciante", "☠️", 1.00, 1.00, 1),
-    "infernal":   Difficulty("infernal",   "Infernal",  "👺", 3.80, 2.50, 2), 
-    "pesadelo":   Difficulty("pesadelo",   "Pesadelo",  "👹", 5.90, 4.40, 3),
+    "infernal":   Difficulty("infernal",   "Infernal",  "👺", 3.80, 2.50, 1), 
+    "pesadelo":   Difficulty("pesadelo",   "Pesadelo",  "👹", 5.90, 4.40, 1),
 }
 
 # ✅ Ordem corrigida

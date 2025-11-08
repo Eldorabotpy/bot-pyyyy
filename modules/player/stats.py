@@ -46,31 +46,23 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
         return ck.strip().lower()
     return None
 
-async def get_player_total_stats(player_data: dict) -> dict:
+# Em modules/player/stats.py
 
-    # 1. Calcula os stats base (de classe + nível) - SEMPRE NECESSÁRIO
+async def get_player_total_stats(player_data: dict) -> dict:
+    
     lvl = _ival(player_data.get("level"), 1)
     ckey = _get_class_key_normalized(player_data)
+    
+    # 1. Calcula os stats base (de classe + nível)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
+    
     total = {}
+    
+    # Pega o valor salvo (ex: 464) ou a baseline (ex: 461)
     for k in _BASELINE_KEYS:
-        total[k] = _ival(class_baseline.get(k))
-    for k in _BASELINE_KEYS:
-        current_val_in_data = _ival(player_data.get(k)) # Valor no topo do save
-        baseline_val = _ival(class_baseline.get(k)) # Valor base já em 'total'
+        total[k] = _ival(player_data.get(k), class_baseline.get(k))
 
-        # Calcula quanto foi investido manualmente (pontos de atributo)
-        invested_delta = max(0, current_val_in_data - baseline_val)
-
-        if invested_delta > 0:
-             # Adiciona apenas a diferença, pois a base já está lá
-             # Precisamos saber quanto cada ponto investido dá (do CLASS_POINT_GAINS)
-             gains = _get_point_gains_for_class(ckey)
-             gain_per_point = max(1, _ival(gains.get(k)))
-
-             if current_val_in_data > baseline_val:
-                  total[k] = current_val_in_data # Usa o valor do save se for maior que a base pura
-
+    # 2. Adiciona Stats de Equipamento
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
 
@@ -78,17 +70,37 @@ async def get_player_total_stats(player_data: dict) -> dict:
         if not unique_id: continue
         inst = inventory.get(unique_id)
         if not isinstance(inst, dict): continue
+        
+        # <<< [ESTA É A CORREÇÃO] >>>
+        # Pega a durabilidade atual do item
+        durability_data = inst.get("durability", [1, 1])
+        current_durability = 0
+        
+        # Verifica se o formato é [atual, max]
+        if isinstance(durability_data, (list, tuple)) and len(durability_data) > 0:
+            current_durability = _ival(durability_data[0])
+        # Verifica se o formato é {"current": x, "max": y}
+        elif isinstance(durability_data, dict):
+             current_durability = _ival(durability_data.get("current", 0))
+
+        # Se o item está quebrado (durabilidade 0), ignora-o e vai para o próximo item
+        if current_durability <= 0:
+            continue 
+        # <<< [FIM DA CORREÇÃO] >>>
+
+        # Se o item NÃO está quebrado, adiciona os stats
         ench = inst.get('enchantments', {}) or {}
         for stat_key, data in ench.items():
             val = _ival((data or {}).get('value'))
-            if stat_key == 'dmg': total['attack'] = total.get('attack', 0) + val # Usa .get() para segurança
+            if stat_key == 'dmg': total['attack'] = total.get('attack', 0) + val
             elif stat_key == 'hp': total['max_hp'] = total.get('max_hp', 0) + val
             elif stat_key in ('defense', 'initiative', 'luck') and stat_key in total: total[stat_key] += val
 
-    # 5. Adiciona Buffs de Clã
+    # 3. Adiciona Buffs de Clã
     clan_id = player_data.get("clan_id")
     if clan_id:
-        clan_buffs = clan_manager.get_clan_buffs(clan_id)
+        # (Assume que 'clan_manager.get_clan_buffs' é síncrono)
+        clan_buffs = clan_manager.get_clan_buffs(clan_id) 
         if "all_stats_percent" in clan_buffs:
             percent_bonus = 1 + (clan_buffs["all_stats_percent"] / 100.0)
             total['max_hp'] = int(total.get('max_hp', 0) * percent_bonus)
@@ -97,19 +109,17 @@ async def get_player_total_stats(player_data: dict) -> dict:
         if "flat_hp_bonus" in clan_buffs:
             total['max_hp'] = total.get('max_hp', 0) + clan_buffs["flat_hp_bonus"]
 
-    # 6. Calcula Mana
-    class_key = _get_class_key_normalized(player_data) 
-    class_prog = CLASS_PROGRESSIONS.get(class_key) or CLASS_PROGRESSIONS["_default"]
+    # 4. Calcula Mana
+    class_prog = CLASS_PROGRESSIONS.get(ckey) or CLASS_PROGRESSIONS["_default"]
     mana_attribute_name = class_prog.get("mana_stat", "luck") 
-    # Usa .get() aqui também para segurança
     mana_attribute_value = total.get(mana_attribute_name, 0)
     mana_base = 10
     mana_por_ponto = 5
-    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)        
+    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)
 
-    # Garante que nenhum stat principal é None ou negativo antes de retornar
+    # 5. Garante valores válidos
     for k in _BASELINE_KEYS:
-        total[k] = max(0, _ival(total.get(k))) # Converte None para 0 e garante não-negativo
+        total[k] = max(0, _ival(total.get(k))) 
 
     return total
 
@@ -177,7 +187,7 @@ def needs_class_choice(player_data: dict) -> bool:
     lvl = _ival(player_data.get("level"), 1)
     already_has_class = bool(player_data.get("class"))
     already_offered = bool(player_data.get("class_choice_offered"))
-    return (lvl >= 10) and (not already_has_class) and (not already_offered)
+    return (lvl >= 5) and (not already_has_class) and (not already_offered)
 
 async def mark_class_choice_offered(user_id: int):
     from .core import get_player_data, save_player_data
@@ -187,10 +197,28 @@ async def mark_class_choice_offered(user_id: int):
     await save_player_data(user_id, pdata)
     
 def _get_point_gains_for_class(ckey: Optional[str]) -> dict:
-    gains = CLASS_POINT_GAINS.get((ckey or "").lower()) or CLASS_POINT_GAINS["_default"]
+    norm_key = (ckey or "").lower()
+    gains = CLASS_POINT_GAINS.get(norm_key)
+
+    # <<< [ESTA É A NOVA LÓGICA] >>>
+    if gains is None:
+        # Se não encontrou (ex: "ronin"), procura a classe base (ex: "samurai")
+        try:
+            # Tenta obter a 'base_class' da evolução
+            base_class = game_data.CLASS_EVOLUTIONS.get(norm_key, {}).get("base_class")
+            if base_class:
+                gains = CLASS_POINT_GAINS.get(base_class.lower())
+        except Exception:
+            pass # Mantém 'gains' como None
+    # Se ainda assim não encontrou, usa o default
+    if gains is None:
+        gains = CLASS_POINT_GAINS["_default"]
+    # <<< [FIM DA NOVA LÓGICA] >>>
+
     full = {}
     for k in _BASELINE_KEYS:
-        full[k] = max(1, _ival(gains.get(k), CLASS_POINT_GAINS["_default"][k]))
+        # Usa o default[k] como fallback se a chave não existir em 'gains'
+        full[k] = max(1, _ival(gains.get(k), CLASS_POINT_GAINS["_default"].get(k, 1)))
     return full
 
 def compute_spent_status_points(pdata: dict) -> int:

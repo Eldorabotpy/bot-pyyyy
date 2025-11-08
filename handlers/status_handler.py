@@ -3,11 +3,13 @@
 import logging
 import re
 import unicodedata
+import certifi
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.error import BadRequest
 from pymongo.errors import ConnectionFailure, ConfigurationError
-import certifi
+from modules.player.stats import _compute_class_baseline_for_level
+
 
 from modules import player_manager, game_data, file_ids
 
@@ -68,7 +70,7 @@ def _get_class_media(player_data: dict, purpose: str = "status"):
 async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMarkup]:
     """Gera o texto e o teclado do menu de status."""
     
-    total_stats = await player_manager.get_player_total_stats(player_data)
+    total_stats = await get_player_total_stats(player_data)
     
     char_name = player_data.get('character_name', 'Aventureiro(a)')
     status_text = f"👤 <b>Status de {char_name}</b>\n\n"
@@ -89,20 +91,20 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
         ckey = _get_class_key_normalized(player_data)
         gains = _get_point_gains_for_class(ckey)
 
-        row1 = [InlineKeyboardButton(f"➕ HP (+{gains['max_hp']})", callback_data='upgrade_max_hp')]
+        row1 = [InlineKeyboardButton(f"➕ ❤️‍🩹 𝐇𝐏 (+{gains['max_hp']})", callback_data='upgrade_max_hp')]
         if 'attack' in PROFILE_KEYS: 
-            row1.append(InlineKeyboardButton(f"➕ ATK (+{gains['attack']})", callback_data='upgrade_attack'))
+            row1.append(InlineKeyboardButton(f"➕ ⚔️ 𝐀𝐓𝐊 (+{gains['attack']})", callback_data='upgrade_attack'))
         keyboard_rows.append(row1)
 
         row2 = []
         if 'defense' in PROFILE_KEYS: 
-            row2.append(InlineKeyboardButton(f"➕ DEF (+{gains['defense']})", callback_data='upgrade_defense'))
+            row2.append(InlineKeyboardButton(f"➕ 🛡 𝐃𝐄𝐅 (+{gains['defense']})", callback_data='upgrade_defense'))
         if 'initiative' in PROFILE_KEYS: 
-            row2.append(InlineKeyboardButton(f"➕ INI (+{gains['initiative']})", callback_data='upgrade_initiative'))
+            row2.append(InlineKeyboardButton(f"➕ 🏃‍♂️ 𝐈𝐍𝐈 (+{gains['initiative']})", callback_data='upgrade_initiative'))
         if row2: keyboard_rows.append(row2)
 
         if 'luck' in PROFILE_KEYS:
-            keyboard_rows.append([InlineKeyboardButton(f"➕ SORTE (+{gains['luck']})", callback_data='upgrade_luck')])
+            keyboard_rows.append([InlineKeyboardButton(f"➕ 🍀 𝐒𝐎𝐑𝐓𝐄 (+{gains['luck']})", callback_data='upgrade_luck')])
 
     keyboard_rows.append([InlineKeyboardButton("🎐 𝐄𝐯𝐨𝐥𝐮çã𝐨 𝐝𝐞 𝐂𝐥𝐚𝐬𝐬𝐞", callback_data="status_evolution_open")])
     keyboard_rows.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='profile')]) 
@@ -160,7 +162,10 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # <<< [MUDANÇA] Lógica de upgrade_stat_callback CORRIGIDA (V6) >>>
 async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Aplica o ganho de stat correto (ex: +2, +3) ao stat base."""
+    """
+    Aplica o ganho de stat correto (ex: +2, +3) ao stat base.
+    (VERSÃO CORRIGIDA FINAL)
+    """
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -187,30 +192,35 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # --- 2. Aplica o upgrade (LÓGICA CORRIGIDA) ---
     player_data["stat_points"] = pool - 1
     
-    # Pega a classe do jogador
     ckey = _get_class_key_normalized(player_data)
-    # Pega os ganhos corretos (ex: +2 Def, +4 HP) de 'stats.py'
     gains = _get_point_gains_for_class(ckey) 
-    
-    # Pega o valor de ganho para o atributo específico
-    # (Usa 1 como fallback)
     increment = gains.get(profile_stat, 1)
 
-    # <<< [MUDANÇA] APLICA O INCREMENTO CORRETO (ex: +2, +4) >>>
-    # O 'player_data' armazena o valor base + investido
-    player_data[profile_stat] = int(player_data.get(profile_stat, 0)) + int(increment)
+    # <<< [ESTA É A CORREÇÃO PRINCIPAL] >>>
+    
+    # 1. Calcula o HP base do Nível (ex: 122)
+    #    (A CORREÇÃO DO BUG ESTÁ AQUI)
+    lvl = int(player_data.get("level", 1)) # <-- USA , 1 DENTRO do get()
+    
+    class_baseline_stats = _compute_class_baseline_for_level(ckey, lvl)
+    
+    # 2. Pega o valor que o jogador tem *agora* (que pode já ter sido investido)
+    #    ou a baseline se for a primeira vez.
+    current_value = int(player_data.get(profile_stat, class_baseline_stats.get(profile_stat, 0)))
+
+    # 3. Adiciona o novo incremento
+    player_data[profile_stat] = current_value + int(increment)
+    
+    # <<< [FIM DA CORREÇÃO PRINCIPAL] >>>
     
     # Lógica especial para HP (curar o jogador)
     if profile_stat == 'max_hp':
         current_hp = int(player_data.get("current_hp", 0))
         
-        # Recalcula os stats totais AGORA para saber o novo máximo
-        # Passa uma cópia para get_player_total_stats recalcular
         player_data_copy = player_data.copy()
         total_stats = await get_player_total_stats(player_data_copy)
         new_max_hp = int(total_stats.get('max_hp'))
         
-        # Cura o jogador no mesmo valor que ganhou (o 'increment')
         if current_hp < new_max_hp:
             player_data["current_hp"] = min(current_hp + int(increment), new_max_hp)
 
@@ -246,10 +256,11 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
             except Exception as e_generic_text:
                 logger.error(f"Erro genérico ao editar menu de status (texto) após fallback: {e_generic_text}", exc_info=True)
         elif "message is not modified" not in error_str:
-            logger.error(f"Falha ao editar menu de status (caption): {e_caption}")
+            # Ignora o erro "message is not modified"
+            pass
     except Exception as e_generic_caption:
         logger.error(f"Erro genérico ao editar menu de status (caption): {e_generic_caption}", exc_info=True)
-
+        
 # ... (close_status_callback está correto) ...
 async def close_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

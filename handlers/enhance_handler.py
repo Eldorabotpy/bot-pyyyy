@@ -284,7 +284,7 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         use_joia = (flag == "joia")
         # Assumindo enhance_item síncrono
-        res = enhance_item(pdata, uid, use_joia=use_joia)
+        res = await enhance_item(pdata, uid, use_joia=use_joia)
         if isinstance(res, dict) and res.get("error"):
             await q.answer(res["error"], show_alert=True)
             # <<< CORREÇÃO 6: Adiciona await >>>

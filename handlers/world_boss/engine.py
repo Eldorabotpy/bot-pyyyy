@@ -35,7 +35,7 @@ POSSIBLE_LOCATIONS = [
     "campos_linho",
     "pico_grifo",
     "mina_ferro",
-    "forja_abandonada"
+    "forja_abandonada",
     "pantano_maldito"
 ]
 
@@ -192,6 +192,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     """
     Itera sobre os participantes, rola o loot, salva,
     envia DMs e envia o anúncio final.
+    (VERSÃO CORRIGIDA COM TRATAMENTO DE ERROS E OTIMIZAÇÃO)
     """
     leaderboard = battle_results.get("leaderboard", {})
     last_hitter_id = battle_results.get("last_hitter_id")
@@ -203,6 +204,24 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
 
     logger.info(f"[WB_LOOT] Distribuindo loot para {len(leaderboard)} participantes...")
 
+    # --- [CORREÇÃO E OTIMIZAÇÃO] ---
+    # Passo 1: Recolher dados de TODOS os participantes primeiro, de forma segura.
+    participant_data = {}
+    for user_id in leaderboard.keys():
+        try:
+            # Tenta obter os dados do jogador
+            pdata = await player_manager.get_player_data(user_id)
+            if pdata:
+                participant_data[user_id] = pdata
+        except Exception as e:
+            logger.error(f"[WB_LOOT] Falha crítica ao obter pdata para {user_id} na recolha inicial: {e}", exc_info=True)
+            # Continua mesmo se um jogador falhar
+    
+    if not participant_data:
+        logger.warning("[WB_LOOT] Nenhum dado de participante foi carregado (todos falharam?). Abortando loot.")
+        return
+    # --- [FIM DA CORREÇÃO] ---
+
     # Lista para o anúncio público
     skill_winners_msg = []
     skin_winners_msg = []
@@ -210,22 +229,33 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     
     # Ordena o ranking para o anúncio
     sorted_ranking = sorted(leaderboard.items(), key=lambda item: item[1], reverse=True)
-    top_3_msg = [
-        f"🥇 { (await player_manager.get_player_data(uid)).get('character_name', 'Herói')} ({dmg:,} dano)" for uid, dmg in sorted_ranking[:3]
-    ]
+    
+    # Passo 2: Construir Top 3 (AGORA É SEGURO, pois usa dados locais)
+    top_3_msg = []
+    for uid, dmg in sorted_ranking[:3]:
+        pdata = participant_data.get(uid) # Pega dos dados locais que já carregámos
+        if pdata:
+            # Usa html.escape para evitar que nomes com < ou > quebrem a mensagem
+            name = html.escape(pdata.get('character_name', 'Herói'))
+            top_3_msg.append(f"🥇 {name} ({dmg:,} dano)")
+        else:
+            # Fallback se o jogador do ranking falhou ao carregar
+            top_3_msg.append(f"🥇 Herói Desconhecido ({dmg:,} dano)")
 
-    # Itera sobre TODOS os participantes para rolar o loot
-    for user_id, damage_dealt in leaderboard.items():
+
+    # Passo 3: Itera sobre os dados LOCAIS que recolhemos
+    for user_id, pdata in participant_data.items():
+        damage_dealt = leaderboard.get(user_id, 0)
+        
         if damage_dealt <= 0:
             continue
         
         try:
-            pdata = await player_manager.get_player_data(user_id)
-            if not pdata:
-                continue
-
+            # JÁ TEMOS OS DADOS: 'pdata'
+            
             player_name = pdata.get("character_name", f"ID {user_id}")
             loot_won_messages = [] # O que este jogador ganhou
+            player_mudou = False # Flag para saber se precisamos salvar
 
             # 1. Rola a SKILL
             if random.random() * 100 <= SKILL_CHANCE:
@@ -233,11 +263,11 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 skill_info = SKILL_DATA.get(won_skill_id, {})
                 skill_name = skill_info.get("display_name", won_skill_id)
                 
-                # Adiciona a skill (se já não a tiver)
                 if won_skill_id not in pdata.get("skills", []):
                     pdata.setdefault("skills", []).append(won_skill_id)
                     loot_won_messages.append(f"✨ Habilidade Rara: [{skill_name}]")
-                    skill_winners_msg.append(f"• {player_name} encontrou a <b>Skill [{skill_name}]</b>!")
+                    skill_winners_msg.append(f"• {html.escape(player_name)} encontrou a <b>Skill [{skill_name}]</b>!")
+                    player_mudou = True
                 else:
                     loot_won_messages.append(f"✨ Você já possui a skill [{skill_name}].")
 
@@ -247,20 +277,22 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 skin_info = SKIN_CATALOG.get(won_skin_id, {})
                 skin_name = skin_info.get("display_name", won_skin_id)
                 
-                # Adiciona a skin como um item
                 player_manager.add_item_to_inventory(pdata, won_skin_id, 1)
                 loot_won_messages.append(f"🎨 Skin Rara: [{skin_name}]")
-                skin_winners_msg.append(f"• {player_name} obteve a <b>Skin [{skin_name}]</b>!")
+                skin_winners_msg.append(f"• {html.escape(player_name)} obteve a <b>Skin [{skin_name}]</b>!")
+                player_mudou = True
 
             # 3. Salva o jogador (se ele ganhou algo)
-            if loot_won_messages:
+            if player_mudou:
                 await player_manager.save_player_data(user_id, pdata)
-                # Envia a DM para o sortudo
+            
+            # Envia a DM (se ganhou algo)
+            if loot_won_messages:
                 await _send_dm_to_winner(context, user_id, loot_won_messages)
 
             # 4. Verifica o Último Golpe
             if user_id == last_hitter_id:
-                last_hit_msg = f"💥 <b>Último Golpe:</b> {player_name}"
+                last_hit_msg = f"💥 <b>Último Golpe:</b> {html.escape(player_name)}"
 
         except Exception as e:
             logger.error(f"[WB_LOOT] Erro ao processar loot para {user_id}: {e}", exc_info=True)
@@ -297,8 +329,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
         logger.info(f"Anúncio de loot do World Boss enviado para o canal.")
     except Exception as e:
         logger.error(f"Falha ao enviar anúncio de loot do World Boss: {e}", exc_info=True)
-
-
+        
 # --- FUNÇÕES DE JOB ---
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """Job que finaliza o evento (chamado pelo agendador se o tempo acabar)."""
@@ -311,7 +342,7 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     await distribute_loot_and_announce(context, battle_results)
     
     anuncio = "O Demônio Dimensional era demasiado poderoso e desapareceu de volta para a sua dimensão..."
-    async for user_id, _ in player_manager.iter_players(filter_query={}):
+    async for user_id, _ in player_manager.iter_players():
         try:
             await context.bot.send_message(chat_id=user_id, text=anuncio)
             await asyncio.sleep(0.1)
@@ -328,7 +359,7 @@ async def broadcast_boss_announcement(application: Application, location_key: st
     )
     
     total_jogadores = 0
-    async for user_id, _ in player_manager.iter_players(filter_query={}):
+    async for user_id, _ in player_manager.iter_players():
         try:
             await application.bot.send_message(chat_id=user_id, text=anuncio, parse_mode='HTML')
             total_jogadores += 1

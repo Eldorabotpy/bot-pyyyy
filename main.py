@@ -1,4 +1,4 @@
-# Arquivo: main.py (VERSÃO FINAL COM AMBOS OS EVENTOS AGENDADOS)
+# Arquivo: main.py (VERSÃO FINAL COM ASYNC E HOOK CORRIGIDO)
 
 from __future__ import annotations
 import os
@@ -12,33 +12,26 @@ from zoneinfo import ZoneInfo
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from threading import Thread
 from flask import Flask
+import asyncio 
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes
 
-# <<< MUDANÇA: Importa a nova lista de horários >>>
 from config import ADMIN_ID, TELEGRAM_TOKEN, EVENT_TIMES, JOB_TIMEZONE, WORLD_BOSS_TIMES
 from registries import register_all_handlers
 
+# Importa o Watchdog
+from modules.player.actions import check_stale_actions_on_startup
+
 # --- Importa os jobs corretos ---
 from handlers.jobs import (
-    regenerate_energy_job,
-    daily_crystal_grant_job,
-    afternoon_event_reminder_job,
-    timed_actions_watchdog,
-    start_kingdom_defense_event, # Job da Defesa do Reino
-    end_kingdom_defense_event,   # Job da Defesa do Reino
-    daily_arena_ticket_job       # Job do Ticket da Arena
+    regenerate_energy_job, daily_crystal_grant_job, afternoon_event_reminder_job,
+    timed_actions_watchdog, start_kingdom_defense_event, end_kingdom_defense_event,
+    daily_arena_ticket_job
 )
-# (Removemos a importação do daily_pvp_entry_reset_job)
-
-# <<< MUDANÇA: Importa os jobs corretos do World Boss >>>
 from handlers.world_boss.engine import (
-    iniciar_world_boss_job,
-    end_world_boss_job
+    iniciar_world_boss_job, end_world_boss_job
 )
-# (Removemos a importação do agendador_mestre_do_boss)
-
 from modules.player import core as player_core
 
 # --- CONFIGURAÇÃO DE LOGGING ---
@@ -46,6 +39,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+logger = logging.getLogger(__name__)
 
 # --- FLASK ---
 flask_app = Flask(__name__)
@@ -58,9 +52,10 @@ def run_flask():
 
 # --- HANDLERS DE ERRO E STARTUP ---
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logging.exception("Exceção ao processar update: %s", context.error)
+    logger.exception(f"Exceção ao processar update: {context.error}")
 
 async def send_startup_message(application: Application):
+    """Envia a mensagem de que o bot iniciou."""
     if not ADMIN_ID: return
     try:
         await application.bot.send_message(
@@ -70,32 +65,24 @@ async def send_startup_message(application: Application):
             disable_notification=True,
         )
     except Exception as e:
-        logging.warning("Não foi possível enviar mensagem inicial: %s", e)
+        logger.warning("Não foi possível enviar mensagem inicial: %s", e)
 
-# (A função de diagnóstico schedule_checker_job fica igual)
-async def schedule_checker_job(context: ContextTypes.DEFAULT_TYPE):
-    # ... (código de diagnóstico) ...
-    pass
-
-# ====================================================================
-
-# --- FUNÇÃO DE REGISTRO DE JOBS (CORRIGIDA PARA OS DOIS EVENTOS) ---
-
+# ... (A tua função 'register_jobs' fica exatamente igual) ...
 def register_jobs(application: Application):
-    logging.info("Registrando jobs...")
+    logger.info("Registrando jobs...")
     j = application.job_queue
-    
+
     try:
         local_tz = ZoneInfo(JOB_TIMEZONE)
-        logging.info(f"Usando timezone local '{JOB_TIMEZONE}' para jobs diários.")
+        logger.info(f"Usando timezone local '{JOB_TIMEZONE}' para jobs diários.")
     except Exception as e_tz:
-        logging.error(f"CRÍTICO: Falha ao carregar timezone '{JOB_TIMEZONE}': {e_tz}. Usando UTC como fallback.")
+        logger.error(f"CRÍTICO: Falha ao carregar timezone '{JOB_TIMEZONE}': {e_tz}. Usando UTC como fallback.")
         local_tz = timezone.utc
 
     # --- Jobs Repetitivos (Intervalo Fixo) ---
     j.run_repeating(regenerate_energy_job, interval=60, first=timedelta(seconds=5), name="regenerate_energy")
     j.run_repeating(timed_actions_watchdog, interval=60, first=timedelta(seconds=15), name="watchdog_acoes")
-    logging.info("-> Job 'watchdog_acoes' agendado para rodar a cada minuto.")
+    logger.info("-> Job 'watchdog_acoes' agendado para rodar a cada minuto.")
 
     # --- Jobs Diários ('cron' - Hora Específica no Fuso Local) ---
     j.run_daily(daily_crystal_grant_job, time=time(hour=0, minute=0, tzinfo=local_tz), name="daily_crystals")
@@ -106,13 +93,13 @@ def register_jobs(application: Application):
         time=time(hour=2, minute=0, tzinfo=local_tz),
         name="daily_arena_tickets"
     )
-    logging.info("-> Job 'daily_arena_ticket_job' agendado para 02:00 diariamente.")
+    logger.info("-> Job 'daily_arena_ticket_job' agendado para 02:00 diariamente.")
     
     # Lembrete (13:30)
     j.run_daily(afternoon_event_reminder_job, time=time(hour=13, minute=30, tzinfo=local_tz), name="afternoon_event_reminder")
 
     # --- [MUDANÇA] Agendamento Evento 1: Defesa do Reino ---
-    logging.info("Registrando jobs de eventos do reino (Defesa)...")
+    logger.info("Registrando jobs de eventos do reino (Defesa)...")
     if EVENT_TIMES: 
         for i, (start_h, start_m, end_h, end_m) in enumerate(EVENT_TIMES):
             try:
@@ -124,7 +111,7 @@ def register_jobs(application: Application):
                 duration_minutes = 30
             
             job_data_start = {"event_duration_minutes": duration_minutes}
-            
+ 
             j.run_daily(
                 start_kingdom_defense_event, 
                 time=time(hour=start_h, minute=start_m, tzinfo=local_tz), 
@@ -136,73 +123,115 @@ def register_jobs(application: Application):
                 time=time(hour=end_h, minute=end_m, tzinfo=local_tz), 
                 name=f"end_defense_{i}_{end_h}h{end_m:02d}"
             )
-            logging.info(f"-> Evento Defesa {i+1} agendado: {start_h:02d}:{start_m:02d} até {end_h:02d}:{end_m:02d} ({JOB_TIMEZONE})")
-            
+            logger.info(f"-> Evento Defesa {i+1} agendado: {start_h:02d}:{start_m:02d} até {end_h:02d}:{end_m:02d} ({JOB_TIMEZONE})")
+
     else:
-        logging.warning("Lista EVENT_TIMES vazia. Jobs de Defesa do Reino não agendados.")
+        logger.warning("Lista EVENT_TIMES vazia. Jobs de Defesa do Reino não agendados.")
 
     # --- [MUDANÇA] Agendamento Evento 2: Demônio Dimensional ---
-    logging.info("Agendando o Demônio Dimensional (World Boss)...")
-    
-    # Remove o agendador aleatório antigo
-    # j.run_daily(agendador_mestre_do_boss, ...)
+    logger.info("Agendando o Demônio Dimensional (World Boss)...")
     
     if WORLD_BOSS_TIMES:
         for i, (start_h, start_m, end_h, end_m) in enumerate(WORLD_BOSS_TIMES):
-            # Calcula a duração em horas (precisa ser float)
             try:
                 start_dt = datetime(2000, 1, 1, start_h, start_m)
                 end_dt = datetime(2000, 1, 1, end_h, end_m)
-                # Lida com o evento que atravessa a meia-noite (ex: 23:00 -> 01:00)
                 if end_dt < start_dt:
-                    end_dt += timedelta(days=1)
-                
+                   end_dt += timedelta(days=1)
+
                 duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
-                if duration_hours <= 0: duration_hours = 1.0 # Fallback 1 hora
+                if duration_hours <= 0: duration_hours = 1.0 
             except Exception:
-                duration_hours = 1.0 # Fallback 1 hora
-            
+               duration_hours = 1.0 
+
             job_data_start = {"duration_hours": duration_hours}
 
-            # Agenda o INÍCIO do boss
             j.run_daily(
-                iniciar_world_boss_job, # <<< Função correta
+                iniciar_world_boss_job, 
                 time=time(hour=start_h, minute=start_m, tzinfo=local_tz),
                 name=f"start_world_boss_{i}_{start_h}h{start_m:02d}",
-                data=job_data_start # Passa a duração
+                data=job_data_start 
             )
-            
-            # Agenda o FIM do boss
+
             j.run_daily(
-                end_world_boss_job, # <<< Função correta
-                time=time(hour=end_h, minute=end_m, tzinfo=local_tz),
+                end_world_boss_job, 
+                time=time(hour=end_h, minute=end_m, tzinfo=local_tz), 
                 name=f"end_world_boss_{i}_{end_h}h{end_m:02d}"
             )
-            logging.info(f"-> World Boss {i+1} agendado: {start_h:02d}:{start_m:02d} até {end_h:02d}:{end_m:02d} ({JOB_TIMEZONE})")
-            
+            logger.info(f"-> World Boss {i+1} agendado: {start_h:02d}:{start_m:02d} até {end_h:02d}:{end_m:02d} ({JOB_TIMEZONE})")
+
     else:
-        logging.warning("Lista WORLD_BOSS_TIMES vazia. Jobs do World Boss não agendados.")
+        logger.warning("Lista WORLD_BOSS_TIMES vazia. Jobs do World Boss não agendados.")
 
     logging.info("Agendando jobs de temporada PvP... (DESATIVADOS - agora manuais via admin)")
     logging.info("Todos os jobs foram registrados com sucesso.")
+
+
+# <<< [CORREÇÃO] CRIA UMA NOVA FUNÇÃO PARA O 'post_init' >>>
+async def post_initialization_hook(application: Application):
+    """
+    Função executada após application.initialize() ser chamado.
+    Usada para o watchdog e para a mensagem de startup.
+    """
+    # 1. Executa o Watchdog
+    try:
+        logger.info("[Watchdog] Executando verificação de ações presas...")
+        await check_stale_actions_on_startup(application)
+    except Exception as e:
+        logger.error(f"Falha ao executar o Watchdog de inicialização: {e}", exc_info=True)
+        # Continua mesmo se o watchdog falhar
+
+    # 2. Envia a mensagem de Startup
+    await send_startup_message(application)
+
     
-# --- FUNÇÃO PRINCIPAL ---
-def main():
-    logging.info("Iniciando o servidor Flask em segundo plano...")
+# --- [CORREÇÃO] FUNÇÃO PRINCIPAL MANUAL (EVITA O RUNTIMEERROR) ---
+async def main():
+    logger.info("Iniciando o servidor Flask em segundo plano...")
     flask_thread = Thread(target=run_flask)
     flask_thread.start()
 
-    logging.info("Configurando a aplicação Telegram...")
+    logger.info("Configurando a aplicação Telegram...")
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     application.add_error_handler(error_handler)
-    
+   
     register_jobs(application) 
     register_all_handlers(application)
 
-    application.post_init = send_startup_message
+    logger.info("Bot configurado. Iniciando...")
 
-    logging.info("Iniciando o bot em modo polling...")
-    application.run_polling()
+    try:
+        # 1. Inicializa o bot (prepara o job_queue, etc.)
+        await application.initialize()
+        
+        # 2. Executa o Watchdog e a Mensagem de Startup
+        await post_initialization_hook(application) 
+        
+        # 3. Começa a "ouvir" (getUpdates)
+        await application.updater.start_polling()
+        
+        # 4. Começa a processar os handlers
+        await application.start()
+
+        logger.info("Bot iniciado. Polling... (Pressione Ctrl+C para parar)")
+       
+        # Mantém o script vivo
+        while True:
+            await asyncio.sleep(3600) # Dorme por 1 hora e repete
+
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot parado (Interrupção).")
+    except Exception as e:
+        logger.critical(f"Bot parado devido a erro: {e}", exc_info=True)
+    finally:
+        logger.info("Desligando o bot...")
+        if application.updater and application.updater.running:
+            await application.updater.stop()
+        if application.running:
+            await application.stop()
+        await application.shutdown()
+        logger.info("Bot desligado.")
+
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

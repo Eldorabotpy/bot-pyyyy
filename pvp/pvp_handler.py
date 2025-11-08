@@ -9,6 +9,7 @@ from .pvp_config import ARENA_MODIFIERS, MONTHLY_RANKING_REWARDS
 from . import pvp_battle
 from . import pvp_config
 from . import pvp_utils
+from handlers.utils import format_pvp_result
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from modules import player_manager, file_ids, game_data
@@ -20,6 +21,8 @@ PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
 PVP_HISTORICO = "pvp_historico"
 
+# Em: pvp/pvp_handler.py
+
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query.message:
@@ -29,65 +32,44 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     await query.answer("Procurando um oponente digno...")
     user_id = query.from_user.id
     
-    # <<< CORREÇÃO 1: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
-    print(f"\n>>> DEBUG: [PvP Match] User {user_id} iniciando busca.")
     
     item_id_entrada = "ticket_arena" 
 
-    # 1. Verifica (Síncrono)
     if not player_manager.has_item(player_data, item_id_entrada, quantity=1):
         current_tickets = player_data.get('inventory', {}).get(item_id_entrada, 0)
         item_name = game_data.ITEMS_DATA.get(item_id_entrada, {}).get('display_name', item_id_entrada)
         await context.bot.answer_callback_query(query.id, f"Você não tem {item_name} suficiente! ({current_tickets} restantes)", show_alert=True)
-        print(f">>> DEBUG: [PvP Match] User {user_id} sem item '{item_id_entrada}'.")
         return
 
-    # 2. Consome (Síncrono localmente)
-    item_consumido_com_sucesso = player_manager.remove_item_from_inventory(player_data, item_id_entrada, quantity=1)
-
-    if not item_consumido_com_sucesso:
+    if not player_manager.remove_item_from_inventory(player_data, item_id_entrada, quantity=1):
         item_name = game_data.ITEMS_DATA.get(item_id_entrada, {}).get('display_name', item_id_entrada)
         await context.bot.answer_callback_query(query.id, f"Erro ao tentar usar o {item_name}. Tente novamente.", show_alert=True)
-        print(f">>> DEBUG: [PvP Match] User {user_id} - Falha ao REMOVER '{item_id_entrada}'.")
         return
 
-    # 4. Salva (Async)
-    # <<< CORREÇÃO 2: Adiciona await >>>
     await player_manager.save_player_data(user_id, player_data) 
-    print(f">>> DEBUG: [PvP Match] Item '{item_id_entrada}' consumido e dados salvos para {user_id}.")
     
-    # Lógica do Modificador (Síncrona)
     today_weekday = datetime.datetime.now().weekday()
     modifier = ARENA_MODIFIERS.get(today_weekday)
     current_effect = None
     if modifier: current_effect = modifier.get("effect")
-    print(f">>> DEBUG: [PvP Match] Modificador do dia: {current_effect or 'Nenhum'}")
 
-    # Lógica de Matchmaking (Síncrona)
     my_points = player_manager.get_pvp_points(player_data)
     my_elo = pvp_utils.get_player_elo(my_points)
-    print(f">>> DEBUG: [PvP Match] User {user_id} tem {my_points} pontos (Elo: {my_elo})")
     
     same_elo_opponents = []
     lower_elo_opponents = []
     
-    print(">>> DEBUG: [PvP Match] Iniciando loop de oponentes...")
-    opponent_count = 0
     try:
-        # <<< CORREÇÃO 3: Adiciona 'async for' >>>
         async for opponent_id, opp_data in player_manager.iter_players():
-            opponent_count += 1
             if opponent_id == user_id: 
                 continue
             
             try:
-                # Síncrono (usa opp_data)
                 opp_points = player_manager.get_pvp_points(opp_data)
                 opp_elo = pvp_utils.get_player_elo(opp_points)
             except Exception as e_opp_stats:
                 logger.error(f"Erro ao obter stats PvP do oponente {opponent_id}: {e_opp_stats}")
-                print(f">>> DEBUG: [PvP Match] ERRO ao obter stats PvP do oponente {opponent_id}: {e_opp_stats}. Pulando.")
                 continue
 
             if my_elo == opp_elo:
@@ -97,72 +79,51 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 
     except Exception as e_iter:
         logger.error(f"Erro CRÍTICO durante player_manager.iter_players(): {e_iter}", exc_info=True)
-        print(f">>> DEBUG: [PvP Match] ERRO CRÍTICO no loop iter_players: {e_iter}")
         error_message = ("🛡️ **Falha na Busca** 🛡️\n\nOcorreu um erro ao procurar oponentes.")
         keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
         original_message_is_media = bool(query.message.photo or query.message.video or query.message.animation)
         try:
-             if original_message_is_media: await query.edit_message_caption(caption=error_message, reply_markup=reply_markup, parse_mode="HTML")
-             else: await query.edit_message_text(text=error_message, reply_markup=reply_markup, parse_mode="HTML")
+            if original_message_is_media: await query.edit_message_caption(caption=error_message, reply_markup=reply_markup, parse_mode="HTML")
+            else: await query.edit_message_text(text=error_message, reply_markup=reply_markup, parse_mode="HTML")
         except Exception: pass
         return
 
-    print(f">>> DEBUG: [PvP Match] Loop de oponentes concluído. Verificados {opponent_count} jogadores.")
-    print(f">>> DEBUG: [PvP Match] Oponentes mesmo Elo: {len(same_elo_opponents)}")
-    print(f">>> DEBUG: [PvP Match] Oponentes Elo inferior: {len(lower_elo_opponents)}")
-
-    # Escolhe o oponente (Síncrono)
     final_opponent_id = None
-    if same_elo_opponents: final_opponent_id = random.choice(same_elo_opponents); print(f">>> DEBUG: [PvP Match] Oponente escolhido (mesmo Elo): {final_opponent_id}")
-    elif lower_elo_opponents: final_opponent_id = random.choice(lower_elo_opponents); print(f">>> DEBUG: [PvP Match] Oponente escolhido (Elo inferior): {final_opponent_id}")
-    else: print(f">>> DEBUG: [PvP Match] Nenhum oponente elegível encontrado.")
+    if same_elo_opponents: final_opponent_id = random.choice(same_elo_opponents)
+    elif lower_elo_opponents: final_opponent_id = random.choice(lower_elo_opponents)
 
     original_message_is_media = bool(query.message.photo or query.message.video or query.message.animation)
 
     if final_opponent_id:
-        # <<< CORREÇÃO 4: Adiciona await >>>
         opponent_data = await player_manager.get_player_data(final_opponent_id)
-        if not opponent_data: # Verifica se o oponente foi carregado
-             await query.edit_message_text("Erro ao carregar oponente. Tente novamente.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]))
-             return
-             
+        if not opponent_data: 
+            await query.edit_message_text("Erro ao carregar oponente. Tente novamente.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]))
+            return
+            
         caption_batalha = "⚔️ Oponente encontrado! Simulando batalha..."
-        print(f">>> DEBUG: [PvP Match] Preparando para editar msg para '{caption_batalha}'")
 
-        # Edita a mensagem ANTES da batalha (Síncrono + Async)
         try:
-            print("\n--- DEBUG Mídia Classe ---")
-            print(f"Opponent Data (parcial): class='{opponent_data.get('class')}', classe='{opponent_data.get('classe')}', class_key='{opponent_data.get('class_key')}'")
             opponent_class_key = (opponent_data.get("class_key") or opponent_data.get("class") or opponent_data.get("classe") or opponent_data.get("class_type") or "default")
             video_key = f"classe_{opponent_class_key.lower()}_media"
-            media_data = file_ids.get_file_data(video_key) # Síncrono
-            print(f"Classe Resolvida: '{opponent_class_key}'"); print(f"Chave de Mídia Procurada: '{video_key}'"); print(f"Dados da Mídia Encontrados: {media_data}"); print("--- FIM DEBUG Mídia Classe ---\n")
+            media_data = file_ids.get_file_data(video_key) 
 
             if media_data and media_data.get("id") and original_message_is_media:
                 new_media = InputMediaVideo(media=media_data["id"], caption=caption_batalha, parse_mode="HTML")
                 await query.edit_message_media(media=new_media)
             elif original_message_is_media:
-                logger.warning(f"Vídeo/Mídia '{video_key}' não encontrado ou msg é mídia. Usando edit_caption.")
                 await query.edit_message_caption(caption=caption_batalha, parse_mode="HTML")
             else:
                 await query.edit_message_text(text=caption_batalha, parse_mode="HTML")
-            print(f">>> DEBUG: [PvP Match] Edição da mensagem de 'Batalha...' SUCESSO.")
         except Exception as e_edit_initial:
             logger.error(f"Falha ao editar msg ANTES da batalha: {e_edit_initial}. Tentando fallback final.")
-            print(f">>> DEBUG: [PvP Match] ERRO ao editar msg antes da batalha: {e_edit_initial}")
             try:
                 await query.edit_message_text(text=caption_batalha, parse_mode="HTML")
             except Exception as e_fallback_text:
                 logger.error(f"Falha no fallback final de texto: {e_fallback_text}")
 
-        # Bloco de Segurança da Batalha
         try:
-            print(f">>> DEBUG: [PvP Match] CHAMANDO simular_batalha_completa...")
-            # <<< CORREÇÃO 5: Adiciona await >>>
             vencedor_id, log_completo = await pvp_battle.simular_batalha_completa( user_id, final_opponent_id, modifier_effect=current_effect )
-            print(f">>> DEBUG: [PvP Match] simular_batalha_completa RETORNOU. Vencedor: {vencedor_id}")
             
-            # Lógica de Elo e Recompensas (Síncrona)
             elo_ganho_base = 25; elo_perdido_base = 15; log_final = list(log_completo)
             OURO_BASE_RECOMPENSA = 50
             OURO_FINAL_RECOMPENSA = OURO_BASE_RECOMPENSA
@@ -175,57 +136,50 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             
             if vencedor_id == user_id:
                 player_manager.add_gold(player_data, OURO_FINAL_RECOMPENSA)
-                player_manager.add_pvp_points(player_data, elo_ganho) # Síncrono
-                player_manager.add_pvp_points(opponent_data, -elo_perdido) # Síncrono
+                player_manager.add_pvp_points(player_data, elo_ganho)
+                player_manager.add_pvp_points(opponent_data, -elo_perdido)
                 log_final.append(f"\n🏆 Você ganhou <b>+{elo_ganho}</b> pontos de Elo!")
                 log_final.append(f"💰 Você recebeu <b>{OURO_FINAL_RECOMPENSA}</b> de ouro pela vitória!")
 
                 clan_id = player_data.get("clan_id")
                 if clan_id: 
-                     # <<< CORREÇÃO 6: Adiciona await >>>
-                     await clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='PVP_WIN', details={'count': 1}, context=context)
+                    await clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='PVP_WIN', details={'count': 1}, context=context)
             elif vencedor_id == final_opponent_id:
-                player_manager.add_pvp_points(player_data, -elo_perdido) # Síncrono
-                player_manager.add_pvp_points(opponent_data, elo_ganho) # Síncrono
+                player_manager.add_pvp_points(player_data, -elo_perdido)
+                player_manager.add_pvp_points(opponent_data, elo_ganho)
                 log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
             
-            # Salvar dados
-            # <<< CORREÇÃO 7: Adiciona await >>>
             await player_manager.save_player_data(user_id, player_data)
-            # <<< CORREÇÃO 8: Adiciona await >>>
             await player_manager.save_player_data(final_opponent_id, opponent_data)
-            print(f">>> DEBUG: [PvP Match] Dados salvos para user {user_id} e oponente {final_opponent_id}")
 
-            # Exibe o resultado final (Síncrono + Async)
-            resultado_final = "\n".join(log_final)
-            keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
-            print(f">>> DEBUG: [PvP Match] Preparando para exibir resultado final (len={len(resultado_final)})...")
+            resultado_final_texto = "\n".join(log_final)
+            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]])
 
-            if len(resultado_final) > 1020: # Lógica de Log Longo
-                logger.warning("Log de batalha >1024. Enviando como nova mensagem.")
-                print(f">>> DEBUG: [PvP Match] Log longo ({len(resultado_final)} chars), enviando nova mensagem.")
-                try: 
-                    await query.delete_message(); print(f">>> DEBUG: [PvP Match] Mensagem de mídia deletada.")
-                except Exception as e_del_long: 
-                    logger.error(f"Falha ao deletar msg antes de enviar log longo: {e_del_long}"); print(f">>> DEBUG: [PvP Match] Falha ao deletar msg: {e_del_long}")
-                await context.bot.send_message(chat_id=query.message.chat_id, text=resultado_final[:4090], reply_markup=reply_markup, parse_mode="HTML")
-                print(f">>> DEBUG: [PvP Match] Nova mensagem (log longo) enviada.")
-            else: # Log curto
-                print(f">>> DEBUG: [PvP Match] Log curto ({len(resultado_final)} chars), tentando editar.")
+            # Define o limite
+            LIMITE_LEGENDA = 1020 
+
+            # Se o texto for muito longo, corta-o
+            if len(resultado_final_texto) > LIMITE_LEGENDA:
+                corte = len(resultado_final_texto) - LIMITE_LEGENDA
+                # Corta o início do log (preservando o fim)
+                resultado_final_texto = f"[... Log muito longo ...]\n" + resultado_final_texto[corte + 20:]
+
+            # Agora, só usamos 'edit_message_caption' ou 'edit_message_text'
+            try:
+                if original_message_is_media: 
+                    await query.edit_message_caption(caption=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
+                else: 
+                    await query.edit_message_text(text=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
+            except Exception as e_edit_final:
+                logger.warning(f"Falha ao editar resultado PvP ({e_edit_final}), tentando método alternativo.")
                 try:
-                    if original_message_is_media: await query.edit_message_caption(caption=resultado_final, reply_markup=reply_markup, parse_mode="HTML"); print(f">>> DEBUG: [PvP Match] edit_message_caption (resultado) SUCESSO.")
-                    else: await query.edit_message_text(text=resultado_final, reply_markup=reply_markup, parse_mode="HTML"); print(f">>> DEBUG: [PvP Match] edit_message_text (resultado) SUCESSO.")
-                except Exception as e_edit_final:
-                    logger.warning(f"Falha ao editar resultado ({e_edit_final}), tentando método alternativo."); print(f">>> DEBUG: [PvP Match] ERRO ao editar resultado ({e_edit_final}), tentando fallback.")
-                    try:
-                        if original_message_is_media: await query.edit_message_text(text=resultado_final, reply_markup=reply_markup, parse_mode="HTML"); print(f">>> DEBUG: [PvP Match] edit_message_text (fallback resultado) SUCESSO.")
-                        else: await query.edit_message_caption(caption=resultado_final, reply_markup=reply_markup, parse_mode="HTML"); print(f">>> DEBUG: [PvP Match] edit_message_caption (fallback resultado) SUCESSO.")
-                    except Exception as e_edit_final_fallback:
-                        logger.error(f"Falha CRÍTICA ao exibir resultado final: {e_edit_final_fallback}"); print(f">>> DEBUG: [PvP Match] ERRO CRÍTICO ao exibir resultado final: {e_edit_final_fallback}")
+                    if original_message_is_media: await query.edit_message_text(text=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
+                    else: await query.edit_message_caption(caption=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
+                except Exception as e_edit_final_fallback:
+                    logger.error(f"Falha CRÍTICA ao exibir resultado final PvP: {e_edit_final_fallback}")
 
         except Exception as e_battle: # Captura de Erro da Batalha
             logger.error(f"Erro CRÍTICO durante a simulação da batalha: {e_battle}", exc_info=True)
-            print(f">>> DEBUG: [PvP Match] ERRO CRÍTICO no bloco try da batalha: {e_battle}")
             error_message = ("🛡️ **Falha na Batalha** 🛡️\n\nOcorreu um erro.\nSua entrada foi consumida.")
             keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
             try: 
@@ -234,16 +188,13 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             except Exception: pass
 
     else: # Se não achou oponente
-        print(f">>> DEBUG: [PvP Match] NENHUM OPONENTE ENCONTRADO. Editando mensagem.")
         no_opp_msg = "🛡️ Nenhum oponente encontrado. Tente novamente."
+        keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
         try:
-            if original_message_is_media: await query.edit_message_caption(caption=no_opp_msg)
-            else: await query.edit_message_text(text=no_opp_msg)
-            print(f">>> DEBUG: [PvP Match] Mensagem 'Nenhum Oponente' editada.")
-        except Exception as e_no_opp: 
-             print(f">>> DEBUG: [PvP Match] Falha ao editar msg 'Nenhum Oponente': {e_no_opp}")
-             pass
-        
+            if original_message_is_media: await query.edit_message_caption(caption=no_opp_msg, reply_markup=reply_markup)
+            else: await query.edit_message_text(text=no_opp_msg, reply_markup=reply_markup)
+        except Exception: pass
+
 async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Exibe o ranking PvP dos melhores jogadores e os prémios mensais."""
     query = update.callback_query
@@ -254,8 +205,8 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # <<< CORREÇÃO 9: Adiciona 'async for' >>>
         async for p_id, p_data in player_manager.iter_players():
-            try: # Adiciona try/except por jogador
-                pvp_points = player_manager.get_pvp_points(p_data) # Síncrono
+            try: 
+                pvp_points = player_manager.get_pvp_points(p_data) 
                 if pvp_points > 0:
                     all_players_ranked.append({
                         "user_id": p_id,
@@ -263,8 +214,8 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         "points": pvp_points
                     })
             except Exception as e_player:
-                 logger.error(f"Erro ao processar ranking para jogador {p_id}: {e_player}")
-                 
+                logger.error(f"Erro ao processar ranking para jogador {p_id}: {e_player}")
+                
     except Exception as e:
         logger.error(f"Erro ao iterar jogadores para ranking: {e}", exc_info=True)
         try: await query.edit_message_caption("❌ Erro ao buscar dados do ranking.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]))
@@ -278,15 +229,15 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         for i, player in enumerate(all_players_ranked):
             rank = i + 1; elo_name, elo_display = pvp_utils.get_player_elo_details(player["points"])
-            line = f"{rank}. {elo_display} - {html.escape(player['name'])} ({player['points']} Pts)" # Adiciona html.escape
+            line = f"{rank}. {elo_display} - {html.escape(player['name'])} ({player['points']} Pts)" 
             if rank <= top_n: ranking_text_lines.append(line)
             if player["user_id"] == user_id: player_rank = rank
         if player_rank > top_n:
             ranking_text_lines.append("\n...")
             my_player_data = next((p for p in all_players_ranked if p["user_id"] == user_id), None)
-            if my_player_data: _, my_elo_display = pvp_utils.get_player_elo_details(my_player_data["points"]); ranking_text_lines.append(f"{player_rank}. {my_elo_display} - {html.escape(my_player_data['name'])} ({my_player_data['points']} Pts) (Você)") # Adiciona html.escape
+            if my_player_data: _, my_elo_display = pvp_utils.get_player_elo_details(my_player_data["points"]); ranking_text_lines.append(f"{player_rank}. {my_elo_display} - {html.escape(my_player_data['name'])} ({my_player_data['points']} Pts) (Você)")
 
-    ranking_text_lines.append("\n\n💎 **Recompensas Mensais (Top 5):**") # Corrigido Top 5
+    ranking_text_lines.append("\n\n💎 **Recompensas Mensais (Top 5):**") 
     for rank, reward in sorted(MONTHLY_RANKING_REWARDS.items()): ranking_text_lines.append(f"   {rank}º Lugar: {reward} Gemas (Dimas)")
     ranking_text_lines.append("_(Próximo reset em ~30 dias)_")
     ranking_text_lines.append(f"\nTotal de jogadores no ranking: {len(all_players_ranked)}")
@@ -313,37 +264,24 @@ async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer("Função 'Histórico' ainda em construção!", show_alert=True)
 
-# Em pvp/pvp_handler.py
-
-# ... (código antes de pvp_menu_command) ...
-
 async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Responde ao comando /pvp ou a um botão para abrir o menu da arena."""
-    print("\n>>> DEBUG: 1. Entrou em pvp_menu_command")
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    print(f">>> DEBUG: 2. User ID: {user_id}, Chat ID: {chat_id}")
 
     try:
         # 1. Carrega dados e verifica se existe
         player_data = await player_manager.get_player_data(user_id)
         if not player_data:
-            print(">>> DEBUG: 3a. Jogador NÃO encontrado. Enviando mensagem de erro.")
             await context.bot.send_message(chat_id, "Você precisa criar um personagem primeiro com /start.")
-            print(">>> DEBUG: 3b. Mensagem de erro (jogador não encontrado) enviada.")
             return
-        
-        print(">>> DEBUG: 4. Jogador encontrado. Buscando modificador...")
         
         # 2. Obtém o número de tickets e o modificador
         item_id_entrada = "ticket_arena"
-        
-        # <<< CORREÇÃO 1: OBTÉM OS TICKETS REAIS DO INVENTÁRIO >>>
         current_tickets = player_data.get('inventory', {}).get(item_id_entrada, 0)
         
         today_weekday = datetime.datetime.now().weekday()
         modifier = ARENA_MODIFIERS.get(today_weekday)
-        print(f">>> DEBUG: 5. Modificador encontrado: {modifier.get('name') if modifier else 'Nenhum'}")
 
         modifier_text = ""
         if modifier:
@@ -355,11 +293,10 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 3. Monta o Caption com o Indicador de Tickets
         caption = (
             "⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 ⚔️\n"
-            f"🎟️ <b>Tickets Disponíveis: {current_tickets}x</b>\n" # <<< NOVO INDICADOR
+            f"🎟️ <b>Tickets Disponíveis: {current_tickets}x</b>\n"
             f"{modifier_text}\n"
             "Escolha seu caminho, campeão:"
         )
-        print(">>> DEBUG: 6. Caption e Keyboard preparados.")
 
         keyboard = [
             [InlineKeyboardButton("⚔️ Procurar Oponente (Ranqueado)", callback_data=PVP_PROCURAR_OPONENTE)],
@@ -372,45 +309,30 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 4. Deleta a mensagem anterior (se for callback)
         if update.callback_query:
             try:
-                print(">>> DEBUG: 7a. Tentando deletar mensagem anterior (callback)...")
                 await update.callback_query.delete_message()
-                print(">>> DEBUG: 7b. Mensagem anterior deletada.")
-            except Exception as e_del:
-                print(f">>> DEBUG: 7c. Falha ao deletar mensagem anterior: {e_del}")
+            except Exception:
                 pass
 
-        # 5. Envia a mensagem com mídia ou texto (Mantido o teu código)
-        print(">>> DEBUG: 8. Preparando para enviar mensagem/foto...")
-        media_data = file_ids.get_file_data("pvp_arena_media") # Síncrono
-        print(f">>> DEBUG: 9. Media data para 'pvp_arena_media': {media_data}") 
+        # 5. Envia a mensagem com mídia ou texto
+        media_data = file_ids.get_file_data("pvp_arena_media")
         
         if media_data and media_data.get("id"):
             try:
-                print(">>> DEBUG: 10a. Tentando enviar FOTO...")
                 await context.bot.send_photo(
                     chat_id=chat_id, photo=media_data["id"],
                     caption=caption, reply_markup=reply_markup, parse_mode="HTML"
                 )
-                print(">>> DEBUG: 10b. FOTO enviada com sucesso.")
                 return
             except Exception as e_photo:
                 logger.error(f"Falha ao enviar pvp_arena_media: {e_photo}")
-                print(f">>> DEBUG: 10c. ERRO ao enviar foto: {e_photo}")
 
-        # Fallback (já usava await)
-        try:
-            print(">>> DEBUG: 11a. Tentando enviar TEXTO (fallback)...")
-            await context.bot.send_message(
-                chat_id=chat_id, text=caption,
-                reply_markup=reply_markup, parse_mode="HTML"
-            )
-            print(">>> DEBUG: 11b. TEXTO enviado com sucesso.")
-        except Exception as e_text:
-            print(f">>> DEBUG: 11c. ERRO CRÍTICO ao enviar texto fallback: {e_text}")
-            logger.error(f"Falha crítica ao enviar fallback de texto no pvp_menu: {e_text}", exc_info=True)
+        # Fallback
+        await context.bot.send_message(
+            chat_id=chat_id, text=caption,
+            reply_markup=reply_markup, parse_mode="HTML"
+        )
 
     except Exception as e_geral:
-        print(f">>> DEBUG: ERRO GERAL INESPERADO em pvp_menu_command: {e_geral}")
         logger.error(f"Erro inesperado em pvp_menu_command: {e_geral}", exc_info=True)
         try:
             await context.bot.send_message(chat_id, "Ocorreu um erro ao abrir o menu PvP. Tente novamente.")
@@ -422,15 +344,14 @@ async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAU
     await query.answer()
     user_id = query.from_user.id
 
-    # <<< CORREÇÃO 11: Adiciona await (assumindo que processar_turno_ataque é async) >>>
+    # <<< CORREÇÃO 11: Adiciona await >>>
     new_state, log_do_turno = await pvp_battle.processar_turno_ataque(user_id)
     
     if not new_state:
         await query.edit_message_text("Esta batalha não está mais ativa.")
         return
 
-    # Junta o log do turno ao texto principal da batalha
-    # <<< CORREÇÃO 12: Adiciona await (assumindo que formatar_mensagem_batalha é async) >>>
+    # <<< CORREÇÃO 12: Adiciona await >>>
     texto_atualizado = await pvp_battle.formatar_mensagem_batalha(new_state)
     texto_atualizado += "\n\n--- Últimas Ações ---\n" + "\n".join(log_do_turno)
     
@@ -441,7 +362,7 @@ async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAU
     
     keyboard = [[
         InlineKeyboardButton("⚔️ Atacar", callback_data="pvp_battle_attack"),
-        InlineKeyboardButton("🏃 Fugir", callback_data="pvp_battle_flee"), # Assumindo que pvp_battle_flee existe
+        InlineKeyboardButton("🏃 Fugir", callback_data="pvp_battle_flee"), 
     ]]
     
     if new_state.get("turn"): # Se a batalha não acabou
@@ -462,15 +383,12 @@ async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAU
             text=texto_atualizado, reply_markup=reply_markup_p2, parse_mode="HTML"
         )
 
-# --- Agrupador de Handlers ---
-# (Uma função que retorna todos os handlers deste arquivo, para manter o main.py limpo)
 def pvp_handlers() -> list:
     return [
         CommandHandler("pvp", pvp_menu_command),
-        CallbackQueryHandler(pvp_menu_command, pattern=r'^pvp_arena$'), # Botão do menu do Reino
+        CallbackQueryHandler(pvp_menu_command, pattern=r'^pvp_arena$'), 
         CallbackQueryHandler(procurar_oponente_callback, pattern=f'^{PVP_PROCURAR_OPONENTE}$'),
         CallbackQueryHandler(ranking_callback, pattern=f'^{PVP_RANKING}$'),
         CallbackQueryHandler(historico_callback, pattern=f'^{PVP_HISTORICO}$'),
         CallbackQueryHandler(pvp_battle_action_callback, pattern=r'^pvp_battle_attack$'),
-
     ]

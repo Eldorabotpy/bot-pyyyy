@@ -150,10 +150,13 @@ async def start_refine(pdata: dict, recipe_id: str) -> dict | str:
     return {"duration_seconds": duration, "finish_time": finish_dt.isoformat()}
 
 
+# Em: modules/refining_engine.py
+
 async def finish_refine(pdata: dict) -> dict | str:
     """
     Finaliza o refino, modificando 'pdata' e salvando-o.
     Agora é 'async' e recebe 'pdata' diretamente.
+    (VERSÃO CORRIGIDA COM RETORNO DE XP)
     """
     if not pdata: return "Jogador não encontrado."
 
@@ -163,27 +166,33 @@ async def finish_refine(pdata: dict) -> dict | str:
 
     rid = (pdata.get("player_state", {}).get("details") or {}).get("recipe_id")
     rec = game_data.REFINING_RECIPES.get(rid)
-    user_id = pdata.get("user_id") # Pega o user_id para salvar
+    user_id = pdata.get("user_id") 
     
     if not user_id:
         return "Erro fatal: user_id não encontrado em pdata ao finalizar."
 
     if not rec:
         pdata["player_state"] = {"action": "idle"}
-        # <<< CORREÇÃO 4: Adiciona 'await' >>>
         await player_manager.save_player_data(user_id, pdata)
         return "Receita não encontrada ao concluir."
 
+    # Entrega os itens
     for item_id, qty in (rec.get("outputs", {}) or {}).items():
         player_manager.add_item_to_inventory(pdata, item_id, int(qty))
 
+    # Calcula e aplica o XP
+    xp_gained = 0 # Valor padrão
     prof_type, prof_lvl = _norm_profession(pdata)
+    
     if _is_crafting_profession(prof_type):
+        xp_gained = int(rec.get("xp_gain", 1)) # Pega o XP da receita
+        
         prof = pdata.get("profession", {}) or {}
         prof["type"]  = prof_type
         prof["level"] = int(prof.get("level", prof_lvl or 1))
-        prof["xp"]    = int(prof.get("xp", 0)) + int(rec.get("xp_gain", 1))
+        prof["xp"]    = int(prof.get("xp", 0)) + xp_gained
 
+        # Lógica de Level Up da Profissão
         cur = int(prof.get("level", 1))
         while True:
             need = int(game_data.get_xp_for_next_collection_level(cur))
@@ -195,7 +204,11 @@ async def finish_refine(pdata: dict) -> dict | str:
         pdata["profession"] = prof
 
     pdata["player_state"] = {"action": "idle"}
-    # <<< CORREÇÃO 5: Adiciona 'await' >>>
     await player_manager.save_player_data(user_id, pdata)
 
-    return {"status": "success", "outputs": dict(rec.get("outputs", {}))}
+    # Retorna o resultado com XP
+    return {
+        "status": "success", 
+        "outputs": dict(rec.get("outputs", {})),
+        "xp_gained": xp_gained # <-- ADICIONADO
+    }

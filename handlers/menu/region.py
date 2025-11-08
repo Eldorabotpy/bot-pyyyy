@@ -50,16 +50,29 @@ def _humanize_duration(seconds: int) -> str:
 
 
 def _default_travel_seconds() -> int:
-    return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 30))
+    return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 360))
 
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
-    # Esta função é síncrona, mas o player_data já é carregado pelo await
-    dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
-    base = int(dest_info.get("travel_time_seconds", _default_travel_seconds()))
-    premium = PremiumManager(player_data)
-    # Assumindo que get_perk_value é async/aceita user_id, mas aqui ele já tem pdata
-    mult = float(premium.get_perk_value("travel_time_multiplier", 1.0)) 
-    return max(0, int(round(base * mult)))
+    """
+    Calcula o tempo de viagem. 
+    FORÇADO PARA 6 MINUTOS (360 segundos) BASE.
+    """
+    # --- VALOR BASE FIXO: 6 MINUTOS ---
+    base = 360 
+    
+    # Aplica multiplicadores de perks (Premium), se houver
+    try:
+        premium = PremiumManager(player_data)
+        mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
+    except Exception:
+        mult = 1.0 # Fallback se o PremiumManager falhar
+
+    final_seconds = max(0, int(round(base * mult)))
+    
+    # Debug para o terminal (para você ter certeza que funcionou)
+    print(f"DEBUG VIAGEM: Base=360s, Mult={mult}, Final={final_seconds}s")
+    
+    return final_seconds
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     """
@@ -100,27 +113,75 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
 # =============================================================================
 # Mostra o menu de VIAGEM (o "Ver Mapa")
 # =============================================================================
+# Em: handlers/menu/region.py
+
 async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     chat_id = query.message.chat_id
-    # <<< CORREÇÃO 4: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id) or {} 
     current_location = player_data.get("current_location", "reino_eldora")
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
     
-    possible_destinations = WORLD_MAP.get(current_location, [])
+    # --- LÓGICA VIP ---
+    is_vip = False
+    try:
+        is_vip = PremiumManager(player_data).is_premium()
+    except Exception:
+        pass
 
-    caption = (
-        f"𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒆𝒎 <b>{region_info.get('display_name','Desconhecido')}</b>.\n"
-        f"𝑷𝒂𝒓𝒂 𝒐𝒏𝒅𝒆 𝒅𝒆𝒔𝒆𝒋𝒂 𝒗𝒊𝒂𝒋𝒂𝒓?"
-    )
+    if is_vip:
+        # --- 👇 DEFINA A SUA ORDEM AQUI 👇 ---
+        # As regiões aparecerão nesta ordem exata no menu VIP.
+        REGION_ORDER = [
+            "reino_eldora",
+            "pradaria_inicial",
+            "floresta_sombria",
+            "campos_linho",
+            "pedreira_granito",
+            "mina_ferro",
+            "pantano_maldito",
+            "pico_grifo",
+            "forja_abandonada",
+            "picos_gelados",
+            "deserto_ancestral"
+        ]
+        # ------------------------------------
+
+        # Pega todas as regiões que existem no jogo
+        all_regions = list((game_data.REGIONS_DATA or {}).keys())
+        
+        # Ordena a lista com base na sua REGION_ORDER
+        # Se uma região não estiver na lista, ela vai para o final (999)
+        all_regions.sort(key=lambda k: REGION_ORDER.index(k) if k in REGION_ORDER else 999)
+
+        # Remove a localização atual da lista de destinos
+        possible_destinations = [r for r in all_regions if r != current_location]
+        
+        caption = (
+            f"🗺 <b>🄼🄰🄿🄰 🄼🅄🄽🄳🄸 (VIP)</b> 🗺\n"
+            f"𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒆𝒎 <b>{region_info.get('display_name','Desconhecido')}</b>.\n\n"
+            f"𝑪𝒐𝒎𝒐 𝒗𝒊𝒂𝒋𝒂𝒏𝒕𝒆 𝒅𝒆 𝒆𝒍𝒊𝒕𝒆, 𝒗𝒐𝒄𝒆̂ 𝒑𝒐𝒔𝒔𝒖𝒊 𝒂 <b>𝐏𝐞𝐝𝐫𝐚 𝐃𝐢𝐦𝐞𝐧𝐬𝐢𝐨𝐧𝐚𝐥</b>. "
+            f"𝑬𝒍𝒂 𝒑𝒆𝒓𝒎𝒊𝒕𝒆 𝒒𝒖𝒆 𝒗𝒐𝒄𝒆̂ 𝒂𝒕𝒊𝒗𝒆 𝒐𝒔 𝒑𝒐𝒓𝒕𝒂𝒊𝒔 𝒅𝒆 𝒗𝒊𝒂𝒈𝒆𝒎 𝒆𝒎 𝒒𝒖𝒂𝒍𝒒𝒖𝒆𝒓 𝒓𝒆𝒈𝒊𝒂̃𝒐,"
+            f"𝒗𝒊𝒂𝒋𝒂𝒏𝒅𝒐 𝒑𝒂𝒓𝒂 𝒒𝒖𝒂𝒍𝒒𝒖𝒆𝒓 𝒅𝒆𝒔𝒕𝒊𝒏𝒐 𝒔𝒆𝒎 𝒓𝒆𝒔𝒕𝒓𝒊𝒄̧𝒐̃𝒆𝒔!"
+        )
+    else:
+        # Jogador normal vê apenas vizinhos (como definido no WORLD_MAP)
+        possible_destinations = WORLD_MAP.get(current_location, [])
+        caption = (
+            f"𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒆𝒎 <b>{region_info.get('display_name','Desconhecido')}</b>.\n"
+            f"𝑷𝒂𝒓𝒂 𝒐𝒏𝒅𝒆 𝒅𝒆𝒔𝒆𝒋𝒂 𝒗𝒊𝒂𝒋𝒂𝒓?"
+        )
+    # ------------------
 
     keyboard = []
     for dest_key in possible_destinations:
         dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
+        # Garante que não cria botões para regiões que não existem no REGIONS_DATA
+        if not dest_info: continue
+        
         button = InlineKeyboardButton(
             f"{dest_info.get('emoji', '')} {dest_info.get('display_name', dest_key)}",
             callback_data=f"region_{dest_key}",
@@ -155,7 +216,6 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML"
     )
-
 
 async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -256,12 +316,15 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     except BadRequest:
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
-async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None):
+async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     """
     Envia a mensagem com a mídia e os botões da região especificada.
+    (VERSÃO ATUALIZADA COM BOTÕES DE AUTO-HUNT)
     """
     print(">>> RASTREAMENTO: Entrou em send_region_menu")
-    player_data = await player_manager.get_player_data(user_id) or {}
+    
+    if player_data is None:
+        player_data = await player_manager.get_player_data(user_id) or {}
     
     final_region_key = region_key or player_data.get("current_location", "reino_eldora")
     player_data['current_location'] = final_region_key
@@ -270,20 +333,12 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
     if not region_info or final_region_key == "reino_eldora":
         if show_kingdom_menu:
-            # Tenta criar um objeto 'Update' simulado
             try:
-                # Objeto Usuário simulado
                 user_obj = type("User", (), {"id": user_id})()
-                # Objeto Chat simulado
                 chat_obj = type("Chat", (), {"id": chat_id})()
-                # Objeto Mensagem simulado
                 msg_obj = type("Message", (), {"from_user": user_obj, "chat": chat_obj})()
-                # Objeto Update simulado
                 fake_update = Update(update_id=0, message=msg_obj)
-                
-                # Passa os player_data já carregados para evitar recarregar
                 await show_kingdom_menu(fake_update, context, player_data=player_data)
-                
             except Exception as e_fake:
                 logger.error(f"Falha ao criar fake_update para show_kingdom_menu: {e_fake}")
                 await context.bot.send_message(chat_id=chat_id, text="Você está no Reino de Eldora.", parse_mode="HTML")
@@ -296,7 +351,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
     boss_location = world_boss_manager.boss_location
 
     if is_boss_active and final_region_key == boss_location:
-        # Se o boss está ativo NESTA região, mostra o menu especial
+        
         caption = (
             f"‼️ **PERIGO IMINENTE** ‼️\n\n"
             f"O **Demônio Dimensional** está nesta região!\n\n"
@@ -306,7 +361,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             [InlineKeyboardButton("⚔️ ATACAR O DEMÔNIO ⚔️", callback_data='wb_attack')],
             [InlineKeyboardButton("👤 Personagem", callback_data='profile')],
             [InlineKeyboardButton("🗺️ Ver Mapa", callback_data='travel')],
-
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         file_data = media_ids.get_file_data(BOSS_STATS.get("media_key"))
@@ -317,16 +371,15 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         # --- SENÃO, mostra o menu normal da região ---
         premium = PremiumManager(player_data)
         
-        # <<< CORREÇÃO APLICADA AQUI >>>
         total_stats = await player_manager.get_player_total_stats(player_data)
         
         current_hp = int(player_data.get("current_hp", 0))
-        max_hp = int(total_stats.get("max_hp", 0)) # <-- Agora funciona!
+        max_hp = int(total_stats.get("max_hp", 0)) 
         current_energy = int(player_data.get("energy", 0))
         max_energy = int(player_manager.get_player_max_energy(player_data))
         status_footer = (
             f"\n\n═════════════ ◆◈◆ ══════════════\n"
-            f"❤️ HP: {current_hp}/{max_hp}      "
+            f"❤️ HP: {current_hp}/{max_hp} "
             f"⚡️ Energia: {current_energy}/{max_energy}"
         )
         caption = (
@@ -336,30 +389,45 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
         keyboard = []
 
-        # --- NOVO: Botão do NPC Alquimista ---
+        # --- Botão do NPC Alquimista ---
         if final_region_key == 'floresta_sombria':
             keyboard.append([InlineKeyboardButton("⛺ Visitar Tenda do Alquimista", callback_data='npc_trade:alquimista_floresta')])
         
-        keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstros", callback_data=f"hunt_{final_region_key}")])
+        # --- BOTÃO DE CAÇA MANUAL ---
+        keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstro ", callback_data=f"hunt_{final_region_key}")])
 
+        
+        # <<< [ESTA É A NOVA SEÇÃO] >>>
+        # --- BOTÕES DE CAÇA AUTOMÁTICA (PREMIUM) ---
+        if premium.is_premium():
+            keyboard.append([
+                InlineKeyboardButton("⏱ 10x", callback_data=f"autohunt_start_10_{final_region_key}"),
+                InlineKeyboardButton("⏱ 25x", callback_data=f"autohunt_start_25_{final_region_key}"),
+                InlineKeyboardButton("⏱ 35x", callback_data=f"autohunt_start_35_{final_region_key}"),
+            ])
+
+
+        # --- Botão do Calabouço ---
         if build_region_dungeon_button:
             try:
                 dungeon_button = build_region_dungeon_button(final_region_key)
                 if dungeon_button:
                         keyboard.append([dungeon_button])
-                else:
-                    keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
+                else: # Fallback se a função não retornar um botão (ex: sem dungeon na região)
+                    pass # Não adiciona o botão
             except Exception:
-                keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
+                pass # Não adiciona o botão
         else:
-            keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
+             # Fallback se a função 'build_region_dungeon_button' não existir
+             if get_dungeon_for_region(final_region_key):
+                keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
 
-
+        # --- Botões de Menu Padrão ---
         keyboard.append([InlineKeyboardButton("👤 Personagem", callback_data="profile")])
         keyboard.append([InlineKeyboardButton("📜 Restaurar Durabilidade", callback_data="restore_durability_menu")])
         keyboard.append([InlineKeyboardButton("ℹ️ Sobre a Região", callback_data=f"region_info:{final_region_key}")])
         
-        # (O resto da lógica do botão de coleta está correta)
+        # --- Botão de Coleta ---
         resource_id = region_info.get("resource")
         if resource_id:
             required_profession = game_data.get_profession_for_resource(resource_id)
@@ -402,7 +470,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
     except Exception as e:
         logger.warning(f"Falha ao enviar menu da região '{final_region_key}'. Erro: {e}. Usando fallback de texto.")
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
-    
+
     # =============================================================================
 # Validação da viagem e início do cronômetro
 # =============================================================================
@@ -413,56 +481,61 @@ def _is_neighbor(world_map: dict, cur: str, dest: str) -> bool:
     neighbors_of_current_location = (world_map or {}).get(cur, [])
     return dest in neighbors_of_current_location
 
-# Em handlers/menu/region.py
+
 
 async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback 'region_<id>': valida e inicia a viagem temporizada."""
     q = update.callback_query
     await q.answer()
+
     user_id = q.from_user.id
     chat_id = q.message.chat_id
+
+    await _auto_finalize_travel_if_due(context, user_id)
+
     data = (q.data or "")
     if not data.startswith("region_"):
         await q.answer("Destino inválido.", show_alert=True)
         return
-    dest_key = (q.data or "").replace("region_", "", 1)
-    player = await player_manager.get_player_data(user_id) or {} 
+    dest_key = data.replace("region_", "", 1)
+
+    player = await player_manager.get_player_data(user_id) or {}
     cur = player.get("current_location", "reino_eldora")
 
+    # Verificações
     if dest_key not in (game_data.REGIONS_DATA or {}):
         await q.answer("Região desconhecida.", show_alert=True)
         return
+
+    # --- 👇 CORREÇÃO VIP: Ignorar verificação de vizinho se for VIP 👇 ---
+    is_vip = PremiumManager(player).is_premium()
     
-    if not _is_neighbor(WORLD_MAP, cur, dest_key):
+    # Só verifica se é vizinho se NÃO for VIP
+    if not is_vip and not _is_neighbor(WORLD_MAP, cur, dest_key):
         await q.answer("Você não pode viajar direto para lá.", show_alert=True)
         return
+    # --- 👆 FIM DA CORREÇÃO VIP 👆 ---
 
-    # Custo de energia
     travel_cost = int(((game_data.REGIONS_DATA or {}).get(dest_key, {}) or {}).get("travel_cost", 0))
     energy = int(player.get("energy", 0))
     if travel_cost > 0 and energy < travel_cost:
         await q.answer("Energia insuficiente para viajar.", show_alert=True)
         return
 
-    # 1. A chamada para a função de tempo de viagem está correta
     secs = _get_travel_time_seconds(player, dest_key)
 
-    # Debita energia
     if travel_cost > 0:
         player["energy"] = max(0, energy - travel_cost)
 
-    # 2. Lógica de teleporte instantâneo
-    if secs <= 0:
+    if secs <= 0: # Teleporte instantâneo
         player["current_location"] = dest_key
         player["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(user_id, player)
-        try:
-            await q.delete_message()
-        except Exception:
-            pass
+        try: await q.delete_message()
+        except Exception: pass
         await send_region_menu(context, user_id, chat_id)
         return
 
-    # 3. CORREÇÃO: O estado do jogador é salvo no formato padronizado
     finish_time = datetime.now(timezone.utc) + timedelta(seconds=secs)
     player["player_state"] = {
         "action": "travel",
@@ -473,11 +546,8 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     await player_manager.save_player_data(user_id, player)
 
-    # Lógica para enviar a mensagem de "viajando..."
-    try:
-        await q.delete_message()
-    except Exception:
-        pass
+    try: await q.delete_message()
+    except Exception: pass
 
     dest_disp = (game_data.REGIONS_DATA or {}).get(dest_key, {}).get("display_name", dest_key)
     human = _humanize_duration(secs)
@@ -496,14 +566,13 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await context.bot.send_message(chat_id=chat_id, text=caption, parse_mode="HTML")
 
-    # Agenda a finalização da viagem
     context.job_queue.run_once(
         finish_travel_job,
         when=secs,
         user_id=user_id,
         chat_id=chat_id,
         data={"dest": dest_key},
-        name=f"finish_travel_{user_id}",
+        name=f"finish_travel_{user_id}"
     )
 
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
@@ -673,13 +742,12 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 # Use este código para substituir a sua função show_region_menu inteira:
 
-async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None):
+async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None, player_data: dict | None = None):
     """
     Função de entrada para mostrar o menu de uma região.
     Pode receber um `region_key` explícito ou usar a localização atual do jogador.
     """
     print(">>> RASTREAMENTO: Entrou em show_region_menu (wrapper)")
-    
     query = getattr(update, "callback_query", None)
     if query:
         await query.answer()
@@ -693,31 +761,24 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, r
         user_id = update.effective_user.id
         chat_id = update.effective_chat.id
 
-    
     await _auto_finalize_travel_if_due(context, user_id) 
     try:
-        # <<< CORREÇÃO APLICADA AQUI >>>
-        # Tenta finalizar ações 'travel' ou 'exploring'
         await player_manager.try_finalize_timed_action_for_user(user_id)
     except Exception as e_finalize:
         logger.warning(f"Falha ao tentar finalizar ação em show_region_menu: {e_finalize}")
-        # Continua mesmo se falhar
-    
-    final_region_key = region_key
-    player_data = None # Reseta para garantir que carregamos
-    
-    if not final_region_key:
-        player_data = await player_manager.get_player_data(user_id)
-        final_region_key = (player_data or {}).get("current_location", "reino_eldora")
 
+    final_region_key = region_key
+   
     # Passa o player_data para o send_region_menu se já o carregamos
-    # (Embora send_region_menu também carregue, isto evita uma carga duplicada)
-    if player_data:
-        # A função send_region_menu espera o region_key explícito
-        await send_region_menu(context, user_id, chat_id, region_key=final_region_key)
-    else:
-        await send_region_menu(context, user_id, chat_id, region_key=final_region_key)
-        # =============================================================================
+    if not final_region_key:
+       if player_data is None: # Só carrega se não foi passado
+            player_data = await player_manager.get_player_data(user_id)
+            final_region_key = (player_data or {}).get("current_location", "reino_eldora")
+
+    # Agora passa o player_data (que pode ser None ou carregado)
+    await send_region_menu(context, user_id, chat_id, region_key=final_region_key, player_data=player_data)
+
+# =============================================================================
 # 👉 Menu local de RESTAURAR DURABILIDADE (somente itens equipados)
 # =============================================================================
 def _dur_tuple(raw) -> tuple[int, int]:

@@ -51,7 +51,9 @@ def _emoji_variants(s: str):
 
 async def create_new_player(user_id: int, character_name: str) -> dict:
     from .actions import utcnow  # Importação local para evitar ciclos
-    
+
+    now_iso = utcnow().isoformat() # Pega a hora atual uma vez
+
     new_player_data = {
         "character_name": character_name,
         "class": None,
@@ -66,7 +68,7 @@ async def create_new_player(user_id: int, character_name: str) -> dict:
         "stat_points": 0,
         "energy": 20,
         "max_energy": 20,
-        "energy_last_ts": utcnow().isoformat(),
+        "energy_last_ts": now_iso, # Usa a nova variável 'now_iso'
         "gold": 0,
         "gems": 0, 
         "premium_tier": None,
@@ -84,6 +86,11 @@ async def create_new_player(user_id: int, character_name: str) -> dict:
         "last_chat_id": None,
         "class_choice_offered": False,
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
+
+        # --- 👇 NOVOS CAMPOS ADICIONADOS 👇 ---
+        "created_at": now_iso, # Guarda a data de criação
+        "last_seen": now_iso,  # Guarda a última interação (agora)
+        # --- 👆 FIM DOS NOVOS CAMPOS 👆 ---
     }
     await save_player_data(user_id, new_player_data)
     return new_player_data

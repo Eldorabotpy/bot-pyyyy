@@ -22,18 +22,32 @@ def _humanize_duration(seconds: int) -> str:
 
 
 def _default_travel_seconds() -> int:
-    return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 30))
+    return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 360))
 
 
-def _get_travel_time_seconds(cur_key: str, dest_key: str, player: dict) -> int:
-    dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {}) or {}
-    base = int(dest_info.get("travel_time_seconds", _default_travel_seconds()))
+# Em: handlers/menu/region.py
+
+def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
+    """
+    Calcula o tempo de viagem. 
+    FORÇADO PARA 6 MINUTOS (360 segundos) BASE.
+    """
+    # --- VALOR BASE FIXO: 6 MINUTOS ---
+    base = 360 
     
-    premium = PremiumManager(player)
-    mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
+    # Aplica multiplicadores de perks (Premium), se houver
+    try:
+        premium = PremiumManager(player_data)
+        mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
+    except Exception:
+        mult = 1.0 # Fallback se o PremiumManager falhar
 
-    secs = max(0, int(round(base * mult)))
-    return secs
+    final_seconds = max(0, int(round(base * mult)))
+    
+    # Debug para o terminal (para você ter certeza que funcionou)
+    print(f"DEBUG VIAGEM: Base=360s, Mult={mult}, Final={final_seconds}s")
+    
+    return final_seconds
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     """
