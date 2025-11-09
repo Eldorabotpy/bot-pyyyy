@@ -452,7 +452,7 @@ async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Erro ao atualizar missão de guilda DISMANTLE para clã {clan_id}: {e_clan_dismantle}")
 
         # O 'finish_dismantle' já mexeu no 'player_data', agora só salvamos.
-        await player_manager.save_player_data(user_id, player_data)
+        #await player_manager.save_player_data(user_id, player_data)
 
     # Mensagem de Sucesso
     caption_lines = [f"♻️ <b>{item_name}</b> foi desmontado com sucesso!", "\nVocê recuperou:"]

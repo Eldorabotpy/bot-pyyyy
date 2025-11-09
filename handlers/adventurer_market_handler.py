@@ -37,50 +37,42 @@ EVOLUTION_ITEMS: set[str] = {
     "emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria",
     "emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno",
     "emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada",
-
 }
 
-EVOL_BLOCK_MSG = (
-    "🚫 Este é um <b>item de evolução de classe</b> e não pode ser vendido no "
-    "<b>Mercado do Aventureiro</b> por ouro.\n"
-    "Use a <b>Loja de Gemas</b> (moeda premium) para negociar esse tipo de item."
-)
-SKILL_DATA: set[str] = {
-    "passive_bulwark", "active_whirlwind", "active_holy_blessing", "passive_unstoppable",
-    "active_unbreakable_charge", "passive_last_stand", "passive_animal_companion",
-    "active_deadeye_shot", "passive_apex_predator", "active_iron_skin",
-    "passive_elemental_strikes", "active_transcendence", "active_curse_of_weakness", 
-    "passive_elemental_attunement", "active_meteor_swarm", "active_song_of_valor",
-    "active_dissonant_melody", "passive_symphony_of_power", "active_shadow_strike", 
-    "passive_potent_toxins", "active_dance_of_a_thousand_cuts", "passive_iai_stance",
-    "active_parry_and_riposte", "active_banner_of_command", 
-
-    "guerreiro_corte_perfurante", "berserker_golpe_selvagem", "cacador_flecha_precisa",
-    "monge_rajada_de_punhos", "mago_bola_de_fogo", "bardo_melodia_restauradora",
-    "assassino_ataque_furtivo", "samurai_corte_iaijutsu",
-
+# 2. Tomos de Skill (CORRIGIDO com "tomo_")
+SKILL_BOOK_ITEMS: set[str] = {
+    "tomo_passive_bulwark", "tomo_active_whirlwind", "tomo_active_holy_blessing", "tomo_passive_unstoppable",
+    "tomo_active_unbreakable_charge", "tomo_passive_last_stand", "tomo_passive_animal_companion",
+    "tomo_active_deadeye_shot", "tomo_passive_apex_predator", "tomo_active_iron_skin",
+    "tomo_passive_elemental_strikes", "tomo_active_transcendence", "tomo_active_curse_of_weakness", 
+    "tomo_passive_elemental_attunement", "tomo_active_meteor_swarm", "tomo_active_song_of_valor",
+    "tomo_active_dissonant_melody", "tomo_passive_symphony_of_power", "tomo_active_shadow_strike", 
+    "tomo_passive_potent_toxins", "tomo_active_dance_of_a_thousand_cuts", "tomo_passive_iai_stance",
+    "tomo_active_parry_and_riposte", "tomo_active_banner_of_command", 
+    "tomo_guerreiro_corte_perfurante", "tomo_berserker_golpe_selvagem", "tomo_cacador_flecha_precisa",
+    "tomo_monge_rajada_de_punhos", "tomo_mago_bola_de_fogo", "tomo_bardo_melodia_restauradora",
+    "tomo_assassino_ataque_furtivo", "tomo_samurai_corte_iaijutsu",
 }
 
-SKILL_DATA_BLOCK_MSG = (
-    "🚫 Este é um <b>item de skill </b> e não pode ser vendido no "
-    "<b>Mercado do Aventureiro</b> por ouro.\n"
-    "Use a <b>COMERCIO DE RELIQUIAS</b> (moeda premium) para negociar esse tipo de item."
-)
-
-SKIN_CATALOG = {
-    'guerreiro_armadura_negra','guerreiro_placas_douradas',
-    'mago_traje_arcano', 'assassino_manto_espectral', 'cacador_patrulheiro_elfico',
-    'berserker_pele_urso', 'monge_quimono_dragao', 'bardo_traje_maestro',
-    'samurai_armadura_shogun', 'samurai_armadura_demoniaca', 'samurai_encarnacao_sangrenta',
-    'samurai_guardiao_celestial', 'samurai_chama_aniquiladora', 
-
+# 3. Caixas de Skin (CORRIGIDO com "caixa_")
+SKIN_BOX_ITEMS: set[str] = {
+    'caixa_guerreiro_armadura_negra', 'caixa_guerreiro_placas_douradas',
+    'caixa_mago_traje_arcano', 'caixa_assassino_manto_espectral', 'caixa_cacador_patrulheiro_elfico',
+    'caixa_berserker_pele_urso', 'caixa_monge_quimono_dragao', 'caixa_bardo_traje_maestro',
+    'caixa_samurai_armadura_shogun', 'caixa_samurai_armadura_demoniaca', 'caixa_samurai_encarnacao_sangrenta',
+    'caixa_samurai_guardiao_celestial', 'caixa_samurai_chama_aniquiladora', 
 }
 
-SKIN_CATALOG_BLOCK_MSG = (
-    "🚫 Este é um <b>item de skill </b> e não pode ser vendido no "
-    "<b>Mercado do Aventureiro</b> por ouro.\n"
-    "Use a <b>COMERCIO DE RELIKIAS</b> (moeda premium) para negociar esse tipo de item."
+# --- Lista de Bloqueio Combinada ---
+PREMIUM_BLOCK_LIST = EVOLUTION_ITEMS.union(SKILL_BOOK_ITEMS).union(SKIN_BOX_ITEMS)
+
+# --- Mensagem de Bloqueio Unificada ---
+PREMIUM_BLOCK_MSG = (
+    "🚫 Este é um item premium (Evolução, Skill ou Skin) e não pode ser vendido "
+    "no Mercado do Aventureiro (Ouro).\n\n"
+    "Use a <b>🏛️ Casa de Leilões</b> (Diamantes) para negociar este item."
 )
+
 # ==============================
 #  Utils básicos
 # ==============================
@@ -601,11 +593,11 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for uid, inst in inv.items():
         if isinstance(inst, dict):
             base_id = inst.get("base_id") or inst.get("tpl") or inst.get("id")
-            if base_id and base_id not in EVOLUTION_ITEMS:
+            if base_id and base_id not in PREMIUM_BLOCK_LIST:
                 sellable_items.append({"type": "unique", "uid": uid, "inst": inst})
     for base_id, qty in inv.items():
         if isinstance(qty, (int, float)) and int(qty) > 0:
-            if base_id not in EVOLUTION_ITEMS:
+            if base_id not in PREMIUM_BLOCK_LIST:
                 sellable_items.append({"type": "stack", "base_id": base_id, "qty": int(qty)})
 
     sellable_items.sort(key=lambda x: x.get('uid', x.get('base_id')))
@@ -938,11 +930,8 @@ async def market_pick_unique(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await q.answer("Item não encontrado.", show_alert=True); return
 
     base_id = inst.get("base_id") or inst.get("tpl") or inst.get("id")
-    if base_id in EVOLUTION_ITEMS:
-        # Usar answer com show_alert=True para mensagens de erro importantes
-        await q.answer("Itens de evolução não podem ser vendidos aqui.", show_alert=True)
-        # Considerar retornar ao menu anterior em vez de só dar answer
-        # await market_sell(update, context) # Exemplo: recarrega a lista
+    if base_id in PREMIUM_BLOCK_LIST:
+        await q.answer(PREMIUM_BLOCK_MSG, show_alert=True, parse_mode="HTML")
         return
 
     context.user_data["market_pending"] = {"type": "unique", "uid": uid, "item": inst}
@@ -974,8 +963,8 @@ async def market_pick_stack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     base_id = q.data.replace("market_pick_stack_", "")
 
-    if base_id in EVOLUTION_ITEMS:
-        await q.answer("Itens de evolução não podem ser vendidos aqui.", show_alert=True)
+    if base_id in PREMIUM_BLOCK_LIST:
+        await q.answer(PREMIUM_BLOCK_MSG, show_alert=True, parse_mode="HTML")
         return
 
     pdata = await player_manager.get_player_data(user_id)
@@ -1099,9 +1088,8 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         
         if pending["type"] == "unique":
             base_id = (pending["item"] or {}).get("base_id")
-            if base_id in EVOLUTION_ITEMS:
-                await context.bot.send_message(chat_id=chat_id, text=EVOL_BLOCK_MSG, parse_mode="HTML")
-                # Devolve o item
+            if base_id in PREMIUM_BLOCK_LIST:
+                await context.bot.send_message(chat_id=chat_id, text=PREMIUM_BLOCK_MSG, parse_mode="HTML")
                 inv = pdata.get("inventory", {}) or {}
                 uid = pending["uid"]
                 new_uid = uid if uid not in inv else f"{uid}_back_evol"
@@ -1126,8 +1114,8 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         
         else: # type == "stack"
             base_id = pending["base_id"]
-            if base_id in EVOLUTION_ITEMS:
-                await context.bot.send_message(chat_id=chat_id, text=EVOL_BLOCK_MSG, parse_mode="HTML")
+            if base_id in PREMIUM_BLOCK_LIST:
+                await context.bot.send_message(chat_id=chat_id, text=PREMIUM_BLOCK_MSG, parse_mode="HTML")
                 context.user_data.pop("market_pending", None)
                 context.user_data.pop("market_price", None)
                 context.user_data.pop("market_lote_qty", None)
