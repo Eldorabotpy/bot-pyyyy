@@ -433,6 +433,8 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await context.bot.send_message(chat_id=chat_id, text=inventory_text, reply_markup=reply_markup, parse_mode="HTML")
 
+# Em: handlers/inventory_handler.py
+
 async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     (ATUALIZADO) Processa o clique no botão [Usar] do inventário.
@@ -457,12 +459,7 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item_info = _info_for(item_id) # Pega info do game_data
     item_name = item_info.get("display_name", item_id)
     
-    # --- (NOVO) Pega a classe do jogador ---
     player_class_key = (player_data.get("class_key") or "").lower()
-    if not player_class_key:
-        # Permite o uso se o jogador ainda não escolheu a classe (ex: poções)
-        # Mas as verificações de grant_skill/skin vão falhar se a classe for necessária
-        pass 
 
     effects_data = item_info.get("effects", {}) or {}
     on_use_data = item_info.get("on_use", {}) or {}
@@ -492,7 +489,7 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     skin_id = effect_data_to_use.get("skin_id")
     
     try:
-        # --- Lógica de SKILL (ATUALIZADA) ---
+        # --- Lógica de SKILL ---
         if effect == "grant_skill" and skill_id:
             skill_info = skills_data.SKILL_DATA.get(skill_id, {})
             allowed_classes = skill_info.get("allowed_classes", [])
@@ -513,10 +510,10 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     feedback_msg = "Você já conhece esta habilidade."
                     player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
 
-        # --- Lógica de SKIN (ATUALIZADA) ---
+        # --- Lógica de SKIN ---
         elif effect == "grant_skin" and skin_id:
             skin_info = SKIN_CATALOG.get(skin_id, {})
-            allowed_class = skin_info.get("class") # ex: 'guerreiro'
+            allowed_class = skin_info.get("class") 
 
             if not player_class_key:
                 feedback_msg = "🚫 Você precisa escolher uma classe antes de desbloquear uma aparência."
@@ -563,7 +560,11 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif 'add_xp' in effect_data_to_use:
              xp_amount = int(effect_data_to_use['add_xp'])
+             
+             # --- ESTA É A CORREÇÃO ---
              player_data['xp'] = player_data.get('xp', 0) + xp_amount
+             # --- FIM DA CORREÇÃO ---
+             
              _n, _p, level_up_msg = player_manager.check_and_apply_level_up(player_data)
              feedback_msg = f"🧠 Você ganhou {xp_amount} XP!"
              if level_up_msg: feedback_msg += f"\n\n{level_up_msg}"
@@ -592,9 +593,20 @@ inventory_handler = CallbackQueryHandler(inventory_callback, pattern=r'^inventor
 
 # No-op para o botão central
 async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.answer()
+    # --- (NOVO) Lógica de Feedback ---
+    query = update.callback_query
+    try:
+        # Tenta pegar a razão (ex: noop_inventory:Outra Classe)
+        reason = query.data.split(":", 1)[1]
+        if reason == "Outra Classe":
+            await query.answer("🚫 Você não pode usar este item (outra classe).", show_alert=True)
+        else:
+            await query.answer() # Resposta silenciosa
+    except IndexError:
+         await query.answer() # Resposta silenciosa padrão
 
-noop_inventory_handler = CallbackQueryHandler(noop_inventory, pattern=r'^noop_inventory$')
+# --- Definição do handler noop_inventory_handler ---
+noop_inventory_handler = CallbackQueryHandler(noop_inventory, pattern=r'^noop_inventory') # (Corrigido para aceitar sufixos)
 
-# --- (NOVO) Handler para o botão "Usar" ---
-use_item_handler = CallbackQueryHandler(use_item_callback, pattern=r'^inv_use_item:')    
+# --- Handler para o botão "Usar" ---
+use_item_handler = CallbackQueryHandler(use_item_callback, pattern=r'^inv_use_item:')

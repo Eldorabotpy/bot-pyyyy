@@ -1,5 +1,5 @@
 # registries/market.py
-# (VERSÃO ATUALIZADA COM FILTROS DE CLASSE)
+# (VERSÃO ATUALIZADA COM OS NOVOS HANDLERS DE FILTRO)
 
 from telegram.ext import Application
 import logging
@@ -35,14 +35,15 @@ def register_market_handlers(application: Application):
         application.add_handler(market_cancel_new_handler)
 
         # --- 2. Casa de Leilões (Gemas / Diamantes) ---
+        # (ESTE É O BLOCO CORRIGIDO)
         from handlers.gem_market_handler import (
             gem_market_main_handler,
-            gem_list_cats_handler,         # (NOVO)
-            gem_sell_cats_handler,         # (NOVO)
-            gem_list_filter_handler,       # (ATUALIZADO)
-            gem_list_class_handler,        # (ATUALIZADO)
-            gem_sell_filter_handler,       # (ATUALIZADO)
-            gem_sell_class_handler,        # (ATUALIZADO)
+            gem_list_cats_handler,         
+            gem_sell_cats_handler,         
+            gem_list_filter_handler,       
+            gem_list_class_handler,        
+            gem_sell_filter_handler,       
+            gem_sell_class_handler,        
             gem_market_pick_item_handler,
             gem_market_cancel_new_handler,
             gem_market_pack_spin_handler,
@@ -51,8 +52,8 @@ def register_market_handlers(application: Application):
             gem_market_lote_confirm_handler,
             gem_market_price_spin_handler,
             gem_market_price_confirm_handler,
-            gem_market_buy_confirm_handler,
-            gem_market_buy_execute_handler,
+            gem_market_buy_confirm_handler, # (IMPORTANTE)
+            gem_market_buy_execute_handler, # (IMPORTANTE)
             gem_market_my_handler,
             gem_market_cancel_execute_handler,
         )
@@ -74,8 +75,8 @@ def register_market_handlers(application: Application):
         application.add_handler(gem_market_lote_confirm_handler)
         application.add_handler(gem_market_price_spin_handler)
         application.add_handler(gem_market_price_confirm_handler)
-        application.add_handler(gem_market_buy_confirm_handler)
-        application.add_handler(gem_market_buy_execute_handler)
+        application.add_handler(gem_market_buy_confirm_handler) # <-- LIGA O BOTÃO "COMPRAR"
+        application.add_handler(gem_market_buy_execute_handler) # <-- LIGA O BOTÃO "SIM, CONFIRMAR"
         application.add_handler(gem_market_my_handler)
         application.add_handler(gem_market_cancel_execute_handler)
 

@@ -8,38 +8,27 @@ from typing import Optional, Dict, List, Tuple
 from threading import Lock
 import logging
 
-# --- IMPORTANTE: Helpers de Jogador para Gemas ---
-# Precisamos de uma forma de ler/escrever gemas.
-# Vamos assumir que o teu player_manager ou outro módulo tem estas funções.
-# Se não tiver, teremos de as criar.
 try:
-    # Tenta importar as funções reais
-    from modules.player_manager import get_gems, spend_gems, add_gems
+    from modules.player.inventory import get_gems, spend_gems, add_gems
 except ImportError:
-    # Se não existirem, cria funções "fallback" para usar pdata["gems"]
-    logging.warning("[GemMarket] Funções get/spend/add_gems não encontradas no player_manager. A usar fallback (pdata['gems']).")
+    # Se nem o inventory.py for encontrado, lança um erro fatal
+    logging.error("[GemMarket] FALHA CRÍTICA: Não foi possível importar get_gems/spend_gems de modules.player.inventory.")
+    
+    # As funções de fallback (plano B) têm de estar indentadas
+    # alinhadas com o logging.error acima.
     
     def _ival(v, default=0):
         try: return int(v)
         except: return default
 
-    def get_gems(pdata: dict) -> int:
-        return _ival(pdata.get("gems"), 0)
+    def get_gems(pdata: dict) -> int: 
+        raise ImportError("get_gems não carregado")
 
-    def spend_gems(pdata: dict, amount: int) -> bool:
-        gems = get_gems(pdata)
-        amount = _ival(amount)
-        if gems < amount:
-            return False
-        pdata["gems"] = gems - amount
-        return True
+    def spend_gems(pdata: dict, amount: int) -> bool: 
+        raise ImportError("spend_gems não carregado")
 
-    def add_gems(pdata: dict, amount: int):
-        gems = get_gems(pdata)
-        amount = _ival(amount)
-        pdata["gems"] = gems + amount
-
-# --- Configuração do Gestor ---
+    def add_gems(pdata: dict, amount: int): 
+        raise ImportError("add_gems não carregado")
 
 log = logging.getLogger(__name__)
 
@@ -216,6 +205,8 @@ def cancel_listing(*, seller_id: int, listing_id: int) -> dict:
     log.info(f"[GemMarket] Listagem {listing_id} cancelada pelo vendedor {seller_id}.")
     return listing
 
+# Em: modules/gem_market_manager.py
+
 def purchase_listing(
     *,
     buyer_pdata: dict, # pdata completo do comprador
@@ -236,18 +227,16 @@ def purchase_listing(
     data = _load()
     idx = None
     listing = None
+    # ... (o loop for continua igual) ...
     for i, l in enumerate(data["listings"]):
         if l["id"] == int(listing_id):
             idx = i
             listing = l
             break
 
-    if listing is None:
-        raise ListingNotFound("Anúncio não encontrado.")
-    if not listing.get("active"):
-        raise ListingInactive("Anúncio inativo.")
-    if int(listing["seller_id"]) == int(buyer_id):
-        raise InvalidPurchase("Não é possível comprar o próprio anúncio.")
+    if listing is None: raise ListingNotFound("Anúncio não encontrado.")
+    if not listing.get("active"): raise ListingInactive("Anúncio inativo.")
+    if int(listing["seller_id"]) == int(buyer_id): raise InvalidPurchase("Não é possível comprar o próprio anúncio.")
     
     available = int(listing.get("quantity", 0))
     if quantity > available:
@@ -255,10 +244,21 @@ def purchase_listing(
 
     total_price_gems = int(listing["unit_price_gems"]) * int(quantity)
 
+    # --- (NOVOS) LOGS DE DEBUG ---
+    # Vamos verificar o que o 'get_gems' (importado) está a ver
+    current_gems_do_comprador = get_gems(buyer_pdata)
+    print("\n--- DEBUG COMPRA DE GEMAS ---")
+    print(f"[GemMarket] Comprador {buyer_id} a tentar comprar.")
+    print(f"[GemMarket] Saldo de Gemas Lido (por get_gems): {current_gems_do_comprador}")
+    print(f"[GemMarket] Preço Total do Item: {total_price_gems}")
+    print("-----------------------------\n")
+    # --- FIM DOS LOGS DE DEBUG ---
+
     # 1. Tenta gastar as gemas do comprador
     if not spend_gems(buyer_pdata, total_price_gems):
         raise InsufficientGems(f"Gemas insuficientes. Você precisa de {total_price_gems} 💎.")
     
+ 
     # 2. Adiciona as gemas ao vendedor (pode ter uma taxa no futuro)
     add_gems(seller_pdata, total_price_gems)
     
