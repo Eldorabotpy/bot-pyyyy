@@ -334,7 +334,12 @@ async def show_buy_class_picker(update: Update, context: ContextTypes.DEFAULT_TY
     kb = _build_class_picker_keyboard(callback_prefix, back_callback="gem_list_cats")
     await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
 
+# Em: handlers/gem_market_handler.py
+
+# Em: handlers/gem_market_handler.py
+
 async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """(ATUALIZADO) Mostra as listagens de Compra, filtradas por categoria E classe."""
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
@@ -401,9 +406,12 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
     for l in items_on_page:
         lines.append(_render_listing_line(l))
         if int(l.get("seller_id", 0)) != user_id:
-            # (NOVO) O callback de "Comprar" agora guarda o filtro atual para o botão "Voltar"
+            # --- (CORREÇÃO AQUI) ---
+            # O formato agora é: gem_buy_confirm:<TIPO>:<CLASSE>:<PAGINA>:<ID_LISTAGEM>
+            # (Substituímos o "_" por um ":" antes do ID da listagem)
             back_cb_data = f":{item_type_filter}:{class_key_filter}:{page}"
-            kb_rows.append([InlineKeyboardButton(f"Comprar [#{l['id']}]", callback_data=f"gem_buy_confirm{back_cb_data}_{l['id']}")])
+            kb_rows.append([InlineKeyboardButton(f"Comprar [#{l['id']}]", callback_data=f"gem_buy_confirm{back_cb_data}:{l['id']}")])
+            # --- Fim da Correção ---
 
     nav_buttons = []
     back_cb = f"gem_list_filter:{item_type_filter}"
@@ -419,7 +427,6 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
         
     kb_rows.append(nav_buttons)
     await _safe_edit_or_send(q, context, chat_id, "\n".join(lines), InlineKeyboardMarkup(kb_rows))
-
 
 # ==============================
 #  SPINNERS E FUNÇÕES DE FINALIZAÇÃO
@@ -750,28 +757,32 @@ def _render_listing_line(listing: dict) -> str:
     
     return f"• {label} (x{pack_qty}) — <b>💎 {price}</b> (Lotes: {lotes}) [#{lid}]"
 
+# Em: handlers/gem_market_handler.py
+
 async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     chat_id = update.effective_chat.id
     
-    # --- (ATUALIZADO) Preserva o filtro para o botão "Voltar" ---
+    # --- (LÓGICA DE LEITURA CORRIGIDA) ---
     try:
-        # Pega os dados do filtro (ex: :evo:guerreiro:1) E o ID do item (ex: _123)
-        parts = q.data.split("_", 1)
-        callback_data_prefix = parts[0] # ex: gem_buy_confirm:evo:guerreiro:1
-        lid = int(parts[1])
+        # Ex: gem_buy_confirm:skill:bardo:1:6
+        parts = q.data.split(":") 
+        lid = int(parts[-1]) # Pega o último item (o ID da listagem)
         
-        # Reconstrói o callback de "Voltar"
-        filter_parts = callback_data_prefix.replace("gem_buy_confirm:", "")
+        # Reconstrói o callback de "Voltar" (tudo menos o 'confirm' e o 'lid')
+        # parts[1:-1] == ['skill', 'bardo', '1']
+        filter_parts = ":".join(parts[1:-1]) 
+        
         if filter_parts:
-             # Ex: gem_list_class:evo:guerreiro:1
+             # Ex: gem_list_class:skill:bardo:1
             back_cb = f"gem_list_class:{filter_parts}"
         else:
             back_cb = "gem_list_cats"
             
     except (IndexError, ValueError):
         await q.answer("ID ou callback inválido.", show_alert=True); return
+    # --- Fim da Correção ---
 
     listing = gem_market_manager.get_listing(lid)
     if not listing or not listing.get("active"):
@@ -787,7 +798,6 @@ async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("❌ Não, voltar", callback_data=back_cb)] # Usa o callback de voltar
     ])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
-
 
 async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -901,24 +911,23 @@ async def gem_market_cancel_execute(update: Update, context: ContextTypes.DEFAUL
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_my")]])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
 
+# Em: handlers/gem_market_handler.py (NO FINAL DO FICHEIRO)
+
 # ==============================
 #  Handlers (Exports)
 # ==============================
 
 gem_market_main_handler = CallbackQueryHandler(gem_market_main, pattern=r'^gem_market_main$')
 
-# --- (NOVOS) Handlers de Navegação (Comprar/Vender) ---
+# --- Handlers de Navegação (Comprar/Vender) ---
 gem_list_cats_handler = CallbackQueryHandler(show_buy_category_menu, pattern=r'^gem_list_cats$')
 gem_sell_cats_handler = CallbackQueryHandler(show_sell_category_menu, pattern=r'^gem_sell_cats$')
 
-# (ATUALIZADO) gem_list_filter agora lida com evo, skin, e skill
 gem_list_filter_handler = CallbackQueryHandler(show_buy_class_picker, pattern=r'^gem_list_filter:(skin|skill|evo)$')
 gem_list_class_handler = CallbackQueryHandler(show_buy_items_filtered, pattern=r'^gem_list_class:(skin|skill|evo):([a-z_]+):(\d+)$')
 
-# (ATUALIZADO) gem_sell_filter agora lida com evo, skin, e skill
 gem_sell_filter_handler = CallbackQueryHandler(show_sell_class_picker, pattern=r'^gem_sell_filter:(skin|skill|evo)$')
 gem_sell_class_handler = CallbackQueryHandler(show_sell_items_filtered, pattern=r'^gem_sell_class:(skin|skill|evo):([a-z_]+):(\d+)$')
-# --- Fim dos Handlers de Navegação ---
 
 # Venda (Picking e Spinners)
 gem_market_pick_item_handler = CallbackQueryHandler(gem_market_pick_item, pattern=r'^gem_sell_item_')
@@ -928,15 +937,15 @@ gem_market_pack_spin_handler = CallbackQueryHandler(gem_market_pack_spin, patter
 gem_market_pack_confirm_handler = CallbackQueryHandler(gem_market_pack_confirm, pattern=r'^gem_pack_confirm$')
 
 gem_market_lote_spin_handler = CallbackQueryHandler(gem_market_lote_spin, pattern=r'^gem_lote_(inc|dec)_[0-9]+$')
-gem_market_lote_confirm_handler = CallbackQueryHandler(gem_market_lote_confirm, pattern=r'^gem_lote_confirm$')
+gem_market_lote_confirm_handler = CallbackQueryHandler(gem_market_lote_confirm, pattern=r'^mkt_lote_confirm$') # <--- CORRIGIDO (era gem_lote_confirm)
 
 gem_market_price_spin_handler = CallbackQueryHandler(gem_market_price_spin, pattern=r'^gem_p_(inc|dec)_[0-9]+$')
 gem_market_price_confirm_handler = CallbackQueryHandler(gem_market_price_confirm, pattern=r'^gem_p_confirm$')
 
 # Compra
-gem_market_buy_confirm_handler = CallbackQueryHandler(gem_market_buy_confirm, pattern=r'^gem_buy_confirm_')
-gem_market_buy_execute_handler = CallbackQueryHandler(gem_market_buy_execute, pattern=r'^gem_buy_execute_')
+gem_market_buy_confirm_handler = CallbackQueryHandler(gem_market_buy_confirm, pattern=r'^gem_buy_confirm:.*:(\d+)$')
+gem_market_buy_execute_handler = CallbackQueryHandler(gem_market_buy_execute, pattern=r'^gem_buy_execute_(\d+)$')
 
 # Minhas Listagens
 gem_market_my_handler = CallbackQueryHandler(gem_market_my, pattern=r'^gem_market_my$')
-gem_market_cancel_execute_handler = CallbackQueryHandler(gem_market_cancel_execute, pattern=r'^gem_cancel_')
+gem_market_cancel_execute_handler = CallbackQueryHandler(gem_market_cancel_execute, pattern=r'^gem_cancel_(\d+)$')
