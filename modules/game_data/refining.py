@@ -106,7 +106,7 @@ REFINING_RECIPES = {
     "ref_nucleo_energia": {
         "display_name": "🌑🪨 Ativação de Núcleo de Golem",
         "profession": ["curtidor", "ferreiro", "armeiro", "alfaiate", "joalheiro", "fundidor"],
-        "level_req": 22,
+        "level_req": 12,
         "time_seconds": 40 * 60,
         "inputs": {"nucleo_de_golem": 1, "pedra_vulcanica": 10},
         "outputs": {"nucleo_de_energia_instavel": 1},
