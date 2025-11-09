@@ -137,7 +137,7 @@ REFINING_RECIPES = {
     "ref_essencia_fungica": {
         "display_name": "🍄 Cultivo de Esporos",
         "profession": ["curtidor", "ferreiro", "armeiro", "alfaiate", "joalheiro", "fundidor"],
-        "level_req": 4,
+        "level_req": 3,
         "time_seconds": 12 * 60,
         "inputs": {"esporo_de_cogumelo": 10},
         "outputs": {"essencia_fungica": 1},
