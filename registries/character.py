@@ -14,20 +14,21 @@ from handlers.status_handler import (
     status_command_handler,
     status_open_handler,
     status_callback_handler,
-    close_status_handler,       # <-- ADICIONADO (estava em falta)
+    close_status_handler,
 )
 from handlers.profile_handler import (
     profile_handler,
-    character_command_handler,  # <-- ADICIONADO (O FIX DO ERRO)
-    skills_menu_handler,        # <-- ADICIONADO (Skills)
-    skills_equip_menu_handler,  # <-- ADICIONADO (Skills)
-    equip_skill_handler,        # <-- ADICIONADO (Skills)
-    unequip_skill_handler,      # <-- ADICIONADO (Skills)
-    noop_handler,               # <-- ADICIONADO (Skills)
+    character_command_handler,
+    skills_menu_handler,
+    skills_equip_menu_handler,
+    equip_skill_handler,
+    unequip_skill_handler,
+    noop_handler,
 )
 from handlers.inventory_handler import (
     inventory_handler,
     noop_inventory_handler,
+    use_item_handler,  # <-- (NOVO) Importa o handler "Usar Item"
 )
 
 from handlers.skin_handler import all_skin_handlers
@@ -70,13 +71,14 @@ def register_character_handlers(application: Application):
         status_command_handler,
         status_open_handler,
         status_callback_handler,
-        close_status_handler,       # <-- ADICIONADO
+        close_status_handler,
         
         profile_handler,
-        character_command_handler,  # <-- ADICIONADO
+        character_command_handler,
         
         inventory_handler,
         noop_inventory_handler,
+        use_item_handler,  # <-- (NOVO) Regista o handler "Usar Item"
         
         # Handlers de Skills (Nova secção)
         skills_menu_handler,

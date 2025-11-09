@@ -70,3 +70,4 @@ def register_all_handlers(application: Application):
     application.add_handlers(all_potion_handlers)
     
     logging.info("Todos os handlers foram registrados com sucesso.")
+    
