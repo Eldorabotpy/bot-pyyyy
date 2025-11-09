@@ -1,4 +1,5 @@
 # registries/market.py
+# (VERSÃO ATUALIZADA COM FILTROS DE CLASSE)
 
 from telegram.ext import Application
 import logging
@@ -36,8 +37,12 @@ def register_market_handlers(application: Application):
         # --- 2. Casa de Leilões (Gemas / Diamantes) ---
         from handlers.gem_market_handler import (
             gem_market_main_handler,
-            gem_market_list_handler,
-            gem_market_sell_handler,
+            gem_list_cats_handler,         # (NOVO)
+            gem_sell_cats_handler,         # (NOVO)
+            gem_list_filter_handler,       # (ATUALIZADO)
+            gem_list_class_handler,        # (ATUALIZADO)
+            gem_sell_filter_handler,       # (ATUALIZADO)
+            gem_sell_class_handler,        # (ATUALIZADO)
             gem_market_pick_item_handler,
             gem_market_cancel_new_handler,
             gem_market_pack_spin_handler,
@@ -53,8 +58,14 @@ def register_market_handlers(application: Application):
         )
         
         application.add_handler(gem_market_main_handler)
-        application.add_handler(gem_market_list_handler)
-        application.add_handler(gem_market_sell_handler)
+        # (Handlers de Navegação)
+        application.add_handler(gem_list_cats_handler)
+        application.add_handler(gem_sell_cats_handler)
+        application.add_handler(gem_list_filter_handler)
+        application.add_handler(gem_list_class_handler)
+        application.add_handler(gem_sell_filter_handler)
+        application.add_handler(gem_sell_class_handler)
+        # (Handlers de Ação)
         application.add_handler(gem_market_pick_item_handler)
         application.add_handler(gem_market_cancel_new_handler)
         application.add_handler(gem_market_pack_spin_handler)

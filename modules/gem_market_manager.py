@@ -96,32 +96,30 @@ def _save(data: Dict):
 # =========================
 # Validações
 # =========================
+# Em: modules/gem_market_manager.py
+
 def _validate_item_payload(item_payload: dict):
     """
-    Valida o 'item' que está a ser vendido.
-    Pode ser 'skill', 'skin', ou 'evo_item'.
+    (CORRIGIDO) Valida o 'item' que está a ser vendido.
+    Agora, todos os tipos (skill, skin, evo_item) são tratados como ITENS
+    e precisam de um 'base_id' e 'qty' (quantidade por lote).
     """
     if not isinstance(item_payload, dict):
         raise InvalidListing("item_payload inválido.")
 
     t = item_payload.get("type")
     if t not in ("skill", "skin", "evo_item"):
-        raise InvalidListing("item_payload.type deve ser 'skill', 'skin', ou 'evo_item'.")
+        raise InvalidListing(f"Tipo de item inválido para o Mercado de Gemas: {t}")
 
-    if t == "skill":
-        if not item_payload.get("skill_id"):
-            raise InvalidListing("skill.skill_id obrigatório.")
+    # --- ESTA É A CORREÇÃO ---
+    # Todos os três tipos são ITENS e devem ter um 'base_id' (o ID do item)
+    if not item_payload.get("base_id") or not isinstance(item_payload.get("base_id"), str):
+        raise InvalidListing(f"Payload do item (tipo {t}) não contém um 'base_id' válido.")
     
-    elif t == "skin":
-        if not item_payload.get("skin_id"):
-            raise InvalidListing("skin.skin_id obrigatório.")
-    
-    elif t == "evo_item":
-        if not item_payload.get("base_id"):
-            raise InvalidListing("evo_item.base_id obrigatório.")
-        qty = item_payload.get("qty")
-        if not isinstance(qty, int) or qty <= 0:
-            raise InvalidListing("evo_item.qty deve ser inteiro > 0.")
+    # Todos os três tipos devem definir a 'qty' (quantidade por lote)
+    qty = item_payload.get("qty")
+    if not isinstance(qty, int) or qty <= 0:
+        raise InvalidListing(f"Payload do item (tipo {t}) não contém uma 'qty' (quantidade por lote) válida.")
 
 def _validate_price_qty(unit_price: int, quantity: int):
     if not isinstance(unit_price, int) or unit_price <= 0 or unit_price > MAX_GEM_PRICE:

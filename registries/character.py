@@ -30,7 +30,12 @@ from handlers.inventory_handler import (
     noop_inventory_handler,
     use_item_handler,  # <-- (NOVO) Importa o handler "Usar Item"
 )
-
+from handlers.converter_handler import (
+    converter_main_handler,
+    converter_list_handler,
+    converter_confirm_handler,
+    converter_execute_handler,
+)
 from handlers.skin_handler import all_skin_handlers
 
 # 3. Do painel de equipamentos
@@ -86,6 +91,12 @@ def register_character_handlers(application: Application):
         equip_skill_handler,
         unequip_skill_handler,
         noop_handler,
+        
+        # (NOVO) Handlers do Conversor
+        converter_main_handler,
+        converter_list_handler,
+        converter_confirm_handler,
+        converter_execute_handler,
         
         # Equipamentos
         equipment_menu_handler,

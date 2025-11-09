@@ -1,70 +1,79 @@
 # handlers/gem_market_handler.py
-# (VERSÃO ATUALIZADA - Pronta para Skills e Skins como ITENS)
-
-# Em: handlers/gem_market_handler.py
-# (Cola isto no topo do ficheiro)
+# (VERSÃO 4.1 - CORREÇÃO DE IMPORTS)
 
 import logging
+import math  # <<< 1. CORREÇÃO: "math" importado
 from typing import List, Dict
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 # --- Nossos Módulos ---
-from modules import player_manager, game_data, file_id_manager
+# <<< 2. CORREÇÃO: 'file_id_manager' mudado para 'file_ids' >>>
+from modules import player_manager, game_data, file_ids
 from modules import gem_market_manager # O "Backend"
-from handlers.admin.utils import ADMIN_LIST # Para Debug (opcional)
-
-# --- LISTAS DE ITENS VENDÁVEIS ---
-
-# 1. Importa a lista de Itens de Evolução
-try:
-    from handlers.adventurer_market_handler import EVOLUTION_ITEMS
-except ImportError:
-    EVOLUTION_ITEMS = {"emblema_guerreiro", "essencia_guardia", "selo_sagrado"} 
-    logging.warning("Lista EVOLUTION_ITEMS não encontrada, a usar fallback.")
-
-# 2. Lista de Tomos de Skill (Itens)
-# (Preenchida com base no teu skills.py. Confirma se os nomes são "tomo_")
-SKILL_BOOK_ITEMS: set[str] = {
-    "tomo_passive_bulwark", "tomo_active_whirlwind", "tomo_active_holy_blessing",
-    "tomo_passive_unstoppable", "tomo_active_unbreakable_charge", "tomo_passive_last_stand",
-    "tomo_passive_animal_companion", "tomo_active_deadeye_shot", "tomo_passive_apex_predator",
-    "tomo_active_iron_skin", "tomo_passive_elemental_strikes", "tomo_active_transcendence",
-    "tomo_active_curse_of_weakness", "tomo_passive_elemental_attunement", "tomo_active_meteor_swarm",
-    "tomo_active_song_of_valor", "tomo_active_dissonant_melody", "tomo_passive_symphony_of_power",
-    "tomo_active_shadow_strike", "tomo_passive_potent_toxins", "tomo_active_dance_of_a_thousand_cuts",
-    "tomo_passive_iai_stance", "tomo_active_parry_and_riposte", "tomo_active_banner_of_command",
-    "tomo_guerreiro_corte_perfurante", "tomo_berserker_golpe_selvagem",
-    "tomo_cacador_flecha_precisa", "tomo_monge_rajada_de_punhos", "tomo_mago_bola_de_fogo",
-    "tomo_bardo_melodia_restauradora", "tomo_assassino_ataque_furtivo", "tomo_samurai_corte_iaijutsu",
-}
-
-# 3. Lista de Caixas de Skin (Itens)
-# (Preenchida com base no teu skins.py. Confirma se os nomes são "caixa_")
-SKIN_BOX_ITEMS: set[str] = {
-    "caixa_guerreiro_armadura_negra",
-    "caixa_guerreiro_placas_douradas",
-    "caixa_mago_traje_arcano",
-    "caixa_assassino_manto_espectral",
-    "caixa_cacador_patrulheiro_elfico",
-    "caixa_berserker_pele_urso",
-    "caixa_monge_quimono_dragao",
-    "caixa_bardo_traje_maestro",
-    "caixa_samurai_armadura_shogun",
-    "caixa_samurai_armadura_demoniaca",
-    "caixa_samurai_encarnacao_sangrenta",
-    "caixa_samurai_guardiao_celestial",
-    "caixa_samurai_chama_aniquiladora",
-}
-
-# Combina todos os itens vendáveis por gemas
-ALL_GEM_SELLABLE_ITEMS = EVOLUTION_ITEMS.union(SKILL_BOOK_ITEMS).union(SKIN_BOX_ITEMS)
+from modules.game_data.skins import SKIN_CATALOG
+from modules.game_data import skills as skills_data
 
 logger = logging.getLogger(__name__)
 
 # ==============================
-#  Utils
+#  LISTAS DE ITENS VENDÁVEIS (DO items.py)
+# ==============================
+
+EVOLUTION_ITEMS: set[str] = {
+    "emblema_guerreiro", "essencia_guardia", "essencia_furia", "selo_sagrado", "essencia_luz",
+    "emblema_berserker", "totem_ancestral",
+    "emblema_cacador", "essencia_precisao", "marca_predador", "essencia_fera",
+    "emblema_monge", "reliquia_mistica", "essencia_ki",
+    "emblema_mago", "essencia_arcana", "essencia_elemental", "grimorio_arcano",
+    "emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria",
+    "emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno",
+    "emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada",
+}
+SKILL_BOOK_ITEMS: set[str] = {
+    "tomo_passive_bulwark", "tomo_active_whirlwind", "tomo_active_holy_blessing", "tomo_passive_unstoppable",
+    "tomo_active_unbreakable_charge", "tomo_passive_last_stand", "tomo_passive_animal_companion",
+    "tomo_active_deadeye_shot", "tomo_passive_apex_predator", "tomo_active_iron_skin",
+    "tomo_passive_elemental_strikes", "tomo_active_transcendence", "tomo_active_curse_of_weakness", 
+    "tomo_passive_elemental_attunement", "tomo_active_meteor_swarm", "tomo_active_song_of_valor",
+    "tomo_active_dissonant_melody", "tomo_passive_symphony_of_power", "tomo_active_shadow_strike", 
+    "tomo_passive_potent_toxins", "tomo_active_dance_of_a_thousand_cuts", "tomo_passive_iai_stance",
+    "tomo_active_parry_and_riposte", "tomo_active_banner_of_command", 
+    "tomo_guerreiro_corte_perfurante", "tomo_berserker_golpe_selvagem", "tomo_cacador_flecha_precisa",
+    "tomo_monge_rajada_de_punhos", "tomo_mago_bola_de_fogo", "tomo_bardo_melodia_restauradora",
+    "tomo_assassino_ataque_furtivo", "tomo_samurai_corte_iaijutsu",
+}
+SKIN_BOX_ITEMS: set[str] = {
+    'caixa_guerreiro_armadura_negra', 'caixa_guerreiro_placas_douradas',
+    'caixa_mago_traje_arcano', 'caixa_assassino_manto_espectral', 'caixa_cacador_patrulheiro_elfico',
+    'caixa_berserker_pele_urso', 'caixa_monge_quimono_dragao', 'caixa_bardo_traje_maestro',
+    'caixa_samurai_armadura_shogun', 'caixa_samurai_armadura_demoniaca', 'caixa_samurai_encarnacao_sangrenta',
+    'caixa_samurai_guardiao_celestial', 'caixa_samurai_chama_aniquiladora', 
+}
+EVO_ITEMS_BY_CLASS_MAP = {
+    "guerreiro": {"emblema_guerreiro", "essencia_guardia", "essencia_furia", "selo_sagrado", "essencia_luz"},
+    "berserker": {"emblema_berserker", "totem_ancestral"},
+    "cacador":   {"emblema_cacador", "essencia_precisao", "marca_predador", "essencia_fera"},
+    "monge":     {"emblema_monge", "reliquia_mistica", "essencia_ki"},
+    "mago":      {"emblema_mago", "essencia_arcana", "essencia_elemental", "grimorio_arcano"},
+    "bardo":     {"emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria"},
+    "assassino": {"emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno"},
+    "samurai":   {"emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada"},
+}
+CLASSES_MAP = {
+    "guerreiro": "⚔️ Guerreiro",
+    "mago": "✨ Mago",
+    "berserker": "🪓 Berserker",
+    "cacador": "🏹 Caçador",
+    "assassino": "🗡️ Assassino",
+    "bardo": "🎵 Bardo",
+    "monge": "🧘 Monge",
+    "samurai": "🥷 Samurai",
+}
+
+# ==============================
+#  Utils (Helpers)
 # ==============================
 
 def _get_item_info(base_id: str) -> dict:
@@ -75,47 +84,31 @@ def _get_item_info(base_id: str) -> dict:
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
 def _item_label(base_id: str) -> str:
+    # <<< 3. CORREÇÃO: Trocado '_info_for' por '_get_item_info' >>>
     info = _get_item_info(base_id)
-    # Define o emoji com base no tipo
-    if base_id in SKILL_BOOK_ITEMS:
-        emoji = "📚"
-    elif base_id in SKIN_BOX_ITEMS:
-        emoji = "🎨"
-    elif base_id in EVOLUTION_ITEMS:
-        emoji = "✨"
-    else:
-        emoji = info.get("emoji", "💎") # Padrão
-        
+    if base_id in SKILL_BOOK_ITEMS: emoji = "📚"
+    elif base_id in SKIN_BOX_ITEMS: emoji = "🎨"
+    elif base_id in EVOLUTION_ITEMS: emoji = "✨"
+    else: emoji = info.get("emoji", "💎")
     name = info.get("display_name", base_id)
     return f"{emoji} {name}"
 
-# Em handlers/adventurer_market_handler.py
-
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
     try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
-        return # Sucesso
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
     except Exception as e:
-        # <<< CORREÇÃO AQUI >>>
-        if "message is not modified" in str(e).lower():
-            return # Para a execução, está tudo bem.
-        pass # Erro real (ex: era texto), tenta o próximo.
-    
+        if "message is not modified" in str(e).lower(): return
+        pass 
     try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-        return # Sucesso
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
     except Exception as e:
-        # <<< CORREÇÃO AQUI >>>
-        if "message is not modified" in str(e).lower():
-            return # Para a execução, está tudo bem.
-        pass # Erro real (ex: era media), tenta o próximo.
-    
-    # Se AMBOS falharam (ex: mensagem foi apagada), envia uma nova.
+        if "message is not modified" in str(e).lower(): return
+        pass 
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 async def _send_with_media(chat_id: int, context: ContextTypes.DEFAULT_TYPE, caption: str, kb: InlineKeyboardMarkup, media_keys: List[str]):
     for key in media_keys:
-        fd = file_id_manager.get_file_data(key)
+        fd = file_ids.get_file_data(key) # (Agora funciona por causa da Correção 2)
         if fd and fd.get("id"):
             fid, ftype = fd["id"], fd.get("type")
             try:
@@ -138,26 +131,299 @@ async def gem_market_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     text = (
-        "🏛️ <b>✨ 𝐂𝐨𝐦𝐞́𝐫𝐜𝐢𝐨 𝐝𝐞 𝐑𝐞𝐥𝐢́𝐪𝐮𝐢𝐚𝐬</b>\n\n" # Nome que escolhemos
-        "Bem-vindo ao Comercio de Relíquias! Aqui podes negociar "
-        "itens raros (Itens de Evolução, Tomos de Skill, Skins) "
+        "🏛️ <b>Casa de Leilões</b>\n\n"
+        "Bem-vindo! Aqui podes negociar itens raros (Evolução, Skills, Skins) "
         "com outros aventureiros usando <b>Diamantes</b> (💎)."
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📦 Ver Listagens (Comprar)", callback_data="gem_market_list:1")],
-        [InlineKeyboardButton("➕ Vender Item", callback_data="gem_market_sell:1")],
+        [InlineKeyboardButton("📦 Ver Listagens (Comprar)", callback_data="gem_list_cats")],
+        [InlineKeyboardButton("➕ Vender Item", callback_data="gem_sell_cats")],
         [InlineKeyboardButton("👤 Minhas Listagens", callback_data="gem_market_my")],
         [InlineKeyboardButton("⬅️ Voltar", callback_data="market")],
     ])
 
     keys = ["mercado_gemas", "img_mercado_gemas", "gem_market", "gem_shop", "casa_leiloes"]
-    try:
-        await q.delete_message()
+    try: await q.delete_message()
     except Exception: pass
     await _send_with_media(chat_id, context, text, kb, keys)
 
 # ==============================
-#  Spinner de Preço (Gemas)
+# (NOVO) Seleção de Classe (Genérico)
+# ==============================
+
+def _build_class_picker_keyboard(callback_prefix: str, back_callback: str) -> InlineKeyboardMarkup:
+    """Cria o teclado de 8 classes para compra ou venda."""
+    kb = []
+    row = []
+    for class_key, class_label in CLASSES_MAP.items():
+        row.append(InlineKeyboardButton(class_label, callback_data=f"{callback_prefix}:{class_key}:1"))
+        if len(row) == 2:
+            kb.append(row)
+            row = []
+    if row:
+        kb.append(row)
+        
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data=back_callback)])
+    return InlineKeyboardMarkup(kb)
+
+# ==============================
+#  Fluxo de Venda (Sell Flow)
+# ==============================
+
+async def show_sell_category_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra as 3 categorias de itens para VENDER."""
+    q = update.callback_query
+    await q.answer()
+    
+    text = "➕ <b>Vender Item</b>\n\nQue tipo de item premium desejas vender?"
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✨ Itens de Evolução", callback_data="gem_sell_filter:evo")],
+        [InlineKeyboardButton("📚 Tomos de Skill", callback_data="gem_sell_filter:skill")],
+        [InlineKeyboardButton("🎨 Caixas de Skin", callback_data="gem_sell_filter:skin")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")],
+    ])
+    await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
+
+async def show_sell_class_picker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """(ATUALIZADO) Mostra o seletor de classe para VENDER evo, skins ou skills."""
+    q = update.callback_query
+    await q.answer()
+    
+    try:
+        item_type = q.data.split(":")[1] # 'evo', 'skill' ou 'skin'
+    except IndexError:
+        return 
+
+    if item_type == "skill":
+        text = "📚 <b>Vender Tomos de Skill</b>\n\nDe qual classe é a skill que queres vender?"
+        callback_prefix = "gem_sell_class:skill"
+    elif item_type == "skin":
+        text = "🎨 <b>Vender Caixas de Skin</b>\n\nDe qual classe é a skin que queres vender?"
+        callback_prefix = "gem_sell_class:skin"
+    else: # evo
+        text = "✨ <b>Vender Itens de Evolução</b>\n\nPara qual classe é o item que queres vender?"
+        callback_prefix = "gem_sell_class:evo"
+        
+    kb = _build_class_picker_keyboard(callback_prefix, back_callback="gem_sell_cats")
+    await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
+
+async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """(ATUALIZADO) Mostra a lista de itens de Venda, filtrada por classe E categoria."""
+    q = update.callback_query
+    await q.answer()
+    user_id = q.from_user.id
+    chat_id = q.message.chat_id
+
+    parts = q.data.split(":")
+    
+    try:
+        item_type = parts[1] # skill, skin, evo
+        class_key = parts[2] # guerreiro, mago...
+        page = int(parts[3])
+    except (IndexError, ValueError):
+        await q.answer("Erro de callback.", show_alert=True); return
+
+    pdata = await player_manager.get_player_data(user_id) or {}
+    inv = pdata.get("inventory", {}) or {}
+
+    sellable_items = []
+    
+    for base_id, qty_have in inv.items():
+        if not (isinstance(qty_have, int) and qty_have > 0):
+            continue
+            
+        item_class_ok = False
+        
+        if item_type == "evo" and base_id in EVOLUTION_ITEMS:
+            if base_id in EVO_ITEMS_BY_CLASS_MAP.get(class_key, set()):
+                item_class_ok = True
+        
+        elif item_type == "skill" and base_id in SKILL_BOOK_ITEMS:
+            skill_id = base_id.replace("tomo_", "")
+            allowed = skills_data.SKILL_DATA.get(skill_id, {}).get("allowed_classes", [])
+            if class_key in allowed: 
+                item_class_ok = True
+        
+        elif item_type == "skin" and base_id in SKIN_BOX_ITEMS:
+            skin_id = base_id.replace("caixa_", "")
+            allowed = SKIN_CATALOG.get(skin_id, {}).get("class")
+            if class_key == allowed: 
+                item_class_ok = True
+        
+        if item_class_ok:
+            sellable_items.append({
+                "base_id": base_id, 
+                "qty_have": qty_have,
+                "label": f"{_item_label(base_id)} (x{qty_have})"
+            })
+            
+    sellable_items.sort(key=lambda x: x["label"])
+
+    ITEMS_PER_PAGE = 8
+    start_index = (page - 1) * ITEMS_PER_PAGE
+    end_index = start_index + ITEMS_PER_PAGE
+    items_for_page = sellable_items[start_index:end_index]
+    total_pages = max(1, math.ceil(len(sellable_items) / ITEMS_PER_PAGE))
+    page = min(page, total_pages)
+
+    title = f"{CLASSES_MAP.get(class_key, class_key).split(' ')[1]}"
+    caption = f"💎 <b>Vender: {title}</b> (Pág. {page}/{total_pages})\nSelecione um item para vender:\n"
+    keyboard_rows = []
+
+    if not sellable_items:
+        caption += f"\n<i>Você não possui itens de '{item_type}' para a classe '{title}' no inventário.</i>"
+    elif not items_for_page:
+        caption += "\n<i>Não há mais itens para mostrar.</i>"
+    else:
+        for item in items_for_page:
+            callback_data = f"gem_sell_item_{item['base_id']}"
+            keyboard_rows.append([InlineKeyboardButton(item["label"], callback_data=callback_data)])
+            
+    nav_buttons = []
+    back_cb = f"gem_sell_filter:{item_type}" 
+
+    if page > 1:
+        cb = f"gem_sell_class:{item_type}:{class_key}:{page-1}"
+        nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=cb))
+        
+    nav_buttons.append(InlineKeyboardButton("⬅️ Voltar", callback_data=back_cb))
+
+    if end_index < len(sellable_items):
+        cb = f"gem_sell_class:{item_type}:{class_key}:{page+1}"
+        nav_buttons.append(InlineKeyboardButton("➡️", callback_data=cb))
+        
+    keyboard_rows.append(nav_buttons)
+    await _safe_edit_or_send(q, context, chat_id, caption, InlineKeyboardMarkup(keyboard_rows))
+
+# ==============================
+#  Fluxo de Compra (Buy Flow)
+# ==============================
+
+async def show_buy_category_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    
+    text = "📦 <b>Ver Listagens</b>\n\nQue tipo de item premium procuras?"
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✨ Itens de Evolução", callback_data="gem_list_filter:evo")],
+        [InlineKeyboardButton("📚 Tomos de Skill", callback_data="gem_list_filter:skill")],
+        [InlineKeyboardButton("🎨 Caixas de Skin", callback_data="gem_list_filter:skin")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")],
+    ])
+    await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
+
+async def show_buy_class_picker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    
+    try:
+        item_type = q.data.split(":")[1] # 'evo', 'skill' ou 'skin'
+    except IndexError:
+        return
+
+    if item_type == "skill":
+        text = "📚 <b>Comprar Tomos de Skill</b>\n\nProcurando skills para qual classe?"
+        callback_prefix = "gem_list_class:skill"
+    elif item_type == "skin":
+        text = "🎨 <b>Comprar Caixas de Skin</b>\n\nProcurando skins para qual classe?"
+        callback_prefix = "gem_list_class:skin"
+    else: # evo
+        text = "✨ <b>Comprar Itens de Evolução</b>\n\nProcurando itens para qual classe?"
+        callback_prefix = "gem_list_class:evo"
+        
+    kb = _build_class_picker_keyboard(callback_prefix, back_callback="gem_list_cats")
+    await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
+
+async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    user_id = q.from_user.id
+    chat_id = q.message.chat_id
+
+    parts = q.data.split(":")
+    
+    try:
+        item_type_filter = parts[1] # evo, skill, skin
+        class_key_filter = parts[2] # guerreiro, mago...
+        page = int(parts[3])
+    except (IndexError, ValueError):
+        await q.answer("Erro de callback.", show_alert=True); return
+
+    pdata = await player_manager.get_player_data(user_id)
+    gems = player_manager.get_gems(pdata)
+
+    all_listings = gem_market_manager.list_active(page=1, page_size=500)
+
+    filtered_listings = []
+    for l in all_listings:
+        item_payload = l.get("item", {})
+        item_type = item_payload.get("type") 
+        base_id = item_payload.get("base_id")
+
+        if not base_id:
+            continue
+            
+        item_class_ok = False
+
+        if item_type_filter == "evo" and item_type == "evo_item":
+            if base_id in EVO_ITEMS_BY_CLASS_MAP.get(class_key_filter, set()):
+                item_class_ok = True
+        
+        elif item_type_filter == "skill" and item_type == "skill":
+            skill_id = base_id.replace("tomo_", "")
+            allowed = skills_data.SKILL_DATA.get(skill_id, {}).get("allowed_classes", [])
+            if class_key_filter in allowed: 
+                item_class_ok = True
+        
+        elif item_type_filter == "skin" and item_type == "skin":
+            skin_id = base_id.replace("caixa_", "")
+            allowed = SKIN_CATALOG.get(skin_id, {}).get("class")
+            if class_key_filter == allowed: 
+                item_class_ok = True
+        
+        if item_class_ok:
+            filtered_listings.append(l)
+
+    ITEMS_PER_PAGE = 10
+    start_index = (page - 1) * ITEMS_PER_PAGE
+    end_index = start_index + ITEMS_PER_PAGE
+    items_on_page = filtered_listings[start_index:end_index]
+    total_pages = max(1, math.ceil(len(filtered_listings) / ITEMS_PER_PAGE))
+    page = min(page, total_pages)
+
+    title = f"{CLASSES_MAP.get(class_key_filter, class_key_filter).split(' ')[1]}"
+    lines = [f"🏛️ <b>Listagens: {title}</b> (Pág. {page}/{total_pages})\nVocê tem <b>💎 {gems}</b>\n"]
+    kb_rows = []
+
+    if not items_on_page and page == 1:
+        lines.append(f"<i>Nenhuma listagem de '{item_type_filter}' encontrada para esta classe.</i>")
+    
+    for l in items_on_page:
+        lines.append(_render_listing_line(l))
+        if int(l.get("seller_id", 0)) != user_id:
+            # (NOVO) O callback de "Comprar" agora guarda o filtro atual para o botão "Voltar"
+            back_cb_data = f":{item_type_filter}:{class_key_filter}:{page}"
+            kb_rows.append([InlineKeyboardButton(f"Comprar [#{l['id']}]", callback_data=f"gem_buy_confirm{back_cb_data}_{l['id']}")])
+
+    nav_buttons = []
+    back_cb = f"gem_list_filter:{item_type_filter}"
+    page_cb_base = f"gem_list_class:{item_type_filter}:{class_key_filter}"
+
+    if page > 1:
+        nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"{page_cb_base}:{page - 1}"))
+    
+    nav_buttons.append(InlineKeyboardButton("⬅️ Voltar", callback_data=back_cb))
+    
+    if end_index < len(filtered_listings):
+        nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"{page_cb_base}:{page + 1}"))
+        
+    kb_rows.append(nav_buttons)
+    await _safe_edit_or_send(q, context, chat_id, "\n".join(lines), InlineKeyboardMarkup(kb_rows))
+
+
+# ==============================
+#  SPINNERS E FUNÇÕES DE FINALIZAÇÃO
+# (Sem mudanças, copiados da V3)
 # ==============================
 
 def _render_gem_price_spinner(price: int) -> InlineKeyboardMarkup:
@@ -213,10 +479,6 @@ async def gem_market_price_confirm(update, context):
     price = max(1, int(context.user_data.get("gem_market_price", 1)))
     await gem_market_finalize_listing(update, context, price)
 
-# ==============================
-#  Spinner de Quantidade (Lotes)
-# ==============================
-
 def _render_gem_lote_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
     qty = max(1, int(qty)); max_qty = max(1, int(max_qty))
     current_qty = max(1, min(int(qty), max_qty))
@@ -235,7 +497,7 @@ def _render_gem_lote_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
 
 async def _show_gem_lote_spinner(q, context, chat_id: int):
     pending = context.user_data.get("gem_market_pending")
-    if not pending or pending.get("type") != "item_stack": # Mudança de nome
+    if not pending or pending.get("type") != "item_stack":
         await gem_market_cancel_new(q, context); return
 
     qty_have = int(pending.get("qty_have", 0))
@@ -296,10 +558,6 @@ async def gem_market_lote_confirm(update, context):
     price = context.user_data["gem_market_price"]
     kb = _render_gem_price_spinner(price)
     await _safe_edit_or_send(q, context, chat_id, f"{caption_prefix} <b>💎 {price}</b>", kb)
-
-# ==============================
-#  Spinner de Tamanho (Pack Qty)
-# ==============================
 
 def _render_gem_pack_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
     qty = max(1, int(qty)); max_qty = max(1, int(max_qty))
@@ -367,64 +625,6 @@ async def gem_market_pack_confirm(update, context):
     context.user_data["gem_market_lotes"] = 1
     await _show_gem_lote_spinner(q, context, chat_id)
 
-# ==============================
-#  Fluxo de Venda (Sell Flow)
-# ==============================
-
-async def gem_market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    user_id = q.from_user.id
-    chat_id = update.effective_chat.id
-
-    try: page = int(q.data.split(':')[1])
-    except: page = 1
-    
-    pdata = await player_manager.get_player_data(user_id) or {}
-    inv = pdata.get("inventory", {}) or {}
-
-    sellable_items = []
-    
-    # (NOVO) Itera sobre o inventário e filtra pelos itens das 3 listas
-    for base_id, qty in inv.items():
-        if isinstance(qty, int) and qty > 0 and base_id in ALL_GEM_SELLABLE_ITEMS:
-            sellable_items.append({
-                "type": "item_stack", # Tipo genérico para todos
-                "base_id": base_id, 
-                "qty_have": qty,
-                "label": f"{_item_label(base_id)} (x{qty})"
-            })
-            
-    sellable_items.sort(key=lambda x: x["label"])
-
-    ITEMS_PER_PAGE = 8
-    start_index = (page - 1) * ITEMS_PER_PAGE
-    end_index = start_index + ITEMS_PER_PAGE
-    items_for_page = sellable_items[start_index:end_index]
-
-    caption = f"💎 <b>Vender Item (Gemas)</b> (Pág. {page})\nSelecione um item para vender:\n"
-    keyboard_rows = []
-
-    if not sellable_items:
-        caption = "Você não tem itens premium (Itens de Evolução, Tomos de Skill, Skins) para vender."
-    elif not items_for_page:
-        caption = "Não há mais itens para mostrar."
-    else:
-        for item in items_for_page:
-            callback_data = f"gem_sell_item_{item['base_id']}"
-            keyboard_rows.append([InlineKeyboardButton(item["label"], callback_data=callback_data)])
-            
-    nav_buttons = []
-    if page > 1:
-        nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"gem_market_sell:{page - 1}"))
-    if end_index < len(sellable_items):
-        nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"gem_market_sell:{page + 1}"))
-    if nav_buttons:
-        keyboard_rows.append(nav_buttons)
-
-    keyboard_rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")])
-    await _safe_edit_or_send(q, context, chat_id, caption, InlineKeyboardMarkup(keyboard_rows))
-
 async def gem_market_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Jogador selecionou um item (Evo, Skill ou Skin) para vender."""
     q = update.callback_query
@@ -440,14 +640,14 @@ async def gem_market_pick_item(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if qty_have <= 0:
         await q.answer("Você não tem mais esse item.", show_alert=True)
-        await gem_market_sell(update, context) # Recarrega lista
+        await gem_market_main(update, context) 
         return
 
     context.user_data["gem_market_pending"] = {
-        "type": "item_stack", # Tipo genérico
+        "type": "item_stack", 
         "base_id": base_id, 
         "qty_have": qty_have,
-        "qty": 1  # 'qty' é o "tamanho do lote", começa em 1
+        "qty": 1  
     }
     
     await _show_gem_pack_spinner(q, context, chat_id)
@@ -486,7 +686,7 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
     pack_qty = int(pending.get("qty", 1))
     lote_qty = max(1, int(context.user_data.get("gem_market_lotes", 1)))
     total_to_remove = pack_qty * lote_qty
-    item_label = _item_label(base_id) # Pega o label
+    item_label = _item_label(base_id) 
 
     if not player_manager.has_item(pdata, base_id, total_to_remove):
         await q.answer(f"Você não tem {total_to_remove}x {item_label}.", show_alert=True)
@@ -496,8 +696,7 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
     player_manager.remove_item_from_inventory(pdata, base_id, total_to_remove)
     await player_manager.save_player_data(user_id, pdata)
     
-    # Define o 'type' correto para o backend
-    item_type_for_backend = "item_stack" # Padrão
+    item_type_for_backend = "item_stack" 
     if base_id in EVOLUTION_ITEMS:
         item_type_for_backend = "evo_item"
     elif base_id in SKILL_BOOK_ITEMS:
@@ -539,12 +738,7 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
     ])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
 
-# ==============================
-#  Fluxo de Compra (Buy Flow)
-# ==============================
-
 def _render_listing_line(listing: dict) -> str:
-    """Formata uma linha de listagem para exibição."""
     item = listing.get("item", {})
     price = listing.get("unit_price_gems", 0)
     lotes = listing.get("quantity", 1)
@@ -552,61 +746,37 @@ def _render_listing_line(listing: dict) -> str:
     
     base_id = item.get("base_id")
     pack_qty = item.get("qty", 1)
-    label = _item_label(base_id) # Usa o label unificado
+    label = _item_label(base_id) 
     
     return f"• {label} (x{pack_qty}) — <b>💎 {price}</b> (Lotes: {lotes}) [#{lid}]"
-
-
-async def gem_market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    chat_id = update.effective_chat.id
-    user_id = q.from_user.id
-    
-    try: page = int(q.data.split(':')[1])
-    except: page = 1
-        
-    pdata = await player_manager.get_player_data(user_id)
-    gems = player_manager.get_gems(pdata)
-
-    listings = gem_market_manager.list_active(page=page, page_size=10)
-
-    if not listings and page == 1:
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")]])
-        await _safe_edit_or_send(q, context, chat_id, "Não há nenhuma listagem ativa no momento.", kb)
-        return
-
-    lines = [f"🏛️ <b>Listagens Ativas</b> (Pág. {page})\nVocê tem <b>💎 {gems}</b>\n"]
-    kb_rows = []
-    
-    for l in listings:
-        lines.append(_render_listing_line(l))
-        if int(l.get("seller_id", 0)) != user_id:
-            kb_rows.append([InlineKeyboardButton(f"Comprar [#{l['id']}]", callback_data=f"gem_buy_confirm_{l['id']}")])
-
-    nav_buttons = []
-    if page > 1:
-        nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"gem_market_list:{page - 1}"))
-    if len(listings) == 10: # Assume que há mais se a página estiver cheia
-        nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"gem_market_list:{page + 1}"))
-    kb_rows.append(nav_buttons)
-
-    kb_rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")])
-    await _safe_edit_or_send(q, context, chat_id, "\n".join(lines), InlineKeyboardMarkup(kb_rows))
-
 
 async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     chat_id = update.effective_chat.id
     
-    try: lid = int(q.data.replace("gem_buy_confirm_", ""))
-    except: await q.answer("ID inválido.", show_alert=True); return
+    # --- (ATUALIZADO) Preserva o filtro para o botão "Voltar" ---
+    try:
+        # Pega os dados do filtro (ex: :evo:guerreiro:1) E o ID do item (ex: _123)
+        parts = q.data.split("_", 1)
+        callback_data_prefix = parts[0] # ex: gem_buy_confirm:evo:guerreiro:1
+        lid = int(parts[1])
+        
+        # Reconstrói o callback de "Voltar"
+        filter_parts = callback_data_prefix.replace("gem_buy_confirm:", "")
+        if filter_parts:
+             # Ex: gem_list_class:evo:guerreiro:1
+            back_cb = f"gem_list_class:{filter_parts}"
+        else:
+            back_cb = "gem_list_cats"
+            
+    except (IndexError, ValueError):
+        await q.answer("ID ou callback inválido.", show_alert=True); return
 
     listing = gem_market_manager.get_listing(lid)
     if not listing or not listing.get("active"):
         await q.answer("Esta listagem não está mais disponível.", show_alert=True)
-        await gem_market_list(update, context); return
+        await gem_market_main(update, context); return
         
     line = _render_listing_line(listing)
     price = listing.get("unit_price_gems", 0)
@@ -614,7 +784,7 @@ async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_T
     text = f"Você confirma a compra de 1 lote deste item?\n\n{line}"
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(f"✅ Sim, comprar por 💎 {price}", callback_data=f"gem_buy_execute_{lid}")],
-        [InlineKeyboardButton("❌ Não, voltar", callback_data="gem_market_list:1")]
+        [InlineKeyboardButton("❌ Não, voltar", callback_data=back_cb)] # Usa o callback de voltar
     ])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
 
@@ -631,7 +801,7 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     listing = gem_market_manager.get_listing(lid)
     if not listing or not listing.get("active"):
         await q.answer("Esta listagem não está mais disponível.", show_alert=True)
-        await gem_market_list(update, context); return
+        await gem_market_main(update, context); return
         
     seller_id = listing.get("seller_id")
     if buyer_id == seller_id:
@@ -645,7 +815,7 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     try:
-        updated_listing, total_price = gem_market_manager.purchase_listing( # Removido Await
+        updated_listing, total_price = gem_market_manager.purchase_listing( 
             buyer_pdata=buyer_pdata,
             seller_pdata=seller_pdata,
             listing_id=lid,
@@ -673,12 +843,8 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     await player_manager.save_player_data(seller_id, seller_pdata)
 
     text = f"✅ Compra concluída! Você comprou 1 lote de {item_label} por 💎 {total_price}."
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar às Listagens", callback_data="gem_market_list:1")]])
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar às Categorias", callback_data="gem_list_cats")]])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
-
-# ==============================
-#  Minhas Listagens (Gemas)
-# ==============================
 
 async def gem_market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -722,7 +888,7 @@ async def gem_market_cancel_execute(update: Update, context: ContextTypes.DEFAUL
     item_payload = listing.get("item", {})
     base_id = item_payload.get("base_id")
     pack_qty = item_payload.get("qty", 1)
-    lotes_left = listing.get("quantity", 0) # Lotes que sobraram
+    lotes_left = listing.get("quantity", 0) 
     total_return = pack_qty * lotes_left
     item_label = _item_label(base_id)
     
@@ -740,14 +906,24 @@ async def gem_market_cancel_execute(update: Update, context: ContextTypes.DEFAUL
 # ==============================
 
 gem_market_main_handler = CallbackQueryHandler(gem_market_main, pattern=r'^gem_market_main$')
-gem_market_list_handler = CallbackQueryHandler(gem_market_list, pattern=r'^gem_market_list:(\d+)$')
 
-# Venda
-gem_market_sell_handler = CallbackQueryHandler(gem_market_sell, pattern=r'^gem_market_sell:(\d+)$')
+# --- (NOVOS) Handlers de Navegação (Comprar/Vender) ---
+gem_list_cats_handler = CallbackQueryHandler(show_buy_category_menu, pattern=r'^gem_list_cats$')
+gem_sell_cats_handler = CallbackQueryHandler(show_sell_category_menu, pattern=r'^gem_sell_cats$')
+
+# (ATUALIZADO) gem_list_filter agora lida com evo, skin, e skill
+gem_list_filter_handler = CallbackQueryHandler(show_buy_class_picker, pattern=r'^gem_list_filter:(skin|skill|evo)$')
+gem_list_class_handler = CallbackQueryHandler(show_buy_items_filtered, pattern=r'^gem_list_class:(skin|skill|evo):([a-z_]+):(\d+)$')
+
+# (ATUALIZADO) gem_sell_filter agora lida com evo, skin, e skill
+gem_sell_filter_handler = CallbackQueryHandler(show_sell_class_picker, pattern=r'^gem_sell_filter:(skin|skill|evo)$')
+gem_sell_class_handler = CallbackQueryHandler(show_sell_items_filtered, pattern=r'^gem_sell_class:(skin|skill|evo):([a-z_]+):(\d+)$')
+# --- Fim dos Handlers de Navegação ---
+
+# Venda (Picking e Spinners)
 gem_market_pick_item_handler = CallbackQueryHandler(gem_market_pick_item, pattern=r'^gem_sell_item_')
 gem_market_cancel_new_handler = CallbackQueryHandler(gem_market_cancel_new, pattern=r'^gem_market_cancel_new$')
 
-# Spinners de Venda (Pack, Lote, Preço)
 gem_market_pack_spin_handler = CallbackQueryHandler(gem_market_pack_spin, pattern=r'^gem_pack_(inc|dec)_[0-9]+$')
 gem_market_pack_confirm_handler = CallbackQueryHandler(gem_market_pack_confirm, pattern=r'^gem_pack_confirm$')
 
