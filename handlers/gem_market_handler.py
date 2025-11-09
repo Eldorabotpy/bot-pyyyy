@@ -131,7 +131,7 @@ async def gem_market_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     text = (
-        "🏛️ <b>Casa de Leilões</b>\n\n"
+        "🏛️ <b>𝐂𝐨𝐦𝐞́𝐫𝐜𝐢𝐨 𝐝𝐞 𝐑𝐞𝐥𝐢́𝐪𝐮𝐢𝐚𝐬 ✨</b>\n\n"
         "Bem-vindo! Aqui podes negociar itens raros (Evolução, Skills, Skins) "
         "com outros aventureiros usando <b>Diamantes</b> (💎)."
     )
