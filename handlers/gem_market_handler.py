@@ -93,17 +93,28 @@ def _item_label(base_id: str) -> str:
     name = info.get("display_name", base_id)
     return f"{emoji} {name}"
 
+# Em: handlers/gem_market_handler.py
+
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
     try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return # Sucesso
     except Exception as e:
-        if "message is not modified" in str(e).lower(): return
-        pass 
+        # --- (CORREÇÃO AQUI) ---
+        if "message is not modified" in str(e).lower():
+            return # Para a execução, está tudo bem.
+        pass # Erro real (ex: era texto), tenta o próximo.
+    
     try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        return # Sucesso
     except Exception as e:
-        if "message is not modified" in str(e).lower(): return
-        pass 
+        # --- (CORREÇÃO AQUI) ---
+        if "message is not modified" in str(e).lower():
+            return # Para a execução, está tudo bem.
+        pass # Erro real (ex: era media), tenta o próximo.
+    
+    # Se AMBOS falharam (ex: mensagem foi apagada), envia uma nova.
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 async def _send_with_media(chat_id: int, context: ContextTypes.DEFAULT_TYPE, caption: str, kb: InlineKeyboardMarkup, media_keys: List[str]):
@@ -632,6 +643,9 @@ async def gem_market_pack_confirm(update, context):
     context.user_data["gem_market_lotes"] = 1
     await _show_gem_lote_spinner(q, context, chat_id)
 
+# Em: handlers/gem_market_handler.py
+# SUBSTITUA A FUNÇÃO 'gem_market_pick_item' PELA SEGUINTE:
+
 async def gem_market_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Jogador selecionou um item (Evo, Skill ou Skin) para vender."""
     q = update.callback_query
@@ -642,12 +656,31 @@ async def gem_market_pick_item(update: Update, context: ContextTypes.DEFAULT_TYP
     base_id = q.data.replace("gem_sell_item_", "")
     
     pdata = await player_manager.get_player_data(user_id)
+    
+    # --- !!! CORREÇÃO ADICIONADA AQUI !!! ---
+    # Verifica se o pdata foi carregado ANTES de o usar.
+    if not pdata:
+        logger.warning(f"[GemMarket] Falha ao carregar pdata para {user_id} em gem_market_pick_item.")
+        await q.answer("Erro: Não foi possível carregar os seus dados. Tente novamente.", show_alert=True)
+        # Tenta enviar o utilizador de volta ao menu principal em vez de falhar silenciosamente
+        try:
+            await gem_market_main(update, context) 
+        except Exception:
+            pass # Se o menu principal também falhar, não há muito a fazer
+        return
+    # --- FIM DA CORREÇÃO ---
+
     inv = pdata.get("inventory", {}) or {}
     qty_have = int(inv.get(base_id, 0))
     
     if qty_have <= 0:
         await q.answer("Você não tem mais esse item.", show_alert=True)
-        await gem_market_main(update, context) 
+        # Se o item acabou, é melhor recarregar o menu de venda (ou principal)
+        # Vamos tentar voltar ao menu principal para evitar um menu vazio
+        try:
+            await gem_market_main(update, context) 
+        except Exception:
+            pass
         return
 
     context.user_data["gem_market_pending"] = {
@@ -657,6 +690,7 @@ async def gem_market_pick_item(update: Update, context: ContextTypes.DEFAULT_TYP
         "qty": 1  
     }
     
+    # Se tudo correu bem, AGORA sim, mostramos o spinner
     await _show_gem_pack_spinner(q, context, chat_id)
 
 async def gem_market_cancel_new(update, context):
@@ -937,7 +971,8 @@ gem_market_pack_spin_handler = CallbackQueryHandler(gem_market_pack_spin, patter
 gem_market_pack_confirm_handler = CallbackQueryHandler(gem_market_pack_confirm, pattern=r'^gem_pack_confirm$')
 
 gem_market_lote_spin_handler = CallbackQueryHandler(gem_market_lote_spin, pattern=r'^gem_lote_(inc|dec)_[0-9]+$')
-gem_market_lote_confirm_handler = CallbackQueryHandler(gem_market_lote_confirm, pattern=r'^mkt_lote_confirm$') # <--- CORRIGIDO (era gem_lote_confirm)
+# LINHA CORRETA:
+gem_market_lote_confirm_handler = CallbackQueryHandler(gem_market_lote_confirm, pattern=r'^gem_lote_confirm$') # <--- CORRIGIDO (era gem_lote_confirm)
 
 gem_market_price_spin_handler = CallbackQueryHandler(gem_market_price_spin, pattern=r'^gem_p_(inc|dec)_[0-9]+$')
 gem_market_price_confirm_handler = CallbackQueryHandler(gem_market_price_confirm, pattern=r'^gem_p_confirm$')

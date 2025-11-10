@@ -17,6 +17,7 @@ from modules import file_ids  # ✅ gerenciador de mídia (JSON)
 from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
 from modules.player import actions as player_actions # Para HP, Energia, etc.
+from modules.player import stats as player_stats
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +200,7 @@ def _guess_tab_by_key(item_key: str) -> str:
 
 def _item_tab_for(item_info: dict, item_key: str, item_value) -> str:
     raw = _extract_raw_category(item_info)
-    
+
     # Mapeamento direto
     if raw:
         mapped = ITEM_CAT_TO_TAB.get(raw)
@@ -236,7 +237,6 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
         pass
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
-# ---- Compat helpers (diamantes + cristais legados) -------------------------
 
 def _get_diamonds_amount(player_data: dict) -> int:
     for fn_name in ("get_diamonds", "get_gems"):
@@ -266,6 +266,9 @@ def _merge_legacy_crystals_view(inventory: dict, player_data: dict) -> dict:
             inv[k] = legacy_val
     return inv
 
+# Em: handlers/inventory_handler.py
+# SUBSTITUA A FUNÇÃO 'inventory_callback' INTEIRA PELA SEGUINTE:
+
 async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -285,8 +288,9 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     category_key = _sanitize_category(m.group(1))
     current_page = max(1, int(m.group(2) or 1))
 
-    # --- (NOVO) Pega a classe do jogador AQUI, para usar no filtro de botão ---
-    player_class_key = (player_data.get("class_key") or "").lower()
+    # --- (CORREÇÃO 2 - JÁ APLICADA) ---
+    player_class_key = player_stats._get_class_key_normalized(player_data)
+    # ----------------------------------
 
     raw_inventory = player_data.get("inventory", {}) or {}
     inventory = _merge_legacy_crystals_view(raw_inventory, player_data)
@@ -343,15 +347,22 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 body_text_lines.append(f"• {emoji + ' ' if emoji else ''}{item_name}: <b>{qty}</b>")
                 
                 # ======================================================
-                # --- (NOVO) LÓGICA DE BOTÃO "USAR" COM FILTRO DE CLASSE ---
+                # --- LÓGICA DE BOTÃO "USAR" (COM CORREÇÃO DE BUG) ---
                 # ======================================================
                 if category_key == "consumivel":
-                    on_use_data = item_info.get("on_use")
-                    effects_data = item_info.get("effects")
+                
+                    # --- !!! CORREÇÃO 4: LÓGICA DE LEITURA SEGURA !!! ---
+                    effects_data = item_info.get("effects", {}) or {}
+                    on_use_data = item_info.get("on_use", {}) or {}
                     
-                    if on_use_data or effects_data:
-                        effect_data_to_check = on_use_data if "effect" in on_use_data else effects_data
-                        
+                    if "effect" in on_use_data:
+                        effect_data_to_check = on_use_data
+                    else:
+                        effect_data_to_check = effects_data
+                    # --- FIM DA CORREÇÃO 4 ---
+                    
+                    # Se houver um efeito válido (em on_use ou effects)
+                    if effect_data_to_check.get("effect"):
                         can_use = True # Começa como verdadeiro
                         effect = effect_data_to_check.get("effect")
                         skill_id = effect_data_to_check.get("skill_id")
@@ -433,8 +444,6 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await context.bot.send_message(chat_id=chat_id, text=inventory_text, reply_markup=reply_markup, parse_mode="HTML")
 
-# Em: handlers/inventory_handler.py
-
 async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     (ATUALIZADO) Processa o clique no botão [Usar] do inventário.
@@ -459,7 +468,9 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item_info = _info_for(item_id) # Pega info do game_data
     item_name = item_info.get("display_name", item_id)
     
-    player_class_key = (player_data.get("class_key") or "").lower()
+    # --- !!! CORREÇÃO 3: USA A FUNÇÃO DE STATS !!! ---
+    player_class_key = player_stats._get_class_key_normalized(player_data)
+    # ------------------------------------------------
 
     effects_data = item_info.get("effects", {}) or {}
     on_use_data = item_info.get("on_use", {}) or {}
@@ -498,6 +509,7 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 feedback_msg = "🚫 Você precisa escolher uma classe antes de aprender uma habilidade."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
             elif allowed_classes and player_class_key not in allowed_classes:
+                # (A classe normalizada (ex: "mago") não está na lista (ex: ["bardo"]))
                 feedback_msg = f"🚫 Sua classe ({player_class_key.capitalize()}) não pode aprender esta habilidade."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
             else:
@@ -549,25 +561,25 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             feedback_msg = f"❤️ Você recuperou {heal_amount} HP!"
         
         elif 'add_energy' in effect_data_to_use:
-             energy_amount = int(effect_data_to_use['add_energy'])
-             player_actions.add_energy(player_data, energy_amount)
-             feedback_msg = f"⚡️ Você recuperou {energy_amount} de Energia!"
+            energy_amount = int(effect_data_to_use['add_energy'])
+            player_actions.add_energy(player_data, energy_amount)
+            feedback_msg = f"⚡️ Você recuperou {energy_amount} de Energia!"
         
         elif 'add_mana' in effect_data_to_use: 
-             mana_amount = int(effect_data_to_use['add_mana'])
-             await player_actions.add_mana(player_data, mana_amount)
-             feedback_msg = f"💙 Você recuperou {mana_amount} de Mana!"
+            mana_amount = int(effect_data_to_use['add_mana'])
+            await player_actions.add_mana(player_data, mana_amount)
+            feedback_msg = f"💙 Você recuperou {mana_amount} de Mana!"
 
         elif 'add_xp' in effect_data_to_use:
-             xp_amount = int(effect_data_to_use['add_xp'])
-             
-             # --- ESTA É A CORREÇÃO ---
-             player_data['xp'] = player_data.get('xp', 0) + xp_amount
-             # --- FIM DA CORREÇÃO ---
-             
-             _n, _p, level_up_msg = player_manager.check_and_apply_level_up(player_data)
-             feedback_msg = f"🧠 Você ganhou {xp_amount} XP!"
-             if level_up_msg: feedback_msg += f"\n\n{level_up_msg}"
+            xp_amount = int(effect_data_to_use['add_xp'])
+            
+            # --- ESTA É A CORREÇÃO ---
+            player_data['xp'] = player_data.get('xp', 0) + xp_amount
+            # --- FIM DA CORREÇÃO ---
+            
+            _n, _p, level_up_msg = player_manager.check_and_apply_level_up(player_data)
+            feedback_msg = f"🧠 Você ganhou {xp_amount} XP!"
+            if level_up_msg: feedback_msg += f"\n\n{level_up_msg}"
         
         # --- Fallback ---
         else:
@@ -603,7 +615,7 @@ async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.answer() # Resposta silenciosa
     except IndexError:
-         await query.answer() # Resposta silenciosa padrão
+        await query.answer() # Resposta silenciosa padrão
 
 # --- Definição do handler noop_inventory_handler ---
 noop_inventory_handler = CallbackQueryHandler(noop_inventory, pattern=r'^noop_inventory') # (Corrigido para aceitar sufixos)

@@ -14,10 +14,11 @@ from modules import player_manager, game_data
 from modules import file_ids
 from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
+from modules.player import stats as player_stats
 
 logger = logging.getLogger(__name__)
 
-MAX_EQUIPPED_SKILLS = 4
+MAX_EQUIPPED_SKILLS = 6
 
 # ===== util =====
 def _slugify(text: str) -> str:
@@ -124,10 +125,7 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
         return
 
-    # --- 👇 CORREÇÃO 1: Obter a classe do jogador 👇 ---
-    # Usamos .get("class_key") que é o ID (ex: 'mago', 'guerreiro')
-    player_class_key = (player_data.get("class_key") or "").lower()
-    # --- 👆 FIM DA CORREÇÃO 1 👆 ---
+    player_class_key = player_stats._get_class_key_normalized(player_data)
 
     all_skill_ids = player_data.get("skills", [])
     equipped_ids = player_data.get("equipped_skills", [])
@@ -230,9 +228,7 @@ async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Erro: Skill não encontrada nos dados do jogo.", show_alert=True)
         return
 
-    # Pega a 'class_key' (ex: 'mago')
-    player_class_key = (player_data.get("class_key") or "").lower()
-    # Pega a lista de classes permitidas da skill (ex: ['mago'])
+    player_class_key = player_stats._get_class_key_normalized(player_data)
     allowed_classes = skill_info.get("allowed_classes", [])
     
     # Se a lista NÃO estiver vazia E a classe do jogador NÃO estiver nela...
