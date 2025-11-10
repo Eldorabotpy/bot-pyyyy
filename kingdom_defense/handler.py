@@ -224,6 +224,9 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
         elif not player_state:
              await query.edit_message_caption(caption="A batalha terminou.", reply_markup=_get_game_over_keyboard())
 
+# Em: kingdom_defense/handler.py
+# SUBSTITUA a função 'show_skill_menu' por esta versão corrigida:
+
 async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -232,27 +235,39 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_data = await player_manager.get_player_data(user_id) 
     if not player_data: return
 
-    player_skill_ids = player_data.get("skills", [])
-    active_skills = [skill_id for skill_id in player_skill_ids if SKILL_DATA.get(skill_id, {}).get("type") == "active"]
+    # --- !!! CORREÇÃO APLICADA AQUI !!! ---
+    # Agora lê a lista de skills EQUIPADAS, não todas as skills aprendidas.
+    equipped_skills = player_data.get("equipped_skills", [])
+    # ------------------------------------
 
-    if not active_skills:
-        await query.answer("Você não possui habilidades ativas para usar!", show_alert=True)
+    if not equipped_skills:
+        await query.answer("Você não tem habilidades ativas EQUIPADAS!", show_alert=True)
         return
 
     keyboard, current_mana = [], player_data.get("mana", 0)
     
+    # Pega o estado da batalha para verificar cooldowns
+    player_state = event_manager.get_battle_data(user_id)
+    active_cooldowns = {}
+    if player_state:
+        # (O teu engine não parece estar a guardar cooldowns entre menus,
+        # mas se guardasse, a lógica viria aqui.)
+        pass 
+
     # -------------------------------------------------------------
-    # NOVO: Lógica para redirecionar skills de alvo único (single target)
+    # Lógica de exibição (mantida, mas agora usa 'equipped_skills')
     # -------------------------------------------------------------
-    for skill_id in active_skills:
-        skill_info = SKILL_DATA[skill_id]
+    for skill_id in equipped_skills: # <-- USA A LISTA CORRIGIDA
+        skill_info = SKILL_DATA.get(skill_id)
+        
+        # Garante que a skill existe e é ativa (filtro de segurança)
+        if not skill_info or skill_info.get("type", "unknown") not in ("active", "support_heal", "support_buff"):
+            continue 
+            
         mana_cost = skill_info.get('mana_cost', 0)
         
-        # Define se a skill precisa de seleção de alvo (aqui: se é 'support_heal' e tem 'target':'single')
-        # Precisamos de uma lógica mais robusta. No momento, assumimos que 'active_holy_blessing' é de alvo único.
-        # VAMOS USAR UM MÉTODO MAIS GERAL PARA SKILLS DE ALVO ÚNICO NO GRUPO
-        
-        is_single_target_support = skill_info.get("type") == "support_heal" and skill_info.get("target") == "single"
+        # (Simplifiquei a tua lógica de alvo, podes ajustar se tiveres mais tipos)
+        is_single_target_support = skill_info.get("type") == "support_heal" 
         
         button_text_base = f"{skill_info['display_name']} ({mana_cost} MP)"
         
@@ -278,7 +293,7 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="back_to_battle")])
     await query.edit_message_caption(caption="Escolha uma habilidade para usar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-
+    
 async def select_skill_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

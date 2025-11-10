@@ -80,7 +80,14 @@ SKILL_DATA = {
     "passive_elemental_strikes": {
         "display_name": "Golpes Elementais", "type": "passive", 
         "description": "Os seus ataques têm uma chance de causar dano elemental extra.", 
-        "effects": {"chance_on_hit": {"effect": "extra_elemental_damage", "value": 25, "chance": 0.2}},
+        "effects": {
+            "chance_on_hit": {
+                "effect": "extra_elemental_damage", 
+                "value": 25, 
+                "chance": 0.2,
+                "damage_type": "magic" # <<< --- ADICIONA ESTA LINHA (dentro do chance_on_hit)
+            }
+        },
         "allowed_classes": ["monge"]    
     },
     "active_transcendence": {
@@ -107,9 +114,13 @@ SKILL_DATA = {
     },
     "active_meteor_swarm": {
         "display_name": "Chuva de Meteoros", "type": "active", 
-        "mana_cost": 30, # <<< ADICIONADO
+        "mana_cost": 30,
         "description": "Invoca uma chuva de meteoros que atinge todos os inimigos.", 
-        "effects": {"cooldown_turns": 5},
+        "effects": {
+            "cooldown_turns": 5,
+            "damage_multiplier": 2.0, # (Recomendo adicionar isto)
+            "damage_type": "magic"    # <<< --- ADICIONA ESTA LINHA ---
+        },
         "allowed_classes": ["mago"]
     },
 
@@ -208,7 +219,11 @@ SKILL_DATA = {
     "mago_bola_de_fogo": {
         "display_name": "Bola de Fogo", "type": "active", "mana_cost": 25,
         "description": "Um feitiço de alvo único que causa alto dano de fogo.",
-        "effects": {"cooldown_turns": 0, "damage_multiplier": 2.5},
+        "effects": {
+            "cooldown_turns": 0, 
+            "damage_multiplier": 2.5,
+            "damage_type": "magic"  # <<< --- ADICIONA ESTA LINHA ---
+        },
         "allowed_classes": ["mago"]
     },
     "bardo_melodia_restauradora": {

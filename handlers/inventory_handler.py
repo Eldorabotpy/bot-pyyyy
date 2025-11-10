@@ -18,6 +18,7 @@ from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
 from modules.player import actions as player_actions # Para HP, Energia, etc.
 from modules.player import stats as player_stats
+from modules.game_data.class_evolution import can_player_use_skill
 
 logger = logging.getLogger(__name__)
 
@@ -115,159 +116,117 @@ _SPECIAL_NAME_HINTS = (
 
 def _first_category_key() -> str:
     return next(iter(CATEGORIES))
-
 def _sanitize_category(cat: str) -> str:
     cat = (cat or "").strip().lower()
     cat = CATEGORY_ALIASES.get(cat, cat)
     return cat if cat in CATEGORIES else _first_category_key()
-
 def _info_for(key: str) -> dict:
-    """Une ITEMS_DATA e ITEM_BASES (fallback)."""
-    if not key:
-        return {}
+    if not key: return {}
     data = getattr(game_data, "ITEMS_DATA", {}).get(key, {}) or {}
     base = getattr(game_data, "ITEM_BASES", {}).get(key, {}) or {}
     info = {}
     info.update(base)
     info.update(data)
     return info
-
 def _humanize_key(key: str) -> str:
-    """barra_de_ferro -> Barra de Ferro (com preposições minúsculas)."""
-    if not key:
-        return ""
+    if not key: return ""
     words = key.replace("_", " ").strip().split()
-    if not words:
-        return key
+    if not words: return key
     titled = [w.capitalize() for w in words]
     for i, w in enumerate(titled):
         if w.lower() in {"de", "da", "do", "das", "dos"} and i != 0:
             titled[i] = w.lower()
     return " ".join(titled)
-
 def _name_for_key(item_key: str) -> str:
     info = _info_for(item_key)
     return info.get("display_name") or _humanize_key(item_key)
-
 def _display_name_for_instance(uid: str, inst: dict) -> str:
     base_id = inst.get("base_id")
     if inst.get("custom_name"):
         return str(inst["custom_name"])
     info = _info_for(base_id)
     return info.get("display_name") or _humanize_key(base_id or uid)
-
 def _render_item_line_safe(inst: dict) -> str:
-    """Usa o formatter novo universal da UI de itens."""
     try:
         return display_utils.formatar_item_para_exibicao(inst)
     except Exception:
         return _display_name_for_instance("", inst)
-
 def _extract_raw_category(item_info: dict) -> str:
-    """Extrai categoria crua de vários campos comuns nos dados."""
     keys_in_order = ["category", "type", "tipo", "group", "grupo", "origin", "origem", "item_category"]
     for k in keys_in_order:
         v = (item_info.get(k) or "")
         if isinstance(v, str) and v.strip():
             return v.strip().lower()
-
     tags = item_info.get("tags") or item_info.get("etiquetas") or []
     if isinstance(tags, (list, tuple)):
         lowered = [str(t).strip().lower() for t in tags]
         for needle in ("cacada", "caça", "hunt", "hunting"):
-            if needle in lowered:
-                return "cacada"
+            if needle in lowered: return "cacada"
         for needle in ("consumivel", "consumível", "potion"):
-            if needle in lowered:
-                return "consumivel"
+            if needle in lowered: return "consumivel"
         for needle in ("material", "material_refinado", "recurso", "coletavel", "coletável"):
-            if needle in lowered:
-                return "coletavel"
+            if needle in lowered: return "coletavel"
         for needle in ("chave", "especial", "equipamento", "event_ticket"):
-            if needle in lowered:
-                return "especial"
+            if needle in lowered: return "especial"
     return ""
 
 def _guess_tab_by_key(item_key: str) -> str:
     k = (item_key or "").lower()
-    if any(h in k for h in _HUNT_NAME_HINTS):
-        return "cacada"
-    if any(h in k for h in _SPECIAL_NAME_HINTS):
-        return "especial"
-    if any(h in k for h in _COLLECT_NAME_HINTS):
-        return "coletavel"
+    if any(h in k for h in _HUNT_NAME_HINTS): return "cacada"
+    if any(h in k for h in _SPECIAL_NAME_HINTS): return "especial"
+    if any(h in k for h in _COLLECT_NAME_HINTS): return "coletavel"
     return "coletavel"  
-
 def _item_tab_for(item_info: dict, item_key: str, item_value) -> str:
     raw = _extract_raw_category(item_info)
-
-    # Mapeamento direto
     if raw:
         mapped = ITEM_CAT_TO_TAB.get(raw)
         if mapped in CATEGORIES:
             return mapped
-
-    # Heurística por nome de chave (quando não há dados)
     hint = _guess_tab_by_key(item_key)
     if hint in CATEGORIES:
         return hint
-
-    # Heurística por 'type'
     t = (item_info.get("type") or item_info.get("tipo") or "").lower()
     if t in ("material", "material_bruto", "material_refinado", "recurso", "coletavel", "coletável"):
         return "coletavel"
-
-    # Fallback final
     return "especial" if isinstance(item_value, dict) else "coletavel"
-
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
     try:
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
     except Exception as e:
-        if "message is not modified" in str(e).lower(): return # (NOVO) Ignora erro "não modificado"
+        if "message is not modified" in str(e).lower(): return 
         pass
     try:
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
     except Exception as e:
-        if "message is not modified" in str(e).lower(): return # (NOVO) Ignora erro "não modificado"
+        if "message is not modified" in str(e).lower(): return 
         pass
     try:
         await query.delete_message()
     except Exception:
         pass
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-
-
 def _get_diamonds_amount(player_data: dict) -> int:
     for fn_name in ("get_diamonds", "get_gems"):
         if hasattr(player_manager, fn_name):
             try:
                 val = getattr(player_manager, fn_name)(player_data)
                 return int(val or 0)
-            except Exception:
-                pass
+            except Exception: pass
     for k in ("diamonds", "gems", "gemas", "dimas", "diamantes"):
         try:
-            if k in player_data:
-                return int(player_data.get(k, 0) or 0)
-        except Exception:
-            continue
+            if k in player_data: return int(player_data.get(k, 0) or 0)
+        except Exception: continue
     return 0
-
 def _merge_legacy_crystals_view(inventory: dict, player_data: dict) -> dict:
     inv = dict(inventory or {})
     legacy_keys = ("cristal_de_abertura", "cristal_abertura")
     for k in legacy_keys:
         try:
             legacy_val = int(player_data.get(k, 0) or 0)
-        except Exception:
-            legacy_val = 0
+        except Exception: legacy_val = 0
         if legacy_val > 0 and k not in inv:
             inv[k] = legacy_val
     return inv
-
-# Em: handlers/inventory_handler.py
-# SUBSTITUA A FUNÇÃO 'inventory_callback' INTEIRA PELA SEGUINTE:
 
 async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -288,9 +247,10 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     category_key = _sanitize_category(m.group(1))
     current_page = max(1, int(m.group(2) or 1))
 
-    # --- (CORREÇÃO 2 - JÁ APLICADA) ---
+    # --- !!! 2. CORREÇÃO DA CLASSE !!! ---
+    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
-    # ----------------------------------
+    # --- FIM DA CORREÇÃO ---
 
     raw_inventory = player_data.get("inventory", {}) or {}
     inventory = _merge_legacy_crystals_view(raw_inventory, player_data)
@@ -347,22 +307,18 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 body_text_lines.append(f"• {emoji + ' ' if emoji else ''}{item_name}: <b>{qty}</b>")
                 
                 # ======================================================
-                # --- LÓGICA DE BOTÃO "USAR" (COM CORREÇÃO DE BUG) ---
+                # --- (LÓGICA DE BOTÃO "USAR" COM FILTRO DE CLASSE) ---
                 # ======================================================
                 if category_key == "consumivel":
-                
-                    # --- !!! CORREÇÃO 4: LÓGICA DE LEITURA SEGURA !!! ---
-                    effects_data = item_info.get("effects", {}) or {}
                     on_use_data = item_info.get("on_use", {}) or {}
+                    effects_data = item_info.get("effects", {}) or {}
                     
                     if "effect" in on_use_data:
                         effect_data_to_check = on_use_data
                     else:
                         effect_data_to_check = effects_data
-                    # --- FIM DA CORREÇÃO 4 ---
                     
-                    # Se houver um efeito válido (em on_use ou effects)
-                    if effect_data_to_check.get("effect"):
+                    if effect_data_to_check: # Garante que há dados de efeito
                         can_use = True # Começa como verdadeiro
                         effect = effect_data_to_check.get("effect")
                         skill_id = effect_data_to_check.get("skill_id")
@@ -371,12 +327,16 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                         if effect == "grant_skill" and skill_id:
                             skill_info = skills_data.SKILL_DATA.get(skill_id, {})
                             allowed_classes = skill_info.get("allowed_classes", [])
-                            if allowed_classes and player_class_key not in allowed_classes:
+                            
+                            # --- !!! 3. CORREÇÃO DA VERIFICAÇÃO !!! ---
+                            if not can_player_use_skill(player_class_key, allowed_classes):
                                 can_use = False # Bloqueia o botão
 
                         elif effect == "grant_skin" and skin_id:
                             skin_info = SKIN_CATALOG.get(skin_id, {})
                             allowed_class = skin_info.get("class")
+                            
+                            # (A lógica de skin não precisa da classe base, então mantemos a verificação simples)
                             if allowed_class and player_class_key != allowed_class:
                                 can_use = False # Bloqueia o botão
                         
@@ -409,14 +369,13 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Lógica de Envio
+    # (Lógica de Envio de Mídia permanece igual)
     fd = (
         file_ids.get_file_data("img_inventario")
         or file_ids.get_file_data("inventario_img")
         or file_ids.get_file_data("inventory_img")
     )
     media_id = fd.get("id") if fd else None
-
     if media_id:
         try:
             media_type = (fd.get("type") or "photo").lower()
@@ -424,13 +383,11 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await query.edit_message_media(media=media_input, reply_markup=reply_markup)
             return
         except Exception:
-            pass # Tenta o Plano B
-
+            pass 
     try:
         await query.delete_message()
     except Exception:
         pass
-    
     if media_id:
         try:
             media_type = (fd.get("type") or "photo").lower()
@@ -441,7 +398,6 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         except Exception as e:
             logger.warning(f"Falha ao enviar mídia do inventário (ID: {media_id}). Erro: {e}. Usando fallback de texto.")
-
     await context.bot.send_message(chat_id=chat_id, text=inventory_text, reply_markup=reply_markup, parse_mode="HTML")
 
 async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -468,9 +424,10 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item_info = _info_for(item_id) # Pega info do game_data
     item_name = item_info.get("display_name", item_id)
     
-    # --- !!! CORREÇÃO 3: USA A FUNÇÃO DE STATS !!! ---
+    # --- !!! 4. CORREÇÃO DA CLASSE !!! ---
+    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
-    # ------------------------------------------------
+    # --- FIM DA CORREÇÃO ---
 
     effects_data = item_info.get("effects", {}) or {}
     on_use_data = item_info.get("on_use", {}) or {}
@@ -508,10 +465,13 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not player_class_key:
                 feedback_msg = "🚫 Você precisa escolher uma classe antes de aprender uma habilidade."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
-            elif allowed_classes and player_class_key not in allowed_classes:
-                # (A classe normalizada (ex: "mago") não está na lista (ex: ["bardo"]))
+            
+            # --- !!! 5. CORREÇÃO DA VERIFICAÇÃO !!! ---
+            elif not can_player_use_skill(player_class_key, allowed_classes):
                 feedback_msg = f"🚫 Sua classe ({player_class_key.capitalize()}) não pode aprender esta habilidade."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
+            # --- FIM DA CORREÇÃO ---
+                
             else:
                 skills = player_data.setdefault("skills", [])
                 if skill_id not in skills:
@@ -530,6 +490,7 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not player_class_key:
                 feedback_msg = "🚫 Você precisa escolher uma classe antes de desbloquear uma aparência."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
+            # (Verificação de skin mantida, pois skins são específicas, não de classe base)
             elif allowed_class and player_class_key != allowed_class:
                 feedback_msg = f"🚫 Sua classe ({player_class_key.capitalize()}) não pode usar esta aparência."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
@@ -543,45 +504,32 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     feedback_msg = "Você já possui esta aparência."
                     player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
 
-        # --- Lógica de TICKET DE ARENA ---
+        # --- (Restante da função 'use_item_callback' mantida igual) ---
         elif effect == "add_pvp_entries":
             value = effect_data_to_use.get("value", 1)
             player_manager.add_pvp_entries(player_data, int(value))
             feedback_msg = f"🎟️ Você ganhou {value} entrada(s) para a Arena!"
-        
-        # --- Lógica de BUFF ---
         elif effect_id == "buff_hp_flat":
             feedback_msg = "Este item (buff) ainda não pode ser usado fora de combate."
             player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
-
-        # --- Lógica de POÇÕES ---
         elif 'heal' in effect_data_to_use:
             heal_amount = int(effect_data_to_use['heal'])
             await player_actions.heal_player(player_data, heal_amount)
             feedback_msg = f"❤️ Você recuperou {heal_amount} HP!"
-        
         elif 'add_energy' in effect_data_to_use:
             energy_amount = int(effect_data_to_use['add_energy'])
             player_actions.add_energy(player_data, energy_amount)
             feedback_msg = f"⚡️ Você recuperou {energy_amount} de Energia!"
-        
         elif 'add_mana' in effect_data_to_use: 
             mana_amount = int(effect_data_to_use['add_mana'])
             await player_actions.add_mana(player_data, mana_amount)
             feedback_msg = f"💙 Você recuperou {mana_amount} de Mana!"
-
         elif 'add_xp' in effect_data_to_use:
             xp_amount = int(effect_data_to_use['add_xp'])
-            
-            # --- ESTA É A CORREÇÃO ---
             player_data['xp'] = player_data.get('xp', 0) + xp_amount
-            # --- FIM DA CORREÇÃO ---
-            
             _n, _p, level_up_msg = player_manager.check_and_apply_level_up(player_data)
             feedback_msg = f"🧠 Você ganhou {xp_amount} XP!"
             if level_up_msg: feedback_msg += f"\n\n{level_up_msg}"
-        
-        # --- Fallback ---
         else:
             feedback_msg = f"O item '{item_name}' não tem um efeito utilizável fora de combate."
             if not item_foi_devolvido:
@@ -600,25 +548,16 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 4. Recarrega o menu do inventário (para mostrar a nova quantidade)
     await inventory_callback(update, context)
 
-# Handler principal
-inventory_handler = CallbackQueryHandler(inventory_callback, pattern=r'^inventory_CAT_[A-Za-z0-9_]+_PAGE_[0-9]+$')
-
-# No-op para o botão central
 async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # --- (NOVO) Lógica de Feedback ---
     query = update.callback_query
     try:
-        # Tenta pegar a razão (ex: noop_inventory:Outra Classe)
         reason = query.data.split(":", 1)[1]
         if reason == "Outra Classe":
             await query.answer("🚫 Você não pode usar este item (outra classe).", show_alert=True)
         else:
-            await query.answer() # Resposta silenciosa
+            await query.answer() 
     except IndexError:
-        await query.answer() # Resposta silenciosa padrão
-
-# --- Definição do handler noop_inventory_handler ---
-noop_inventory_handler = CallbackQueryHandler(noop_inventory, pattern=r'^noop_inventory') # (Corrigido para aceitar sufixos)
-
-# --- Handler para o botão "Usar" ---
+        await query.answer() 
+noop_inventory_handler = CallbackQueryHandler(noop_inventory, pattern=r'^noop_inventory') 
+inventory_handler = CallbackQueryHandler(inventory_callback, pattern=r'^inventory_CAT_[A-Za-z0-9_]+_PAGE_[0-9]+$')
 use_item_handler = CallbackQueryHandler(use_item_callback, pattern=r'^inv_use_item:')

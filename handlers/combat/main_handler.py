@@ -98,6 +98,9 @@ async def _return_to_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: in
     await send_region_menu(context=context, user_id=user_id, chat_id=chat_id)
 
 
+# Em: handlers/combat/main_handler.py
+# (Função 'combat_callback' completa e corrigida)
+
 async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str = None) -> None:
     """
     Motor de Combate Principal (Usa o BATTLE CACHE).
@@ -195,8 +198,8 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         
         skill_id = battle_cache.pop('skill_to_use', None) 
         skill_info = SKILL_DATA.get(skill_id) if skill_id else None
-        #
-        # CÓDIGO NOVO (CORRIGIDO)
+        
+        # Validação de Mana
         if skill_info:
             mana_cost = skill_info.get("mana_cost", 0)
             if mana_cost > 0: 
@@ -217,12 +220,13 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             else:
                 log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>!")
         
+        # Pega os efeitos (seja da skill ou um dict vazio)
         skill_effects = skill_info.get("effects", {}) if skill_info else {}
         
         attacker_stats_modified = player_stats.copy() 
         target_stats_modified = monster_stats.copy()
         
-        damage_mult = float(skill_effects.get("damage_multiplier", 1.0))
+        # (Nota: damage_mult é agora lido DENTRO do criticals.py)
         num_attacks = int(skill_effects.get("multi_hit", 0))
         defense_penetration = float(skill_effects.get("defense_penetration", 0.0))
         bonus_crit_chance = float(skill_effects.get("bonus_crit_chance", 0.0))
@@ -243,8 +247,39 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         if "low_hp_dmg_boost" in skill_effects:
             player_hp_percent = battle_cache.get('player_hp', 1) / attacker_stats_modified.get('max_hp', 1)
             if player_hp_percent < 0.3:
-                damage_mult *= (1.0 + skill_effects.get("low_hp_dmg_boost", 0.0))
-                log.append(f"🩸 Fúria Selvagem!")
+                # O 'criticals.py' não lê isto, então o damage_mult tem de ser
+                # aplicado aqui... Oh, espera. 'criticals.py' NÃO lê low_hp_dmg_boost.
+                # A tua lógica antiga estava a modificar 'damage_mult' aqui.
+                
+                # VAMOS REVER:
+                # A tua lógica antiga era:
+                # damage_mult = float(skill_effects.get("damage_multiplier", 1.0))
+                # ...
+                # if "low_hp_dmg_boost" in skill_effects:
+                #     ...
+                #     damage_mult *= (1.0 + skill_effects.get("low_hp_dmg_boost", 0.0))
+                # ...
+                # player_damage = max(1, int(player_damage_raw * damage_mult))
+                
+                # A lógica de 'criticals.py' SÓ lê 'damage_multiplier'.
+                # Precisamos de *adicionar* o 'low_hp_dmg_boost' ao 'skill_effects'
+                # antes de o passarmos para 'criticals.py'
+                
+                # Vamos criar uma cópia mutável dos efeitos
+                skill_effects_modified = skill_effects.copy()
+                
+                if player_hp_percent < 0.3:
+                    current_mult = skill_effects_modified.get("damage_multiplier", 1.0)
+                    boost = 1.0 + skill_effects.get("low_hp_dmg_boost", 0.0)
+                    skill_effects_modified["damage_multiplier"] = current_mult * boost
+                    log.append(f"🩸 Fúria Selvagem!")
+                
+                # Passa os efeitos modificados para a fórmula de dano
+                skill_effects_to_use = skill_effects_modified
+            else:
+                # Passa os efeitos originais
+                skill_effects_to_use = skill_effects
+
         if "debuff_target" in skill_effects:
             debuff = skill_effects["debuff_target"]
             if debuff.get("stat") == "defense":
@@ -253,11 +288,30 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 target_stats_modified['defense'] = monster_stats['defense']
                 log.append(f"🛡️ A defesa do inimigo foi reduzida!")
         
-        monster_defeated_in_turn = False
-        for i in range(num_attacks):
-            player_damage_raw, is_crit, is_mega = criticals.roll_damage(attacker_stats_modified, target_stats_modified, {})
-            player_damage = max(1, int(player_damage_raw * damage_mult))
+        # (Se 'skill_effects_to_use' não foi definido no if do low_hp, define-o agora)
+        if 'skill_effects_to_use' not in locals():
+            skill_effects_to_use = skill_effects
             
+        monster_defeated_in_turn = False
+        
+        # --- !!! ESTE É O BLOCO DE CÓDIGO CORRIGIDO !!! ---
+        for i in range(num_attacks):
+            
+            # 1. Passa os 'skill_effects' (que contêm o damage_type E o multiplier)
+            #    para a fórmula de dano. Usamos 'skill_effects_to_use'
+            #    para incluir a lógica do 'low_hp_dmg_boost'.
+            player_damage_raw, is_crit, is_mega = criticals.roll_damage(
+                attacker_stats_modified, 
+                target_stats_modified, 
+                skill_effects_to_use # <--- CORREÇÃO AQUI
+            )
+
+            # 2. O dano 'raw' já vem com o multiplicador e o tipo (mágico) aplicado
+            #    pelo 'criticals.py'. Não precisamos multiplicar de novo.
+            player_damage = max(1, int(player_damage_raw))
+            
+            # --- !!! FIM DA CORREÇÃO !!! ---
+
             log.append(f"➡️ {battle_cache['player_name']} ataca e causa {player_damage} de dano.")
             if is_mega: log.append("💥💥 𝐌𝐄𝐆𝐀 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!")
             elif is_crit: log.append("💥 𝐃𝐀𝐍𝐎 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!")
@@ -267,6 +321,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             if monster_stats['hp'] <= 0:
                 monster_defeated_in_turn = True
                 break
+        # --- FIM DO BLOCO CORRIGIDO ---
 
         # 3. Atualizar Mídia (Turno do Jogador)
         battle_cache['battle_log'] = log

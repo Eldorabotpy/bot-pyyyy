@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 from typing import Dict, Any, List
-
+import logging
+logger = logging.getLogger(__name__)
 EVOLUTIONS: Dict[str, Dict[str, Any]] = {
     # ========================= # GUERREIRO # =========================
     "guerreiro": {
@@ -298,3 +299,70 @@ def get_evolution_options(
             if show_locked or current_level >= min_lvl:
                 options.append({"tier": tier, **opt})
     return options
+
+# Em: modules/game_data/class_evolution.py
+# (COLE ESTE CÓDIGO NO FINAL DO FICHEIRO)
+
+# --- INÍCIO DO NOVO CÓDIGO (CORREÇÃO DO BUG DE SKILL) ---
+
+# Cache para guardar o mapa de classes base (Ex: "arquimago" -> "mago")
+_EVOLUTION_BASE_CLASS_MAP: Dict[str, str] = {}
+
+def _get_base_class(class_key: str) -> str:
+    """
+    Função auxiliar interna para encontrar a classe base de qualquer classe.
+    Usa o _EVOLUTION_BASE_CLASS_MAP como cache.
+    """
+    if not class_key: 
+        return class_key
+        
+    # 1. Se já está no cache, retorna imediatamente
+    if class_key in _EVOLUTION_BASE_CLASS_MAP:
+        return _EVOLUTION_BASE_CLASS_MAP[class_key]
+    
+    # 2. Se o cache está vazio, constrói-o
+    if not _EVOLUTION_BASE_CLASS_MAP:
+        logger.info("[ClassEvolution] Construindo mapa de classes base...")
+        for base_class, tiers in EVOLUTIONS.items():
+            # A classe base (ex: "mago") aponta para si mesma
+            _EVOLUTION_BASE_CLASS_MAP[base_class] = base_class
+            
+            # Itera T2, T3... e mapeia todas evoluções para a classe base
+            for tier_name, tier_list in tiers.items():
+                if isinstance(tier_list, list):
+                    for evo in tier_list:
+                        evo_to_key = evo.get("to")
+                        if evo_to_key:
+                            # Ex: _EVOLUTION_BASE_CLASS_MAP["arquimago"] = "mago"
+                            _EVOLUTION_BASE_CLASS_MAP[evo_to_key] = base_class
+
+    # 3. Retorna o resultado (seja a classe base ou a própria classe, se não for uma evolução)
+    base_class_result = _EVOLUTION_BASE_CLASS_MAP.get(class_key, class_key)
+    
+    # 4. Guarda no cache para a próxima vez
+    _EVOLUTION_BASE_CLASS_MAP[class_key] = base_class_result
+    return base_class_result
+
+def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> bool:
+    """
+    Verifica se um jogador pode usar uma skill, checando a sua classe 
+    ATUAL e a sua classe BASE.
+    """
+    if not allowed_classes:
+        return True # Skill universal (lista de permissão vazia)
+    
+    allowed_set = set(allowed_classes)
+    
+    # 1. Verifica a classe atual (ex: "arcanista" está em ["arcanista"])
+    if player_class_key in allowed_set:
+        return True
+    
+    # 2. Verifica a classe BASE (ex: "mago" (base de "arcanista") está em ["mago"])
+    base_class = _get_base_class(player_class_key)
+    if base_class in allowed_set:
+        return True
+    
+    # Se nenhum passou, o jogador não pode usar
+    return False
+
+# --- FIM DO NOVO CÓDIGO ---

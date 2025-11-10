@@ -15,6 +15,8 @@ from modules import file_ids
 from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
 from modules.player import stats as player_stats
+from modules.player import stats as player_stats
+from modules.game_data.class_evolution import can_player_use_skill
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ def _slugify(text: str) -> str:
     return norm
 
 def _get_class_media(player_data: dict, purpose: str = "personagem"):
+    # (Função original mantida - sem alterações)
     raw_cls = (player_data.get("class") or player_data.get("class_tag") or "").strip()
     cls = _slugify(raw_cls)
     purpose = (purpose or "").strip().lower()
@@ -72,19 +75,33 @@ async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not player_data:
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
         return
+    
+    # --- !!! 2. CORREÇÃO DA CLASSE !!! ---
+    # Pega a classe normalizada (ex: "arcanista")
+    player_class_key = player_stats._get_class_key_normalized(player_data)
+    
     player_skill_ids = player_data.get("skills", [])
     if not player_skill_ids:
         text = "📚 <b>Suas Habilidades</b>\n\nVocê ainda não aprendeu nenhuma habilidade."
         kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")]]
         await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
         return
+
     active_skills_lines = []
     passive_skills_lines = []
+    
     for skill_id in player_skill_ids:
         skill_info = skills_data.SKILL_DATA.get(skill_id)
         if not skill_info:
             logger.warning(f"Skill ID '{skill_id}' encontrado em {user_id} mas não existe em SKILL_DATA.")
             continue
+            
+        # --- !!! 3. CORREÇÃO DA VERIFICAÇÃO !!! ---
+        # Verifica se a classe atual (ou a base) pode usar esta skill
+        allowed_classes = skill_info.get("allowed_classes", [])
+        if not can_player_use_skill(player_class_key, allowed_classes):
+            continue # Pula esta skill, o jogador não pode mais usá-la
+            
         name = skill_info.get("display_name", skill_id)
         desc = skill_info.get("description", "Sem descrição.")
         mana_cost = skill_info.get("mana_cost")
@@ -97,6 +114,7 @@ async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             active_skills_lines.append(line)
         elif skill_type == "passive":
             passive_skills_lines.append(line)
+            
     text_parts = ["📚 <b>Suas Habilidades</b>\n"]
     if active_skills_lines:
         text_parts.append("✨ <b><u>Habilidades Ativas</u></b> ✨")
@@ -107,9 +125,15 @@ async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text_parts.append("🛡️ <b><u>Habilidades Passivas</u></b> 🛡️")
         text_parts.extend(passive_skills_lines)
         text_parts.append("")
+        
+    # Se ambas as listas estiverem vazias (ex: só tinha skills de mago e evoluiu)
+    if not active_skills_lines and not passive_skills_lines:
+        text_parts.append("<i>Você não possui nenhuma habilidade que sua classe atual possa usar.</i>")
+
     kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")]]
     if active_skills_lines:
         kb.insert(0, [InlineKeyboardButton("⚙️ Equipar Skills Ativas", callback_data="skills_equip_menu")])
+    
     final_text = "\n".join(text_parts)
     reply_markup = InlineKeyboardMarkup(kb)
     await _safe_edit_or_send(query, context, chat_id, final_text, reply_markup)
@@ -125,7 +149,10 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
         return
 
+    # --- !!! 4. CORREÇÃO DA CLASSE !!! ---
+    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
+    # --- FIM DA CORREÇÃO ---
 
     all_skill_ids = player_data.get("skills", [])
     equipped_ids = player_data.get("equipped_skills", [])
@@ -156,11 +183,21 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
         for skill_id in equipped_ids:
             skill_info = skills_data.SKILL_DATA.get(skill_id)
             if not skill_info: continue
-            name = skill_info.get("display_name", skill_id)
-            mana_cost = skill_info.get("mana_cost")
-            line = f"• <b>{name}</b>"
-            if mana_cost is not None: line += f" ({mana_cost} MP)"
-            text_parts.append(line)
+            
+            # --- !!! 5. CORREÇÃO DA VERIFICAÇÃO !!! ---
+            # Adiciona uma verificação para o caso de uma skill equipada se tornar inválida
+            allowed_classes = skill_info.get("allowed_classes", [])
+            if not can_player_use_skill(player_class_key, allowed_classes):
+                # A skill está equipada mas não devia! (Não mostra, mas oferece desequipar)
+                name = skill_info.get("display_name", skill_id)
+                text_parts.append(f"• <s><b>{name}</b> (Classe Inválida)</s>")
+            else:
+                name = skill_info.get("display_name", skill_id)
+                mana_cost = skill_info.get("mana_cost")
+                line = f"• <b>{name}</b>"
+                if mana_cost is not None: line += f" ({mana_cost} MP)"
+                text_parts.append(line)
+            
             kb_rows.append([InlineKeyboardButton(f"➖ Desequipar {name}", callback_data=f"unequip_skill:{skill_id}")])
 
     text_parts.append("\n" + ("─" * 20) + "\n")
@@ -168,19 +205,17 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
     
     slots_free = MAX_EQUIPPED_SKILLS - len(equipped_ids)
     available_to_equip_found = False
- 
+
     for skill_id in active_skill_ids:
         if skill_id not in equipped_ids:
             skill_info = skills_data.SKILL_DATA.get(skill_id)
             if not skill_info: continue
 
-            # --- 👇 CORREÇÃO 2: Verificação de Classe (Exibição) 👇 ---
-            # Aqui estamos a usar a informação que acabámos de adicionar!
+            # --- !!! 6. CORREÇÃO DA VERIFICAÇÃO !!! ---
             allowed_classes = skill_info.get("allowed_classes", [])
-            # Se a lista de classes permitidas NÃO estiver vazia E a classe do jogador NÃO estiver nela...
-            if allowed_classes and player_class_key not in allowed_classes:
+            if not can_player_use_skill(player_class_key, allowed_classes):
                 continue # ...pula esta skill, nem mostra o botão.
-            # --- 👆 FIM DA CORREÇÃO 2 👆 ---
+            # --- FIM DA CORREÇÃO ---
 
             available_to_equip_found = True
             name = skill_info.get("display_name", skill_id)
@@ -202,8 +237,6 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
     reply_markup = InlineKeyboardMarkup(kb_rows)
     await _safe_edit_or_send(query, context, chat_id, final_text, reply_markup)
 
-# Em: handlers/profile_handler.py
-
 async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -221,23 +254,21 @@ async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Erro: Personagem não encontrado.", show_alert=True)
         return
 
-    # --- Verificação de Classe (Validação Final) ---
-    # (Assume que 'skills_data' foi importado no topo do ficheiro)
     skill_info = skills_data.SKILL_DATA.get(skill_id)
     if not skill_info:
         await query.answer("Erro: Skill não encontrada nos dados do jogo.", show_alert=True)
         return
 
+    # --- !!! 7. CORREÇÃO DA VERIFICAÇÃO !!! ---
+    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
     allowed_classes = skill_info.get("allowed_classes", [])
     
-    # Se a lista NÃO estiver vazia E a classe do jogador NÃO estiver nela...
-    if allowed_classes and player_class_key not in allowed_classes:
-        # ...bloqueia a ação.
-        await query.answer("Sua classe não pode equipar esta habilidade!", show_alert=True)
+    if not can_player_use_skill(player_class_key, allowed_classes):
+        await query.answer("Sua classe (ou classe base) não pode equipar esta habilidade!", show_alert=True)
         await show_equip_skills_menu(update, context) # Recarrega o menu
         return
-    # --- Fim da Verificação ---
+    # --- FIM DA CORREÇÃO ---
 
     equipped_skills = player_data.setdefault("equipped_skills", [])
     if not isinstance(equipped_skills, list):
@@ -253,12 +284,11 @@ async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer(f"Limite de {MAX_EQUIPPED_SKILLS} skills equipadas atingido!", show_alert=True)
         await show_equip_skills_menu(update, context)
         return
-   
+    
     equipped_skills.append(skill_id)
     await player_manager.save_player_data(user_id, player_data)
     
-    # Erro de digitação 'a' removido daqui
-    await show_equip_skills_menu(update, context) # Recarrega o menu
+    await show_equip_skills_menu(update, context)
 
 async def unequip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

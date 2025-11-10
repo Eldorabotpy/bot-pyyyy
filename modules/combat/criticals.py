@@ -37,27 +37,20 @@ def get_crit_params(stats: dict) -> dict:
         "min_damage": 1,
     }
 
-# Em: modules/combat/criticals.py
-
 def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) -> tuple[int, bool, bool]:
     """
-    (VERSÃO CORRIGIDA: AGORA LÊ O 'damage_multiplier' DAS SKILLS)
+    (VERSÃO CORRIGIDA: AGORA LÊ O 'damage_multiplier' E O 'damage_type')
     """
     if options is None:
         options = {}
 
-    # 1. Extrai os valores numéricos de dentro dos dicionários
     raw_attack = int(attacker_stats.get('attack', 0))
     target_defense = int(target_stats.get('defense', 0))
     
-    # 2. Gera os parâmetros de crítico para o atacante
     params = get_crit_params(attacker_stats)
 
-    # --- 3. (NOVO) Lê o multiplicador da SKILL (dos 'options') ---
-    # 'options' é o dicionário 'skill_effects' que passámos
     skill_mult = float(options.get("damage_multiplier", 1.0))
 
-    # 4. Lógica de rolagem de CRÍTICO (inalterada)
     r = random.random() * 100.0
     is_crit = (r <= float(params.get("chance", 0.0)))
     crit_mult, is_mega = 1.0, False # Multiplicador do crítico
@@ -68,15 +61,13 @@ def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) 
         else:
             crit_mult = float(params.get("mult", 1.6))
 
-    # --- 5. Cálculo do dano final (CORRIGIDO) ---
-    
-    # Primeiro, aplica o multiplicador da SKILL
     attack_with_skill = float(raw_attack) * skill_mult
     
-    # Segundo, aplica o multiplicador do CRÍTICO
     boosted_attack = math.ceil(attack_with_skill * crit_mult)
     
-    # Terceiro, subtrai a defesa
-    final_damage = max(int(params.get("min_damage", 1)), boosted_attack - target_defense)
+    if options.get("damage_type") == "magic":
+        final_damage = max(int(params.get("min_damage", 1)), boosted_attack)
+    else:
+        final_damage = max(int(params.get("min_damage", 1)), boosted_attack - target_defense)
     
     return final_damage, is_crit, is_mega
