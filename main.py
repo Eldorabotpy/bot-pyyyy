@@ -1,4 +1,4 @@
-# Arquivo: main.py (VERSÃO FINAL COM ASYNC E HOOK CORRIGIDO)
+# Arquivo: main.py (VERSÃO CORRIGIDA COM ENTREGA DE TICKETS)
 
 from __future__ import annotations
 import os
@@ -27,7 +27,9 @@ from modules.player.actions import check_stale_actions_on_startup
 from handlers.jobs import (
     regenerate_energy_job, daily_crystal_grant_job, afternoon_event_reminder_job,
     timed_actions_watchdog, start_kingdom_defense_event, end_kingdom_defense_event,
-    daily_arena_ticket_job
+    daily_arena_ticket_job,
+    # --- !!! IMPORTAÇÃO ADICIONADA !!! ---
+    distribute_kingdom_defense_ticket_job 
 )
 from handlers.world_boss.engine import (
     iniciar_world_boss_job, end_world_boss_job
@@ -98,7 +100,7 @@ def register_jobs(application: Application):
     # Lembrete (13:30)
     j.run_daily(afternoon_event_reminder_job, time=time(hour=13, minute=30, tzinfo=local_tz), name="afternoon_event_reminder")
 
-    # --- [MUDANÇA] Agendamento Evento 1: Defesa do Reino ---
+    # --- [CORREÇÃO] Agendamento Evento 1: Defesa do Reino (COM TICKETS) ---
     logger.info("Registrando jobs de eventos do reino (Defesa)...")
     if EVENT_TIMES: 
         for i, (start_h, start_m, end_h, end_m) in enumerate(EVENT_TIMES):
@@ -111,13 +113,37 @@ def register_jobs(application: Application):
                 duration_minutes = 30
             
             job_data_start = {"event_duration_minutes": duration_minutes}
- 
+            
+            # --- !!! INÍCIO DA CORREÇÃO !!! ---
+            # 1. Agendar a ENTREGA DE TICKETS (10 minutos ANTES do evento)
+            
+            # Calcula o horário de entrega (10 min antes)
+            ticket_time_dt = datetime(2000, 1, 1, start_h, start_m) - timedelta(minutes=10)
+            ticket_h = ticket_time_dt.hour
+            ticket_m = ticket_time_dt.minute
+            
+            # Prepara os dados para o job (para a notificação)
+            event_time_str = f"{start_h:02d}:{start_m:02d}"
+            job_data_ticket = {"event_time": event_time_str}
+            
+            j.run_daily(
+                distribute_kingdom_defense_ticket_job,
+                time=time(hour=ticket_h, minute=ticket_m, tzinfo=local_tz),
+                name=f"distribute_ticket_{i}_{ticket_h}h{ticket_m:02d}",
+                data=job_data_ticket
+            )
+            logger.info(f"-> Job de Ticket {i+1} agendado para: {ticket_h:02d}:{ticket_m:02d}")
+            # --- !!! FIM DA CORREÇÃO !!! ---
+
+            # 2. Agendar o INÍCIO do evento (no horário certo)
             j.run_daily(
                 start_kingdom_defense_event, 
                 time=time(hour=start_h, minute=start_m, tzinfo=local_tz), 
                 name=f"start_defense_{i}_{start_h}h{start_m:02d}",
                 data=job_data_start
             )
+            
+            # 3. Agendar o FIM do evento
             j.run_daily(
                 end_kingdom_defense_event, 
                 time=time(hour=end_h, minute=end_m, tzinfo=local_tz), 
@@ -137,12 +163,12 @@ def register_jobs(application: Application):
                 start_dt = datetime(2000, 1, 1, start_h, start_m)
                 end_dt = datetime(2000, 1, 1, end_h, end_m)
                 if end_dt < start_dt:
-                   end_dt += timedelta(days=1)
+                    end_dt += timedelta(days=1)
 
                 duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
                 if duration_hours <= 0: duration_hours = 1.0 
             except Exception:
-               duration_hours = 1.0 
+                duration_hours = 1.0 
 
             job_data_start = {"duration_hours": duration_hours}
 
@@ -194,7 +220,7 @@ async def main():
     logger.info("Configurando a aplicação Telegram...")
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     application.add_error_handler(error_handler)
-   
+    
     register_jobs(application) 
     register_all_handlers(application)
 
@@ -214,7 +240,7 @@ async def main():
         await application.start()
 
         logger.info("Bot iniciado. Polling... (Pressione Ctrl+C para parar)")
-       
+        
         # Mantém o script vivo
         while True:
             await asyncio.sleep(3600) # Dorme por 1 hora e repete

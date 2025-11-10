@@ -10,7 +10,8 @@ from . import leaderboard
 from modules.combat import criticals
 from modules.game_data import items as game_items
 from modules.game_data.monsters import MONSTERS_DATA
-from modules.game_data.skills import SKILL_DATA # Importa o banco de dados de skills
+from modules.game_data.skills import SKILL_DATA 
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,9 @@ class KingdomDefenseManager:
     async def start_event(self):
         """Inicia o evento de defesa do reino a partir da Onda 1."""
         if self.is_active: return {"error": "O evento já está ativo."}
-        self.reset_event() # Reset é síncrono
+        self.reset_event()
         self.is_active = True
-        await self.setup_wave(1) # <--- NECESSITA AWAIT
+        await self.setup_wave(1) 
         logger.info("Evento de Defesa do Reino iniciado na Onda 1.")
         return {"success": "Evento iniciado!"}
     
@@ -78,11 +79,11 @@ class KingdomDefenseManager:
                     
                     # Notifica o jogador que o evento acabou (opcional, mas bom)
                     if context:
-                         try:
-                             await context.bot.send_message(chat_id=user_id, text="⚔️ O evento de Defesa do Reino foi encerrado! ⚔️")
-                         except Exception:
-                             pass # Ignora se o bot for bloqueado
-                             
+                        try:
+                            await context.bot.send_message(chat_id=user_id, text="⚔️ O evento de Defesa do Reino foi encerrado! ⚔️")
+                        except Exception:
+                            pass # Ignora se o bot for bloqueado
+                        
             except Exception as e:
                 logger.error(f"Erro ao finalizar evento/resetar estado para {user_id}: {e}")
 
@@ -125,13 +126,12 @@ class KingdomDefenseManager:
         """Configura a próxima onda ou termina o evento se não houver mais ondas."""
         if wave_number not in self.wave_definitions:
             logger.info(f"Onda {wave_number} não encontrada. Encerrando o evento.")
-            await self.end_event() # <--- NECESSITA AWAIT
-            return # Termina a execução aqui
+            await self.end_event()
+            return 
 
         logger.info(f"Configurando Onda {wave_number}...")
         self.current_wave = wave_number
         self.boss_mode_active = False
-        # ... (resto da lógica de cálculo de max_concurrent_fighters) ...
         limite_base = 5
         vagas_por_onda = 5
         self.max_concurrent_fighters = limite_base + (vagas_por_onda * self.current_wave)
@@ -157,7 +157,6 @@ class KingdomDefenseManager:
         
         if len(self.active_fighters) < self.max_concurrent_fighters:
             self.active_fighters.add(user_id)
-            # <<< CORREÇÃO 1: Adiciona 'await' na chamada da função auxiliar >>>
             await self._setup_player_battle_state(user_id, player_data) 
             return "active"
         else:
@@ -185,7 +184,7 @@ class KingdomDefenseManager:
         mob_instance = mob_template.copy()
         mob_instance['active_effects'] = []
         if self.boss_mode_active:
-           mob_instance.update({'hp': self.boss_global_hp, 'max_hp': self.boss_max_hp, 'is_boss': True})
+            mob_instance.update({'hp': self.boss_global_hp, 'max_hp': self.boss_max_hp, 'is_boss': True})
         else:
             mob_instance.update({'max_hp': mob_instance['hp'], 'is_boss': False})
 
@@ -196,7 +195,7 @@ class KingdomDefenseManager:
         current_hp = max_hp
 
         # 2. Verifica se o jogador já estava em batalha (vindo de outra luta)
-        # #    e se seu HP é válido (para não carregar HP negativo)
+        # #     e se seu HP é válido (para não carregar HP negativo)
         if user_id in self.player_states and self.player_states[user_id].get('player_hp', 0) > 0:
             # 3. Se sim (SOBREVIVEU), usa o HP da batalha anterior
             previous_hp = self.player_states[user_id]['player_hp']
@@ -230,9 +229,7 @@ class KingdomDefenseManager:
                 await self._setup_player_battle_state(next_player_id, player_data) 
                 logger.info(f"Jogador {next_player_id} promovido da fila para a batalha.")
             else:
-                 logger.warning(f"Jogador {next_player_id} estava na fila mas não foi encontrado (get_player_data retornou None).")
-
-    # Arquivo: kingdom_defense/engine.py
+                logger.warning(f"Jogador {next_player_id} estava na fila mas não foi encontrado (get_player_data retornou None).")
 
     async def _resolve_turn(self, user_id: int, player_data: dict, logs: list) -> dict:
         """
@@ -290,8 +287,8 @@ class KingdomDefenseManager:
                     "next_mob_data": self.player_states.get(user_id, {}).get('current_mob')
                 }
             else:
-                 # Se o jogador não está mais no estado (evento acabou), apenas retorna a informação
-                 return {
+                # Se o jogador não está mais no estado (evento acabou), apenas retorna a informação
+                return {
                     "monster_defeated": True,
                     "event_over": True, # Sinaliza que o evento acabou durante a transição
                     "action_log": "\n".join(logs),
@@ -317,7 +314,7 @@ class KingdomDefenseManager:
                     fighter_full_stats = await player_manager.get_player_total_stats(fighter_data)
                     damage_to_fighter, _, _ = criticals.roll_damage(mob, fighter_full_stats, {})
                     final_damage = int(damage_to_fighter * special_attack_data.get("damage_multiplier", 1.0))
-                     # Garante que o HP não fique negativo visualmente após o AoE
+                    # Garante que o HP não fique negativo visualmente após o AoE
                     fighter_state['player_hp'] = max(0, fighter_state['player_hp'] - final_damage)
                     logs.append(f"🩸 {fighter_data.get('character_name', 'Herói')} sofre {final_damage} de dano! (HP: {fighter_state['player_hp']})") # Log HP atual
                     was_defeated = fighter_state['player_hp'] <= 0
@@ -345,7 +342,7 @@ class KingdomDefenseManager:
                         logs.append(f"🩸 {mob['name']} contra-ataca, causando {mob_damage} de dano!")
                         if mob_is_mega: logs.append("‼️ MEGA CRÍTICO inimigo!")
                         elif mob_is_crit: logs.append("❗️ DANO CRÍTICO inimigo!")
-                     # Garante que o HP não fique negativo visualmente
+                   
                     player_state['player_hp'] = max(0, player_state['player_hp'] - mob_damage)
 
 
@@ -358,41 +355,31 @@ class KingdomDefenseManager:
                     await self._promote_next_player()
                     return { "game_over": True, "action_log": "\n".join(logs) }
 
-                # <<< ESTA É A CORREÇÃO! >>>
-                # Se o código chegou aqui, o jogador sobreviveu ao contra-ataque.
-                # Este é o retorno de um turno normal.
                 return { "monster_defeated": False, "game_over": False, "action_log": "\n".join(logs) }
 
     async def process_player_attack(self, user_id, player_data, player_full_stats):
         """Calcula o dano do ataque básico de um jogador e passa para a resolução do turno."""
-    
-        # 1. REMOVE: A chamada incorreta de _tick_effects que estava aqui.
-        # self._tick_effects(user_id) 
-
-        # 2. VERIFICAÇÃO DE ATIVIDADE
+        
+        # --- !!! INÍCIO DA CORREÇÃO (BUG 1) !!! ---
+        
+        # 1. VERIFICAÇÃO DE ATIVIDADE (FEITA PRIMEIRO)
         if not self.is_active or user_id not in self.active_fighters:
             return {"error": "Você não está em uma batalha ativa."}
-    
-        # 3. VERIFICAÇÃO CRÍTICA DE ESTADO
+        
+        # 2. VERIFICAÇÃO CRÍTICA DE ESTADO (SEGUNDO)
         if user_id not in self.player_states:
             # Garante que o jogador é removido se o estado estiver corrompido
             self.active_fighters.discard(user_id) 
             return {"error": "Seu estado de batalha não foi encontrado. Tente reentrar no evento."}
 
-        # 4. EXECUÇÃO CORRETA: Agora que sabemos que o estado existe, fazemos o 'tick'.
+        # 3. EXECUÇÃO CORRETA: Agora que sabemos que o estado existe, fazemos o 'tick'.
         self._tick_effects(user_id) 
-    
-        # 5. REMOVE: O bloco duplicado de segurança que estava a repetir a chamada
-        # if user_id not in self.player_states:
-        #     self.active_fighters.discard(user_id) 
-        #     return {"error": "Seu estado de batalha não foi encontrado. Tente reentrar no evento."}
-        # self._tick_effects(user_id) # Esta chamada é redundante se a de cima for usada
-        # --- FIM DA REMOÇÃO ---
+        
+        # --- !!! FIM DA CORREÇÃO (BUG 1) !!! ---
 
         player_state = self.player_states[user_id]
         mob = player_state['current_mob']
         is_boss_fight = mob.get('is_boss', False)
-        #player_full_stats = player_manager.get_player_total_stats(player_data) # Comentário antigo
         logs, num_attacks = [], 1
 
         attacker_combat_stats = self._get_stats_with_effects(
@@ -422,7 +409,7 @@ class KingdomDefenseManager:
                 self.boss_global_hp -= damage
             else: 
                 mob['hp'] -= damage
-        
+            
             mob_hp = self.boss_global_hp if is_boss_fight else mob['hp']
             if mob_hp <= 0: 
                 break
@@ -478,7 +465,7 @@ class KingdomDefenseManager:
             else:
                 # Garante que o HP não fique negativo
                 mob['hp'] = max(0, mob['hp'] - final_damage)
- 
+
             player_state['damage_dealt'] += final_damage
 
             # LÓGICA DE DEBUFF
@@ -507,7 +494,12 @@ class KingdomDefenseManager:
                 
                     if not ally_state or not ally_data: continue
                 
-                    ally_max_hp = await player_manager.get_player_total_stats(ally_data).get('max_hp', 1)
+                    # --- !!! INÍCIO DA CORREÇÃO (BUG 2) !!! ---
+                    # Precisamos dos stats totais para saber o max_hp do aliado
+                    ally_total_stats = await player_manager.get_player_total_stats(ally_data)
+                    ally_max_hp = ally_total_stats.get('max_hp', 1)
+                    # --- !!! FIM DA CORREÇÃO (BUG 2) !!! ---
+                    
                     ally_current_hp = ally_state.get('player_hp', 0)
                 
                     healed_for = min(heal_amount, ally_max_hp - ally_current_hp)
@@ -520,7 +512,7 @@ class KingdomDefenseManager:
                             await player_manager.save_player_data(ally_id, ally_data)
                         
                         logs.append(f"✨ {ally_data.get('character_name', 'Aliado')} foi curado em {healed_for} HP!")
-            
+                
                 logs.append("🎶 A melodia restauradora atingiu todos os aliados!")
             
             # --- Lógica de Cura de Alvo Único (Targeted Heal) ---

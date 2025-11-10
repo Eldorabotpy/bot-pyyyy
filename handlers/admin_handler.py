@@ -1,4 +1,5 @@
 # handlers/admin_handler.py
+# (VERSÃO CORRIGIDA DO BUG DE NOTIFICAÇÃO)
 
 from __future__ import annotations
 import os
@@ -7,6 +8,7 @@ import logging
 import json
 import sys
 from typing import Optional
+from handlers.jobs import distribute_kingdom_defense_ticket_job
 from handlers.admin.grant_item import grant_item_conv_handler # Já estava
 from handlers.admin.sell_gems import sell_gems_conv_handler # Já estava
 from handlers.admin.generate_equip import generate_equip_conv_handler # <<< ADICIONADO (Assumindo que existe)
@@ -18,6 +20,7 @@ from handlers.admin.grant_skin import grant_skin_conv_handler
 from handlers.admin.player_management_handler import player_management_conv_handler
 from modules.player.queries import _normalize_char_name
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -39,7 +42,7 @@ from modules.player_manager import (
     find_player_by_name, # ASYNC
     allowed_points_for_level, # SÍNCRONO
     compute_spent_status_points, # SÍNCRONO
-   
+    
 )
 from modules import game_data
 from handlers.jobs import reset_pvp_season, force_grant_daily_crystals # <<< CORRIGIDO >>> Importa force_grant_daily_crystals
@@ -184,6 +187,7 @@ def _admin_event_menu_kb() -> InlineKeyboardMarkup:
     """O submenu de gerenciamento de eventos."""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎟️ Entregar Ticket de Defesa", callback_data="admin_event_force_ticket")],
+        [InlineKeyboardButton("📨 FORÇAR JOB DE TICKETS (TODOS)", callback_data="admin_force_ticket_job")],
         [InlineKeyboardButton("▶️ Forçar Início do Evento", callback_data="admin_event_force_start")],
         [InlineKeyboardButton("⏹️ Forçar Fim do Evento", callback_data="admin_event_force_end")],
         [InlineKeyboardButton("⬅️ Voltar ao Painel Principal", callback_data="admin_main")],
@@ -208,6 +212,8 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🧹 𓂀 ℝ𝕖𝕤𝕖𝕥/ℝ𝕖𝕤𝕡𝕖𝕔 𓂀", callback_data="admin_reset_menu")],
         [InlineKeyboardButton("🧽 𓂀 𝕃𝕚𝕞𝕡𝕒𝕣 ℂ𝕒𝕔𝕙𝕖 𓂀", callback_data="admin_clear_cache")],
         [InlineKeyboardButton("🔄 𝐑𝐞𝐬𝐞𝐭𝐚𝐫 𝐄𝐬𝐭𝐚𝐝𝐨 (/𝐫𝐞𝐬𝐞𝐭_𝐬𝐭𝐚𝐭𝐞)", callback_data="admin_reset_state_hint")], # Assume que este botão apenas mostra uma dica
+        [InlineKeyboardButton("ℹ️ 𝐀𝐣𝐮𝐝𝐚 𝐝𝐨𝐬 𝐂𝐨𝐦𝐚𝐧𝐝𝐨𝐬", callback_data="admin_help")]
+    
     ])
 
 # =========================================================
@@ -428,29 +434,40 @@ async def _handle_force_end_event(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         logger.warning(f"Não foi possível editar mensagem após forçar fim do evento: {e}")
 
+# --- !!! INÍCIO DA FUNÇÃO CORRIGIDA !!! ---
 async def _handle_force_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Entrega um ticket de defesa ao admin."""
-    # <<< CORREÇÃO 22: Adiciona await >>>
-    if not await ensure_admin(update): return
-    # <<< CORREÇÃO 23: Adiciona await >>>
-    await _safe_answer(update)
-    user_id = update.effective_user.id
+    """Entrega um ticket de defesa ao admin. (VERSÃO CORRIGIDA)"""
+    query = update.callback_query
+    if not query:
+        return # Não deve acontecer vindo de um botão
 
-    # <<< CORREÇÃO 24: Adiciona await >>>
-    player_data = await get_player_data(user_id)
-    if not player_data:
-        await update.callback_query.answer("Erro: Não foi possível carregar seus dados.", show_alert=True)
+    if not await ensure_admin(update):
+        # Resposta ÚNICA (Erro de permissão)
+        await query.answer("Você não tem permissão.", show_alert=True)
         return
-
+    
+    user_id = update.effective_user.id
     item_id = 'ticket_defesa_reino'
+
     try:
-        add_item_to_inventory(player_data, item_id, 1) # SÍNCRONO
-        # <<< CORREÇÃO 25: Adiciona await >>>
+        player_data = await get_player_data(user_id)
+        if not player_data:
+            # Resposta ÚNICA (Erro de jogador)
+            await query.answer("Erro: Não foi possível carregar seus dados de jogador.", show_alert=True)
+            return
+
+        add_item_to_inventory(player_data, item_id, 1) # Síncrono
         await save_player_data(user_id, player_data)
-        await update.callback_query.answer(f"🎟️ Você recebeu 1x {item_id}!", show_alert=True)
+        
+        # Resposta ÚNICA (Sucesso)
+        await query.answer(f"🎟️ Você recebeu 1x {item_id}!", show_alert=True)
+
     except Exception as e:
         logger.error(f"Erro ao entregar ticket para admin {user_id}: {e}", exc_info=True)
-        await update.callback_query.answer(f"Erro ao entregar o item '{item_id}'.", show_alert=True)
+        # Resposta ÚNICA (Erro geral)
+        await query.answer(f"Erro ao entregar o item: {e}", show_alert=True)
+# --- !!! FIM DA FUNÇÃO CORRIGIDA !!! ---
+
 
 # --- Funções de Cristais Diários ---
 async def _handle_admin_force_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -531,7 +548,7 @@ async def _cache_clear_user(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         found_by = "ID"
     except ValueError:
         try:
-             # <<< CORREÇÃO 36: Adiciona await >>>
+            # <<< CORREÇÃO 36: Adiciona await >>>
             found = await find_player_by_name(target_input)
             # OU, se usar a função específica por nome:
             # found_info = await find_player_by_character_name(target_input)
@@ -684,6 +701,62 @@ async def my_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Erro ao enviar documento mydata para {user_id}: {e}")
         await update.message.reply_text("Erro ao enviar o ficheiro de dados.")
 
+async def _handle_force_ticket_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Força a execução do JOB de distribuição de tickets para TODOS os jogadores."""
+    query = update.callback_query
+    if not await ensure_admin(update):
+        await query.answer("Você não tem permissão.", show_alert=True)
+        return
+
+    await query.answer("Iniciando job de entrega de tickets para TODOS os jogadores...", show_alert=True)
+
+    # Simula os dados do job (para a mensagem de notificação)
+    context.job = type('Job', (object,), {
+        'data': {"event_time": "TESTE DE ADMIN"},
+        'name': 'admin_force_ticket_job'
+    })
+
+    try:
+        total_entregue = await distribute_kingdom_defense_ticket_job(context)
+        await query.message.reply_text(f"✅ Job de tickets concluído. {total_entregue} jogadores receberam o ticket.")
+    except Exception as e:
+        await query.message.reply_text(f"❌ Erro ao executar o job de tickets: {e}")
+
+# Em: handlers/admin_handler.py
+
+# Texto de ajuda com a descrição dos comandos
+ADMIN_HELP_TEXT = """ℹ️ <b>Ajuda dos Comandos de Admin</b> ℹ️
+
+<b>Gerenciamento Básico:</b>
+<code>/admin</code> - Abre o painel de admin principal.
+<code>/get_id</code> - Mostra o ID do chat e do tópico (para configurar anúncios, etc.).
+<code>/mydata</code> - Envia um arquivo .json com os seus dados de jogador (para debug).
+
+<b>Gerenciamento de Jogadores:</b>
+<code>/find_player [nome]</code> - Encontra o User ID de um jogador (necessário para os botões de "Dar Item", "Editar Jogador", etc.).
+<code>/debug_player [user_id]</code> - Verifica o status do cache e do DB para um jogador (vê se ele está "preso").
+<code>/delete_player [user_id]</code> - <b>[PERIGOSO]</b> Apaga permanentemente um jogador da base de dados.
+<code>/fixme</code> - (Apenas Admin) Recalcula os seus pontos de stats com base no nível (corrige bugs de level up).
+
+<b>Recursos e Eventos:</b>
+<code>/forcar_cristais</code> - Executa o job diário de entrega de cristais para todos os jogadores.
+<code>/resetpvpnow</code> - Reseta a temporada PvP e os pontos de todos imediatamente.
+
+<b>Debug de Jogo:</b>
+<code>/inspect_item [item_id]</code> - Mostra os dados brutos (JSON) de um item (ex: 'espada_longa') para ver os seus stats base.
+"""
+
+async def _handle_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra a ajuda dos comandos de admin."""
+    if not await ensure_admin(update): return
+    await _safe_answer(update)
+    
+    # Cria um teclado simples apenas com o botão "Voltar"
+    kb = [[InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data="admin_main")]]
+    reply_markup = InlineKeyboardMarkup(kb)
+    
+    # Edita a mensagem para mostrar o texto de ajuda
+    await _safe_edit_text(update, context, ADMIN_HELP_TEXT, reply_markup)
 # =========================================================
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
 # =========================================================
@@ -707,7 +780,8 @@ admin_event_menu_handler = CallbackQueryHandler(_handle_admin_event_menu, patter
 admin_force_start_handler = CallbackQueryHandler(_handle_force_start_event, pattern="^admin_event_force_start$")
 admin_force_end_handler = CallbackQueryHandler(_handle_force_end_event, pattern="^admin_event_force_end$")
 admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern="^admin_event_force_ticket$")
-
+admin_force_ticket_job_handler = CallbackQueryHandler(_handle_force_ticket_job, pattern="^admin_force_ticket_job$")
+admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_help$")
 
 # Handler de Conversa para Limpeza de Cache (filtros aplicados nos entry points e message handlers)
 clear_cache_conv_handler = ConversationHandler(
@@ -727,6 +801,7 @@ clear_cache_conv_handler = ConversationHandler(
     ],
     per_message=False
 )
+
 
 # Handler de Conversa para Teste de Evento (filtros aplicados nos entry points e message handlers)
 test_event_conv_handler = ConversationHandler(
@@ -764,6 +839,7 @@ all_admin_handlers = [
     admin_force_start_handler,
     admin_force_end_handler,
     admin_force_ticket_handler,
+    admin_force_ticket_job_handler,
     clear_cache_conv_handler, # A conversa de cache
     test_event_conv_handler, # A conversa de teste
     grant_item_conv_handler, # A conversa de dar item
@@ -778,4 +854,5 @@ all_admin_handlers = [
     grant_skill_conv_handler,
     grant_skin_conv_handler,
     player_management_conv_handler,
+    admin_help_handler,
 ]

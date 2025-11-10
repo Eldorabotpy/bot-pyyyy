@@ -3,9 +3,8 @@
 from __future__ import annotations
 import re as _re
 import unicodedata
-from typing import AsyncIterator, Iterator, Tuple, Optional
 import logging
-# Importa as funções essenciais do nosso novo módulo 'core'
+from typing import AsyncIterator, Iterator, Tuple, Optional
 from .core import players_collection, get_player_data, save_player_data, clear_player_cache
 
 # ========================================

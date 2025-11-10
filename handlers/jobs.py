@@ -218,6 +218,74 @@ async def daily_event_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     logger.info("[JOB_TICKET] Tickets de evento entregues para %s jogadores.", delivered)
     return delivered
 
+# Em: handlers/jobs.py
+# SUBSTITUA a função 'distribute_kingdom_defense_ticket_job' por esta:
+
+async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    (NOVO JOB - VERSÃO 2, MAIS ROBUSTA) 
+    Concede 1 ticket de Defesa do Reino para todos os jogadores 
+    antes de um evento específico começar.
+    """
+    
+    job_data = context.job.data or {}
+    event_time_str = job_data.get("event_time", "horário desconhecido")
+    
+    TICKET_ID = "ticket_defesa_reino"
+    TICKET_QTY = 1
+    
+    notify_text = (
+        f"🎟️ <b>Prepare-se, defensor!</b>\n\n"
+        f"Você recebeu 1 {TICKET_ID} para a próxima invasão ao reino, que começará às <b>{event_time_str}</b>!"
+    )
+    
+    logger.info(f"[JOB_KD_TICKET] Iniciando entrega de ticket para o evento das {event_time_str}...")
+    
+    delivered = 0
+    
+    # --- !!! MUDANÇA DE LÓGICA AQUI !!! ---
+    # Vamos usar 'iter_player_ids' (Síncrono) que é mais simples e robusto
+    # do que 'iter_players' (Assíncrono) para este loop.
+    
+    all_player_ids = []
+    try:
+        # Tenta buscar todos os IDs primeiro
+        all_player_ids = list(player_manager.iter_player_ids())
+        logger.info(f"[JOB_KD_TICKET] Encontrados {len(all_player_ids)} IDs de jogadores na base de dados.")
+    except Exception as e_fetch_ids:
+        logger.error(f"Erro CRÍTICO ao buscar 'iter_player_ids': {e_fetch_ids}", exc_info=True)
+        return 0 # Não pode continuar se não consegue buscar os IDs
+
+    # Agora iteramos pela lista de IDs
+    for user_id in all_player_ids:
+        try:
+            # Carregamos os dados de CADA jogador (um de cada vez)
+            pdata = await player_manager.get_player_data(user_id)
+            if not pdata:
+                logger.warning(f"[JOB_KD_TICKET] get_player_data retornou None para o ID {user_id}. Ignorando.")
+                continue
+            
+            # Dá o ticket
+            _safe_add_stack(pdata, TICKET_ID, TICKET_QTY)
+            
+            # Salva os dados
+            await save_player_data(user_id, pdata)
+            delivered += 1
+            
+            # Tenta notificar o jogador
+            try:
+                await context.bot.send_message(chat_id=user_id, text=notify_text, parse_mode='HTML')
+                await asyncio.sleep(0.05) # 50ms de delay (mais rápido)
+            except Forbidden:
+                pass # Bot bloqueado, ignora
+            except Exception:
+                pass # Outros erros de envio, ignora
+
+        except Exception as e_player:
+            logger.warning(f"[JOB_KD_TICKET] Falha ao processar e entregar ticket para {user_id}: {e_player}")
+            
+    logger.info(f"[JOB_KD_TICKET] {delivered} jogadores receberam o ticket para o evento das {event_time_str}.")
+    return delivered
 
 async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     """Envia uma notificação de lembrete para o segundo evento do dia (assíncrono)."""
