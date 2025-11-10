@@ -16,6 +16,7 @@ from .player.queries import (
     find_player_by_name,
     find_player_by_name_norm, 
     iter_players,
+    iter_player_ids
 )
 
 # --- 3. Funções de Stats, Classes e Level Up ---
