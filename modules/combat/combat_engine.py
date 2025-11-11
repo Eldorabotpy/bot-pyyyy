@@ -55,6 +55,8 @@ async def processar_acao_combate(
     skill_effects_to_use = skill_effects.copy()
     if "low_hp_dmg_boost" in skill_effects:
         attacker_max_hp = attacker_stats.get('max_hp', 1)
+        if attacker_max_hp == 0: attacker_max_hp = 1 # Evitar divisão por zero
+        
         player_hp_percent = attacker_current_hp / attacker_max_hp
         
         if player_hp_percent < 0.3: # (Ex: menos de 30% HP)
@@ -62,9 +64,6 @@ async def processar_acao_combate(
             boost = 1.0 + skill_effects.get("low_hp_dmg_boost", 0.0)
             skill_effects_to_use["damage_multiplier"] = current_mult * boost
             log_messages.append(f"🩸 Fúria Selvagem!")
-
-    # (Nota: Efeitos de 'debuff_target' são mais complexos de unificar)
-    # (Vamos focar no dano por agora)
 
     # --- Fim da Lógica de Efeitos ---
 
@@ -83,7 +82,12 @@ async def processar_acao_combate(
         player_damage = max(1, int(player_damage_raw))
         total_damage += player_damage
         
-        log_messages.append(f"➡️ Ataque {i+1} causa {player_damage} de dano.")
+        # (Logs mais descritivos)
+        if num_attacks > 1:
+            log_messages.append(f"➡️ Golpe {i+1} causa {player_damage} de dano.")
+        else:
+            log_messages.append(f"➡️ Você causa {player_damage} de dano.")
+
         if is_mega: 
             log_messages.append("💥💥 𝐌𝐄𝐆𝐀 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!")
         elif is_crit: 
@@ -94,5 +98,4 @@ async def processar_acao_combate(
         "total_damage": total_damage,    # Dano total a ser aplicado
         "log_messages": log_messages,    # Lista de logs
         "num_hits": num_attacks          # Quantos ataques foram dados
-        # (Poderíamos adicionar "healing_done": 0, "effects_applied": [], etc.)
     }
