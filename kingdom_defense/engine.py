@@ -11,7 +11,7 @@ from modules.combat import criticals
 from modules.game_data import items as game_items
 from modules.game_data.monsters import MONSTERS_DATA
 from modules.game_data.skills import SKILL_DATA 
-
+from modules.combat import combat_engine
 
 logger = logging.getLogger(__name__)
 
@@ -358,67 +358,59 @@ class KingdomDefenseManager:
                 return { "monster_defeated": False, "game_over": False, "action_log": "\n".join(logs) }
 
     async def process_player_attack(self, user_id, player_data, player_full_stats):
-        """Calcula o dano do ataque básico de um jogador e passa para a resolução do turno."""
+        """Calcula o dano do ataque básico usando o 'combat_engine' unificado."""
         
-        # --- !!! INÍCIO DA CORREÇÃO (BUG 1) !!! ---
-        
-        # 1. VERIFICAÇÃO DE ATIVIDADE (FEITA PRIMEIRO)
         if not self.is_active or user_id not in self.active_fighters:
             return {"error": "Você não está em uma batalha ativa."}
         
-        # 2. VERIFICAÇÃO CRÍTICA DE ESTADO (SEGUNDO)
         if user_id not in self.player_states:
-            # Garante que o jogador é removido se o estado estiver corrompido
             self.active_fighters.discard(user_id) 
             return {"error": "Seu estado de batalha não foi encontrado. Tente reentrar no evento."}
 
-        # 3. EXECUÇÃO CORRETA: Agora que sabemos que o estado existe, fazemos o 'tick'.
         self._tick_effects(user_id) 
         
-        # --- !!! FIM DA CORREÇÃO (BUG 1) !!! ---
-
         player_state = self.player_states[user_id]
         mob = player_state['current_mob']
         is_boss_fight = mob.get('is_boss', False)
-        logs, num_attacks = [], 1
+        logs = []
 
+        # Pega os stats modificados por buffs/debuffs
         attacker_combat_stats = self._get_stats_with_effects(
             player_full_stats, 
             player_state.get('active_effects', [])
         )
-
-        # player_stats_engine.get_player_double_attack_chance agora é async
-        chance_dupla = await player_stats_engine.get_player_double_attack_chance(player_data) 
-    
-        if random.random() < chance_dupla:
-            num_attacks = 2
-            logs.append("⚡ Ataque Duplo!")
-
-        for _ in range(num_attacks):
-            # Aplica debuffs no alvo antes de calcular o dano
-            target_combat_stats = self._get_stats_with_effects(mob, mob.get('active_effects', []))
+        target_combat_stats = self._get_stats_with_effects(
+            mob, 
+            mob.get('active_effects', [])
+        )
         
-            damage, is_crit, is_mega = criticals.roll_damage(attacker_combat_stats, target_combat_stats, {})
+        # 1. CHAMA O CÉREBRO UNIFICADO
+        # O motor unificado já lida com o 'ataque duplo' (se skill_id=None)
+        resultado_combate = await combat_engine.processar_acao_combate(
+            attacker_stats=attacker_combat_stats,
+            target_stats=target_combat_stats,
+            skill_id=None, # 'None' significa ataque básico
+            attacker_current_hp=player_state.get('player_hp')
+        )
         
-            logs.append(f"Você ataca {mob['name']} e causa {damage} de dano.")
-            if is_mega: logs.append("💥💥 MEGA CRÍTICO!")
-            elif is_crit: logs.append("💥 DANO CRÍTICO!")
+        # 2. APLICA OS RESULTADOS
+        damage = resultado_combate["total_damage"]
+        # Adiciona os logs do motor (ex: "Ataque Duplo!", "Dano Crítico!")
+        logs.extend(resultado_combate["log_messages"])
         
-            player_state['damage_dealt'] += damage
-            if is_boss_fight: 
-                self.boss_global_hp -= damage
-            else: 
-                mob['hp'] -= damage
-            
-            mob_hp = self.boss_global_hp if is_boss_fight else mob['hp']
-            if mob_hp <= 0: 
-                break
-    
-        # Chama a função auxiliar para resolver o resto do turno, que agora é async
+        player_state['damage_dealt'] += damage
+        if is_boss_fight: 
+            self.boss_global_hp = max(0, self.boss_global_hp - damage)
+        else: 
+            mob['hp'] = max(0, mob['hp'] - damage)
+        
+        # 3. CHAMA A RESOLUÇÃO DO TURNO
+        # (Removemos a lógica de 'num_attacks' e 'criticals' daqui)
         return await self._resolve_turn(user_id, player_data, logs)
 
     async def process_player_skill(self, user_id, player_data, skill_id, target_id=None):
-        # CORREÇÃO: Adicionada a contagem regressiva dos efeitos no início do turno
+        """Processa o uso de skill, usando o 'combat_engine' para skills de ataque."""
+        
         self._tick_effects(user_id)
 
         if user_id not in self.active_fighters:
@@ -432,42 +424,44 @@ class KingdomDefenseManager:
         is_boss_fight = mob.get('is_boss', False)
 
         player_full_stats = await player_manager.get_player_total_stats(player_data) 
-    
         logs = []
 
         mana_cost = skill_info.get("mana_cost", 0)
         if player_data.get("mana", 0) < mana_cost:
             return {"error": f"Mana insuficiente! ({player_data.get('mana', 0)}/{mana_cost})"}
-    
+        
         player_data["mana"] -= mana_cost
         logs.append(f"Você usa {skill_info['display_name']}! (-{mana_cost} MP)")
 
         skill_type = skill_info.get("type")
+        skill_effects = skill_info.get("effects", {})
 
         # --- LÓGICA DE EXECUÇÃO DA SKILL ---
-        if skill_type == "attack":
+        
+        if skill_type == "active": # <-- SKILL DE ATAQUE (Ex: Sombra Demoníaca)
             
-            # --- !!! INÍCIO DA CORREÇÃO !!! ---
-            
-            # 1. Pega TODOS os efeitos da skill (que contêm os multiplicadores E o damage_type)
-            skill_effects = skill_info.get("effects", {})
-            
-            attacker_combat_stats = self._get_stats_with_effects(player_full_stats, player_state.get('active_effects', []))
-            target_combat_stats = self._get_stats_with_effects(mob, mob.get('active_effects', []))
-
-            # 2. Passa os 'skill_effects' como o 3º argumento (options)
-            # (Ainda precisamos do criticals.py para finalizar esta correção)
-            final_damage, is_crit, is_mega = criticals.roll_damage(
-                attacker_combat_stats, 
-                target_combat_stats, 
-                skill_effects  # <-- Passa os efeitos da skill para a fórmula
+            attacker_combat_stats = self._get_stats_with_effects(
+                player_full_stats, 
+                player_state.get('active_effects', [])
+            )
+            target_combat_stats = self._get_stats_with_effects(
+                mob, 
+                mob.get('active_effects', [])
             )
             
-            logs.append(f"Sua habilidade causa {final_damage} de dano!")
-            if is_mega: logs.append("💥💥 MEGA CRÍTICO!")
-            elif is_crit: logs.append("💥 DANO CRÍTICO!")
-            
-            # --- FIM DA CORREÇÃO ---
+            # 1. CHAMA O CÉREBRO UNIFICADO
+            # O motor unificado vai ler 'multi_hit', 'bonus_crit_chance', etc.
+            resultado_combate = await combat_engine.processar_acao_combate(
+                attacker_stats=attacker_combat_stats,
+                target_stats=target_combat_stats,
+                skill_id=skill_id, # <--- Passa a ID da skill
+                attacker_current_hp=player_state.get('player_hp')
+            )
+
+            # 2. APLICA OS RESULTADOS
+            final_damage = resultado_combate["total_damage"]
+            # Adiciona os logs do motor (ex: "multi_hit", "Dano Crítico!")
+            logs.extend(resultado_combate["log_messages"])
             
             if is_boss_fight:
                 self.boss_global_hp = max(0, self.boss_global_hp - final_damage)
@@ -475,6 +469,7 @@ class KingdomDefenseManager:
                 mob['hp'] = max(0, mob['hp'] - final_damage)
             player_state['damage_dealt'] += final_damage
 
+            # (Lógica de Debuff - permanece, pois é aplicada APÓS o dano)
             if "debuff_target" in skill_effects:
                 debuff_info = skill_effects["debuff_target"]
                 mob.get('active_effects', []).append({
@@ -485,67 +480,45 @@ class KingdomDefenseManager:
                 logs.append(f"🛡️ A defesa de {mob['name']} foi reduzida!")
 
         elif skill_type == "support_heal":
-            
+            # (A lógica de cura permanece idêntica, pois é específica do evento)
             heal_info = skill_info.get("effects", {})
-        
-            # --- Lógica de Cura de Grupo (Party Heal) ---
             if "party_heal" in heal_info:
-            
                 heal_amount = heal_info["party_heal"]["amount"]
-            
-                for ally_id in list(self.active_fighters): # Itera sobre uma cópia
+                for ally_id in list(self.active_fighters):
                     ally_state = self.player_states.get(ally_id)
                     ally_data = await player_manager.get_player_data(ally_id)
-                
                     if not ally_state or not ally_data: continue
-                
-                    # (BUG 2 que já corrigimos antes)
                     ally_total_stats = await player_manager.get_player_total_stats(ally_data)
                     ally_max_hp = ally_total_stats.get('max_hp', 1)
-                    
                     ally_current_hp = ally_state.get('player_hp', 0)
-                
                     healed_for = min(heal_amount, ally_max_hp - ally_current_hp)
-                
                     if healed_for > 0:
                         ally_state['player_hp'] += healed_for
-                    
                         if ally_id != user_id:
                             await player_manager.save_player_data(ally_id, ally_data)
-                        
                         logs.append(f"✨ {ally_data.get('character_name', 'Aliado')} foi curado em {healed_for} HP!")
-                
                 logs.append("🎶 A melodia restauradora atingiu todos os aliados!")
-            
-            # --- Lógica de Cura de Alvo Único (Targeted Heal) ---
             else: 
                 heal_target_id = target_id if target_id is not None else user_id 
-            
                 target_state = self.player_states.get(heal_target_id)
                 target_data = await player_manager.get_player_data(heal_target_id)
-            
                 if target_state and target_data:
                     total_target_stats = await player_manager.get_player_total_stats(target_data) 
                     max_hp = total_target_stats.get('max_hp', 1)
                     current_hp = target_state.get('player_hp', 0)
-                
                     heal_amount = heal_info.get("heal_amount", 0) 
-                
                     healed_for = min(heal_amount, max_hp - current_hp)
-                
                     if healed_for > 0:
                         target_state['player_hp'] += healed_for
-                    
                         if heal_target_id != user_id:
                             await player_manager.save_player_data(heal_target_id, target_data)
-                        
                         logs.append(f"✨ {target_data.get('character_name', 'Aliado')} foi curado em {healed_for} HP!")
                     else:
                         logs.append(f"{target_data.get('character_name', 'Aliado')} já está com a vida cheia!")
 
         elif skill_type == "support_buff":
+            # (A lógica de buff permanece idêntica)
             buff_info = skill_info.get("effects", {}).get("self_buff") 
-        
             if buff_info:
                 target_state = self.player_states.get(user_id)
                 if target_state:
@@ -558,10 +531,12 @@ class KingdomDefenseManager:
 
         # --- DECISÃO DE FIM DE TURNO ---
         if skill_type.startswith("support"):
+            # Salva o player_data (pois gastou mana)
             await player_manager.save_player_data(user_id, player_data) 
+            # Retorna sem chamar o _resolve_turn (não houve ataque)
             return { "monster_defeated": False, "action_log": "\n".join(logs) }
-    
-        # Se a skill foi de ataque, a lógica de fim de turno (vitória ou contra-ataque) continua
+        
+        # Se a skill foi de ataque, chama a resolução (vitória ou contra-ataque)
         return await self._resolve_turn(user_id, player_data, logs)
 
     def get_battle_data(self, user_id):
