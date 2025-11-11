@@ -101,9 +101,13 @@ async def _return_to_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: in
 # Em: handlers/combat/main_handler.py
 # (Função 'combat_callback' completa e corrigida)
 
+# Em: handlers/combat/main_handler.py
+# (Substitua a função 'combat_callback' inteira por esta)
+
 async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str = None) -> None:
     """
     Motor de Combate Principal (Usa o BATTLE CACHE).
+    (VERSÃO FINAL - CORRIGE O BUG DE MANA E O BUG DE DANO MÁGICO)
     """
     query = update.callback_query
     
@@ -199,34 +203,36 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         skill_id = battle_cache.pop('skill_to_use', None) 
         skill_info = SKILL_DATA.get(skill_id) if skill_id else None
         
-        # Validação de Mana
+        # --- !!! INÍCIO DA CORREÇÃO DE MANA !!! ---
         if skill_info:
             mana_cost = skill_info.get("mana_cost", 0)
             if mana_cost > 0: 
-                player_data_db = await player_manager.get_player_data(user_id)
-                if not spend_mana(player_data_db, mana_cost):
+                # 1. Lê o MP atual DO CACHE
+                current_mp = battle_cache.get('player_mp', 0)
+                
+                if current_mp < mana_cost: # <-- Compara com o cache
                     # Falhou
-                    current_mp = player_data_db.get('current_mp', 0) # Pega o mana atual para o log
                     log.append(f"❗️ Você tentou usar <b>{skill_info['display_name']}</b>, mas falhou (Mana: {current_mp}/{mana_cost}).")
                     log.append("Seu personagem usa um ataque básico.")
                     skill_info = None 
                     skill_id = None
                 else:
                     # Sucesso!
-                    await player_manager.save_player_data(user_id, player_data_db) # Salva o pdata com o mana gasto
-                    # Atualiza o cache da batalha
-                    battle_cache['player_mp'] = player_data_db.get('current_mp', 0) 
+                    # 2. Subtrai o mana DO CACHE
+                    battle_cache['player_mp'] = current_mp - mana_cost
                     log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{mana_cost} MP)")
+                    
+                    # (Nota: O mana só será salvo no DB no FIM da batalha (vitória/derrota))
             else:
                 log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>!")
+        # --- !!! FIM DA CORREÇÃO DE MANA !!! ---
         
-        # Pega os efeitos (seja da skill ou um dict vazio)
         skill_effects = skill_info.get("effects", {}) if skill_info else {}
         
         attacker_stats_modified = player_stats.copy() 
         target_stats_modified = monster_stats.copy()
         
-        # (Nota: damage_mult é agora lido DENTRO do criticals.py)
+        # (A lógica de buffs/debuffs permanece a mesma)
         num_attacks = int(skill_effects.get("multi_hit", 0))
         defense_penetration = float(skill_effects.get("defense_penetration", 0.0))
         bonus_crit_chance = float(skill_effects.get("bonus_crit_chance", 0.0))
@@ -244,42 +250,17 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         if bonus_crit_chance > 0:
             attacker_stats_modified['luck'] += int(bonus_crit_chance * 140) 
             log.append(f"🎯 Mirando um ponto vital...")
+            
+        # (Lógica para 'low_hp_dmg_boost' - Corrigida)
+        skill_effects_to_use = skill_effects.copy()
         if "low_hp_dmg_boost" in skill_effects:
             player_hp_percent = battle_cache.get('player_hp', 1) / attacker_stats_modified.get('max_hp', 1)
             if player_hp_percent < 0.3:
-                # O 'criticals.py' não lê isto, então o damage_mult tem de ser
-                # aplicado aqui... Oh, espera. 'criticals.py' NÃO lê low_hp_dmg_boost.
-                # A tua lógica antiga estava a modificar 'damage_mult' aqui.
+                current_mult = skill_effects_to_use.get("damage_multiplier", 1.0)
+                boost = 1.0 + skill_effects.get("low_hp_dmg_boost", 0.0)
+                skill_effects_to_use["damage_multiplier"] = current_mult * boost
+                log.append(f"🩸 Fúria Selvagem!")
                 
-                # VAMOS REVER:
-                # A tua lógica antiga era:
-                # damage_mult = float(skill_effects.get("damage_multiplier", 1.0))
-                # ...
-                # if "low_hp_dmg_boost" in skill_effects:
-                #     ...
-                #     damage_mult *= (1.0 + skill_effects.get("low_hp_dmg_boost", 0.0))
-                # ...
-                # player_damage = max(1, int(player_damage_raw * damage_mult))
-                
-                # A lógica de 'criticals.py' SÓ lê 'damage_multiplier'.
-                # Precisamos de *adicionar* o 'low_hp_dmg_boost' ao 'skill_effects'
-                # antes de o passarmos para 'criticals.py'
-                
-                # Vamos criar uma cópia mutável dos efeitos
-                skill_effects_modified = skill_effects.copy()
-                
-                if player_hp_percent < 0.3:
-                    current_mult = skill_effects_modified.get("damage_multiplier", 1.0)
-                    boost = 1.0 + skill_effects.get("low_hp_dmg_boost", 0.0)
-                    skill_effects_modified["damage_multiplier"] = current_mult * boost
-                    log.append(f"🩸 Fúria Selvagem!")
-                
-                # Passa os efeitos modificados para a fórmula de dano
-                skill_effects_to_use = skill_effects_modified
-            else:
-                # Passa os efeitos originais
-                skill_effects_to_use = skill_effects
-
         if "debuff_target" in skill_effects:
             debuff = skill_effects["debuff_target"]
             if debuff.get("stat") == "defense":
@@ -294,20 +275,17 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             
         monster_defeated_in_turn = False
         
-        # --- !!! ESTE É O BLOCO DE CÓDIGO CORRIGIDO !!! ---
+        # --- !!! ESTE É O BLOCO DE DANO QUE JÁ CORRIGIMOS !!! ---
         for i in range(num_attacks):
             
-            # 1. Passa os 'skill_effects' (que contêm o damage_type E o multiplier)
-            #    para a fórmula de dano. Usamos 'skill_effects_to_use'
-            #    para incluir a lógica do 'low_hp_dmg_boost'.
+            # 1. Passa os 'skill_effects' (que contêm "magic" e "low_hp")
             player_damage_raw, is_crit, is_mega = criticals.roll_damage(
                 attacker_stats_modified, 
                 target_stats_modified, 
                 skill_effects_to_use # <--- CORREÇÃO AQUI
             )
 
-            # 2. O dano 'raw' já vem com o multiplicador e o tipo (mágico) aplicado
-            #    pelo 'criticals.py'. Não precisamos multiplicar de novo.
+            # 2. Dano já vem corrigido pelo 'criticals.py'
             player_damage = max(1, int(player_damage_raw))
             
             # --- !!! FIM DA CORREÇÃO !!! ---
@@ -321,7 +299,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             if monster_stats['hp'] <= 0:
                 monster_defeated_in_turn = True
                 break
-        # --- FIM DO BLOCO CORRIGIDO ---
+        # --- FIM DO BLOCO DE DANO ---
 
         # 3. Atualizar Mídia (Turno do Jogador)
         battle_cache['battle_log'] = log
@@ -340,19 +318,19 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         # 4. Processar Resultado (Vitória ou Turno do Monstro)
         if monster_defeated_in_turn:
             # --- VITÓRIA ---
-            log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>") # <-- USA O 'name' DO CACHE
+            log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
             battle_cache['battle_log'] = log
             
             pdata = await player_manager.get_player_data(user_id)
             
-            # --- CORREÇÃO: Usa a função de cache ---
             victory_summary = await rewards.apply_and_format_victory_from_cache(pdata, battle_cache)
             _, _, level_up_msg = player_manager.check_and_apply_level_up(pdata) 
             if level_up_msg:
                 victory_summary += level_up_msg
             
-            pdata['current_hp'] = player_stats.get('max_hp', 50)
-            pdata['current_mp'] = player_stats.get('max_mana', 10)
+            # Salva o HP/MP final do cache no DB
+            pdata['current_hp'] = battle_cache.get('player_hp', player_stats.get('max_hp', 50))
+            pdata['current_mp'] = battle_cache.get('player_mp', player_stats.get('max_mana', 10))
             pdata['player_state'] = {'action': 'idle'}
             
             await player_manager.save_player_data(user_id, pdata)
@@ -371,6 +349,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             # --- TURNO DO MONSTRO ---
             battle_cache['turn'] = 'monster'
             
+            # (Lógica de Cooldowns mantida)
             active_cooldowns = battle_cache.setdefault("skill_cooldowns", {})
             skills_off_cooldown = []
             if active_cooldowns:
@@ -384,6 +363,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     skill_name = SKILL_DATA.get(skill_id_cd, {}).get('display_name', 'Habilidade')
                     log.append(f"🔔 <b>{skill_name}</b> está pronta!")
             
+            # (Lógica de Esquiva mantida)
             initiative = player_stats.get('initiative', 0)
             dodge_chance = (initiative * 0.4) / 100.0
             dodge_chance = min(dodge_chance, 0.75)
@@ -391,6 +371,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             if random.random() < dodge_chance: 
                 log.append("💨 Você se esquivou do ataque!")
             else:
+                # (Lógica de Dano do Monstro mantida)
                 monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_stats, {})
                 log.append(f"⬅️ {monster_stats['name']} ataca e causa {monster_damage} de dano.")
                 if m_is_mega: log.append("‼️ 𝕄𝔼𝔾𝔸 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
@@ -403,11 +384,11 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     battle_cache['battle_log'] = log
                     
                     pdata = await player_manager.get_player_data(user_id)
-                    # --- CORREÇÃO: Usa a função de cache ---
                     defeat_summary, _ = rewards.process_defeat_from_cache(pdata, battle_cache)
                     
-                    pdata['current_hp'] = player_stats.get('max_hp', 50)
-                    pdata['current_mp'] = player_stats.get('max_mana', 10)
+                    # Salva o HP/MP final (0) no DB
+                    pdata['current_hp'] = 0 
+                    pdata['current_mp'] = battle_cache.get('player_mp', player_stats.get('max_mana', 10))
                     pdata['player_state'] = {'action': 'idle'}
                     
                     await player_manager.save_player_data(user_id, pdata)
@@ -453,8 +434,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         fake_update = Update(update_id=0, callback_query=fake_query)
         await combat_callback(fake_update, context, action='combat_attack')
         return
-
-# Em: handlers/combat/main_handler.py
 
 async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, player_data: dict):
     """

@@ -244,4 +244,16 @@ SKILL_DATA = {
         "effects": {"cooldown_turns": 0, "damage_multiplier": 1.4, "bonus_crit_chance": 0.30},
         "allowed_classes": ["samurai"]
     },
+    "samurai_sombra_demoniaca": {
+        "display_name": "Sombra Demoníaca",
+        "description": "O samurai assume uma postura sombria, atacando duas vezes com precisão demoníaca, aumentando drasticamente a chance de acertos críticos.",
+        "type": "active", 
+        "mana_cost": 25,
+        
+        "effects": {
+            "cooldown_turns": 5, 
+            "multi_hit": 2,
+            "bonus_crit_chance": 1.0 
+        }
+    },
 }
