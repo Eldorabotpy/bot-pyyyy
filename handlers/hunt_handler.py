@@ -290,7 +290,7 @@ async def start_hunt(
     if cost > 0:
         if not player_manager.spend_energy(pdata, cost):
             if is_auto_mode:
-                 await context.bot.send_message(chat_id, "⚡️ Sua energia acabou! Caça automática finalizada.")
+                await context.bot.send_message(chat_id, "⚡️ Sua energia acabou! Caça automática finalizada.")
             elif query:
                 await query.answer(f"Energia insuficiente para caçar (precisa de {cost}).", show_alert=True)
             return
@@ -309,14 +309,33 @@ async def start_hunt(
 
     player_media_data = _get_class_media(pdata, purpose="combate") # Pega skin/classe
 
-    # 5. CRIA O CACHE DE BATALHA
+    # --- !!! INÍCIO DA CORREÇÃO DE MANA !!! ---
+    # 1. Pega o HP e MP MÁXIMOS dos stats totais
+    max_hp = total_stats_jogador.get('max_hp', 50)
+    max_mp = total_stats_jogador.get('max_mana', 10)
+    
+    # 2. Pega o HP e MP atuais da base de dados
+    current_hp = pdata.get('current_hp', max_hp)
+    current_mp = pdata.get('current_mp', max_mp)
+    
+    # 3. Garante que o HP e MP atuais não sejam maiores que o máximo
+    #    (Isto sincroniza o HP/MP no início da batalha)
+    current_hp = min(current_hp, max_hp)
+    current_mp = min(current_mp, max_mp)
+    # --- !!! FIM DA CORREÇÃO DE MANA !!! ---
+
+
+    # 5. CRIA O CACHE DE BATALHA (Corrigido)
     battle_cache = {
         'player_id': user_id,
         'chat_id': chat_id,
         'player_name': pdata.get('character_name', 'Herói'),
         'player_stats': total_stats_jogador, # Stats totais (ATK, DEF, etc.)
-        'player_hp': pdata.get('current_hp'), # HP atual
-        'player_mp': pdata.get('current_mp'), # MP atual
+        
+        # --- Usa os valores sincronizados ---
+        'player_hp': current_hp,
+        'player_mp': current_mp, 
+        
         'player_media_id': player_media_data.get('id') if player_media_data else None,
         'player_media_type': (player_media_data.get('type') or 'photo').lower() if player_media_data else 'photo',
         
@@ -332,8 +351,10 @@ async def start_hunt(
         'skill_cooldowns': {}, 
     }
 
-    # 6. Atualiza o Estado do Jogador
+    # 6. Atualiza o Estado do Jogador (e o HP/MP no DB, se tiverem mudado)
     pdata["player_state"] = {"action": "in_combat"}
+    pdata["current_hp"] = current_hp
+    pdata["current_mp"] = current_mp
     await player_manager.save_player_data(user_id, pdata)
 
     # 7. Formata a Mensagem Inicial (usando o cache)

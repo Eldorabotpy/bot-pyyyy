@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Dict, Any, List
 import logging
 logger = logging.getLogger(__name__)
+
 EVOLUTIONS: Dict[str, Dict[str, Any]] = {
     # ========================= # GUERREIRO # =========================
     "guerreiro": {
