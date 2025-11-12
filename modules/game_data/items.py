@@ -123,12 +123,15 @@ ITEMS_DATA = {
      "joia_da_forja": {
         "display_name": "Joia de Aprimoramento",
         "emoji": "💎",
+        "type": "especial",
+        "category": "especial",
     },
 
      "sigilo_protecao": {
         "display_name": "Sigilo de Proteção",
         "emoji": "✨",
         "type": "especial",
+        "category": "especial",
      },
      
     "gems": {
@@ -138,10 +141,6 @@ ITEMS_DATA = {
         "type": "currency",     # Sugestão: bom para organizar seus itens
         "stackable": True,      # Moedas são sempre empilháveis
     
-    },
-    "pergaminho_durabilidade": {
-        "display_name": "Pergaminho de Durabilidade",
-        "emoji": "📜",
     },
 
     # ================================
