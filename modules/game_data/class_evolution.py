@@ -1070,3 +1070,57 @@ def get_evolution_options(
             if show_locked or current_level >= min_lvl:
                 options.append({"tier": tier, **opt})
     return options
+
+# Mapeamento para acelerar a busca de pais/evoluções
+# Key: Classe atual (ex: 'templario'), Value: Classe base (ex: 'guerreiro')
+_CLASS_HIERARCHY_MAP: Dict[str, str] = {}
+
+def _build_hierarchy_map():
+    """Constrói o mapa de hierarquia de classes (Parent/Base)."""
+    global _CLASS_HIERARCHY_MAP
+    if _CLASS_HIERARCHY_MAP:
+        return
+    
+    for base_class, evolutions in EVOLUTIONS.items():
+        # A classe base é seu próprio pai base
+        _CLASS_HIERARCHY_MAP[base_class] = base_class
+        
+        # Mapeia toda a cadeia de evolução para a classe base
+        for evo in evolutions:
+            to_class = evo.get("to")
+            if to_class:
+                _CLASS_HIERARCHY_MAP[to_class] = base_class
+
+_build_hierarchy_map()
+
+
+def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> bool:
+    """
+    Verifica se o jogador pode usar a skill:
+    1. Se a classe atual do jogador está na lista de classes permitidas.
+    2. Se a classe base (raiz da árvore de evolução) está na lista de classes permitidas.
+    
+    Args:
+        player_class_key: A classe atual do jogador (normalizada).
+        allowed_classes: Lista de classes permitidas da skill (do SKILL_DATA).
+    """
+    if not allowed_classes:
+        # Se nenhuma classe estiver listada, a skill é universal
+        return True
+
+    player_class_key = player_class_key.lower()
+    allowed_classes_lower = {c.lower() for c in allowed_classes}
+    
+    # 1. Checagem direta: A classe do jogador é permitida?
+    if player_class_key in allowed_classes_lower:
+        return True
+    
+    # 2. Checagem de herança: A skill é permitida para a classe BASE da árvore?
+    # Se uma skill é liberada para a classe T1 (e não só para a T1),
+    # presume-se que classes posteriores na mesma árvore possam usá-la.
+    base_class = _CLASS_HIERARCHY_MAP.get(player_class_key)
+
+    if base_class and base_class in allowed_classes_lower:
+        return True
+
+    return False
