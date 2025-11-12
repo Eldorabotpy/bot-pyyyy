@@ -34,13 +34,19 @@ async def processar_acao_combate(
     defense_penetration = float(skill_effects.get("defense_penetration", 0.0))
     bonus_crit_chance = float(skill_effects.get("bonus_crit_chance", 0.0))
 
-    if num_attacks == 0:
-        # Lógica de ataque duplo por iniciativa (ataque básico)
+    # --- NOVO BLOCO DE DETERMINAÇÃO DO NÚMERO DE ATAQUES ---
+    if skill_id:
+        # Se uma skill foi usada, o número de ataques é o multi_hit da skill, ou 1 por padrão.
+        num_attacks = int(skill_effects.get("multi_hit", 1))
+    else:
+        # É um ataque BÁSICO. Calcula a chance de ataque duplo por iniciativa.
         initiative = attacker_stats_modified.get('initiative', 0)
         double_attack_chance = (initiative * 0.25) / 100.0
         num_attacks = 2 if random.random() < min(double_attack_chance, 0.50) else 1
-        if num_attacks == 2 and not skill_id:
-             log_messages.append("⚡ 𝐀𝐓𝐀Q𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
+        
+        if num_attacks == 2:
+            log_messages.append("⚡ 𝐀𝐓𝐀Q𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
+    # --- FIM DO BLOCO DE DETERMINAÇÃO ---
     
     if defense_penetration > 0:
         target_stats_modified['defense'] = int(target_stats_modified['defense'] * (1.0 - defense_penetration))
