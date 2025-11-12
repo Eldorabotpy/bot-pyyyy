@@ -333,3 +333,37 @@ async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE
         monster_id,
         target_class # Passa a classe alvo para o 'finalize_evolution' saber
     )
+    # ====================================================================
+# HANDLERS DE EXPORTAÇÃO (Para serem importados pelo registries/character.py)
+# ====================================================================
+
+# Handler para abrir o menu da Árvore de Ascensão
+# Esta variável é a que está faltando no seu registry!
+status_evolution_open_handler = CallbackQueryHandler(
+    open_evolution_menu, 
+    pattern=r'^open_evolution_menu$'
+)
+
+# Handler para ver a informação/custo de um nó (tarefa)
+show_node_info_handler = CallbackQueryHandler(
+    show_node_info, 
+    pattern=r'^evo_node_info:'
+)
+
+# Handler para completar a tarefa (pagar o custo)
+complete_node_handler = CallbackQueryHandler(
+    complete_node, 
+    pattern=r'^evo_complete_node:'
+)
+
+# Handler para a tela de confirmação do teste final
+start_trial_confirmation_handler = CallbackQueryHandler(
+    start_trial_confirmation, 
+    pattern=r'^evo_start_trial_confirm:'
+)
+
+# Handler para iniciar a execução da batalha
+start_trial_execute_handler = CallbackQueryHandler(
+    start_trial_execute, 
+    pattern=r'^evo_start_trial_execute:'
+)

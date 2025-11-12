@@ -19,7 +19,7 @@ from handlers.utils import format_combat_message_from_cache, format_combat_messa
 
 from modules.combat import durability, criticals, rewards
 from modules.dungeons import runtime as dungeons_runtime
-from handlers.class_evolution_handler import open_evolution
+from handlers.class_evolution_handler import open_evolution_menu
 from handlers.hunt_handler import start_hunt # (Usado pelo fallback de auto-hunt)
 from modules.game_data.skills import SKILL_DATA
 from modules.player.actions import spend_mana
@@ -566,7 +566,8 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                 success, message = await class_evolution_service.finalize_evolution(user_id, target_class)
                 if query: await query.delete_message()
                 await context.bot.send_message(chat_id=chat_id, text=f"🎉 {message} 🎉", parse_mode="HTML")
-                await open_evolution(update, context) 
+                # NOME DA FUNÇÃO CORRIGIDO
+                await open_evolution_menu(update, context) 
                 return
             if in_dungeon:
                 xp_reward, gold_reward, looted_items_list = rewards.calculate_victory_rewards(player_data, combat_details)

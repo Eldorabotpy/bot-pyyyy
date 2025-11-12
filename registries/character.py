@@ -1,5 +1,3 @@
-# registries/character.py (VERSÃO CORRIGIDA FINAL)
-
 from telegram.ext import Application
 
 # 1. Do fluxo de início e criação de personagem
@@ -28,7 +26,7 @@ from handlers.profile_handler import (
 from handlers.inventory_handler import (
     inventory_handler,
     noop_inventory_handler,
-    use_item_handler,  # <-- (NOVO) Importa o handler "Usar Item"
+    use_item_handler,
 )
 from handlers.converter_handler import (
     converter_main_handler,
@@ -46,14 +44,19 @@ from handlers.equipment_handler import (
     equip_unequip_handler,
 )
 
-# 4. Das Classes e Evolução
+# 4. Das Classes e Evolução - CORRIGIDO AQUI
 from handlers.class_selection_handler import class_selection_handler
 from handlers.class_evolution_handler import (
     status_evolution_open_handler,
-    evolution_command_handler,
-    evolution_callback_handler,
-    evolution_do_handler,
-    evolution_cancel_handler,
+    # Novos Handlers que correspondem às definições no class_evolution_handler.py:
+    show_node_info_handler,         
+    complete_node_handler,          
+    start_trial_confirmation_handler, 
+    start_trial_execute_handler,    
+    # evolution_command_handler, # Presumido como não existente/obsoleto
+    # evolution_callback_handler, # Presumido como não existente/obsoleto
+    # evolution_do_handler,       # Presumido como não existente/obsoleto
+    # evolution_cancel_handler,   # Presumido como não existente/obsoleto
 )
 
 # 5. Das Profissões
@@ -83,16 +86,16 @@ def register_character_handlers(application: Application):
         
         inventory_handler,
         noop_inventory_handler,
-        use_item_handler,  # <-- (NOVO) Regista o handler "Usar Item"
+        use_item_handler,
         
-        # Handlers de Skills (Nova secção)
+        # Handlers de Skills
         skills_menu_handler,
         skills_equip_menu_handler,
         equip_skill_handler,
         unequip_skill_handler,
         noop_handler,
         
-        # (NOVO) Handlers do Conversor
+        # Handlers do Conversor
         converter_main_handler,
         converter_list_handler,
         converter_confirm_handler,
@@ -104,24 +107,24 @@ def register_character_handlers(application: Application):
         equip_pick_handler,
         equip_unequip_handler,
         
-        # Classes e Evolução
+        # Classes e Evolução - CORRIGIDO AQUI
         class_selection_handler,
         status_evolution_open_handler,
-        evolution_command_handler,
-        evolution_callback_handler,
-        evolution_do_handler,
-        evolution_cancel_handler,
+        
+        # Novos Handlers de Evolução Registrados:
+        show_node_info_handler,
+        complete_node_handler,
+        start_trial_confirmation_handler,
+        start_trial_execute_handler,
         
         # Profissões
         job_menu_handler,
         job_pick_handler,
     ]
     normal_handlers.extend(all_skin_handlers)
-    # --- CORREÇÃO APLICADA AQUI ---
-    # Registramos os handlers normais primeiro
+    
+    # Registramos os handlers normais
     application.add_handlers(normal_handlers)
 
-    # Registramos o 'character_creation_handler' SEPARADAMENTE
-    # e o colocamos no group=1 (prioridade menor)
+    # Registramos o 'character_creation_handler' SEPARADAMENTE no group=1 (prioridade menor)
     application.add_handler(character_creation_handler, group=1)
-    # --- FIM DA CORREÇÃO ---
