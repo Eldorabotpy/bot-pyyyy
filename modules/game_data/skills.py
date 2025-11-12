@@ -335,7 +335,8 @@ SKILL_DATA = {
             "cooldown_turns": 5, 
             "multi_hit": 2,
             "bonus_crit_chance": 1.0, 
-            "damage_multiplier": 0.9
+            "damage_multiplier": 0.9,
+        "allowed_classes": ["samurai"]     
         }
     },
 }

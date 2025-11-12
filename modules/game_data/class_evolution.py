@@ -1093,34 +1093,58 @@ def _build_hierarchy_map():
 
 _build_hierarchy_map()
 
+_DIRECT_PARENT_MAP: Dict[str, str] = {}
+
+def _build_direct_parent_map():
+    """Constrói o mapa de parentesco direto e atualiza o Hierarchy Map (para garantir)."""
+    global _DIRECT_PARENT_MAP
+    # Itera sobre todas as árvores de evolução
+    for base_class, evolutions in EVOLUTIONS.items():
+        current_parent = base_class
+        for evo in evolutions:
+            to_class = evo.get("to")
+            if to_class:
+                _DIRECT_PARENT_MAP[to_class] = current_parent
+                current_parent = to_class # O filho se torna o pai da próxima TIER
+    
+_build_direct_parent_map()
+
+def get_class_ancestry(current_class: str) -> List[str]:
+    """Retorna a cadeia de evolução do jogador: [classe_atual, pai, avô, base]"""
+    ancestry = []
+    current = current_class.lower()
+    
+    # Percorre o mapa de pais até encontrar a classe base
+    while current and current not in ancestry:
+        ancestry.append(current)
+        parent = _DIRECT_PARENT_MAP.get(current)
+        if not parent or parent == current:
+            break
+        current = parent
+    
+    return ancestry
+
+
+# --- SUBSTITUIÇÃO DA FUNÇÃO can_player_use_skill COM A NOVA LÓGICA ---
 
 def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> bool:
     """
-    Verifica se o jogador pode usar a skill:
-    1. Se a classe atual do jogador está na lista de classes permitidas.
-    2. Se a classe base (raiz da árvore de evolução) está na lista de classes permitidas.
-    
-    Args:
-        player_class_key: A classe atual do jogador (normalizada).
-        allowed_classes: Lista de classes permitidas da skill (do SKILL_DATA).
+    Verifica se o jogador pode usar a skill verificando a classe atual 
+    E TODA A SUA CADEIA DE EVOLUÇÃO (T3, T2, T1).
     """
     if not allowed_classes:
-        # Se nenhuma classe estiver listada, a skill é universal
-        return True
-
+        return True # Skills universais/de evento sem restrição
+    
     player_class_key = player_class_key.lower()
+    
+    # 1. Obter a ancestralidade (T3, T2, T1)
+    # Se 'templario', retorna ['templario', 'cavaleiro', 'guerreiro']
+    ancestry = get_class_ancestry(player_class_key)
     allowed_classes_lower = {c.lower() for c in allowed_classes}
-    
-    # 1. Checagem direta: A classe do jogador é permitida?
-    if player_class_key in allowed_classes_lower:
-        return True
-    
-    # 2. Checagem de herança: A skill é permitida para a classe BASE da árvore?
-    # Se uma skill é liberada para a classe T1 (e não só para a T1),
-    # presume-se que classes posteriores na mesma árvore possam usá-la.
-    base_class = _CLASS_HIERARCHY_MAP.get(player_class_key)
 
-    if base_class and base_class in allowed_classes_lower:
-        return True
+    # 2. Verificar se qualquer classe na cadeia pode usar a skill
+    for class_node in ancestry:
+        if class_node in allowed_classes_lower:
+            return True
 
     return False
