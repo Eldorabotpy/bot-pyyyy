@@ -1,135 +1,246 @@
-# modules/class_evolution_service.py (VERSÃO CORRIGIDA PARA LISTA DE SKILLS)
+# modules/class_evolution_service.py
+# (VERSÃO NOVA - LÊ O SISTEMA "CAMINHO DA ASCENSÃO")
 
 from __future__ import annotations
-from typing import Dict, Tuple, Optional, List
-from modules.game_data.class_evolution import EVOLUTIONS
+from typing import Dict, Tuple, Optional, List, Any
 from modules import player_manager
+from modules.game_data import class_evolution as evo_data # Importa o ficheiro de DADOS
 
-# (As funções de acesso a dados _inventory_has e _consume_items estão corretas)
+# ================================================
+# Funções Auxiliares (Não mudaram)
 # ================================================
 def _inventory_has(pdata: Dict, required_items: Dict[str, int]) -> bool:
-    """Verifica se o jogador tem os itens, usando o player_manager."""
+    """Verifica se o jogador tem os itens."""
     for item_id, qty in required_items.items():
         if not player_manager.has_item(pdata, item_id, qty):
             return False
     return True
 
-def _consume_items(pdata: Dict, required_items: Dict[str, int]) -> None:
-    """Consome os itens do inventário, usando o player_manager."""
+def _consume_items(pdata: Dict, required_items: Dict[str, int]) -> bool:
+    """Consome os itens do inventário."""
+    # (Verifica de novo por segurança, caso seja chamado diretamente)
+    if not _inventory_has(pdata, required_items):
+        return False
+        
     for item_id, qty in required_items.items():
         player_manager.remove_item_from_inventory(pdata, item_id, qty)
+    return True
+
+def _consume_gold(pdata: Dict, amount: int) -> bool:
+    """Consome ouro do jogador."""
+    current_gold = pdata.get("gold", 0)
+    if current_gold < amount:
+        return False
+    pdata["gold"] = current_gold - amount
+    return True
+
+# ================================================
+# NOVAS FUNÇÕES DE LÓGICA
 # ================================================
 
-
-# <<< MUDANÇA (INÍCIO): Função _find_evolution_option corrigida >>>
-def _find_evolution_option(current_class: str, target_class: str) -> Optional[Dict]:
-    """Encontra a definição de uma evolução específica, procurando em T2 e T3."""
-    curr = (current_class or "").lower()
-    
-    # 1. Tenta encontrar como uma T2 (ex: guerreiro -> cavaleiro)
-    # Procura na classe base 'current_class'
-    base_data = EVOLUTIONS.get(curr)
-    if base_data:
-        for opt in base_data.get("tier2", []):
-            if opt.get("to") == target_class:
-                return {"tier": "tier2", **opt}
-
-    # 2. Se não, procura em TODAS as T3 (ex: cavaleiro -> templario)
-    # Itera por todas as classes base (guerreiro, mago, etc.)
-    for base_class_key, base_class_data in EVOLUTIONS.items():
-        # Procura nas T3 dessa classe
-        for opt in base_class_data.get("tier3", []):
-            if opt.get("to") == target_class:
-                # Se encontrou, verifica se a classe atual é permitida
-                req_from = opt.get("from_any_of")
-                if isinstance(req_from, list) and curr in req_from:
-                    return {"tier": "tier3", **opt}
-    
-    return None # Não encontrou
-# <<< MUDANÇA (FIM): Função _find_evolution_option corrigida >>>
-
-
-def can_evolve_to(pdata: dict, target_class: str) -> Tuple[bool, str, Optional[Dict]]:
-    """Checa se o jogador pode evoluir para 'target_class' (versão síncrona)."""
-    if not pdata:
-        return False, "Jogador não encontrado.", None
-        
+def get_player_evolution_status(pdata: dict) -> Dict[str, Any]:
+    """
+    Verifica o estado da próxima evolução do jogador, incluindo o progresso
+    no "Caminho da Ascensão" (a árvore).
+    """
     current_class = (pdata.get("class") or "").lower()
-    level = int(pdata.get("level") or 1)
+    current_level = int(pdata.get("level") or 1)
+    
+    # 1. Encontra a próxima evolução disponível
+    evo_opt = evo_data.get_evolution_options(current_class)
+    
+    if not evo_opt:
+        return {"status": "max_tier", "message": "Você atingiu o auge da sua classe."}
 
-    opt = _find_evolution_option(current_class, target_class) # Síncrono
-    if not opt:
-        return False, "Evolução inválida para sua classe atual.", None
+    min_lvl = evo_opt.get("min_level", 999)
+    
+    # 2. Verifica se o nível mínimo foi atingido
+    if current_level < min_lvl:
+        return {
+            "status": "locked", 
+            "message": f"Requer Nível {min_lvl} para iniciar este caminho.",
+            "option": evo_opt
+        }
 
-    # (Esta verificação 'from_any_of' é redundante pois _find_evolution_option já a faz, mas mantemos por segurança)
-    req_from = opt.get("from_any_of")
-    if isinstance(req_from, list) and current_class not in req_from:
-        return False, "Essa evolução requer uma especialização anterior específica.", opt
+    # 3. Processa a "Árvore" (Ascension Path)
+    ascension_path = evo_opt.get("ascension_path", [])
+    if not ascension_path:
+        # (Fallback para 'required_items' se a árvore não foi definida)
+        return _check_legacy_evolution(pdata, evo_opt)
 
-    min_lvl = int(opt.get("min_level") or 0)
-    if level < min_lvl:
-        return False, f"Requer nível {min_lvl}.", opt
+    player_progress = pdata.get("evolution_progress", {})
+    path_nodes = [] # A lista de tarefas para mostrar ao jogador
+    all_nodes_complete = True
+    next_node_unlocked = True # O primeiro nó está sempre desbloqueado
 
-    req_items = opt.get("required_items") or {}
-    if not _inventory_has(pdata, req_items): # Síncrono
-        return False, "Faltam itens necessários.", opt
+    for node in ascension_path:
+        node_id = node["id"]
+        is_complete = player_progress.get(node_id, False)
+        
+        node_status = "locked" # (Status padrão: 🔒)
+        
+        if is_complete:
+            node_status = "complete" # (Status: ✅)
+        elif next_node_unlocked:
+            # Este é o próximo nó disponível
+            node_status = "available" # (Status: 🔘)
+            all_nodes_complete = False
+            next_node_unlocked = False # Bloqueia os próximos até este ser feito
+        else:
+            # Este é um nó futuro, mas não o próximo
+            all_nodes_complete = False
+            
+        path_nodes.append({
+            "id": node_id,
+            "desc": node["desc"],
+            "cost": node.get("cost", {}),
+            "status": node_status
+        })
 
-    return True, "Requisitos atendidos.", opt
+    # 4. Retorna o status completo
+    return {
+        "status": "path_available",
+        "message": f"Siga o Caminho da Ascensão para se tornar um {evo_opt['to'].title()}.",
+        "option": evo_opt,
+        "path_nodes": path_nodes,
+        "all_nodes_complete": all_nodes_complete
+    }
+
+def _check_legacy_evolution(pdata: dict, evo_opt: dict) -> Dict[str, Any]:
+    """Função de fallback para evoluções que ainda usam 'required_items'."""
+    req_items = evo_opt.get("required_items", {})
+    if _inventory_has(pdata, req_items):
+        return {
+            "status": "trial_ready", # Pronto para o teste (sistema antigo)
+            "message": "Você tem os itens. Pronto para o teste!",
+            "option": evo_opt,
+            "all_nodes_complete": True # (Considerado completo)
+        }
+    else:
+        return {
+            "status": "path_available", # Mostra os itens em falta
+            "message": "Reúna os itens necessários.",
+            "option": evo_opt,
+            "path_nodes": [], # Sem árvore, o handler deve mostrar 'required_items'
+            "all_nodes_complete": False
+        }
+
+async def attempt_ascension_node(user_id: int, node_id: str) -> Tuple[bool, str]:
+    """
+    Tenta completar um "nó" (tarefa) da árvore de ascensão.
+    Consome os itens/ouro se o jogador os tiver.
+    """
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        return False, "Erro: Jogador não encontrado."
+        
+    status = get_player_evolution_status(pdata)
+    
+    # Encontra o nó que o jogador está a tentar ativar
+    node_to_complete = None
+    if status.get("status") == "path_available":
+        for node in status.get("path_nodes", []):
+            if node["id"] == node_id and node["status"] == "available":
+                node_to_complete = node
+                break
+    
+    if not node_to_complete:
+        return False, "Esta tarefa não está disponível ou já foi completada."
+        
+    # Verifica o custo (Itens e Ouro)
+    cost = node_to_complete.get("cost", {})
+    required_items = {k: v for k, v in cost.items() if k != "gold"}
+    required_gold = cost.get("gold", 0)
+    
+    # 1. Verifica Ouro
+    if pdata.get("gold", 0) < required_gold:
+        return False, f"Ouro insuficiente. Requer {required_gold} 🪙."
+    
+    # 2. Verifica Itens
+    if not _inventory_has(pdata, required_items):
+        return False, "Itens insuficientes."
+
+    # 3. SUCESSO! Consome tudo e salva o progresso.
+    _consume_gold(pdata, required_gold)
+    _consume_items(pdata, required_items)
+    
+    # Salva o progresso
+    if "evolution_progress" not in pdata:
+        pdata["evolution_progress"] = {}
+    pdata["evolution_progress"][node_id] = True
+    
+    await player_manager.save_player_data(user_id, pdata)
+    
+    return True, f"Tarefa '{node_to_complete['desc']}' concluída!"
+
 
 async def start_evolution_trial(user_id: int, target_class: str) -> dict:
     """
-    Verifica os requisitos, consome os itens e retorna as informações
-    para o handler iniciar a Batalha de Provação.
+    Verifica se o Caminho da Ascensão está completo e retorna os dados
+    para a Batalha de Provação.
     """
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         return {'success': False, 'message': "Erro: Jogador não encontrado."}
         
-    ok, msg, opt = can_evolve_to(pdata, target_class)
+    status = get_player_evolution_status(pdata)
     
-    if not ok or not opt:
-        return {'success': False, 'message': msg}
+    # Verifica se a evolução alvo é a correta
+    if status.get("option", {}).get("to") != target_class:
+        return {'success': False, 'message': "Esta não é a sua próxima evolução."}
+        
+    # Verifica se o caminho (árvore) está completo
+    if not status.get("all_nodes_complete", False):
+        return {'success': False, 'message': "Você deve completar todo o Caminho da Ascensão primeiro."}
 
-    req_items = opt.get("required_items") or {}
-    _consume_items(pdata, req_items)
+    # (Lógica de 'required_items' do sistema antigo é movida para cá, como fallback)
+    # Se o sistema for antigo E usa 'required_items'
+    if "ascension_path" not in status.get("option", {}):
+        req_items = status["option"].get("required_items", {})
+        if not _consume_items(pdata, req_items):
+            return {'success': False, 'message': "Erro ao consumir itens (fallback)."}
+        await player_manager.save_player_data(user_id, pdata)
     
-    await player_manager.save_player_data(user_id, pdata)
-    
+    # Sucesso!
     return {
         'success': True,
-        'message': 'Você entregou os materiais e está pronto para a sua provação!',
-        'trial_monster_id': opt.get('trial_monster_id')
+        'message': 'Você completou o Caminho e está pronto para a sua provação!',
+        'trial_monster_id': status["option"].get('trial_monster_id')
     }
 
 
-# <<< MUDANÇA (INÍCIO): Função finalize_evolution corrigida >>>
 async def finalize_evolution(user_id: int, target_class: str) -> Tuple[bool, str]:
     """
     Esta função é chamada APÓS o jogador vencer a batalha de provação.
-    Ela efetivamente muda a classe e adiciona as novas habilidades (plural).
+    Ela efetivamente muda a classe e adiciona as novas habilidades.
     """
     pdata = await player_manager.get_player_data(user_id)
-    # (Usa a função corrigida _find_evolution_option)
-    opt = _find_evolution_option((pdata.get("class") or "").lower(), target_class)
+    
+    # Usa a nova função 'find_evolution_by_target' do ficheiro de DADOS
+    opt = evo_data.find_evolution_by_target(target_class)
     
     if not pdata or not opt:
         return False, "Erro ao finalizar a evolução. Dados não encontrados."
+        
+    # Verifica se a classe atual é a correta para esta evolução
+    current_class = (pdata.get("class") or "").lower()
+    if opt.get("from") != current_class:
+        return False, f"Erro de lógica: Sua classe atual ({current_class}) não pode evoluir para {target_class}."
 
     # 1. Altera a classe do jogador
     pdata["class"] = target_class
     
-    # 2. Adiciona as novas habilidades (agora uma lista)
+    # 2. LIMPA o progresso da árvore antiga
+    # (Para que o jogador não tenha 'cav_node_1' quando for T3)
+    pdata["evolution_progress"] = {}
+    
+    # 3. Adiciona as novas habilidades (agora uma lista)
     if "skills" not in pdata or not isinstance(pdata["skills"], list):
         pdata["skills"] = []
 
-    # Pega a nova lista (plural)
     new_skill_ids = opt.get("unlocks_skills", [])
-    
-    # Fallback para a chave antiga (singular), caso tenhamos esquecido de atualizar
-    if not new_skill_ids and opt.get("unlocks_skill"):
-        new_skill_ids = [opt.get("unlocks_skill")]
-
     skills_adicionadas = 0
+    
     if new_skill_ids:
         for skill_id in new_skill_ids:
             if skill_id and skill_id not in pdata["skills"]:
@@ -144,4 +255,3 @@ async def finalize_evolution(user_id: int, target_class: str) -> Tuple[bool, str
         msg_final += f"\nVocê aprendeu {skills_adicionadas} nova{s} habilidade{s}!"
         
     return True, msg_final
-# <<< MUDANÇA (FIM): Função finalize_evolution corrigida >>>

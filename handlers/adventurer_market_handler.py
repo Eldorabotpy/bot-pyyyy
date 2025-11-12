@@ -830,11 +830,25 @@ async def _show_lote_qty_spinner(q, context, chat_id: int, caption_prefix: str =
     
     await _safe_edit_or_send(q, context, chat_id, caption, kb)
 
+# Em: handlers/adventurer_market_handler.py
+# Substitua a função 'market_lote_qty_spin' inteira por esta:
+
 async def market_lote_qty_spin(update, context):
     """Handler para os botões +1, -1, +10, -10 do spinner de LOTES."""
     q = update.callback_query
     await q.answer()
     chat_id = update.effective_chat.id
+
+    # --- 👇 INÍCIO DA CORREÇÃO 👇 ---
+    # Verifica se o estado 'pending' ainda existe
+    pending = context.user_data.get("market_pending")
+    if not pending:
+        logger.warning("market_lote_qty_spin: 'pending' state missing. Cancelling.")
+        await q.answer("Sua sessão expirou. Por favor, tente novamente.", show_alert=True)
+        # Tenta cancelar de forma graciosa
+        await market_cancel_new(update, context) 
+        return
+    # --- 👆 FIM DA CORREÇÃO 👆 ---
 
     cur = max(1, int(context.user_data.get("market_lote_qty", 1)))
     max_qty = max(1, int(context.user_data.get("market_lote_max", 1)))
@@ -849,8 +863,7 @@ async def market_lote_qty_spin(update, context):
         
     context.user_data["market_lote_qty"] = cur
 
-    # Simplesmente atualiza a mensagem
-    pending = context.user_data.get("market_pending")
+    # Agora 'pending' está verificado e é seguro usar
     item_label = _item_label_from_base(pending["base_id"])
     pack_qty = int(pending.get("qty", 1))
     qty_have = int(pending.get("qty_have", 0))
@@ -863,6 +876,9 @@ async def market_lote_qty_spin(update, context):
     await _safe_edit_or_send(q, context, chat_id, caption, kb)
 
 
+# Em: handlers/adventurer_market_handler.py
+# Substitua a função 'market_lote_qty_confirm' inteira por esta:
+
 async def market_lote_qty_confirm(update, context):
     """Confirma a quantidade de lotes e avança para o spinner de PREÇO."""
     q = update.callback_query
@@ -870,9 +886,18 @@ async def market_lote_qty_confirm(update, context):
     chat_id = update.effective_chat.id
     
     # A quantidade de lotes já está em context.user_data["market_lote_qty"]
-    # Apenas avançamos para o spinner de preço
     
+    # --- 👇 INÍCIO DA CORREÇÃO 👇 ---
     pending = context.user_data.get("market_pending")
+    if not pending:
+        logger.warning("market_lote_qty_confirm: 'pending' state missing. Cancelling.")
+        await q.answer("Sua sessão expirou. Por favor, tente novamente.", show_alert=True)
+        # Tenta cancelar de forma graciosa
+        await market_cancel_new(update, context) 
+        return
+    # --- 👆 FIM DA CORREÇÃO 👆 ---
+
+    # Agora 'pending' está verificado e é seguro usar
     item_label = _item_label_from_base(pending["base_id"])
     pack_qty = int(pending.get("qty", 1))
     lote_qty = int(context.user_data.get("market_lote_qty", 1))
@@ -887,11 +912,6 @@ async def market_lote_qty_confirm(update, context):
     )
     
     await _show_price_spinner(q, context, chat_id, caption_prefix)
-
-# =================================================================
-# <<< CORREÇÃO DE INDENTAÇÃO COMEÇA AQUI >>>
-# Todas as funções abaixo estavam com espaços a mais
-# =================================================================
 
 async def market_price_spin(update, context):
     q = update.callback_query

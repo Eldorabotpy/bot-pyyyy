@@ -138,7 +138,11 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
     battle_cache = context.user_data.get('battle_cache')
     mana_cost = skill_info.get("mana_cost", 0)
     cooldown = skill_info.get("effects", {}).get("cooldown_turns", 0)
-
+    
+    # 🌟 NOVO: Define se o turno deve ser encerrado ou se permite outra ação.
+    is_support = skill_info.get("type") == "support"
+    
+    # 1. TRATAMENTO VIA BATTLE_CACHE (Modo Novo)
     if battle_cache and battle_cache.get('player_id') == user_id:
             
         active_cooldowns = battle_cache.setdefault("skill_cooldowns", {})
@@ -155,15 +159,17 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
                 await query.answer(f"Você não tem Mana ({mana_cost}) suficiente!", show_alert=True)
                 return
 
+        # Aplica Cooldown e Custo
         if cooldown > 0:
             active_cooldowns[skill_id] = cooldown + 1 
-
-
-        battle_cache['skill_to_use'] = skill_id
+        battle_cache['player_mp'] -= mana_cost # Diminui o MP diretamente no cache
         
+        battle_cache['skill_to_use'] = skill_id
+        # 🌟 NOVO: Adiciona a flag para sinalizar que é uma ação de suporte/buff.
+        battle_cache['action_type'] = "support" if is_support else "attack"
+        
+    # 2. TRATAMENTO VIA PLAYER_STATE (Modo Legado/Calabouço)
     else:
-        # --- MODO CALABOUÇO (LEGADO) ---
-
         player_data = await player_manager.get_player_data(user_id)
         state = player_data.get('player_state', {})
         if state.get('action') != 'in_combat':
@@ -179,7 +185,9 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
             await query.answer(f"{skill_info['display_name']} está em recarga!", show_alert=True)
             return
 
+        # Verifica e Gasta Mana (Ação de Batalha de Suporte não gasta turno, mas gasta recursos)
         if mana_cost > 0:
+            # Pega stats atuais (incluindo buffs, se houver)
             total_stats = await player_manager.get_player_total_stats(player_data)
             max_mp = total_stats.get('max_mana', 10)
             current_mp = player_data.get('current_mp', max_mp)
@@ -188,17 +196,24 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
                 await _safe_answer(query)
                 await query.answer(f"Você não tem Mana ({mana_cost}) suficiente!", show_alert=True)
                 return
+            
+            # Gasta Mana no modo legado (salva diretamente)
+            player_data = await spend_mana(user_id, mana_cost, player_data)
 
+
+        # Aplica Cooldown
         if cooldown > 0:
             active_cooldowns[skill_id] = cooldown + 1 
 
         combat_details['skill_to_use'] = skill_id
+        # 🌟 NOVO: Adiciona a flag para sinalizar que é uma ação de suporte/buff.
+        combat_details['action_type'] = "support" if is_support else "attack"
+
         player_data['player_state']['details'] = combat_details
-        
         await player_manager.save_player_data(user_id, player_data)
 
     await _safe_answer(query)
-    
+
     await combat_callback(update, context, action="combat_attack")
 
 async def combat_skill_on_cooldown_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

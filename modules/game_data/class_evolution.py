@@ -2,270 +2,1040 @@
 
 from __future__ import annotations
 from typing import Dict, Any, List
-import logging
-logger = logging.getLogger(__name__)
 
-EVOLUTIONS: Dict[str, Dict[str, Any]] = {
-    # ========================= # GUERREIRO # =========================
-    "guerreiro": {
-        "tier2": [
-            {
-                "to": "cavaleiro", "min_level": 25,
-                "required_items": {"emblema_guerreiro": 25, "essencia_guardia": 25}, 
-                "desc": "Defesa elevada e proteção de aliados.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_bulwark"], 
-                "trial_monster_id": "guardian_of_the_aegis",
-            },
-            {
-                "to": "gladiador", "min_level": 35,
-                "required_items": {"emblema_guerreiro": 35, "essencia_furia": 35},
-                "desc": "Ofensiva agressiva e golpes em área.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_whirlwind"], 
-                "trial_monster_id": "phantom_of_the_arena",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["cavaleiro", "gladiador"], "to": "templario", "min_level": 60,
-                "required_items": {"selo_sagrado": 50, "essencia_luz": 50},
-                "desc": "Paladino sagrado que combina defesa com suporte divino.",
-                # --- MUDANÇA ---
-                # (Ganha a skill que sobrou do pacote de "Guerreiro")
-                "unlocks_skills": ["active_holy_blessing"], 
-                "trial_monster_id": "aspect_of_the_divine",
-            },
-        ],
-    },
-
-    # ========================= # BERSERKER # =========================
-    "berserker": {
-        "tier2": [
-            {
-                "to": "barbaro", "min_level": 25,
-                "required_items": {"emblema_berserker": 25, "essencia_furia": 25},
-                "desc": "Dano bruto e resistência a controlo.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_unstoppable"], 
-                "trial_monster_id": "primal_spirit_of_rage",
-            },
-            {
-                "to": "juggernaut", "min_level": 35,
-                "required_items": {"emblema_berserker": 35, "essencia_guardia": 35},
-                "desc": "Avanços imparáveis e mitigação de dano.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_unbreakable_charge"], 
-                "trial_monster_id": "guardian_of_the_mountain",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["barbaro", "juggernaut"], "to": "ira_primordial", "min_level": 60,
-                "required_items": {"totem_ancestral": 50, "essencia_furia": 50},
-                "desc": "Forma ancestral que amplifica dano conforme a vida cai.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_last_stand"],
-                "trial_monster_id": "avatar_of_primal_wrath",
-            }
-        ],
-    },
-
-    # ========================= # CAÇADOR # =========================
-    "cacador": {
-        "tier2": [
-            {
-                "to": "patrulheiro", "min_level": 25,
-                "required_items": {"emblema_cacador": 25, "essencia_fera": 25},
-                "desc": "Mestre da sobrevivência que luta ao lado de um companheiro animal.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_animal_companion"], 
-                "trial_monster_id": "spirit_of_the_alpha_wolf",
-            },
-            {
-                "to": "franco_atirador", "min_level": 35,
-                "required_items": {"emblema_cacador": 35, "essencia_precisao": 35},
-                "desc": "Especialista em tiros à distância com dano crítico devastador.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_deadeye_shot"], 
-                "trial_monster_id": "phantom_of_the_watchtower",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["patrulheiro", "franco_atirador"], "to": "mestre_da_selva", "min_level": 60,
-                "required_items": {"marca_predador": 50, "essencia_fera": 50},
-                "desc": "O predador alfa, capaz de domar as feras mais selvagens.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_apex_predator"], 
-                "trial_monster_id": "aspect_of_the_world_tree",
-            }
-        ],
-    },
-
-    # ========================= # MONGE # =========================
-    "monge": {
-        "tier2": [
-            {
-                "to": "guardiao_do_templo", "min_level": 25,
-                "required_items": {"emblema_monge": 25, "essencia_guardia": 25},
-                "desc": "Mestre da defesa que usa o Ki para criar barreiras e contra-atacar.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_iron_skin"], 
-                "trial_monster_id": "statue_of_the_serene_fist",
-            },
-            {
-                "to": "punho_elemental", "min_level": 35,
-                "required_items": {"emblema_monge": 35, "essencia_ki": 35},
-                "desc": "Lutador que canaliza a fúria dos elementos nos seus punhos.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_elemental_strikes"], 
-                "trial_monster_id": "avatar_of_the_four_elements",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["guardiao_do_templo", "punho_elemental"], "to": "ascendente", "min_level": 60,
-                "required_items": {"reliquia_mistica": 50, "essencia_ki": 50},
-                "desc": "Atingiu a transcendência, movendo-se como o vento e golpeando como o trovão.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_transcendence"], 
-                "trial_monster_id": "echo_of_the_grandmaster",
-            }
-        ],
-    },
-
-    # ========================= # MAGO # =========================
-    "mago": {
-        "tier2": [
-            {
-                "to": "feiticeiro", "min_level": 25,
-                "required_items": {"emblema_mago": 25, "essencia_arcana": 25},
-                "desc": "Mestre das maldições e do dano contínuo (DoT).",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_curse_of_weakness"], 
-                "trial_monster_id": "shade_of_the_forbidden_library",
-            },
-            {
-                "to": "elementalista", "min_level": 35,
-                "required_items": {"emblema_mago": 35, "essencia_elemental": 35},
-                "desc": "Especialista em dano elemental massivo e em área.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_elemental_attunement"], 
-                "trial_monster_id": "raging_elemental_vortex",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["feiticeiro", "elementalista"], "to": "arquimago", "min_level": 60,
-                "required_items": {"grimorio_arcano": 50, "essencia_arcana": 50},
-                "desc": "Um canal de poder arcano puro, capaz de alterar a realidade.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_meteor_swarm"], 
-                "trial_monster_id": "essence_of_pure_magic",
-            }
-        ],
-    },
+EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     
-    # ... (Bardo, Assassino, Samurai - o mesmo padrão) ...
+    # ========================= # CAMINHO DO GUERREIRO # =========================
+    "guerreiro": [
+        # T2 (Lvl 25)
+        { 
+            "tier_num": 2, "from": "guerreiro", "to": "cavaleiro", "min_level": 25,
+            "desc": "Defesa elevada e proteção de aliados.",
+            
+            "ascension_path": [
+                {
+                    "id": "cav_node_1", 
+                    "desc": "Estudar Táticas Defensivas",
+                    "cost": {"emblema_guerreiro": 10, "gold": 5000}
+                },
+                {
+                    "id": "cav_node_2",
+                    "desc": "Forjar a Primeira Placa",
+                    "cost": {"essencia_guardia": 15, "gold": 10000}
+                },
+                {
+                    "id": "cav_node_3",
+                    "desc": "Meditação do Guardião",
+                    "cost": {"emblema_guerreiro": 15, "essencia_guardia": 10, "gold": 15000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_bulwark"], 
+            "trial_monster_id": "guardian_of_the_aegis", 
+        },
+        # T3 (Lvl 40)
+        { 
+            "tier_num": 3, "from": "cavaleiro", "to": "templario", "min_level": 40,
+            "desc": "Paladino sagrado que combina defesa com suporte divino.",
+            
+            "ascension_path": [
+                {
+                    "id": "temp_node_1",
+                    "desc": "Receber a Bênção da Luz",
+                    "cost": {"selo_sagrado": 20, "gold": 25000}
+                },
+                {
+                    "id": "temp_node_2",
+                    "desc": "Juramento de Proteção",
+                    "cost": {"essencia_luz": 40, "gold": 50000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_holy_blessing"], 
+            "trial_monster_id": "aspect_of_the_divine",
+        },
+        # T4 (Lvl 60)
+        { 
+            "tier_num": 4, "from": "templario", "to": "guardiao_divino", "min_level": 60,
+            "desc": "Uma fortaleza impenetrável de fé e aço.",
+            
+            "ascension_path": [
+                {
+                    "id": "gd_node_1", 
+                    "desc": "Dominar a Aura Protetora", 
+                    "cost": {"coracao_do_colosso": 30, "gold": 100000}
+                },
+                {
+                    "id": "gd_node_2", 
+                    "desc": "Canalizar a Égide", 
+                    "cost": {"essencia_luz": 60, "gold": 150000}
+                }
+            ],
+            
+            "unlocks_skills": ["guerreiro_placeholder_t4_def"], 
+            "trial_monster_id": "divine_sentinel",
+        },
+        # T5 (Lvl 80)
+        { 
+            "tier_num": 5, "from": "guardiao_divino", "to": "avatar_da_egide", "min_level": 80,
+            "desc": "A encarnação viva da proteção divina, imune a danos mortais.",
+            
+            "ascension_path": [
+                {
+                    "id": "aegis_node_1", 
+                    "desc": "Infundir a Alma do Guardião", 
+                    "cost": {"alma_do_guardiao": 80, "gold": 250000}
+                },
+                {
+                    "id": "aegis_node_2", 
+                    "desc": "Absorver a Luz Pura", 
+                    "cost": {"essencia_luz_pura": 80, "gold": 300000}
+                }
+            ],
+            
+            "unlocks_skills": ["guerreiro_placeholder_t5_def"], 
+            "trial_monster_id": "celestial_bastion",
+        },
+        # T6 (Lvl 100)
+        { 
+            "tier_num": 6, "from": "avatar_da_egide", "to": "lenda_divina", "min_level": 100,
+            "desc": "Um herói lendário cuja defesa inspira milagres.",
+            
+            "ascension_path": [
+                {
+                    "id": "legdiv_node_1", 
+                    "desc": "A Provação Divina Final", 
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "legdiv_node_2", 
+                    "desc": "Forjar o Fragmento Celestial", 
+                    "cost": {"fragmento_celestial": 100, "gold": 1500000}
+                }
+            ],
+            
+            "unlocks_skills": ["guerreiro_placeholder_t6_def"], 
+            "trial_monster_id": "eldora_legend_guard",
+        },
+    ],
+
+    # ========================= # CAMINHO DO BERSERKER # (JÁ ESTÁ NO FORMATO) # =========================
+    "berserker": [
+        # T2 (Lvl 25)
+        {
+            "tier_num": 2, "from": "berserker", "to": "barbaro", "min_level": 25,
+            "desc": "Dano bruto e resistência a controlo.",
+            
+            "ascension_path": [
+                {
+                    "id": "barb_node_1",
+                    "desc": "Abraçar a Fúria",
+                    "cost": {"emblema_berserker": 25, "gold": 5000}
+                },
+                {
+                    "id": "barb_node_2",
+                    "desc": "Sobreviver ao Ritual de Dor",
+                    "cost": {"essencia_furia": 25, "gold": 10000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_unstoppable"], 
+            "trial_monster_id": "primal_spirit_of_rage",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "barbaro", "to": "selvagem", "min_level": 40,
+            "desc": "Abraça a fúria total, sacrificando defesa por poder de ataque.",
+            
+            "ascension_path": [
+                {
+                    "id": "selv_node_1",
+                    "desc": "Despertar o Totem Ancestral",
+                    "cost": {"totem_ancestral": 20, "gold": 20000}
+                },
+                {
+                    "id": "selv_node_2",
+                    "desc": "Canalizar a Dor em Poder",
+                    "cost": {"essencia_furia": 40, "gold": 25000}
+                },
+                {
+                    "id": "selv_node_3",
+                    "desc": "A Marca do Caos",
+                    "cost": {"totem_ancestral": 20, "gold": 30000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_last_stand"],
+            "trial_monster_id": "avatar_of_primal_wrath",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "selvagem", "to": "ira_primordial", "min_level": 60,
+            "desc": "A própria encarnação da raiva, com ataques que não podem ser defendidos.",
+            
+            "ascension_path": [
+                {
+                    "id": "ira_node_1",
+                    "desc": "Dominar a Raiva Incontrolável",
+                    "cost": {"coracao_da_furia": 30, "gold": 50000}
+                },
+                {
+                    "id": "ira_node_2",
+                    "desc": "Tornar-se a Própria Ira",
+                    "cost": {"essencia_furia": 60, "gold": 75000}
+                }
+            ],
+            
+            "unlocks_skills": ["berserker_placeholder_t4_atk"],
+            "trial_monster_id": "primal_rage_incarnate",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "ira_primordial", "to": "avatar_da_calamidade", "min_level": 80,
+            "desc": "Um desastre natural ambulante, cuja fúria destrói o mundo.",
+            
+            "ascension_path": [
+                {
+                    "id": "calam_node_1",
+                    "desc": "Quebrar os Limites Mortais",
+                    "cost": {"alma_da_furia": 40, "gold": 100000}
+                },
+                {
+                    "id": "calam_node_2",
+                    "desc": "O Grito de Guerra Mundial",
+                    "cost": {"essencia_furia_pura": 80, "gold": 150000}
+                },
+                {
+                    "id": "calam_node_3",
+                    "desc": "O Ritual Final",
+                    "cost": {"alma_da_furia": 40, "gold": 200000}
+                }
+            ],
+            
+            "unlocks_skills": ["berserker_placeholder_t5_atk"],
+            "trial_monster_id": "calamity_bringer",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "avatar_da_calamidade", "to": "deus_da_ira", "min_level": 100,
+            "desc": "A fúria de um deus. Seus golpes quebram a própria realidade.",
+            
+            "ascension_path": [
+                {
+                    "id": "deusira_node_1",
+                    "desc": "A Provação Divina da Fúria",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "deusira_node_2",
+                    "desc": "Absorver o Fragmento do Caos",
+                    "cost": {"fragmento_caos": 100, "gold": 1500000}
+                }
+            ],
+            
+            "unlocks_skills": ["berserker_placeholder_t6_atk"],
+            "trial_monster_id": "wrath_god_incarnate",
+        },
+    ],
     
-    # ========================= # BARDO # =========================
-    "bardo": {
-        "tier2": [
-            {
-                "to": "menestrel", "min_level": 25,
-                "required_items": {"emblema_bardo": 25, "essencia_harmonia": 25},
-                "desc": "Focado em canções que curam e fortalecem os aliados.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_song_of_valor"], 
-                "trial_monster_id": "echo_of_the_first_ballad",
-            },
-            {
-                "to": "encantador", "min_level": 35,
-                "required_items": {"emblema_bardo": 35, "essencia_encanto": 35},
-                "desc": "Usa melodias para confundir e debilitar os inimigos.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_dissonant_melody"], 
-                "trial_monster_id": "siren_of_the_lost_stage",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["menestrel", "encantador"], "to": "maestro", "min_level": 60,
-                "required_items": {"batuta_maestria": 50, "essencia_harmonia": 50},
-                "desc": "Rege o campo de batalha com sinfonias de poder.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_symphony_of_power"], 
-                "trial_monster_id": "avatar_of_the_grand_orchestra",
-            }
-        ],
-    },
-
-    # ========================= # ASSASSINO # =========================
-    "assassino": {
-        "tier2": [
-            {
-                "to": "sombra", "min_level": 25,
-                "required_items": {"emblema_assassino": 25, "essencia_sombra": 25},
-                "desc": "Mestre da furtividade e de ataques surpresa devastadores.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_shadow_strike"], 
-                "trial_monster_id": "doppelganger_of_the_throne",
-            },
-            {
-                "to": "venefico", "min_level": 35,
-                "required_items": {"emblema_assassino": 35, "essencia_letal": 35},
-                "desc": "Especialista em venenos e toxinas que causam dano ao longo do tempo.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_potent_toxins"], 
-                "trial_monster_id": "spirit_of_the_swamp_adder",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["sombra", "venefico"], "to": "mestre_das_laminas", "min_level": 60,
-                "required_items": {"manto_eterno": 50, "essencia_sombra": 50},
-                "desc": "Um vulto letal cuja velocidade é inigualável.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_dance_of_a_thousand_cuts"], 
-                "trial_monster_id": "specter_of_the_silent_kill",
-            }
-        ],
-    },
-
-    # ========================= # SAMURAI # =========================
-    "samurai": {
-        "tier2": [
-            {
-                "to": "kensei", "min_level": 25,
-                "required_items": {"emblema_samurai": 25, "essencia_corte": 25},
-                "desc": "O Santo da Espada, focado na perfeição técnica de cada golpe.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["passive_iai_stance"], 
-                "trial_monster_id": "phantom_of_the_dojo",
-            },
-            {
-                "to": "ronin", "min_level": 35,
-                "required_items": {"emblema_samurai": 35, "essencia_disciplina": 35},
-                "desc": "Um guerreiro solitário, mestre do contra-ataque e da sobrevivência.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_parry_and_riposte"], 
-                "trial_monster_id": "spirit_of_the_wandering_warrior",
-            },
-        ],
-        "tier3": [
-            {
-                "from_any_of": ["kensei", "ronin"], "to": "shogun", "min_level": 60,
-                "required_items": {"lamina_sagrada": 50, "essencia_disciplina": 50},
-                "desc": "Um líder no campo de batalha, cujas ordens inspiram os aliados.",
-                # --- MUDANÇA ---
-                "unlocks_skills": ["active_banner_of_command"], 
-                "trial_monster_id": "avatar_of_the_first_emperor",
-            }
-        ],
-    },
+    # ========================= # CAMINHO DO CAÇADOR # =========================
+    "cacador": [
+        # T2 (Lvl 25)
+        {
+            "tier_num": 2, "from": "cacador", "to": "franco_atirador", "min_level": 25,
+            "desc": "Especialista em tiros à distância com dano crítico devastador.",
+            
+            "ascension_path": [
+                {
+                    "id": "franco_node_1",
+                    "desc": "Estudar Pontos Vitais",
+                    "cost": {"emblema_cacador": 10, "gold": 5000}
+                },
+                {
+                    "id": "franco_node_2",
+                    "desc": "Calibrar o Arco Longo",
+                    "cost": {"essencia_precisao": 15, "gold": 10000}
+                },
+                {
+                    "id": "franco_node_3",
+                    "desc": "Meditação da Precisão",
+                    "cost": {"emblema_cacador": 15, "essencia_precisao": 10, "gold": 15000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_deadeye_shot"], 
+            "trial_monster_id": "phantom_of_the_watchtower",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "franco_atirador", "to": "olho_de_aguia", "min_level": 40,
+            "desc": "Seus tiros ignoram parcialmente a defesa inimiga.",
+            
+            "ascension_path": [
+                {
+                    "id": "aguia_node_1",
+                    "desc": "Criar Lentes Infalíveis",
+                    "cost": {"lente_infalivel": 20, "gold": 25000}
+                },
+                {
+                    "id": "aguia_node_2",
+                    "desc": "Treinar a Visão Penetrante",
+                    "cost": {"essencia_precisao": 40, "gold": 50000}
+                }
+            ],
+            
+            "unlocks_skills": ["cacador_placeholder_t3_atk"], 
+            "trial_monster_id": "sky_piercer_hawk",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "olho_de_aguia", "to": "atirador_espectral", "min_level": 60,
+            "desc": "Seus tiros agora ricocheteiam, atingindo múltiplos alvos.",
+            
+            "ascension_path": [
+                {
+                    "id": "espec_node_1",
+                    "desc": "Infundir o Arco com Ectoplasma",
+                    "cost": {"arco_fantasma": 30, "gold": 100000}
+                },
+                {
+                    "id": "espec_node_2",
+                    "desc": "Dominar a Flecha Ricochete",
+                    "cost": {"essencia_precisao": 60, "gold": 150000}
+                }
+            ],
+            
+            "unlocks_skills": ["cacador_placeholder_t4_atk"], 
+            "trial_monster_id": "spectral_marksman",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "atirador_espectral", "to": "o_horizonte_longinquo", "min_level": 80,
+            "desc": "Um tiro, um fim. Seu alcance é infinito.",
+            
+            "ascension_path": [
+                {
+                    "id": "horiz_node_1",
+                    "desc": "Capturar a Alma da Precisão",
+                    "cost": {"alma_da_precisao": 80, "gold": 250000}
+                },
+                {
+                    "id": "horiz_node_2",
+                    "desc": "O Tiro Interdimensional",
+                    "cost": {"essencia_precisao_pura": 80, "gold": 300000}
+                }
+            ],
+            
+            "unlocks_skills": ["cacador_placeholder_t5_atk"], 
+            "trial_monster_id": "horizon_walker",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "o_horizonte_longinquo", "to": "lenda_do_arco", "min_level": 100,
+            "desc": "Suas flechas nunca erram, guiadas pelo próprio vento.",
+            
+            "ascension_path": [
+                {
+                    "id": "lendaarco_node_1",
+                    "desc": "A Provação Divina da Mira",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "lendaarco_node_2",
+                    "desc": "A Flecha Celestial",
+                    "cost": {"fragmento_celestial": 100, "gold": 1500000}
+                }
+            ],
+            
+            "unlocks_skills": ["cacador_placeholder_t6_atk"], 
+            "trial_monster_id": "legend_of_the_bow",
+        },
+    ],
+    
+    # ========================= # CAMINHO DO MONGE # =========================
+    "monge": [
+        # T2 (Lvl 25)
+        {
+            "tier_num": 2, "from": "monge", "to": "punho_elemental", "min_level": 25,
+            "desc": "Lutador que canaliza a fúria dos elementos nos seus punhos.",
+            
+            "ascension_path": [
+                {
+                    "id": "punelem_node_1",
+                    "desc": "Despertar o Ki Interior",
+                    "cost": {"emblema_monge": 10, "gold": 5000}
+                },
+                {
+                    "id": "punelem_node_2",
+                    "desc": "Infundir Punhos com Ki",
+                    "cost": {"essencia_ki": 15, "gold": 10000}
+                },
+                {
+                    "id": "punelem_node_3",
+                    "desc": "Alcançar o Equilíbrio Elemental",
+                    "cost": {"emblema_monge": 15, "essencia_ki": 10, "gold": 15000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_elemental_strikes"], 
+            "trial_monster_id": "avatar_of_the_four_elements",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "punho_elemental", "to": "ascendente", "min_level": 40,
+            "desc": "Atingiu a transcendência, movendo-se como o vento.",
+            
+            "ascension_path": [
+                {
+                    "id": "asc_node_1",
+                    "desc": "Meditar sobre a Relíquia Mística",
+                    "cost": {"reliquia_mistica": 20, "gold": 25000}
+                },
+                {
+                    "id": "asc_node_2",
+                    "desc": "Alcançar a Verdadeira Transcendência",
+                    "cost": {"essencia_ki": 40, "gold": 50000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_transcendence"], 
+            "trial_monster_id": "echo_of_the_grandmaster",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "ascendente", "to": "punho_divino", "min_level": 60,
+            "desc": "Seu Ki é tão puro que seus golpes causam dano sagrado.",
+            
+            "ascension_path": [
+                {
+                    "id": "pundiv_node_1",
+                    "desc": "Decifrar o Pergaminho Celestial",
+                    "cost": {"pergaminho_celestial": 30, "gold": 100000}
+                },
+                {
+                    "id": "pundiv_node_2",
+                    "desc": "Canalizar o Ki Divino",
+                    "cost": {"essencia_ki": 60, "gold": 150000}
+                }
+            ],
+            
+            "unlocks_skills": ["monge_placeholder_t4_atk"], 
+            "trial_monster_id": "divine_hand",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "punho_divino", "to": "o_dragao_interior", "min_level": 80,
+            "desc": "Libera o dragão interior, o mestre supremo das artes marciais.",
+            
+            "ascension_path": [
+                {
+                    "id": "dragao_node_1",
+                    "desc": "Confrontar o Dragão Interior",
+                    "cost": {"alma_do_ki": 80, "gold": 250000}
+                },
+                {
+                    "id": "dragao_node_2",
+                    "desc": "Absorver a Essência Pura do Ki",
+                    "cost": {"essencia_ki_pura": 80, "gold": 300000}
+                }
+            ],
+            
+            "unlocks_skills": ["monge_placeholder_t5_atk"], 
+            "trial_monster_id": "inner_dragon_spirit",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "o_dragao_interior", "to": "lenda_do_punho", "min_level": 100,
+            "desc": "Um com o universo. Seus golpes são o próprio equilíbrio.",
+            
+            "ascension_path": [
+                {
+                    "id": "lendapunho_node_1",
+                    "desc": "A Provação Divina do Equilíbrio",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "lendapunho_node_2",
+                    "desc": "O Punho Celestial",
+                    "cost": {"fragmento_celestial": 100, "gold": 1500000}
+                }
+            ],
+            
+            "unlocks_skills": ["monge_placeholder_t6_atk"], 
+            "trial_monster_id": "legend_of_the_fist",
+        },
+    ],
+    
+    # ========================= # CAMINHO DO MAGO # (JÁ ESTÁ NO FORMATO) # =========================
+    "mago": [
+        # T2 (Lvl 25)
+        {
+            "tier_num": 2, "from": "mago", "to": "elementalista", "min_level": 25,
+            "desc": "Especialista em dano elemental massivo e em área.",
+            
+            "ascension_path": [
+                {
+                    "id": "elem_node_1",
+                    "desc": "Estudar os Fundamentos Arcanos",
+                    "cost": {"emblema_mago": 10, "gold": 5000}
+                },
+                {
+                    "id": "elem_node_2",
+                    "desc": "Dominar a Primeira Essência",
+                    "cost": {"essencia_elemental": 15, "gold": 10000}
+                },
+                {
+                    "id": "elem_node_3",
+                    "desc": "Sintonização Elemental",
+                    "cost": {"emblema_mago": 15, "essencia_elemental": 10, "gold": 15000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_elemental_attunement"], 
+            "trial_monster_id": "raging_elemental_vortex",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "elementalista", "to": "arquimago", "min_level": 40,
+            "desc": "Um canal de poder arcano puro, mestre de todos os elementos.",
+            
+            "ascension_path": [
+                {
+                    "id": "arq_node_1",
+                    "desc": "Decifrar o Grimório Arcano",
+                    "cost": {"grimorio_arcano": 20, "gold": 25000}
+                },
+                {
+                    "id": "arq_node_2",
+                    "desc": "Alinhar os Focos Elementais",
+                    "cost": {"essencia_elemental": 40, "gold": 50000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_meteor_swarm"], 
+            "trial_monster_id": "essence_of_pure_magic",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "arquimago", "to": "mago_de_batalha", "min_level": 60,
+            "desc": "Combina magia elemental com defesa arcana, lutando na linha de frente.",
+            
+            "ascension_path": [
+                {
+                    "id": "battlemage_node_1",
+                    "desc": "Infundir o Foco Cristalino",
+                    "cost": {"foco_cristalino": 30, "gold": 100000}
+                },
+                {
+                    "id": "battlemage_node_2",
+                    "desc": "Dominar a Armadura Arcana",
+                    "cost": {"essencia_elemental": 60, "gold": 150000}
+                }
+            ],
+            
+            "unlocks_skills": ["mago_placeholder_t4_atk"], 
+            "trial_monster_id": "battlemage_prime",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "mago_de_batalha", "to": "arcanista_supremo", "min_level": 80,
+            "desc": "Transcendeu a magia, tornando-se a própria magia.",
+            
+            "ascension_path": [
+                {
+                    "id": "arcano_node_1",
+                    "desc": "Absorver a Alma Elemental",
+                    "cost": {"alma_elemental": 80, "gold": 250000}
+                },
+                {
+                    "id": "arcano_node_2",
+                    "desc": "Controlar a Essência Elemental Pura",
+                    "cost": {"essencia_elemental_pura": 80, "gold": 300000}
+                }
+            ],
+            
+            "unlocks_skills": ["mago_placeholder_t5_atk"], 
+            "trial_monster_id": "supreme_arcanist",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "arcanista_supremo", "to": "aspecto_arcano", "min_level": 100,
+            "desc": "A realidade se dobra à sua vontade. Um deus da magia.",
+            
+            "ascension_path": [
+                {
+                    "id": "aspect_node_1",
+                    "desc": "A Provação Divina do Conhecimento",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "aspect_node_2",
+                    "desc": "Absorver o Fragmento Arcano",
+                    "cost": {"fragmento_arcano": 100, "gold": 1500000}
+                }
+            ],
+            
+            "unlocks_skills": ["mago_placeholder_t6_atk"], 
+            "trial_monster_id": "arcane_aspect",
+        },
+    ],
+    
+    # ========================= # CAMINHO DO BARDO # (JÁ ESTÁ NO FORMATO) # =========================
+    "bardo": [
+        # T2 (Lvl 25)
+        {
+            "tier_num": 2, "from": "bardo", "to": "menestrel", "min_level": 25,
+            "desc": "Foco em canções de suporte e inspiração para a equipe.",
+        
+            "ascension_path": [
+                {
+                    "id": "menestrel_node_1",
+                    "desc": "Aprender as Primeiras Melodias",
+                    "cost": {"emblema_bardo": 10, "gold": 5000}
+                },
+                {
+                    "id": "menestrel_node_2",
+                    "desc": "Dominar a Lira de Batalha",
+                    "cost": {"corda_encantada": 15, "gold": 10000}
+                },
+                {
+                    "id": "menestrel_node_3",
+                    "desc": "Performance em Público",
+                    "cost": {"emblema_bardo": 15, "corda_encantada": 10, "gold": 15000}
+                }
+            ],
+        
+            "unlocks_skills": ["passive_inspiring_melody"], 
+            "trial_monster_id": "silencing_critics",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "menestrel", "to": "trovador", "min_level": 40,
+            "desc": "Especialista em controlar o campo de batalha com canções hipnóticas.",
+        
+            "ascension_path": [
+                {
+                    "id": "trovador_node_1",
+                    "desc": "Decifrar Partituras Antigas",
+                    "cost": {"partitura_antiga": 20, "gold": 25000}
+                },
+                {
+                    "id": "trovador_node_2",
+                    "desc": "Afinar a Voz Mágica",
+                    "cost": {"corda_encantada": 40, "gold": 50000}
+                }
+            ],
+        
+            "unlocks_skills": ["active_sleep_song"], 
+            "trial_monster_id": "deafening_silence",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "trovador", "to": "mestre_de_concerto", "min_level": 60,
+            "desc": "Transforma a música em dano sonoro puro e barreiras protetoras.",
+        
+            "ascension_path": [
+                {
+                    "id": "mestre_node_1",
+                    "desc": "Infusão de Ressonância",
+                    "cost": {"cristal_sonoro": 30, "gold": 100000}
+                },
+                {
+                    "id": "mestre_node_2",
+                    "desc": "Conduzir a Sinfonia",
+                    "cost": {"corda_encantada": 60, "gold": 150000}
+                }
+            ],
+        
+            "unlocks_skills": ["active_sonic_blast"], 
+            "trial_monster_id": "unruly_orchestra",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "mestre_de_concerto", "to": "harmonista", "min_level": 80,
+            "desc": "Um mestre da harmonia, capaz de equilibrar o suporte e o ataque.",
+        
+            "ascension_path": [
+                {
+                    "id": "harmonista_node_1",
+                    "desc": "Absorver o Espírito da Música",
+                    "cost": {"espirito_musica": 80, "gold": 250000}
+                },
+                {
+                    "id": "harmonista_node_2",
+                    "desc": "Controlar a Frequência Pura",
+                    "cost": {"frequencia_pura": 80, "gold": 300000}
+                }
+            ],
+        
+            "unlocks_skills": ["passive_perfect_pitch"], 
+            "trial_monster_id": "chaotic_harmony",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "harmonista", "to": "aspecto_musical", "min_level": 100,
+            "desc": "A encarnação do som, sua música reescreve a realidade.",
+        
+            "ascension_path": [
+                {
+                    "id": "aspect_node_1",
+                    "desc": "A Provação Divina da Criação",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "aspect_node_2",
+                    "desc": "Absorver o Fragmento da Melodia Original",
+                    "cost": {"fragmento_melodia": 100, "gold": 1500000}
+                }
+            ],
+        
+            "unlocks_skills": ["active_crescendo_of_creation"], 
+            "trial_monster_id": "primordial_symphony",
+        },
+    ],
+    
+    # ========================= # CAMINHO DO ASSASSINO # (JÁ ESTÁ NO FORMATO) # =========================
+    "assassino": [
+        # T2 (Lvl 25)
+        { 
+            "tier_num": 2, "from": "assassino", "to": "ladrao_de_sombras", "min_level": 25,
+            "desc": "Especialista em furtividade e ataques de oportunidade com dano extra.",
+        
+            "ascension_path": [
+                {
+                    "id": "shadow_node_1",
+                    "desc": "Dominar a Arte da Furtividade",
+                    "cost": {"emblema_assassino": 10, "gold": 5000}
+                },
+                {
+                    "id": "shadow_node_2",
+                    "desc": "Aprimoramento da Lâmina Oculta",
+                    "cost": {"lâmina_afiada": 15, "gold": 10000}
+                },
+                {
+                    "id": "shadow_node_3",
+                    "desc": "Transição para as Sombras",
+                    "cost": {"emblema_assassino": 15, "lâmina_afiada": 10, "gold": 15000}
+                }
+            ],
+        
+            "unlocks_skills": ["passive_backstab_boost"], 
+            "trial_monster_id": "vigilant_guard",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "ladrao_de_sombras", "to": "ninja", "min_level": 40,
+            "desc": "Foco em velocidade, agilidade e uso de venenos e ferramentas táticas.",
+        
+            "ascension_path": [
+                {
+                    "id": "ninja_node_1",
+                    "desc": "Aprender a Técnica de Substituição",
+                    "cost": {"poeira_sombria": 20, "gold": 25000}
+                },
+                {
+                    "id": "ninja_node_2",
+                    "desc": "Infusão de Veneno Letal",
+                    "cost": {"essencia_venenosa": 40, "gold": 50000}
+                }
+            ],
+        
+            "unlocks_skills": ["active_smoke_bomb"], 
+            "trial_monster_id": "quick_phantom",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "ninja", "to": "mestre_das_laminas", "min_level": 60,
+            "desc": "Transforma o Assassino em um duelista mortal com foco em ataques críticos.",
+        
+            "ascension_path": [
+                {
+                    "id": "blade_master_node_1",
+                    "desc": "Forjar a Lâmina Eterna",
+                    "cost": {"aço_sombrio": 30, "gold": 100000}
+                },
+                {
+                    "id": "blade_master_node_2",
+                    "desc": "Sexto Sentido Mortal",
+                    "cost": {"essencia_venenosa": 60, "gold": 150000}
+                }
+            ],
+        
+            "unlocks_skills": ["passive_critical_precision"], 
+            "trial_monster_id": "dual_wielding_ronin",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "mestre_das_laminas", "to": "ceifador", "min_level": 80,
+            "desc": "Canaliza a energia da morte, garantindo que nenhum alvo escape de seu destino.",
+        
+            "ascension_path": [
+                {
+                    "id": "reaper_node_1",
+                    "desc": "Absorver a Energia Kármica",
+                    "cost": {"energia_karmica": 80, "gold": 250000}
+                },
+                {
+                    "id": "reaper_node_2",
+                    "desc": "Controlar a Névoa da Morte",
+                    "cost": {"nevoa_da_morte": 80, "gold": 300000}
+                }
+            ],
+        
+            "unlocks_skills": ["active_guillotine_strike"], 
+            "trial_monster_id": "shadow_of_fate",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "ceifador", "to": "aspecto_da_noite", "min_level": 100,
+            "desc": "Tornou-se um com o manto da noite, capaz de eliminar qualquer criatura em um instante.",
+        
+            "ascension_path": [
+                {
+                    "id": "aspect_night_node_1",
+                    "desc": "A Provação Divina da Sombra",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "aspect_night_node_2",
+                    "desc": "Absorver o Fragmento da Escuridão Pura",
+                    "cost": {"fragmento_escuridao": 100, "gold": 1500000}
+                }
+            ],
+        
+            "unlocks_skills": ["active_one_hit_kill"], 
+            "trial_monster_id": "avatar_of_the_void",
+        },
+    ],
+    
+    # ========================= # CAMINHO DO SAMURAI # (NOVO NO FORMATO) # =========================
+    "samurai": [
+        # T2 (Lvl 25)
+        {
+            "tier_num": 2, "from": "samurai", "to": "ronin", "min_level": 25,
+            "desc": "Um guerreiro errante focado em golpes rápidos e críticos de sobrevivência.",
+            
+            "ascension_path": [
+                {
+                    "id": "ronin_node_1",
+                    "desc": "Aprender o Caminho do Sem-Mestre",
+                    "cost": {"emblema_samurai": 10, "gold": 5000}
+                },
+                {
+                    "id": "ronin_node_2",
+                    "desc": "Forjar a Primeira Katana de Batalha",
+                    "cost": {"aco_tamahagane": 15, "gold": 10000}
+                },
+                {
+                    "id": "ronin_node_3",
+                    "desc": "Foco na Meditação",
+                    "cost": {"emblema_samurai": 15, "aco_tamahagane": 10, "gold": 15000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_swift_strike"], 
+            "trial_monster_id": "lone_brigand_leader",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "ronin", "to": "kenshi", "min_level": 40,
+            "desc": "Um Mestre da Espada que domina técnicas de corte aprimoradas e parry.",
+            
+            "ascension_path": [
+                {
+                    "id": "kenshi_node_1",
+                    "desc": "Decifrar os Tomos do Kendo",
+                    "cost": {"tomo_bushido": 20, "gold": 25000}
+                },
+                {
+                    "id": "kenshi_node_2",
+                    "desc": "Dominar o Iaijutsu (Saque Rápido)",
+                    "cost": {"aco_tamahagane": 40, "gold": 50000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_izanagi_cut"], 
+            "trial_monster_id": "master_swordsman_phantom",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "kenshi", "to": "shogunato", "min_level": 60,
+            "desc": "Guerreiro com capacidade de liderança, que inspira ou intimida seus aliados e inimigos.",
+            
+            "ascension_path": [
+                {
+                    "id": "shogun_node_1",
+                    "desc": "Forjar a Armadura do Comandante",
+                    "cost": {"placa_forjada": 30, "gold": 100000}
+                },
+                {
+                    "id": "shogun_node_2",
+                    "desc": "Aprender a Arte da Guerra",
+                    "cost": {"tomo_bushido": 60, "gold": 150000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_battle_cry"], 
+            "trial_monster_id": "heavy_armored_general",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "shogunato", "to": "mestre_de_bushido", "min_level": 80,
+            "desc": "Alcançou a perfeição do bushido, focando em técnica e ataques de precisão final.",
+            
+            "ascension_path": [
+                {
+                    "id": "bushido_node_1",
+                    "desc": "Unir Mente e Lâmina",
+                    "cost": {"alma_katana": 80, "gold": 250000}
+                },
+                {
+                    "id": "bushido_node_2",
+                    "desc": "Dominar a Respiração Focada",
+                    "cost": {"aura_bushido": 80, "gold": 300000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_perfect_parry"], 
+            "trial_monster_id": "spirit_of_honor",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "mestre_de_bushido", "to": "aspecto_da_lamina", "min_level": 100,
+            "desc": "Sua lâmina é a própria manifestação da vontade. Um corte que transcende a realidade.",
+            
+            "ascension_path": [
+                {
+                    "id": "aspect_blade_node_1",
+                    "desc": "A Provação Divina da Disciplina",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "aspect_blade_node_2",
+                    "desc": "Absorver o Fragmento da Espada Original",
+                    "cost": {"fragmento_espada_original": 100, "gold": 1500000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_god_slayer_strike"], 
+            "trial_monster_id": "divine_blade_incarnate",
+        },
+    ],
+    
+    # ========================= # CAMINHO DO CURANDEIRO # (ADICIONADO NO FORMATO) # =========================
+    "curandeiro": [
+        # T2 (Lvl 25)
+        {
+            "tier_num": 2, "from": "curandeiro", "to": "clerigo", "min_level": 25,
+            "desc": "Foco em magias de cura de alvo único e purificação.",
+            
+            "ascension_path": [
+                {
+                    "id": "cleric_node_1",
+                    "desc": "Aprender o Toque Divino",
+                    "cost": {"emblema_cura": 10, "gold": 5000}
+                },
+                {
+                    "id": "cleric_node_2",
+                    "desc": "Infusão da Primeira Fé",
+                    "cost": {"essencia_fe": 15, "gold": 10000}
+                },
+                {
+                    "id": "cleric_node_3",
+                    "desc": "Jurar a Pureza",
+                    "cost": {"emblema_cura": 15, "essencia_fe": 10, "gold": 15000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_divine_touch"],
+            "trial_monster_id": "plague_carrier_specter",
+        },
+        # T3 (Lvl 40)
+        {
+            "tier_num": 3, "from": "clerigo", "to": "sacerdote", "min_level": 40,
+            "desc": "Especialista em cura em área e fortalecimento de defesas aliadas.",
+            
+            "ascension_path": [
+                {
+                    "id": "priest_node_1",
+                    "desc": "Decifrar o Pergaminho Sagrado",
+                    "cost": {"pergaminho_sagrado": 20, "gold": 25000}
+                },
+                {
+                    "id": "priest_node_2",
+                    "desc": "Aumentar a Aura de Cura",
+                    "cost": {"essencia_fe": 40, "gold": 50000}
+                }
+            ],
+            
+            "unlocks_skills": ["passive_aegis_of_faith"],
+            "trial_monster_id": "unholy_inquisitor",
+        },
+        # T4 (Lvl 60)
+        {
+            "tier_num": 4, "from": "sacerdote", "to": "hierofante", "min_level": 60,
+            "desc": "Seu toque restaura até a vida perdida, revertendo o dano.",
+            
+            "ascension_path": [
+                {
+                    "id": "hiero_node_1",
+                    "desc": "Infusão do Cálice da Luz",
+                    "cost": {"calice_da_luz": 30, "gold": 100000}
+                },
+                {
+                    "id": "hiero_node_2",
+                    "desc": "Dominar a Magia Reversa",
+                    "cost": {"essencia_fe": 60, "gold": 150000}
+                }
+            ],
+            
+            "unlocks_skills": ["curandeiro_placeholder_t4_sup"],
+            "trial_monster_id": "avatar_of_restoration",
+        },
+        # T5 (Lvl 80)
+        {
+            "tier_num": 5, "from": "hierofante", "to": "oraculo_celestial", "min_level": 80,
+            "desc": "Pode prever e anular ataques. Sua fé se manifesta como escudo de luz.",
+            
+            "ascension_path": [
+                {
+                    "id": "oracle_node_1",
+                    "desc": "Capturar a Alma da Fé",
+                    "cost": {"alma_da_fe": 80, "gold": 250000}
+                },
+                {
+                    "id": "oracle_node_2",
+                    "desc": "Absorver a Essência Pura da Fé",
+                    "cost": {"essencia_fe_pura": 80, "gold": 300000}
+                }
+            ],
+            
+            "unlocks_skills": ["active_celestial_shield"],
+            "trial_monster_id": "void_prophet",
+        },
+        # T6 (Lvl 100)
+        {
+            "tier_num": 6, "from": "oraculo_celestial", "to": "lenda_da_cura", "min_level": 100,
+            "desc": "A própria luz da esperança. Capaz de ressuscitar aliados e curar o impossível.",
+            
+            "ascension_path": [
+                {
+                    "id": "legendcura_node_1",
+                    "desc": "A Provação Divina da Esperança",
+                    "cost": {"essencia_divina_eldora": 100, "gold": 1000000}
+                },
+                {
+                    "id": "legendcura_node_2",
+                    "desc": "O Milagre Final",
+                    "cost": {"fragmento_celestial": 100, "gold": 1500000}
+                }
+            ],
+            
+            "unlocks_skills": ["curandeiro_placeholder_t6_sup"],
+            "trial_monster_id": "divine_healer_legend",
+        },
+    ],
 }
-
 # --- MUDANÇA: A função get_evolution_options foi removida daqui ---
 # (Ela estava no teu ficheiro, mas o teu 'class_evolution_handler.py'
 # importa-a de 'modules.game_data.class_evolution', então está correto.)
@@ -300,70 +1070,3 @@ def get_evolution_options(
             if show_locked or current_level >= min_lvl:
                 options.append({"tier": tier, **opt})
     return options
-
-# Em: modules/game_data/class_evolution.py
-# (COLE ESTE CÓDIGO NO FINAL DO FICHEIRO)
-
-# --- INÍCIO DO NOVO CÓDIGO (CORREÇÃO DO BUG DE SKILL) ---
-
-# Cache para guardar o mapa de classes base (Ex: "arquimago" -> "mago")
-_EVOLUTION_BASE_CLASS_MAP: Dict[str, str] = {}
-
-def _get_base_class(class_key: str) -> str:
-    """
-    Função auxiliar interna para encontrar a classe base de qualquer classe.
-    Usa o _EVOLUTION_BASE_CLASS_MAP como cache.
-    """
-    if not class_key: 
-        return class_key
-        
-    # 1. Se já está no cache, retorna imediatamente
-    if class_key in _EVOLUTION_BASE_CLASS_MAP:
-        return _EVOLUTION_BASE_CLASS_MAP[class_key]
-    
-    # 2. Se o cache está vazio, constrói-o
-    if not _EVOLUTION_BASE_CLASS_MAP:
-        logger.info("[ClassEvolution] Construindo mapa de classes base...")
-        for base_class, tiers in EVOLUTIONS.items():
-            # A classe base (ex: "mago") aponta para si mesma
-            _EVOLUTION_BASE_CLASS_MAP[base_class] = base_class
-            
-            # Itera T2, T3... e mapeia todas evoluções para a classe base
-            for tier_name, tier_list in tiers.items():
-                if isinstance(tier_list, list):
-                    for evo in tier_list:
-                        evo_to_key = evo.get("to")
-                        if evo_to_key:
-                            # Ex: _EVOLUTION_BASE_CLASS_MAP["arquimago"] = "mago"
-                            _EVOLUTION_BASE_CLASS_MAP[evo_to_key] = base_class
-
-    # 3. Retorna o resultado (seja a classe base ou a própria classe, se não for uma evolução)
-    base_class_result = _EVOLUTION_BASE_CLASS_MAP.get(class_key, class_key)
-    
-    # 4. Guarda no cache para a próxima vez
-    _EVOLUTION_BASE_CLASS_MAP[class_key] = base_class_result
-    return base_class_result
-
-def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> bool:
-    """
-    Verifica se um jogador pode usar uma skill, checando a sua classe 
-    ATUAL e a sua classe BASE.
-    """
-    if not allowed_classes:
-        return True # Skill universal (lista de permissão vazia)
-    
-    allowed_set = set(allowed_classes)
-    
-    # 1. Verifica a classe atual (ex: "arcanista" está em ["arcanista"])
-    if player_class_key in allowed_set:
-        return True
-    
-    # 2. Verifica a classe BASE (ex: "mago" (base de "arcanista") está em ["mago"])
-    base_class = _get_base_class(player_class_key)
-    if base_class in allowed_set:
-        return True
-    
-    # Se nenhum passou, o jogador não pode usar
-    return False
-
-# --- FIM DO NOVO CÓDIGO ---

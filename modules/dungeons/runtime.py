@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import List, Dict, Any
 from collections import Counter 
-
+from modules.game_data.monsters import MONSTERS_DATA
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 from telegram.error import BadRequest
@@ -58,6 +58,25 @@ def _final_gold_for(dungeon_cfg: dict, difficulty_cfg: Difficulty) -> int:
     except Exception as e:
         logger.warning(f"Falha ao calcular ouro final: {e}")
         return 0
+
+def _find_monster_template(mob_id: str) -> dict | None:
+    """Encontra um template de monstro de qualquer região pelo seu ID."""
+    if not mob_id: return None
+    # MONSTERS_DATA é um dict de listas, ex: {"floresta_sombria": [...], "pico_congelado": [...]}
+    for region_monsters in MONSTERS_DATA.values():
+        if isinstance(region_monsters, list):
+            for monster in region_monsters:
+                if isinstance(monster, dict) and monster.get("id") == mob_id:
+                    return monster.copy()
+    
+    # Fallback (caso esteja mal formatado)
+    if isinstance(MONSTERS_DATA, dict):
+         monster = MONSTERS_DATA.get(mob_id)
+         if isinstance(monster, dict):
+             return monster.copy()
+             
+    logger.warning(f"Não foi possível encontrar o template do monstro: {mob_id}")
+    return None
 
 def _key_cost_for(difficulty_cfg: Difficulty) -> int:
     return difficulty_cfg.key_cost
@@ -471,6 +490,97 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
             
     await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))
 
+# ============================================================
+# NOVA FUNÇÃO: INICIADOR DO TESTE DE EVOLUÇÃO
+# ============================================================
+
+async def start_evolution_trial_battle(
+    update: Update, 
+    context: ContextTypes.DEFAULT_TYPE, 
+    user_id: int, 
+    monster_id: str,
+    target_class: str # A classe para a qual o jogador está a evoluir
+):
+    """
+    Inicia um combate singular (legado) para o Teste de Evolução.
+    Isto é chamado pelo 'class_evolution_handler.py'.
+    """
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+    
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        await query.answer("Erro: Jogador não encontrado.", show_alert=True)
+        return
+
+    # 1. Encontra o monstro do teste
+    monster_template = _find_monster_template(monster_id)
+    if not monster_template:
+        logger.error(f"ERRO CRÍTICO DE EVOLUÇÃO: Monstro de teste '{monster_id}' não encontrado em MONSTERS_DATA.")
+        await query.answer(f"Erro: Monstro do teste '{monster_id}' não configurado.", show_alert=True)
+        return
+
+    # 2. Constrói os detalhes do combate (sem dificuldade, stats diretos)
+    base_stats = monster_template
+    hp = int(base_stats.get("hp", 100))
+    attack = int(base_stats.get("attack", 10))
+    defense = int(base_stats.get("defense", 5))
+    
+    combat_details = {
+        "monster_name": base_stats.get("name", monster_id),
+        "monster_hp": hp, 
+        "monster_max_hp": hp, 
+        "monster_attack": attack,
+        "monster_defense": defense, 
+        "monster_initiative": base_stats.get("initiative", 5),
+        "monster_luck": base_stats.get("luck", 5),
+        "monster_xp_reward": 0, # Testes não dão XP
+        "monster_gold_drop": 0, # Testes não dão Ouro
+        "loot_table": base_stats.get("loot_table", []),
+        "file_id_name": base_stats.get("media_key") or base_stats.get("file_id_name"),
+        "is_boss": True, # Testes são sempre considerados bosses
+        
+        # --- MARCADORES ESPECIAIS PARA O main_handler ---
+        "evolution_trial": {
+            "target_class": target_class 
+        },
+        "dungeon_ctx": True # Faz o main_handler usar a lógica de "Dungeon" (derrota/fuga)
+        # --- FIM DOS MARCADORES ---
+    }
+
+    # 3. Define o estado do jogador para combate (Modo Legado)
+    state = {
+        "action": "in_combat",
+        "details": combat_details
+    }
+    pdata["player_state"] = state
+    await player_manager.save_player_data(user_id, pdata)
+
+    # 4. Formata e envia a UI de combate
+    caption = await format_combat_message(pdata)
+    kb = [
+        [
+            InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),
+            InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu")
+        ],
+        [
+            InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), 
+            # Nota: Fugir aqui contará como derrota!
+            InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫 (Falhar)", callback_data="combat_flee")
+        ]
+    ]
+    
+    # Apaga a mensagem do menu de evolução
+    if query:
+        try: await query.delete_message()
+        except Exception: pass
+            
+    # Envia a mensagem de combate
+    await _send_battle_media(
+        context, chat_id, caption, 
+        combat_details.get("file_id_name"), 
+        reply_markup=InlineKeyboardMarkup(kb)
+    )
 
 # ============================================================
 # Handlers (Sem alterações)
