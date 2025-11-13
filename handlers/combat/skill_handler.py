@@ -4,7 +4,6 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
-
 from modules import player_manager
 from modules.game_data.skills import SKILL_DATA
 from handlers.utils import format_combat_message
@@ -14,10 +13,16 @@ from modules.player.actions import spend_mana
 logger = logging.getLogger(__name__)
 
 async def _safe_answer(query):
-    try: await query.answer()
-    except BadRequest: pass
+    """Tenta responder ao CallbackQuery de forma segura. Loga falhas não-críticas."""
+    if not query:
+        return
+    try:
+        await query.answer()
+    except BadRequest as e:
+        logger.debug(f"_safe_answer BadRequest: {e}")
+    except Exception as e:
+        logger.exception(f"Erro inesperado em _safe_answer: {e}")
 
-# --- 👇 FUNÇÃO ATUALIZADA (HÍBRIDA) 👇 ---
 async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Mostra a lista de skills ATIVAS.
@@ -161,7 +166,7 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
 
         # Aplica Cooldown e Custo
         if cooldown > 0:
-            active_cooldowns[skill_id] = cooldown + 1 
+            active_cooldowns[skill_id] = cooldown
         battle_cache['player_mp'] -= mana_cost # Diminui o MP diretamente no cache
         
         battle_cache['skill_to_use'] = skill_id
@@ -203,7 +208,7 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
 
         # Aplica Cooldown
         if cooldown > 0:
-            active_cooldowns[skill_id] = cooldown + 1 
+            active_cooldowns[skill_id] = cooldown
 
         combat_details['skill_to_use'] = skill_id
         # 🌟 NOVO: Adiciona a flag para sinalizar que é uma ação de suporte/buff.

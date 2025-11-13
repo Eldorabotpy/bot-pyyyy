@@ -78,12 +78,41 @@ from .player.actions import (
 # =================================================================
 # Agora, importamos a CLASSE, não as funções antigas.
 from .player.premium import PremiumManager
-from typing import Awaitable 
+from typing import Any, Optional, Type
 
-def has_premium_plan(pdata: dict) -> bool: # <<< RECEBE pdata
-    """Verifica se um jogador tem um plano premium ativo."""
-    return PremiumManager(pdata).is_premium()
+def has_premium_plan(pdata: Optional[dict]) -> bool:
+    """
+    Recebe player_data (pdata) e retorna True se o jogador tem premium ativo.
+    Defensive: aceita pdata == None.
+    """
+    if not pdata:
+        return False
+    try:
+        return PremiumManager(pdata).is_premium()
+    except Exception:
+        # Em caso de erro, não quebremos o fluxo — assume que não tem premium
+        return False
 
-def get_perk_value(pdata: dict, perk_name: str, default=1): # <<< RECEBE pdata
-    """Obtém o valor de um perk específico para o jogador."""
-    return PremiumManager(pdata).get_perk_value(perk_name, default)
+def get_perk_value(pdata: Optional[dict], perk_name: str, default: Any = 1, cast: Type = None) -> Any:
+    """
+    Retorna o valor do perk para um jogador.
+    Se 'cast' for fornecido (ex: float, int), tenta converter o valor antes de devolver.
+    Uso recomendado para multiplicadores: get_perk_value(pdata, 'xp_multiplier', 1.0, cast=float)
+    """
+    if not pdata:
+        return default
+    try:
+        return PremiumManager(pdata).get_perk_value(perk_name, default, cast=cast)
+    except Exception:
+        return default
+
+def get_perk_value_float(pdata: Optional[dict], perk_name: str, default: float = 1.0) -> float:
+    """
+    Conveniência: retorna o perk convertido para float com fallback seguro.
+    Use isto quando você espera um multiplicador numérico.
+    """
+    val = get_perk_value(pdata, perk_name, default, cast=float)
+    try:
+        return float(val)
+    except Exception:
+        return float(default)
