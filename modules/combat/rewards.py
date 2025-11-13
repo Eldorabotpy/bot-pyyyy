@@ -4,7 +4,7 @@ import random
 from collections import Counter
 from typing import Any, Dict, List, Tuple
 
-from modules import player_manager, game_data, mission_manager, clan_manager
+from modules import player_manager, game_data, mission_manager, clan_manager, file_ids as file_id_manager
 from modules.player.premium import PremiumManager
 from modules.game_data import xp as xp_manager
 
@@ -78,7 +78,7 @@ def calculate_victory_rewards(player_data: dict, combat_details: dict) -> Tuple[
 async def apply_and_format_victory(player_data: dict, combat_details: dict, context) -> str:
     """
     Aplica recompensas (XP, ouro, itens), atualiza missões e formata a mensagem de vitória.
-    - Modifica player_data em memória; quem chama deve salvar (player_manager.save_player_data).
+    - Modifica player_data em memória; salva ao final.
     """
     user_id = player_data.get("user_id")
     if not user_id:
@@ -89,18 +89,23 @@ async def apply_and_format_victory(player_data: dict, combat_details: dict, cont
 
     xp_reward, gold_reward, looted_items = calculate_victory_rewards(player_data, combat_details)
 
-    # Aplica XP (usa função do xp_manager que altera player_data in-place)
+    # Aplica XP usando o xp_manager (garante level ups e retorno informativo)
     try:
         level_up_result = xp_manager.add_combat_xp_inplace(player_data, xp_reward)
     except Exception as e:
-        logger.exception(f"Erro ao adicionar XP: {e}")
-        level_up_result = {}
+        logger.exception(f"Erro ao adicionar XP com xp_manager: {e}")
+        # fallback defensivo: soma direta (não ideal)
+        try:
+            player_data['xp'] = int(player_data.get('xp', 0)) + int(xp_reward)
+        except Exception:
+            player_data['xp'] = player_data.get('xp', 0)
+        level_up_result = {"levels_gained": 0, "points_awarded": 0, "new_level": player_data.get("level")}
 
     level_up_msg = ""
     if level_up_result and level_up_result.get("levels_gained", 0) > 0:
         levels_gained = level_up_result.get("levels_gained", 0)
         points_gained = level_up_result.get("points_awarded", 0)
-        new_level = level_up_result.get("new_level", "?")
+        new_level = level_up_result.get("new_level", player_data.get("level", "?"))
         nivel_txt = "nível" if levels_gained == 1 else "níveis"
         ponto_txt = "ponto" if points_gained == 1 else "pontos"
         level_up_msg = (
@@ -131,10 +136,15 @@ async def apply_and_format_victory(player_data: dict, combat_details: dict, cont
 
     for item_id in looted_items:
         try:
-            # Sempre usar quantidade explícita para evitar erros de assinatura
             player_manager.add_item_to_inventory(player_data, item_id, 1)
         except Exception:
             logger.exception(f"Erro ao adicionar item {item_id} ao inventário.")
+
+    # Salva player_data após aplicar recompensas
+    try:
+        await player_manager.save_player_data(user_id, player_data)
+    except Exception:
+        logger.exception("Erro ao salvar player_data após aplicar recompensas.")
 
     # Monta a mensagem final
     monster_name = combat_details.get('monster_name', 'inimigo')
@@ -214,11 +224,21 @@ async def apply_and_format_victory_from_cache(player_data: dict, battle_cache: d
     """
     Aplica recompensas lidas do battle_cache (não salva player_data).
     """
+    user_id = player_data.get("user_id")
     clan_id = player_data.get("clan_id")
     monster_stats = battle_cache.get("monster_stats", {}) or {}
 
     xp_reward, gold_reward, looted_items = _calculate_rewards_from_cache(player_data, battle_cache)
 
+    # Aplica XP via xp_manager (inplace)
+    try:
+        level_up_result = xp_manager.add_combat_xp_inplace(player_data, xp_reward)
+    except Exception as e:
+        logger.exception(f"Erro ao aplicar XP (cache): {e}")
+        player_data['xp'] = player_data.get('xp', 0) + int(xp_reward)
+        level_up_result = {"levels_gained": 0, "points_awarded": 0, "new_level": player_data.get("level")}
+
+    # Aplica ouro e itens (no pdata)
     try:
         player_manager.add_gold(player_data, gold_reward)
     except Exception:
@@ -230,6 +250,7 @@ async def apply_and_format_victory_from_cache(player_data: dict, battle_cache: d
         except Exception:
             logger.exception(f"Erro ao adicionar item {item_id} (cache).")
 
+    # Missões
     try:
         mission_manager.update_mission_progress(player_data, 'HUNT', details=monster_stats)
         if monster_stats.get('is_elite', False):
@@ -237,12 +258,19 @@ async def apply_and_format_victory_from_cache(player_data: dict, battle_cache: d
     except Exception:
         logger.exception("Erro ao atualizar missões (cache).")
 
-    # Notificação de missão de clã — não temos context aqui; se quiser executar async,
-    # o caller pode agendar uma tarefa com context disponível.
+    # Clã: sem context aqui; caller deve atualizar se desejar (assíncrono)
     if clan_id and monster_stats.get("id"):
         # exemplo: asyncio.create_task(clan_manager.update_guild_mission_progress(...))
         pass
 
+    # Salva player_data após aplicar recompensas
+    try:
+        if user_id:
+            await player_manager.save_player_data(user_id, player_data)
+    except Exception:
+        logger.exception("Erro ao salvar player_data (cache).")
+
+    # Formata mensagem
     monster_name = monster_stats.get('name', 'inimigo')
     summary = (f"✅ Você derrotou <b>{monster_name}</b>!\n"
                f"+{xp_reward} XP, +{gold_reward} Ouro.")
@@ -252,6 +280,18 @@ async def apply_and_format_victory_from_cache(player_data: dict, battle_cache: d
         item_names = [(game_data.ITEMS_DATA.get(item_id) or {}).get('display_name', item_id) for item_id in looted_items]
         for name, count in Counter(item_names).items():
             summary += f"- {count}x {name}\n"
+
+    if level_up_result and level_up_result.get("levels_gained", 0) > 0:
+        levels_gained = level_up_result.get("levels_gained", 0)
+        points_gained = level_up_result.get("points_awarded", 0)
+        new_level = level_up_result.get("new_level", player_data.get("level", "?"))
+        nivel_txt = "nível" if levels_gained == 1 else "níveis"
+        ponto_txt = "ponto" if points_gained == 1 else "pontos"
+        level_up_msg = (
+            f"\n\n✨ <b>Parabéns!</b> Você subiu {levels_gained} {nivel_txt} "
+            f"(agora Nv. {new_level}) e ganhou {points_gained} {ponto_txt} de atributo."
+        )
+        summary += level_up_msg
 
     return summary
 

@@ -112,8 +112,9 @@ async def _return_to_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: in
 
 async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str = None) -> None:
     """
-    Motor de Combate Principal (Usa o BATTLE CACHE).
-    (VERSÃO REFATORADA - CHAMA O 'combat_engine')
+    Handler de combate sem usar 'battle_cache' em memória.
+    Usa apenas player_data['player_state']['details'] como fonte de verdade.
+    Mantém compatibilidade com o fluxo legado quando necessário.
     """
     query = update.callback_query
 
@@ -127,18 +128,11 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     chat_id = query.message.chat.id if query else update.effective_chat.id
 
     if action == 'combat_attack_menu':
-        # (Esta parte permanece idêntica)
         if not query: return
         await _safe_answer(query)
         kb = [
-            [
-                InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'),
-                InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')
-            ],
-            [
-                InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'),
-                InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')
-            ]
+            [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
+            [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
         ]
         try:
             await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
@@ -149,13 +143,23 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     if query:
         await _safe_answer(query)
 
-    # --- CARREGAR O CACHE DE BATALHA ---
-    battle_cache = context.user_data.get('battle_cache')
+    # ============================
+    # Carrega o player_data (fonte de verdade)
+    # ============================
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        # sem player: avisar e sair
+        idle_msg = "Usuário não encontrado."
+        if query:
+            try: await query.edit_message_text(text=idle_msg)
+            except Exception: pass
+        return
 
-    # --- (A lógica de Fallback para o Legado permanece idêntica) ---
-    if not battle_cache or battle_cache.get('player_id') != user_id:
-        player_data_db = await player_manager.get_player_data(user_id)
-        if not player_data_db or player_data_db.get('player_state', {}).get('action') != 'in_combat':
+    player_state = pdata.get('player_state', {})
+    if player_state.get('action') != 'in_combat':
+        # fallback para legada se action não for in_combat
+        # O legacy handler espera player_data com 'player_state.details'
+        if not player_state.get('details'):
             idle_msg = "Você não está em combate."
             if query:
                 try: await query.edit_message_caption(caption=idle_msg, reply_markup=None)
@@ -163,283 +167,314 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     try: await query.edit_message_text(text=idle_msg, reply_markup=None)
                     except Exception: pass
             return
-        else:
-            logger.debug(f"Ação de combate {action} recebida, mas SEM CACHE (é Dungeon/PvP?). Chamando _legacy_combat_callback...")
-            # Chama a versão LEGADA, que também será refatorada
-            await _legacy_combat_callback(update, context, action, player_data_db)
-            return
+        # chama legado (passa player_data)
+        await _legacy_combat_callback(update, context, action, pdata)
+        return
 
-    # --- Se chegamos aqui, temos um 'battle_cache' válido ---
-    log = battle_cache.get('battle_log', [])
-    player_stats = battle_cache.get('player_stats', {})
-    monster_stats = battle_cache.get('monster_stats', {})
-    is_auto_mode = battle_cache.get('is_auto_mode', False)
+    # pega os detalhes do combate a partir do player_state (SERÁ A FONTE)
+    combat_details = dict(player_state.get('details', {}))  # cópia defensiva
+    # normalize: garantir estruturas mínimas
+    monster_stats = combat_details.get('monster_stats') or {
+        'name': combat_details.get('monster_name', 'Inimigo'),
+        'hp': combat_details.get('monster_hp', 1),
+        'max_hp': combat_details.get('monster_max_hp', 1),
+        'attack': combat_details.get('monster_attack', 1),
+        'defense': combat_details.get('monster_defense', 0),
+        'luck': combat_details.get('monster_luck', 5),
+        'initiative': combat_details.get('monster_initiative', 0),
+        'gold_drop': combat_details.get('monster_gold_drop', 0),
+        'xp_reward': combat_details.get('monster_xp_reward', 0),
+        'loot_table': combat_details.get('loot_table', []),
+        'id': combat_details.get('id'),
+        'is_elite': combat_details.get('is_elite', False),
+    }
+
+    # player hp/mp no combate (estado transitório mantido em player_state.details)
+    player_hp = int(combat_details.get('player_hp', pdata.get('current_hp', 0)))
+    player_mp = int(combat_details.get('player_mp', pdata.get('current_mp', 0)))
+
+    is_auto_mode = bool(combat_details.get('is_auto_mode', False))
 
     kb_voltar = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data='continue_after_action')]])
 
-    # --- LÓGICA DE FUGA (USA O CACHE) ---
+    # ---------- AÇÃO: FUGA ----------
     if action == 'combat_flee':
-        # (Esta parte permanece idêntica)
-        if not query: return
-        context.user_data.pop('battle_cache', None)
-        player_data = await player_manager.get_player_data(user_id)
-        player_data['player_state'] = {'action': 'idle'}
-        try:
-            total_stats = await player_manager.get_player_total_stats(player_data)
-            player_data['current_hp'] = int(total_stats.get('max_hp', 50))
-            player_data['current_mp'] = int(total_stats.get('max_mana', 10))
-        except Exception:
-            logger.exception("Falha ao calcular total_stats no flee; usando fallback values.")
-            player_data['current_hp'] = player_data.get('current_hp', 50)
-            player_data['current_mp'] = player_data.get('current_mp', 10)
+        # tentativa de fuga: 50% de sucesso (mesma lógica antiga)
+        if random.random() <= 0.5:
+            durability.apply_end_of_battle_wear(pdata, combat_details, combat_details.setdefault('battle_log', []))
+            # restaurar stats com base nos stats canônicos do player
+            try:
+                total_stats = await player_manager.get_player_total_stats(pdata)
+                pdata['current_hp'] = int(total_stats.get('max_hp', 50))
+                pdata['current_mp'] = int(total_stats.get('max_mana', 10))
+            except Exception:
+                logger.exception("Erro ao calcular total_stats no flee; usando valores fallback.")
+                pdata['current_hp'] = pdata.get('current_hp', 50)
+                pdata['current_mp'] = pdata.get('current_mp', 10)
 
-        await player_manager.save_player_data(user_id, player_data)
-        try: await query.delete_message()
-        except Exception: pass
-        caption = "🏃 <b>FUGA!</b>\n\nVocê conseguiu fugir da batalha."
-        await _send_battle_media(context, chat_id, caption, "media_fuga_sucesso", kb_voltar)
-        return
+            pdata['player_state'] = {'action': 'idle'}  # finaliza combate
+            # salvar alterações atômicas (recarrega antes por segurança)
+            try:
+                await player_manager.save_player_data(user_id, pdata)
+            except Exception:
+                logger.exception("Erro ao salvar player_data no flee.")
+            # enviar feedback
+            try: 
+                if query: await query.delete_message()
+            except Exception: pass
+            caption = "🏃 <b>FUGA!</b>\n\nVocê conseguiu fugir da batalha."
+            await _send_battle_media(context, chat_id, caption, "media_fuga_sucesso", kb_voltar)
+            return
+        else:
+            # falha na fuga -> monstro ataca uma vez (mesma lógica do legado)
+            log = combat_details.setdefault('battle_log', [])
+            log.append("🏃 Sua tentativa de fuga falhou!")
+            dodge_chance = await player_manager.get_player_dodge_chance(await player_manager.get_player_total_stats(pdata))
+            if random.random() < dodge_chance:
+                log.append("💨 Você se esquivou do ataque!")
+            else:
+                monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, await player_manager.get_player_total_stats(pdata), {})
+                log.append(f"⬅️ {monster_stats['name']} ataca e causa {monster_damage} de dano.")
+                player_hp = int(player_hp) - monster_damage
+                combat_details['took_damage'] = True
 
-    # --- LÓGICA DE ATAQUE (USA O CACHE) ---
-    elif action == 'combat_attack':
+            # verifica derrota
+            if player_hp <= 0:
+                # aplicar desgaste
+                durability.apply_end_of_battle_wear(pdata, combat_details, log)
+                defeat_summary, _ = rewards.process_defeat(pdata, combat_details)
+                # restaurar hp para max e mp coerente
+                try:
+                    total_stats = await player_manager.get_player_total_stats(pdata)
+                    pdata['current_hp'] = int(total_stats.get('max_hp', 50))
+                    pdata['current_mp'] = int(total_stats.get('max_mana', 10))
+                except Exception:
+                    pdata['current_hp'] = 0
+                    pdata['current_mp'] = pdata.get('current_mp', 10)
+                pdata['player_state'] = {'action': 'idle'}
+                try:
+                    await player_manager.save_player_data(user_id, pdata)
+                except Exception:
+                    logger.exception("Erro ao salvar player_data apos derrota no flee.")
+                try:
+                    if query: await query.delete_message()
+                except Exception: pass
+                keyboard = [[InlineKeyboardButton("➡️ Continuar", callback_data='continue_after_action')]]
+                await _send_battle_media(context, chat_id, defeat_summary, "media_derrota_cacada", InlineKeyboardMarkup(keyboard))
+                return
+            else:
+                # Atualiza combat_details com hp/mp e salva player_state (sem finalizar combate)
+                combat_details['player_hp'] = player_hp
+                combat_details['player_mp'] = player_mp
+                pdata['player_state']['details'] = combat_details
+                try:
+                    await player_manager.save_player_data(user_id, pdata)
+                except Exception:
+                    logger.exception("Erro ao salvar player_state após falha de fuga.")
+                # atualizar mensagem (tentar editar)
+                new_caption = await format_combat_message(pdata, player_stats=await player_manager.get_player_total_stats(pdata))
+                if query:
+                    await _edit_caption_only(query, new_caption, None)
+                return
 
-        battle_cache['turn'] = 'player'
-
-        skill_id = battle_cache.pop('skill_to_use', None)
-        # 🟢 NOVO: Extrai a action_type (deve ser definida no skill_handler)
-        action_type = battle_cache.pop('action_type', 'attack')
+    # ---------- AÇÃO: ATAQUE ----------
+    if action == 'combat_attack':
+        # atualiza turno no details
+        combat_details['turn'] = 'player'
+        skill_id = combat_details.pop('skill_to_use', None)  # caso preenchido pelo handler de uso de skill
+        action_type = combat_details.pop('action_type', 'attack')
 
         skill_info = SKILL_DATA.get(skill_id) if skill_id else None
-
-        # Variável para controlar se devemos pular o turno do monstro
         skip_monster_turn = False
+        log = combat_details.setdefault('battle_log', [])
 
-        # --- LÓGICA DE SKILL/ATAQUE ---
+        # obter stats canônicos do jogador (para cálculo de dano e restore)
+        player_total_stats = await player_manager.get_player_total_stats(pdata)
 
         if skill_info:
             mana_cost = skill_info.get("mana_cost", 0)
-
-            # ** Assumimos que a verificação de Mana e o gasto de Cooldown **
-            # ** já foram aplicados no combat_use_skill_callback! **
-
             log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{mana_cost} MP)")
-
-            # 🟢 LÓGICA DE SKILL DE SUPORTE
             if action_type == 'support':
-                # 1. Aplicar Efeitos de Suporte (Cura, Buffs, etc.)
-                # O motor deve retornar os efeitos aplicados aqui (por exemplo, cura)
-
-                # Exemplo: Se a skill curar 10 HP
-                # battle_cache['player_hp'] = min(battle_cache.get('player_hp', 0) + 10, player_stats.get('max_hp'))
-
-                log.append("➕ <i>Efeitos de suporte aplicados.</i>")
-
-                # 2. Marcar para Pular o Turno do Monstro
+                # placeholder: aplicar efeitos de suporte (cura/buff) aqui — quem chama deve definir quais efeitos
+                # Exemplo genérico: se skill tiver 'heal_amount' no effects
+                heal = skill_info.get('effects', {}).get('heal_amount')
+                if heal:
+                    player_hp = min(player_hp + int(heal), player_total_stats.get('max_hp', player_hp))
+                    log.append(f"➕ Você recupera {int(heal)} HP.")
                 skip_monster_turn = True
-
-            # 🟢 LÓGICA DE SKILL DE ATAQUE (Dano)
-            else: # action_type == 'attack' ou não definido
-                # 2. CHAMAMOS O MOTOR UNIFICADO (Processa Dano)
+            else:
                 resultado_combate = await combat_engine.processar_acao_combate(
-                    attacker_stats=player_stats,
+                    attacker_stats=player_total_stats,
                     target_stats=monster_stats,
                     skill_id=skill_id,
-                    attacker_current_hp=battle_cache.get('player_hp', 9999)
+                    attacker_current_hp=player_hp
                 )
-
-                # 3. Aplicamos os resultados
                 player_damage = resultado_combate["total_damage"]
                 log.extend(resultado_combate["log_messages"])
-
-                if skill_info and "debuff_target" in skill_info.get("effects", {}):
-                    # Lógica para aplicar debuffs ao monstro (seria implementada aqui)
-                    pass
-
                 monster_stats['hp'] = int(monster_stats.get('hp', 0)) - player_damage
                 monster_defeated_in_turn = monster_stats['hp'] <= 0
-
         else:
-            # Caso use ataque básico (sem skill)
+            # ataque básico
             log.append("⚔️ Você realiza um ataque básico.")
             resultado_combate = await combat_engine.processar_acao_combate(
-                attacker_stats=player_stats, target_stats=monster_stats, skill_id=None,
-                attacker_current_hp=battle_cache.get('player_hp', 9999)
+                attacker_stats=player_total_stats, target_stats=monster_stats, skill_id=None,
+                attacker_current_hp=player_hp
             )
             player_damage = resultado_combate["total_damage"]
             log.extend(resultado_combate["log_messages"])
             monster_stats['hp'] = int(monster_stats.get('hp', 0)) - player_damage
             monster_defeated_in_turn = monster_stats['hp'] <= 0
 
-        # 4. Atualizar Mídia (Pós-Ação do Jogador)
-        battle_cache['battle_log'] = log
-        caption_turno_jogador = await format_combat_message_from_cache(battle_cache)
+        # salva alterações temporárias em combat_details
+        combat_details['monster_stats'] = monster_stats
+        combat_details['player_hp'] = player_hp
+        combat_details['player_mp'] = player_mp
+        combat_details['battle_log'] = log
 
-        # 5. SAÍDA PARA SKILL DE SUPORTE
+        # SE SKILL DE SUPORTE -> pular turno do monstro e salvar estado
         if skip_monster_turn:
-            battle_cache['turn'] = 'player' # Continua o turno do jogador
-
-            # Recria o teclado principal para permitir outra ação
-            kb_player_turn = InlineKeyboardMarkup([
-                [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
-                [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
-            ])
-
-            # Edita a mensagem para mostrar os novos logs e a vida/mana atualizada
-            await _edit_media_or_caption(
-                context, battle_cache,
-                caption_turno_jogador,
-                battle_cache['player_media_id'],
-                battle_cache['player_media_type'],
-                reply_markup=kb_player_turn
-            )
-            return # ⬅️ FINALIZA A FUNÇÃO: o monstro não ataca.
-        # 4. Processar Resultado (Vitória ou Turno do Monstro)
-        if monster_defeated_in_turn:
-            # (A lógica de VITÓRIA permanece idêntica)
-            log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
-            battle_cache['battle_log'] = log
-            pdata = await player_manager.get_player_data(user_id)
-            victory_summary = await rewards.apply_and_format_victory_from_cache(pdata, battle_cache)
-            _, _, level_up_msg = await player_manager.check_and_apply_level_up(pdata)
-            if level_up_msg:
-                victory_summary += level_up_msg
-
-            # --- Restaurar HP/MP usando stats canônicos calculados a partir do pdata ---
-            try:
-                total_stats = await player_manager.get_player_total_stats(pdata)
-                new_hp = int(total_stats.get('max_hp', 50))
-                new_mp = int(total_stats.get('max_mana', 10))
-            except Exception:
-                logger.exception("Falha ao calcular total_stats antes de restaurar HP/MP (cache). Usando fallback from battle_cache.")
-                new_hp = int(player_stats.get('max_hp', 50))
-                new_mp = int(player_stats.get('max_mana', 10))
-
-            pdata['current_hp'] = new_hp
-            pdata['current_mp'] = new_mp
-            pdata['player_state'] = {'action': 'idle'}
-
-            logger.info("RESTORE (cache, victory) -> user=%s current_hp=%s current_mp=%s", user_id, new_hp, new_mp)
+            pdata['player_state']['details'] = combat_details
             try:
                 await player_manager.save_player_data(user_id, pdata)
             except Exception:
-                logger.exception("Erro ao salvar player_data após vitória (cache).")
+                logger.exception("Erro ao salvar player_state apos skill de suporte.")
+            # atualizar UI
+            caption = await format_combat_message(pdata, player_stats=player_total_stats)
+            if query:
+                kb_player_turn = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'),
+                     InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
+                    [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'),
+                     InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
+                ])
+                await _edit_caption_only(query, caption, kb_player_turn)
+            return
 
-            # remover cache apenas após salvar
-            context.user_data.pop('battle_cache', None)
+        # SE MONSTRO MORREU -> aplicar recompensas e finalizar combate
+        if monster_stats.get('hp', 0) <= 0:
+            log.append(f"🏆 <b>{monster_stats.get('name')}</b> foi derrotado!")
+            combat_details['battle_log'] = log
+            # Aplicar recompensas (essa função altera pdata em memória)
+            try:
+                victory_summary = await rewards.apply_and_format_victory(pdata, combat_details, context)
+            except Exception:
+                logger.exception("Erro ao aplicar recompensas; tentando aplicar manualmente.")
+                victory_summary = "✅ Você derrotou o inimigo! (recompensas aplicadas com erro de auditoria)"
 
-            await _edit_media_or_caption(
-                context, battle_cache,
+            # processar level up (função já altera pdata)
+            try:
+                _ = await player_manager.check_and_apply_level_up(pdata)
+            except Exception:
+                logger.exception("Erro ao aplicar level up após vitória.")
+
+            # Restaurar HP/MP reais com base nos stats canônicos
+            try:
+                total_stats_after = await player_manager.get_player_total_stats(pdata)
+                pdata['current_hp'] = int(total_stats_after.get('max_hp', 50))
+                pdata['current_mp'] = int(total_stats_after.get('max_mana', 10))
+            except Exception:
+                logger.exception("Erro ao calcular total_stats apos victory; usando fallback.")
+                pdata['current_hp'] = pdata.get('current_hp', 50)
+                pdata['current_mp'] = pdata.get('current_mp', 10)
+
+            pdata['player_state'] = {'action': 'idle'}
+            try:
+                await player_manager.save_player_data(user_id, pdata)
+            except Exception:
+                logger.exception("Erro ao salvar player_data apos victory.")
+
+            # enviar mídia/summary
+            await _send_battle_media(
+                context, chat_id,
                 victory_summary,
-                battle_cache['player_media_id'],
-                battle_cache['player_media_type'],
-                reply_markup=kb_voltar
+                (pdata.get('player_media_id') or combat_details.get('player_media_id')),
+                kb_voltar
             )
             return
 
+        # SENÃO -> TURNO DO MONSTRO: calcular dano do monstro
+        # reduzir cooldowns
+        active_cooldowns = combat_details.setdefault("skill_cooldowns", {})
+        skills_off_cooldown = []
+        if active_cooldowns:
+            for skill_id_cd, turns_left in list(active_cooldowns.items()):
+                active_cooldowns[skill_id_cd] = turns_left - 1
+                if active_cooldowns[skill_id_cd] <= 0:
+                    skills_off_cooldown.append(skill_id_cd)
+            for skill_id_cd in skills_off_cooldown:
+                del active_cooldowns[skill_id_cd]
+                skill_name = SKILL_DATA.get(skill_id_cd, {}).get('display_name', 'Habilidade')
+                log.append(f"🔔 <b>{skill_name}</b> está pronta!")
+
+        # chance de esquiva baseada na iniciativa do jogador
+        initiative = player_total_stats.get('initiative', 0)
+        dodge_chance = (initiative * 0.4) / 100.0
+        dodge_chance = min(dodge_chance, 0.75)
+        if random.random() < dodge_chance:
+            log.append("💨 Você se esquivou do ataque!")
         else:
-            # (A lógica do TURNO DO MONSTRO permanece idêntica)
-            battle_cache['turn'] = 'monster'
+            monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_total_stats, {})
+            log.append(f"⬅️ {monster_stats.get('name')} ataca e causa {monster_damage} de dano.")
+            if m_is_mega: log.append("‼️ MEGA CRÍTICO inimigo!")
+            elif m_is_crit: log.append("❗️ DANO CRÍTICO inimigo!")
+            player_hp = int(player_hp) - monster_damage
 
-            active_cooldowns = battle_cache.setdefault("skill_cooldowns", {})
-            skills_off_cooldown = []
-            if active_cooldowns:
-                for skill_id_cd, turns_left in list(active_cooldowns.items()):
-                    active_cooldowns[skill_id_cd] = turns_left - 1
-                    if active_cooldowns[skill_id_cd] <= 0:
-                        skills_off_cooldown.append(skill_id_cd)
+        # salvar hp e estado e verificar derrota
+        combat_details['player_hp'] = player_hp
+        combat_details['battle_log'] = log
+        pdata['player_state']['details'] = combat_details
 
-                for skill_id_cd in skills_off_cooldown:
-                    del active_cooldowns[skill_id_cd]
-                    skill_name = SKILL_DATA.get(skill_id_cd, {}).get('display_name', 'Habilidade')
-                    log.append(f"🔔 <b>{skill_name}</b> está pronta!")
-
-            initiative = player_stats.get('initiative', 0)
-            dodge_chance = (initiative * 0.4) / 100.0
-            dodge_chance = min(dodge_chance, 0.75)
-
-            if random.random() < dodge_chance:
-                log.append("💨 Você se esquivou do ataque!")
-            else:
-
-                monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_stats, {})
-                log.append(f"⬅️ {monster_stats['name']} ataca e causa {monster_damage} de dano.")
-                if m_is_mega: log.append("‼️ 𝕄𝔼𝔾𝔸 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
-                elif m_is_crit: log.append("❗️ 𝔻𝔸ℕ𝕆 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
-
-                battle_cache['player_hp'] = int(battle_cache.get('player_hp', 0)) - monster_damage
-
-                if battle_cache['player_hp'] <= 0: # Derrota
-                    # (A lógica de DERROTA permanece idêntica)
-                    log.append("☠️ <b>Você foi derrotado!</b>")
-                    battle_cache['battle_log'] = log
-                    pdata = await player_manager.get_player_data(user_id)
-                    defeat_summary, _ = rewards.process_defeat_from_cache(pdata, battle_cache)
-
-                    # setar current_hp = 0 (player está morto) e tentar manter mp coerente
-                    pdata['current_hp'] = 0
-                    try:
-                        total_stats = await player_manager.get_player_total_stats(pdata)
-                        pdata['current_mp'] = int(total_stats.get('max_mana', 10))
-                    except Exception:
-                        pdata['current_mp'] = battle_cache.get('player_mp', player_stats.get('max_mana', 10))
-
-                    pdata['player_state'] = {'action': 'idle'}
-
-                    logger.info("DERROTA (cache) -> user=%s setting current_hp=0 current_mp=%s", user_id, pdata.get('current_mp'))
-                    try:
-                        await player_manager.save_player_data(user_id, pdata)
-                    except Exception:
-                        logger.exception("Erro ao salvar player_data após derrota (cache).")
-
-                    # limpar cache após salvar
-                    context.user_data.pop('battle_cache', None)
-
-                    await _edit_media_or_caption(
-                        context, battle_cache,
-                        defeat_summary,
-                        (file_id_manager.get_file_data("media_derrota_cacada") or {}).get('id'),
-                        (file_id_manager.get_file_data("media_derrota_cacada") or {}).get('type', 'photo'),
-                        reply_markup=kb_voltar
-                    )
-                    return # Fim da batalha
-
-    # 5. Atualizar Mídia (Turno do Monstro)
-    # (Esta parte permanece idêntica)
-    battle_cache['battle_log'] = log
-    caption_turno_monstro = await format_combat_message_from_cache(battle_cache)
-
-    kb_player_turn = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'),
-            InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')
-        ],
-        [
-            InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'),
-            InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')
-        ]
-    ])
-
-    await _edit_media_or_caption(
-        context, battle_cache,
-        caption_turno_monstro,
-        battle_cache['monster_media_id'],
-        battle_cache['monster_media_type'],
-        reply_markup=kb_player_turn
-    )
-
-    if is_auto_mode:
-        async def _continue_auto():
-            await asyncio.sleep(2)
-            # FakeUpdate com só os atributos que combat_callback usa quando não há callback_query
-            fake_user = type("User", (), {"id": user_id})()
-            fake_chat = type("Chat", (), {"id": battle_cache.get('chat_id')})()
-            fake_update = type("FakeUpdate", (), {"effective_user": fake_user, "effective_chat": fake_chat})()
+        if player_hp <= 0:
+            # jogador derrotado
+            durability.apply_end_of_battle_wear(pdata, combat_details, log)
+            defeat_summary, _ = rewards.process_defeat(pdata, combat_details)
+            # manter current_hp = 0 (morto) e restaurar mp coerente
+            pdata['current_hp'] = 0
             try:
-                await combat_callback(fake_update, context, action='combat_attack')
+                total_stats = await player_manager.get_player_total_stats(pdata)
+                pdata['current_mp'] = int(total_stats.get('max_mana', 10))
             except Exception:
-                logger.exception("Erro ao continuar auto-mode (cache)")
-        asyncio.create_task(_continue_auto())
-        return
+                pdata['current_mp'] = combat_details.get('player_mp', 10)
+            pdata['player_state'] = {'action': 'idle'}
+            try:
+                await player_manager.save_player_data(user_id, pdata)
+            except Exception:
+                logger.exception("Erro ao salvar player_data apos defeat (no-cache).")
+            await _send_battle_media(
+                context, chat_id,
+                defeat_summary,
+                (file_id_manager.get_file_data("media_derrota_cacada") or {}).get('id'),
+                InlineKeyboardMarkup([[InlineKeyboardButton("➡️ Continuar", callback_data='continue_after_action')]])
+            )
+            return
+        else:
+            # continua batalha; salva estado e atualiza UI
+            try:
+                await player_manager.save_player_data(user_id, pdata)
+            except Exception:
+                logger.exception("Erro ao salvar player_state apos turno do monstro.")
+            new_caption = await format_combat_message_from_cache({'battle_log': log, 'player_hp': player_hp, 'monster_stats': monster_stats, 'player_stats': player_total_stats})
+            # tenta editar a mensagem (se veio por query)
+            if query:
+                kb_player_turn = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
+                    [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
+                ])
+                await _edit_caption_only(query, new_caption, kb_player_turn)
+            return
+
+    # ---------------- fim do if action == 'combat_attack' ----------------
+
+    # Se chegou aqui sem ação específica — atualiza UI com estado atual do combate
+    # (útil para continuity)
+    new_caption = await format_combat_message(pdata, player_stats=await player_manager.get_player_total_stats(pdata))
+    if query:
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
+            [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
+        ])
+        await _edit_caption_only(query, new_caption, kb)
+    return
 
 
     

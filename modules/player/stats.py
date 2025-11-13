@@ -1,7 +1,6 @@
-# modules/player/stats.py (VERSÃO FINAL COMPLETA)
-
+# modules/player/stats.py (VERSÃO FINAL CORRIGIDA)
 from __future__ import annotations
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 from modules import game_data, clan_manager
 from modules.game_data.class_evolution import get_evolution_options
@@ -36,9 +35,16 @@ CLASS_POINT_GAINS = {
 
 _BASELINE_KEYS = ("max_hp", "attack", "defense", "initiative", "luck")
 
-def _ival(x, default=0):
-    try: return int(x)
-    except Exception: return int(default)
+
+def _ival(x: Any, default: int = 0) -> int:
+    try:
+        return int(round(float(x)))
+    except Exception:
+        try:
+            return int(default)
+        except Exception:
+            return 0
+
 
 def _get_class_key_normalized(pdata: dict) -> Optional[str]:
     ck = pdata.get("class_key") or pdata.get("class") or pdata.get("classe") or pdata.get("class_type")
@@ -46,82 +52,101 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
         return ck.strip().lower()
     return None
 
+
 # Em modules/player/stats.py
 
 async def get_player_total_stats(player_data: dict) -> dict:
-    
+    """
+    Calcula os stats totais (incluindo equipamento, encantamentos e buffs).
+    Esta função é defensiva: ignora equipamentos quebrados e formatos estranhos.
+    """
     lvl = _ival(player_data.get("level"), 1)
     ckey = _get_class_key_normalized(player_data)
-    
+
     # 1. Calcula os stats base (de classe + nível)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
-    
-    total = {}
-    
+
+    total: Dict[str, int] = {}
+
     # Pega o valor salvo (ex: 464) ou a baseline (ex: 461)
     for k in _BASELINE_KEYS:
-        total[k] = _ival(player_data.get(k), class_baseline.get(k))
+        # _ival aceita um segundo parâmetro de fallback
+        total[k] = _ival(player_data.get(k, class_baseline.get(k)), class_baseline.get(k, 0))
 
-    # 2. Adiciona Stats de Equipamento
+    # 2. Adiciona Stats de Equipamento (somente itens não quebrados)
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
 
-    for slot, unique_id in (equipped.items() if isinstance(equipped, dict) else []):
-        if not unique_id: continue
-        inst = inventory.get(unique_id)
-        if not isinstance(inst, dict): continue
-        
-        # <<< [ESTA É A CORREÇÃO] >>>
-        # Pega a durabilidade atual do item
-        durability_data = inst.get("durability", [1, 1])
-        current_durability = 0
-        
-        # Verifica se o formato é [atual, max]
-        if isinstance(durability_data, (list, tuple)) and len(durability_data) > 0:
-            current_durability = _ival(durability_data[0])
-        # Verifica se o formato é {"current": x, "max": y}
-        elif isinstance(durability_data, dict):
-             current_durability = _ival(durability_data.get("current", 0))
+    if isinstance(equipped, dict):
+        for slot, unique_id in equipped.items():
+            if not unique_id:
+                continue
+            inst = inventory.get(unique_id)
+            if not isinstance(inst, dict):
+                continue
 
-        # Se o item está quebrado (durabilidade 0), ignora-o e vai para o próximo item
-        if current_durability <= 0:
-            continue 
-        # <<< [FIM DA CORREÇÃO] >>>
+            # Pega a durabilidade atual do item (vários formatos suportados)
+            durability_data = inst.get("durability", [1, 1])
+            current_durability = 0
 
-        # Se o item NÃO está quebrado, adiciona os stats
-        ench = inst.get('enchantments', {}) or {}
-        for stat_key, data in ench.items():
-            val = _ival((data or {}).get('value'))
-            if stat_key == 'dmg': total['attack'] = total.get('attack', 0) + val
-            elif stat_key == 'hp': total['max_hp'] = total.get('max_hp', 0) + val
-            elif stat_key in ('defense', 'initiative', 'luck') and stat_key in total: total[stat_key] += val
+            # Formato lista/tuple: [current, max]
+            if isinstance(durability_data, (list, tuple)) and len(durability_data) > 0:
+                current_durability = _ival(durability_data[0], 0)
+            # Formato dict: {"current": x, "max": y}
+            elif isinstance(durability_data, dict):
+                current_durability = _ival(durability_data.get("current", 0), 0)
+            else:
+                # Tentativa fallback se foi armazenado como int/str
+                current_durability = _ival(durability_data, 0)
 
-    # 3. Adiciona Buffs de Clã
+            # Se o item está quebrado (durabilidade <= 0), ignora-o
+            if current_durability <= 0:
+                continue
+
+            # Se o item NÃO está quebrado, soma encantamentos / stats base
+            ench = inst.get('enchantments', {}) or {}
+            for stat_key, data in ench.items():
+                val = _ival((data or {}).get('value', 0), 0)
+                if stat_key == 'dmg':
+                    total['attack'] = total.get('attack', 0) + val
+                elif stat_key == 'hp':
+                    total['max_hp'] = total.get('max_hp', 0) + val
+                elif stat_key in ('defense', 'initiative', 'luck'):
+                    if stat_key in total:
+                        total[stat_key] = total.get(stat_key, 0) + val
+
+    # 3. Adiciona Buffs de Clã (se houver)
     clan_id = player_data.get("clan_id")
     if clan_id:
-        # (Assume que 'clan_manager.get_clan_buffs' é síncrono)
-        clan_buffs = clan_manager.get_clan_buffs(clan_id) 
-        if "all_stats_percent" in clan_buffs:
-            percent_bonus = 1 + (clan_buffs["all_stats_percent"] / 100.0)
-            total['max_hp'] = int(total.get('max_hp', 0) * percent_bonus)
-            total['attack'] = int(total.get('attack', 0) * percent_bonus)
-            total['defense'] = int(total.get('defense', 0) * percent_bonus)
-        if "flat_hp_bonus" in clan_buffs:
-            total['max_hp'] = total.get('max_hp', 0) + clan_buffs["flat_hp_bonus"]
+        try:
+            clan_buffs = clan_manager.get_clan_buffs(clan_id) or {}
+            if "all_stats_percent" in clan_buffs:
+                percent_bonus = 1 + (float(clan_buffs.get("all_stats_percent", 0)) / 100.0)
+                total['max_hp'] = int(total.get('max_hp', 0) * percent_bonus)
+                total['attack'] = int(total.get('attack', 0) * percent_bonus)
+                total['defense'] = int(total.get('defense', 0) * percent_bonus)
+            if "flat_hp_bonus" in clan_buffs:
+                total['max_hp'] = total.get('max_hp', 0) + int(clan_buffs.get("flat_hp_bonus", 0))
+        except Exception:
+            # Evita quebra se clan_manager falhar
+            pass
 
-    # 4. Calcula Mana
+    # 4. Calcula Mana a partir do atributo configurado para a classe
     class_prog = CLASS_PROGRESSIONS.get(ckey) or CLASS_PROGRESSIONS["_default"]
-    mana_attribute_name = class_prog.get("mana_stat", "luck") 
+    mana_attribute_name = class_prog.get("mana_stat", "luck")
     mana_attribute_value = total.get(mana_attribute_name, 0)
     mana_base = 10
     mana_por_ponto = 5
     total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)
 
-    # 5. Garante valores válidos
+    # 5. Garante valores válidos (não-negativos)
     for k in _BASELINE_KEYS:
-        total[k] = max(0, _ival(total.get(k))) 
+        total[k] = max(0, _ival(total.get(k), 0))
+
+    total['max_mana'] = max(0, _ival(total.get('max_mana', 10)))
 
     return total
+
 
 async def get_player_dodge_chance(player_data: dict) -> float:
     total_stats = await get_player_total_stats(player_data)
@@ -129,11 +154,13 @@ async def get_player_dodge_chance(player_data: dict) -> float:
     dodge_chance = (initiative * 0.4) / 100.0
     return min(dodge_chance, 0.75)
 
+
 async def get_player_double_attack_chance(player_data: dict) -> float:
     total_stats = await get_player_total_stats(player_data)
     initiative = total_stats.get('initiative', 0)
     double_attack_chance = (initiative * 0.25) / 100.0
     return min(double_attack_chance, 0.50)
+
 
 def allowed_points_for_level(pdata: dict) -> int:
     lvl = _ival(pdata.get("level"), 1)
@@ -141,6 +168,7 @@ def allowed_points_for_level(pdata: dict) -> int:
     prog = CLASS_PROGRESSIONS.get(ckey or "") or CLASS_PROGRESSIONS["_default"]
     per_lvl = _ival(prog.get("FREE_POINTS_PER_LVL"), 0)
     return per_lvl * max(0, lvl - 1)
+
 
 def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
     """Opção A: XP Excedente (Carry-over)"""
@@ -150,24 +178,24 @@ def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
     while True:
         current_level = int(player_data.get('level', 1))
         xp_needed = int(game_data.get_xp_for_next_combat_level(current_level))
-        
+
         if xp_needed <= 0 or current_xp < xp_needed:
             break
-        
+
         current_xp -= xp_needed
-        
+
         old_allowed = allowed_points_for_level(player_data)
         player_data['level'] = current_level + 1
         new_allowed = allowed_points_for_level(player_data)
-        
+
         delta_points = max(0, new_allowed - old_allowed)
-        
+
         levels_gained += 1
         points_gained += delta_points
 
     if levels_gained > 0:
         player_data['xp'] = current_xp
-        
+
         allowed = allowed_points_for_level(player_data)
         spent = compute_spent_status_points(player_data)
         player_data['stat_points'] = max(0, allowed - spent)
@@ -180,8 +208,9 @@ def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
             f"\n\n✨ <b>Parabéns!</b> Você subiu {levels_gained} {nivel_txt} "
             f"(agora Nv. {player_data['level']}) e ganhou {points_gained} {ponto_txt} de atributo."
         )
-        
+
     return levels_gained, points_gained, level_up_message
+
 
 def needs_class_choice(player_data: dict) -> bool:
     lvl = _ival(player_data.get("level"), 1)
@@ -189,62 +218,59 @@ def needs_class_choice(player_data: dict) -> bool:
     already_offered = bool(player_data.get("class_choice_offered"))
     return (lvl >= 5) and (not already_has_class) and (not already_offered)
 
+
 async def mark_class_choice_offered(user_id: int):
     from .core import get_player_data, save_player_data
     pdata = await get_player_data(user_id)
-    if not pdata: return
+    if not pdata:
+        return
     pdata["class_choice_offered"] = True
     await save_player_data(user_id, pdata)
-    
+
+
 def _get_point_gains_for_class(ckey: Optional[str]) -> dict:
     norm_key = (ckey or "").lower()
     gains = CLASS_POINT_GAINS.get(norm_key)
 
-    # <<< [ESTA É A NOVA LÓGICA] >>>
+    # Se não encontrou (ex: classe evoluída), procura a classe base
     if gains is None:
-        # Se não encontrou (ex: "ronin"), procura a classe base (ex: "samurai")
         try:
-            # Tenta obter a 'base_class' da evolução
             base_class = game_data.CLASS_EVOLUTIONS.get(norm_key, {}).get("base_class")
             if base_class:
                 gains = CLASS_POINT_GAINS.get(base_class.lower())
         except Exception:
-            pass # Mantém 'gains' como None
-    # Se ainda assim não encontrou, usa o default
+            pass
     if gains is None:
         gains = CLASS_POINT_GAINS["_default"]
-    # <<< [FIM DA NOVA LÓGICA] >>>
 
-    full = {}
+    full: Dict[str, int] = {}
     for k in _BASELINE_KEYS:
-        # Usa o default[k] como fallback se a chave não existir em 'gains'
         full[k] = max(1, _ival(gains.get(k), CLASS_POINT_GAINS["_default"].get(k, 1)))
     return full
+
 
 def compute_spent_status_points(pdata: dict) -> int:
     """Calcula quantos pontos de atributo o jogador já gastou manualmente."""
     lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
-    
+
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
     gains = _get_point_gains_for_class(ckey)
     spent = 0
-    
+
     for k in _BASELINE_KEYS:
         current_stat_value = _ival(pdata.get(k), class_baseline.get(k))
         baseline_stat_value = _ival(class_baseline.get(k))
-        
         delta = current_stat_value - baseline_stat_value
-        
         if delta <= 0:
             continue
-            
+
         gain_per_point = max(1, int(gains.get(k, 1)))
-        
         points_for_this_stat = (delta + gain_per_point - 1) // gain_per_point
         spent += points_for_this_stat
-            
+
     return spent
+
 
 async def reset_stats_and_refund_points(pdata: dict) -> int:
     _ensure_base_stats_block_inplace(pdata)
@@ -259,18 +285,22 @@ async def reset_stats_and_refund_points(pdata: dict) -> int:
         totals = await get_player_total_stats(pdata)
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
         pdata["current_hp"] = max(1, min(_ival(pdata.get("current_hp"), max_hp), max_hp))
-    except Exception: pass
+    except Exception:
+        pass
     return spent_before
 
-# <<< CORREÇÃO 12: Adiciona async def >>>
+
+# Sincronizadores / Migrações
+
 async def _sync_all_stats_inplace(pdata: dict) -> bool:
     """Função mestra que executa todas as sincronizações de stats."""
-    mig = _migrate_point_pool_to_stat_points_inplace(pdata) # Síncrono
-    base_changed = _ensure_base_stats_block_inplace(pdata) # Síncrono
-    cls_sync = await _apply_class_progression_sync_inplace(pdata) 
-    
-    synced = _sync_stat_points_to_level_cap_inplace(pdata) # Síncrono
+    mig = _migrate_point_pool_to_stat_points_inplace(pdata)  # Síncrono
+    base_changed = _ensure_base_stats_block_inplace(pdata)  # Síncrono
+    cls_sync = await _apply_class_progression_sync_inplace(pdata)
+
+    synced = _sync_stat_points_to_level_cap_inplace(pdata)  # Síncrono
     return any([mig, base_changed, cls_sync, synced])
+
 
 def _migrate_point_pool_to_stat_points_inplace(pdata: dict) -> bool:
     if "point_pool" in pdata:
@@ -280,8 +310,10 @@ def _migrate_point_pool_to_stat_points_inplace(pdata: dict) -> bool:
         return True
     return False
 
+
 def _get_default_baseline_from_new_player() -> dict:
     return {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}
+
 
 def _ensure_base_stats_block_inplace(pdata: dict) -> bool:
     changed = False
@@ -290,10 +322,10 @@ def _ensure_base_stats_block_inplace(pdata: dict) -> bool:
 
     if base is None and isinstance(pdata.get("invested"), dict):
         inv = pdata.get("invested") or {}
-        hp_inv   = _ival(inv.get("hp"))
-        atk_inv  = _ival(inv.get("attack"))
-        def_inv  = _ival(inv.get("defense"))
-        ini_inv  = _ival(inv.get("initiative"))
+        hp_inv = _ival(inv.get("hp"))
+        atk_inv = _ival(inv.get("attack"))
+        def_inv = _ival(inv.get("defense"))
+        ini_inv = _ival(inv.get("initiative"))
         luck_inv = _ival(inv.get("luck"))
         base = {
             "max_hp":     max(1, _ival(pdata.get("max_hp"), defaults["max_hp"]) - hp_inv),
@@ -318,25 +350,27 @@ def _ensure_base_stats_block_inplace(pdata: dict) -> bool:
             changed = True
     return changed
 
+
 def _compute_class_baseline_for_level(class_key: Optional[str], level: int) -> dict:
     lvl = max(1, int(level or 1))
     prog = CLASS_PROGRESSIONS.get((class_key or "").lower()) or CLASS_PROGRESSIONS["_default"]
 
     base = dict(prog["BASE"])
-    per  = dict(prog["PER_LVL"])
+    per = dict(prog["PER_LVL"])
     if lvl <= 1:
         return base
 
     levels_up = lvl - 1
-    out = {}
+    out: Dict[str, int] = {}
     for k in _BASELINE_KEYS:
         out[k] = _ival(base.get(k)) + _ival(per.get(k)) * levels_up
     return out
 
+
 def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
-    delta = {}
+    delta: Dict[str, int] = {}
     base_stats = pdata.get("base_stats", {})
-    
+
     for k in _BASELINE_KEYS:
         cur = _ival(base_stats.get(k), baseline.get(k))
         base = _ival(baseline.get(k))
@@ -344,13 +378,13 @@ def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
         delta[k] = max(0, d)
     return delta
 
-# <<< CORREÇÃO 14: Adiciona async def >>>
+
 async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
     """VERSÃO CORRIGIDA: Não sobrescreve os stats principais."""
     changed = False
     lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
-    class_baseline = _compute_class_baseline_for_level(ckey, lvl) # Síncrono
+    class_baseline = _compute_class_baseline_for_level(ckey, lvl)  # Síncrono
 
     current_base_stats = pdata.get("base_stats") or {}
     if any(_ival(current_base_stats.get(k)) != _ival(class_baseline.get(k)) for k in _BASELINE_KEYS):
@@ -358,10 +392,9 @@ async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
         changed = True
 
     try:
-        # <<< CORREÇÃO 15: Adiciona await >>>
-        totals = await get_player_total_stats(pdata) # Chama função async
+        totals = await get_player_total_stats(pdata)  # Chama função async
 
-        # --- Sincronização de HP (Já estava correta) ---
+        # --- Sincronização de HP ---
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
         cur_hp = _ival(pdata.get("current_hp"), max_hp)
         new_hp = min(max_hp, max(1, cur_hp))
@@ -369,20 +402,19 @@ async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
             pdata["current_hp"] = new_hp
             changed = True
 
-        # --- 👇 LÓGICA DE MANA ADICIONADA 👇 ---
-        max_mp = _ival(totals.get("max_mana"), 10) # Pega o max_mana
-        cur_mp = _ival(pdata.get("current_mp"), max_mp) # Pega o current_mp (ou enche)
-        new_mp = min(max_mp, max(0, cur_mp)) # Garante que está dentro dos limites
-        
+        # --- LÓGICA DE MANA ---
+        max_mp = _ival(totals.get("max_mana"), 10)
+        cur_mp = _ival(pdata.get("current_mp"), max_mp)
+        new_mp = min(max_mp, max(0, cur_mp))
         if new_mp != cur_mp or "current_mp" not in pdata:
             pdata["current_mp"] = new_mp
             changed = True
-    # --- 👆 FIM DA LÓGICA DE MANA 👆 ---
-
     except Exception:
+        # Se algo falhar aqui, não quebramos o fluxo
         pass
 
     return changed
+
 
 def _sync_stat_points_to_level_cap_inplace(pdata: dict) -> bool:
     allowed = allowed_points_for_level(pdata)
@@ -394,9 +426,11 @@ def _sync_stat_points_to_level_cap_inplace(pdata: dict) -> bool:
         return True
     return False
 
+
 def has_completed_dungeon(player_data: dict, dungeon_id: str, difficulty: str) -> bool:
     completions = player_data.get("dungeon_completions", {})
     return difficulty in completions.get(dungeon_id, [])
+
 
 def can_see_evolution_menu(player_data: dict) -> bool:
     current_class = player_data.get("class")
@@ -414,12 +448,13 @@ def can_see_evolution_menu(player_data: dict) -> bool:
             return True
     return False
 
+
 def mark_dungeon_as_completed(player_data: dict, dungeon_id: str, difficulty: str):
     if "dungeon_completions" not in player_data:
         player_data["dungeon_completions"] = {}
-    
+
     if dungeon_id not in player_data["dungeon_completions"]:
         player_data["dungeon_completions"][dungeon_id] = []
-        
+
     if difficulty not in player_data["dungeon_completions"][dungeon_id]:
         player_data["dungeon_completions"][dungeon_id].append(difficulty)
