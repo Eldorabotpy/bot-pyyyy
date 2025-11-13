@@ -324,6 +324,30 @@ async def start_hunt(
     current_mp = min(current_mp, max_mp)
     # --- !!! FIM DA CORREÇÃO DE MANA !!! ---
 
+    # --- !!! INÍCIO: Normalização defensiva de XP/Ouro do monstro !!! ---
+    try:
+        def _first_int(d, *keys, default=0):
+            for k in keys:
+                if isinstance(d, dict) and k in d:
+                    try:
+                        return int(float(d.get(k, 0)))
+                    except Exception:
+                        continue
+            return int(default)
+
+        monster_stats['xp_reward'] = _first_int(monster_stats, 'xp_reward', 'xp', 'monster_xp_reward', default=0)
+        monster_stats['gold_drop'] = _first_int(monster_stats, 'gold_drop', 'gold', 'monster_gold_drop', default=0)
+
+        # Propaga nomes alternativos para compatibilidade com outros módulos
+        if 'monster_xp_reward' not in monster_stats:
+            monster_stats['monster_xp_reward'] = monster_stats['xp_reward']
+        if 'monster_gold_drop' not in monster_stats:
+            monster_stats['monster_gold_drop'] = monster_stats['gold_drop']
+
+        logger.debug(f"[HUNT DEBUG] monster template id={tpl.get('id')} name={tpl.get('name') or tpl.get('monster_name')} -> xp_reward={monster_stats['xp_reward']}, gold_drop={monster_stats['gold_drop']}")
+    except Exception as e:
+        logger.exception(f"[HUNT DEBUG] Falha ao normalizar monster_stats: {e}")
+    # --- !!! FIM: Normalização defensiva !!! ---
 
     # 5. CRIA O CACHE DE BATALHA (Corrigido)
     battle_cache = {
