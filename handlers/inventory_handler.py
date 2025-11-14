@@ -1,4 +1,5 @@
 # handlers/inventory_handler.py
+# (VERSÃO CORRIGIDA - PASSO 5A: LÓGICA DE FUSÃO DE SKILL)
 
 import math
 import re
@@ -232,7 +233,7 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    chat_id = query.message.chat_id
+    chat_id = query.message.chat.id
 
     await _auto_finalize_safe(user_id, context)
     player_data = await player_manager.get_player_data(user_id)
@@ -247,10 +248,8 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     category_key = _sanitize_category(m.group(1))
     current_page = max(1, int(m.group(2) or 1))
 
-    # --- !!! 2. CORREÇÃO DA CLASSE !!! ---
-    # Pega a classe normalizada (ex: "arcanista")
+    # --- Pega a classe normalizada (ex: "arcanista") ---
     player_class_key = player_stats._get_class_key_normalized(player_data)
-    # --- FIM DA CORREÇÃO ---
 
     raw_inventory = player_data.get("inventory", {}) or {}
     inventory = _merge_legacy_crystals_view(raw_inventory, player_data)
@@ -288,7 +287,7 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     label = CATEGORIES.get(category_key, "Inventário")
     header = (
         f"🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 — {label} (Página {current_page}/{total_pages})\n"
-        f"🪙 𝐎𝐮𝐫𝐨: {gold_amt:,}   💎 𝐃𝐢𝐚𝐦𝐚𝐧𝐭𝐞𝐬: {diamonds_amt}\n\n"
+        f"🪙 𝐎𝐮𝐫𝐨: {gold_amt:,}   💎 𝐃𝐢𝐚𝐦𝐚𝐧𝐭𝐞𝐬: {diamonds_amt}\n\n"
     )
 
     body_text_lines = []
@@ -306,9 +305,7 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 item_name = item_info.get("display_name") or _humanize_key(item_key)
                 body_text_lines.append(f"• {emoji + ' ' if emoji else ''}{item_name}: <b>{qty}</b>")
                 
-                # ======================================================
                 # --- (LÓGICA DE BOTÃO "USAR" COM FILTRO DE CLASSE) ---
-                # ======================================================
                 if category_key == "consumivel":
                     on_use_data = item_info.get("on_use", {}) or {}
                     effects_data = item_info.get("effects", {}) or {}
@@ -328,7 +325,7 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                             skill_info = skills_data.SKILL_DATA.get(skill_id, {})
                             allowed_classes = skill_info.get("allowed_classes", [])
                             
-                            # --- !!! 3. CORREÇÃO DA VERIFICAÇÃO !!! ---
+                            # Verifica a classe base
                             if not can_player_use_skill(player_class_key, allowed_classes):
                                 can_use = False # Bloqueia o botão
 
@@ -336,7 +333,6 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                             skin_info = SKIN_CATALOG.get(skin_id, {})
                             allowed_class = skin_info.get("class")
                             
-                            # (A lógica de skin não precisa da classe base, então mantemos a verificação simples)
                             if allowed_class and player_class_key != allowed_class:
                                 can_use = False # Bloqueia o botão
                         
@@ -400,10 +396,22 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             logger.warning(f"Falha ao enviar mídia do inventário (ID: {media_id}). Erro: {e}. Usando fallback de texto.")
     await context.bot.send_message(chat_id=chat_id, text=inventory_text, reply_markup=reply_markup, parse_mode="HTML")
 
+# =========================================================================
+# ================== INÍCIO DA FUNÇÃO CORRIGIDA (PASSO 5A) ==================
+# =========================================================================
+
+# handlers/inventory_handler.py
+
+# ... (todo o código anterior, como inventory_callback, etc.) ...
+
+# =========================================================================
+# ================== INÍCIO DA FUNÇÃO CORRIGIDA (Contador + effect_id) ==================
+# =========================================================================
+
 async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    (ATUALIZADO) Processa o clique no botão [Usar] do inventário.
-    Agora inclui verificação de classe para Skills e Skins.
+    (ATUALIZADO COM CONTADOR 6/12 e CORREÇÃO effect_id)
+    Processa o clique no botão [Usar] do inventário.
     """
     query = update.callback_query
     user_id = query.from_user.id
@@ -424,11 +432,8 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item_info = _info_for(item_id) # Pega info do game_data
     item_name = item_info.get("display_name", item_id)
     
-    # --- !!! 4. CORREÇÃO DA CLASSE !!! ---
-    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
-    # --- FIM DA CORREÇÃO ---
-
+    
     effects_data = item_info.get("effects", {}) or {}
     on_use_data = item_info.get("on_use", {}) or {}
     
@@ -452,37 +457,78 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item_foi_devolvido = False
     
     effect = effect_data_to_use.get("effect") 
-    effect_id = effect_data_to_use.get("effect_id")
+    
+    # --- !!! AQUI ESTÁ A CORREÇÃO !!! ---
+    effect_id = effect_data_to_use.get("effect_id") # Esta linha estava faltando
+    # --- FIM DA CORREÇÃO ---
+    
     skill_id = effect_data_to_use.get("skill_id")
     skin_id = effect_data_to_use.get("skin_id")
     
     try:
-        # --- Lógica de SKILL ---
+        # --- Lógica de SKILL (MODIFICADA COM CONTADOR) ---
         if effect == "grant_skill" and skill_id:
             skill_info = skills_data.SKILL_DATA.get(skill_id, {})
+            skill_name = skill_info.get("display_name", skill_id)
             allowed_classes = skill_info.get("allowed_classes", [])
             
             if not player_class_key:
                 feedback_msg = "🚫 Você precisa escolher uma classe antes de aprender uma habilidade."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
             
-            # --- !!! 5. CORREÇÃO DA VERIFICAÇÃO !!! ---
             elif not can_player_use_skill(player_class_key, allowed_classes):
                 feedback_msg = f"🚫 Sua classe ({player_class_key.capitalize()}) não pode aprender esta habilidade."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
-            # --- FIM DA CORREÇÃO ---
                 
             else:
-                skills = player_data.setdefault("skills", [])
-                if skill_id not in skills:
-                    skills.append(skill_id)
-                    skill_name = skill_info.get("display_name", skill_id)
-                    feedback_msg = f"📚 Você aprendeu a habilidade: {skill_name}!"
-                else:
-                    feedback_msg = "Você já conhece esta habilidade."
-                    player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
+                skills = player_data.setdefault("skills", {})
+                if not isinstance(skills, dict):
+                    logger.warning(f"use_item_callback: Migrando 'skills' (era lista) para {user_id}...")
+                    new_skills_dict = {sid: {"rarity": "comum", "progress": 0} for sid in skills if sid}
+                    player_data["skills"] = new_skills_dict
+                    skills = new_skills_dict
 
-        # --- Lógica de SKIN ---
+                # --- LÓGICA DE FUSÃO/APRENDIZADO COM CONTADOR ---
+                if skill_id not in skills:
+                    # 1. APRENDER (Skill Nova)
+                    skills[skill_id] = {"rarity": "comum", "progress": 0}
+                    feedback_msg = f"📚 Você aprendeu a habilidade: {skill_name} (Comum)!"
+                else:
+                    # 2. MELHORAR (Fusão de Skill Existente)
+                    current_rarity = skills[skill_id].get("rarity", "comum")
+                    current_progress = skills[skill_id].get("progress", 0)
+                    
+                    if current_rarity == "lendaria":
+                        feedback_msg = f"Você já maximizou a skill [{skill_name}] (Lendária)."
+                        player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
+                    else:
+                        cap = 0
+                        next_rarity = ""
+                        if current_rarity == "comum":
+                            cap = 6
+                            next_rarity = "epica"
+                        elif current_rarity == "epica":
+                            cap = 12
+                            next_rarity = "lendaria"
+                        
+                        if cap == 0:
+                            feedback_msg = f"Você já conhece esta skill ({current_rarity.capitalize()})."
+                            player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
+                        else:
+                            # Adiciona progresso
+                            current_progress += 1
+                            skills[skill_id]["progress"] = current_progress
+                            
+                            if current_progress >= cap:
+                                # APRIMOROU!
+                                skills[skill_id]["rarity"] = next_rarity
+                                skills[skill_id]["progress"] = 0
+                                feedback_msg = f"🌟 Habilidade Aprimorada! Sua skill [{skill_name}] agora é {next_rarity.capitalize()}!"
+                            else:
+                                # Apenas ganhou progresso
+                                feedback_msg = f"✨ Progresso da Skill [{skill_name}] aumentou! ({current_progress}/{cap})"
+
+        # --- Lógica de SKIN (Sem alteração) ---
         elif effect == "grant_skin" and skin_id:
             skin_info = SKIN_CATALOG.get(skin_id, {})
             allowed_class = skin_info.get("class") 
@@ -490,7 +536,6 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not player_class_key:
                 feedback_msg = "🚫 Você precisa escolher uma classe antes de desbloquear uma aparência."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
-            # (Verificação de skin mantida, pois skins são específicas, não de classe base)
             elif allowed_class and player_class_key != allowed_class:
                 feedback_msg = f"🚫 Sua classe ({player_class_key.capitalize()}) não pode usar esta aparência."
                 player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
@@ -509,9 +554,11 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             value = effect_data_to_use.get("value", 1)
             player_manager.add_pvp_entries(player_data, int(value))
             feedback_msg = f"🎟️ Você ganhou {value} entrada(s) para a Arena!"
-        elif effect_id == "buff_hp_flat":
+        
+        elif effect_id == "buff_hp_flat": # <--- AGORA FUNCIONA
             feedback_msg = "Este item (buff) ainda não pode ser usado fora de combate."
             player_manager.add_item_to_inventory(player_data, item_id, 1); item_foi_devolvido = True
+        
         elif 'heal' in effect_data_to_use:
             heal_amount = int(effect_data_to_use['heal'])
             await player_actions.heal_player(player_data, heal_amount)
@@ -548,6 +595,11 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 4. Recarrega o menu do inventário (para mostrar a nova quantidade)
     await inventory_callback(update, context)
 
+
+# =========================================================================
+# ================== FIM DA FUNÇÃO CORRIGIDA ===================
+# =========================================================================
+
 async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try:
@@ -558,6 +610,7 @@ async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer() 
     except IndexError:
         await query.answer() 
+        
 noop_inventory_handler = CallbackQueryHandler(noop_inventory, pattern=r'^noop_inventory') 
 inventory_handler = CallbackQueryHandler(inventory_callback, pattern=r'^inventory_CAT_[A-Za-z0-9_]+_PAGE_[0-9]+$')
 use_item_handler = CallbackQueryHandler(use_item_callback, pattern=r'^inv_use_item:')

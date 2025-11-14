@@ -106,8 +106,6 @@ def _save_player_data_sync(user_id: int, player_info: dict) -> None:
         # Gravamos no DB
         players_collection.replace_one({"_id": user_id}, to_save, upsert=True)
 
-        # Atualiza cache local com uma cópia limpa
-        # (a atualização do cache assíncrona/lock está na camada async que chama esta função)
     except Exception:
         logger.exception(f"Erro ao salvar player {user_id} no DB (sync).")
 
@@ -127,15 +125,12 @@ async def get_player_data(user_id: int) -> Optional[dict]:
         logger.error("get_player_data: players_collection é None — retorna None.")
         return None
 
-    # 1) Tenta cache (protegido)
     async with _player_cache_lock:
         cached = _player_cache.get(user_id)
         if cached is not None:
-            # Retorna uma cópia para evitar mutações externas no cache
             logger.debug(f"[CACHE_DEBUG] Hit para user_id {user_id}")
             return dict(cached)
 
-    # 2) Cache miss: buscar do DB em thread
     logger.debug(f"[CACHE_DEBUG] Miss para user_id {user_id}. Buscando no DB...")
     try:
         raw_data = await asyncio.to_thread(_load_player_from_db_sync, user_id)
@@ -147,16 +142,13 @@ async def get_player_data(user_id: int) -> Optional[dict]:
         logger.debug(f"[CACHE_DEBUG] get_player_data: nenhum registro encontrado para {user_id}")
         return None
 
-    # 3) Trabalhar sobre uma cópia e aplicar migrações/saneamentos
     data = dict(raw_data)
     data["user_id"] = user_id
 
     try:
-        # Migrações / saneamentos que podem alterar o objeto
         changed_by_migration = False
         if hasattr(inventory, "_sanitize_and_migrate_gold"):
             try:
-                # can be async or sync; support both
                 maybe = inventory._sanitize_and_migrate_gold(data)
                 if asyncio.iscoroutine(maybe):
                     changed_by_migration = await maybe
@@ -185,9 +177,44 @@ async def get_player_data(user_id: int) -> Optional[dict]:
             data['mana'] = 50
             data['max_mana'] = 50
             is_newly_updated = True
-        if 'skills' not in data:
-            data['skills'] = []
-            is_newly_updated = True
+
+            # --- Migração do Sistema de Skills (Lista -> Dicionário -> com Progress) ---
+            if 'skills' not in data or not isinstance(data.get('skills'), dict):
+                logger.info(f"Migrando 'skills' (era lista) para o formato de dicionário para o user: {data.get('user_id', '???')}")
+            
+                # Se 'skills' existe e é uma lista antiga
+                if isinstance(data.get('skills'), list):
+                    old_skills_list = data.get('skills', [])
+                    new_skills_dict = {}
+                    for skill_id in old_skills_list:
+                        if skill_id and skill_id not in new_skills_dict:
+                            # Adiciona a skill antiga com a raridade 'comum' E o novo contador
+                            new_skills_dict[skill_id] = {"rarity": "comum", "progress": 0}
+                    data['skills'] = new_skills_dict
+                else:
+                    # É um jogador novo ou 'skills' está ausente
+                    data['skills'] = {}
+                is_newly_updated = True
+ 
+            else:
+                # O jogador JÁ TEM um dicionário de skills.
+                # Precisamos verificar se as skills dentro dele têm o campo "progress".
+                skills_dict = data.get('skills', {})
+                # Usamos list(skills_dict.keys()) para evitar 'dictionary changed size during iteration'
+                for skill_id in list(skills_dict.keys()): 
+                    if isinstance(skills_dict[skill_id], dict):
+                        if "progress" not in skills_dict[skill_id]:
+                            # Esta é uma skill migrada (dict) mas antiga (sem progress)
+                            skills_dict[skill_id]["progress"] = 0
+                            is_newly_updated = True # Força o salvamento
+                    else:
+                        # O dicionário está corrompido (ex: {"skill_id": "comum"}). Deleta e recria.
+                        logger.warning(f"Corrigindo skill mal formatada: {skill_id} para user {data.get('user_id', '???')}")
+                        del skills_dict[skill_id]
+                        skills_dict[skill_id] = {"rarity": "comum", "progress": 0}
+                        is_newly_updated = True
+                        # --- Fim da Migração --- 
+        
     except Exception:
         logger.exception("Erro ao aplicar migrações/saneamentos em player data.")
         # Mesmo em caso de erro, seguimos com o raw_data parcialmente processado

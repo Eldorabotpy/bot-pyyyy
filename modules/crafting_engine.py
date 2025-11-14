@@ -5,8 +5,6 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import random
 from typing import Any, Dict, Tuple, List
-
-# Módulos do projeto
 from modules import player_manager, game_data
 from modules.crafting_registry import get_recipe, all_recipes  # noqa: F401
 from modules.game_data.classes import get_primary_damage_profile
@@ -14,7 +12,7 @@ from modules.game_data import rarity as rarity_tables  # ATTR_COUNT_BY_RARITY, B
 from modules import clan_manager
 
 # =========================
-# Utilitários básicos
+#    Utilitários básicos 
 # =========================
 
 def _as_dict(obj: Any, default: Dict | None = None) -> Dict:

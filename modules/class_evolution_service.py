@@ -234,17 +234,20 @@ async def finalize_evolution(user_id: int, target_class: str) -> Tuple[bool, str
     # (Para que o jogador não tenha 'cav_node_1' quando for T3)
     pdata["evolution_progress"] = {}
     
-    # 3. Adiciona as novas habilidades (agora uma lista)
-    if "skills" not in pdata or not isinstance(pdata["skills"], list):
-        pdata["skills"] = []
+    # 3. Adiciona as novas habilidades (agora um dicionário com progress)
+    if "skills" not in pdata or not isinstance(pdata["skills"], dict):
+        # Se a migração do core.py falhou ou é um player novo, garante que é um dict
+        pdata["skills"] = {} 
 
     new_skill_ids = opt.get("unlocks_skills", [])
     skills_adicionadas = 0
-    
+
     if new_skill_ids:
         for skill_id in new_skill_ids:
+            # Verifica se a CHAVE da skill não está no dicionário
             if skill_id and skill_id not in pdata["skills"]:
-                pdata["skills"].append(skill_id)
+                # Adiciona a skill no novo formato de dicionário (com progress)
+                pdata["skills"][skill_id] = {"rarity": "comum", "progress": 0}
                 skills_adicionadas += 1
                 
     await player_manager.save_player_data(user_id, pdata)

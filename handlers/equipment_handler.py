@@ -1,4 +1,5 @@
 # handlers/equipment_handler.py
+# (VERSÃO CORRIGIDA - ADICIONADO 'await' NAS CHAMADAS ASSÍNCRONAS)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -52,6 +53,7 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
         await query.delete_message()
     except Exception:
         pass
+    # <<< CORREÇÃO: Adiciona await >>>
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
@@ -163,14 +165,15 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     row = []
     for slot in SLOTS_ORDER:
         row.append(InlineKeyboardButton(f"{SLOT_EMOJIS.get(slot,'❓')} {SLOT_LABELS.get(slot, slot.title())}",
-                                         callback_data=f"equip_slot_{slot}"))
+                                          callback_data=f"equip_slot_{slot}"))
         if len(row) == 3:
             keyboard.append(row); row = []
     if row:
         keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("📦 𝐀𝐛𝐫𝐢𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data="inventory_CAT_equipamento_PAGE_1")]) # Assuming this callback exists elsewhere
-    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")]) # Assuming back goes to profile
+    # CORREÇÃO: O callback do inventário deve apontar para a aba "especial"
+    keyboard.append([InlineKeyboardButton("📦 𝐀𝐛𝐫𝐢𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data="inventory_CAT_especial_PAGE_1")]) 
+    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")]) 
 
     # <<< CORREÇÃO 3: Adiciona await >>>
     await _safe_edit_or_send(q, context, chat_id, text, InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -212,7 +215,7 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    lines = [f"<b>𝑬𝒔𝒄𝒐𝒍𝒉𝒆𝒓 𝒑𝒂𝒓𝒂 {slot_label}</b>\n"] # Não precisa de \n no final
+    lines = [f"<b>𝑬𝒔𝒄𝒐𝒍𝒉𝒆𝒓 𝒑𝒂𝒓𝒂 {slot_label}</b>"]
     kb: list[list[InlineKeyboardButton]] = []
     for uid, pretty in items:
         txt = pretty if len(pretty) <= 60 else (pretty[:57] + "…")
@@ -220,7 +223,6 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="equipment_menu")])
     # <<< CORREÇÃO 7: Adiciona await >>>
-    # Usa text=caption (ou text=text) consistente com a definição de _safe_edit_or_send
     await _safe_edit_or_send(q, context, chat_id, "\n".join(lines), InlineKeyboardMarkup(kb))
 
 async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -1,6 +1,7 @@
 # handlers/combat/skill_handler.py
 
 import logging
+from typing import Optional, Dict
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
@@ -11,6 +12,39 @@ from handlers.combat.main_handler import combat_callback
 from modules.player.actions import spend_mana 
 
 logger = logging.getLogger(__name__)
+
+def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dict]:
+    """
+    Helper para buscar os dados de uma skill (SKILL_DATA) e mesclá-los
+    com os dados da raridade que o jogador possui.
+    """
+    base_skill = SKILL_DATA.get(skill_id)
+    if not base_skill: 
+        return None # Skill não existe
+
+    # Se a skill não tem o sistema de raridade (é uma skill antiga/simples), 
+    # retorna a base
+    if "rarity_effects" not in base_skill:
+        return base_skill
+
+    player_skills = pdata.get("skills", {})
+    if not isinstance(player_skills, dict):
+
+        rarity = "comum"
+    else:
+        player_skill_instance = player_skills.get(skill_id)
+        if not player_skill_instance:
+
+            rarity = "comum"
+        else:
+            rarity = player_skill_instance.get("rarity", "comum")
+
+    merged_data = base_skill.copy()
+
+    rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
+    merged_data.update(rarity_data) # Sobrescreve "description", "effects", "mana_cost", etc.
+    
+    return merged_data
 
 async def _safe_answer(query):
     """Tenta responder ao CallbackQuery de forma segura. Loga falhas não-críticas."""
@@ -52,7 +86,7 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
     keyboard_rows = [] 
     
     for skill_id in equipped_skills: 
-        skill_info = SKILL_DATA.get(skill_id)
+        skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
 
         if not skill_info or skill_info.get("type") not in ("active", "support"):
             continue
@@ -91,8 +125,15 @@ async def combat_skill_info_callback(update: Update, context: ContextTypes.DEFAU
     query = update.callback_query
     
     try:
+        user_id = query.from_user.id
+        player_data = await player_manager.get_player_data(user_id)
+        if not player_data:
+            await query.answer("Erro: Jogador não encontrado.", show_alert=True)
+            return
+        
         skill_id = query.data.split(':', 1)[1]
-        skill_info = SKILL_DATA.get(skill_id)
+        # MODIFICADO: Lê os dados da skill baseado na raridade
+        skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
     except Exception:
         await query.answer("Erro: Skill não encontrada.", show_alert=True)
         return
@@ -118,15 +159,21 @@ async def combat_skill_info_callback(update: Update, context: ContextTypes.DEFAU
     await query.answer("\n".join(popup_text), show_alert=True)
 
 
-# --- 👇 FUNÇÃO ATUALIZADA (HÍBRIDA) 👇 ---
 async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Processa o uso de uma skill em combate.
-    (Versão Híbrida: Funciona com battle_cache e player_state)
-    """
+    Processa o uso de uma skill em combate.
+    (Versão Híbrida: Funciona com battle_cache e player_state)
+    """
     query = update.callback_query
     user_id = query.from_user.id
 
+    # --- MODIFICADO: Carrega pdata e skill_info PRIMEIRO ---
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await _safe_answer(query)
+        await query.answer("Erro: Jogador não encontrado.", show_alert=True)
+        return
+    
     try:
         skill_id = query.data.split(':')[1]
     except IndexError:
@@ -134,16 +181,18 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
         await query.answer("Erro ao usar a skill.", show_alert=True)
         return
 
-    skill_info = SKILL_DATA.get(skill_id)
+    # Lê os dados da skill baseado na raridade do jogador
+    skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
     if not skill_info:
         await _safe_answer(query)
         await query.answer("Skill não encontrada.", show_alert=True)
         return
 
     battle_cache = context.user_data.get('battle_cache')
+    # Lê o custo e cooldown da skill mesclada (que tem os dados da raridade)
     mana_cost = skill_info.get("mana_cost", 0)
     cooldown = skill_info.get("effects", {}).get("cooldown_turns", 0)
-    
+
     # 🌟 NOVO: Define se o turno deve ser encerrado ou se permite outra ação.
     is_support = skill_info.get("type") == "support"
     
@@ -175,7 +224,6 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
         
     # 2. TRATAMENTO VIA PLAYER_STATE (Modo Legado/Calabouço)
     else:
-        player_data = await player_manager.get_player_data(user_id)
         state = player_data.get('player_state', {})
         if state.get('action') != 'in_combat':
             await _safe_answer(query)

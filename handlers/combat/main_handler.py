@@ -1,5 +1,6 @@
 # handlers/combat/main_handler.py
 # (VERSÃO FINAL COM 'BATTLE CACHE' E TROCA DE MÍDIA)
+# (VERSÃO CORRIGIDA PARA PASSAR 'attacker_pdata' AO COMBAT_ENGINE)
 
 import logging
 import random
@@ -55,7 +56,7 @@ async def _edit_media_or_caption(context: ContextTypes.DEFAULT_TYPE, battle_cach
             new_media_type = battle_cache['monster_media_type']
             # Se nem a do monstro existir, falha (vai para o 'except')
             if not new_media_id:
-                 raise ValueError("Nenhuma mídia válida encontrada no cache (nem jogador, nem monstro)")
+                    raise ValueError("Nenhuma mídia válida encontrada no cache (nem jogador, nem monstro)")
 
         InputMediaClass = InputMediaVideo if new_media_type == "video" else InputMediaPhoto
         
@@ -186,6 +187,15 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     # --- LÓGICA DE ATAQUE (USA O CACHE) ---
     elif action == 'combat_attack':
         
+        # *** INÍCIO DA MODIFICAÇÃO 1 (CACHE) ***
+        # Carrega o pdata completo para passar ao combat_engine
+        player_data = await player_manager.get_player_data(user_id)
+        if not player_data:
+            logger.error(f"COMBAT_CALLBACK: Não foi possível carregar player_data para {user_id}")
+            await _safe_answer(query)
+            return
+        # *** FIM DA MODIFICAÇÃO 1 ***
+            
         battle_cache['turn'] = 'player'
         
         skill_id = battle_cache.pop('skill_to_use', None) 
@@ -200,12 +210,14 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         # --- LÓGICA DE SKILL/ATAQUE ---
         
         if skill_info:
-            mana_cost = skill_info.get("mana_cost", 0)
+            # NOTA: O mana_cost real será lido pelo combat_engine a partir do pdata
+            # Este mana_cost é apenas para o log.
+            log_mana_cost = skill_info.get("mana_cost", 0)
             
             # ** Assumimos que a verificação de Mana e o gasto de Cooldown **
             # ** já foram aplicados no combat_use_skill_callback! **
             
-            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{mana_cost} MP)")
+            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{log_mana_cost} MP)")
             
             # 🟢 LÓGICA DE SKILL DE SUPORTE
             if action_type == 'support':
@@ -223,12 +235,16 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             # 🟢 LÓGICA DE SKILL DE ATAQUE (Dano)
             else: # action_type == 'attack' ou não definido
                 # 2. CHAMAMOS O MOTOR UNIFICADO (Processa Dano)
+                
+                # *** INÍCIO DA MODIFICAÇÃO 2 (CACHE - SKILL) ***
                 resultado_combate = await combat_engine.processar_acao_combate(
+                    attacker_pdata=player_data, # <--- LINHA ADICIONADA
                     attacker_stats=player_stats,
                     target_stats=monster_stats,
                     skill_id=skill_id,
                     attacker_current_hp=battle_cache.get('player_hp', 9999)
                 )
+                # *** FIM DA MODIFICAÇÃO 2 ***
 
                 # 3. Aplicamos os resultados
                 player_damage = resultado_combate["total_damage"]
@@ -244,10 +260,17 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         else:
             # Caso use ataque básico (sem skill)
             log.append("⚔️ Você realiza um ataque básico.")
+            
+            # *** INÍCIO DA MODIFICAÇÃO 3 (CACHE - BÁSICO) ***
             resultado_combate = await combat_engine.processar_acao_combate(
-                attacker_stats=player_stats, target_stats=monster_stats, skill_id=None,
+                attacker_pdata=player_data, # <--- LINHA ADICIONADA
+                attacker_stats=player_stats, 
+                target_stats=monster_stats, 
+                skill_id=None,
                 attacker_current_hp=battle_cache.get('player_hp', 9999)
             )
+            # *** FIM DA MODIFICAÇÃO 3 ***
+            
             player_damage = resultado_combate["total_damage"]
             log.extend(resultado_combate["log_messages"])
             monster_stats['hp'] = int(monster_stats.get('hp', 0)) - player_damage
@@ -276,22 +299,27 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 reply_markup=kb_player_turn 
             )
             return # ⬅️ FINALIZA A FUNÇÃO: o monstro não ataca.
+            
         # 4. Processar Resultado (Vitória ou Turno do Monstro)
         if monster_defeated_in_turn:
             # (A lógica de VITÓRIA permanece idêntica)
             log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
             battle_cache['battle_log'] = log
-            pdata = await player_manager.get_player_data(user_id)
-            victory_summary = await rewards.apply_and_format_victory_from_cache(pdata, battle_cache)
-            _, _, level_up_msg = player_manager.check_and_apply_level_up(pdata) 
+            
+            # *** INÍCIO DA MODIFICAÇÃO 4 (VITÓRIA) ***
+            # pdata (agora player_data) JÁ FOI CARREGADO no início da ação de ataque
+            victory_summary = await rewards.apply_and_format_victory_from_cache(player_data, battle_cache)
+            _, _, level_up_msg = player_manager.check_and_apply_level_up(player_data) 
             if level_up_msg:
                 victory_summary += level_up_msg
             
-            pdata['current_hp'] = player_stats.get('max_hp', 50)
-            pdata['current_mp'] = player_stats.get('max_mana', 10)
-            pdata['player_state'] = {'action': 'idle'}
+            player_data['current_hp'] = player_stats.get('max_hp', 50)
+            player_data['current_mp'] = player_stats.get('max_mana', 10)
+            player_data['player_state'] = {'action': 'idle'}
             
-            await player_manager.save_player_data(user_id, pdata)
+            await player_manager.save_player_data(user_id, player_data)
+            # *** FIM DA MODIFICAÇÃO 4 ***
+            
             context.user_data.pop('battle_cache', None)
             
             await _edit_media_or_caption(
@@ -339,12 +367,18 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     # (A lógica de DERROTA permanece idêntica)
                     log.append("☠️ <b>Você foi derrotado!</b>")
                     battle_cache['battle_log'] = log
-                    pdata = await player_manager.get_player_data(user_id)
-                    defeat_summary, _ = rewards.process_defeat_from_cache(pdata, battle_cache)
-                    pdata['current_hp'] = 0 
-                    pdata['current_mp'] = battle_cache.get('player_mp', player_stats.get('max_mana', 10))
-                    pdata['player_state'] = {'action': 'idle'}
-                    await player_manager.save_player_data(user_id, pdata)
+                    
+                    # *** INÍCIO DA MODIFICAÇÃO 5 (DERROTA) ***
+                    # Carrega o pdata aqui, pois não estava em escopo
+                    player_data = await player_manager.get_player_data(user_id)
+                    
+                    defeat_summary, _ = rewards.process_defeat_from_cache(player_data, battle_cache)
+                    player_data['current_hp'] = 0 
+                    player_data['current_mp'] = battle_cache.get('player_mp', player_stats.get('max_mana', 10))
+                    player_data['player_state'] = {'action': 'idle'}
+                    await player_manager.save_player_data(user_id, player_data)
+                    # *** FIM DA MODIFICAÇÃO 5 ***
+                    
                     context.user_data.pop('battle_cache', None)
                     
                     await _edit_media_or_caption(
@@ -388,7 +422,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         fake_update = Update(update_id=0, callback_query=fake_query)
         await combat_callback(fake_update, context, action='combat_attack')
         return
-    
+
 async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, player_data: dict):
     """
     (VERSÃO CORRIGIDA)
@@ -504,11 +538,13 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
         # --- LÓGICA DE SKILL ---
         
         if skill_info:
-            mana_cost = skill_info.get("mana_cost", 0)
+            # NOTA: O mana_cost real será lido pelo combat_engine
+            # Este é apenas para o log.
+            log_mana_cost = skill_info.get("mana_cost", 0)
             
             # Nota: O gasto de Mana já foi feito no combat_use_skill_callback,
             # mas o log é adicionado aqui.
-            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{mana_cost} MP)")
+            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{log_mana_cost} MP)")
             
             # 🟢 LÓGICA DE SKILL DE SUPORTE
             if action_type == 'support':
@@ -521,20 +557,24 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
             # 🟢 LÓGICA DE SKILL DE ATAQUE (Dano)
             else: # action_type == 'attack' ou não definido
                 # 2. CHAMAMOS O MOTOR UNIFICADO (Processa Dano)
+                
+                # *** INÍCIO DA MODIFICAÇÃO 6 (LEGACY - SKILL) ***
                 resultado_combate = await combat_engine.processar_acao_combate(
+                    attacker_pdata=player_data, # <--- LINHA ADICIONADA
                     attacker_stats=player_total_stats, # Stats totais do jogador
                     target_stats=monster_stats,
                     skill_id=skill_id,
                     attacker_current_hp=player_data.get('current_hp', 9999)
                 )
+                # *** FIM DA MODIFICAÇÃO 6 ***
 
                 # 3. Aplicamos os resultados
                 player_damage = resultado_combate["total_damage"]
                 log.extend(resultado_combate["log_messages"])
                 
                 if skill_info and "debuff_target" in skill_info.get("effects", {}):
-                     # Lógica para aplicar debuffs ao monstro
-                     pass
+                        # Lógica para aplicar debuffs ao monstro
+                        pass
 
                 combat_details['monster_hp'] = int(combat_details.get('monster_hp', 0)) - player_damage
                 combat_details["used_weapon"] = True
@@ -543,10 +583,17 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
         else:
             # Caso use ataque básico (sem skill)
             log.append("⚔️ Você realiza um ataque básico.")
+            
+            # *** INÍCIO DA MODIFICAÇÃO 7 (LEGACY - BÁSICO) ***
             resultado_combate = await combat_engine.processar_acao_combate(
-                attacker_stats=player_total_stats, target_stats=monster_stats, skill_id=None,
+                attacker_pdata=player_data, # <--- LINHA ADICIONADA
+                attacker_stats=player_total_stats, 
+                target_stats=monster_stats, 
+                skill_id=None,
                 attacker_current_hp=player_data.get('current_hp', 9999)
             )
+            # *** FIM DA MODIFICAÇÃO 7 ***
+            
             player_damage = resultado_combate["total_damage"]
             log.extend(resultado_combate["log_messages"])
             combat_details['monster_hp'] = int(combat_details.get('monster_hp', 0)) - player_damage

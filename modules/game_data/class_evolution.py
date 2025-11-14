@@ -29,8 +29,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                     "cost": {"emblema_guerreiro": 15, "essencia_guardia": 10, "gold": 15000}
                 }
             ],
-            
-            "unlocks_skills": ["passive_bulwark"], 
+            "unlocks_skills": ["evo_knight_aegis"],
             "trial_monster_id": "guardian_of_the_aegis", 
         },
         # T3 (Lvl 40)
@@ -51,7 +50,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_holy_blessing"], 
+            "unlocks_skills": ["evo_templar_divine_light"],
             "trial_monster_id": "aspect_of_the_divine",
         },
         # T4 (Lvl 60)
@@ -72,7 +71,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["guerreiro_placeholder_t4_def"], 
+            "unlocks_skills": ["evo_divine_guardian_fortress"],
             "trial_monster_id": "divine_sentinel",
         },
         # T5 (Lvl 80)
@@ -93,7 +92,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["guerreiro_placeholder_t5_def"], 
+            "unlocks_skills": ["evo_aegis_avatar_incarnate"],
             "trial_monster_id": "celestial_bastion",
         },
         # T6 (Lvl 100)
@@ -114,7 +113,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["guerreiro_placeholder_t6_def"], 
+            "unlocks_skills": ["evo_divine_legend_miracle"],
             "trial_monster_id": "eldora_legend_guard",
         },
     ],
@@ -139,7 +138,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["passive_unstoppable"], 
+            "unlocks_skills": ["evo_barbarian_wrath"], 
             "trial_monster_id": "primal_spirit_of_rage",
         },
         # T3 (Lvl 40)
@@ -165,7 +164,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["passive_last_stand"],
+            "unlocks_skills": ["evo_savage_reckless_blows"],
             "trial_monster_id": "avatar_of_primal_wrath",
         },
         # T4 (Lvl 60)
@@ -186,7 +185,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["berserker_placeholder_t4_atk"],
+            "unlocks_skills": ["evo_primal_wrath_armorbreaker"],
             "trial_monster_id": "primal_rage_incarnate",
         },
         # T5 (Lvl 80)
@@ -212,7 +211,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["berserker_placeholder_t5_atk"],
+            "unlocks_skills": ["evo_calamity_shatter_earth"],
             "trial_monster_id": "calamity_bringer",
         },
         # T6 (Lvl 100)
@@ -233,7 +232,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["berserker_placeholder_t6_atk"],
+            "unlocks_skills": ["evo_wrath_god_undying_rage"],
             "trial_monster_id": "wrath_god_incarnate",
         },
     ],
@@ -263,7 +262,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_deadeye_shot"], 
+            "unlocks_skills": ["evo_sniper_precision"],
             "trial_monster_id": "phantom_of_the_watchtower",
         },
         # T3 (Lvl 40)
@@ -284,7 +283,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["cacador_placeholder_t3_atk"], 
+            "unlocks_skills": ["evo_hawkeye_piercing_gaze"],
             "trial_monster_id": "sky_piercer_hawk",
         },
         # T4 (Lvl 60)
@@ -305,7 +304,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["cacador_placeholder_t4_atk"], 
+            "unlocks_skills": ["evo_spectral_ricochet_shot"],
             "trial_monster_id": "spectral_marksman",
         },
         # T5 (Lvl 80)
@@ -326,7 +325,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["cacador_placeholder_t5_atk"], 
+            "unlocks_skills": ["evo_horizon_endless_shot"],
             "trial_monster_id": "horizon_walker",
         },
         # T6 (Lvl 100)
@@ -347,7 +346,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["cacador_placeholder_t6_atk"], 
+            "unlocks_skills": ["evo_legend_phantom_wind"],
             "trial_monster_id": "legend_of_the_bow",
         },
     ],
@@ -377,7 +376,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["passive_elemental_strikes"], 
+            "unlocks_skills": ["evo_elemental_fist_attunement"],
             "trial_monster_id": "avatar_of_the_four_elements",
         },
         # T3 (Lvl 40)
@@ -398,7 +397,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_transcendence"], 
+            "unlocks_skills": ["evo_ascendant_gait"],
             "trial_monster_id": "echo_of_the_grandmaster",
         },
         # T4 (Lvl 60)
@@ -419,7 +418,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["monge_placeholder_t4_atk"], 
+            "unlocks_skills": ["evo_divine_fist_strike"],
             "trial_monster_id": "divine_hand",
         },
         # T5 (Lvl 80)
@@ -440,7 +439,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["monge_placeholder_t5_atk"], 
+            "unlocks_skills": ["evo_inner_dragon_unleashed"], 
             "trial_monster_id": "inner_dragon_spirit",
         },
         # T6 (Lvl 100)
@@ -461,7 +460,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["monge_placeholder_t6_atk"], 
+            "unlocks_skills": ["evo_fist_legend_balance"],
             "trial_monster_id": "legend_of_the_fist",
         },
     ],
@@ -491,7 +490,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["passive_elemental_attunement"], 
+            "unlocks_skills": ["evo_elementalist_power"], 
             "trial_monster_id": "raging_elemental_vortex",
         },
         # T3 (Lvl 40)
@@ -512,7 +511,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_meteor_swarm"], 
+            "unlocks_skills": ["evo_archmage_elemental_weave"], 
             "trial_monster_id": "essence_of_pure_magic",
         },
         # T4 (Lvl 60)
@@ -533,7 +532,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["mago_placeholder_t4_atk"], 
+            "unlocks_skills": ["evo_battlemage_mana_shield"], 
             "trial_monster_id": "battlemage_prime",
         },
         # T5 (Lvl 80)
@@ -554,7 +553,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["mago_placeholder_t5_atk"], 
+            "unlocks_skills": ["evo_arcanist_overcharge"], 
             "trial_monster_id": "supreme_arcanist",
         },
         # T6 (Lvl 100)
@@ -575,7 +574,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["mago_placeholder_t6_atk"], 
+            "unlocks_skills": ["evo_arcane_aspect_singularity"], 
             "trial_monster_id": "arcane_aspect",
         },
     ],
@@ -605,7 +604,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["passive_inspiring_melody"], 
+            "unlocks_skills": ["evo_minstrel_healing_note"], 
             "trial_monster_id": "silencing_critics",
         },
         # T3 (Lvl 40)
@@ -626,7 +625,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["active_sleep_song"], 
+            "unlocks_skills": ["evo_troubadour_hypnotic_lullaby"], 
             "trial_monster_id": "deafening_silence",
         },
         # T4 (Lvl 60)
@@ -647,7 +646,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["active_sonic_blast"], 
+            "unlocks_skills": ["evo_maestro_barrier_sonata"], 
             "trial_monster_id": "unruly_orchestra",
         },
         # T5 (Lvl 80)
@@ -668,7 +667,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["passive_perfect_pitch"], 
+            "unlocks_skills": ["evo_harmonist_grand_overture"], 
             "trial_monster_id": "chaotic_harmony",
         },
         # T6 (Lvl 100)
@@ -689,7 +688,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["active_crescendo_of_creation"], 
+            "unlocks_skills": ["evo_aspect_primordial_symphony"], 
             "trial_monster_id": "primordial_symphony",
         },
     ],
@@ -719,7 +718,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["passive_backstab_boost"], 
+            "unlocks_skills": ["evo_shadow_thief_ambush"], 
             "trial_monster_id": "vigilant_guard",
         },
         # T3 (Lvl 40)
@@ -740,7 +739,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["active_smoke_bomb"], 
+            "unlocks_skills": ["evo_ninja_poison_arts"], 
             "trial_monster_id": "quick_phantom",
         },
         # T4 (Lvl 60)
@@ -761,7 +760,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["passive_critical_precision"], 
+            "unlocks_skills": ["evo_blademaster_focus"], 
             "trial_monster_id": "dual_wielding_ronin",
         },
         # T5 (Lvl 80)
@@ -782,7 +781,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["active_guillotine_strike"], 
+            "unlocks_skills": ["evo_reaper_mark_of_death"], 
             "trial_monster_id": "shadow_of_fate",
         },
         # T6 (Lvl 100)
@@ -803,7 +802,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
         
-            "unlocks_skills": ["active_one_hit_kill"], 
+            "unlocks_skills": ["evo_night_aspect_invisibility"], 
             "trial_monster_id": "avatar_of_the_void",
         },
     ],
@@ -833,7 +832,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["passive_swift_strike"], 
+            "unlocks_skills": ["evo_ronin_wanderers_focus"], 
             "trial_monster_id": "lone_brigand_leader",
         },
         # T3 (Lvl 40)
@@ -854,7 +853,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_izanagi_cut"], 
+            "unlocks_skills": ["evo_kenshi_perfect_parry"], 
             "trial_monster_id": "master_swordsman_phantom",
         },
         # T4 (Lvl 60)
@@ -875,7 +874,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_battle_cry"], 
+            "unlocks_skills": ["evo_shogun_banner_of_war"], 
             "trial_monster_id": "heavy_armored_general",
         },
         # T5 (Lvl 80)
@@ -896,7 +895,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["passive_perfect_parry"], 
+            "unlocks_skills": ["evo_bushido_final_cut"], 
             "trial_monster_id": "spirit_of_honor",
         },
         # T6 (Lvl 100)
@@ -917,7 +916,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_god_slayer_strike"], 
+            "unlocks_skills": ["evo_blade_aspect_presence"], 
             "trial_monster_id": "divine_blade_incarnate",
         },
     ],
@@ -947,7 +946,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_divine_touch"],
+            "unlocks_skills": ["evo_cleric_divine_light"],
             "trial_monster_id": "plague_carrier_specter",
         },
         # T3 (Lvl 40)
@@ -968,7 +967,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["passive_aegis_of_faith"],
+            "unlocks_skills": ["evo_priest_holy_ground"],
             "trial_monster_id": "unholy_inquisitor",
         },
         # T4 (Lvl 60)
@@ -989,7 +988,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["curandeiro_placeholder_t4_sup"],
+            "unlocks_skills": ["evo_hierophant_divine_aegis"],
             "trial_monster_id": "avatar_of_restoration",
         },
         # T5 (Lvl 80)
@@ -1010,7 +1009,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["active_celestial_shield"],
+            "unlocks_skills": ["evo_celestial_oracle_preservation"],
             "trial_monster_id": "void_prophet",
         },
         # T6 (Lvl 100)
@@ -1031,16 +1030,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 }
             ],
             
-            "unlocks_skills": ["curandeiro_placeholder_t6_sup"],
+            "unlocks_skills": ["evo_healing_legend_miracle"],
             "trial_monster_id": "divine_healer_legend",
         },
     ],
 }
-# --- MUDANÇA: A função get_evolution_options foi removida daqui ---
-# (Ela estava no teu ficheiro, mas o teu 'class_evolution_handler.py'
-# importa-a de 'modules.game_data.class_evolution', então está correto.)
-# Se ela só existir aqui, mantemos. Se não, removemos.
-# Vou assumir que ela fica aqui, como no teu ficheiro original.
 
 def get_evolution_options(
     current_class: str,
@@ -1048,31 +1042,34 @@ def get_evolution_options(
     show_locked: bool = True,
 ) -> List[dict]:
     """
-    Retorna as opções de evolução da classe atual.
-    (Esta função já não funciona para T3, precisa ser corrigida,
-     mas está igual ao ficheiro que enviaste)
+    Retorna a PRÓXIMA opção de evolução disponível para a classe atual.
+    Esta função foi corrigida para ler a nova estrutura de lista.
     """
-    curr_key = (current_class or "").lower()
-    data = EVOLUTIONS.get(curr_key)
-    if not data:
+    current_class = (current_class or "").lower()
+    
+    base_class = _CLASS_HIERARCHY_MAP.get(current_class)
+    if not base_class:
+        return [] 
+
+    evolutions = EVOLUTIONS.get(base_class, [])
+    if not evolutions:
         return []
 
-    options: List[dict] = []
-    for tier in ("tier2", "tier3"):
-        for opt in data.get(tier, []):
-            req_from = opt.get("from_any_of")
-            if isinstance(req_from, list):
-                allowed = {str(x).lower() for x in req_from}
-                if curr_key not in allowed:
-                    continue 
+    next_evolution = None
+    for evo in evolutions:
+        if evo.get("from") == current_class:
+            next_evolution = evo
+            break
+            
+    if not next_evolution:
+        return [] 
 
-            min_lvl = int(opt.get("min_level", 0))
-            if show_locked or current_level >= min_lvl:
-                options.append({"tier": tier, **opt})
-    return options
+    min_lvl = int(next_evolution.get("min_level", 999))
+    if show_locked or current_level >= min_lvl:
+        return [next_evolution] 
+        
+    return []
 
-# Mapeamento para acelerar a busca de pais/evoluções
-# Key: Classe atual (ex: 'templario'), Value: Classe base (ex: 'guerreiro')
 _CLASS_HIERARCHY_MAP: Dict[str, str] = {}
 
 def _build_hierarchy_map():
@@ -1082,10 +1079,9 @@ def _build_hierarchy_map():
         return
     
     for base_class, evolutions in EVOLUTIONS.items():
-        # A classe base é seu próprio pai base
-        _CLASS_HIERARCHY_MAP[base_class] = base_class
         
-        # Mapeia toda a cadeia de evolução para a classe base
+        _CLASS_HIERARCHY_MAP[base_class] = base_class
+ 
         for evo in evolutions:
             to_class = evo.get("to")
             if to_class:
@@ -1098,14 +1094,14 @@ _DIRECT_PARENT_MAP: Dict[str, str] = {}
 def _build_direct_parent_map():
     """Constrói o mapa de parentesco direto e atualiza o Hierarchy Map (para garantir)."""
     global _DIRECT_PARENT_MAP
-    # Itera sobre todas as árvores de evolução
+
     for base_class, evolutions in EVOLUTIONS.items():
         current_parent = base_class
         for evo in evolutions:
             to_class = evo.get("to")
             if to_class:
                 _DIRECT_PARENT_MAP[to_class] = current_parent
-                current_parent = to_class # O filho se torna o pai da próxima TIER
+                current_parent = to_class 
     
 _build_direct_parent_map()
 
@@ -1114,7 +1110,6 @@ def get_class_ancestry(current_class: str) -> List[str]:
     ancestry = []
     current = current_class.lower()
     
-    # Percorre o mapa de pais até encontrar a classe base
     while current and current not in ancestry:
         ancestry.append(current)
         parent = _DIRECT_PARENT_MAP.get(current)
@@ -1124,25 +1119,19 @@ def get_class_ancestry(current_class: str) -> List[str]:
     
     return ancestry
 
-
-# --- SUBSTITUIÇÃO DA FUNÇÃO can_player_use_skill COM A NOVA LÓGICA ---
-
 def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> bool:
     """
     Verifica se o jogador pode usar a skill verificando a classe atual 
     E TODA A SUA CADEIA DE EVOLUÇÃO (T3, T2, T1).
     """
     if not allowed_classes:
-        return True # Skills universais/de evento sem restrição
+        return True 
     
     player_class_key = player_class_key.lower()
     
-    # 1. Obter a ancestralidade (T3, T2, T1)
-    # Se 'templario', retorna ['templario', 'cavaleiro', 'guerreiro']
     ancestry = get_class_ancestry(player_class_key)
     allowed_classes_lower = {c.lower() for c in allowed_classes}
 
-    # 2. Verificar se qualquer classe na cadeia pode usar a skill
     for class_node in ancestry:
         if class_node in allowed_classes_lower:
             return True

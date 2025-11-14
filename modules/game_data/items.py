@@ -1,5 +1,4 @@
 # modules/game_data/items.py
-# Em modules/game_data/items.py
 
 """
 Tabela base de itens de inventário (materiais, consumíveis, insumos, etc).
@@ -20,23 +19,21 @@ except ImportError:
     print("AVISO: modules/game_data/skins.py não encontrado.")
 
 ITEMS_DATA = {
-    # Em modules/game_data/items.py, dentro do dicionário ITEMS_DATA
 
-    # --- NOVOS INGREDIENTES DE ALQUIMIA ---
     "frasco_com_agua": {
-        "display_name": "Frasco com Água",
+        "display_name": "𝑭𝒓𝒂𝒔𝒄𝒐 𝒄𝒐𝒎 𝑨́𝒈𝒖𝒂",
         "emoji": "💧",
         "type": "reagent",
         "description": "A base para a maioria das poções."
     },
     "folha_sombria": {
-        "display_name": "Folha Sombria",
+        "display_name": "𝑭𝒐𝒍𝒉𝒂 𝑺𝒐𝒎𝒃𝒓𝒊𝒂",
         "emoji": "🌿",
         "type": "reagent",
         "description": "Uma erva com propriedades curativas que cresce na Floresta Sombria."
     },
     "geleia_slime": {
-        "display_name": "Geleia de Slime",
+        "display_name": "𝑮𝒆𝒍𝒆𝒊𝒂 𝒅𝒆 𝑺𝒍𝒊𝒎𝒆",
         "emoji": "🟢",
         "type": "reagent",
         "description": "Uma substância viscosa com uma energia vital peculiar."
@@ -44,7 +41,7 @@ ITEMS_DATA = {
 
     # --- NOVAS POÇÕES ---
     "pocao_cura_leve": {
-        "display_name": "Poção de Cura Leve",
+        "display_name": "𝑷𝒐𝒄̧𝒂̃𝒐 𝒅𝒆 𝑪𝒖𝒓𝒂 𝑳𝒆𝒗𝒆",
         "emoji": "❤️",
         "type": "potion",
         "description": "Recupera 50 pontos de vida instantaneamente.",
@@ -53,7 +50,7 @@ ITEMS_DATA = {
         }
     },
     "pocao_cura_media": {
-        "display_name": "Poção de Cura Média", # <--- ESTA LINHA FALTAVA
+        "display_name": "𝑷𝒐𝒄̧𝒂̃𝒐 𝒅𝒆 𝑪𝒖𝒓𝒂 𝑴𝒆́𝒅𝒊𝒂", 
         "emoji": "❤️‍🩹",
         "type": "potion",
         "description": "Recupera 150 pontos de vida instantaneamente.",
@@ -62,7 +59,7 @@ ITEMS_DATA = {
         }
     },
     "pocao_energia_fraca": {
-        "display_name": "Poção de Energia Fraca",
+        "display_name": "𝑷𝒐𝒄̧𝒂̃𝒐 𝒅𝒆 𝑬𝒏𝒆𝒓𝒈𝒊𝒂 𝑭𝒓𝒂𝒄𝒂",
         "emoji": "⚡️",
         "type": "potion",
         "description": "Recupera 10 pontos de energia instantaneamente.",
@@ -71,42 +68,41 @@ ITEMS_DATA = {
         }
     },
     "frasco_sabedoria": {
-        "display_name": "Frasco de Sabedoria",
+        "display_name": "𝑭𝒓𝒂𝒔𝒄𝒐 𝒅𝒆 𝑺𝒂𝒃𝒆𝒅𝒐𝒓𝒊𝒂",
         "emoji": "🧠",
         "type": "potion",
-        "description": "Concede 100 pontos de experiência de combate.",
+        "description": "Concede 500 pontos de experiência de combate.",
         "effects": {
-            "add_xp": 100
+            "add_xp": 500
         }
     },
     "fragmento_bravura": {
-        "display_name": "Fʀᴀɢᴍᴇɴᴛᴏ ᴅᴇ Bʀᴀᴠᴜʀᴀ",
+        "display_name": "𝑭𝒓𝒂𝒈𝒎𝒆𝒏𝒕𝒐 𝒅𝒆 𝑩𝒓𝒂𝒗𝒖𝒓𝒂",
         "emoji": "🏅",
         "type": "especial",
         "category": "evento",
         "description": "Um fragmento obtido ao defender o reino. Junte 100 para forjar uma recompensa.",
         "stackable": True,
-        "media_key": "item_fragmento_bravura" # Podemos criar um file_id para ele depois
+        "media_key": "item_fragmento_bravura" 
     },
     "ticket_defesa_reino": {
-        "display_name": "Tɪᴄᴋᴇᴛ ᴅᴇ Dᴇғᴇsᴀ ᴅᴏ Rᴇɪɴᴏ",
+        "display_name": "𝑻𝒊𝒄𝒌𝒆𝒕 𝒅𝒆 𝑫𝒆𝒇𝒆𝒔𝒂 𝒅𝒐 𝑹𝒆𝒊𝒏𝒐",
         "emoji": "🎟️",
         "type": "event_ticket",
         "category": "evento",
         "description": "Garante uma entrada no evento de Defesa do Reino. Válido até o fim do evento ou até você ser derrotado.",
         "stackable": True,
-        "media_key": "item_ticket_defesa_reino" # Podemos criar um file_id para ele depois
+        "media_key": "item_ticket_defesa_reino" 
     },
 
     "ticket_arena": {
-    "display_name": "Entrada da Arena",
+    "display_name": "𝑬𝒏𝒕𝒓𝒂𝒅𝒂 𝒅𝒂 𝑨𝒓𝒆𝒏𝒂",
     "emoji": "🎟️",
     "description": "Um ticket que concede uma entrada extra para as batalhas ranqueadas da Arena de Eldora. Pode ser usado a qualquer momento.",
     "type": "event_ticke",
-    "category": "evento",        # É um item consumível
-    "stackable": True,      # O jogador pode ter vários
+    "category": "evento",    
+    "stackable": True,     
     
-    # Efeito especial ao usar o item do inventário
     "on_use": {
         "effect": "add_pvp_entries",
         "value": 1
@@ -114,32 +110,32 @@ ITEMS_DATA = {
     },
 
         "nucleo_forja_comum": {
-        "display_name": "Núcleo de Forja Comum",
+        "display_name": "𝑵𝒖́𝒄𝒍𝒆𝒐 𝒅𝒆 𝑭𝒐𝒓𝒋𝒂 𝑪𝒐𝒎𝒖𝒎",
         "emoji": "🔥",
         "type": "material",
         "description": "Fonte de energia básica utilizada na forja de itens de Tier 2."
     },
 
-     "joia_da_forja": {
-        "display_name": "Joia de Aprimoramento",
+    "joia_da_forja": {
+        "display_name": "𝑱𝒐𝒊𝒂 𝒅𝒆 𝑨𝒑𝒓𝒊𝒎𝒐𝒓𝒂𝒎𝒆𝒏𝒕𝒐",
         "emoji": "💎",
         "type": "especial",
         "category": "especial",
     },
 
-     "sigilo_protecao": {
-        "display_name": "Sigilo de Proteção",
+    "sigilo_protecao": {
+        "display_name": "𝑺𝒊𝒈𝒊𝒍𝒐 𝒅𝒆 𝑷𝒓𝒐𝒕𝒆𝒄̧𝒂̃𝒐",
         "emoji": "✨",
         "type": "especial",
         "category": "especial",
-     },
-     
+    },
+    
     "gems": {
-        "display_name": "Diamante",
+        "display_name": "𝑫𝒊𝒂𝒎𝒂𝒏𝒕𝒆",
         "emoji": "💎",
         "description": "Uma gema rara e valiosa, usada para transações especiais na loja.",
-        "type": "currency",     # Sugestão: bom para organizar seus itens
-        "stackable": True,      # Moedas são sempre empilháveis
+        "type": "currency",     
+        "stackable": True,     
     
     },
 
@@ -147,7 +143,7 @@ ITEMS_DATA = {
     # COLETA BÁSICA
     # ================================
     "madeira": {
-        "display_name": "Mᴀᴅᴇɪʀᴀ", "emoji": "🪵",
+        "display_name": "𝑴𝒂𝒅𝒆𝒊𝒓𝒂", "emoji": "🪵",
         "type": "material_bruto", "category": "coletavel",
         "description": "Madeira comum para várias criações.",
         "stackable": True,  
@@ -155,7 +151,7 @@ ITEMS_DATA = {
         
     },
     "pedra": {
-        "display_name": "Pᴇᴅʀᴀ", "emoji": "🪨",
+        "display_name": "𝑷𝒆𝒅𝒓𝒂", "emoji": "🪨",
         "type": "material_bruto", "category": "coletavel",
         "description": "Rocha comum, serve para construções e refino.",
         "stackable": True,
@@ -163,7 +159,7 @@ ITEMS_DATA = {
         
     },
     "minerio_de_ferro": {
-        "display_name": "Mɪɴᴇ́ʀɪᴏ ᴅᴇ Fᴇʀʀᴏ", "emoji": "⛏️",
+        "display_name": "𝑴𝒊𝒏𝒆́𝒓𝒊𝒐 𝒅𝒆 𝑭𝒆𝒓𝒓𝒐", "emoji": "⛏️",
         "type": "material_bruto", "category": "coletavel",
         "description": "Minério metálico que pode ser fundido.",
         "stackable": True,
@@ -172,7 +168,7 @@ ITEMS_DATA = {
     },
 
     "linho": {
-        "display_name": "Lɪɴʜᴏ", "emoji": "🌿",
+        "display_name": "𝑳𝒊𝒏𝒉𝒐", "emoji": "🌿",
         "type": "material_bruto", "category": "coletavel",
         "description": "Fibras vegetais base para tecelagem.",
         "stackable": True,
@@ -181,21 +177,19 @@ ITEMS_DATA = {
     },
     
     "pena": {
-        "display_name": "Pᴇɴᴀ", "emoji": "🪶",
+        "display_name": "𝑷𝒆𝒏𝒂", "emoji": "🪶",
         "type": "material_monstro", "category": "coletavel",
         "description": "Pena leve, útil para flechas e ornamentos.",
         "stackable": True,
         "media_key": "imagem_pena",
-        
     },
     
     "sangue": {
-        "display_name": "Sᴀɴɢᴜᴇ", "emoji": "🩸",
+        "display_name": "𝑺𝒂𝒏𝒈𝒖𝒆", "emoji": "🩸",
         "type": "material_monstro", "category": "coletavel",
         "description": "Amostra de sangue para poções e rituais.",
         "stackable": True,
         "media_key": "imagem_sangue",
-        
     },
 
     
@@ -204,7 +198,7 @@ ITEMS_DATA = {
     # ================================
     
     "minerio_estanho": {
-        "display_name": "Mɪɴᴇ́ʀɪᴏ ᴅᴇ Esᴛᴀɴʜᴏ", "emoji": "🪙",
+        "display_name": "𝑴𝒊𝒏𝒆́𝒓𝒊𝒐 𝒅𝒆 𝑬𝒔𝒕𝒂𝒏𝒏𝒉𝒐", "emoji": "🪙",
         "type": "material_bruto", "category": "cacada",
         "description": "Metal macio, excelente para ligas (ex.: bronze).",
         "stackable": True,
@@ -212,7 +206,7 @@ ITEMS_DATA = {
     },
     
     "gema_bruta": {
-        "display_name": "Gᴇᴍᴀ Bʀᴜᴛᴀ", "emoji": "💎",
+        "display_name": "𝑮𝒆𝒎𝒂 𝑩𝒓𝒖𝒕𝒂", "emoji": "💎",
         "type": "material_bruto", "category": "cacada",
         "description": "Pedra preciosa sem lapidação, com potencial mágico.",
         "stackable": True,
@@ -220,7 +214,7 @@ ITEMS_DATA = {
     },
 
     "madeira_rara": {
-        "display_name": "Mᴀᴅᴇɪʀᴀ Rᴀʀᴀ", "emoji": "🪵☦️",
+        "display_name": "𝑴𝒂𝒅𝒆𝒊𝒓𝒂 𝑹𝒂𝒓𝒂", "emoji": "🪵☦️",
         "type": "material_bruto", "category": "cacada",
         "description": "Madeira de árvore antiga, resistente e flexível.",
         "stackable": True,
@@ -228,63 +222,63 @@ ITEMS_DATA = {
     },
 
     "pano_simples": {
-        "display_name": "Pᴇᴅᴀᴄ̧ᴏ ᴅᴇ Pᴀɴᴏ", "emoji": "🧣",
+        "display_name": "𝑷𝒆𝒅𝒂𝒄̧𝒐 𝒅𝒆 𝒑𝒂𝒏𝒐", "emoji": "🧣",
         "type": "material_monstro", "category": "cacada",
         "description": "Retalho comum, cai de criaturas humanoides.",
         "stackable": True,
         "media_key": "item_pano_simples"
     },
     "esporo_de_cogumelo": {
-        "display_name": "Esᴘᴏʀᴏ ᴅᴇ Cᴏɢᴜᴍᴇʟᴏ", "emoji": "🍄",
+        "display_name": "𝑬𝒔𝒑𝒐𝒓𝒐 𝒅𝒆 𝑪𝒐𝒈𝒖𝒎𝒆𝒍𝒐", "emoji": "🍄",
         "type": "material_monstro", "category": "cacada",
         "description": "Base alquímica vinda de cogumelos gigantes.",
         "stackable": True,
         "media_key": "item_esporo_de_cogumelo"
     },
     "couro_de_lobo": {
-        "display_name": "Cᴏᴜʀᴏ ᴅᴇ Lᴏʙᴏ", "emoji": "🐺",
+        "display_name": "𝑪𝒐𝒖𝒓𝒐 𝒅𝒆 𝑳𝒐𝒃𝒐", "emoji": "🐺",
         "type": "material_monstro", "category": "cacada",
         "description": "Pele de lobo comum para armaduras leves.",
         "stackable": True,
         "media_key": "item_couro_de_lobo"
     },
     "couro_de_lobo_alfa": {
-        "display_name": "Cᴏᴜʀᴏ ᴅᴇ Lᴏʙᴏ Aʟғᴀ", "emoji": "🟤🐺",
+        "display_name": "𝑪𝒐𝒖𝒓𝒐 𝒅𝒆 𝑳𝒐𝒃𝒐 𝑨𝒍𝒇𝒂", "emoji": "🟤🐺",
         "type": "material_monstro", "category": "cacada",
         "description": "Pele espessa e rara de um lobo alfa.",
         "stackable": True,
         "media_key": "item_couro_de_lobo_alfa"
     },
     "seiva_de_ent": {
-        "display_name": "Sᴇɪᴠᴀ ᴅᴇ Eɴᴛ", "emoji": "🌳",
+        "display_name": "𝑺𝒆𝒊𝒗𝒂 𝒅𝒆 𝑬𝒏𝒕", "emoji": "🌳",
         "type": "material_monstro", "category": "cacada",
         "description": "Seiva dourada de uma criatura ancestral.",
         "stackable": True,
         "media_key": "item_seiva_de_ent"
     },
     "ectoplasma": {
-        "display_name": "Eᴄᴛᴏᴘʟᴀsᴍᴀ", "emoji": "👻",
+        "display_name": "𝑬𝒄𝒕𝒐𝒑𝒍𝒂𝒔𝒎𝒂", "emoji": "👻",
         "type": "material_monstro", "category": "cacada",
         "description": "Resíduo etéreo de aparições.",
         "stackable": True,
         "media_key": "item_ectoplasma"
     },
     "joia_da_criacao": {
-        "display_name": "Jᴏɪᴀ ᴅᴀ Cʀɪᴀᴄ̧ᴀ̃ᴏ", "emoji": "🔷",
+        "display_name": "𝑱𝒐𝒊𝒂 𝒅𝒂 𝑪𝒓𝒊𝒂𝒄̧𝒂̃𝒐", "emoji": "🔷",
         "type": "material_magico", "category": "consumivel",
         "description": "Gema rara com energia criadora.",
         "stackable": True,
         "media_key": "item_joia_da_criacao"
     },
     "presa_de_javali": {
-        "display_name": "Pʀᴇsᴀ ᴅᴇ Jᴀᴠᴀʟɪ", "emoji": "🦷",
+        "display_name": "𝑷𝒓𝒆𝒔𝒂 𝒅𝒆 𝒋𝒂𝒗𝒂𝒍𝒊", "emoji": "🦷",
         "type": "material_monstro", "category": "cacada",
         "description": "Presas afiadas, úteis em talismãs e reforços.",
         "stackable": True,
         "media_key": "item_presa_de_javali"
     },
     "carapaca_de_pedra": {
-        "display_name": "Cᴀʀᴀᴘᴀᴄ̧ᴀ ᴅᴇ Pᴇᴅʀᴀ", "emoji": "🪨",
+        "display_name": "𝑪𝒂𝒓𝒂𝒑𝒂𝒄̧𝒂 𝒅𝒆 𝑷𝒆𝒅𝒓𝒂", "emoji": "🪨",
         "type": "material_monstro", "category": "cacada",
         "description": "Placas pétreas de criaturas rochosas.",
         "stackable": True,
@@ -292,77 +286,77 @@ ITEMS_DATA = {
         
     },
     "nucleo_de_golem": {
-        "display_name": "Nᴜ́ᴄʟᴇᴏ ᴅᴇ Gᴏʟᴇᴍ", "emoji": "🧿",
+        "display_name": "𝑵𝒖́𝒄𝒍𝒆𝒐 𝒅𝒆 𝑮𝒐𝒍𝒆𝒎", "emoji": "🧿",
         "type": "material_magico", "category": "cacada",
         "description": "Coração animado que dá vida a um golem.",
         "stackable": True,
         "media_key": "item_nucleo_de_golem"
     },
     "escama_de_salamandra": {
-        "display_name": "Esᴄᴀᴍᴀ ᴅᴇ Sᴀʟᴀᴍᴀɴᴅʀᴀ", "emoji": "🦎",
+        "display_name": "𝑬𝒔𝒄𝒂𝒎𝒂 𝒅𝒆 𝑺𝒂𝒍𝒂𝒎𝒂𝒏𝒅𝒓𝒂", "emoji": "🦎",
         "type": "material_monstro", "category": "cacada",
         "description": "Escamas resistentes ao calor intenso.",
         "stackable": True,
         "media_key": "item_escama_de_salamandra"
     },
     "coracao_de_magma": {
-        "display_name": "Cᴏʀᴀᴄ̧ᴀ̃ᴏ ᴅᴇ Mᴀɢᴍᴀ", "emoji": "❤️‍🔥",
+        "display_name": "𝑪𝒐𝒓𝒂𝒄̧𝒂̃𝒐 𝒅𝒆 𝑴𝒂𝒈𝒎𝒂", "emoji": "❤️‍🔥",
         "type": "material_magico", "category": "cacada",
         "description": "Núcleo ígneo que pulsa calor.",
         "stackable": True,
         "media_key": "item_coracao_de_magma"
     },
     "poeira_magica": {
-        "display_name": "Pᴏᴇɪʀᴀ Mᴀ́ɢɪᴄᴀ", "emoji": "✨",
+        "display_name": "𝑷𝒐𝒆𝒊𝒓𝒂 𝑴𝒂́𝒈𝒊𝒄𝒂", "emoji": "✨",
         "type": "material_magico", "category": "cacada",
         "description": "Resíduo arcano com usos variados.",
         "stackable": True,
         "media_key": "item_poeira_magica"
     },
     "olho_de_basilisco": {
-        "display_name": "Oʟʜᴏ ᴅᴇ Bᴀsɪʟɪsᴄᴏ", "emoji": "👁️",
+        "display_name": "𝑶𝒍𝒉𝒐 𝒅𝒆 𝑩𝒂𝒔𝒊𝒍𝒊𝒔𝒄𝒐", "emoji": "👁️",
         "type": "material_magico", "category": "cacada",
         "description": "Olho petrificante, raro e perigoso.",
         "stackable": True,
         "media_key": "item_olho_de_basilisco"
     },
     "asa_de_morcego": {
-        "display_name": "Asᴀ ᴅᴇ Mᴏʀᴄᴇɢᴏ", "emoji": "🦇",
+        "display_name": "𝑨𝒔𝒂 𝒅𝒆 𝑴𝒐𝒓𝒄𝒆𝒈𝒐", "emoji": "🦇",
         "type": "material_monstro", "category": "cacada",
         "description": "Asas membranosas, úteis em alquimia.",
         "stackable": True,
         "media_key": "item_asa_de_morcego"
     },
     "pele_de_troll": {
-        "display_name": "Pᴇʟᴇ ᴅᴇ Tʀᴏʟʟ", "emoji": "🧌",
+        "display_name": "𝑷𝒆𝒍𝒆 𝒅𝒆 𝑻𝒓𝒐𝒍𝒍", "emoji": "🧌",
         "type": "material_monstro", "category": "cacada",
         "description": "Couro grosso com traços regenerativos.",
         "stackable": True,
         "media_key": "item_pele_de_troll"
     },
     "sangue_regenerativo": {
-        "display_name": "Sᴀɴɢᴜᴇ Rᴇɢᴇɴᴇʀᴀᴛɪᴠᴏ", "emoji": "✨🩸",
+        "display_name": "𝑺𝒂𝒏𝒈𝒖𝒆 𝑹𝒆𝒈𝒆𝒏𝒆𝒓𝒂𝒕𝒊𝒗𝒐", "emoji": "✨🩸",
         "type": "material_magico", "category": "cacada",
         "description": "Líquido denso com poder de cura.",
         "stackable": True,
         "media_key": "item_sangue_regenerativo"
     },
     "nucleo_de_magma": {
-        "display_name": "Nᴜ́ᴄʟᴇᴏ ᴅᴇ Mᴀɢᴍᴀ", "emoji": "🪔",
+        "display_name": "𝑵𝒖́𝒄𝒍𝒆𝒐 𝒅𝒆 𝑴𝒂𝒈𝒎𝒂", "emoji": "🪔",
         "type": "material_magico", "category": "cacada",
         "description": "Fragmento ardente retirado de elementais.",
         "stackable": True,
         "media_key": "item_nucleo_de_magma"
     },
     "pedra_vulcanica": {
-        "display_name": "Pᴇᴅʀᴀ Vᴜʟᴄᴀ̂ɴɪᴄᴀ", "emoji": "🪨🌋",
+        "display_name": "𝑷𝒆𝒅𝒓𝒂 𝑽𝒖𝒍𝒄𝒂̂𝒏𝒊𝒄𝒂", "emoji": "🪨🌋",
         "type": "material_monstro", "category": "cacada",
         "description": "Rochas formadas por magma resfriado.",
         "stackable": True,
         "media_key": "item_pedra_vulcanica"
     },
     "semente_encantada": {
-        "display_name": "Sᴇᴍᴇɴᴛᴇ Eɴᴄᴀɴᴛᴀᴅᴀ", "emoji": "🌱✨",
+        "display_name": "𝑺𝒆𝒎𝒆𝒏𝒕𝒆 𝑬𝒏𝒄𝒂𝒏𝒕𝒂𝒅𝒂", "emoji": "🌱✨",
         "type": "material_magico", "category": "cacada",
         "description": "Semente viva com magia natural.",
         "stackable": True,
@@ -370,35 +364,35 @@ ITEMS_DATA = {
     },
 
     "engrenagem_usada": {
-        "display_name": "Eɴɢʀᴇɴᴀɢᴇᴍ Usᴀᴅᴀ", "emoji": "⚙️",
+        "display_name": "𝑬𝒏𝒈𝒓𝒆𝒏𝒂𝒈𝒆𝒎 𝑼𝒔𝒂𝒅𝒂", "emoji": "⚙️",
         "type": "material_monstro", "category": "cacada",
         "description": "Peça mecânica recuperada de autômatos.",
         "stackable": True,
         "media_key": "item_engrenagem_usada"
     },
     "martelo_enferrujado": {
-        "display_name": "Mᴀʀᴛᴇʟᴏ Eɴғᴇʀʀᴜᴊᴀᴅᴏ", "emoji": "🔨🔸",
+        "display_name": "𝑴𝒂𝒓𝒕𝒆𝒍𝒐 𝑬𝒏𝒇𝒆𝒓𝒓𝒖𝒋𝒂𝒅𝒐", "emoji": "🔨🔸",
         "type": "sucata", "category": "cacada",
         "description": "Velho martelo, mais lembrança do que ferramenta.",
         "stackable": True,
         "media_key": "item_martelo_enfrrujado"
     },
     "escama_incandescente": {
-        "display_name": "Esᴄᴀᴍᴀ Iɴᴄᴀɴᴅᴇsᴄᴇɴᴛᴇ", "emoji": "🔥",
+        "display_name": "𝑬𝒔𝒄𝒂𝒎𝒂 𝑰𝒏𝒄𝒂𝒏𝒅𝒆𝒔𝒄𝒆𝒏𝒕𝒆", "emoji": "🔥",
         "type": "material_monstro", "category": "cacada",
         "description": "Escama que retém calor sobrenatural.",
         "stackable": True,
         "media_key": "item_escama_incandescente"
     },
     "essencia_de_fogo": {
-        "display_name": "Essᴇ̂ɴᴄɪᴀ ᴅᴇ Fᴏɢᴏ", "emoji": "♨️",
+        "display_name": "𝑬𝒔𝒔𝒆̂𝒏𝒄𝒊𝒂 𝒅𝒆 𝑭𝒐𝒈𝒐", "emoji": "♨️",
         "type": "material_magico", "category": "cacada",
         "description": "Essência elementar ardente.",
         "stackable": True,
         "media_key": "item_essencia_de_fogo"
     },
     "barra_de_aco": {
-        "display_name": "Bᴀʀʀᴀ ᴅᴇ Aᴄ̧ᴏ", "emoji": "⛓️🧱",
+        "display_name": "𝑩𝒂𝒓𝒓𝒂 𝒅𝒆 𝑨𝒄̧𝒐", "emoji": "⛓️🧱",
         "type": "material_refinado", "category": "coletavel",
         "description": "Liga metálica superior ao ferro, essencial em equipamentos T2.",
         "stackable": True,
@@ -406,7 +400,7 @@ ITEMS_DATA = {
         "media_key": "item_barra_de_aco"
     },
     "dente_afiado_superior": {
-        "display_name": "Dᴇɴᴛᴇ Aғɪᴀᴅᴏ Sᴜᴘᴇʀɪᴏʀ", "emoji": "🦷",
+        "display_name": "𝑫𝒆𝒏𝒕𝒆 𝑨𝒇𝒊𝒂𝒅𝒐 𝑺𝒖𝒑𝒆𝒓𝒊𝒐𝒓", "emoji": "🦷",
         "type": "material_monstro", "category": "cacada",
         "description": "Dente robusto e extremamente afiado, usado em forjas avançadas.",
         "stackable": True,
@@ -414,7 +408,7 @@ ITEMS_DATA = {
         
     },
     "ponta_de_osso_afiada": {
-        "display_name": "Pᴏɴᴛᴀ ᴅᴇ Ossᴏ Aғɪᴀᴅᴀ", "emoji": "🦴",
+        "display_name": "𝑷𝒐𝒏𝒕𝒂 𝒅𝒆 𝑶𝒔𝒔𝒐 𝑨𝒇𝒊𝒂𝒅𝒂", "emoji": "🦴",
         "type": "material_monstro", "category": "coletavel",
         "description": "Dente robusto e extremamente afiado, usado em forjas avançadas.",
         "stackable": True,
@@ -422,35 +416,35 @@ ITEMS_DATA = {
         
     },
     "veludo_runico": {
-        "display_name": "Vᴇʟᴜᴅᴏ Rᴜ́ɴɪᴄᴏ", "emoji": "🧵",
+        "display_name": "𝑽𝒆𝒍𝒖𝒅𝒐 𝑹𝒖́𝒏𝒊𝒄𝒐", "emoji": "🧵",
         "type": "material_refinado", "category": "coletavel",
         "description": "Tecido mágico e luxuoso usado em trajes avançados.",
         "stackable": True,
         "media_key": "item_veludo_runico"
     },
     "couro_reforcado": {
-        "display_name": "Cᴏᴜʀᴏ Rᴇғᴏʀᴄ̧ᴀᴅᴏ", "emoji": "🐂",
+        "display_name": "𝑪𝒐𝒖𝒓𝒐 𝑹𝒆𝒇𝒐𝒓𝒄̧𝒂𝒅𝒐", "emoji": "🐂",
         "type": "material_refinado", "category": "coletavel",
         "description": "Couro tratado com técnicas especiais para maior durabilidade.",
         "stackable": True,
         "media_key": "item_couro_reforcado"
     },    
     "pele_troll_regenerativa": {
-        "display_name": "Pᴇʟᴇ ᴅᴇ Tʀᴏʟʟ Rᴇɢᴇɴᴇʀᴀᴛɪᴠᴀ", "emoji": "🧌✨🩸",
+        "display_name": "𝑷𝒆𝒍𝒆 𝒅𝒆 𝑻𝒓𝒐𝒍𝒍 𝑹𝒆𝒈𝒆𝒏𝒆𝒓𝒂𝒕𝒊𝒗𝒂", "emoji": "🧌✨🩸",
         "type": "material_refinado", "category": "coletavel",
         "description": "Couro tratado com técnicas especiais para maior durabilidade.",
         "stackable": True,
         "media_key": "item_pele_troll_regenerativa"    
      },    
     "membrana_de_couro_fino": {
-        "display_name": "Mᴇᴍʙʀᴀɴᴀ ᴅᴇ Cᴏᴜʀᴏ Fɪɴᴏ", "emoji": "🦇",
+        "display_name": "𝑴𝒆𝒎𝒃𝒓𝒂𝒏𝒂 𝒅𝒆 𝑪𝒐𝒖𝒓𝒐 𝑭𝒊𝒏𝒐", "emoji": "🦇",
         "type": "material_refinado", "category": "coletavel",
         "description": "Couro tratado com técnicas especiais para maior durabilidade.",
         "stackable": True,
         "media_key": "item_membrana_de_couro_fino"        
     },
     "barra_de_prata": {
-        "display_name": "Bᴀʀʀᴀ ᴅᴇ Pʀᴀᴛᴀ", "emoji": "🥈",
+        "display_name": "𝑩𝒂𝒓𝒓𝒂 𝒅𝒆 𝑷𝒓𝒂𝒕𝒂", "emoji": "🥈",
         "type": "material_refinado", "category": "coletavel",
         "description": "Metal precioso usado em joias e ornamentos.",
         "stackable": True,
@@ -460,35 +454,35 @@ ITEMS_DATA = {
     # PRODUTOS DE REFINO & TECELAGEM (ABA: COLETÁVEL)
     # ================================
     "barra_de_ferro": {
-        "display_name": "Bᴀʀʀᴀ ᴅᴇ Fᴇʀʀᴏ", "emoji": "🧱",
+        "display_name": "𝑩𝒂𝒓𝒓𝒂 𝒅𝒆 𝑭𝒆𝒓𝒓𝒐", "emoji": "🧱",
         "type": "material_refinado", "category": "coletavel",
         "description": "Barra metálica básica, resultado de refino.",
         "stackable": True,
         "media_key": "item_barra_de_ferro"
     },
     "barra_bronze": {
-        "display_name": "Bᴀʀʀᴀ ᴅᴇ Bʀᴏɴᴢᴇ", "emoji": "🟤",
+        "display_name": "𝑩𝒂𝒓𝒓𝒂 𝒅𝒆 𝒃𝒓𝒐𝒏𝒛𝒆", "emoji": "🟤",
         "type": "material_refinado", "category": "coletavel",
         "description": "Liga de ferro+estanho (neste jogo).",
         "stackable": True,
         "media_key": "item_barra_de_bronze"
     },
     "couro_curtido": {
-        "display_name": "Cᴏᴜʀᴏ Cᴜʀᴛɪᴅᴏ", "emoji": "🐑",
+        "display_name": "𝑪𝒐𝒖𝒓𝒐 𝑪𝒖𝒓𝒕𝒊𝒅𝒐", "emoji": "🐑",
         "type": "material_refinado", "category": "coletavel",
         "description": "Couro tratado, base para várias criações.",
         "stackable": True,
         "media_key": "item_couro_curtido"
     },
     "rolo_de_pano_simples": {
-        "display_name": "Rᴏʟᴏ ᴅᴇ Pᴀɴᴏ Sɪᴍᴘʟᴇs", "emoji": "🪢",
+        "display_name": "𝑹𝒐𝒍𝒐 𝒅𝒆 𝑷𝒂𝒏𝒐 𝑺𝒊𝒎𝒑𝒍𝒆𝒔", "emoji": "🪢",
         "type": "material_refinado", "category": "coletavel",
         "description": "Tecido básico preparado para costura.",
         "stackable": True,
         "media_key": "item_rolo_de_pano_simples"
     },
        "gema_polida": { 
-        "display_name": "Gᴇᴍᴀ Pᴏʟɪᴅᴀ", "emoji": "🔷",
+        "display_name": "𝑮𝒆𝒎𝒂 𝑷𝒐𝒍𝒊𝒅𝒂", "emoji": "🔷",
         "type": "material_refinado", "category": "coletavel",
         "description": "Gema lapidada, pronta para engaste em joias.",
         "stackable": True,
@@ -496,28 +490,28 @@ ITEMS_DATA = {
         
     },
     "dente_afiado": {
-        "display_name": "Dᴇɴᴛᴇ Aғɪᴀᴅᴏ", "emoji": "🦷",
+        "display_name": "𝑫𝒆𝒏𝒕𝒆 𝑨𝒇𝒊𝒂𝒅𝒐", "emoji": "🦷",
         "type": "material_monstro", "category": "cacada",
         "description": "Dente afiado coletado de criaturas selvagens.",
         "stackable": True,
         "media_key": "item_dente_afiado"
     },
     "fragmento_gargula": {
-        "display_name": "Fʀᴀɢᴍᴇɴᴛᴏ ᴅᴇ Gᴀ́ʀɢᴜʟᴀ", "emoji": "🪨",
+        "display_name": "𝑭𝒓𝒂𝒈𝒎𝒆𝒏𝒕𝒐 𝒅𝒆 𝑮𝒂́𝒓𝒈𝒖𝒍𝒂", "emoji": "🪨",
         "type": "material_monstro", "category": "cacada",
         "description": "Estilhaço pétreo imbuído de energia sombria.",
         "stackable": True,
         "media_key": "item_fragmento_gargula"
     },
     "fio_de_prata": {
-        "display_name": "Fɪᴏ ᴅᴇ Pʀᴀᴛᴀ", "emoji": "🪡",
+        "display_name": "𝑭𝒊𝒐 𝒅𝒆 𝑷𝒓𝒂𝒕𝒂", "emoji": "🪡",
         "type": "material_refinado", "category": "coletavel",
         "description": "Fio de prata maleável, ótimo para joias finas.",
         "stackable": True,
         "media_key": "item_fio_de_prata"
     },
         "pedra_do_aprimoramento": {
-        "display_name": "Pᴇᴅʀᴀ ᴅᴏ Aᴘʀɪᴍᴏʀᴀᴍᴇɴᴛᴏ", "emoji": "✨",
+        "display_name": "𝑷𝒆𝒅𝒓𝒂 𝒅𝒆 𝑨𝒑𝒓𝒊𝒎𝒐𝒓𝒂𝒎𝒆𝒏𝒕𝒐", "emoji": "✨",
         "type": "consumivel", "category": "consumivel",
         "description": "Melhora a qualidade de equipamentos.",
         "stackable": True,
@@ -525,21 +519,21 @@ ITEMS_DATA = {
 
     },
     "pergaminho_durabilidade": {
-        "display_name": "Pᴇʀɢᴀᴍɪɴʜᴏ ᴅᴇ Dᴜʀᴀʙɪʟɪᴅᴀᴅᴇ", "emoji": "📜",
+        "display_name": "𝑷𝒆𝒓𝒈𝒂𝒎𝒊𝒏𝒉𝒐 𝒅𝒆 𝑫𝒖𝒓𝒂𝒃𝒊𝒍𝒊𝒅𝒂𝒅𝒆", "emoji": "📜",
         "type": "consumivel", "category": "consumivel",
         "description": "Restaura a durabilidade máxima de um item.",
         "stackable": True,
         "value": 150,
     },
     "nucleo_forja_fraco": {
-        "display_name": "Nᴜ́ᴄʟᴇᴏ ᴅᴇ Fᴏʀᴊᴀ Fʀᴀᴄᴏ", "emoji": "🔥",
+        "display_name": "𝑵𝒖́𝒄𝒍𝒆𝒐 𝒅𝒆 𝑭𝒐𝒓𝒋𝒂 𝑭𝒓𝒂𝒄𝒐", "emoji": "🔥",
         "type": "material_magico", "category": "consumivel",
         "description": "Fonte de poder modesta para a forja.",
         "stackable": True,
         "value": 40,
     },
     "nucleo_forja_comum": {
-        "display_name": "Nᴜ́ᴄʟᴇᴏ ᴅᴇ Fᴏʀᴊᴀ Cᴏᴍᴜᴍ", "emoji": "💥",
+        "display_name": "𝑵𝒖́𝒄𝒍𝒆𝒐 𝒅𝒆 𝑭𝒐𝒓𝒋𝒂 𝑪𝒐𝒎𝒖𝒎", "emoji": "💥",
         "type": "material_magico", "category": "consumivel",
         "description": "Fonte de poder estável para a forja.",
         "stackable": True,
@@ -552,7 +546,7 @@ ITEMS_DATA = {
     # --- Chaves de dungeon ---
 
     "cristal_de_abertura": {
-        "display_name": "Cʀɪsᴛᴀʟ ᴅᴇ Aʙᴇʀᴛᴜʀᴀ", "emoji": "🔹",
+        "display_name": "𝑪𝒓𝒊𝒔𝒕𝒂𝒍 𝒅𝒆 𝑨𝒃𝒆𝒓𝒕𝒖𝒓𝒂", "emoji": "🔹",
         "type": "especial", "category": "especial",
         "description": "Chave arcana para abrir portais de dungeons.",
         "stackable": True,
@@ -568,7 +562,7 @@ ITEMS_DATA = {
 # --- Drop regional da Floresta (buff de vida ao usar) ---
 
     "seiva_escura": {
-        "display_name": "Sᴇɪᴠᴀ Esᴄᴜʀᴀ", "emoji": "🩸",
+        "display_name": "𝐒𝐞𝐢𝐯𝐚 𝐄𝐬𝐜𝐮𝐫𝐚", "emoji": "🩸",
         "type": "consumivel", "category": "buff",
         "description": "Essência vital da floresta sombria. Ao usar: +10 Vida máxima por 60 min.",
         "stackable": True,
@@ -589,63 +583,63 @@ ITEMS_DATA = {
     # ITENS RESULTANTES - ASSASSINO T1
     # ================================
     "adaga_sorrateira_assassino": {
-        "display_name": "Adaga Sorrateira", "emoji": "🔪",
+        "display_name": "𝐀𝐝𝐚𝐠𝐚 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐚", "emoji": "🔪",
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Arma letal do Conjunto Sorrateiro do Assassino.",
         "media_key": "item_adaga_sorrateira_assassino",
         "class_req": ["assassino"]
     },
     "mascara_sorrateira_assassino": {
-        "display_name": "Máscara Sorrateira", "emoji": "🪖",
+        "display_name": "𝐌𝐚́𝐬𝐜𝐚𝐫𝐚 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐚", "emoji": "🪖",
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Máscara leve e intimidadora do Conjunto Sorrateiro.",
         "media_key": "item_mascara_sorrateira_assassino",
         "class_req": ["assassino"]
     },
     "couraca_sorrateira_assassino": {
-        "display_name": "Couraça Sorrateira", "emoji": "👕",
+        "display_name": "𝐂𝐨𝐮𝐫𝐚𝐜̧𝐚 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐚", "emoji": "👕",
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Proteção ágil feita para furtividade.",
         "media_key": "item_couraca_sorrateira_assassino",
         "class_req": ["assassino"] 
     },
     "calcas_sorrateiras_assassino": {
-        "display_name": "Calças Sorrateiras", "emoji": "👖",
+        "display_name": "𝐂𝐚𝐥𝐜̧𝐚𝐬 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐚𝐬", "emoji": "👖",
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Calças leves que permitem movimentos rápidos.",
         "media_key": "item_calcas_sorrateira_assassino",
         "class_req": ["assassino"]
     },
     "botas_sorrateiras_assassino": {
-        "display_name": "Botas Sorrateiras", "emoji": "🥾",
+        "display_name": "𝐁𝐨𝐭𝐚𝐬 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐚𝐬", "emoji": "🥾",
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas reforçadas para movimentação silenciosa.",
         "media_key": "item_bota_sorrateira_assassino",
         "class_req": ["assassino"]
     },
     "luvas_sorrateiras_assassino": {
-        "display_name": "Luvas Sorrateiras", "emoji": "🧤",
+        "display_name": "𝐋𝐮𝐯𝐚𝐬 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐚𝐬", "emoji": "🧤",
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Luvas leves que aumentam a destreza do assassino.",
         "media_key": "item_luvas_sorrateiras_assassino",
         "class_req": ["assassino"]
     },
     "anel_sorrateiro_assassino": {
-        "display_name": "Anel Sorrateiro", "emoji": "💍",
+        "display_name": "𝐋𝐮𝐯𝐚𝐬 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐚𝐬", "emoji": "💍",
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel sombrio que amplifica a furtividade.",
         "media_key": "item_anel_sorrateiro_assassino",
         "class_req": ["assassino"]
     },
     "colar_sorrateiro_assassino": {
-        "display_name": "Colar Sorrateiro", "emoji": "📿",
+        "display_name": "𝐂𝐨𝐥𝐚𝐫 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐨", "emoji": "📿",
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar que envolve o portador em uma aura de sombras.",
         "media_key": "item_colar_sorrateiro_assassino",
         "class_req": ["assassino"]
     },
     "brinco_sorrateiro_assassino": {
-        "display_name": "Brinco Sorrateiro", "emoji": "🧿",
+        "display_name": "𝐁𝐫𝐢𝐧𝐜𝐨 𝐒𝐨𝐫𝐫𝐚𝐭𝐞𝐢𝐫𝐨", "emoji": "🧿",
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que protege contra olhares indiscretos.",
         "media_key": "item_brinco_sorrateiro_assassino",
@@ -656,14 +650,14 @@ ITEMS_DATA = {
     # ITENS RESULTANTES — Assassino T2
     # ================================
     "adaga_sombra_assassino": {
-        "display_name": "Adaga da Sombra", "emoji": "🔪",
+        "display_name": "𝐀𝐝𝐚𝐠𝐚 𝐝𝐚 𝐒𝐨𝐦𝐛𝐫𝐚", "emoji": "🔪",
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Lâmina leve e mortal, envolta em brumas etéreas.",
         "media_key": "item_adaga_sombra_assassino",
         "class_req": ["assassino"]
     },
     "mascara_sombra_assassino": {
-        "display_name": "Máscara da Sombra", "emoji": "🪖",
+        "display_name": "𝐌𝐚́𝐬𝐜𝐚𝐫𝐚 𝐝𝐚 𝐒𝐨𝐦𝐛𝐫𝐚", "emoji": "🪖",
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Máscara de couro escuro, oculta intenções.",
         "media_key": "item_mascara_sombra_assassino",
@@ -1763,9 +1757,12 @@ ITEMS_DATA = {
 
 }
 
-ITEMS_DATA["ferro"] = ITEMS_DATA["minerio_de_ferro"]
 
-# Alguns módulos antigos ainda esperam ITEM_BASES apontando para uma tabela de itens.
+# -----------------
+# (BLOCO DE CÓDIGO ANTIGO MOVIDO PARA O FINAL DO ARQUIVO)
+# -----------------
+
+ITEMS_DATA["ferro"] = ITEMS_DATA["minerio_de_ferro"]
 ITEM_BASES = ITEMS_DATA
 MARKET_ITEMS = list(ITEMS_DATA.keys())
 ITEMS = ITEMS_DATA
@@ -1781,23 +1778,6 @@ def get_display_name(item_id: str) -> str:
     meta = ITEMS_DATA.get(item_id) or {}
     return meta.get("display_name", item_id)
 
-
-# 2) Nomes das peças citadas no set da dungeon (apenas display)
-ITEMS_DATA.update({
-    "peitoral_coracao_umbrio": {
-        "display_name": "Peitoral do Coração Umbrio", "emoji": "🛡️",
-        "type": "equipamento", "category": "armadura",
-        "description": "Uma couraça pulsante com ecos da floresta sombria.",
-        "stackable": False,
-    },
-    "manto_coracao_umbrio": {
-        "display_name": "Manto do Coração Umbrio", "emoji": "🧥",
-        "type": "equipamento", "category": "armadura",
-        "description": "Tecidos enfeitiçados que latejam como raízes vivas.",
-        "stackable": False,
-    },
-})
-
 # 3) Corrige tipo/descrição da chave da catacumba (se existir com erro)
 if "chave_da_catacumba" in ITEMS_DATA:
     ITEMS_DATA["chave_da_catacumba"]["type"] = "especial"
@@ -1807,48 +1787,46 @@ if "chave_da_catacumba" in ITEMS_DATA:
 # ============================================================
 # (NOVO) Itens Consumíveis (Tomos de Skill)
 # ============================================================
-# Este loop lê o teu SKILL_DATA e cria um "Tomo" para cada skill
 for skill_id, skill_info in SKILL_DATA.items():
-    item_id = f"tomo_{skill_id}" # Ex: tomo_active_whirlwind
-    if item_id not in ITEMS_DATA: # Evita duplicatas
+    item_id = f"tomo_{skill_id}" 
+    if item_id not in ITEMS_DATA: 
         ITEMS_DATA[item_id] = {
             "display_name": f"Tomo: {skill_info.get('display_name', skill_id)}",
             "emoji": "📚",
-            "type": "consumable", # Define como consumível
-            "category": "consumivel", # Categoria para o Mercado de Gemas
+            "type": "consumable", 
+            "category": "consumivel", 
             "description": f"Tomo selado. Ao ler, ensina a habilidade: {skill_info.get('display_name', skill_id)}.",
-            "stackable": True, # Tomos podem ser empilhados
-            "tradable": True,  # Pode ser vendido
-            "market_currency": "gems", # Define que é vendido por gemas
+            "stackable": True, 
+            "tradable": True, 
+            "market_currency": "gems", 
             
-            # --- O EFEITO DE USO ---
             "on_use": {
                 "effect": "grant_skill",
-                "skill_id": skill_id # O ID que o 'grant_skill' usa
+                "skill_id": skill_id 
             }
         }
+
 
 # ============================================================
 # (NOVO) Itens Consumíveis (Caixas de Skin)
 # ============================================================
 # Este loop lê o teu SKIN_CATALOG e cria uma "Caixa" para cada skin
 for skin_id, skin_info in SKIN_CATALOG.items():
-    item_id = f"caixa_{skin_id}" # Ex: caixa_guerreiro_armadura_negra
-    if item_id not in ITEMS_DATA: # Evita duplicatas
+    item_id = f"caixa_{skin_id}" 
+    if item_id not in ITEMS_DATA: 
         ITEMS_DATA[item_id] = {
             "display_name": f"Caixa: {skin_info.get('display_name', skin_id)}",
             "emoji": "🎨",
-            "type": "consumable", # Define como consumível
-            "category": "consumivel", # Categoria para o Mercado de Gemas
+            "type": "consumable", 
+            "category": "consumivel", 
             "description": f"Caixa selada. Ao abrir, liberta a skin: {skin_info.get('display_name', skin_id)}.",
-            "stackable": True, # Caixas podem ser empilhadas
-            "tradable": True,  # Pode ser vendido
-            "market_currency": "gems", # Define que é vendido por gemas
+            "stackable": True, 
+            "tradable": True, 
+            "market_currency": "gems", 
             
-            # --- O EFEITO DE USO ---
             "on_use": {
                 "effect": "grant_skin",
-                "skin_id": skin_id # O ID que o 'grant_skin' usa
+                "skin_id": skin_id 
             }
         }
         
@@ -1856,17 +1834,12 @@ def _register_item_safe(item_id: str, data: dict, market_price: int | None = Non
     """Adiciona o item se ainda não existir. Opcionalmente registra no MARKET_ITEMS."""
     if item_id not in ITEMS_DATA:
         ITEMS_DATA[item_id] = data
-
-    # Ajusta MARKET_ITEMS (há projetos que usam dict e outros que usam list)
     try:
-        # se for dict de catálogo fixo
         if isinstance(MARKET_ITEMS, dict) and market_price is not None:
             MARKET_ITEMS[item_id] = {"price": int(market_price), "currency": "gold", "tradeable": bool(data.get("tradable", True))}
-        # se for list (seu arquivo atual faz MARKET_ITEMS = list(ITEMS_DATA.keys()))
         elif isinstance(MARKET_ITEMS, list) and item_id not in MARKET_ITEMS:
             MARKET_ITEMS.append(item_id)
     except NameError:
-        # se MARKET_ITEMS ainda não existe aqui, ignore
         pass
 
 # -----------------------------
@@ -1921,14 +1894,14 @@ for _id, (_name, _emoji, _desc) in _EVOLUTION_ESSENCES.items():
 # Relíquias / Chaves (Tier 3)
 # -----------------------------
 _EVOLUTION_RELICS = {
-    "selo_sagrado":     ("Selo Sagrado",        "🕊️", "Símbolo de devoção. Necessário para Templário."),
-    "totem_ancestral":  ("Totem Ancestral",     "🪵", "Canaliza a fúria antiga. Necessário para Ira Primordial."),
-    "marca_predador":   ("Marca do Predador",   "🐺", "Selo do caçador supremo. Necessário para Mestre Caçador."),
-    "reliquia_mistica": ("Relíquia Mística",    "🔱", "Artefato de ki e luz. Necessário para Santo Asceta."),
-    "grimorio_arcano":  ("Grimório Arcano",     "📘", "Tomo proibido. Necessário para Arquimago."),
-    "batuta_maestria":  ("Batuta da Maestria",  "🎼", "Domínio absoluto da sinfonia. Necessário para Maestro."),
-    "manto_eterno":     ("Manto Eterno",        "🕯️", "Tecidos da noite. Necessário para Sombra Inexorável."),
-    "lamina_sagrada":   ("Lâmina Sagrada",      "⚔️", "Katana abençoada. Necessária para Iaijutsu."),
+    "selo_sagrado":     ("Selo Sagrado",         "🕊️", "Símbolo de devoção. Necessário para Templário."),
+    "totem_ancestral":  ("Totem Ancestral",      "🪵", "Canaliza a fúria antiga. Necessário para Ira Primordial."),
+    "marca_predador":   ("Marca do Predador",    "🐺", "Selo do caçador supremo. Necessário para Mestre Caçador."),
+    "reliquia_mistica": ("Relíquia Mística",     "🔱", "Artefato de ki e luz. Necessário para Santo Asceta."),
+    "grimorio_arcano":  ("Grimório Arcano",      "📘", "Tomo proibido. Necessário para Arquimago."),
+    "batuta_maestria":  ("Batuta da Maestria",    "🎼", "Domínio absoluto da sinfonia. Necessário para Maestro."),
+    "manto_eterno":     ("Manto Eterno",         "🕯️", "Tecidos da noite. Necessário para Sombra Inexorável."),
+    "lamina_sagrada":   ("Lâmina Sagrada",       "⚔️", "Katana abençoada. Necessária para Iaijutsu."),
 }
 for _id, (_name, _emoji, _desc) in _EVOLUTION_RELICS.items():
     _register_item_safe(_id, {

@@ -2,10 +2,13 @@
 # (VERSÃO NOVA - LÊ O "CAMINHO DA ASCENSÃO")
 
 import logging
+from typing import Optional, Dict, List, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
-
+from modules.game_data.skills import SKILL_DATA
+from modules.player import stats as player_stats
+from modules.game_data.class_evolution import get_class_ancestry
 from modules import player_manager
 # Importa o NOVO serviço de lógica e o ficheiro de DADOS
 from modules import class_evolution_service as evo_service
@@ -150,10 +153,15 @@ async def open_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
                     callback_data=f"evo_start_trial_confirm:{target_class}"
                 )
             ])
+    if pdata.get("class") != player_stats._get_class_key_normalized(pdata):
+        keyboard.append([InlineKeyboardButton(
+            "💎 Aprimorar Skills de Evolução 💎", 
+            callback_data="evo_skill_ascend_menu"
+        )])
+    
 
     # Botão de Voltar
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="open_profile_menu")])
-    
     try:
         await query.edit_message_text(
             "\n".join(caption_lines),
@@ -333,7 +341,277 @@ async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE
         monster_id,
         target_class # Passa a classe alvo para o 'finalize_evolution' saber
     )
-    # ====================================================================
+
+# [CÓDIGO NOVO - Adicionar no final do arquivo, antes dos 'HANDLERS DE EXPORTAÇÃO']
+# ================================================
+# HANDLERS DE ASCENSÃO DE SKILLS (PASSO 5B)
+# ================================================
+
+# Define a ordem de raridade para a melhoria
+RARITY_UPGRADE_PATH = {
+    "comum": "epica",
+    "epica": "lendaria",
+    "lendaria": None # Nível Máximo
+}
+
+def _get_skill_upgrade_cost(pdata: dict, skill_id: str, current_rarity: str) -> Optional[dict]:
+    """
+    Determina o custo para evoluir uma skill (ex: T2 usa materiais T3).
+    """
+    skill_data = SKILL_DATA.get(skill_id)
+    if not skill_data:
+        return None
+
+    # Tenta encontrar a definição da skill nas árvores de evolução
+    base_class = player_stats._get_class_key_normalized(pdata)
+    target_tier = None
+    
+    for evo in evo_data.EVOLUTIONS.get(base_class, []):
+        if skill_id in evo.get("unlocks_skills", []):
+            target_tier = evo.get("tier_num")
+            break
+            
+    if not target_tier:
+        return None # Skill não é de evolução
+
+    # Lógica de Custo:
+    # Skill T2 (target_tier=2) usa materiais T3 para upar
+    # Skill T3 (target_tier=3) usa materiais T4 para upar
+    # ...
+    # Skill T6 (target_tier=6) usa materiais T6 para upar (caso especial)
+    
+    cost_tier = target_tier + 1
+    if target_tier == 6:
+        cost_tier = 6 # Skill T6 usa materiais T6
+
+    # Encontra a evolução do Tier de Custo (ex: T3)
+    cost_evolution = None
+    for evo in evo_data.EVOLUTIONS.get(base_class, []):
+        if evo.get("tier_num") == cost_tier:
+            cost_evolution = evo
+            break
+            
+    if not cost_evolution or not cost_evolution.get("ascension_path"):
+        return {"gold": 999999} # Fallback se os custos T+1 não estiverem definidos
+
+    # Pega o primeiro material do T+1 como custo
+    material_node = cost_evolution["ascension_path"][0]
+    base_cost = material_node.get("cost", {})
+    
+    # Aplica multiplicador baseado na raridade atual
+    cost = {}
+    multiplier = 1.0
+    
+    if current_rarity == "comum": # Custo para Épica
+        multiplier = 2.0 # Ex: 2x o custo do primeiro nó T+1
+    elif current_rarity == "epica": # Custo para Lendária
+        multiplier = 4.0 # Ex: 4x o custo do primeiro nó T+1
+    else:
+        return None # Raridade inválida para upgrade
+
+    for item, qty in base_cost.items():
+        cost[item] = int(qty * multiplier)
+
+    return cost
+
+
+async def show_skill_ascension_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra as skills de evolução que o jogador pode melhorar."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        await query.edit_message_text("Erro: Não foi possível carregar seus dados.")
+        return
+
+    player_skills = pdata.get("skills", {})
+    if not isinstance(player_skills, dict):
+        await query.edit_message_text("Erro: Formato de skills inválido.")
+        return
+
+    caption_lines = [
+        "💎 <b>Aprimorar Skills de Evolução</b> 💎",
+        "Melhore suas skills exclusivas de classe usando materiais de ascensão.",
+        "---"
+    ]
+    keyboard = []
+
+    # Pega a ancestralidade (ex: ['templario', 'cavaleiro', 'guerreiro'])
+    ancestry = get_class_ancestry(pdata.get("class", ""))
+    
+    # Encontra todas as skills 'evo_...' que o jogador possui
+    evo_skills_owned = []
+    for skill_id in player_skills:
+        if skill_id.startswith("evo_"):
+            evo_skills_owned.append(skill_id)
+            
+    if not evo_skills_owned:
+         caption_lines.append("Você ainda não possui skills de evolução para aprimorar.")
+         
+    # Ordena (Opcional, mas bom)
+    evo_skills_owned.sort() 
+
+    for skill_id in evo_skills_owned:
+        skill_instance = player_skills[skill_id]
+        rarity = skill_instance.get("rarity", "comum")
+        skill_name = SKILL_DATA.get(skill_id, {}).get("display_name", skill_id)
+        
+        # Mostra a skill e o botão para ver o custo
+        caption_lines.append(f"• <b>{skill_name}</b> (Raridade: {rarity.capitalize()})")
+        
+        next_rarity = RARITY_UPGRADE_PATH.get(rarity)
+        if next_rarity:
+            keyboard.append([InlineKeyboardButton(
+                f"Melhorar {skill_name}", 
+                callback_data=f"evo_skill_ascend_info:{skill_id}"
+            )])
+        else:
+             caption_lines.append("   (Nível Máximo)")
+
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="open_evolution_menu")])
+    
+    await query.edit_message_text(
+        "\n".join(caption_lines),
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="HTML"
+    )
+
+async def show_skill_ascension_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra o custo para melhorar uma skill de evolução específica."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    try:
+        skill_id = query.data.split(":", 1)[1]
+    except IndexError:
+        await query.answer("Erro: ID da skill não encontrado.", show_alert=True)
+        return
+
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata or not isinstance(pdata.get("skills"), dict):
+        await query.answer("Erro: Dados do jogador inválidos.", show_alert=True)
+        return
+
+    skill_instance = pdata["skills"].get(skill_id)
+    if not skill_instance:
+        await query.answer("Você não possui esta skill.", show_alert=True)
+        return
+
+    current_rarity = skill_instance.get("rarity", "comum")
+    next_rarity = RARITY_UPGRADE_PATH.get(current_rarity)
+    
+    if not next_rarity:
+        await query.answer("Esta skill já está no nível máximo.", show_alert=True)
+        await show_skill_ascension_menu(update, context)
+        return
+
+    skill_name = SKILL_DATA.get(skill_id, {}).get("display_name", skill_id)
+    cost = _get_skill_upgrade_cost(pdata, skill_id, current_rarity)
+
+    caption_lines = [
+        f"💎 <b>Aprimorar: {skill_name}</b>",
+        f"Raridade Atual: {current_rarity.capitalize()}",
+        f"Próxima Raridade: <b>{next_rarity.capitalize()}</b>",
+        "\nCusto da Ascensão:"
+    ]
+    
+    if not cost:
+        caption_lines.append("<i>Erro: Custo não definido.</i>")
+        keyboard = [
+            [InlineKeyboardButton("⬅️ Voltar", callback_data="evo_skill_ascend_menu")]
+        ]
+    else:
+        caption_lines.append(_format_cost_lines(cost))
+        # Verifica se o jogador PODE pagar
+        can_afford = True
+        if "gold" in cost and player_manager.get_gold(pdata) < cost["gold"]:
+            can_afford = False
+        
+        item_cost = {k: v for k, v in cost.items() if k != "gold"}
+        if not evo_service._inventory_has(pdata, item_cost):
+            can_afford = False
+            
+        if can_afford:
+            keyboard = [
+                [InlineKeyboardButton(
+                    f"✅ Sim, Aprimorar para {next_rarity.capitalize()}", 
+                    callback_data=f"evo_skill_ascend_confirm:{skill_id}"
+                )],
+                [InlineKeyboardButton("⬅️ Voltar", callback_data="evo_skill_ascend_menu")]
+            ]
+        else:
+            caption_lines.append("\n<b>Você não possui os materiais necessários.</b>")
+            keyboard = [
+                [InlineKeyboardButton("⬅️ Voltar", callback_data="evo_skill_ascend_menu")]
+            ]
+
+    await query.edit_message_text(
+        "\n".join(caption_lines),
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="HTML"
+    )
+
+async def confirm_skill_ascension(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Confirma e executa o upgrade da skill de evolução."""
+    query = update.callback_query
+    
+    try:
+        skill_id = query.data.split(":", 1)[1]
+    except IndexError:
+        await query.answer("Erro: ID da skill não encontrado.", show_alert=True)
+        return
+
+    await query.answer("Aprimorando...")
+    user_id = query.from_user.id
+    
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata or not isinstance(pdata.get("skills"), dict) or skill_id not in pdata["skills"]:
+        await query.answer("Erro: Skill ou dados do jogador não encontrados.", show_alert=True)
+        return
+
+    current_rarity = pdata["skills"][skill_id].get("rarity", "comum")
+    next_rarity = RARITY_UPGRADE_PATH.get(current_rarity)
+    
+    if not next_rarity:
+        await query.answer("Skill já está no nível máximo.", show_alert=True)
+        await show_skill_ascension_menu(update, context)
+        return
+
+    cost = _get_skill_upgrade_cost(pdata, skill_id, current_rarity)
+    if not cost:
+        await query.answer("Erro: Custo não pôde ser determinado.", show_alert=True)
+        await show_skill_ascension_menu(update, context)
+        return
+
+    # Verifica e consome Ouro
+    gold_cost = cost.get("gold", 0)
+    if not evo_service._consume_gold(pdata, gold_cost):
+        await query.answer(f"Ouro insuficiente. Requer {gold_cost} 🪙.", show_alert=True)
+        return
+
+    # Verifica e consome Itens
+    item_cost = {k: v for k, v in cost.items() if k != "gold"}
+    if not evo_service._consume_items(pdata, item_cost):
+        await query.answer("Itens insuficientes.", show_alert=True)
+        return
+        
+    # --- SUCESSO ---
+    pdata["skills"][skill_id]["rarity"] = next_rarity
+    await player_manager.save_player_data(user_id, pdata)
+    
+    skill_name = SKILL_DATA.get(skill_id, {}).get("display_name", skill_id)
+    await query.answer(
+        f"🌟 SUCESSO! Sua skill [{skill_name}] agora é {next_rarity.capitalize()}!",
+        show_alert=True
+    )
+
+    # Recarrega o menu de ascensão
+    await show_skill_ascension_menu(update, context)
+
+# ====================================================================
 # HANDLERS DE EXPORTAÇÃO (Para serem importados pelo registries/character.py)
 # ====================================================================
 
@@ -367,3 +645,26 @@ start_trial_execute_handler = CallbackQueryHandler(
     start_trial_execute, 
     pattern=r'^evo_start_trial_execute:'
 )
+
+# [CÓDIGO NOVO - Adicionar no final do bloco 'HANDLERS DE EXPORTAÇÃO']
+
+# --- Handlers do Passo 5B (Ascensão de Skills) ---
+
+# Handler para abrir o menu de melhoria de skills 'evo_...'
+skill_ascension_menu_handler = CallbackQueryHandler(
+    show_skill_ascension_menu,
+    pattern=r'^evo_skill_ascend_menu$'
+)
+
+# Handler para mostrar o custo de uma skill 'evo_...' específica
+skill_ascension_info_handler = CallbackQueryHandler(
+    show_skill_ascension_info,
+    pattern=r'^evo_skill_ascend_info:'
+)
+
+# Handler para confirmar e pagar o custo da melhoria
+skill_ascension_confirm_handler = CallbackQueryHandler(
+    confirm_skill_ascension,
+    pattern=r'^evo_skill_ascend_confirm:'
+)
+

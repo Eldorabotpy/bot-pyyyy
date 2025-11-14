@@ -1,52 +1,82 @@
 # modules/combat/combat_engine.py
 import random
 import logging
-
-# Importa os seus módulos de dados e regras
 from modules.game_data.skills import SKILL_DATA
 from modules.combat import criticals
+from typing import Optional, Dict, Any
+from modules import player_manager
 
 logger = logging.getLogger(__name__)
 
+
+def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dict]:
+    """
+    Helper para buscar os dados de uma skill (SKILL_DATA) e mesclá-los
+    com os dados da raridade que o jogador possui.
+    """
+    base_skill = SKILL_DATA.get(skill_id)
+    if not base_skill: 
+        return None
+
+    if "rarity_effects" not in base_skill:
+        return base_skill
+
+    player_skills = pdata.get("skills", {})
+    if not isinstance(player_skills, dict):
+        rarity = "comum"
+    else:
+        player_skill_instance = player_skills.get(skill_id)
+        if not player_skill_instance:
+            rarity = "comum"
+        else:
+            rarity = player_skill_instance.get("rarity", "comum")
+
+    merged_data = base_skill.copy()
+    rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
+    merged_data.update(rarity_data)
+    
+    return merged_data
+
 async def processar_acao_combate(
+    attacker_pdata: dict, # MODIFICADO: Recebe o pdata completo
     attacker_stats: dict, 
     target_stats: dict, 
     skill_id: str | None,
     attacker_current_hp: int = 9999, # HP atual para skills (como low_hp_dmg_boost)
 ) -> dict:
     """
-    Este é o CÉREBRO UNIFICADO do combate.
-    Ele recebe os stats e a skill, e retorna o resultado (dano, logs, etc.).
-    """
+    Este é o CÉREBRO UNIFICADO do combate.
+    Ele recebe os stats e a skill, e retorna o resultado (dano, logs, etc.).
+    """
     
-    skill_info = SKILL_DATA.get(skill_id) if skill_id else None
-    skill_effects = skill_info.get("effects", {}) if skill_info else {}
-    
-    # --- Início da Lógica de Combate (Movida do main_handler) ---
-    
+    # MODIFICADO: Usa a nova função auxiliar para ler a raridade
+    if skill_id:
+        skill_info = _get_player_skill_data_by_rarity(attacker_pdata, skill_id)
+    else:
+        skill_info = None
+
+    # Lê os efeitos de dentro da skill_info (que já tem os dados da raridade)
+    skill_effects = skill_info.get("effects", {}) if skill_info else {}        
     attacker_stats_modified = attacker_stats.copy()
     target_stats_modified = target_stats.copy()
     
-    log_messages = [] # Log específico desta ação
+    log_messages = [] 
 
-    # 1. Aplicar Efeitos da Skill (multi_hit, crit_chance, etc.)
     num_attacks = int(skill_effects.get("multi_hit", 0))
     defense_penetration = float(skill_effects.get("defense_penetration", 0.0))
     bonus_crit_chance = float(skill_effects.get("bonus_crit_chance", 0.0))
 
-    # --- NOVO BLOCO DE DETERMINAÇÃO DO NÚMERO DE ATAQUES ---
     if skill_id:
-        # Se uma skill foi usada, o número de ataques é o multi_hit da skill, ou 1 por padrão.
+        
         num_attacks = int(skill_effects.get("multi_hit", 1))
     else:
-        # É um ataque BÁSICO. Calcula a chance de ataque duplo por iniciativa.
+        
         initiative = attacker_stats_modified.get('initiative', 0)
         double_attack_chance = (initiative * 0.25) / 100.0
         num_attacks = 2 if random.random() < min(double_attack_chance, 0.50) else 1
         
         if num_attacks == 2:
             log_messages.append("⚡ 𝐀𝐓𝐀Q𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
-    # --- FIM DO BLOCO DE DETERMINAÇÃO ---
     
     if defense_penetration > 0:
         target_stats_modified['defense'] = int(target_stats_modified['defense'] * (1.0 - defense_penetration))

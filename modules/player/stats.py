@@ -1,9 +1,13 @@
 # modules/player/stats.py (VERSÃO FINAL CORRIGIDA)
 from __future__ import annotations
+import logging
 from typing import Dict, Optional, Tuple, Any
-
+from modules.game_data.skills import SKILL_DATA
 from modules import game_data, clan_manager
 from modules.game_data.class_evolution import get_evolution_options
+
+
+logger = logging.getLogger(__name__)
 
 # ========================================
 # CONSTANTES DE PROGRESSÃO DE CLASSE
@@ -53,7 +57,67 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
     return None
 
 
-# Em modules/player/stats.py
+def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict) -> None:
+    """
+    Aplica bônus de stats passivos das skills (lê a nova estrutura de raridade).
+    Modifica 'total_stats' IN-PLACE.
+    """
+    player_skills_dict = pdata.get("skills", {})
+    if not isinstance(player_skills_dict, dict):
+        return  
+
+    for skill_id, skill_info in player_skills_dict.items():
+        if not isinstance(skill_info, dict):
+            continue 
+
+        skill_data = SKILL_DATA.get(skill_id)
+        if not skill_data:
+            continue 
+
+        
+        rarity = skill_info.get("rarity", "comum")
+        
+        rarity_effects_data = skill_data.get("rarity_effects", {}).get(rarity)
+        if not rarity_effects_data:
+            continue # Skill não tem efeitos para esta raridade (ou não usa o sistema)
+
+        # Pega os efeitos
+        effects = rarity_effects_data.get("effects", {})
+        if not effects:
+            continue
+
+        # --- Aplica os Efeitos ---
+        # (Esta lógica precisa espelhar todos os efeitos passivos que criamos)
+
+        # 1. Bônus de Stats (Ex: {"stat_add_mult": {"max_hp": 0.10, "defense": 0.05}})
+        stat_bonuses = effects.get("stat_add_mult", {})
+        if stat_bonuses:
+            for stat, multiplier in stat_bonuses.items():
+                if stat in total_stats:
+                    # Aplica o bônus multiplicativo
+                    total_stats[stat] = int(total_stats[stat] * (1 + float(multiplier)))
+                elif stat == "max_mp": # Bônus de Mana
+                     total_stats["max_mana"] = int(total_stats.get("max_mana", 50) * (1 + float(multiplier)))
+                elif stat == "magic_attack": # Bônus de Ataque Mágico (não é um stat base)
+                     total_stats["magic_attack"] = int(total_stats.get("magic_attack", 0) * (1 + float(multiplier)))
+                # Adicione outros stats se necessário (ex: armor_penetration, crit_damage_mult)
+                # Estes stats "secundários" podem precisar ser inicializados
+                else:
+                    if stat not in total_stats:
+                         total_stats[stat] = 0
+                    total_stats[stat] += float(multiplier) # Bônus flat para stats secundários
+
+        # 2. Bônus de Resistência (Ex: {"resistance_mult": {"physical": 0.10}})
+        res_bonuses = effects.get("resistance_mult", {})
+        if res_bonuses:
+            if "resistance" not in total_stats:
+                total_stats["resistance"] = {}
+            for res_type, value in res_bonuses.items():
+                total_stats["resistance"][res_type] = total_stats["resistance"].get(res_type, 0) + float(value)
+        
+        # 3. Imunidade a Crítico (Ex: {"crit_immune": True})
+        if effects.get("crit_immune", False):
+            total_stats["crit_immune"] = True # O motor de combate precisa ler isso
 
 async def get_player_total_stats(player_data: dict) -> dict:
     """
@@ -114,6 +178,14 @@ async def get_player_total_stats(player_data: dict) -> dict:
                 elif stat_key in ('defense', 'initiative', 'luck'):
                     if stat_key in total:
                         total[stat_key] = total.get(stat_key, 0) + val
+
+    # --- NOVO PASSO 2.5: Adiciona Bônus Passivos de Skills ---
+    # (Modifica 'total' in-place ANTES dos bônus de clã)
+    try:
+        _apply_passive_skill_bonuses(player_data, total)
+    except Exception as e:
+        logger.exception(f"Erro ao aplicar bônus de skills passivas para {player_data.get('user_id')}: {e}")
+    # --- Fim do Novo Passo ---
 
     # 3. Adiciona Buffs de Clã (se houver)
     clan_id = player_data.get("clan_id")

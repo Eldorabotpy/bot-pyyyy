@@ -1,4 +1,5 @@
 # handlers/admin/grant_skill.py
+
 import logging
 import math
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -11,7 +12,6 @@ from telegram.ext import (
     filters,
 )
 
-# --- Imports Corrigidas ---
 from modules import player_manager
 from modules.game_data.skills import SKILL_DATA 
 from handlers.admin.utils import (
@@ -25,16 +25,10 @@ from handlers.admin.utils import (
 
 logger = logging.getLogger(__name__)
 
-# --- Constantes do Catálogo ---
-SKILLS_PER_PAGE = 8 # Quantas skills mostrar por página
-
-# --- Novos Estados da Conversa ---
-# (0 e 1 são INPUT_TEXTO e CONFIRMAR_JOGADOR do utils)
+SKILLS_PER_PAGE = 8 
 (SHOW_CATALOG, CONFIRMAR_GRANT) = range(2, 4) 
-ASK_PLAYER = INPUT_TEXTO # Renomeia para clareza
+ASK_PLAYER = INPUT_TEXTO  
 
-
-# --- PASSO 1: Ponto de Entrada (Pede o Jogador) ---
 async def grant_skill_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Ponto de entrada: Pede o ID ou Nome do jogador."""
     await update.callback_query.answer()
@@ -44,14 +38,13 @@ async def grant_skill_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Use /cancelar para sair.",
         parse_mode="HTML"
     )
-    return ASK_PLAYER # Estado 0
+    return ASK_PLAYER 
 
-# --- PASSO 2: Mostrar o Catálogo (Substitui o ask_skill_id) ---
 async def show_skill_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1) -> int:
     """
     Jogador foi confirmado. Mostra o catálogo de skills paginado.
     """
-    # Ordena todas as skills (do SKILL_DATA) por nome para o catálogo
+
     try:
         sorted_skills = sorted(
             SKILL_DATA.items(), 
@@ -61,7 +54,6 @@ async def show_skill_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE,
         logger.error(f"Erro ao ordenar SKILL_DATA: {e}")
         sorted_skills = list(SKILL_DATA.items())
 
-    # Lógica de Paginação
     start_index = (page - 1) * SKILLS_PER_PAGE
     end_index = start_index + SKILLS_PER_PAGE
     paginated_skills = sorted_skills[start_index:end_index]
@@ -77,7 +69,6 @@ async def show_skill_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE,
         callback_data = f"admin_gskill_select:{skill_id}"
         keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
 
-    # Botões de Navegação de Página
     nav_row = []
     if page > 1:
         nav_row.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"admin_gskill_page:{page-1}"))
@@ -95,20 +86,18 @@ async def show_skill_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE,
         f"Selecione a Habilidade (Pág. {page}/{total_pages}):"
     )
 
-    # Determina se é uma nova mensagem (do ask_player) ou uma edição (mudando de página)
     if update.callback_query and update.callback_query.data.startswith("admin_gskill_page"):
         await update.callback_query.edit_message_text(
             text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        # Se veio do passo anterior (confirmar_jogador), envia uma nova mensagem
+
         await update.message.reply_text(
             text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
-    return SHOW_CATALOG # Estado 2
+    return SHOW_CATALOG 
 
-# --- PASSO 2.5: Mudar de Página ---
 async def skill_catalog_pager(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Lida com os botões 'Anterior' e 'Próxima'."""
     await update.callback_query.answer()
@@ -116,7 +105,6 @@ async def skill_catalog_pager(update: Update, context: ContextTypes.DEFAULT_TYPE
     await show_skill_catalog(update, context, page=page)
     return SHOW_CATALOG
 
-# --- PASSO 3: Selecionar a Skill (Substitui o confirm_skill) ---
 async def select_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Admin clicou numa skill. Valida e pede confirmação."""
     await update.callback_query.answer()
@@ -146,9 +134,8 @@ async def select_skill_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await update.callback_query.edit_message_text(
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    return CONFIRMAR_GRANT # Estado 3
+    return CONFIRMAR_GRANT 
 
-# --- PASSO 4: Confirmação Final (Quase igual a antes) ---
 async def grant_skill_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """O admin confirmou. Adiciona a skill ao jogador."""
     await update.callback_query.answer()
@@ -163,9 +150,21 @@ async def grant_skill_confirmed(update: Update, context: ContextTypes.DEFAULT_TY
             await update.callback_query.edit_message_text("Erro: O jogador alvo desapareceu. Ação cancelada.")
             return ConversationHandler.END
 
-        player_skills = player_data.setdefault("skills", [])
+        # Define 'skills' como um dicionário
+        player_skills = player_data.setdefault("skills", {})
+
+        # Salvaguarda de migração (se o admin mexer num player antigo)
+        if not isinstance(player_skills, dict):
+            logger.warning(f"Admin grant_skill: Migrando 'skills' (era lista) para {user_id}...")
+            # Converte a lista antiga para o dicionário novo (com progress)
+            new_skills_dict = {sid: {"rarity": "comum", "progress": 0} for sid in player_skills if sid}
+            player_data["skills"] = new_skills_dict
+            player_skills = new_skills_dict
+
+        # Verifica se a CHAVE da skill já existe
         if skill_id not in player_skills:
-            player_skills.append(skill_id)
+            # Adiciona a skill no novo formato de dicionário (com progress)
+            player_skills[skill_id] = {"rarity": "comum", "progress": 0}
         else:
             await update.callback_query.edit_message_text(
                 f"Aviso: <code>{target_player_name}</code> já conhecia a skill <code>{skill_id}</code>.",
@@ -190,7 +189,7 @@ async def grant_skill_confirmed(update: Update, context: ContextTypes.DEFAULT_TY
                     parse_mode="HTML"
                 )
             except Exception:
-                pass # Ignora
+                pass
 
     except Exception as e:
         await update.callback_query.edit_message_text(f"Ocorreu um erro grave: {e}")
@@ -198,38 +197,27 @@ async def grant_skill_confirmed(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data.clear()
     return ConversationHandler.END
 
-# --- PASSO 5: Handler de "Voltar" (Novo) ---
 async def back_to_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Volta da confirmação para o catálogo."""
     await update.callback_query.answer()
-    # Chama a função de mostrar o catálogo, que vai editar a mensagem
     await show_skill_catalog(update, context, page=1)
     return SHOW_CATALOG
 
-
-# --- Handler da Conversa (Atualizado) ---
 grant_skill_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(grant_skill_entry, pattern=r"^admin_grant_skill$")],
     states={
-        ASK_PLAYER: [ # Estado 0
-            # Espera o nome/ID do jogador, chama o 'confirmar_jogador'
-            # Se o jogador for confirmado, o 'utils' chama 'show_skill_catalog'
+        ASK_PLAYER: [ 
             MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), confirmar_jogador(show_skill_catalog))
         ],
-        CONFIRMAR_JOGADOR: [ # Estado 1
-             # Se o jogador foi encontrado por nome, o 'utils' chama 'show_skill_catalog'
+        CONFIRMAR_JOGADOR: [ 
              CallbackQueryHandler(jogador_confirmado(show_skill_catalog), pattern=r"^confirm_player_")
         ],
-        SHOW_CATALOG: [ # Estado 2
-            # Espera o admin clicar num botão de skill
+        SHOW_CATALOG: [ 
             CallbackQueryHandler(select_skill_callback, pattern=r"^admin_gskill_select:"),
-            # Espera o admin clicar num botão de página
             CallbackQueryHandler(skill_catalog_pager, pattern=r"^admin_gskill_page:"),
         ],
-        CONFIRMAR_GRANT: [ # Estado 3
-            # Espera o admin clicar em "Sim, ensinar"
+        CONFIRMAR_GRANT: [ 
             CallbackQueryHandler(grant_skill_confirmed, pattern=r"^confirm_grant_skill$"),
-            # Espera o admin clicar em "Voltar ao Catálogo"
             CallbackQueryHandler(back_to_catalog, pattern=r"^back_to_skill_catalog$"),
         ],
     },
