@@ -107,6 +107,7 @@ def _list_equippable_items_for_slot(player_data: dict, slot: str) -> list[tuple[
     for uid, val in inv.items():
         if not isinstance(val, dict):
             continue
+        # <<< CORREÇÃO: Acessa o base_id corretamente >>>
         if _item_slot_from_base(val.get("base_id")) != slot:
             continue
         pretty = _render_item_line_full(val)

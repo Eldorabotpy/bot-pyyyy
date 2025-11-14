@@ -178,46 +178,49 @@ async def get_player_data(user_id: int) -> Optional[dict]:
             data['max_mana'] = 50
             is_newly_updated = True
 
-            # --- Migração do Sistema de Skills (Lista -> Dicionário -> com Progress) ---
-            if 'skills' not in data or not isinstance(data.get('skills'), dict):
-                logger.info(f"Migrando 'skills' (era lista) para o formato de dicionário para o user: {data.get('user_id', '???')}")
-            
-                # Se 'skills' existe e é uma lista antiga
-                if isinstance(data.get('skills'), list):
-                    old_skills_list = data.get('skills', [])
-                    new_skills_dict = {}
-                    for skill_id in old_skills_list:
-                        if skill_id and skill_id not in new_skills_dict:
-                            # Adiciona a skill antiga com a raridade 'comum' E o novo contador
-                            new_skills_dict[skill_id] = {"rarity": "comum", "progress": 0}
-                    data['skills'] = new_skills_dict
-                else:
-                    # É um jogador novo ou 'skills' está ausente
-                    data['skills'] = {}
-                is_newly_updated = True
- 
+        # --- Migração do Sistema de Skills (Lista -> Dicionário -> com Progress) ---
+        # (Corrigido: Bloco movido para fora do 'if mana...')
+        if 'skills' not in data or not isinstance(data.get('skills'), dict):
+            logger.info(f"Migrando 'skills' (era lista) para o formato de dicionário para o user: {data.get('user_id', '???')}")
+           
+            # Se 'skills' existe e é uma lista antiga
+            if isinstance(data.get('skills'), list):
+                old_skills_list = data.get('skills', [])
+                new_skills_dict = {}
+                for skill_id in old_skills_list:
+                    if skill_id and skill_id not in new_skills_dict:
+                        # Adiciona a skill antiga com a raridade 'comum' E o novo contador
+                        new_skills_dict[skill_id] = {"rarity": "comum", "progress": 0}
+                data['skills'] = new_skills_dict
             else:
-                # O jogador JÁ TEM um dicionário de skills.
-                # Precisamos verificar se as skills dentro dele têm o campo "progress".
-                skills_dict = data.get('skills', {})
-                # Usamos list(skills_dict.keys()) para evitar 'dictionary changed size during iteration'
-                for skill_id in list(skills_dict.keys()): 
-                    if isinstance(skills_dict[skill_id], dict):
-                        if "progress" not in skills_dict[skill_id]:
-                            # Esta é uma skill migrada (dict) mas antiga (sem progress)
-                            skills_dict[skill_id]["progress"] = 0
-                            is_newly_updated = True # Força o salvamento
-                    else:
-                        # O dicionário está corrompido (ex: {"skill_id": "comum"}). Deleta e recria.
-                        logger.warning(f"Corrigindo skill mal formatada: {skill_id} para user {data.get('user_id', '???')}")
+                # É um jogador novo ou 'skills' está ausente
+                data['skills'] = {}
+            is_newly_updated = True
+
+        else:
+            # O jogador JÁ TEM um dicionário de skills.
+            # Precisamos verificar se as skills dentro dele têm o campo "progress".
+            skills_dict = data.get('skills', {})
+            # Usamos list(skills_dict.keys()) para evitar 'dictionary changed size during iteration'
+            for skill_id in list(skills_dict.keys()): 
+                if isinstance(skills_dict.get(skill_id), dict):
+                    if "progress" not in skills_dict[skill_id]:
+                        # Esta é uma skill migrada (dict) mas antiga (sem progress)
+                        skills_dict[skill_id]["progress"] = 0
+                        is_newly_updated = True # Força o salvamento
+                else:
+                    # O dicionário está corrompido (ex: {"skill_id": "comum"} ou None)
+                    logger.warning(f"Corrigindo skill mal formatada: {skill_id} para user {data.get('user_id', '???')}")
+                    # Deleta a entrada ruim
+                    if skill_id in skills_dict:
                         del skills_dict[skill_id]
-                        skills_dict[skill_id] = {"rarity": "comum", "progress": 0}
-                        is_newly_updated = True
-                        # --- Fim da Migração --- 
-        
+                    # Recria a entrada no formato correto
+                    skills_dict[skill_id] = {"rarity": "comum", "progress": 0}
+                    is_newly_updated = True
+        # --- Fim da Migração ---
+    
     except Exception:
         logger.exception("Erro ao aplicar migrações/saneamentos em player data.")
-        # Mesmo em caso de erro, seguimos com o raw_data parcialmente processado
 
     # 4) Atualiza cache com a versão final (protegido)
     try:
