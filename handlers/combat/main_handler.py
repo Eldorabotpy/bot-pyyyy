@@ -1,11 +1,11 @@
 # handlers/combat/main_handler.py
-# (VERSÃO FINAL COM 'BATTLE CACHE' E TROCA DE MÍDIA)
-# (VERSÃO CORRIGIDA PARA PASSAR 'attacker_pdata' AO COMBAT_ENGINE)
+# (VERSÃO FINAL CORRIGIDA - HP na Morte, Custo de Mana e Lógica de Cura de Suporte)
 
 import logging
 import random
 import asyncio
 import math
+from typing import Optional, Dict, Any # <--- ADICIONADO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo, InputMediaPhoto, CallbackQuery
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
@@ -31,6 +31,40 @@ from modules.combat import combat_engine
 
 logger = logging.getLogger(__name__)
 
+# ================================================
+# INÍCIO: FUNÇÃO AUXILIAR DE SKILL (COPIADA DO COMBAT_ENGINE)
+# ================================================
+def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dict]:
+    """
+    Helper para buscar os dados de uma skill (SKILL_DATA) e mesclá-los
+    com os dados da raridade que o jogador possui.
+    """
+    base_skill = SKILL_DATA.get(skill_id)
+    if not base_skill: 
+        return None # Skill não existe
+
+    if "rarity_effects" not in base_skill:
+        return base_skill
+
+    player_skills = pdata.get("skills", {})
+    if not isinstance(player_skills, dict):
+        rarity = "comum"
+    else:
+        player_skill_instance = player_skills.get(skill_id)
+        if not player_skill_instance:
+            rarity = "comum"
+        else:
+            rarity = player_skill_instance.get("rarity", "comum")
+
+    merged_data = base_skill.copy()
+    rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
+    merged_data.update(rarity_data)
+    
+    return merged_data
+# ================================================
+# FIM: FUNÇÃO AUXILIAR DE SKILL
+# ================================================
+
 async def _safe_answer(query):
     try: await query.answer()
     except BadRequest: pass
@@ -50,11 +84,9 @@ async def _edit_media_or_caption(context: ContextTypes.DEFAULT_TYPE, battle_cach
     Função 'inteligente' que troca a mídia E a legenda. (Usada pelo Cache)
     """
     try:
-        # Fallback de mídia: Se a mídia desejada não existir, usa a do monstro
         if not new_media_id:
             new_media_id = battle_cache['monster_media_id']
             new_media_type = battle_cache['monster_media_type']
-            # Se nem a do monstro existir, falha (vai para o 'except')
             if not new_media_id:
                     raise ValueError("Nenhuma mídia válida encontrada no cache (nem jogador, nem monstro)")
 
@@ -103,7 +135,6 @@ async def _return_to_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: in
 async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str = None) -> None:
     """
     Motor de Combate Principal (Usa o BATTLE CACHE).
-    (VERSÃO REFATORADA - CHAMA O 'combat_engine')
     """
     query = update.callback_query
     
@@ -117,7 +148,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     chat_id = query.message.chat.id if query else update.effective_chat.id
 
     if action == 'combat_attack_menu':
-        # (Esta parte permanece idêntica)
         if not query: return
         await _safe_answer(query)
         kb = [
@@ -142,7 +172,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     # --- CARREGAR O CACHE DE BATALHA ---
     battle_cache = context.user_data.get('battle_cache')
     
-    # --- (A lógica de Fallback para o Legado permanece idêntica) ---
+    # --- (Fallback para Legado) ---
     if not battle_cache or battle_cache.get('player_id') != user_id:
         player_data_db = await player_manager.get_player_data(user_id)
         if not player_data_db or player_data_db.get('player_state', {}).get('action') != 'in_combat':
@@ -155,7 +185,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             return
         else:
             logger.debug(f"Ação de combate {action} recebida, mas SEM CACHE (é Dungeon/PvP?). Chamando _legacy_combat_callback...")
-            # Chama a versão LEGADA, que também será refatorada
             await _legacy_combat_callback(update, context, action, player_data_db)
             return
 
@@ -169,12 +198,12 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     
     # --- LÓGICA DE FUGA (USA O CACHE) ---
     if action == 'combat_flee':
-        # (Esta parte permanece idêntica)
         if not query: return
         context.user_data.pop('battle_cache', None)
         player_data = await player_manager.get_player_data(user_id)
         player_data['player_state'] = {'action': 'idle'}
         total_stats = await player_manager.get_player_total_stats(player_data)
+        # (Fuga restaura HP/MP)
         player_data['current_hp'] = total_stats.get('max_hp', 50)
         player_data['current_mp'] = total_stats.get('max_mana', 10)
         await player_manager.save_player_data(user_id, player_data)
@@ -187,73 +216,77 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     # --- LÓGICA DE ATAQUE (USA O CACHE) ---
     elif action == 'combat_attack':
         
-        # *** INÍCIO DA MODIFICAÇÃO 1 (CACHE) ***
         # Carrega o pdata completo para passar ao combat_engine
         player_data = await player_manager.get_player_data(user_id)
         if not player_data:
             logger.error(f"COMBAT_CALLBACK: Não foi possível carregar player_data para {user_id}")
             await _safe_answer(query)
             return
-        # *** FIM DA MODIFICAÇÃO 1 ***
             
         battle_cache['turn'] = 'player'
         
         skill_id = battle_cache.pop('skill_to_use', None) 
-        # 🟢 NOVO: Extrai a action_type (deve ser definida no skill_handler)
         action_type = battle_cache.pop('action_type', 'attack') 
         
-        skill_info = SKILL_DATA.get(skill_id) if skill_id else None
+        # --- CORREÇÃO 1: Lê a skill (com raridade) usando a função auxiliar ---
+        skill_info = _get_player_skill_data_by_rarity(player_data, skill_id) if skill_id else None
         
-        # Variável para controlar se devemos pular o turno do monstro
         skip_monster_turn = False
         
         # --- LÓGICA DE SKILL/ATAQUE ---
         
         if skill_info:
-            # NOTA: O mana_cost real será lido pelo combat_engine a partir do pdata
-            # Este mana_cost é apenas para o log.
-            log_mana_cost = skill_info.get("mana_cost", 0)
+            # (O custo de mana agora é lido corretamente da raridade)
+            mana_cost = skill_info.get("mana_cost", 0)
             
-            # ** Assumimos que a verificação de Mana e o gasto de Cooldown **
-            # ** já foram aplicados no combat_use_skill_callback! **
+            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{mana_cost} MP)")
             
-            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{log_mana_cost} MP)")
-            
-            # 🟢 LÓGICA DE SKILL DE SUPORTE
+            # --- CORREÇÃO 2: Lógica de Suporte (Cura) ---
             if action_type == 'support':
-                # 1. Aplicar Efeitos de Suporte (Cura, Buffs, etc.)
-                # O motor deve retornar os efeitos aplicados aqui (por exemplo, cura)
+                skill_effects = skill_info.get("effects", {})
+                heal_applied = False
                 
-                # Exemplo: Se a skill curar 10 HP
-                # battle_cache['player_hp'] = min(battle_cache.get('player_hp', 0) + 10, player_stats.get('max_hp'))
+                # Lógica de Cura (para Melodia Restauradora, etc.)
+                if "party_heal" in skill_effects:
+                    heal_def = skill_effects["party_heal"]
+                    heal_amount = 0
+                    
+                    if "amount_percent_max_hp" in heal_def: # Ex: Bênção Sagrada
+                        heal_amount = int(player_stats.get('max_hp', 1) * heal_def["amount_percent_max_hp"])
+                    elif heal_def.get("heal_type") == "magic_attack": # Ex: Melodia Restauradora
+                        # (Assume que M.Atk está nos player_stats)
+                        m_atk = player_stats.get('magic_attack', player_stats.get('attack', 0))
+                        heal_amount = int(m_atk * heal_def.get("heal_scale", 1.0))
+                    
+                    if heal_amount > 0:
+                        current_hp = battle_cache.get('player_hp', 0)
+                        max_hp = player_stats.get('max_hp', 1)
+                        new_hp = min(max_hp, current_hp + heal_amount)
+                        healed_for = new_hp - current_hp
+                        
+                        if healed_for > 0:
+                            battle_cache['player_hp'] = new_hp
+                            log.append(f"❤️ Você e seus aliados são curados em {healed_for} HP!")
+                            heal_applied = True
                 
-                log.append("➕ <i>Efeitos de suporte aplicados.</i>") 
+                if not heal_applied:
+                    log.append("➕ <i>Efeitos de suporte (Buffs) aplicados.</i>")
                 
-                # 2. Marcar para Pular o Turno do Monstro
                 skip_monster_turn = True
                 
-            # 🟢 LÓGICA DE SKILL DE ATAQUE (Dano)
-            else: # action_type == 'attack' ou não definido
-                # 2. CHAMAMOS O MOTOR UNIFICADO (Processa Dano)
-                
-                # *** INÍCIO DA MODIFICAÇÃO 2 (CACHE - SKILL) ***
+            # LÓGICA DE SKILL DE ATAQUE (Dano)
+            else: 
                 resultado_combate = await combat_engine.processar_acao_combate(
-                    attacker_pdata=player_data, # <--- LINHA ADICIONADA
+                    attacker_pdata=player_data, 
                     attacker_stats=player_stats,
                     target_stats=monster_stats,
                     skill_id=skill_id,
                     attacker_current_hp=battle_cache.get('player_hp', 9999)
                 )
-                # *** FIM DA MODIFICAÇÃO 2 ***
 
-                # 3. Aplicamos os resultados
                 player_damage = resultado_combate["total_damage"]
                 log.extend(resultado_combate["log_messages"])
                 
-                if skill_info and "debuff_target" in skill_info.get("effects", {}):
-                    # Lógica para aplicar debuffs ao monstro (seria implementada aqui)
-                    pass 
-
                 monster_stats['hp'] = int(monster_stats.get('hp', 0)) - player_damage
                 monster_defeated_in_turn = monster_stats['hp'] <= 0
         
@@ -261,15 +294,13 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             # Caso use ataque básico (sem skill)
             log.append("⚔️ Você realiza um ataque básico.")
             
-            # *** INÍCIO DA MODIFICAÇÃO 3 (CACHE - BÁSICO) ***
             resultado_combate = await combat_engine.processar_acao_combate(
-                attacker_pdata=player_data, # <--- LINHA ADICIONADA
+                attacker_pdata=player_data, 
                 attacker_stats=player_stats, 
                 target_stats=monster_stats, 
                 skill_id=None,
                 attacker_current_hp=battle_cache.get('player_hp', 9999)
             )
-            # *** FIM DA MODIFICAÇÃO 3 ***
             
             player_damage = resultado_combate["total_damage"]
             log.extend(resultado_combate["log_messages"])
@@ -282,15 +313,13 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         
         # 5. SAÍDA PARA SKILL DE SUPORTE
         if skip_monster_turn:
-            battle_cache['turn'] = 'player' # Continua o turno do jogador
+            battle_cache['turn'] = 'player'
             
-            # Recria o teclado principal para permitir outra ação
             kb_player_turn = InlineKeyboardMarkup([
                 [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
                 [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
             ])
             
-            # Edita a mensagem para mostrar os novos logs e a vida/mana atualizada
             await _edit_media_or_caption(
                 context, battle_cache, 
                 caption_turno_jogador, 
@@ -298,28 +327,25 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 battle_cache['player_media_type'],
                 reply_markup=kb_player_turn 
             )
-            return # ⬅️ FINALIZA A FUNÇÃO: o monstro não ataca.
+            return 
             
         # 4. Processar Resultado (Vitória ou Turno do Monstro)
         if monster_defeated_in_turn:
-            # (A lógica de VITÓRIA permanece idêntica)
             log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
             battle_cache['battle_log'] = log
             
-            # *** INÍCIO DA MODIFICAÇÃO 4 (VITÓRIA) ***
-            # pdata (agora player_data) JÁ FOI CARREGADO no início da ação de ataque
+            # (pdata já foi carregado)
             victory_summary = await rewards.apply_and_format_victory_from_cache(player_data, battle_cache)
             _, _, level_up_msg = player_manager.check_and_apply_level_up(player_data) 
             if level_up_msg:
                 victory_summary += level_up_msg
             
+            # (Vitória restaura HP/MP)
             player_data['current_hp'] = player_stats.get('max_hp', 50)
             player_data['current_mp'] = player_stats.get('max_mana', 10)
             player_data['player_state'] = {'action': 'idle'}
             
             await player_manager.save_player_data(user_id, player_data)
-            # *** FIM DA MODIFICAÇÃO 4 ***
-            
             context.user_data.pop('battle_cache', None)
             
             await _edit_media_or_caption(
@@ -332,7 +358,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             return 
             
         else:
-            # (A lógica do TURNO DO MONSTRO permanece idêntica)
+            # (Turno do Monstro)
             battle_cache['turn'] = 'monster'
             
             active_cooldowns = battle_cache.setdefault("skill_cooldowns", {})
@@ -355,7 +381,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             if random.random() < dodge_chance: 
                 log.append("💨 Você se esquivou do ataque!")
             else:
-
                 monster_damage, m_is_crit, m_is_mega = criticals.roll_damage(monster_stats, player_stats, {})
                 log.append(f"⬅️ {monster_stats['name']} ataca e causa {monster_damage} de dano.")
                 if m_is_mega: log.append("‼️ 𝕄𝔼𝔾𝔸 ℂℝ𝕀́𝕋𝕀ℂ𝕆 𝕚𝕟𝕚𝕞𝕚𝕘𝕠!")
@@ -364,21 +389,20 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 battle_cache['player_hp'] = int(battle_cache.get('player_hp', 0)) - monster_damage
                 
                 if battle_cache['player_hp'] <= 0: # Derrota
-                    # (A lógica de DERROTA permanece idêntica)
                     log.append("☠️ <b>Você foi derrotado!</b>")
                     battle_cache['battle_log'] = log
                     
-                    # *** INÍCIO DA MODIFICAÇÃO 5 (DERROTA) ***
-                    # Carrega o pdata aqui, pois não estava em escopo
+                    # Carrega pdata aqui para salvar a derrota
                     player_data = await player_manager.get_player_data(user_id)
                     
                     defeat_summary, _ = rewards.process_defeat_from_cache(player_data, battle_cache)
-                    player_data['current_hp'] = 0 
+                    
+                    # --- CORREÇÃO 3: HP NA DERROTA ---
+                    # (Restaura o HP, como você pediu)
+                    player_data['current_hp'] = player_stats.get('max_hp', 50) 
                     player_data['current_mp'] = battle_cache.get('player_mp', player_stats.get('max_mana', 10))
                     player_data['player_state'] = {'action': 'idle'}
                     await player_manager.save_player_data(user_id, player_data)
-                    # *** FIM DA MODIFICAÇÃO 5 ***
-                    
                     context.user_data.pop('battle_cache', None)
                     
                     await _edit_media_or_caption(
@@ -391,7 +415,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     return # Fim da batalha
 
     # 5. Atualizar Mídia (Turno do Monstro)
-    # (Esta parte permanece idêntica)
     battle_cache['battle_log'] = log
     caption_turno_monstro = await format_combat_message_from_cache(battle_cache)
     
@@ -415,7 +438,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     )
     
     if is_auto_mode:
-        # (Lógica de auto-hunt permanece idêntica)
         await asyncio.sleep(2) 
         fake_user = type("User", (), {"id": user_id})()
         fake_query = CallbackQuery(id=f"auto_{user_id}", from_user=fake_user, chat_instance="auto", data="combat_attack")
@@ -427,7 +449,6 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
     """
     (VERSÃO CORRIGIDA)
     Função 'combat_callback' antiga, usada como fallback
-    para sistemas (Dungeon/PvP) que AINDA usam player_state.
     """
     logger.debug("[LEGACY COMBAT] Executando fallback de combate (sem cache)")
     query = update.callback_query
@@ -461,7 +482,6 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
     if action == 'combat_flee':
         if not query: return
         
-        # (Lógica de fuga permanece a mesma)
         if random.random() <= 0.5: # Sucesso
             durability.apply_end_of_battle_wear(player_data, combat_details, log)
             
@@ -505,6 +525,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                     return
                 
                 defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
+                # (HP na derrota do modo legado JÁ ESTAVA CORRETO)
                 player_data['current_hp'] = int(player_total_stats.get('max_hp', 50))
                 player_data['current_mp'] = int(player_total_stats.get('max_mana', 10))
                 player_data['player_state'] = {'action': 'idle'}
@@ -527,55 +548,66 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
     elif action == 'combat_attack':
         
         skill_id = combat_details.pop('skill_to_use', None) 
-        # 🟢 NOVO: Extrai a action_type (deve ser 'support' se for buff/cura)
         action_type = combat_details.pop('action_type', 'attack') 
         
-        skill_info = SKILL_DATA.get(skill_id) if skill_id else None
+        # --- CORREÇÃO 4: Lê a skill (com raridade) usando a função auxiliar ---
+        skill_info = _get_player_skill_data_by_rarity(player_data, skill_id) if skill_id else None
         
-        # Variável para controlar se devemos pular o turno do monstro
         skip_monster_turn = False
         
         # --- LÓGICA DE SKILL ---
         
         if skill_info:
-            # NOTA: O mana_cost real será lido pelo combat_engine
-            # Este é apenas para o log.
-            log_mana_cost = skill_info.get("mana_cost", 0)
+            # (O custo de mana agora é lido corretamente da raridade)
+            mana_cost = skill_info.get("mana_cost", 0)
             
-            # Nota: O gasto de Mana já foi feito no combat_use_skill_callback,
-            # mas o log é adicionado aqui.
-            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{log_mana_cost} MP)")
+            log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{mana_cost} MP)")
             
-            # 🟢 LÓGICA DE SKILL DE SUPORTE
+            # --- CORREÇÃO 5: Lógica de Suporte (Cura) ---
             if action_type == 'support':
-                # 1. Aplicar Efeitos de Suporte (Cura, Buffs, etc.)
-                # *Neste ponto, você deve chamar a lógica real para aplicar buffs/curas ao player_data/combat_details*
-                log.append("➕ <i>Efeitos de suporte aplicados.</i>") # Placeholder
+                skill_effects = skill_info.get("effects", {})
+                heal_applied = False
+                
+                if "party_heal" in skill_effects:
+                    heal_def = skill_effects["party_heal"]
+                    heal_amount = 0
+                    
+                    if "amount_percent_max_hp" in heal_def: 
+                        heal_amount = int(player_total_stats.get('max_hp', 1) * heal_def["amount_percent_max_hp"])
+                    elif heal_def.get("heal_type") == "magic_attack":
+                        m_atk = player_total_stats.get('magic_attack', player_total_stats.get('attack', 0))
+                        heal_amount = int(m_atk * heal_def.get("heal_scale", 1.0))
+                    
+                    if heal_amount > 0:
+                        current_hp = player_data.get('current_hp', 0)
+                        max_hp = player_total_stats.get('max_hp', 1)
+                        new_hp = min(max_hp, current_hp + heal_amount)
+                        healed_for = new_hp - current_hp
+                        
+                        if healed_for > 0:
+                            player_data['current_hp'] = new_hp
+                            log.append(f"❤️ Você e seus aliados são curados em {healed_for} HP!")
+                            heal_applied = True
+                
+                if not heal_applied:
+                    log.append("➕ <i>Efeitos de suporte (Buffs) aplicados.</i>")
+                
                 skip_monster_turn = True
-                combat_details["turn"] = 'player' # Reinicia o turno para o jogador
+                combat_details["turn"] = 'player'
                 
-            # 🟢 LÓGICA DE SKILL DE ATAQUE (Dano)
-            else: # action_type == 'attack' ou não definido
-                # 2. CHAMAMOS O MOTOR UNIFICADO (Processa Dano)
-                
-                # *** INÍCIO DA MODIFICAÇÃO 6 (LEGACY - SKILL) ***
+            # LÓGICA DE SKILL DE ATAQUE (Dano)
+            else: 
                 resultado_combate = await combat_engine.processar_acao_combate(
-                    attacker_pdata=player_data, # <--- LINHA ADICIONADA
-                    attacker_stats=player_total_stats, # Stats totais do jogador
+                    attacker_pdata=player_data, 
+                    attacker_stats=player_total_stats, 
                     target_stats=monster_stats,
                     skill_id=skill_id,
                     attacker_current_hp=player_data.get('current_hp', 9999)
                 )
-                # *** FIM DA MODIFICAÇÃO 6 ***
 
-                # 3. Aplicamos os resultados
                 player_damage = resultado_combate["total_damage"]
                 log.extend(resultado_combate["log_messages"])
                 
-                if skill_info and "debuff_target" in skill_info.get("effects", {}):
-                        # Lógica para aplicar debuffs ao monstro
-                        pass
-
                 combat_details['monster_hp'] = int(combat_details.get('monster_hp', 0)) - player_damage
                 combat_details["used_weapon"] = True
                 monster_defeated_in_turn = combat_details['monster_hp'] <= 0
@@ -584,15 +616,13 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
             # Caso use ataque básico (sem skill)
             log.append("⚔️ Você realiza um ataque básico.")
             
-            # *** INÍCIO DA MODIFICAÇÃO 7 (LEGACY - BÁSICO) ***
             resultado_combate = await combat_engine.processar_acao_combate(
-                attacker_pdata=player_data, # <--- LINHA ADICIONADA
+                attacker_pdata=player_data,
                 attacker_stats=player_total_stats, 
                 target_stats=monster_stats, 
                 skill_id=None,
                 attacker_current_hp=player_data.get('current_hp', 9999)
             )
-            # *** FIM DA MODIFICAÇÃO 7 ***
             
             player_damage = resultado_combate["total_damage"]
             log.extend(resultado_combate["log_messages"])
@@ -603,17 +633,14 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
 
         # --- 4. Resultado (Vitória, Suporte ou Turno do Monstro) ---
         if monster_defeated_in_turn: 
-            # (Toda a lógica de Vitória permanece a mesma)
             durability.apply_end_of_battle_wear(player_data, combat_details, log)
             log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
             
-            # Lógica de Evolução, Dungeon, Recompensas, etc. (Vitória)
             if combat_details.get('evolution_trial'):
                 target_class = combat_details.get('evolution_trial').get('target_class')
                 success, message = await class_evolution_service.finalize_evolution(user_id, target_class)
                 if query: await query.delete_message()
                 await context.bot.send_message(chat_id=chat_id, text=f"🎉 {message} 🎉", parse_mode="HTML")
-                # NOME DA FUNÇÃO CORRIGIDO
                 await open_evolution_menu(update, context) 
                 return
             if in_dungeon:
@@ -657,9 +684,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
             return
 
         elif skip_monster_turn:
-            # ⬅️ SAÍDA PARA SKILL DE SUPORTE (Legado)
-            
-            # --- Atualização final do menu (Legado) ---
+            # (Saída para Skill de Suporte - Legado)
             combat_details['battle_log'] = log[-15:]
             player_data['player_state']['details'] = combat_details
             await player_manager.save_player_data(user_id, player_data) 
@@ -705,6 +730,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                         return
                     
                     defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
+                    # (HP na derrota do modo legado JÁ ESTAVA CORRETO)
                     player_data['current_hp'] = int(player_total_stats.get('max_hp', 50))
                     player_data['current_mp'] = int(player_total_stats.get('max_mana', 10))
                     player_data['player_state'] = {'action': 'idle'}

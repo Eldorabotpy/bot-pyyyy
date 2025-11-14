@@ -1,4 +1,6 @@
 # Em modules/player/inventory.py
+# (VERSÃO CORRIGIDA - 'equip_unique_item_for_user' AGORA É ASSÍNCRONA)
+
 import uuid
 from typing import Tuple, Optional
 from modules import game_data
@@ -215,6 +217,10 @@ def _get_unique_item_from_inventory(player_data: dict, unique_id: str) -> Option
     val = inv.get(unique_id)
     return val if is_unique_item_entry(val) else None
 
+# =========================================================================
+# ================== INÍCIO DAS 3 CORREÇÕES DO BUG DA ARMADURA ==================
+# =========================================================================
+
 # <<< CORREÇÃO 1: Adiciona async def >>>
 async def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot: Optional[str] = None) -> Tuple[bool, str]:
     from .core import get_player_data, save_player_data # Importação local (mantida)
@@ -252,3 +258,7 @@ async def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot
     await save_player_data(user_id, pdata)
     name = item.get("display_name") or base_id or "Item"
     return True, f"Equipado {name} em {slot_from_item}."
+
+# =========================================================================
+# ================== FIM DAS 3 CORREÇÕES DO BUG DA ARMADURA ===================
+# =========================================================================
