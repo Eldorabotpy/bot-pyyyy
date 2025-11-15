@@ -1472,14 +1472,14 @@ ITEMS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Manoplas simples usadas por monges em treinamento.",
         "media_key": "item_manoplas_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "bandana_iniciado_monge": {
         "display_name": "Bandana de Iniciado", "emoji": "🪖",
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Bandana leve que ajuda na concentração.",
         "media_key": "item_bandana_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
 
     },
     "gi_iniciado_monge": {
@@ -1487,49 +1487,49 @@ ITEMS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Roupa tradicional de treinamento monástico.",
         "media_key": "item_gi_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "calcas_iniciado_monge": {
         "display_name": "Calças de Iniciado", "emoji": "👖",
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Calças leves para liberdade de movimento.",
         "media_key": "item_calcas_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "sandalias_iniciado_monge": {
         "display_name": "Sandálias de Iniciado", "emoji": "🥾",
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Sandálias tradicionais, leves e práticas.",
         "media_key": "item_sandalias_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "faixas_iniciado_monge": {
         "display_name": "Faixas de Mão de Iniciado", "emoji": "🧤",
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Faixas de tecido usadas para proteger as mãos.",
         "media_key": "item_faixas_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "anel_iniciado_monge": {
         "display_name": "Anel de Iniciado", "emoji": "💍",
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel simples usado em rituais de foco espiritual.",
         "media_key": "item_anel_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "colar_iniciado_monge": {
         "display_name": "Colar de Iniciado", "emoji": "📿",
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar com contas que auxiliam na meditação.",
         "media_key": "item_colar_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "brinco_iniciado_monge": {
         "display_name": "Brinco de Iniciado", "emoji": "🧿",
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que simboliza disciplina e equilíbrio.",
         "media_key": "item_brinco_iniciado_monge",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
 
 # --- EQUIPAMENTOS DO MONGE T2 (MESTRE) ---

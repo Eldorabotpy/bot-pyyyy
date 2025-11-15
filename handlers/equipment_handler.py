@@ -238,7 +238,7 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.answer()
     uid = q.data.replace("equip_pick_", "")
     user_id = q.from_user.id
-    chat_id = q.message.chat.id
+    chat_id = q.message.chat_id
 
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
