@@ -1,7 +1,7 @@
 # modules/stats_engine.py
 from __future__ import annotations
 from typing import Dict, Tuple
-
+from modules.game_data.classes import get_stat_modifiers
 # =========================
 # Pontos por atributo (fixo)
 # =========================
@@ -29,24 +29,34 @@ def _i(x) -> int:
 def compute_final_stats(class_key: str, invested: Dict[str, int] | None) -> Dict[str, int]:
     """
     Retorna APENAS o bloco 'base por pontos' (para UI e composições),
-    já aplicando os ganhos fixos e arredondando para inteiro.
-    OBS: O total final do jogo continua vindo de player_manager.get_player_total_stats,
-    que soma base + equipamentos + bônus de classe/perks. Aqui focamos no resultado
-    dos pontos investidos sem casas decimais.
+    já aplicando os ganhos fixos E OS MODIFICADORES DE CLASSE.
     """
     inv = invested or {}
+    
+    # --- LINHAS ADICIONADAS ---
+    # Pega os modificadores da classe (ex: {'hp': 3.0, 'attack': 1.4, ...})
+    modifiers = get_stat_modifiers(class_key)
+    mod_hp  = modifiers.get("hp", 1.0)
+    mod_atk = modifiers.get("attack", 1.0)
+    mod_def = modifiers.get("defense", 1.0)
+    mod_ini = modifiers.get("initiative", 1.0)
+    mod_luk = modifiers.get("luck", 1.0)
+    # --------------------------
+
     pts_hp  = _i(inv.get("hp", 0))
     pts_atk = _i(inv.get("attack", 0))
     pts_def = _i(inv.get("defense", 0))
     pts_ini = _i(inv.get("initiative", 0))
     pts_luk = _i(inv.get("luck", 0))
 
+    # --- BLOCO DE RETORNO ALTERADO ---
+    # Agora a fórmula é: (Pontos * ValorPorPonto) * ModificadorDaClasse
     return {
-        "hp":         pts_hp  * PER_POINT["hp"],          # mapeado para max_hp na UI
-        "attack":     pts_atk * PER_POINT["attack"],
-        "defense":    pts_def * PER_POINT["defense"],
-        "initiative": pts_ini * PER_POINT["initiative"],
-        "luck":       pts_luk * PER_POINT["luck"],
+        "hp":         _i((pts_hp  * PER_POINT["hp"])       * mod_hp),
+        "attack":     _i((pts_atk * PER_POINT["attack"])   * mod_atk),
+        "defense":    _i((pts_def * PER_POINT["defense"])  * mod_def),
+        "initiative": _i((pts_ini * PER_POINT["initiative"]) * mod_ini),
+        "luck":       _i((pts_luk * PER_POINT["luck"])     * mod_luk),
     }
 
 # =========================

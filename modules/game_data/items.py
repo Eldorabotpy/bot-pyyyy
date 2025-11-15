@@ -196,7 +196,13 @@ ITEMS_DATA = {
     # ================================
     # MATERIAIS DE MONSTROS (ABA: CAÇA)
     # ================================
-    
+    "palha_amaldicoada": {
+        "display_name": "Palha Amaldicoada", "emoji": "🍂☦️",
+        "type": "material_bruto", "category": "cacada",
+        "description": "Material deixado por um Espantalho.",
+        "stackable": True,
+        "media_key": "item_palha_amaldicoadaS"
+    },
     "minerio_estanho": {
         "display_name": "𝑴𝒊𝒏𝒆́𝒓𝒊𝒐 𝒅𝒆 𝑬𝒔𝒕𝒂𝒏𝒏𝒉𝒐", "emoji": "🪙",
         "type": "material_bruto", "category": "cacada",

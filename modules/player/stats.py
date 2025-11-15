@@ -1,16 +1,11 @@
-# modules/player/stats.py (VERSÃO CORRIGIDA COM SKILLS PASSIVAS E AURAS)
+# modules/player/stats.py 
+
 from __future__ import annotations
 import logging
 from typing import Dict, Optional, Tuple, Any, List
-
-# --- Imports Adicionados ---
 from modules.game_data.skills import SKILL_DATA
-from modules import player_manager # Importado para carregar dados de aliados
-# (Não precisamos do party_manager aqui, ele será chamado ANTES)
-# --- Fim dos Imports Adicionados ---
-
+from modules import player_manager 
 from modules import game_data, clan_manager
-# --- CORREÇÃO: Importa get_class_ancestry (necessário para _get_class_key_normalized) ---
 from modules.game_data.class_evolution import get_evolution_options, get_class_ancestry
 
 
@@ -33,18 +28,30 @@ CLASS_PROGRESSIONS = {
     "_default": { "BASE": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
 }
 
+# (Substitua o bloco CLASS_POINT_GAINS inteiro por este)
+
 CLASS_POINT_GAINS = {
-    "guerreiro": {"max_hp": 4, "attack": 1, "defense": 2, "initiative": 1, "luck": 1},
-    "berserker": {"max_hp": 3, "attack": 2, "defense": 1, "initiative": 1, "luck": 1},
-    "cacador":   {"max_hp": 3, "attack": 2, "defense": 1, "initiative": 2, "luck": 1},
-    "monge":     {"max_hp": 3, "attack": 1, "defense": 2, "initiative": 2, "luck": 1},
-    "mago":      {"max_hp": 2, "attack": 3, "defense": 1, "initiative": 1, "luck": 2},
-    "bardo":     {"max_hp": 3, "attack": 1, "defense": 1, "initiative": 1, "luck": 2},
-    "assassino": {"max_hp": 2, "attack": 2, "defense": 1, "initiative": 3, "luck": 2},
-    "samurai":   {"max_hp": 3, "attack": 2, "defense": 2, "initiative": 1, "luck": 1},
-    "curandeiro": {"max_hp": 4, "attack": 1, "defense": 2, "initiative": 1, "luck": 1},
+
+    # 1 Ponto de Atributo dá +X no status:
+    "guerreiro": {"max_hp": 4, "defense": 2}, 
+    "berserker": {"max_hp": 3, "attack": 2},  
+    "cacador":   {"attack": 2, "initiative": 2}, 
+    "monge":     {"defense": 2, "initiative": 2}, 
+    
+    # --- AJUSTADOS ---
+    "mago":      {"max_hp": 2, "attack": 2, "luck": 2}, 
+    "bardo":     {"max_hp": 3, "luck": 2}, 
+    "assassino": {"attack": 2, "initiative": 2, "luck": 2}, 
+    # ---------------
+
+    "samurai":   {"attack": 2, "defense": 2},
+    "curandeiro":{"max_hp": 4, "defense": 2}, 
+    
+
     "_default":  {"max_hp": 3, "attack": 1, "defense": 1, "initiative": 1, "luck": 1},
 }
+
+
 
 _BASELINE_KEYS = ("max_hp", "attack", "defense", "initiative", "luck")
 
