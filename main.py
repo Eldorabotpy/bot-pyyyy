@@ -1,4 +1,4 @@
-# Arquivo: main.py (VERSÃO CORRIGIDA COM TIMEOUT PARA RENDER)
+# Arquivo: main.py (VERSÃO CORRIGIDA PARA DEPLOY NO RENDER)
 
 from __future__ import annotations
 import os
@@ -16,8 +16,9 @@ import asyncio
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes
-# <<< IMPORT ADICIONADO >>>
+# --- [CORREÇÃO 1] Imports Adicionados ---
 from telegram.request import HTTPXRequest 
+from telegram.error import Conflict 
 
 from config import ADMIN_ID, TELEGRAM_TOKEN, EVENT_TIMES, JOB_TIMEZONE, WORLD_BOSS_TIMES
 from registries import register_all_handlers
@@ -54,8 +55,16 @@ def run_flask():
     port = int(os.environ.get("PORT", 5000))
     flask_app.run(host="0.0.0.0", port=port)
 
-# --- HANDLERS DE ERRO E STARTUP ---
+# --- [CORREÇÃO 2] HANDLER DE ERRO MODIFICADO ---
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Loga o erro, mas ignora 'Conflict' (comum no Render)."""
+    
+    # Verifica se o erro é o 'Conflict' que esperamos no Render
+    if isinstance(context.error, Conflict):
+        logger.warning(f"Conflito de polling detectado: {context.error} - (Isso é normal durante deploys no Render)")
+        return # Ignora o erro e não faz mais nada
+        
+    # Se for qualquer outro erro, loga como exceção (como antes)
     logger.exception(f"Exceção ao processar update: {context.error}")
 
 async def send_startup_message(application: Application):
@@ -220,8 +229,8 @@ async def main():
     flask_thread.start()
 
     logger.info("Configurando a aplicação Telegram...")
-
-    # --- <<< INÍCIO DA CORREÇÃO DE TIMEOUT DO RENDER >>> ---
+    
+    # --- [CORREÇÃO 3] Bloco de Timeout e Request ---
     # Aumenta os tempos limite para 30 segundos
     http_request = HTTPXRequest(
         connect_timeout=30.0,
@@ -229,8 +238,7 @@ async def main():
         write_timeout=30.0
     )
     application = Application.builder().token(TELEGRAM_TOKEN).request(http_request).build()
-    # --- <<< FIM DA CORREÇÃO >>> ---
-
+    
     application.add_error_handler(error_handler)
     
     register_jobs(application) 
@@ -246,7 +254,8 @@ async def main():
         await post_initialization_hook(application) 
         
         # 3. Começa a "ouvir" (getUpdates)
-        await application.updater.start_polling()
+        # --- [CORREÇÃO 4] Adiciona drop_pending_updates=True ---
+        await application.updater.start_polling(drop_pending_updates=True)
         
         # 4. Começa a processar os handlers
         await application.start()
@@ -260,6 +269,7 @@ async def main():
     except (KeyboardInterrupt, SystemExit):
         logger.info("Bot parado (Interrupção).")
     except Exception as e:
+        # O 'Conflict' não será pego aqui, será pego pelo error_handler
         logger.critical(f"Bot parado devido a erro: {e}", exc_info=True)
     finally:
         logger.info("Desligando o bot...")
