@@ -597,18 +597,20 @@ def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
     return delta
 
 
+# Em modules/player/stats.py
+
+# Em modules/player/stats.py
+
 async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
     """
+    (VERSÃO CORRIGIDA)
     Sincroniza os stats base (pdata['base_stats']) com a progressão da classe.
-    Também sincroniza HP/MP atuais.
+    NÃO recalcula os stats principais (pdata['attack'], etc.), apenas o HP/MP atual.
     """
     changed = False
     lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)  # Síncrono
-    
-    # Delta armazena os pontos que o jogador investiu manualmente
-    delta = _current_invested_delta_over_baseline(pdata, class_baseline)
 
     # Garante que os stats base (sem investimento) estão corretos
     current_base_stats = pdata.get("base_stats") or {}
@@ -616,13 +618,7 @@ async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
         pdata["base_stats"] = {k: _ival(class_baseline.get(k)) for k in _BASELINE_KEYS}
         changed = True
 
-    # Aplica os deltas (pontos investidos) de volta aos stats principais
-    gains = _get_point_gains_for_class(ckey)
-    for k in _BASELINE_KEYS:
-        gain_per_point = max(1, int(gains.get(k, 1)))
-        # Recalcula o stat total = (base da classe) + (pontos investidos * ganho por ponto)
-        pdata[k] = _ival(class_baseline.get(k)) + (delta[k] * gain_per_point)
-        changed = True # Força a mudança se os stats principais foram recalculados
+    # --- O BLOCO DE RECALCULO DE STATS (QUE CAUSAVA INFLAÇÃO) FOI REMOVIDO ---
 
     try:
         # Passa 'None' para a lista de aliados, pois esta função
