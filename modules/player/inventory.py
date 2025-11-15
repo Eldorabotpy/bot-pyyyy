@@ -188,9 +188,19 @@ def can_equip_slot(slot: str) -> bool:
     return (slot or "").lower() in {"arma","elmo","armadura","calca","luvas","botas","colar","anel","brinco"}
 
 def _class_req_from_base(base_id: Optional[str]):
+    """Tenta a nova 'get_item_info', depois a 'ITEMS_DATA' legada."""
     if not base_id:
         return None
-    base = game_data.ITEMS_DATA.get(base_id) or {}
+    try:
+        # 1. Tenta o novo sistema (ITEM_DATABASE)
+        info = game_data.get_item_info(base_id) or {}
+        if info.get("class_req"):
+            return info["class_req"]
+    except Exception:
+        pass 
+
+    # 2. Fallback para o sistema antigo (ITEMS_DATA)
+    base = getattr(game_data, "ITEMS_DATA", {}).get(base_id) or {}
     return base.get("class_req")
 
 # =========================================================================
@@ -234,29 +244,37 @@ def is_item_allowed_for_player_class(player_data: dict, item: dict) -> Tuple[boo
     
     # --- CORREÇÃO DO NameError ('req_list' -> 'req_list_lower') ---
     return False, f"⚠️ {disp} é exclusivo para {', '.join(req_list_lower)}."
-# =========================================================================
-# --- FIM DA CORREÇÃO 2 ---
-# =========================================================================
 
-# =========================================================================
-# --- CORREÇÃO 3: LÓGICA DE SLOT (SUBSTITUIR) ---
-# (Copia a lógica do equipment_handler para cá)
-# =========================================================================
+# Substitua a função _get_item_slot_from_base (em modules/player/inventory.py, linha 302)
+# por esta versão:
+
 def _get_item_slot_from_base(base_id: Optional[str]) -> Optional[str]:
     """
-    Descobre o slot do item base. Tenta "slot" primeiro, depois "type" como fallback.
+    Descobre o slot do item base, tentando o novo 'get_item_info'
+    e o 'ITEMS_DATA' legado, e checando 'slot' e 'type'.
     """
-    if not base_id: return None
-    entry = game_data.ITEMS_DATA.get(base_id) or {}
+    if not base_id: 
+        return None
     
-    # 1. Tenta a chave "slot"
+    entry = {}
+    try:
+        # 1. Tenta o novo sistema (ITEM_DATABASE) via accessor
+        entry = game_data.get_item_info(base_id) or {}
+    except Exception:
+        pass # Ignora e tenta o legado
+
+    if not entry:
+        # 2. Fallback para o sistema antigo (ITEMS_DATA)
+        entry = getattr(game_data, "ITEMS_DATA", {}).get(base_id) or {}
+
+    # 3. Lógica (que você já tinha) para encontrar o slot
     slot = entry.get("slot")
     if slot and isinstance(slot, str):
         slot_lower = slot.strip().lower()
         if can_equip_slot(slot_lower):
             return slot_lower
-        
-    # 2. Fallback: Tenta a chave "type"
+    
+    # 4. Fallback do fallback (para 'type')
     slot_type = entry.get("type")
     if slot_type and isinstance(slot_type, str):
         slot_type_lower = slot_type.strip().lower()

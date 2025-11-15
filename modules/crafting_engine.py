@@ -339,17 +339,19 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     final_rarity = _roll_rarity(player_data, recipe)
     base_id = recipe["result_base_id"]
 
+    # <<< CORREÇÃO (Parte 1): Buscamos o slot ANTES de criar o item >>>
+    info = _get_item_info(base_id)
+    slot = (info.get("slot") or "").lower()
+    
     new_item = {
         "uuid": str(uuid.uuid4()),
         "base_id": base_id,
         "rarity": final_rarity,
+        "slot": slot,  # <<< CORREÇÃO (Parte 2): O slot agora é salvo no item >>>
         "upgrade_level": 1,          # nasce no +1
         "durability": [20, 20],      # [cur/max]
         "enchantments": {},
     }
-
-    info = _get_item_info(base_id)
-    slot = (info.get("slot") or "").lower()
 
     # ===== Classe-alvo: usa class_req da receita se existir; senão, cai para a classe do jogador =====
     if isinstance(recipe.get("class_req"), (list, tuple)) and recipe["class_req"]:
@@ -422,7 +424,6 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         new_item["class_req"] = [class_req.strip().lower()]
 
     return new_item
-
 
 # =========================
 # Finish / XP
