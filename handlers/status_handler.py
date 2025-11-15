@@ -106,7 +106,7 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
         if 'luck' in PROFILE_KEYS:
             keyboard_rows.append([InlineKeyboardButton(f"➕ 🍀 𝐒𝐎𝐑𝐓𝐄 (+{gains['luck']})", callback_data='upgrade_luck')])
 
-    keyboard_rows.append([InlineKeyboardButton("🎐 𝐄𝐯𝐨𝐥𝐮çã𝐨 𝐝𝐞 𝐂𝐥𝐚𝐬𝐬𝐞", callback_data="status_evolution_open")])
+    keyboard_rows.append([InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data="open_evolution_menu")])
     keyboard_rows.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='profile')]) 
 
     return status_text, InlineKeyboardMarkup(keyboard_rows)

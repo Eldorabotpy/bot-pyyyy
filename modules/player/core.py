@@ -96,12 +96,8 @@ def _save_player_data_sync(user_id: int, player_info: dict) -> None:
         except Exception:
             logger.exception("Falha ao sanitizar energia durante save.")
         # Tenta executar a migração/sanitização de inventário de forma síncrona, se existir
-        try:
-            # inventory._sanitize_and_migrate_gold pode ser síncrono; se não existir, ignora
-            if hasattr(inventory, "_sanitize_and_migrate_gold"):
-                inventory._sanitize_and_migrate_gold(to_save)
-        except Exception:
-            logger.exception("Falha na migração síncrona de gold durante save.")
+        pass
+
 
         # Gravamos no DB
         players_collection.replace_one({"_id": user_id}, to_save, upsert=True)

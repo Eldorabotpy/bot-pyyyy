@@ -32,17 +32,34 @@ def _slugify(text: str) -> str:
     norm = re.sub(r"[^a-z0-9_]", "", norm)
     return norm
 
+# CORRIGIDO:
 def _get_class_media(player_data: dict, purpose: str = "personagem"):
-    # (Função original mantida - sem alterações)
+    
+    # Pega a classe ATUAL (evoluiída) para o fallback
     raw_cls = (player_data.get("class") or player_data.get("class_tag") or "").strip()
     cls = _slugify(raw_cls)
+    
+    # Pega a classe BASE (normalizada) para checar a skin
+    try:
+        player_base_class = player_stats._get_class_key_normalized(player_data)
+    except Exception:
+        player_base_class = cls # Fallback se a função falhar
+
     purpose = (purpose or "").strip().lower()
     candidates = []
     equipped_skin_id = player_data.get("equipped_skin")
+
+    # --- LÓGICA DE SKIN CORRIGIDA ---
     if equipped_skin_id and equipped_skin_id in SKIN_CATALOG:
         skin_info = SKIN_CATALOG[equipped_skin_id]
-        if skin_info.get('class') == raw_cls or skin_info.get('class') == cls:
-            candidates.append(skin_info['media_key'])
+        
+        # Compara a classe da skin (ex: "guerreiro") com a classe base do jogador (ex: "guerreiro")
+        if skin_info.get('class') == player_base_class:
+            candidates.append(skin_info['media_key']) # Adiciona a skin como primeira prioridade
+    
+
+    classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
+
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(cls) or {}
     for k in ("profile_file_id_key", "profile_media_key", "file_id_name", "status_file_id_key", "file_id_key"):

@@ -5,7 +5,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
-
+from modules.player import stats as player_stats
 from modules import player_manager, game_data
 from modules.game_data.skins import SKIN_CATALOG
 
@@ -21,7 +21,10 @@ async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_caption(caption="Erro ao carregar dados. Tente /start.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]]))
         return
         
-    player_class_key = (player_data.get("class_key") or "").lower()
+    try:
+        player_class_key = player_stats._get_class_key_normalized(player_data)
+    except Exception:
+        player_class_key = (player_data.get("class") or "").lower() # Fallback
     
     if not player_class_key:
         await query.answer("Você precisa de ter uma classe para mudar de aparência!", show_alert=True)

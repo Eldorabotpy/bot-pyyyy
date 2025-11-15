@@ -1137,3 +1137,25 @@ def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> b
             return True
 
     return False
+
+# =======================================================
+# --- FUNÇÃO DE BUSCA (ADICIONAR NO FIM DO ARQUIVO) ---
+# =======================================================
+
+def find_evolution_by_target(target_class: str) -> Dict[str, Any] | None:
+    """
+    Encontra a definição de uma evolução pela sua classe "alvo" (o "to").
+    Ex: "templario" -> retorna o dicionário da evolução T3 do Guerreiro.
+    """
+    if not target_class:
+        return None
+        
+    target_class_lower = target_class.lower()
+    
+    # Procura em todas as árvores de evolução
+    for base_class, evolutions in EVOLUTIONS.items():
+        for evo_option in evolutions:
+            if evo_option.get("to") == target_class_lower:
+                return evo_option # Encontrou!
+                
+    return None # Não encontrou a definição

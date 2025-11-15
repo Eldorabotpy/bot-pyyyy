@@ -1,4 +1,4 @@
-# modules/game_data/xp.py
+# modules/game_data/xp.py (CORRIGIDO)
 from __future__ import annotations
 from typing import Dict, Optional, Tuple
 
@@ -16,7 +16,7 @@ def _xp_formula(level: int) -> int:
     """
     if level >= MAX_LEVEL:
         return 0
-    base = 100         # XP base para sair do nível 1
+    base = 100      # XP base para sair do nível 1
     lin  = 35 * (level - 1)
     quad = 10 * (level - 1) * (level - 1)
     return int(base + lin + quad)
@@ -32,7 +32,7 @@ def get_xp_for_next_combat_level(level: int) -> int:
     return max(0, _xp_formula(level))
 
 # Quantos pontos de atributo (point_pool) cada nível concede
-POINTS_PER_LEVEL: int = 2
+POINTS_PER_LEVEL: int = 1
 
 # ================================
 # Núcleo de Level Up
@@ -114,7 +114,7 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
 # ================================
 # API Pública
 # ================================
-def add_combat_x_inplace(player_data: dict, amount: int) -> Dict[str, int]:
+def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]: # <<< CORREÇÃO DE NOME AQUI
     """
     Adiciona XP ao jogador em memória e processa level ups.
     Não salva em disco. Retorna resumo do resultado.
@@ -164,7 +164,7 @@ def add_combat_x_inplace(player_data: dict, amount: int) -> Dict[str, int]:
     player_data["xp"] += amount
     return _apply_level_ups_inplace(player_data)
 
-async def add_combat_x(user_id: int, amount: int) -> Dict[str, int]:
+async def add_combat_xp(user_id: int, amount: int) -> Dict[str, int]: # <<< CORREÇÃO DE NOME AQUI
     """
     Carrega o jogador, adiciona XP, processa level ups e salva.
     Agora é async: usa await player_manager.get_player_data / save_player_data.
@@ -179,6 +179,9 @@ async def add_combat_x(user_id: int, amount: int) -> Dict[str, int]:
             "current_xp": 0,
             "next_level_xp": get_xp_for_next_combat_level(1),
         }
-    result = add_combat_x_inplace(pdata, amount)
+    
+    # Chama a função síncrona com o nome corrigido
+    result = add_combat_xp_inplace(pdata, amount) 
+    
     await player_manager.save_player_data(user_id, pdata)
     return result

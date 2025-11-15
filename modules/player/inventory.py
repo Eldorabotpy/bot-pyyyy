@@ -7,7 +7,8 @@ from modules import game_data
 from . import stats # Importa o nosso novo módulo de stats para usar as suas funções
 # --- CORREÇÃO: Importa a função de ancestralidade ---
 from modules.game_data.class_evolution import get_class_ancestry
-
+from modules.game_data.skins import SKIN_CATALOG
+from modules.player import stats as player_stats_helper
 
 # ========================================
 # CONSTANTES
@@ -100,6 +101,8 @@ async def _sanitize_and_migrate_gold(player_data: dict) -> bool:
 # INVENTÁRIO E ITENS
 # ========================================
 
+# Em modules/player/inventory.py
+
 def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1):
     qty = int(quantity)
     if qty == 0:
@@ -115,6 +118,36 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1):
         else: spend_gems(player_data, -qty)
         return player_data
 
+    # ================================================
+    # --- (INÍCIO DA CORREÇÃO DE SKIN) ---
+    # ================================================
+    # Verifica se o ID do "item" é, na verdade, uma SKIN
+    if item_id in SKIN_CATALOG:
+        skin_info = SKIN_CATALOG[item_id]
+        skin_class_req = skin_info.get('class')
+        
+        # Pega a classe BASE do jogador (ex: "guerreiro", não "templario")
+        try:
+            player_base_class = player_stats_helper._get_class_key_normalized(player_data)
+        except Exception:
+            # Fallback se a função de stats falhar
+            player_base_class = (player_data.get("class") or "").lower()
+
+        # Verifica se a skin é da classe base do jogador
+        if skin_class_req == player_base_class:
+            unlocked_list = player_data.setdefault("unlocked_skins", [])
+            if item_id not in unlocked_list:
+                unlocked_list.append(item_id)
+                player_data["unlocked_skins"] = unlocked_list
+                # (Aqui você poderia adicionar um log se quisesse)
+        
+        # IMPORTANTE: Retorna aqui para NÃO adicionar a skin ao inventário normal
+        return player_data 
+    # ================================================
+    # --- (FIM DA CORREÇÃO DE SKIN) ---
+    # ================================================
+
+    # Se não for ouro, gema ou skin, trata como item normal:
     inventory = player_data.setdefault('inventory', {})
     current = int(inventory.get(item_id, 0))
     new_val = current + qty
