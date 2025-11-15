@@ -1,4 +1,4 @@
-# Em handlers/admin/reset_panel.py
+# Em handlers/admin/reset_panel.py (CORRIGIDO)
 
 from __future__ import annotations
 import os
@@ -21,10 +21,16 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 MAIN_MENU, ASKING_PLAYER_RESPEC, ASKING_PLAYER_IDLE, CONFIRM_ALL, CONFIRM_IDLE = range(5)
 
 # --- Funções Auxiliares (Lógica de Reset) ---
-def _reset_points_one(p: dict) -> int:
+
+# 👇 [CORREÇÃO 1] Transformada em "async def"
+async def _reset_points_one(p: dict) -> int:
     try:
-        refunded = player_manager.reset_stats_and_refund_points(p)
-        totals = player_manager.get_player_total_stats(p)
+        # 👇 [CORREÇÃO 2] Adicionado "await"
+        refunded = await player_manager.reset_stats_and_refund_points(p)
+        
+        # 👇 [CORREÇÃO 3] Adicionado "await"
+        totals = await player_manager.get_player_total_stats(p)
+        
         max_hp = int(totals.get("max_hp", p.get("max_hp", 50)))
         p["current_hp"] = max(1, min(int(p.get("current_hp", max_hp)), max_hp))
         return int(refunded)
@@ -117,7 +123,10 @@ async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAU
 
     summary = []
     if action == 'points':
-        rec = _reset_points_one(pdata)
+        
+        # 👇 [CORREÇÃO 4] Adicionado "await"
+        rec = await _reset_points_one(pdata)
+        
         summary.append(f"pontos (recuperados: {rec})")
     elif action == 'class':
         _reset_class_one(pdata)
@@ -200,8 +209,13 @@ async def _reset_all_points_execute(update: Update, context: ContextTypes.DEFAUL
     
     changed = 0
     total_recovered = 0
+    
+    # A função iter_players() é síncrona (um gerador), então o 'for' está correto.
     for uid, pdata in player_manager.iter_players():
-        total_recovered += _reset_points_one(pdata)
+        
+        # 👇 [CORREÇÃO 5] Adicionado "await"
+        total_recovered += await _reset_points_one(pdata)
+        
         await player_manager.save_player_data(uid, pdata)
         changed += 1
     

@@ -660,12 +660,14 @@ async def _handle_force_ticket_job(update: Update, context: ContextTypes.DEFAULT
 # <<< FUNÇÃO DE RESET GERAL (HARD RESPEC) CORRIGIDA >>>
 # ==================================
 
+# Em: handlers/admin_handler.py
+#
+# SUBSTITUA A FUNÇÃO INTEIRA POR ESTA VERSÃO FINAL:
+
 async def hard_respec_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     [ADMIN] Comando /hard_respec_all.
-    Executa o reset de status em TODOS os jogadores.
-    Usado após mudanças de balanceamento para limpar dados antigos/bugados.
-    Recalcula o status base e reembolsa todos os pontos de atributo.
+    (VERSÃO CORRIGIDA DO 'bypass_cache')
     """
     # 1. Verifica se é admin
     if not await ensure_admin(update):
@@ -696,35 +698,46 @@ async def hard_respec_all_command(update: Update, context: ContextTypes.DEFAULT_
     total = 0
     changed = 0
     
-    # Pega a lista de IDs primeiro (usando a função importada 'iter_players')
-    player_ids = [uid for uid, _ in iter_players()] 
+    player_ids = []
+    try:
+        # (Isto já estava correto da última vez)
+        async for uid, _ in iter_players():
+            player_ids.append(uid)
+            
+    except Exception as e:
+        logging.error(f"Erro ao COLETAR IDs para /hard_respec_all: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Erro ao coletar a lista de jogadores: {e}")
+        return
+    
+    logging.info(f"[ADMIN] /hard_respec_all - {len(player_ids)} jogadores encontrados. Iniciando o loop de reset.")
     
     # 3. Itera sobre todos os jogadores
     for uid in player_ids:
         total += 1
         try:
-            # Carrega os dados do jogador (usando a função importada)
             pdata = await get_player_data(uid)
             if not pdata:
                 continue
             
-            # Chama a função de reset (usando a função importada)
             spent_before = await reset_stats_and_refund_points(pdata)
             
-            # Salva os dados resetados (usando a função importada)
-            await save_player_data(uid, pdata, bypass_cache=True)
+            # --- AQUI ESTÁ A CORREÇÃO ---
+            # Removemos o argumento 'bypass_cache=True'
+            await save_player_data(uid, pdata)
+            # --- FIM DA CORREÇÃO ---
+            
             changed += 1
             
             logging.info(f"[Respec] Jogador {uid} resetado. Pontos reembolsados (aprox): {spent_before}")
 
-            # Pausa para não sobrecarregar o Render/API
             if total % 20 == 0:
                 await asyncio.sleep(0.1) 
                 
         except Exception as e:
-            logging.error(f"Falha grave ao resetar stats do jogador {uid}: {e}")
+            # Agora os logs de erro serão mais úteis se algo mais falhar
+            logging.error(f"Falha grave ao resetar stats do jogador {uid}: {e}", exc_info=True) 
 
-    # 4. Limpa o cache todo de uma vez (usando a função importada)
+    # 4. Limpa o cache todo de uma vez
     clear_all_player_cache()
 
     # 5. Envia mensagem de conclusão
@@ -737,7 +750,6 @@ async def hard_respec_all_command(update: Update, context: ContextTypes.DEFAULT_
         parse_mode=ParseMode.HTML
     )
     logging.info("[ADMIN] /hard_respec_all concluído.")
-
 
 # Texto de ajuda com a descrição dos comandos
 ADMIN_HELP_TEXT = """ℹ️ <b>Ajuda dos Comandos de Admin</b> ℹ️
