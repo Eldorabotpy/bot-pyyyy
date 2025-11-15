@@ -84,6 +84,9 @@ def _md_escape(text: str) -> str:
     """Escapa caracteres especiais para o modo MarkdownV2 (mais seguro)."""
     return escape_markdown(str(text))
 
+# Em handlers/forge_handler.py
+# (Substitua a função _send_or_edit_photo antiga por esta)
+
 async def _send_or_edit_photo(
     query: CallbackQuery,
     context: ContextTypes.DEFAULT_TYPE,
@@ -92,21 +95,35 @@ async def _send_or_edit_photo(
     reply_markup: InlineKeyboardMarkup | None = None,
 ):
     """
-    Tenta editar a mídia e o texto de uma mensagem. Se falhar, tenta editar
-    apenas o texto. Se tudo falhar, envia uma nova mensagem.
+    CORRIGIDO: Apaga a mensagem anterior e envia uma nova com a foto.
+    Isso evita erros ao tentar editar uma mensagem de vídeo (do menu Reino)
+    para uma mensagem de foto (do menu Forja).
     """
+    
+    # 1. APAGA A MENSAGEM ANTERIOR (do menu Reino/outro)
     try:
-        # Tenta editar a mídia primeiro se a mensagem já tiver uma foto
-        if query.message.photo and photo_source:
-            photo_input = InputFile(photo_source) if photo_source.startswith(('assets/', './')) else photo_source
-            await query.edit_message_media(media=InputMediaPhoto(media=photo_input), reply_markup=reply_markup)
-            # A legenda precisa ser editada em uma chamada separada após a mídia
-            await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
-        else:
-            # Fallback: se não havia foto ou a edição de mídia falhou, edita o texto
-            await query.edit_message_text(text=caption, reply_markup=reply_markup, parse_mode="Markdown")
+        await query.delete_message()
     except Exception as e:
-        logger.error(f"Falha ao editar a mensagem ({e}), enviando uma nova.")
+        logger.debug(f"Falha (normal) ao apagar mensagem em _send_or_edit_photo (forge): {e}")
+
+    try:
+        # 2. TENTA ENVIAR A NOVA MENSAGEM (com foto)
+        if photo_source:
+            photo_input = InputFile(photo_source) if photo_source.startswith(('assets/', './')) else photo_source
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=photo_input,
+                caption=caption,
+                reply_markup=reply_markup,
+                parse_mode="Markdown"
+            )
+        else:
+            # Se photo_source estiver vazio, aciona o fallback
+            raise ValueError("photo_source estava vazio ou inválido")
+            
+    except Exception as e_photo:
+        # 3. FALLBACK (envia como texto puro se a foto falhar)
+        logger.error(f"Falha ao enviar foto ({photo_source}) em _send_or_edit_photo: {e_photo}. Enviando como texto.")
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=caption,

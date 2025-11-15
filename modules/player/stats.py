@@ -1,10 +1,17 @@
-# modules/player/stats.py (VERSÃO FINAL CORRIGIDA)
+# modules/player/stats.py (VERSÃO CORRIGIDA COM SKILLS PASSIVAS E AURAS)
 from __future__ import annotations
 import logging
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any, List
+
+# --- Imports Adicionados ---
 from modules.game_data.skills import SKILL_DATA
+from modules import player_manager # Importado para carregar dados de aliados
+# (Não precisamos do party_manager aqui, ele será chamado ANTES)
+# --- Fim dos Imports Adicionados ---
+
 from modules import game_data, clan_manager
-from modules.game_data.class_evolution import get_evolution_options
+# --- CORREÇÃO: Importa get_class_ancestry (necessário para _get_class_key_normalized) ---
+from modules.game_data.class_evolution import get_evolution_options, get_class_ancestry
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +29,7 @@ CLASS_PROGRESSIONS = {
     "bardo": { "BASE": {"max_hp": 47, "attack": 5, "defense": 3, "initiative": 5, "luck": 6}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 2}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
     "assassino": { "BASE": {"max_hp": 47, "attack": 6, "defense": 2, "initiative": 7, "luck": 5}, "PER_LVL": {"max_hp": 5, "attack": 2, "defense": 0, "initiative": 3, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
     "samurai": { "BASE": {"max_hp": 50, "attack": 6, "defense": 4, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 7, "attack": 2, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "defense" },
+    "curandeiro": { "BASE": {"max_hp": 48, "attack": 5, "defense": 4, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 2, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
     "_default": { "BASE": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
 }
 
@@ -34,6 +42,7 @@ CLASS_POINT_GAINS = {
     "bardo":     {"max_hp": 3, "attack": 1, "defense": 1, "initiative": 1, "luck": 2},
     "assassino": {"max_hp": 2, "attack": 2, "defense": 1, "initiative": 3, "luck": 2},
     "samurai":   {"max_hp": 3, "attack": 2, "defense": 2, "initiative": 1, "luck": 1},
+    "curandeiro": {"max_hp": 4, "attack": 1, "defense": 2, "initiative": 1, "luck": 1},
     "_default":  {"max_hp": 3, "attack": 1, "defense": 1, "initiative": 1, "luck": 1},
 }
 
@@ -49,125 +58,218 @@ def _ival(x: Any, default: int = 0) -> int:
         except Exception:
             return 0
 
-
 def _get_class_key_normalized(pdata: dict) -> Optional[str]:
-    ck = pdata.get("class_key") or pdata.get("class") or pdata.get("classe") or pdata.get("class_type")
-    if isinstance(ck, str) and ck.strip():
-        return ck.strip().lower()
-    return None
-
-
-def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict) -> None:
     """
-    Aplica bônus de stats passivos das skills (lê a nova estrutura de raridade).
+    CORRIGIDO: Retorna a classe BASE (T1) do jogador (ex: "guerreiro").
+    Isso é necessário para que skins e skills de T1 funcionem em classes T3+.
+    """
+    current_class = pdata.get("class") or pdata.get("classe")
+    if not current_class:
+        return "_default" # Fallback se não tiver classe
+
+    try:
+        # Usa a função de ancestralidade que já criamos
+        ancestry = get_class_ancestry(current_class)
+        if ancestry:
+            return ancestry[-1] # Retorna o último item, que é a classe base T1
+    except Exception as e:
+        logger.debug(f"Falha ao buscar ancestralidade para '{current_class}': {e}. Verificando se é T1.")
+        pass
+        
+    if current_class.lower() in CLASS_PROGRESSIONS:
+         return current_class.lower()
+
+    return "_default"
+
+
+# ========================================
+# --- FUNÇÕES DE SKILL (PASSIVAS / AURAS) ---
+# ========================================
+
+def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
+    """
+    (FUNÇÃO ADICIONADA E CORRIGIDA)
+    Aplica bônus de stats passivos das skills do PRÓPRIO JOGADOR.
     Modifica 'total_stats' IN-PLACE.
     """
     player_skills_dict = pdata.get("skills", {})
     if not isinstance(player_skills_dict, dict):
-        return  
+        return
+
+    # O ckey_fallback é usado apenas se a função _get_class_key_normalized falhar
+    ckey_fallback = (pdata.get("class") or "").lower()
 
     for skill_id, skill_info in player_skills_dict.items():
         if not isinstance(skill_info, dict):
             continue 
 
         skill_data = SKILL_DATA.get(skill_id)
-        if not skill_data:
+        if not skill_data or skill_data.get("type") != "passive":
             continue 
 
-        
         rarity = skill_info.get("rarity", "comum")
-        
         rarity_effects_data = skill_data.get("rarity_effects", {}).get(rarity)
+        
         if not rarity_effects_data:
-            continue # Skill não tem efeitos para esta raridade (ou não usa o sistema)
+            continue
 
-        # Pega os efeitos
         effects = rarity_effects_data.get("effects", {})
         if not effects:
             continue
 
-        # --- Aplica os Efeitos ---
-        # (Esta lógica precisa espelhar todos os efeitos passivos que criamos)
+        # --- Aplica os Efeitos Passivos ---
 
         # 1. Bônus de Stats (Ex: {"stat_add_mult": {"max_hp": 0.10, "defense": 0.05}})
         stat_bonuses = effects.get("stat_add_mult", {})
         if stat_bonuses:
             for stat, multiplier in stat_bonuses.items():
                 if stat in total_stats:
-                    # Aplica o bônus multiplicativo
-                    total_stats[stat] = int(total_stats[stat] * (1 + float(multiplier)))
-                elif stat == "max_mp": # Bônus de Mana
-                     total_stats["max_mana"] = int(total_stats.get("max_mana", 50) * (1 + float(multiplier)))
-                elif stat == "magic_attack": # Bônus de Ataque Mágico (não é um stat base)
-                     total_stats["magic_attack"] = int(total_stats.get("magic_attack", 0) * (1 + float(multiplier)))
-                # Adicione outros stats se necessário (ex: armor_penetration, crit_damage_mult)
-                # Estes stats "secundários" podem precisar ser inicializados
+                    bonus_valor = total_stats[stat] * float(multiplier)
+                    total_stats[stat] += int(bonus_valor)
+                elif stat == "max_mp": 
+                    # CORREÇÃO: "total_stats" é o nome correto da variável
+                    total_stats["max_mana"] += int(total_stats.get("max_mana", 50) * float(multiplier))
+                elif stat == "magic_attack": 
+                    if "magic_attack" not in total_stats:
+                         total_stats["magic_attack"] = total_stats.get("attack", 0)
+                    total_stats["magic_attack"] += int(total_stats.get("magic_attack", 0) * float(multiplier))
                 else:
-                    if stat not in total_stats:
-                         total_stats[stat] = 0
-                    total_stats[stat] += float(multiplier) # Bônus flat para stats secundários
+                    total_stats[stat] = total_stats.get(stat, 0.0) + float(multiplier) 
 
-        # 2. Bônus de Resistência (Ex: {"resistance_mult": {"physical": 0.10}})
+        # 2. Bônus de Resistência
         res_bonuses = effects.get("resistance_mult", {})
         if res_bonuses:
             if "resistance" not in total_stats:
                 total_stats["resistance"] = {}
             for res_type, value in res_bonuses.items():
-                total_stats["resistance"][res_type] = total_stats["resistance"].get(res_type, 0) + float(value)
+                total_stats["resistance"][res_type] = total_stats["resistance"].get(res_type, 0.0) + float(value)
         
-        # 3. Imunidade a Crítico (Ex: {"crit_immune": True})
+        # 3. Imunidade a Crítico
         if effects.get("crit_immune", False):
-            total_stats["crit_immune"] = True # O motor de combate precisa ler isso
+            total_stats["crit_immune"] = True 
 
-async def get_player_total_stats(player_data: dict) -> dict:
+        # 4. Scaling de Stats (Ex: Mago T6)
+        scaling = effects.get("stat_scaling")
+        if scaling:
+            try:
+                source_stat_val = total_stats.get(scaling["source_stat"], 0)
+                target_stat = scaling["target_stat"]
+                ratio = float(scaling["ratio"])
+                bonus = source_stat_val * ratio
+                
+                if target_stat in total_stats:
+                     total_stats[target_stat] += int(bonus)
+                else: 
+                    total_stats[target_stat] = total_stats.get(target_stat, 0.0) + bonus
+            except Exception as e:
+                logger.error(f"Erro ao aplicar stat_scaling para skill {skill_id}: {e}")
+
+def _apply_party_aura_bonuses(ally_data: dict, target_stats: dict):
     """
-    Calcula os stats totais (incluindo equipamento, encantamentos e buffs).
-    Esta função é defensiva: ignora equipamentos quebrados e formatos estranhos.
+    (FUNÇÃO ADICIONADA)
+    Lê as skills de um ALIADO (ally_data) e aplica APENAS os efeitos
+    de "party_aura" nos status do jogador principal (target_stats).
+    """
+    ally_skills_dict = ally_data.get("skills", {})
+    if not isinstance(ally_skills_dict, dict):
+        return
+
+    for skill_id, skill_info in ally_skills_dict.items():
+        if not isinstance(skill_info, dict): continue
+            
+        skill_data = SKILL_DATA.get(skill_id)
+        if not skill_data or skill_data.get("type") != "passive":
+            continue
+        
+        rarity = skill_info.get("rarity", "comum")
+        rarity_effects_data = skill_data.get("rarity_effects", {}).get(rarity)
+        if not rarity_effects_data: continue
+
+        effects = rarity_effects_data.get("effects", {})
+        
+        aura_bonuses = effects.get("party_aura", {})
+        if not aura_bonuses:
+            continue # Esta skill não é uma aura de grupo
+
+        # 1. Bônus de Stats da Aura
+        stat_bonuses = aura_bonuses.get("stat_add_mult", {})
+        if stat_bonuses:
+            for stat, multiplier in stat_bonuses.items():
+                if stat in target_stats:
+                    bonus_valor = target_stats[stat] * float(multiplier)
+                    target_stats[stat] += int(bonus_valor)
+                else:
+                    target_stats[stat] = target_stats.get(stat, 0.0) + float(multiplier)
+
+        # 2. Outros efeitos de Aura
+        if aura_bonuses.get("cannot_be_dodged", False):
+            target_stats["cannot_be_dodged"] = True
+        
+        if "hp_regen_percent" in aura_bonuses:
+             target_stats["hp_regen_percent"] = target_stats.get("hp_regen_percent", 0.0) + float(aura_bonuses["hp_regen_percent"])
+
+# ========================================
+# --- FUNÇÃO DE MANA (SEPARADA) ---
+# ========================================
+
+def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
+    """(FUNÇÃO ADICIONADA) Calcula a mana e a adiciona em 'total_stats'."""
+    ckey = _get_class_key_normalized(pdata) or ckey_fallback
+    class_prog = CLASS_PROGRESSIONS.get(ckey) or CLASS_PROGRESSIONS["_default"]
+    
+    mana_attribute_name = class_prog.get("mana_stat", "luck")
+    mana_attribute_value = total_stats.get(mana_attribute_name, 0)
+    mana_base = 10
+    mana_por_ponto = 5
+    
+    # Define max_mana (antes das skills passivas)
+    total_stats['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)
+
+# ========================================
+# --- FUNÇÃO MESTRA DE STATS (CORRIGIDA) ---
+# ========================================
+
+async def get_player_total_stats(
+    player_data: dict, 
+    ally_user_ids: List[int] = None  # <-- MODIFICADO: Recebe IDs, não pdata
+) -> dict:
+    """
+    (MODIFICADO para aceitar 'ally_user_ids' e aplicar skills/auras)
     """
     lvl = _ival(player_data.get("level"), 1)
-    ckey = _get_class_key_normalized(player_data)
+    ckey = _get_class_key_normalized(player_data) # ckey agora é a classe base
 
     # 1. Calcula os stats base (de classe + nível)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
 
-    total: Dict[str, int] = {}
+    total: Dict[str, Any] = {} 
 
-    # Pega o valor salvo (ex: 464) ou a baseline (ex: 461)
+    # Pega o valor salvo (investido) ou a baseline
     for k in _BASELINE_KEYS:
-        # _ival aceita um segundo parâmetro de fallback
         total[k] = _ival(player_data.get(k, class_baseline.get(k)), class_baseline.get(k, 0))
 
-    # 2. Adiciona Stats de Equipamento (somente itens não quebrados)
+    # 2. Adiciona Stats de Equipamento
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
 
     if isinstance(equipped, dict):
         for slot, unique_id in equipped.items():
-            if not unique_id:
-                continue
+            if not unique_id: continue
             inst = inventory.get(unique_id)
-            if not isinstance(inst, dict):
-                continue
+            if not isinstance(inst, dict): continue
 
-            # Pega a durabilidade atual do item (vários formatos suportados)
+            # (Lógica de durabilidade omitida para brevidade, mas está correta)
             durability_data = inst.get("durability", [1, 1])
             current_durability = 0
-
-            # Formato lista/tuple: [current, max]
             if isinstance(durability_data, (list, tuple)) and len(durability_data) > 0:
                 current_durability = _ival(durability_data[0], 0)
-            # Formato dict: {"current": x, "max": y}
             elif isinstance(durability_data, dict):
                 current_durability = _ival(durability_data.get("current", 0), 0)
             else:
-                # Tentativa fallback se foi armazenado como int/str
                 current_durability = _ival(durability_data, 0)
-
-            # Se o item está quebrado (durabilidade <= 0), ignora-o
             if current_durability <= 0:
-                continue
+                continue 
 
-            # Se o item NÃO está quebrado, soma encantamentos / stats base
             ench = inst.get('enchantments', {}) or {}
             for stat_key, data in ench.items():
                 val = _ival((data or {}).get('value', 0), 0)
@@ -178,16 +280,14 @@ async def get_player_total_stats(player_data: dict) -> dict:
                 elif stat_key in ('defense', 'initiative', 'luck'):
                     if stat_key in total:
                         total[stat_key] = total.get(stat_key, 0) + val
+                elif stat_key not in total:
+                     total[stat_key] = 0
+                total[stat_key] += val
 
-    # --- NOVO PASSO 2.5: Adiciona Bônus Passivos de Skills ---
-    # (Modifica 'total' in-place ANTES dos bônus de clã)
-    try:
-        _apply_passive_skill_bonuses(player_data, total)
-    except Exception as e:
-        logger.exception(f"Erro ao aplicar bônus de skills passivas para {player_data.get('user_id')}: {e}")
-    # --- Fim do Novo Passo ---
-
-    # 3. Adiciona Buffs de Clã (se houver)
+    # 3. Calcula Mana (Pré-Skills)
+    _calculate_mana(player_data, total, ckey_fallback=ckey)
+    
+    # 4. Adiciona Bônus de Clã
     clan_id = player_data.get("clan_id")
     if clan_id:
         try:
@@ -200,39 +300,63 @@ async def get_player_total_stats(player_data: dict) -> dict:
             if "flat_hp_bonus" in clan_buffs:
                 total['max_hp'] = total.get('max_hp', 0) + int(clan_buffs.get("flat_hp_bonus", 0))
         except Exception:
-            # Evita quebra se clan_manager falhar
             pass
 
-    # 4. Calcula Mana a partir do atributo configurado para a classe
-    class_prog = CLASS_PROGRESSIONS.get(ckey) or CLASS_PROGRESSIONS["_default"]
-    mana_attribute_name = class_prog.get("mana_stat", "luck")
-    mana_attribute_value = total.get(mana_attribute_name, 0)
-    mana_base = 10
-    mana_por_ponto = 5
-    total['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)
+    # --- NOVO PASSO 5: Adiciona Bônus Passivos (Próprios e Auras de Aliados) ---
+    try:
+        # 5a. Aplica as skills passivas do PRÓPRIO jogador
+        _apply_passive_skill_bonuses(player_data, total)
+        
+        # 5b. Aplica as AURAS PASSIVAS dos aliados (se fornecidos)
+        if ally_user_ids:
+            # Carrega os dados dos aliados (do cache, deve ser rápido)
+            for ally_id in ally_user_ids:
+                if ally_id == player_data.get("user_id"):
+                    continue # Não aplica a própria aura duas vezes
+                    
+                ally_data = await player_manager.get_player_data(ally_id)
+                if ally_data:
+                    _apply_party_aura_bonuses(ally_data, total)
 
-    # 5. Garante valores válidos (não-negativos)
+    except Exception as e:
+        logger.exception(f"Erro ao aplicar bônus de skills passivas/auras para {player_data.get('user_id')}: {e}")
+    # --- Fim do Novo Passo ---
+
+    # 6. Garante valores válidos (não-negativos)
     for k in _BASELINE_KEYS:
         total[k] = max(0, _ival(total.get(k), 0))
-
+    
     total['max_mana'] = max(0, _ival(total.get('max_mana', 10)))
+    
+    if 'magic_attack' not in total:
+        total['magic_attack'] = total.get('attack', 0) 
 
     return total
 
 
-async def get_player_dodge_chance(player_data: dict) -> float:
-    total_stats = await get_player_total_stats(player_data)
+async def get_player_dodge_chance(player_data: dict, ally_user_ids: List[int] = None) -> float:
+    # (MODIFICADO para passar a lista de aliados)
+    total_stats = await get_player_total_stats(player_data, ally_user_ids)
     initiative = total_stats.get('initiative', 0)
     dodge_chance = (initiative * 0.4) / 100.0
-    return min(dodge_chance, 0.75)
+    
+    dodge_chance += total_stats.get('dodge_chance_flat', 0)
+    
+    if total_stats.get("cannot_be_dodged", False):
+        return 0.0 
+        
+    return min(dodge_chance, 0.75) 
 
 
-async def get_player_double_attack_chance(player_data: dict) -> float:
-    total_stats = await get_player_total_stats(player_data)
+async def get_player_double_attack_chance(player_data: dict, ally_user_ids: List[int] = None) -> float:
+    # (MODIFICADO para passar a lista de aliados)
+    total_stats = await get_player_total_stats(player_data, ally_user_ids)
     initiative = total_stats.get('initiative', 0)
     double_attack_chance = (initiative * 0.25) / 100.0
-    return min(double_attack_chance, 0.50)
+    return min(double_attack_chance, 0.50) 
 
+# ... (O resto do arquivo: allowed_points_for_level, check_and_apply_level_up, etc.) ...
+# ... (NÃO PRECISAM DE MUDANÇA) ...
 
 def allowed_points_for_level(pdata: dict) -> int:
     lvl = _ival(pdata.get("level"), 1)
@@ -304,16 +428,17 @@ def _get_point_gains_for_class(ckey: Optional[str]) -> dict:
     norm_key = (ckey or "").lower()
     gains = CLASS_POINT_GAINS.get(norm_key)
 
-    # Se não encontrou (ex: classe evoluída), procura a classe base
     if gains is None:
         try:
-            base_class = game_data.CLASS_EVOLUTIONS.get(norm_key, {}).get("base_class")
-            if base_class:
+            ancestry = get_class_ancestry(norm_key)
+            if ancestry:
+                base_class = ancestry[-1] # Pega a classe T1
                 gains = CLASS_POINT_GAINS.get(base_class.lower())
         except Exception:
             pass
+            
     if gains is None:
-        gains = CLASS_POINT_GAINS["_default"]
+        gains = CLASS_POINT_GAINS.get(norm_key, CLASS_POINT_GAINS["_default"])
 
     full: Dict[str, int] = {}
     for k in _BASELINE_KEYS:
@@ -333,9 +458,10 @@ def compute_spent_status_points(pdata: dict) -> int:
     for k in _BASELINE_KEYS:
         current_stat_value = _ival(pdata.get(k), class_baseline.get(k))
         baseline_stat_value = _ival(class_baseline.get(k))
+        
         delta = current_stat_value - baseline_stat_value
         if delta <= 0:
-            continue
+            continue 
 
         gain_per_point = max(1, int(gains.get(k, 1)))
         points_for_this_stat = (delta + gain_per_point - 1) // gain_per_point
@@ -348,11 +474,15 @@ async def reset_stats_and_refund_points(pdata: dict) -> int:
     _ensure_base_stats_block_inplace(pdata)
     base = pdata["base_stats"]
     spent_before = compute_spent_status_points(pdata)
+    
     for k in _BASELINE_KEYS:
         pdata[k] = _ival(base.get(k))
-    pdata["stat_points"] = allowed_points_for_level(pdata)
+        
+    pdata["stat_points"] = allowed_points_for_level(pdata) 
+    
     if isinstance(pdata.get("invested"), dict):
         pdata["invested"] = {k: 0 for k in _BASELINE_KEYS}
+        
     try:
         totals = await get_player_total_stats(pdata)
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
@@ -366,11 +496,11 @@ async def reset_stats_and_refund_points(pdata: dict) -> int:
 
 async def _sync_all_stats_inplace(pdata: dict) -> bool:
     """Função mestra que executa todas as sincronizações de stats."""
-    mig = _migrate_point_pool_to_stat_points_inplace(pdata)  # Síncrono
-    base_changed = _ensure_base_stats_block_inplace(pdata)  # Síncrono
+    mig = _migrate_point_pool_to_stat_points_inplace(pdata)
+    base_changed = _ensure_base_stats_block_inplace(pdata)
     cls_sync = await _apply_class_progression_sync_inplace(pdata)
 
-    synced = _sync_stat_points_to_level_cap_inplace(pdata)  # Síncrono
+    synced = _sync_stat_points_to_level_cap_inplace(pdata)
     return any([mig, base_changed, cls_sync, synced])
 
 
@@ -441,30 +571,49 @@ def _compute_class_baseline_for_level(class_key: Optional[str], level: int) -> d
 
 def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
     delta: Dict[str, int] = {}
-    base_stats = pdata.get("base_stats", {})
-
+    
+    # Esta função é síncrona, mas 'pdata' pode conter os stats base errados
+    # A correção é pegar os stats do NÍVEL SUPERIOR
+    
     for k in _BASELINE_KEYS:
-        cur = _ival(base_stats.get(k), baseline.get(k))
+        cur = _ival(pdata.get(k), baseline.get(k))
         base = _ival(baseline.get(k))
         d = cur - base
-        delta[k] = max(0, d)
+        delta[k] = max(0, d) # A diferença é o que foi investido
     return delta
 
 
 async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
-    """VERSÃO CORRIGIDA: Não sobrescreve os stats principais."""
+    """
+    Sincroniza os stats base (pdata['base_stats']) com a progressão da classe.
+    Também sincroniza HP/MP atuais.
+    """
     changed = False
     lvl = _ival(pdata.get("level"), 1)
     ckey = _get_class_key_normalized(pdata)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)  # Síncrono
+    
+    # Delta armazena os pontos que o jogador investiu manualmente
+    delta = _current_invested_delta_over_baseline(pdata, class_baseline)
 
+    # Garante que os stats base (sem investimento) estão corretos
     current_base_stats = pdata.get("base_stats") or {}
     if any(_ival(current_base_stats.get(k)) != _ival(class_baseline.get(k)) for k in _BASELINE_KEYS):
         pdata["base_stats"] = {k: _ival(class_baseline.get(k)) for k in _BASELINE_KEYS}
         changed = True
 
+    # Aplica os deltas (pontos investidos) de volta aos stats principais
+    gains = _get_point_gains_for_class(ckey)
+    for k in _BASELINE_KEYS:
+        gain_per_point = max(1, int(gains.get(k, 1)))
+        # Recalcula o stat total = (base da classe) + (pontos investidos * ganho por ponto)
+        pdata[k] = _ival(class_baseline.get(k)) + (delta[k] * gain_per_point)
+        changed = True # Força a mudança se os stats principais foram recalculados
+
     try:
-        totals = await get_player_total_stats(pdata)  # Chama função async
+        # Passa 'None' para a lista de aliados, pois esta função
+        # só deve sincronizar os stats base do próprio jogador.
+        totals = await get_player_total_stats(pdata, None)  # Chama função async
 
         # --- Sincronização de HP ---
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
@@ -482,7 +631,6 @@ async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
             pdata["current_mp"] = new_mp
             changed = True
     except Exception:
-        # Se algo falhar aqui, não quebramos o fluxo
         pass
 
     return changed
@@ -510,15 +658,16 @@ def can_see_evolution_menu(player_data: dict) -> bool:
         return False
 
     player_level = player_data.get("level", 1)
+    
+    # --- CORREÇÃO: Usa a função corrigida que não precisa de 'level' ---
     all_options = get_evolution_options(current_class, player_level, show_locked=True)
 
     if not all_options:
-        return False
+        return False # Sem evoluções (provavelmente T6)
 
-    for option in all_options:
-        if player_level >= option.get("min_level", 999):
-            return True
-    return False
+    # A lógica de 'min_level' agora é tratada pelo 'evolution_service'
+    # Esta função só precisa saber se HÁ uma próxima evolução.
+    return bool(all_options)
 
 
 def mark_dungeon_as_completed(player_data: dict, dungeon_id: str, difficulty: str):
