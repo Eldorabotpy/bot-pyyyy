@@ -1,4 +1,4 @@
-# Arquivo: main.py (VERSÃO CORRIGIDA COM ENTREGA DE TICKETS)
+# Arquivo: main.py (VERSÃO CORRIGIDA COM TIMEOUT PARA RENDER)
 
 from __future__ import annotations
 import os
@@ -16,6 +16,8 @@ import asyncio
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes
+# <<< IMPORT ADICIONADO >>>
+from telegram.request import HTTPXRequest 
 
 from config import ADMIN_ID, TELEGRAM_TOKEN, EVENT_TIMES, JOB_TIMEZONE, WORLD_BOSS_TIMES
 from registries import register_all_handlers
@@ -218,7 +220,17 @@ async def main():
     flask_thread.start()
 
     logger.info("Configurando a aplicação Telegram...")
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+
+    # --- <<< INÍCIO DA CORREÇÃO DE TIMEOUT DO RENDER >>> ---
+    # Aumenta os tempos limite para 30 segundos
+    http_request = HTTPXRequest(
+        connect_timeout=30.0,
+        read_timeout=30.0,
+        write_timeout=30.0
+    )
+    application = Application.builder().token(TELEGRAM_TOKEN).request(http_request).build()
+    # --- <<< FIM DA CORREÇÃO >>> ---
+
     application.add_error_handler(error_handler)
     
     register_jobs(application) 
