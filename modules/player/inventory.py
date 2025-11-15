@@ -5,7 +5,7 @@ import uuid
 from typing import Tuple, Optional, List
 from modules import game_data
 from . import stats # Importa o nosso novo módulo de stats para usar as suas funções
-# --- CORREÇÃO 1: Importa a função de ancestralidade ---
+# --- CORREÇÃO: Importa a função de ancestralidade ---
 from modules.game_data.class_evolution import get_class_ancestry
 
 
@@ -232,24 +232,31 @@ def is_item_allowed_for_player_class(player_data: dict, item: dict) -> Tuple[boo
     # Se chegou aqui, não pode equipar
     disp = item.get("display_name") or item.get("base_id") or "item"
     
-    # --- !!! AQUI ESTÁ A CORREÇÃO (NameError) !!! ---
-    # Usando 'req_list_lower' em vez de 'req_list'
+    # --- CORREÇÃO DO NameError ('req_list' -> 'req_list_lower') ---
     return False, f"⚠️ {disp} é exclusivo para {', '.join(req_list_lower)}."
 # =========================================================================
 # --- FIM DA CORREÇÃO 2 ---
 # =========================================================================
 
+# =========================================================================
+# --- CORREÇÃO 3: LÓGICA DE SLOT (SUBSTITUIR) ---
+# (Copia a lógica do equipment_handler para cá)
+# =========================================================================
 def _get_item_slot_from_base(base_id: Optional[str]) -> Optional[str]:
+    """
+    Descobre o slot do item base. Tenta "slot" primeiro, depois "type" como fallback.
+    """
     if not base_id: return None
     entry = game_data.ITEMS_DATA.get(base_id) or {}
     
-    # (Lógica melhorada que usamos no equipment_handler)
+    # 1. Tenta a chave "slot"
     slot = entry.get("slot")
     if slot and isinstance(slot, str):
         slot_lower = slot.strip().lower()
         if can_equip_slot(slot_lower):
             return slot_lower
         
+    # 2. Fallback: Tenta a chave "type"
     slot_type = entry.get("type")
     if slot_type and isinstance(slot_type, str):
         slot_type_lower = slot_type.strip().lower()
@@ -257,13 +264,16 @@ def _get_item_slot_from_base(base_id: Optional[str]) -> Optional[str]:
             return slot_type_lower
             
     return None
+# =========================================================================
+# --- FIM DA CORREÇÃO 3 ---
+# =========================================================================
 
 def _get_unique_item_from_inventory(player_data: dict, unique_id: str) -> Optional[dict]:
     inv = player_data.get("inventory", {}) or {}
     val = inv.get(unique_id)
     return val if is_unique_item_entry(val) else None
 
-# (Função já estava corrigida com 'async' e 'await' na sua versão)
+# (Esta função já estava correta com 'async' e 'await')
 async def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot: Optional[str] = None) -> Tuple[bool, str]:
     from .core import get_player_data, save_player_data 
     
@@ -276,7 +286,10 @@ async def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot
         return False, "Item não encontrado no inventário."
 
     base_id = item.get("base_id")
+    
+    # (Agora chama a função de slot CORRIGIDA)
     slot_from_item = _get_item_slot_from_base(base_id) or item.get("slot")
+    
     if not slot_from_item:
         return False, "Item sem slot reconhecido."
 
@@ -287,7 +300,7 @@ async def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot
     if expected_slot and expected_slot.strip().lower() != slot_from_item:
         return False, f"Este item é do slot '{slot_from_item}', não '{expected_slot.strip().lower()}'."
 
-    # (Agora chama a função de verificação CORRIGIDA)
+    # (Agora chama a função de verificação de classe CORRIGIDA)
     ok, err = is_item_allowed_for_player_class(pdata, item)
     if not ok:
         return False, err or "Sua classe não pode equipar este item."
