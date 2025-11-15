@@ -179,14 +179,19 @@ async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     try:
-        # rota especial: retomar após ação
-        if button == "continue_after_action":
-            current_location = player_data.get("current_location", "reino_eldora")
-            if current_location == "reino_eldora":
-                await show_kingdom_menu(update, context)
-            else:
-                await show_region_menu(update, context)
-            return
+        # Mude isto:
+        current_location = player_data.get("current_location", "reino_eldora")
+        if current_location == "reino_eldora":
+            await show_kingdom_menu(update, context)
+        else:
+            await show_region_menu(update, context) # <--- BUG
+
+# Para isto (passando a key):
+        current_location = player_data.get("current_location", "reino_eldora")
+        if current_location == "reino_eldora":
+            await show_kingdom_menu(update, context)
+        else:
+            await show_region_menu(update, context, region_key=current_location) # <--- CORRIGIDO
 
         # despacho por tabela
         handler = ROUTES.get(button)

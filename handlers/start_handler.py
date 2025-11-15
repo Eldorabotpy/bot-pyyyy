@@ -169,12 +169,15 @@ async def resume_game_state(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 
     current_location = player_data.get('current_location', 'reino_eldora')
+    # CORRIGIDO:
+
     try:
         if current_location == 'reino_eldora':
             # Chama o menu do reino com os dados JÁ carregados
             await show_kingdom_menu(update, context, player_data=player_data) 
         else:
-            await show_region_menu(update, context) 
+            # CORREÇÃO: Passa a localização atual do jogador
+            await show_region_menu(update, context, region_key=current_location) 
     except Exception as e:
         logger.error("Erro abrindo menu (%s): %s", current_location, e, exc_info=True)
         if update.message:

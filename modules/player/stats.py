@@ -277,19 +277,26 @@ async def get_player_total_stats(
             if current_durability <= 0:
                 continue 
 
+            # CORRIGIDO:
+
             ench = inst.get('enchantments', {}) or {}
             for stat_key, data in ench.items():
                 val = _ival((data or {}).get('value', 0), 0)
+                
                 if stat_key == 'dmg':
                     total['attack'] = total.get('attack', 0) + val
+                
                 elif stat_key == 'hp':
                     total['max_hp'] = total.get('max_hp', 0) + val
+                
                 elif stat_key in ('defense', 'initiative', 'luck'):
-                    if stat_key in total:
+                    total[stat_key] = total.get(stat_key, 0) + val
+                
+                else:
+                    # Lógica para stats secundários (ex: 'magic_attack', 'crit_chance_flat')
+                    # Não adiciona 'dmg' ou 'hp' aqui novamente
+                    if stat_key not in ('dmg', 'hp') and stat_key not in _BASELINE_KEYS:
                         total[stat_key] = total.get(stat_key, 0) + val
-                elif stat_key not in total:
-                     total[stat_key] = 0
-                total[stat_key] += val
 
     # 3. Calcula Mana (Pré-Skills)
     _calculate_mana(player_data, total, ckey_fallback=ckey)
