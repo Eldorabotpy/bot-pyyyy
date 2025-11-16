@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 CLASS_PROGRESSIONS = {
     "guerreiro": { "BASE": {"max_hp": 52, "attack": 5, "defense": 4, "initiative": 4, "luck": 3}, "PER_LVL": {"max_hp": 8, "attack": 1, "defense": 2, "initiative": 0, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
     "berserker": { "BASE": {"max_hp": 55, "attack": 6, "defense": 3, "initiative": 5, "luck": 3}, "PER_LVL": {"max_hp": 9, "attack": 2, "defense": 0, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
+    
+    # --- CORRIGIDO: "cacador" para "cacador" ---
     "cacador": { "BASE": {"max_hp": 48, "attack": 6, "defense": 3, "initiative": 6, "luck": 4}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 0, "initiative": 2, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
+    
     "monge": { "BASE": {"max_hp": 50, "attack": 5, "defense": 4, "initiative": 6, "luck": 3}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 2, "initiative": 2, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
     "mago": { "BASE": {"max_hp": 45, "attack": 7, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "attack" },
     "bardo": { "BASE": {"max_hp": 47, "attack": 5, "defense": 3, "initiative": 5, "luck": 6}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 2}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
@@ -35,7 +38,10 @@ CLASS_POINT_GAINS = {
     # 1 Ponto de Atributo dá +X no status:
     "guerreiro": {"max_hp": 4, "defense": 2}, 
     "berserker": {"max_hp": 3, "attack": 2},  
+    
+    # --- CORRIGIDO: "cacador" para "cacador" ---
     "cacador":   {"attack": 2, "initiative": 2}, 
+    
     "monge":     {"defense": 2, "initiative": 2}, 
     
     # --- AJUSTADOS ---
@@ -70,7 +76,12 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
     CORRIGIDO: Retorna a classe BASE (T1) do jogador (ex: "guerreiro").
     Isso é necessário para que skins e skills de T1 funcionem em classes T3+.
     """
-    current_class = pdata.get("class") or pdata.get("classe")
+    
+    # --- CORREÇÃO IMPORTANTE ---
+    # Tenta usar a 'class_key' primeiro (ex: "cacador"), que é a chave interna.
+    # Se não existir (personagens antigos), usa 'class' (ex: "Caçador").
+    current_class = pdata.get("class_key") or pdata.get("class") or pdata.get("classe")
+    
     if not current_class:
         return "_default" # Fallback se não tiver classe
 
@@ -83,6 +94,7 @@ def _get_class_key_normalized(pdata: dict) -> Optional[str]:
         logger.debug(f"Falha ao buscar ancestralidade para '{current_class}': {e}. Verificando se é T1.")
         pass
         
+    # Esta verificação agora vai funcionar (ex: "cacador" == "cacador")
     if current_class.lower() in CLASS_PROGRESSIONS:
          return current_class.lower()
 
@@ -104,7 +116,7 @@ def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
         return
 
     # O ckey_fallback é usado apenas se a função _get_class_key_normalized falhar
-    ckey_fallback = (pdata.get("class") or "").lower()
+    ckey_fallback = (pdata.get("class_key") or pdata.get("class") or "").lower()
 
     for skill_id, skill_info in player_skills_dict.items():
         if not isinstance(skill_info, dict):
@@ -486,11 +498,19 @@ def compute_spent_status_points(pdata: dict) -> int:
 
 async def reset_stats_and_refund_points(pdata: dict) -> int:
     _ensure_base_stats_block_inplace(pdata)
-    base = pdata["base_stats"]
+    
+    # --- CORREÇÃO IMPORTANTE AQUI ---
+    # Precisamos recalcular o baseline ANTES de resetar os stats.
+    lvl = _ival(pdata.get("level"), 1)
+    ckey = _get_class_key_normalized(pdata)
+    class_baseline = _compute_class_baseline_for_level(ckey, lvl)
+    # --- FIM DA CORREÇÃO ---
+
     spent_before = compute_spent_status_points(pdata)
     
     for k in _BASELINE_KEYS:
-        pdata[k] = _ival(base.get(k))
+        # Reseta para o baseline da classe, não para o 'base_stats' (que pode estar desatualizado)
+        pdata[k] = _ival(class_baseline.get(k))
         
     pdata["stat_points"] = allowed_points_for_level(pdata) 
     
@@ -498,9 +518,11 @@ async def reset_stats_and_refund_points(pdata: dict) -> int:
         pdata["invested"] = {k: 0 for k in _BASELINE_KEYS}
         
     try:
+        # Recalcula os totais (com o baseline novo)
         totals = await get_player_total_stats(pdata)
         max_hp = _ival(totals.get("max_hp"), pdata.get("max_hp"))
-        pdata["current_hp"] = max(1, min(_ival(pdata.get("current_hp"), max_hp), max_hp))
+        # Define o HP atual para o novo HP máximo
+        pdata["current_hp"] = max(1, max_hp)
     except Exception:
         pass
     return spent_before
