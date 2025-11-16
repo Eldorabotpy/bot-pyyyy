@@ -211,7 +211,7 @@ async def _reset_all_points_execute(update: Update, context: ContextTypes.DEFAUL
     total_recovered = 0
     
     # A função iter_players() é síncrona (um gerador), então o 'for' está correto.
-    for uid, pdata in player_manager.iter_players():
+    async for uid, pdata in player_manager.iter_players():
         
         # 👇 [CORREÇÃO 5] Adicionado "await"
         total_recovered += await _reset_points_one(pdata)
