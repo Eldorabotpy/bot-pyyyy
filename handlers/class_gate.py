@@ -26,7 +26,7 @@ async def maybe_offer_class_choice(user_id: int, chat_id: int, context: ContextT
     ])
 
     txt = (
-        "🎉 <b>Nível 10 alcançado!</b>\n"
+        "🎉 <b>Nível 5 alcançado!</b>\n"
         "Você desbloqueou a <b>escolha de classe</b>. Toque no botão abaixo para escolher."
     )
     # <<< CORREÇÃO 2: Adiciona await (já estava correto) >>>

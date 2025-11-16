@@ -245,9 +245,42 @@ CLASSES_DATA = {
         'tier': 3
     },
     
+    # ... (depois do bloco do 'shogun') ...
 
+    #------------------------------------------------------------------------------------------------------------
+    'curandeiro': {
+        'display_name': 'Curandeiro', 'emoji': '🩹',
+        'description': 'Suporte focado em cura e buffs.',
+        'stat_modifiers': {'hp': 3.2, 'attack': 0.8, 'defense': 1.5, 'initiative': 1.0, 'luck': 1.5},
+        'file_id_name': 'classe_curandeiro_media',
+        'tier': 1
+    },
+    # EVOLUÇÕES TIER 2 
+    'clerigo': {
+        'display_name': 'Clérigo', 'emoji': '✝️',
+        'description': 'Canaliza poder divino para curas potentes e purificação.',
+        'stat_modifiers': {'hp': 3.4, 'attack': 0.8, 'defense': 1.7, 'initiative': 1.1, 'luck': 1.8},
+        'file_id_name': 'classe_curandeiro_media',
+        'tier': 2
+    },
+    'druida': {
+        'display_name': 'Druida', 'emoji': '🌳',
+        'description': 'Usa o poder da natureza para curar aliados e prender inimigos.',
+        'stat_modifiers': {'hp': 3.3, 'attack': 1.0, 'defense': 1.6, 'initiative': 1.3, 'luck': 1.6},
+        'file_id_name': 'classe_curandeiro_media',
+        'tier': 2
+    },
+    # EVOLUÇÕES TIER 3 
+    'sacerdote': {
+        'display_name': 'Sacerdote', 'emoji': '⛪',
+        'description': 'Um mestre da cura em área (HoT) e escudos sagrados.',
+        'stat_modifiers': {'hp': 3.6, 'attack': 0.8, 'defense': 2.0, 'initiative': 1.2, 'luck': 2.0},
+        'file_id_name': 'classe_curandeiro_media',
+        'tier': 3
+    },
 
 }
+
 
 
 
@@ -263,6 +296,7 @@ CLASS_PRIMARY_DAMAGE = {
     "bardo":     {"stat_key": "carisma",     "type": "sonoro",     "scales_with": "carisma"},
     "berserker": {"stat_key": "furia",       "type": "impacto",    "scales_with": "furia"},
     "cacador":   {"stat_key": "precisao",    "type": "perfuracao", "scales_with": "precisao"},
+    "curandeiro":{"stat_key": "fe",          "type": "sagrado",    "scales_with": "fe"}, 
 }
 
 
@@ -278,6 +312,7 @@ CLASS_DMG_EMOJI = {
     "bardo": "🎶",
     "assassino": "🔪",
     "samurai": "🥷",
+    "curandeiro": "🩹",
 }
 
 def get_primary_damage_profile(player_class: str) -> dict:

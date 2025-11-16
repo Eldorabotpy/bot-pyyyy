@@ -6,8 +6,20 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data, file_id_manager
 from handlers.menu_handler import show_kingdom_menu
 from modules.balance import ui_display_modifiers
+from modules.player.stats import CLASS_PROGRESSIONS, CLASS_POINT_GAINS
 
-
+CLASS_MANA_INFO = {
+    "guerreiro": "Sorte",
+    "berserker": "Sorte",
+    "cacador": "Iniciativa",
+    "monge": "Iniciativa",
+    "mago": "Ataque",
+    "bardo": "Sorte",
+    "assassino": "Iniciativa",
+    "samurai": "Defesa",
+    "curandeiro": "Sorte",
+    "_default": "Sorte",
+}
 # =========================
 # Fontes de classes + normalização
 # =========================
@@ -107,15 +119,14 @@ def _load_classes_list() -> list[dict]:
 # Elegibilidade (Síncrono)
 # =========================
 def _eligible_for_class(player_data: dict) -> bool:
-    """Pode escolher classe se nível ≥ 10 e ainda não tiver classe."""
+    """Pode escolher classe se nível ≥ 5 e ainda não tiver classe.""" 
     if not player_data:
         return False
     try:
         lvl = int(player_data.get("level", 1))
     except Exception:
         lvl = 1
-    return (lvl >= 5) and not bool(player_data.get("class"))
-
+    return (lvl >= 5) and not bool(player_data.get("class")) 
 
 # =========================
 # Tela: Lista de Classes
@@ -143,7 +154,7 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Checa nível (função síncrona, não precisa de await)
     if not _eligible_for_class(player_data or {}):
-        msg = "Você ainda não atingiu o nível 10 para escolher uma classe."
+        msg = "Você ainda não atingiu o nível 5 para escolher uma classe."
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]])
         if query:
             try:
@@ -186,45 +197,77 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 # Tela: Detalhes da Classe
 # =========================
+# =========================
+# Tela: Detalhes da Classe
+# =========================
 async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE, class_key: str):
     query = update.callback_query
     user_id = query.from_user.id if query else (update.effective_user.id if update.effective_user else None)
 
-    # CORREÇÃO 3: Adiciona await
     player_data = await player_manager.get_player_data(user_id) if user_id else None
 
     if player_data and player_data.get("class"):
         await query.answer("Você já escolheu sua classe.", show_alert=True)
         return
 
-    # Síncrono
+    # Corrigido para Nv 5
     if not _eligible_for_class(player_data or {}):
-        await query.answer("Você ainda não pode escolher classe (nível 10 necessário).", show_alert=True)
+        await query.answer("Você ainda não pode escolher classe (nível 5 necessário).", show_alert=True)
         return
 
     classes = _load_classes_list() # Síncrono
     entry = next((e for e in classes if e["key"] == class_key), None)
     if not entry:
-        # CORREÇÃO 4: Adiciona await
         await query.edit_message_text(
             "Classe inválida.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="show_class_list")]])
         )
         return
+    # --- INÍCIO DA LÓGICA DE TEXTO SUBSTITUÍDA ---
+    # 1. Obter os dados dos dicionários
+    prog = CLASS_PROGRESSIONS.get(class_key, CLASS_PROGRESSIONS["_default"])
+    gains_manual = CLASS_POINT_GAINS.get(class_key, CLASS_POINT_GAINS["_default"])
+    gains_default = CLASS_POINT_GAINS["_default"]
+    
+    mana_stat_name = CLASS_MANA_INFO.get(class_key, "Sorte")
+    
+    # 2. Ganhos Automáticos
+    auto = prog.get("PER_LVL", {})
+    auto_hp = auto.get("max_hp", 0)
+    auto_atk = auto.get("attack", 0)
+    auto_def = auto.get("defense", 0)
+    auto_ini = auto.get("initiative", 0)
+    auto_luk = auto.get("luck", 0)
 
-    disp = ui_display_modifiers(entry["key"]) # Síncrono
+    # 3. Ganhos Manuais (misturando o default com a classe)
+    manual_hp = gains_manual.get("max_hp", gains_default.get("max_hp", 1))
+    manual_atk = gains_manual.get("attack", gains_default.get("attack", 1))
+    manual_def = gains_manual.get("defense", gains_default.get("defense", 1))
+    manual_ini = gains_manual.get("initiative", gains_default.get("initiative", 1))
+    manual_luk = gains_manual.get("luck", gains_default.get("luck", 1))
+
+    # 4. Montar o texto
     details_text = (
         f"{entry['emoji']} <b>{entry['display_name']}</b>\n\n"
         f"<i>{entry.get('description', 'Sem descrição.')}</i>\n\n"
-        "<b>Afinidades da Classe:</b>\n"
-        # Ajusta para usar :g para remover .0 desnecessário
-        f"  - HP: x{disp.get('hp', 1.0):g}\n"
-        f"  - Ataque: x{disp.get('attack', 1.0):g}\n"
-        f"  - Defesa: x{disp.get('defense', 1.0):g}\n"
-        f"  - Iniciativa: x{disp.get('initiative', 1.0):g}\n"
-        f"  - Sorte: x{disp.get('luck', 1.0):g}\n\n"
+
+        "<b>📈 Ganhos Automáticos (por Nível):</b>\n"
+        f"  ❤️ HP Máx: +{auto_hp}\n"
+        f"  ⚔️ Ataque: +{auto_atk}\n"
+        f"  🛡️ Defesa: +{auto_def}\n"
+        f"  🏃 Iniciativa: +{auto_ini}\n"
+        f"  🍀 Sorte: +{auto_luk}\n"
+        f"  (Mana escala com: <b>{mana_stat_name}</b>)\n\n"
+        
+        "<b>📌 Distribuição Manual (1 Ponto = ...):</b>\n"
+        f"  ❤️ HP Máx: +{manual_hp}\n"
+        f"  ⚔️ Ataque: +{manual_atk}\n"
+        f"  🛡️ Defesa: +{manual_def}\n"
+        f"  🏃 Iniciativa: +{manual_ini}\n"
+        f"  🍀 Sorte: +{manual_luk}\n\n"
         "Deseja escolher este caminho?"
     )
+    # --- FIM DA LÓGICA DE TEXTO SUBSTITUÍDA ---
 
     keyboard = [[
         InlineKeyboardButton("✅ Confirmar", callback_data=f"confirm_class_{entry['key']}"),
@@ -248,24 +291,20 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if file_data and file_data.get("id"):
         file_id, file_type = file_data["id"], (file_data.get("type") or "").lower()
         if file_type == 'video':
-            # CORREÇÃO 5: Adiciona await
             await context.bot.send_video(
                 chat_id=chat_id, video=file_id, caption=details_text,
                 reply_markup=reply_markup, parse_mode='HTML'
             )
         else:
-            # CORREÇÃO 6: Adiciona await
             await context.bot.send_photo(
                 chat_id=chat_id, photo=file_id, caption=details_text,
                 reply_markup=reply_markup, parse_mode='HTML'
             )
     else:
-        # CORREÇÃO 7: Adiciona await
         await context.bot.send_message(
             chat_id=chat_id, text=details_text,
             reply_markup=reply_markup, parse_mode='HTML'
         )
-
 
 # =========================
 # Confirmar Escolha
