@@ -198,7 +198,7 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Força bruta V2: Calcula a data E remove flags de 'Permanente' que bugam o perfil.
+    VERSÃO NUCLEAR: Define a data e DELETA qualquer chave que possa estar travando o status como Permanente.
     """
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
@@ -214,60 +214,72 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     except:
         return ASK_NAME
 
-    await query.answer(f"Ajustando data e removendo travas...")
+    await query.answer(f"Forçando data e limpando travas...")
 
     try:
-        # 1. Pega os dados
+        # 1. Pega os dados frescos
         pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Jogador não encontrado.")
 
-        # 2. Lógica Manual de Data
+        # 2. Define a nova data (Começando de agora se for 'permanente' antigo)
         now = datetime.now(timezone.utc)
         current_exp_iso = pdata.get("premium_expiration")
-        
         new_date = None
 
-        # Se não tem data ou se a data atual é invalida/passada
         if not current_exp_iso:
             new_date = now + timedelta(days=days)
         else:
             try:
                 current_date = datetime.fromisoformat(current_exp_iso)
                 if current_date.tzinfo is None: current_date = current_date.replace(tzinfo=timezone.utc)
-                
                 if current_date > now:
                     new_date = current_date + timedelta(days=days)
                 else:
                     new_date = now + timedelta(days=days)
-            except Exception:
+            except:
                 new_date = now + timedelta(days=days)
 
-        # 3. Grava a Data
+        # 3. Grava a data
         pdata["premium_expiration"] = new_date.isoformat()
         
-        # 4. LIMPEZA DE TRAVAS (AQUI ESTÁ A SOLUÇÃO DO SEU PROBLEMA)
-        # O perfil deve estar lendo uma dessas chaves e ignorando a data. Vamos matar todas.
-        keys_to_remove = ["is_permanent", "permanent", "premium_permanent", "infinite_premium"]
-        for k in keys_to_remove:
-            if k in pdata:
-                del pdata[k] # Deleta a chave que diz que é permanente
+        # ==================================================================
+        # AQUI ESTÁ A CORREÇÃO PARA O SEU PROBLEMA DO PERFIL
+        # Vamos deletar qualquer chave que possa estar forçando "Permanente"
+        # ==================================================================
+        travas_comuns = [
+            "is_permanent", 
+            "permanent", 
+            "premium_permanent", 
+            "infinite_premium", 
+            "is_founder",
+            "lifetime"
+        ]
         
-        # Garante Tier
+        travas_removidas = []
+        for chave in travas_comuns:
+            if chave in pdata:
+                del pdata[chave]
+                travas_removidas.append(chave)
+        
+        if travas_removidas:
+            logger.info(f"Travas removidas do jogador {target_uid}: {travas_removidas}")
+
+        # 4. Garante o Tier correto
         tier_atual = pdata.get("premium_tier")
         if not tier_atual or tier_atual == "free":
              pdata["premium_tier"] = "premium"
 
-        # 5. Salva
+        # 5. Salva no Banco
         await player_manager.save_player_data(target_uid, pdata)
 
-        # 6. Atualiza Painel
+        # 6. Atualiza o Painel Admin
         updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
         
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
-        logger.error(f"Erro add days v2: {e}", exc_info=True)
+        logger.error(f"Erro nuclear add days: {e}", exc_info=True)
         await query.answer(f"❌ Erro: {e}", show_alert=True)
 
     return ASK_NAME
