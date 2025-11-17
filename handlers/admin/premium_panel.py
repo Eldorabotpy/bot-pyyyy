@@ -198,8 +198,7 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Força bruta: Calcula a data manualmente e insere no dicionário do jogador.
-    Resolve o problema de não adicionar dias em contas Permanentes ou bugadas.
+    Força bruta V2: Calcula a data E remove flags de 'Permanente' que bugam o perfil.
     """
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
@@ -215,7 +214,7 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     except:
         return ASK_NAME
 
-    await query.answer(f"Adicionando +{days} dias...")
+    await query.answer(f"Ajustando data e removendo travas...")
 
     try:
         # 1. Pega os dados
@@ -228,8 +227,8 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         new_date = None
 
+        # Se não tem data ou se a data atual é invalida/passada
         if not current_exp_iso:
-            # Se é Permanente (None) ou Free (None), começa de AGORA + Dias
             new_date = now + timedelta(days=days)
         else:
             try:
@@ -237,32 +236,38 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 if current_date.tzinfo is None: current_date = current_date.replace(tzinfo=timezone.utc)
                 
                 if current_date > now:
-                    # Soma na data existente
                     new_date = current_date + timedelta(days=days)
                 else:
-                    # Se já venceu, começa de agora
                     new_date = now + timedelta(days=days)
             except Exception:
                 new_date = now + timedelta(days=days)
 
-        # 3. Grava e Garante Tier
+        # 3. Grava a Data
         pdata["premium_expiration"] = new_date.isoformat()
         
+        # 4. LIMPEZA DE TRAVAS (AQUI ESTÁ A SOLUÇÃO DO SEU PROBLEMA)
+        # O perfil deve estar lendo uma dessas chaves e ignorando a data. Vamos matar todas.
+        keys_to_remove = ["is_permanent", "permanent", "premium_permanent", "infinite_premium"]
+        for k in keys_to_remove:
+            if k in pdata:
+                del pdata[k] # Deleta a chave que diz que é permanente
+        
+        # Garante Tier
         tier_atual = pdata.get("premium_tier")
         if not tier_atual or tier_atual == "free":
              pdata["premium_tier"] = "premium"
 
-        # 4. Salva
+        # 5. Salva
         await player_manager.save_player_data(target_uid, pdata)
 
-        # 5. Atualiza Tela
+        # 6. Atualiza Painel
         updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
         
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
-        logger.error(f"Erro add days força bruta: {e}", exc_info=True)
+        logger.error(f"Erro add days v2: {e}", exc_info=True)
         await query.answer(f"❌ Erro: {e}", show_alert=True)
 
     return ASK_NAME
