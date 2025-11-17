@@ -13,6 +13,7 @@ from telegram.ext import (
     MessageHandler, 
     filters
 )
+
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from modules.player_manager import find_player_by_name
@@ -299,20 +300,37 @@ async def admin_choose_action(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     action = query.data
 
-    # --- !!! 6. BLOCO ADICIONADO !!! ---
+    # --- !!! 6. BLOCO CORRIGIDO (Com Importação de Segurança) !!! ---
     if action == "edit_char_class":
         # Monta o teclado com todas as classes disponíveis
         kb_rows = []
-        # Assumindo que game_data.CLASSES_DATA está disponível
-        if hasattr(game_data, 'CLASSES_DATA'):
-            for class_id, class_data in game_data.CLASSES_DATA.items():
-                kb_rows.append([InlineKeyboardButton(
-                    f"{class_data.get('emoji', '👤')} {class_data.get('display_name', class_id)}",
-                    callback_data=f"set_class:{class_id}"
-                )])
+        
+        # --- LÓGICA DE SEGURANÇA ---
+        # 1. Tenta pegar do game_data
+        classes_data = getattr(game_data, 'CLASSES_DATA', None)
+
+        # 2. Se falhar (None ou vazio), importa diretamente do arquivo classes.py
+        if not classes_data:
+            try:
+                from modules.game_data.classes import CLASSES_DATA as direct_classes
+                classes_data = direct_classes
+            except ImportError:
+                logger.error("CRÍTICO: Não foi possível importar CLASSES_DATA de modules.game_data.classes")
+                classes_data = {}
+        # ---------------------------
+
+        if classes_data:
+            for class_id, class_data in classes_data.items():
+                # (Opcional) Filtrar apenas Tier 1 para não lotar o menu
+                if class_data.get('tier', 1) == 1:
+                    kb_rows.append([InlineKeyboardButton(
+                        f"{class_data.get('emoji', '👤')} {class_data.get('display_name', class_id)}",
+                        callback_data=f"set_class:{class_id}"
+                    )])
         else:
-            logger.warning("game_data.CLASSES_DATA não encontrado!")
-            # Adiciona fallback manual se necessário, ou apenas o botão de voltar
+            logger.warning("CLASSES_DATA vazio ou não encontrado mesmo após tentativa direta.")
+            await query.edit_message_text("Erro interno: Lista de classes não encontrada.")
+            return STATE_SHOW_MENU
             
         kb_rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="edit_back_menu")])
         
@@ -322,12 +340,15 @@ async def admin_choose_action(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode=ParseMode.HTML
         )
         return STATE_AWAIT_CLASS
-    # --- FIM DO NOVO BLOCO ---
+    # --- FIM DO BLOCO CORRIGIDO ---
 
     elif action == "edit_prof_type":
         # Monta o teclado com todas as profissões disponíveis
         kb_rows = []
-        for prof_id, prof_data in game_data.PROFESSIONS_DATA.items():
+        # Aplica a mesma lógica de segurança para profissões, se necessário
+        professions_data = getattr(game_data, 'PROFESSIONS_DATA', {})
+        
+        for prof_id, prof_data in professions_data.items():
             kb_rows.append([InlineKeyboardButton(
                 f"{prof_data.get('display_name', prof_id)} ({prof_data.get('category', 'N/A')})",
                 callback_data=f"set_prof:{prof_id}"

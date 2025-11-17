@@ -381,8 +381,6 @@ async def get_player_double_attack_chance(player_data: dict, ally_user_ids: List
     double_attack_chance = (initiative * 0.25) / 100.0
     return min(double_attack_chance, 0.50) 
 
-# ... (O resto do arquivo: allowed_points_for_level, check_and_apply_level_up, etc.) ...
-# ... (NÃO PRECISAM DE MUDANÇA) ...
 
 def allowed_points_for_level(pdata: dict) -> int:
     lvl = _ival(pdata.get("level"), 1)

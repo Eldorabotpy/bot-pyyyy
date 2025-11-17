@@ -1,6 +1,6 @@
 # modules/player/premium.py
 from __future__ import annotations
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Type
 from modules import game_data
 
@@ -59,11 +59,7 @@ class PremiumManager:
 
     def grant_days(self, tier: str, days: int, *, force: bool = False) -> None:
         """
-        Concede ou atualiza premium por 'days' dias. Não sobrescreve permanência a menos
-        que force=True.
-        - tier: novo tier (ex: 'gold')
-        - days: inteiro não-negativo
-        - force: se True, sobrescreve mesmo se expiração atual for None (permanente)
+        Concede ou atualiza premium por 'days' dias.
         """
         from .actions import get_player_max_energy
 
@@ -75,33 +71,44 @@ class PremiumManager:
 
         self.player_data['premium_tier'] = tier
 
-        current_expiry = self.expiration_date  # None => permanente ou não definido
+        # 1. Determinar a data base para adicionar os dias
+        current_expiry = self.expiration_date 
+        
+        # Garante que base_date seja timezone-aware (UTC) para comparação segura
+        base_date = self._now.replace(tzinfo=timezone.utc) if self._now.tzinfo is None else self._now
 
-        if current_expiry is None and self.player_data.get('premium_expires_at') is None:
-            # era permanente/sem data
-            if not force:
-                # mantém permanente; nada a fazer sobre a data
-                pass
+        if current_expiry is None:
+            # Se for permanente (None), só muda se forçado
+            if self.player_data.get('premium_expires_at') is None:
+                if not force:
+                    return # Já é permanente, não faz nada
+                else:
+                    # Força sobrescrever permanente -> começa de agora
+                    start_date = base_date
             else:
-                # força criação de data a partir de agora
-                base_date = self._now
-                new_expiry = base_date + timedelta(days=days)
-                self.player_data['premium_expires_at'] = new_expiry.isoformat()
+                # Expiry é None mas não é permanente (ex: nunca teve premium)
+                start_date = base_date
         else:
-            # se existir expiry válido no futuro, acumula; senão usa agora como base
-            base_date = self._now
-            if current_expiry and current_expiry > base_date:
-                base_date = current_expiry
-            new_expiry = base_date + timedelta(days=days)
-            self.player_data['premium_expires_at'] = new_expiry.isoformat()
+            # Se já tem data, garante UTC
+            current_expiry = current_expiry.replace(tzinfo=timezone.utc) if current_expiry.tzinfo is None else current_expiry
+            
+            # Se a data atual ainda é válida (futuro), soma a partir dela
+            if current_expiry > base_date:
+                start_date = current_expiry
+            else:
+                # Se já venceu, começa de agora
+                start_date = base_date
+
+        # 2. Calcular nova data
+        new_expiry = start_date + timedelta(days=days)
+        self.player_data['premium_expires_at'] = new_expiry.isoformat()
 
         # Bônus: recarrega energia
         try:
             max_energy = get_player_max_energy(self.player_data)
             self.player_data["energy"] = max_energy
-            self.player_data['energy_last_ts'] = self._now.isoformat()
+            self.player_data['energy_last_ts'] = base_date.isoformat()
         except Exception:
-            # Não falhar se utilitário ausente; apenas logar.
             import logging
             logging.getLogger(__name__).exception("Falha ao aplicar bônus de energia em grant_days")
 
