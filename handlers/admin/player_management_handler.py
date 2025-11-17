@@ -1,368 +1,344 @@
-# handlers/admin/player_management_handler.py
+# handlers/admin/premium_panel.py
+
+from __future__ import annotations
+import os
 import logging
-import math
-from datetime import datetime, timezone, timedelta
-import asyncio # <--- CORREÇÃO 1: ADICIONADO
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery # <--- CORREÇÃO 2: ADICIONADO
+from datetime import datetime, timezone
+from typing import Tuple, Optional
+
+# --- CORREÇÃO 1: Importar BadRequest para tratar o erro ---
+from telegram.error import BadRequest 
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ContextTypes,
-    ConversationHandler,
     CallbackQueryHandler,
-    CommandHandler,
+    ConversationHandler,
     MessageHandler,
+    CommandHandler,
+    ContextTypes,
     filters,
 )
-
-from modules import player_manager
-from modules.player.core import players_collection 
-from handlers.admin.utils import (
-    ADMIN_LIST,
-    ensure_admin, 
-    find_player_from_input,
-    cancelar_conversa,
-    confirmar_jogador,
-    jogador_confirmado,
-    INPUT_TEXTO,
-    CONFIRMAR_JOGADOR,
-)
+from modules import player_manager, game_data
+from handlers.admin.utils import ensure_admin
+from modules.player.premium import PremiumManager
 
 logger = logging.getLogger(__name__)
 
-# --- Constantes de Paginação e Estados ---
-PLAYERS_PER_PAGE = 5
-INACTIVE_DAYS = 30 
+# ---- States da conversa ----
+(ASK_NAME,) = range(1)
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-(MAIN_MENU, LIST_INACTIVE, PLAYER_DETAIL, CONFIRM_DELETE) = range(2, 6)
-ASK_PLAYER_TO_FIND = 7 
-
-
-# ==========================================================
-# PASSO 1: Menu Principal de Gestão
-# ==========================================================
-
-async def show_main_management_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, pdata: dict | None = None) -> int:
-    """Mostra o menu principal de gestão com estatísticas."""
-    query = update.callback_query
-    if query:
-        await query.answer()
-
+# ---------------------------------------------------------
+# Utilidades
+# ---------------------------------------------------------
+def _fmt_date(iso: Optional[str]) -> str:
+    if not iso: return "Permanente"
     try:
-        total_players = players_collection.count_documents({})
-        
-        inactive_date_limit = datetime.now(timezone.utc) - timedelta(days=INACTIVE_DAYS)
-        inactive_count = players_collection.count_documents(
-            {"last_seen": {"$lt": inactive_date_limit.isoformat()}}
-        )
-        
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        active_today_count = players_collection.count_documents(
-            {"last_seen": {"$gte": today_start.isoformat()}}
-        )
-        
-        text = [
-            "👥 <b>Gestão de Jogadores</b>\n",
-            f"<b>Total de Contas:</b> {total_players}",
-            f"<b>Ativos Hoje:</b> {active_today_count}",
-            f"<b>Inativos (+{INACTIVE_DAYS} dias):</b> {inactive_count}",
-            "\nEscolha uma opção:"
-        ]
-        
-        keyboard = [
-            [InlineKeyboardButton(f"📜 Listar Jogadores Inativos ({inactive_count})", callback_data="admin_pmanage_list:1")],
-            [InlineKeyboardButton("🔍 Encontrar Jogador (Nome/ID)", callback_data="admin_pmanage_find")],
-            [InlineKeyboardButton("⬅️ Voltar ao Admin", callback_data="admin_main")],
-        ]
-        
-        if query:
-            await query.edit_message_text(
-                "\n".join(text), 
-                reply_markup=InlineKeyboardMarkup(keyboard), 
-                parse_mode="HTML"
-            )
-        else:
-            await update.effective_message.reply_text(
-                "\n".join(text), 
-                reply_markup=InlineKeyboardMarkup(keyboard), 
-                parse_mode="HTML"
-            )
-            
-    except Exception as e:
-        logger.error(f"Erro ao carregar estatísticas de jogadores: {e}", exc_info=True)
-        await update.effective_message.reply_text(f"Erro ao carregar estatísticas: {e}")
-        
-    return MAIN_MENU
+        dt = datetime.fromisoformat(iso)
+        if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
+    except Exception: return iso
 
-# ==========================================================
-# PASSO 2: Listar Jogadores Inativos (Paginado)
-# ==========================================================
+def _get_user_target(context: ContextTypes.DEFAULT_TYPE) -> Optional[int]:
+    return context.user_data.get("premium_target_uid")
 
-async def list_inactive_players(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1) -> int:
-    """Mostra a lista paginada de jogadores inativos."""
+def _set_user_target(context: ContextTypes.DEFAULT_TYPE, uid: int, name: str) -> None:
+    context.user_data["premium_target_uid"] = int(uid)
+    context.user_data["premium_target_name"] = name
+
+def _panel_text(user_id: int, pdata: dict) -> str:
+    name = pdata.get("character_name") or f"Jogador {user_id}"
+    
+    premium = PremiumManager(pdata)
+    tier = premium.tier
+    tier_disp = game_data.PREMIUM_TIERS.get(tier, {}).get("display_name", "Free") if tier else "Free"
+    exp_date = premium.expiration_date
+    exp_disp = _fmt_date(exp_date.isoformat()) if exp_date else "Permanente"
+
+    return (
+        "🔥 <b>Painel Premium</b>\n\n"
+        f"<b>Usuário:</b> {name} <code>({user_id})</code>\n"
+        f"<b>Tier Atual:</b> {tier_disp}\n"
+        f"<b>Expira em:</b> {exp_disp}\n\n"
+        "Selecione uma ação:"
+    )
+
+def _panel_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton("🆓 Free", callback_data="prem_tier:free"),
+            InlineKeyboardButton("⭐ Premium", callback_data="prem_tier:premium"),
+            InlineKeyboardButton("💎 VIP", callback_data="prem_tier:vip"),
+            InlineKeyboardButton("👑 Lenda", callback_data="prem_tier:lenda"),
+        ],
+        [
+            InlineKeyboardButton("➕ 1 Dia", callback_data="prem_add:1"),
+            InlineKeyboardButton("➕ 7 Dias", callback_data="prem_add:7"),
+            InlineKeyboardButton("➕ 30 Dias", callback_data="prem_add:30"),
+        ],
+        [
+             InlineKeyboardButton("🚫 Remover Premium", callback_data="prem_clear"),
+        ],
+        [
+            InlineKeyboardButton("🔎 Trocar Usuário", callback_data="prem_change_user"),
+            InlineKeyboardButton("❌ Fechar Painel", callback_data="prem_close"),
+        ],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+# ---------------------------------------------------------
+# Entrada e Gestão da Conversa
+# ---------------------------------------------------------
+async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
-    await query.answer()
+    try: await query.answer()
+    except: pass
 
-    inactive_date_limit = datetime.now(timezone.utc) - timedelta(days=INACTIVE_DAYS)
+    prompt = (
+        "🔥 <b>Painel Premium</b>\n\n"
+        "Envie o <b>User ID</b> ou o <b>nome exato do personagem</b>.\n"
+        "Use /cancelar para sair."
+    )
+    keyboard = [[InlineKeyboardButton("❌ Fechar", callback_data="prem_close")]]
     
     try:
-        db_query = {
-            "$or": [
-                {"last_seen": {"$lt": inactive_date_limit.isoformat()}},
-                {"last_seen": {"$exists": False}}
-            ]
-        }
-        
-        total_inactive = players_collection.count_documents(db_query)
-        total_pages = math.ceil(total_inactive / PLAYERS_PER_PAGE)
-        page = max(1, min(page, total_pages)) 
-        
-        start_index = (page - 1) * PLAYERS_PER_PAGE
-        
-        cursor = players_collection.find(db_query).sort("last_seen", 1).skip(start_index).limit(PLAYERS_PER_PAGE)
-        
-        inactive_list = list(cursor)
-        
-        text = [f"👥 <b>Jogadores Inativos (+{INACTIVE_DAYS} dias)</b> - Página {page}/{total_pages}\n"]
-        keyboard = []
+        await query.edit_message_text(prompt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    except BadRequest:
+        # Se falhar (ex: msg antiga sem texto), envia nova
+        if query.message:
+             await context.bot.send_message(chat_id=query.message.chat.id, text=prompt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
-        if not inactive_list:
-            text.append("<i>Nenhum jogador inativo encontrado.</i>")
-        
-        for pdata in inactive_list:
-            user_id = pdata["_id"]
-            name = pdata.get("character_name", f"ID {user_id}")
-            
-            last_seen_iso = pdata.get("last_seen", "Nunca")
-            if last_seen_iso != "Nunca":
-                try:
-                    last_seen_dt = datetime.fromisoformat(last_seen_iso)
-                    last_seen_str = last_seen_dt.strftime("%d/%m/%Y")
-                except Exception:
-                    last_seen_str = "Data Inválida"
-            else:
-                last_seen_str = "Nunca"
+    context.user_data.pop("premium_target_uid", None)
+    context.user_data.pop("premium_target_name", None)
+    return ASK_NAME
 
-            button_text = f"👤 {name} (Visto em: {last_seen_str})"
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"admin_pmanage_detail:{user_id}")])
+async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not await ensure_admin(update): return ConversationHandler.END
 
-        nav_row = []
-        if page > 1:
-            nav_row.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"admin_pmanage_list:{page-1}"))
-        if page < total_pages:
-            nav_row.append(InlineKeyboardButton("Próxima ➡️", callback_data=f"admin_pmanage_list:{page+1}"))
-        
-        if nav_row:
-            keyboard.append(nav_row)
-            
-        keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="admin_pmanage_main")])
-        
-        await query.edit_message_text(
-            "\n".join(text), 
-            reply_markup=InlineKeyboardMarkup(keyboard), 
-            parse_mode="HTML"
-        )
-        
-    except Exception as e:
-        logger.error(f"Erro ao listar jogadores inativos: {e}", exc_info=True)
-        await query.edit_message_text(f"Erro ao listar jogadores: {e}")
-
-    return LIST_INACTIVE
-
-# Callback para os botões de página
-async def list_inactive_pager(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    page = int(update.callback_query.data.split(':')[-1])
-    await list_inactive_players(update, context, page=page)
-    return LIST_INACTIVE
-
-# ==========================================================
-# PASSO 3: Detalhes do Jogador
-# ==========================================================
-
-async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Mostra os detalhes de um jogador específico e opções de moderação."""
-    query = update.callback_query
-    await query.answer()
+    target_input = (update.message.text or "").strip()
+    user_id, pdata = None, None
 
     try:
-        target_user_id = int(query.data.split(':')[-1])
-    except (ValueError, IndexError):
-        await query.edit_message_text("Erro: ID do jogador inválido.")
-        return await show_main_management_menu(update, context) 
-    
-    context.user_data['target_user_id'] = target_user_id
-    
-    pdata = await player_manager.get_player_data(target_user_id)
+        user_id_int = int(target_input)
+        pdata_found = await player_manager.get_player_data(user_id_int)
+        if pdata_found:
+            user_id = user_id_int
+            pdata = pdata_found
+    except ValueError:
+        found_by_name = await player_manager.find_player_by_name(target_input)
+        if found_by_name:
+            user_id, pdata = found_by_name
+
     if not pdata:
-        await query.edit_message_text(f"Erro: Jogador <code>{target_user_id}</code> não encontrado.")
-        return MAIN_MENU
+        await update.message.reply_text(
+            "❌ Jogador não encontrado. Tente novamente com o <b>User ID</b> ou o <b>nome exato</b>.\n"
+            "Use /cancelar para sair.", parse_mode="HTML"
+        )
+        return ASK_NAME
 
+    player_name = pdata.get("character_name", f"ID: {user_id}")
+    _set_user_target(context, user_id, player_name)
+
+    text = _panel_text(user_id, pdata)
+    await update.message.reply_text(text, reply_markup=_panel_keyboard(), parse_mode="HTML")
+
+    return ASK_NAME
+
+# ---------------------------------------------------------
+# Ações do painel (Callbacks)
+# ---------------------------------------------------------
+
+# --- Helper para edição segura ---
+async def _safe_edit(query, text, keyboard):
+    """Tenta editar a mensagem ignorando erro de 'não modificado'."""
     try:
-        created_at_dt = datetime.fromisoformat(pdata.get("created_at", ""))
-        created_at_str = created_at_dt.strftime("%d/%m/%Y às %H:%M")
-    except Exception:
-        created_at_str = "Desconhecida"
-        
-    try:
-        last_seen_dt = datetime.fromisoformat(pdata.get("last_seen", ""))
-        last_seen_str = last_seen_dt.strftime("%d/%m/%Y às %H:%M")
-    except Exception:
-        last_seen_str = "Desconhecida"
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
+    except BadRequest as e:
+        if "not modified" in str(e):
+            pass # Ignora se o texto for igual
+        else:
+            raise e # Levanta outros erros
+    except Exception as e:
+        logger.error(f"Erro genérico ao editar mensagem: {e}")
 
-    name = pdata.get("character_name", "N/A")
-    level = pdata.get("level", 1)
-    
-    text = [
-        f"👤 <b>Detalhes de {name}</b>",
-        f"<b>ID:</b> <code>{target_user_id}</code>",
-        f"<b>Nível:</b> {level}",
-        f"<b>Conta Criada:</b> {created_at_str}",
-        f"<b>Última Interação:</b> {last_seen_str}",
-        "\nO que deseja fazer?"
-    ]
-    
-    keyboard = [
-        [InlineKeyboardButton("🗑️ APAGAR ESTE JOGADOR", callback_data=f"admin_pmanage_delconf:{target_user_id}")],
-        [InlineKeyboardButton("⬅️ Voltar para a Lista", callback_data="admin_pmanage_list:1")],
-        [InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="admin_pmanage_main")],
-    ]
-    
-    await query.edit_message_text(
-        "\n".join(text), 
-        reply_markup=InlineKeyboardMarkup(keyboard), 
-        parse_mode="HTML"
-    )
-    return PLAYER_DETAIL
-
-# ==========================================================
-# PASSO 4: Apagar Jogador (Confirmação e Execução)
-# ==========================================================
-
-async def confirm_delete_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Mostra o botão de confirmação final para apagar."""
+async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
     await query.answer()
+    target_uid = _get_user_target(context)
+    if not target_uid:
+        await query.answer("Erro: Alvo perdido.", show_alert=True)
+        return ASK_NAME
 
-    target_user_id = int(query.data.split(':')[-1])
-    context.user_data['target_user_id'] = target_user_id 
-    
-    pdata = await player_manager.get_player_data(target_user_id)
-    name = pdata.get("character_name", f"ID {target_user_id}") if pdata else f"ID {target_user_id}"
+    new_tier = (query.data or "prem_tier:free").split(":", 1)[1]
 
-    text = (
-        f"‼️ <b>ATENÇÃO: AÇÃO IRREVERSÍVEL</b> ‼️\n\n"
-        f"Você tem <b>ABSOLUTA CERTEZA</b> que quer apagar o jogador <b>{name}</b> (<code>{target_user_id}</code>)?\n\n"
-        f"Todos os dados (inventário, progresso, etc) serão perdidos permanentemente."
-    )
-    
-    keyboard = [
-        [InlineKeyboardButton("✅ SIM, APAGAR PERMANENTEMENTE", callback_data=f"admin_pmanage_dodelete:{target_user_id}")],
-        [InlineKeyboardButton("❌ NÃO, CANCELAR", callback_data=f"admin_pmanage_detail:{target_user_id}")],
-    ]
-    
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-    return CONFIRM_DELETE
-
-async def execute_delete_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Executa a exclusão do jogador."""
-    query = update.callback_query
-    await query.answer("Processando exclusão...")
-
-    target_user_id = int(query.data.split(':')[-1])
-    
     try:
-        deleted_ok = player_manager.delete_player(target_user_id)
+        pdata = await player_manager.get_player_data(target_uid)
+        if not pdata: raise ValueError("Dados não encontrados.")
+
+        premium = PremiumManager(pdata)
+        premium.set_tier(new_tier)
+        await player_manager.save_player_data(target_uid, premium.player_data)
+
+        updated_pdata = (await player_manager.get_player_data(target_uid)) or pdata
+        text = _panel_text(target_uid, updated_pdata)
         
-        if deleted_ok:
-            await query.edit_message_text(f"✅ Jogador <code>{target_user_id}</code> foi apagado com sucesso.")
-        else:
-            await query.edit_message_text(f"⚠️ Jogador <code>{target_user_id}</code> não foi encontrado na base de dados.")
-            
+        # Usa o helper seguro
+        await _safe_edit(query, text, _panel_keyboard())
+
     except Exception as e:
-        logger.error(f"Erro ao tentar apagar jogador {target_user_id}: {e}", exc_info=True)
-        await query.edit_message_text(f"Ocorreu um erro ao apagar o jogador: {e}")
+        logger.error(f"Erro set tier: {e}")
+        await query.answer(f"❌ Erro: {e}", show_alert=True)
 
+    return ASK_NAME
+
+async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Adiciona dias e trata o erro de Message Not Modified."""
+    if not await ensure_admin(update): return ConversationHandler.END
+    query = update.callback_query
+    target_uid = _get_user_target(context)
+    
+    if not target_uid:
+        await query.answer("Erro: Alvo perdido.", show_alert=True)
+        return ASK_NAME
+
+    try:
+        days_str = (query.data or "prem_add:1").split(":", 1)[1]
+        days = int(days_str)
+    except:
+        return ASK_NAME
+
+    # Feedback visual imediato (pop-up)
+    await query.answer(f"Processando +{days} dias...")
+
+    try:
+        pdata = await player_manager.get_player_data(target_uid)
+        if not pdata: raise ValueError("Jogador não encontrado no DB.")
+
+        current_tier = pdata.get("premium_tier") or "premium"
+        if current_tier == "free": current_tier = "premium"
+
+        premium = PremiumManager(pdata)
+        premium.grant_days(tier=current_tier, days=days)
+        
+        # Salva
+        await player_manager.save_player_data(target_uid, premium.player_data)
+
+        # Recarrega os dados para garantir visualização correta
+        updated_pdata = await player_manager.get_player_data(target_uid)
+        
+        # Gera o novo texto
+        text = _panel_text(target_uid, updated_pdata)
+        
+        # --- CORREÇÃO PRINCIPAL AQUI ---
+        # Tenta editar. Se o texto for igual (erro not modified), ignora silenciosamente.
+        try:
+            await query.edit_message_text(
+                text=text,
+                parse_mode="HTML",
+                reply_markup=_panel_keyboard()
+            )
+        except BadRequest as e:
+            if "not modified" in str(e):
+                # Opcional: avisar no log, mas não travar
+                # logger.info("Mensagem não modificada (dias adicionados visualmente idênticos?)")
+                pass 
+            else:
+                raise e # Se for outro erro (ex: chat not found), relança
+
+    except Exception as e:
+        logger.error(f"Erro add days: {e}", exc_info=True)
+        await query.answer(f"❌ Falha: {e}", show_alert=True)
+
+    return ASK_NAME
+
+async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not await ensure_admin(update): return ConversationHandler.END
+    query = update.callback_query
+    target_uid = _get_user_target(context)
+    if not target_uid:
+        await query.answer("Erro: Alvo perdido.", show_alert=True)
+        return ASK_NAME
+
+    await query.answer("Revogando...")
+
+    try:
+        pdata = await player_manager.get_player_data(target_uid)
+        if not pdata: raise ValueError("Dados não encontrados.")
+
+        premium = PremiumManager(pdata)
+        premium.revoke()
+        await player_manager.save_player_data(target_uid, premium.player_data)
+
+        updated_pdata = (await player_manager.get_player_data(target_uid)) or pdata
+        text = _panel_text(target_uid, updated_pdata)
+        
+        await _safe_edit(query, text, _panel_keyboard())
+
+    except Exception as e:
+        logger.error(f"Erro clear: {e}")
+        await query.answer(f"❌ Erro: {e}", show_alert=True)
+
+    return ASK_NAME
+
+async def _action_change_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not await ensure_admin(update): return ConversationHandler.END
+    return await _entry_from_callback(update, context)
+
+async def _action_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    try: await query.answer()
+    except: pass
+    try: await query.delete_message()
+    except: pass
     context.user_data.clear()
-    await asyncio.sleep(3)
-    return await show_main_management_menu(update, context)
+    return ConversationHandler.END
 
-# ==========================================================
-# PASSO 5: Encontrar Jogador (Fluxo de Busca)
-# ==========================================================
+async def _cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Operação cancelada.")
+    context.user_data.clear()
+    return ConversationHandler.END
 
-async def ask_find_player_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Pede o ID ou Nome do jogador para a busca."""
-    await update.callback_query.answer()
-    await update.callback_query.edit_message_text(
-        "🔍 <b>Encontrar Jogador</b>\n\n"
-        "Envie o ID (número) ou o Nome exato do personagem que você quer ver.\n\n"
-        "Use /cancelar para sair.",
-        parse_mode="HTML"
-    )
-    return ASK_PLAYER_TO_FIND 
+async def _premium_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_admin(update): return
+    if not context.args:
+        await update.message.reply_text("Uso: /premium_user <user_id>")
+        return
+    try: uid = int(context.args[0])
+    except: return
 
-async def show_player_detail_from_find(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Função intermediária. O 'confirmar_jogador' (do utils) já encontrou 
-    o jogador. Agora, vamos forjar um callback para o menu de detalhes.
-    """
-    target_user_id = context.user_data.get('target_user_id')
-    if not target_user_id:
-        await update.message.reply_text("Erro ao encontrar o jogador. Tente novamente.")
-        return await show_main_management_menu(update, context)
+    pdata = await player_manager.get_player_data(uid)
+    if not pdata:
+        await update.message.reply_text("Não encontrado.")
+        return
 
-    fake_query_data = f"admin_pmanage_detail:{target_user_id}"
-    
-    fake_query = CallbackQuery(
-        id="fake_query_id", 
-        from_user=update.effective_user, 
-        chat_instance="", 
-        data=fake_query_data, 
-        message=update.effective_message
-    )
-    
-    fake_update = Update(update_id=update.update_id, callback_query=fake_query)
-    
-    return await show_player_detail(fake_update, context)
+    player_name = pdata.get("character_name", f"ID: {uid}")
+    _set_user_target(context, uid, player_name)
+    await update.message.reply_text(_panel_text(uid, pdata), parse_mode="HTML", reply_markup=_panel_keyboard())
 
-
-# ==========================================================
-# Handler da Conversa
-# ==========================================================
-
-player_management_conv_handler = ConversationHandler(
+# ---------------------------------------------------------
+# Exports
+# ---------------------------------------------------------
+premium_panel_handler = ConversationHandler(
     entry_points=[
-        CallbackQueryHandler(show_main_management_menu, pattern=r"^admin_pmanage_main$")
+        CallbackQueryHandler(_entry_from_callback, pattern=r'^admin_premium$'),
     ],
     states={
-        MAIN_MENU: [
-            CallbackQueryHandler(list_inactive_pager, pattern=r"^admin_pmanage_list:"),
-            CallbackQueryHandler(ask_find_player_input, pattern=r"^admin_pmanage_find$"),
-            CallbackQueryHandler(show_main_management_menu, pattern=r"^admin_main$"), 
-        ],
-        LIST_INACTIVE: [
-            CallbackQueryHandler(show_player_detail, pattern=r"^admin_pmanage_detail:"),
-            CallbackQueryHandler(list_inactive_pager, pattern=r"^admin_pmanage_list:"),
-            CallbackQueryHandler(show_main_management_menu, pattern=r"^admin_pmanage_main$"),
-        ],
-        PLAYER_DETAIL: [
-            CallbackQueryHandler(confirm_delete_player, pattern=r"^admin_pmanage_delconf:"),
-            CallbackQueryHandler(list_inactive_pager, pattern=r"^admin_pmanage_list:"), 
-            CallbackQueryHandler(show_main_management_menu, pattern=r"^admin_pmanage_main$"),
-        ],
-        CONFIRM_DELETE: [
-            CallbackQueryHandler(execute_delete_player, pattern=r"^admin_pmanage_dodelete:"),
-            CallbackQueryHandler(show_player_detail, pattern=r"^admin_pmanage_detail:"), 
-        ],
-        ASK_PLAYER_TO_FIND: [ 
-            MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), confirmar_jogador(show_player_detail_from_find))
-        ],
-        CONFIRMAR_JOGADOR: [ 
-             CallbackQueryHandler(jogador_confirmado(show_player_detail_from_find), pattern=r"^confirm_player_")
+        ASK_NAME: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, _receive_name_or_id),
+            CallbackQueryHandler(_action_set_tier, pattern=r"^prem_tier:(free|premium|vip|lenda)$"),
+            CallbackQueryHandler(_action_add_days, pattern=r"^prem_add:(\d+)$"),
+            CallbackQueryHandler(_action_clear, pattern=r"^prem_clear$"),
+            CallbackQueryHandler(_action_change_user, pattern=r"^prem_change_user$"),
+            CallbackQueryHandler(_action_close, pattern=r"^prem_close$"),
         ],
     },
     fallbacks=[
-        CommandHandler("cancelar", cancelar_conversa, filters=filters.User(ADMIN_LIST)),
-        CallbackQueryHandler(cancelar_conversa, pattern=r"^cancelar_admin_conv$"),
-        CallbackQueryHandler(show_main_management_menu, pattern=r"^admin_main$"),
+        CommandHandler("cancelar", _cmd_cancel),
+        CallbackQueryHandler(_action_close, pattern=r"^prem_close$"),
     ],
-    per_message=False
+    name="premium_panel_conv",
+    persistent=False,
 )
+
+premium_command_handler = CommandHandler("premium_user", _premium_user_cmd, filters=filters.User(ADMIN_ID))

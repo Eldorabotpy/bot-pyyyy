@@ -1,7 +1,7 @@
 # handlers/gem_shop.py
 import logging
 from typing import Dict, List
-
+from telegram.error import BadRequest
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 
@@ -140,7 +140,12 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # pode ser chamado por callback ou por comando /gemas
     q = update.callback_query
     if q:
-        await q.answer()
+        # Não usamos await q.answer() aqui se formos editar logo em seguida, 
+        # mas para garantir feedback visual imediato, pode manter.
+        try:
+            await q.answer()
+        except:
+            pass
         chat_id = update.effective_chat.id
         user_id = q.from_user.id
     else:
@@ -167,19 +172,33 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines.append(f"Selecionado: <b>{name}</b> — {price} 💎/un")
 
     kb = _build_shop_keyboard(base_id, qty)
+    text_content = "\n".join(lines)
 
     if q:
+        # --- CORREÇÃO DO ERRO "MESSAGE NOT MODIFIED" ---
         try:
-            await q.edit_message_caption(caption="\n".join(lines), reply_markup=kb, parse_mode="HTML")
-            return
+            # Tenta editar se for uma mensagem com foto (caption)
+            await q.edit_message_caption(caption=text_content, reply_markup=kb, parse_mode="HTML")
+        except BadRequest as e:
+            # Se o erro for "não modificado", ignoramos
+            if "not modified" in str(e):
+                return
+            
+            # Se falhar porque não tem caption (é texto puro), tentamos editar texto
+            try:
+                await q.edit_message_text(text=text_content, reply_markup=kb, parse_mode="HTML")
+            except BadRequest as e2:
+                if "not modified" in str(e2):
+                    return
+                # Se for outro erro, pode ser útil logar ou ignorar
+                pass
         except Exception:
+            # Fallback genérico
             pass
-        try:
-            await q.edit_message_text(text="\n".join(lines), reply_markup=kb, parse_mode="HTML")
-            return
-        except Exception:
-            pass
-    await context.bot.send_message(chat_id=chat_id, text="\n".join(lines), reply_markup=kb, parse_mode="HTML")
+        return
+
+    # Se não for callback (foi comando /gemas), envia nova mensagem
+    await context.bot.send_message(chat_id=chat_id, text=text_content, reply_markup=kb, parse_mode="HTML")
 
 async def gem_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
