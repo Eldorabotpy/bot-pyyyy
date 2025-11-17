@@ -1,4 +1,4 @@
-# handlers/profile_handler.py (VERSÃO FINALÍSSIMA CORRIGIDA)
+# handlers/profile_handler.py
 
 import logging
 import unicodedata
@@ -14,7 +14,6 @@ from modules import player_manager, game_data
 from modules import file_ids
 from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
-from modules.player import stats as player_stats
 from modules.player import stats as player_stats
 from modules.game_data.class_evolution import can_player_use_skill
 
@@ -59,8 +58,6 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
     
 
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
-
-    classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(cls) or {}
     for k in ("profile_file_id_key", "profile_media_key", "file_id_name", "status_file_id_key", "file_id_key"):
         if cls_cfg and cls_cfg.get(k):
@@ -78,9 +75,7 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
         tried.append(key)
         fd = file_ids.get_file_data(key)
         if fd and fd.get("id"):
-            logger.info("[PROFILE_MEDIA] purpose=%s class=%s slug=%s chosen=%s", purpose, raw_cls, cls, key)
             return fd
-    logger.info("[PROFILE_MEDIA] purpose=%s class=%s slug=%s chosen=None tried=%s", purpose, raw_cls, cls, tried)
     return None
 
 async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -425,17 +420,30 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location_key = player_data.get('current_location', 'reino_eldora')
     location_name = (game_data.REGIONS_DATA or {}).get(location_key, {}).get('display_name', 'Lugar Desconhecido')
 
-    # ===== BLOCO PREMIUM =====
+    # ===== BLOCO PREMIUM (FORÇA BRUTA VISUAL) =====
     premium_line = ""
-    premium = PremiumManager(player_data)
-    if premium.is_premium():
-        tier_name = premium.tier.capitalize() if premium.tier else "Premium"
-        exp_date = premium.expiration_date
-        premium_line = f"\n👑 <b>Status Premium:</b> {tier_name}"
-        if exp_date:
-            premium_line += f"\n(Expira em: {exp_date.strftime('%d/%m/%Y')})"
+    # Lê direto do dicionário para ignorar qualquer lógica complexa da classe
+    raw_tier = player_data.get("premium_tier")
+    raw_exp = player_data.get("premium_expiration")
+
+    if raw_tier and raw_tier != "free":
+        tier_name = raw_tier.capitalize()
+        
+        if raw_exp:
+            try:
+                # Tenta formatar a data ISO gravada
+                dt_exp = datetime.fromisoformat(raw_exp)
+                if dt_exp.tzinfo is None: 
+                    dt_exp = dt_exp.replace(tzinfo=timezone.utc)
+                
+                fmt_date = dt_exp.strftime('%d/%m/%Y %H:%M UTC')
+                premium_line = f"\n👑 <b>Status Premium:</b> {tier_name}\n(Expira em: {fmt_date})"
+            except Exception:
+                # Se a data estiver corrompida, mostra erro mas não permanente
+                premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Data Inválida)"
         else:
-            premium_line += " (Permanente)"
+            # Só mostra permanente se REALMENTE não tiver data
+            premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Permanente)"
     
     # ===== XP, Profissão, Classe =====
     # <<< CORREÇÃO 3: Remove await AQUI >>>

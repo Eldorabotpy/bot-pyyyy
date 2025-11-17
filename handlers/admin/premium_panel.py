@@ -198,7 +198,7 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    VERSÃO NUCLEAR: Define a data e DELETA qualquer chave que possa estar travando o status como Permanente.
+    VERSÃO DETETIVE: Limpeza profunda e LOG das chaves no terminal para debug.
     """
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
@@ -214,18 +214,52 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     except:
         return ASK_NAME
 
-    await query.answer(f"Forçando data e limpando travas...")
+    await query.answer(f"Limpando dados e definindo +{days} dias...")
 
     try:
-        # 1. Pega os dados frescos
         pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Jogador não encontrado.")
 
-        # 2. Define a nova data (Começando de agora se for 'permanente' antigo)
+        # --- 1. LOG PARA DEBUG (Olhe no seu terminal após clicar!) ---
+        logger.info(f"--- CHAVES ATUAIS DO JOGADOR {target_uid} ---")
+        keys_list = list(pdata.keys())
+        logger.info(f"Chaves: {keys_list}")
+        # Se houver sub-dicionários suspeitos, logamos também
+        if "premium" in pdata and isinstance(pdata["premium"], dict):
+            logger.info(f"Conteúdo de 'premium': {pdata['premium']}")
+        if "vip" in pdata:
+            logger.info(f"Conteúdo de 'vip': {pdata['vip']}")
+        logger.info("------------------------------------------------")
+
+        # --- 2. LIMPEZA AGRESSIVA ---
+        # Lista de chaves suspeitas que podem travar o perfil em Permanente
+        suspeitos = [
+            "is_permanent", "permanent", "premium_permanent", "infinite_premium", 
+            "is_founder", "lifetime", "donator", "patron", "vip_permanent",
+            "vip_data", "premium_flags", "custom_title"
+        ]
+        
+        removidos = []
+        for chave in suspeitos:
+            if chave in pdata:
+                del pdata[chave]
+                removidos.append(chave)
+        
+        # Verifica se existe um sub-dicionário antigo 'premium' e o remove/limpa
+        # (Algumas versões salvam pdata['premium'] = {'permanent': True})
+        if "premium" in pdata and isinstance(pdata["premium"], dict):
+            removidos.append(f"premium_dict: {pdata['premium']}")
+            del pdata["premium"] # Deleta o objeto inteiro para recriar limpo se precisar
+
+        if removidos:
+            logger.info(f"♻️ LIMPEZA: Removeu as chaves travadas: {removidos}")
+
+        # --- 3. DEFINE A DATA ---
         now = datetime.now(timezone.utc)
         current_exp_iso = pdata.get("premium_expiration")
         new_date = None
 
+        # Lógica de soma de data
         if not current_exp_iso:
             new_date = now + timedelta(days=days)
         else:
@@ -239,47 +273,23 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             except:
                 new_date = now + timedelta(days=days)
 
-        # 3. Grava a data
         pdata["premium_expiration"] = new_date.isoformat()
         
-        # ==================================================================
-        # AQUI ESTÁ A CORREÇÃO PARA O SEU PROBLEMA DO PERFIL
-        # Vamos deletar qualquer chave que possa estar forçando "Permanente"
-        # ==================================================================
-        travas_comuns = [
-            "is_permanent", 
-            "permanent", 
-            "premium_permanent", 
-            "infinite_premium", 
-            "is_founder",
-            "lifetime"
-        ]
-        
-        travas_removidas = []
-        for chave in travas_comuns:
-            if chave in pdata:
-                del pdata[chave]
-                travas_removidas.append(chave)
-        
-        if travas_removidas:
-            logger.info(f"Travas removidas do jogador {target_uid}: {travas_removidas}")
-
-        # 4. Garante o Tier correto
+        # Garante o Tier
         tier_atual = pdata.get("premium_tier")
         if not tier_atual or tier_atual == "free":
              pdata["premium_tier"] = "premium"
 
-        # 5. Salva no Banco
+        # --- 4. SALVA E ATUALIZA ---
         await player_manager.save_player_data(target_uid, pdata)
 
-        # 6. Atualiza o Painel Admin
         updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
         
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
-        logger.error(f"Erro nuclear add days: {e}", exc_info=True)
+        logger.error(f"Erro detetive add days: {e}", exc_info=True)
         await query.answer(f"❌ Erro: {e}", show_alert=True)
 
     return ASK_NAME
