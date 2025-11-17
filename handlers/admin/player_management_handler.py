@@ -1,9 +1,10 @@
 # handlers/admin/player_management_handler.py
 import logging
 import math
+import asyncio
 from datetime import datetime, timezone, timedelta
-import asyncio # <--- CORREÇÃO 1: ADICIONADO
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery # <--- CORREÇÃO 2: ADICIONADO
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
@@ -180,7 +181,11 @@ async def list_inactive_pager(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Mostra os detalhes de um jogador específico e opções de moderação."""
     query = update.callback_query
-    await query.answer()
+    # Tenta responder ao callback para parar o reloginho de carregamento
+    try:
+        await query.answer()
+    except Exception:
+        pass
 
     try:
         target_user_id = int(query.data.split(':')[-1])
@@ -311,12 +316,14 @@ async def show_player_detail_from_find(update: Update, context: ContextTypes.DEF
 
     fake_query_data = f"admin_pmanage_detail:{target_user_id}"
     
+    # Cria um objeto CallbackQuery simulado para reutilizar a função show_player_detail
     fake_query = CallbackQuery(
         id="fake_query_id", 
         from_user=update.effective_user, 
-        chat_instance="", 
+        chat_instance="fake_instance", 
         data=fake_query_data, 
-        message=update.effective_message
+        message=update.effective_message,
+        _bot=context.bot # Necessário para .answer() funcionar no PTB v20+
     )
     
     fake_update = Update(update_id=update.update_id, callback_query=fake_query)
@@ -364,5 +371,7 @@ player_management_conv_handler = ConversationHandler(
         CallbackQueryHandler(cancelar_conversa, pattern=r"^cancelar_admin_conv$"),
         CallbackQueryHandler(show_main_management_menu, pattern=r"^admin_main$"),
     ],
+    name="player_management_conv",
+    persistent=False,
     per_message=False
 )

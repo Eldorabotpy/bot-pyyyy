@@ -3,10 +3,11 @@
 from __future__ import annotations
 import os
 import logging
-from datetime import datetime, timezone
+# --- IMPORTS CORRIGIDOS DE TEMPO ---
+from datetime import datetime, timezone, timedelta 
 from typing import Tuple, Optional
 
-# --- CORREÇÃO 1: Importar BadRequest para tratar o erro ---
+# --- IMPORT PARA TRATAR O ERRO 400 ---
 from telegram.error import BadRequest 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ---- States da conversa ----
 (ASK_NAME,) = range(1)
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0")) # Previne erro se .env falhar
 
 # ---------------------------------------------------------
 # Utilidades
@@ -48,11 +49,12 @@ def _set_user_target(context: ContextTypes.DEFAULT_TYPE, uid: int, name: str) ->
 def _panel_text(user_id: int, pdata: dict) -> str:
     name = pdata.get("character_name") or f"Jogador {user_id}"
     
-    premium = PremiumManager(pdata)
-    tier = premium.tier
+    # Lê direto do dicionário para garantir que mostre o que está no banco
+    tier = pdata.get("premium_tier")
+    exp_iso = pdata.get("premium_expiration")
+    
     tier_disp = game_data.PREMIUM_TIERS.get(tier, {}).get("display_name", "Free") if tier else "Free"
-    exp_date = premium.expiration_date
-    exp_disp = _fmt_date(exp_date.isoformat()) if exp_date else "Permanente"
+    exp_disp = _fmt_date(exp_iso)
 
     return (
         "🔥 <b>Painel Premium</b>\n\n"
@@ -104,7 +106,6 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         await query.edit_message_text(prompt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
     except BadRequest:
-        # Se falhar (ex: msg antiga sem texto), envia nova
         if query.message:
              await context.bot.send_message(chat_id=query.message.chat.id, text=prompt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -148,16 +149,16 @@ async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE
 # Ações do painel (Callbacks)
 # ---------------------------------------------------------
 
-# --- Helper para edição segura ---
 async def _safe_edit(query, text, keyboard):
     """Tenta editar a mensagem ignorando erro de 'não modificado'."""
     try:
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
     except BadRequest as e:
-        if "not modified" in str(e):
-            pass # Ignora se o texto for igual
+        if "not modified" in str(e) or "Message is not modified" in str(e):
+            pass 
         else:
-            raise e # Levanta outros erros
+            logger.error(f"Erro no _safe_edit: {e}")
+            # Não damos raise para não quebrar o fluxo, apenas logamos
     except Exception as e:
         logger.error(f"Erro genérico ao editar mensagem: {e}")
 
@@ -176,14 +177,17 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Dados não encontrados.")
 
-        premium = PremiumManager(pdata)
-        premium.set_tier(new_tier)
-        await player_manager.save_player_data(target_uid, premium.player_data)
+        # Define direto
+        pdata["premium_tier"] = new_tier
+        # Se virou Free, remove a data. Se virou outro, mantem a data (ou deixa permanente se não tiver)
+        if new_tier == "free":
+            pdata["premium_expiration"] = None
+        
+        await player_manager.save_player_data(target_uid, pdata)
 
-        updated_pdata = (await player_manager.get_player_data(target_uid)) or pdata
+        updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
         
-        # Usa o helper seguro
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
@@ -193,7 +197,10 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return ASK_NAME
 
 async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Adiciona dias e trata o erro de Message Not Modified."""
+    """
+    Força bruta: Calcula a data manualmente e insere no dicionário do jogador.
+    Resolve o problema de não adicionar dias em contas Permanentes ou bugadas.
+    """
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
     target_uid = _get_user_target(context)
@@ -208,47 +215,55 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     except:
         return ASK_NAME
 
-    # Feedback visual imediato (pop-up)
-    await query.answer(f"Processando +{days} dias...")
+    await query.answer(f"Adicionando +{days} dias...")
 
     try:
+        # 1. Pega os dados
         pdata = await player_manager.get_player_data(target_uid)
-        if not pdata: raise ValueError("Jogador não encontrado no DB.")
+        if not pdata: raise ValueError("Jogador não encontrado.")
 
-        current_tier = pdata.get("premium_tier") or "premium"
-        if current_tier == "free": current_tier = "premium"
-
-        premium = PremiumManager(pdata)
-        premium.grant_days(tier=current_tier, days=days)
+        # 2. Lógica Manual de Data
+        now = datetime.now(timezone.utc)
+        current_exp_iso = pdata.get("premium_expiration")
         
-        # Salva
-        await player_manager.save_player_data(target_uid, premium.player_data)
+        new_date = None
 
-        # Recarrega os dados para garantir visualização correta
+        if not current_exp_iso:
+            # Se é Permanente (None) ou Free (None), começa de AGORA + Dias
+            new_date = now + timedelta(days=days)
+        else:
+            try:
+                current_date = datetime.fromisoformat(current_exp_iso)
+                if current_date.tzinfo is None: current_date = current_date.replace(tzinfo=timezone.utc)
+                
+                if current_date > now:
+                    # Soma na data existente
+                    new_date = current_date + timedelta(days=days)
+                else:
+                    # Se já venceu, começa de agora
+                    new_date = now + timedelta(days=days)
+            except Exception:
+                new_date = now + timedelta(days=days)
+
+        # 3. Grava e Garante Tier
+        pdata["premium_expiration"] = new_date.isoformat()
+        
+        tier_atual = pdata.get("premium_tier")
+        if not tier_atual or tier_atual == "free":
+             pdata["premium_tier"] = "premium"
+
+        # 4. Salva
+        await player_manager.save_player_data(target_uid, pdata)
+
+        # 5. Atualiza Tela
         updated_pdata = await player_manager.get_player_data(target_uid)
-        
-        # Gera o novo texto
         text = _panel_text(target_uid, updated_pdata)
         
-        # --- CORREÇÃO PRINCIPAL AQUI ---
-        # Tenta editar. Se o texto for igual (erro not modified), ignora silenciosamente.
-        try:
-            await query.edit_message_text(
-                text=text,
-                parse_mode="HTML",
-                reply_markup=_panel_keyboard()
-            )
-        except BadRequest as e:
-            if "not modified" in str(e):
-                # Opcional: avisar no log, mas não travar
-                # logger.info("Mensagem não modificada (dias adicionados visualmente idênticos?)")
-                pass 
-            else:
-                raise e # Se for outro erro (ex: chat not found), relança
+        await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
-        logger.error(f"Erro add days: {e}", exc_info=True)
-        await query.answer(f"❌ Falha: {e}", show_alert=True)
+        logger.error(f"Erro add days força bruta: {e}", exc_info=True)
+        await query.answer(f"❌ Erro: {e}", show_alert=True)
 
     return ASK_NAME
 
@@ -260,17 +275,18 @@ async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await query.answer("Erro: Alvo perdido.", show_alert=True)
         return ASK_NAME
 
-    await query.answer("Revogando...")
+    await query.answer("Removendo Premium...")
 
     try:
         pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Dados não encontrados.")
 
-        premium = PremiumManager(pdata)
-        premium.revoke()
-        await player_manager.save_player_data(target_uid, premium.player_data)
+        pdata["premium_tier"] = "free"
+        pdata["premium_expiration"] = None
+        
+        await player_manager.save_player_data(target_uid, pdata)
 
-        updated_pdata = (await player_manager.get_player_data(target_uid)) or pdata
+        updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
         
         await _safe_edit(query, text, _panel_keyboard())
