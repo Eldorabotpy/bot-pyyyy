@@ -391,9 +391,12 @@ def allowed_points_for_level(pdata: dict) -> int:
 
 
 def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
-    """Opção A: XP Excedente (Carry-over)"""
+    """Opção A: XP Excedente (Carry-over) com Correção de Status"""
     levels_gained, points_gained = 0, 0
     current_xp = int(player_data.get('xp', 0))
+
+    # 1. Identifica a classe para saber quanto status ganha por nível
+    ckey = _get_class_key_normalized(player_data)
 
     while True:
         current_level = int(player_data.get('level', 1))
@@ -404,6 +407,28 @@ def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
 
         current_xp -= xp_needed
 
+        # --- CORREÇÃO: Atualização de Status ---
+        # Calcula quanto de status a classe tem no nível ATUAL e no PRÓXIMO
+        old_baseline = _compute_class_baseline_for_level(ckey, current_level)
+        new_baseline = _compute_class_baseline_for_level(ckey, current_level + 1)
+
+        # Para cada status base (HP, Atk, Def, etc...), aplica a diferença
+        for k in _BASELINE_KEYS:
+            stat_increase = new_baseline.get(k, 0) - old_baseline.get(k, 0)
+            if stat_increase > 0:
+                # Pega o valor atual salvo no jogador
+                current_val = int(player_data.get(k, old_baseline.get(k, 0)))
+                # Soma o aumento natural do nível
+                player_data[k] = current_val + stat_increase
+                
+                # Se for HP, cura o jogador pela quantidade ganha (UX melhor)
+                if k == "max_hp":
+                    current_hp = int(player_data.get("current_hp", current_val))
+                    player_data["current_hp"] = current_hp + stat_increase
+
+        # --- Fim da Correção ---
+
+        # Calcula pontos antes e depois de subir o nível
         old_allowed = allowed_points_for_level(player_data)
         player_data['level'] = current_level + 1
         new_allowed = allowed_points_for_level(player_data)
@@ -709,3 +734,41 @@ def mark_dungeon_as_completed(player_data: dict, dungeon_id: str, difficulty: st
 
     if difficulty not in player_data["dungeon_completions"][dungeon_id]:
         player_data["dungeon_completions"][dungeon_id].append(difficulty)
+
+async def apply_class_change_and_recalculate(player_data: dict, new_class_key: str):
+    """
+    Aplica a nova classe e recalcula os stats base retroativamente,
+    preservando os pontos que o jogador gastou manualmente.
+    """
+    lvl = _ival(player_data.get("level"), 1)
+    old_ckey = _get_class_key_normalized(player_data)
+    old_baseline = _compute_class_baseline_for_level(old_ckey, lvl)
+    invested_diffs = {}
+    for k in _BASELINE_KEYS:
+        current_val = _ival(player_data.get(k, old_baseline.get(k)))
+        base_val = _ival(old_baseline.get(k))
+        invested_diffs[k] = max(0, current_val - base_val)
+
+    player_data["class"] = new_class_key
+    player_data["class_key"] = new_class_key
+
+    if "class_tag" in player_data:
+        del player_data["class_tag"]
+
+    new_ckey = _get_class_key_normalized(player_data)
+    new_baseline = _compute_class_baseline_for_level(new_ckey, lvl)
+
+    for k in _BASELINE_KEYS:
+        new_base = _ival(new_baseline.get(k))
+        saved_investment = invested_diffs.get(k, 0)
+        player_data[k] = new_base + saved_investment
+
+
+    totals = await get_player_total_stats(player_data)
+    
+    player_data["current_hp"] = _ival(totals.get("max_hp"))
+    player_data["current_mp"] = _ival(totals.get("max_mana"))
+
+    player_data["class_choice_offered"] = True
+    
+    return player_data        

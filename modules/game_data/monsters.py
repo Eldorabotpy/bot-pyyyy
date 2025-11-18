@@ -3,119 +3,164 @@
 MONSTERS_DATA = {
 
     # --- MONSTROS ESPECIAIS DE EVOLUÇÃO ---
+    # --- MONSTROS ESPECIAIS DE EVOLUÇÃO ---
     "_evolution_trials": [
-        # --- Guardiões do Guerreiro ---
-        {"id": "guardian_of_the_aegis",
-          "name": "Guardião do Égide", 
-          "hp": 800, "attack": 40, "defense": 70, "initiative": 20, "luck": 10, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-          "media_key": "trial_guardian_aegis_media"},
-        {"id": "phantom_of_the_arena",
-          "name": "Fantasma da Arena", 
-          "hp": 650, "attack": 75, "defense": 30, "initiative": 60, "luck": 20, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-          "media_key": "trial_phantom_arena_media"},
-        {"id": "aspect_of_the_divine", 
-         "name": "Aspecto do Divino", 
+        
+        # ==================== GUARDÕES DO GUERREIRO ====================
+        {"id": "guardian_of_the_aegis", "name": "Guardião do Égide", 
+         "hp": 800, "attack": 40, "defense": 70, "initiative": 20, "luck": 10, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_guardian_aegis_media"}, # T2
+        {"id": "aspect_of_the_divine", "name": "Aspecto do Divino", 
          "hp": 2500, "attack": 120, "defense": 200, "initiative": 50, "luck": 30, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_aspect_divine_media"},
-
-        # --- Guardiões do Berserker ---
-        {"id": "primal_spirit_of_rage", 
-         "name": "Espírito Primordial da Fúria", 
+         "media_key": "trial_aspect_divine_media"}, # T3
+        {"id": "divine_sentinel", "name": "Sentinela Divina", 
+         "hp": 3500, "attack": 180, "defense": 250, "initiative": 70, "luck": 40, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_divine_sentinel_media"}, # T4
+        {"id": "celestial_bastion", "name": "Bastião Celestial", 
+         "hp": 5000, "attack": 250, "defense": 350, "initiative": 90, "luck": 50, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_celestial_bastion_media"}, # T5
+        {"id": "eldora_legend_guard", "name": "Guardião da Lenda", 
+         "hp": 7500, "attack": 400, "defense": 500, "initiative": 120, "luck": 60, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_eldora_legend_media"}, # T6
+        
+        # ==================== GUARDÕES DO BERSERKER ====================
+        {"id": "primal_spirit_of_rage", "name": "Espírito Primordial da Fúria", 
          "hp": 700, "attack": 85, "defense": 20, "initiative": 40, "luck": 15, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_spirit_rage_media"},
-        {"id": "guardian_of_the_mountain", 
-         "name": "Guardião da Montanha", 
-         "hp": 950, "attack": 60, "defense": 60, "initiative": 15, "luck": 5, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_guardian_mountain_media"},
-        {"id": "avatar_of_primal_wrath", 
-         "name": "Avatar da Ira Primordial", 
+         "media_key": "trial_spirit_rage_media"}, # T2
+        {"id": "avatar_of_primal_wrath", "name": "Avatar da Ira Primordial", 
          "hp": 2200, "attack": 250, "defense": 80, "initiative": 80, "luck": 25, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_avatar_wrath_media"},
+         "media_key": "trial_avatar_wrath_media"}, # T3
+        {"id": "primal_rage_incarnate", "name": "Encarnação da Raiva", 
+         "hp": 3000, "attack": 350, "defense": 120, "initiative": 100, "luck": 35, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_rage_incarnate_media"}, # T4
+        {"id": "calamity_bringer", "name": "Portador da Calamidade", 
+         "hp": 4800, "attack": 450, "defense": 150, "initiative": 130, "luck": 45, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_calamity_bringer_media"}, # T5
+        {"id": "wrath_god_incarnate", "name": "Encarnação do Deus da Ira", 
+         "hp": 7000, "attack": 650, "defense": 200, "initiative": 160, "luck": 60, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_wrath_god_media"}, # T6
 
-        # --- Guardiões do Caçador ---
-        {"id": "spirit_of_the_alpha_wolf", 
-         "name": "Espírito do Lobo Alfa", 
-         "hp": 600, "attack": 65, "defense": 30, "initiative": 70, "luck": 30, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_spirit_wolf_media"},
-        {"id": "phantom_of_the_watchtower", 
-         "name": "Fantasma da Atalaia", 
+        # ==================== GUARDÕES DO CAÇADOR ====================
+        {"id": "phantom_of_the_watchtower", "name": "Fantasma da Atalaia", 
          "hp": 550, "attack": 70, "defense": 25, "initiative": 65, "luck": 40, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_phantom_watchtower_media"},
-        {"id": "aspect_of_the_world_tree", 
-         "name": "Aspecto da Árvore-Mundo", 
-         "hp": 2400, "attack": 150, "defense": 120, "initiative": 130, "luck": 50, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_aspect_tree_media"},
-
-        # --- Guardiões do Monge ---
-        {"id": "statue_of_the_serene_fist", 
-         "name": "Estátua do Punho Sereno", 
-         "hp": 900, "attack": 35, "defense": 80, "initiative": 30, "luck": 10, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_statue_fist_media"},
-        {"id": "avatar_of_the_four_elements", 
-         "name": "Avatar dos Quatro Elementos", 
+         "media_key": "trial_phantom_watchtower_media"}, # T2
+        {"id": "sky_piercer_hawk", "name": "Falcão Perfurador", 
+         "hp": 1800, "attack": 150, "defense": 50, "initiative": 100, "luck": 55, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_sky_piercer_hawk_media"}, # T3
+        {"id": "spectral_marksman", "name": "Atirador Espectral", 
+         "hp": 2800, "attack": 250, "defense": 80, "initiative": 130, "luck": 70, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_spectral_marksman_media"}, # T4
+        {"id": "horizon_walker", "name": "Caminhante do Horizonte", 
+         "hp": 4000, "attack": 350, "defense": 110, "initiative": 160, "luck": 85, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_horizon_walker_media"}, # T5
+        {"id": "legend_of_the_bow", "name": "Lenda do Arco", 
+         "hp": 6000, "attack": 550, "defense": 150, "initiative": 200, "luck": 100, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_legend_bow_media"}, # T6
+        
+        # ==================== GUARDÕES DO MONGE ====================
+        {"id": "avatar_of_the_four_elements", "name": "Avatar dos Quatro Elementos", 
          "hp": 680, "attack": 70, "defense": 45, "initiative": 55, "luck": 20, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_avatar_elements_media"},
-        {"id": "echo_of_the_grandmaster", 
-         "name": "Eco do Grão-Mestre", 
+         "media_key": "trial_avatar_elements_media"}, # T2
+        {"id": "echo_of_the_grandmaster", "name": "Eco do Grão-Mestre", 
          "hp": 2300, "attack": 140, "defense": 180, "initiative": 150, "luck": 40, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_echo_grandmaster_media"},
+         "media_key": "trial_echo_grandmaster_media"}, # T3
+        {"id": "divine_hand", "name": "Mão Divina", 
+         "hp": 3300, "attack": 220, "defense": 220, "initiative": 180, "luck": 55, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_divine_hand_media"}, # T4
+        {"id": "inner_dragon_spirit", "name": "Espírito do Dragão", 
+         "hp": 4500, "attack": 300, "defense": 280, "initiative": 220, "luck": 70, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_inner_dragon_media"}, # T5
+        {"id": "legend_of_the_fist", "name": "Lenda do Punho", 
+         "hp": 6800, "attack": 450, "defense": 350, "initiative": 250, "luck": 85, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_legend_fist_media"}, # T6
 
-        # --- Guardiões do Mago ---
-        {"id": "shade_of_the_forbidden_library", 
-         "name": "Sombra da Biblioteca Proibida", 
-         "hp": 550, "attack": 80, "defense": 25, "initiative": 40, "luck": 25, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_shade_library_media"},
-        {"id": "raging_elemental_vortex", 
-         "name": "Vórtice Elemental Furioso", 
+        # ==================== GUARDÕES DO MAGO ====================
+        {"id": "raging_elemental_vortex", "name": "Vórtice Elemental Furioso", 
          "hp": 600, "attack": 90, "defense": 30, "initiative": 45, "luck": 15, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_raging_vortex_media"},
-        {"id": "essence_of_pure_magic", 
-         "name": "Essência da Magia Pura", 
+         "media_key": "trial_raging_vortex_media"}, # T2
+        {"id": "essence_of_pure_magic", "name": "Essência da Magia Pura", 
          "hp": 2000, "attack": 280, "defense": 90, "initiative": 100, "luck": 35, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_essence_magic_media"},
-
-        # --- Guardiões do Bardo ---
-        {"id": "echo_of_the_first_ballad", 
-         "name": "Eco da Primeira Balada", 
+         "media_key": "trial_essence_magic_media"}, # T3
+        {"id": "battlemage_prime", "name": "Mago de Batalha Prime", 
+         "hp": 3000, "attack": 350, "defense": 150, "initiative": 130, "luck": 50, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_battlemage_prime_media"}, # T4
+        {"id": "supreme_arcanist", "name": "Arcanista Supremo", 
+         "hp": 4200, "attack": 450, "defense": 180, "initiative": 160, "luck": 65, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_supreme_arcanist_media"}, # T5
+        {"id": "arcane_aspect", "name": "Aspecto Arcano", 
+         "hp": 6500, "attack": 600, "defense": 220, "initiative": 190, "luck": 80, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_arcane_aspect_media"}, # T6
+        
+        # ==================== GUARDÕES DO BARDO ====================
+        {"id": "silencing_critics", "name": "Críticos Silenciadores", 
          "hp": 750, "attack": 40, "defense": 50, "initiative": 50, "luck": 45, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_echo_ballad_media"},
-        {"id": "siren_of_the_lost_stage", 
-         "name": "Sereia do Palco Perdido", 
-         "hp": 650, "attack": 60, "defense": 40, "initiative": 60, "luck": 50, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_siren_stage_media"},
-        {"id": "avatar_of_the_grand_orchestra", 
-         "name": "Avatar da Grande Orquestra", 
-         "hp": 2400, "attack": 110, "defense": 130, "initiative": 140, "luck": 80, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_avatar_orchestra_media"},
+         "media_key": "trial_silencing_critics_media"}, # T2
+        {"id": "deafening_silence", "name": "Silêncio Ensurdecedor", 
+         "hp": 1900, "attack": 80, "defense": 100, "initiative": 120, "luck": 65, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_deafening_silence_media"}, # T3
+        {"id": "unruly_orchestra", "name": "Orquestra Descontrolada", 
+         "hp": 3000, "attack": 120, "defense": 150, "initiative": 150, "luck": 80, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_unruly_orchestra_media"}, # T4
+        {"id": "chaotic_harmony", "name": "Harmonia Caótica", 
+         "hp": 4500, "attack": 180, "defense": 200, "initiative": 180, "luck": 95, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_chaotic_harmony_media"}, # T5
+        {"id": "primordial_symphony", "name": "Sinfonia Primordial", 
+         "hp": 7000, "attack": 250, "defense": 280, "initiative": 220, "luck": 110, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_primordial_symphony_media"}, # T6
 
-        # --- Guardiões do Assassino ---
-        {"id": "doppelganger_of_the_throne", 
-         "name": "Doppelgänger do Trono", 
+        # ==================== GUARDÕES DO ASSASSINO ====================
+        {"id": "doppelganger_of_the_throne", "name": "Doppelgänger do Trono", 
          "hp": 600, "attack": 70, "defense": 35, "initiative": 80, "luck": 35, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_doppelganger_throne_media"},
-        {"id": "spirit_of_the_swamp_adder", 
-         "name": "Espírito da Víbora do Pântano", 
-         "hp": 620, "attack": 65, "defense": 40, "initiative": 60, "luck": 40, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_spirit_adder_media"},
-        {"id": "specter_of_the_silent_kill", 
-         "name": "Espectro do Abate Silencioso", 
-         "hp": 2100, "attack": 180, "defense": 100, "initiative": 200, "luck": 60, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_specter_kill_media"},
+         "media_key": "trial_doppelganger_throne_media"}, # T2
+        {"id": "quick_phantom", "name": "Fantasma Rápido", 
+         "hp": 1700, "attack": 160, "defense": 60, "initiative": 140, "luck": 50, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_quick_phantom_media"}, # T3
+        {"id": "dual_wielding_ronin", "name": "Ronin de Duas Lâminas", 
+         "hp": 2800, "attack": 280, "defense": 90, "initiative": 180, "luck": 65, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_dual_wielding_ronin_media"}, # T4
+        {"id": "shadow_of_fate", "name": "Sombra do Destino", 
+         "hp": 4000, "attack": 380, "defense": 120, "initiative": 220, "luck": 80, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_shadow_fate_media"}, # T5
+        {"id": "avatar_of_the_void", "name": "Avatar do Vazio", 
+         "hp": 6000, "attack": 550, "defense": 160, "initiative": 250, "luck": 95, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_avatar_void_media"}, # T6
 
-        # --- Guardiões do Samurai ---
-        {"id": "phantom_of_the_dojo", 
-         "name": "Fantasma do Dojo", 
+        # ==================== GUARDÕES DO SAMURAI ====================
+        {"id": "phantom_of_the_dojo", "name": "Fantasma do Dojo", 
          "hp": 720, "attack": 75, "defense": 45, "initiative": 50, "luck": 20, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_phantom_dojo_media"},
-        {"id": "spirit_of_the_wandering_warrior", 
-         "name": "Espírito do Guerreiro Errante", 
-         "hp": 800, "attack": 65, "defense": 65, "initiative": 40, "luck": 25, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_spirit_warrior_media"},
-        {"id": "avatar_of_the_first_emperor", 
-         "name": "Avatar do Primeiro Imperador", 
-         "hp": 2600, "attack": 160, "defense": 160, "initiative": 110, "luck": 40, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_avatar_emperor_media"},
+         "media_key": "trial_phantom_dojo_media"}, # T2
+        {"id": "master_swordsman_phantom", "name": "Fantasma Mestre Espadachim", 
+         "hp": 1900, "attack": 130, "defense": 100, "initiative": 80, "luck": 30, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_master_swordsman_media"}, # T3
+        {"id": "heavy_armored_general", "name": "General de Armadura Pesada", 
+         "hp": 3200, "attack": 180, "defense": 200, "initiative": 110, "luck": 45, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_heavy_armored_general_media"}, # T4
+        {"id": "spirit_of_honor", "name": "Espírito da Honra", 
+         "hp": 4800, "attack": 250, "defense": 280, "initiative": 140, "luck": 60, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_spirit_honor_media"}, # T5
+        {"id": "divine_blade_incarnate", "name": "Encarnação da Lâmina Divina", 
+         "hp": 7200, "attack": 380, "defense": 380, "initiative": 180, "luck": 80, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_divine_blade_media"}, # T6
+
+        # ==================== GUARDÕES DO CURANDEIRO (NOVO) ====================
+        {"id": "plague_carrier_specter", "name": "Espectro Portador da Peste", 
+         "hp": 700, "attack": 60, "defense": 35, "initiative": 40, "luck": 50, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_specter_plague_media"}, # T2
+        {"id": "unholy_inquisitor", "name": "Inquisidor Profano", 
+         "hp": 1800, "attack": 120, "defense": 100, "initiative": 70, "luck": 60, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_unholy_inquisitor_media"}, # T3
+        {"id": "avatar_of_restoration", "name": "Avatar da Restauração", 
+         "hp": 3000, "attack": 150, "defense": 180, "initiative": 100, "luck": 70, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_avatar_restoration_media"}, # T4
+        {"id": "void_prophet", "name": "Profeta do Vazio", 
+         "hp": 4500, "attack": 200, "defense": 250, "initiative": 130, "luck": 90, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_void_prophet_media"}, # T5
+        {"id": "divine_healer_legend", "name": "Lenda da Cura Divina", 
+         "hp": 7000, "attack": 350, "defense": 350, "initiative": 170, "luck": 110, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_healer_legend_media"}, # T6
     ],
+
+
     "defesa_reino": [
         {
             "id": "ond1_pequeno_slime",
@@ -413,7 +458,8 @@ MONSTERS_DATA = {
             "name": "Pequeno Slime",
             "hp": 15, "attack": 2, "defense": 1, "initiative": 5, "luck": 1,
             "xp_reward": 10, "gold_drop": 2,
-           # "loot_table": [{"item_id": "geleia_comum", "drop_chance": 60.0}],
+            "loot_table": [{"item_id": "frasco_com_agua", "drop_chance": 10}],
+           
             "media_key": "slime_pequeno_media"
         },
         {
@@ -421,23 +467,23 @@ MONSTERS_DATA = {
             "name": "Slime Verde",
             "hp": 25, "attack": 3, "defense": 2, "initiative": 3, "luck": 2,
             "xp_reward": 10, "gold_drop": 3,
-            #"loot_table": [{"item_id": "geleia_verde", "drop_chance": 50.0}],
+            "loot_table": [{"item_id": "geleia_slime", "drop_chance": 10}],
             "media_key": "slime_verde_media"
         },
         {
             "id": "slime_azul",
-            "name": "Slime Azul", # Mais defensivo
+            "name": "Slime Azul", 
             "hp": 35, "attack": 2, "defense": 4, "initiative": 2, "luck": 2,
             "xp_reward": 10, "gold_drop": 4,
-            #"loot_table": [{"item_id": "geleia_azul", "drop_chance": 50.0}],
+            "loot_table": [{"item_id": "cristal_mana_bruto", "drop_chance": 10}],
             "media_key": "slime_azul_media"
         },
         {
             "id": "slime_magma",
-            "name": "Slime de Magma", # Mais agressivo
+            "name": "Slime de Magma", 
             "hp": 20, "attack": 5, "defense": 1, "initiative": 4, "luck": 2,
             "xp_reward": 10, "gold_drop": 4,
-            #"loot_table": [{"item_id": "geleia_vermelha", "drop_chance": 50.0}],
+            "loot_table": [{"item_id": "pocao_cura_leve", "drop_chance": 2}],
             "media_key": "slime_magma_media"
         },
         
@@ -447,10 +493,7 @@ MONSTERS_DATA = {
             "name": "Slime Terra",
             "hp": 50, "attack": 4, "defense": 3, "initiative": 1, "luck": 3,
             "xp_reward": 10, "gold_drop": 8,
-            "loot_table": [
-                #{"item_id": "geleia_verde", "drop_chance": 70.0},
-                #{"item_id": "geleia_grande", "drop_chance": 20.0}
-            ],
+            "loot_table": [{"item_id": "raiz_da_fortuna", "drop_chance": 10}],
             "media_key": "slime_terra_media"
         },
         {
@@ -458,15 +501,15 @@ MONSTERS_DATA = {
             "name": "Slime Venenoso", 
             "hp": 25, "attack": 3, "defense": 2, "initiative": 12, "luck": 5,
             "xp_reward": 10, "gold_drop": 5,
-            #"loot_table": [{"item_id": "geleia_pegajosa", "drop_chance": 40.0}],
+            "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
             "media_key": "slime_venenoso_media"
         },
         {
             "id": "slime_eletrico",
-            "name": "Slime Eeletrico", # Causa um pouco de dano extra
+            "name": "Slime Eeletrico", 
             "hp": 30, "attack": 4, "defense": 3, "initiative": 4, "luck": 4,
             "xp_reward": 10, "gold_drop": 6,
-            #"loot_table": [{"item_id": "geleia_acida", "drop_chance": 40.0}],
+            "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_eletrico_media"
         },
 
@@ -476,7 +519,7 @@ MONSTERS_DATA = {
             "name": "Slime Brilhante", # Raro, dá mais ouro
             "hp": 20, "attack": 1, "defense": 1, "initiative": 20, "luck": 10,
             "xp_reward": 10, "gold_drop": 5,
-            #"loot_table": [{"item_id": "po_brilhante", "drop_chance": 100.0}],
+            "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_brilhante_media"
         },
         {
@@ -484,7 +527,7 @@ MONSTERS_DATA = {
             "name": "Slime da Escuridão", # Raro, muito defensivo
             "hp": 60, "attack": 3, "defense": 15, "initiative": 1, "luck": 5,
             "xp_reward": 10, "gold_drop": 1,
-            #"loot_table": [{"item_id": "fragmento_metalico", "drop_chance": 30.0}],
+            "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
             "media_key": "slime_escuridao_media"
         },
 
@@ -494,10 +537,7 @@ MONSTERS_DATA = {
             "name": "Rei Slime",
             "hp": 150, "attack": 10, "defense": 8, "initiative": 5, "luck": 10,
             "xp_reward": 10, "gold_drop": 1,
-            "loot_table": [
-                #{"item_id": "coroa_de_geleia", "drop_chance": 10.0},
-                #{"item_id": "nucleo_de_slime", "drop_chance": 100.0}
-            ],
+            "loot_table": [{"item_id": "po_de_iniciativa", "drop_chance": 5}],
             "media_key": "rei_slime_media"
         }
     ],
@@ -815,7 +855,7 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "file_id_name": "abelha_gigante_rainha_media",
             "loot_table": [
-                {"item_id": "gema_bruta", "drop_chance": 28},
+                {"item_id": "cera_de_abelha", "drop_chance": 28},
             ],
         },
     ],
@@ -850,8 +890,8 @@ MONSTERS_DATA = {
             "xp_reward": 22, "gold_drop": 1, "ambush_chance": 0.0,
             "file_id_name": "slime_ferrugem_media",
             "loot_table": [
-                {"item_id": "pedra", "drop_chance": 60},
-                {"item_id": "barra_bronze", "drop_chance": 25}
+                {"item_id": "minerio_estanho", "drop_chance": 6},
+                
             ],
         },
         {
@@ -895,7 +935,7 @@ MONSTERS_DATA = {
             "hp": 495, "attack": 32, "defense": 44, "initiative": 28, "luck": 16,
             "xp_reward": 24, "gold_drop": 1, "ambush_chance": 0.0,
             "loot_table": [
-                {"item_id": "barra_de_ferro", "drop_chance": 25},
+                {"item_id": "martelo_enferrujado", "drop_chance": 25},
             ],
             "file_id_name": "golem_ferro_incompleto_media",
         },
@@ -916,7 +956,7 @@ MONSTERS_DATA = {
             "xp_reward": 24, "gold_drop": 1, "ambush_chance": 0.5,
             "loot_table": [
                 {"item_id": "engrenagem_usada", "drop_chance": 25},
-                {"item_id": "barra_de_ferro", "drop_chance": 25}
+                {"item_id": "martelo_enferrujado", "drop_chance": 25}
             ],
             "file_id_name": "cao_caca_metal_media",
         },
@@ -949,7 +989,7 @@ MONSTERS_DATA = {
             "xp_reward": 24, "gold_drop": 1, "ambush_chance": 0.20,
             "loot_table": [
                 {"item_id": "engrenagem_usada", "drop_chance": 35},
-                {"item_id": "barra_de_ferro", "drop_chance": 32}
+                #{"item_id": "barra_de_ferro", "drop_chance": 32}
             ],
             "file_id_name": "automato_defeito_media",
         },
@@ -960,7 +1000,7 @@ MONSTERS_DATA = {
             "name": "Carniçal Faminto",
             "hp": 500, "attack": 40, "defense": 33, "initiative": 37, "luck": 55,
             "xp_reward": 26, "gold_drop": 5,
-            #"loot_table": [{"item_id": "osso_quebrado", "drop_chance": 30}],
+            "loot_table": [{"item_id": "pedra_vulcanica", "drop_chance": 10 }],
             "media_key": "carnical_faminto_media"
         },
         {
@@ -968,7 +1008,7 @@ MONSTERS_DATA = {
             "name": "Verme de Carcaça",
             "hp": 535, "attack": 44, "defense": 46, "initiative": 39, "luck": 54,
             "xp_reward": 26, "gold_drop": 6,
-            #"loot_table": [{"item_id": "fibra_viscosa", "drop_chance": 35}],
+            "loot_table": [{"item_id": "semente_encantada", "drop_chance": 10 }],
             "media_key": "verme_carcaca_media"
         },
         {
@@ -976,7 +1016,7 @@ MONSTERS_DATA = {
             "name": "Abominação de Lodo",
             "hp": 540, "attack": 46, "defense": 50, "initiative": 52, "luck": 53,
             "xp_reward": 26, "gold_drop": 8,
-            #"loot_table": [{"item_id": "lodo_espesso", "drop_chance": 40}],
+            "loot_table": [{"item_id": "nucleo_de_magma", "drop_chance": 10 }],
             "media_key": "abominacao_lodo_media"
         },
         {
@@ -984,7 +1024,7 @@ MONSTERS_DATA = {
             "name": "Espectro do Pântano",
             "hp": 545, "attack": 44, "defense": 55, "initiative": 58, "luck": 60,
             "xp_reward": 26, "gold_drop": 10,
-            #"loot_table": [{"item_id": "essencia_sombria", "drop_chance": 30}],
+            "loot_table": [{"item_id": "", "drop_chance": 10 }],
             "media_key": "espectro_pantano_media"
         },
         {
@@ -992,7 +1032,7 @@ MONSTERS_DATA = {
             "name": "Sanguessuga Gigante",
             "hp": 550, "attack": 46, "defense": 48, "initiative": 56, "luck": 67,
             "xp_reward": 26, "gold_drop": 12,
-            #"loot_table": [{"item_id": "liquido_escarlate", "drop_chance": 35}],
+            "loot_table": [{"item_id": "oleo_mineral", "drop_chance": 6}],
             "media_key": "sanguessuga_gigante_media"
         },
         {
@@ -1001,8 +1041,8 @@ MONSTERS_DATA = {
             "hp": 555, "attack": 48, "defense": 55, "initiative": 54, "luck": 66,
             "xp_reward": 26, "gold_drop": 15,
             "loot_table": [
-                #{"item_id": "couro_crocodilo", "drop_chance": 50},
-                #{"item_id": "presa_mutante", "drop_chance": 20}
+                {"item_id": "oleo_mineral"},
+                #{"item_id": "", "drop_chance": 6}
             ],
             "media_key": "crocodilo_mutante_media"
         }
@@ -1013,7 +1053,7 @@ MONSTERS_DATA = {
             "name": "Lebre da Neve",
             "hp": 560, "attack": 50, "defense": 52, "initiative": 42, "luck": 68,
             "xp_reward": 28, "gold_drop": 8,
-            #"loot_table": [{"item_id": "pelo_fofo", "drop_chance": 40}],
+            #"loot_table": [{"item_id": , "drop_chance": 32}],
             "media_key": "lebre_neve_media"
         },
         {
@@ -1021,7 +1061,7 @@ MONSTERS_DATA = {
              "name": "Urso Polar Jovem",
             "hp": 565, "attack": 56, "defense": 50, "initiative": 46, "luck": 57,
             "xp_reward": 28, "gold_drop": 12,
-            #"loot_table": [{"item_id": "garra_gelada", "drop_chance": 35}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32}],
             "media_key": "urso_polar_jovem_media"
         },
         {
@@ -1029,7 +1069,7 @@ MONSTERS_DATA = {
             "name": "Golem de Gelo",
             "hp": 570, "attack": 64, "defense": 50, "initiative": 53, "luck": 45,
             "xp_reward": 28, "gold_drop": 15,
-            #"loot_table": [{"item_id": "bloco_de_gelo_puro", "drop_chance": 45}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32}],
             "media_key": "golem_de_gelo_media"
         },
         {
@@ -1037,7 +1077,7 @@ MONSTERS_DATA = {
             "name": "Elemental do Vento Gélido",
             "hp": 575, "attack": 52, "defense": 58, "initiative": 50, "luck": 42,
             "xp_reward": 28, "gold_drop": 18,
-            #"loot_table": [{"item_id": "cristal_de_vento", "drop_chance": 30}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32}],
             "media_key": "elemental_vento_gelido_media"
         },
         {
@@ -1045,7 +1085,7 @@ MONSTERS_DATA = {
             "name": "Urso Polar Alfa",
             "hp": 580, "attack": 65, "defense": 55, "initiative": 57, "luck": 49,
             "xp_reward": 28, "gold_drop": 25,
-            #"loot_table": [{"item_id": "couro_polar_premium", "drop_chance": 30}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32}],
             "media_key": "urso_polar_alfa_media"
         },
         {
@@ -1054,8 +1094,8 @@ MONSTERS_DATA = {
             "hp": 585, "attack": 70, "defense": 65, "initiative": 42, "luck": 55,
             "xp_reward": 28, "gold_drop": 30,
             "loot_table": [
-            #{"item_id": "coracao_congelado", "drop_chance": 20},
-            #{"item_id": "pedra_runea_de_gelo", "drop_chance": 10}
+            #{"item_id": , "drop_chance": 32},
+            #{"item_id": }
             ],
             "media_key": "gigante_congelado_media"
         }
@@ -1066,7 +1106,7 @@ MONSTERS_DATA = {
             "name": "Escorpião Venenoso",
             "hp": 590, "attack": 58, "defense": 48, "initiative": 65, "luck": 50,
             "xp_reward": 30, "gold_drop": 20,
-            #"loot_table": [{"item_id": "ferrao_toxico", "drop_chance": 45}],
+            #"loot_table": [{"item_id": , "drop_chance": 32"}],
             "media_key": "escorpiao_venenoso_media"
         },
         {
@@ -1074,7 +1114,7 @@ MONSTERS_DATA = {
             "name": "Cobra Hieroglífica",
             "hp": 595, "attack": 60, "defense": 30, "initiative": 58, "luck": 52,
             "xp_reward": 30, "gold_drop": 25,
-            #"loot_table": [{"item_id": "escama_gravada", "drop_chance": 40}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32"}],
             "media_key": "cobra_hieroglifica_media"
         },
         {
@@ -1082,7 +1122,7 @@ MONSTERS_DATA = {
             "name": "Guardião Mumificado",
             "hp": 600, "attack": 60, "defense": 50, "initiative": 45, "luck": 48,
             "xp_reward": 30, "gold_drop": 30,
-            #"loot_table": [{"item_id": "atadura_antiga", "drop_chance": 50}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32}],
             "media_key": "guardiao_mumificado_media"
         },
         {
@@ -1090,7 +1130,7 @@ MONSTERS_DATA = {
             "name": "Elemental de Areia",
             "hp": 610, "attack": 70, "defense": 55, "initiative": 40, "luck": 45,
             "xp_reward": 30, "gold_drop": 35,
-            "loot_table": [{"item_id": "areia_magica", "drop_chance": 35}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32}],
             "media_key": "elemental_areia_media"
         },
         {
@@ -1098,7 +1138,7 @@ MONSTERS_DATA = {
             "name": "Chacal Fantasma",
             "hp": 615, "attack": 75, "defense": 50, "initiative": 44, "luck": 40,
             "xp_reward": 30, "gold_drop": 40,
-            #"loot_table": [{"item_id": "presa_fantasma", "drop_chance": 30}],
+            #"loot_table": [{"item_id": ,"drop_chance": 32}],
             "media_key": "chacal_fantasma_media"
         },
         {
@@ -1107,8 +1147,8 @@ MONSTERS_DATA = {
             "hp": 620, "attack": 80, "defense": 60, "initiative": 46, "luck": 55,
             "xp_reward": 30, "gold_drop": 50,
             "loot_table": [
-                #{"item_id": "amuleto_do_farao", "drop_chance": 15},
-                #{"item_id": "fragmento_de_poder", "drop_chance": 10}
+                #{"item_id": ,"drop_chance": 32},
+                #{"item_id": }
             ],
             "media_key": "farao_maldito_media"
         }

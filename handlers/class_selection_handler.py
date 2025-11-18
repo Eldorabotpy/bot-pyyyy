@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data, file_id_manager
 from handlers.menu_handler import show_kingdom_menu
 from modules.balance import ui_display_modifiers
+from modules.player import stats as player_stats  # <--- Importante: Importa o módulo stats completo
 from modules.player.stats import CLASS_PROGRESSIONS, CLASS_POINT_GAINS
 
 CLASS_MANA_INFO = {
@@ -20,6 +21,7 @@ CLASS_MANA_INFO = {
     "curandeiro": "Sorte",
     "_default": "Sorte",
 }
+
 # =========================
 # Fontes de classes + normalização
 # =========================
@@ -108,12 +110,10 @@ def _load_classes_list() -> list[dict]:
             out.sort(key=lambda e: e["display_name"].lower())
             return out
 
-    # Fallback mínimo
     return [
         _normalize_class_entry("guerreiro", {"display_name": "Guerreiro", "emoji": "⚔️", "description": "Combatente robusto."}),
         _normalize_class_entry("mago", {"display_name": "Mago", "emoji": "🧙", "description": "Mestre das artes arcanas."}),
     ]
-
 
 # =========================
 # Elegibilidade (Síncrono)
@@ -139,10 +139,8 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id if update.effective_user else None
     
-    # CORREÇÃO: Adicionado 'await'
     player_data = await player_manager.get_player_data(user_id) if user_id else None
 
-    # Já tem classe?
     if player_data and player_data.get("class"):
         text = f"Você já escolheu sua classe: <b>{player_data.get('class')}</b>."
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]])
@@ -152,7 +150,6 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode="HTML", reply_markup=kb)
         return
 
-    # Checa nível (função síncrona, não precisa de await)
     if not _eligible_for_class(player_data or {}):
         msg = "Você ainda não atingiu o nível 5 para escolher uma classe."
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]])
@@ -167,7 +164,6 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = "Sua jornada o fortaleceu. Escolha a classe que definirá seu destino:"
     
-    # Carrega classes (função síncrona)
     classes = _load_classes_list()
 
     keyboard = []
@@ -180,7 +176,6 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="profile")])
 
-    # Limpa a mensagem anterior, se der
     if query and query.message:
         try:
             await query.delete_message()
@@ -193,10 +188,6 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-
-# =========================
-# Tela: Detalhes da Classe
-# =========================
 # =========================
 # Tela: Detalhes da Classe
 # =========================
@@ -223,8 +214,7 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="show_class_list")]])
         )
         return
-    # --- INÍCIO DA LÓGICA DE TEXTO SUBSTITUÍDA ---
-    # 1. Obter os dados dos dicionários
+
     prog = CLASS_PROGRESSIONS.get(class_key, CLASS_PROGRESSIONS["_default"])
     gains_manual = CLASS_POINT_GAINS.get(class_key, CLASS_POINT_GAINS["_default"])
     gains_default = CLASS_POINT_GAINS["_default"]
@@ -239,14 +229,12 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
     auto_ini = auto.get("initiative", 0)
     auto_luk = auto.get("luck", 0)
 
-    # 3. Ganhos Manuais (misturando o default com a classe)
     manual_hp = gains_manual.get("max_hp", gains_default.get("max_hp", 1))
     manual_atk = gains_manual.get("attack", gains_default.get("attack", 1))
     manual_def = gains_manual.get("defense", gains_default.get("defense", 1))
     manual_ini = gains_manual.get("initiative", gains_default.get("initiative", 1))
     manual_luk = gains_manual.get("luck", gains_default.get("luck", 1))
 
-    # 4. Montar o texto
     details_text = (
         f"{entry['emoji']} <b>{entry['display_name']}</b>\n\n"
         f"<i>{entry.get('description', 'Sem descrição.')}</i>\n\n"
@@ -267,7 +255,6 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
         f"  🍀 Sorte: +{manual_luk}\n\n"
         "Deseja escolher este caminho?"
     )
-    # --- FIM DA LÓGICA DE TEXTO SUBSTITUÍDA ---
 
     keyboard = [[
         InlineKeyboardButton("✅ Confirmar", callback_data=f"confirm_class_{entry['key']}"),
@@ -275,7 +262,6 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
     ]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Mídia (síncrono)
     file_data = None
     if entry.get("file_id_name"):
         file_data = file_id_manager.get_file_data(entry["file_id_name"])
@@ -313,14 +299,12 @@ async def confirm_class_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     user_id = query.from_user.id if query else (update.effective_user.id if update.effective_user else None)
 
-    # CORREÇÃO 8: Adiciona await
     player_data = await player_manager.get_player_data(user_id) if user_id else None
 
     classes = _load_classes_list() # Síncrono
     entry = next((e for e in classes if e["key"] == class_key), None)
     if not entry or not player_data:
         if query:
-            # CORREÇÃO 9: Adiciona await
             await query.edit_message_text(
                 text="Classe inválida.",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="show_class_list")]])
@@ -329,32 +313,25 @@ async def confirm_class_choice(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_message(chat_id=update.effective_chat.id, text="Classe inválida.")
         return
 
-    # Síncrono
     if player_data.get('class') is not None:
         if query:
             await query.answer("Você já escolheu sua classe!", show_alert=True)
         return
 
-    # Síncrono
     if not _eligible_for_class(player_data):
         if query:
-            await query.answer("Você ainda não pode escolher classe (nível 10 necessário).", show_alert=True)
+            await query.answer("Você ainda não pode escolher classe (nível 5 necessário).", show_alert=True)
         return
 
-    # Salva
-    disp_name = entry["display_name"]
-    player_data['class'] = disp_name
-    player_data['class_key'] = entry["key"]
-    player_data['class_choice_offered'] = True # Marca como escolhido
+    player_data = await player_stats.apply_class_change_and_recalculate(player_data, entry["key"])
 
-    # CORREÇÃO 10: Adiciona await
     await player_manager.save_player_data(user_id, player_data)
 
+    disp_name = entry["display_name"]
     if query:
         await query.answer(f"Você agora é um {disp_name}!", show_alert=True)
 
-    # CORREÇÃO 11: Adiciona await
-    await show_kingdom_menu(update, context) # Chama função async
+    await show_kingdom_menu(update, context) 
 
 
 # =========================
@@ -362,30 +339,22 @@ async def confirm_class_choice(update: Update, context: ContextTypes.DEFAULT_TYP
 # =========================
 async def class_selection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    if not query: # Ignora se não for callback
+    if not query: 
         return
     
-    # Não responde aqui, deixa as funções específicas responderem (com await query.answer())
-    # Isso evita o "relógio" de carregamento no Telegram se a função demorar.
-    # As funções show_class_list, show_class_details, etc., dão o answer.
-
     data = query.data
     
     if data in ('show_class_list', 'class_open') or data.startswith('class_open:'):
-        # CORREÇÃO 12: Adiciona await
         await show_class_list(update, context); return
 
     if data.startswith('view_class_'):
         class_key = data.replace('view_class_', '', 1)
-        # CORREÇÃO 13: Adiciona await
         await show_class_details(update, context, class_key); return
 
     if data.startswith('confirm_class_'):
         class_key = data.replace('confirm_class_', '', 1)
-        # CORREÇÃO 14: Adiciona await
         await confirm_class_choice(update, context, class_key); return
 
-    # Se chegou aqui, é um callback desconhecido, responde silenciosamente
     try: await query.answer()
     except Exception: pass
     return
@@ -398,5 +367,4 @@ class_selection_handler = CallbackQueryHandler(
     pattern=r'^(?:show_class_list|class_open(?::\d+)?|view_class_[\w_]+|confirm_class_[\w_]+)$'
 )
 
-# Alias para chamadas diretas de outros módulos
 show_class_selection_menu = show_class_list
