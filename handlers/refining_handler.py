@@ -154,31 +154,42 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     print("\n>>> DENTRO DO refining_main_callback! O BOTÃO DE REFINO FOI ATIVADO! <<<\n", flush=True)
     """
     Lista TODAS as receitas de refino e agora também o botão para Desmontar.
+    O texto da listagem foi minimizado para evitar o erro 'caption too long'.
     """
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
     chat_id = q.message.chat.id
 
-    # <<< CORREÇÃO 1: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id) or {}
 
     lines = ["🛠️ <b>Refino & Desmontagem</b>\n"]
     kb: list[list[InlineKeyboardButton]] = []
-
+    
+    # 1. Adiciona botão de Desmontagem
     kb.append([InlineKeyboardButton("♻️ Desmontar Equipamento", callback_data="ref_dismantle_list")])
+    
+    lines.append("\n🧾 <b>Receitas de Refino:</b>")
 
     any_recipe = False
+    recipe_list_items = [] # Lista separada para condensar o texto
+
     # Assumindo REFINING_RECIPES é síncrono
     for rid, rec in game_data.REFINING_RECIPES.items():
         # Assumindo preview_refine é síncrono
         prev = preview_refine(rid, pdata)
-        if not prev:
+        
+        # Filtra receitas que não estão prontas ou não existem
+        if not prev or not rec.get("display_name"): 
             continue
+            
         any_recipe = True
-        mins = _fmt_minutes_or_seconds(int(prev.get("duration_seconds", 0))) # Síncrono
-        tag = "✅" if prev.get("can_refine") else "⛔"
-        lines.append(f"{tag} <b>{rec.get('display_name', rid)}</b> • ⏳ ~{mins}")
+        
+        # --- SOLUÇÃO DE MINIMALISMO DE TEXTO ---
+        # Mostra apenas o nome para economizar espaço
+        recipe_list_items.append(f"• {rec.get('display_name', rid)}") 
+        # --- FIM DA SOLUÇÃO ---
+        
         kb.append([
             InlineKeyboardButton(
                 text=rec.get("display_name", rid),
@@ -187,14 +198,17 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
         ])
 
     if not any_recipe:
-        lines.append("\nAinda não há receitas de refino cadastradas.")
+        lines.append("Ainda não há receitas de refino cadastradas.")
+    else:
+        # Adiciona a lista condensada de receitas
+        lines.extend(recipe_list_items)
+        lines.append(f"\n({len(recipe_list_items)} receitas listadas. Clique para ver status/custos)")
 
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="continue_after_action")])
     caption = "\n".join(lines)
 
-    # <<< CORREÇÃO 2: Adiciona await >>>
     await _safe_edit_or_send_with_media(q, context, chat_id, caption, InlineKeyboardMarkup(kb))
-
+    
 async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Mostra a lista paginada de itens que podem ser desmontados.
