@@ -159,6 +159,10 @@
     "id": "file_ids",
     "type": "video"
   },
+  "defessa_media": {
+    "id": "AgACAgEAAxkBAAIMYWkeGkMHPgg2krbl_XdLH-evWuSRAAI1C2sbRHzxRHd5LKc3RFg1AQADAgADeAADNgQ",
+    "type": "photo"
+  },
   "demonio_dimensional_media": {
     "id": "AgACAgEAAxkBAAIIsWjsRCWXOVakS3EK_udBmBYxQCviAAImC2sb8kVgR3VFLO9qwm7UAQADAgADeQADNgQ",
     "type": "photo"

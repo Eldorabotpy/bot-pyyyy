@@ -12,7 +12,7 @@ from modules import player_manager, game_data, clan_manager
 from handlers.utils import format_combat_message
 from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER, Difficulty
 from .regions import REGIONAL_DUNGEONS, MobDef
-
+from modules.dungeons.runtime_api import set_pending_battle
 try:
     from modules import file_id_manager as media_ids
 except Exception:
@@ -271,25 +271,36 @@ async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE,
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     query = update.callback_query
+    
     dungeon = _load_region_dungeon(region_key)
     difficulty_cfg = DIFFICULTIES.get(difficulty_key)
+    
     if not difficulty_cfg:
         await query.answer("Dificuldade não encontrada.", show_alert=True)
         return
+
     key_item = _key_item_for(dungeon)
     key_cost = _key_cost_for(difficulty_cfg)
+    
     pdata = await player_manager.get_player_data(user_id) or {}
+    
+    # Verifica e consome a chave
     if not _consume_keys(pdata, key_item, key_cost):
         try:
             await query.answer(f"Você precisa de {key_cost}× {key_item} para entrar.", show_alert=True)
         except Exception:
             await context.bot.send_message(chat_id=chat_id, text=f"Você precisa de {key_cost}× {key_item} para entrar.")
         return
+
     floors: List[MobDef] = list(dungeon.get("floors") or [])
     if not floors:
         await context.bot.send_message(chat_id=chat_id, text="Este calabouço não tem andares configurados.")
         return
-    await player_manager.save_player_data(user_id, pdata) # Salva o consumo da chave
+
+    # Salva o consumo da chave antes de prosseguir
+    await player_manager.save_player_data(user_id, pdata) 
+
+    # Prepara o estado da Dungeon
     state = _new_run_state(region_key, difficulty_key)
     combat = _build_combat_details(
         floor_mob=floors[0], difficulty_cfg=difficulty_cfg,
@@ -298,6 +309,21 @@ async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE,
     state["action"] = "in_combat"
     state["details"] = combat
     pdata["player_state"] = state
+
+    # ✅ CORREÇÃO AQUI: Cria o Cache de Batalha para as Skills funcionarem
+    cache_ctx = {
+        "dungeon_id": region_key,
+        "difficulty": difficulty_key,
+        "floor_idx": 0,
+        "region": region_key
+    }
+    set_pending_battle(user_id, cache_ctx)
+    # ✅ FIM DA CORREÇÃO
+
+    # Salva o estado atualizado (com o combate iniciado)
+    await player_manager.save_player_data(user_id, pdata)
+
+    # Envia a mensagem visual
     caption = await format_combat_message(pdata)
     kb = [
         [
@@ -309,12 +335,12 @@ async def _start_first_fight(update: Update, context: ContextTypes.DEFAULT_TYPE,
             InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")
         ]
     ]
+    
     await _send_battle_media(
         context, chat_id, caption, 
         combat.get("file_id_name"), 
         reply_markup=InlineKeyboardMarkup(kb)
-    )
-    await player_manager.save_player_data(user_id, pdata) 
+    ) 
 
 # ============================================================
 # Fim da Run (Vitória/Derrota) (COM IMAGEM)
@@ -365,6 +391,7 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
 
     region_key = str(det.get("region_key") or "")
     difficulty_key = str(det.get("difficulty") or "normal")
+    
     try:
         dungeon = _load_region_dungeon(region_key)
         difficulty_cfg = DIFFICULTIES.get(difficulty_key)
@@ -385,7 +412,9 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
     next_stage = cur_stage + 1
     det["dungeon_stage"] = next_stage
 
-    # Verificação de Vitória Final
+    # ====================================================
+    # 1. Verificação de Vitória Final (Dungeon Completa)
+    # ====================================================
     if next_stage >= len(floors):
         if clan_id:
             await clan_manager.update_guild_mission_progress(
@@ -394,7 +423,7 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
                 context=context
             )
 
-        # ... (Lógica de salvar progresso) ...
+        # Atualiza recorde de dificuldade
         completed_diff_key = difficulty_key
         pdata.setdefault("dungeon_progress", {}).setdefault(region_key, {})
         current_highest_key = pdata["dungeon_progress"][region_key].get("highest_completed")
@@ -407,7 +436,7 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
         except (ValueError, TypeError):
             logger.warning(f"Chave de dificuldade inválida: '{current_highest_key}', '{completed_diff_key}'")
 
-        # Aplicação de recompensas (Opção B)
+        # Aplicação de recompensas
         boss_rewards = det.get("last_fight_rewards", {})
         final_xp = boss_rewards.get("xp", 0)
         final_gold = boss_rewards.get("gold", 0)
@@ -428,7 +457,7 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
         pdata['current_hp'] = total_stats.get('max_hp', 50)
         pdata['current_mp'] = total_stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
-        await player_manager.save_player_data(user_id, pdata) # Salva tudo
+        await player_manager.save_player_data(user_id, pdata)
 
         summary_text = (
             f"🏆 <b>Calabouço Concluído!</b> 🏆\n\n"
@@ -440,24 +469,24 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard = [[InlineKeyboardButton("➡️ 𝐂𝐨𝐧𝐭𝐢𝐧𝐮𝐚𝐫", callback_data="continue_after_action")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # --- [MUDANÇA] ---
         if update and update.callback_query:
             try:
                 await update.callback_query.delete_message()
             except Exception:
                 pass
                 
-        # Usa a função de mídia, com uma chave de mídia "hardcoded"
         await _send_battle_media(
             context,
             chat_id,
             summary_text,
-            "media_dungeon_victory", # <--- CHAVE DA IMAGEM DE VITÓRIA
+            "media_dungeon_victory",
             reply_markup
         )
         return
 
-    # Próximo combate (NÃO é o final)
+    # ====================================================
+    # 2. Próximo combate (NÃO é o final)
+    # ====================================================
     combat = _build_combat_details(
         floor_mob=floors[next_stage],
         difficulty_cfg=difficulty_cfg,
@@ -468,7 +497,17 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
     run["details"] = combat
     pdata["player_state"] = run
     
-    await player_manager.save_player_data(user_id, pdata) # Salva o estado
+    await player_manager.save_player_data(user_id, pdata)
+
+    # ✅ CORREÇÃO: Cria o Cache de Batalha para o Próximo Andar
+    cache_ctx = {
+        "dungeon_id": region_key,
+        "difficulty": difficulty_key,
+        "floor_idx": next_stage,
+        "region": region_key
+    }
+    set_pending_battle(user_id, cache_ctx)
+    # ✅ FIM DA CORREÇÃO
 
     caption = await format_combat_message(pdata)
     kb = [
@@ -489,7 +528,7 @@ async def advance_after_victory(update: Update, context: ContextTypes.DEFAULT_TY
             pass
             
     await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), reply_markup=InlineKeyboardMarkup(kb))
-
+    
 # ============================================================
 # NOVA FUNÇÃO: INICIADOR DO TESTE DE EVOLUÇÃO
 # ============================================================
@@ -613,6 +652,106 @@ async def _dungeon_locked_cb(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer("Você precisa de completar a dificuldade anterior para desbloquear esta!", show_alert=True)
 
+# ============================================================
+# MÓDULO DE INTERFACE DE COMBATE (Adicionar ao runtime.py)
+# ============================================================
+
+async def open_combat_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Abre o menu de skills substituindo o teclado principal."""
+    query = update.callback_query
+    try: await query.answer()
+    except: pass
+    
+    user_id = update.effective_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return
+
+    # Tenta pegar as skills aprendidas (adapte a chave conforme seu save)
+    # Geralmente é 'skills', 'learned_skills' ou 'class_skills'
+    learned_skills = pdata.get("skills") or pdata.get("learned_skills") or []
+    
+    kb = []
+    row = []
+    
+    if not learned_skills:
+        # Se não tiver skills, mostra aviso
+        kb.append([InlineKeyboardButton("🚫 Sem skills aprendidas", callback_data="ignore")])
+    else:
+        # Cria botões para cada skill
+        # Você pode precisar importar SKILLS_DATA se quiser os nomes bonitos
+        for skill_id in learned_skills:
+            # Formata o nome (ex: 'fireball' -> 'Fireball')
+            skill_name = str(skill_id).replace("_", " ").title()
+            # Botão: callback DEVE ser o que o seu sistema de combate espera para USAR a skill
+            btn = InlineKeyboardButton(f"✨ {skill_name}", callback_data=f"combat_use_skill:{skill_id}")
+            row.append(btn)
+            
+            if len(row) == 2: # 2 skills por linha
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+
+    # Botão Voltar
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="combat_menu_return")])
+    
+    # Atualiza apenas o teclado
+    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
+
+
+async def open_combat_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Abre o menu de poções/consumíveis."""
+    query = update.callback_query
+    try: await query.answer()
+    except: pass
+
+    user_id = update.effective_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    
+    inv = _inv(pdata) # Usa a função helper _inv que já existe no runtime.py
+    
+    kb = []
+    # Lista de itens que são considerados poções/cura
+    # Adapte os IDs conforme o seu items.py
+    potion_ids = ["hp_potion_small", "hp_potion_medium", "mp_potion_small", "pocao_vida", "pocao_mana"]
+    
+    found_any = False
+    for item_id, qtd in inv.items():
+        if int(qtd) > 0 and any(pid in item_id for pid in potion_ids):
+            found_any = True
+            name = item_id.replace("_", " ").title()
+            # Callback para usar o item
+            kb.append([InlineKeyboardButton(f"🧪 {name} (x{qtd})", callback_data=f"combat_use_item:{item_id}")])
+            
+    if not found_any:
+        kb.append([InlineKeyboardButton("🚫 Mochila vazia", callback_data="ignore")])
+
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="combat_menu_return")])
+    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
+
+
+async def return_to_main_combat_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reconstrói o menu principal de combate (Atacar, Skills, etc)."""
+    query = update.callback_query
+    try: await query.answer()
+    except: pass
+    
+    # Recria o teclado padrão definido no combat_hook.py
+    kb = [
+        [
+            InlineKeyboardButton("⚔️ Atacar", callback_data="combat_attack"), 
+            InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu") 
+        ],
+        [
+            InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), 
+            InlineKeyboardButton("🏃 Fugir", callback_data="combat_flee")
+        ]
+    ]
+    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
+
 dungeon_open_handler = CallbackQueryHandler(_open_menu_cb, pattern=r"^dungeon_open:[A-Za-z0-9_]+$")
 dungeon_pick_handler = CallbackQueryHandler(_pick_diff_cb, pattern=r"^dungeon_pick:(iniciante|infernal|pesadelo):[A-Za-z0-9_]+$")
 dungeon_locked_handler = CallbackQueryHandler(_dungeon_locked_cb, pattern=r'^dungeon_locked$')
+combat_skill_handler = CallbackQueryHandler(open_combat_skill_menu, pattern="^combat_skill_menu$")
+combat_potion_handler = CallbackQueryHandler(open_combat_potion_menu, pattern="^combat_potion_menu$")
+combat_return_handler = CallbackQueryHandler(return_to_main_combat_menu, pattern="^combat_menu_return$")

@@ -195,7 +195,7 @@ REGIONAL_DUNGEONS = {
             ),
             MobDef(
                 key="aranha_gigante_da_tocaia",
-                display="GuarAranha Gigante da Tocaia",
+                display="Aranha Gigante da Tocaia",
                 emoji="🌳",
                 media_key="aranha_gigante_da_tocaia_media",
                 stats_base={"max_hp": 80, 

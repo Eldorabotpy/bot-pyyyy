@@ -161,11 +161,14 @@ async def combat_skill_info_callback(update: Update, context: ContextTypes.DEFAU
 
 async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Processa o uso de uma skill em combate.
-    (Versão Híbrida: Funciona com battle_cache e player_state)
-    """
+    Processa o uso de uma skill em combate.
+    (Versão Híbrida: Funciona com battle_cache e player_state)
+    """
     query = update.callback_query
     user_id = query.from_user.id
+
+    # Importação necessária para a correção
+    from modules.player.actions import spend_mana
 
     # --- MODIFICADO: Carrega pdata e skill_info PRIMEIRO ---
     player_data = await player_manager.get_player_data(user_id)
@@ -196,7 +199,7 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
     # 🌟 NOVO: Define se o turno deve ser encerrado ou se permite outra ação.
     is_support = skill_info.get("type") == "support"
     
-    # 1. TRATAMENTO VIA BATTLE_CACHE (Modo Novo)
+    # 1. TRATAMENTO VIA BATTLE_CACHE (Modo Novo - Caçadas)
     if battle_cache and battle_cache.get('player_id') == user_id:
             
         active_cooldowns = battle_cache.setdefault("skill_cooldowns", {})
@@ -219,10 +222,9 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
         battle_cache['player_mp'] -= mana_cost # Diminui o MP diretamente no cache
         
         battle_cache['skill_to_use'] = skill_id
-        # 🌟 NOVO: Adiciona a flag para sinalizar que é uma ação de suporte/buff.
         battle_cache['action_type'] = "support" if is_support else "attack"
         
-    # 2. TRATAMENTO VIA PLAYER_STATE (Modo Legado/Calabouço)
+    # 2. TRATAMENTO VIA PLAYER_STATE (Modo Legado - Dungeons)
     else:
         state = player_data.get('player_state', {})
         if state.get('action') != 'in_combat':
@@ -238,9 +240,9 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
             await query.answer(f"{skill_info['display_name']} está em recarga!", show_alert=True)
             return
 
-        # Verifica e Gasta Mana (Ação de Batalha de Suporte não gasta turno, mas gasta recursos)
+        # Verifica e Gasta Mana
         if mana_cost > 0:
-            # Pega stats atuais (incluindo buffs, se houver)
+            # Pega stats atuais
             total_stats = await player_manager.get_player_total_stats(player_data)
             max_mp = total_stats.get('max_mana', 10)
             current_mp = player_data.get('current_mp', max_mp)
@@ -250,16 +252,17 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
                 await query.answer(f"Você não tem Mana ({mana_cost}) suficiente!", show_alert=True)
                 return
             
-            # Gasta Mana no modo legado (salva diretamente)
-            player_data = await spend_mana(user_id, mana_cost, player_data)
-
+            # ✅ CORREÇÃO FINAL AQUI:
+            # Removemos o 'await' (pois spend_mana é síncrona)
+            # Removemos a atribuição (pois ela modifica o dict in-place)
+            # Passamos os argumentos na ordem: (player_data, amount)
+            spend_mana(player_data, mana_cost)
 
         # Aplica Cooldown
         if cooldown > 0:
             active_cooldowns[skill_id] = cooldown
 
         combat_details['skill_to_use'] = skill_id
-        # 🌟 NOVO: Adiciona a flag para sinalizar que é uma ação de suporte/buff.
         combat_details['action_type'] = "support" if is_support else "attack"
 
         player_data['player_state']['details'] = combat_details
@@ -273,6 +276,27 @@ async def combat_skill_on_cooldown_callback(update: Update, context: ContextType
     """Callback para quando o jogador clica numa skill em cooldown."""
     query = update.callback_query
     await query.answer("Esta habilidade ainda está em recarga!", show_alert=True)
+
+# No final de handlers/combat/skill_handler.py
+
+async def combat_attack_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reconstrói o menu principal de combate quando clica em Voltar."""
+    query = update.callback_query
+    try: await query.answer()
+    except: pass
+    
+    # Recria o teclado padrão
+    kb = [
+        [
+            InlineKeyboardButton("⚔️ Atacar", callback_data="combat_attack"), 
+            InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu") 
+        ],
+        [
+            InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), 
+            InlineKeyboardButton("🏃 Fugir", callback_data="combat_flee")
+        ]
+    ]
+    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
 
 # Exporta os handlers
 combat_skill_menu_handler = CallbackQueryHandler(combat_skill_menu_callback, pattern=r'^combat_skill_menu$')
