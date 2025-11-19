@@ -1,5 +1,6 @@
 # handlers/refining_handler.py
 import logging 
+import math
 import telegram
 from telegram import (
     Update,
@@ -151,44 +152,67 @@ def _fmt_item_line(item_id: str, qty: int) -> str:
 # =========================
 
 async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("\n>>> DENTRO DO refining_main_callback! O BOTÃO DE REFINO FOI ATIVADO! <<<\n", flush=True)
     """
-    Lista TODAS as receitas de refino e agora também o botão para Desmontar.
-    O texto da listagem foi minimizado para evitar o erro 'caption too long'.
+    Lista receitas de refino usando paginação para evitar erro de limite de texto.
     """
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
     chat_id = q.message.chat.id
 
+    # 1. Paginação e Inicialização
+    RECIPES_PER_PAGE = 8
+    current_page = 1 
+    
+    # Tenta obter o número da página do callback (se veio de um botão de navegação)
+    if q.data and "_PAGE_" in q.data:
+        try:
+            current_page = int(q.data.split('_PAGE_')[-1])
+        except ValueError:
+            current_page = 1
+
     pdata = await player_manager.get_player_data(user_id) or {}
 
-    lines = ["🛠️ <b>Refino & Desmontagem</b>\n"]
-    kb: list[list[InlineKeyboardButton]] = []
+    # 2. Filtra todas as receitas disponíveis e armazena (síncrono)
+    all_available_recipes = []
+    for rid, rec in game_data.REFINING_RECIPES.items():
+        # preview_refine é essencial para filtrar receitas incompletas/inválidas
+        prev = preview_refine(rid, pdata)
+        if prev and rec.get("display_name"):
+             # Armazena o resultado do preview e a duração formatada
+             mins = _fmt_minutes_or_seconds(int(prev.get("duration_seconds", 0)))
+             all_available_recipes.append({
+                 "id": rid, 
+                 "data": rec, 
+                 "preview": prev,
+                 "duration_fmt": mins
+             }) 
+
+    # 3. Aplica Paginação
+    total_recipes = len(all_available_recipes)
+    total_pages = max(1, math.ceil(total_recipes / RECIPES_PER_PAGE))
+    current_page = max(1, min(current_page, total_pages))
     
-    # 1. Adiciona botão de Desmontagem
+    start = (current_page - 1) * RECIPES_PER_PAGE
+    end = start + RECIPES_PER_PAGE
+    recipes_on_page = all_available_recipes[start:end]
+
+    # 4. Constrói o Caption e Botões
+    lines = ["🛠️ <b>Refino & Desmontagem</b>\n"]
+    lines.append(f"🧾 <b>Receitas:</b> (Pág. {current_page}/{total_pages})")
+    
+    kb: list[list[InlineKeyboardButton]] = []
     kb.append([InlineKeyboardButton("♻️ Desmontar Equipamento", callback_data="ref_dismantle_list")])
     
-    lines.append("\n🧾 <b>Receitas de Refino:</b>")
-
-    any_recipe = False
-    recipe_list_items = [] # Lista separada para condensar o texto
-
-    # Assumindo REFINING_RECIPES é síncrono
-    for rid, rec in game_data.REFINING_RECIPES.items():
-        # Assumindo preview_refine é síncrono
-        prev = preview_refine(rid, pdata)
+    if not recipes_on_page:
+        lines.append("\nNenhuma receita disponível nesta página.")
+    
+    for recipe in recipes_on_page:
+        rid, rec, prev, mins = recipe["id"], recipe["data"], recipe["preview"], recipe["duration_fmt"]
+        tag = "✅" if prev.get("can_refine") else "⛔"
         
-        # Filtra receitas que não estão prontas ou não existem
-        if not prev or not rec.get("display_name"): 
-            continue
-            
-        any_recipe = True
-        
-        # --- SOLUÇÃO DE MINIMALISMO DE TEXTO ---
-        # Mostra apenas o nome para economizar espaço
-        recipe_list_items.append(f"• {rec.get('display_name', rid)}") 
-        # --- FIM DA SOLUÇÃO ---
+        # Linha compacta e informativa (cabe no caption)
+        lines.append(f"{tag} {rec.get('display_name', rid)} | ⏳ {mins}") 
         
         kb.append([
             InlineKeyboardButton(
@@ -196,19 +220,26 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
                 callback_data=f"ref_sel_{rid}",
             )
         ])
-
-    if not any_recipe:
-        lines.append("Ainda não há receitas de refino cadastradas.")
-    else:
-        # Adiciona a lista condensada de receitas
-        lines.extend(recipe_list_items)
-        lines.append(f"\n({len(recipe_list_items)} receitas listadas. Clique para ver status/custos)")
-
+    
+    # 5. Adiciona Botões de Paginação
+    pag_kb = []
+    if current_page > 1:
+        # O callback agora inclui o número da nova página
+        pag_kb.append(InlineKeyboardButton("◀️ Anterior", callback_data=f"ref_main_PAGE_{current_page - 1}"))
+    
+    pag_kb.append(InlineKeyboardButton(f"- {current_page} / {total_pages} -", callback_data="noop_ref_page"))
+    
+    if current_page < total_pages:
+        pag_kb.append(InlineKeyboardButton("Próximo ▶️", callback_data=f"ref_main_PAGE_{current_page + 1}"))
+        
+    if pag_kb: kb.append(pag_kb)
+    
+    # 6. Botões Finais
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="continue_after_action")])
     caption = "\n".join(lines)
 
     await _safe_edit_or_send_with_media(q, context, chat_id, caption, InlineKeyboardMarkup(kb))
-    
+
 async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Mostra a lista paginada de itens que podem ser desmontados.
