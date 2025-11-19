@@ -424,21 +424,28 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for skill_id in equipped_skills:
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
         
-        if not skill_info or skill_info.get("type", "unknown") not in ("active", "support_heal", "support_buff"):
+        # ✅ CORREÇÃO: Removemos o filtro restrito.
+        # Agora aceita "active", "support", "support_heal", "support_buff" e qualquer variação.
+        # Apenas ignoramos "passive" (passivas não se usam manualmente).
+        skill_type = skill_info.get("type", "unknown")
+        if not skill_info or skill_type == "passive": 
             continue 
             
         mana_cost = skill_info.get('mana_cost', 0)
-        is_single_target_support = skill_info.get("type") == "support_heal" 
+        
+        # Define se precisa selecionar alvo (apenas skills de cura de alvo único)
+        is_single_target = skill_type == "support_heal" 
         
         button_text_base = f"{skill_info['display_name']} ({mana_cost} MP)"
         
-        if is_single_target_support:
+        if is_single_target:
             if current_mana < mana_cost:
                  button_text = f"❌ {button_text_base}"
             else:
                  button_text = f"🎯 {button_text_base}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"select_target:{skill_id}")])
         else:
+            # Ataques, Buffs, Curas em Área (Party Heal)
             if current_mana < mana_cost:
                 button_text = f"❌ {button_text_base}"
             else:
@@ -449,7 +456,6 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text_content = "<b>Menu de Habilidades</b>\n\nEscolha uma habilidade para usar:"
     
-    # ✅ CORREÇÃO: Verifica se edita Caption (Foto) ou Texto (Sem foto)
     if query.message.photo:
         await query.edit_message_caption(caption=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     else:
