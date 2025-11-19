@@ -291,9 +291,24 @@ async def get_player_total_stats(
 
             # CORRIGIDO:
 
+            # Dentro de modules/player/stats.py -> get_player_total_stats
+            
             ench = inst.get('enchantments', {}) or {}
             for stat_key, data in ench.items():
                 val = _ival((data or {}).get('value', 0), 0)
+
+                # === [CORREÇÃO DE COMPATIBILIDADE] ===
+                # Traduz nomes antigos/visuais para as chaves reais do sistema
+                k = stat_key.lower()
+                if k in ("inteligencia", "magia", "poder_magico", "dano_magico"):
+                    stat_key = "magic_attack"
+                elif k in ("furia", "forca_bruta"):
+                    stat_key = "attack" # Ou bonus de dano critico, depende do design
+                elif k in ("precisao", "mira"):
+                    stat_key = "crit_chance_flat"
+                elif k in ("fe", "faith"):
+                    stat_key = "heal_potency" # Exemplo para curandeiro
+                # =====================================
                 
                 if stat_key == 'dmg':
                     total['attack'] = total.get('attack', 0) + val
@@ -305,8 +320,8 @@ async def get_player_total_stats(
                     total[stat_key] = total.get(stat_key, 0) + val
                 
                 else:
-                    # Lógica para stats secundários (ex: 'magic_attack', 'crit_chance_flat')
-                    # Não adiciona 'dmg' ou 'hp' aqui novamente
+                    # Lógica para stats secundários (magic_attack, crit, etc)
+                    # Agora 'inteligencia' vai cair aqui como 'magic_attack' e somar certo!
                     if stat_key not in ('dmg', 'hp') and stat_key not in _BASELINE_KEYS:
                         total[stat_key] = total.get(stat_key, 0) + val
 
@@ -640,11 +655,6 @@ def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
         d = cur - base
         delta[k] = max(0, d) # A diferença é o que foi investido
     return delta
-
-
-# Em modules/player/stats.py
-
-# Em modules/player/stats.py
 
 async def _apply_class_progression_sync_inplace(pdata: dict) -> bool:
     """
