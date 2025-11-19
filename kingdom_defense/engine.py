@@ -304,16 +304,17 @@ class KingdomDefenseManager:
                 item_id = 'fragmento_bravura'
                 player_manager.add_item_to_inventory(player_data, item_id, reward_amount)
                 
-                # Tenta pegar o nome bonito do item
                 item_info = game_items.ITEMS_DATA.get(item_id, {})
                 item_name = item_info.get('display_name', 'Fragmento de Bravura')
                 
-                loot_msg = f"💎 <b>Loot:</b> {reward_amount}x {item_name}"
-                
-                # ✅ ADICIONA AO LOG VISUAL (Aqui está a mudança)
+                loot_msg = f"💎 𝐋𝐨𝐨𝐭: {reward_amount}x {item_name}"
                 logs.append(loot_msg) 
 
-                # Verifica se spawnou o Boss
+                # ✅ CORREÇÃO CRUCIAL: Remove o monstro morto da piscina global
+                if self.current_wave_mob_pool:
+                    self.current_wave_mob_pool.pop(0)
+
+                # Verifica se spawnou o Boss (agora funciona pq a lista diminuiu)
                 if not self.boss_mode_active and not self.current_wave_mob_pool:
                     self.boss_mode_active = True
                     boss_id = self.wave_definitions[self.current_wave].get("boss_id")
@@ -332,8 +333,8 @@ class KingdomDefenseManager:
                     logs.append(f"\n🚨 <b>{boss_name}</b> APARECEU COM {self.boss_global_hp:,} HP! 🚨")
 
             if user_id in self.player_states:
+                # Carrega o PRÓXIMO monstro (agora será um novo, pois demos pop no antigo)
                 await self._setup_player_battle_state(user_id, player_data)
-                # Passa loot_msg também no retorno para o 'toast' (notificação rápida)
                 return {
                     "monster_defeated": True, 
                     "action_log": "\n".join(logs), 
@@ -368,7 +369,6 @@ class KingdomDefenseManager:
                     
                     f_state['player_hp'] = max(0, f_state['player_hp'] - final_dmg)
                     
-                    # Log individual será gerado no handler para cada jogador, aqui logamos o geral
                     logs.append(f"🔥 {f_data.get('character_name','Herói')} sofreu {final_dmg}!")
                     
                     was_defeated = f_state['player_hp'] <= 0
@@ -388,7 +388,6 @@ class KingdomDefenseManager:
                 else:
                     mob_damage, mob_is_crit, mob_is_mega = criticals.roll_damage(mob, player_full_stats, {})
                     
-                    # Aplica multiplicador se for especial single target
                     if is_boss_fight and special_attack_data and not special_attack_data.get("is_aoe") and self.boss_attack_counter % 3 == 0:
                         mob_damage = int(mob_damage * special_attack_data.get("damage_multiplier", 1.0))
                         logs.append(f"👑 <b>{special_attack_data['name']}!</b>")
