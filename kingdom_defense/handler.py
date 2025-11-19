@@ -77,7 +77,39 @@ async def _safe_interface_update(query, context, user_id, caption, media_key, ke
         except Exception as e_final:
             logger.error(f"Erro crítico na interface: {e_final}")
 
+async def _safe_send_new_message(context, user_id, caption, media_key, keyboard, delete_msg=None):
+    """Envia uma NOVA mensagem com segurança (Mídia Específica -> Genérica -> Texto)."""
+    # 1. Tenta apagar a mensagem anterior se solicitado
+    if delete_msg:
+        try: await delete_msg.delete()
+        except: pass
 
+    file_data = file_ids.get_file_data(media_key) if media_key else None
+    specific_file_id = file_data.get("id") if file_data else None
+    
+    # 2. Tenta enviar foto específica do monstro
+    if specific_file_id:
+        try:
+            msg = await context.bot.send_photo(chat_id=user_id, photo=specific_file_id, caption=caption, reply_markup=keyboard, parse_mode="HTML")
+            event_manager.store_player_message_id(user_id, msg.message_id)
+            return
+        except Exception: pass # Falhou? Continua...
+    
+    # 3. Tenta enviar foto genérica de teste (Fallback)
+    if DEFAULT_TEST_IMAGE_ID:
+        try:
+            msg = await context.bot.send_photo(chat_id=user_id, photo=DEFAULT_TEST_IMAGE_ID, caption=caption, reply_markup=keyboard, parse_mode="HTML")
+            event_manager.store_player_message_id(user_id, msg.message_id)
+            return
+        except Exception: pass # Falhou? Continua...
+    
+    # 4. Último recurso: Envia apenas texto
+    try:
+        msg = await context.bot.send_message(chat_id=user_id, text=caption, reply_markup=keyboard, parse_mode="HTML")
+        event_manager.store_player_message_id(user_id, msg.message_id)
+    except Exception as e:
+        logger.error(f"Falha total ao enviar mensagem para {user_id}: {e}")
+        
 # =============================================================================
 # HELPER: Raridade de Skills (Essencial para custos e efeitos corretos)
 # =============================================================================
@@ -649,151 +681,66 @@ async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
-    
     player_data = await player_manager.get_player_data(user_id)
-    if not player_data:
-         await query.answer("Erro ao carregar dados. Tente /start.", show_alert=True)
-         return
-         
-    ticket_id = 'ticket_defesa_reino'
-    player_inventory = player_data.get('inventory', {})
+    if not player_data: return
     
-    if player_inventory.get(ticket_id, 0) <= 0:
-        await query.answer("Você precisa de um Ticket da Defesa para entrar!", show_alert=True)
-        return
+    if player_data.get('inventory', {}).get('ticket_defesa_reino', 0) <= 0:
+        await query.answer("Sem Ticket!", show_alert=True); return
 
-    await query.answer("Ticket validado! Verificando seu lugar na linha de frente...")
-
+    await query.answer("Entrando...")
     if not event_manager.is_active:
-        await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
-        return
+        await query.edit_message_text("Evento encerrado.", reply_markup=_get_game_over_keyboard()); return
 
-    # Consome o ticket
-    player_manager.remove_item_from_inventory(player_data, ticket_id, 1)
+    player_manager.remove_item_from_inventory(player_data, 'ticket_defesa_reino', 1)
     await player_manager.save_player_data(user_id, player_data)
     
     status = await event_manager.add_player_to_event(user_id, player_data) 
     
     if status == "active":
-        total_stats = await player_manager.get_player_total_stats(player_data) 
-        battle_data = event_manager.get_battle_data(user_id)
+        stats = await player_manager.get_player_total_stats(player_data) 
+        bdata = event_manager.get_battle_data(user_id)
+        if not bdata: return
         
-        if not battle_data:
-             await query.edit_message_caption(caption="Ocorreu um erro ao buscar seus dados de batalha. Tente novamente.", reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
-             return
-        
-        # Prepara dados da mídia
-        media_key = battle_data['current_mob'].get('media_key')
-        file_data = file_ids.get_file_data(media_key) if media_key else None
-        caption = _format_battle_caption(battle_data, player_data, total_stats)
-        
-        # --- TENTATIVA 1: Enviar com Mídia (Foto/Vídeo) ---
-        if file_data and file_data.get("id"):
-            try:
-                media = InputMediaPhoto(media=file_data["id"], caption=caption, parse_mode="HTML")
-                edited_message = await query.edit_message_media(media=media, reply_markup=_get_battle_keyboard())
-                event_manager.store_player_message_id(user_id, edited_message.message_id)
-                return # Sucesso! Sai da função.
-            except Exception as e:
-                logger.error(f"Falha ao enviar mídia '{media_key}': {e}. Tentando fallback...")
-        
-        # --- TENTATIVA 2 (FALLBACK): Se a mídia falhar, tenta modo seguro ---
-        try:
-            # Se a mensagem anterior já era uma foto, tentamos editar apenas a legenda
-            if query.message.photo:
-                edited_message = await query.edit_message_caption(
-                    caption=caption, 
-                    reply_markup=_get_battle_keyboard(), 
-                    parse_mode="HTML"
-                )
-            else:
-                # Se era texto ou deu erro grave, apagamos e enviamos uma nova mensagem limpa
-                await query.message.delete()
-                # Tenta enviar foto novamente como nova mensagem, se falhar, envia texto
-                if file_data and file_data.get("id"):
-                    try:
-                        edited_message = await context.bot.send_photo(
-                            chat_id=user_id, 
-                            photo=file_data["id"], 
-                            caption=caption, 
-                            reply_markup=_get_battle_keyboard(), 
-                            parse_mode="HTML"
-                        )
-                    except Exception:
-                         # Último recurso: Apenas texto
-                         edited_message = await context.bot.send_message(
-                            chat_id=user_id, 
-                            text=caption, 
-                            reply_markup=_get_battle_keyboard(), 
-                            parse_mode="HTML"
-                        )
-                else:
-                    # Sem mídia definida, envia texto direto
-                    edited_message = await context.bot.send_message(
-                        chat_id=user_id, 
-                        text=caption, 
-                        reply_markup=_get_battle_keyboard(), 
-                        parse_mode="HTML"
-                    )
-
-            event_manager.store_player_message_id(user_id, edited_message.message_id)
-
-        except Exception as e_final:
-            logger.error(f"Erro CRÍTICO ao iniciar interface de batalha: {e_final}")
-            await query.message.reply_text("Erro visual na batalha. Tente usar /start novamente.")
-
+        # ✅ USA A FUNÇÃO SEGURA
+        await _safe_send_new_message(
+            context, user_id, 
+            _format_battle_caption(bdata, player_data, stats), 
+            bdata['current_mob'].get('media_key'), 
+            _get_battle_keyboard(),
+            delete_msg=query.message # Apaga o menu anterior
+        )
+    
     elif status == "waiting":
-        status_text = event_manager.get_queue_status_text()
-        text = f"🛡️ Fila de Reforços 🛡️\n\nA linha de frente está cheia!\n\n{status_text}\n\nAguarde sua vez."
+        text = f"🛡️ Fila de Reforços 🛡️\n\nAguarde sua vez.\n{event_manager.get_queue_status_text()}"
         await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard(), parse_mode='HTML')
 
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
-
     if not event_manager.is_active:
-        await query.answer("O evento já terminou.", show_alert=True)
-        await query.edit_message_text("A invasão já terminou.", reply_markup=_get_game_over_keyboard())
-        return
+        await query.edit_message_text("Evento encerrado.", reply_markup=_get_game_over_keyboard()); return
 
     status = event_manager.get_player_status(user_id)
-
     if status == "active":
-        await query.answer("Sua vez chegou! Prepare-se!", show_alert=True)
-
+        await query.answer("Sua vez!", show_alert=True)
         player_data = await player_manager.get_player_data(user_id)
-        total_stats = await player_manager.get_player_total_stats(player_data)
-        battle_data = event_manager.get_battle_data(user_id)
-
-        if not player_data or not battle_data:
-            await query.edit_message_text("Erro ao iniciar sua batalha. Tente entrar novamente.", reply_markup=_get_game_over_keyboard())
-            return
-
-        media_key = battle_data['current_mob'].get('media_key')
-        file_data = file_ids.get_file_data(media_key) if media_key else None
-
-        if not file_data or not file_data.get("id"):
-            await query.message.edit_text("Erro: Mídia do monstro não encontrada.")
-            return
-
-        caption = _format_battle_caption(battle_data, player_data, total_stats)
-
-        await query.message.delete()
-
-        new_message = await context.bot.send_photo(
-            chat_id=user_id, photo=file_data["id"], caption=caption, 
-            reply_markup=_get_battle_keyboard(), parse_mode="HTML"
+        stats = await player_manager.get_player_total_stats(player_data)
+        bdata = event_manager.get_battle_data(user_id)
+        if not bdata: return
+        
+        # ✅ USA A FUNÇÃO SEGURA
+        await _safe_send_new_message(
+            context, user_id, 
+            _format_battle_caption(bdata, player_data, stats), 
+            bdata['current_mob'].get('media_key'), 
+            _get_battle_keyboard(),
+            delete_msg=query.message # Apaga a msg de "aguardando"
         )
 
-        event_manager.store_player_message_id(user_id, new_message.message_id)
-
     elif status == "waiting":
-        status_text = event_manager.get_queue_status_text()
-        text = f"🛡️ Fila de Reforços 🛡️\n\nAinda aguardando vaga...\n\n{status_text}"
-        await query.edit_message_text(text=text, reply_markup=_get_waiting_keyboard(), parse_mode='HTML')
-        await query.answer("Ainda não há vagas. Continue alerta!")
+        await query.edit_message_text(text=f"Ainda na fila...\n{event_manager.get_queue_status_text()}", reply_markup=_get_waiting_keyboard(), parse_mode='HTML')
+        await query.answer("Aguarde.")
     else: 
-        await query.answer("Você não está mais na fila.", show_alert=True)
         await show_event_menu(update, context)
 
 def register_handlers(application):
