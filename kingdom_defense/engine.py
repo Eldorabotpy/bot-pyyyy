@@ -198,18 +198,10 @@ class KingdomDefenseManager:
         total_stats = await player_manager.get_player_total_stats(player_data) 
         current_wave_info = self.wave_definitions[self.current_wave]
         
+        # Lógica do Monstro (Mantida)
         mob_template = None
         if not self.boss_mode_active:
-            if not self.current_wave_mob_pool:
-                # Se o pool estiver vazio mas não for boss, tenta pegar o último mob ou erro
-                if self.total_mobs_in_wave > 0:
-                     # Apenas para evitar crash, não deveria acontecer se a lógica de spawn estiver certa
-                     logger.warning(f"Pool vazio na onda {self.current_wave}.")
-                     return
-            else:
-                # Pega o ID sem remover (a remoção acontece quando o jogador entra/mata)
-                # Se a lógica for remover ao entrar, use pop(0). Se for ao matar, use [0].
-                # Assumindo pop(0) baseado no seu código anterior:
+            if self.current_wave_mob_pool:
                 mob_id = self.current_wave_mob_pool[0] 
                 mob_template = _find_monster_template(mob_id)
         else:
@@ -217,38 +209,41 @@ class KingdomDefenseManager:
             mob_template = _find_monster_template(boss_id)
             
         if not mob_template:
-            logger.error(f"ERRO CRÍTICO: Não foi possível encontrar os dados do monstro para a onda {self.current_wave}.")
+            logger.error(f"ERRO CRÍTICO: Monstro não encontrado (Onda {self.current_wave}).")
             return
 
         mob_instance = mob_template.copy()
         mob_instance['active_effects'] = []
-        
         if self.boss_mode_active:
             mob_instance.update({'hp': self.boss_global_hp, 'max_hp': self.boss_max_hp, 'is_boss': True})
         else:
             mob_instance.update({'max_hp': mob_instance['hp'], 'is_boss': False})
 
         # --- HP DO JOGADOR ---
-        max_hp = total_stats.get('max_hp', 100)
-        current_hp = max_hp
-        if user_id in self.player_states and self.player_states[user_id].get('player_hp', 0) > 0:
-            previous_hp = self.player_states[user_id]['player_hp']
-            current_hp = min(previous_hp, max_hp) 
-            logger.debug(f"Preservando HP do jogador {user_id} em {current_hp}")        
+        max_hp = int(total_stats.get('max_hp', 100))
+        # Se o jogador já está na memória do evento, mantém o HP atual.
+        if user_id in self.player_states:
+             current_hp = self.player_states[user_id].get('player_hp', max_hp)
         else:
-            logger.debug(f"Definindo HP inicial (máximo) para {user_id} em {current_hp}")
-            
-        # --- MP DO JOGADOR ---
-        max_mp = total_stats.get('max_mana', 50)
-        previous_mp = self.player_states.get(user_id, {}).get('player_mp', max_mp)
-        current_mp = min(previous_mp, max_mp)
+             # Se é novo, pega do banco de dados (ou full se não tiver)
+             current_hp = int(player_data.get('current_hp', max_hp))
+        current_hp = min(current_hp, max_hp)
+
+        # --- MP DO JOGADOR (CORREÇÃO AQUI) ---
+        max_mp = int(total_stats.get('max_mana', 50))
+        
+        if user_id in self.player_states:
+             # Se já está lutando, mantém o MP que tinha
+             current_mp = self.player_states[user_id].get('player_mp', max_mp)
+        else:
+             # Se acabou de entrar, pega do banco de dados ('current_mp')
+             current_mp = int(player_data.get('current_mp', max_mp))
+        
+        current_mp = min(current_mp, max_mp)
 
         # --- DADOS EXTRAS ---
         current_damage = self.player_states.get(user_id, {}).get('damage_dealt', 0)
         current_message_id = self.player_states.get(user_id, {}).get('message_id', None)
-
-        # ✅ CORREÇÃO CRUCIAL: Preserva os cooldowns existentes
-        # Se não fizer isso, toda vez que atualizar o estado, os cooldowns resetam para 0
         saved_cooldowns = self.player_states.get(user_id, {}).get('skill_cooldowns', {})
 
         self.player_states[user_id] = {
@@ -260,9 +255,9 @@ class KingdomDefenseManager:
             'damage_dealt': current_damage,
             'active_effects': [],
             'message_id': current_message_id,
-            'skill_cooldowns': saved_cooldowns # <--- OBRIGATÓRIO PARA O COOLDOWN FUNCIONAR
+            'skill_cooldowns': saved_cooldowns
         }
-        logger.info(f"Jogador {user_id} configurado para lutar contra {mob_instance['name']} com {current_hp} de HP.")
+        logger.info(f"Jogador {user_id}: HP {current_hp}/{max_hp}, MP {current_mp}/{max_mp}")
 
 
     async def _promote_next_player(self):
