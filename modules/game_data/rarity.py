@@ -1,5 +1,7 @@
 # modules/game_data/rarity.py
 
+from typing import Dict, List
+
 BASE_STATS_BY_RARITY = {
     # slots com primary fixo
     "elmo":      {"vida":      {"comum":[3,5],  "bom":[5,8],  "raro":[8,12],  "epico":[12,16], "lendario":[16,22]}},
@@ -39,4 +41,44 @@ UPGRADE_CAP_BY_RARITY = {
     "raro": 30,
     "epico": 35,
     "lendario": 40,
+}
+
+# modules/game_data/rarity.py
+
+# =====================================================
+# POOLS DE ATRIBUTOS SECUNDÁRIOS (AFFIXES)
+# Usados pelo crafting_engine para sortear atributos secundários.
+# =====================================================
+
+AFFIX_POOLS: Dict[str, List[str]] = {
+    # Pool Geral (Usado por todas as classes)
+    "geral": [
+        "vida", "defesa", "iniciativa", "sorte", "tenacidade", "agilidade"
+    ],
+    
+    # Pool Mágico/Arcano (Para Mago, Bardo, Curandeiro)
+    "magico_arcano": [
+        "inteligencia", "mana", "magic_attack", "magic_penetration", "cooldown_reduction"
+    ],
+    
+    # Pool Físico/Guerreiro (Para Guerreiro, Samurai)
+    "fisico_defensivo": [
+        "forca", "defesa_fisica", "max_hp", "tenacidade"
+    ],
+    
+    # Pool Agilidade/Letalidade (Para Caçador, Assassino)
+    "agilidade_letal": [
+        "crit_chance_flat", "crit_damage_mult", "armor_penetration", "lifesteal"
+    ],
+
+    # --- Pools de Classes Específicas (Opcional) ---
+    "guerreiro": ["vida", "defesa_fisica", "max_hp", "tenacidade", "block_chance"],
+    "berserker": ["furia", "crit_damage_mult", "lifesteal", "attack_speed"],
+    "mago":      ["inteligencia", "magic_attack", "max_mana", "magic_penetration"],
+    "cacador":   ["crit_chance_flat", "armor_penetration", "agilidade"],
+    "monge":     ["foco", "dodge_chance_flat", "tenacidade"],
+    "assassino": ["letalidade", "crit_chance_flat", "armor_penetration"],
+    "bardo":     ["carisma", "cooldown_reduction", "max_mana"],
+    "samurai":   ["bushido", "block_chance", "parry_chance"],
+    "curandeiro": ["fe", "heal_potency", "magic_resist"]
 }

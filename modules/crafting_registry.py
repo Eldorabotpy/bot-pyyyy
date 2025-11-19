@@ -6,7 +6,7 @@
 import logging
 import pkgutil
 import importlib
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 # Importamos o pacote de receitas para que o código possa encontrá-lo
 from modules import recipes as recipes_package

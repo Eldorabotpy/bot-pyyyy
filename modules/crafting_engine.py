@@ -191,11 +191,18 @@ async def start_craft(user_id: int, recipe_id: str):
 # =========================
 
 def _attr_to_enchant_key(attr_name: str) -> str:
-    """
-    Normaliza nomes para as chaves usadas em 'enchantments'.
-    (Mantemos 'dmg' exclusivo para cálculo; não exibimos como atributo visível.)
-    """
+    """Normaliza nomes para as chaves usadas em 'enchantments'."""
     a = str(attr_name or "").lower()
+    
+    # --- Mapeamentos CRÍTICOS para Magia/Foco/Recursos ---
+    if a in {"inteligencia", "magia", "poder_magico", "dano_magico"}:
+        return "magic_attack" # Chave usada para dano de feitiços
+    if a in {"mana", "mp", "mana_max", "max_mana"}:
+        return "max_mana"
+    if a in {"foco", "disciplina", "tenacidade", "tenacity"}:
+        return "tenacity" # Exemplo de atributo secundário
+    # ----------------------------------------------------
+
     if a in {"forca", "força", "ataque", "attack", "dano", "damage", "dmg", "poder", "ofensivo"}:
         return "dmg"
     if a in {"vida", "hp", "saude", "saúde", "health"}:
@@ -206,7 +213,8 @@ def _attr_to_enchant_key(attr_name: str) -> str:
         return "initiative"
     if a in {"sorte", "luck"}:
         return "luck"
-    # atributos de classe (bushido, carisma, foco, letalidade, etc.) permanecem como vêm
+        
+    # Atributos de classe (bushido, carisma, letalidade, etc.)
     return a
 
 def _class_primary_attr(player_class: str | None) -> str:
