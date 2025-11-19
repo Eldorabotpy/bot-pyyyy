@@ -244,42 +244,48 @@ def is_item_allowed_for_player_class(player_data: dict, item: dict) -> Tuple[boo
     Verifica se o jogador pode equipar o item, checando a ancestralidade da classe.
     (Ex: "Arquimago" pode equipar itens "Mago").
     """
-    player_class_key = stats._get_class_key_normalized(player_data)
+    # 1. Descobre a classe atual do jogador (normalizada)
+    player_class_key = player_stats_helper._get_class_key_normalized(player_data)
+    
+    # 2. Descobre a restrição do item
     req = item.get("class_req") or _class_req_from_base(item.get("base_id"))
     
+    # Se o item não pede classe nenhuma, está liberado
     if not req:
-        return True, None # Item não tem restrição de classe
+        return True, None 
 
-    # Garante que req_list_lower seja uma lista de strings
+    # Normaliza a lista de requisitos do item para minúsculo
     if isinstance(req, str):
         req_list_lower = [req.strip().lower()]
     elif isinstance(req, (list, tuple)):
         req_list_lower = [str(x).strip().lower() for x in req]
     else:
-        req_list_lower = [] # Formato desconhecido
+        req_list_lower = [] 
     
     if not req_list_lower:
-        return True, None # Lista de restrição vazia
+        return True, None
         
     if not player_class_key:
         return False, "Classe do jogador não definida."
 
-    # --- LÓGICA DE ANCESTRALIDADE ---
-    # Pega a lista de classes (ex: ['arquimago', 'elementalista', 'mago'])
-    ancestry = get_class_ancestry(player_class_key)
+    # --- LÓGICA DE ANCESTRALIDADE (A CORREÇÃO MÁGICA) ---
+    # Pega toda a árvore genealógica da classe (ex: ['mago', 'arquimago'])
+    try:
+        ancestry = get_class_ancestry(player_class_key)
+    except Exception:
+        # Fallback: se der erro na ancestralidade, usa apenas a própria classe
+        ancestry = [player_class_key]
     
+    # Verifica se ALGUMA das classes da árvore do jogador está na lista do item
     for class_node in ancestry:
         if class_node in req_list_lower:
-            return True, None # Encontrou! (ex: "mago" está em ["mago"])
+            return True, None # Sucesso!
 
     # Se chegou aqui, não pode equipar
     disp = item.get("display_name") or item.get("base_id") or "item"
+    classes_str = ", ".join([r.title() for r in req_list_lower])
     
-    # --- CORREÇÃO DO NameError ('req_list' -> 'req_list_lower') ---
-    return False, f"⚠️ {disp} é exclusivo para {', '.join(req_list_lower)}."
-
-# Substitua a função _get_item_slot_from_base (em modules/player/inventory.py, linha 302)
-# por esta versão:
+    return False, f"⚠️ {disp} é exclusivo para: {classes_str}."
 
 def _get_item_slot_from_base(base_id: Optional[str]) -> Optional[str]:
     """

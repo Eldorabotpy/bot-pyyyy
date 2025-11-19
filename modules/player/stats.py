@@ -8,12 +8,29 @@ from modules import player_manager
 from modules import game_data, clan_manager
 from modules.game_data.class_evolution import get_evolution_options, get_class_ancestry
 
+try:
+    from modules.combat.durability import is_item_broken
+except ImportError:
+    # Fallback caso o arquivo não exista ou esteja em outro lugar, evita crash
+    def is_item_broken(x): return False
 
 logger = logging.getLogger(__name__)
 
 # ========================================
 # CONSTANTES DE PROGRESSÃO DE CLASSE
 # ========================================
+MAGIC_CLASSES = {
+    "mago", "arquimago", "feiticeiro", "bruxo", "necromante", 
+    "curandeiro", "sacerdote", "clerigo", "druida", "xama",
+    "bardo", "mistico", "elementalista"
+}
+
+# Define quais classes ganham bônus de dano pela Iniciativa/Agilidade.
+AGILITY_CLASSES = {
+    "cacador", "arqueiro", "patrulheiro", 
+    "assassino", "ninja", "ladino", 
+    "monge"
+}
 
 CLASS_PROGRESSIONS = {
     "guerreiro": { "BASE": {"max_hp": 52, "attack": 5, "defense": 4, "initiative": 4, "luck": 3}, "PER_LVL": {"max_hp": 8, "attack": 1, "defense": 2, "initiative": 0, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
@@ -23,7 +40,7 @@ CLASS_PROGRESSIONS = {
     "cacador": { "BASE": {"max_hp": 48, "attack": 6, "defense": 3, "initiative": 6, "luck": 4}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 0, "initiative": 2, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
     
     "monge": { "BASE": {"max_hp": 50, "attack": 5, "defense": 4, "initiative": 6, "luck": 3}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 2, "initiative": 2, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
-    "mago": { "BASE": {"max_hp": 45, "attack": 7, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "attack" },
+    "mago": { "BASE": {"max_hp": 45, "attack": 7, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "magic_attack" },
     "bardo": { "BASE": {"max_hp": 47, "attack": 5, "defense": 3, "initiative": 5, "luck": 6}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 2}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
     "assassino": { "BASE": {"max_hp": 47, "attack": 6, "defense": 2, "initiative": 7, "luck": 5}, "PER_LVL": {"max_hp": 5, "attack": 2, "defense": 0, "initiative": 3, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
     "samurai": { "BASE": {"max_hp": 50, "attack": 6, "defense": 4, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 7, "attack": 2, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "defense" },
@@ -250,24 +267,22 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
 
 async def get_player_total_stats(
     player_data: dict, 
-    ally_user_ids: List[int] = None  # <-- MODIFICADO: Recebe IDs, não pdata
+    ally_user_ids: List[int] = None
 ) -> dict:
-    """
-    (MODIFICADO para aceitar 'ally_user_ids' e aplicar skills/auras)
-    """
     lvl = _ival(player_data.get("level"), 1)
-    ckey = _get_class_key_normalized(player_data) # ckey agora é a classe base
+    ckey = _get_class_key_normalized(player_data)
+    real_class_key = (player_data.get("class_key") or player_data.get("class") or "").lower()
 
-    # 1. Calcula os stats base (de classe + nível)
+    # 1. Base Stats
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
-
     total: Dict[str, Any] = {} 
 
-    # Pega o valor salvo (investido) ou a baseline
     for k in _BASELINE_KEYS:
         total[k] = _ival(player_data.get(k, class_baseline.get(k)), class_baseline.get(k, 0))
 
-    # 2. Adiciona Stats de Equipamento
+    total['magic_attack'] = 0
+
+    # 2. Equipamentos
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
 
@@ -277,58 +292,41 @@ async def get_player_total_stats(
             inst = inventory.get(unique_id)
             if not isinstance(inst, dict): continue
 
-            # (Lógica de durabilidade omitida para brevidade, mas está correta)
-            durability_data = inst.get("durability", [1, 1])
-            current_durability = 0
-            if isinstance(durability_data, (list, tuple)) and len(durability_data) > 0:
-                current_durability = _ival(durability_data[0], 0)
-            elif isinstance(durability_data, dict):
-                current_durability = _ival(durability_data.get("current", 0), 0)
-            else:
-                current_durability = _ival(durability_data, 0)
-            if current_durability <= 0:
-                continue 
+            # ====================================================
+            # --- CORREÇÃO DE DURABILIDADE ---
+            # Verifica se o item está quebrado usando a lógica centralizada
+            if is_item_broken(inst):
+                continue # PULA ESTE ITEM, NÃO SOMA NADA
+            # ====================================================
 
-            # CORRIGIDO:
-
-            # Dentro de modules/player/stats.py -> get_player_total_stats
-            
             ench = inst.get('enchantments', {}) or {}
             for stat_key, data in ench.items():
                 val = _ival((data or {}).get('value', 0), 0)
-
-                # === [CORREÇÃO DE COMPATIBILIDADE] ===
-                # Traduz nomes antigos/visuais para as chaves reais do sistema
                 k = stat_key.lower()
+                
                 if k in ("inteligencia", "magia", "poder_magico", "dano_magico"):
                     stat_key = "magic_attack"
-                elif k in ("furia", "forca_bruta"):
-                    stat_key = "attack" # Ou bonus de dano critico, depende do design
+                elif k in ("furia", "forca_bruta", "dmg"):
+                    stat_key = "attack"
                 elif k in ("precisao", "mira"):
                     stat_key = "crit_chance_flat"
-                elif k in ("fe", "faith"):
-                    stat_key = "heal_potency" # Exemplo para curandeiro
-                # =====================================
+                elif k in ("hp", "vida"):
+                    stat_key = "max_hp"
                 
-                if stat_key == 'dmg':
-                    total['attack'] = total.get('attack', 0) + val
-                
-                elif stat_key == 'hp':
+                if stat_key == 'max_hp':
                     total['max_hp'] = total.get('max_hp', 0) + val
-                
-                elif stat_key in ('defense', 'initiative', 'luck'):
+                elif stat_key == 'magic_attack':
+                    total['magic_attack'] = total.get('magic_attack', 0) + val
+                elif stat_key in ('attack', 'defense', 'initiative', 'luck'):
                     total[stat_key] = total.get(stat_key, 0) + val
-                
                 else:
-                    # Lógica para stats secundários (magic_attack, crit, etc)
-                    # Agora 'inteligencia' vai cair aqui como 'magic_attack' e somar certo!
-                    if stat_key not in ('dmg', 'hp') and stat_key not in _BASELINE_KEYS:
+                    if stat_key not in _BASELINE_KEYS:
                         total[stat_key] = total.get(stat_key, 0) + val
 
-    # 3. Calcula Mana (Pré-Skills)
+    # 3. Mana
     _calculate_mana(player_data, total, ckey_fallback=ckey)
     
-    # 4. Adiciona Bônus de Clã
+    # 4. Clã Buffs
     clan_id = player_data.get("clan_id")
     if clan_id:
         try:
@@ -343,35 +341,47 @@ async def get_player_total_stats(
         except Exception:
             pass
 
-    # --- NOVO PASSO 5: Adiciona Bônus Passivos (Próprios e Auras de Aliados) ---
+    # 5. Passivas e Auras
     try:
-        # 5a. Aplica as skills passivas do PRÓPRIO jogador
         _apply_passive_skill_bonuses(player_data, total)
-        
-        # 5b. Aplica as AURAS PASSIVAS dos aliados (se fornecidos)
         if ally_user_ids:
-            # Carrega os dados dos aliados (do cache, deve ser rápido)
             for ally_id in ally_user_ids:
-                if ally_id == player_data.get("user_id"):
-                    continue # Não aplica a própria aura duas vezes
-                    
+                if ally_id == player_data.get("user_id"): continue
                 ally_data = await player_manager.get_player_data(ally_id)
                 if ally_data:
                     _apply_party_aura_bonuses(ally_data, total)
+    except Exception:
+        pass
 
-    except Exception as e:
-        logger.exception(f"Erro ao aplicar bônus de skills passivas/auras para {player_data.get('user_id')}: {e}")
-    # --- Fim do Novo Passo ---
+    # 6. Unificação de Dano (Mágico vs Físico)
+    base_attack = total.get('attack', 0)
+    magic_bonus = total.get('magic_attack', 0)
+    
+    is_magic = real_class_key in MAGIC_CLASSES
+    if not is_magic:
+        ancestry = get_class_ancestry(real_class_key)
+        if any(c in MAGIC_CLASSES for c in ancestry):
+            is_magic = True
 
-    # 6. Garante valores válidos (não-negativos)
+    if is_magic:
+        total['attack'] = base_attack + magic_bonus
+        total['magic_attack'] = total['attack']
+
+    is_agility = real_class_key in AGILITY_CLASSES
+    if not is_agility:
+         ancestry = get_class_ancestry(real_class_key)
+         if any(c in AGILITY_CLASSES for c in ancestry):
+             is_agility = True
+             
+    if is_agility:
+        ini_bonus = int(total.get('initiative', 0) * 0.25)
+        total['attack'] += ini_bonus
+
+    # 7. Sanitização
     for k in _BASELINE_KEYS:
         total[k] = max(0, _ival(total.get(k), 0))
-    
     total['max_mana'] = max(0, _ival(total.get('max_mana', 10)))
     
-    if 'magic_attack' not in total:
-        total['magic_attack'] = total.get('attack', 0) 
-
     return total
 
 

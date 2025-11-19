@@ -1,4 +1,4 @@
-# modules/combat/durability.py
+# modules/player/durability.py (ou modules/combat/durability.py dependendo da sua pasta)
 from modules import player_manager
 
 _WEAPON_SLOTS = ("weapon", "primary_weapon", "arma")
@@ -19,6 +19,7 @@ def _get_unique_inst(player_data: dict, uid: str) -> dict | None:
     return inst if isinstance(inst, dict) and inst.get("base_id") else None
 
 def _dur_tuple(raw) -> tuple[int, int]:
+    """Lê a durabilidade e retorna (atual, maxima)."""
     cur, mx = 20, 20
     if isinstance(raw, (list, tuple)) and len(raw) >= 2:
         try:
@@ -28,9 +29,27 @@ def _dur_tuple(raw) -> tuple[int, int]:
         try:
             cur, mx = int(raw.get("current", 20)), int(raw.get("max", 20))
         except Exception: pass
+    # Tratamento caso venha apenas um inteiro (ex: legado)
+    elif isinstance(raw, (int, float)):
+        cur = int(raw)
+        
     cur = max(0, min(cur, mx))
     mx = max(1, mx)
     return cur, mx
+
+# --- NOVA FUNÇÃO IMPORTANTE ---
+def is_item_broken(item_inst: dict) -> bool:
+    """Retorna True se o item estiver com durabilidade 0."""
+    if not item_inst: 
+        return False
+    dur_data = item_inst.get("durability")
+    # Se não tiver durabilidade definida, assumimos que é indestrutível (False)
+    if dur_data is None:
+        return False
+        
+    cur, _ = _dur_tuple(dur_data)
+    return cur <= 0
+# ------------------------------
 
 def consume_durability(player_data: dict, uid: str, amount: int = 1) -> tuple[int, int, bool]:
     inv = player_data.get("inventory", {}) or {}
@@ -49,16 +68,14 @@ def is_weapon_broken(player_data: dict) -> tuple[bool, str | None, tuple[int, in
     if not w_uid: return (False, None, (0, 0))
     inst = _get_unique_inst(player_data, w_uid)
     if not inst: return (False, None, (0, 0))
-    cur, mx = _dur_tuple(inst.get("durability"))
-    return (cur <= 0, w_uid, (cur, mx))
-
-# Em modules/combat/durability.py
+    
+    if is_item_broken(inst):
+        cur, mx = _dur_tuple(inst.get("durability"))
+        return (True, w_uid, (cur, mx))
+        
+    return (False, None, (0, 0))
 
 def apply_end_of_battle_wear(player_data: dict, combat_details: dict, log: list[str]) -> bool:
-    """
-    Aplica 1 de desgaste a TODOS os itens equipados (arma + armadura)
-    no final de uma batalha (vitória, derrota ou fuga).
-    """
     changed = False
     
     # --- Desgaste da Arma ---
