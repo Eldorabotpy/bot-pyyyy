@@ -135,8 +135,18 @@ def _format_battle_caption(player_state: dict, player_data: dict, total_stats: d
     action_log = player_state.get('action_log', '')
     
     p_name = player_data.get('character_name', 'Herói')
-    p_hp_str = f"❤️ HP: {player_state['player_hp']}/{int(total_stats.get('max_hp', 0))}"
-    p_mp_str = f"💙 MP: {player_data.get('mana', 0)}/{int(total_stats.get('max_mana', 0))}"
+    
+    # --- CORREÇÃO AQUI: Lê HP e MP diretamente do estado da batalha (Real-time) ---
+    current_hp = player_state.get('player_hp', 0)
+    max_hp = int(total_stats.get('max_hp', 0))
+    
+    current_mp = player_state.get('player_mp', 0) # <--- LÊ DO STATE, NÃO DO DATA
+    max_mp = int(total_stats.get('max_mana', 0))
+    
+    p_hp_str = f"❤️ HP: {current_hp}/{max_hp}"
+    p_mp_str = f"💙 MP: {current_mp}/{max_mp}"
+    # -----------------------------------------------------------------------------
+
     p_atk_str = f"⚔️ ATK: {int(total_stats.get('attack', 0))}"
     p_def_str = f"🛡️ DEF: {int(total_stats.get('defense', 0))}"
     p_vel_str = f"🏃‍♂️ VEL: {int(total_stats.get('initiative', 0))}"
