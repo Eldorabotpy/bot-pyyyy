@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # --- 1. Funções do Core ---
+# Ajustado para buscar dentro da pasta .player
 from .player.core import (
     get_player_data, 
     save_player_data, 
@@ -56,7 +57,8 @@ from .player.inventory import (
 # --- 5. Funções de Ações, Energia e Estado ---
 from .player.actions import (
     get_player_max_energy, 
-    spend_energy, add_energy, 
+    spend_energy, 
+    add_energy, 
     set_last_chat_id,
     ensure_timed_state, 
     try_finalize_timed_action_for_user, 
@@ -66,39 +68,33 @@ from .player.actions import (
     heal_player, 
     add_buff, 
     
-    # ==================================
-    # 👇 FUNÇÕES DE PVP ADICIONADAS 👇
-    # ==================================
+    # ===============================================
+    # 👇 CORREÇÃO CRÍTICA DE MANA: EXPORTAÇÕES 👇
+    # ===============================================
+    get_player_max_mana,
+    add_mana,
+    spend_mana,
+    
+    # PvP Points
     get_pvp_points,
     add_pvp_points,
 )
 
 # =================================================================
-# --- 6. Funções do Sistema Premium (VERSÃO REATORADA) ---
+# --- 6. Funções do Sistema Premium ---
 # =================================================================
-# Agora, importamos a CLASSE, não as funções antigas.
 from .player.premium import PremiumManager
 from typing import Any, Optional, Type
 
 def has_premium_plan(pdata: Optional[dict]) -> bool:
-    """
-    Recebe player_data (pdata) e retorna True se o jogador tem premium ativo.
-    Defensive: aceita pdata == None.
-    """
     if not pdata:
         return False
     try:
         return PremiumManager(pdata).is_premium()
     except Exception:
-        # Em caso de erro, não quebremos o fluxo — assume que não tem premium
         return False
 
 def get_perk_value(pdata: Optional[dict], perk_name: str, default: Any = 1, cast: Type = None) -> Any:
-    """
-    Retorna o valor do perk para um jogador.
-    Se 'cast' for fornecido (ex: float, int), tenta converter o valor antes de devolver.
-    Uso recomendado para multiplicadores: get_perk_value(pdata, 'xp_multiplier', 1.0, cast=float)
-    """
     if not pdata:
         return default
     try:
@@ -107,12 +103,31 @@ def get_perk_value(pdata: Optional[dict], perk_name: str, default: Any = 1, cast
         return default
 
 def get_perk_value_float(pdata: Optional[dict], perk_name: str, default: float = 1.0) -> float:
-    """
-    Conveniência: retorna o perk convertido para float com fallback seguro.
-    Use isto quando você espera um multiplicador numérico.
-    """
     val = get_perk_value(pdata, perk_name, default, cast=float)
     try:
         return float(val)
     except Exception:
         return float(default)
+
+# =================================================================
+# --- 7. HELPER: FULL RESTORE (Corrige o bug de 10 MP) ---
+# =================================================================
+async def full_restore(user_id: int):
+    """
+    Restaura totalmente HP, MP e Energia.
+    Chame isso quando o jogador subir de nível ou houver correções de stats.
+    """
+    pdata = await get_player_data(user_id)
+    if pdata:
+        # Calcula os stats máximos
+        stats = await get_player_total_stats(pdata)
+        
+        # Define o atual como o máximo
+        pdata['current_hp'] = stats.get('max_hp', 100)
+        pdata['current_mp'] = stats.get('max_mana', 50)
+        pdata['energy'] = get_player_max_energy(pdata)
+        
+        # Salva imediatamente
+        await save_player_data(user_id, pdata)
+        return True
+    return False

@@ -17,32 +17,42 @@ from modules.combat import combat_engine
 
 logger = logging.getLogger(__name__)
 
-# ================================================
-# INÍCIO: FUNÇÃO AUXILIAR DE SKILL (COPIADA)
-# ================================================
-# (Necessária para ler custos/efeitos de skills de raridade no 'process_player_skill')
-def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dict]:
-    """Busca os dados da skill mesclando com a raridade."""
+# =============================================================================
+# HELPER: Raridade de Skills (COM BALANCEAMENTO DE CUSTO)
+# =============================================================================
+def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> dict | None:
+    """
+    Busca os dados da skill e ajusta o CUSTO DE MANA baseado na classe.
+    """
     base_skill = SKILL_DATA.get(skill_id)
     if not base_skill: return None
-    if "rarity_effects" not in base_skill: return base_skill
 
-    player_skills = pdata.get("skills", {})
-    rarity = "comum"
-    if isinstance(player_skills, dict):
-        player_skill_instance = player_skills.get(skill_id)
-        if player_skill_instance:
-            rarity = player_skill_instance.get("rarity", "comum")
-
+    # 1. Lógica de Raridade (Mantida)
     merged_data = base_skill.copy()
-    rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
-    merged_data.update(rarity_data)
+    
+    if "rarity_effects" in base_skill:
+        player_skills = pdata.get("skills", {})
+        rarity = "comum"
+        if isinstance(player_skills, dict):
+            player_skill_instance = player_skills.get(skill_id)
+            if player_skill_instance:
+                rarity = player_skill_instance.get("rarity", "comum")
+        
+        rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
+        merged_data.update(rarity_data)
+    
+    player_class = (pdata.get("class_key") or pdata.get("class") or "").lower()
+    
+    # Lista de classes que sofrem penalidade de custo de mana
+    high_mana_classes = ["mago", "feiticeiro", "elementalista", "arquimago"]
+    
+    if player_class in high_mana_classes:
+        original_cost = merged_data.get("mana_cost", 0)
+        new_cost = int(original_cost * 2.0) 
+        
+        merged_data["mana_cost"] = new_cost
+
     return merged_data
-
-# ================================================
-# FIM: FUNÇÃO AUXILIAR DE SKILL
-# ================================================
-
 
 def _find_monster_template(mob_id: str) -> dict | None:
     if not mob_id: return None
@@ -198,10 +208,15 @@ class KingdomDefenseManager:
         total_stats = await player_manager.get_player_total_stats(player_data) 
         current_wave_info = self.wave_definitions[self.current_wave]
         
-        # Lógica do Monstro (Mantida)
+        # Lógica do Monstro
         mob_template = None
         if not self.boss_mode_active:
-            if self.current_wave_mob_pool:
+            if not self.current_wave_mob_pool:
+                if self.total_mobs_in_wave > 0:
+                     logger.warning(f"Pool vazio na onda {self.current_wave}.")
+                     return
+            else:
+                # Apenas PEGA o ID (não remove). A remoção ocorre no _resolve_turn
                 mob_id = self.current_wave_mob_pool[0] 
                 mob_template = _find_monster_template(mob_id)
         else:
@@ -221,12 +236,15 @@ class KingdomDefenseManager:
 
         # --- HP DO JOGADOR ---
         max_hp = int(total_stats.get('max_hp', 100))
-        # Se o jogador já está na memória do evento, mantém o HP atual.
-        if user_id in self.player_states:
-             current_hp = self.player_states[user_id].get('player_hp', max_hp)
+        if user_id in self.player_states and self.player_states[user_id].get('player_hp', 0) > 0:
+            previous_hp = self.player_states[user_id]['player_hp']
+            current_hp = min(previous_hp, max_hp) 
         else:
-             # Se é novo, pega do banco de dados (ou full se não tiver)
-             current_hp = int(player_data.get('current_hp', max_hp))
+            # Lê do banco. Tenta 'current_hp' ou 'hp'.
+            db_hp = player_data.get('current_hp')
+            if db_hp is None: db_hp = player_data.get('hp')
+            current_hp = int(db_hp) if db_hp is not None else max_hp
+            
         current_hp = min(current_hp, max_hp)
 
         # --- MP DO JOGADOR (CORREÇÃO AQUI) ---
@@ -236,8 +254,14 @@ class KingdomDefenseManager:
              # Se já está lutando, mantém o MP que tinha
              current_mp = self.player_states[user_id].get('player_mp', max_mp)
         else:
-             # Se acabou de entrar, pega do banco de dados ('current_mp')
-             current_mp = int(player_data.get('current_mp', max_mp))
+             # ✅ AGORA LÊ CORRETAMENTE DO BANCO DE DADOS
+             # Verifica a chave 'current_mp' E a chave 'mana'
+             db_mp = player_data.get('current_mp')
+             if db_mp is None: 
+                 db_mp = player_data.get('mana')
+             
+             # Se encontrou valor no banco, usa. Se não, usa Max (fallback)
+             current_mp = int(db_mp) if db_mp is not None else max_mp
         
         current_mp = min(current_mp, max_mp)
 
