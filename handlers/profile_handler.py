@@ -518,6 +518,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard.extend([
         [InlineKeyboardButton("🔰⚜️𝐂𝐋𝐀𝐍⚜️🔰", callback_data='clan_menu:profile')],
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬 📊", callback_data='status_open')],
+        [InlineKeyboardButton("💼 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨 💼", callback_data="job_menu")],
         [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬 🧰", callback_data='equipment_menu')],
         [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 𝐂𝐨𝐦𝐩𝐥𝐞𝐭𝐨 🎒", callback_data='inventory_CAT_equipamento_PAGE_1')],
         [InlineKeyboardButton("🧪 𝐔𝐬𝐚𝐫 𝐂𝐨𝐧𝐬𝐮𝐦𝐢́𝐯𝐞𝐥 🧪", callback_data='inventory_CAT_consumivel_PAGE_1')],

@@ -1,3 +1,5 @@
+# registries/character.py
+
 from telegram.ext import Application
 
 # 1. Do fluxo de início e criação de personagem
@@ -44,25 +46,22 @@ from handlers.equipment_handler import (
     equip_unequip_handler,
 )
 
-# 4. Das Classes e Evolução - CORRIGIDO AQUI
+# 4. Das Classes e Evolução
 from handlers.class_selection_handler import class_selection_handler
 from handlers.class_evolution_handler import (
     status_evolution_open_handler,
-    # Novos Handlers que correspondem às definições no class_evolution_handler.py:
     show_node_info_handler,         
     complete_node_handler,          
     start_trial_confirmation_handler, 
     start_trial_execute_handler,    
-    # evolution_command_handler, # Presumido como não existente/obsoleto
-    # evolution_callback_handler, # Presumido como não existente/obsoleto
-    # evolution_do_handler,       # Presumido como não existente/obsoleto
-    # evolution_cancel_handler,   # Presumido como não existente/obsoleto
 )
 
-# 5. Das Profissões
+# 5. Das Profissões (CORRIGIDO AQUI)
 from handlers.profession_handler import (
     job_menu_handler,
-    job_pick_handler,
+    job_view_handler,     # Novo
+    job_confirm_handler,  # Novo
+    job_guide_handler,    # Novo
 )
 
 
@@ -71,7 +70,7 @@ def register_character_handlers(application: Application):
 
     # Handlers normais (irão para o group=0 por padrão)
     normal_handlers = [
-        # Início e Criação (exceto o ladrão)
+        # Início e Criação
         start_command_handler,
         name_command_handler,
         
@@ -107,19 +106,19 @@ def register_character_handlers(application: Application):
         equip_pick_handler,
         equip_unequip_handler,
         
-        # Classes e Evolução - CORRIGIDO AQUI
+        # Classes e Evolução
         class_selection_handler,
         status_evolution_open_handler,
-        
-        # Novos Handlers de Evolução Registrados:
         show_node_info_handler,
         complete_node_handler,
         start_trial_confirmation_handler,
         start_trial_execute_handler,
         
-        # Profissões
+        # Profissões (CORRIGIDO AQUI)
         job_menu_handler,
-        job_pick_handler,
+        job_view_handler,     # Novo
+        job_confirm_handler,  # Novo
+        job_guide_handler,    # Novo
     ]
     normal_handlers.extend(all_skin_handlers)
     
