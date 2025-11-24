@@ -71,6 +71,10 @@
     "id": "BAACAgEAAxkBAAIGbmjo3AhlUrNNxDQzmTIoexP1uCo0AAJjBwACGhnYRi-PA1quX7GbNgQ",
     "type": "video"
   },
+  "classe_assassino_manto_espectral_media": {
+    "id": "BAACAgEAAxkBAAEBT5tpIRWL8E3DDnQYorvB_m2ZTCHvowACKQYAAmPbCEX5Lv-fRjTvyjYE",
+    "type": "video"
+  },
   "classe_bardo_media": {
     "id": "BAACAgEAAxkBAAIGhmjo3Sly7GM0--4TjVmqOqnC55K4AAIEBgACxKC4R5ukKTfSk8BrNgQ",
     "type": "video"
@@ -200,11 +204,11 @@
     "type": "video"
   },
   "espantalho_vivo_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAALxW2kaEnam7kGctmxviFGYYa3QniWSAAJmBQACW3gZRNhcGjmAS7w8NgQ",
     "type": "video"
   },
   "espectro_bosque_media": {
-    "id": "file_ids",
+    "id": "BAACAgEAAxkBAAEBVhZpIYWlYKoJ9-J2OuRzpB1fytOCTQACBwYAAtXEAUTav_ztLD90tzYE",
     "type": "video"
   },
   "evo_samurai_to_ronin_video": {

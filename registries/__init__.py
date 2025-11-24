@@ -1,9 +1,8 @@
-# registries/__init__.py (VERSÃO FINAL E LIMPA)
+# registries/__init__.py (VERSÃO FINAL CORRIGIDA)
 
 import logging
-from telegram.ext import Application
 from telegram import Update
-from telegram.ext import Application, TypeHandler, ContextTypes
+from telegram.ext import Application, TypeHandler, ContextTypes, CallbackQueryHandler
 from modules import player_manager
 from datetime import datetime, timezone
 
@@ -23,28 +22,25 @@ from handlers.potion_handler import all_potion_handlers
 #from handlers.autohunt_handler import all_autohunt_handlers
 from kingdom_defense.handler import register_handlers as register_kingdom_defense_handlers
 
+# --- IMPORTS DO SISTEMA DE EVENTOS ---
+from handlers.menu import kingdom  # Para o botão "Voltar ao Reino"
+from modules.events import event_menu  # O menu que lista os eventos
+
+# Importa Entry (Entrada/Lobby) E Combat (Luta)
+from modules.events.catacumbas import entry_handler as cat_entry
+from modules.events.catacumbas import combat_handler as cat_combat
+
 async def update_last_seen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handler global (Middleware) que atualiza 'last_seen' para CADA interação do jogador.
-    """
+    """Handler global (Middleware) que atualiza 'last_seen'."""
     if not update.effective_user:
-        return # Ignora se não conseguirmos identificar o utilizador
+        return 
         
     user_id = update.effective_user.id
-    
-    # Tenta pegar os dados do cache (rápido)
     pdata = await player_manager.get_player_data(user_id) 
     
     if pdata:
-        # Atualiza o timestamp
         pdata['last_seen'] = datetime.now(timezone.utc).isoformat()
-        # Salva (o save_player_data vai atualizar o cache e o DB)
         await player_manager.save_player_data(user_id, pdata)
-    
-    # Nota: Se pdata for None (jogador não existe/nunca deu /start), 
-    # não fazemos nada. O 'created_at' e 'last_seen' serão definidos no /start.
-
-# --- 👆 FIM DA NOVA FUNÇÃO 👆 ---
 
 def register_all_handlers(application: Application):
     """Chama todas as funções de registo de cada categoria na ordem correta."""
@@ -64,10 +60,23 @@ def register_all_handlers(application: Application):
     register_kingdom_defense_handlers(application)
     
     # --- Registo de Listas de Handlers ---
-    # Estes são os handlers que não têm uma função de registo própria
-    #application.add_handlers(all_autohunt_handlers)
+    # application.add_handlers(all_autohunt_handlers)
     application.add_handlers(all_world_boss_handlers)
     application.add_handlers(all_potion_handlers)
     
-    logging.info("Todos os handlers foram registrados com sucesso.")
+    # ============================================================
+    # 💀 REGISTRO DO SISTEMA DE EVENTOS (CATACUMBAS)
+    # ============================================================
     
+    # 1. Menu Principal de Eventos (Atualizado para evitar conflito)
+    application.add_handler(CallbackQueryHandler(event_menu.show_active_events, pattern="^evt_hub_principal$"))    
+    # 2. Botão Voltar para o Reino
+    application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern="^back_to_kingdom$"))
+    
+    # 3. Lógica das Catacumbas (Lobby, Criar Sala, Entrar)
+    application.add_handlers(cat_entry.handlers)
+
+    # 4. Lógica de Combate (Ataques, Skills, Boss) - MUITO IMPORTANTE
+    application.add_handlers(cat_combat.handlers)
+    
+    logging.info("Todos os handlers foram registrados com sucesso.")

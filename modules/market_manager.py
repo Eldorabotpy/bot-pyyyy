@@ -48,27 +48,59 @@ def _now_iso() -> str:
 def _ensure_file():
     os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.exists(FILE_PATH):
-        _save({"seq": 1, "listings": []})
+        # Apenas cria se o arquivo REALMENTE não existir
+        initial_data = {"seq": 1, "listings": []}
+        with open(FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(initial_data, f, ensure_ascii=False, indent=2)
 
 def _load() -> Dict:
     _ensure_file()
     try:
         with _IO_LOCK, open(FILE_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            content = f.read().strip()
+            if not content:
+                # Arquivo existe mas está vazio
+                return {"seq": 1, "listings": []}
+            
+            data = json.loads(content)
+            
             if not isinstance(data, dict) or "listings" not in data or "seq" not in data:
-                raise ValueError("Formato inválido")
+                log.error(f"[MARKET] Estrutura inválida no arquivo: {FILE_PATH}")
+                # Não salva por cima! Retorna vazio na memória, mas mantém arquivo para análise
+                return {"seq": 1, "listings": []}
+                
             return data
-    except Exception:
-        data = {"seq": 1, "listings": []}
-        _save(data)
-        return data
+            
+    except json.JSONDecodeError as e:
+        log.error(f"[MARKET] JSON corrompido ao carregar: {e}")
+        # Opcional: Fazer backup do arquivo corrompido antes de permitir sobrescrever futuramente
+        if os.path.exists(FILE_PATH):
+            try:
+                os.rename(FILE_PATH, str(FILE_PATH) + ".bak_corrupted")
+                log.info("[MARKET] Arquivo corrompido renomeado para .bak_corrupted")
+            except OSError:
+                pass
+        return {"seq": 1, "listings": []}
+        
+    except Exception as e:
+        log.error(f"[MARKET] Erro genérico ao carregar: {e}")
+        # AQUI ESTAVA O ERRO: Removemos o _save(data) daqui.
+        # Se der erro de leitura, não queremos apagar o banco de dados.
+        return {"seq": 1, "listings": []}
 
 def _save(data: Dict):
     tmp_path = str(FILE_PATH) + ".tmp"
-    with _IO_LOCK:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, str(FILE_PATH))
+    try:
+        with _IO_LOCK:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                # Força o sistema a escrever no disco físico imediatamente
+                f.flush()
+                os.fsync(f.fileno())
+            # Troca atômica (mais seguro contra falhas no meio da escrita)
+            os.replace(tmp_path, str(FILE_PATH))
+    except Exception as e:
+        log.error(f"[MARKET] Erro crítico ao salvar mercado: {e}")
 
 def _norm_region(s):
     if s is None:
@@ -222,7 +254,9 @@ def create_listing(
     item_payload: dict,
     unit_price: int,
     quantity: int = 1,
-    region_key: Optional[str] = None
+    region_key: Optional[str] = None,
+    target_buyer_id: Optional[int] = None,   # <--- NOVO
+    target_buyer_name: Optional[str] = None  # <--- NOVO (Para exibição)
 ) -> dict:
     _validate_item_payload(item_payload)
     _validate_price_qty(unit_price, quantity)
@@ -240,29 +274,60 @@ def create_listing(
         "created_at": _now_iso(),
         "region_key": _norm_region(region_key),
         "active": True,
+        # Adiciona os campos de reserva se existirem
+        "target_buyer_id": int(target_buyer_id) if target_buyer_id else None,
+        "target_buyer_name": str(target_buyer_name) if target_buyer_name else None
     }
     data["listings"].append(listing)
     _save(data)
-    log.info("[market_manager] listing criada: id=%s active=%s qty=%s item=%r",
-             lid, listing["active"], listing["quantity"], listing["item"])
+    
+    # Log ajustado para mostrar se é privado
+    dest = f"-> {target_buyer_id}" if target_buyer_id else "Public"
+    log.info("[market_manager] listing criada: id=%s active=%s qty=%s dest=%s",
+             lid, listing["active"], listing["quantity"], dest)
     return listing
 
 def list_active(
     *,
     region_key: Optional[str] = None,
     base_id: Optional[str] = None,
-    sort_by: str = "created_at",    # "price" | "created_at"
+    sort_by: str = "created_at",
     ascending: bool = False,
     page: int = 1,
     page_size: int = 20,
     price_per_unit: bool = False,
+    viewer_id: Optional[int] = None # <--- ADICIONE ESTE ARGUMENTO
 ) -> List[dict]:
     data = _load()
+    
+    # Filtro inicial: Ativos
     items = [l for l in data["listings"] if l.get("active")]
 
+    # Filtro de Região
     if region_key:
         items = [l for l in items if l.get("region_key") == region_key]
 
+    # --- LÓGICA DE VISUALIZAÇÃO DE PRIVADOS ---
+    # Regra:
+    # 1. Se não tiver target_buyer_id (Público) -> Mostra pra todos
+    # 2. Se tiver target_buyer_id -> Só mostra se o viewer_id for o dono ou o destinatário
+    filtered_items = []
+    for l in items:
+        target = l.get("target_buyer_id")
+        seller = l.get("seller_id")
+        
+        if target is None:
+            # Item público
+            filtered_items.append(l)
+        else:
+            # Item privado: Só mostra se quem está vendo é o alvo ou o vendedor
+            if viewer_id and (int(viewer_id) == int(target) or int(viewer_id) == int(seller)):
+                filtered_items.append(l)
+    
+    items = filtered_items
+    # ------------------------------------------
+
+    # Filtro de Base ID (busca específica)
     if base_id:
         items = [
             l for l in items
@@ -405,8 +470,20 @@ def render_listing_line(
     lid = listing.get("id")
     lots = int(listing.get("quantity", 1))
 
+    # --- LÓGICA DE VENDA PRIVADA (Adicionado) ---
+    target_id = listing.get("target_buyer_id")
+    target_name = listing.get("target_buyer_name", "Desconhecido")
+    is_private = target_id is not None
+
+    # Prefixo: Cadeado se for privado
+    security_prefix = "🔒 " if is_private else ""
+    # Sufixo: Mostra pra quem está reservado
+    reserved_suffix = f" [RESERVADO: {target_name}]" if is_private else ""
+    # --------------------------------------------
+
     viewer_class = _viewer_class_key(viewer_player_data, "guerreiro")
 
+    # --- TIPO UNIQUE ---
     if it.get("type") == "unique":
         inst = it.get("item") or {}
         line = None
@@ -424,9 +501,11 @@ def render_listing_line(
             suffix += f" — {lots} lote(s)"
         if include_id and lid is not None:
             suffix += f" (#{lid})"
-        return f"{line}{suffix}"
+        
+        # Retorna com o prefixo de segurança e o aviso de reserva
+        return f"{security_prefix}{line}{suffix}{reserved_suffix}"
 
-    # STACK
+    # --- TIPO STACK ---
     base_id = it.get("base_id", "")
     pack_qty = int(it.get("qty", 1))
     core = _stack_inv_display(base_id, pack_qty)
@@ -443,4 +522,6 @@ def render_listing_line(
         suffix += f" — {lots} lote(s)"
     if include_id and lid is not None:
         suffix += f" (#{lid})"
-    return f"{core}{suffix}"
+
+    # Retorna com o prefixo de segurança e o aviso de reserva
+    return f"{security_prefix}{core}{suffix}{reserved_suffix}"

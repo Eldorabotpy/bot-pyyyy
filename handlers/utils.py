@@ -349,6 +349,124 @@ async def format_dungeon_combat_message(dungeon_instance: dict, all_players_data
 
     return "\n".join(header + [heroes_section, enemies_section] + log_lines + footer)
 
+# =============================================================================
+# 💀 FORMATADOR ESPECÍFICO PARA CATACUMBAS (ESTILO DETALHADO)
+# =============================================================================
+
+async def format_catacomb_interface(session: dict, current_user_id: int, all_players_data: dict) -> str:
+    """
+    Gera a interface visual da Raid usando os blocos detalhados solicitados.
+    Suporta múltiplos jogadores e múltiplos mobs (se existirem na sessão).
+    """
+    
+    # 1. CABEÇALHO
+    floor = session.get("current_floor", 1)
+    total_floors = session.get("total_floors", 3)
+    header = f"🏰 **CATACUMBAS - ANDAR {floor}/{total_floors}**\n"
+
+    # 2. BLOCO DOS HERÓIS (PLAYERS)
+    heroes_blocks = []
+    players_in_session = session.get("players", {}) # Dict {id: name}
+    
+    for pid in players_in_session:
+        p_data = all_players_data.get(pid)
+        if not p_data: continue
+
+        # Calcula Stats Totais
+        stats = await player_manager.get_player_total_stats(p_data)
+        
+        p_name = html.escape(p_data.get("character_name", "Herói")[:15])
+        p_max_hp = _i(stats.get("max_hp", 100))
+        p_current_hp = _i(p_data.get("current_hp", p_max_hp))
+        p_max_mp = _i(stats.get("max_mana", 10))
+        p_current_mp = _i(p_data.get("current_mp", p_max_mp))
+        
+        p_atk = _i(stats.get("attack", 0))
+        p_def = _i(stats.get("defense", 0))
+        p_ini = _i(stats.get("initiative", 0))
+        p_srt = _i(stats.get("luck", 0))
+        
+        # Marcador visual se for o usuário atual
+        if pid == current_user_id:
+            p_name = f"👉 {p_name}"
+        if p_current_hp <= 0:
+            p_name = f"💀 {p_name}"
+
+        # 🔥 SEU BLOCO DE PLAYER 🔥
+        player_block = (
+            f"<b>{p_name}</b>\n"
+            f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
+            f"💙 𝐌𝐏: {p_current_mp}/{p_max_mp}\n"
+            f"⚔️ 𝐀𝐓𝐊: {p_atk} | 🛡 𝐃𝐄𝐅: {p_def}\n"
+            f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini} | 🍀 𝐒𝐑𝐓: {p_srt}"
+        )
+        heroes_blocks.append(player_block)
+
+    # 3. BLOCO DOS MONSTROS (MOBS)
+    # Tenta pegar lista 'enemies' (se você implementou 6 mobs), senão pega o 'boss' único e põe numa lista
+    enemies_list = session.get("enemies", [])
+    if not enemies_list and session.get("boss"):
+        enemies_list = [session.get("boss")]
+
+    mobs_blocks = []
+    for idx, mob in enumerate(enemies_list):
+        # Se o mob já morreu (HP 0), podemos pular ou mostrar como morto
+        # Aqui vou mostrar mesmo morto para manter o layout fixo dos 6 mobs se desejar
+        
+        m_hp = _i(mob.get("current_hp", 0))
+        if m_hp <= 0 and len(enemies_list) > 1: 
+            continue # Se tem vários, esconde os mortos para economizar espaço
+
+        m_max = _i(mob.get("max_hp", 100))
+        m_name = html.escape(mob.get("name", f"Inimigo {idx+1}"))
+        
+        # Se for Boss/Mob único, tentamos pegar stats detalhados se existirem no dict
+        # Se não existirem (mob simples), usamos 0 ou valor padrão
+        m_atk = _i(mob.get("attack", 0))
+        m_def = _i(mob.get("defense", 0))
+        m_ini = _i(mob.get("initiative", mob.get("speed", 0))) # Tenta initiative ou speed
+        m_srt = _i(mob.get("luck", 0))
+        
+        # Ícone de Chefe
+        if mob.get("is_boss"):
+            m_name = f"👿 {m_name}"
+        else:
+            m_name = f"👹 {m_name}"
+
+        # 🔥 SEU BLOCO DE MONSTRO 🔥
+        monster_block = (
+            f"<b>{m_name}</b>\n"
+            f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
+            f"⚔️ 𝐀𝐓𝐊: {m_atk} | 🛡 𝐃𝐄𝐅: {m_def}\n"
+            f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini} | 🍀 𝐒𝐑𝐓: {m_srt}"
+        )
+        mobs_blocks.append(monster_block)
+
+    # 4. LOG
+    log_raw = session.get("turn_log", [])
+    log_lines = [_format_log_line(l) for l in log_raw[-4:]]
+    log_block = "\n".join(log_lines) if log_lines else "O combate começou!"
+
+    # 5. MONTAGEM FINAL
+    # Junta todos os heróis separados por linha vazia
+    heroes_section = "\n───────────────\n".join(heroes_blocks)
+    
+    # Junta todos os mobs separados por linha vazia
+    mobs_section = "\n───────────────\n".join(mobs_blocks)
+
+    final_msg = (
+        f"{header}\n"
+        f"╔═══════════ 👥 ═══════════╗\n"
+        f"{heroes_section}\n"
+        f"╠═══════════ ⚔️ ═══════════╣\n"
+        f"{mobs_section}\n"
+        f"╚══════════════════════════╝\n"
+        f"📜 <b>Log:</b>\n"
+        f"<code>{log_block}</code>"
+    )
+    
+    return final_msg
+
 # ---------- Utilidades de dungeon ----------
 def get_monster_template(dungeon_instance: dict, monster_key_in_combat: str) -> Optional[dict]:
     """

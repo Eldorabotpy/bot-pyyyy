@@ -1,4 +1,4 @@
-# modules/player/core.py (VERSÃO CORRIGIDA, THREAD-SAFE E ASSÍNCRONA)
+# modules/player/core.py (VERSÃO HÍBRIDA: MONGO + MONGITA)
 import os
 import logging
 import pymongo
@@ -14,33 +14,71 @@ _player_cache_lock: asyncio.Lock = asyncio.Lock()  # protege acessos ao cache lo
 
 logger = logging.getLogger(__name__)
 
-# --- MongoDB connection (executed at import time) ---
-MONGO_CONNECTION_STRING = os.environ.get("MONGO_CONNECTION_STRING")
+# ====================================================================
+# CONFIGURAÇÃO INTELIGENTE DE BANCO DE DADOS
+# ====================================================================
 
-if not MONGO_CONNECTION_STRING:
-    logger.error("CRÍTICO: MONGO_CONNECTION_STRING não definida! players_collection ficará None.")
-else:
+# Lê o modo do bot ('dev' localmente, 'prod' no Render/Production)
+# Se não estiver definido, assume 'prod' por segurança.
+BOT_MODE = os.environ.get("BOT_MODE", "prod").lower()
+
+if BOT_MODE == "dev":
+    # === MODO DE TESTE LOCAL (MONGITA) ===
+    logger.warning("⚠️ RODANDO EM MODO LOCAL (DEV). USANDO BANCO DE DADOS DE ARQUIVO (MONGITA).")
     try:
-        ca = certifi.where()
-        client = pymongo.MongoClient(MONGO_CONNECTION_STRING, tlsCAFile=ca)
-        client.admin.command('ping')
-        logger.info("✅ Conexão com o MongoDB estabelecida!")
-        db = client.get_database("eldora_db")
+        from mongita import MongitaClientDisk
+        
+        # Cria (ou carrega) o banco na pasta local protegida pelo .gitignore
+        client = MongitaClientDisk(host="./.local_db_data")
+        
+        # Usa um nome de banco diferente para garantir isolamento visual
+        db = client.get_database("eldora_test_db")
         players_collection = db.get_collection("players")
-        # Criar índice se possível (ignora erro se já existe)
-        try:
-            players_collection.create_index("character_name_normalized")
-        except Exception:
-            logger.debug("create_index falhou ou já existe; ignorando.")
-    except ConfigurationError as e:
-        logger.error(f"CRÍTICO: Erro de configuração do MongoDB (verifique a URI): {e}")
-        players_collection = None
-    except ConnectionFailure as e:
-        logger.error(f"CRÍTICO: Falha na conexão com o MongoDB: {e}")
+        
+        logger.info("✅ Conectado ao Mongita Local com sucesso!")
+        logger.info("📁 Os dados estão sendo salvos em: ./.local_db_data")
+        
+    except ImportError:
+        logger.error("❌ ERRO: A biblioteca 'mongita' não está instalada.")
+        logger.error("👉 Rode: pip install mongita")
+        logger.error("Ou mude BOT_MODE para 'prod' no seu .env")
         players_collection = None
     except Exception as e:
-        logger.exception(f"CRÍTICO: Erro inesperado ao conectar ao MongoDB: {e}")
+        logger.exception(f"Erro inesperado ao iniciar Mongita: {e}")
         players_collection = None
+
+else:
+    # === MODO DE PRODUÇÃO (MONGODB ATLAS / RENDER) ===
+    MONGO_CONNECTION_STRING = os.environ.get("MONGO_CONNECTION_STRING")
+
+    if not MONGO_CONNECTION_STRING:
+        logger.error("CRÍTICO: MONGO_CONNECTION_STRING não definida! players_collection ficará None.")
+    else:
+        try:
+            ca = certifi.where()
+            client = pymongo.MongoClient(MONGO_CONNECTION_STRING, tlsCAFile=ca)
+            # Teste de conexão (Ping)
+            client.admin.command('ping')
+            
+            logger.info("✅ Conexão com o MongoDB (Produção) estabelecida!")
+            db = client.get_database("eldora_db")
+            players_collection = db.get_collection("players")
+            
+            # Criar índice se possível (ignora erro se já existe)
+            try:
+                players_collection.create_index("character_name_normalized")
+            except Exception:
+                logger.debug("create_index falhou ou já existe; ignorando.")
+                
+        except ConfigurationError as e:
+            logger.error(f"CRÍTICO: Erro de configuração do MongoDB (verifique a URI): {e}")
+            players_collection = None
+        except ConnectionFailure as e:
+            logger.error(f"CRÍTICO: Falha na conexão com o MongoDB: {e}")
+            players_collection = None
+        except Exception as e:
+            logger.exception(f"CRÍTICO: Erro inesperado ao conectar ao MongoDB: {e}")
+            players_collection = None
 
 
 # ====================================================================
@@ -175,7 +213,6 @@ async def get_player_data(user_id: int) -> Optional[dict]:
             is_newly_updated = True
 
         # --- Migração do Sistema de Skills (Lista -> Dicionário -> com Progress) ---
-        # (Corrigido: Bloco movido para fora do 'if mana...')
         if 'skills' not in data or not isinstance(data.get('skills'), dict):
             logger.info(f"Migrando 'skills' (era lista) para o formato de dicionário para o user: {data.get('user_id', '???')}")
            
@@ -195,7 +232,6 @@ async def get_player_data(user_id: int) -> Optional[dict]:
 
         else:
             # O jogador JÁ TEM um dicionário de skills.
-            # Precisamos verificar se as skills dentro dele têm o campo "progress".
             skills_dict = data.get('skills', {})
             # Usamos list(skills_dict.keys()) para evitar 'dictionary changed size during iteration'
             for skill_id in list(skills_dict.keys()): 
@@ -205,12 +241,10 @@ async def get_player_data(user_id: int) -> Optional[dict]:
                         skills_dict[skill_id]["progress"] = 0
                         is_newly_updated = True # Força o salvamento
                 else:
-                    # O dicionário está corrompido (ex: {"skill_id": "comum"} ou None)
+                    # O dicionário está corrompido
                     logger.warning(f"Corrigindo skill mal formatada: {skill_id} para user {data.get('user_id', '???')}")
-                    # Deleta a entrada ruim
                     if skill_id in skills_dict:
                         del skills_dict[skill_id]
-                    # Recria a entrada no formato correto
                     skills_dict[skill_id] = {"rarity": "comum", "progress": 0}
                     is_newly_updated = True
         # --- Fim da Migração ---
@@ -273,19 +307,14 @@ def clear_player_cache(user_id: int) -> bool:
     Remove entrada do cache local (thread-safe).
     Retorna True se foi removida.
     """
-    # lock síncrono não disponível; usar loop atual
     try:
         loop = asyncio.get_running_loop()
-        # se estamos dentro do event loop, usamos uma chamada síncrona sobre o lock
-        # mas aqui simplificamos: apenas removemos sem lock (caso raro), ou schedule uma remoção segura
     except RuntimeError:
-        # Não há event loop rodando — podemos acessar diretamente
         if user_id in _player_cache:
             del _player_cache[user_id]
             return True
         return False
 
-    # Se há event loop, agendamos a remoção com lock via coroutine
     async def _remove():
         async with _player_cache_lock:
             if user_id in _player_cache:
@@ -304,7 +333,6 @@ def clear_all_player_cache() -> int:
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
-        # sem loop, acesso direto
         num = len(_player_cache)
         _player_cache.clear()
         return num

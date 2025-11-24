@@ -18,6 +18,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Variáveis de ambiente
+# Variáveis de ambiente (Senhas e Tokens)
 .env
 
+# Banco de Dados Local (Mongita - Testes Seguros)
+.local_db_data/

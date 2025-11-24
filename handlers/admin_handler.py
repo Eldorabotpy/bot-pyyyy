@@ -64,7 +64,7 @@ HTML = "HTML"
 
 (SELECT_CACHE_ACTION, ASK_USER_FOR_CACHE_CLEAR) = range(2)
 (SELECT_TEST_ACTION, ASK_WAVE_NUMBER) = range(2, 4)
-
+(ASK_DELETE_ID, CONFIRM_DELETE_ACTION) = range(4, 6)
 # =========================================================
 # MENUS E TECLADOS (Keyboards)
 # =========================================================
@@ -206,6 +206,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎨 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝔸𝕡𝕒𝕣𝕖̂𝕟𝕔𝕚𝕒 (Skin) 𓂀", callback_data="admin_grant_skin")],
         [InlineKeyboardButton("👥 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤 𓂀", callback_data="admin_pmanage_main")],
         [InlineKeyboardButton("👤 𓂀 𝔼𝕕𝕚𝕥𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣 𓂀", callback_data="admin_edit_player")], 
+        [InlineKeyboardButton("💀 𝐃𝐄𝐋𝐄𝐓𝐀𝐑 𝐂𝐎𝐍𝐓𝐀 (Perigo)", callback_data="admin_delete_start")],
         [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
         [InlineKeyboardButton("👑 𓂀 ℙ𝕣𝕖𝕞𝕚𝕦𝕞 𓂀", callback_data="admin_premium")],
         [InlineKeyboardButton("⚔️ Painel PvP", callback_data="admin_pvp_menu")],
@@ -444,6 +445,99 @@ async def _handle_admin_force_daily(update: Update, context: ContextTypes.DEFAUL
         feedback_text = f"❌ Erro ao processar: {e}"
 
     await _safe_edit_text(update, context, feedback_text, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
+
+# --- Lógica de Deletar Jogador (Botão) ---
+
+async def _delete_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Inicia o fluxo de deletar conta."""
+    if not await ensure_admin(update): return ConversationHandler.END
+    await _safe_answer(update)
+    
+    msg = (
+        "💀 <b>DELETAR CONTA DE JOGADOR</b> 💀\n\n"
+        "Por favor, envie o <b>User ID</b> ou o <b>Nome do Personagem</b> que deseja apagar.\n\n"
+        "⚠️ <i>Esta ação é irreversível.</i>\n"
+        "Digite /cancelar para voltar."
+    )
+    await _safe_edit_text(update, context, msg)
+    return ASK_DELETE_ID
+
+async def _delete_resolve_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Busca o usuário e pede confirmação final."""
+    target_input = update.message.text
+    user_id, pdata = None, None
+    
+    # Tenta achar por ID ou Nome (Mesma lógica do Cache)
+    try:
+        user_id = int(target_input)
+        pdata = await get_player_data(user_id)
+    except ValueError:
+        found = await find_player_by_name(target_input)
+        if found:
+            user_id, pdata = found
+
+    if not pdata or not user_id:
+        await update.message.reply_text("❌ Jogador não encontrado. Tente novamente o ID ou Nome, ou use /cancelar.")
+        return ASK_DELETE_ID
+
+    # Salva no contexto para o próximo passo
+    context.user_data['delete_target_id'] = user_id
+    char_name = pdata.get('character_name', 'Desconhecido')
+    lvl = pdata.get('level', 0)
+
+    # Monta teclado de confirmação
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ SIM, APAGAR PARA SEMPRE", callback_data="confirm_delete_yes")],
+        [InlineKeyboardButton("❌ NÃO! CANCELAR!", callback_data="admin_main")]
+    ])
+
+    report = (
+        f"⚠️ <b>CONFIRMAÇÃO DE EXCLUSÃO</b> ⚠️\n\n"
+        f"👤 <b>Nome:</b> {char_name}\n"
+        f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
+        f"📊 <b>Nível:</b> {lvl}\n\n"
+        f"Você tem certeza absoluta que deseja apagar todos os dados deste jogador?"
+    )
+    
+    await update.message.reply_text(report, reply_markup=kb, parse_mode=HTML)
+    return CONFIRM_DELETE_ACTION
+
+async def _delete_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Executa a deleção após confirmação."""
+    query = update.callback_query
+    if not await ensure_admin(update): return ConversationHandler.END
+    await query.answer()
+
+    target_id = context.user_data.get('delete_target_id')
+    if not target_id:
+        await _safe_edit_text(update, context, "❌ Erro interno: ID perdido. Operação cancelada.")
+        await _send_admin_menu(update.effective_chat.id, context)
+        return ConversationHandler.END
+
+    try:
+        # Chama a função de deletar importada
+        deleted_ok = await delete_player(target_id)
+        
+        if deleted_ok:
+            await _safe_edit_text(update, context, f"✅ <b>SUCESSO!</b>\nO jogador {target_id} foi apagado da base de dados.")
+        else:
+            await _safe_edit_text(update, context, f"⚠️ Erro: O sistema disse que não encontrou o jogador {target_id} para apagar.")
+            
+    except Exception as e:
+        logger.error(f"Erro ao deletar via botão admin: {e}", exc_info=True)
+        await _safe_edit_text(update, context, f"❌ Ocorreu um erro crítico ao apagar: {e}")
+
+    # Retorna ao menu após 3 segundos ou mostra botão
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data="admin_main")]])
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="...", reply_markup=kb)
+    return ConversationHandler.END
+
+async def _delete_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancela a deleção."""
+    context.user_data.pop('delete_target_id', None)
+    await update.message.reply_text("Operação de deleção cancelada.")
+    await _send_admin_menu(update.effective_chat.id, context)
+    return ConversationHandler.END
 
 async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Envia o menu principal do admin (usado como fallback)."""
@@ -853,6 +947,25 @@ test_event_conv_handler = ConversationHandler(
     block=False
 )
 
+# Handler de Conversa para Deletar Jogador
+delete_player_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(_delete_entry_point, pattern=r"^admin_delete_start$")],
+    states={
+        ASK_DELETE_ID: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), _delete_resolve_user)
+        ],
+        CONFIRM_DELETE_ACTION: [
+            CallbackQueryHandler(_delete_perform, pattern="^confirm_delete_yes$"),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$") # Cancelar pelo botão
+        ]
+    },
+    fallbacks=[
+        CommandHandler("cancelar", _delete_cancel, filters=filters.User(ADMIN_LIST)),
+        CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+    ],
+    per_message=False
+)
+
 # Lista final de handlers para exportar (certifique-se que todos os handlers importados existem)
 all_admin_handlers = [
     admin_command_handler,
@@ -884,5 +997,6 @@ all_admin_handlers = [
     grant_skin_conv_handler,
     player_management_conv_handler, # <--- O 'a' FOI REMOVIDO DAQUI
     admin_help_handler,
+    delete_player_conv_handler,
     hard_respec_all_handler, # <<< COMANDO DE RESET ADICIONADO
 ]
