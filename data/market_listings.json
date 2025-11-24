@@ -1,5 +1,5 @@
 {
-  "seq": 274,
+  "seq": 275,
   "listings": [
     {
       "id": 1,
@@ -5817,6 +5817,22 @@
       "created_at": "2025-11-08T19:05:41.191420+00:00",
       "region_key": null,
       "active": false
+    },
+    {
+      "id": 274,
+      "seller_id": 7734113583,
+      "item": {
+        "type": "stack",
+        "base_id": "madeira",
+        "qty": 1
+      },
+      "unit_price": 110,
+      "quantity": 1,
+      "created_at": "2025-11-24T20:34:54.045393+00:00",
+      "region_key": null,
+      "active": false,
+      "target_buyer_id": null,
+      "target_buyer_name": null
     }
   ]
 }

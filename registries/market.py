@@ -6,127 +6,135 @@ def register_market_handlers(application: Application):
     """Registra todos os handlers relacionados ao mercado (Ouro) e à Casa de Leilões (Gemas)."""
     
     try:
-        # --- 1. Mercado do Aventureiro (Ouro) ---
-        # Handlers internos de navegação e lógica de venda antiga (se houver)
-        from handlers.adventurer_market_handler import (
-            market_adventurer_handler, market_list_handler, market_my_handler,
+        # ===============================================================
+        # 1. MERCADO DO AVENTUREIRO (OURO)
+        # ===============================================================
+        # CORREÇÃO: Importando tudo do novo arquivo unificado 'handlers.market_handler'
+        
+        from handlers.market_handler import (
+            market_open_handler, 
+            market_adventurer_handler, # Adicionado explicitamente
+            market_list_handler, market_my_handler,
             market_sell_handler, market_buy_handler, market_cancel_handler,
             market_pick_unique_handler, market_pick_stack_handler,
+            # Spinners
             market_pack_qty_spin_handler, market_pack_qty_confirm_handler,
-            market_price_spin_handler, market_price_confirm_handler, market_cancel_new_handler,
             market_lote_qty_spin_handler, market_lote_qty_confirm_handler,
+            market_price_spin_handler, market_price_confirm_handler, 
+            market_cancel_new_handler,
+            # Lógica de Venda Privada
+            market_type_public,
+            market_type_private,
+            market_catch_input_text
         )
         
+        # Menu Principal
+        application.add_handler(market_open_handler)
         application.add_handler(market_adventurer_handler)
+        
+        # Navegação e Ações Básicas
         application.add_handler(market_list_handler)
         application.add_handler(market_my_handler)
         application.add_handler(market_sell_handler)
         application.add_handler(market_buy_handler)
         application.add_handler(market_cancel_handler)
+        
+        # Fluxo de Venda (Item -> Qtd -> Preço)
         application.add_handler(market_pick_unique_handler)
         application.add_handler(market_pick_stack_handler)
+        
+        # Spinners (Lotes e Tamanhos)
         application.add_handler(market_pack_qty_spin_handler)
         application.add_handler(market_pack_qty_confirm_handler)
-        application.add_handler(market_price_spin_handler)
-        application.add_handler(market_price_confirm_handler)
         application.add_handler(market_lote_qty_spin_handler)
         application.add_handler(market_lote_qty_confirm_handler)
+        
+        # Preço e Confirmação
+        application.add_handler(market_price_spin_handler)
+        application.add_handler(market_price_confirm_handler) 
         application.add_handler(market_cancel_new_handler)
-
-        # --- 2. Casa de Leilões (Gemas / Diamantes) ---
-        from handlers.gem_market_handler import (
-            gem_market_main_handler,
-            gem_list_cats_handler,         
-            gem_sell_cats_handler,         
-            gem_list_filter_handler,       
-            gem_list_class_handler,        
-            gem_sell_filter_handler,       
-            gem_sell_class_handler,        
-            gem_market_pick_item_handler,
-            gem_market_cancel_new_handler,
-            gem_market_pack_spin_handler,
-            gem_market_pack_confirm_handler,
-            gem_market_lote_spin_handler,
-            gem_market_lote_confirm_handler,
-            gem_market_price_spin_handler,
-            gem_market_price_confirm_handler,
-            gem_market_buy_confirm_handler, 
-            gem_market_buy_execute_handler, 
-            gem_market_my_handler,
-            gem_market_cancel_execute_handler,
-        )
         
-        application.add_handler(gem_market_main_handler)
-        # (Handlers de Navegação)
-        application.add_handler(gem_list_cats_handler)
-        application.add_handler(gem_sell_cats_handler)
-        application.add_handler(gem_list_filter_handler)
-        application.add_handler(gem_list_class_handler)
-        application.add_handler(gem_sell_filter_handler)
-        application.add_handler(gem_sell_class_handler)
-        # (Handlers de Ação)
-        application.add_handler(gem_market_pick_item_handler)
-        application.add_handler(gem_market_cancel_new_handler)
-        application.add_handler(gem_market_pack_spin_handler)
-        application.add_handler(gem_market_pack_confirm_handler)
-        application.add_handler(gem_market_lote_spin_handler)
-        application.add_handler(gem_market_lote_confirm_handler)
-        application.add_handler(gem_market_price_spin_handler)
-        application.add_handler(gem_market_price_confirm_handler)
-        application.add_handler(gem_market_buy_confirm_handler)
-        application.add_handler(gem_market_buy_execute_handler)
-        application.add_handler(gem_market_my_handler)
-        application.add_handler(gem_market_cancel_execute_handler)
-
-        # --- 3. Loja de Gemas (do Bot) ---
-        from handlers.gem_shop_handler import (
-            gem_shop_command_handler, gem_shop_menu_handler, gem_shop_items_handler,
-            gem_item_pick_handler, gem_item_qty_handler, gem_item_buy_handler,
-            gem_shop_premium_handler, gem_prem_confirm_handler, gem_prem_execute_handler,
-        )
-        
-        application.add_handler(gem_shop_command_handler)
-        application.add_handler(gem_shop_menu_handler)
-        application.add_handler(gem_shop_items_handler)
-        application.add_handler(gem_item_pick_handler)
-        application.add_handler(gem_item_qty_handler)
-        application.add_handler(gem_item_buy_handler)
-        application.add_handler(gem_shop_premium_handler)
-        application.add_handler(gem_prem_confirm_handler)
-        application.add_handler(gem_prem_execute_handler)
-
-        # --- 4. Loja do Reino (Honra) ---
-        from handlers.kingdom_shop_handler import (
-            market_kingdom_handler, kingdom_set_item_handler, kingdom_qty_minus_handler,
-            kingdom_qty_plus_handler, market_kingdom_buy_handler, market_kingdom_buy_legacy_handler,
-        )
-        
-        application.add_handler(market_kingdom_handler)
-        application.add_handler(kingdom_set_item_handler)
-        application.add_handler(kingdom_qty_minus_handler)
-        application.add_handler(kingdom_qty_plus_handler)
-        application.add_handler(market_kingdom_buy_handler)
-        application.add_handler(market_kingdom_buy_legacy_handler)
-        
-        # --- 5. Menu Principal e Lógica de Venda Privada (BOTÃO + TEXTO) ---
-        from handlers.market_handler import (
-            market_open_handler, 
-            market_type_public, 
-            market_type_private, 
-            market_catch_input_text
-        )
-        
-        # Handler do Menu Principal
-        application.add_handler(market_open_handler)
-        
-        # Handlers da decisão de Venda (Pública ou Privada)
+        # --- NOVOS: Decisão Público/Privado ---
         application.add_handler(CallbackQueryHandler(market_type_public, pattern="^mkt_type_public$"))
         application.add_handler(CallbackQueryHandler(market_type_private, pattern="^mkt_type_private$"))
         
-        # Handler Mágico: Captura o nome digitado para a venda privada
-        # (Filtra apenas TEXTO e ignora COMANDOS para não atrapalhar o bot)
+        # --- NOVO: Captura de Texto (Nome do Jogador) ---
+        # Filtra apenas texto e ignora comandos para não atrapalhar o bot
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, market_catch_input_text))
+
+        # ===============================================================
+        # 2. OUTROS MERCADOS (GEMAS / REINO)
+        # ===============================================================
+        # Mantive os try/except para evitar erro se você não tiver esses arquivos ainda
         
+        # Casa de Leilões (Gemas)
+        try:
+            from handlers.gem_market_handler import (
+                gem_market_main_handler, gem_list_cats_handler, gem_sell_cats_handler,
+                gem_list_filter_handler, gem_list_class_handler, gem_sell_filter_handler,
+                gem_sell_class_handler, gem_market_pick_item_handler, gem_market_cancel_new_handler,
+                gem_market_pack_spin_handler, gem_market_pack_confirm_handler,
+                gem_market_lote_spin_handler, gem_market_lote_confirm_handler,
+                gem_market_price_spin_handler, gem_market_price_confirm_handler,
+                gem_market_buy_confirm_handler, gem_market_buy_execute_handler,
+                gem_market_my_handler, gem_market_cancel_execute_handler
+            )
+            application.add_handler(gem_market_main_handler)
+            application.add_handler(gem_list_cats_handler)
+            application.add_handler(gem_sell_cats_handler)
+            application.add_handler(gem_list_filter_handler)
+            application.add_handler(gem_list_class_handler)
+            application.add_handler(gem_sell_filter_handler)
+            application.add_handler(gem_sell_class_handler)
+            application.add_handler(gem_market_pick_item_handler)
+            application.add_handler(gem_market_cancel_new_handler)
+            application.add_handler(gem_market_pack_spin_handler)
+            application.add_handler(gem_market_pack_confirm_handler)
+            application.add_handler(gem_market_lote_spin_handler)
+            application.add_handler(gem_market_lote_confirm_handler)
+            application.add_handler(gem_market_price_spin_handler)
+            application.add_handler(gem_market_price_confirm_handler)
+            application.add_handler(gem_market_buy_confirm_handler)
+            application.add_handler(gem_market_buy_execute_handler)
+            application.add_handler(gem_market_my_handler)
+            application.add_handler(gem_market_cancel_execute_handler)
+        except ImportError:
+            logging.warning("Gem Market handlers not found (optional).")
+
+        # Loja de Gemas (Bot)
+        try:
+            from handlers.gem_shop_handler import (
+                gem_shop_command_handler, gem_shop_menu_handler, gem_shop_items_handler,
+                gem_item_pick_handler, gem_item_qty_handler, gem_item_buy_handler,
+                gem_shop_premium_handler, gem_prem_confirm_handler, gem_prem_execute_handler,
+            )
+            application.add_handler(gem_shop_command_handler)
+            application.add_handler(gem_shop_menu_handler)
+            application.add_handler(gem_shop_items_handler)
+            application.add_handler(gem_item_pick_handler)
+            application.add_handler(gem_item_qty_handler)
+            application.add_handler(gem_item_buy_handler)
+            application.add_handler(gem_shop_premium_handler)
+            application.add_handler(gem_prem_confirm_handler)
+            application.add_handler(gem_prem_execute_handler)
+        except ImportError:
+            logging.warning("Gem Shop handlers not found (optional).")
+
+        # Loja do Reino
+        try:
+            from handlers.kingdom_shop_handler import (
+                market_kingdom_handler, kingdom_set_item_handler, kingdom_qty_minus_handler,
+                kingdom_qty_plus_handler, market_kingdom_buy_handler, market_kingdom_buy_legacy_handler,
+            )
+            application.add_handler(market_kingdom_handler)
+            application.add_handler(kingdom_set_item_handler)
+            application.add_handler(kingdom_qty_minus_handler)
+            application.add_handler(kingdom_qty_plus_handler)
+            application.add_handler(market_kingdom_buy_handler)
+            application.add_handler(market_kingdom_buy_legacy_handler)
+        except ImportError:
+            logging.warning("Kingdom Shop handlers not found (optional).")
+
     except ImportError as e:
         logging.error(f"### ERRO FATAL AO REGISTRAR MERCADOS ###: {e}")
-        logging.exception("Verifique se os handlers (adventurer, gem_market, market_handler, etc.) existem e não têm erros de sintaxe.")
+        logging.exception("Verifique se o arquivo 'handlers/market_handler.py' existe.")
