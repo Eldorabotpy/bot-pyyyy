@@ -7,7 +7,8 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 # modules importados (sem mission_manager, pois o market_manager agora faz isso)
 from modules import player_manager, game_data, file_id_manager, market_manager, clan_manager
 from modules.market_manager import render_listing_line as _mm_render_listing_line
-
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
+from telegram.ext import MessageHandler, filters
 # --- DISPLAY UTILS opcional (fallback consistente) ---
 try:
     from modules import display_utils  # deve ter: formatar_item_para_exibicao(dict) -> str
@@ -403,6 +404,86 @@ async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ Voltar", callback_data="market_my")]
     ]))
 
+async def market_type_public(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    
+    # Limpa sujeira de tentativas anteriores
+    context.user_data.pop("market_target_id", None)
+    context.user_data.pop("market_target_name", None)
+    
+    price = context.user_data.get("market_price", 1)
+    await market_finalize_listing(update, context, price)
+
+# --- B. VENDA PRIVADA (Pede Texto) ---
+async def market_type_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    user_id = q.from_user.id
+    
+    # Checa VIP
+    pdata = await player_manager.get_player_data(user_id)
+    # Ajuste 'is_vip' conforme sua estrutura real de VIP
+    is_vip = pdata.get("is_vip") or player_manager.has_premium_plan(pdata) 
+    
+    if not is_vip:
+        await q.answer("🔒 Recurso exclusivo para VIPs!", show_alert=True)
+        return
+
+    await q.answer()
+    
+    # ATIVA O MODO DE ESPERA DE TEXTO
+    context.user_data["awaiting_market_name"] = True
+    
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]])
+    
+    await _safe_edit_or_send(q, context, update.effective_chat.id,
+        (
+            "🔒 <b>VENDA PRIVADA</b>\n\n"
+            "Por favor, <b>digite no chat o nome exato</b> do personagem para quem você quer vender.\n\n"
+            "<i>Estou aguardando sua resposta...</i>"
+        ),
+        kb
+    )
+
+async def market_catch_input_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    # Se não estiver esperando nome, ignora (deixa o bot seguir a vida)
+    if not context.user_data.get("awaiting_market_name"):
+        return 
+
+    # Limpa o estado para não travar
+    context.user_data.pop("awaiting_market_name", None)
+    
+    target_name = update.message.text.strip()
+    
+    # Busca o jogador no banco
+    found = await player_manager.find_player_by_name(target_name)
+    
+    if not found:
+        await update.message.reply_text(
+            f"❌ Jogador <b>{target_name}</b> não encontrado.\nA criação do anúncio foi cancelada.",
+            parse_mode="HTML"
+        )
+        return
+
+    target_id, target_pdata = found
+    real_name = target_pdata.get("character_name", target_name)
+
+    if target_id == user_id:
+        await update.message.reply_text("❌ Você não pode vender para si mesmo.")
+        return
+
+    # Salva os dados do alvo para o finalizador usar
+    context.user_data["market_target_id"] = target_id
+    context.user_data["market_target_name"] = real_name
+    
+    # Executa a finalização
+    price = context.user_data.get("market_price", 1)
+    
+    # Chama o finalizador passando a mensagem de texto como update
+    await market_finalize_listing(update, context, price)
+
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # <<< FUNÇÃO TOTALMENTE CORRIGIDA E SIMPLIFICADA >>>
     
@@ -574,11 +655,24 @@ async def market_price_spin(update, context):
 
     await _safe_edit_or_send(q, context, chat_id, f"{prefix} <b>{cur} 🪙</b>", kb)
 
-async def market_price_confirm(update, context):
+async def market_price_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Chamado quando o usuário clica em '✅ Confirmar' no seletor de preço."""
     q = update.callback_query
     await q.answer()
+    
     price = max(1, int(context.user_data.get("market_price", 1)))
-    await market_finalize_listing(update, context, price)
+    
+    # Em vez de finalizar, PERGUNTA O TIPO DE VENDA
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌍 Venda Pública (Todos)", callback_data="mkt_type_public")],
+        [InlineKeyboardButton("🔒 Venda Privada (VIP)", callback_data="mkt_type_private")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="market_price_back")] # Opcional, se tiver handler pra isso
+    ])
+    
+    await _safe_edit_or_send(q, context, update.effective_chat.id, 
+        f"💰 Preço definido: <b>{price} 🪙</b>\n\nComo deseja anunciar este item?", 
+        kb
+    )
 
 async def market_pick_unique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -698,6 +792,7 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         user_id = update.callback_query.from_user.id
         chat_id = update.effective_chat.id
     else:
+        # Caso venha do handler de texto (Input State)
         user_id = update.effective_user.id
         chat_id = update.effective_chat.id
 
@@ -707,12 +802,20 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         await context.bot.send_message(chat_id=chat_id, text="Nada pendente para vender. Volte e selecione o item novamente.")
         return
 
+    # --- RECUPERA DADOS DA VENDA PRIVADA (Se houver) ---
+    target_id = context.user_data.get("market_target_id")     # ID do comprador (ou None)
+    target_name = context.user_data.get("market_target_name") # Nome do comprador (ou None)
+    # ---------------------------------------------------
+
     pdata = await player_manager.get_player_data(user_id)
     inv = pdata.get("inventory", {}) or {}
 
     try:
+        # --- CASO 1: ITEM ÚNICO ---
         if pending["type"] == "unique":
             base_id = (pending["item"] or {}).get("base_id") or (pending["item"] or {}).get("tpl") or (pending["item"] or {}).get("id")
+            
+            # Bloqueio de Evolução
             if base_id in EVOLUTION_ITEMS:
                 await context.bot.send_message(chat_id=chat_id, text=EVOL_BLOCK_MSG, parse_mode="HTML")
                 # Devolve o item
@@ -726,22 +829,34 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
 
             item_payload = {"type": "unique", "uid": pending["uid"], "item": pending["item"]}
             
-            # <<< CORREÇÃO: Removido 'await' (create_listing é síncrono) >>>
-            listing = market_manager.create_listing(seller_id=user_id, item_payload=item_payload, unit_price=price, quantity=1)
+            # CRIAÇÃO DA LISTAGEM (Com suporte a Privado)
+            listing = market_manager.create_listing(
+                seller_id=user_id, 
+                item_payload=item_payload, 
+                unit_price=price, 
+                quantity=1,
+                target_buyer_id=target_id,      # <--- Passa o ID alvo
+                target_buyer_name=target_name   # <--- Passa o Nome alvo
+            )
         
-        else: # type == "stack"
+        # --- CASO 2: STACK (Empilhável) ---
+        else: 
             base_id = pending["base_id"]
+            
+            # Bloqueio de Evolução
             if base_id in EVOLUTION_ITEMS:
                 await context.bot.send_message(chat_id=chat_id, text=EVOL_BLOCK_MSG, parse_mode="HTML")
                 return
 
             pack_qty = int(pending.get("qty", 0))
             have = int(inv.get(base_id, 0))
+            
             if pack_qty <= 0 or have < pack_qty:
                 logger.warning("[market_finalize_listing] qty inválida: pack=%s have=%s", pack_qty, have)
                 await context.bot.send_message(chat_id=chat_id, text="Quantidade inválida ou insuficiente.")
                 return
 
+            # Remove do inventário
             inv[base_id] = have - pack_qty
             if inv[base_id] <= 0:
                 del inv[base_id]
@@ -750,27 +865,58 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
 
             item_payload = {"type": "stack", "base_id": base_id, "qty": pack_qty}
             
-            # <<< CORREÇÃO: Removido 'await' (create_listing é síncrono) >>>
-            listing = market_manager.create_listing(seller_id=user_id, item_payload=item_payload, unit_price=price, quantity=1)
+            # CRIAÇÃO DA LISTAGEM (Com suporte a Privado)
+            listing = market_manager.create_listing(
+                seller_id=user_id, 
+                item_payload=item_payload, 
+                unit_price=price, 
+                quantity=1,
+                target_buyer_id=target_id,      # <--- Passa o ID alvo
+                target_buyer_name=target_name   # <--- Passa o Nome alvo
+            )
 
+        # --- LIMPEZA DE ESTADO ---
         context.user_data.pop("market_pending", None)
         context.user_data.pop("market_price", None)
-        context.user_data.pop("market_sell_page", None) # Limpa a página
+        context.user_data.pop("market_sell_page", None)
+        context.user_data.pop("market_target_id", None)   # Limpa alvo
+        context.user_data.pop("market_target_name", None) # Limpa nome
 
-        text = f"✅ Listagem #{listing['id']} criada."
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 Minhas Listagens", callback_data="market_my")],
-                                     [InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]])
+        # --- MENSAGEM DE SUCESSO ---
+        if target_name:
+            # Mensagem Especial para Venda Privada
+            text = (
+                f"✅ <b>VENDA PRIVADA CRIADA!</b>\n\n"
+                f"📦 Listagem <b>#{listing['id']}</b>\n"
+                f"💰 Preço: <b>{price} 🪙</b>\n"
+                f"🔒 Reservado exclusivamente para: <b>{target_name}</b>"
+            )
+        else:
+            # Mensagem Padrão
+            text = f"✅ Listagem <b>#{listing['id']}</b> criada com sucesso!"
+
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👤 Minhas Listagens", callback_data="market_my")],
+            [InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market_adventurer")]
+        ])
+
         if update.callback_query:
-            await _safe_edit_or_send(update.callback_query, context, chat_id, text, kb)
+            # Tenta editar a mensagem anterior (do input de texto ou botão)
+            try:
+                await update.callback_query.edit_message_text(text, reply_markup=kb, parse_mode='HTML')
+            except Exception:
+                 # Se não der pra editar (ex: veio de input de texto), manda nova
+                 await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb, parse_mode='HTML')
         else:
             await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb, parse_mode='HTML')
 
-        logger.info("[market_finalize_listing] OK -> #%s", listing["id"])
+        logger.info("[market_finalize_listing] OK -> #%s (Privado: %s)", listing["id"], bool(target_id))
 
     except Exception as e:
         logger.exception("[market_finalize_listing] erro: %s", e)
-        await context.bot.send_message(chat_id=chat_id, text="Falha ao criar a listagem. Tente novamente.")
+        await context.bot.send_message(chat_id=chat_id, text="❌ Falha ao criar a listagem. O item foi devolvido.")
         
+        # --- SEGURANÇA: DEVOLVER O ITEM SE DER ERRO ---
         # Tenta devolver o item único se a criação falhou
         if pending and pending.get("type") == "unique":
             try:
@@ -785,11 +931,22 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
             except Exception as e_ret:
                 logger.error(f"Erro CRÍTICO ao tentar devolver item único {pending.get('uid')} após falha: {e_ret}")
         
-        # Limpa o estado
+        # Se for stack, o código acima já salvou a remoção, então precisamos adicionar de volta
+        elif pending and pending.get("type") == "stack":
+             try:
+                base_id = pending["base_id"]
+                qty = int(pending.get("qty", 0))
+                pdata_reloaded = await player_manager.get_player_data(user_id)
+                player_manager.add_item_to_inventory(pdata_reloaded, base_id, qty) # Helper síncrono
+                await player_manager.save_player_data(user_id, pdata_reloaded)
+             except Exception as e_ret:
+                logger.error(f"Erro CRÍTICO ao devolver stack {base_id} após falha: {e_ret}")
+
+        # Limpa o estado mesmo com erro para não travar
         context.user_data.pop("market_pending", None)
         context.user_data.pop("market_price", None)
-        context.user_data.pop("market_sell_page", None)
-
+        context.user_data.pop("market_target_id", None)
+        context.user_data.pop("market_target_name", None)
 
 # ==============================
 #  Loja do Reino (dinâmica)
@@ -935,6 +1092,171 @@ async def market_kingdom_buy_legacy(update: Update, context: ContextTypes.DEFAUL
     await market_kingdom_buy(update, context)
 
 # ==============================
+#  COMANDO /vender (Texto) - Suporta Venda Privada
+# ==============================
+async def sell_item_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando para vender itens rapidamente via texto.
+    Uso: 
+    /vender <nome_item> <preço>  (Público)
+    /vender <nome_item> <preço> <nome_jogador> (Privado - VIP)
+    """
+    user_id = update.effective_user.id
+    args = context.args
+
+    if len(args) < 2:
+        await update.message.reply_text(
+            "⚠️ <b>Uso incorreto!</b>\n\n"
+            "<b>Público:</b> <code>/vender espada 100</code>\n"
+            "<b>Privado (VIP):</b> <code>/vender espada 100 NomeDoAmigo</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    # 1. Identificar Item e Preço
+    item_input = args[0].lower()
+    try:
+        price = int(args[1])
+        if price <= 0: raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ O preço deve ser um número maior que zero.")
+        return
+
+    # 2. Verificar Itens Proibidos (Evolução de Classe)
+    # Tenta achar o base_id (simplificado, assume que o input é o ID ou parte do nome)
+    # Para ser mais preciso, idealmente verificamos no inventário primeiro, mas aqui é um filtro rápido.
+    if item_input in EVOLUTION_ITEMS:
+        await update.message.reply_text(EVOL_BLOCK_MSG, parse_mode="HTML")
+        return
+
+    # 3. Verificar Inventário do Jogador
+    pdata = await player_manager.get_player_data(user_id)
+    inv = pdata.get("inventory", {}) or {}
+    
+    # Lógica para encontrar o item no inventário (suporta ID exato ou busca parcial simples)
+    found_item_key = None
+    item_payload = None
+    
+    # A. Verifica Stackable (ex: "pocao_vida")
+    if item_input in inv and isinstance(inv[item_input], int):
+        found_item_key = item_input
+        qty_have = inv[item_input]
+        if qty_have < 1:
+            await update.message.reply_text("❌ Você não tem este item.")
+            return
+        # Remove 1 do inventário
+        inv[item_input] = qty_have - 1
+        if inv[item_input] <= 0: del inv[item_input]
+        item_payload = {"type": "stack", "base_id": item_input, "qty": 1}
+
+    # B. Verifica Unique (ex: itera sobre o inventário buscando UID ou base_id)
+    else:
+        # Tenta achar um item unique que contenha o nome digitado
+        for uid, inst in inv.items():
+            if isinstance(inst, dict):
+                base = inst.get("base_id") or inst.get("tpl") or inst.get("id")
+                if base == item_input or uid == item_input:
+                    if base in EVOLUTION_ITEMS:
+                         await update.message.reply_text(EVOL_BLOCK_MSG, parse_mode="HTML")
+                         return
+                    found_item_key = uid
+                    item_payload = {"type": "unique", "uid": uid, "item": inst}
+                    # Remove do inventário
+                    del inv[uid]
+                    break
+    
+    if not item_payload:
+        await update.message.reply_text(f"❌ Item <b>{item_input}</b> não encontrado no seu inventário.", parse_mode="HTML")
+        return
+
+    # 4. Salva a remoção do item (importante salvar ANTES de criar a listing pra evitar duplicação)
+    pdata["inventory"] = inv
+    await player_manager.save_player_data(user_id, pdata)
+
+    # 5. Configurar Venda Privada (Se houver 3º argumento)
+    target_buyer_id = None
+    target_buyer_name = None
+    
+    if len(args) >= 3:
+        potential_name = " ".join(args[2:]) # Nome do jogador
+        
+        # --- CHECK VIP ---
+        # Verifica se é VIP usando a função helper se existir, ou direto no dict
+        is_vip = player_manager.has_premium_plan(pdata) # Supondo que exista essa função no seu player_manager
+        # Se não tiver a função has_premium_plan, use: is_vip = pdata.get("is_vip", False)
+        
+        if not is_vip:
+            # Devolve o item pois falhou a validação
+            if item_payload["type"] == "stack":
+                player_manager.add_item_to_inventory(pdata, item_payload["base_id"], 1)
+            else:
+                inv[item_payload["uid"]] = item_payload["item"]
+                pdata["inventory"] = inv
+            await player_manager.save_player_data(user_id, pdata)
+            
+            await update.message.reply_text("🔒 <b>Recurso VIP:</b> Vendas privadas são exclusivas para Apoiadores!", parse_mode="HTML")
+            return
+
+        # --- BUSCA ID DO ALVO ---
+        # Precisamos da função find_player_by_name. Se não estiver importada, precisa importar.
+        # Assumindo que está em player_manager:
+        found = await player_manager.find_player_by_name(potential_name)
+        if not found:
+            # Devolve item
+            if item_payload["type"] == "stack":
+                player_manager.add_item_to_inventory(pdata, item_payload["base_id"], 1)
+            else:
+                inv[item_payload["uid"]] = item_payload["item"]
+                pdata["inventory"] = inv
+            await player_manager.save_player_data(user_id, pdata)
+
+            await update.message.reply_text(f"❌ Jogador '{potential_name}' não encontrado.")
+            return
+            
+        target_buyer_id, target_pdata = found
+        target_buyer_name = target_pdata.get("character_name", potential_name)
+        
+        if target_buyer_id == user_id:
+            # Devolve item... (mesma lógica de devolução)
+            player_manager.add_item_to_inventory(pdata, item_payload["base_id"] if item_payload["type"]=="stack" else item_payload["uid"], 1) # Simplificado
+            await player_manager.save_player_data(user_id, pdata)
+            await update.message.reply_text("❌ Você não pode vender para si mesmo.")
+            return
+
+    # 6. Criar Listing no Market Manager
+    try:
+        # Note que create_listing é SÍNCRONO no seu código original
+        listing = market_manager.create_listing(
+            seller_id=user_id,
+            item_payload=item_payload,
+            unit_price=price,
+            quantity=1,
+            target_buyer_id=target_buyer_id,
+            target_buyer_name=target_buyer_name
+        )
+        
+        item_name_display = item_payload.get("base_id")
+        if item_payload["type"] == "unique":
+            item_name_display = (item_payload["item"].get("display_name") or "Item Único")
+
+        if target_buyer_name:
+            msg = f"✅ <b>Venda Privada Criada!</b>\n📦 {item_name_display}\n💰 {price} 🪙\n🔒 <b>Reservado para:</b> {target_buyer_name}"
+        else:
+            msg = f"✅ <b>Venda Pública Criada!</b>\n📦 {item_name_display}\n💰 {price} 🪙"
+
+        await update.message.reply_text(msg, parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Erro ao criar listing via comando: {e}")
+        # Tenta devolver o item em caso de erro crítico no market_manager
+        if item_payload["type"] == "stack":
+             player_manager.add_item_to_inventory(pdata, item_payload["base_id"], 1)
+        else:
+             pdata["inventory"][item_payload["uid"]] = item_payload["item"]
+        await player_manager.save_player_data(user_id, pdata)
+        await update.message.reply_text("❌ Ocorreu um erro ao criar o anúncio. O item foi devolvido.")
+
+# ==============================
 #  Handlers (exports)
 # ==============================
 market_open_handler       = CallbackQueryHandler(market_open, pattern=r'^market$')
@@ -960,5 +1282,6 @@ market_qty_handler        = CallbackQueryHandler(market_choose_qty,  pattern=r'^
 
 market_price_spin_handler    = CallbackQueryHandler(market_price_spin,    pattern=r'^mktp_(inc|dec)_[0-9]+$')
 market_price_confirm_handler = CallbackQueryHandler(market_price_confirm, pattern=r'^mktp_confirm$')
+sell_item_command_handler = CommandHandler("vender", sell_item_command)
 
 market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^market_cancel_new$')

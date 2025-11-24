@@ -1,7 +1,5 @@
 # registries/market.py
-# (VERSÃO ATUALIZADA COM OS NOVOS HANDLERS DE FILTRO)
-
-from telegram.ext import Application
+from telegram.ext import Application, CallbackQueryHandler, MessageHandler, filters
 import logging
 
 def register_market_handlers(application: Application):
@@ -9,6 +7,7 @@ def register_market_handlers(application: Application):
     
     try:
         # --- 1. Mercado do Aventureiro (Ouro) ---
+        # Handlers internos de navegação e lógica de venda antiga (se houver)
         from handlers.adventurer_market_handler import (
             market_adventurer_handler, market_list_handler, market_my_handler,
             market_sell_handler, market_buy_handler, market_cancel_handler,
@@ -35,7 +34,6 @@ def register_market_handlers(application: Application):
         application.add_handler(market_cancel_new_handler)
 
         # --- 2. Casa de Leilões (Gemas / Diamantes) ---
-        # (ESTE É O BLOCO CORRIGIDO)
         from handlers.gem_market_handler import (
             gem_market_main_handler,
             gem_list_cats_handler,         
@@ -52,8 +50,8 @@ def register_market_handlers(application: Application):
             gem_market_lote_confirm_handler,
             gem_market_price_spin_handler,
             gem_market_price_confirm_handler,
-            gem_market_buy_confirm_handler, # (IMPORTANTE)
-            gem_market_buy_execute_handler, # (IMPORTANTE)
+            gem_market_buy_confirm_handler, 
+            gem_market_buy_execute_handler, 
             gem_market_my_handler,
             gem_market_cancel_execute_handler,
         )
@@ -75,8 +73,8 @@ def register_market_handlers(application: Application):
         application.add_handler(gem_market_lote_confirm_handler)
         application.add_handler(gem_market_price_spin_handler)
         application.add_handler(gem_market_price_confirm_handler)
-        application.add_handler(gem_market_buy_confirm_handler) # <-- LIGA O BOTÃO "COMPRAR"
-        application.add_handler(gem_market_buy_execute_handler) # <-- LIGA O BOTÃO "SIM, CONFIRMAR"
+        application.add_handler(gem_market_buy_confirm_handler)
+        application.add_handler(gem_market_buy_execute_handler)
         application.add_handler(gem_market_my_handler)
         application.add_handler(gem_market_cancel_execute_handler)
 
@@ -110,10 +108,25 @@ def register_market_handlers(application: Application):
         application.add_handler(market_kingdom_buy_handler)
         application.add_handler(market_kingdom_buy_legacy_handler)
         
-        # --- 5. Menu Principal (/mercado) ---
-        from handlers.market_handler import market_open_handler
+        # --- 5. Menu Principal e Lógica de Venda Privada (BOTÃO + TEXTO) ---
+        from handlers.market_handler import (
+            market_open_handler, 
+            market_type_public, 
+            market_type_private, 
+            market_catch_input_text
+        )
+        
+        # Handler do Menu Principal
         application.add_handler(market_open_handler)
+        
+        # Handlers da decisão de Venda (Pública ou Privada)
+        application.add_handler(CallbackQueryHandler(market_type_public, pattern="^mkt_type_public$"))
+        application.add_handler(CallbackQueryHandler(market_type_private, pattern="^mkt_type_private$"))
+        
+        # Handler Mágico: Captura o nome digitado para a venda privada
+        # (Filtra apenas TEXTO e ignora COMANDOS para não atrapalhar o bot)
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, market_catch_input_text))
         
     except ImportError as e:
         logging.error(f"### ERRO FATAL AO REGISTRAR MERCADOS ###: {e}")
-        logging.exception("Verifique se os handlers (adventurer, gem_market, etc.) existem e não têm erros de sintaxe.")
+        logging.exception("Verifique se os handlers (adventurer, gem_market, market_handler, etc.) existem e não têm erros de sintaxe.")
