@@ -557,4 +557,3 @@ market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^m
 
 from handlers.market_sell import open_sell_menu
 market_sell_handler = CallbackQueryHandler(open_sell_menu, pattern=r'^market_sell(:(\d+))?$')
-# NOTE: Certifique-se de que handlers/market_sell.py existe como criamos antes.
