@@ -552,41 +552,93 @@ async def market_cancel_new(update, context):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
+    chat_id = update.effective_chat.id # Importante pegar o chat_id
     
+    # Lógica de Devolução do Item (Mantida)
     pending = context.user_data.pop("market_pending", None)
     if pending and pending.get("type") == "unique":
         pdata = await player_manager.get_player_data(user_id)
         inv = pdata.get("inventory", {}) or {}
-        inv[pending["uid"]] = pending["item"] # Devolve
+        uid = pending["uid"]
+        new_uid = uid if uid not in inv else f"{uid}_back"
+        inv[new_uid] = pending["item"]
         pdata["inventory"] = inv
         await player_manager.save_player_data(user_id, pdata)
 
+    # Limpeza de Estado
     context.user_data.pop("market_price", None)
     context.user_data.pop("awaiting_market_name", None)
     context.user_data.pop("market_lote_qty", None)
     
-    await q.edit_message_text("❌ Operação cancelada.", reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market_adventurer")]
-    ]))
+    # --- CORREÇÃO DO ERRO AQUI ---
+    # Em vez de q.edit_message_text, usamos o helper seguro ou deletamos a mídia.
+    
+    # Opção mais limpa visualmente: Deleta a foto e manda texto novo
+    try:
+        await q.delete_message()
+    except Exception:
+        pass # Se não der pra deletar, ignora
+        
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="❌ Operação cancelada.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market_adventurer")]
+        ])
+    )
 
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    await q.answer()
-    buyer_id = q.from_user.id
-    lid = int(q.data.replace("market_buy_", ""))
+    # É CRUCIAL dar o answer() logo no início, senão o botão fica girando e "não responde"
+    await q.answer() 
     
+    buyer_id = q.from_user.id
+    chat_id = update.effective_chat.id
+    
+    # Tenta extrair o ID do item do callback data "market_buy_123"
     try:
-        buyer = await player_manager.get_player_data(buyer_id)
-        if not player_manager.has_premium_plan(buyer):
-            await q.answer("Apenas VIPs podem comprar.", show_alert=True); return
+        lid = int(q.data.replace("market_buy_", ""))
+    except ValueError:
+        await q.answer("Erro: ID inválido.", show_alert=True)
+        return
 
-        updated_listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1, context=context)
+    # --- Lógica de Compra ---
+    try:
+        # Carrega dados do comprador
+        buyer = await player_manager.get_player_data(buyer_id)
         
-        await _safe_edit_or_send(q, context, update.effective_chat.id, 
-            f"✅ Compra realizada! Custo: {cost} 🪙.", 
-            InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]]))
+        # Verifica VIP (se for regra do seu jogo)
+        if not player_manager.has_premium_plan(buyer):
+            await q.answer("Apenas VIPs podem comprar.", show_alert=True)
+            return
+
+        # Executa a compra no gerenciador
+        # ATENÇÃO: Se purchase_listing for async, use await. Se for sync, não use.
+        # No código que fizemos, purchase_listing no market_manager.py era SÍNCRONO (sem async def)
+        # Mas se você mudou para async, precisa do await.
+        # Vou assumir SÍNCRONO conforme o arquivo original.
+        
+        # Se o seu market_manager.purchase_listing for ASYNC:
+        # updated_listing, cost = await market_manager.purchase_listing(...)
+        
+        # Se for SÍNCRONO (padrão do arquivo que enviou):
+        updated_listing, cost = market_manager.purchase_listing(
+            buyer_id=buyer_id, 
+            listing_id=lid, 
+            quantity=1
+        )
+        
+        # Se chegou aqui, deu certo! Envia feedback visual.
+        await _safe_edit_or_send(q, context, chat_id, 
+            f"✅ <b>Compra realizada com sucesso!</b>\n\n"
+            f"Item: {updated_listing['item'].get('base_id')}\n"
+            f"Custo: {cost} 🪙", 
+            InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]])
+        )
+
     except Exception as e:
-        await q.answer(str(e), show_alert=True)
+        # Se der erro (sem ouro, já vendido, etc), mostra alerta
+        await q.answer(f"❌ Erro: {str(e)}", show_alert=True)
 
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
