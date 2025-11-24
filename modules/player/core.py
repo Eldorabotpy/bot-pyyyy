@@ -302,46 +302,27 @@ async def save_player_data(user_id: int, player_info: dict) -> None:
             logger.exception("save_player_data: falha ao atualizar cache local após save.")
 
 
-def clear_player_cache(user_id: int) -> bool:
+# ====================================================================
+# FUNÇÕES DE LIMPEZA DE CACHE (CORRIGIDAS)
+# ====================================================================
+
+async def clear_player_cache(user_id: int) -> bool:
     """
-    Remove entrada do cache local (thread-safe).
+    Remove entrada do cache local de forma assíncrona e segura.
     Retorna True se foi removida.
     """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
+    async with _player_cache_lock:
         if user_id in _player_cache:
             del _player_cache[user_id]
             return True
         return False
 
-    async def _remove():
-        async with _player_cache_lock:
-            if user_id in _player_cache:
-                del _player_cache[user_id]
-                return True
-            return False
-
-    fut = asyncio.run_coroutine_threadsafe(_remove(), loop)
-    return bool(fut.result())
-
-
-def clear_all_player_cache() -> int:
+async def clear_all_player_cache() -> int:
     """
-    Limpa todo o cache local. Retorna o número de itens removidos.
+    Limpa todo o cache local de forma assíncrona.
+    Retorna o número de itens removidos.
     """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
+    async with _player_cache_lock:
         num = len(_player_cache)
         _player_cache.clear()
         return num
-
-    async def _clear():
-        async with _player_cache_lock:
-            n = len(_player_cache)
-            _player_cache.clear()
-            return n
-
-    fut = asyncio.run_coroutine_threadsafe(_clear(), loop)
-    return int(fut.result())
