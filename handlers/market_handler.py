@@ -552,33 +552,34 @@ async def market_cancel_new(update, context):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
-    chat_id = update.effective_chat.id # Importante pegar o chat_id
+    chat_id = update.effective_chat.id # Importante: Pega o ID do chat
     
-    # Lógica de Devolução do Item (Mantida)
+    # --- 1. Devolve o item pendente (Segurança) ---
     pending = context.user_data.pop("market_pending", None)
     if pending and pending.get("type") == "unique":
         pdata = await player_manager.get_player_data(user_id)
         inv = pdata.get("inventory", {}) or {}
         uid = pending["uid"]
+        # Evita sobrescrever se algo estranho aconteceu
         new_uid = uid if uid not in inv else f"{uid}_back"
         inv[new_uid] = pending["item"]
         pdata["inventory"] = inv
         await player_manager.save_player_data(user_id, pdata)
 
-    # Limpeza de Estado
+    # --- 2. Limpa os estados temporários ---
     context.user_data.pop("market_price", None)
     context.user_data.pop("awaiting_market_name", None)
     context.user_data.pop("market_lote_qty", None)
+    context.user_data.pop("market_lote_max", None)
     
-    # --- CORREÇÃO DO ERRO AQUI ---
-    # Em vez de q.edit_message_text, usamos o helper seguro ou deletamos a mídia.
-    
-    # Opção mais limpa visualmente: Deleta a foto e manda texto novo
+    # --- 3. CORREÇÃO DO ERRO VISUAL ---
+    # Em vez de tentar editar (que falha em fotos), nós DELETAMOS a mensagem da foto.
     try:
         await q.delete_message()
     except Exception:
-        pass # Se não der pra deletar, ignora
+        pass # Se não der pra deletar, ignora e só manda a msg nova
         
+    # Envia a mensagem de cancelado limpa
     await context.bot.send_message(
         chat_id=chat_id,
         text="❌ Operação cancelada.",
