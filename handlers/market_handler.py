@@ -250,10 +250,20 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pclass = _player_class_key(pdata)
     
     sellable = []
+    # COLETA ITENS (Com proteção)
     for uid, inst in inv.items():
         if isinstance(inst, dict):
             if inst.get("base_id") not in PREMIUM_BLOCK_LIST:
+                # --- PROTEÇÃO DE ITEM BUGADO ---
+                # Simula o tamanho do callback
+                cb_len = len(f"market_pick_unique_{uid}")
+                if cb_len > 60:
+                    print(f"⚠️ ITEM BLOQUEANDO O MENU: {inst.get('name')} (ID muito longo: {uid})")
+                    # Pula este item para não travar o bot
+                    continue
+                
                 sellable.append({"type": "unique", "uid": uid, "inst": inst, "sort": inst.get("base_id")})
+                
     for bid, qty in inv.items():
         if isinstance(qty, (int, float)) and qty > 0 and bid not in PREMIUM_BLOCK_LIST:
             sellable.append({"type": "stack", "base_id": bid, "qty": int(qty), "sort": bid})
@@ -267,33 +277,20 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     items_page = sellable[start:end]
     
     if not sellable:
-        # Helper seguro
-        await _safe_edit_or_send(q, context, update.effective_chat.id, "Inventário vazio ou sem itens vendáveis.", 
-                                 InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
+        await _safe_edit_or_send(q, context, update.effective_chat.id, 
+            "🎒 <b>Inventário vazio ou itens não listáveis.</b>\n\n"
+            "<i>Nota: Itens com IDs corrompidos (muito longos) foram ocultados por segurança.</i>", 
+            InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
         return
 
     kb = []
     for it in items_page:
         if it["type"] == "unique":
             txt = _render_unique_line_safe(it["inst"], pclass)
-            # PROTEÇÃO CONTRA BUTTON_DATA_INVALID
-            # Se o UID for muito longo, o callback explode.
-            uid_str = str(it['uid'])
-            if len(uid_str) > 40: # Limite de segurança
-                # Se for muito longo, infelizmente não dá pra por no botão direto.
-                # Uma solução seria usar um mapeamento temporário, mas vamos tentar cortar/avisar.
-                print(f"AVISO: UID muito longo para botão: {uid_str}")
-                continue 
-            
-            kb.append([InlineKeyboardButton(_cut_middle(txt, 56), callback_data=f"market_pick_unique_{uid_str}")])
+            kb.append([InlineKeyboardButton(_cut_middle(txt, 56), callback_data=f"market_pick_unique_{it['uid']}")])
         else:
             name = _item_label_from_base(it["base_id"])
-            base_id_str = str(it['base_id'])
-            if len(base_id_str) > 40:
-                 print(f"AVISO: BaseID muito longo para botão: {base_id_str}")
-                 continue
-
-            kb.append([InlineKeyboardButton(f"📦 {name} ({it['qty']}x)", callback_data=f"market_pick_stack_{base_id_str}")])
+            kb.append([InlineKeyboardButton(f"📦 {name} ({it['qty']}x)", callback_data=f"market_pick_stack_{it['base_id']}")])
             
     nav = []
     if page > 1: nav.append(InlineKeyboardButton("⬅️ Ant", callback_data=f"market_sell:{page-1}"))
@@ -645,14 +642,14 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             item_name_display = f"{_item_label_from_base(base_id)} x{qty_to_add}"
 
         elif item_type == "unique":
-            # Único (Equipamentos)
+            
             real_item_obj = item_data.get("item")
             old_uid = item_data.get("uid")
             
             if real_item_obj:
                 import time
-                # Gera novo UID para não dar conflito
-                new_uid = f"{old_uid}_bought_{int(time.time())}"
+                base_uid_clean = old_uid.split("_bought_")[0] 
+                new_uid = f"{base_uid_clean}_bought_{int(time.time())}"
                 if "inventory" not in buyer: buyer["inventory"] = {}
                 buyer["inventory"][new_uid] = real_item_obj
                 
