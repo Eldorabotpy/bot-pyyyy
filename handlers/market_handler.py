@@ -608,48 +608,39 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await q.answer("Apenas VIPs podem comprar.", show_alert=True)
             return
 
-        # 3. Executa a transação no Mercado (Deduz o dinheiro e marca vendido)
-        # Isso retorna o objeto da listagem atualizado e o custo total
-        updated_listing, cost = await market_manager.purchase_listing(
+        # 3. Executa a transação no Mercado
+        # <<< CORREÇÃO AQUI: REMOVIDO O 'await' >>>
+        updated_listing, cost = market_manager.purchase_listing(
             buyer_id=buyer_id, 
             listing_id=lid, 
             quantity=1, 
             context=context
         )
         
-        # === 4. ENTREGA DO ITEM (AQUI ESTAVA O PROBLEMA) ===
+        # 4. ENTREGA DO ITEM
         item_data = updated_listing.get("item", {})
         item_type = item_data.get("type")
         item_name_display = "Item Recebido"
 
         if item_type == "stack":
-            # --- ENTREGA DE STACK (Poções, Materiais) ---
+            # Stack (Poções, etc)
             base_id = item_data.get("base_id")
-            # A quantidade é: Qtd por Lote * Lotes comprados (aqui é sempre 1 lote por clique)
             qty_to_add = int(item_data.get("qty", 1))
-            
-            # Usa a função do player_manager que já sabe somar pilhas
             player_manager.add_item_to_inventory(buyer, base_id, qty_to_add)
-            
             item_name_display = f"{_item_label_from_base(base_id)} x{qty_to_add}"
 
         elif item_type == "unique":
-            # --- ENTREGA DE ÚNICO (Espadas, Armaduras) ---
-            # Pega o objeto real do item (stats, durabilidade, etc)
+            # Único (Equipamentos)
             real_item_obj = item_data.get("item")
             old_uid = item_data.get("uid")
             
             if real_item_obj:
-                # Gera um UID novo para garantir que não duplique na mochila
-                # Usa timestamp para ser único
                 import time
+                # Gera novo UID para não dar conflito
                 new_uid = f"{old_uid}_bought_{int(time.time())}"
-                
-                # Adiciona diretamente ao dicionário do inventário
                 if "inventory" not in buyer: buyer["inventory"] = {}
                 buyer["inventory"][new_uid] = real_item_obj
                 
-                # Nome para exibir na mensagem
                 item_name_display = real_item_obj.get("display_name") or real_item_obj.get("name") or "Equipamento"
             else:
                 raise Exception("Erro: Dados do item único corrompidos.")
@@ -657,8 +648,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             raise Exception(f"Tipo de item desconhecido: {item_type}")
 
-        # === 5. SALVAR O JOGADOR (CRUCIAL) ===
-        # Se não salvar aqui, o item não vai para o banco de dados
+        # 5. SALVAR O JOGADOR
         await player_manager.save_player_data(buyer_id, buyer)
 
         # 6. Feedback
@@ -670,9 +660,12 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]])
         )
 
+    except market_manager.InvalidPurchase:
+        await q.answer("⚠️ Você não pode comprar seu próprio item!", show_alert=True)
     except Exception as e:
+        # Loga o erro no console para vermos o que é, se continuar
         logger.error(f"Erro na compra {lid}: {e}", exc_info=True)
-        await q.answer(f"Erro na entrega: {str(e)}", show_alert=True)
+        await q.answer(f"Erro: {str(e)}", show_alert=True)
 
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
