@@ -593,21 +593,23 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
     buyer_id = q.from_user.id
     
-    # Tenta pegar o ID da listagem
+    # 1. Extrai o ID da listagem
     try:
         lid = int(q.data.replace("market_buy_", ""))
     except ValueError:
         return
 
     try:
+        # 2. Carrega dados
         buyer = await player_manager.get_player_data(buyer_id)
         
-        # Verificação de VIP (Opcional, mantenha se for regra do seu jogo)
+        # Verificação VIP (Opcional)
         if not player_manager.has_premium_plan(buyer):
             await q.answer("Apenas VIPs podem comprar.", show_alert=True)
             return
 
-        # Executa a compra
+        # 3. Executa a transação no Mercado (Deduz o dinheiro e marca vendido)
+        # Isso retorna o objeto da listagem atualizado e o custo total
         updated_listing, cost = await market_manager.purchase_listing(
             buyer_id=buyer_id, 
             listing_id=lid, 
@@ -615,35 +617,62 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context=context
         )
         
-        # --- CORREÇÃO DO NOME DO ITEM ---
+        # === 4. ENTREGA DO ITEM (AQUI ESTAVA O PROBLEMA) ===
         item_data = updated_listing.get("item", {})
-        item_name_display = "Item Desconhecido"
-        
-        if item_data.get("type") == "unique":
-            # Se for único, pega os dados de dentro do sub-objeto 'item'
-            real_item = item_data.get("item", {})
-            base_id = real_item.get("base_id") or real_item.get("tpl")
-            # Tenta pegar o nome customizado ou o nome base
-            item_name_display = real_item.get("display_name") or _item_label_from_base(base_id)
-        else:
-            # Se for stack (poções, materiais), pega direto
-            base_id = item_data.get("base_id")
-            qty = item_data.get("qty", 1)
-            name = _item_label_from_base(base_id)
-            item_name_display = f"{name} x{qty}"
+        item_type = item_data.get("type")
+        item_name_display = "Item Recebido"
 
-        # --------------------------------
-        
+        if item_type == "stack":
+            # --- ENTREGA DE STACK (Poções, Materiais) ---
+            base_id = item_data.get("base_id")
+            # A quantidade é: Qtd por Lote * Lotes comprados (aqui é sempre 1 lote por clique)
+            qty_to_add = int(item_data.get("qty", 1))
+            
+            # Usa a função do player_manager que já sabe somar pilhas
+            player_manager.add_item_to_inventory(buyer, base_id, qty_to_add)
+            
+            item_name_display = f"{_item_label_from_base(base_id)} x{qty_to_add}"
+
+        elif item_type == "unique":
+            # --- ENTREGA DE ÚNICO (Espadas, Armaduras) ---
+            # Pega o objeto real do item (stats, durabilidade, etc)
+            real_item_obj = item_data.get("item")
+            old_uid = item_data.get("uid")
+            
+            if real_item_obj:
+                # Gera um UID novo para garantir que não duplique na mochila
+                # Usa timestamp para ser único
+                import time
+                new_uid = f"{old_uid}_bought_{int(time.time())}"
+                
+                # Adiciona diretamente ao dicionário do inventário
+                if "inventory" not in buyer: buyer["inventory"] = {}
+                buyer["inventory"][new_uid] = real_item_obj
+                
+                # Nome para exibir na mensagem
+                item_name_display = real_item_obj.get("display_name") or real_item_obj.get("name") or "Equipamento"
+            else:
+                raise Exception("Erro: Dados do item único corrompidos.")
+
+        else:
+            raise Exception(f"Tipo de item desconhecido: {item_type}")
+
+        # === 5. SALVAR O JOGADOR (CRUCIAL) ===
+        # Se não salvar aqui, o item não vai para o banco de dados
+        await player_manager.save_player_data(buyer_id, buyer)
+
+        # 6. Feedback
         await _safe_edit_or_send(q, context, update.effective_chat.id, 
             f"✅ <b>Compra realizada com sucesso!</b>\n\n"
-            f"📦 <b>Item:</b> {item_name_display}\n"
-            f"💰 <b>Custo:</b> {cost} 🪙", 
+            f"📦 <b>Item Entregue:</b> {item_name_display}\n"
+            f"💰 <b>Custo:</b> {cost} 🪙\n\n"
+            f"<i>O item já está no seu inventário.</i>", 
             InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]])
         )
 
     except Exception as e:
-        # Se der erro (ex: alguém comprou na frente), avisa
-        await q.answer(str(e), show_alert=True)
+        logger.error(f"Erro na compra {lid}: {e}", exc_info=True)
+        await q.answer(f"Erro na entrega: {str(e)}", show_alert=True)
 
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
