@@ -6,7 +6,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 from modules import mission_manager, player_manager, game_data, file_id_manager, market_manager, clan_manager
 from modules.market_manager import render_listing_line as _mm_render_listing_line
-
+# Adicione este import junto com os outros de modules
+from modules.player import inventory
 # --- DISPLAY UTILS opcional ---
 try:
     from modules import display_utils
@@ -602,82 +603,92 @@ async def market_cancel_new(update, context):
 
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    await q.answer()
+    # Tenta responder o clique para não travar a UI
+    try: await q.answer()
+    except: pass
+
     buyer_id = q.from_user.id
+    chat_id = update.effective_chat.id
     
-    # 1. Extrai o ID da listagem
+    # 1. Pega o ID da listagem
     try:
         lid = int(q.data.replace("market_buy_", ""))
     except ValueError:
         return
 
     try:
-        # 2. Carrega dados
+        # 2. Carrega o Comprador
         buyer = await player_manager.get_player_data(buyer_id)
-        
-        # Verificação VIP (Opcional)
+        if not buyer:
+            await context.bot.send_message(chat_id, "Erro: Seus dados não foram carregados.")
+            return
+
+        # Verificação VIP (Se houver no seu jogo)
         if not player_manager.has_premium_plan(buyer):
             await q.answer("Apenas VIPs podem comprar.", show_alert=True)
             return
 
-        # 3. Executa a transação no Mercado
-        # <<< CORREÇÃO AQUI: REMOVIDO O 'await' >>>
+        # 3. Executa a compra no Banco de Dados (Tira o estoque do mercado)
+        # Retorna o objeto da listagem ATUALIZADO e o custo
         updated_listing, cost = market_manager.purchase_listing(
             buyer_id=buyer_id, 
             listing_id=lid, 
-            quantity=1, 
-            context=context
+            quantity=1
         )
         
-        # 4. ENTREGA DO ITEM
+        # 4. Processa a Entrega (USANDO SEU MÓDULO INVENTORY)
         item_data = updated_listing.get("item", {})
         item_type = item_data.get("type")
-        item_name_display = "Item Recebido"
+        item_name_display = "Item"
 
         if item_type == "stack":
-            # Stack (Poções, etc)
+            # === ENTREGA DE STACK (Fios, Minérios, etc) ===
             base_id = item_data.get("base_id")
-            qty_to_add = int(item_data.get("qty", 1))
-            player_manager.add_item_to_inventory(buyer, base_id, qty_to_add)
-            item_name_display = f"{_item_label_from_base(base_id)} x{qty_to_add}"
+            qty_per_lote = int(item_data.get("qty", 1)) # Tamanho do lote comprado
+            
+            # Usa a função oficial do seu inventory.py
+            # Ela já sabe lidar com Ouro, Gemas, Skins e Itens normais
+            inventory.add_item_to_inventory(buyer, base_id, qty_per_lote)
+            
+            name = _item_label_from_base(base_id)
+            item_name_display = f"{name} x{qty_per_lote}"
 
         elif item_type == "unique":
+            # === ENTREGA DE ÚNICOS (Equipamentos) ===
+            real_item = item_data.get("item")
             
-            real_item_obj = item_data.get("item")
-            old_uid = item_data.get("uid")
-            
-            if real_item_obj:
-                import time
-                base_uid_clean = old_uid.split("_bought_")[0] 
-                new_uid = f"{base_uid_clean}_bought_{int(time.time())}"
-                if "inventory" not in buyer: buyer["inventory"] = {}
-                buyer["inventory"][new_uid] = real_item_obj
+            if real_item:
+                # Usa a função oficial add_unique_item do seu inventory.py
+                # Ela gera o UUID automaticamente e adiciona no dicionário correto
+                inventory.add_unique_item(buyer, real_item)
                 
-                item_name_display = real_item_obj.get("display_name") or real_item_obj.get("name") or "Equipamento"
+                item_name_display = real_item.get("display_name") or "Equipamento"
             else:
-                raise Exception("Erro: Dados do item único corrompidos.")
+                raise Exception("Dados do item único vazios.")
 
-        else:
-            raise Exception(f"Tipo de item desconhecido: {item_type}")
-
-        # 5. SALVAR O JOGADOR
+        # 5. Salva o Jogador no Banco (CRUCIAL)
         await player_manager.save_player_data(buyer_id, buyer)
 
-        # 6. Feedback
-        await _safe_edit_or_send(q, context, update.effective_chat.id, 
-            f"✅ <b>Compra realizada com sucesso!</b>\n\n"
-            f"📦 <b>Item Entregue:</b> {item_name_display}\n"
-            f"💰 <b>Custo:</b> {cost} 🪙\n\n"
-            f"<i>O item já está no seu inventário.</i>", 
+        # 6. Confirmação Visual
+        await _safe_edit_or_send(q, context, chat_id, 
+            f"✅ <b>Compra realizada!</b>\n\n"
+            f"📦 <b>Recebido:</b> {item_name_display}\n"
+            f"💰 <b>Pago:</b> {cost} 🪙\n\n"
+            f"<i>O item foi adicionado ao seu inventário.</i>",
             InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]])
         )
 
-    except market_manager.InvalidPurchase:
-        await q.answer("⚠️ Você não pode comprar seu próprio item!", show_alert=True)
     except Exception as e:
-        # Loga o erro no console para vermos o que é, se continuar
-        logger.error(f"Erro na compra {lid}: {e}", exc_info=True)
-        await q.answer(f"Erro: {str(e)}", show_alert=True)
+        logger.error(f"Erro fatal na compra {lid}: {e}", exc_info=True)
+        # Mensagem amigável de erro
+        if "InsufficientQuantity" in str(e):
+            msg = "❌ Este item acabou de ser vendido ou o estoque acabou."
+        elif "PermissionDenied" in str(e):
+            msg = "🔒 Este item é uma Venda Privada para outro jogador."
+        else:
+            msg = f"❌ Erro ao processar a compra: {e}"
+            
+        await context.bot.send_message(chat_id, msg)
 
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
