@@ -22,6 +22,7 @@ from telegram.error import Conflict
 
 from config import ADMIN_ID, TELEGRAM_TOKEN, EVENT_TIMES, JOB_TIMEZONE, WORLD_BOSS_TIMES
 from registries import register_all_handlers
+from registries.events import register_event_handlers
 
 # Importa o Watchdog
 from modules.player.actions import check_stale_actions_on_startup
@@ -243,7 +244,8 @@ async def main():
     
     register_jobs(application) 
     register_all_handlers(application)
-
+    register_event_handlers(application)
+    
     logger.info("Bot configurado. Iniciando...")
 
     try:
