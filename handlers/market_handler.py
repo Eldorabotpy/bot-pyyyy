@@ -630,7 +630,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             buyer_id=buyer_id, listing_id=lid, quantity=1
         )
         
-        # 3. Processa Entrega (Usando o Inventory Oficial)
+        # 3. Processa Entrega
         item_data = updated_listing.get("item", {})
         item_type = item_data.get("type")
         item_name_display = "Item"
@@ -638,9 +638,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if item_type == "stack":
             base_id = item_data.get("base_id")
             qty_per_lote = int(item_data.get("qty", 1))
-            
             inventory.add_item_to_inventory(buyer, base_id, qty_per_lote)
-            
             name = _item_label_from_base(base_id)
             item_name_display = f"{name} x{qty_per_lote}"
 
@@ -650,12 +648,12 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 inventory.add_unique_item(buyer, real_item)
                 item_name_display = real_item.get("display_name") or "Equipamento"
             else:
-                raise Exception("Dados do equipamento vazios.")
+                raise Exception("Dados vazios.")
 
         # 4. Salva Jogador
         await player_manager.save_player_data(buyer_id, buyer)
 
-        # 5. Feedback para quem comprou
+        # 5. Feedback (Sucesso)
         await _safe_edit_or_send(q, context, chat_id, 
             f"✅ <b>Compra realizada!</b>\n\n"
             f"📦 <b>Recebido:</b> {item_name_display}\n"
@@ -663,7 +661,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]])
         )
 
-        # === 6. LOG NO GRUPO (COM TÓPICO) ===
+        # === 6. LOG COM DEBUG DE ERRO ===
         try:
             buyer_name = buyer.get("character_name") or q.from_user.first_name
             seller_id = updated_listing.get("seller_id")
@@ -682,16 +680,23 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🤝 <b>Vendedor:</b> {seller_name}"
             )
             
-            # Envia para o Grupo E para o Tópico específico
+            # Tenta enviar com os IDs configurados no topo do arquivo
             await context.bot.send_message(
                 chat_id=LOG_GROUP_ID, 
-                message_thread_id=LOG_TOPIC_ID, # <--- AQUI ESTÁ O SEGREDO
+                message_thread_id=LOG_TOPIC_ID, 
                 text=log_text, 
                 parse_mode="HTML"
             )
             
         except Exception as e_log:
-            logger.warning(f"Erro ao enviar log de transação: {e_log}")
+            # --- AQUI ESTÁ O DEBUG ---
+            logger.error(f"Erro Log: {e_log}")
+            # Avisa você no chat privado qual foi o erro
+            await context.bot.send_message(
+                chat_id=chat_id, 
+                text=f"⚠️ <b>Aviso de Admin:</b> O log não foi enviado.\nErro: <code>{e_log}</code>",
+                parse_mode="HTML"
+            )
 
     except Exception as e:
         logger.error(f"Erro compra {lid}: {e}")
