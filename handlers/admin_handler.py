@@ -161,21 +161,26 @@ async def find_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando de admin para obter IDs de chat e tópico."""
-    if not await ensure_admin(update): return 
-
+    """
+    Comando LIBERADO para obter IDs de chat e tópico.
+    (Trava de segurança removida para facilitar configuração)
+    """
+    # if not await ensure_admin(update): return  <-- REMOVIDO
+    
     chat_id = update.effective_chat.id
     thread_id = getattr(update.effective_message, 'message_thread_id', None)
 
+    # Monta o texto informativo
+    topic_text = f"🆔 <b>Topic ID:</b> <code>{thread_id}</code>" if thread_id else "🆔 <b>Topic ID:</b> <i>Geral (None)</i>"
+
     text = (
-        f"<b>INFORMAÇÕES DE ID:</b>\n"
+        f"<b>🕵️ INSPETOR DE IDs</b>\n"
         f"--------------------------\n"
-        f"ID do Chat Atual (chat_id): <code>{chat_id}</code>\n"
+        f"👤 <b>Seu User ID:</b> <code>{update.effective_user.id}</code>\n"
+        f"🏠 <b>Group ID:</b> <code>{chat_id}</code>\n"
+        f"{topic_text}\n\n"
+        f"<i>Copie estes IDs para configurar os logs de mercado.</i>"
     )
-    if thread_id:
-        text += f"ID do Tópico Atual (thread_id): <code>{thread_id}</code>"
-    else:
-        text += "<i>Esta mensagem não está num tópico.</i>"
 
     await update.message.reply_text(text, parse_mode=HTML)
 
@@ -892,7 +897,8 @@ my_data_handler = CommandHandler("mydata", my_data_command, filters=filters.User
 reset_pvp_now_handler = CommandHandler("resetpvpnow", _reset_pvp_now_command, filters=filters.User(ADMIN_LIST))
 find_player_handler = CommandHandler("find_player", find_player_command, filters=filters.User(ADMIN_LIST))
 debug_player_handler = CommandHandler("debug_player", debug_player_data, filters=filters.User(ADMIN_LIST))
-get_id_command_handler = CommandHandler("get_id", get_id_command, filters=filters.User(ADMIN_LIST))
+# Removemos o filtro de usuário. Agora qualquer um pode usar /get_id
+get_id_command_handler = CommandHandler("get_id", get_id_command)
 fixme_handler = CommandHandler("fixme", fix_my_character, filters=filters.User(ADMIN_LIST))
 hard_respec_all_handler = CommandHandler("hard_respec_all", hard_respec_all_command, filters=filters.User(ADMIN_LIST))
 
