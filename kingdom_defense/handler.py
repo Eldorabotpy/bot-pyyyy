@@ -514,7 +514,7 @@ async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else: await show_event_menu(update, context)
 
 def register_handlers(application):
-    application.add_handler(CallbackQueryHandler(show_event_menu, pattern='^show_events_menu$'))
+    application.add_handler(CallbackQueryHandler(show_event_menu, pattern='^defesa_reino_main$'))
     application.add_handler(CallbackQueryHandler(handle_join_and_start_battle, pattern='^kd_join_and_start$'))
     application.add_handler(CallbackQueryHandler(handle_marathon_attack, pattern='^kd_marathon_attack$'))
     application.add_handler(CallbackQueryHandler(check_queue_status, pattern='^kd_check_queue_status$'))

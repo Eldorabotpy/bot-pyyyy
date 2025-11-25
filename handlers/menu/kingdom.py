@@ -4,38 +4,32 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from modules import player_manager, game_data, file_ids
-from kingdom_defense import leaderboard # Assumimos que isto é síncrono e rápido
+from kingdom_defense import leaderboard 
 
 logger = logging.getLogger(__name__)
 
-# A função de menu corrigida
 async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, player_data: dict | None = None):
     """Mostra o menu principal do Reino de Eldora."""
     user = update.effective_user
     chat_id = update.effective_chat.id
 
-    # <<< CORREÇÃO 1: Garante que os dados são carregados se não forem passados >>>
     if player_data is None:
-        player_data = await player_manager.get_player_data(user.id) # Adiciona await
+        player_data = await player_manager.get_player_data(user.id)
         if not player_data:
             await context.bot.send_message(chat_id=chat_id, text="Personagem não encontrado. Use /start para criar um.")
             return
 
-    # <<< CORREÇÃO 2: Adiciona await para salvar a localização >>>
     player_data['current_location'] = 'reino_eldora'
-    await player_manager.save_player_data(user.id, player_data) # Adiciona await
+    await player_manager.save_player_data(user.id, player_data) 
 
-    # ===== Renderização do Conteúdo (Assumindo que estas são SÍNCRONAS) =====
     character_name = player_data.get("character_name", "Aventureiro(a)")
     total_stats = await player_manager.get_player_total_stats(player_data)
     
-    # As seguintes funções devem ser SÍNCRONAS (não fazem DB/I/O)
     p_hp = int(player_data.get('current_hp', 0))
     p_max_hp = int(total_stats.get('max_hp', 0))
     p_energy = int(player_data.get('energy', 0))
     max_energy = int(player_manager.get_player_max_energy(player_data))
 
-    # Busca o texto do recorde (Assumimos que leaderboard.get_top_score_text é SÍNCRONO)
     leaderboard_text = leaderboard.get_top_score_text()
     
     status_footer = (
@@ -60,15 +54,12 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         ],
         [InlineKeyboardButton("🧪 𝐑𝐞𝐟𝐢𝐧𝐨 🧪", callback_data='refining_main')],
         [InlineKeyboardButton("🆅🆂 𝐀𝐫𝐞𝐧𝐚 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 🆅🆂", callback_data='pvp_arena')], 
-        # Mudamos para 'evt_hub_principal' para não conflitar com a defesa
-[InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬 𝐄𝐬𝐩𝐞𝐜𝐢𝐚𝐢𝐬 💀", callback_data='evt_hub_principal')],
+        [InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬 𝐄𝐬𝐩𝐞𝐜𝐢𝐚𝐢𝐬 💀", callback_data='evt_hub_principal')],
         [InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦 👤", callback_data='profile')],
         [InlineKeyboardButton("ℹ️ 𝐒𝐨𝐛𝐫𝐞 𝐨 𝐑𝐞𝐢𝐧𝐨", callback_data='region_info:reino_eldora')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # --- Lógica para enviar a mensagem ---
-    # Responde à query se existir
     if update.callback_query:
         try:
             await update.callback_query.message.delete()
@@ -77,7 +68,6 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
     fd = file_ids.get_file_data('regiao_reino_eldora')
     if fd and fd.get("id"):
-        # ... (lógica de envio de mídia mantida) ...
         try:
             if (fd.get("type") or "photo").lower() in ("video", "animation"):
                 await context.bot.send_animation(
