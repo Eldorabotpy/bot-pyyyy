@@ -267,6 +267,7 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     items_page = sellable[start:end]
     
     if not sellable:
+        # Helper seguro
         await _safe_edit_or_send(q, context, update.effective_chat.id, "Inventário vazio ou sem itens vendáveis.", 
                                  InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
         return
@@ -275,10 +276,24 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for it in items_page:
         if it["type"] == "unique":
             txt = _render_unique_line_safe(it["inst"], pclass)
-            kb.append([InlineKeyboardButton(_cut_middle(txt, 56), callback_data=f"market_pick_unique_{it['uid']}")])
+            # PROTEÇÃO CONTRA BUTTON_DATA_INVALID
+            # Se o UID for muito longo, o callback explode.
+            uid_str = str(it['uid'])
+            if len(uid_str) > 40: # Limite de segurança
+                # Se for muito longo, infelizmente não dá pra por no botão direto.
+                # Uma solução seria usar um mapeamento temporário, mas vamos tentar cortar/avisar.
+                print(f"AVISO: UID muito longo para botão: {uid_str}")
+                continue 
+            
+            kb.append([InlineKeyboardButton(_cut_middle(txt, 56), callback_data=f"market_pick_unique_{uid_str}")])
         else:
             name = _item_label_from_base(it["base_id"])
-            kb.append([InlineKeyboardButton(f"📦 {name} ({it['qty']}x)", callback_data=f"market_pick_stack_{it['base_id']}")])
+            base_id_str = str(it['base_id'])
+            if len(base_id_str) > 40:
+                 print(f"AVISO: BaseID muito longo para botão: {base_id_str}")
+                 continue
+
+            kb.append([InlineKeyboardButton(f"📦 {name} ({it['qty']}x)", callback_data=f"market_pick_stack_{base_id_str}")])
             
     nav = []
     if page > 1: nav.append(InlineKeyboardButton("⬅️ Ant", callback_data=f"market_sell:{page-1}"))
