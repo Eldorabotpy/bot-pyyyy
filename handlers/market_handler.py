@@ -9,8 +9,8 @@ from modules.market_manager import render_listing_line as _mm_render_listing_lin
 # Adicione este import junto com os outros de modules
 from modules.player import inventory
 
-LOG_GROUP_ID = -1001234567890  # ID do Grupo
-LOG_TOPIC_ID = 442
+LOG_GROUP_ID = -1002881364171
+LOG_TOPIC_ID = 24475
 
 # --- DISPLAY UTILS opcional ---
 try:
