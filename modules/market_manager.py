@@ -1,35 +1,37 @@
 # modules/market_manager.py
-# (VERSÃO DEFINITIVA: MONGODB)
+# (VERSÃO CORRIGIDA E INDEPENDENTE)
 from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple
+from pymongo import MongoClient
 
-# --- CONEXÃO COM O BANCO DE DADOS ---
-# Tenta reaproveitar a conexão existente do player module
+# --- CONFIGURAÇÃO DO BANCO DE DADOS ---
+# Forçamos o uso da variável de ambiente para garantir que é o mesmo banco.
+MONGO_URL = os.getenv("MONGO_URL")
+
+if not MONGO_URL:
+    # Fallback para local se não tiver variável (evita erro no PC)
+    MONGO_URL = "mongodb://localhost:27017/rpg_bot"
+
 try:
-    from modules.player.core import players_collection
-    # Pega o objeto 'database' a partir da coleção de jogadores
-    if players_collection is not None:
-        db = players_collection.database
-        market_col = db["market_listings"]
-        counters_col = db["counters"] # Para gerar IDs numéricos (1, 2, 3...)
-    else:
-        raise ImportError("players_collection is None")
-except (ImportError, AttributeError):
-    # Fallback: Se der erro ao importar ou se players_collection for None, tenta conectar direto
-    # Isso é útil se o módulo player falhar ou para testes isolados
-    from pymongo import MongoClient
-    # Pega a URL do ambiente ou usa localhost como padrão
-    MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/rpg_bot")
     client = MongoClient(MONGO_URL)
-    # Pega o banco padrão da connection string
-    db = client.get_default_database()
+    # IMPORTANTE: Forçamos o nome do banco para 'eldora_db' para bater com o dos jogadores
+    db = client["eldora_db"] 
     market_col = db["market_listings"]
     counters_col = db["counters"]
+    
+    # Garante índices para performance e ordenação
+    market_col.create_index("id", unique=True)
+    market_col.create_index("created_at")
+    market_col.create_index("active")
+    
+except Exception as e:
+    logging.critical(f"FALHA AO CONECTAR NO MONGODB DO MERCADO: {e}")
+    raise e
 
-# Tenta importar display_utils para visualização bonita de itens
+# Tenta importar display_utils (apenas visual)
 try:
     from modules import display_utils
 except Exception:
@@ -39,7 +41,7 @@ from modules import game_data
 
 log = logging.getLogger(__name__)
 
-MAX_PRICE = 100_000_000
+MAX_PRICE = 100_000_000_000 # Aumentado para evitar erros com inflação
 MAX_QTY = 1_000_000
 
 # =========================
@@ -54,13 +56,10 @@ class InsufficientQuantity(MarketError): ...
 class InvalidPurchase(MarketError): ...
 
 # =========================
-# Helpers de Banco de Dados
+# Helpers
 # =========================
 def _get_next_sequence(name: str) -> int:
-    """
-    Gera um ID numérico sequencial (1, 2, 3...) igual ao SQL.
-    Isso é necessário porque o MongoDB usa IDs longos e feios por padrão.
-    """
+    """Gera ID numérico (1, 2, 3...)"""
     ret = counters_col.find_one_and_update(
         {"_id": name},
         {"$inc": {"seq": 1}},
@@ -72,28 +71,12 @@ def _get_next_sequence(name: str) -> int:
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-# =========================
-# Validações
-# =========================
-def _validate_item_payload(item_payload: dict):
-    if not isinstance(item_payload, dict):
-        raise InvalidListing("item_payload inválido.")
-    t = item_payload.get("type")
-    if t not in ("stack", "unique"):
-        raise InvalidListing("Tipo deve ser 'stack' ou 'unique'.")
-    if t == "stack":
-        if not item_payload.get("base_id"): raise InvalidListing("stack.base_id obrigatório.")
-    if t == "unique":
-        if not item_payload.get("uid"): raise InvalidListing("unique.uid obrigatório.")
-
 def _validate_price_qty(unit_price: int, quantity: int):
-    if unit_price <= 0 or unit_price > MAX_PRICE:
-        raise InvalidListing(f"Preço deve ser entre 1 e {MAX_PRICE}.")
-    if quantity <= 0 or quantity > MAX_QTY:
-        raise InvalidListing(f"Quantidade deve ser entre 1 e {MAX_QTY}.")
+    if unit_price <= 0: raise InvalidListing("Preço deve ser maior que 0.")
+    if quantity <= 0: raise InvalidListing("Quantidade deve ser maior que 0.")
 
 # =========================
-# Funções Principais (CRUD com MongoDB)
+# CRUD (Create, Read, Update, Delete)
 # =========================
 
 def create_listing(
@@ -103,84 +86,76 @@ def create_listing(
     unit_price: int,
     quantity: int = 1,
     region_key: Optional[str] = None,
-    target_buyer_id: Optional[int] = None,   # <--- PRIVADO
-    target_buyer_name: Optional[str] = None  # <--- PRIVADO
+    target_buyer_id: Optional[int] = None,
+    target_buyer_name: Optional[str] = None
 ) -> dict:
-    """Cria um anúncio e salva no MongoDB."""
-    _validate_item_payload(item_payload)
     _validate_price_qty(unit_price, quantity)
 
-    # Gera próximo ID (ex: #150)
     lid = _get_next_sequence("market_id")
 
     listing = {
-        "id": lid, # ID Inteiro legível
-        "seller_id": int(seller_id),
+        "id": lid,
+        "seller_id": int(seller_id), # Garante Inteiro
         "item": item_payload,
         "unit_price": int(unit_price),
         "quantity": int(quantity),
         "created_at": _now_iso(),
         "region_key": region_key,
         "active": True,
-        # Campos de Venda Privada
+        # Venda Privada (Garante Null/Int)
         "target_buyer_id": int(target_buyer_id) if target_buyer_id else None,
         "target_buyer_name": str(target_buyer_name) if target_buyer_name else None
     }
 
     market_col.insert_one(listing)
-    
-    log.info(f"[MARKET] Listagem #{lid} criada (MongoDB). Privado: {bool(target_buyer_id)}")
+    log.info(f"[MARKET] Item #{lid} criado por {seller_id}.")
     return listing
 
 def list_active(
     *,
     region_key: Optional[str] = None,
     base_id: Optional[str] = None,
-    sort_by: str = "created_at", 
+    sort_by: str = "created_at",
     ascending: bool = False,
     page: int = 1,
     page_size: int = 20,
     price_per_unit: bool = False,
-    viewer_id: Optional[int] = None 
+    viewer_id: Optional[int] = None
 ) -> List[dict]:
-    """
-    Lista itens ativos do MongoDB com suporte a filtro privado.
-    """
-    # Filtro base: Ativo = True
+    """Busca itens ativos com lógica de privacidade robusta."""
+    
+    # 1. Filtro Base: Item deve estar Ativo
     query = {"active": True}
 
-    if region_key:
-        query["region_key"] = region_key
-    
-    if base_id:
-        query["item.base_id"] = base_id
+    # 2. Filtros Opcionais
+    if region_key: query["region_key"] = region_key
+    if base_id: query["item.base_id"] = base_id
 
-    # --- LÓGICA DE PRIVACIDADE ---
+    # 3. Lógica de Privacidade (QUEM PODE VER?)
     if viewer_id:
-        # Mostra itens públicos OU itens onde o usuário é o alvo/vendedor
+        viewer_id = int(viewer_id) # Garante Int para bater com o banco
         query["$or"] = [
-            {"target_buyer_id": None},           # Públicos
-            {"target_buyer_id": {"$exists": False}}, # Compatibilidade (itens antigos)
-            {"target_buyer_id": int(viewer_id)}, # Sou o comprador alvo
-            {"seller_id": int(viewer_id)}        # Sou o vendedor (meus itens)
+            {"target_buyer_id": None},           # Público
+            {"target_buyer_id": viewer_id},      # Privado pra mim
+            {"seller_id": viewer_id}             # Meu próprio item (mesmo privado)
         ]
     else:
-        # Se não tem viewer_id, mostra só públicos
         query["target_buyer_id"] = None
 
-    # Ordenação
+    # 4. Ordenação
     sort_dir = 1 if ascending else -1
     mongo_sort = [("created_at", sort_dir)]
     if sort_by == "price":
-        # Se for preço por unidade, o mongo ordena direto pelo unit_price (simplificado)
         mongo_sort = [("unit_price", sort_dir)]
 
-    # Paginação
-    skip = (page - 1) * page_size
+    # 5. Paginação
+    skip = (max(1, page) - 1) * page_size
     
-    # Executa a busca no banco
     cursor = market_col.find(query).sort(mongo_sort).skip(skip).limit(page_size)
-    return list(cursor)
+    items = list(cursor)
+    
+    log.info(f"[MARKET] Listando ativos. Viewer: {viewer_id}. Encontrados: {len(items)}")
+    return items
 
 def list_by_seller(seller_id: int) -> List[dict]:
     return list(market_col.find({"active": True, "seller_id": int(seller_id)}))
@@ -189,57 +164,41 @@ def get_listing(listing_id: int) -> Optional[dict]:
     return market_col.find_one({"id": int(listing_id)})
 
 def delete_listing(listing_id: int):
-    """Marca como inativo (soft delete)."""
-    res = market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
-    if res.modified_count == 0:
-        # Se não achou ativo, tenta ver se existe inativo, só pra não dar erro
-        if not market_col.find_one({"id": int(listing_id)}):
-             raise ListingNotFound(f"Listing {listing_id} não encontrada.")
+    market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
 
 def purchase_listing(
     *,
     buyer_id: int,
     listing_id: int,
     quantity: int = 1,
-    context=None 
+    context=None
 ) -> Tuple[dict, int]:
-    """
-    Processa a compra atomicamente no MongoDB.
-    """
     listing = get_listing(listing_id)
-    if not listing:
-        raise ListingNotFound("Anúncio não encontrado.")
-    
-    if not listing.get("active"):
-        raise ListingInactive("Anúncio já foi vendido ou cancelado.")
-    
-    if int(listing["seller_id"]) == int(buyer_id):
-        raise InvalidPurchase("Não pode comprar o próprio item.")
+    if not listing: raise ListingNotFound("Anúncio não encontrado.")
+    if not listing.get("active"): raise ListingInactive("Anúncio inativo.")
+    if int(listing["seller_id"]) == int(buyer_id): raise InvalidPurchase("Não pode comprar seu item.")
 
-    # Validação de Venda Privada
+    # Trava de Privacidade
     target = listing.get("target_buyer_id")
     if target is not None and int(target) != int(buyer_id):
-        target_name = listing.get("target_buyer_name", "outro jogador")
-        raise PermissionDenied(f"🔒 Item reservado exclusivamente para: {target_name}")
+        raise PermissionDenied(f"🔒 Item reservado para: {listing.get('target_buyer_name')}")
 
+    # Trava de Estoque
     available = int(listing.get("quantity", 0))
     if quantity > available:
-        raise InsufficientQuantity(f"Estoque insuficiente. Restam {available}.")
+        raise InsufficientQuantity(f"Estoque insuficiente ({available}).")
 
-    total_price = int(listing["unit_price"]) * quantity
-
-    # Atualiza estoque atomicamente no banco
+    # Atualiza Banco
     new_qty = available - quantity
     update_doc = {"quantity": new_qty}
-    if new_qty <= 0:
-        update_doc["active"] = False
-
+    if new_qty <= 0: update_doc["active"] = False
+    
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
-    # Retorna listagem atualizada para o handler
     listing["quantity"] = new_qty
     listing["active"] = (new_qty > 0)
     
+    total_price = int(listing["unit_price"]) * quantity
     return listing, total_price
 
 # =========================
@@ -247,7 +206,6 @@ def purchase_listing(
 # =========================
 RARITY_LABEL = {"comum": "Comum", "bom": "Boa", "raro": "Rara", "epico": "Épica", "lendario": "Lendária"}
 _CLASS_DMG_EMOJI_FALLBACK = {"guerreiro": "⚔️", "berserker": "🪓", "cacador": "🏹", "assassino": "🗡", "bardo": "🎵", "monge": "🙏", "mago": "✨", "samurai": "🗡"}
-_STAT_EMOJI_FALLBACK = {"dmg": "🗡", "hp": "❤️‍🩹", "defense": "🛡️", "initiative": "🏃", "luck": "🍀", "forca": "💪", "inteligencia": "🧠", "furia": "🔥"}
 
 def _viewer_class_key(pdata: dict, fallback="guerreiro"):
     if not pdata: return fallback
@@ -288,26 +246,18 @@ def render_listing_line(
     show_price_per_unit: bool = False,
     include_id: bool = True
 ) -> str:
-    """Gera a linha de texto para o menu do Telegram."""
     it = listing.get("item") or {}
     unit_price = int(listing.get("unit_price", 0))
     lid = listing.get("id")
-    
-    # A quantidade a mostrar depende se é único ou stack
-    # Mas geralmente é a quantidade de 'lotes' restantes
-    lots = int(listing.get("quantity", 1))
-    
     viewer_class = _viewer_class_key(viewer_player_data, "guerreiro")
 
-    # Prefixo de Segurança (Cadeado)
+    # Privacidade
     target_id = listing.get("target_buyer_id")
-    target_name = listing.get("target_buyer_name", "Alguém")
     is_private = target_id is not None
     prefix = "🔒 " if is_private else ""
-    reserved_suf = f" [RESERVADO: {target_name}]" if is_private else ""
+    reserved_suf = f" [RESERVADO: {listing.get('target_buyer_name')}]" if is_private else ""
 
     text = ""
-    # --- TIPO UNIQUE ---
     if it.get("type") == "unique":
         inst = it.get("item") or {}
         try:
@@ -319,21 +269,15 @@ def render_listing_line(
         if include_id: suffix += f" (#{lid})"
         return f"{prefix}{text}{suffix}{reserved_suf}"
 
-    # --- TIPO STACK ---
+    # Stack
     base_id = it.get("base_id", "")
-    # Em stacks, a 'quantidade' do item payload é o tamanho do lote (ex: 10 poções por lote)
     pack_qty = int(it.get("qty", 1))
-    
-    # O display mostra: "Poção de Vida x10" (tamanho do lote)
     core = _stack_inv_display(base_id, pack_qty)
     
     suffix = f" — <b>{unit_price} 🪙</b>/lote"
-    
-    # Calcula preço por unidade para ajudar o jogador
     if show_price_per_unit and pack_qty > 0:
         ppu = int(round(unit_price / pack_qty))
         suffix += f" (~{ppu} 🪙/un)"
     
     if include_id: suffix += f" (#{lid})"
-    
     return f"{prefix}{core}{suffix}{reserved_suf}"
