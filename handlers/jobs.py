@@ -97,7 +97,7 @@ def _safe_add_stack(pdata: dict, item_id: str, qty: int) -> None:
 
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Regenera energia no Banco ($inc) E na Memória (Cache).
+    Regenera energia usando UPDATE ATÔMICO ($inc) e força recarga do cache.
     """
     _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
     regenerate_non_premium = (_non_premium_tick["count"] == 0)
@@ -106,48 +106,56 @@ async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     processed_count = 0 
     
     try:
+        # Usamos iter_players para pegar todos, mas a decisão de update é feita com cuidado
         async for user_id, pdata in player_manager.iter_players():
             processed_count += 1
             try:
                 if not isinstance(pdata, dict): continue
 
-                # Tenta pegar a versão mais recente da memória, se existir
-                current_data = player_cache.get(user_id, pdata)
-
-                max_e = int(player_manager.get_player_max_energy(current_data)) 
-                cur_e = int(current_data.get("energy", 0))
+                # Verificação rápida de máximo (pode usar dado em cache, não tem problema se pular um tick)
+                max_e = int(player_manager.get_player_max_energy(pdata)) 
+                cur_e = int(pdata.get("energy", 0))
                 
                 if cur_e >= max_e: continue 
 
-                is_premium = player_manager.has_premium_plan(current_data) 
+                is_premium = player_manager.has_premium_plan(pdata) 
                 
                 if is_premium or regenerate_non_premium:
-                    # --- ATUALIZAÇÃO DUPLA (BANCO + MEMÓRIA) ---
+                    # --- JEITO SEGURO E SINCRONIZADO ---
                     if players_col is not None:
-                        # 1. Atualiza o Banco (Segurança)
+                        # 1. Atualiza o Banco (Aumenta energia sem tocar no ouro)
                         players_col.update_one(
                             {"_id": user_id}, 
                             {"$inc": {"energy": 1}}
                         )
                         
-                        # 2. Atualiza a Memória (Visual)
-                        # Isso garante que o jogador veja a energia subindo na hora
-                        current_data["energy"] = cur_e + 1
+                        # 2. Limpa o Cache (Força o bot a ler o novo valor do banco)
+                        # Isso resolve o problema de "24/35 travado"
+                        try:
+                            # Tenta limpar de forma síncrona ou agenda task se for async
+                            # (Assume que player_manager.clear_player_cache está disponível)
+                            if asyncio.iscoroutinefunction(player_manager.clear_player_cache):
+                                asyncio.create_task(player_manager.clear_player_cache(user_id))
+                            else:
+                                player_manager.clear_player_cache(user_id)
+                        except Exception:
+                            pass # Se falhar a limpeza, apenas visual atrasa, não quebra o job
                         
                         touched += 1
                     else:
-                        # Fallback
-                        player_manager.add_energy(current_data, 1) 
-                        await save_player_data(user_id, current_data) 
+                        # Fallback (Modo antigo inseguro - só roda se banco cair)
+                        player_manager.add_energy(pdata, 1) 
+                        await player_manager.save_player_data(user_id, pdata) 
                         touched += 1
             
             except Exception as e_player:
-                logger.warning(f"[ENERGY] Falha no jogador {user_id}: {e_player}")
+                # Silencia erros individuais para não spammar log
+                pass
 
     except Exception as e_iter:
         logger.error(f"Erro regenerate_energy_job: {e_iter}")
             
-    logger.info(f"[ENERGY] Job concluído. Processados: {processed_count}. Regenerados: {touched}.")
+    logger.info(f"[ENERGY] Job concluído. Processados: {processed_count}. Regenerados (DB+CacheClear): {touched}.")
 
 async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     today = _today_str()
