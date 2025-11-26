@@ -177,7 +177,7 @@ def purchase_listing(
     quantity: int = 1,
     context=None
 ) -> Tuple[dict, int]:
-    # 1. Busca e Validação
+    # --- Validações e Buscas ---
     listing = get_listing(listing_id)
     if not listing: raise ListingNotFound("Anúncio não encontrado.")
     if not listing.get("active"): raise ListingInactive("Anúncio inativo.")
@@ -195,38 +195,38 @@ def purchase_listing(
     if quantity > available:
         raise InsufficientQuantity(f"Estoque insuficiente ({available}).")
 
-    # 2. Atualiza Estoque
+    # --- Cálculos e Atualização do Anúncio ---
     total_price = int(listing["unit_price"]) * quantity
     new_qty = available - quantity
     
     update_doc = {"quantity": new_qty}
     if new_qty <= 0: update_doc["active"] = False
     
+    # Atualiza o anúncio no banco
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
-    # 3. PAGAR O VENDEDOR E LIMPAR CACHE
+    # --- PAGAMENTO E LIMPEZA DE CACHE (A CORREÇÃO) ---
     try:
-        # Paga no banco (Atomicamente)
+        # 1. Paga no Banco de Dados (Isso você já tinha e funcionava)
         result = db["players"].update_one(
             {"_id": seller_id}, 
             {"$inc": {"gold": total_price}}
         )
         
         if result.modified_count > 0:
-            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu +{total_price} gold.")
+            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu +{total_price} gold no banco.")
             
-            # --- A MÁGICA ACONTECE AQUI ---
-            # Força o bot a esquecer os dados antigos deste jogador na memória.
-            # Na próxima vez que o bot precisar do jogador, ele vai ler do banco (que já tem o ouro novo).
+            # 2. LIMPEZA DE CACHE (A PEÇA QUE FALTAVA)
+            # Isso obriga o bot a ler o banco novamente na próxima ação, 
+            # impedindo que ele sobrescreva o ouro novo com o velho da memória.
             try:
                 player_manager.clear_player_cache(seller_id)
-                log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo com sucesso.")
+                log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo. Dados serão recarregados.")
             except Exception as e_cache:
-                log.warning(f"⚠️ [MARKET] Falha ao limpar cache do vendedor: {e_cache}")
-            # -----------------------------
-            
+                log.error(f"⚠️ [MARKET] Falha ao limpar cache: {e_cache}")
+
         else:
-            log.warning(f"⚠️ [MARKET] Venda ok, mas falha ao pagar (Vendedor {seller_id} não encontrado).")
+            log.warning(f"⚠️ [MARKET] Venda ok, mas vendedor {seller_id} não encontrado no banco.")
             
     except Exception as e:
         log.error(f"🔥 [MARKET] Erro crítico no pagamento: {e}")
