@@ -30,6 +30,10 @@ try:
     from handlers.menu.region import finish_travel_job
 except ImportError:
     pass
+try:
+    from modules.player.core import player_cache
+except ImportError:
+    player_cache = {}
 
 from modules.player.actions import _parse_iso as _parse_iso_utc
 from pvp.pvp_config import MONTHLY_RANKING_REWARDS
@@ -95,7 +99,7 @@ def _safe_add_stack(pdata: dict, item_id: str, qty: int) -> None:
 
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Regenera energia usando UPDATE ATÔMICO ($inc) para proteger o ouro.
+    Regenera energia no Banco ($inc) E na Memória (Cache) para o jogador ver na hora.
     """
     _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
     regenerate_non_premium = (_non_premium_tick["count"] == 0)
@@ -109,26 +113,37 @@ async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 if not isinstance(pdata, dict): continue
 
-                max_e = int(player_manager.get_player_max_energy(pdata)) 
-                cur_e = int(pdata.get("energy", 0))
+                # Se o jogador estiver no cache, usamos os dados do cache (que são os mais atuais)
+                # Se não, usamos do banco mesmo
+                current_data = player_cache.get(user_id, pdata)
                 
-                if cur_e >= max_e: continue 
+                max_e = int(player_manager.get_player_max_energy(current_data)) 
+                cur_e = int(current_data.get("energy", 0))
+                
+                # Se já estiver cheio, ignora
+                if cur_e >= max_e:
+                    continue 
 
-                is_premium = player_manager.has_premium_plan(pdata) 
+                is_premium = player_manager.has_premium_plan(current_data) 
                 
                 if is_premium or regenerate_non_premium:
-                    # --- CORREÇÃO AQUI: 'is not None' ---
+                    # 1. ATUALIZA O BANCO (Protege o Ouro)
                     if players_col is not None:
-                        # JEITO CERTO: Só mexe na energia, ignora o resto (protege o ouro)
                         players_col.update_one(
                             {"_id": user_id}, 
                             {"$inc": {"energy": 1}}
                         )
+                        
+                        # 2. ATUALIZA A MEMÓRIA (Para o jogador ver)
+                        # Se o jogador estiver online/carregado, atualizamos a ficha dele na hora
+                        if user_id in player_cache:
+                            player_cache[user_id]["energy"] = cur_e + 1
+                        
                         touched += 1
                     else:
-                        # Fallback (só se o banco estiver desconectado)
-                        player_manager.add_energy(pdata, 1) 
-                        await save_player_data(user_id, pdata) 
+                        # Fallback (banco desconectado)
+                        player_manager.add_energy(current_data, 1) 
+                        await save_player_data(user_id, current_data) 
                         touched += 1
             
             except Exception as e_player:
