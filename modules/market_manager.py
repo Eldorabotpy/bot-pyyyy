@@ -8,8 +8,9 @@ import certifi
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple
 from pymongo import MongoClient
-
+import asyncio
 from modules import player_manager
+
 # --- CONFIGURAÇÃO DE LOGGING ---
 logging.basicConfig(level=logging.INFO)
 # CORREÇÃO: Agora a variável se chama 'log' para bater com o resto do código
@@ -220,10 +221,18 @@ def purchase_listing(
             # Isso obriga o bot a ler o banco novamente na próxima ação, 
             # impedindo que ele sobrescreva o ouro novo com o velho da memória.
             try:
-                player_manager.clear_player_cache(seller_id)
-                log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo. Dados serão recarregados.")
+                # Cria um novo loop de eventos temporário apenas para rodar essa limpeza
+                # ou usa o loop existente se já estivermos dentro de um.
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(player_manager.clear_player_cache(seller_id))
+                except RuntimeError:
+                    # Se não houver loop rodando, usamos run()
+                    asyncio.run(player_manager.clear_player_cache(seller_id))
+                
+                log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo (Async).")
             except Exception as e_cache:
-                log.error(f"⚠️ [MARKET] Falha ao limpar cache: {e_cache}")
+                log.warning(f"⚠️ [MARKET] Falha ao limpar cache: {e_cache}")
 
         else:
             log.warning(f"⚠️ [MARKET] Venda ok, mas vendedor {seller_id} não encontrado no banco.")
