@@ -7,7 +7,7 @@ REFINING_RECIPES = {
     
     "ref_couro_curtido_rapido": {
         "display_name": "🐑🐾 Curtição de Couro (Rápida)",
-        "profession": ["curtidor"],
+        "profession": ["curtidor", "ferreiro", "armeiro",],
         "level_req": 1,
         "time_seconds": 6 * 60,
         "inputs": {"couro_de_lobo": 2},
@@ -223,7 +223,7 @@ REFINING_RECIPES = {
         "xp_gain": 20
     },
     "ref_fio_de_prata": {
-        "display_name": "🧵 Fio de Prata",
+        "display_name": "🪡 Fio de Prata",
         "profession": ["ferreiro", "armeiro", "joalheiro", "fundidor"],
         "level_req": 11,
         "time_seconds": 10 * 60,
