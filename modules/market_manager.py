@@ -189,16 +189,38 @@ def purchase_listing(
     if quantity > available:
         raise InsufficientQuantity(f"Estoque insuficiente ({available}).")
 
+    # 1. Calcular preço total
+    total_price = int(listing["unit_price"]) * quantity
+
+    # 2. Atualizar Estoque (Decrementa)
     new_qty = available - quantity
     update_doc = {"quantity": new_qty}
     if new_qty <= 0: update_doc["active"] = False
     
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
+    # 3. PAGAR O VENDEDOR (A Correção)
+    # Assumindo que a coleção de jogadores se chama "players" e o campo de dinheiro é "gold".
+    # Se o seu banco usa "money", "coins" ou "_id" no lugar de "id", ajuste abaixo.
+    try:
+        seller_id = int(listing["seller_id"])
+        result = db["players"].update_one(
+            {"id": seller_id},  # Busca o vendedor pelo ID
+            {"$inc": {"gold": total_price}}  # Adiciona o ouro
+        )
+        
+        if result.modified_count > 0:
+            log.info(f"💰 [MARKET] Transação #{listing_id}: Vendedor {seller_id} recebeu {total_price} gold.")
+        else:
+            log.warning(f"⚠️ [MARKET] Vendedor {seller_id} não encontrado para receber {total_price} gold!")
+            
+    except Exception as e:
+        log.error(f"🔥 ERRO AO PAGAR VENDEDOR: {e}")
+
+    # Atualiza objeto local para retorno
     listing["quantity"] = new_qty
     listing["active"] = (new_qty > 0)
     
-    total_price = int(listing["unit_price"]) * quantity
     return listing, total_price
 
 # =========================
