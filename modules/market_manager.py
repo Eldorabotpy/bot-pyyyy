@@ -4,11 +4,12 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import certifi
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple
 from pymongo import MongoClient
-import certifi
 
+from modules import player_manager
 # --- CONFIGURAÇÃO DE LOGGING ---
 logging.basicConfig(level=logging.INFO)
 # CORREÇÃO: Agora a variável se chama 'log' para bater com o resto do código
@@ -176,48 +177,61 @@ def purchase_listing(
     quantity: int = 1,
     context=None
 ) -> Tuple[dict, int]:
+    # 1. Busca e Validação
     listing = get_listing(listing_id)
     if not listing: raise ListingNotFound("Anúncio não encontrado.")
     if not listing.get("active"): raise ListingInactive("Anúncio inativo.")
-    if int(listing["seller_id"]) == int(buyer_id): raise InvalidPurchase("Não pode comprar seu item.")
+    
+    seller_id = int(listing["seller_id"])
+    buyer_id = int(buyer_id)
+
+    if seller_id == buyer_id: raise InvalidPurchase("Não pode comprar seu próprio item.")
 
     target = listing.get("target_buyer_id")
-    if target is not None and int(target) != int(buyer_id):
+    if target is not None and int(target) != buyer_id:
         raise PermissionDenied(f"🔒 Item reservado para: {listing.get('target_buyer_name')}")
 
     available = int(listing.get("quantity", 0))
     if quantity > available:
         raise InsufficientQuantity(f"Estoque insuficiente ({available}).")
 
-    # 1. Calcular preço total
+    # 2. Atualiza Estoque
     total_price = int(listing["unit_price"]) * quantity
-
-    # 2. Atualizar Estoque (Decrementa)
     new_qty = available - quantity
+    
     update_doc = {"quantity": new_qty}
     if new_qty <= 0: update_doc["active"] = False
     
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
-    # 3. PAGAR O VENDEDOR (A Correção)
-    # Assumindo que a coleção de jogadores se chama "players" e o campo de dinheiro é "gold".
-    # Se o seu banco usa "money", "coins" ou "_id" no lugar de "id", ajuste abaixo.
+    # 3. PAGAR O VENDEDOR E LIMPAR CACHE
     try:
-        seller_id = int(listing["seller_id"])
+        # Paga no banco (Atomicamente)
         result = db["players"].update_one(
-            {"id": seller_id},  # Busca o vendedor pelo ID
-            {"$inc": {"gold": total_price}}  # Adiciona o ouro
+            {"_id": seller_id}, 
+            {"$inc": {"gold": total_price}}
         )
         
         if result.modified_count > 0:
-            log.info(f"💰 [MARKET] Transação #{listing_id}: Vendedor {seller_id} recebeu {total_price} gold.")
+            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu +{total_price} gold.")
+            
+            # --- A MÁGICA ACONTECE AQUI ---
+            # Força o bot a esquecer os dados antigos deste jogador na memória.
+            # Na próxima vez que o bot precisar do jogador, ele vai ler do banco (que já tem o ouro novo).
+            try:
+                player_manager.clear_player_cache(seller_id)
+                log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo com sucesso.")
+            except Exception as e_cache:
+                log.warning(f"⚠️ [MARKET] Falha ao limpar cache do vendedor: {e_cache}")
+            # -----------------------------
+            
         else:
-            log.warning(f"⚠️ [MARKET] Vendedor {seller_id} não encontrado para receber {total_price} gold!")
+            log.warning(f"⚠️ [MARKET] Venda ok, mas falha ao pagar (Vendedor {seller_id} não encontrado).")
             
     except Exception as e:
-        log.error(f"🔥 ERRO AO PAGAR VENDEDOR: {e}")
+        log.error(f"🔥 [MARKET] Erro crítico no pagamento: {e}")
 
-    # Atualiza objeto local para retorno
+    # Retorno
     listing["quantity"] = new_qty
     listing["active"] = (new_qty > 0)
     

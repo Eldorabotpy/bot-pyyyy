@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 import datetime
 import asyncio
+import os
 from zoneinfo import ZoneInfo
 from typing import Dict, Optional, Any, Tuple, Iterator
 from telegram.ext import ContextTypes
 from telegram.error import Forbidden
+from pymongo import MongoClient
+import certifi
 
 from modules import player_manager
 # Módulos do player (get_player_data agora é async)
@@ -29,6 +32,37 @@ from modules.player.actions import _parse_iso as _parse_iso_utc # Usa a função
 
 from pvp.pvp_config import MONTHLY_RANKING_REWARDS
 logger = logging.getLogger(__name__)
+
+from dotenv import load_dotenv # Importar biblioteca de env
+load_dotenv() # <--- FORÇA O CARREGAMENTO DO .ENV AGORA
+
+# 1. Tenta pegar do ambiente
+# ==============================================================================
+# CONFIGURAÇÃO BLINDADA DO MONGODB (SUBSTITUA NO TOPO DO ARQUIVO)
+# ==============================================================================
+# Importante: Mantemos a string fixa aqui para garantir que o job NUNCA falhe.
+MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
+players_col = None
+
+print("🔄 [JOBS] Tentando conectar ao MongoDB para proteger o ouro...")
+
+try:
+    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
+    db = client["eldora_db"]
+    players_col = db["players"]
+    
+    # Teste real de conexão
+    client.admin.command('ping')
+    print("✅ [JOBS] CONEXÃO SEGURA ATIVA! Ouro blindado contra perda.")
+    logger.info("✅ [JOBS] CONEXÃO SEGURA ATIVA! Ouro blindado contra perda.")
+    
+except Exception as e:
+    print(f"❌ [JOBS] FALHA CRÍTICA NA CONEXÃO: {e}")
+    logger.critical(f"❌ [JOBS] FALHA CRÍTICA NA CONEXÃO: {e}")
+    players_col = None
+
+# ==============================================================================
 
 # --- CONSTANTES ---
 DAILY_CRYSTAL_ITEM_ID = "cristal_de_abertura"
@@ -69,8 +103,10 @@ def _safe_add_stack(pdata: dict, item_id: str, qty: int) -> None:
 # --- JOBS PRINCIPAIS ---
 
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Regenera energia de forma assíncrona para todos os jogadores."""
-    # Lógica para alternar regeneração não-premium (mantida)
+    """
+    Regenera energia de forma assíncrona E ATÔMICA.
+    CORREÇÃO: Usa $inc para não sobrescrever o ouro ganho no mercado.
+    """
     _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
     regenerate_non_premium = (_non_premium_tick["count"] == 0)
     
@@ -81,32 +117,41 @@ async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         async for user_id, pdata in player_manager.iter_players():
             processed_count += 1
             try:
-                if not isinstance(pdata, dict):
-                    logger.warning(f"[ENERGY] Dados inválidos recebidos de iter_players para user_id {user_id} (tipo: {type(pdata)}). Ignorando.")
-                    continue
+                if not isinstance(pdata, dict): continue
 
                 max_e = int(player_manager.get_player_max_energy(pdata)) 
                 cur_e = int(pdata.get("energy", 0))
+                
+                # Se já estiver cheio, ignora
                 if cur_e >= max_e:
                     continue 
 
                 is_premium = player_manager.has_premium_plan(pdata) 
                 
                 if is_premium or regenerate_non_premium:
-                    player_manager.add_energy(pdata, 1) 
-                    await player_manager.save_player_data(user_id, pdata) 
-                    touched += 1
+                    # --- A CORREÇÃO MÁGICA ---
+                    # Em vez de salvar o pdata inteiro (que pode ter ouro antigo),
+                    # nós mandamos um comando direto pro banco: "Aumente energia em 1"
+                    if players_col:
+                        players_col.update_one(
+                            {"_id": user_id}, 
+                            {"$inc": {"energy": 1}}
+                        )
+                        touched += 1
+                    else:
+                        # Fallback perigoso (só se o banco falhar na conexão inicial)
+                        player_manager.add_energy(pdata, 1) 
+                        await player_manager.save_player_data(user_id, pdata) 
+                        touched += 1
             
             except Exception as e_player:
-                 # <<< CORREÇÃO APLICADA AQUI (e -> e_player) >>>
-                logger.warning(f"[ENERGY] Falha ao processar jogador {user_id} DENTRO do loop: {type(e_player).__name__} - {e_player}")
+                logger.warning(f"[ENERGY] Falha no jogador {user_id}: {e_player}")
 
     except Exception as e_iter:
-        logger.error(f"Erro crítico DURANTE a iteração de jogadores em regenerate_energy_job: {e_iter}", exc_info=True)
+        logger.error(f"Erro crítico regenerate_energy_job: {e_iter}", exc_info=True)
             
-    logger.info(f"[ENERGY] Job concluído. Jogadores processados: {processed_count}. Energia regenerada para: {touched} jogadores.")
-# (A função _process_energy_for_player agora não é mais necessária para este job)
-# Podes mantê-la se outros módulos a usarem, ou apagá-la se este era o único uso.
+    logger.info(f"[ENERGY] Job concluído. Processados: {processed_count}. Regenerados: {touched}.")
+
         
 async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     """Concede cristais diários (assíncrono)."""
