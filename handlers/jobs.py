@@ -82,7 +82,9 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
 # ==============================================================================
 
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Regenera energia sem sobrescrever o Nível/XP."""
+    """
+    Regenera energia usando UPDATE ATÔMICO ($inc) e limpa o cache para forçar atualização visual.
+    """
     _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
     regenerate_non_premium = (_non_premium_tick["count"] == 0)
     
@@ -90,35 +92,51 @@ async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     processed_count = 0 
     
     try:
+        # Itera sobre os jogadores
         async for user_id, pdata in player_manager.iter_players():
             processed_count += 1
             try:
                 if not isinstance(pdata, dict): continue
-                
-                # Usa cache se disponível para checar máximo
-                current_data = player_cache.get(user_id, pdata)
-                max_e = int(player_manager.get_player_max_energy(current_data)) 
-                cur_e = int(current_data.get("energy", 0))
+
+                # Verifica se precisa regenerar (Lê do banco/pdata que veio da iteração)
+                max_e = int(player_manager.get_player_max_energy(pdata)) 
+                cur_e = int(pdata.get("energy", 0))
                 
                 if cur_e >= max_e: continue 
 
-                is_premium = player_manager.has_premium_plan(current_data) 
+                is_premium = player_manager.has_premium_plan(pdata) 
                 
                 if is_premium or regenerate_non_premium:
                     if players_col is not None:
-                        # JEITO SEGURO: Só toca na energia
-                        players_col.update_one({"_id": user_id}, {"$inc": {"energy": 1}})
+                        # 1. ATUALIZA O BANCO (Aumenta energia de forma segura)
+                        players_col.update_one(
+                            {"_id": user_id}, 
+                            {"$inc": {"energy": 1}}
+                        )
                         
-                        # Atualiza visual (memória)
-                        if user_id in player_cache:
-                            player_cache[user_id]["energy"] = cur_e + 1
+                        # 2. LIMPA O CACHE (A Solução Definitiva)
+                        # Isso obriga o bot a baixar o valor novo (que acabamos de subir) do banco.
+                        try:
+                            # Tenta o método exposto no player_manager
+                            if hasattr(player_manager, "clear_player_cache"):
+                                player_manager.clear_player_cache(user_id)
+                            
+                            # Tenta deletar direto da variável local se foi importada
+                            elif "player_cache" in globals() and user_id in player_cache:
+                                del player_cache[user_id]
+                        except Exception:
+                            pass 
+                        
                         touched += 1
                     else:
-                        # Fallback
-                        player_manager.add_energy(current_data, 1) 
-                        await save_player_data(user_id, current_data) 
+                        # Fallback (apenas se a conexão direta falhar)
+                        player_manager.add_energy(pdata, 1) 
+                        await player_manager.save_player_data(user_id, pdata) 
                         touched += 1
-            except Exception: pass
+            
+            except Exception:
+                pass # Ignora erros individuais para não travar o loop
+
     except Exception as e_iter:
         logger.error(f"Erro regenerate_energy_job: {e_iter}")
             

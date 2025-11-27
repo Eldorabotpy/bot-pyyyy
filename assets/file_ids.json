@@ -59,6 +59,18 @@
     "id": "AgACAgEAAxkBAAEBvRppJ6GsBa1XzmydovM0LcQfgwgLiQACmAtrG7IGOUV31yU7qF9FuwEAAwIAA3kAAzYE",
     "type": "photo"
   },
+  "img_prof_curtidor": {
+    "id": "AgACAgEAAxkBAAEBvctpJ6seeQtu3PZ86waVkmKqrwABQqUAApsLaxuyBjlFA6kAARnmdMUkAQADAgADeQADNgQ",
+    "type": "photo"
+  },
+  "img_prof_curtidor_craft": {
+    "id": "AgACAgEAAxkBAAEBviBpJ65mahQmE-E0zkO2-bPssS-xNAACnQtrG7IGOUV2ApJI61w2KgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_curtidor_refino": {
+    "id": "AgACAgEAAxkBAAEBvihpJ66wiJO_Oyg2tvmuLMmF6-HB2AACnwtrG7IGOUVWDuvf54_3RgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
   "VICTORY_PHOTO_ID": {
     "id": "AgACAgEAAxkBAAIW52jztXfEWirRJSoo9yUx5pjGQ7u_AAInC2sbR-agR7yizwIUvB1jAQADAgADeQADNgQ",
     "type": "photo"
