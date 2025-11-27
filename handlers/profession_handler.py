@@ -1,357 +1,259 @@
 # handlers/profession_handler.py
+# (VERSÃO 3.1: FALLBACK INTELIGENTE PARA TEXTO SE NÃO HOUVER IMAGEM)
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import math
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from modules import player_manager, game_data
-from modules import player_manager, game_data, crafting_registry
-# ==============================================================================
-# CONFIGURAÇÃO DE TEXTOS E DETALHES (ATUALIZADO COM SUA LISTA OFICIAL)
-# ==============================================================================
-PROFESSION_INFO = {
-    # --- COLETA (GATHERING) ---
-    "lenhador": {
-        "emoji": "🪓",
-        "title": "Lenhador (Lumberjack)",
-        "desc": "Conhecedores da floresta que extraem madeiras nobres.",
-        "bonuses": ["Extração eficiente de madeira.", "Encontra tipos raros de toras."],
-        "mechanic": "Foca em Força e Constituição.",
-        "guide": (
-            "🪓 <b>Guia do Lenhador:</b>\n\n"
-            "📍 <b>Onde:</b> Florestas ou Locais de Coleta.\n"
-            "🌲 <b>O que fazer:</b>\n"
-            "1. <b>Cortar:</b> Use seu machado para obter 'Madeira' e toras raras.\n"
-            "2. <b>Fornecer:</b> Venda madeira bruta para o mercado ou processe com outros artesãos."
-        )
-    },
-    "minerador": {
-        "emoji": "⛏️",
-        "title": "Minerador (Miner)",
-        "desc": "Trabalhadores robustos que extraem minérios das profundezas.",
-        "bonuses": ["Extração de Pedra e Ferro.", "Chance de achar gemas brutas."],
-        "mechanic": "Foca em Força.",
-        "guide": (
-            "⛏️ <b>Guia do Minerador:</b>\n\n"
-            "📍 <b>Onde:</b> Cavernas e Minas.\n"
-            "💎 <b>O que fazer:</b>\n"
-            "1. <b>Minerar:</b> Obtenha 'Pedra' e 'Minério de Ferro'.\n"
-            "2. <b>Fornecer:</b> Minérios são essenciais para Fundidores criarem barras."
-        )
-    },
-    "colhedor": {
-        "emoji": "🌿",
-        "title": "Colhedor (Harvester)",
-        "desc": "Especialistas em identificar e colher fibras naturais e ervas.",
-        "bonuses": ["Colheita de Linho e Fibras.", "Encontra sementes raras."],
-        "mechanic": "Foca em Destreza e Sabedoria.",
-        "guide": (
-            "🌿 <b>Guia do Colhedor:</b>\n\n"
-            "📍 <b>Onde:</b> Campos e Planícies.\n"
-            "🌾 <b>O que fazer:</b>\n"
-            "1. <b>Colher:</b> Obtenha 'Linho' e plantas têxteis.\n"
-            "2. <b>Fornecer:</b> O linho é a matéria-prima essencial para os Alfaiates."
-        )
-    },
-    "esfolador": {
-        "emoji": "🔪",
-        "title": "Esfolador (Skinner)",
-        "desc": "Mestres em obter recursos de criaturas abatidas.",
-        "bonuses": ["Obtenção de Penas e Peles.", "Aproveitamento de carcaças."],
-        "mechanic": "Foca em Destreza.",
-        "guide": (
-            "🔪 <b>Guia do Esfolador:</b>\n\n"
-            "📍 <b>Onde:</b> Zonas de Caça (após derrotar monstros).\n"
-            "🦅 <b>O que fazer:</b>\n"
-            "1. <b>Esfolar:</b> Obtenha 'Pena', peles e couros brutos.\n"
-            "2. <b>Fornecer:</b> Venda penas para flechas e peles para Curtidores."
-        )
-    },
-    "alquimista": { # Na sua lista é Gathering (coleta sangue/ingredientes)
-        "emoji": "⚗️",
-        "title": "Alquimista (Gatherer)",
-        "desc": "Estudiosos que coletam essências vitais e fluidos raros.",
-        "bonuses": ["Coleta segura de Sangue e Venenos.", "Identificação de fluidos."],
-        "mechanic": "Foca em Inteligência.",
-        "guide": (
-            "⚗️ <b>Guia do Alquimista:</b>\n\n"
-            "📍 <b>Onde:</b> Pântanos e Zonas Mágicas.\n"
-            "🩸 <b>O que fazer:</b>\n"
-            "1. <b>Extrair:</b> Colete 'Sangue' e essências de monstros.\n"
-            "2. <b>Estudar:</b> Prepare ingredientes base para poções poderosas."
-        )
-    },
 
-    # --- PRODUÇÃO (CRAFTING) ---
-    "ferreiro": {
-        "emoji": "🔨",
-        "title": "Ferreiro (Blacksmith)",
-        "desc": "Forjam armaduras pesadas e escudos metálicos.",
-        "bonuses": ["Criação de Armaduras de Placas.", "Reparos de itens de metal."],
-        "mechanic": "Foca em Força.",
-        "guide": (
-            "🔨 <b>Guia do Ferreiro:</b>\n\n"
-            "📍 <b>Local:</b> Forja .\n"
-            "🛡️ <b>O que fazer:</b>\n"
-            "1. <b>Forjar:</b> Use Barras de Ferro para criar Capacetes e Peitorais.\n"
-            "2. <b>Requisito:</b> Precisa de 'Barra de Ferro' (feita pelo Fundidor)."
-        )
-    },
-    "armeiro": {
-        "emoji": "⚔️",
-        "title": "Armeiro (Weaponsmith)",
-        "desc": "Especialistas dedicados exclusivamente à criação de armas letais.",
-        "bonuses": ["Criação de Espadas e Machados.", "Afiação de lâminas."],
-        "mechanic": "Foca em Força e Precisão.",
-        "guide": (
-            "⚔️ <b>Guia do Armeiro:</b>\n\n"
-            "📍 <b>Local:</b> Forja de Armas .\n"
-            "🗡️ <b>O que fazer:</b>\n"
-            "1. <b>Criar:</b> Forje Espadas, Machados e Lanças.\n"
-            "2. <b>Materiais:</b> Usa Barras de Ferro, Madeira e Couro."
-        )
-    },
-    "alfaiate": {
-        "emoji": "🧵",
-        "title": "Alfaiate (Tailor)",
-        "desc": "Mestres dos tecidos que criam roupas leves e mantos mágicos.",
-        "bonuses": ["Criação de Robes e Capas.", "Trabalho com Linho e Seda."],
-        "mechanic": "Foca em Destreza e Inteligência.",
-        "guide": (
-            "🧵 <b>Guia do Alfaiate:</b>\n\n"
-            "📍 <b>Local:</b> Ateliê .\n"
-            "👕 <b>O que fazer:</b>\n"
-            "1. <b>Costurar:</b> Use Linho para criar Túnicas e Chapéus.\n"
-            "2. <b>Requisito:</b> Precisa de 'Linho' (colhido pelo Colhedor)."
-        )
-    },
-    "joalheiro": {
-        "emoji": "💍",
-        "title": "Joalheiro (Jeweler)",
-        "desc": "Artesãos delicados que trabalham com gemas e metais preciosos.",
-        "bonuses": ["Criação de Anéis e Amuletos.", "Lapidação de gemas."],
-        "mechanic": "Foca em Destreza e Sorte.",
-        "guide": (
-            "💍 <b>Guia do Joalheiro:</b>\n\n"
-            "📍 <b>Local:</b> Bancada de Joias .\n"
-            "💎 <b>O que fazer:</b>\n"
-            "1. <b>Criar:</b> Produza acessórios que dão status extras.\n"
-            "2. <b>Materiais:</b> Usa metais raros e pedras preciosas."
-        )
-    },
-    "curtidor": {
-        "emoji": "🧥",
-        "title": "Curtidor (Tanner)",
-        "desc": "Processam peles brutas para criar couro utilizável.",
-        "bonuses": ["Refino de Peles em Couro.", "Criação de armaduras leves de couro."],
-        "mechanic": "Foca em Constituição.",
-        "guide": (
-            "🧥 <b>Guia do Curtidor:</b>\n\n"
-            "📍 <b>Local:</b> Curtume .\n"
-            "🐂 <b>O que fazer:</b>\n"
-            "1. <b>Processar:</b> Transforme peles/penas (do Esfolador) em Couro.\n"
-            "2. <b>Criar:</b> Produza Botas e Luvas de couro."
-        )
-    },
-    "fundidor": {
-        "emoji": "🔥",
-        "title": "Fundidor (Smelter)",
-        "desc": "Trabalham com calor extremo para purificar minérios.",
-        "bonuses": ["Derretimento de Minério em Barras.", "Purificação de metais."],
-        "mechanic": "Foca em Resistência.",
-        "guide": (
-            "🔥 <b>Guia do Fundidor:</b>\n\n"
-            "📍 <b>Local:</b> Fundição.\n"
-            "🧱 <b>O que fazer:</b>\n"
-            "1. <b>Fundir:</b> Transforme 'Minério de Ferro' (do Minerador) em 'Barra de Ferro'.\n"
-            "2. <b>Fornecer:</b> As barras são a base para Ferreiros e Armeiros."
-        )
-    }
-}
+from modules import player_manager, game_data, file_ids, crafting_registry
+from modules.game_data.refining import REFINING_RECIPES
+from modules.player import stats as player_stats
 
-def _get_prof_info(key: str):
-    key_lower = str(key).lower().strip()
-    default = {
-        "emoji": "💼",
-        "title": key.capitalize(),
-        "desc": "Profissão de produção.",
-        "bonuses": [],
-        "mechanic": "Padrão.",
-        "guide": f"💼 <b>Guia de {key.capitalize()}:</b>\nUse /craft para ver receitas."
-    }
-    # Se não achar a profissão exata, tenta buscar na lista completa do game_data para não quebrar
-    if key_lower not in PROFESSION_INFO:
-        prof_data = (game_data.PROFESSIONS_DATA or {}).get(key_lower)
-        if prof_data:
-            default['title'] = prof_data.get('display_name', key.capitalize())
-            return default
+logger = logging.getLogger(__name__)
+
+# Itens por página nas listas
+RECIPES_PER_PAGE = 6
+
+# ==================================================================
+# HELPERS
+# ==================================================================
+
+def _bar(current: int, total: int, blocks: int = 10, filled_char: str = '🟧', empty_char: str = '⬜️') -> str:
+    if total <= 0: filled = blocks
+    else:
+        ratio = max(0.0, min(1.0, float(current) / float(total)))
+        filled = int(round(ratio * blocks))
+    return filled_char * filled + empty_char * (blocks - filled)
+
+def _get_profession_info(player_data: dict):
+    """Extrai dados normalizados da profissão."""
+    prof_data = player_data.get("profession")
+    key, level, xp = None, 1, 0
+    if isinstance(prof_data, dict):
+        key = prof_data.get("type")
+        level = int(prof_data.get("level", 1))
+        xp = int(prof_data.get("xp", 0))
+    elif isinstance(prof_data, str):
+        key = prof_data
+    return key, level, xp
+
+def _get_recipes_for_profession(prof_key: str, category: str) -> list:
+    filtered = []
+    craft_recipes = crafting_registry.all_recipes() or {}
+    refine_recipes = REFINING_RECIPES or {}
+    all_pool = {}
+    all_pool.update(craft_recipes)
+    all_pool.update(refine_recipes)
+
+    for item_result_id, recipe_data in all_pool.items():
+        req_prof = recipe_data.get("profession")
+        # Verifica se a profissão bate (suporta string ou lista)
+        if isinstance(req_prof, list):
+            if prof_key not in req_prof: continue
+        elif req_prof != prof_key: continue
             
-    return PROFESSION_INFO.get(key_lower, default)
+        item_info = game_data.ITEMS_DATA.get(item_result_id, {})
+        if not item_info:
+            item_info = {"display_name": recipe_data.get("display_name", item_result_id), "emoji": "🔸"}
 
-# ==============================================================================
-# NOVA FUNÇÃO: GERADOR DE LISTA DE RECEITAS
-# ==============================================================================
-def _get_recipes_text_for_profession(prof_key: str) -> str:
+        item_type = (item_info.get("type") or "").lower()
+        item_cat = (item_info.get("category") or "").lower()
+        
+        is_refining = item_result_id in refine_recipes
+        if not is_refining:
+            if item_type in ("material_refinado", "material", "ingrediente", "reagent") or item_cat == "coletavel":
+                is_refining = True
+            
+        if category == "refino" and is_refining:
+            filtered.append((item_result_id, recipe_data, item_info))
+        elif category == "craft" and not is_refining:
+            filtered.append((item_result_id, recipe_data, item_info))
+            
+    filtered.sort(key=lambda x: int(x[1].get("level_req", 1)))
+    return filtered
+
+async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML', media_key="img_profissao"):
     """
-    Busca no crafting_registry todas as receitas dessa profissão e monta uma lista.
+    Função Inteligente de Envio:
+    1. Procura imagem específica > pai > genérica.
+    2. Se achar imagem: Tenta editar a mídia ou envia nova foto.
+    3. Se NÃO achar imagem (None): Edita apenas o texto ou envia nova mensagem de texto.
+    Isso impede que o bot quebre em ambientes de teste sem imagens configuradas.
     """
-    all_recs = crafting_registry.all_recipes()
-    if not all_recs:
-        return "\n<i>(Nenhuma receita encontrada no sistema ainda)</i>"
-
-    # Filtra receitas desta profissão
-    my_recs = []
-    for rid, rdata in all_recs.items():
-        if rdata.get('profession') == prof_key:
-            my_recs.append(rdata)
-
-    if not my_recs:
-        return "\n🚫 <i>Nenhuma receita disponível no momento.</i>"
-
-    # Ordena por nível (Level 1 primeiro, depois Level 2...)
-    my_recs.sort(key=lambda x: int(x.get('level_req', 1)))
-
-    txt = "\n📜 <b>Receitas Conhecidas:</b>\n"
+    fd = None
     
-    # Lista as receitas (Limitamos a 15 para não ficar gigante se tiver muitas)
-    for rec in my_recs[:15]:
-        lvl = rec.get('level_req', 1)
-        name = rec.get('display_name', 'Item Desconhecido')
-        emoji = rec.get('emoji', '🔹')
+    # 1. Tenta chave específica (ex: img_prof_armeiro_craft)
+    if media_key:
+        fd = file_ids.get_file_data(media_key)
+    
+    # 2. Tenta chave pai (ex: img_prof_armeiro)
+    if not fd and media_key and "_" in media_key:
+        parent_key = media_key.rsplit("_", 1)[0]
+        fd = file_ids.get_file_data(parent_key)
         
-        # Formato: [Nv. 1] 🧥 Couro Simples
-        txt += f"• <code>[Nv. {lvl}]</code> {emoji} {name}\n"
-        
-    if len(my_recs) > 15:
-        txt += f"<i>...e mais {len(my_recs) - 15} receitas.</i>"
-        
-    return txt
+    # 3. Tenta genérica (img_profissao)
+    if not fd:
+        fd = file_ids.get_file_data("img_profissao")
 
-# ==============================================================================
-# HANDLERS (Safe Edit e Menus mantidos)
-# ==============================================================================
+    media_id = fd.get("id") if fd else None
+    media_type = (fd.get("type") or "photo").lower() if fd else "photo"
 
-async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
-    # (Mesma função auxiliar de antes)
-    try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception: pass
-    try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception: pass
+    # --- TENTATIVA DE EDIÇÃO ---
+    if query.message:
+        try:
+            if media_id:
+                # Tem imagem nova para mostrar
+                media = InputMediaVideo(media_id, caption=text, parse_mode=parse_mode) if media_type == "video" else InputMediaPhoto(media_id, caption=text, parse_mode=parse_mode)
+                await query.edit_message_media(media=media, reply_markup=reply_markup)
+            else:
+                # Não tem imagem (ou não achou no banco): Edita só o texto
+                # Se a mensagem anterior tinha foto, isso pode falhar, caindo no except
+                await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            return
+        except Exception:
+            pass # Falha na edição (ex: mudar de foto pra texto), tenta reenvio limpo
+
+    # --- REENVIO LIMPO (Fallback) ---
+    try: await query.delete_message()
+    except: pass
+    
+    if media_id:
+        try:
+            if media_type == "video":
+                await context.bot.send_video(chat_id=chat_id, video=media_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            else:
+                await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            return
+        except: pass # Se falhar enviar a foto (ID inválido), cai para o texto
+        
+    # Último recurso: Apenas texto
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
-async def show_profession_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # (Mesmo código de antes, sem alterações na lógica)
-    q = update.callback_query
-    await q.answer()
-    user_id = q.from_user.id
-    chat_id = q.message.chat_id
+# ==================================================================
+# 1. MENU PRINCIPAL DA PROFISSÃO
+# ==================================================================
 
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        await _safe_edit_or_send(q, context, chat_id, "❌ Erro: Use /start.")
+async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data: return
+
+    prof_key, prof_level, prof_xp = _get_profession_info(player_data)
+    
+    if not prof_key:
+        text = "🚫 <b>Você ainda não tem uma profissão.</b>\n\nVá ao mestre de ofícios na cidade para aprender uma!"
+        kb = [[InlineKeyboardButton("🔙 Voltar", callback_data="profile")]]
+        await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(kb))
         return
 
-    # JÁ TEM PROFISSÃO
-    if (pdata.get('profession') or {}).get('type'):
-        cur = pdata['profession']['type']
-        info = _get_prof_info(cur)
-        level = pdata['profession'].get('level', 1)
-        xp = pdata['profession'].get('xp', 0)
-        
-        txt = (
-            f"💼 <b>Sua Profissão: {info['title']}</b>\n"
-            f"Nível: {level} | XP: {xp}\n\n"
-            f"<i>{info['desc']}</i>"
-        )
-        
-        kb = [
-            [InlineKeyboardButton("❓ Guia & Receitas", callback_data=f"job_guide_{cur}")],
-            [InlineKeyboardButton("👤 Voltar ao Personagem", callback_data="profile")]
-        ]
-        await _safe_edit_or_send(q, context, chat_id, txt, InlineKeyboardMarkup(kb))
-        return
+    prof_info = (game_data.PROFESSIONS_DATA or {}).get(prof_key, {})
+    display_name = prof_info.get("display_name", prof_key.title())
+    emoji = prof_info.get("emoji", "⚒️")
+    desc = prof_info.get("description", "Um mestre em seu ofício.")
 
-    # ESCOLHER PROFISSÃO
-    title = "💼 <b>Guilda das Profissões</b>\nEscolha seu caminho:"
-    kb = []
-    for key, data in (game_data.PROFESSIONS_DATA or {}).items():
-        info = _get_prof_info(key)
-        display = f"{info['emoji']} {info['title']}"
-        kb.append([InlineKeyboardButton(display, callback_data=f"job_view_{key}")])
+    try: xp_next = int(game_data.get_xp_for_next_collection_level(prof_level))
+    except: xp_next = prof_level * 1000 
     
-    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="profile")])
-    await _safe_edit_or_send(q, context, chat_id, title, InlineKeyboardMarkup(kb))
-
-async def view_profession_detail(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # (Mesmo código de antes)
-    q = update.callback_query
-    await q.answer()
-    data = q.data or ""
-    prof_key = data.replace("job_view_", "")
-    info = _get_prof_info(prof_key)
-    
-    # Aqui também podemos mostrar uma prévia das receitas se quiser, 
-    # mas para não poluir, mantemos só os bônus.
-    bonuses_txt = "\n".join([f"• {b}" for b in info.get('bonuses', [])])
+    bar = _bar(prof_xp, xp_next)
     
     text = (
-        f"{info['emoji']} <b>{info['title']}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"{info['desc']}\n\n"
-        f"✨ <b>Vantagens:</b>\n{bonuses_txt}\n\n"
-        f"⚙️ <b>Mecânica:</b> {info['mechanic']}\n\n"
-        f"⚠️ <i>Tem certeza? Mudar depois custa caro!</i>"
+        f"{emoji} <b>GUIA DA PROFISSÃO: {display_name.upper()}</b>\n\n"
+        f"<i>{desc}</i>\n\n"
+        f"🎖️ <b>Nível:</b> {prof_level}\n"
+        f"💠 <b>Progresso:</b> <code>[{bar}]</code> ({prof_xp}/{xp_next} XP)\n\n"
+        f"Selecione uma categoria para ver as receitas disponíveis:"
     )
-    kb = [[InlineKeyboardButton("⬅️ Voltar", callback_data="job_menu"), InlineKeyboardButton("✅ Confirmar", callback_data=f"job_confirm_{prof_key}")]]
-    await _safe_edit_or_send(q, context, q.message.chat_id, text, InlineKeyboardMarkup(kb))
 
-async def confirm_profession_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # (Mesmo código de antes)
-    q = update.callback_query
-    await q.answer()
-    user_id = q.from_user.id
-    data = q.data or ""
-    prof_key = data.replace("job_confirm_", "")
+    keyboard = [
+        [
+            InlineKeyboardButton("🔨 Criação (Equips)", callback_data=f"job_list_craft_1"),
+            InlineKeyboardButton("🔥 Refino (Materiais)", callback_data=f"job_list_refino_1")
+        ],
+        [InlineKeyboardButton("🔙 Voltar ao Perfil", callback_data="profile")]
+    ]
     
-    pdata = await player_manager.get_player_data(user_id)
-    if (pdata.get('profession') or {}).get('type'):
-        await show_profession_menu(update, context); return
+    img_key = f"img_prof_{prof_key}"
+    await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(keyboard), media_key=img_key)
 
-    pdata['profession'] = {"type": prof_key, "level": 1, "xp": 0}
-    await player_manager.save_player_data(user_id, pdata)
+# ==================================================================
+# 2. LISTA DE RECEITAS (Paginada e Separada)
+# ==================================================================
 
-    info = _get_prof_info(prof_key)
-    txt = f"🎉 <b>Parabéns! Agora você é um {info['title']}!</b>\nClique abaixo para ver o que você pode criar."
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("❓ Guia & Receitas", callback_data=f"job_guide_{prof_key}")], [InlineKeyboardButton("👤 Perfil", callback_data="profile")]])
-    await _safe_edit_or_send(q, context, q.message.chat_id, txt, kb)
+async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        _, _, mode, page_str = query.data.split("_")
+        page = int(page_str)
+    except:
+        await job_menu_callback(update, context)
+        return
 
-async def show_profession_guide_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    HANDLER MODIFICADO: Agora busca receitas dinamicamente!
-    """
-    q = update.callback_query
-    await q.answer()
-    
-    data = q.data or ""
-    # Extrai a profissão da callback (ex: job_guide_curtidor)
-    prof_key = data.replace("job_guide_", "")
-    
-    # 1. Pega o texto estático (Local, Dicas, Descrição)
-    info = _get_prof_info(prof_key)
-    base_text = info.get('guide', f"Guia de {prof_key}.")
-    
-    # 2. Gera a lista de receitas dinamicamente
-    recipes_text = _get_recipes_text_for_profession(prof_key)
-    
-    # 3. Junta tudo
-    full_text = base_text + recipes_text
-    
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="job_menu")]])
-    
-    await _safe_edit_or_send(q, context, q.message.chat_id, full_text, kb)
+    user_id = query.from_user.id
+    player_data = await player_manager.get_player_data(user_id)
+    prof_key, prof_level, _ = _get_profession_info(player_data)
 
-# EXPORTS
-job_menu_handler = CallbackQueryHandler(show_profession_menu, pattern=r'^job_menu$')
-job_view_handler = CallbackQueryHandler(view_profession_detail, pattern=r'^job_view_[A-Za-z0-9_]+$')
-job_confirm_handler = CallbackQueryHandler(confirm_profession_callback, pattern=r'^job_confirm_[A-Za-z0-9_]+$')
-job_guide_handler = CallbackQueryHandler(show_profession_guide_callback, pattern=r'^job_guide_[A-Za-z0-9_]+$')
+    recipes_list = _get_recipes_for_profession(prof_key, mode)
+    
+    if mode == "craft":
+        title = "🔨 RECEITAS DE CRIAÇÃO"
+        empty_msg = "Nenhuma receita de equipamento encontrada para esta profissão."
+    else:
+        title = "🔥 RECEITAS DE REFINO"
+        empty_msg = "Nenhuma receita de refino encontrada para esta profissão."
+
+    total_items = len(recipes_list)
+    total_pages = math.ceil(total_items / RECIPES_PER_PAGE) or 1
+    page = max(1, min(page, total_pages))
+    
+    start = (page - 1) * RECIPES_PER_PAGE
+    end = start + RECIPES_PER_PAGE
+    current_items = recipes_list[start:end]
+
+    text = f"<b>{title}</b> (Pág {page}/{total_pages})\n\n"
+    
+    if not current_items:
+        text += f"<i>{empty_msg}</i>"
+    else:
+        for item_id, recipe_data, item_info in current_items:
+            base_name = item_info.get("display_name", item_id) or recipe_data.get("display_name") or item_id
+            name = base_name.replace("_", " ").title()
+            emoji = item_info.get("emoji", "🔸")
+            lvl_req = recipe_data.get("level_req", 1)
+            
+            status_icon = "✅" if prof_level >= lvl_req else "🔒"
+            
+            mats = recipe_data.get("inputs") or recipe_data.get("materials") or {}
+            mats_str_list = []
+            for mat_id, qty in mats.items():
+                mat_info = game_data.ITEMS_DATA.get(mat_id, {})
+                mat_name = mat_info.get("display_name", mat_id)
+                mats_str_list.append(f"{qty}x {mat_name}")
+            mats_str = ", ".join(mats_str_list)
+            
+            text += f"{status_icon} <b>[Nv. {lvl_req}] {emoji} {name}</b>\n"
+            text += f"   └ ⚒️ <i>{mats_str}</i>\n\n"
+
+    keyboard = []
+    nav_row = []
+    if page > 1: nav_row.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"job_list_{mode}_{page-1}"))
+    nav_row.append(InlineKeyboardButton("🔙 Menu Profissão", callback_data="job_menu"))
+    if page < total_pages: nav_row.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"job_list_{mode}_{page+1}"))
+    keyboard.append(nav_row)
+    
+    img_key = f"img_prof_{prof_key}_{mode}"
+    await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(keyboard), media_key=img_key)
+
+# ==================================================================
+# GANCHOS
+# ==================================================================
+job_menu_handler = CallbackQueryHandler(job_menu_callback, pattern=r'^job_menu$')
+job_view_handler = CallbackQueryHandler(job_recipes_callback, pattern=r'^job_list_')
+async def _noop(u, c): await u.callback_query.answer("Em desenvolvimento.")
+job_confirm_handler = CallbackQueryHandler(_noop, pattern=r'^job_confirm')
+job_guide_handler = CallbackQueryHandler(_noop, pattern=r'^job_guide')

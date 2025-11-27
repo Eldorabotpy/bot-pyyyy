@@ -3,19 +3,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# ============================================================
-# 1. INICIALIZAÇÃO DAS TABELAS (Obrigatório estar no topo)
-# ============================================================
-# Aqui criamos os dicionários vazios para evitar erros de "não definido"
+
 ITEMS_DATA = {}
 MARKET_ITEMS = {} 
 
-# ============================================================
-# 2. ITENS CONSUMÍVEIS E MATERIAIS
-# ============================================================
-# Usamos .update() para adicionar itens com segurança
 ITEMS_DATA.update({
-    # --- REAGENTES E POÇÕES ---
+    
     "frasco_com_agua": {
         "display_name": "Frasco com Água", "emoji": "💧", "type": "reagent",
         "description": "A base para a maioria das poções.", "stackable": True
@@ -178,7 +171,13 @@ ITEMS_DATA.update({
         "stackable": True,
         "media_key": "item_minerio_stanho"
     },
-
+    "minerio_de_prata": {
+        "display_name": "Minerio de Prata", "emoji": "⛏️🪙",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Minério metálico que pode ser fundido.",
+        "stackable": True,
+        "media_key": "imagem_minerio_de_prata",
+    },
     # --------- cacada ----------
     "madeira_rara": {
         "display_name": "Mᴀᴅᴇɪʀᴀ Rᴀʀᴀ", "emoji": "🪵☦️",
@@ -494,13 +493,7 @@ ITEMS_DATA.update({
         "stackable": True,
         "media_key": "item_membrana_de_couro_fino"        
     },
-    "barra_de_prata": {
-        "display_name": "Bᴀʀʀᴀ ᴅᴇ Pʀᴀᴛᴀ", "emoji": "🥈",
-        "type": "material_refinado", "category": "coletavel",
-        "description": "Metal precioso usado em joias e ornamentos.",
-        "stackable": True,
-        "media_key": "item_barra_de_prata" 
-    },
+    
     # ================================
     # PRODUTOS DE REFINO & TECELAGEM (ABA: COLETÁVEL)
     # ================================
@@ -512,11 +505,11 @@ ITEMS_DATA.update({
         "media_key": "item_barra_de_ferro"
     },
     "barra_de_prata": {
-        "display_name": "Bᴀʀʀᴀ ᴅᴇ Fᴇʀʀᴏ", "emoji": "🕋",
+        "display_name": "Bᴀʀʀᴀ ᴅᴇ Pʀᴀᴛᴀ", "emoji": "🥈",
         "type": "material_refinado", "category": "coletavel",
-        "description": "Barra metálica básica, resultado de refino.",
+        "description": "Metal precioso usado em joias e ornamentos.",
         "stackable": True,
-        "media_key": "item_barra_de_ferro"
+        "media_key": "item_barra_de_prata" 
     },
     "barra_bronze": {
         "display_name": "Bᴀʀʀᴀ ᴅᴇ Bʀᴏɴᴢᴇ", "emoji": "🟤",

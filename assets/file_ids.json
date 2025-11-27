@@ -11,6 +11,54 @@
     "id": "AgACAgEAAxkBAAIBLGja_hvVzvFFISYfX7YJVDzuvwAB3gACSq8xG_i5wUSUviFeVBjGXwEAAwIAA3kAAzYE",
     "type": "video"
   },
+  "img_profissao": {
+    "id": "AgACAgEAAxkBAAEBtL9pJ0NVOhuzNazCLt7fgik2u8DYuAACXwtrG9cMOEW08kRUdYoDMwEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_armeiro_craft": {
+    "id": "AgACAgEAAxkBAAEBtNdpJ0UqjsG8EfAZVpchgf7zVUBweQACYAtrG9cMOEUK7pTnDC_ZRAEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_armeiro_refino": {
+    "id": "AgACAgEAAxkBAAEBtOBpJ0Wsg-aL1Gdz1cvpsejnlxqaEAACYQtrG9cMOEVff0VNds_KdgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_ferreiro": {
+    "id": "AgACAgEAAxkBAAEBvF9pJ5jkFeS-JTUJkerGKxH38EJbKwACkAtrG7IGOUVAnW3ZqTIdIQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_ferreiro_craft": {
+    "id": "AgACAgEAAxkBAAEBvF9pJ5jkFeS-JTUJkerGKxH38EJbKwACkAtrG7IGOUVAnW3ZqTIdIQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_ferreiro_refino": {
+    "id": "AgACAgEAAxkBAAEBtNdpJ0UqjsG8EfAZVpchgf7zVUBweQACYAtrG9cMOEUK7pTnDC_ZRAEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_alfaiate": {
+    "id": "AgACAgEAAxkBAAEBvIZpJ5vJpw8wV34mgW_TOvgvOBf1bAACkQtrG7IGOUVWC55qfO-vdwEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_alfaiate_craft": {
+    "id": "AgACAgEAAxkBAAEBvJJpJ5xhDrZ2_8OTiE-y2q8grQiY7AACkgtrG7IGOUWKF0zdmrY-qQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_alfaiate_refino": {
+    "id": "AgACAgEAAxkBAAEBvJJpJ5xhDrZ2_8OTiE-y2q8grQiY7AACkgtrG7IGOUWKF0zdmrY-qQEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_joalheiro": {
+    "id": "AgACAgEAAxkBAAEBvMNpJ6AxOcObxQ_1fg_8KW9JqwUuugAClQtrG7IGOUWdUXGEKjcAAYcBAAMCAAN5AAM2BA",
+    "type": "photo"
+  },
+  "img_prof_joalheiro_craft": {
+    "id": "AgACAgEAAxkBAAEBvPRpJ6Cfq2pwb_XYHRW7Kl90SGXehAAClgtrG7IGOUUmpSINcrQPvgEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
+  "img_prof_joalheiro_refino": {
+    "id": "AgACAgEAAxkBAAEBvRppJ6GsBa1XzmydovM0LcQfgwgLiQACmAtrG7IGOUV31yU7qF9FuwEAAwIAA3kAAzYE",
+    "type": "photo"
+  },
   "VICTORY_PHOTO_ID": {
     "id": "AgACAgEAAxkBAAIW52jztXfEWirRJSoo9yUx5pjGQ7u_AAInC2sbR-agR7yizwIUvB1jAQADAgADeQADNgQ",
     "type": "photo"

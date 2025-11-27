@@ -25,11 +25,16 @@ from handlers.profile_handler import (
     unequip_skill_handler,
     noop_handler,
 )
+
+# --- CORREÇÃO AQUI: Importamos todos os novos handlers ---
 from handlers.inventory_handler import (
-    inventory_handler,
-    noop_inventory_handler,
-    use_item_handler,
+    inventory_menu_handler,   # Menu principal
+    inventory_cat_handler,    # Categorias
+    use_item_handler,         # Usar item
+    noop_inventory_handler    # Cliques inválidos
 )
+# ---------------------------------------------------------
+
 from handlers.converter_handler import (
     converter_main_handler,
     converter_list_handler,
@@ -56,12 +61,12 @@ from handlers.class_evolution_handler import (
     start_trial_execute_handler,    
 )
 
-# 5. Das Profissões (CORRIGIDO AQUI)
+# 5. Das Profissões
 from handlers.profession_handler import (
     job_menu_handler,
-    job_view_handler,     # Novo
-    job_confirm_handler,  # Novo
-    job_guide_handler,    # Novo
+    job_view_handler,     
+    job_confirm_handler,  
+    job_guide_handler,    
 )
 
 
@@ -83,9 +88,12 @@ def register_character_handlers(application: Application):
         profile_handler,
         character_command_handler,
         
-        inventory_handler,
-        noop_inventory_handler,
-        use_item_handler,
+        # --- CORREÇÃO AQUI: Atualizamos a lista com os novos nomes ---
+        inventory_menu_handler,  # <--- Novo
+        inventory_cat_handler,   # <--- Novo
+        use_item_handler,        # Mantido
+        noop_inventory_handler,  # Adicionado
+        # -------------------------------------------------------------
         
         # Handlers de Skills
         skills_menu_handler,
@@ -114,11 +122,11 @@ def register_character_handlers(application: Application):
         start_trial_confirmation_handler,
         start_trial_execute_handler,
         
-        # Profissões (CORRIGIDO AQUI)
+        # Profissões
         job_menu_handler,
-        job_view_handler,     # Novo
-        job_confirm_handler,  # Novo
-        job_guide_handler,    # Novo
+        job_view_handler,     
+        job_confirm_handler,  
+        job_guide_handler,    
     ]
     normal_handlers.extend(all_skin_handlers)
     

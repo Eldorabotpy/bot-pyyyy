@@ -1,4 +1,4 @@
-# Arquivo: handlers/jobs.py (VERSÃO FINAL: DB BLINDADO + VISUAL ATUALIZADO)
+# Arquivo: handlers/jobs.py (VERSÃO FINAL: ANTI-ROLLBACK DE NÍVEL)
 
 from __future__ import annotations
 
@@ -7,34 +7,30 @@ import datetime
 import asyncio
 import os
 from zoneinfo import ZoneInfo
-from typing import Dict, Optional, Any, Tuple, Iterator
+from typing import Dict, Optional, Any
 from telegram.ext import ContextTypes
 from telegram.error import Forbidden
 
-# --- 1. MONGODB IMPORTS ---
+# --- MONGODB IMPORTS ---
 from pymongo import MongoClient
 import certifi
 
 from modules import player_manager
-# Módulos do player
 from modules.player_manager import (
     iter_players, add_energy, save_player_data, has_premium_plan,
     get_perk_value, get_player_max_energy, add_item_to_inventory,
-    get_pvp_points, add_gems, get_player_data, iter_player_ids
+    iter_player_ids
 )
 
-# --- 2. IMPORTAÇÃO DO CACHE (A CORREÇÃO VISUAL) ---
 try:
     from modules.player.core import player_cache
 except ImportError:
-    # Se falhar, define um dict vazio para não quebrar o bot, 
-    # mas o visual pode demorar a atualizar.
     player_cache = {}
 
 from config import EVENT_TIMES, JOB_TIMEZONE
 from kingdom_defense.engine import event_manager
 
-# Imports opcionais de handlers
+# Imports opcionais
 try:
     from handlers.refining_handler import finish_dismantle_job, finish_refine_job
     from handlers.forge_handler import finish_craft_notification_job as finish_crafting_job
@@ -52,31 +48,27 @@ logger = logging.getLogger(__name__)
 # CONFIGURAÇÃO BLINDADA DO MONGODB
 # ==============================================================================
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-
 players_col = None
 
 try:
     client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
     db = client["eldora_db"]
     players_col = db["players"]
-    logger.info("✅ [JOBS] Conexão SEGURA estabelecida. Ouro e Energia sincronizados.")
+    logger.info("✅ [JOBS] Conexão SEGURA. Proteção contra perda de Nível ATIVA.")
 except Exception as e:
     logger.critical(f"❌ [JOBS] FALHA CRÍTICA NA CONEXÃO: {e}")
     players_col = None
 
 # ==============================================================================
 
-# --- CONSTANTES ---
 DAILY_CRYSTAL_ITEM_ID = "cristal_de_abertura"
 DAILY_CRYSTAL_BASE_QTY = 4
 DAILY_NOTIFY_USERS = True
 _non_premium_tick: Dict[str, int] = {"count": 0}
 
-# IDs ANÚNCIOS
 ANNOUNCEMENT_CHAT_ID = -1002881364171 
 ANNOUNCEMENT_THREAD_ID = 24 
 
-# --- HELPERS ---
 def _today_str(tzname: str = JOB_TIMEZONE) -> str:
     try:
         tz = ZoneInfo(tzname)
@@ -85,20 +77,12 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
         now = datetime.datetime.now()
     return now.date().isoformat()
 
-def _safe_add_stack(pdata: dict, item_id: str, qty: int) -> None:
-    try:
-        add_item_to_inventory(pdata, item_id, qty)
-    except Exception as e:
-        logger.debug("[_safe_add_stack] Fallback: %s", e)
-        inv = pdata.setdefault("inventory", {})
-        inv[item_id] = int(inv.get(item_id, 0)) + int(qty)
-
-# --- JOBS PRINCIPAIS ---
+# ==============================================================================
+# JOBS (AGORA COM ATUALIZAÇÃO ATÔMICA EM TUDO)
+# ==============================================================================
 
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Regenera energia usando UPDATE ATÔMICO ($inc) e força recarga do cache.
-    """
+    """Regenera energia sem sobrescrever o Nível/XP."""
     _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
     regenerate_non_premium = (_non_premium_tick["count"] == 0)
     
@@ -106,103 +90,106 @@ async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     processed_count = 0 
     
     try:
-        # Usamos iter_players para pegar todos, mas a decisão de update é feita com cuidado
         async for user_id, pdata in player_manager.iter_players():
             processed_count += 1
             try:
                 if not isinstance(pdata, dict): continue
-
-                # Verificação rápida de máximo (pode usar dado em cache, não tem problema se pular um tick)
-                max_e = int(player_manager.get_player_max_energy(pdata)) 
-                cur_e = int(pdata.get("energy", 0))
+                
+                # Usa cache se disponível para checar máximo
+                current_data = player_cache.get(user_id, pdata)
+                max_e = int(player_manager.get_player_max_energy(current_data)) 
+                cur_e = int(current_data.get("energy", 0))
                 
                 if cur_e >= max_e: continue 
 
-                is_premium = player_manager.has_premium_plan(pdata) 
+                is_premium = player_manager.has_premium_plan(current_data) 
                 
                 if is_premium or regenerate_non_premium:
-                    # --- JEITO SEGURO E SINCRONIZADO ---
                     if players_col is not None:
-                        # 1. Atualiza o Banco (Aumenta energia sem tocar no ouro)
-                        players_col.update_one(
-                            {"_id": user_id}, 
-                            {"$inc": {"energy": 1}}
-                        )
+                        # JEITO SEGURO: Só toca na energia
+                        players_col.update_one({"_id": user_id}, {"$inc": {"energy": 1}})
                         
-                        # 2. Limpa o Cache (Força o bot a ler o novo valor do banco)
-                        # Isso resolve o problema de "24/35 travado"
-                        try:
-                            # Tenta limpar de forma síncrona ou agenda task se for async
-                            # (Assume que player_manager.clear_player_cache está disponível)
-                            if asyncio.iscoroutinefunction(player_manager.clear_player_cache):
-                                asyncio.create_task(player_manager.clear_player_cache(user_id))
-                            else:
-                                player_manager.clear_player_cache(user_id)
-                        except Exception:
-                            pass # Se falhar a limpeza, apenas visual atrasa, não quebra o job
-                        
+                        # Atualiza visual (memória)
+                        if user_id in player_cache:
+                            player_cache[user_id]["energy"] = cur_e + 1
                         touched += 1
                     else:
-                        # Fallback (Modo antigo inseguro - só roda se banco cair)
-                        player_manager.add_energy(pdata, 1) 
-                        await player_manager.save_player_data(user_id, pdata) 
+                        # Fallback
+                        player_manager.add_energy(current_data, 1) 
+                        await save_player_data(user_id, current_data) 
                         touched += 1
-            
-            except Exception as e_player:
-                # Silencia erros individuais para não spammar log
-                pass
-
+            except Exception: pass
     except Exception as e_iter:
         logger.error(f"Erro regenerate_energy_job: {e_iter}")
             
-    logger.info(f"[ENERGY] Job concluído. Processados: {processed_count}. Regenerados (DB+CacheClear): {touched}.")
+    logger.info(f"[ENERGY] Job concluído. Processados: {processed_count}. Regenerados: {touched}.")
 
 async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entrega cristais SEM sobrescrever o Nível (Usa $inc no inventário)."""
     today = _today_str()
     granted = 0
+    
     try:
         async for user_id, pdata in player_manager.iter_players():
             try:
                 if not pdata: continue
+                
                 daily = pdata.get("daily_awards") or {}
                 if daily.get("last_crystal_date") == today: continue
 
                 bonus_qty = get_perk_value(pdata, "daily_crystal_bonus", 0) 
                 total_qty = DAILY_CRYSTAL_BASE_QTY + bonus_qty
                 
-                _safe_add_stack(pdata, DAILY_CRYSTAL_ITEM_ID, total_qty)
-                daily["last_crystal_date"] = today
-                pdata["daily_awards"] = daily
-                
-                await save_player_data(user_id, pdata) 
+                # --- CORREÇÃO CRÍTICA: UPDATE ATÔMICO ---
+                if players_col is not None:
+                    # Adiciona item direto no banco sem ler o resto
+                    # Sintaxe MongoDB: "inventory.nome_do_item"
+                    players_col.update_one(
+                        {"_id": user_id},
+                        {
+                            "$inc": {f"inventory.{DAILY_CRYSTAL_ITEM_ID}": total_qty},
+                            "$set": {"daily_awards.last_crystal_date": today}
+                        }
+                    )
+                    # Limpa cache para forçar recarregamento
+                    if user_id in player_cache: del player_cache[user_id]
+                else:
+                    # Fallback perigoso (apenas se banco cair)
+                    player_manager.add_item_to_inventory(pdata, DAILY_CRYSTAL_ITEM_ID, total_qty)
+                    daily["last_crystal_date"] = today
+                    pdata["daily_awards"] = daily
+                    await save_player_data(user_id, pdata)
+                # ----------------------------------------
+
                 granted += 1
                 
                 if DAILY_NOTIFY_USERS:
-                    msg = f"🎁 Recebeu {total_qty}x Cristais Diários."
-                    if bonus_qty > 0: msg += f" (+{bonus_qty} bônus)"
+                    msg = f"🎁 Você recebeu {total_qty}× Cristal de Abertura (recompensa diária)."
+                    if bonus_qty > 0: msg += f"\n✨ Bônus VIP: +{bonus_qty}!"
                     try: 
                         await context.bot.send_message(chat_id=user_id, text=msg)
                         await asyncio.sleep(0.1) 
                     except Exception: pass
             except Exception: pass
-    except Exception: pass
+    except Exception as e_iter:
+        logger.error(f"Erro daily_crystal: {e_iter}")
+    
+    logger.info("[DAILY] %s jogadores receberam cristais (modo seguro).", granted)
     return granted
 
 async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
+    # (Versão Admin - Mantida simples pois é manual)
     granted = 0
     try:
         async for user_id, pdata in player_manager.iter_players():
             try:
                 if not pdata: continue
-                _safe_add_stack(pdata, DAILY_CRYSTAL_ITEM_ID, DAILY_CRYSTAL_BASE_QTY)
-                daily = pdata.get("daily_awards") or {}
-                daily["last_crystal_date"] = _today_str()
-                pdata["daily_awards"] = daily
-                await save_player_data(user_id, pdata) 
+                player_manager.add_item_to_inventory(pdata, DAILY_CRYSTAL_ITEM_ID, DAILY_CRYSTAL_BASE_QTY)
+                if "daily_awards" not in pdata: pdata["daily_awards"] = {}
+                pdata["daily_awards"]["last_crystal_date"] = _today_str()
+                await save_player_data(user_id, pdata)
                 granted += 1
-                try: 
-                    await context.bot.send_message(chat_id=user_id, text=f"🎁 Admin enviou {DAILY_CRYSTAL_BASE_QTY}x Cristais!")
-                    await asyncio.sleep(0.1) 
+                try: await context.bot.send_message(chat_id=user_id, text=f"🎁 Admin enviou {DAILY_CRYSTAL_BASE_QTY}x Cristais!")
                 except Exception: pass
             except Exception: pass
     except Exception: pass
@@ -212,27 +199,41 @@ async def daily_event_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     return await distribute_kingdom_defense_ticket_job(context)
 
 async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entrega Tickets SEM sobrescrever o Nível."""
     job_data = context.job.data or {}
-    event_time_str = job_data.get("event_time", "horário desconhecido")
+    event_time_str = job_data.get("event_time", "breve")
     TICKET_ID = "ticket_defesa_reino"
-    
     delivered = 0
+    
     all_player_ids = []
     try: all_player_ids = list(player_manager.iter_player_ids())
     except Exception: return 0
 
     for user_id in all_player_ids:
         try:
-            pdata = await player_manager.get_player_data(user_id)
-            if not pdata: continue
-            _safe_add_stack(pdata, TICKET_ID, 1)
-            await save_player_data(user_id, pdata)
-            delivered += 1
+            # --- CORREÇÃO CRÍTICA: UPDATE ATÔMICO ---
+            if players_col is not None:
+                players_col.update_one(
+                    {"_id": user_id},
+                    {"$inc": {f"inventory.{TICKET_ID}": 1}}
+                )
+                if user_id in player_cache: del player_cache[user_id]
+                delivered += 1
+            else:
+                pdata = await player_manager.get_player_data(user_id)
+                if not pdata: continue
+                player_manager.add_item_to_inventory(pdata, TICKET_ID, 1)
+                await save_player_data(user_id, pdata)
+                delivered += 1
+            # ----------------------------------------
+            
             try:
-                await context.bot.send_message(chat_id=user_id, text=f"🎟️ Recebeu Ticket de Defesa para as {event_time_str}!", parse_mode='HTML')
+                await context.bot.send_message(chat_id=user_id, text=f"🎟️ Recebeu 1 Ticket para o evento das {event_time_str}!", parse_mode='HTML')
                 await asyncio.sleep(0.05) 
             except Exception: pass
         except Exception: pass
+            
+    logger.info(f"[JOB_KD_TICKET] {delivered} tickets entregues (modo seguro).")
     return delivered
 
 async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -248,27 +249,21 @@ async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> in
     return notified
 
 async def _process_watchdog_for_player(context: ContextTypes.DEFAULT_TYPE, user_id: int, now: datetime.datetime, ACTION_FINISHERS: Dict[str, Any]) -> int:
+    # Watchdog padrão (não altera dados, seguro)
     try:
         pdata = await player_manager.get_player_data(user_id)
         if not pdata: return 0
         st = pdata.get("player_state") or {}
         action = st.get("action")
         if not action or action not in ACTION_FINISHERS: return 0
-
         ft = _parse_iso_utc(st.get("finish_time")) 
         if not ft or ft > now: return 0
-
         config = ACTION_FINISHERS[action]
         finalizer_fn = config.get("fn")
         if not finalizer_fn: return 0
-        
         job_data = config.get("data_builder")(st) if "data_builder" in config else {}
         chat_id = pdata.get("last_chat_id", user_id)
-
-        context.job_queue.run_once(
-            finalizer_fn, when=0, chat_id=chat_id, user_id=user_id,
-            data=job_data, name=f"{action}:{user_id}",
-        )
+        context.job_queue.run_once(finalizer_fn, when=0, chat_id=chat_id, user_id=user_id, data=job_data, name=f"{action}:{user_id}")
         return 1 
     except Exception: return 0
         
@@ -312,7 +307,8 @@ async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
                          except Exception: pass
                     else:
                         p_data = await player_manager.get_player_data(user_id)
-                        player_manager.add_gems(p_data, reward_amount)
+                        # Adiciona gemas manualmente se banco falhar
+                        pdata = player_manager.add_gems(p_data, reward_amount)
                         await save_player_data(user_id, p_data)
                 except Exception: pass
             else:
@@ -349,21 +345,42 @@ async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     except Exception: pass
 
 async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entrega Tickets de Arena SEM sobrescrever o Nível."""
     today = _today_str()
     granted = 0
     TICKET_ID = "ticket_arena"
     TICKET_QTY = 10
+    
     async for user_id, pdata in player_manager.iter_players():
         try:
             if not pdata: continue
             daily = pdata.get("daily_awards") or {}
             if daily.get("last_arena_ticket_date") == today: continue
-            _safe_add_stack(pdata, TICKET_ID, TICKET_QTY)
-            daily["last_arena_ticket_date"] = today
-            pdata["daily_awards"] = daily
-            await save_player_data(user_id, pdata)
-            granted += 1
+            
+            # --- CORREÇÃO CRÍTICA: UPDATE ATÔMICO ---
+            if players_col is not None:
+                players_col.update_one(
+                    {"_id": user_id},
+                    {
+                        "$inc": {f"inventory.{TICKET_ID}": TICKET_QTY},
+                        "$set": {"daily_awards.last_arena_ticket_date": today}
+                    }
+                )
+                # Limpa cache para garantir que o inventário atualize na próxima vez que abrir
+                if user_id in player_cache: del player_cache[user_id]
+                granted += 1
+            else:
+                # Fallback
+                player_manager.add_item_to_inventory(pdata, TICKET_ID, TICKET_QTY)
+                daily["last_arena_ticket_date"] = today
+                pdata["daily_awards"] = daily
+                await save_player_data(user_id, pdata)
+                granted += 1
+            # ----------------------------------------
+
             try: await context.bot.send_message(chat_id=user_id, text=f"🎟️ Recebeu {TICKET_QTY} Tickets Arena!")
             except Exception: pass
         except Exception: pass
+    
+    logger.info(f"[DAILY_ARENA] {granted} jogadores receberam tickets (modo seguro).")
     return granted

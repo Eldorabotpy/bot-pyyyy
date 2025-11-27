@@ -1,4 +1,5 @@
 # handlers/profile_handler.py
+# (VERSÃO CORRIGIDA: BOTÃO DE INVENTÁRIO ATUALIZADO PARA 3.0)
 
 import logging
 import unicodedata
@@ -23,39 +24,29 @@ MAX_EQUIPPED_SKILLS = 6
 
 # ===== util =====
 def _slugify(text: str) -> str:
-    if not text:
-        return ""
+    if not text: return ""
     norm = unicodedata.normalize("NFKD", text)
     norm = norm.encode("ascii", "ignore").decode("ascii")
     norm = re.sub(r"\s+", "_", norm.strip().lower())
     norm = re.sub(r"[^a-z0-9_]", "", norm)
     return norm
 
-# CORRIGIDO:
 def _get_class_media(player_data: dict, purpose: str = "personagem"):
-    
-    # Pega a classe ATUAL (evoluiída) para o fallback
     raw_cls = (player_data.get("class") or player_data.get("class_tag") or "").strip()
     cls = _slugify(raw_cls)
-    
-    # Pega a classe BASE (normalizada) para checar a skin
     try:
         player_base_class = player_stats._get_class_key_normalized(player_data)
     except Exception:
-        player_base_class = cls # Fallback se a função falhar
+        player_base_class = cls
 
     purpose = (purpose or "").strip().lower()
     candidates = []
     equipped_skin_id = player_data.get("equipped_skin")
 
-    # --- LÓGICA DE SKIN CORRIGIDA ---
     if equipped_skin_id and equipped_skin_id in SKIN_CATALOG:
         skin_info = SKIN_CATALOG[equipped_skin_id]
-        
-        # Compara a classe da skin (ex: "guerreiro") com a classe base do jogador (ex: "guerreiro")
         if skin_info.get('class') == player_base_class:
-            candidates.append(skin_info['media_key']) # Adiciona a skin como primeira prioridade
-    
+            candidates.append(skin_info['media_key'])
 
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(cls) or {}
@@ -70,9 +61,8 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
             f"{cls}_{purpose}_video", f"{cls}_{purpose}",
         ]
     candidates += ["perfil_video", "personagem_video", "profile_video", "perfil_foto", "profile_photo"]
-    tried = []
+    
     for key in [k for k in candidates if k and "abertura" not in k.lower()]:
-        tried.append(key)
         fd = file_ids.get_file_data(key)
         if fd and fd.get("id"):
             return fd
@@ -88,8 +78,6 @@ async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
         return
     
-    # --- !!! 2. CORREÇÃO DA CLASSE !!! ---
-    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
     
     player_skill_ids = player_data.get("skills", [])
@@ -104,15 +92,11 @@ async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for skill_id in player_skill_ids:
         skill_info = skills_data.SKILL_DATA.get(skill_id)
-        if not skill_info:
-            logger.warning(f"Skill ID '{skill_id}' encontrado em {user_id} mas não existe em SKILL_DATA.")
-            continue
+        if not skill_info: continue
             
-        # --- !!! 3. CORREÇÃO DA VERIFICAÇÃO !!! ---
-        # Verifica se a classe atual (ou a base) pode usar esta skill
         allowed_classes = skill_info.get("allowed_classes", [])
         if not can_player_use_skill(player_class_key, allowed_classes):
-            continue # Pula esta skill, o jogador não pode mais usá-la
+            continue 
             
         name = skill_info.get("display_name", skill_id)
         desc = skill_info.get("description", "Sem descrição.")
@@ -131,14 +115,13 @@ async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if active_skills_lines:
         text_parts.append("✨ <b><u>Habilidades Ativas</u></b> ✨")
         text_parts.extend(active_skills_lines)
-        text_parts.append("(Você pode equipar até 4 skills ativas para usar em combate)")
+        text_parts.append("(Você pode equipar até 6 skills ativas para usar em combate)")
         text_parts.append("")
     if passive_skills_lines:
         text_parts.append("🛡️ <b><u>Habilidades Passivas</u></b> 🛡️")
         text_parts.extend(passive_skills_lines)
         text_parts.append("")
         
-    # Se ambas as listas estiverem vazias (ex: só tinha skills de mago e evoluiu)
     if not active_skills_lines and not passive_skills_lines:
         text_parts.append("<i>Você não possui nenhuma habilidade que sua classe atual possa usar.</i>")
 
@@ -157,14 +140,9 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
     chat_id = query.message.chat.id
     
     player_data = await player_manager.get_player_data(user_id)
-    if not player_data:
-        await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
-        return
+    if not player_data: return
 
-    # --- !!! 4. CORREÇÃO DA CLASSE !!! ---
-    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
-    # --- FIM DA CORREÇÃO ---
 
     all_skill_ids = player_data.get("skills", [])
     equipped_ids = player_data.get("equipped_skills", [])
@@ -173,7 +151,6 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
         player_data["equipped_skills"] = equipped_ids
 
     active_skill_ids = []
-    # Filtra as skills ativas que o jogador APRENDEU
     for skill_id in all_skill_ids:
         skill_type = skills_data.SKILL_DATA.get(skill_id, {}).get("type", "unknown")
         if skill_type == "active" or skill_type.startswith("support"):
@@ -196,11 +173,8 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
             skill_info = skills_data.SKILL_DATA.get(skill_id)
             if not skill_info: continue
             
-            # --- !!! 5. CORREÇÃO DA VERIFICAÇÃO !!! ---
-            # Adiciona uma verificação para o caso de uma skill equipada se tornar inválida
             allowed_classes = skill_info.get("allowed_classes", [])
             if not can_player_use_skill(player_class_key, allowed_classes):
-                # A skill está equipada mas não devia! (Não mostra, mas oferece desequipar)
                 name = skill_info.get("display_name", skill_id)
                 text_parts.append(f"• <s><b>{name}</b> (Classe Inválida)</s>")
             else:
@@ -223,11 +197,9 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
             skill_info = skills_data.SKILL_DATA.get(skill_id)
             if not skill_info: continue
 
-            # --- !!! 6. CORREÇÃO DA VERIFICAÇÃO !!! ---
             allowed_classes = skill_info.get("allowed_classes", [])
             if not can_player_use_skill(player_class_key, allowed_classes):
-                continue # ...pula esta skill, nem mostra o botão.
-            # --- FIM DA CORREÇÃO ---
+                continue 
 
             available_to_equip_found = True
             name = skill_info.get("display_name", skill_id)
@@ -242,7 +214,7 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
                 kb_rows.append([InlineKeyboardButton(f"🚫 Limite Atingido", callback_data="noop")])
 
     if not available_to_equip_found:
-        text_parts.append("<i>Não há outras skills ativas disponíveis (ou que a sua classe possa usar).</i>")
+        text_parts.append("<i>Não há outras skills ativas disponíveis.</i>")
     
     kb_rows.append([InlineKeyboardButton("⬅️ Voltar (Habilidades)", callback_data="skills_menu_open")])
     final_text = "\n".join(text_parts)
@@ -257,30 +229,21 @@ async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         skill_id = query.data.split(":", 1)[1]
     except IndexError:
-        logger.error(f"Callback equip_skill inválido: {query.data}")
-        await query.answer("Erro ao processar a ação.", show_alert=True)
         return
 
     player_data = await player_manager.get_player_data(user_id)
-    if not player_data:
-        await query.answer("Erro: Personagem não encontrado.", show_alert=True)
-        return
+    if not player_data: return
 
     skill_info = skills_data.SKILL_DATA.get(skill_id)
-    if not skill_info:
-        await query.answer("Erro: Skill não encontrada nos dados do jogo.", show_alert=True)
-        return
+    if not skill_info: return
 
-    # --- !!! 7. CORREÇÃO DA VERIFICAÇÃO !!! ---
-    # Pega a classe normalizada (ex: "arcanista")
     player_class_key = player_stats._get_class_key_normalized(player_data)
     allowed_classes = skill_info.get("allowed_classes", [])
     
     if not can_player_use_skill(player_class_key, allowed_classes):
-        await query.answer("Sua classe (ou classe base) não pode equipar esta habilidade!", show_alert=True)
-        await show_equip_skills_menu(update, context) # Recarrega o menu
+        await query.answer("Sua classe não pode equipar esta habilidade!", show_alert=True)
+        await show_equip_skills_menu(update, context)
         return
-    # --- FIM DA CORREÇÃO ---
 
     equipped_skills = player_data.setdefault("equipped_skills", [])
     if not isinstance(equipped_skills, list):
@@ -288,12 +251,11 @@ async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         player_data["equipped_skills"] = equipped_skills
     
     if skill_id in equipped_skills:
-        await query.answer("Essa skill já está equipada.", show_alert=True)
         await show_equip_skills_menu(update, context)
         return
     
     if len(equipped_skills) >= MAX_EQUIPPED_SKILLS:
-        await query.answer(f"Limite de {MAX_EQUIPPED_SKILLS} skills equipadas atingido!", show_alert=True)
+        await query.answer(f"Limite atingido!", show_alert=True)
         await show_equip_skills_menu(update, context)
         return
     
@@ -306,98 +268,62 @@ async def unequip_skill_callback(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    try:
-        skill_id = query.data.split(":", 1)[1]
-    except IndexError:
-        logger.error(f"Callback unequip_skill inválido: {query.data}")
-        await query.answer("Erro ao processar a ação.", show_alert=True)
-        return
+    try: skill_id = query.data.split(":", 1)[1]
+    except IndexError: return
     player_data = await player_manager.get_player_data(user_id)
-    if not player_data:
-        await query.answer("Erro: Personagem não encontrado.", show_alert=True)
-        return
+    if not player_data: return
     equipped_skills = player_data.get("equipped_skills", [])
-    if not isinstance(equipped_skills, list):
-        equipped_skills = []
-        player_data["equipped_skills"] = equipped_skills
     if skill_id in equipped_skills:
         equipped_skills.remove(skill_id)
         await player_manager.save_player_data(user_id, player_data)
-    else:
-        await query.answer("Essa skill não estava equipada.", show_alert=True)
     await show_equip_skills_menu(update, context)
 
 async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer("Limite de skills equipadas atingido!")
+    await query.answer("Ação inválida ou limite atingido!")
 
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
     try:
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
+    except Exception: pass
     try:
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
+    except Exception: pass
     try:
         await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-    except Exception as e:
-        logger.error(f"Falha ao enviar mensagem em _safe_edit_or_send: {e}")
+    except Exception as e: logger.error(f"Falha ao enviar mensagem: {e}")
 
 def _bar(current: int, total: int, blocks: int = 10, filled_char: str = '🟧', empty_char: str = '⬜️') -> str:
-    if total <= 0:
-        filled = blocks
+    if total <= 0: filled = blocks
     else:
         ratio = max(0.0, min(1.0, float(current) / float(total)))
         filled = int(round(ratio * blocks))
     return filled_char * filled + empty_char * (blocks - filled)
 
 def _normalize_profession(raw):
-    if not raw:
-        return None
-    if isinstance(raw, str):
-        return (raw, 1, 0)
-    if isinstance(raw, dict) and ('type' in raw):
-        t = raw.get('type') or None
-        if not t: return None
-        return (t, int(raw.get('level', 1)), int(raw.get('xp', 0)))
+    if not raw: return None
+    if isinstance(raw, str): return (raw, 1, 0)
     if isinstance(raw, dict):
+        if 'type' in raw: return (raw.get('type'), int(raw.get('level', 1)), int(raw.get('xp', 0)))
         for k, v in raw.items():
-            if isinstance(v, dict):
-                return (k, int(v.get('level', 1)), int(v.get('xp', 0)))
+            if isinstance(v, dict): return (k, int(v.get('level', 1)), int(v.get('xp', 0)))
             return (k, 1, 0)
     return None
 
-def _class_key_from_player(player_data: dict) -> str:
-    if player_data.get("class_key"):
-        return str(player_data["class_key"])
-    raw = (player_data.get("class") or "").strip()
-    return _slugify(raw) or "_default"
-
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Função unificada para lidar com /personagem (comando) e 'profile' (botão).
-    """
     query = update.callback_query
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    if query:
-        await query.answer()
+    if query: await query.answer()
 
     player_data = await player_manager.get_player_data(user_id)
-
     if not player_data:
         text = "Erro: Personagem não encontrado. Use /start para começar."
-        if query:
-            await _safe_edit_or_send(query, context, chat_id, text)
-        else:
-            await context.bot.send_message(chat_id, text)
+        if query: await _safe_edit_or_send(query, context, chat_id, text)
+        else: await context.bot.send_message(chat_id, text)
         return
     
-    # ===== totais (base + equipamentos) =====
-
     totals = await player_manager.get_player_total_stats(player_data)
     
     total_hp_max = int(totals.get('max_hp', 50))
@@ -405,55 +331,40 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_def = int(totals.get('defense', 0))
     total_ini = int(totals.get('initiative', 0))
     total_luck = int(totals.get('luck', 0))
-    # --- ADICIONADO MANA ---
-    total_mp_max = int(totals.get('max_mana', 10)) # Puxa o Mana Máximo
+    total_mp_max = int(totals.get('max_mana', 10))
 
     current_hp = max(0, min(int(player_data.get('current_hp', total_hp_max)), total_hp_max))
-    # --- ADICIONADO MANA ---
     current_mp = max(0, min(int(player_data.get('current_mp', total_mp_max)), total_mp_max))
     
-    # <<< CORREÇÃO 1: Adiciona await AQUI >>>
     chance_esquiva = int((await player_manager.get_player_dodge_chance(player_data)) * 100)
-    # <<< CORREÇÃO 2: Adiciona await AQUI >>>
     chance_ataque_duplo = int((await player_manager.get_player_double_attack_chance(player_data)) * 100)
 
     location_key = player_data.get('current_location', 'reino_eldora')
     location_name = (game_data.REGIONS_DATA or {}).get(location_key, {}).get('display_name', 'Lugar Desconhecido')
 
-    # ===== BLOCO PREMIUM (FORÇA BRUTA VISUAL) =====
+    # ===== BLOCO PREMIUM =====
     premium_line = ""
-    # Lê direto do dicionário para ignorar qualquer lógica complexa da classe
     raw_tier = player_data.get("premium_tier")
     raw_exp = player_data.get("premium_expiration")
 
     if raw_tier and raw_tier != "free":
         tier_name = raw_tier.capitalize()
-        
         if raw_exp:
             try:
-                # Tenta formatar a data ISO gravada
                 dt_exp = datetime.fromisoformat(raw_exp)
-                if dt_exp.tzinfo is None: 
-                    dt_exp = dt_exp.replace(tzinfo=timezone.utc)
-                
+                if dt_exp.tzinfo is None: dt_exp = dt_exp.replace(tzinfo=timezone.utc)
                 fmt_date = dt_exp.strftime('%d/%m/%Y %H:%M UTC')
                 premium_line = f"\n👑 <b>Status Premium:</b> {tier_name}\n(Expira em: {fmt_date})"
             except Exception:
-                # Se a data estiver corrompida, mostra erro mas não permanente
                 premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Data Inválida)"
         else:
-            # Só mostra permanente se REALMENTE não tiver data
             premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Permanente)"
     
-    # ===== XP, Profissão, Classe =====
-    # <<< CORREÇÃO 3: Remove await AQUI >>>
     max_energy  = int(player_manager.get_player_max_energy(player_data))
     combat_level = int(player_data.get('level', 1))
     combat_xp = int(player_data.get('xp', 0))
-    try:
-        combat_next = int(game_data.get_xp_for_next_combat_level(combat_level))
-    except Exception:
-        combat_next = 0
+    try: combat_next = int(game_data.get_xp_for_next_combat_level(combat_level))
+    except Exception: combat_next = 0
     combat_bar = _bar(combat_xp, combat_next)
 
     prof_line = "" 
@@ -461,10 +372,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if prof_norm:
         prof_key, prof_level, prof_xp = prof_norm
         prof_name = (game_data.PROFESSIONS_DATA or {}).get(prof_key, {}).get('display_name', prof_key)
-        try:
-            prof_next = int(game_data.get_xp_for_next_collection_level(prof_level))
-        except Exception:
-            prof_next = 0
+        try: prof_next = int(game_data.get_xp_for_next_collection_level(prof_level))
+        except Exception: prof_next = 0
         prof_bar = _bar(prof_xp, prof_next, blocks=10, filled_char='🟨', empty_char='⬜️')
         prof_line = f"\n💼 <b>Profissão:</b> {prof_name} — Nível {prof_level}\n<code>[{prof_bar}]</code> {prof_xp}/{prof_next} XP"
     
@@ -477,7 +386,6 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     class_name = class_config.get("display_name", current_class_key.title())
     class_emoji = class_config.get("emoji", "👤")
 
-    # ===== texto do perfil =====
     char_name = player_data.get('character_name','Aventureiro(a)')
     available_points = int(player_data.get("stat_points", 0) or 0)
 
@@ -501,14 +409,12 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎯 <b>𝑷𝒐𝒏𝒕𝒐𝒔 𝒅𝒆 𝑨𝒕𝒓𝒊𝒃𝒖𝒕𝒐 𝒅𝒊𝒔𝒑𝒐𝒏𝒊́𝒗𝒆𝒊𝒔:</b> {available_points}",
         f"🎖️ <b>𝑵𝒊́𝒗𝒆𝒍 𝒅𝒆 𝑪𝒐𝒎𝒃𝒂𝒕𝒆:</b> {combat_level}\n<code>[{combat_bar}]</code> {combat_xp}/{combat_next} 𝐗𝐏",
     ]
-    if prof_line:
-        lines.append(prof_line)
-    if class_banner:
-        lines.append(class_banner)
+    if prof_line: lines.append(prof_line)
+    if class_banner: lines.append(class_banner)
 
     profile_text = "\n".join(lines)
 
-    # ===== teclado =====
+    # ===== TECLADO DO PERFIL =====
     keyboard = []
     if player_manager.needs_class_choice(player_data):
         keyboard.append([InlineKeyboardButton("✨ 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐂𝐥𝐚𝐬𝐬𝐞", callback_data='class_open')])
@@ -520,8 +426,11 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬 📊", callback_data='status_open')],
         [InlineKeyboardButton("💼 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨 💼", callback_data="job_menu")],
         [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬 🧰", callback_data='equipment_menu')],
-        [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 𝐂𝐨𝐦𝐩𝐥𝐞𝐭𝐨 🎒", callback_data='inventory_CAT_equipamento_PAGE_1')],
-        [InlineKeyboardButton("🧪 𝐔𝐬𝐚𝐫 𝐂𝐨𝐧𝐬𝐮𝐦𝐢́𝐯𝐞𝐥 🧪", callback_data='inventory_CAT_consumivel_PAGE_1')],
+        
+        # --- CORREÇÃO AQUI: Link para o menu novo de inventário ---
+        [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 🎒", callback_data='inventory_menu')],
+        # -----------------------------------------------------------
+        
         [InlineKeyboardButton("📚 𝐇𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞𝐬 📚", callback_data='skills_menu_open')],
         [InlineKeyboardButton("🎨 𝐌𝐮𝐝𝐚𝐫 𝐀𝐩𝐚𝐫𝐞̂𝐧𝐜𝐢𝐚 🎨", callback_data='skin_menu')],
         [InlineKeyboardButton("🔄 𝐂𝐨𝐧𝐯𝐞𝐫𝐭𝐞𝐫 𝐑𝐞𝐜𝐨𝐦𝐩𝐞𝐧𝐬𝐚𝐬 🔄", callback_data='conv:main')],
@@ -529,12 +438,10 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ===== mídia da classe =====
     media = _get_class_media(player_data, "personagem")
     if media and media.get("id"):
         try:
-            if query:
-                await query.delete_message()
+            if query: await query.delete_message()
             fid  = media["id"]
             ftyp = (media.get("type") or "photo").lower()
             if ftyp == "video":
@@ -543,26 +450,18 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=profile_text, reply_markup=reply_markup, parse_mode="HTML")
             return 
         except Exception as e:
-            logger.error(f"Falha ao enviar mídia do perfil para user {user_id}: {e}")
+            logger.error(f"Falha ao enviar mídia do perfil: {e}")
 
-    # Fallback: sem mídia
     if query:
         await _safe_edit_or_send(query, context, chat_id, profile_text, reply_markup=reply_markup, parse_mode='HTML')
     else:
-        # Se veio de um comando (/personagem), envia uma nova mensagem
         await context.bot.send_message(chat_id=chat_id, text=profile_text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ====================================================================
-# <<< INÍCIO DAS EXPORTAÇÕES DE HANDLER (O QUE FALTAVA) >>>
+# EXPORTAÇÕES
 # ====================================================================
-
-# O handler para o comando /personagem
 character_command_handler = CommandHandler("personagem", profile_callback)
-
-# O handler para o botão 'profile' (ex: "Voltar ao Perfil")
 profile_handler = CallbackQueryHandler(profile_callback, pattern=r'^(?:profile|personagem)$')
-
-# Handlers para os sub-menus de skills (que estão neste ficheiro)
 skills_menu_handler = CallbackQueryHandler(show_skills_menu, pattern=r'^skills_menu_open$')
 skills_equip_menu_handler = CallbackQueryHandler(show_equip_skills_menu, pattern=r'^skills_equip_menu$')
 equip_skill_handler = CallbackQueryHandler(equip_skill_callback, pattern=r'^equip_skill:')
