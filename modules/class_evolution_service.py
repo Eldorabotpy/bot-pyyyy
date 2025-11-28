@@ -38,6 +38,8 @@ def _consume_gold(pdata: Dict, amount: int) -> bool:
 # NOVAS FUNÇÕES DE LÓGICA
 # ================================================
 
+# Em modules/class_evolution_service.py
+
 def get_player_evolution_status(pdata: dict) -> Dict[str, Any]:
     """
     Verifica o estado da próxima evolução do jogador, incluindo o progresso
@@ -46,8 +48,11 @@ def get_player_evolution_status(pdata: dict) -> Dict[str, Any]:
     current_class = (pdata.get("class") or "").lower()
     current_level = int(pdata.get("level") or 1)
     
-    # 1. Encontra a próxima evolução disponível
-    evo_opt = evo_data.get_evolution_options(current_class)
+    # --- CORREÇÃO AQUI ---
+    # 1. Passamos o current_level que a função exige.
+    # 2. Pegamos o primeiro item da lista (pois a função retorna uma lista).
+    evo_options_list = evo_data.get_evolution_options(current_class, current_level)
+    evo_opt = evo_options_list[0] if evo_options_list else None
     
     if not evo_opt:
         return {"status": "max_tier", "message": "Você atingiu o auge da sua classe."}
