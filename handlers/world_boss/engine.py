@@ -318,7 +318,7 @@ async def broadcast_boss_announcement(application: Application, location_key: st
             await application.bot.send_message(chat_id=user_id, text=anuncio, parse_mode='HTML')
             await asyncio.sleep(0.05) # Delay reduzido
         except (Forbidden, TelegramError):
-            continue # Ignora usuários que bloquearam
+            continue 
         except Exception: 
             continue
 
