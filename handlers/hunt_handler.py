@@ -157,8 +157,10 @@ def _build_combat_details_from_template(mon: dict) -> dict:
     name = mon.get("monster_name") or mon.get("name") or "Inimigo"
     max_hp = int(mon.get("monster_max_hp", mon.get("max_hp", mon.get("hp", 1))))
     
+    # [CORREÇÃO] Passamos o ID e flags especiais para o cache de batalha
+    # para que o mission_manager consiga ler depois da vitória.
     return {
-        "id": mon.get("id"),
+        "id": mon.get("id"), # <--- Essencial para missões específicas
         "name": name,
         "hp": int(mon.get("monster_hp", mon.get("hp", max_hp))),
         "max_hp": max_hp,
@@ -169,7 +171,8 @@ def _build_combat_details_from_template(mon: dict) -> dict:
         "gold_drop": int(mon.get("monster_gold_drop", mon.get("gold_drop", 0))),
         "xp_reward": int(mon.get("monster_xp_reward", mon.get("xp_reward", 0))),
         "loot_table": mon.get("loot_table", []),
-        "is_elite": bool(mon.get("_elite", False)),
+        "is_elite": bool(mon.get("_elite", False) or mon.get("is_elite", False)),
+        "is_boss": bool(mon.get("is_boss", False)),
     }
 
     

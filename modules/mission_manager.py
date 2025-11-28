@@ -1,107 +1,174 @@
 # modules/mission_manager.py
+# (VERSÃO FINAL COMPATÍVEL COM SEU MONSTERS.PY)
 
-import random
-from datetime import datetime, timezone
-from modules import player_manager, clan_manager, guild_system
-from modules.game_data.missions import MISSION_CATALOG
-from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG
+import logging
+from modules import player_manager, clan_manager, guild_system, game_data
+# Importamos a coleção do DB para updates atômicos de clã (se usar MongoDB)
+# Se não usar, a parte de clã precisará ser adaptada.
+from modules.database import db 
+
+logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# MISSÕES PESSOAIS (GUILDA DE AVENTUREIROS)
+# MISSÕES PESSOAIS
 # ==============================================================================
 
 def get_player_missions(user_id: int) -> dict:
     """
-    Obtém as missões diárias de um jogador (lógica síncrona de leitura).
-    Nota: Quem chamar deve ter o player_data carregado ou gerenciar o save.
+    Retorna missões apenas para leitura visual.
+    A geração real ocorre no guild_system.py.
     """
-    # Esta função é um helper de leitura. A geração real é feita no guild_system.py
-    # e chamada pelo menu handler.
-    # Se precisar ler do banco aqui, teria que ser async.
-    # Para compatibilidade com handlers síncronos antigos, mantemos a lógica simples
-    # de retornar estrutura vazia se não tiver dados.
     return {} 
 
 async def update_mission_progress(user_id: int, action_type: str, target_id: str, quantity: int = 1):
     """
-    Chamado sempre que algo acontece no jogo (combate, coleta, craft).
-    Verifica e atualiza missões PESSOAIS e de CLÃ.
+    Central de processamento de missões.
+    
+    Args:
+        user_id: ID do jogador
+        action_type: "hunt", "collect", "craft", etc.
+        target_id: ID do monstro (ex: 'goblin_batedor') ou item (ex: 'madeira')
+        quantity: Quantidade a incrementar
     """
     player_data = await player_manager.get_player_data(user_id)
-    if not player_data: return
+    if not player_data: return []
 
+    logs = []
+
+    # --- 0. ENRIQUECIMENTO DE DADOS (LOOKUP INTELIGENTE) ---
+    # Aqui adaptamos para ler o seu MONSTERS_DATA
+    target_info = {}
+    target_region = None
+    is_elite = False
+    is_boss = False
+
+    if action_type == "hunt":
+        # 1. Tenta pegar o dicionário global de monstros
+        # (Assume que game_data.MONSTERS_DATA é o dict do seu arquivo)
+        monsters_db = getattr(game_data, "MONSTERS_DATA", {})
+        
+        # 2. Varre as regiões para encontrar o monstro e definir a região
+        for region_key, monster_list in monsters_db.items():
+            if not isinstance(monster_list, list): continue # Pula _evolution_trials se não for lista de dicts padrão
+            
+            for m in monster_list:
+                if m.get("id") == target_id:
+                    target_info = m
+                    target_region = region_key # "floresta_sombria", "pradaria_inicial", etc.
+                    break
+            if target_region: break
+        
+        # 3. Define propriedades especiais
+        # Verifica se é Elite OU Boss (para missões de desafio)
+        is_elite = target_info.get("is_elite", False)
+        is_boss = target_info.get("is_boss", False)
+        
+        # Se for Boss, conta como Elite também para facilitar missões
+        if is_boss: is_elite = True
+
+    # ====================================================
     # 1. MISSÕES PESSOAIS (Guilda de Aventureiros)
+    # ====================================================
     gdata = player_data.get("adventurer_guild", {})
     missions = gdata.get("active_missions", [])
     updated = False
 
     for m in missions:
-        if m.get("status") == "active":
-            # Verifica tipo e alvo
-            # Ex: type='hunt', target='slime'
-            if m.get("type") == action_type and m.get("target") == target_id:
-                current = m.get("progress", 0)
-                req = m.get("qty", 1)
+        if m.get("status") != "active": continue
+        
+        mission_type = m.get("type", "").upper()
+        req_action = action_type.upper()
+
+        match = False
+        
+        # --- CAÇA (HUNT) ---
+        if req_action == "HUNT":
+            # 1.1 Caça Específica (ID Exato)
+            if mission_type == "HUNT" and m.get("target_id") == target_id:
+                match = True
+            
+            # 1.2 Caça Regional (Qualquer monstro da região)
+            # Ex: "Derrote 5 monstros na Floresta Sombria"
+            elif mission_type == "HUNT" and m.get("target_region") == target_region and not m.get("target_id"):
+                match = True
                 
-                if current < req:
-                    m["progress"] = min(current + quantity, req)
-                    updated = True
-                    
-                    if m["progress"] >= req:
-                        m["status"] = "completed"
-                        # Opcional: Notificar jogador aqui se tiver context
+            # 1.3 Caça Global (Qualquer monstro)
+            elif mission_type == "HUNT" and not m.get("target_region") and not m.get("target_id"):
+                match = True
+
+            # 1.4 Caça de Elite/Boss
+            elif mission_type == "HUNT_ELITE" and is_elite:
+                match = True
+
+        # --- COLETA (COLLECT) ---
+        elif req_action == "COLLECT" and mission_type == "COLLECT":
+            if m.get("target_id") == target_id:
+                match = True
+
+        # --- OUTROS (Craft, Spend Energy) ---
+        elif mission_type == req_action and m.get("target_id") == target_id:
+            match = True
+
+        # --- APLICA PROGRESSO ---
+        if match:
+            current = m.get("progress", 0)
+            req = m.get("target_count", m.get("qty", 1))
+            
+            if current < req:
+                increment = min(quantity, req - current)
+                m["progress"] = current + increment
+                updated = True
+                
+                if m["progress"] >= req:
+                    m["status"] = "completed"
+                    # logs.append(f"✅ Missão Concluída: <b>{m.get('title', 'Missão')}</b>!")
 
     if updated:
         player_data["adventurer_guild"] = gdata
         await player_manager.save_player_data(user_id, player_data)
 
+    # ====================================================
     # 2. MISSÕES DE CLÃ (Coletivas)
+    # ====================================================
     clan_id = player_data.get("clan_id")
     if clan_id:
-        # Busca missão ativa do clã
-        active_mission = await clan_manager.get_active_guild_mission(clan_id)
-        
-        if active_mission:
-            c_type = active_mission.get("type")
-            c_target = active_mission.get("target_monster_id") # ou target_item_id dependendo da missão
-            
-            # Mapeamento de tipos (ajuste conforme seu catalogo)
-            # Se no catalogo for MONSTER_HUNT e a ação for 'hunt'
-            match = False
-            if c_type == "MONSTER_HUNT" and action_type == "hunt":
-                if c_target == target_id: match = True
-            elif c_type == "COLLECT" and action_type == "collect":
-                # Assumindo que missões de coleta usem target_item_id ou similar
-                if active_mission.get("target_item_id") == target_id: match = True
-            
-            if match:
-                # Atualiza o clã atomicamente (banco de dados)
-                # Como o clan_manager.update_guild_mission_progress não existe no código final do clan_manager,
-                # vamos implementar a lógica de incremento direto aqui.
+        try:
+            # Busca missão ativa do clã no DB
+            clan = await db.clans.find_one({"_id": clan_id}, {"active_mission": 1})
+            active_mission = clan.get("active_mission") if clan else None
+
+            if active_mission and not active_mission.get("completed", False):
+                c_type = active_mission.get("type")
+                c_target = active_mission.get("target_monster_id") or active_mission.get("target_id")
                 
-                # Nota: Idealmente, isso estaria no clan_manager para encapsulamento.
-                # Mas como estamos unificando, faremos a chamada direta ao banco do clã aqui
-                # ou usamos uma função helper se existir.
+                match_clan = False
                 
-                # Vamos assumir que precisamos incrementar 'active_mission.current_progress'
-                from modules.clan_manager import clans_col
-                if clans_col is not None:
-                    clans_col.update_one(
+                if action_type == "hunt":
+                    # Caça exata
+                    if c_type == "HUNT" and c_target == target_id:
+                        match_clan = True
+                    # Caça Elite Global
+                    elif c_type == "HUNT_ELITE" and is_elite:
+                        match_clan = True
+                        
+                elif action_type == "collect" and c_type == "COLLECT":
+                    if active_mission.get("target_item_id") == target_id:
+                        match_clan = True
+
+                if match_clan:
+                    # Update atômico e seguro no DB
+                    await db.clans.update_one(
                         {"_id": clan_id},
                         {"$inc": {"active_mission.current_progress": quantity}}
                     )
-                    
-                    # Verifica conclusão (precisa ler o valor atualizado)
-                    # Para performance, podemos não verificar a cada kill, 
-                    # ou fazer uma verificação leve.
-                    # O menu do clã já checa isso visualmente.
-                    # A conclusão real é feita pelo líder no botão "Concluir" ou automática
-                    # se implementarmos um check periódico.
+        except Exception as e:
+            logger.error(f"Erro ao atualizar missão de clã: {e}")
 
+    return logs
 
 async def claim_personal_reward(user_id: int, mission_index: int):
     """
-    Reclama a recompensa de uma missão pessoal concluída.
+    Reclama a recompensa e aplica (Gold, XP, Pontos de Guilda).
     """
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return None
@@ -114,37 +181,34 @@ async def claim_personal_reward(user_id: int, mission_index: int):
     mission = missions[mission_index]
     if mission.get("status") != "completed": return None
     
-    # Dá recompensas
-    gold = mission.get("reward_gold", 0)
-    pts = mission.get("reward_points", 0)
+    # Processa Recompensas
+    rewards = mission.get("rewards", {})
+    gold = rewards.get("gold", 0)
+    xp = rewards.get("xp", 0)
+    points = rewards.get("prestige_points", 0)
     
     if gold > 0: player_manager.add_gold(player_data, gold)
+    if xp > 0: player_data["xp"] = player_data.get("xp", 0) + xp
     
-    # Adiciona pontos de rank
-    gdata["points"] = gdata.get("points", 0) + pts
+    # Pontos de Rank
+    gdata["points"] = gdata.get("points", 0) + points
     
-    # Remove a missão da lista (ou marca como claimada/arquivada)
-    # Para missões diárias, geralmente removemos ou substituímos.
-    # Aqui vamos remover para simples rotação, ou marcar 'claimed'.
-    mission["status"] = "claimed" # Marca como feito para não sumir até o reset
-    # Se quiser substituir imediatamente por outra (ciclo infinito):
-    # new_mission = ... (logica de gerar nova)
-    # missions[mission_index] = new_mission
+    # Marca como coletada
+    mission["status"] = "claimed"
     
     player_data["adventurer_guild"] = gdata
     
     # Verifica Rank Up
-    rank_up, new_rank = guild_system.check_rank_up(player_data)
+    rank_up_info = await guild_system.check_rank_up(player_data)
     
     await player_manager.save_player_data(user_id, player_data)
     
     return {
         "gold": gold,
-        "points": pts,
-        "rank_up": new_rank if rank_up else None
+        "xp": xp,
+        "points": points,
+        "rank_up": rank_up_info
     }
 
-# Mantivemos reroll_mission para compatibilidade se usado em handlers antigos,
-# mas a lógica principal agora é via guild_system e reset diário.
 def reroll_mission(user_id, index):
     return False

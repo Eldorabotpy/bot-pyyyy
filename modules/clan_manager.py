@@ -315,23 +315,25 @@ async def assign_mission_to_clan(clan_id: str, mission_id: str, user_id: int):
     mission_template = GUILD_MISSIONS_CATALOG.get(mission_id)
     if not mission_template: raise ValueError("Missão inválida.")
     
+    # [CORREÇÃO] Agora copiamos TODOS os campos essenciais para o Mission Manager funcionar
     active_mission = {
         "id": mission_id,
         "title": mission_template["title"],
+        "type": mission_template["type"], # <--- ESSENCIAL!
+        "target_monster_id": mission_template.get("target_monster_id"), # <--- ESSENCIAL!
+        "target_item_id": mission_template.get("target_item_id"),       # <--- Para missões de coleta
         "target_count": mission_template["target_count"],
         "current_progress": 0,
         "start_date": _now_iso(),
         "rewards": mission_template["rewards"],
-        "story": mission_template.get("story", ""),
-        "objective": mission_template.get("objective", "")
+        "description": mission_template.get("description", ""),
+        "completed": False # <--- Marcador para evitar contar depois de pronta
     }
     
     clans_col.update_one(
         {"_id": clan_id},
         {"$set": {"active_mission": active_mission}}
     )
-
-    # Adicione no final de modules/clan_manager.py
 
 async def delete_clan(clan_id: str, leader_id: int):
     """

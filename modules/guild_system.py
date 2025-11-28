@@ -1,10 +1,11 @@
 # modules/guild_system.py
-# (VERSÃO FINAL: COM EMOJIS NOS RANKS)
+# (VERSÃO FINAL: Conectado ao MISSION_CATALOG)
 
 import random
 from datetime import datetime, timezone
+from modules.game_data.missions import MISSION_CATALOG # <--- Importa o catálogo real
 
-# Configuração dos Ranks (AGORA COM EMOJIS)
+# Configuração dos Ranks (Visual)
 ADVENTURER_RANKS = {
     "F": {"title": "Novato",      "next": "E", "req_points": 100,   "emoji": "🌱"},
     "E": {"title": "Iniciado",    "next": "D", "req_points": 300,   "emoji": "🪵"},
@@ -15,42 +16,98 @@ ADVENTURER_RANKS = {
     "S": {"title": "Lenda",       "next": None, "req_points": 0,    "emoji": "👑"}
 }
 
-# Missões Diárias (Templates)
-MISSION_TEMPLATES = [
-    {"type": "hunt", "target": "slime", "qty": 10, "name": "Praga Gosmenta", "desc": "Elimine 10 Slimes.", "xp": 50, "pts": 10},
-    {"type": "hunt", "target": "lobo", "qty": 5, "name": "Uivos na Noite", "desc": "Cace 5 Lobos.", "xp": 80, "pts": 15},
-    {"type": "collect", "target": "madeira", "qty": 10, "name": "Reforma da Guilda", "desc": "Entregue 10 Madeiras.", "xp": 40, "pts": 10},
-    {"type": "collect", "target": "ferro", "qty": 5, "name": "Armas para Novatos", "desc": "Doe 5 Minérios de Ferro.", "xp": 60, "pts": 15},
-]
-
 def get_rank_info(rank: str) -> dict:
     """Retorna os dados do rank. Se não existir, retorna o rank F."""
     return ADVENTURER_RANKS.get(rank, ADVENTURER_RANKS["F"])
 
+def check_rank_up(player_data: dict) -> dict | None:
+    """
+    Verifica se o jogador pode subir de rank.
+    Retorna dict com info do novo rank se subiu, ou None.
+    """
+    gdata = player_data.get("adventurer_guild", {})
+    current_rank_id = gdata.get("rank", "F")
+    points = gdata.get("points", 0)
+    
+    current_info = get_rank_info(current_rank_id)
+    next_rank_id = current_info.get("next")
+    
+    if not next_rank_id: return None # Já é rank máximo
+    
+    req_points = current_info.get("req_points", 999999)
+    
+    if points >= req_points:
+        # Subiu de rank!
+        gdata["rank"] = next_rank_id
+        # Reseta pontos excedentes ou acumula? Normalmente acumula em RPGs modernos.
+        # Se quiser resetar: gdata["points"] -= req_points
+        
+        player_data["adventurer_guild"] = gdata
+        
+        new_rank_info = get_rank_info(next_rank_id)
+        return {
+            "old_rank": current_rank_id,
+            "new_rank": next_rank_id,
+            "title": new_rank_info["title"],
+            "emoji": new_rank_info["emoji"]
+        }
+    return None
+
 def generate_daily_missions(pdata: dict):
-    """Gera 3 missões novas se o dia mudou."""
+    """
+    Gera 3 missões novas baseadas no MISSION_CATALOG se o dia mudou.
+    """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     gdata = pdata.get("adventurer_guild", {})
     
     # Se já tem missões de hoje, retorna as existentes
-    if gdata.get("last_mission_date") == today:
+    if gdata.get("last_mission_date") == today and gdata.get("active_missions"):
         return gdata.get("active_missions", [])
 
     new_missions = []
-    # Seleciona 3 missões aleatórias
-    templates = random.sample(MISSION_TEMPLATES, k=min(3, len(MISSION_TEMPLATES)))
     
-    for t in templates:
+    # Filtra missões possíveis (ex: não dar missão de dungeon difícil para novatos)
+    # Por enquanto, pegamos todas do catálogo
+    available_templates = MISSION_CATALOG
+    
+    # Seleciona 3 aleatórias
+    # Se tiver menos de 3 no catálogo, pega todas
+    count = min(3, len(available_templates))
+    if count == 0: return []
+    
+    chosen_templates = random.sample(available_templates, k=count)
+    
+    player_lvl = pdata.get("level", 1)
+    
+    for t in chosen_templates:
+        # Cria uma CÓPIA do template para salvar no player
         m = t.copy()
-        m["id"] = f"ms_{random.randint(10000,99999)}"
+        
+        # Define status inicial
         m["status"] = "active"
-        # Variação de recompensa baseada no nível do jogador (simples)
-        lvl = pdata.get("level", 1)
-        m["reward_gold"] = int(random.randint(50, 100) * (1 + (lvl * 0.1)))
-        m["reward_points"] = m.get("pts", 10)
+        m["progress"] = 0
+        
+        # Ajusta recompensas baseadas no nível (escalonamento opcional)
+        # Se o template já tem rewards fixas, usamos elas.
+        # Se quisermos dar um bônus de nível:
+        base_rewards = m.get("rewards", {})
+        gold = base_rewards.get("gold", 0)
+        xp = base_rewards.get("xp", 0)
+        
+        # Exemplo: +5% de ouro por nível
+        bonus_mult = 1 + (player_lvl * 0.05)
+        
+        m["rewards"] = {
+            "gold": int(gold * bonus_mult),
+            "xp": int(xp * bonus_mult),
+            "prestige_points": base_rewards.get("prestige_points", 5)
+        }
+        
         new_missions.append(m)
     
+    # Salva no player
     gdata["last_mission_date"] = today
     gdata["active_missions"] = new_missions
     pdata["adventurer_guild"] = gdata
+    
     return new_missions

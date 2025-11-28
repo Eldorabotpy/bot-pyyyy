@@ -1,281 +1,228 @@
 # modules/file_ids.py
+# (VERSÃO MONGODB: Sincronizada e Persistente)
 from __future__ import annotations
 
+import logging
+import threading
 import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Iterable
-import threading
-import tempfile
 
-# ---------------------------------------------------------
-# Config
-# ---------------------------------------------------------
-_DEFAULT_PATHS: Tuple[Path, ...] = (
-    Path("assets/file_ids.json"),      # caminho padrão do seu projeto
-    Path("bot/assets/file_ids.json"),  # compat opcional
-)
+# Importa a conexão central do banco (que criamos no passo anterior)
+from modules.database import db
 
-_JSON_CACHE: Dict[str, Any] | None = None
-_JSON_PATH: Path | None = None
-_LOCK = threading.RLock()  # segurança contra concorrência
+logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# CONFIGURAÇÃO E CACHE
+# ==============================================================================
 
-# ---------------------------------------------------------
-# Path / I/O
-# ---------------------------------------------------------
-def _resolve_path() -> Path:
+# Nome da coleção no MongoDB
+COLLECTION_NAME = "file_assets"
+
+# Cache em memória para não consultar o banco toda vez que enviar uma imagem (performance)
+_CACHE: Dict[str, Dict[str, str]] = {}
+_LOCK = threading.RLock()
+_INITIALIZED = False
+
+# ==============================================================================
+# LÓGICA DE BANCO DE DADOS
+# ==============================================================================
+
+def _get_collection():
+    """Retorna a coleção do Mongo ou None se não conectado."""
+    if db is not None:
+        return db[COLLECTION_NAME]
+    return None
+
+def _load_cache_from_db():
     """
-    Resolve o caminho do JSON. Se nenhum existir, escolhe o primeiro
-    da lista (_DEFAULT_PATHS[0]).
+    Baixa todos os IDs do Mongo para a memória RAM (Cache).
+    Estrutura no Mongo: { "_id": "nome_da_key", "file_id": "...", "file_type": "..." }
     """
-    global _JSON_PATH
-    if _JSON_PATH:
-        return _JSON_PATH
-    for p in _DEFAULT_PATHS:
-        if p.exists():
-            _JSON_PATH = p
-            return p
-    _JSON_PATH = _DEFAULT_PATHS[0]
-    return _JSON_PATH
+    global _CACHE
+    col = _get_collection()
+    if col is None:
+        return
 
-
-def _ensure_file_exists() -> Path:
-    """
-    Garante que o diretório exista e o arquivo JSON também (inicializa com {}).
-    """
-    path = _resolve_path()
-    os.makedirs(path.parent, exist_ok=True)
-    if not path.exists():
-        # gravação atômica para criar o arquivo vazio
-        tmp_fd, tmp_name = tempfile.mkstemp(prefix="file_ids_", suffix=".json.tmp", dir=str(path.parent))
+    with _LOCK:
+        new_cache = {}
         try:
-            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-                json.dump({}, f, ensure_ascii=False)
-            os.replace(tmp_name, path)
-        finally:
+            # Pega todos os documentos
+            cursor = col.find({})
+            for doc in cursor:
+                key = doc["_id"]
+                new_cache[key] = {
+                    "id": doc.get("file_id"),
+                    "type": doc.get("file_type", "photo")
+                }
+            _CACHE = new_cache
+            logger.info(f"[FILE_IDS] Cache carregado com {len(_CACHE)} arquivos de mídia.")
+        except Exception as e:
+            logger.error(f"[FILE_IDS] Erro ao carregar cache do Mongo: {e}")
+
+def _migrate_json_to_mongo():
+    """
+    Verifica se o Mongo está vazio. Se estiver, lê o file_ids.json local
+    e sobe os dados para não perder as imagens antigas.
+    """
+    col = _get_collection()
+    if col is None: return
+
+    # Se já tem dados no Mongo, assumimos que a migração já foi feita ou não é necessária
+    if col.count_documents({}, limit=1) > 0:
+        return
+
+    json_path = Path("assets/file_ids.json")
+    if not json_path.exists():
+        json_path = Path("bot/assets/file_ids.json")
+    
+    if json_path.exists():
+        logger.warning("[FILE_IDS] Iniciando migração de JSON para MongoDB...")
+        try:
+            raw = json_path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            
+            bulk_ops = []
+            # O formato do JSON era: "key": "string_id" OU "key": {"id": "...", "type": "..."}
+            for key, val in data.items():
+                if not key: continue
+                
+                # Normaliza
+                if isinstance(val, str):
+                    fid = val
+                    ftype = "photo"
+                else:
+                    fid = val.get("id")
+                    ftype = val.get("type", "photo")
+                
+                if fid:
+                    # Prepara inserção (usamos replace com upsert para garantir)
+                    col.replace_one(
+                        {"_id": key.strip()}, 
+                        {"_id": key.strip(), "file_id": fid, "file_type": ftype}, 
+                        upsert=True
+                    )
+            
+            logger.info("[FILE_IDS] Migração concluída com sucesso!")
+            # Renomeia o JSON para não migrar de novo (backup)
             try:
-                if os.path.exists(tmp_name):
-                    os.unlink(tmp_name)
-            except Exception:
+                os.rename(json_path, str(json_path) + ".bak")
+            except:
                 pass
-    return path
+            
+        except Exception as e:
+            logger.error(f"[FILE_IDS] Falha na migração JSON->Mongo: {e}")
 
+# ==============================================================================
+# INICIALIZAÇÃO
+# ==============================================================================
+def _ensure_initialized():
+    """Garante que o cache foi carregado pelo menos uma vez."""
+    global _INITIALIZED
+    if not _INITIALIZED:
+        with _LOCK:
+            if not _INITIALIZED:
+                _migrate_json_to_mongo() # Tenta migrar se for a primeira vez
+                _load_cache_from_db()    # Carrega o cache
+                _INITIALIZED = True
 
-def get_store_path() -> Path:
-    """
-    Caminho absoluto do arquivo JSON de armazenamento.
-    Útil para logar/mostrar onde está salvando.
-    """
-    return _ensure_file_exists().resolve()
+# ==============================================================================
+# FUNÇÕES PUBLICAS (API IDÊNTICA AO ANTERIOR)
+# ==============================================================================
 
-
-def _load() -> Dict[str, Any]:
-    """
-    Carrega o JSON em cache de processo.
-    """
-    global _JSON_CACHE
-    with _LOCK:
-        if _JSON_CACHE is not None:
-            return _JSON_CACHE
-        path = _ensure_file_exists()
-        try:
-            raw = path.read_text(encoding="utf-8")
-            data = json.loads(raw) if raw.strip() else {}
-            if not isinstance(data, dict):
-                data = {}
-        except Exception:
-            data = {}
-        _JSON_CACHE = data
-        return _JSON_CACHE
-
-
-def _atomic_save_json(path: Path, data: Dict[str, Any]) -> None:
-    """
-    Grava JSON de forma atômica: escreve em arquivo temporário e faz os.replace().
-    """
-    tmp_fd, tmp_name = tempfile.mkstemp(prefix="file_ids_", suffix=".json.tmp", dir=str(path.parent))
-    try:
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_name, path)
-    finally:
-        try:
-            if os.path.exists(tmp_name):
-                os.unlink(tmp_name)
-        except Exception:
-            pass
-
-
-def _save(db: Dict[str, Any]) -> None:
-    """
-    Persiste no disco. Mantém o mesmo objeto referenciado no cache.
-    """
-    global _JSON_CACHE
-    with _LOCK:
-        path = _ensure_file_exists()
-        _atomic_save_json(path, db)
-        _JSON_CACHE = db  # garante que o cache aponte para o mesmo conteúdo
-
-
-# ---------------------------------------------------------
-# Normalizações / validações
-# ---------------------------------------------------------
-def _norm_key(key: str | None) -> str:
-    """
-    Normaliza a chave de mídia (remove espaços nas pontas).
-    """
-    if key is None:
-        return ""
-    return str(key).strip()
-
-
-def _norm_type(file_type: str | None) -> str:
-    """
-    Normaliza o tipo ('photo'|'video'), padrão 'photo'.
-    """
-    t = (file_type or "photo").strip().lower()
-    if t not in {"photo", "video"}:
-        t = "photo"
-    return t
-
-
-# ---------------------------------------------------------
-# API principal
-# ---------------------------------------------------------
 def get_file_data(key: str) -> Optional[Dict[str, str]]:
     """
     Retorna {'id': '...', 'type': 'photo'|'video'} ou None.
-    Aceita formato legado (valor string => assume 'photo').
+    Lê direto da memória (rápido).
     """
-    k = _norm_key(key)
-    if not k:
-        return None
-    db = _load()
-    val = db.get(k)
-    if val is None:
-        return None
-    if isinstance(val, str):
-        return {"id": val, "type": "photo"}
-    fid = (val or {}).get("id")
-    if not fid:
-        return None
-    ftype = _norm_type((val or {}).get("type"))
-    return {"id": fid, "type": ftype}
-
+    _ensure_initialized()
+    k = str(key).strip()
+    return _CACHE.get(k)
 
 def get_file_id(key: str) -> Optional[str]:
-    """
-    Retorna apenas o file_id (ou None).
-    """
-    fd = get_file_data(key)
-    return fd["id"] if fd else None
-
+    data = get_file_data(key)
+    return data["id"] if data else None
 
 def get_file_type(key: str) -> Optional[str]:
-    """
-    Retorna apenas o tipo salvo ('photo'|'video') (ou None).
-    """
-    fd = get_file_data(key)
-    return fd["type"] if fd else None
-
+    data = get_file_data(key)
+    return data["type"] if data else None
 
 def set_file_data(key: str, file_id: str, file_type: str = "photo") -> None:
     """
-    Cria/atualiza a entrada de mídia.
-    file_type: 'photo' ou 'video'
+    Salva no MongoDB e atualiza o Cache local.
     """
-    k = _norm_key(key)
-    if not k:
-        raise ValueError("A chave (nome) não pode ser vazia.")
-    fid = str(file_id or "").strip()
-    if not fid:
-        raise ValueError("file_id não pode ser vazio.")
-    ftype = _norm_type(file_type)
+    _ensure_initialized()
+    col = _get_collection()
+    
+    k = str(key).strip()
+    fid = str(file_id).strip()
+    ftype = "video" if file_type.lower() == "video" else "photo"
 
+    if not k or not fid:
+        raise ValueError("Chave ou File ID inválidos.")
+
+    # 1. Salva no Banco (Persistência)
+    if col:
+        try:
+            col.update_one(
+                {"_id": k},
+                {"$set": {"file_id": fid, "file_type": ftype}},
+                upsert=True
+            )
+        except Exception as e:
+            logger.error(f"[FILE_IDS] Erro ao salvar no Mongo: {e}")
+            # Mesmo se der erro no banco, tentamos atualizar o cache local para a sessão atual
+    
+    # 2. Atualiza Cache Local (Velocidade)
     with _LOCK:
-        db = _load()
-        # _load() pode ter retornado o objeto de cache; copiamos para
-        # evitar mutação visível em caso de erro de gravação.
-        new_db = dict(db)
-        new_db[k] = {"id": fid, "type": ftype}
-        _save(new_db)
+        _CACHE[k] = {"id": fid, "type": ftype}
 
-
-# Alias para compatibilidade com conversas que chamam save_file_id(...)
+# Alias para compatibilidade
 def save_file_id(key: str, file_id: str, file_type: str = "photo") -> None:
     set_file_data(key, file_id, file_type)
 
-
 def delete_file_data(key: str) -> bool:
-    """
-    Remove a entrada. Retorna True se removeu.
-    """
-    k = _norm_key(key)
-    if not k:
-        return False
-    with _LOCK:
-        db = _load()
-        if k in db:
-            new_db = dict(db)
-            del new_db[k]
-            _save(new_db)
-            return True
-        return False
+    """Remove do banco e do cache."""
+    _ensure_initialized()
+    col = _get_collection()
+    k = str(key).strip()
 
+    if not k: return False
+
+    # Remove do banco
+    if col:
+        try:
+            col.delete_one({"_id": k})
+        except Exception as e:
+            logger.error(f"[FILE_IDS] Erro ao deletar do Mongo: {e}")
+
+    # Remove do cache
+    with _LOCK:
+        if k in _CACHE:
+            del _CACHE[k]
+            return True
+    return False
 
 def list_keys() -> Tuple[str, ...]:
-    """
-    Lista todas as chaves cadastradas (ordenadas por nome).
-    """
+    _ensure_initialized()
     with _LOCK:
-        return tuple(sorted(_load().keys()))
-
+        return tuple(sorted(_CACHE.keys()))
 
 def exists(key: str) -> bool:
-    """
-    Verifica se a chave existe.
-    """
-    k = _norm_key(key)
-    if not k:
-        return False
-    with _LOCK:
-        return k in _load()
+    _ensure_initialized()
+    return str(key).strip() in _CACHE
 
-
-def items() -> Iterable[Tuple[str, Dict[str, str] | str]]:
-    """
-    Itera sobre os itens crus do banco (pode conter formato legado).
-    """
-    with _LOCK:
-        return tuple(_load().items())
-
+# Funções auxiliares de debug/compatibilidade
+def refresh_cache() -> None:
+    """Força recarregamento do banco."""
+    _load_cache_from_db()
 
 def get_all_normalized() -> Dict[str, Dict[str, str]]:
-    """
-    Retorna um dicionário {key: {'id':..., 'type':...}} já normalizado,
-    convertendo valores legados (string → {'id':..., 'type':'photo'}).
-    """
-    with _LOCK:
-        src = _load()
-        out: Dict[str, Dict[str, str]] = {}
-        for k, v in src.items():
-            if isinstance(v, str):
-                out[k] = {"id": v, "type": "photo"}
-            else:
-                fid = (v or {}).get("id")
-                if fid:
-                    out[k] = {"id": fid, "type": _norm_type((v or {}).get("type"))}
-        return out
+    _ensure_initialized()
+    return _CACHE.copy()
 
-
-def refresh_cache() -> None:
-    """
-    Descarta o cache e recarrega do disco (útil se você editar o JSON manualmente).
-    """
-    global _JSON_CACHE
-    with _LOCK:
-        _JSON_CACHE = None
-        _load()
+# Compatibilidade com chamadas de caminho (agora dummy)
+def get_store_path() -> Path:
+    return Path("MONGODB_CLOUD_STORAGE")
