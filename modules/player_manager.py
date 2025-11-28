@@ -124,25 +124,25 @@ async def full_restore(user_id: int):
         return True
     return False
 
-# No final de modules/player_manager.py
-
 async def find_player_by_character_name(name: str):
     """
     Busca jogador pelo nome do personagem (Case Insensitive).
-    Garante retorno compatível (Dicionário).
+    Retorna o dicionário completo do jogador (com 'user_id' injetado).
     """
-    # Tenta buscar
+    # Chama a função original que busca no banco
     result = await find_player_by_name(name)
     
-    # Se for None, retorna None
     if not result:
         return None
         
-    # Se for uma tupla (formato antigo ou de cache), converte para dict
-    if isinstance(result, tuple):
-        # Assume que a tupla é (user_id, player_data) ou (user_id, name)
-        # O mais seguro é retornar apenas o ID se for tupla simples
-        return {'user_id': result[0]}
+    # A função find_player_by_name retorna uma tupla: (user_id, player_data)
+    if isinstance(result, tuple) and len(result) >= 2:
+        user_id = result[0]
+        player_data = result[1]
         
-    # Se já for dict, retorna direto
-    return result
+        # Garante que o ID esteja dentro do dicionário para o sistema de clãs usar
+        if isinstance(player_data, dict):
+            player_data['user_id'] = user_id
+            return player_data
+            
+    return None
