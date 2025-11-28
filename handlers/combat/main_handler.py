@@ -416,7 +416,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                     InlineKeyboardMarkup(keyboard)
                 )
                 return
-        else: # Falha na Fuga
+        else: 
             log.append("🏃 𝑺𝒖𝒂 𝒕𝒆𝒏𝒕𝒂𝒕𝒊𝒗𝒂 𝒅𝒆 𝒇𝒖𝒈𝒂 𝒇𝒂𝒍𝒉𝒐𝒖!")
             
             dodge_chance = await player_manager.get_player_dodge_chance(player_total_stats)
@@ -690,4 +690,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
         pass
 
 # Handler Registrado
-combat_handler = CallbackQueryHandler(combat_callback, pattern=r'^(combat_attack|combat_flee|combat_attack_menu)$')
+combat_handler = CallbackQueryHandler(
+    combat_callback, 
+    pattern=r'^(combat_attack|combat_flee|combat_attack_menu|combat_return_to_map)$'
+)
