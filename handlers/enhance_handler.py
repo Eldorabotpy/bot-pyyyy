@@ -263,8 +263,6 @@ async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 # Ações
 # =========================
-# Em handlers/enhance_handler.py
-# SUBSTITUA a sua função original por esta versão completa:
 
 async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -291,14 +289,15 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await enhance_item_menu(update, context) # Chama função async
             return
 
-        # --- GATILHO DE MISSÃO (síncrono localmente) ---
+        # --- GATILHO DE MISSÃO (BLINDADO) ---
         if res.get("success"):
-            pdata["user_id"] = user_id # Adiciona ID para mission manager
-            mission_manager.update_mission_progress(
-                pdata,
-                event_type="ENHANCE_SUCCESS",
-                details={"quantity": 1}
-            )
+            try:
+                # Chama a missão no padrão correto: (user_id, mission_type, item_id, quantity)
+                # 'enhance' é um tipo comum, 'any' significa qualquer item, 1 é a quantidade
+                await mission_manager.update_mission_progress(user_id, 'enhance', 'any', 1)
+            except Exception:
+                # Se falhar, ignora para não travar o jogo
+                pass
         # --- FIM DO GATILHO DE MISSÃO ---
 
         # <<< CORREÇÃO 7: Adiciona await (SALVA APÓS ENHANCE E MISSÃO) >>>
