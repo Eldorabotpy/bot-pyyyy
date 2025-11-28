@@ -4,6 +4,7 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from modules.chat_responses import CHAT_RESPONSES
+from modules import player_manager
 
 async def chat_interaction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -39,5 +40,23 @@ async def chat_interaction_callback(update: Update, context: ContextTypes.DEFAUL
             # Para o loop após encontrar a primeira correspondência
             break
 
+async def debug_inv_cmd(update, context):
+    """Comando secreto para ver IDs do inventário."""
+    user_id = update.effective_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    
+    inv = pdata.get("inventory", {})
+    msg = "🕵️‍♂️ **RAIO-X DO INVENTÁRIO** 🕵️‍♂️\n\n"
+    
+    if not inv:
+        msg += "Inventário vazio."
+    else:
+        for item_id, qtd in inv.items():
+            # Mostra o ID cru e a quantidade
+            msg += f"📦 ID: <code>{item_id}</code> | Qtd: {qtd}\n"
+            
+    await update.message.reply_text(msg, parse_mode="HTML")
+
 # O handler em si não muda
 chat_interaction_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, chat_interaction_callback)
+

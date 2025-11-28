@@ -13,6 +13,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from threading import Thread
 from flask import Flask
 import asyncio 
+from telegram.ext import CommandHandler
+from modules import player_manager
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes
@@ -23,6 +25,7 @@ from telegram.error import Conflict
 from config import ADMIN_ID, TELEGRAM_TOKEN, EVENT_TIMES, JOB_TIMEZONE, WORLD_BOSS_TIMES
 from registries import register_all_handlers
 from registries.events import register_event_handlers
+from registries.class_evolution import register_evolution_handlers
 
 # Importa o Watchdog
 from modules.player.actions import check_stale_actions_on_startup
@@ -240,12 +243,15 @@ async def main():
     )
     application = Application.builder().token(TELEGRAM_TOKEN).request(http_request).build()
     
+    application.add_handler(CommandHandler("debug_inv", debug_inv_cmd))
+
     application.add_error_handler(error_handler)
     
     register_jobs(application) 
     register_all_handlers(application)
     register_event_handlers(application)
-    
+    register_evolution_handlers(application)
+
     logger.info("Bot configurado. Iniciando...")
 
     try:
@@ -281,7 +287,23 @@ async def main():
             await application.stop()
         await application.shutdown()
         logger.info("Bot desligado.")
-
+async def debug_inv_cmd(update, context):
+    """Comando secreto para ver IDs do inventário."""
+    user_id = update.effective_user.id
+    # Agora o player_manager vai funcionar
+    pdata = await player_manager.get_player_data(user_id)
+    
+    inv = pdata.get("inventory", {})
+    msg = "🕵️‍♂️ **RAIO-X DO INVENTÁRIO** 🕵️‍♂️\n\n"
+    
+    if not inv:
+        msg += "Inventário vazio."
+    else:
+        for item_id, qtd in inv.items():
+            # Mostra o ID cru e a quantidade
+            msg += f"📦 ID: <code>{item_id}</code> | Qtd: {qtd}\n"
+            
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 if __name__ == "__main__":
     asyncio.run(main())
