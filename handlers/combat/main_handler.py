@@ -1,5 +1,5 @@
 # handlers/combat/main_handler.py
-# (VERSÃO FINAL CORRIGIDA - LOCALIZAÇÃO PERSISTENTE)
+# (VERSÃO CORRIGIDA: PASSO 'CHAT_ID' NO RETORNO AO MAPA)
 
 import logging
 import random
@@ -110,9 +110,8 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             player_data['player_state'] = {'action': 'idle'}
             await player_manager.save_player_data(user_id, player_data)
             
-            # Envia o menu da região CORRETA
-            # A função send_region_menu lê o 'current_location' do banco
-            await send_region_menu(update, context)
+            # [CORREÇÃO AQUI]: Adicionado o argumento chat_id
+            await send_region_menu(update, context, chat_id)
             
             # Tenta apagar a mensagem de batalha para limpar o chat
             try: await query.delete_message()
@@ -152,7 +151,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     monster_stats = battle_cache.get('monster_stats', {})
     is_auto_mode = battle_cache.get('is_auto_mode', False)
     
-    # [CORREÇÃO] Botão agora chama 'combat_return_to_map' em vez de 'continue_after_action'
+    # Botão agora chama 'combat_return_to_map' em vez de 'continue_after_action'
     kb_voltar = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣 𝕡𝕒𝕣𝕒 𝕠 𝕄𝕒𝕡𝕒", callback_data='combat_return_to_map')]])
     
     # --- FUGIR ---
@@ -245,7 +244,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         if monster_defeated_in_turn:
             log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
             
-            # Recompensas
             reward_context = battle_cache.copy()
             reward_context.update(monster_stats)
             reward_context['monster_level'] = monster_stats.get('level', 1) 
@@ -268,7 +266,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     iname = item_def.get("display_name", item_id) if item_def else item_id
                     summary += f"• {qty}x {iname}\n"
 
-            # Missões (Protegido)
             try:
                 mission_logs = []
                 monster_id = monster_stats.get("id")
@@ -290,7 +287,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             player_data['current_mp'] = total_stats.get('max_mana', 50)
             player_data['player_state'] = {'action': 'idle'}
             
-            # SALVAMENTO FINAL
             await player_manager.save_player_data(user_id, player_data)
             context.user_data.pop('battle_cache', None)
             
@@ -690,7 +686,4 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
         pass
 
 # Handler Registrado
-combat_handler = CallbackQueryHandler(
-    combat_callback, 
-    pattern=r'^(combat_attack|combat_flee|combat_attack_menu|combat_return_to_map)$'
-)
+combat_handler = CallbackQueryHandler(combat_callback, pattern=r'^(combat_attack|combat_flee|combat_attack_menu|combat_return_to_map)$')
