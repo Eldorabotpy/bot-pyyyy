@@ -321,7 +321,7 @@ async def _delete_player_command(update: Update, context: ContextTypes.DEFAULT_T
         return
     try:
         user_id_to_delete = int(context.args[0])
-        deleted_ok = await delete_player(user_id_to_delete)
+        deleted_ok = delete_player(user_id_to_delete) # <--- SEM AWAIT
         if deleted_ok:
             await update.message.reply_text(f"✅ Jogador com ID {user_id_to_delete} foi apagado com sucesso.")
         else:
@@ -521,7 +521,7 @@ async def _delete_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     try:
         # Chama a função de deletar importada
-        deleted_ok = await delete_player(target_id)
+        deleted_ok = delete_player(target_id)
         
         if deleted_ok:
             await _safe_edit_text(update, context, f"✅ <b>SUCESSO!</b>\nO jogador {target_id} foi apagado da base de dados.")

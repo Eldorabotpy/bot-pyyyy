@@ -287,23 +287,41 @@ async def main():
             await application.stop()
         await application.shutdown()
         logger.info("Bot desligado.")
+        
 async def debug_inv_cmd(update, context):
-    """Comando secreto para ver IDs do inventário."""
+    """Comando secreto para ver IDs do inventário (Versão Anti-Crash)."""
     user_id = update.effective_user.id
-    # Agora o player_manager vai funcionar
     pdata = await player_manager.get_player_data(user_id)
     
     inv = pdata.get("inventory", {})
-    msg = "🕵️‍♂️ **RAIO-X DO INVENTÁRIO** 🕵️‍♂️\n\n"
     
     if not inv:
-        msg += "Inventário vazio."
-    else:
-        for item_id, qtd in inv.items():
-            # Mostra o ID cru e a quantidade
-            msg += f"📦 ID: <code>{item_id}</code> | Qtd: {qtd}\n"
-            
-    await update.message.reply_text(msg, parse_mode="HTML")
+        await update.message.reply_text("Inventário vazio.", parse_mode="HTML")
+        return
+
+    # Cabeçalho
+    header = "🕵️‍♂️ **RAIO-X DO INVENTÁRIO** 🕵️‍♂️\n\n"
+    message_chunks = []
+    current_chunk = header
+    
+    for item_id, qtd in inv.items():
+        # Cria a linha do item
+        line = f"📦 ID: <code>{item_id}</code> | Qtd: {qtd}\n"
+        
+        # Se adicionar essa linha estourar o limite (4096), salva o bloco atual e começa um novo
+        if len(current_chunk) + len(line) > 4000: # Margem de segurança
+            message_chunks.append(current_chunk)
+            current_chunk = ""
+        
+        current_chunk += line
+    
+    # Adiciona o último bloco que sobrou
+    if current_chunk:
+        message_chunks.append(current_chunk)
+        
+    # Envia cada bloco como uma mensagem separada
+    for chunk in message_chunks:
+        await update.message.reply_text(chunk, parse_mode="HTML")
 
 if __name__ == "__main__":
     asyncio.run(main())
