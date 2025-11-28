@@ -1,5 +1,5 @@
 # handlers/combat/main_handler.py
-# (VERSÃO FINAL CORRIGIDA - HP na Morte, Custo de Mana e Lógica de Cura de Suporte)
+# (VERSÃO FINAL CORRIGIDA - LOCALIZAÇÃO PERSISTENTE)
 
 import logging
 import random
@@ -12,7 +12,6 @@ from telegram.error import BadRequest
 
 # Importações dos seus módulos
 from modules import player_manager, game_data, class_evolution_service, clan_manager
-# IMPORTANTE: Adicionado mission_manager
 from modules import mission_manager 
 from handlers.menu.region import send_region_menu
 
@@ -33,105 +32,61 @@ from modules.combat import combat_engine
 logger = logging.getLogger(__name__)
 
 # ================================================
-# INÍCIO: FUNÇÃO AUXILIAR DE SKILL
+# FUNÇÃO AUXILIAR DE SKILL
 # ================================================
 def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dict]:
-    """
-    Helper para buscar os dados de uma skill (SKILL_DATA) e mesclá-los
-    com os dados da raridade que o jogador possui.
-    """
+    """Helper para buscar skill com dados de raridade."""
     base_skill = SKILL_DATA.get(skill_id)
-    if not base_skill: 
-        return None # Skill não existe
+    if not base_skill: return None
 
-    if "rarity_effects" not in base_skill:
-        return base_skill
+    if "rarity_effects" not in base_skill: return base_skill
 
     player_skills = pdata.get("skills", {})
-    if not isinstance(player_skills, dict):
-        rarity = "comum"
+    if not isinstance(player_skills, dict): rarity = "comum"
     else:
         player_skill_instance = player_skills.get(skill_id)
-        if not player_skill_instance:
-            rarity = "comum"
-        else:
-            rarity = player_skill_instance.get("rarity", "comum")
+        rarity = player_skill_instance.get("rarity", "comum") if player_skill_instance else "comum"
 
     merged_data = base_skill.copy()
     rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
     merged_data.update(rarity_data)
-    
     return merged_data
-# ================================================
-# FIM: FUNÇÃO AUXILIAR DE SKILL
-# ================================================
 
+# ================================================
+# HELPERS VISUAIS
+# ================================================
 async def _safe_answer(query):
     try: await query.answer()
     except BadRequest: pass
 
 async def _edit_caption_only(query, caption_text: str, reply_markup=None):
-    """ Tenta editar o caption, se falhar, tenta editar o texto. (Usado pelo Legacy)"""
-    try:
-        await query.edit_message_caption(caption=caption_text, reply_markup=reply_markup, parse_mode='HTML')
+    try: await query.edit_message_caption(caption=caption_text, reply_markup=reply_markup, parse_mode='HTML')
     except (BadRequest, AttributeError):
-        try:
-            await query.edit_message_text(text=caption_text, reply_markup=reply_markup, parse_mode='HTML')
-        except Exception: 
-            pass 
+        try: await query.edit_message_text(text=caption_text, reply_markup=reply_markup, parse_mode='HTML')
+        except Exception: pass 
 
 async def _edit_media_or_caption(context: ContextTypes.DEFAULT_TYPE, battle_cache: dict, new_caption: str, new_media_id: str, new_media_type: str, reply_markup=None):
-    """
-    Função 'inteligente' que troca a mídia E a legenda. (Usada pelo Cache)
-    """
     try:
         if not new_media_id:
-            new_media_id = battle_cache['monster_media_id']
-            new_media_type = battle_cache['monster_media_type']
+            new_media_id = battle_cache.get('monster_media_id')
+            new_media_type = battle_cache.get('monster_media_type', 'photo')
             if not new_media_id:
-                    raise ValueError("Nenhuma mídia válida encontrada no cache (nem jogador, nem monstro)")
+                 await context.bot.edit_message_text(chat_id=battle_cache['chat_id'], message_id=battle_cache['message_id'], text=new_caption, reply_markup=reply_markup, parse_mode="HTML")
+                 return
 
         InputMediaClass = InputMediaVideo if new_media_type == "video" else InputMediaPhoto
-        
-        await context.bot.edit_message_media(
-            chat_id=battle_cache['chat_id'],
-            message_id=battle_cache['message_id'],
-            media=InputMediaClass(
-                media=new_media_id,
-                caption=new_caption,
-                parse_mode="HTML"
-            ),
-            reply_markup=reply_markup
-        )
+        await context.bot.edit_message_media(chat_id=battle_cache['chat_id'], message_id=battle_cache['message_id'], media=InputMediaClass(media=new_media_id, caption=new_caption, parse_mode="HTML"), reply_markup=reply_markup)
     except Exception as e:
-        if "Message is not modified" in str(e):
-            pass 
+        if "Message is not modified" in str(e): pass 
         else:
-            logger.warning(f"Falha ao trocar mídia (edit_message_media): {e}. Tentando editar só a legenda.")
-            try:
-                await context.bot.edit_message_caption(
-                    chat_id=battle_cache['chat_id'],
-                    message_id=battle_cache['message_id'],
-                    caption=new_caption,
-                    reply_markup=reply_markup,
-                    parse_mode="HTML"
-                )
-            except Exception as e_caption:
-                logger.error(f"Falha CRÍTICA ao editar legenda no fallback: {e_caption}")
+            try: await context.bot.edit_message_caption(chat_id=battle_cache['chat_id'], message_id=battle_cache['message_id'], caption=new_caption, reply_markup=reply_markup, parse_mode="HTML")
+            except Exception:
+                try: await context.bot.send_message(chat_id=battle_cache['chat_id'], text=new_caption, reply_markup=reply_markup, parse_mode="HTML")
+                except: pass
 
-
-async def _return_to_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, msg: str | None = None):
-    """Retorna ao menu principal da região, garantindo que o estado é 'idle'."""
-    player = await player_manager.get_player_data(user_id) or {}
-    
-    player['player_state'] = {'action': 'idle'}
-    context.user_data.pop('battle_cache', None) 
-    
-    await player_manager.save_player_data(user_id, player) 
-    if msg:
-        await context.bot.send_message(chat_id, msg)
-    await send_region_menu(context=context, user_id=user_id, chat_id=chat_id)
-
+# ================================================
+# MOTOR DE COMBATE PRINCIPAL
+# ================================================
 
 async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str = None) -> None:
     """Motor de Combate Principal (Usa o BATTLE CACHE)."""
@@ -142,6 +97,27 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
     user_id = query.from_user.id if query else update.effective_user.id
     chat_id = query.message.chat.id if query else update.effective_chat.id
+
+    # --- AÇÃO: VOLTAR PARA O MAPA (CORREÇÃO DE LOCALIZAÇÃO) ---
+    if action == 'combat_return_to_map':
+        if query: await _safe_answer(query)
+        # Limpa o cache da batalha
+        context.user_data.pop('battle_cache', None)
+        
+        # Garante estado IDLE
+        player_data = await player_manager.get_player_data(user_id)
+        if player_data:
+            player_data['player_state'] = {'action': 'idle'}
+            await player_manager.save_player_data(user_id, player_data)
+            
+            # Envia o menu da região CORRETA
+            # A função send_region_menu lê o 'current_location' do banco
+            await send_region_menu(update, context)
+            
+            # Tenta apagar a mensagem de batalha para limpar o chat
+            try: await query.delete_message()
+            except: pass
+        return
 
     if action == 'combat_attack_menu':
         if not query: return
@@ -158,38 +134,43 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     
     battle_cache = context.user_data.get('battle_cache')
     
-    # Fallback para legado
+    # --- FALLBACK LEGACY ---
     if not battle_cache or battle_cache.get('player_id') != user_id:
         player_data_db = await player_manager.get_player_data(user_id)
         if not player_data_db or player_data_db.get('player_state', {}).get('action') != 'in_combat':
             if query:
-                try: await query.edit_message_caption(caption="Você não está em combate.", reply_markup=None)
+                try: await query.edit_message_caption(caption="⚠️ Batalha encerrada.", reply_markup=None)
                 except: pass
             return
         else:
             await _legacy_combat_callback(update, context, action, player_data_db)
             return
 
+    # --- COMBATE CACHE ---
     log = battle_cache.get('battle_log', [])
     player_stats = battle_cache.get('player_stats', {}) 
     monster_stats = battle_cache.get('monster_stats', {})
     is_auto_mode = battle_cache.get('is_auto_mode', False)
-    kb_voltar = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data='continue_after_action')]])
     
+    # [CORREÇÃO] Botão agora chama 'combat_return_to_map' em vez de 'continue_after_action'
+    kb_voltar = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣 𝕡𝕒𝕣𝕒 𝕠 𝕄𝕒𝕡𝕒", callback_data='combat_return_to_map')]])
+    
+    # --- FUGIR ---
     if action == 'combat_flee':
         if not query: return
         context.user_data.pop('battle_cache', None)
         player_data = await player_manager.get_player_data(user_id)
         player_data['player_state'] = {'action': 'idle'}
         total_stats = await player_manager.get_player_total_stats(player_data)
-        player_data['current_hp'] = total_stats.get('max_hp', 50)
-        player_data['current_mp'] = total_stats.get('max_mana', 10)
+        player_data['current_hp'] = max(1, int(total_stats.get('max_hp', 50) * 0.1))
         await player_manager.save_player_data(user_id, player_data)
+        
         try: await query.delete_message()
         except Exception: pass
-        await _send_battle_media(context, chat_id, "🏃 <b>FUGA!</b>\n\nVocê fugiu.", "media_fuga_sucesso", kb_voltar)
+        await _send_battle_media(context, chat_id, "🏃 <b>FUGA!</b>\n\nVocê escapou com vida.", "media_fuga_sucesso", kb_voltar)
         return
 
+    # --- ATACAR ---
     elif action == 'combat_attack':
         player_data = await player_manager.get_player_data(user_id)
         if not player_data: return
@@ -237,7 +218,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 player_damage = resultado["total_damage"]
                 log.extend(resultado["log_messages"])
                 monster_stats['hp'] = int(monster_stats.get('hp', 0)) - player_damage
-                monster_defeated_in_turn = monster_stats['hp'] <= 0
+                
         else:
             log.append("⚔️ Ataque básico.")
             resultado = await combat_engine.processar_acao_combate(
@@ -248,8 +229,8 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             player_damage = resultado["total_damage"]
             log.extend(resultado["log_messages"])
             monster_stats['hp'] = int(monster_stats.get('hp', 0)) - player_damage
-            monster_defeated_in_turn = monster_stats['hp'] <= 0
             
+        monster_defeated_in_turn = monster_stats['hp'] <= 0
         battle_cache['battle_log'] = log
         caption_turno_jogador = await format_combat_message_from_cache(battle_cache)
         
@@ -264,51 +245,43 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         if monster_defeated_in_turn:
             log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
             
-            # A. Calcula Recompensas e DROPS
-            xp, gold, looted_items = rewards.calculate_victory_rewards(player_data, battle_cache)
+            # Recompensas
+            reward_context = battle_cache.copy()
+            reward_context.update(monster_stats)
+            reward_context['monster_level'] = monster_stats.get('level', 1) 
             
-            # B. Atualiza Player (XP/Ouro)
+            xp, gold, looted_items = rewards.calculate_victory_rewards(player_data, reward_context)
+            
             player_data["xp"] = player_data.get("xp", 0) + xp
             player_data["gold"] = player_data.get("gold", 0) + gold
             
-            # C. Atualiza Inventário (Drops)
             for item_id, qty in looted_items:
                 player_manager.add_item_to_inventory(player_data, item_id, qty)
 
-            # D. Formata Texto Base
             summary = f"🏆 <b>VITÓRIA!</b>\n\nVocê derrotou {monster_stats['name']}!\n"
             summary += f"✨ XP: +{xp}\n💰 Ouro: +{gold}\n"
+            
             if looted_items:
                 summary += "\n<b>📦 Itens Encontrados:</b>\n"
                 for item_id, qty in looted_items:
-                    iname = game_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id)
+                    item_def = game_data.ITEMS_DATA.get(item_id, {})
+                    iname = item_def.get("display_name", item_id) if item_def else item_id
                     summary += f"• {qty}x {iname}\n"
 
-            # --- E. INTEGRAÇÃO DE MISSÕES (O PULO DO GATO) ---
-            mission_logs = []
-            
-            # 1. Conta a CAÇA (Matar o monstro)
-            monster_id = monster_stats.get("id")
-            if monster_id:
-                try:
+            # Missões (Protegido)
+            try:
+                mission_logs = []
+                monster_id = monster_stats.get("id")
+                if monster_id:
                     hunt_logs = await mission_manager.update_mission_progress(user_id, "hunt", monster_id, 1)
-                    mission_logs.extend(hunt_logs)
-                except Exception: pass
-
-            # 2. Conta a COLETA (Pelos itens dropados)
-            # Isso permite que o Ferreiro complete missões de coleta lutando!
-            for item_id, qty in looted_items:
-                try:
-                    # "collect" é o tipo da missão de coleta
+                    if hunt_logs: mission_logs.extend(hunt_logs)
+                for item_id, qty in looted_items:
                     collect_logs = await mission_manager.update_mission_progress(user_id, "collect", item_id, qty)
-                    mission_logs.extend(collect_logs)
-                except Exception: pass
-            
-            if mission_logs:
-                summary += "\n" + "\n".join(mission_logs)
-            # -------------------------------------------------------
+                    if collect_logs: mission_logs.extend(collect_logs)
+                if mission_logs: summary += "\n" + "\n".join(mission_logs)
+            except Exception as e:
+                logger.error(f"Erro em missões: {e}")
 
-            # F. Check Level Up e Restaura Status
             _, _, lvl_msg = player_manager.check_and_apply_level_up(player_data)
             if lvl_msg: summary += lvl_msg
             
@@ -317,10 +290,10 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             player_data['current_mp'] = total_stats.get('max_mana', 50)
             player_data['player_state'] = {'action': 'idle'}
             
+            # SALVAMENTO FINAL
             await player_manager.save_player_data(user_id, player_data)
             context.user_data.pop('battle_cache', None)
             
-            # G. Envia Tela Final
             await _edit_media_or_caption(
                 context, battle_cache, summary, 
                 battle_cache['player_media_id'], battle_cache['player_media_type'], 
@@ -351,16 +324,19 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     log.append("☠️ <b>Derrota!</b>")
                     battle_cache['battle_log'] = log
                     player_data = await player_manager.get_player_data(user_id)
-                    defeat_summary, _ = rewards.process_defeat_from_cache(player_data, battle_cache)
+                    
+                    reward_context = battle_cache.copy()
+                    reward_context.update(monster_stats)
+                    defeat_summary, _ = rewards.process_defeat_from_cache(player_data, reward_context)
+                    
                     player_data['current_hp'] = player_stats.get('max_hp', 50)
                     player_data['current_mp'] = battle_cache.get('player_mp', 10)
                     player_data['player_state'] = {'action': 'idle'}
                     await player_manager.save_player_data(user_id, player_data)
                     context.user_data.pop('battle_cache', None)
                     
-                    await _edit_media_or_caption(context, battle_cache, defeat_summary, 
-                        (file_id_manager.get_file_data("media_derrota_cacada") or {}).get('id'), 
-                        "photo", reply_markup=kb_voltar)
+                    media_derrota = (file_id_manager.get_file_data("media_derrota_cacada") or {}).get('id')
+                    await _edit_media_or_caption(context, battle_cache, defeat_summary, media_derrota, "photo", reply_markup=kb_voltar)
                     return 
 
     battle_cache['battle_log'] = log

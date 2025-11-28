@@ -1,4 +1,4 @@
-# modules/game_data/class_evolution.py (VERSÃO ATUALIZADA COM "unlocks_skills")
+# modules/game_data/class_evolution.py (VERSÃO FINAL COMPLETA)
 
 from __future__ import annotations
 from typing import Dict, Any, List
@@ -1036,6 +1036,10 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     ],
 }
 
+# =======================================================
+# --- FUNÇÕES DE BUSCA (ATUALIZADAS) ---
+# =======================================================
+
 def get_evolution_options(
     current_class: str,
     current_level: int,
@@ -1043,10 +1047,10 @@ def get_evolution_options(
 ) -> List[dict]:
     """
     Retorna a PRÓXIMA opção de evolução disponível para a classe atual.
-    Esta função foi corrigida para ler a nova estrutura de lista.
     """
     current_class = (current_class or "").lower()
     
+    # Busca a classe base no mapa de hierarquia
     base_class = _CLASS_HIERARCHY_MAP.get(current_class)
     if not base_class:
         return [] 
@@ -1055,6 +1059,7 @@ def get_evolution_options(
     if not evolutions:
         return []
 
+    # Encontra a evolução onde "from" == classe atual
     next_evolution = None
     for evo in evolutions:
         if evo.get("from") == current_class:
@@ -1069,78 +1074,6 @@ def get_evolution_options(
         return [next_evolution] 
         
     return []
-
-_CLASS_HIERARCHY_MAP: Dict[str, str] = {}
-
-def _build_hierarchy_map():
-    """Constrói o mapa de hierarquia de classes (Parent/Base)."""
-    global _CLASS_HIERARCHY_MAP
-    if _CLASS_HIERARCHY_MAP:
-        return
-    
-    for base_class, evolutions in EVOLUTIONS.items():
-        
-        _CLASS_HIERARCHY_MAP[base_class] = base_class
- 
-        for evo in evolutions:
-            to_class = evo.get("to")
-            if to_class:
-                _CLASS_HIERARCHY_MAP[to_class] = base_class
-
-_build_hierarchy_map()
-
-_DIRECT_PARENT_MAP: Dict[str, str] = {}
-
-def _build_direct_parent_map():
-    """Constrói o mapa de parentesco direto e atualiza o Hierarchy Map (para garantir)."""
-    global _DIRECT_PARENT_MAP
-
-    for base_class, evolutions in EVOLUTIONS.items():
-        current_parent = base_class
-        for evo in evolutions:
-            to_class = evo.get("to")
-            if to_class:
-                _DIRECT_PARENT_MAP[to_class] = current_parent
-                current_parent = to_class 
-    
-_build_direct_parent_map()
-
-def get_class_ancestry(current_class: str) -> List[str]:
-    """Retorna a cadeia de evolução do jogador: [classe_atual, pai, avô, base]"""
-    ancestry = []
-    current = current_class.lower()
-    
-    while current and current not in ancestry:
-        ancestry.append(current)
-        parent = _DIRECT_PARENT_MAP.get(current)
-        if not parent or parent == current:
-            break
-        current = parent
-    
-    return ancestry
-
-def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> bool:
-    """
-    Verifica se o jogador pode usar a skill verificando a classe atual 
-    E TODA A SUA CADEIA DE EVOLUÇÃO (T3, T2, T1).
-    """
-    if not allowed_classes:
-        return True 
-    
-    player_class_key = player_class_key.lower()
-    
-    ancestry = get_class_ancestry(player_class_key)
-    allowed_classes_lower = {c.lower() for c in allowed_classes}
-
-    for class_node in ancestry:
-        if class_node in allowed_classes_lower:
-            return True
-
-    return False
-
-# =======================================================
-# --- FUNÇÃO DE BUSCA (ADICIONAR NO FIM DO ARQUIVO) ---
-# =======================================================
 
 def find_evolution_by_target(target_class: str) -> Dict[str, Any] | None:
     """
@@ -1159,3 +1092,78 @@ def find_evolution_by_target(target_class: str) -> Dict[str, Any] | None:
                 return evo_option # Encontrou!
                 
     return None # Não encontrou a definição
+
+# =======================================================
+# --- MAPAS DE HIERARQUIA (GERAÇÃO AUTOMÁTICA) ---
+# =======================================================
+
+_CLASS_HIERARCHY_MAP: Dict[str, str] = {}
+_DIRECT_PARENT_MAP: Dict[str, str] = {}
+
+def _build_maps():
+    """Constrói os mapas de hierarquia de classes."""
+    global _CLASS_HIERARCHY_MAP, _DIRECT_PARENT_MAP
+    
+    if _CLASS_HIERARCHY_MAP: return # Já construído
+    
+    for base_class, evolutions in EVOLUTIONS.items():
+        # A classe base aponta para si mesma
+        _CLASS_HIERARCHY_MAP[base_class] = base_class
+        
+        current_parent = base_class
+        
+        # Ordena evoluções por tier para garantir a cadeia correta
+        sorted_evos = sorted(evolutions, key=lambda x: x.get("tier_num", 0))
+        
+        for evo in sorted_evos:
+            to_class = evo.get("to")
+            from_class = evo.get("from")
+            
+            if to_class:
+                # Todos apontam para a base (para achar a lista correta)
+                _CLASS_HIERARCHY_MAP[to_class] = base_class
+                
+                # Mapa direto de parentesco (Filho -> Pai)
+                if from_class:
+                    _DIRECT_PARENT_MAP[to_class] = from_class
+
+# Executa a construção ao carregar o módulo
+_build_maps()
+
+def get_class_ancestry(current_class: str) -> List[str]:
+    """Retorna a cadeia de evolução do jogador: [classe_atual, pai, avô, base]"""
+    ancestry = []
+    current = (current_class or "").lower()
+    
+    # Evita loop infinito com limite de segurança
+    safety_limit = 10
+    
+    while current and safety_limit > 0:
+        if current in ancestry: break # Loop detectado
+        ancestry.append(current)
+        
+        parent = _DIRECT_PARENT_MAP.get(current)
+        if not parent or parent == current:
+            break
+        current = parent
+        safety_limit -= 1
+    
+    return ancestry
+
+def can_player_use_skill(player_class_key: str, allowed_classes: List[str]) -> bool:
+    """
+    Verifica se o jogador pode usar a skill verificando a classe atual 
+    E TODA A SUA CADEIA DE EVOLUÇÃO.
+    """
+    if not allowed_classes:
+        return True 
+    
+    player_class_key = player_class_key.lower()
+    ancestry = get_class_ancestry(player_class_key)
+    allowed_classes_lower = {c.lower() for c in allowed_classes}
+
+    for class_node in ancestry:
+        if class_node in allowed_classes_lower:
+            return True
+
+    return False
