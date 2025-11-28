@@ -1456,18 +1456,20 @@ def _register_item_safe(item_id: str, data: dict, market_price: int | None = Non
             }
 
 def _generate_auto_items():
-    """Lê Skills e Skins e cria os itens 'Tomo' e 'Caixa'."""
+    """Lê Skills e Skins e cria os itens 'Tomo' e 'Caixa' + Compatibilidade."""
     generated = 0
     
-    # SKILLS -> TOMOS
+    # 1. GERAÇÃO DE SKILLS -> TOMOS
     try:
         from modules.game_data.skills import SKILL_DATA
         for skill_id, info in SKILL_DATA.items():
-            item_id = f"tomo_{skill_id}"
-            if item_id not in ITEMS_DATA:
-                ITEMS_DATA[item_id] = {
+            tomo_id = f"tomo_{skill_id}"
+            
+            # Cria o Tomo Padrão
+            if tomo_id not in ITEMS_DATA:
+                ITEMS_DATA[tomo_id] = {
                     "display_name": f"Tomo: {info.get('display_name', skill_id)}",
-                    "emoji": "📖",
+                    "emoji": "📚",
                     "type": "consumable",
                     "category": "aprendizado", 
                     "description": f"Ensina a habilidade: {info.get('display_name', skill_id)}.",
@@ -1475,33 +1477,54 @@ def _generate_auto_items():
                     "on_use": {"effect": "grant_skill", "skill_id": skill_id}
                 }
                 generated += 1
+            
+            # CORREÇÃO: Se o jogador tiver o ID da skill direto no inventário (bug antigo)
+            # transformamos o próprio ID da skill em um item usável.
+            if skill_id not in ITEMS_DATA:
+                ITEMS_DATA[skill_id] = ITEMS_DATA[tomo_id].copy()
+                ITEMS_DATA[skill_id]["display_name"] += " (Antigo)"
+
     except Exception as e:
         logger.error(f"Auto-Items Skill Error: {e}")
 
-    # SKINS -> CAIXAS
+    # 2. GERAÇÃO DE SKINS -> CAIXAS
     try:
         from modules.game_data.skins import SKIN_CATALOG
         for skin_id, info in SKIN_CATALOG.items():
-            item_id = f"caixa_{skin_id}"
-            if item_id not in ITEMS_DATA:
-                ITEMS_DATA[item_id] = {
-                    "display_name": f"Cx. Skin: {info.get('display_name', skin_id)}",
-                    "emoji": "🎨",
-                    "type": "consumable",
-                    "category": "aprendizado", 
-                    "description": f"Desbloqueia skin: {info.get('display_name', skin_id)}.",
-                    "stackable": True, "tradable": True, "market_currency": "gems",
-                    "on_use": {"effect": "grant_skin", "skin_id": skin_id}
-                }
+            caixa_id = f"caixa_{skin_id}"
+            
+            # Definição comum para Caixa e Item Antigo
+            item_def = {
+                "display_name": f"Cx. Skin: {info.get('display_name', skin_id)}",
+                "emoji": "👘", # Emoji de quimono/roupa
+                "type": "consumable",
+                "category": "aprendizado", # Força ir para aba de livros/aprendizado
+                "description": f"Desbloqueia a aparência: {info.get('display_name', skin_id)}.",
+                "stackable": True, "tradable": True, "market_currency": "gems",
+                "on_use": {"effect": "grant_skin", "skin_id": skin_id}
+            }
+
+            # Cria a Caixa Nova (Padrão correto)
+            if caixa_id not in ITEMS_DATA:
+                ITEMS_DATA[caixa_id] = item_def
                 generated += 1
+            
+            # --- A MÁGICA ACONTECE AQUI ---
+            # Se o jogador tem o ID "monge_quimono_dragao" (sem 'caixa_') no inventário,
+            # definimos esse ID como um item usável também!
+            if skin_id not in ITEMS_DATA:
+                legacy_item = item_def.copy()
+                legacy_item["display_name"] = f"Skin: {info.get('display_name')} (Item)"
+                ITEMS_DATA[skin_id] = legacy_item
+                generated += 1
+
     except Exception as e:
         logger.error(f"Auto-Items Skin Error: {e}")
         
-    print(f">>> ITEMS: {generated} itens automáticos gerados.")
+    print(f">>> ITEMS: {generated} itens automáticos gerados (incluindo legado).")
 
 # Executa geração
 _generate_auto_items()
-
 # ============================================================
 # 5. ITENS DE EVOLUÇÃO
 # ============================================================
