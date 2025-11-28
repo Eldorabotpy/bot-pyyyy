@@ -1,5 +1,5 @@
 # handlers/combat/main_handler.py
-# (VERSÃO CORRIGIDA: PASSO 'CHAT_ID' NO RETORNO AO MAPA)
+# (VERSÃO CORRIGIDA: REMOVIDO ARGUMENTO QUE CAUSAVA CRASH NO MENU)
 
 import logging
 import random
@@ -96,9 +96,9 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     elif action is None and not query: return
 
     user_id = query.from_user.id if query else update.effective_user.id
-    chat_id = query.message.chat.id if query else update.effective_chat.id
+    chat_id = query.message.chat_id if query else update.effective_chat.id
 
-    # --- AÇÃO: VOLTAR PARA O MAPA (CORREÇÃO DE LOCALIZAÇÃO) ---
+    # --- AÇÃO: VOLTAR PARA O MAPA ---
     if action == 'combat_return_to_map':
         if query: await _safe_answer(query)
         # Limpa o cache da batalha
@@ -107,13 +107,13 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         # Garante estado IDLE
         player_data = await player_manager.get_player_data(user_id)
         if player_data:
+            # Garante que salvamos o estado IDLE antes de chamar o menu
             player_data['player_state'] = {'action': 'idle'}
             await player_manager.save_player_data(user_id, player_data)
             
-            # [CORREÇÃO AQUI]: Adicionado o argumento chat_id
-            await send_region_menu(update, context, chat_id)
+            # Chama o menu sem argumentos extras (lê do DB)
+            await send_region_menu(context, user_id, chat_id)
             
-            # Tenta apagar a mensagem de batalha para limpar o chat
             try: await query.delete_message()
             except: pass
         return
@@ -151,7 +151,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     monster_stats = battle_cache.get('monster_stats', {})
     is_auto_mode = battle_cache.get('is_auto_mode', False)
     
-    # Botão agora chama 'combat_return_to_map' em vez de 'continue_after_action'
+    # Botão de retorno
     kb_voltar = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣 𝕡𝕒𝕣𝕒 𝕠 𝕄𝕒𝕡𝕒", callback_data='combat_return_to_map')]])
     
     # --- FUGIR ---
@@ -242,28 +242,46 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             return 
             
         if monster_defeated_in_turn:
-            log.append(f"🏆 <b>{monster_stats['name']} foi derrotado!</b>")
+            log.append(f"🏆 <b>{monster_stats.get('name', 'Inimigo')} foi derrotado!</b>")
             
             reward_context = battle_cache.copy()
             reward_context.update(monster_stats)
             reward_context['monster_level'] = monster_stats.get('level', 1) 
             
-            xp, gold, looted_items = rewards.calculate_victory_rewards(player_data, reward_context)
+            xp, gold, looted_items_raw = rewards.calculate_victory_rewards(player_data, reward_context)
+            
+            # --- NORMALIZAÇÃO DO LOOT ---
+            processed_loot = []
+            if looted_items_raw:
+                for drop in looted_items_raw:
+                    if isinstance(drop, str):
+                        processed_loot.append((drop, 1, None))
+                    elif isinstance(drop, (list, tuple)):
+                        i_id = drop[0] if len(drop) > 0 else None
+                        i_qty = drop[1] if len(drop) > 1 else 1
+                        i_name = drop[2] if len(drop) > 2 else None
+                        
+                        try: i_qty = int(i_qty)
+                        except: i_qty = 1
+                        
+                        if i_id: processed_loot.append((i_id, i_qty, i_name))
             
             player_data["xp"] = player_data.get("xp", 0) + xp
             player_data["gold"] = player_data.get("gold", 0) + gold
             
-            for item_id, qty in looted_items:
+            for item_id, qty, _ in processed_loot:
                 player_manager.add_item_to_inventory(player_data, item_id, qty)
 
-            summary = f"🏆 <b>VITÓRIA!</b>\n\nVocê derrotou {monster_stats['name']}!\n"
+            summary = f"🏆 <b>VITÓRIA!</b>\n\nVocê derrotou {monster_stats.get('name', 'Inimigo')}!\n"
             summary += f"✨ XP: +{xp}\n💰 Ouro: +{gold}\n"
             
-            if looted_items:
+            if processed_loot:
                 summary += "\n<b>📦 Itens Encontrados:</b>\n"
-                for item_id, qty in looted_items:
-                    item_def = game_data.ITEMS_DATA.get(item_id, {})
-                    iname = item_def.get("display_name", item_id) if item_def else item_id
+                for item_id, qty, iname in processed_loot:
+                    if not iname:
+                        item_def = game_data.ITEMS_DATA.get(item_id, {})
+                        iname = item_def.get("display_name", item_id) if item_def else item_id
+                        
                     summary += f"• {qty}x {iname}\n"
 
             try:
@@ -272,9 +290,11 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 if monster_id:
                     hunt_logs = await mission_manager.update_mission_progress(user_id, "hunt", monster_id, 1)
                     if hunt_logs: mission_logs.extend(hunt_logs)
-                for item_id, qty in looted_items:
+                
+                for item_id, qty, _ in processed_loot:
                     collect_logs = await mission_manager.update_mission_progress(user_id, "collect", item_id, qty)
                     if collect_logs: mission_logs.extend(collect_logs)
+                    
                 if mission_logs: summary += "\n" + "\n".join(mission_logs)
             except Exception as e:
                 logger.error(f"Erro em missões: {e}")
@@ -355,7 +375,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
 async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, player_data: dict):
     """
-    (VERSÃO CORRIGIDA)
+    (VERSÃO CORRIGIDA COM SUPORTE A DADOS IMPERFEITOS)
     Função 'combat_callback' antiga, usada como fallback
     """
     logger.debug("[LEGACY COMBAT] Executando fallback de combate (sem cache)")
@@ -369,16 +389,21 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
     log = list(combat_details.get('battle_log', []))
     player_total_stats = await player_manager.get_player_total_stats(player_data) 
     
+    # --- CORREÇÃO DE DADOS DE MONSTRO (BUSCA ROBUSTA) ---
+    m_name = combat_details.get('monster_name', combat_details.get('name', 'Inimigo'))
+    m_xp = combat_details.get('monster_xp_reward', combat_details.get('xp_reward', combat_details.get('xp', 0)))
+    m_gold = combat_details.get('monster_gold_drop', combat_details.get('gold_drop', combat_details.get('gold', 0)))
+    
     monster_stats = {
-        'name': combat_details.get('monster_name', 'Inimigo'),
+        'name': m_name,
         'hp': combat_details.get('monster_hp', 1),
         'max_hp': combat_details.get('monster_max_hp', 1),
         'attack': combat_details.get('monster_attack', 1), 
         'defense': combat_details.get('monster_defense', 0),
         'luck': combat_details.get('monster_luck', 5), 
         'initiative': combat_details.get('monster_initiative', 0),
-        'gold_drop': combat_details.get('monster_gold_drop', 0),
-        'xp_reward': combat_details.get('monster_xp_reward', 0),
+        'gold_drop': m_gold,
+        'xp_reward': m_xp,
         'loot_table': combat_details.get('loot_table', []),
         'id': combat_details.get('id'),
         'is_elite': combat_details.get('is_elite', False),
@@ -433,7 +458,6 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                     return
                 
                 defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
-                # (HP na derrota do modo legado JÁ ESTAVA CORRETO)
                 player_data['current_hp'] = int(player_total_stats.get('max_hp', 50))
                 player_data['current_mp'] = int(player_total_stats.get('max_mana', 10))
                 player_data['player_state'] = {'action': 'idle'}
@@ -451,27 +475,23 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                 return
 
     # ======================================================
-    # --- (INÍCIO) LÓGICA DE ATAQUE (Legada - CORRIGIDA) ---
+    # --- (INÍCIO) LÓGICA DE ATAQUE (Legada) ---
     # ======================================================
     elif action == 'combat_attack':
         
         skill_id = combat_details.pop('skill_to_use', None) 
         action_type = combat_details.pop('action_type', 'attack') 
         
-        # --- CORREÇÃO 4: Lê a skill (com raridade) usando a função auxiliar ---
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id) if skill_id else None
         
         skip_monster_turn = False
         
         # --- LÓGICA DE SKILL ---
-        
         if skill_info:
-            # (O custo de mana agora é lido corretamente da raridade)
             mana_cost = skill_info.get("mana_cost", 0)
-            
             log.append(f"✨ Você usa <b>{skill_info['display_name']}</b>! (-{mana_cost} MP)")
             
-            # --- CORREÇÃO 5: Lógica de Suporte (Cura) ---
+            # --- Lógica de Suporte (Cura) ---
             if action_type == 'support':
                 skill_effects = skill_info.get("effects", {})
                 heal_applied = False
@@ -552,7 +572,10 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                 await open_evolution_menu(update, context) 
                 return
             if in_dungeon:
-                xp_reward, gold_reward, looted_items_list = rewards.calculate_victory_rewards(player_data, combat_details)
+                reward_context = combat_details.copy()
+                reward_context.update(monster_stats) 
+                xp_reward, gold_reward, looted_items_list = rewards.calculate_victory_rewards(player_data, reward_context)
+                
                 rewards_package = {"xp": xp_reward, "gold": gold_reward, "items": looted_items_list}
                 await player_manager.save_player_data(user_id, player_data)
                 await dungeons_runtime.advance_after_victory(update, context, user_id, chat_id, combat_details, rewards_package)
@@ -568,7 +591,11 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                     )
                 except Exception as e:
                     logger.error(f"Falha ao atualizar progresso da missão de guilda para o clã {clan_id}: {e}")
+            
+            # --- CORREÇÃO FINAL DE RECOMPENSAS NO LEGACY ---
+            combat_details.update(monster_stats)
             victory_summary = await rewards.apply_and_format_victory(player_data, combat_details, context)
+            
             _, _, level_up_msg = player_manager.check_and_apply_level_up(player_data) 
             if level_up_msg:
                 victory_summary += level_up_msg
@@ -583,7 +610,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
             media_key = None
             if player_media and player_media.get("id"):
                 media_key = player_media.get("id") 
-            keyboard = [[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data='continue_after_action')]]
+            keyboard = [[InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data='combat_return_to_map')]]
             await _send_battle_media(
                 context, chat_id, victory_summary, 
                 media_key, 
@@ -607,7 +634,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
             return
 
         else: 
-            # --- TURNO DO MONSTRO (Legado - Sem alterações) ---
+            # --- TURNO DO MONSTRO (Legado) ---
             active_cooldowns = combat_details.setdefault("skill_cooldowns", {})
             skills_off_cooldown = []
             if active_cooldowns:
@@ -638,7 +665,6 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                         return
                     
                     defeat_summary, _ = rewards.process_defeat(player_data, combat_details)
-                    # (HP na derrota do modo legado JÁ ESTAVA CORRETO)
                     player_data['current_hp'] = int(player_total_stats.get('max_hp', 50))
                     player_data['current_mp'] = int(player_total_stats.get('max_mana', 10))
                     player_data['player_state'] = {'action': 'idle'}
@@ -655,7 +681,7 @@ async def _legacy_combat_callback(update: Update, context: ContextTypes.DEFAULT_
                     )
                     return
 
-    # --- (FIM) LÓGICA DE ATAQUE (Legada - CORRIGIDA) ---
+    # --- (FIM) LÓGICA DE ATAQUE (Legada) ---
     
     # --- Atualização final do menu (Legado) ---
     combat_details['battle_log'] = log[-15:]

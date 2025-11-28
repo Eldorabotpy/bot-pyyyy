@@ -5,6 +5,7 @@ from collections import Counter
 from modules import player_manager, game_data, mission_manager, clan_manager
 from modules.player.premium import PremiumManager
 from modules.game_data import xp as xp_manager
+from modules.player.inventory import add_item_to_inventory
 
 logger = logging.getLogger(__name__)
 
@@ -44,71 +45,56 @@ def calculate_victory_rewards(player_data: dict, combat_details: dict) -> tuple[
     
     return xp_reward, gold_reward, looted_items
 
-async def apply_and_format_victory(player_data: dict, combat_details: dict, context) -> str:
-    """
-    Aplica as recompensas de uma caça NORMAL, atualiza missões, verifica level up
-    e formata a mensagem final de vitória.
-    """
-    # Verifica se user_id está em player_data, se não, busca no contexto (embora deva estar)
+async def apply_and_format_victory(player_data: dict, monster_stats: dict, context=None) -> str:
+    """Aplica recompensas ao player e retorna texto formatado."""
+    xp, gold, items = calculate_victory_rewards(player_data, monster_stats)
+    
+    # Aplica
+    player_data['xp'] = player_data.get('xp', 0) + xp
+    player_manager.add_gold(player_data, gold)
+    
+    # Formata
+    monster_name = monster_stats.get('name') or monster_stats.get('monster_name', 'Inimigo')
+    text = f"🏆 <b>VITÓRIA!</b>\n\nVocê derrotou {monster_name}!\n"
+    text += f"✨ XP: +{xp}\n💰 Ouro: +{gold}\n"
+    
+    if items:
+        text += "\n<b>📦 Itens Encontrados:</b>\n"
+        for item_id, qty in items:
+            add_item_to_inventory(player_data, item_id, qty)
+            item_def = game_data.ITEMS_DATA.get(item_id, {})
+            name = item_def.get('display_name', item_id)
+            text += f"• {qty}x {name}\n"
+
+    # --- CORREÇÃO: INTEGRAÇÃO COM MISSÕES ---
+    monster_id = monster_stats.get('id')
     user_id = player_data.get("user_id")
-    if not user_id:
-         # Fallback muito improvável, mas seguro
-         logger.warning("apply_and_format_victory foi chamada sem user_id em player_data.")
-         return "Erro ao aplicar recompensas: ID do jogador não encontrado."
-         
-    clan_id = player_data.get("clan_id")
-
-    # Síncrono (usa pdata)
-    xp_reward, gold_reward, looted_items = calculate_victory_rewards(player_data, combat_details)
-
-    # Lógica de XP e Level Up (Síncrono, assumindo que xp_manager.add_combat_xp_inplace é síncrono)
-    level_up_result = xp_manager.add_combat_xp_inplace(player_data, xp_reward)
-    level_up_msg = ""
-    if level_up_result.get("levels_gained", 0) > 0:
-        levels_gained = level_up_result["levels_gained"]
-        points_gained = level_up_result["points_awarded"]
-        new_level = level_up_result["new_level"]
-        nivel_txt = "nível" if levels_gained == 1 else "níveis"
-        ponto_txt = "ponto" if points_gained == 1 else "pontos"
-        level_up_msg = (
-            f"\n\n✨ <b>Parabéns!</b> Você subiu {levels_gained} {nivel_txt} "
-            f"(agora Nv. {new_level}) e ganhou {points_gained} {ponto_txt} de atributo."
-        )
-
-    # Missões Pessoais (Síncrono)
-    mission_manager.update_mission_progress(player_data, 'HUNT', details=combat_details)
-    if combat_details.get('is_elite', False):
-        mission_manager.update_mission_progress(player_data, 'HUNT_ELITE', details=combat_details)
-
-    # Missão de Clã (Assíncrono)
-    if clan_id:
+    
+    if user_id and monster_id:
         try:
-            # <<< CORREÇÃO: Adiciona await >>>
-            await clan_manager.update_guild_mission_progress(clan_id, 'HUNT', details=combat_details, context=context)
-        except Exception as e_clan_hunt:
-             logger.error(f"Erro ao atualizar missão de guilda HUNT para clã {clan_id}: {e_clan_hunt}")
-
-
-    # Adiciona ouro e itens (Síncrono)
-    player_manager.add_gold(player_data, gold_reward)
-    for item_id in looted_items:
-        player_manager.add_item_to_inventory(player_data, item_id)
-    
-    # Monta a mensagem final (Síncrono)
-    monster_name = combat_details.get('monster_name', 'inimigo')
-    summary = (f"✅ Você derrotou {monster_name}!\n"
-               f"+{xp_reward} XP, +{gold_reward} ouro.")
-    
-    if looted_items:
-        summary += "\n\n<b>Itens Adquiridos:</b>\n"
-        item_names = [(game_data.ITEMS_DATA.get(item_id) or {}).get('display_name', item_id) for item_id in looted_items]
-        for name, count in Counter(item_names).items():
-            summary += f"- {count}x {name}\n"
+            # Atualiza missão de CAÇA
+            logs = await mission_manager.update_mission_progress(
+                user_id=user_id, 
+                mission_type="hunt", 
+                target_id=monster_id, 
+                amount=1
+            )
+            if logs: text += "\n" + "\n".join(logs)
             
-    if level_up_msg:
-        summary += level_up_msg
-        
-    return summary
+            # Atualiza missão de COLETA (para cada item dropado)
+            for item_id, qty in items:
+                c_logs = await mission_manager.update_mission_progress(
+                    user_id=user_id,
+                    mission_type="collect",
+                    target_id=item_id,
+                    amount=qty
+                )
+                if c_logs: text += "\n" + "\n".join(c_logs)
+                
+        except Exception as e:
+            print(f"[Rewards] Erro ao atualizar missão: {e}")
+
+    return text
 
 def process_defeat(player_data: dict, combat_details: dict) -> tuple[str, bool]:
     """

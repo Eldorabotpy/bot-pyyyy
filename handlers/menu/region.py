@@ -488,12 +488,9 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 # =============================================================================
 def _is_neighbor(world_map: dict, cur: str, dest: str) -> bool:
     """Verifica se há uma rota de 'cur' para 'dest' no mapa principal."""
-    if cur == dest:
-        return True
+    if cur == dest: return True
     neighbors_of_current_location = (world_map or {}).get(cur, [])
     return dest in neighbors_of_current_location
-
-
 
 async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback 'region_<id>': valida e inicia a viagem temporizada."""
@@ -813,42 +810,42 @@ def _dur_tuple(raw) -> tuple[int, int]:
 async def show_restore_durability_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-
-    user_id = q.from_user.id
-    chat_id = q.message.chat_id
-    pdata = await player_manager.get_player_data(user_id) or {}
-    inv = pdata.get("inventory", {}) or {}
-    equip = pdata.get("equipment", {}) or {}
-
-    lines = ["<b>📜 Restaurar Durabilidade</b>\nEscolha um item <u>equipado</u> para restaurar:\n"]
-    kb_rows = []
-    any_repairable = False
-
-    for slot, uid in (equip.items() if isinstance(equip, dict) else []):
-        inst = inv.get(uid)
-        if not (isinstance(inst, dict) and inst.get("base_id")):
-            continue
-        cur, mx = _dur_tuple(inst.get("durability"))
-        # mostra apenas quem precisa de reparo
-        if cur < mx:
-            any_repairable = True
-            base = (game_data.ITEMS_DATA or {}).get(inst["base_id"], {}) or {}
-            name = base.get("display_name", inst["base_id"])
-            lines.append(f"• {name} — <b>{cur}/{mx}</b>")
-            kb_rows.append([InlineKeyboardButton(f"Restaurar {name}", callback_data=f"rd_fix_{uid}")])
-
-    if not any_repairable:
-        lines.append("<i>Nenhum equipamento equipado precisa de reparo.</i>")
-
-    # <<< CORREÇÃO: Botão "Voltar" deve ir para a região atual, não 'continue_after_action' >>>
-    current_location = pdata.get("current_location", "reino_eldora")
-    back_callback = f"open_region:{current_location}"
-    kb_rows.append([InlineKeyboardButton("⬅️ 𝕍𝕠𝕝𝕥𝕒𝕣", callback_data=back_callback)])
-
-    try:
-        await q.edit_message_caption(caption="\n".join(lines), reply_markup=InlineKeyboardMarkup(kb_rows), parse_mode="HTML")
-    except Exception:
-        await q.edit_message_text(text="\n".join(lines), reply_markup=InlineKeyboardMarkup(kb_rows), parse_mode="HTML")
+    uid = q.from_user.id
+    pdata = await player_manager.get_player_data(uid) or {}
+    
+    lines = ["<b>📜 Restaurar Durabilidade</b>\nEscolha um item:\n"]
+    kb = []
+    
+    inv, equip = pdata.get("inventory", {}), pdata.get("equipment", {})
+    any_rep = False
+    
+    # Lista itens equipados que precisam de reparo
+    for slot, uid_item in equip.items():
+        inst = inv.get(uid_item)
+        if isinstance(inst, dict):
+            cur, mx = _dur_tuple(inst.get("durability"))
+            if cur < mx:
+                any_rep = True
+                nm = (game_data.ITEMS_DATA or {}).get(inst.get("base_id"), {}).get("display_name", "Item")
+                lines.append(f"• {nm} ({cur}/{mx})")
+                kb.append([InlineKeyboardButton(f"Reparar {nm}", callback_data=f"rd_fix_{uid_item}")])
+    
+    if not any_rep: lines.append("<i>Nenhum item precisa de reparo.</i>")
+    
+    # --- CORREÇÃO DO BOTÃO VOLTAR ---
+    loc = pdata.get("current_location", "reino_eldora")
+    
+    # Se estiver no Reino, usa 'continue_after_action' (menu do reino)
+    # Se estiver fora, usa 'open_region' (menu da região)
+    if loc == 'reino_eldora':
+        back_callback = 'continue_after_action'
+    else:
+        back_callback = f"open_region:{loc}"
+        
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data=back_callback)])
+    
+    try: await q.edit_message_caption("\n".join(lines), reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    except: await q.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 
 async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE):
