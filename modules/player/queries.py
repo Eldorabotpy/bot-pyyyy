@@ -6,7 +6,7 @@ import unicodedata
 import logging
 from typing import AsyncIterator, Iterator, Tuple, Optional
 from .core import players_collection, get_player_data, save_player_data, clear_player_cache
-
+from modules.player.core import players_collection, _player_cache
 # ========================================
 # FUNÇÕES AUXILIARES DE NORMALIZAÇÃO
 # ========================================
@@ -101,11 +101,30 @@ async def get_or_create_player(user_id: int, default_name: str = "Aventureiro") 
     return pdata
 
 def delete_player(user_id: int) -> bool:
-    if players_collection is None:
-        return False
-    result = players_collection.delete_one({"_id": user_id})
-    clear_player_cache(user_id)
-    return result.deleted_count > 0
+    """
+    Remove completamente um jogador do banco de dados e do cache.
+    Retorna True se apagou, False se não encontrou.
+    """
+    user_id = int(user_id)
+    deleted = False
+
+    # 1. Remove do MongoDB
+    if players_collection is not None:
+        try:
+            result = players_collection.delete_one({"_id": user_id})
+            if result.deleted_count > 0:
+                deleted = True
+        except Exception as e:
+            print(f"Erro ao deletar do Mongo: {e}")
+
+    # 2. Remove do Cache (Memória)
+    # Acessa o dicionário global diretamente (pois queries.py tem acesso ao core)
+    if user_id in _player_cache:
+        del _player_cache[user_id]
+        deleted = True 
+
+    return deleted
+
 
 # ========================================
 # FUNÇÕES DE BUSCA (QUERIES)
