@@ -1,5 +1,5 @@
 # handlers/combat/main_handler.py
-# (VERSÃO CORRIGIDA: REMOVIDO ARGUMENTO QUE CAUSAVA CRASH NO MENU)
+# (VERSÃO ANTI-TRAVAMENTO 2.0: RECRIAÇÃO DE MENSAGEM COM ATUALIZAÇÃO DE CACHE)
 
 import logging
 import random
@@ -53,36 +53,81 @@ def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dic
     return merged_data
 
 # ================================================
-# HELPERS VISUAIS
+# HELPERS VISUAIS ROBUSTOS
 # ================================================
 async def _safe_answer(query):
     try: await query.answer()
     except BadRequest: pass
 
 async def _edit_caption_only(query, caption_text: str, reply_markup=None):
-    try: await query.edit_message_caption(caption=caption_text, reply_markup=reply_markup, parse_mode='HTML')
-    except (BadRequest, AttributeError):
-        try: await query.edit_message_text(text=caption_text, reply_markup=reply_markup, parse_mode='HTML')
-        except Exception: pass 
+    """Tenta editar a legenda. Se falhar, envia nova mensagem."""
+    try: 
+        await query.edit_message_caption(caption=caption_text, reply_markup=reply_markup, parse_mode='HTML')
+    except BadRequest as e:
+        if "Message is not modified" in str(e): return
+        # Se falhar, tenta mandar nova
+        try: await query.message.reply_text(text=caption_text, reply_markup=reply_markup, parse_mode='HTML')
+        except: pass
+    except Exception:
+        pass
 
 async def _edit_media_or_caption(context: ContextTypes.DEFAULT_TYPE, battle_cache: dict, new_caption: str, new_media_id: str, new_media_type: str, reply_markup=None):
-    try:
-        if not new_media_id:
-            new_media_id = battle_cache.get('monster_media_id')
-            new_media_type = battle_cache.get('monster_media_type', 'photo')
-            if not new_media_id:
-                 await context.bot.edit_message_text(chat_id=battle_cache['chat_id'], message_id=battle_cache['message_id'], text=new_caption, reply_markup=reply_markup, parse_mode="HTML")
-                 return
+    """
+    Tenta editar a mídia. Se der QUALQUER erro (400, file_id invalido, caption missing),
+    apaga a mensagem antiga e envia uma nova, ATUALIZANDO O CACHE.
+    """
+    chat_id = battle_cache['chat_id']
+    message_id = battle_cache['message_id']
+    sent_message = None
 
+    try:
+        # Se não tiver mídia nova, tenta editar só o texto
+        if not new_media_id:
+            await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=new_caption, reply_markup=reply_markup, parse_mode="HTML")
+            return
+
+        # Tenta editar a mídia
         InputMediaClass = InputMediaVideo if new_media_type == "video" else InputMediaPhoto
-        await context.bot.edit_message_media(chat_id=battle_cache['chat_id'], message_id=battle_cache['message_id'], media=InputMediaClass(media=new_media_id, caption=new_caption, parse_mode="HTML"), reply_markup=reply_markup)
+        await context.bot.edit_message_media(
+            chat_id=chat_id, 
+            message_id=message_id, 
+            media=InputMediaClass(media=new_media_id, caption=new_caption, parse_mode="HTML"), 
+            reply_markup=reply_markup
+        )
     except Exception as e:
-        if "Message is not modified" in str(e): pass 
-        else:
-            try: await context.bot.edit_message_caption(chat_id=battle_cache['chat_id'], message_id=battle_cache['message_id'], caption=new_caption, reply_markup=reply_markup, parse_mode="HTML")
-            except Exception:
-                try: await context.bot.send_message(chat_id=battle_cache['chat_id'], text=new_caption, reply_markup=reply_markup, parse_mode="HTML")
-                except: pass
+        # Se der erro "Message is not modified", ignoramos (sucesso técnico)
+        if "Message is not modified" in str(e):
+            return
+
+        logger.warning(f"Erro ao editar mensagem de combate ({e}). Recriando mensagem...")
+        
+        # Tenta apagar a mensagem quebrada para não poluir
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except:
+            pass # Se não der pra apagar, paciência
+
+        # Envia uma mensagem NOVA
+        try:
+            if new_media_type == "video":
+                sent_message = await context.bot.send_video(chat_id=chat_id, video=new_media_id, caption=new_caption, reply_markup=reply_markup, parse_mode="HTML")
+            else:
+                # Fallback para foto se video falhar ou for foto
+                sent_message = await context.bot.send_photo(chat_id=chat_id, photo=new_media_id, caption=new_caption, reply_markup=reply_markup, parse_mode="HTML")
+            
+            # ATUALIZA O CACHE COM O NOVO ID DA MENSAGEM
+            # Isso é crucial para o próximo turno saber qual mensagem editar
+            if sent_message:
+                battle_cache['message_id'] = sent_message.message_id
+                
+        except Exception as e2:
+            logger.error(f"Erro CRÍTICO ao recriar mensagem de combate: {e2}")
+            # Último recurso: mandar apenas texto
+            try:
+                sent_message = await context.bot.send_message(chat_id=chat_id, text=new_caption, reply_markup=reply_markup, parse_mode="HTML")
+                if sent_message:
+                    battle_cache['message_id'] = sent_message.message_id
+            except: pass
 
 # ================================================
 # MOTOR DE COMBATE PRINCIPAL
@@ -107,7 +152,6 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         # Garante estado IDLE
         player_data = await player_manager.get_player_data(user_id)
         if player_data:
-            # Garante que salvamos o estado IDLE antes de chamar o menu
             player_data['player_state'] = {'action': 'idle'}
             await player_manager.save_player_data(user_id, player_data)
             
@@ -138,7 +182,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         player_data_db = await player_manager.get_player_data(user_id)
         if not player_data_db or player_data_db.get('player_state', {}).get('action') != 'in_combat':
             if query:
-                try: await query.edit_message_caption(caption="⚠️ Batalha encerrada.", reply_markup=None)
+                try: await query.edit_message_caption(caption="⚠️ Batalha encerrada ou cache expirado.", reply_markup=None)
                 except: pass
             return
         else:
