@@ -1,7 +1,10 @@
+# modules/player_manager.py
+# (VERSÃO FINAL CORRIGIDA: COM BUSCA POR NOME PARA CLÃS)
+
 from __future__ import annotations
+from typing import Any, Optional, Type
 
 # --- 1. Funções do Core ---
-# Ajustado para buscar dentro da pasta .player
 from .player.core import (
     get_player_data, 
     save_player_data, 
@@ -14,7 +17,7 @@ from .player.queries import (
     create_new_player, 
     get_or_create_player, 
     delete_player, 
-    find_player_by_name,
+    find_player_by_name,      # <--- Usaremos esta função
     find_player_by_name_norm, 
     iter_players,
     iter_player_ids
@@ -67,14 +70,10 @@ from .player.actions import (
     add_pvp_entries,
     heal_player, 
     add_buff, 
-    
-    # ===============================================
-    # 👇 CORREÇÃO CRÍTICA DE MANA: EXPORTAÇÕES 👇
-    # ===============================================
+    # CORREÇÃO CRÍTICA DE MANA
     get_player_max_mana,
     add_mana,
     spend_mana,
-    
     # PvP Points
     get_pvp_points,
     add_pvp_points,
@@ -84,7 +83,6 @@ from .player.actions import (
 # --- 6. Funções do Sistema Premium ---
 # =================================================================
 from .player.premium import PremiumManager
-from typing import Any, Optional, Type
 
 def has_premium_plan(pdata: Optional[dict]) -> bool:
     if not pdata:
@@ -110,24 +108,41 @@ def get_perk_value_float(pdata: Optional[dict], perk_name: str, default: float =
         return float(default)
 
 # =================================================================
-# --- 7. HELPER: FULL RESTORE (Corrige o bug de 10 MP) ---
+# --- 7. HELPER: FULL RESTORE ---
 # =================================================================
 async def full_restore(user_id: int):
     """
     Restaura totalmente HP, MP e Energia.
-    Chame isso quando o jogador subir de nível ou houver correções de stats.
     """
     pdata = await get_player_data(user_id)
     if pdata:
-        # Calcula os stats máximos
         stats = await get_player_total_stats(pdata)
-        
-        # Define o atual como o máximo
         pdata['current_hp'] = stats.get('max_hp', 100)
         pdata['current_mp'] = stats.get('max_mana', 50)
         pdata['energy'] = get_player_max_energy(pdata)
-        
-        # Salva imediatamente
         await save_player_data(user_id, pdata)
         return True
     return False
+
+# No final de modules/player_manager.py
+
+async def find_player_by_character_name(name: str):
+    """
+    Busca jogador pelo nome do personagem (Case Insensitive).
+    Garante retorno compatível (Dicionário).
+    """
+    # Tenta buscar
+    result = await find_player_by_name(name)
+    
+    # Se for None, retorna None
+    if not result:
+        return None
+        
+    # Se for uma tupla (formato antigo ou de cache), converte para dict
+    if isinstance(result, tuple):
+        # Assume que a tupla é (user_id, player_data) ou (user_id, name)
+        # O mais seguro é retornar apenas o ID se for tupla simples
+        return {'user_id': result[0]}
+        
+    # Se já for dict, retorna direto
+    return result

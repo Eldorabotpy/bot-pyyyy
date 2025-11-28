@@ -221,7 +221,7 @@ async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    chat_id = query.message.chat.id
+    chat_id = query.message.chat_id
     
     try:
         region_key = query.data.split(':')[1]
@@ -319,7 +319,7 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     """
     Envia a mensagem com a mídia e os botões da região especificada.
-    (VERSÃO ATUALIZADA COM BOTÕES DE AUTO-HUNT)
+    (VERSÃO ATUALIZADA COM BOTÕES DE AUTO-HUNT E STATUS COMPLETO)
     """
     print(">>> RASTREAMENTO: Entrou em send_region_menu")
     
@@ -373,14 +373,27 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         
         total_stats = await player_manager.get_player_total_stats(player_data)
         
+        # --- CORREÇÃO AQUI: Status Completos (HP, MP, Energia, Ouro, Gemas) ---
         current_hp = int(player_data.get("current_hp", 0))
         max_hp = int(total_stats.get("max_hp", 0)) 
+        
+        # Mana
+        current_mp = int(player_data.get("current_mp", 0))
+        max_mp = int(total_stats.get("max_mana", 0))
+        
+        # Energia
         current_energy = int(player_data.get("energy", 0))
         max_energy = int(player_manager.get_player_max_energy(player_data))
+        
+        # Economia
+        p_gold = player_manager.get_gold(player_data)
+        p_gems = player_manager.get_gems(player_data)
+        
         status_footer = (
             f"\n\n═════════════ ◆◈◆ ══════════════\n"
-            f"❤️ HP: {current_hp}/{max_hp} "
-            f"⚡️ Energia: {current_energy}/{max_energy}"
+            f"💰 𝐎𝐮𝐫𝐨: {p_gold:,}   💎 𝐆𝐞𝐦𝐚𝐬: {p_gems:,}\n"
+            f"❤️ 𝐇𝐏: {current_hp}/{max_hp}   💙 𝐌𝐚𝐧𝐚: {current_mp}/{max_mp}\n"
+            f"⚡️ 𝐄𝐧𝐞𝐫𝐠𝐢𝐚: {current_energy}/{max_energy}"
         )
         caption = (
             f"Você está em <b>{region_info.get('display_name', 'Região Desconhecida')}</b>.\n"
@@ -397,7 +410,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstro ", callback_data=f"hunt_{final_region_key}")])
 
         
-        # <<< [ESTA É A NOVA SEÇÃO] >>>
         # --- BOTÕES DE CAÇA AUTOMÁTICA (PREMIUM) ---
         if premium.is_premium():
             keyboard.append([

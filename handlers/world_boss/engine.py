@@ -1,4 +1,4 @@
-# handlers/world_boss/engine.py (VERSÃO FINAL CORRIGIDA)
+# handlers/world_boss/engine.py (VERSÃO FINAL OTIMIZADA)
 
 import random
 import logging
@@ -6,7 +6,7 @@ import asyncio
 import html
 from datetime import timedelta, datetime, time
 from telegram.ext import ContextTypes, Application
-from telegram.error import Forbidden
+from telegram.error import Forbidden, TelegramError
 
 from modules import player_manager, game_data
 from modules.combat import criticals
@@ -34,6 +34,7 @@ POSSIBLE_LOCATIONS = [
 ]
 
 # --- CONFIGURAÇÕES DE LOOT ---
+# Sugestão: Mover esses IDs para um arquivo de configuração (.env) no futuro
 ANNOUNCEMENT_CHAT_ID = -1002881364171
 ANNOUNCEMENT_THREAD_ID = 24
 
@@ -107,8 +108,10 @@ class WorldBossManager:
 
         player_stats = await player_manager.get_player_total_stats(player_data)
         
+        # Rola o dano do jogador contra o boss
         player_damage, is_crit, is_mega = criticals.roll_damage(player_stats, BOSS_STATS, {})
         
+        # Capa o dano para não exceder a vida restante do boss
         if player_damage > self.boss_hp:
             player_damage = self.boss_hp
             
@@ -127,7 +130,7 @@ class WorldBossManager:
             battle_results = self.end_event(reason="Boss derrotado")
             return {"boss_defeated": True, "log": "\n".join(log_messages), "battle_results": battle_results}
 
-        # Contra-ataque
+        # Contra-ataque do Boss
         dodge_chance = await player_stats_engine.get_player_dodge_chance(player_data)
         
         if random.random() < dodge_chance:
@@ -138,6 +141,9 @@ class WorldBossManager:
             if boss_is_mega: boss_attack_log += " ‼️ MEGA CRÍTICO!"
             elif boss_is_crit: boss_attack_log += " ❗️ DANO CRÍTICO!"
             log_messages.append(boss_attack_log)
+            
+            # Aplica dano ao jogador (opcional, se quiser que o boss tire vida real)
+            # await player_actions.take_damage(player_data, boss_damage)
             
         return {"success": True, "log": "\n".join(log_messages)}
 
@@ -170,7 +176,11 @@ async def _send_dm_to_winner(context: ContextTypes.DEFAULT_TYPE, user_id: int, l
         await context.bot.send_message(chat_id=user_id, text=message, parse_mode='HTML')
         await asyncio.sleep(0.1) 
         return True
-    except Exception:
+    except Forbidden:
+        logger.warning(f"Não foi possível enviar DM para {user_id} (Bloqueado).")
+        return False
+    except Exception as e:
+        logger.error(f"Erro ao enviar DM para {user_id}: {e}")
         return False
 
 async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battle_results: dict):
@@ -199,12 +209,14 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     
     sorted_ranking = sorted(leaderboard.items(), key=lambda item: item[1], reverse=True)
     
-    # 2. Constrói Top 3
+    # 2. Constrói Top 3 (CORRIGIDO AS MEDALHAS)
     top_3_msg = []
-    for uid, dmg in sorted_ranking[:3]:
+    medals = ["🥇", "🥈", "🥉"]
+    for i, (uid, dmg) in enumerate(sorted_ranking[:3]):
         pdata = participant_data.get(uid)
         name = html.escape(pdata.get('character_name', 'Herói')) if pdata else "Herói Desconhecido"
-        top_3_msg.append(f"🥇 {name} ({dmg:,} dano)")
+        medal = medals[i] if i < 3 else "🏅"
+        top_3_msg.append(f"{medal} {name} ({dmg:,} dano)")
 
     # 3. Distribui Loot
     for user_id, pdata in participant_data.items():
@@ -215,27 +227,28 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
             loot_won_messages = []
             player_mudou = False
 
-            # Roll SKILL
+            # Roll SKILL (5%)
             if random.random() * 100 <= SKILL_CHANCE:
                 won_skill_id = random.choice(SKILL_REWARD_POOL)
-                # Cria o ITEM TOMO, não dá a skill direto
                 won_item_id = f"tomo_{won_skill_id}" 
                 
-                item_info = game_data.ITEMS_DATA.get(won_item_id)
-                display_name = item_info.get("display_name", won_skill_id) if item_info else won_skill_id
+                # Busca segura no ITEMS_DATA
+                item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
+                display_name = item_info.get("display_name", won_skill_id)
 
                 player_manager.add_item_to_inventory(pdata, won_item_id, 1)
                 loot_won_messages.append(f"📚 Item Raro: [{display_name}]")
                 skill_winners_msg.append(f"• {html.escape(player_name)} obteve o <b>{display_name}</b>!")
                 player_mudou = True
 
-            # Roll SKIN
+            # Roll SKIN (1%)
             if random.random() * 100 <= SKIN_CHANCE:
                 won_skin_id = random.choice(SKIN_REWARD_POOL)
                 won_item_id = f"caixa_{won_skin_id}"
                 
-                item_info = game_data.ITEMS_DATA.get(won_item_id)
-                display_name = item_info.get("display_name", won_skin_id) if item_info else won_skin_id
+                # Busca segura no ITEMS_DATA
+                item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
+                display_name = item_info.get("display_name", won_skin_id)
                 
                 player_manager.add_item_to_inventory(pdata, won_item_id, 1)
                 loot_won_messages.append(f"🎨 Item Raro: [{display_name}]")
@@ -276,7 +289,8 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
             text=f"{title}\n\n{body}",
             parse_mode="HTML"
         )
-    except Exception: pass
+    except Exception as e:
+        logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
 # --- JOBS ---
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
@@ -284,12 +298,15 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
     await distribute_loot_and_announce(context, battle_results)
     
-    # Notifica todos os players
+    # Notifica todos os players (Otimizado)
     async for user_id, _ in player_manager.iter_players():
         try:
-            await context.bot.send_message(chat_id=user_id, text="O Demônio Dimensional desapareceu...")
-            await asyncio.sleep(0.1)
-        except Exception: continue
+            await context.bot.send_message(chat_id=user_id, text="O tempo acabou! O Demônio Dimensional desapareceu...")
+            await asyncio.sleep(0.05) # Delay reduzido para ser mais rápido
+        except (Forbidden, TelegramError):
+            continue # Ignora usuários que bloquearam
+        except Exception: 
+            continue
 
 async def broadcast_boss_announcement(application: Application, location_key: str):
     """Anuncia início para todos."""
@@ -299,8 +316,11 @@ async def broadcast_boss_announcement(application: Application, location_key: st
     async for user_id, _ in player_manager.iter_players():
         try:
             await application.bot.send_message(chat_id=user_id, text=anuncio, parse_mode='HTML')
-            await asyncio.sleep(0.1)
-        except Exception: continue
+            await asyncio.sleep(0.05) # Delay reduzido
+        except (Forbidden, TelegramError):
+            continue # Ignora usuários que bloquearam
+        except Exception: 
+            continue
 
 async def iniciar_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """Inicia o evento."""

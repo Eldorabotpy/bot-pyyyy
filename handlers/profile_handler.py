@@ -422,7 +422,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("💼 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data='job_menu')])
 
     keyboard.extend([
-        [InlineKeyboardButton("🔰⚜️𝐂𝐋𝐀𝐍⚜️🔰", callback_data='clan_menu:profile')],
+        [InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚 𝐝𝐞 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨𝐬 🏰", callback_data='adventurer_guild_main')],
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬 📊", callback_data='status_open')],
         [InlineKeyboardButton("💼 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨 💼", callback_data="job_menu")],
         [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬 🧰", callback_data='equipment_menu')],

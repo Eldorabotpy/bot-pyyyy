@@ -1,4 +1,5 @@
-# handlers/guild/creation_search.py (Versão Refinada)
+# handlers/guild/creation_search.py
+# (VERSÃO CORRIGIDA: FUNÇÕES DE ACEITAR/RECUSAR RESTAURADAS)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -6,239 +7,284 @@ from telegram.ext import (
     MessageHandler, filters, CommandHandler
 )
 
-from modules import player_manager, clan_manager, game_data
-from ..guild_handler import ASKING_NAME, ASKING_SEARCH_NAME
+from modules import player_manager, clan_manager, game_data, file_ids
 
-# --- Funções de Menu ---
+# --- Definição de Estados ---
+ASKING_NAME, ASKING_SEARCH_NAME = range(2)
+
+# --- Helper de Limpeza ---
+async def _clean_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Apaga a mensagem do usuário e a última mensagem do bot salva no contexto."""
+    try: await update.message.delete()
+    except: pass
+    last_msg_id = context.user_data.get('last_bot_msg_id')
+    if last_msg_id:
+        try: await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=last_msg_id)
+        except: pass
+        context.user_data.pop('last_bot_msg_id', None)
+
+# ==============================================================================
+# FUNÇÕES DE VISUALIZAÇÃO (MENU)
+# ==============================================================================
 
 async def show_create_clan_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, came_from: str = 'guild_menu'):
-    """Mostra o menu para jogadores sem clã."""
     query = update.callback_query
-    
-    custo_ouro = game_data.CLAN_CONFIG['creation_cost']['gold']
-    custo_dimas = game_data.CLAN_CONFIG['creation_cost']['dimas']
+    creation_cost = getattr(game_data, "CLAN_CONFIG", {}).get('creation_cost', {'gold': 10000, 'dimas': 100})
+    custo_ouro = creation_cost.get('gold', 10000)
+    custo_dimas = creation_cost.get('dimas', 100)
 
-    caption = (
-        "Você ainda não faz parte de um clã.\n\n"
-        "Criar um novo clã une aventureiros sob um mesmo estandarte, "
-        "permitindo o acesso a benefícios e missões exclusivas.\n\n"
+    text = (
+        "🛡️ <b>SEM CLÃ? SEM PROBLEMA!</b>\n\n"
+        "Você ainda não faz parte de um estandarte. Juntar-se a um clã oferece:\n"
+        "• 🏦 Banco Compartilhado\n"
+        "• 🏰 Buffs de XP e Drop\n"
+        "• ⚔️ Raids Exclusivas\n\n"
         f"<b>Custo para fundar um clã:</b>\n"
         f"- 🪙 {custo_ouro:,} Ouro\n"
         f"- 💎 {custo_dimas} Diamantes"
     )
 
     keyboard = [
-        [InlineKeyboardButton("🔎 Procurar Clã", callback_data='clan_search_start')],
-        [InlineKeyboardButton(f"🪙 Fundar com Ouro", callback_data='clan_create_start:gold')],
-        [InlineKeyboardButton(f"💎 Fundar com Diamantes", callback_data='clan_create_start:dimas')],
-        [InlineKeyboardButton("⬅️ Voltar", callback_data='show_kingdom_menu')],
+        [InlineKeyboardButton("🔍 Procurar Clã Existente", callback_data='clan_search_start')],
+        [InlineKeyboardButton(f"🪙 Fundar (Ouro)", callback_data='clan_create_start:gold')],
+        [InlineKeyboardButton(f"💎 Fundar (Diamantes)", callback_data='clan_create_start:dimas')],
+        [InlineKeyboardButton("🔙 Voltar à Guilda", callback_data='adventurer_guild_main')],
     ]
     
-    await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    if query:
+        try:
+            await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        except:
+            try: await query.delete_message() 
+            except: pass
+            await context.bot.send_message(chat_id=query.message.chat.id, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
-# --- Lógica de Criação de Clã (Conversation) ---
+# ==============================================================================
+# FLUXO: CRIAÇÃO DE CLÃ
+# ==============================================================================
 
 async def start_clan_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Inicia a conversa para criar um clã."""
     query = update.callback_query
     await query.answer()
-    user_id = update.effective_user.id
     
-    # <<< CORREÇÃO 1: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
-    payment_method = query.data.split(':')[1]
-    cost = game_data.CLAN_CONFIG["creation_cost"][payment_method]
-    
-    currency = "gold" if payment_method == "gold" else "dimas"
-    if player_data.get(currency, 0) < cost:
-        await context.bot.answer_callback_query(query.id, f"Você não tem recursos suficientes.", show_alert=True)
-        return ConversationHandler.END
-
+    try: payment_method = query.data.split(':')[1]
+    except: payment_method = 'gold'
     context.user_data['clan_payment_method'] = payment_method
-    await query.edit_message_caption(caption="Excelente! Por favor, envie o nome que deseja para o seu clã. (Use /cancelar para desistir)")
+
+    msg_text = (
+        "✍️ <b>Fundação de Clã</b>\n\n"
+        "Digite o <b>NOME</b> do seu novo clã no chat:\n"
+        "<i>(3 a 20 letras. Sem caracteres especiais)</i>\n\n"
+        "Digite /cancelar para desistir."
+    )
+    
+    try:
+        msg = await query.edit_message_text(text=msg_text, parse_mode="HTML")
+        context.user_data['last_bot_msg_id'] = msg.message_id
+    except:
+        await query.delete_message()
+        msg = await context.bot.send_message(chat_id=query.message.chat.id, text=msg_text, parse_mode="HTML")
+        context.user_data['last_bot_msg_id'] = msg.message_id
+        
     return ASKING_NAME
 
 async def receive_clan_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Recebe o nome do clã e finaliza a criação."""
     user_id = update.effective_user.id
-    clan_name = update.message.text
-    
+    clan_name = update.message.text.strip()
+    await _clean_chat(update, context)
+
     if not 3 <= len(clan_name) <= 20:
-        await update.message.reply_text("Nome inválido. Por favor, escolha um nome entre 3 e 20 caracteres.")
+        msg = await update.message.reply_text("❌ Nome inválido (3-20 letras). Tente novamente.")
+        context.user_data['last_bot_msg_id'] = msg.message_id
         return ASKING_NAME
         
-    payment_method = context.user_data.get('clan_payment_method')
+    payment_method = context.user_data.get('clan_payment_method', 'gold')
     
     try:
-        # <<< CORREÇÃO 2: Adiciona await >>>
         clan_id = await clan_manager.create_clan(leader_id=user_id, clan_name=clan_name, payment_method=payment_method)
         
-        # <<< CORREÇÃO 3: Adiciona await >>>
-        player_data = await player_manager.get_player_data(user_id)
-        player_data["clan_id"] = clan_id
+        # Atualiza jogador
+        pdata = await player_manager.get_player_data(user_id)
+        pdata["clan_id"] = clan_id
+        await player_manager.save_player_data(user_id, pdata)
         
-        # <<< CORREÇÃO 4: Adiciona await >>>
-        await player_manager.save_player_data(user_id, player_data)
-        await update.message.reply_text(f"Parabéns! O clã '{clan_name}' foi fundado com sucesso!")
+        # Botões de Sucesso
+        kb = [
+            [InlineKeyboardButton("🛡️ Acessar Meu Clã", callback_data="clan_menu")],
+            [InlineKeyboardButton("🔙 Voltar à Guilda", callback_data="adventurer_guild_main")]
+        ]
+        
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"🎉 <b>Parabéns!</b>\nO clã <b>'{clan_name}'</b> foi fundado com sucesso!",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="HTML"
+        )
+        
     except ValueError as e:
-        await update.message.reply_text(f"Erro: {e}")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ Erro: {e}")
+    except Exception:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Erro interno.")
 
-    context.user_data.pop('clan_payment_method', None)
     return ConversationHandler.END
 
 async def cancel_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancela o processo de criação de clã."""
-    context.user_data.pop('clan_payment_method', None)
-    await update.message.reply_text("Criação de clã cancelada.")
+    await _clean_chat(update, context)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Cancelado.")
     return ConversationHandler.END
 
-# --- Lógica de Busca e Aplicação (Conversation) ---
+# ==============================================================================
+# FLUXO: BUSCA DE CLÃ
+# ==============================================================================
 
 async def start_clan_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Inicia a conversa para procurar um clã."""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_caption(caption="Qual o nome do clã que você procura? (Use /cancelar para desistir)")
+    
+    msg = "🔍 <b>Busca de Clã</b>\n\nDigite o nome do clã que procura:\n(Ou /cancelar)"
+    try:
+        msg = await query.edit_message_text(text=msg, parse_mode="HTML")
+        context.user_data['last_bot_msg_id'] = msg.message_id
+    except:
+        await query.delete_message()
+        msg = await context.bot.send_message(chat_id=query.message.chat.id, text=msg, parse_mode="HTML")
+        context.user_data['last_bot_msg_id'] = msg.message_id
+        
     return ASKING_SEARCH_NAME
 
 async def receive_clan_search_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Recebe o nome do clã para busca e mostra o resultado."""
-    clan_name_searched = update.message.text
+    search = update.message.text.strip()
+    await _clean_chat(update, context)
     
-    # <<< CORREÇÃO 5: Adiciona await >>>
-    clan_data = await clan_manager.find_clan_by_display_name(clan_name_searched)
+    clan_data = await clan_manager.find_clan_by_display_name(search)
     
     if not clan_data:
-        await update.message.reply_text(f"Nenhum clã com o nome '{clan_name_searched}' foi encontrado. Tente de novo.")
+        msg = await update.message.reply_text(f"❌ Clã '{search}' não encontrado.")
+        context.user_data['last_bot_msg_id'] = msg.message_id
         return ASKING_SEARCH_NAME
 
-    clan_id = clan_data.get("id")
+    clan_id = clan_data.get("_id")
     clan_name = clan_data.get("display_name")
+    count = len(clan_data.get("members", []))
     
-    # <<< CORREÇÃO 6: Adiciona await >>>
-    leader_data = await player_manager.get_player_data(clan_data.get("leader_id"))
-    leader_name = leader_data.get("character_name", "Desconhecido") if leader_data else "Desconhecido"
-    
-    member_count = len(clan_data.get("members", []))
-    
-    caption = (
-        f"<b>Clã Encontrado:</b> {clan_name}\n"
-        f"<b>Líder:</b> {leader_name}\n"
-        f"<b>Membros:</b> {member_count}\n\n"
-        f"Deseja enviar um pedido para se juntar?"
-    )
-    keyboard = [[
-        InlineKeyboardButton("✅ Sim, enviar pedido", callback_data=f'clan_apply:{clan_id}'),
-        InlineKeyboardButton("⬅️ Voltar", callback_data='guild_menu'),
+    caption = f"🛡️ <b>Clã Encontrado:</b> {clan_name}\n👥 <b>Membros:</b> {count}\n\nDeseja enviar pedido?"
+    kb = [[
+        InlineKeyboardButton("✅ Enviar Pedido", callback_data=f'clan_apply:{clan_id}'),
+        InlineKeyboardButton("⬅️ Cancelar", callback_data='adventurer_guild_main'),
     ]]
-    await update.message.reply_text(caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
     return ConversationHandler.END
 
 async def apply_to_clan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa o pedido de um jogador para entrar num clã."""
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    clan_id_to_join = query.data.split(':')[1]
-    
     try:
-        # <<< CORREÇÃO 7: Adiciona await >>>
-        await clan_manager.add_application(clan_id_to_join, user_id)
-        await query.edit_message_text("Seu pedido foi enviado com sucesso!")
+        clan_id = query.data.split(':')[1]
+        await clan_manager.add_application(clan_id, user_id)
+        await query.edit_message_text("✅ Pedido enviado ao líder!")
     except ValueError as e:
-        await context.bot.answer_callback_query(query.id, f"Erro: {e}", show_alert=True)
+        await context.bot.answer_callback_query(query.id, str(e), show_alert=True)
+    except Exception:
+        await query.edit_message_text("❌ Erro ao enviar pedido.")
+
+# ==============================================================================
+# GESTÃO DE CANDIDATURAS (LÍDER) - RESTAURADO!
+# ==============================================================================
 
 async def show_applications_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o menu para o líder aceitar ou recusar candidaturas."""
+    """Mostra a lista de jogadores que querem entrar no clã."""
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
     
-    # <<< CORREÇÃO 8: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
-    clan_id = player_data.get("clan_id")
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    if not clan_id: return
     
-    # <<< CORREÇÃO 9: Adiciona await >>>
     clan_data = await clan_manager.get_clan(clan_id)
-
     if not clan_data or clan_data.get("leader_id") != user_id:
+        await query.answer("Apenas o líder vê isso.", show_alert=True)
         return
 
-    applications = clan_data.get("pending_applications", [])
-    caption = "<b>📩 Candidaturas Pendentes</b>\n\n"
-    keyboard = []
+    apps = clan_data.get("pending_applications", [])
+    text = "<b>📩 Candidaturas Pendentes</b>\n\n"
+    kb = []
 
-    if not applications:
-        caption += "Não há nenhuma candidatura pendente no momento."
+    if not apps:
+        text += "Nenhuma candidatura pendente."
     else:
-        for applicant_id in applications:
-            # <<< CORREÇÃO 10: Adiciona await >>>
-            applicant_data = await player_manager.get_player_data(applicant_id)
-            applicant_name = applicant_data.get("character_name", f"ID: {applicant_id}")
+        for applicant_id in apps:
+            adata = await player_manager.get_player_data(applicant_id)
+            aname = adata.get("character_name", f"ID: {applicant_id}") if adata else f"ID: {applicant_id}"
             
-            keyboard.append([
-                InlineKeyboardButton(f"{applicant_name}", callback_data="noop"),
+            kb.append([
+                InlineKeyboardButton(f"👤 {aname}", callback_data="noop"),
                 InlineKeyboardButton("✅ Aceitar", callback_data=f'clan_app_accept:{applicant_id}'),
                 InlineKeyboardButton("❌ Recusar", callback_data=f'clan_app_decline:{applicant_id}'),
             ])
 
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data='clan_menu')])
-    await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data='clan_manage_menu')])
+    
+    try:
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
+    except:
+        await query.delete_message()
+        await context.bot.send_message(chat_id=query.message.chat.id, text=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 async def accept_application_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a aceitação de um novo membro."""
+    """Aceita um jogador no clã."""
     query = update.callback_query
     leader_id = update.effective_user.id
     
-    # <<< CORREÇÃO 11: Adiciona await >>>
-    player_data = await player_manager.get_player_data(leader_id)
-    clan_id = player_data.get("clan_id")
-    applicant_id = int(query.data.split(':')[1])
+    pdata = await player_manager.get_player_data(leader_id)
+    clan_id = pdata.get("clan_id")
+    try: applicant_id = int(query.data.split(':')[1])
+    except: return
 
     try:
-        # <<< CORREÇÃO 12: Adiciona await >>>
         await clan_manager.accept_application(clan_id, applicant_id)
         
-        # <<< CORREÇÃO 13: Adiciona await >>>
-        applicant_data = await player_manager.get_player_data(applicant_id)
-        applicant_data["clan_id"] = clan_id
+        # Atualiza o novato
+        app_data = await player_manager.get_player_data(applicant_id)
+        if app_data:
+            app_data["clan_id"] = clan_id
+            await player_manager.save_player_data(applicant_id, app_data)
+            
+            # Notifica
+            cdata = await clan_manager.get_clan(clan_id)
+            try: await context.bot.send_message(chat_id=applicant_id, text=f"🎉 Você entrou no clã <b>{cdata.get('display_name')}</b>!", parse_mode="HTML")
+            except: pass
         
-        # <<< CORREÇÃO 14: Adiciona await >>>
-        await player_manager.save_player_data(applicant_id, applicant_data)
-
-        # <<< CORREÇÃO 15: Adiciona await >>>
-        clan_name = (await clan_manager.get_clan(clan_id)).get("display_name")
-        await context.bot.send_message(chat_id=applicant_id, text=f"🎉 Parabéns! A sua candidatura ao clã '{clan_name}' foi aceite!")
-        
-        await query.answer("Candidatura aceite com sucesso!")
-
+        await query.answer("Membro aceito!")
     except ValueError as e:
-        await context.bot.answer_callback_query(query.id, f"Erro: {e}", show_alert=True)
+        await context.bot.answer_callback_query(query.id, str(e), show_alert=True)
     
     await show_applications_menu(update, context)
 
 async def decline_application_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a recusa de um candidato."""
+    """Recusa um jogador."""
     query = update.callback_query
     leader_id = update.effective_user.id
-    
-    # <<< CORREÇÃO 16: Adiciona await >>>
-    player_data = await player_manager.get_player_data(leader_id)
-    clan_id = player_data.get("clan_id")
-    applicant_id = int(query.data.split(':')[1])
+    pdata = await player_manager.get_player_data(leader_id)
+    clan_id = pdata.get("clan_id")
+    try: applicant_id = int(query.data.split(':')[1])
+    except: return
 
-    # <<< CORREÇÃO 17: Adiciona await >>>
     await clan_manager.decline_application(clan_id, applicant_id)
+    await query.answer("Recusado.")
     
-    # <<< CORREÇÃO 18: Adiciona await >>>
-    clan_name = (await clan_manager.get_clan(clan_id)).get("display_name")
-    await context.bot.send_message(chat_id=applicant_id, text=f"A sua candidatura ao clã '{clan_name}' foi recusada.")
-
-    await query.answer("Candidatura recusada.")
+    # Notifica (Opcional)
+    try: await context.bot.send_message(chat_id=applicant_id, text="Sua candidatura ao clã foi recusada.")
+    except: pass
 
     await show_applications_menu(update, context)
 
-# --- Definição dos Handlers ---
+# ==============================================================================
+# HANDLERS EXPORTADOS
+# ==============================================================================
+
 clan_creation_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(start_clan_creation, pattern=r'^clan_create_start:(gold|dimas)$')],
     states={ASKING_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_clan_name)]},
@@ -252,7 +298,7 @@ clan_search_conv_handler = ConversationHandler(
     fallbacks=[CommandHandler('cancelar', cancel_creation)],
 )
 
-clan_apply_handler = CallbackQueryHandler(apply_to_clan_callback, pattern=r'^clan_apply:[a-z0-9_]+$')
+clan_apply_handler = CallbackQueryHandler(apply_to_clan_callback, pattern=r'^clan_apply:')
 clan_manage_apps_handler = CallbackQueryHandler(show_applications_menu, pattern=r'^clan_manage_apps$')
-clan_app_accept_handler = CallbackQueryHandler(accept_application_callback, pattern=r'^clan_app_accept:\d+$')
-clan_app_decline_handler = CallbackQueryHandler(decline_application_callback, pattern=r'^clan_app_decline:\d+$')
+clan_app_accept_handler = CallbackQueryHandler(accept_application_callback, pattern=r'^clan_app_accept:')
+clan_app_decline_handler = CallbackQueryHandler(decline_application_callback, pattern=r'^clan_app_decline:')

@@ -1,18 +1,10 @@
-#
-# >>> INÍCIO DO CÓDIGO CORRIGIDO (dashboard.py) <<<
-# Substitua o ficheiro inteiro
-#
-
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from typing import List # <<< IMPORTAÇÃO ADICIONADA
+from typing import List
 
-from modules import player_manager, clan_manager, file_id_manager # <<< file_id_manager ADICIONADO
+from modules import player_manager, clan_manager, file_id_manager
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS
-# (utils e kingdom_menu parecem não ser usados aqui, removi 'create_progress_bar')
-# from ..utils import create_progress_bar 
-# from handlers.menu.kingdom import show_kingdom_menu 
 
 # Importações das outras funcionalidades (mantidas)
 from handlers.guild.missions import show_guild_mission_details
@@ -233,8 +225,4 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
 # --- UM ÚNICO HANDLER EFICIENTE ---
 # Este handler captura 'clan_menu' e 'clan_menu:profile'
-clan_handler = CallbackQueryHandler(clan_router, pattern=r'^clan_') 
-
-#
-# >>> FIM DO CÓDIGO CORRIGIDO (dashboard.py) <<<
-#
+clan_handler = CallbackQueryHandler(clan_router, pattern=r'^clan_')

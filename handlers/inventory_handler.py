@@ -67,13 +67,19 @@ def _display_name_for_instance(uid: str, inst: dict) -> str:
 
 def _determine_tab(item_key: str, item_value: dict|int) -> str:
     """Lógica de separação de categorias."""
+    # Se o valor for um dicionário, é um item único (equipamento com stats variáveis)
     if isinstance(item_value, dict): return "equipamento"
 
     info = _info_for(item_key)
     tipo = (info.get("type") or "").lower()
     cat = (info.get("category") or "").lower()
     
-    if "tomo_" in item_key or "caixa_skin" in item_key or "livro" in item_key: return "aprendizado"
+    # --- CORREÇÃO PRINCIPAL AQUI ---
+    # Mudado de "caixa_skin" para "caixa_" para aceitar IDs como "caixa_guerreiro_armadura_negra"
+    if "tomo_" in item_key or "caixa_" in item_key or "livro" in item_key: 
+        return "aprendizado"
+        
+    # Verifica também pelos efeitos se o item concede skill ou skin
     effects = info.get("effects") or info.get("on_use") or {}
     if effects.get("effect") in ("grant_skill", "grant_skin"): return "aprendizado"
 

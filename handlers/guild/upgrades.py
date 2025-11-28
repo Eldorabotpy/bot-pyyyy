@@ -1,18 +1,11 @@
-# handlers/guild/upgrades.py (Versão Corrigida)
-
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, clan_manager
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS
-from ..utils import safe_edit_message
-
-# ✅ 1. IMPORTAÇÕES CORRIGIDAS: Funções vêm do ficheiro central de utilitários.
-from ..utils import create_progress_bar, format_buffs_text
+from ..utils import safe_edit_message, create_progress_bar, format_buffs_text # Importações combinadas
 
 # --- Lógica de Aprimoramento do Clã ---
-
 
 async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o menu de aprimoramento, com custos e benefícios do próximo nível."""
@@ -24,7 +17,6 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
     player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
     if not clan_id:
-        # Usar safe_edit_message aqui também
         await safe_edit_message(query, text="Você não está em um clã.")
         return
         
@@ -59,7 +51,7 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
         
         caption += "\n<b>Benefícios do Próximo Nível:</b>\n"
         caption += f"   - Membros: {next_level_info.get('max_members', 0)}\n"
-        caption += format_buffs_text(next_level_info.get("buffs", {})) # Já estava correto
+        caption += format_buffs_text(next_level_info.get("buffs", {}))
 
         upgrade_cost = next_level_info.get("upgrade_cost", {})
         cost_gold = upgrade_cost.get("gold", 0)
@@ -76,11 +68,10 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
                 InlineKeyboardButton("💎 Aprimorar com Dimas", callback_data='clan_upgrade_confirm:dimas'),
             ])
     else: # Sem next_level_info, significa nível máximo
-        caption += "\n<b>O seu clã já atingiu o nível máximo de prestígio!</b>" # Mensagem corrigida
+        caption += "\n<b>O seu clã já atingiu o nível máximo de prestígio!</b>"
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='clan_manage_menu')])
     
-    # Usar safe_edit_message aqui em vez de edit_message_caption
     await safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
 async def confirm_clan_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,8 +112,7 @@ async def confirm_clan_upgrade_callback(update: Update, context: ContextTypes.DE
 
     except ValueError as e:
         await context.bot.answer_callback_query(query.id, str(e), show_alert=True)
-        # Se falhar, não tenta mostrar o dashboard, pois pode dar erro
-        return # Adicionado return para sair após erro
+        return
 
     from handlers.guild.dashboard import show_clan_dashboard
     # <<< CORREÇÃO 6: Adiciona await >>>

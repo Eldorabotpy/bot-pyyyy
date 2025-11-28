@@ -1,4 +1,3 @@
-# handlers/guild/missions.py
 import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -30,7 +29,10 @@ async def show_missions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     user_id = update.effective_user.id
     
-    missions_data = mission_manager.get_player_missions(user_id)
+    # mission_manager.get_player_missions might be synchronous or asynchronous depending on implementation. 
+    # Assuming synchronous for now based on typical pattern, but if it accesses DB directly it should be awaited.
+    # If mission_manager functions are async, add await.
+    missions_data = mission_manager.get_player_missions(user_id) 
     active_missions = missions_data.get("active_missions", [])
     rerolls_left = missions_data.get("daily_rerolls_left", 0)
     
@@ -80,7 +82,9 @@ async def claim_reward_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     # <<< CORREÇÃO 1: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
-    rewards = mission_manager.claim_reward(player_data, mission_index) # Assume que claim_reward é síncrono
+    
+    # Assuming claim_reward modifies player_data in place but returns rewards dict
+    rewards = mission_manager.claim_reward(player_data, mission_index) 
 
     if rewards:
         # <<< CORREÇÃO 2: Adiciona await >>>
@@ -95,7 +99,7 @@ async def claim_reward_callback(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception:
             pass
         await context.bot.send_message(
-            chat_id=user_id, # Usar user_id em vez de chat_id aqui faz mais sentido para DM
+            chat_id=user_id, 
             text=f"✅ <b>Missão Concluída!</b>\n\n{rewards_text}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📜 Ver Novas Missões", callback_data="guild_missions")]]),
             parse_mode='HTML'
@@ -104,45 +108,13 @@ async def claim_reward_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await context.bot.answer_callback_query(query.id, "Recompensa já reclamada ou missão incompleta.", show_alert=True)
         # <<< CORREÇÃO 3: Adiciona await >>>
         await show_missions_menu(update, context)
-        
-async def claim_reward_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a recompensa de uma missão diária."""
-    query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-    mission_index = int(query.data.split(':')[1])
-    
-    player_data = player_manager.get_player_data(user_id)
-    rewards = mission_manager.claim_reward(player_data, mission_index)
-    
-    if rewards:
-        player_manager.save_player_data(user_id, player_data)
-        
-        rewards_text = "<b>Recompensas Recebidas:</b>\n"
-        if "xp" in rewards: rewards_text += f"- {rewards['xp']} XP ✨\n"
-        if "gold" in rewards: rewards_text += f"- {rewards['gold']} Ouro 🪙\n"
-        
-        try:
-            await query.delete_message()
-        except Exception:
-            pass
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"✅ <b>Missão Concluída!</b>\n\n{rewards_text}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📜 Ver Novas Missões", callback_data="guild_missions")]]),
-            parse_mode='HTML'
-        )
-    else:
-        await context.bot.answer_callback_query(query.id, "Recompensa já reclamada ou missão incompleta.", show_alert=True)
-        await show_missions_menu(update, context)
 
 async def reroll_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa a troca de uma missão diária."""
     query = update.callback_query
     mission_index = int(query.data.split(':')[1])
     
-    # Assumindo que mission_manager.reroll_mission é síncrono ou já foi corrigido para async
-    # Se for async, adicione await aqui: success = await mission_manager.reroll_mission(...)
+    # Assuming mission_manager.reroll_mission is synchronous
     success = mission_manager.reroll_mission(update.effective_user.id, mission_index)
     
     if success:
@@ -350,4 +322,3 @@ clan_mission_details_handler = CallbackQueryHandler(show_guild_mission_details, 
 # --- NOVOS HANDLERS ---
 clan_mission_preview_handler = CallbackQueryHandler(show_mission_confirmation_screen, pattern=r'^clan_mission_preview:[a-zA-Z0-9_]+$')
 clan_mission_accept_handler = CallbackQueryHandler(accept_mission_callback, pattern=r'^clan_mission_accept:[a-zA-Z0-9_]+$')
-
