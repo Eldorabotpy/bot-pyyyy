@@ -1,21 +1,17 @@
 # handlers/class_evolution_handler.py
-# (VERSÃO ATUALIZADA COM PASSO 5B - APRIMORAMENTO PROGRESSIVO)
+# (VERSÃO CORRIGIDA - SUPORTE A SKILLS TIER 1)
 
 import logging
-from typing import Dict, Tuple, Optional, List, Any # <--- ADICIONADO
+from typing import Dict, Tuple, Optional, List, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
 
 from modules import player_manager
-# Importa o NOVO serviço de lógica e o ficheiro de DADOS
 from modules import class_evolution_service as evo_service
 from modules.game_data import class_evolution as evo_data
-
-# --- IMPORTS ADICIONADOS PARA O PASSO 5B ---
 from modules.game_data.skills import SKILL_DATA
-from modules.player import stats as player_stats # Para pegar a classe base
-from modules.game_data.class_evolution import get_class_ancestry
+from modules.player import stats as player_stats
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +26,13 @@ def _format_cost_lines(cost: dict) -> str:
     if "gold" in cost:
         lines.append(f"  • {cost['gold']:,} 🪙 Ouro")
     
-    # Importa os dados dos itens aqui dentro para evitar importação circular
     try:
         from modules.game_data.items import ITEMS_DATA
     except ImportError:
         ITEMS_DATA = {}
     
     for item_id, qty in cost.items():
-        if item_id == "gold":
-            continue
+        if item_id == "gold": continue
         item_info = ITEMS_DATA.get(item_id, {})
         item_name = item_info.get("display_name", item_id)
         item_emoji = item_info.get("emoji", "💠")
@@ -47,53 +41,28 @@ def _format_cost_lines(cost: dict) -> str:
     return "\n".join(lines)
 
 def _get_player_class_name(pdata: dict) -> str:
-    """Pega o nome da classe atual do jogador."""
     class_key = (pdata.get("class") or "N/A").lower()
-    
-    # Tenta encontrar o nome no T1
-    if class_key in evo_data.EVOLUTIONS:
-        return class_key.title()
-        
-    # Tenta encontrar o nome nas evoluções
-    # (find_evolution_by_target pode não existir em evo_data, vamos tratar)
+    if class_key in evo_data.EVOLUTIONS: return class_key.title()
     try:
         evo_def = evo_data.find_evolution_by_target(class_key)
-        if evo_def:
-            return evo_def.get("to", class_key).title()
+        if evo_def: return evo_def.get("to", class_key).title()
     except AttributeError:
-        # Fallback se find_evolution_by_target foi removido ou movido
-        for base_class, evolutions in evo_data.EVOLUTIONS.items():
-            for evo in evolutions:
-                if evo.get("to") == class_key:
-                    return evo.get("to", class_key).title()
-        
+        pass
     return class_key.title()
 
-
 # ================================================
-# HANDLER PRINCIPAL (O MENU DA ÁRVORE)
+# HANDLER PRINCIPAL (MENU DA ÁRVORE)
 # ================================================
 
 async def open_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handler principal. Mostra o estado atual da evolução
-    e a "Árvore de Ascensão" (Ascension Path).
-    """
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        await query.edit_message_text("Erro: Não foi possível carregar seus dados.")
-        return
+    if not pdata: return
 
-    # 1. Pega o status da evolução (esta é a nova função de LÓGICA)
-    # (Corrigido para usar a função corrigida de evo_data)
-    current_class_key = (pdata.get("class") or "").lower()
-    current_level = pdata.get("level", 1)
     status_info = evo_service.get_player_evolution_status(pdata)
-    
     current_class_name = _get_player_class_name(pdata)
     level = pdata.get("level", 1)
     
@@ -104,613 +73,285 @@ async def open_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     ]
     keyboard = []
 
-    # 2. Analisa o status retornado pelo serviço
-    
-    # Caso 1: Jogador está no T6 (Tier Máximo)
     if status_info["status"] == "max_tier":
         caption_lines.append("Você atingiu o auge da sua classe.")
-        caption_lines.append("Não há mais evoluções disponíveis no momento.")
-        
-    # Caso 2: Jogador não tem nível suficiente
     elif status_info["status"] == "locked":
         evo_opt = status_info["option"]
-        caption_lines.append(f"Próxima Evolução: <b>{evo_opt['to'].title()}</b>")
-        caption_lines.append(f"🔒 {status_info['message']}") # Ex: "Requer Nível 25"
-
-    # Caso 3: Jogador está no Caminho da Ascensão (A "ÁRVORE")
+        caption_lines.append(f"Próxima: <b>{evo_opt['to'].title()}</b>")
+        caption_lines.append(f"🔒 {status_info['message']}")
     elif status_info["status"] == "path_available":
         evo_opt = status_info["option"]
         target_class = evo_opt['to']
+        caption_lines.append(f"Próxima: <b>{target_class.title()}</b>")
+        caption_lines.append(f"<i>{evo_opt['desc']}</i>\n")
         
-        caption_lines.append(f"Próxima Evolução: <b>{target_class.title()}</b>")
-        caption_lines.append(f"<i>{evo_opt['desc']}</i>")
-        caption_lines.append("\nComplete as tarefas da ascensão:")
-        
-        # 3a. Desenha a Árvore (os "nós")
-        path_nodes = status_info.get("path_nodes", [])
-        
-        for node in path_nodes:
+        for node in status_info.get("path_nodes", []):
             if node["status"] == "complete":
-                caption_lines.append(f"  ✅ <s>{node['desc']}</s> (Completo)")
-            
+                caption_lines.append(f"  ✅ <s>{node['desc']}</s>")
             elif node["status"] == "available":
-                # Este é o próximo nó a ser completado
                 caption_lines.append(f"  🔘 <b>{node['desc']}</b>")
-                # Adiciona um botão para o jogador ver o custo
-                keyboard.append([
-                    InlineKeyboardButton(
-                        f"Ver Tarefa: {node['desc']}", 
-                        callback_data=f"evo_node_info:{node['id']}"
-                    )
-                ])
-                
+                keyboard.append([InlineKeyboardButton(f"Ver: {node['desc']}", callback_data=f"evo_node_info:{node['id']}")])
             elif node["status"] == "locked":
-                caption_lines.append(f"  🔒 <i>{node['desc']}</i> (Bloqueado)")
+                caption_lines.append(f"  🔒 <i>{node['desc']}</i>")
 
-        # 3b. Verifica se a árvore está COMPLETA
         if status_info.get("all_nodes_complete", False):
-            caption_lines.append("\n<b>Você completou todas as tarefas!</b>")
-            caption_lines.append("O Teste Final está disponível.")
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"⚔️ Tentar o Teste: {target_class.title()}",
-                    callback_data=f"evo_start_trial_confirm:{target_class}"
-                )
-            ])
+            caption_lines.append("\n<b>Caminho completo!</b> O Teste Final aguarda.")
+            keyboard.append([InlineKeyboardButton(f"⚔️ Iniciar Teste: {target_class.title()}", callback_data=f"evo_start_trial_confirm:{target_class}")])
     
-    # (Adicione aqui o fallback para 'required_items' se ainda usar)
-    elif status_info["status"] == "trial_ready":
-        evo_opt = status_info["option"]
-        target_class = evo_opt['to']
-        caption_lines.append(f"Próxima Evolução: <b>{target_class.title()}</b>")
-        caption_lines.append("Você possui os itens necessários (sistema antigo).")
-        keyboard.append([
-            InlineKeyboardButton(
-                f"⚔️ Tentar o Teste: {target_class.title()}",
-                callback_data=f"evo_start_trial_confirm:{target_class}"
-            )
-        ])
-
-    # --- NOVO: Botão para Ascensão de Skills (Passo 5B) ---
-    base_class_key = player_stats._get_class_key_normalized(pdata)
-    # Só mostra se o jogador tiver evoluído (classe atual != classe base)
-    if current_class_key != base_class_key:
-        keyboard.append([InlineKeyboardButton(
-            "💎 Aprimorar Skills de Evolução 💎", 
-            callback_data="evo_skill_ascend_menu"
-        )])
-    # --- Fim do Novo Botão ---
-
-    # Botão de Voltar
+    # Botão de Skills (Passo 5B)
+    # Mostra sempre que o jogador tiver skills, para poder ver o menu mesmo no T1
+    keyboard.append([InlineKeyboardButton("💎 Aprimorar Skills de Evolução", callback_data="evo_skill_ascend_menu")])
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="open_profile_menu")])
     
-    try:
-        await query.edit_message_text(
-            "\n".join(caption_lines),
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
-        )
-    except BadRequest as e:
-        if "not modified" not in str(e):
-            logger.warning(f"Erro ao editar menu de evolução: {e}")
-
+    try: await query.edit_message_text("\n".join(caption_lines), reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    except BadRequest: pass
 
 # ================================================
-# HANDLERS DA ÁRVORE (NOVOS)
+# LÓGICA DE CUSTO DE SKILL (CORRIGIDA)
 # ================================================
 
-async def show_node_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o custo de um nó (tarefa) da árvore de ascensão."""
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    
-    try:
-        node_id = query.data.split(":", 1)[1]
-    except IndexError:
-        await query.answer("Erro: ID da tarefa não encontrado.", show_alert=True)
-        return
-
-    pdata = await player_manager.get_player_data(user_id)
-    status_info = evo_service.get_player_evolution_status(pdata)
-
-    # Encontra o nó específico
-    node_to_show = None
-    if status_info.get("status") == "path_available":
-        for node in status_info.get("path_nodes", []):
-            if node["id"] == node_id and node["status"] == "available":
-                node_to_show = node
-                break
-                
-    if not node_to_show:
-        await query.answer("Esta tarefa não está mais disponível.", show_alert=True)
-        await open_evolution_menu(update, context) # Atualiza o menu
-        return
-
-    # Mostra o custo
-    cost = node_to_show.get("cost", {})
-    cost_str = _format_cost_lines(cost)
-    
-    caption_lines = [
-        f"🔘 <b>Tarefa: {node_to_show['desc']}</b>",
-        "\nCusto para completar:",
-        cost_str
-    ]
-    
-    keyboard = [
-        [InlineKeyboardButton(
-            f"✅ Completar Tarefa (Gastar Recursos)",
-            callback_data=f"evo_complete_node:{node_id}"
-        )],
-        [InlineKeyboardButton("⬅️ Voltar para a Árvore", callback_data="open_evolution_menu")]
-    ]
-    
-    await query.edit_message_text(
-        "\n".join(caption_lines),
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="HTML"
-    )
-
-async def complete_node(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Tenta completar (pagar) um nó da árvore de ascensão."""
-    query = update.callback_query
-    
-    try:
-        node_id = query.data.split(":", 1)[1]
-    except IndexError:
-        await query.answer("Erro: ID da tarefa não encontrado.", show_alert=True)
-        return
-
-    user_id = query.from_user.id
-    
-    # Tenta completar o nó (esta função consome itens/ouro)
-    success, message = await evo_service.attempt_ascension_node(user_id, node_id)
-    
-    await query.answer(message, show_alert=True)
-    
-    # Se conseguiu ou não, sempre atualiza o menu principal para
-    # mostrar o novo estado da árvore (ou a mensagem de erro).
-    await open_evolution_menu(update, context)
-
-
-# ================================================
-# HANDLERS DO TESTE (TRIAL)
-# ================================================
-
-async def start_trial_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Pede confirmação antes de iniciar o teste."""
-    query = update.callback_query
-    
-    try:
-        target_class = query.data.split(":", 1)[1]
-    except IndexError:
-        await query.answer("Erro: Classe alvo não encontrada.", show_alert=True)
-        return
-
-    # Pega a definição da evolução
-    evo_opt = evo_data.find_evolution_by_target(target_class)
-    if not evo_opt:
-        await query.answer("Erro: Definição da evolução não encontrada.", show_alert=True)
-        return
-        
-    # Verifica se é sistema antigo (required_items) ou novo (ascension_path)
-    cost_str = ""
-    if "ascension_path" in evo_opt:
-        cost_str = "Seu Caminho da Ascensão está completo."
-    elif "required_items" in evo_opt:
-        cost_str = "Isto consumirá os seguintes itens:\n"
-        cost_str += _format_cost_lines(evo_opt["required_items"])
-        
-    caption = [
-        f"⚔️ <b>Teste de Evolução: {target_class.title()}</b> ⚔️",
-        "\nVocê está prestes a enfrentar o teste final.",
-        cost_str,
-        "\n<b>Esta ação não pode ser desfeita.</b>",
-        "Se você falhar, terá que completar o Caminho (ou juntar os itens) novamente.",
-        "\nDeseja continuar?"
-    ]
-    
-    keyboard = [
-        [InlineKeyboardButton(
-            f"Sim, iniciar o Teste!",
-            callback_data=f"evo_start_trial_execute:{target_class}"
-        )],
-        [InlineKeyboardButton("Não, voltar", callback_data="open_evolution_menu")]
-    ]
-    
-    await query.edit_message_text(
-        "\n".join(caption),
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="HTML"
-    )
-
-async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Inicia a batalha de provação."""
-    query = update.callback_query
-    await query.answer("Iniciando o teste...")
-    user_id = query.from_user.id
-
-    try:
-        target_class = query.data.split(":", 1)[1]
-    except IndexError:
-        await query.answer("Erro: Classe alvo não encontrada.", show_alert=True)
-        return
-        
-    # 1. Chama o serviço para consumir itens (se houver) e verificar
-    result = await evo_service.start_evolution_trial(user_id, target_class)
-
-    if not result.get("success"):
-        await query.answer(result.get("message", "Erro desconhecido."), show_alert=True)
-        await open_evolution_menu(update, context) # Atualiza o menu
-        return
-
-    # 2. Pega o monstro do teste
-    monster_id = result.get("trial_monster_id")
-    if not monster_id:
-        await query.answer("ERRO CRÍTICO: Monstro de teste não definido!", show_alert=True)
-        return
-
-    # 3. Importa o motor de dungeon (que sabe como iniciar combates legados)
-    from modules.dungeons import runtime as dungeons_runtime
-    
-    # 4. Inicia o combate
-    # (Esta função deve apagar a mensagem atual e enviar a UI de combate)
-    await dungeons_runtime.start_evolution_trial_battle(
-        update, 
-        context, 
-        user_id, 
-        monster_id,
-        target_class # Passa a classe alvo para o 'finalize_evolution' saber
-    )
-
-# ====================================================================
-# --- INÍCIO DO NOVO BLOCO (PASSO 5B - ASCENSÃO DE SKILL) ---
-# ====================================================================
-
-# Define os "CAPS" (limites) para cada raridade
 RARITY_UPGRADE_PATH_EVO = {
     "comum": {"cap": 10, "next": "epica"},
-    "epica": {"cap": 10, "next": "lendaria"}, # Era 12 na sua sugestão, ajustei para 10
-    "lendaria": None # Nível Máximo
+    "epica": {"cap": 10, "next": "lendaria"},
+    "lendaria": None
 }
 
 def _get_skill_upgrade_cost(pdata: dict, skill_id: str, current_rarity: str) -> Optional[dict]:
     """
-    Determina o custo para o PRÓXIMO APRIMORAMENTO (1 passo).
-    Baseado na sua ideia: "10 selos e 5000" para Comum -> Épica
-    e "mais selos e mais cara" para Épica -> Lendária.
+    Calcula o custo para aprimorar uma skill.
+    CORREÇÃO: Agora suporta skills T1 (Iniciais).
     """
     skill_data = SKILL_DATA.get(skill_id)
-    if not skill_data:
-        return None
+    if not skill_data: return None
 
-    # 1. Encontra a qual Tier (T2, T3...) esta skill pertence
     base_class = player_stats._get_class_key_normalized(pdata)
-    target_tier = None
+    
+    # 1. Tenta descobrir o Tier da Skill
+    target_tier = 1 # Assume Tier 1 por padrão (Skills Iniciais)
+    
+    # Verifica se a skill pertence a uma evolução (T2+)
     for evo in evo_data.EVOLUTIONS.get(base_class, []):
         if skill_id in evo.get("unlocks_skills", []):
             target_tier = evo.get("tier_num")
             break
             
-    if not target_tier:
-        return None # Skill não é de evolução
-
-    # 2. Define o Tier do material de custo (T+1)
+    # 2. Define o Tier do material de custo (Sempre Tier + 1)
+    # Ex: Skill T1 usa item da evolução T2 (Emblema)
+    # Ex: Skill T2 usa item da evolução T3 (Relíquia)
     cost_tier = target_tier + 1
-    if target_tier == 6:
-        cost_tier = 6 # Skill T6 usa materiais T6
+    if target_tier >= 6: cost_tier = 6 # Cap no T6
 
-    # 3. Encontra o material de custo (o primeiro item do 'ascension_path' do T+1)
+    # 3. Encontra a evolução que contém o material de custo
     cost_evolution = None
     for evo in evo_data.EVOLUTIONS.get(base_class, []):
         if evo.get("tier_num") == cost_tier:
             cost_evolution = evo
             break
             
-    if not cost_evolution or not cost_evolution.get("ascension_path"):
-        return {"gold": 999999} # Fallback
+    # Se não achou a evolução de custo (ex: não existe T7), usa um custo padrão alto ou aborta
+    if not cost_evolution:
+        # Tenta pegar custo da última evolução disponível se for lendária
+        if current_rarity == "lendaria": return None
+        return {"gold": 50000} # Fallback seguro
 
-    material_node = cost_evolution["ascension_path"][0]
-    base_cost_def = material_node.get("cost", {})
-    
-    # Pega o primeiro item (que não seja gold) da lista de custo
+    # 4. Extrai o ID do material do primeiro nó da árvore dessa evolução
     material_id = None
-    for item_id in base_cost_def:
-        if item_id != "gold":
-            material_id = item_id
-            break
-            
-    if not material_id:
-        return {"gold": 999999} # Fallback se o nó T+1 só custa gold
+    asc_path = cost_evolution.get("ascension_path", [])
+    if asc_path:
+        first_node_cost = asc_path[0].get("cost", {})
+        for item in first_node_cost:
+            if item != "gold":
+                material_id = item
+                break
+    
+    if not material_id: return {"gold": 50000} # Fallback
 
-    # 4. Aplica a sua lógica de custo (10 selos + 5000, etc.)
+    # 5. Define quantidades baseadas na raridade
     cost = {}
-    if current_rarity == "comum": # Custo para 1 passo (de 10) para Épica
+    if current_rarity == "comum":
         cost[material_id] = 10
         cost["gold"] = 5000
-    elif current_rarity == "epica": # Custo para 1 passo (de 10) para Lendária
-        cost[material_id] = 20 # "mais selos"
-        cost["gold"] = 10000  # "mais cara"
+    elif current_rarity == "epica":
+        cost[material_id] = 20
+        cost["gold"] = 10000
     else:
-        return None # Raridade inválida para upgrade
+        return None
 
     return cost
 
+# ================================================
+# MENUS DE SKILL E OUTROS HANDLERS
+# ================================================
+
+async def show_node_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try: node_id = query.data.split(":", 1)[1]
+    except: return
+
+    user_id = query.from_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    status_info = evo_service.get_player_evolution_status(pdata)
+
+    node = next((n for n in status_info.get("path_nodes", []) if n["id"] == node_id), None)
+    if not node:
+        await query.answer("Tarefa indisponível.", show_alert=True)
+        await open_evolution_menu(update, context)
+        return
+
+    cost_str = _format_cost_lines(node.get("cost", {}))
+    text = f"🔘 <b>Tarefa: {node['desc']}</b>\n\nCusto:\n{cost_str}"
+    kb = [[InlineKeyboardButton("✅ Completar", callback_data=f"evo_complete_node:{node_id}")],
+          [InlineKeyboardButton("⬅️ Voltar", callback_data="open_evolution_menu")]]
+    
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+async def complete_node(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    try: node_id = query.data.split(":", 1)[1]
+    except: return
+    
+    success, msg = await evo_service.attempt_ascension_node(query.from_user.id, node_id)
+    await query.answer(msg, show_alert=True)
+    await open_evolution_menu(update, context)
+
+async def start_trial_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    try: target = query.data.split(":", 1)[1]
+    except: return
+    
+    text = f"⚔️ <b>Teste: {target.title()}</b>\nDeseja iniciar a batalha pela sua evolução?"
+    kb = [[InlineKeyboardButton("⚔️ Lutar!", callback_data=f"evo_start_trial_execute:{target}")],
+          [InlineKeyboardButton("Cancelar", callback_data="open_evolution_menu")]]
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    try: target = query.data.split(":", 1)[1]
+    except: return
+
+    result = await evo_service.start_evolution_trial(user_id, target)
+    if not result.get("success"):
+        await query.answer(result.get("message"), show_alert=True)
+        return
+
+    from modules.dungeons import runtime as dungeons_runtime
+    await dungeons_runtime.start_evolution_trial_battle(update, context, user_id, result["trial_monster_id"], target)
+
+# --- SKILL ASCENSION HANDLERS ---
 
 async def show_skill_ascension_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra as skills de evolução que o jogador pode melhorar (com progresso)."""
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    pdata = await player_manager.get_player_data(query.from_user.id)
+    skills = pdata.get("skills", {})
     
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        await query.edit_message_text("Erro: Não foi possível carregar seus dados.")
-        return
-
-    player_skills = pdata.get("skills", {})
-    if not isinstance(player_skills, dict):
-        await query.edit_message_text("Erro: Formato de skills inválido.")
-        return
-
-    caption_lines = [
-        "💎 <b>Aprimorar Skills de Evolução</b> 💎",
-        "Melhore suas skills exclusivas de classe usando materiais de ascensão.",
-        "---"
-    ]
-    keyboard = []
-
-    # Encontra todas as skills 'evo_...' que o jogador possui
-    evo_skills_owned = []
-    for skill_id in player_skills:
-        if skill_id.startswith("evo_"):
-            evo_skills_owned.append(skill_id)
+    text = "💎 <b>Aprimorar Skills</b> 💎\nSelecione uma skill para evoluir sua raridade.\n"
+    kb = []
+    
+    # Filtra skills aprimoráveis (que começam com 'evo_' OU são skills de classe conhecidas)
+    # Para simplificar, vamos listar todas que estão no dicionário novo
+    valid_skills = []
+    for sid, sdata in skills.items():
+        # Verifica se é um dicionário (formato novo) e se tem dados no SKILL_DATA
+        if isinstance(sdata, dict) and sid in SKILL_DATA:
+            valid_skills.append(sid)
             
-    if not evo_skills_owned:
-         caption_lines.append("Você ainda não possui skills de evolução para aprimorar.")
-         
-    evo_skills_owned.sort() 
-
-    for skill_id in evo_skills_owned:
-        skill_instance = player_skills.get(skill_id, {})
-        rarity = skill_instance.get("rarity", "comum")
-        progress = skill_instance.get("progress", 0)
-        skill_name = SKILL_DATA.get(skill_id, {}).get("display_name", skill_id)
-        
-        upgrade_path = RARITY_UPGRADE_PATH_EVO.get(rarity)
-        
-        if upgrade_path:
-            cap = upgrade_path["cap"]
-            caption_lines.append(f"• <b>{skill_name}</b> (Raridade: {rarity.capitalize()} - {progress}/{cap})")
-            keyboard.append([InlineKeyboardButton(
-                f"Melhorar {skill_name} ({progress}/{cap})", 
-                callback_data=f"evo_skill_ascend_info:{skill_id}"
-            )])
-        else:
-             caption_lines.append(f"• <b>{skill_name}</b> (Raridade: {rarity.capitalize()})")
-             caption_lines.append("   (Nível Máximo)")
-
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="open_evolution_menu")])
+    if not valid_skills:
+        text += "\n<i>Nenhuma skill aprimorável encontrada. Evolua sua classe para ganhar novas skills!</i>"
     
-    await query.edit_message_text(
-        "\n".join(caption_lines),
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="HTML"
-    )
+    for sid in valid_skills:
+        sdata = skills[sid]
+        info = SKILL_DATA[sid]
+        rarity = sdata.get("rarity", "comum")
+        prog = sdata.get("progress", 0)
+        path = RARITY_UPGRADE_PATH_EVO.get(rarity)
+        
+        if path:
+            btn_txt = f"{info['display_name']} ({rarity.title()} {prog}/{path['cap']})"
+            kb.append([InlineKeyboardButton(btn_txt, callback_data=f"evo_skill_ascend_info:{sid}")])
+        else:
+            kb.append([InlineKeyboardButton(f"🌟 {info['display_name']} (MÁX)", callback_data="noop")])
+
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="open_evolution_menu")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 async def show_skill_ascension_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o custo para o PRÓXIMO passo de aprimoramento."""
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    try: sid = query.data.split(":", 1)[1]
+    except: return
     
-    try:
-        skill_id = query.data.split(":", 1)[1]
-    except IndexError:
-        await query.answer("Erro: ID da skill não encontrado.", show_alert=True)
-        return
-
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata or not isinstance(pdata.get("skills"), dict):
-        await query.answer("Erro: Dados do jogador inválidos.", show_alert=True)
-        return
-
-    skill_instance = pdata["skills"].get(skill_id)
-    if not skill_instance:
-        await query.answer("Você não possui esta skill.", show_alert=True)
-        return
-
-    current_rarity = skill_instance.get("rarity", "comum")
-    current_progress = skill_instance.get("progress", 0)
+    pdata = await player_manager.get_player_data(query.from_user.id)
+    sdata = pdata["skills"].get(sid)
+    info = SKILL_DATA.get(sid)
     
-    upgrade_path = RARITY_UPGRADE_PATH_EVO.get(current_rarity)
-    if not upgrade_path:
-        await query.answer("Esta skill já está no nível máximo.", show_alert=True)
-        await show_skill_ascension_menu(update, context)
-        return
-
-    cap = upgrade_path["cap"]
-    next_rarity_name = upgrade_path["next"]
-    skill_name = SKILL_DATA.get(skill_id, {}).get("display_name", skill_id)
+    rarity = sdata.get("rarity", "comum")
+    cost = _get_skill_upgrade_cost(pdata, sid, rarity)
     
-    # Pega o custo para ESTE passo
-    cost = _get_skill_upgrade_cost(pdata, skill_id, current_rarity)
-
-    caption_lines = [
-        f"💎 <b>Aprimorar: {skill_name}</b>",
-        f"Raridade Atual: {current_rarity.capitalize()} (Progresso: {current_progress}/{cap})",
-        f"Próximo Nível: {current_rarity.capitalize()} (Progresso: {current_progress + 1}/{cap})",
-        "\nCusto para este aprimoramento:"
-    ]
+    text = f"💎 <b>{info['display_name']}</b>\n"
+    text += f"Raridade: {rarity.title()}\n"
+    text += f"Progresso: {sdata.get('progress', 0)}/{RARITY_UPGRADE_PATH_EVO[rarity]['cap']}\n\n"
     
-    if not cost:
-        caption_lines.append("<i>Erro: Custo não definido.</i>")
-        keyboard = [
-            [InlineKeyboardButton("⬅️ Voltar", callback_data="evo_skill_ascend_menu")]
-        ]
+    kb = []
+    if cost:
+        text += "<b>Custo para melhorar:</b>\n" + _format_cost_lines(cost)
+        kb.append([InlineKeyboardButton("✅ Melhorar", callback_data=f"evo_skill_ascend_confirm:{sid}")])
     else:
-        caption_lines.append(_format_cost_lines(cost))
+        text += "<i>Não é possível melhorar mais.</i>"
         
-        # Verifica se o jogador PODE pagar
-        can_afford = True
-        if "gold" in cost and player_manager.get_gold(pdata) < cost["gold"]:
-            can_afford = False
-        
-        item_cost = {k: v for k, v in cost.items() if k != "gold"}
-        if not evo_service._inventory_has(pdata, item_cost):
-            can_afford = False
-            
-        if can_afford:
-            keyboard = [
-                [InlineKeyboardButton(
-                    f"✅ Aprimorar (Gastar Recursos)", 
-                    callback_data=f"evo_skill_ascend_confirm:{skill_id}"
-                )],
-                [InlineKeyboardButton("⬅️ Voltar", callback_data="evo_skill_ascend_menu")]
-            ]
-        else:
-            caption_lines.append("\n<b>Você não possui os materiais necessários.</b>")
-            keyboard = [
-                [InlineKeyboardButton("⬅️ Voltar", callback_data="evo_skill_ascend_menu")]
-            ]
-
-    await query.edit_message_text(
-        "\n".join(caption_lines),
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="HTML"
-    )
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="evo_skill_ascend_menu")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 async def confirm_skill_ascension(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Confirma e executa UM passo de aprimoramento da skill de evolução."""
     query = update.callback_query
+    try: sid = query.data.split(":", 1)[1]
+    except: return
     
-    try:
-        skill_id = query.data.split(":", 1)[1]
-    except IndexError:
-        await query.answer("Erro: ID da skill não encontrado.", show_alert=True)
-        return
-
-    await query.answer("Aprimorando...")
     user_id = query.from_user.id
-    
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata or not isinstance(pdata.get("skills"), dict) or skill_id not in pdata["skills"]:
-        await query.answer("Erro: Skill ou dados do jogador não encontrados.", show_alert=True)
-        return
-
-    skill_instance = pdata["skills"][skill_id]
-    current_rarity = skill_instance.get("rarity", "comum")
-    current_progress = skill_instance.get("progress", 0)
+    sdata = pdata["skills"].get(sid)
     
-    upgrade_path = RARITY_UPGRADE_PATH_EVO.get(current_rarity)
-    if not upgrade_path:
-        await query.answer("Skill já está no nível máximo.", show_alert=True)
-        await show_skill_ascension_menu(update, context)
+    cost = _get_skill_upgrade_cost(pdata, sid, sdata.get("rarity", "comum"))
+    if not cost: 
+        await query.answer("Erro no custo.", show_alert=True)
         return
 
-    cap = upgrade_path["cap"]
-    next_rarity = upgrade_path["next"]
-    
-    cost = _get_skill_upgrade_cost(pdata, skill_id, current_rarity)
-    if not cost:
-        await query.answer("Erro: Custo não pôde ser determinado.", show_alert=True)
-        await show_skill_ascension_menu(update, context)
-        return
-
-    # Verifica e consome Ouro
-    gold_cost = cost.get("gold", 0)
-    if not evo_service._consume_gold(pdata, gold_cost):
-        await query.answer(f"Ouro insuficiente. Requer {gold_cost} 🪙.", show_alert=True)
-        return
-
-    # Verifica e consome Itens
-    item_cost = {k: v for k, v in cost.items() if k != "gold"}
-    if not evo_service._consume_items(pdata, item_cost):
-        await query.answer("Itens insuficientes.", show_alert=True)
-        # Devolve o ouro se falhar nos itens
-        player_manager.add_gold(pdata, gold_cost)
+    # Consome Ouro
+    if not evo_service._consume_gold(pdata, cost.get("gold", 0)):
+        await query.answer("Ouro insuficiente!", show_alert=True)
         return
         
-    # --- SUCESSO ---
-    current_progress += 1
-    pdata["skills"][skill_id]["progress"] = current_progress
+    # Consome Itens
+    items_only = {k:v for k,v in cost.items() if k!="gold"}
+    if not evo_service._consume_items(pdata, items_only):
+        player_manager.add_gold(pdata, cost.get("gold", 0)) # Reembolsa
+        await query.answer("Itens insuficientes!", show_alert=True)
+        return
+        
+    # Aplica Upgrade
+    sdata["progress"] = sdata.get("progress", 0) + 1
+    path = RARITY_UPGRADE_PATH_EVO.get(sdata["rarity"])
     
-    skill_name = SKILL_DATA.get(skill_id, {}).get("display_name", skill_id)
-    
-    if current_progress >= cap:
-        # ATINGIU A PRÓXIMA RARIDADE!
-        pdata["skills"][skill_id]["rarity"] = next_rarity
-        pdata["skills"][skill_id]["progress"] = 0
-        await query.answer(
-            f"🌟 SUCESSO! Sua skill [{skill_name}] ascendeu para {next_rarity.capitalize()}!",
-            show_alert=True
-        )
-    else:
-        # Apenas progrediu
-        await query.answer(
-            f"✨ Aprimoramento realizado! Progresso: {current_progress}/{cap}",
-            show_alert=True
-        )
-
+    msg = "✨ Skill aprimorada!"
+    if sdata["progress"] >= path["cap"]:
+        sdata["rarity"] = path["next"]
+        sdata["progress"] = 0
+        msg = f"🌟 A skill evoluiu para {sdata['rarity'].title()}!"
+        
     await player_manager.save_player_data(user_id, pdata)
-    
-    # Recarrega o menu de ascensão
-    await show_skill_ascension_menu(update, context)
+    await query.answer(msg, show_alert=True)
+    await show_skill_ascension_info(update, context)
 
-# ====================================================================
-# --- FIM DO NOVO BLOCO (PASSO 5B) ---
-# ====================================================================
-
-# ====================================================================
-# HANDLERS DE EXPORTAÇÃO (Para serem importados pelo registries/character.py)
-# ====================================================================
-
-# Handler para abrir o menu da Árvore de Ascensão
-status_evolution_open_handler = CallbackQueryHandler(
-    open_evolution_menu, 
-    pattern=r'^open_evolution_menu$'
-)
-
-# Handler para ver a informação/custo de um nó (tarefa)
-show_node_info_handler = CallbackQueryHandler(
-    show_node_info, 
-    pattern=r'^evo_node_info:'
-)
-
-# Handler para completar a tarefa (pagar o custo)
-complete_node_handler = CallbackQueryHandler(
-    complete_node, 
-    pattern=r'^evo_complete_node:'
-)
-
-# Handler para a tela de confirmação do teste final
-start_trial_confirmation_handler = CallbackQueryHandler(
-    start_trial_confirmation, 
-    pattern=r'^evo_start_trial_confirm:'
-)
-
-# Handler para iniciar a execução da batalha
-start_trial_execute_handler = CallbackQueryHandler(
-    start_trial_execute, 
-    pattern=r'^evo_start_trial_execute:'
-)
-
-# --- Handlers do Passo 5B (Ascensão de Skills) ---
-
-# Handler para abrir o menu de melhoria de skills 'evo_...'
-skill_ascension_menu_handler = CallbackQueryHandler(
-    show_skill_ascension_menu,
-    pattern=r'^evo_skill_ascend_menu$'
-)
-
-# Handler para mostrar o custo de uma skill 'evo_...' específica
-skill_ascension_info_handler = CallbackQueryHandler(
-    show_skill_ascension_info,
-    pattern=r'^evo_skill_ascend_info:'
-)
-
-# Handler para confirmar e pagar o custo da melhoria
-skill_ascension_confirm_handler = CallbackQueryHandler(
-    confirm_skill_ascension,
-    pattern=r'^evo_skill_ascend_confirm:'
-)
+# ================================================
+# EXPORTS
+# ================================================
+status_evolution_open_handler = CallbackQueryHandler(open_evolution_menu, pattern=r'^open_evolution_menu$')
+show_node_info_handler = CallbackQueryHandler(show_node_info, pattern=r'^evo_node_info:')
+complete_node_handler = CallbackQueryHandler(complete_node, pattern=r'^evo_complete_node:')
+start_trial_confirmation_handler = CallbackQueryHandler(start_trial_confirmation, pattern=r'^evo_start_trial_confirm:')
+start_trial_execute_handler = CallbackQueryHandler(start_trial_execute, pattern=r'^evo_start_trial_execute:')
+skill_ascension_menu_handler = CallbackQueryHandler(show_skill_ascension_menu, pattern=r'^evo_skill_ascend_menu$')
+skill_ascension_info_handler = CallbackQueryHandler(show_skill_ascension_info, pattern=r'^evo_skill_ascend_info:')
+skill_ascension_confirm_handler = CallbackQueryHandler(confirm_skill_ascension, pattern=r'^evo_skill_ascend_confirm:')
