@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # --- Criação e Busca ---
 try:
     from handlers.guild.creation_search import (
+        clan_create_menu_handler,
         clan_creation_conv_handler, 
         clan_search_conv_handler, 
         clan_apply_handler,
@@ -23,6 +24,7 @@ try:
 except ImportError as e:
     logger.error(f"Erro ao importar creation_search: {e}")
     clan_creation_conv_handler = None
+    clan_create_menu_handler = None
 
 # --- Gestão (Logo, Convites, Transferência) ---
 try:
@@ -72,6 +74,7 @@ raw_handlers = [
     clan_transfer_leader_conv_handler,
 
     # 2. Ações Específicas de Criação/Busca/Convite
+    clan_create_menu_handler,
     clan_apply_handler,
     clan_manage_apps_handler,
     clan_app_accept_handler,
@@ -80,9 +83,7 @@ raw_handlers = [
     clan_invite_decline_handler,
     clan_delete_warn_handler, 
     clan_delete_do_handler,
-
-    # 3. Roteador Principal do Clã (Dashboard & Gestão Visual)
-    # É AQUI que o botão 'clan_menu' vai cair e executar o código do dashboard.py
+    
     dashboard_router,
 
     # 4. Guilda de Aventureiros (NPC)
