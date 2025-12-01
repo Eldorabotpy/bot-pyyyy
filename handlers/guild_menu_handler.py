@@ -149,7 +149,8 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
     if pdata.get("clan_id"):
         keyboard.append([InlineKeyboardButton("🛡️ Acessar Meu Clã", callback_data="clan_menu")])
     else:
-        keyboard.append([InlineKeyboardButton("🛡️ Criar ou Buscar Clã", callback_data="guild_menu")])
+        # MUDANÇA: Direciona para o callback que abre o menu de criação
+        keyboard.append([InlineKeyboardButton("🛡️ Criar ou Buscar Clã", callback_data="clan_create_menu_start")])
 
     keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="profile")])
     markup = InlineKeyboardMarkup(keyboard)
