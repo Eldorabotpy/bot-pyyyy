@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 ASKING_INVITEE = 0
 ASKING_LOGO = 1
+ASKING_TRANSFER_TARGET = 2
 
 # --- HELPER DE LIMPEZA ---
 async def _clean_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -31,14 +32,14 @@ async def _clean_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- FUNÇÃO DE CANCELAR (Global para este arquivo) ---
 async def cancel_op(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancela a operação atual e retorna ao menu."""
     await _clean_chat(update, context)
-    kb = [[InlineKeyboardButton("⬅️ Voltar", callback_data='clan_manage_menu')]]
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id, 
-        text="❌ Operação cancelada.", 
-        reply_markup=InlineKeyboardMarkup(kb)
-    )
+    msg = await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Operação cancelada.")
+    # Apaga a mensagem de "Cancelado" depois de 3 segs para limpar a tela (opcional)
+    # context.job_queue.run_once(lambda ctx: ctx.bot.delete_message(msg.chat_id, msg.message_id), 3)
+    
+    # Retorna ao menu de gestão
+    # Precisamos "simular" um update para chamar o show_clan_management_menu, 
+    # mas como cancelou via comando, o ideal é o usuário clicar no menu de novo ou mandarmos um novo menu.
     return ConversationHandler.END
 
 # ==============================================================================
@@ -46,41 +47,34 @@ async def cancel_op(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # ==============================================================================
 async def show_clan_management_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    
-    # 1. Tenta parar o loading do botão
     try: await query.answer()
     except: pass
-    
-    # NOTA: Removemos o 'delete_message' para usar a transição suave
     
     user_id = query.from_user.id
     pdata = await player_manager.get_player_data(user_id)
     clan_id = pdata.get("clan_id")
     
-    # 2. Busca dados do Clã
     clan_data = None
     try:
         result = clan_manager.get_clan(clan_id)
         if hasattr(result, '__await__'): clan_data = await result
         else: clan_data = result
-    except Exception as e:
-        logger.error(f"Erro leitura clã: {e}")
+    except: pass
 
     if not clan_data:
-        # Fallback apenas se não achar o clã
         await context.bot.send_message(chat_id=query.message.chat.id, text="⚠️ Erro: Clã não encontrado.")
         return
 
-    # 3. MONTA TEXTO E BOTÕES
+    # Validação de Líder
     leader_id_raw = clan_data.get("leader_id", 0)
-    is_leader = (int(leader_id_raw) == user_id)
+    is_leader = (str(leader_id_raw) == str(user_id))
+    
     pending = clan_data.get("pending_applications", [])
     
     keyboard = []
     keyboard.append([InlineKeyboardButton("📜 Ver Lista de Membros", callback_data='clan_view_members')])
 
     if is_leader:
-        # Adicionei o nome do clã no título para ficar mais bonito
         text = f"👑 <b>GESTÃO DO CLÃ: {clan_data.get('display_name')}</b>\nConfigure seu clã e gerencie membros."
         
         if pending:
@@ -89,21 +83,223 @@ async def show_clan_management_menu(update: Update, context: ContextTypes.DEFAUL
         keyboard.append([InlineKeyboardButton("✉️ Convidar Jogador", callback_data='clan_invite_start')])
         keyboard.append([InlineKeyboardButton("👟 Expulsar Membro", callback_data='clan_kick_menu')])
         keyboard.append([InlineKeyboardButton("🖼️ Alterar Logo", callback_data='clan_logo_start')])
-        keyboard.append([InlineKeyboardButton("👑 Transferir Liderança", callback_data='clan_transfer_leader_start')])
-        keyboard.append([InlineKeyboardButton("⚠️ Dissolver Clã", callback_data='clan_delete_warn')])
+        keyboard.append([InlineKeyboardButton("👑 Transferir Liderança", callback_data='clan_transfer_start')]) # Corrigido callback
+        keyboard.append([InlineKeyboardButton("⚠️ Dissolver Clã", callback_data='clan_delete_ask')]) # Corrigido callback
     else:
         text = "👤 <b>ÁREA DO MEMBRO</b>\n\nDeseja sair do clã?"
         keyboard.append([InlineKeyboardButton("🚪 Sair do Clã", callback_data='clan_leave_ask')])
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data='clan_menu')])
 
-    # 4. ENVIO IMERSIVO (Substitui o bloco antigo de delete/send)
-    # Essa função detecta a mídia atual e edita suavemente
     await _render_clan_screen(update, context, clan_data, text, keyboard)
 
 # ==============================================================================
 # 2. LISTA DE MEMBROS
 # ==============================================================================
+
+async def start_invite_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    msg_text = "✉️ <b>CONVIDAR JOGADOR</b>\n\nDigite o <b>Nome do Personagem</b> exato que deseja convidar:\n(Ou /cancelar)"
+    
+    # Envia mensagem de pergunta
+    try: await query.delete_message() # Limpa o menu para focar na pergunta
+    except: pass
+    
+    msg = await context.bot.send_message(chat_id=query.message.chat.id, text=msg_text, parse_mode="HTML")
+    context.user_data['last_bot_msg_id'] = msg.message_id
+    
+    return ASKING_INVITEE
+
+async def receive_invitee_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    target_name = update.message.text.strip()
+    
+    await _clean_chat(update, context) # Limpa a resposta do user e a pergunta do bot
+
+    # Busca o jogador alvo
+    target = await player_manager.find_player_by_character_name(target_name)
+    
+    if not target:
+        msg = await update.message.reply_text(f"❌ Personagem '{target_name}' não encontrado. Tente novamente ou /cancelar.")
+        context.user_data['last_bot_msg_id'] = msg.message_id
+        return ASKING_INVITEE
+    
+    # Trata retorno do banco (pode ser dict ou lista dependendo da implementação do seu player_manager)
+    target_data = target[0] if isinstance(target, list) and target else target
+    target_id = target_data.get('user_id')
+    
+    # Verifica se já tem clã
+    if target_data.get('clan_id'):
+        await update.message.reply_text("❌ Este jogador já está em um clã.")
+        return ConversationHandler.END
+
+    # Pega dados do clã atual (do líder)
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    clan = await clan_manager.get_clan(clan_id)
+    clan_name = clan.get("display_name")
+
+    # Envia Convite para o ALVO
+    kb_invite = [
+        [InlineKeyboardButton("✅ Aceitar", callback_data=f"clan_invite_accept:{clan_id}")],
+        [InlineKeyboardButton("❌ Recusar", callback_data="clan_invite_decline")]
+    ]
+    
+    try:
+        await context.bot.send_message(
+            chat_id=target_id,
+            text=f"📜 <b>CONVITE DE CLÃ</b>\n\nO clã <b>{clan_name}</b> convidou você para se juntar a eles!",
+            reply_markup=InlineKeyboardMarkup(kb_invite),
+            parse_mode="HTML"
+        )
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"✅ Convite enviado para <b>{target_name}</b>!", parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Erro ao enviar convite: {e}")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="❌ Erro ao enviar mensagem privada. O jogador bloqueou o bot?")
+
+    return ConversationHandler.END
+
+async def accept_invite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    clan_id = query.data.split(":")[1]
+    
+    try:
+        # Usa a função de aceitar do clan_manager (que move de pending pra member)
+        # Como aqui é convite direto, forçamos a entrada
+        
+        # 1. Adiciona como se fosse aceito da lista de espera
+        # Mas primeiro adiciona na lista de espera para a função funcionar, ou faz manual
+        await clan_manager.add_application(clan_id, user_id)
+        await clan_manager.accept_application(clan_id, user_id)
+        
+        # 2. Atualiza o player
+        pdata = await player_manager.get_player_data(user_id)
+        pdata["clan_id"] = clan_id
+        await player_manager.save_player_data(user_id, pdata)
+        
+        await query.edit_message_text(f"🎉 <b>Parabéns!</b> Você agora é membro do clã.", parse_mode="HTML")
+        
+    except ValueError as e:
+        await query.edit_message_text(f"❌ Erro: {str(e)}")
+    except Exception as e:
+        await query.edit_message_text("❌ Ocorreu um erro ao entrar no clã.")
+
+async def decline_invite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.edit_message_text("❌ Convite recusado.")
+
+async def start_transfer_leadership(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    msg_text = (
+        "👑 <b>TRANSFERIR LIDERANÇA</b>\n\n"
+        "Digite o <b>Nome do Membro</b> para quem deseja passar a coroa.\n"
+        "⚠️ <i>Você se tornará um membro comum.</i>\n\n"
+        "/cancelar para voltar."
+    )
+    
+    try: await query.delete_message()
+    except: pass
+    
+    msg = await context.bot.send_message(chat_id=query.message.chat.id, text=msg_text, parse_mode="HTML")
+    context.user_data['last_bot_msg_id'] = msg.message_id
+    return ASKING_TRANSFER_TARGET
+
+async def receive_transfer_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    target_name = update.message.text.strip()
+    await _clean_chat(update, context)
+    
+    # Busca o alvo
+    target = await player_manager.find_player_by_character_name(target_name)
+    if not target:
+        msg = await update.message.reply_text("❌ Membro não encontrado.")
+        context.user_data['last_bot_msg_id'] = msg.message_id
+        return ASKING_TRANSFER_TARGET
+        
+    target_data = target[0] if isinstance(target, list) and target else target
+    target_id = target_data.get('user_id')
+    
+    # Verifica se é o mesmo
+    if str(target_id) == str(user_id):
+        msg = await update.message.reply_text("❌ Você já é o líder.")
+        context.user_data['last_bot_msg_id'] = msg.message_id
+        return ASKING_TRANSFER_TARGET
+
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    
+    try:
+        await clan_manager.transfer_leadership(clan_id, old_leader_id=user_id, new_leader_id=target_id)
+        
+        kb = [[InlineKeyboardButton("🔙 Voltar ao Clã", callback_data="clan_menu")]]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"✅ <b>Sucesso!</b>\n\nA liderança foi transferida para <b>{target_name}</b>.",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="HTML"
+        )
+        
+        # Avisa o novo líder
+        try: await context.bot.send_message(target_id, "👑 <b>Atenção!</b> Você é o novo Líder do Clã!", parse_mode="HTML")
+        except: pass
+        
+    except ValueError as e:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"❌ Erro: {str(e)}")
+        
+    return ConversationHandler.END
+
+async def warn_delete_clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Pergunta se tem certeza."""
+    query = update.callback_query
+    await query.answer()
+    
+    text = (
+        "⚠️ <b>PERIGO: DISSOLVER CLÃ</b> ⚠️\n\n"
+        "Tem certeza que deseja apagar este clã permanentemente?\n"
+        "• Todo o Ouro será perdido.\n"
+        "• Todos os membros ficarão sem clã.\n"
+        "• O nível e progresso serão apagados.\n\n"
+        "<b>Essa ação não pode ser desfeita!</b>"
+    )
+    
+    kb = [
+        [InlineKeyboardButton("🔥 SIM, APAGAR TUDO", callback_data='clan_delete_confirm')],
+        [InlineKeyboardButton("🔙 Cancelar", callback_data='clan_manage_menu')]
+    ]
+    
+    # Usa render ou edit
+    try: await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    except: 
+        await query.delete_message()
+        await context.bot.send_message(query.message.chat.id, text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+async def perform_delete_clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Apaga o clã."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    
+    try:
+        await clan_manager.delete_clan(clan_id, leader_id=user_id)
+        
+        # Atualiza o ex-líder
+        pdata["clan_id"] = None
+        await player_manager.save_player_data(user_id, pdata)
+        
+        await query.answer("Clã dissolvido.", show_alert=True)
+        await query.edit_message_text("🚫 <b>O Clã foi dissolvido.</b>", parse_mode="HTML")
+        
+    except Exception as e:
+        logger.error(f"Erro ao deletar clã: {e}")
+        await query.answer(f"Erro: {e}", show_alert=True)
+
+
 async def show_members_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
@@ -236,19 +432,11 @@ async def do_kick_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 4. UPLOAD DE LOGO (CORRIGIDO PARA VÍDEO)
 # ==============================================================================
 async def start_logo_conversation(u, c) -> int:
-    q = u.callback_query
-    await q.answer()
-    
-    msg_text = "🖼️ <b>ALTERAR LOGO DO CLÃ</b>\n\nEnvie agora a <b>FOTO</b>, <b>VÍDEO</b> (curto) ou <b>GIF</b> que deseja usar."
-    
-    # Envia nova mensagem e salva o ID para apagar depois
-    # (Não editamos a anterior para garantir que o _clean_chat funcione bem com mídias)
+    q = u.callback_query; await q.answer()
     try: await q.delete_message()
     except: pass
-    
-    msg = await c.bot.send_message(q.message.chat.id, msg_text, parse_mode="HTML")
-    c.user_data['last_bot_msg_id'] = msg.message_id # <--- ISSO É CRUCIAL PARA APAGAR DEPOIS
-    
+    msg = await c.bot.send_message(q.message.chat.id, "🖼️ Envie a nova FOTO ou GIF:", parse_mode="HTML")
+    c.user_data['last_bot_msg_id'] = msg.message_id
     return ASKING_LOGO
 
 async def receive_logo_image(u: Update, c: ContextTypes.DEFAULT_TYPE) -> int:
@@ -331,46 +519,50 @@ async def receive_logo_image(u: Update, c: ContextTypes.DEFAULT_TYPE) -> int:
         
     return ConversationHandler.END
 
-async def start_invite_conversation(u,c):
-    q = u.callback_query; await q.answer(); msg = await q.edit_message_text("✉️ Nome do Personagem:", parse_mode="HTML"); c.user_data['last_bot_msg_id'] = msg.message_id; return ASKING_INVITEE
-async def receive_invitee_name(u,c):
-    target_name = u.message.text.strip(); await _clean_chat(u, c)
-    target = await player_manager.find_player_by_character_name(target_name)
-    if not target: msg = await u.message.reply_text("❌ Personagem não encontrado."); c.user_data['last_bot_msg_id'] = msg.message_id; return ASKING_INVITEE
-    tid = target.get('user_id') if isinstance(target, dict) else target[0]
-    kb = [[InlineKeyboardButton("✅ Aceitar", callback_data=f"clan_invite_accept:{u.effective_user.id}")], [InlineKeyboardButton("❌ Recusar", callback_data="clan_invite_decline")]]
-    try: await c.bot.send_message(tid, "📜 Convite de Clã recebido!", reply_markup=InlineKeyboardMarkup(kb)); await c.bot.send_message(u.effective_chat.id, "✅ Enviado!")
-    except: await u.message.reply_text("❌ Erro ao enviar.")
-    return ConversationHandler.END
-
-async def accept_invite_callback(u,c): await u.callback_query.answer("Aceito!")
-async def decline_invite_callback(u,c): await u.callback_query.answer("Recusado."); await u.callback_query.delete_message()
-async def warn_delete_clan(u,c): await u.callback_query.answer("Em breve")
-async def clan_transfer_leader_placeholder(u,c): await u.callback_query.answer("Em breve")
 
 # ==============================================================================
 # 5. EXPORTAÇÃO (HANDLERS)
 # ==============================================================================
+# ==============================================================================
+# HANDLERS
+# ==============================================================================
+
+# Menus e Ações Simples
 clan_manage_menu_handler = CallbackQueryHandler(show_clan_management_menu, pattern=r'^clan_manage_menu$')
 clan_view_members_handler = CallbackQueryHandler(show_members_list, pattern=r'^clan_view_members$')
+
+# Sair
 clan_leave_warn_handler = CallbackQueryHandler(warn_leave_clan, pattern=r'^clan_leave_ask$')
 clan_leave_do_handler = CallbackQueryHandler(do_leave_clan, pattern=r'^clan_leave_perform$')
+
+# Expulsar
 clan_kick_menu_handler = CallbackQueryHandler(show_kick_member_menu, pattern=r'^clan_kick_menu$')
 clan_kick_ask_handler = CallbackQueryHandler(warn_kick_member, pattern=r'^clan_kick_ask:')
 clan_kick_do_handler = CallbackQueryHandler(do_kick_member, pattern=r'^clan_kick_do:')
-clan_delete_warn_handler = CallbackQueryHandler(warn_delete_clan, pattern=r'^clan_delete_warn$')
-clan_delete_do_handler = None 
-clan_transfer_leader_conv_handler = CallbackQueryHandler(clan_transfer_leader_placeholder, pattern='^clan_transfer')
+
+# Deletar (Dissolver)
+clan_delete_warn_handler = CallbackQueryHandler(warn_delete_clan, pattern=r'^clan_delete_ask$')
+clan_delete_do_handler = CallbackQueryHandler(perform_delete_clan, pattern=r'^clan_delete_confirm$')
+
+# Aceitar/Recusar Convite
 clan_invite_accept_handler = CallbackQueryHandler(accept_invite_callback, pattern=r'^clan_invite_accept:')
 clan_invite_decline_handler = CallbackQueryHandler(decline_invite_callback, pattern=r'^clan_invite_decline')
 
-clan_logo_conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(start_logo_conversation, pattern='^clan_logo_start$')], 
-    states={ASKING_LOGO: [MessageHandler(filters.PHOTO | filters.VIDEO | filters.ANIMATION, receive_logo_image)]}, 
-    fallbacks=[CommandHandler('cancelar', cancel_op)]
-)
+# CONVERSATIONS (Onde você digita coisas)
 invite_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(start_invite_conversation, pattern=r'^clan_invite_start$')], 
-    states={ ASKING_INVITEE: [MessageHandler(filters.TEXT, receive_invitee_name)] }, 
+    states={ ASKING_INVITEE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_invitee_name)] }, 
+    fallbacks=[CommandHandler('cancelar', cancel_op)]
+)
+
+clan_transfer_leader_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(start_transfer_leadership, pattern=r'^clan_transfer_start$')], 
+    states={ ASKING_TRANSFER_TARGET: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_transfer_name)] }, 
+    fallbacks=[CommandHandler('cancelar', cancel_op)]
+)
+
+clan_logo_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(start_logo_conversation, pattern='^clan_logo_start$')], 
+    states={ASKING_LOGO: [MessageHandler(filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.Document.ALL, receive_logo_image)]}, 
     fallbacks=[CommandHandler('cancelar', cancel_op)]
 )

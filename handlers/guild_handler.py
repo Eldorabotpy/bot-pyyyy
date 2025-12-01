@@ -31,7 +31,9 @@ try:
         invite_conv_handler,
         clan_transfer_leader_conv_handler,
         clan_invite_accept_handler, 
-        clan_invite_decline_handler
+        clan_invite_decline_handler,
+        clan_delete_warn_handler,
+        clan_delete_do_handler
     )
 except ImportError as e:
     logger.error(f"Erro ao importar management: {e}")
@@ -58,11 +60,6 @@ from handlers.guild.dashboard import clan_handler as dashboard_router
 # ==============================================================================
 # 2. MONTAGEM DA LISTA (A ORDEM IMPORTA!)
 # ==============================================================================
-# Prioridade:
-# 1. Conversas (Se o user estiver digitando/mandando foto)
-# 2. Ações Específicas (Aceitar/Recusar)
-# 3. Roteador Geral do Clã (Dashboard, Membros, Missões)
-# 4. Menu da Guilda NPC
 
 raw_handlers = [
     # 1. ConversationHandlers (Alta Prioridade)
@@ -81,6 +78,8 @@ raw_handlers = [
     clan_app_decline_handler,
     clan_invite_accept_handler,
     clan_invite_decline_handler,
+    clan_delete_warn_handler, 
+    clan_delete_do_handler,
 
     # 3. Roteador Principal do Clã (Dashboard & Gestão Visual)
     # É AQUI que o botão 'clan_menu' vai cair e executar o código do dashboard.py
@@ -92,5 +91,3 @@ raw_handlers = [
 
 # Filtra possíveis Nones (caso alguma importação falhe)
 all_guild_handlers = [h for h in raw_handlers if h is not None]
-
-logger.info(f"Handlers de Guilda carregados: {len(all_guild_handlers)}")
