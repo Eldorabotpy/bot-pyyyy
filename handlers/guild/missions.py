@@ -94,13 +94,15 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     kb = []
     
     if is_leader:
-        # Se completou: Finalizar
+        # Se completou, mostra o botão de finalizar
         if prog >= target:
              text += "\n\n✅ <b>MISSÃO COMPLETA!</b>"
              kb.append([InlineKeyboardButton("🏆 Finalizar e Receber Prêmios", callback_data="gld_mission_finish")])
-        else:
-             # Se não completou: Cancelar
-             kb.append([InlineKeyboardButton("❌ Cancelar Missão (Líder)", callback_data="gld_mission_cancel")])
+        
+        # [CORREÇÃO] O botão Cancelar agora é adicionado SEMPRE para o líder
+        # Isso permite apagar missões bugadas mesmo que estejam 100%
+        kb.append([InlineKeyboardButton("❌ Cancelar Missão (Líder)", callback_data="gld_mission_cancel")])
+    
     elif prog >= target:
         text += "\n\n✅ <b>Aguardando Líder finalizar.</b>"
     

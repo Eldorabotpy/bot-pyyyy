@@ -2,6 +2,7 @@
 
 import unicodedata
 import re
+import math
 from modules import file_ids
 from .pvp_config import ELO_THRESHOLDS, ELO_DISPLAY
 
@@ -26,6 +27,18 @@ def get_player_class_media(player_data: dict):
         if fd and fd.get("id"):
             return fd
     return None
+
+def gerar_barra_hp(atual: int, maximo: int, tamanho: int = 10) -> str:
+    """Gera uma barra de vida visual (ex: 🟥🟥🟥⬜⬜)."""
+    if maximo <= 0: maximo = 1
+    if atual < 0: atual = 0
+    
+    porcentagem = atual / maximo
+    cheios = int(porcentagem * tamanho)
+    vazios = tamanho - cheios
+    
+    # Barra vermelha para HP baixo, Verde/Azul para cheio (opcional, aqui usaremos padrão)
+    return "🟥" * cheios + "⬜" * vazios
 
 # --- FERRAMENTAS DE LÓGICA DE JOGO (PvP) ---
 

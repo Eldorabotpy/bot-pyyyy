@@ -4,7 +4,7 @@ import logging
 import random
 import datetime
 import html
-from modules import clan_manager
+import asyncio
 from .pvp_config import ARENA_MODIFIERS, MONTHLY_RANKING_REWARDS
 from . import pvp_battle
 from . import pvp_config
@@ -32,6 +32,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     await query.answer("Procurando um oponente digno...")
     user_id = query.from_user.id
     
+    # 1. Carrega dados e verifica Tickets
     player_data = await player_manager.get_player_data(user_id)
     
     item_id_entrada = "ticket_arena" 
@@ -49,6 +50,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
     await player_manager.save_player_data(user_id, player_data) 
     
+    # 2. Configura Modificadores e Busca
     today_weekday = datetime.datetime.now().weekday()
     modifier = ARENA_MODIFIERS.get(today_weekday)
     current_effect = None
@@ -94,6 +96,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
     original_message_is_media = bool(query.message.photo or query.message.video or query.message.animation)
 
+    # 3. Oponente Encontrado
     if final_opponent_id:
         opponent_data = await player_manager.get_player_data(final_opponent_id)
         if not opponent_data: 
@@ -102,6 +105,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             
         caption_batalha = "⚔️ Oponente encontrado! Simulando batalha..."
 
+        # Tenta mostrar a mídia da classe do oponente
         try:
             opponent_class_key = (opponent_data.get("class_key") or opponent_data.get("class") or opponent_data.get("classe") or opponent_data.get("class_type") or "default")
             video_key = f"classe_{opponent_class_key.lower()}_media"
@@ -121,14 +125,19 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             except Exception as e_fallback_text:
                 logger.error(f"Falha no fallback final de texto: {e_fallback_text}")
 
+        # --- LÓGICA DE BATALHA E RECOMPENSAS ---
         try:
             vencedor_id, log_completo = await pvp_battle.simular_batalha_completa( user_id, final_opponent_id, modifier_effect=current_effect )
             
             elo_ganho_base = 25; elo_perdido_base = 15; log_final = list(log_completo)
             OURO_BASE_RECOMPENSA = 50
             OURO_FINAL_RECOMPENSA = OURO_BASE_RECOMPENSA
-            if current_effect == "prestige_day": elo_ganho = int(elo_ganho_base * 1.5); elo_perdido = int(elo_perdido_base * 1.5); log_final.append("\n🏆 <b>Dia do Prestígio!</b> Pontos de Elo aumentados!")
-            else: elo_ganho = elo_ganho_base; elo_perdido = elo_perdido_base
+            
+            if current_effect == "prestige_day": 
+                elo_ganho = int(elo_ganho_base * 1.5); elo_perdido = int(elo_perdido_base * 1.5)
+                log_final.append("\n🏆 <b>Dia do Prestígio!</b> Pontos de Elo aumentados!")
+            else: 
+                elo_ganho = elo_ganho_base; elo_perdido = elo_perdido_base
             
             if current_effect == "greed_day": 
                 OURO_FINAL_RECOMPENSA *= 2
@@ -140,10 +149,8 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 player_manager.add_pvp_points(opponent_data, -elo_perdido)
                 log_final.append(f"\n🏆 Você ganhou <b>+{elo_ganho}</b> pontos de Elo!")
                 log_final.append(f"💰 Você recebeu <b>{OURO_FINAL_RECOMPENSA}</b> de ouro pela vitória!")
+                # Drops extras podem ser adicionados aqui
 
-                clan_id = player_data.get("clan_id")
-                if clan_id: 
-                    await clan_manager.update_guild_mission_progress(clan_id=clan_id, mission_type='PVP_WIN', details={'count': 1}, context=context)
             elif vencedor_id == final_opponent_id:
                 player_manager.add_pvp_points(player_data, -elo_perdido)
                 player_manager.add_pvp_points(opponent_data, elo_ganho)
@@ -152,35 +159,61 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             await player_manager.save_player_data(user_id, player_data)
             await player_manager.save_player_data(final_opponent_id, opponent_data)
 
-            resultado_final_texto = "\n".join(log_final)
-            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]])
+            # =========================================================================
+            # 👇 ANIMAÇÃO DE SUBSTITUIÇÃO (ESTILO FILME) 👇
+            # =========================================================================
+            
+            reply_markup_final = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]])
+            
+            # log_final[0] é o cabeçalho com os status (VS). Ele é fixo.
+            header = log_final[0] 
+            # O resto são os turnos e o resultado final.
+            corpo_log = log_final[1:]
+            
+            # Configura método de edição
+            if original_message_is_media:
+                metodo_edit = query.edit_message_caption
+                param_key = 'caption'
+            else:
+                metodo_edit = query.edit_message_text
+                param_key = 'text'
 
-            # Define o limite
-            LIMITE_LEGENDA = 1020 
+            # Define quantos blocos de texto mostrar por vez.
+            passo = 5 
+            
+            for i in range(0, len(corpo_log), passo):
+                chunk = corpo_log[i : i + passo]
+                texto_do_turno = "\n".join(chunk)
+                
+                is_last_frame = (i + passo) >= len(corpo_log)
+                
+                # Monta o frame: Cabeçalho + Apenas o pedaço atual
+                # Se for o último frame, mostra o botão de voltar.
+                markup = reply_markup_final if is_last_frame else None
+                
+                # Rodapé de status
+                rodape = "\n\n⚔️ <i>Batalha em andamento...</i>" if not is_last_frame else ""
+                
+                # O TEXTO FINAL DO FRAME:
+                texto_frame = f"{header}\n{texto_do_turno}{rodape}"
+                
+                # Verificação de segurança de tamanho (raramente necessário neste modo, mas bom ter)
+                if len(texto_frame) > 1024 and original_message_is_media:
+                    texto_frame = texto_frame[:1000] + "\n[...]"
 
-            # Se o texto for muito longo, corta-o
-            if len(resultado_final_texto) > LIMITE_LEGENDA:
-                corte = len(resultado_final_texto) - LIMITE_LEGENDA
-                # Corta o início do log (preservando o fim)
-                resultado_final_texto = f"[... Log muito longo ...]\n" + resultado_final_texto[corte + 20:]
-
-            # Agora, só usamos 'edit_message_caption' ou 'edit_message_text'
-            try:
-                if original_message_is_media: 
-                    await query.edit_message_caption(caption=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
-                else: 
-                    await query.edit_message_text(text=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
-            except Exception as e_edit_final:
-                logger.warning(f"Falha ao editar resultado PvP ({e_edit_final}), tentando método alternativo.")
                 try:
-                    if original_message_is_media: await query.edit_message_text(text=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
-                    else: await query.edit_message_caption(caption=resultado_final_texto, reply_markup=reply_markup, parse_mode="HTML")
-                except Exception as e_edit_final_fallback:
-                    logger.error(f"Falha CRÍTICA ao exibir resultado final PvP: {e_edit_final_fallback}")
+                    await metodo_edit(**{param_key: texto_frame}, reply_markup=markup, parse_mode="HTML")
+                    
+                    if not is_last_frame:
+                        await asyncio.sleep(1.5) # Pausa dramática entre os turnos
+                        
+                except Exception as e_anim:
+                    # Se der erro (ex: mensagem não modificada), ignora e tenta o próximo
+                    continue
 
         except Exception as e_battle: # Captura de Erro da Batalha
             logger.error(f"Erro CRÍTICO durante a simulação da batalha: {e_battle}", exc_info=True)
-            error_message = ("🛡️ **Falha na Batalha** 🛡️\n\nOcorreu um erro.\nSua entrada foi consumida.")
+            error_message = ("🛡️ **Falha na Batalha** 🛡️\n\nOcorreu um erro crítico.\nSua entrada foi consumida.")
             keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
             try: 
                 if original_message_is_media: await query.edit_message_caption(caption=error_message, reply_markup=reply_markup, parse_mode="HTML")
@@ -188,7 +221,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             except Exception: pass
 
     else: # Se não achou oponente
-        no_opp_msg = "🛡️ Nenhum oponente encontrado. Tente novamente."
+        no_opp_msg = "🛡️ Nenhum oponente encontrado com Elo compatível. Tente novamente."
         keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
         try:
             if original_message_is_media: await query.edit_message_caption(caption=no_opp_msg, reply_markup=reply_markup)
