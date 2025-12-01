@@ -702,7 +702,7 @@ MONSTERS_DATA = {
             "id": "basilisco_jovem",
             "name": "Basilisco Jovem",
             "hp": 280, "attack": 28, "defense": 20, "initiative": 38, "luck": 7,
-            "xp_reward": 15, "ambush_chance": 0.0,
+            "xp_reward": 15, "ambush_chance": 6.60,
             "file_id_name": "basilisco_jovem_media",
             "gold_drop": 1,
             "loot_table": [

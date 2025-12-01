@@ -9,7 +9,6 @@ from modules import player_manager, game_data
 from modules.crafting_registry import get_recipe, all_recipes  # noqa: F401
 from modules.game_data.classes import get_primary_damage_profile
 from modules.game_data import rarity as rarity_tables  # ATTR_COUNT_BY_RARITY, BASE_STATS_BY_RARITY etc.
-from modules import clan_manager
 
 # =========================
 #    Utilitários básicos 
@@ -54,14 +53,7 @@ async def _seconds_with_perks(player_data: dict, base_seconds: int) -> int:
         mult = float(craft_mult_raw)
 
     clan_id = player_data.get("clan_id")
-    if clan_id:
-        # <<< [ESTA É A CORREÇÃO] >>>
-        # Remove 'await'. Esta função é síncrona (def) e não async.
-        clan_buffs = clan_manager.get_clan_buffs(clan_id) 
-        speed_bonus_percent = clan_buffs.get("crafting_speed_percent", 0)
-        if speed_bonus_percent > 0:
-            mult += (speed_bonus_percent / 100.0)
-
+    
     mult = max(0.25, min(4.0, mult)) # Síncrono
  
     return max(1, int(base_seconds / mult)) # Síncrono
@@ -99,12 +91,17 @@ def _get_item_info(base_id: str) -> dict:
     e cai para ITEMS_DATA se preciso.
     """
     try:
+        # CORREÇÃO 1: Adiciona fallback para ITEM_BASES
         info = game_data.get_item_info(base_id)
         if info:
             return dict(info)
     except Exception:
         pass
-    return _as_dict(getattr(game_data, "ITEMS_DATA", {})).get(base_id, {}) or {}
+    # Tenta ITEMS_DATA
+    data = _as_dict(getattr(game_data, "ITEMS_DATA", {})).get(base_id, {}) or {}
+    if data: return data
+    # Tenta ITEM_BASES (para pegar o slot)
+    return _as_dict(getattr(game_data, "ITEM_BASES", {})).get(base_id, {}) or {}
 
 def _get_player_class_key(player_data: dict) -> str | None:
     candidates = [
@@ -238,7 +235,8 @@ def _secondary_attr_pool(recipe: dict, player_class: str | None) -> List[str]:
     """
     Monta a pool de candidatos (sem primário): pools da receita + 'geral' + pool da classe.
     """
-    AFFIX_POOLS = getattr(game_data, "AFFIX_POOLS", {}) or {}
+    # CORREÇÃO 2: Usa o game_data.attributes.AFFIX_POOLS que é importado no __init__ do game_data
+    AFFIX_POOLS = getattr(game_data, "AFFIX_POOLS", {}) or {} 
     combined: List[str] = []
 
     for pool_name in (recipe.get("affix_pools_to_use") or []):

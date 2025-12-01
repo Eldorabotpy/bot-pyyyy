@@ -1,324 +1,300 @@
+# handlers/guild/missions.py
+# (VERSÃO CORRIGIDA: LENDO DO GUILD_MISSIONS_CATALOG)
+
+import logging
 import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
-from modules import player_manager, clan_manager, mission_manager
-from modules.game_data.missions import MISSION_CATALOG
-from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG
-from modules.game_data.clans import CLAN_CONFIG
+from modules import player_manager, clan_manager
+from modules.database import db
 
-# Importa a função auxiliar de barra de progresso do dashboard
-from handlers.utils import create_progress_bar
+# Tenta importar o catálogo novo. Se falhar, usa um fallback vazio para não quebrar.
+try:
+    from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG
+except ImportError:
+    GUILD_MISSIONS_CATALOG = {}
 
-# --- Lógica de Missões Diárias do Jogador ---
+logger = logging.getLogger(__name__)
 
-async def _safe_edit_message(query, text, reply_markup=None, parse_mode='HTML'):
-    """Tenta editar a legenda de uma mensagem, se falhar, edita o texto."""
-    try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
-    except Exception:
-        try:
-            await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-        except Exception as e:
-            print(f"Erro ao editar a mensagem: {e}")
-
-
-async def show_missions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o menu de missões diárias do jogador."""
+# ==============================================================================
+# 1. VISUALIZAR DETALHES DA MISSÃO ATIVA
+# ==============================================================================
+async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra o status detalhado da missão atual do clã."""
     query = update.callback_query
     await query.answer()
-    user_id = update.effective_user.id
+    user_id = query.from_user.id
     
-    # mission_manager.get_player_missions might be synchronous or asynchronous depending on implementation. 
-    # Assuming synchronous for now based on typical pattern, but if it accesses DB directly it should be awaited.
-    # If mission_manager functions are async, add await.
-    missions_data = mission_manager.get_player_missions(user_id) 
-    active_missions = missions_data.get("active_missions", [])
-    rerolls_left = missions_data.get("daily_rerolls_left", 0)
-    
-    caption = f"📜 <b>Missões Diárias</b>\n"
-    caption += f"🔄 Você pode atualizar {rerolls_left} missões hoje.\n\n"
-    
-    keyboard = []
-    
-    if not active_missions:
-        caption += "Um novo dia, novas missões! Boa sorte."
-    
-    for i, mission_state in enumerate(active_missions):
-        template = next((m for m in MISSION_CATALOG if m["id"] == mission_state["mission_id"]), None)
-        if not template: continue
-
-        progress = mission_state.get("progress", 0)
-        target = template.get("target_count", 1)
-        
-        status_icon = "⏳"
-        progress_text = f"({progress}/{target})"
-        buttons = []
-
-        if mission_state.get("is_claimed"):
-            status_icon = "🏅"
-            progress_text = "(Reclamada)"
-        elif mission_state.get("is_complete"):
-            status_icon = "✅"
-            progress_text = "<b>(Completa!)</b>"
-            buttons.append(InlineKeyboardButton("🏆 Reclamar", callback_data=f"mission_claim:{i}"))
-        elif rerolls_left > 0:
-            buttons.append(InlineKeyboardButton("🔄 Atualizar", callback_data=f"mission_reroll:{i}"))
-        
-        caption += f"<b>{status_icon} {template['title']}</b>: {template['description']} {progress_text}\n"
-        
-        if buttons:
-            keyboard.append(buttons)
-
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='guild_menu')])
-    await _safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-
-async def claim_reward_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a recompensa de uma missão diária."""
-    query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-    mission_index = int(query.data.split(':')[1])
-
-    # <<< CORREÇÃO 1: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
-    
-    # Assuming claim_reward modifies player_data in place but returns rewards dict
-    rewards = mission_manager.claim_reward(player_data, mission_index) 
-
-    if rewards:
-        # <<< CORREÇÃO 2: Adiciona await >>>
-        await player_manager.save_player_data(user_id, player_data)
-
-        rewards_text = "<b>Recompensas Recebidas:</b>\n"
-        if "xp" in rewards: rewards_text += f"- {rewards['xp']} XP ✨\n"
-        if "gold" in rewards: rewards_text += f"- {rewards['gold']} Ouro 🪙\n"
-
-        try:
-            await query.delete_message()
-        except Exception:
-            pass
-        await context.bot.send_message(
-            chat_id=user_id, 
-            text=f"✅ <b>Missão Concluída!</b>\n\n{rewards_text}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📜 Ver Novas Missões", callback_data="guild_missions")]]),
-            parse_mode='HTML'
-        )
-    else:
-        await context.bot.answer_callback_query(query.id, "Recompensa já reclamada ou missão incompleta.", show_alert=True)
-        # <<< CORREÇÃO 3: Adiciona await >>>
-        await show_missions_menu(update, context)
-
-async def reroll_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a troca de uma missão diária."""
-    query = update.callback_query
-    mission_index = int(query.data.split(':')[1])
-    
-    # Assuming mission_manager.reroll_mission is synchronous
-    success = mission_manager.reroll_mission(update.effective_user.id, mission_index)
-    
-    if success:
-        await context.bot.answer_callback_query(query.id, "Missão atualizada!")
-    else:
-        await context.bot.answer_callback_query(query.id, "Não foi possível atualizar a missão.", show_alert=True)
-
-    # <<< CORREÇÃO 4: Adiciona await >>>
-    await show_missions_menu(update, context)
-
-async def handle_clan_mission_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Roteador: Verifica se o clã pode pegar missões ou se precisa comprar o quadro primeiro."""
-    query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-    
-    # <<< CORREÇÃO 5: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
     
-    # <<< CORREÇÃO 6: Adiciona await >>>
-    clan_data = await clan_manager.get_clan(clan_id)
+    if not clan_id:
+        await query.edit_message_text("Você não tem um clã.")
+        return
 
-    if clan_data.get("has_mission_board"):
-        await show_mission_selection_menu(update, context)
-    else:
-        await show_purchase_board_menu(update, context)
+    # Busca dados do clã
+    clan = await clan_manager.get_clan(clan_id)
+    if not clan:
+        await query.edit_message_text("Clã não encontrado.")
+        return
 
-async def show_purchase_board_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o menu para o líder comprar o quadro de missões."""
-    query = update.callback_query
-    cost = CLAN_CONFIG.get("mission_board_cost", {}).get("gold", 0)
+    mission = clan.get("active_mission")
+    is_leader = (int(clan.get("leader_id")) == user_id)
+
+    # [PROTEÇÃO] Remove missões de coleta antigas se existirem
+    if mission and str(mission.get('type')).upper() == 'COLLECT':
+        mission = None
+
+    if not mission:
+        text = (
+            "🛡️ <b>Missão do Clã</b>\n\n"
+            "<i>Nenhuma missão ativa no momento.</i>\n"
+            "O Líder deve acessar o menu do clã para iniciar uma nova caçada."
+        )
+        kb = []
+        if is_leader:
+            kb.append([InlineKeyboardButton("⚔️ Iniciar Nova Caçada", callback_data="gld_mission_select_menu")])
+        
+        kb.append([InlineKeyboardButton("🔙 Voltar", callback_data="clan_menu")])
+        
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        return
+
+    # Dados da missão ativa
+    title = mission.get("title", "Missão de Caça")
+    desc = mission.get("description", "Derrote os monstros.")
+    prog = mission.get("current_progress", 0)
+    target = mission.get("target_count", 10)
+    monster_id = mission.get("target_monster_id")
+    monster_name = str(monster_id).replace("_", " ").title()
     
-    caption = (
-        "<b>Quadro de Missões da Guilda</b>\n\n"
-        "Para que o seu clã possa realizar missões, o líder precisa de adquirir um Quadro de Missões.\n\n"
-        "Esta é uma compra única e permitirá o acesso permanente às missões de guilda.\n\n"
-        f"<b>Custo:</b> {cost:,} 🪙 Ouro (será debitado do Banco do Clã)"
+    # Barra de progresso
+    percent = (prog / target) * 100 if target > 0 else 0
+    blocks = int(percent / 10)
+    bar = "🟩" * blocks + "⬜" * (10 - blocks)
+
+    text = (
+        f"📜 <b>{title}</b>\n"
+        f"<i>{desc}</i>\n\n"
+        f"🎯 <b>Alvo:</b> {monster_name}\n"
+        f"📊 <b>Progresso:</b> {prog}/{target} ({percent:.1f}%)\n"
+        f"<code>[{bar}]</code>\n\n"
+        f"⚠️ <i>Todos os membros do clã contribuem matando este monstro.</i>"
+    )
+
+    kb = []
+    
+    if is_leader:
+        # Se completou: Finalizar
+        if prog >= target:
+             kb.append([InlineKeyboardButton("✅ Finalizar e Receber Prêmios", callback_data="gld_mission_finish")])
+        else:
+             text += "\n\n✅ <b>Missão Completa! Aguardando Líder finalizar.</b>" if prog >= target else ""
+             # Botão de Cancelar para trocar de missão se quiser
+             kb.append([InlineKeyboardButton("❌ Cancelar Missão (Líder)", callback_data="gld_mission_cancel")])
+    
+    kb.append([InlineKeyboardButton("🔙 Voltar", callback_data="clan_menu")])
+
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+
+# ==============================================================================
+# 2. MENU DE SELEÇÃO (LÍDER)
+# ==============================================================================
+async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra opções de dificuldade para nova missão."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    clan = await clan_manager.get_clan(clan_id)
+    
+    if not clan or int(clan.get("leader_id")) != user_id:
+        await query.answer("Apenas o líder pode iniciar missões!", show_alert=True)
+        return
+
+    # Verifica se já tem missão ativa (e não é bugada)
+    if clan.get("active_mission") and not clan.get("active_mission", {}).get("completed"):
+        if str(clan.get("active_mission", {}).get("type")).upper() != 'COLLECT':
+            await query.answer("Já existe uma missão ativa!", show_alert=True)
+            return
+
+    text = (
+        "⚔️ <b>Mural de Contratos</b>\n\n"
+        "Escolha a dificuldade da caçada para o seu clã.\n"
+        "<i>Missões mais difíceis dão mais XP de Clã e Ouro para o Banco.</i>"
+    )
+
+    kb = [
+        [InlineKeyboardButton("🟢 Caçada Fácil (Nv. 1-15)", callback_data="gld_start_hunt:easy")],
+        [InlineKeyboardButton("🟡 Caçada Média (Nv. 15-30)", callback_data="gld_start_hunt:medium")],
+        [InlineKeyboardButton("🔴 Caçada Difícil (Nv. 30+)", callback_data="gld_start_hunt:hard")],
+        [InlineKeyboardButton("🔙 Cancelar", callback_data="clan_menu")]
+    ]
+    
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+
+# ==============================================================================
+# 3. LÓGICA DE INICIAR A MISSÃO (AGORA USA O CATÁLOGO)
+# ==============================================================================
+async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Gera a missão a partir do CATÁLOGO externo."""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        selected_difficulty = query.data.split(":")[1]
+    except:
+        selected_difficulty = "easy"
+        
+    user_id = query.from_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    
+    # --- FILTRAGEM DO CATÁLOGO ---
+    # Encontra todas as chaves no catálogo que batem com a dificuldade
+    available_keys = [
+        k for k, v in GUILD_MISSIONS_CATALOG.items() 
+        if v.get("difficulty") == selected_difficulty and v.get("type") == "HUNT"
+    ]
+    
+    # Se não achar nenhuma (ou catálogo vazio), usa fallback genérico
+    if not available_keys:
+        logger.warning(f"Nenhuma missão encontrada no catálogo para diff: {selected_difficulty}. Usando fallback.")
+        # Fallback de segurança
+        mission_data = {
+            "title": "Caçada de Emergência",
+            "description": "Mate monstros aleatórios.",
+            "target_monster_id": "slime_verde", # Monster default
+            "target_count": 10,
+            "rewards": {"clan_xp": 100, "clan_gold": 500}
+        }
+    else:
+        # Sorteia uma missão do catálogo daquela dificuldade
+        chosen_key = random.choice(available_keys)
+        mission_data = GUILD_MISSIONS_CATALOG[chosen_key]
+
+    # Prepara o objeto para salvar no banco
+    monster_id = mission_data.get("target_monster_id")
+    monster_name = str(monster_id).replace("_", " ").title()
+    target_count = mission_data.get("target_count", 10)
+    
+    new_mission = {
+        "type": "HUNT",
+        "title": mission_data.get("title"),
+        "description": mission_data.get("description"),
+        "target_monster_id": monster_id,
+        "target_count": target_count,
+        "current_progress": 0,
+        "rewards": mission_data.get("rewards", {}),
+        "completed": False,
+        "start_date": str(query.message.date)
+    }
+    
+    try:
+        # Salva no banco
+        if hasattr(clan_manager, "set_active_mission"):
+            await clan_manager.set_active_mission(clan_id, new_mission)
+        else:
+            db.clans.update_one({"_id": clan_id}, {"$set": {"active_mission": new_mission}})
+            
+        await query.edit_message_text(
+            f"✅ <b>Contrato Aceito!</b>\n\n"
+            f"📜 <b>{new_mission['title']}</b>\n"
+            f"🎯 Alvo: <b>{monster_name}</b>\n"
+            f"💀 Meta: {target_count} abates.\n\n"
+            f"Avisem os membros do clã! Cada abate conta.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]])
+        , parse_mode="HTML")
+        
+    except Exception as e:
+        logger.error(f"Erro ao iniciar missão: {e}")
+        await query.edit_message_text("Erro técnico ao iniciar missão. Tente novamente.")
+
+
+# ==============================================================================
+# 4. FINALIZAR MISSÃO (Líder)
+# ==============================================================================
+async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    clan = await clan_manager.get_clan(clan_id)
+    
+    mission = clan.get("active_mission")
+    if not mission: return
+
+    if mission.get("current_progress", 0) < mission.get("target_count", 1):
+        await query.answer("A missão ainda não foi concluída!", show_alert=True)
+        return
+
+    rewards = mission.get("rewards", {})
+    # Suporte a várias chaves de dicionário para evitar erro
+    xp = rewards.get("clan_xp") or rewards.get("guild_xp") or 0
+    gold = rewards.get("clan_gold") or rewards.get("gold") or 0
+    
+    # Atualiza o banco do clã
+    db.clans.update_one(
+        {"_id": clan_id},
+        {
+            "$inc": {"prestige_points": xp, "bank": gold},
+            "$unset": {"active_mission": ""}
+        }
     )
     
-    keyboard = [
-        [InlineKeyboardButton("🪙 Comprar Quadro", callback_data="clan_board_purchase")],
-        [InlineKeyboardButton("⬅️ Voltar", callback_data="clan_manage_menu")]
-    ]
-    
-    await _safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    await query.edit_message_text(
+        f"🏆 <b>MISSÃO CUMPRIDA!</b>\n\n"
+        f"O clã recebeu:\n"
+        f"➕ {xp} Pontos de Prestígio\n"
+        f"💰 {gold} Ouro no Cofre\n\n"
+        f"Bom trabalho, líder! O clã está mais forte.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛡️ Voltar", callback_data="clan_menu")]])
+    , parse_mode="HTML")
 
-async def handle_board_purchase_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a compra do quadro de missões."""
+# ==============================================================================
+# 5. CANCELAR MISSÃO
+# ==============================================================================
+async def cancel_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = update.effective_user.id
+    user_id = query.from_user.id
     
-    # <<< CORREÇÃO 7: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
-    clan_id = player_data.get("clan_id")
-
-    try:
-        # <<< CORREÇÃO 8: Adiciona await >>>
-        await clan_manager.purchase_mission_board(clan_id, user_id)
-        await context.bot.answer_callback_query(query.id, "Quadro de Missões comprado com sucesso!", show_alert=True)
-        await show_mission_selection_menu(update, context)
-    except ValueError as e:
-        await context.bot.answer_callback_query(query.id, str(e), show_alert=True)
-
-async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra 3 missões aleatórias para o líder escolher."""
-    query = update.callback_query
-    user_id = update.effective_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    clan = await clan_manager.get_clan(clan_id)
     
-    # <<< CORREÇÃO 9: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
-    clan_id = player_data.get("clan_id")
-    
-    # <<< CORREÇÃO 10: Adiciona await >>>
-    clan_data = await clan_manager.get_clan(clan_id)
-
-    if "active_mission" in clan_data and clan_data.get("active_mission"):
-        await context.bot.answer_callback_query(query.id, "O seu clã já tem uma missão ativa.", show_alert=True)
+    if int(clan.get("leader_id")) != user_id:
+        await query.answer("Apenas o líder pode cancelar!", show_alert=True)
         return
 
-    mission_ids = list(GUILD_MISSIONS_CATALOG.keys())
-    sample_size = min(3, len(mission_ids))
-    random_mission_ids = random.sample(mission_ids, sample_size)
+    db.clans.update_one(
+        {"_id": clan_id},
+        {"$unset": {"active_mission": ""}}
+    )
     
-    caption = "🎯 <b>Escolha a Próxima Missão</b>\n\nSelecione uma das missões abaixo para ver os detalhes:"
-    keyboard = []
-    for mission_id in random_mission_ids:
-        mission = GUILD_MISSIONS_CATALOG[mission_id]
-        keyboard.append([InlineKeyboardButton(f"📜 {mission['title']}", callback_data=f"clan_mission_preview:{mission_id}")])
-
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data='clan_manage_menu')])
-    await _safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-
-async def accept_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Confirma e inicia a missão de guilda escolhida pelo líder."""
-    query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-    
-    # <<< CORREÇÃO 11: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
-    clan_id = player_data.get("clan_id")
-    mission_id = query.data.split(':')[1]
-
-    try:
-        # <<< CORREÇÃO 12: Adiciona await >>>
-        await clan_manager.assign_mission_to_clan(clan_id, mission_id, user_id)
-        mission_title = GUILD_MISSIONS_CATALOG[mission_id]['title']
-        await context.bot.answer_callback_query(query.id, f"Missão '{mission_title}' iniciada!", show_alert=True)
-    except ValueError as e:
-        await context.bot.answer_callback_query(query.id, str(e), show_alert=True)
-    
-    from handlers.guild.dashboard import show_clan_dashboard
-    # <<< CORREÇÃO 13: Adiciona await >>>
-    await show_clan_dashboard(update, context)
-
-async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra os detalhes da missão de guilda ativa, agora com história."""
-    query = update.callback_query
-    await query.answer()
-    user_id = update.effective_user.id
-    
-    # <<< CORREÇÃO 14: Adiciona await >>>
-    player_data = await player_manager.get_player_data(user_id)
-    clan_id = player_data.get("clan_id")
-    
-    # <<< CORREÇÃO 15: Adiciona await >>>
-    active_mission = await clan_manager.get_active_guild_mission(clan_id)
-    
-    if not active_mission:
-        await _safe_edit_message(
-            query,
-            text="O seu clã não tem uma missão ativa.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="clan_menu")]])
-        )
-        return
-
-    progress = active_mission.get("current_progress", 0)
-    target = active_mission.get("target_count", 1)
-    
-    title = active_mission.get("title", "Missão Misteriosa")
-    story = active_mission.get("story", "Uma tarefa aguarda...")
-    objective = active_mission.get("objective", "Complete a tarefa.")
-
-    caption = f"📜 <b>{title}</b> 📜\n\n"
-    caption += f"<i>{story}</i>\n\n"
-    caption += f"🎯 <b>Objetivo:</b> {objective}\n\n"
-    caption += f"<b>Progresso:</b> {create_progress_bar(progress, target)} {progress}/{target}\n"
-    
-    rewards = active_mission.get("rewards", {})
-    if rewards:
-        caption += "\n<b>Recompensas pela Conclusão:</b>\n"
-        if "guild_xp" in rewards: caption += f"- Prestígio para o Clã: {rewards['guild_xp']} ✨\n"
-        if "gold_per_member" in rewards: caption += f"- Ouro p/ membro: {rewards['gold_per_member']} 🪙\n"
-
-    keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data="clan_menu")]]
-    await _safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-
-async def show_mission_confirmation_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o preview da missão (com história) antes do líder aceitar."""
-    query = update.callback_query
-    await query.answer()
-    mission_id = query.data.split(':')[1]
-    
-    mission = GUILD_MISSIONS_CATALOG.get(mission_id)
-    if not mission:
-        await context.bot.answer_callback_query(query.id, "Essa missão não foi encontrada.", show_alert=True)
-        return
-
-    # Pega os dados da história
-    title = mission.get("title", "Missão Misteriosa")
-    story = mission.get("story", "Uma tarefa aguarda...")
-    objective = mission.get("objective", "Complete a tarefa.") # Note que 'description' não existe mais
-
-    caption = f"📜 <b>{title}</b> 📜\n\n"
-    caption += f"<i>{story}</i>\n\n"
-    caption += f"🎯 <b>Objetivo:</b> {objective}\n"
-    
-    rewards = mission.get("rewards", {})
-    if rewards:
-        caption += "\n<b>Recompensas pela Conclusão:</b>\n"
-        if "guild_xp" in rewards: caption += f"- Prestígio para o Clã: {rewards['guild_xp']} ✨\n"
-        if "gold_per_member" in rewards: caption += f"- Ouro p/ membro: {rewards['gold_per_member']} 🪙\n"
-
-    caption += "\n<b>Deseja aceitar esta missão para a guilda?</b>"
-
-    keyboard = [
-        [InlineKeyboardButton("✅ Aceitar Missão", callback_data=f"clan_mission_accept:{mission_id}")],
-        [InlineKeyboardButton("⬅️ Voltar (Escolher Outra)", callback_data="clan_mission_start")]
-    ]
-    await _safe_edit_message(query, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    await query.edit_message_text(
+        "❌ <b>Missão Cancelada.</b>\n\n"
+        "O contrato foi rasgado. Você pode escolher outra missão no mural.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]])
+    , parse_mode="HTML")
 
 
-# --- Definição dos Handlers ---
-missions_menu_handler = CallbackQueryHandler(show_missions_menu, pattern=r'^guild_missions$')
-mission_claim_handler = CallbackQueryHandler(claim_reward_callback, pattern=r'^mission_claim:\d+$')
-mission_reroll_handler = CallbackQueryHandler(reroll_mission_callback, pattern=r'^mission_reroll:\d+$')
+# ==============================================================================
+# 6. HANDLERS EXPORTADOS
+# ==============================================================================
 
-clan_mission_start_handler = CallbackQueryHandler(handle_clan_mission_button, pattern=r'^clan_mission_start$')
-clan_board_purchase_handler = CallbackQueryHandler(handle_board_purchase_callback, pattern=r'^clan_board_purchase$')
-clan_guild_mission_details_handler = CallbackQueryHandler(show_guild_mission_details, pattern=r'^clan_guild_mission_details$')
-clan_mission_details_handler = CallbackQueryHandler(show_guild_mission_details, pattern=r'^clan_mission_details$')
+clan_mission_start_handler = CallbackQueryHandler(show_mission_selection_menu, pattern=r'^gld_mission_select_menu$')
+clan_guild_mission_details_handler = CallbackQueryHandler(show_guild_mission_details, pattern=r'^clan_mission_details$')
+clan_mission_accept_handler = CallbackQueryHandler(start_mission_callback, pattern=r'^gld_start_hunt:')
+clan_mission_finish_handler = CallbackQueryHandler(finish_mission_callback, pattern=r'^gld_mission_finish$')
+clan_mission_cancel_handler = CallbackQueryHandler(cancel_mission_callback, pattern=r'^gld_mission_cancel$')
 
-# --- NOVOS HANDLERS ---
-clan_mission_preview_handler = CallbackQueryHandler(show_mission_confirmation_screen, pattern=r'^clan_mission_preview:[a-zA-Z0-9_]+$')
-clan_mission_accept_handler = CallbackQueryHandler(accept_mission_callback, pattern=r'^clan_mission_accept:[a-zA-Z0-9_]+$')
+async def placeholder_purchase(u, c): pass
+clan_board_purchase_handler = CallbackQueryHandler(placeholder_purchase, pattern=r'^gld_buy_board$')

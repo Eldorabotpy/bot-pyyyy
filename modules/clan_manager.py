@@ -9,7 +9,6 @@ from typing import Optional, Tuple, List, Dict, Any
 from pymongo import MongoClient, ReturnDocument
 import certifi
 
-# Importa configurações de jogo
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS, CLAN_CONFIG
 
 logger = logging.getLogger(__name__)
@@ -244,13 +243,14 @@ async def bank_withdraw(clan_id: str, user_id: int, amount: int) -> Tuple[bool, 
 # ==============================================================================
 
 async def level_up_clan(clan_id: str, user_id: int, payment_method: str):
-    """Tenta subir o nível de prestígio do clã."""
+    """Tenta subir o nível de prestígio do clã e consome recursos."""
     clan = await get_clan(clan_id)
     if not clan: raise ValueError("Clã não encontrado.")
     
     current_lvl = clan.get("prestige_level", 1)
     current_pts = clan.get("prestige_points", 0)
     
+    # Busca dados do próximo nível
     next_lvl_info = CLAN_PRESTIGE_LEVELS.get(current_lvl + 1)
     if not next_lvl_info:
         raise ValueError("Nível máximo atingido!")
@@ -258,31 +258,44 @@ async def level_up_clan(clan_id: str, user_id: int, payment_method: str):
     req_pts = next_lvl_info.get("points_to_next_level", 999999)
     cost = next_lvl_info.get("upgrade_cost", {})
     
+    # 1. Verifica XP
     if current_pts < req_pts:
         raise ValueError(f"Faltam pontos de prestígio ({current_pts}/{req_pts}).")
         
     cost_val = cost.get(payment_method, 0)
     
+    # 2. Verifica e Cobra o Custo Monetário (Gold/Dimas)
+    update_query = {}
+    
     if payment_method == 'gold':
         if clan.get("bank", 0) < cost_val:
             raise ValueError(f"Ouro insuficiente no cofre ({cost_val} necessários).")
         
-        clans_col.update_one(
-            {"_id": clan_id},
-            {
-                "$inc": {"bank": -cost_val, "prestige_level": 1},
-                "$set": {"max_members": next_lvl_info.get("max_members", 10)}
-            }
-        )
-    else:
-        # Lógica para Dimas (cobrado do jogador no handler)
-        clans_col.update_one(
-            {"_id": clan_id},
-            {
-                "$inc": {"prestige_level": 1},
-                "$set": {"max_members": next_lvl_info.get("max_members", 10)}
-            }
-        )
+        # Prepara a query para Ouro
+        update_query = {
+            "$inc": {
+                "bank": -cost_val, 
+                "prestige_level": 1,
+                "prestige_points": -req_pts  # <--- CORREÇÃO CRÍTICA: Subtrai o XP usado!
+            },
+            "$set": {"max_members": next_lvl_info.get("max_members", 10)}
+        }
+        
+    elif payment_method == 'dimas':
+        # Nota: A cobrança de Dimas geralmente é feita no handler (do bolso do jogador),
+        # então aqui só atualizamos o nível e o XP do clã.
+        update_query = {
+            "$inc": {
+                "prestige_level": 1,
+                "prestige_points": -req_pts # <--- CORREÇÃO CRÍTICA: Subtrai o XP usado!
+            },
+            "$set": {"max_members": next_lvl_info.get("max_members", 10)}
+        }
+    
+    # 3. Executa a atualização
+    clans_col.update_one({"_id": clan_id}, update_query)
+    
+    logger.info(f"[CLAN] Clã {clan_id} subiu para nível {current_lvl + 1} por {user_id}.")
 
 async def get_active_guild_mission(clan_id: str) -> Optional[dict]:
     """Retorna a missão ativa do clã."""
@@ -335,6 +348,78 @@ async def assign_mission_to_clan(clan_id: str, mission_id: str, user_id: int):
         {"$set": {"active_mission": active_mission}}
     )
 
+async def set_active_mission(clan_id: str, mission_data: dict):
+    """
+    Salva uma estrutura de missão completa diretamente no clã.
+    Usado pelo sistema de sorteio de missões (missions.py).
+    """
+    if clans_col is None: return
+    
+    clans_col.update_one(
+        {"_id": clan_id},
+        {"$set": {"active_mission": mission_data}}
+    )
+
+# Add this function to modules/clan_manager.py
+
+async def update_guild_mission_progress(user_id: int, action_type: str, target_id: str, quantity: int = 1):
+    """
+    Atualiza o progresso da missão do clã se a ação corresponder.
+    Chamado pelo sistema de combate/coleta.
+    """
+    # 1. Busca o clã do jogador
+    # Precisamos importar player_manager aqui dentro para evitar ciclo, ou assumir que quem chama já sabe o clan_id.
+    # Como a assinatura pede user_id, vamos buscar o clã.
+    from modules import player_manager
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata or not pdata.get("clan_id"):
+        return
+
+    clan_id = pdata.get("clan_id")
+    clan = await get_clan(clan_id)
+    if not clan: return
+
+    mission = clan.get("active_mission")
+    if not mission or mission.get("completed"):
+        return
+
+    # 2. Verifica se a ação bate com a missão
+    # Normaliza tipos para comparação (ex: 'HUNT' vs 'hunt')
+    mission_type = str(mission.get("type", "")).upper()
+    action_type = str(action_type).upper()
+
+    match = False
+    
+    # Caso Caçada (HUNT)
+    if mission_type == 'HUNT' and action_type == 'HUNT':
+        # Verifica se o monstro é o alvo
+        target_monster = mission.get("target_monster_id")
+        if target_monster == target_id:
+            match = True
+            
+    # Caso Coleta (COLLECT) - Se houver no futuro
+    elif mission_type == 'COLLECT' and action_type == 'COLLECT':
+        target_item = mission.get("target_item_id")
+        if target_item == target_id:
+            match = True
+
+    # 3. Se deu match, atualiza o banco
+    if match:
+        # Incrementa progresso
+        new_progress = mission.get("current_progress", 0) + quantity
+        
+        # Verifica se completou (mas não finaliza, deixa pro líder)
+        # target_count = mission.get("target_count", 1)
+        # is_complete = new_progress >= target_count
+        
+        clans_col.update_one(
+            {"_id": clan_id},
+            {"$inc": {"active_mission.current_progress": quantity}}
+        )
+        
+        # Opcional: Logar ou avisar
+        # logger.info(f"Progresso de clã atualizado: {clan_id} (+{quantity})")
+        #     
 async def delete_clan(clan_id: str, leader_id: int):
     """
     Apaga permanentemente um clã e remove os membros.

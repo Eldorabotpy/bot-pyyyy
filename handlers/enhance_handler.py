@@ -6,7 +6,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data, crafting_registry
-from modules import mission_manager
+# REMOVIDO: import mission_manager
+from modules.profession_engine import enhance_item, restore_durability
 # --- DISPLAY UTILS opcional (fallback simples) ---
 try:
     from modules import display_utils  # deve ter: formatar_item_para_exibicao(item_dict) -> str
@@ -22,7 +23,7 @@ except Exception:
             return f"{emoji} {name}"
     display_utils = _DisplayFallback()
 
-from modules.profession_engine import enhance_item, restore_durability
+
 
 # =========================
 # Config / Fallbacks
@@ -118,7 +119,7 @@ def _compute_upgrade_costs_from_recipe(inst: dict, include_joia_forja: bool, inc
     """
     Custo:
       - Base = insumos da receita (mesmas quantidades)
-      - + 1x joia_da_forja (se você estiver usando isso no seu design)
+      - + 1x joia_da_forja (se usar em algum lugar)
       - + 1x sigilo_protecao APENAS na receita protegida
     """
     rec = _resolve_recipe_for_inst(inst)
@@ -205,7 +206,8 @@ async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inst = inv.get(uid)
     if not isinstance(inst, dict) or not inst.get('base_id'):
         await q.answer("Item inválido.", show_alert=True)
-        # Consider adding await show_enhance_menu(update, context) here to refresh
+        # CORREÇÃO 3.1: Adiciona await
+        await show_enhance_menu(update, context) # Recarrega menu
         return
 
     # Síncrono
@@ -289,18 +291,18 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await enhance_item_menu(update, context) # Chama função async
             return
 
-        # --- GATILHO DE MISSÃO (BLINDADO) ---
-        if res.get("success"):
-            try:
-                # Chama a missão no padrão correto: (user_id, mission_type, item_id, quantity)
-                # 'enhance' é um tipo comum, 'any' significa qualquer item, 1 é a quantidade
-                await mission_manager.update_mission_progress(user_id, 'enhance', 'any', 1)
-            except Exception:
-                # Se falhar, ignora para não travar o jogo
-                pass
+        # --- GATILHO DE MISSÃO (REMOVIDO) ---
+        # if res.get("success"):
+        #     try:
+        #         # Chama a missão no padrão correto: (user_id, mission_type, item_id, quantity)
+        #         # 'enhance' é um tipo comum, 'any' significa qualquer item, 1 é a quantidade
+        #         await mission_manager.update_mission_progress(user_id, 'enhance', 'any', 1)
+        #     except Exception:
+        #         # Se falhar, ignora para não travar o jogo
+        #         pass
         # --- FIM DO GATILHO DE MISSÃO ---
 
-        # <<< CORREÇÃO 7: Adiciona await (SALVA APÓS ENHANCE E MISSÃO) >>>
+        # <<< CORREÇÃO 7: Adiciona await (SALVA APÓS ENHANCE) >>>
         await player_manager.save_player_data(user_id, pdata)
 
         # Prepara mensagem de resultado (síncrono)
@@ -331,7 +333,7 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔁 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚 𝐦𝐞𝐥𝐡𝐨𝐫𝐚𝐫 𝐞𝐬𝐭𝐞 𝐢𝐭𝐞𝐦", callback_data=f"enh_sel_{uid}")],
+            [InlineKeyboardButton("🔁 𝐕𝐨𝐥𝐭𝐚𝐫 a 𝐦𝐞𝐥𝐡𝐨𝐫𝐚𝐫 𝐞𝐬𝐭𝐞 𝐢𝐭𝐞𝐦", callback_data=f"enh_sel_{uid}")],
             [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨𝐬 𝐞𝐪𝐮𝐢𝐩𝐚𝐝𝐨𝐬", callback_data="enhance_menu")],
         ])
         # <<< CORREÇÃO 8: Adiciona await >>>

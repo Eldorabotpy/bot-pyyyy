@@ -1,11 +1,11 @@
 # modules/player/core.py
-# (VERSÃO CORRIGIDA: Importa do modules.database)
+# (VERSÃO CORRIGIDA: Com sanitização de chaves None no inventário)
 
 import logging
 import asyncio
 from typing import Optional, Dict, Any
 
-# <<< CORREÇÃO: Importa a conexão centralizada >>>
+# Conexão centralizada
 from modules.database import players_col as players_collection
 
 # --- Globais ---
@@ -14,7 +14,6 @@ _player_cache_lock: asyncio.Lock = asyncio.Lock()
 
 logger = logging.getLogger(__name__)
 
-# Nota: A conexão agora é feita automaticamente quando importamos modules.database
 if players_collection is None:
     logger.error("⚠️ AVISO: players_collection é None. Verifique modules/database.py")
 
@@ -52,6 +51,17 @@ def _save_player_data_sync(user_id: int, player_info: dict) -> None:
             actions.sanitize_and_cap_energy(to_save)
         except Exception: pass
 
+        # --- CORREÇÃO DE SEGURANÇA (SANITIZAÇÃO DO INVENTÁRIO) ---
+        # Remove chaves None e garante que todas sejam strings para o MongoDB
+        if "inventory" in to_save and isinstance(to_save["inventory"], dict):
+            clean_inventory = {}
+            for item_id, quantity in to_save["inventory"].items():
+                if item_id is not None:
+                    # Converte chave para string (ex: números ou UUIDs viram texto)
+                    clean_inventory[str(item_id)] = quantity
+            to_save["inventory"] = clean_inventory
+        # ---------------------------------------------------------
+
         players_collection.replace_one({"_id": user_id}, to_save, upsert=True)
     except Exception:
         logger.exception(f"Erro ao salvar player {user_id} no DB (sync).")
@@ -88,7 +98,6 @@ async def get_player_data(user_id: int) -> Optional[dict]:
         if hasattr(inventory, "_sanitize_and_migrate_gold"):
             res = inventory._sanitize_and_migrate_gold(data)
             if asyncio.iscoroutine(res): await res
-            # Assumimos que a função modifica in-place, marcamos changed se necessário
         
         # 2. Energia
         if actions._apply_energy_autoregen_inplace(data): changed = True
@@ -122,7 +131,7 @@ async def get_player_data(user_id: int) -> Optional[dict]:
         _player_cache[user_id] = dict(data)
 
     # Salva se houve mudança
-    if locals().get('changed', False): # Verifica flag local
+    if locals().get('changed', False): 
         asyncio.create_task(save_player_data(user_id, data))
 
     return dict(data)

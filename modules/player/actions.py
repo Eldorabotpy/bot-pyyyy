@@ -164,7 +164,42 @@ def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
         player_data['energy_last_ts'] = new_anchor.isoformat()
         changed = True
     return changed
+# -------------------------
+# Funções de COLETA (NOVAS)
+# -------------------------
+def _collect_duration_seconds(player_data: dict) -> int:
+    """Calcula o tempo de coleta baseado em perks e configurações."""
+    # Tempo base (padrão 1 minuto se não configurado)
+    base_minutes = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1))
+    base_seconds = base_minutes * 60
+    
+    try:
+        premium = PremiumManager(player_data)
+        speed_mult = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
+    except:
+        speed_mult = 1.0
+        
+    # Garante que o multiplicador seja positivo e não quebre a divisão
+    speed_mult = max(0.1, speed_mult)
+    
+    # Quanto maior o multiplicador, menor o tempo
+    return max(1, int(base_seconds / speed_mult))
 
+def _gather_cost(player_data: dict) -> int:
+    """Calcula o custo de energia da coleta."""
+    try:
+        premium = PremiumManager(player_data)
+        return int(premium.get_perk_value("gather_energy_cost", 1))
+    except:
+        return 1 # Custo padrão
+
+def _gather_xp_mult(player_data: dict) -> float:
+    """Calcula o multiplicador de XP de coleta."""
+    try:
+        premium = PremiumManager(player_data)
+        return float(premium.get_perk_value("gather_xp_multiplier", 1.0))
+    except:
+        return 1.0
 # -------------------------
 # Ações temporizadas & Estado
 # -------------------------

@@ -1,12 +1,17 @@
-# registries/guild.py (VERSÃO CORRIGIDA)
+# registries/guild.py
+# (DESATIVADO: A responsabilidade passou para registries/character.py)
 
 from telegram.ext import Application
-from handlers.guild_handler import all_guild_handlers
 
 def register_guild_handlers(application: Application):
-    """Registra todos os handlers relacionados ao sistema de guildas."""
+    """
+    Este arquivo agora está vazio propositalmente.
     
-    # MUDANÇA: Em vez de um loop, registramos a lista inteira de uma vez.
-    # O 'group=0' é o grupo padrão para ConversationHandlers e
-    # garante que eles sejam processados na ordem correta.
-    application.add_handlers(all_guild_handlers, group=0)
+    Motivo: Todos os handlers de guilda já estão sendo registrados 
+    no arquivo 'registries/character.py' com filtros de segurança anti-crash.
+    
+    Manter este arquivo vazio evita:
+    1. Erro de duplicidade.
+    2. Erro de 'handler is not an instance of BaseHandler'.
+    """
+    pass

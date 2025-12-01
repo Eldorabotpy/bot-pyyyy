@@ -7,6 +7,62 @@ ITEMS_DATA = {}
 MARKET_ITEMS = {} 
 
 ITEMS_DATA.update({
+
+    "minerio_cobre": {
+        "display_name": "Minério de Cobre", "emoji": "🥉",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Metal condutor básico.", "stackable": True
+    },
+    "minerio_ouro": {
+        "display_name": "Minério de Ouro", "emoji": "🥇",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Metal precioso e brilhante.", "stackable": True
+    },
+    "carvao": {
+        "display_name": "Carvão Mineral", "emoji": "⚫",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Combustível essencial para forjas.", "stackable": True
+    },
+    "cristal_bruto": {
+        "display_name": "Cristal Bruto", "emoji": "💎",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Cristal com potencial mágico não lapidado.", "stackable": True
+    },
+
+    # LENHADOR (Árvores e Subprodutos)
+    "madeira_carvalho": {
+        "display_name": "Tora de Carvalho", "emoji": "🪵🟤",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Madeira dura e resistente.", "stackable": True
+    },
+    "ambar_seiva": {
+        "display_name": "Âmbar Fossilizado", "emoji": "🔸",
+        "type": "reagent", "category": "coletavel",
+        "description": "Seiva endurecida contendo história antiga.", "stackable": True
+    },
+    "casca_rigida": {
+        "display_name": "Casca Rígida", "emoji": "🛡️",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Casca de árvore grossa para curtição.", "stackable": True
+    },
+
+    # COLHEITA (Ervas para Alquimia)
+    "flor_da_lua": {
+        "display_name": "Flor da Lua", "emoji": "🌷",
+        "type": "reagent", "category": "coletavel",
+        "description": "Brilha levemente à noite. Usada em poções de Mana.", "stackable": True
+    },
+    "raiz_sangrenta": {
+        "display_name": "Raiz Sangrenta", "emoji": "🥕",
+        "type": "reagent", "category": "coletavel",
+        "description": "Raiz vermelha para poções de Vida.", "stackable": True
+    },
+    "cogumelo_azul": {
+        "display_name": "Cogumelo Azul", "emoji": "🍄🟦",
+        "type": "reagent", "category": "coletavel",
+        "description": "Fungo raro com propriedades alucinógenas (ou mágicas).", "stackable": True
+    },
+
     
     # --- CONSUMÍVEIS BÁSICOS ---
     "frasco_com_agua": {
@@ -103,12 +159,14 @@ ITEMS_DATA.update({
     "madeira": {
         "display_name": "Madeira", "emoji": "🪵", 
         "type": "material_bruto", "category": "coletavel", 
-        "stackable": True
+        "stackable": True,
+        "media_key": "item_madeira",
     },
     "pedra": {
         "display_name": "Pedra", "emoji": "🪨", 
         "type": "material_bruto", "category": "coletavel", 
-        "stackable": True
+        "stackable": True,
+        "media_key": "item_pedra",
     },
     "minerio_de_ferro": {
         "display_name": "Mɪɴᴇ́ʀɪᴏ ᴅᴇ Fᴇʀʀᴏ", "emoji": "⛏️",

@@ -1,5 +1,5 @@
 # modules/auto_hunt_engine.py
-# (VERSÃO FINAL: Missões Integradas + Anti-Crash + Energia Correta)
+# (VERSÃO FINAL: Logs de Energia + Missões Integradas + Anti-Crash)
 
 import random
 import asyncio
@@ -55,6 +55,7 @@ async def _simulate_single_battle(
             # Cria um contexto seguro para o cálculo de recompensas
             # Garante que 'xp_reward' e 'gold_drop' existam para não quebrar o rewards.py
             combat_details_for_reward = monster_data.copy()
+            # Garante compatibilidade de chaves
             combat_details_for_reward['monster_xp_reward'] = monster_data.get('xp_reward', 0)
             combat_details_for_reward['monster_gold_drop'] = monster_data.get('gold_drop', 0)
             
@@ -219,11 +220,7 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
         
     # --- Visual (Mídia e Edição) ---
-    if wins > 0:
-        media_key = "autohunt_victory_media" 
-    else:
-        media_key = "autohunt_defeat_media" 
-
+    media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
     file_data = file_id_manager.get_file_data(media_key)
     
     # Se não tiver msg para editar, envia nova
@@ -284,20 +281,28 @@ async def start_auto_hunt(
         return
     
     # --- CÁLCULO DE ENERGIA ---
+    # Importação dentro da função para evitar ciclo
     from handlers.hunt_handler import _hunt_energy_cost 
 
     # Custo unitário x Quantidade (Ex: 1 x 35 = 35)
     cost_per_hunt = await _hunt_energy_cost(player_data, region_key)
     total_cost = cost_per_hunt * hunt_count
-     
+    
+    # [LOG DE DEBUG] Para vermos no terminal se o custo está zero
+    logger.info(f"[AutoHunt] User: {user_id} | Count: {hunt_count} | Cost/Unit: {cost_per_hunt} | Total: {total_cost} | Current: {player_data.get('energy')}")
+
     if player_data.get('energy', 0) < total_cost:
         await query.answer(f"Energia insuficiente. Precisa de {total_cost}⚡.", show_alert=True)
         return
 
-    # Gasta a energia
-    player_manager.spend_energy(player_data, total_cost)
+    # [CORREÇÃO] Forçamos o gasto e verificamos o sucesso
+    success = player_manager.spend_energy(player_data, total_cost)
+    if not success:
+        # Se spend_energy falhou (ex: verificação interna), bloqueia
+        await query.answer(f"Erro ao debitar energia.", show_alert=True)
+        return
     
-    duration_seconds = SECONDS_PER_HUNT * hunt_count # Ex: 30s * 10 = 5 min (ajuste SECONDS_PER_HUNT se quiser mais rápido)
+    duration_seconds = SECONDS_PER_HUNT * hunt_count 
     duration_minutes = duration_seconds / 60
 
     # Define estado
@@ -310,6 +315,7 @@ async def start_auto_hunt(
         }
     }
 
+    # Salva os dados (incluindo a energia gasta)
     await player_manager.save_player_data(user_id, player_data)
 
     region_name = game_data.REGIONS_DATA.get(region_key, {}).get('display_name', region_key)

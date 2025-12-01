@@ -1,8 +1,12 @@
 # modules/player_manager.py
-# (VERSÃO FINAL CORRIGIDA: COM BUSCA POR NOME PARA CLÃS)
+# (VERSÃO FINAL: ENERGIA CONECTADA ÀS MISSÕES GLOBALMENTE)
 
 from __future__ import annotations
 from typing import Any, Optional, Type
+import asyncio # Necessário para atualizar missão em segundo plano
+import logging
+
+logger = logging.getLogger(__name__)
 
 # --- 1. Funções do Core ---
 from .player.core import (
@@ -17,7 +21,7 @@ from .player.queries import (
     create_new_player, 
     get_or_create_player, 
     delete_player, 
-    find_player_by_name,      # <--- Usaremos esta função
+    find_player_by_name,
     find_player_by_name_norm, 
     iter_players,
     iter_player_ids
@@ -60,7 +64,7 @@ from .player.inventory import (
 # --- 5. Funções de Ações, Energia e Estado ---
 from .player.actions import (
     get_player_max_energy, 
-    spend_energy, 
+    # spend_energy, <--- REMOVIDO DAQUI (Vamos redefinir abaixo)
     add_energy, 
     set_last_chat_id,
     ensure_timed_state, 
@@ -70,14 +74,55 @@ from .player.actions import (
     add_pvp_entries,
     heal_player, 
     add_buff, 
-    # CORREÇÃO CRÍTICA DE MANA
     get_player_max_mana,
     add_mana,
     spend_mana,
-    # PvP Points
     get_pvp_points,
     add_pvp_points,
 )
+
+# Importamos a função original com outro nome para usar dentro do nosso Wrapper
+from .player.actions import spend_energy as _spend_energy_internal
+
+# =================================================================
+# --- 5.1 WRAPPER GLOBAL DE ENERGIA (A MÁGICA ACONTECE AQUI) ---
+# =================================================================
+def spend_energy(player_data: dict, amount: int) -> bool:
+    """
+    Consome energia do jogador e atualiza missões automaticamente.
+    Esta função substitui a original para garantir que TODO gasto conte.
+    """
+    # 1. Executa a lógica original (desconta do dicionário)
+    success = _spend_energy_internal(player_data, amount)
+
+    # 2. Se gastou com sucesso, dispara atualização da missão
+    if success and amount > 0:
+        try:
+            user_id = player_data.get("user_id") or player_data.get("_id")
+            
+            if user_id:
+                # Função assíncrona interna para rodar no background
+                async def _bg_mission_update():
+                    try:
+                        from modules import mission_manager
+                        # Tenta atualizar com as chaves mais comuns
+                        await mission_manager.update_mission_progress(user_id, "spend_energy", "any", amount)
+                        await mission_manager.update_mission_progress(user_id, "energy", "any", amount)
+                    except Exception as e:
+                        logger.error(f"Erro silencioso ao atualizar missão de energia: {e}")
+
+                # Dispara a tarefa sem travar o código principal (Fire and Forget)
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(_bg_mission_update())
+                except RuntimeError:
+                    # Caso não haja loop rodando (testes unitários, etc)
+                    pass
+
+        except Exception as e:
+            logger.error(f"Erro no hook de spend_energy: {e}")
+
+    return success
 
 # =================================================================
 # --- 6. Funções do Sistema Premium ---
@@ -129,18 +174,15 @@ async def find_player_by_character_name(name: str):
     Busca jogador pelo nome do personagem (Case Insensitive).
     Retorna o dicionário completo do jogador (com 'user_id' injetado).
     """
-    # Chama a função original que busca no banco
     result = await find_player_by_name(name)
     
     if not result:
         return None
         
-    # A função find_player_by_name retorna uma tupla: (user_id, player_data)
     if isinstance(result, tuple) and len(result) >= 2:
         user_id = result[0]
         player_data = result[1]
         
-        # Garante que o ID esteja dentro do dicionário para o sistema de clãs usar
         if isinstance(player_data, dict):
             player_data['user_id'] = user_id
             return player_data

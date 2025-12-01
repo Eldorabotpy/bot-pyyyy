@@ -21,6 +21,10 @@ async def resume_after_battle(context, user_id: int, victory: bool) -> None:
     Chamado pelo combat_handler assim que a luta termina.
     Encaminha para o motor da dungeon retomar do andar atual.
     """
-    from .engine import resume_dungeon_after_battle  # evite import circular
+    # CORREÇÃO: Importamos do runtime (onde a lógica está) e DENTRO da função
+    # para evitar erro de importação circular.
+    from .runtime import resume_dungeon_after_battle 
+    
     dctx = pop_pending(user_id)
+    # Chama a função que adicionamos no runtime.py
     await resume_dungeon_after_battle(context, user_id, dctx, victory)

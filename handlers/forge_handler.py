@@ -18,7 +18,6 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.helpers import escape_markdown
 
 # --- Módulos do Jogo ---
-# REMOVIDO: mission_manager, clan_manager
 from modules import (
     player_manager,
     game_data,
@@ -26,8 +25,6 @@ from modules import (
     crafting_registry,
     file_ids,
 )
-
-print("!!! O ARQUIVO forge_handler.py FOI CARREGADO COM SUCESSO !!!")
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +118,7 @@ def _fmt_need_line(item_id: str, have: int, need: int) -> str:
 async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
+    
     player_data = await player_manager.get_player_data(user_id)
 
     profession_info = "Você ainda não tem uma profissão de criação."
@@ -144,6 +142,8 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
                 row = []
     if row:
         keyboard.append(row)
+    
+    # --- CORREÇÃO AQUI: Garante que volta para o menu do reino ---
     keyboard.append([InlineKeyboardButton("↩️ Voltar ao Reino", callback_data="show_kingdom_menu")])
 
     text = f"{profession_info}\n\n🔥 *Forja de Eldora*\nEscolha uma profissão para ver as receitas:"
@@ -292,13 +292,7 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
         return
 
     item_criado = result["item_criado"]
-    player_data = await player_manager.get_player_data(user_id)
-
-    # --- SALVAMENTO (Sem Missões) ---
-    if player_data:
-        # Apenas salva os dados, sem atualizar missões
-        await player_manager.save_player_data(user_id, player_data)
-
+    
     item_txt = formatar_item_para_exibicao(item_criado)
     text = f"✨ *Forja Concluída!*\n\nVocê obteve:\n{item_txt}"
 

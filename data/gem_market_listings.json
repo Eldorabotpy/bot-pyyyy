@@ -1,5 +1,5 @@
 {
-  "seq": 10,
+  "seq": 13,
   "listings": [
     {
       "id": 1,
@@ -116,6 +116,45 @@
       "unit_price_gems": 10,
       "quantity": 0,
       "created_at": "2025-11-10T11:05:51.895584+00:00",
+      "active": false
+    },
+    {
+      "id": 10,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "skill",
+        "base_id": "tomo_mago_bola_de_fogo",
+        "qty": 1
+      },
+      "unit_price_gems": 10,
+      "quantity": 0,
+      "created_at": "2025-11-29T09:08:02.873757+00:00",
+      "active": false
+    },
+    {
+      "id": 11,
+      "seller_id": 7913385053,
+      "item": {
+        "type": "skill",
+        "base_id": "tomo_assassino_ataque_furtivo",
+        "qty": 1
+      },
+      "unit_price_gems": 10,
+      "quantity": 0,
+      "created_at": "2025-11-29T09:08:41.061556+00:00",
+      "active": false
+    },
+    {
+      "id": 12,
+      "seller_id": 8523689321,
+      "item": {
+        "type": "evo_item",
+        "base_id": "emblema_mago",
+        "qty": 4
+      },
+      "unit_price_gems": 1,
+      "quantity": 0,
+      "created_at": "2025-12-01T15:21:39.023686+00:00",
       "active": false
     }
   ]

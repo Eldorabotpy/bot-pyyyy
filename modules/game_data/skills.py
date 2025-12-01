@@ -2074,17 +2074,17 @@ SKILL_DATA = {
             "comum": {
                 "description": "Comum (CD 0, Mana 25): Dano 2.5x (Mágico).",
                 "mana_cost": 25,
-                "effects": {"cooldown_turns": 0, "damage_multiplier": 2.5, "damage_type": "magic"}
+                "effects": {"cooldown_turns": 5, "damage_multiplier": 2.5, "damage_type": "magic"}
             },
             "epica": {
                 "description": "Épica (CD 0, Mana 22): Dano 2.8x (Mágico).",
                 "mana_cost": 22,
-                "effects": {"cooldown_turns": 0, "damage_multiplier": 2.8, "damage_type": "magic"}
+                "effects": {"cooldown_turns": 4, "damage_multiplier": 2.8, "damage_type": "magic"}
             },
             "lendaria": {
                 "description": "Lendária (CD 0, Mana 20): Dano 3.0x (Mágico). Aplica 'Queimadura'.",
                 "mana_cost": 20,
-                "effects": {"cooldown_turns": 0, "damage_multiplier": 3.0, "damage_type": "magic",
+                "effects": {"cooldown_turns": 3, "damage_multiplier": 3.0, "damage_type": "magic",
                             "chance_on_hit": {"effect": "dot", "chance": 1.0, "scale": "magic_attack", "value": 0.15, "duration_turns": 2}}
             }
         }

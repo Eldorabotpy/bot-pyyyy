@@ -1,5 +1,5 @@
 # handlers/profile_handler.py
-# (VERSÃO CORRIGIDA: BOTÃO DE INVENTÁRIO ATUALIZADO PARA 3.0)
+# (VERSÃO CORRIGIDA: Botão Voltar Dinâmico - Respeita a Localização Atual)
 
 import logging
 import unicodedata
@@ -339,6 +339,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chance_esquiva = int((await player_manager.get_player_dodge_chance(player_data)) * 100)
     chance_ataque_duplo = int((await player_manager.get_player_double_attack_chance(player_data)) * 100)
 
+    # --- CORREÇÃO DO LOCAL: Pega a localização exata ---
     location_key = player_data.get('current_location', 'reino_eldora')
     location_name = (game_data.REGIONS_DATA or {}).get(location_key, {}).get('display_name', 'Lugar Desconhecido')
 
@@ -421,20 +422,25 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not prof_norm:
         keyboard.append([InlineKeyboardButton("💼 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data='job_menu')])
 
+    # Define o callback de voltar DINAMICAMENTE
+    # Se estiver no Reino, manda pra lá. Se estiver na Floresta, manda pra Floresta.
+    if location_key == "reino_eldora":
+        back_callback = "back_to_kingdom" # Esse handler já existe e leva ao reino
+    else:
+        back_callback = f"open_region:{location_key}" # Esse abre a região atual
+
     keyboard.extend([
         [InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚 𝐝𝐞 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨𝐬 🏰", callback_data='adventurer_guild_main')],
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬 📊", callback_data='status_open')],
         [InlineKeyboardButton("💼 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨 💼", callback_data="job_menu")],
         [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬 🧰", callback_data='equipment_menu')],
-        
-        # --- CORREÇÃO AQUI: Link para o menu novo de inventário ---
         [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 🎒", callback_data='inventory_menu')],
-        # -----------------------------------------------------------
-        
         [InlineKeyboardButton("📚 𝐇𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞𝐬 📚", callback_data='skills_menu_open')],
         [InlineKeyboardButton("🎨 𝐌𝐮𝐝𝐚𝐫 𝐀𝐩𝐚𝐫𝐞̂𝐧𝐜𝐢𝐚 🎨", callback_data='skin_menu')],
         [InlineKeyboardButton("🔄 𝐂𝐨𝐧𝐯𝐞𝐫𝐭𝐞𝐫 𝐑𝐞𝐜𝐨𝐦𝐩𝐞𝐧𝐬𝐚𝐬 🔄", callback_data='conv:main')],
-        [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 ⬅️", callback_data='continue_after_action')],
+        
+        # --- BOTÃO CORRIGIDO AQUI ---
+        [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 ⬅️", callback_data=back_callback)],
     ])
     reply_markup = InlineKeyboardMarkup(keyboard)
 

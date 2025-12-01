@@ -17,29 +17,25 @@ from modules.game_data.worldmap import WORLD_MAP
 from modules.game_data import monsters as monsters_data
 logger = logging.getLogger(__name__)
 
-# 🔎 Mídias (mapa/regiões). Suporta tanto file_id_manager quanto file_ids.
 try:
     from modules import file_id_manager as media_ids
 except Exception:
     try:
         from modules import file_ids as media_ids
     except Exception:
-        media_ids = None # fallback mudo
+        media_ids = None
 
 # Menu principal do reino (fallback)
 try:
     from handlers.menu.kingdom import show_kingdom_menu
 except Exception:
-    show_kingdom_menu = None # será checado antes de usar
+    show_kingdom_menu = None 
 
-# Botão utilitário do calabouço (se o runtime existir)
+# Botão Dungeon
 try:
     from modules.dungeons.runtime import build_region_dungeon_button
 except Exception:
-    build_region_dungeon_button = None # fallback: usaremos InlineKeyboardButton
-
-logger = logging.getLogger(__name__)
-
+    build_region_dungeon_button = None
 
 def _humanize_duration(seconds: int) -> str:
     seconds = int(seconds)
@@ -48,31 +44,17 @@ def _humanize_duration(seconds: int) -> str:
         return f"{mins} min"
     return f"{seconds} s"
 
-
 def _default_travel_seconds() -> int:
     return int(getattr(game_data, "TRAVEL_DEFAULT_SECONDS", 360))
 
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
-    """
-    Calcula o tempo de viagem. 
-    FORÇADO PARA 6 MINUTOS (360 segundos) BASE.
-    """
-    # --- VALOR BASE FIXO: 6 MINUTOS ---
     base = 360 
-    
-    # Aplica multiplicadores de perks (Premium), se houver
     try:
         premium = PremiumManager(player_data)
         mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
     except Exception:
-        mult = 1.0 # Fallback se o PremiumManager falhar
-
-    final_seconds = max(0, int(round(base * mult)))
-    
-    # Debug para o terminal (para você ter certeza que funcionou)
-    print(f"DEBUG VIAGEM: Base=360s, Mult={mult}, Final={final_seconds}s")
-    
-    return final_seconds
+        mult = 1.0 
+    return max(0, int(round(base * mult)))
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     """

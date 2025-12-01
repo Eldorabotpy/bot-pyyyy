@@ -138,3 +138,4 @@ def register_market_handlers(application: Application):
     except ImportError as e:
         logging.error(f"### ERRO FATAL AO REGISTRAR MERCADOS ###: {e}")
         logging.exception("Verifique se o arquivo 'handlers/market_handler.py' existe.")
+        

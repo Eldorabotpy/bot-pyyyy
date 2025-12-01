@@ -65,6 +65,7 @@ HTML = "HTML"
 (SELECT_CACHE_ACTION, ASK_USER_FOR_CACHE_CLEAR) = range(2)
 (SELECT_TEST_ACTION, ASK_WAVE_NUMBER) = range(2, 4)
 (ASK_DELETE_ID, CONFIRM_DELETE_ACTION) = range(4, 6)
+ASK_GHOST_CLAN_ID = 6
 # =========================================================
 # MENUS E TECLADOS (Keyboards)
 # =========================================================
@@ -211,6 +212,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎨 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝔸𝕡𝕒𝕣𝕖̂𝕟𝕔𝕚𝕒 (Skin) 𓂀", callback_data="admin_grant_skin")],
         [InlineKeyboardButton("👥 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤 𓂀", callback_data="admin_pmanage_main")],
         [InlineKeyboardButton("👤 𓂀 𝔼𝕕𝕚𝕥𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣 𓂀", callback_data="admin_edit_player")], 
+        [InlineKeyboardButton("🏚️ Limpar Clã Fantasma", callback_data="admin_fix_clan_start")],
         [InlineKeyboardButton("💀 𝐃𝐄𝐋𝐄𝐓𝐀𝐑 𝐂𝐎𝐍𝐓𝐀 (Perigo)", callback_data="admin_delete_start")],
         [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
         [InlineKeyboardButton("👑 𓂀 ℙ𝕣𝕖𝕞𝕚𝕦𝕞 𓂀", callback_data="admin_premium")],
@@ -466,6 +468,83 @@ async def _delete_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
     await _safe_edit_text(update, context, msg)
     return ASK_DELETE_ID
+
+# --- Lógica de Limpar Clã Fantasma (Botão) ---
+
+async def _fix_clan_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Inicia o fluxo de limpar clã fantasma."""
+    if not await ensure_admin(update): return ConversationHandler.END
+    await _safe_answer(update)
+    
+    msg = (
+        "🏚️ <b>LIMPEZA DE CLÃ FANTASMA</b> 🏚️\n\n"
+        "Se você apagou um clã do banco de dados mas os jogadores continuam presos nele, use esta ferramenta.\n\n"
+        "📝 <b>Digite o ID do clã deletado</b> (ex: <code>draconicos</code>):\n"
+        "Ou /cancelar para voltar."
+    )
+    # Mostra botão de cancelar caso não queira digitar
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="admin_main")]])
+    
+    await _safe_edit_text(update, context, msg, reply_markup=kb)
+    return ASK_GHOST_CLAN_ID
+
+async def _fix_clan_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Executa a limpeza baseada no ID enviado."""
+    target_clan_id = update.message.text.strip()
+    
+    # Mensagem de espera
+    await update.message.reply_text(f"⏳ <b>Varrendo banco de dados...</b>\nProcurando jogadores presos em: <code>{target_clan_id}</code>", parse_mode=HTML)
+
+    count_fixed = 0
+    players_fixed_names = []
+
+    try:
+        # Usa o iter_players que já está importado no seu arquivo
+        async for user_id, pdata in iter_players():
+            current_clan = pdata.get('clan_id')
+            
+            if current_clan == target_clan_id:
+                # Remove o clã e convites
+                pdata['clan_id'] = None
+                if 'clan_invite' in pdata:
+                    del pdata['clan_invite']
+                
+                # Salva e limpa cache
+                await save_player_data(user_id, pdata)
+                clear_player_cache(user_id)
+                
+                count_fixed += 1
+                players_fixed_names.append(pdata.get('character_name', str(user_id)))
+
+        # Relatório final
+        if count_fixed > 0:
+            names_list = ", ".join(players_fixed_names[:5]) # Mostra só os 5 primeiros nomes pra não poluir
+            if len(players_fixed_names) > 5:
+                names_list += f" e mais {len(players_fixed_names)-5}..."
+                
+            msg = (
+                f"✅ <b>LIMPEZA CONCLUÍDA!</b>\n\n"
+                f"🏚️ Clã Alvo: <code>{target_clan_id}</code>\n"
+                f"👥 Jogadores libertados: <b>{count_fixed}</b>\n"
+                f"📝 Nomes: <i>{names_list}</i>"
+            )
+        else:
+            msg = f"✅ Nenhum jogador foi encontrado preso no clã '<code>{target_clan_id}</code>'. Todos parecem estar livres."
+
+    except Exception as e:
+        logger.error(f"Erro ao limpar clã fantasma: {e}", exc_info=True)
+        msg = f"❌ Ocorreu um erro durante a varredura: {e}"
+
+    # Envia o relatório e o menu de volta
+    await update.message.reply_text(msg, parse_mode=HTML)
+    await _send_admin_menu(update.effective_chat.id, context)
+    return ConversationHandler.END
+
+async def _fix_clan_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancela a operação."""
+    await update.message.reply_text("Operação de limpeza cancelada.")
+    await _send_admin_menu(update.effective_chat.id, context)
+    return ConversationHandler.END
 
 async def _delete_resolve_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Busca o usuário e pede confirmação final."""
@@ -873,6 +952,87 @@ ADMIN_HELP_TEXT = """ℹ️ <b>Ajuda dos Comandos de Admin</b> ℹ️
 <code>/inspect_item [item_id]</code> - Mostra os dados brutos (JSON) de um item (ex: 'espada_longa') para ver os seus stats base.
 """
 
+async def clean_clan_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando para limpar o clan_id de um jogador específico.
+    Uso: /limpar_cla <user_id>
+    """
+    if not await ensure_admin(update): return
+
+    if not context.args:
+        await update.message.reply_text("⚠️ Uso: /limpar_cla <user_id>")
+        return
+
+    try:
+        target_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ O ID do usuário deve ser um número.")
+        return
+
+    player_data = await get_player_data(target_id)
+    
+    if not player_data:
+        await update.message.reply_text(f"❌ Jogador {target_id} não encontrado.")
+        return
+
+    # Remove o clan_id
+    old_clan = player_data.get('clan_id', 'Nenhum')
+    player_data['clan_id'] = None
+    
+    # Se houver dados de convite pendente, limpa também
+    if 'clan_invite' in player_data:
+        del player_data['clan_invite']
+
+    await save_player_data(target_id, player_data)
+    
+    # Limpa cache para garantir
+    clear_player_cache(target_id)
+
+    await update.message.reply_text(
+        f"✅ <b>Sucesso!</b>\n"
+        f"O jogador <code>{target_id}</code> foi removido do clã '<code>{old_clan}</code>'.\n"
+        f"Agora ele está livre para entrar em outro.",
+        parse_mode=ParseMode.HTML
+    )
+
+async def fix_deleted_clan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando para remover um ID de clã específico de TODOS os jogadores.
+    Ideal para quando um clã foi apagado mas os membros ficaram 'presos'.
+    Uso: /fix_cla_fantasma <id_do_cla_deletado>
+    """
+    if not await ensure_admin(update): return
+
+    if not context.args:
+        await update.message.reply_text("⚠️ Uso: /fix_cla_fantasma <id_do_cla_exato>\nExemplo: /fix_cla_fantasma draconicos")
+        return
+
+    target_clan_id = context.args[0].strip()
+    
+    await update.message.reply_text(f"⏳ Buscando jogadores presos no clã deletado '{target_clan_id}'...")
+
+    count_fixed = 0
+    
+    # Itera sobre todos os jogadores para achar quem tem esse clã
+    async for user_id, pdata in iter_players():
+        current_clan = pdata.get('clan_id')
+        
+        if current_clan == target_clan_id:
+            # Remove o clã
+            pdata['clan_id'] = None
+            await save_player_data(user_id, pdata)
+            clear_player_cache(user_id) # Limpa cache individualmente
+            count_fixed += 1
+            
+    if count_fixed > 0:
+        await update.message.reply_text(
+            f"✅ <b>Limpeza Concluída!</b>\n\n"
+            f"O clã fantasma '<code>{target_clan_id}</code>' foi removido de <b>{count_fixed}</b> jogadores.",
+            parse_mode=ParseMode.HTML
+        )
+    else:
+        await update.message.reply_text(f"✅ Nenhum jogador encontrado preso no clã '{target_clan_id}'.")
+
 async def _handle_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra a ajuda dos comandos de admin."""
     if not await ensure_admin(update): return
@@ -912,6 +1072,9 @@ admin_force_end_handler = CallbackQueryHandler(_handle_force_end_event, pattern=
 admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern="^admin_event_force_ticket$")
 admin_force_ticket_job_handler = CallbackQueryHandler(_handle_force_ticket_job, pattern="^admin_force_ticket_job$")
 admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_help$")
+# ... outros handlers ...
+clean_clan_handler = CommandHandler("limpar_cla", clean_clan_status_command, filters=filters.User(ADMIN_LIST))
+fix_ghost_clan_handler = CommandHandler("fix_cla_fantasma", fix_deleted_clan_command, filters=filters.User(ADMIN_LIST))
 
 # Handler de Conversa para Limpeza de Cache (filtros aplicados nos entry points e message handlers)
 clear_cache_conv_handler = ConversationHandler(
@@ -972,6 +1135,21 @@ delete_player_conv_handler = ConversationHandler(
     per_message=False
 )
 
+# --- Handler de Conversa para Clã Fantasma ---
+fix_clan_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(_fix_clan_entry_point, pattern=r"^admin_fix_clan_start$")],
+    states={
+        ASK_GHOST_CLAN_ID: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), _fix_clan_perform)
+        ]
+    },
+    fallbacks=[
+        CommandHandler("cancelar", _fix_clan_cancel, filters=filters.User(ADMIN_LIST)),
+        CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+    ],
+    per_message=False
+)
+
 # Lista final de handlers para exportar (certifique-se que todos os handlers importados existem)
 all_admin_handlers = [
     admin_command_handler,
@@ -1004,5 +1182,8 @@ all_admin_handlers = [
     player_management_conv_handler, # <--- O 'a' FOI REMOVIDO DAQUI
     admin_help_handler,
     delete_player_conv_handler,
-    hard_respec_all_handler, # <<< COMANDO DE RESET ADICIONADO
+    hard_respec_all_handler, 
+    clean_clan_handler,   
+    fix_ghost_clan_handler,
+    fix_clan_conv_handler,
 ]
