@@ -102,6 +102,11 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not player_data: return
     clan_id = player_data.get("clan_id")
     
+    if not clan_id:
+        from handlers.guild.creation_search import show_create_clan_menu
+        await show_create_clan_menu(update, context)
+        return
+    
     try:
         res = clan_manager.get_clan(clan_id)
         clan_data = await res if hasattr(res, '__await__') else res
