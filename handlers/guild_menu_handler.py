@@ -1,54 +1,78 @@
 # handlers/guild_menu_handler.py
-# (VERSÃO FINAL: Botão de CANCELAR adicionado ao Mural)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes, CallbackQueryHandler
+from datetime import datetime, timedelta, timezone
 from modules import player_manager, guild_system, clan_manager, file_ids
 
 async def _smart_media_edit(query, text, markup, media_key, context):
-    """
-    Tenta editar a mensagem existente para evitar 'piscar'.
-    Só apaga e reenvia se for absolutamente necessário (ex: troca de Foto para Vídeo).
-    """
-    # 1. Pega o ID da mídia
+    chat_id = query.message.chat_id
+    
+    # 1. Mídia de Destino
+    media_fid = None
     try: media_fid = file_ids.get_file_id(media_key)
-    except: media_fid = None
+    except: pass
 
-    # Se não tiver mídia configurada, usa texto simples (fallback)
-    if not media_fid:
-        try: await query.edit_message_text(text=text, reply_markup=markup, parse_mode="HTML")
-        except: 
-            try: await query.delete_message()
-            except: pass
-            await context.bot.send_message(query.message.chat.id, text, reply_markup=markup, parse_mode="HTML")
-        return
+    # 2. Estado Atual
+    has_media_now = bool(query.message.photo or query.message.video or query.message.animation)
+    is_current_photo = bool(query.message.photo)
 
-    # 2. Tenta EDITAR a Mídia (Transição Suave)
-    # Assumimos que a guilda usa FOTO por padrão. Se usar GIF, troque para InputMediaAnimation
-    try:
-        await query.edit_message_media(
-            media=InputMediaPhoto(media=media_fid, caption=text, parse_mode="HTML"),
-            reply_markup=markup
-        )
-    except Exception:
-        # Se falhar (ex: mensagem anterior era texto puro ou vídeo incompatível), deleta e envia novo
+    should_resend = False
+    if media_fid and not has_media_now: should_resend = True
+    elif not media_fid and has_media_now: should_resend = True
+    elif media_fid and not is_current_photo: should_resend = True 
+
+    # 3. Execução
+    if not should_resend:
+        try:
+            if media_fid:
+                await query.edit_message_media(
+                    media=InputMediaPhoto(media=media_fid, caption=text, parse_mode="HTML"),
+                    reply_markup=markup
+                )
+            else:
+                await query.edit_message_text(text=text, reply_markup=markup, parse_mode="HTML")
+            return
+        except Exception:
+            should_resend = True
+
+    # 4. Fallback
+    if should_resend:
         try: await query.delete_message()
         except: pass
-        await context.bot.send_photo(
-            chat_id=query.message.chat.id,
-            photo=media_fid,
-            caption=text,
-            reply_markup=markup,
-            parse_mode="HTML"
-        )
+        try:
+            if media_fid:
+                await context.bot.send_photo(chat_id, photo=media_fid, caption=text, reply_markup=markup, parse_mode="HTML")
+            else:
+                await context.bot.send_message(chat_id, text, reply_markup=markup, parse_mode="HTML")
+        except: pass
 
 # --- HELPERS ---
 
 def _bar(current, total, blocks=8):
+    """Barra grande para o texto."""
     if total <= 0: return "🟩" * blocks
     ratio = min(1.0, max(0.0, current / total))
     filled = int(ratio * blocks)
     return "🟩" * filled + "⬜" * (blocks - filled)
+
+def _mini_bar(current, total):
+    """Barra compacta para usar dentro de botões (5 blocos)."""
+    blocks = 5
+    if total <= 0: return "▪️" * blocks
+    ratio = min(1.0, max(0.0, current / total))
+    filled = int(ratio * blocks)
+    # ▪️ (Vazio) ▫️ (Cheio - invertido visualmente para dar contraste em alguns temas)
+    # Vamos usar ■ e □ que são mais universais
+    return "■" * filled + "□" * (blocks - filled)
+def _get_time_until_reset():
+    """Calcula tempo até meia-noite UTC."""
+    now = datetime.now(timezone.utc)
+    next_reset = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    diff = next_reset - now
+    hours, remainder = divmod(diff.seconds, 3600)
+    minutes, _ = divmod(remainder, 60)
+    return f"{hours}h {minutes}m"
 
 async def _safe_edit(query, text, markup):
     try:
@@ -69,8 +93,6 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
     except: pass
     
     user_id = query.from_user.id
-    
-    # --- Dados ---
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return
 
@@ -82,8 +104,11 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
     points = gdata.get("points", 0)
     rank_info = guild_system.get_rank_info(rank_letra)
     next_pts = rank_info.get("req_points", 9999)
+    
     prog_bar = _bar(points, next_pts) if next_pts > 0 else "🌟🌟🌟🌟🌟🌟🌟🌟"
     prog_text = f"{points}/{next_pts}" if next_pts > 0 else "MÁXIMO"
+    
+    timer_str = _get_time_until_reset()
 
     text = (
         f"🏰 <b>GUILDA DE AVENTUREIROS</b>\n"
@@ -92,25 +117,35 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
         f"👤 <b>Nome:</b> {pdata.get('character_name')}\n"
         f"🎖️ <b>Rank:</b> {rank_info.get('emoji', '🔰')} <b>{rank_letra}</b> - {rank_info.get('title', 'Aventureiro')}\n"
         f"💠 <b>Prestígio:</b> <code>[{prog_bar}]</code> ({prog_text})\n\n"
-        f"📋 <b>QUADRO DE AVISOS DIÁRIO:</b>\n"
+        f"📋 <b>QUADRO DE AVISOS DIÁRIO</b>\n"
+        f"🕒 <i>Novos contratos em: {timer_str}</i>"
     )
 
     keyboard = []
     
-    # Listagem de Missões
     for idx, m in enumerate(missions):
         if str(m.get('type', '')).upper() == 'COLLECT': continue
-        status_icon = "✅" if m.get('status') in ['completed', 'claimed'] else "⬜"
-        if m.get('status') == 'completed': status_icon = "🎁"
+        
+        status = m.get('status', 'active')
         name = m.get('title') or m.get('name') or "Missão"
         rewards = m.get('rewards', {})
         pts = rewards.get('prestige_points', m.get('reward_points', 0))
         prog = m.get('progress', 0)
         target = m.get('target_count', m.get('qty', 1))
         
-        btn_txt = f"{status_icon} {name} ({prog}/{target}) [+ {pts} pts]"
+        # Lógica visual do botão
+        if status == 'claimed':
+            btn_txt = f"✅ {name} (Concluído)"
+        elif status == 'completed':
+            btn_txt = f"🎁 {name} (RECEBER)" # Destaca que tem prêmio
+        else:
+            # Missão em andamento com mini-barra
+            mini_b = _mini_bar(prog, target)
+            btn_txt = f"▫️ {name} [{mini_b}] {prog}/{target}"
+        
         keyboard.append([InlineKeyboardButton(btn_txt, callback_data=f"gld_mission_view_{idx}")])
 
+    # Botões de Navegação
     if pdata.get("clan_id"):
         keyboard.append([InlineKeyboardButton("🛡️ Acessar Meu Clã", callback_data="clan_menu")])
     else:
@@ -119,8 +154,6 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
     keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="profile")])
     markup = InlineKeyboardMarkup(keyboard)
 
-    # --- AQUI ESTÁ A MÁGICA ---
-    # Usa a função inteligente com a imagem do NPC
     await _smart_media_edit(query, text, markup, "img_guild_npc", context)
 
 async def view_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -173,26 +206,22 @@ async def view_mission_details(update: Update, context: ContextTypes.DEFAULT_TYP
     await _safe_edit(query, text, InlineKeyboardMarkup(kb))
 
 async def claim_mission_reward(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Resgata recompensa pessoal."""
     query = update.callback_query
     user_id = query.from_user.id
-    
     try: idx = int(query.data.split("_")[-1])
     except: return
-
     from modules import mission_manager
+    
     result = await mission_manager.claim_personal_reward(user_id, idx)
     
     if not result:
-        await query.answer("Erro: Já coletada ou inválida.", show_alert=True)
-        await adventurer_guild_menu(update, context)
-        return
-    
-    await query.answer(f"🎉 Sucesso! +{result['gold']} Ouro, +{result['xp']} XP!", show_alert=True)
-    
-    if result.get("rank_up"):
-        await context.bot.send_message(chat_id=query.message.chat.id, text=f"🎉 <b>PARABÉNS!</b>\nSubiu para Rank {result['rank_up']['title']}!", parse_mode="HTML")
-    
+        await query.answer("Já coletada ou inválida.", show_alert=True)
+    else:
+        msg = f"🎉 Recompensa: +{result['gold']} Ouro"
+        if result.get('xp'): msg += f", +{result['xp']} XP"
+        if result.get('rank_up'): msg += f"\n🏆 SUBIU DE RANK: {result['rank_up']['title']}!"
+        await query.answer(msg, show_alert=True)
+        
     await adventurer_guild_menu(update, context)
 
 # ==========================================================

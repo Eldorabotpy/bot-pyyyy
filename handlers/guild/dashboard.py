@@ -121,15 +121,20 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     leader_id = str(clan_data.get("leader_id", 0))
     is_leader = (str(user_id) == leader_id)
 
-    next_level_info = CLAN_PRESTIGE_LEVELS.get(level + 1)
-    xp_needed = next_level_info.get("points_to_next_level", 1) if next_level_info else xp
+    # CORREÇÃO DA BARRA DE PROGRESSO E XP NECESSÁRIO
+    # Pega os dados do nível ATUAL para saber quanto falta para completar
+    current_level_info = CLAN_PRESTIGE_LEVELS.get(level, {})
+    xp_needed = current_level_info.get("points_to_next_level", 999999)
     
-    percent = min(1.0, max(0.0, xp / xp_needed)) if xp_needed > 0 else 1.0
+    # Prevenção contra divisão por zero ou None
+    if not xp_needed: xp_needed = xp if xp > 0 else 1
+    
+    percent = min(1.0, max(0.0, xp / xp_needed))
     filled = int(percent * 10)
     bar = "🟦" * filled + "⬜" * (10 - filled)
     
     members_count = len(clan_data.get('members', []))
-    max_members = CLAN_PRESTIGE_LEVELS.get(level, {}).get('max_members', 10)
+    max_members = current_level_info.get('max_members', 10)
 
     text = (
         f"🛡️ <b>CLÃ: {clan_name.upper()}</b> [Nv. {level}]\n"
@@ -152,7 +157,6 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="adventurer_guild_main")])
 
     await _render_clan_screen(update, context, clan_data, text, keyboard)
-
 # ==============================================================================
 # 3. ROTEADOR (CORRIGIDO PARA ACEITAR O BOTÃO DA GESTÃO)
 # ==============================================================================
