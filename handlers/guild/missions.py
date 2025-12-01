@@ -278,6 +278,8 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
 # ==============================================================================
 async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # IMPORTAÇÃO TARDIA DO RENDERIZADOR (ESSENCIAL)
     from handlers.guild.dashboard import _render_clan_screen
 
     user_id = query.from_user.id
@@ -286,15 +288,27 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     clan = await clan_manager.get_clan(clan_id)
     
     mission = clan.get("active_mission")
-    if not mission: return
-
-    if mission.get("current_progress", 0) < mission.get("target_count", 1):
-        await query.answer("Missão incompleta!", show_alert=True)
+    if not mission:
+        await query.answer("Nenhuma missão ativa.", show_alert=True)
         return
 
+    # Verificação de Líder
+    if str(clan.get("leader_id")) != str(user_id):
+        await query.answer("Apenas o líder pode finalizar.", show_alert=True)
+        return
+
+    # Verificação de Progresso (Com margem de segurança)
+    current = mission.get("current_progress", 0)
+    target = mission.get("target_count", 1)
+    
+    if current < target:
+        await query.answer(f"Incompleta! {current}/{target}", show_alert=True)
+        return
+
+    # Entrega Recompensas
     rewards = mission.get("rewards", {})
-    xp = rewards.get("clan_xp", 0)
-    gold = rewards.get("clan_gold", 0)
+    xp = rewards.get("clan_xp") or rewards.get("guild_xp") or 0
+    gold = rewards.get("clan_gold") or rewards.get("gold") or 0
     
     # Atualiza banco
     db.clans.update_one(
@@ -305,6 +319,9 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         }
     )
     
+    # Recarrega dados atualizados para exibir
+    updated_clan = await clan_manager.get_clan(clan_id)
+    
     text = (
         f"🏆 <b>MISSÃO CUMPRIDA!</b>\n\n"
         f"O clã recebeu:\n"
@@ -314,7 +331,7 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     )
     kb = [[InlineKeyboardButton("🛡️ Voltar", callback_data="clan_menu")]]
     
-    await _render_clan_screen(update, context, clan, text, kb)
+    await _render_clan_screen(update, context, updated_clan, text, kb)
 
 # ==============================================================================
 # 5. CANCELAR MISSÃO
