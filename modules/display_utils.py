@@ -8,6 +8,11 @@ from modules.game_data.equipment import SLOT_EMOJI
 from modules.game_data.attributes import ATTRIBUTE_ICONS
 
 try:
+    from modules.game_data import runes_data
+except ImportError:
+    runes_data = None
+
+try:
     from modules.game_data.classes import get_primary_damage_profile, CLASSES_DATA
 except Exception:
     CLASSES_DATA = {}
@@ -85,19 +90,12 @@ def _attr_icon_for(key: str) -> str:
         "defense": "defesa",
         "initiative": "agilidade",
         "luck": "sorte",
-        # "dmg" costuma ser exibido como o atributo da classe, não direto;
-        # mas se algum lugar pedir explicitamente dmg, podemos cair num ícone genérico:
-        "dmg": "forca",  # fallback visual (⚔️ não está no ATTRIBUTE_ICONS por padrão)
+        "dmg": "forca",  # fallback visual
     }
     k = alias.get(key, key)
     return ATTRIBUTE_ICONS.get(k, "✨")
 
 def _detect_item_class_key(item: Dict[str, Any]) -> str | None:
-    """
-    Descobre a classe alvo do item:
-      1) pela restrição 'class_req' (se houver e for única)
-      2) heurística pelo base_id contendo o nome da classe (ex.: *_samurai)
-    """
     req = item.get("class_req")
     if isinstance(req, list) and req:
         return str(req[0]).lower()
@@ -108,30 +106,18 @@ def _detect_item_class_key(item: Dict[str, Any]) -> str | None:
     return None
 
 def _find_primary(item: Dict[str, Any]) -> tuple[str | None, int]:
-    """
-    Acha o PRIMÁRIO:
-      1) enchant com source começando por 'primary' (inclui 'primary' e 'primary_mirror')
-         - se a chave for 'dmg', mapeia para o stat da classe para ícone correto (ex.: 🎯 Precisão)
-      2) se não achar, tenta o stat primário da classe diretamente nas enchants
-      3) fallback: maior valor não-'dmg'
-    Retorna (key_canonica, valor) ou (None, 0).
-    """
     ench = item.get("enchantments") or {}
     if isinstance(ench, dict):
         # 1) 'primary' / 'primary_mirror'
         for k, v in ench.items():
-            if not isinstance(v, dict):
-                continue
+            if not isinstance(v, dict): continue
             src = str(v.get("source", ""))
-            if not src.startswith("primary"):
-                continue
-            try:
-                val = int(v.get("value", 0))
-            except Exception:
-                val = 0
+            if not src.startswith("primary"): continue
+            
+            try: val = int(v.get("value", 0))
+            except Exception: val = 0
 
             if k == "dmg":
-                # dmg como primário → converter para o stat da classe (para o ícone correto)
                 ckey = _detect_item_class_key(item)
                 if ckey:
                     stat_key = get_primary_damage_profile(ckey).get("stat_key") or "dmg"
@@ -146,46 +132,49 @@ def _find_primary(item: Dict[str, Any]) -> tuple[str | None, int]:
         if ckey:
             stat_key = get_primary_damage_profile(ckey).get("stat_key")
             if stat_key and stat_key in ench and isinstance(ench.get(stat_key), dict):
-                try:
-                    return stat_key, int(ench[stat_key].get("value", 0))
-                except Exception:
-                    return stat_key, 0
+                try: return stat_key, int(ench[stat_key].get("value", 0))
+                except Exception: return stat_key, 0
 
-        # 3) maior valor não-'dmg'
+        # 3) fallback: maior valor não-'dmg'
         best = None
         for k, v in ench.items():
-            if k == "dmg" or not isinstance(v, dict):
-                continue
-            try:
-                val = int(v.get("value", 0))
-            except Exception:
-                val = 0
+            if k == "dmg" or not isinstance(v, dict): continue
+            try: val = int(v.get("value", 0))
+            except Exception: val = 0
             if best is None or val > best[1]:
                 best = (k, val)
-        if best:
-            return best
+        if best: return best
 
     return (None, 0)
 
 def _collect_affixes(item: Dict[str, Any], exclude_key: str | None) -> list[tuple[str, int]]:
-    """
-    Coleta afixos (source='affix'), ignorando 'dmg' e a chave do primário.
-    Ordena para estabilidade: por nome e valor desc.
-    """
     out: list[tuple[str, int]] = []
     ench = item.get("enchantments") or {}
     if not isinstance(ench, dict):
         return out
     for k, v in ench.items():
-        if k in ("dmg", exclude_key):
-            continue
+        if k in ("dmg", exclude_key): continue
         if isinstance(v, dict) and str(v.get("source")) == "affix":
-            try:
-                out.append((k, int(v.get("value", 0))))
-            except Exception:
-                out.append((k, 0))
+            try: out.append((k, int(v.get("value", 0))))
+            except Exception: out.append((k, 0))
     out.sort(key=lambda t: (t[0], -t[1]))
     return out
+
+def _socket_dots(item: Dict[str, Any]) -> str:
+    """
+    Retorna string como '(🟣⚪)' indicando sockets cheios/vazios.
+    Se não tiver sockets, retorna string vazia.
+    """
+    sockets = item.get("sockets")
+    if not sockets or not isinstance(sockets, list):
+        return ""
+    
+    dots = ""
+    for s in sockets:
+        # Se s for None, é vazio (⚪). Se tiver string ID, é cheio (🟣).
+        dots += "🟣" if s else "⚪"
+    
+    return f" ({dots})"
 
 # -----------------------------
 # API pública
@@ -193,11 +182,8 @@ def _collect_affixes(item: Dict[str, Any], exclude_key: str | None) -> list[tupl
 
 def formatar_item_para_exibicao(item: Dict[str, Any]) -> str:
     """
-    Ex.: 『[20/20] 🥷⚔️ Katana Laminada [1][Bom]: 🥷 +1, 🍀 +1 』
-    Regras de exibição:
-      - Emoji da classe + emoji do item, sem duplicar (se forem iguais, mostra só um)
-      - Primário sempre primeiro; afixos depois (exclui 'dmg' da lista)
-      - Raridade capitalizada
+    Ex.: 『[20/20] 🥷⚔️ Katana Laminada [1][Bom]: 🥷 +1, 🍀 +1 』 (⚪)
+    Inclui as bolinhas de runas no final.
     """
     dur = _durability_str(item)
     class_emo = _class_emoji_from_req(item)
@@ -206,33 +192,56 @@ def formatar_item_para_exibicao(item: Dict[str, Any]) -> str:
     upg = _upgrade_level(item)
     rarity = _rarity_title(item.get("rarity", "comum"))
 
-    # primário (robusto; lida com 'dmg' → stat da classe)
     pkey, pval = _find_primary(item)
     prim_icon = _attr_icon_for(pkey)
 
-    # afixos (exclui chave do primário)
     affixes = _collect_affixes(item, exclude_key=pkey)
     parts = [f"{prim_icon} +{int(pval or 0)}"]
     for ak, av in affixes:
         parts.append(f"{_attr_icon_for(ak)} +{int(av or 0)}")
     stats_text = ", ".join(parts)
 
-    # bloco de emoji sem duplicar
     emoji_block = item_emo
     if class_emo and class_emo != item_emo:
         emoji_block = f"{class_emo}{item_emo}"
 
-    return f"『{dur} {emoji_block} {name} [{upg}][{rarity}]: {stats_text} 』"
+    # Pega as bolinhas de socket
+    socket_indicator = _socket_dots(item)
+
+    return f"『{dur} {emoji_block} {name} [{upg}][{rarity}]: {stats_text} 』{socket_indicator}"
+
+def formatar_detalhes_runas(item: Dict[str, Any]) -> str:
+    """
+    Gera o bloco de texto detalhado das runas.
+    Usado quando o jogador clica em 'Ver Detalhes' do item.
+    """
+    sockets = item.get("sockets")
+    if not sockets or not isinstance(sockets, list):
+        return "" # Sem sockets, sem texto extra
+    
+    text = "\n💠 *Engastes Rúnicos:*\n"
+    for i, rune_id in enumerate(sockets, start=1):
+        if rune_id is None:
+            text += f"{i}️⃣ `[ Espaço Vazio ]`\n"
+        else:
+            # Tenta buscar no runes_data
+            if runes_data:
+                info = runes_data.get_rune_info(rune_id)
+                emoji = info.get("emoji", "🔮")
+                name = info.get("name", "Runa Desconhecida")
+                desc = info.get("desc", "")
+                text += f"{i}️⃣ {emoji} *{name}*: _{desc}_\n"
+            else:
+                # Fallback se runes_data não carregou
+                text += f"{i}️⃣ 🔮 *Runa*: {rune_id}\n"
+    
+    return text
 
 # -------------------------------------------------------------------
 # Extensões p/ Inventário, Equipamentos e Mercado do Aventureiro
 # -------------------------------------------------------------------
 
 def render_item_line(item: Dict[str, Any], *_args, **_kwargs) -> str:
-    """
-    Alias compatível com handlers antigos.
-    Garante que todo lugar use o mesmo formato bonito de equipamento único.
-    """
     return formatar_item_para_exibicao(item)
 
 def _nome_de_item(item_id: str) -> str:
@@ -240,7 +249,6 @@ def _nome_de_item(item_id: str) -> str:
     name = info.get("display_name")
     if name:
         return str(name)
-    # fallback: "barra_de_ferro" -> "Barra de Ferro"
     words = item_id.replace("_", " ").strip().split()
     titled = [w.capitalize() for w in words]
     for i, w in enumerate(titled):
@@ -249,32 +257,13 @@ def _nome_de_item(item_id: str) -> str:
     return " ".join(titled) if titled else item_id
 
 def formatar_empilhavel_para_exibicao(item_id: str, qty: int) -> str:
-    """
-    Mesmo padrão usado no inventário para itens empilháveis.
-    Ex.: '• 5x Barra de Ferro'
-    """
-    try:
-        q = int(qty)
-    except Exception:
-        q = 0
+    try: q = int(qty)
+    except Exception: q = 0
     return f"• {q}x {_nome_de_item(item_id)}"
 
 def market_render_line(item_key: str, item_value) -> str:
-    """
-    Helper para o Mercado do Aventureiro:
-      - se 'item_value' for dict com base_id (único): usa a linha bonita
-      - se for número (empilhável): usa '• Qtd x Nome'
-    """
     if isinstance(item_value, dict) and item_value.get("base_id"):
         return render_item_line(item_value)
-    try:
-        qty = int(item_value)
-    except Exception:
-        qty = 0
+    try: qty = int(item_value)
+    except Exception: qty = 0
     return formatar_empilhavel_para_exibicao(item_key, qty)
-
-# Renderização igual ao inventário/forja
-try:
-    from modules import display_utils  # formatar_item_para_exibicao(item: dict) -> str
-except Exception:
-    display_utils = None  # usamos fallback local se não existir

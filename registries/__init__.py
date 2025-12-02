@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import Application, TypeHandler, ContextTypes, CallbackQueryHandler
 from modules import player_manager
 from datetime import datetime, timezone
-
+from handlers import runes_handler
 # --- IMPORTS DOS REGISTROS (SEUS MÓDULOS) ---
 from .admin import register_admin_handlers
 from .character import register_character_handlers
@@ -76,8 +76,10 @@ def register_all_handlers(application: Application):
     # 3. Registra eventos gerais
     register_event_handlers(application)
     
-    # [IMPORTANTE] Registra a Defesa do Reino explicitamente
-    # Isso garante que o botão 'defesa_reino_main' seja ouvido
+    # --- NOVO REGISTRO DO MÍSTICO RÚNICO ---
+    application.add_handler(CallbackQueryHandler(runes_handler.action_router, pattern="^rune_npc:"))
+    application.add_handler(CallbackQueryHandler(runes_handler.runes_router, pattern="^rune_mgr:"))
+    
     register_kingdom_defense_handlers(application)
     
     # 4. Registo de Listas de Handlers (Legado/Outros)

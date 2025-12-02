@@ -9,6 +9,7 @@ from modules import player_manager, game_data
 from modules.crafting_registry import get_recipe, all_recipes  # noqa: F401
 from modules.game_data.classes import get_primary_damage_profile
 from modules.game_data import rarity as rarity_tables  # ATTR_COUNT_BY_RARITY, BASE_STATS_BY_RARITY etc.
+from modules.game_data import runes_data
 
 # =========================
 #    Utilitários básicos 
@@ -349,13 +350,25 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     info = _get_item_info(base_id)
     slot = (info.get("slot") or "").lower()
     
+    SOCKETS_MAP = {
+        "comum": 0,
+        "bom": 0,
+        "raro": 1,      
+        "epico": 2,     
+        "lendario": 3   
+    }
+
+    num_sockets = SOCKETS_MAP.get(final_rarity, 0)
+    initial_sockets = [None] * num_sockets
+
     new_item = {
         "uuid": str(uuid.uuid4()),
         "base_id": base_id,
         "rarity": final_rarity,
-        "slot": slot,  # <<< CORREÇÃO (Parte 2): O slot agora é salvo no item >>>
-        "upgrade_level": 1,          # nasce no +1
-        "durability": [20, 20],      # [cur/max]
+        "slot": slot,  
+        "upgrade_level": 1,
+        "durability": [20, 20],
+        "sockets": initial_sockets,
         "enchantments": {},
     }
 

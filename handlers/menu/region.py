@@ -388,6 +388,9 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         if final_region_key == 'floresta_sombria':
             keyboard.append([InlineKeyboardButton("⛺ Visitar Tenda do Alquimista", callback_data='npc_trade:alquimista_floresta')])
         
+        if final_region_key == 'deserto_ancestral':
+            keyboard.append([InlineKeyboardButton("🧙‍♂️ Cabana do Místico (Runas)", callback_data='rune_npc:main')])
+            
         # --- BOTÃO DE CAÇA MANUAL ---
         keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstro ", callback_data=f"hunt_{final_region_key}")])
 
