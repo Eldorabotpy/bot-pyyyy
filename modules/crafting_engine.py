@@ -10,8 +10,7 @@ from typing import Any, Dict, Tuple, List
 from modules import player_manager, game_data
 from modules.crafting_registry import get_recipe, all_recipes  # noqa: F401
 from modules.game_data.classes import get_primary_damage_profile
-from modules.game_data import rarity as rarity_tables  # ATTR_COUNT_BY_RARITY, BASE_STATS_BY_RARITY etc.
-from modules import clan_manager
+from modules.game_data import rarity as rarity_tables
 
 # =========================
 # Utilitários básicos
@@ -23,10 +22,6 @@ def _as_dict(obj: Any, default: Dict | None = None) -> Dict:
     return {} if default is None else default
 
 def _as_tuple_2(val: Any, fallback: Tuple[int, int] = (1, 1)) -> Tuple[int, int]:
-    """
-    Compat: converte ([a,b], {'min':a,'max':b}, {'raro':[a,b]}, etc.) para (min,max).
-    Aqui é usado apenas para metadados (ex.: bloco "damage" do item), não para o valor dos atributos.
-    """
     try:
         if isinstance(val, (list, tuple)) and len(val) >= 2:
             return int(val[0]), int(val[1])
@@ -41,32 +36,30 @@ def _as_tuple_2(val: Any, fallback: Tuple[int, int] = (1, 1)) -> Tuple[int, int]
         pass
     return fallback
 
-# <<< CORREÇÃO 1: Adiciona async def >>>
 async def _seconds_with_perks(player_data: dict, base_seconds: int) -> int:
-    user_id = player_data['user_id']
-    
-    # <<< CORREÇÃO 2: Adiciona await (Assumindo que get_perk_value é async) >>>
-    # Se for síncrono (como em premium.py), remova o await.
-    # Mas é mais seguro assumir que é async se chama o player_manager.
-    craft_mult_raw = await player_manager.get_perk_value(user_id, "craft_speed_multiplier", None)
+    """
+    Calcula o tempo de forja baseando-se APENAS nos perks do jogador (VIP/Passivas).
+    Removemos a dependência de Clã/Guilda para evitar erros em outras profissões.
+    """
+    craft_mult_raw = player_manager.get_perk_value(player_data, "craft_speed_multiplier", None)
     
     if craft_mult_raw is None:
-        # <<< CORREÇÃO 3: Adiciona await >>>
-        mult = float(await player_manager.get_perk_value(user_id, "refine_speed_multiplier", 1.0))
+        mult = float(player_manager.get_perk_value(player_data, "refine_speed_multiplier", 1.0))
     else:
-        mult = float(craft_mult_raw)
-        
-    clan_id = player_data.get("clan_id")
-    if clan_id:
-        # <<< CORREÇÃO 4: Adiciona await >>>
-        clan_buffs = await clan_manager.get_clan_buffs(clan_id) # Chama função async
-        speed_bonus_percent = clan_buffs.get("crafting_speed_percent", 0)
-        if speed_bonus_percent > 0:
-            mult += (speed_bonus_percent / 100.0)
-            
-    mult = max(0.25, min(4.0, mult)) # Síncrono
+        mult = float(craft_mult_raw)  
+    mult = max(0.25, min(4.0, mult))
     
-    return max(1, int(base_seconds / mult)) # Síncrono
+    return max(1, int(base_seconds / mult))
+
+def _has_materials(player_data: dict, inputs: dict) -> bool:
+    inv = _as_dict(player_data.get("inventory"))
+    for k, v in _as_dict(inputs).items():
+        have = inv.get(k, 0)
+        if isinstance(have, dict):
+            have = int(have.get("quantity", 0))
+        if int(have) < int(v):
+            return False
+    return True
 
 def _has_materials(player_data: dict, inputs: dict) -> bool:
     inv = _as_dict(player_data.get("inventory"))
@@ -83,11 +76,6 @@ def _consume_materials(player_data: dict, inputs: dict) -> None:
         player_manager.remove_item_from_inventory(player_data, item_id, int(qty))
 
 def _gd_attr(slot: str, key: str, default: Any = None):
-    """
-    Busca ranges em modules/game_data/rarity.py
-    Esperado: BASE_STATS_BY_RARITY[slot][key] -> {rarity: [min,max]}
-    (Hoje serve só para meta/compat; não define valores de atributo.)
-    """
     try:
         table = getattr(rarity_tables, "BASE_STATS_BY_RARITY", {}) or {}
         out = _as_dict(_as_dict(table.get(slot)).get(key), default={})
@@ -96,10 +84,6 @@ def _gd_attr(slot: str, key: str, default: Any = None):
         return {}
 
 def _get_item_info(base_id: str) -> dict:
-    """
-    Tenta pegar metadados da versão nova (equipment via game_data.get_item_info),
-    e cai para ITEMS_DATA se preciso.
-    """
     try:
         info = game_data.get_item_info(base_id)
         if info:
@@ -127,28 +111,23 @@ def _is_weapon_slot(slot: str | None) -> bool:
     s = (slot or "").lower()
     return s in {"arma", "weapon", "weap", "primary_weapon"}
 
-
 # =========================
 # Preview / Start
 # =========================
 
-# <<< CORREÇÃO 5: Adiciona async def >>>
 async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
-    rec = get_recipe(recipe_id) # Síncrono
+    rec = get_recipe(recipe_id)
     if not rec:
         return None
-
     rec = dict(rec)
-    inputs = _as_dict(rec.get("inputs")) # Síncrono
-    prof = _as_dict(player_data.get("profession")) # Síncrono
+    inputs = _as_dict(rec.get("inputs"))
+    prof = _as_dict(player_data.get("profession"))
     ok_prof = (prof.get("type") == rec.get("profession")) and \
-              (int(prof.get("level", 1)) >= int(rec.get("level_req", 1))) # Síncrono
-
-    # <<< CORREÇÃO 6: Adiciona await >>>
-    duration = await _seconds_with_perks(player_data, int(rec.get("time_seconds", 60))) # Chama função async
+              (int(prof.get("level", 1)) >= int(rec.get("level_req", 1)))
+    duration = await _seconds_with_perks(player_data, int(rec.get("time_seconds", 60)))
 
     return {
-        "can_craft": bool(ok_prof and _has_materials(player_data, inputs)), # Síncrono
+        "can_craft": bool(ok_prof and _has_materials(player_data, inputs)),
         "duration_seconds": duration,
         "inputs": dict(inputs),
         "result_base_id": rec.get("result_base_id"),
@@ -156,35 +135,27 @@ async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
         "emoji": rec.get("emoji", ""),
     }
 
-# <<< CORREÇÃO 7: Adiciona async def >>>
 async def start_craft(user_id: int, recipe_id: str):
-    # <<< CORREÇÃO 8: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id)
-    rec = get_recipe(recipe_id) # Síncrono
+    rec = get_recipe(recipe_id)
     if not pdata or not rec:
         return "Receita de forja inválida."
-
     rec = dict(rec)
-    prof = _as_dict(pdata.get("profession")) # Síncrono
+    prof = _as_dict(pdata.get("profession"))
     if prof.get("type") != rec.get("profession") or int(prof.get("level", 1)) < int(rec.get("level_req", 1)):
         return "Nível ou tipo de profissão insuficiente para esta receita."
-
-    inputs = _as_dict(rec.get("inputs")) # Síncrono
-    if not _has_materials(pdata, inputs): # Síncrono
+    inputs = _as_dict(rec.get("inputs"))
+    if not _has_materials(pdata, inputs):
         return "Materiais insuficientes."
+    duration = await _seconds_with_perks(pdata, int(rec.get("time_seconds", 60)))
+    _consume_materials(pdata, inputs)
 
-    # <<< CORREÇÃO 9: Adiciona await >>>
-    duration = await _seconds_with_perks(pdata, int(rec.get("time_seconds", 60))) # Chama função async
-    _consume_materials(pdata, inputs) # Síncrono
-
-    # Lógica síncrona de estado
     finish = datetime.now(timezone.utc) + timedelta(seconds=duration)
     pdata["player_state"] = {
         "action": "crafting",
         "finish_time": finish.isoformat(),
         "details": {"recipe_id": recipe_id}
     }
-    # <<< CORREÇÃO 10: Adiciona await >>>
     await player_manager.save_player_data(user_id, pdata)
     return {"duration_seconds": duration, "finish_time": finish.isoformat()}
 
