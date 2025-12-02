@@ -9,15 +9,14 @@ CLAN_PRESTIGE_LEVELS = {
     1: {
         "title": "Iniciante",
         "max_members": 5,
-        "points_to_next_level": 5000, # Nvl 1 -> 2 custa 5k
+        "points_to_next_level": 5000,  # Do 1 para o 2: Precisa de 5.000
         "upgrade_cost": {"gold": 0, "dimas": 0},
         "buffs": {} 
     },
     2: {
         "title": "Reconhecido",
         "max_members": 10,
-        # AQUI ESTAVA 15000. MUDEI PARA 30000 CONFORME VOCÊ QUERIA.
-        "points_to_next_level": 5000, 
+        "points_to_next_level": 30000, # Do 2 para o 3: Precisa de 30.000
         "upgrade_cost": {"gold": 150000, "dimas": 500},
         "buffs": {
             "xp_bonus": 5,
@@ -27,7 +26,7 @@ CLAN_PRESTIGE_LEVELS = {
     3: {
         "title": "Renomado",
         "max_members": 15,
-        "points_to_next_level": 30000, # Nvl 3 -> 4 custa 50k
+        "points_to_next_level": 60000, # Do 3 para o 4: Precisa de 60.000
         "upgrade_cost": {"gold": 300000, "dimas": 1000},
         "buffs": {
             "xp_bonus": 10,
@@ -38,7 +37,7 @@ CLAN_PRESTIGE_LEVELS = {
     4: {
         "title": "Lendário",
         "max_members": 20,
-        "points_to_next_level": 60000,
+        "points_to_next_level": 120000, # Do 4 para o 5: Precisa de 120.000
         "upgrade_cost": {"gold": 500000, "dimas": 1500},
         "buffs": {
             "xp_bonus": 15,
@@ -50,7 +49,7 @@ CLAN_PRESTIGE_LEVELS = {
     5: {
         "title": "Mítico",
         "max_members": 25,
-        "points_to_next_level": 150000,
+        "points_to_next_level": 250000, # Do 5 para o 6: Precisa de 250.000
         "upgrade_cost": {"gold": 1000000, "dimas": 3000},
         "buffs": {
             "xp_bonus": 20,
@@ -62,7 +61,7 @@ CLAN_PRESTIGE_LEVELS = {
     6: {
         "title": "Divino",
         "max_members": 30,
-        "points_to_next_level": 999999999,
+        "points_to_next_level": 999999999, # Nível Máximo (Fim)
         "upgrade_cost": {"gold": 2000000, "dimas": 5000},
         "buffs": {
             "xp_bonus": 25,

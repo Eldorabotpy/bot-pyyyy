@@ -1,5 +1,5 @@
 # handlers/guild/dashboard.py
-# (VERSÃO FINAL: CORREÇÃO DE IMPORTAÇÃO DOS NOMES DE SAIR)
+# (VERSÃO FINAL: CÁLCULO DE XP CORRIGIDO PARA O NÍVEL ATUAL)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaAnimation, InputMediaVideo
@@ -84,7 +84,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
             logger.error(f"Erro fatal rendering clan dashboard: {e}")
 
 # ==============================================================================
-# 2. DASHBOARD
+# 2. DASHBOARD (AQUI ESTAVA O ERRO DE LÓGICA)
 # ==============================================================================
 async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE, came_from: str = "kingdom"):
     query = update.callback_query
@@ -106,6 +106,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
         except: pass
         return
 
+    # Dados
     clan_name = clan_data.get('display_name', 'Clã')
     level = clan_data.get('prestige_level', 1)
     xp = clan_data.get('prestige_points', 0)
@@ -113,9 +114,13 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     leader_id = str(clan_data.get("leader_id", 0))
     is_leader = (str(user_id) == leader_id)
 
-    # Lógica de XP
+    # --- CORREÇÃO DO XP ---
+    # Antes: Olhava o Nível Seguinte (level + 1). Errado!
+    # Agora: Olha o Nível ATUAL para saber quanto falta para completar.
     current_level_info = CLAN_PRESTIGE_LEVELS.get(level, {})
     xp_needed = current_level_info.get("points_to_next_level", 999999)
+    
+    # Se xp_needed for None (nível máximo) ou 0, evita erro
     if not xp_needed: xp_needed = xp if xp > 0 else 1
     
     percent = min(1.0, max(0.0, xp / xp_needed))
@@ -123,7 +128,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     bar = "🟦" * filled + "⬜" * (10 - filled)
     
     members_count = len(clan_data.get('members', []))
-    max_members = current_level_info.get('max_members', 10)
+    max_members = current_level_info.get('max_members', 10) # Usa info do nível atual também
 
     text = (
         f"🛡️ <b>CLÃ: {clan_name.upper()}</b> [Nv. {level}]\n"
@@ -147,8 +152,9 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await _render_clan_screen(update, context, clan_data, text, keyboard)
 
+
 # ==============================================================================
-# 3. ROTEADOR (CORRIGIDO PARA ACEITAR O BOTÃO DA GESTÃO)
+# 3. ROTEADOR
 # ==============================================================================
 async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -161,7 +167,6 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     try:
-        # Importa TODAS as funções de missões necessárias
         from handlers.guild.missions import (
             show_guild_mission_details, 
             finish_mission_callback, 
@@ -170,7 +175,7 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             start_mission_callback
         )
         from handlers.guild.bank import show_clan_bank_menu
-        from handlers.guild.upgrades import show_clan_upgrade_menu 
+        from handlers.guild.upgrades import show_clan_upgrade_menu, confirm_clan_upgrade_callback 
     except ImportError: pass
     
     came_from = "kingdom"
@@ -183,12 +188,12 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- NAVEGAÇÃO PRINCIPAL ---
     if action == 'clan_menu': await show_clan_dashboard(update, context, came_from=came_from) 
     
-    # --- MISSÕES (CORREÇÃO AQUI) ---
+    # --- MISSÕES ---
     elif action == 'clan_mission_details': await show_guild_mission_details(update, context)
-    elif action == 'gld_mission_finish': await finish_mission_callback(update, context) # Botão Finalizar
-    elif action == 'gld_mission_cancel': await cancel_mission_callback(update, context) # Botão Cancelar
-    elif action == 'gld_mission_select_menu': await show_mission_selection_menu(update, context) # Botão Iniciar
-    elif action.startswith('gld_start_hunt'): await start_mission_callback(update, context) # Botões de Dificuldade
+    elif action == 'gld_mission_finish': await finish_mission_callback(update, context)
+    elif action == 'gld_mission_cancel': await cancel_mission_callback(update, context)
+    elif action == 'gld_mission_select_menu': await show_mission_selection_menu(update, context)
+    elif action.startswith('gld_start_hunt'): await start_mission_callback(update, context)
     
     # --- SAIR ---
     elif action == 'clan_leave_ask': await warn_leave_clan(update, context)
@@ -210,12 +215,10 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: await query.answer("Em breve!", show_alert=True)
         
     elif action.startswith('clan_upgrade_confirm'):
-        from handlers.guild.upgrades import confirm_clan_upgrade_callback
         await confirm_clan_upgrade_callback(update, context)
 
     else:
         try: await query.answer("Opção não encontrada.", show_alert=True)
         except: pass
 
-# Regex expandido para pegar 'gld_' (missões) e 'clan_' (gestão)
 clan_handler = CallbackQueryHandler(clan_router, pattern=r'^clan_|^gld_')
