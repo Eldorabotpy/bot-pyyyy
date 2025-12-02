@@ -61,6 +61,56 @@ async def _send_media_menu(query, context, text, keyboard, media_key=None):
 # LÓGICA DE BACKEND (ECONOMIA E MANIPULAÇÃO)
 # ==============================================================================
 
+async def logic_craft_rune_from_fragments(user_id: int) -> str:
+    pdata = await player_manager.get_player_data(user_id)
+    inv = pdata.get("inventory", {})
+    
+    # 1. Verifica Fragmentos
+    frag_id = "fragmento_runa_ancestral"
+    qtd = inv.get(frag_id, 0)
+    if isinstance(qtd, dict): qtd = qtd.get("quantity", 0)
+    
+    if qtd < 7:
+        return f"❌ Você precisa de 7 Fragmentos. Você só tem {qtd}."
+
+    # 2. Consome 7 Fragmentos
+    await player_manager.remove_item_from_inventory(pdata, frag_id, 7)
+    
+    # 3. Sorteia a Runa (Probabilidades)
+    roll = random.randint(1, 1000)
+    
+    tier = 1
+    
+    # --- ANCESTRAL (0.5% de chance) ---
+    # Se sair entre 1 e 5 (5 números em 1000 = 0.5%)
+    if roll <= 5: 
+        tier = 3 
+        
+    # --- MAIOR (19.5% de chance) ---
+    # Se sair entre 6 e 200 (195 números em 1000 = 19.5%)
+    elif roll <= 200: 
+        tier = 2 
+        
+    # --- MENOR (80% de chance) ---
+    # Qualquer número acima de 200
+    else: 
+        tier = 1
+    
+    # Pega lista de runas desse tier
+    possiveis = runes_data.get_runes_by_tier(tier)
+    if not possiveis:
+        # Fallback de segurança se a lista estiver vazia
+        rune_won = "runa_vampiro_menor"
+    else:
+        rune_won = random.choice(possiveis)
+        
+    # 4. Entrega a Runa
+    player_manager.add_item_to_inventory(pdata, rune_won, 1)
+    await player_manager.save_player_data(user_id, pdata)
+    
+    # Retorna Info para exibir
+    r_info = runes_data.get_rune_info(rune_won)
+    return f"✨ **SUCESSO!**\n\nOs fragmentos se fundiram e formaram:\n{r_info['emoji']} **{r_info['name']}**"
 
 async def _deduct_currency(user_id: int, pdata: dict, currency_type: str, amount: int) -> bool:
     """Helper para descontar dinheiro/diamante."""
@@ -166,11 +216,45 @@ async def logic_reroll_rune(user_id: int, slot_name: str, slot_index: int) -> st
     await player_manager.save_player_data(user_id, pdata)
     
     new_info = runes_data.get_rune_info(new_rune_id)
-    return f"🎰 **Roleta Mística!**\nSua runa se transformou em:\n{new_info.get('emoji')} **{new_info.get('name')}**!"
+    return f"🎰 𝑹𝒐𝒍𝒆𝒕𝒂 𝑴𝒊́𝒔𝒕𝒊𝒄𝒂!\nSua runa se transformou em:\n{new_info.get('emoji')} **{new_info.get('name')}**!"
 
 # ==============================================================================
 # MENUS DO NPC (FRONTEND)
 # ==============================================================================
+
+async def npc_crafting_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Tela de fusão de fragmentos."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    
+    # Pega qtd de fragmentos
+    inv = pdata.get("inventory", {})
+    frag_id = "fragmento_runa_ancestral"
+    qtd = inv.get(frag_id, 0)
+    if isinstance(qtd, dict): qtd = qtd.get("quantity", 0)
+    
+    # Barra de progresso visual (Ex: 🟦🟦🟦⬜⬜⬜⬜)
+    bar = "🟦" * min(qtd, 7) + "⬜" * max(0, 7 - qtd)
+    
+    text = (
+        "⚗️ **Mesa de Fusão Rúnica**\n\n"
+        "O Místico coloca os fragmentos em um almofariz brilhante e começa a moer...\n\n"
+        f"🧩 𝐒𝐞𝐮𝐬 𝐅𝐫𝐚𝐠𝐦𝐞𝐧𝐭𝐨𝐬: {qtd}\n"
+        f"💠 𝐏𝐫𝐨𝐠𝐫𝐞𝐬𝐬𝐨: `{bar}` (7 necessários)\n\n"
+        "_Junte 7 fragmentos para criar uma Runa Aleatória._"
+    )
+    
+    kb = []
+    if qtd >= 7:
+        kb.append([InlineKeyboardButton("✨ 𝑭𝑼𝑵𝑫𝑰𝑹 𝑨𝑮𝑶𝑹𝑨 ✨", callback_data="rune_npc:do_craft")])
+    else:
+        kb.append([InlineKeyboardButton(f"𝑭𝒂𝒍𝒕𝒂𝒎 {7-qtd} 𝑭𝒓𝒂𝒈𝒎𝒆𝒏𝒕𝒐𝒔", callback_data="rune_npc:ignore")])
+        
+    kb.append([InlineKeyboardButton("🔙 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="rune_npc:main")])
+    
+    # Se quiser imagem, pode usar uma chave tipo 'npc_mistico_crafting'
+    await _send_media_menu(query, context, text, kb, media_key="npc_mistico_intro")
 
 async def npc_rune_master_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Menu principal do NPC: Visual Melhorado."""
@@ -196,7 +280,9 @@ async def npc_rune_master_main(update: Update, context: ContextTypes.DEFAULT_TYP
             "🧙‍♂️ _\"Você vem até mim com essa sucata? A magia rúnica exige recipientes de poder!_\n"
             "_Volte quando tiver uma arma ou armadura 𝐑𝐚𝐫𝐚, 𝐄́𝐩𝐢𝐜𝐚 𝐨𝐮 𝐋𝐞𝐧𝐝𝐚́𝐫𝐢𝐚 equipada.\"_"
         )
-        kb = [[InlineKeyboardButton("🔙 Voltar", callback_data="show_kingdom_menu")]] # Ajuste o voltar se preferir
+        kb.append([InlineKeyboardButton("✨ 𝐅𝐮𝐧𝐝𝐢𝐫 𝐅𝐫𝐚𝐠𝐦𝐞𝐧𝐭𝐨𝐬", callback_data="rune_npc:craft_menu")])
+    
+        kb.append([InlineKeyboardButton("🚪 𝑺𝒂𝒊𝒓 𝒅𝒂 𝑻𝒆𝒏𝒅𝒂", callback_data="show_kingdom_menu")])
         
         # Usa a imagem de "triste" ou "recusa"
         await _send_media_menu(query, context, text, kb, media_key="npc_mistico_triste")
@@ -359,6 +445,19 @@ async def action_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("A magia está acontecendo...", show_alert=False)
         await query.edit_message_text(msg, parse_mode="Markdown", 
                                       reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Ok", callback_data=f"rune_npc:select_item:{parts[2]}")]]))
+    
+    elif action == "craft_menu":
+        await npc_crafting_menu(update, context)
+        
+    elif action == "do_craft":
+        msg = await logic_craft_rune_from_fragments(query.from_user.id)
+        # Mostra o resultado e atualiza o menu
+        await query.answer("Fusão realizada!", show_alert=False)
+        await query.edit_message_text(msg, parse_mode="Markdown", 
+                                      reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Fundir Mais", callback_data="rune_npc:craft_menu"), InlineKeyboardButton("Voltar", callback_data="rune_npc:main")]]))
+    
+    elif action == "ignore":
+        await query.answer("Você precisa de mais fragmentos!", show_alert=True)
 
 # ==============================================================================
 # ROUTER DE INVENTÁRIO (CORREÇÃO DE ERRO)

@@ -154,7 +154,7 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
     total_stats['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)
 
 # ========================================
-# --- FUNÇÃO MESTRA DE STATS ---
+# --- FUNÇÃO MESTRA DE STATS (ATUALIZADA) ---
 # ========================================
 async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = None) -> dict:
     # IMPORT LOCAL PARA EVITAR CICLO
@@ -171,9 +171,12 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
         total[k] = _ival(player_data.get(k, class_baseline.get(k)), class_baseline.get(k, 0))
     total['magic_attack'] = 0
 
-    # 2. Equipamentos
+    # 2. Equipamentos (Enchantments)
     inventory = player_data.get('inventory', {}) or {}
-    equipped = player_data.get('equipment', {}) or {}
+    equipped = player_data.get('equipment', {}) or {} # Atenção: seu save usa 'equipments' ou 'equipment'? 
+    # (Nota: No rune_handler usamos 'equipments', verifique se o seu save usa o mesmo nome. 
+    # O código original aqui usa 'equipment', vou manter o original para não quebrar equips.)
+    
     if isinstance(equipped, dict):
         for slot, unique_id in equipped.items():
             if not unique_id: continue
@@ -195,9 +198,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
                 else:
                     if stat_key not in _BASELINE_KEYS: total[stat_key] = total.get(stat_key, 0) + val
 
-    # 3. REMOVIDO CÁLCULO DE MANA PREMATURO DAQUI
-
-    # 4. Clã Buffs
+    # 3. Clã Buffs
     clan_id = player_data.get("clan_id")
     if clan_id:
         try:
@@ -211,7 +212,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
                 total['max_hp'] = total.get('max_hp', 0) + int(clan_buffs.get("flat_hp_bonus", 0))
         except: pass
 
-    # 5. Passivas e Auras
+    # 4. Passivas e Auras
     try:
         _apply_passive_skill_bonuses(player_data, total)
         if ally_user_ids:
@@ -220,6 +221,27 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
                 ally_data = await player_manager.get_player_data(ally_id)
                 if ally_data: _apply_party_aura_bonuses(ally_data, total)
     except: pass
+
+    # --- 5.5 [NOVO] INTEGRAÇÃO DE RUNAS ---
+    # Soma os bônus vindos das runas (calculados no player_manager)
+    try:
+        rune_bonuses = player_manager.get_rune_bonuses(player_data)
+        for stat, value in rune_bonuses.items():
+            # Se for porcentagem (ex: 5% gold), mantém float
+            # Se for atributo base (ex: attack), soma int
+            
+            # Normalização de chaves para bater com o sistema de stats
+            if stat == "magic_attack": 
+                total["magic_attack"] = total.get("magic_attack", 0) + int(value)
+            elif stat in total:
+                # Se já existe (ex: max_hp, attack), soma direto
+                total[stat] += value # Assume que value é do tipo certo
+            else:
+                # Se é novo (ex: lifesteal, crit_damage_mult), cria
+                total[stat] = total.get(stat, 0) + value
+    except Exception as e:
+        logger.error(f"Erro ao calcular bônus de runas: {e}")
+    # --------------------------------------
 
     # 6. Unificação de Dano (Mágico vs Físico)
     base_attack = total.get('attack', 0)
@@ -240,8 +262,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
         ini_bonus = int(total.get('initiative', 0) * 0.25)
         total['attack'] += ini_bonus
 
-    # 7. MANA CALCULATION (AGORA AQUI NO FINAL)
-    # Isso garante que pegue o 'magic_attack' ou 'initiative' já bufados
+    # 7. MANA CALCULATION
     _calculate_mana(player_data, total, ckey_fallback=ckey)
 
     # 8. Sanitização

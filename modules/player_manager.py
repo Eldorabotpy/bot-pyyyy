@@ -188,3 +188,51 @@ async def find_player_by_character_name(name: str):
             return player_data
             
     return None
+
+# =================================================================
+# --- 8. SISTEMA DE RUNAS (CÁLCULO DE BÔNUS) ---
+# =================================================================
+# Tenta importar os dados das runas (proteção contra erro se arquivo não existir)
+try:
+    from modules.game_data import runes_data
+except ImportError:
+    runes_data = None
+
+def get_rune_bonuses(player_data: dict) -> dict:
+    """
+    Varre todos os equipamentos equipados e soma os bônus das runas.
+    Retorna um dict: {'lifesteal': 5, 'crit_damage_mult': 20, 'max_mana': 50, ...}
+    """
+    bonuses = {}
+    
+    # Se o sistema de runas não estiver carregado, retorna vazio
+    if not runes_data:
+        return bonuses
+
+    equipments = player_data.get("equipment") or player_data.get("equipments") or {}
+    
+    # Itera sobre cada slot (arma, elmo, etc)
+    for slot, item in equipments.items():
+        if not isinstance(item, dict): continue
+        
+        sockets = item.get("sockets", [])
+        
+        # Itera sobre cada socket do item
+        for rune_id in sockets:
+            if not rune_id: continue # Pula slot vazio (None)
+            
+            # Pega os dados da runa no arquivo runes_data
+            info = runes_data.get_rune_info(rune_id)
+            stat_key = info.get("stat_key")
+            value = info.get("value", 0)
+            
+            if stat_key and value:
+                # Soma o valor no acumulador
+                current = bonuses.get(stat_key, 0)
+                # Assume que tudo é soma (int ou float)
+                try:
+                    bonuses[stat_key] = current + value
+                except Exception:
+                    pass
+                
+    return bonuses
