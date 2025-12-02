@@ -301,24 +301,44 @@ async def npc_slot_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ROUTERS
 # ==============================================================================
 
+# ==============================================================================
+# 4. ROUTERS (CORRIGIDO)
+# ==============================================================================
+
 async def action_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     parts = data.split(":")
     action = parts[1]
     
-    if action == "main": await npc_rune_master_main(update, context)
-    elif action == "craft_menu": await npc_crafting_menu(update, context)
-    elif action == "select_item": await npc_manage_item_slots(update, context)
-    elif action == "open_inv": await npc_select_rune_inv(update, context)
-    elif action == "options": await npc_slot_options(update, context)
-    elif action == "ignore": await query.answer("Falta recursos!", show_alert=True)
+    # Navegação de Menus
+    if action == "main": 
+        await npc_rune_master_main(update, context)
+    elif action == "craft_menu": 
+        await npc_crafting_menu(update, context)
+    elif action == "select_item": 
+        await npc_manage_item_slots(update, context)
+    elif action == "open_inv": 
+        await npc_select_rune_inv(update, context)
+    elif action == "options": 
+        await npc_slot_options(update, context)
+    elif action == "ignore": 
+        await query.answer("Falta recursos!", show_alert=True)
+    
+    # --- AÇÕES LÓGICAS (ONDE O BOTÃO DO_CRAFT ESTAVA FALTANDO) ---
     
     elif action == "do_craft":
+        # Chama a lógica de fundir
         msg = await logic_craft_rune_from_fragments(query.from_user.id)
-        await query.answer("Feito!", show_alert=False)
-        await npc_crafting_menu(update, context)
+        
+        # Feedback visual
+        await query.answer("Fusão realizada!", show_alert=False)
+        
+        # Manda o resultado como mensagem nova (para não perder o menu)
         await context.bot.send_message(query.message.chat_id, msg, parse_mode="Markdown")
+        
+        # Recarrega o menu de craft (para atualizar a barra de progresso)
+        await npc_crafting_menu(update, context)
 
     elif action == "do_socket":
         msg = await logic_socket_rune(query.from_user.id, parts[2], int(parts[3]), parts[4])
@@ -335,7 +355,4 @@ async def action_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Feito!", show_alert=False)
         await npc_manage_item_slots(update, context)
         await context.bot.send_message(query.message.chat_id, msg, parse_mode="Markdown")
-
-async def runes_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer("⚠️ Visite o Místico Rúnico no Deserto Ancestral!", show_alert=True)
+        
