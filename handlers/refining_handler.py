@@ -371,6 +371,7 @@ async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     user_id, chat_id = job.user_id, job.chat_id
     job_details = job.data
     
+    # Tenta apagar a mensagem de "processando" se houver ID (Melhoria visual)
     message_id_to_delete = job_details.get("message_id_to_delete")
     if message_id_to_delete:
         try:
@@ -378,27 +379,34 @@ async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
+    # 1. Carrega dados do jogador
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         return
 
+    # 2. Chama a engine (agora async) para processar a lógica
+    # A engine retorna uma string em caso de erro, ou uma tupla (nome, materiais) em caso de sucesso
     result = await dismantle_engine.finish_dismantle(player_data, job_details)
 
     if isinstance(result, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ Erro ao finalizar desmontagem: {result}")
         return
 
+    # 3. Sucesso: Desempacota os dados
     item_name, returned_materials = result
 
-    # --- SALVAMENTO (Sem Missões) ---
+    # 4. Salvamento de segurança (Garante que o estado 'idle' e inventário fiquem salvos)
     if player_data:
         await player_manager.save_player_data(user_id, player_data)
 
+    # 5. Monta a mensagem de resposta
     caption_lines = [f"♻️ <b>{item_name}</b> foi desmontado com sucesso!", "\nVocê recuperou:"]
+    
     if not returned_materials:
         caption_lines.append(" - Nenhum material foi recuperado.")
     else:
         for mat_id, mat_qty in returned_materials.items():
+            # _fmt_item_line é uma função auxiliar interna do refining_handler.py
             caption_lines.append(f"• {_fmt_item_line(mat_id, mat_qty)}")
 
     keyboard = [
