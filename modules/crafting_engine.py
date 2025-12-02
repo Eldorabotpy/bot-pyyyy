@@ -5,14 +5,16 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import random
 from typing import Any, Dict, Tuple, List
+
+# Módulos do projeto
 from modules import player_manager, game_data
 from modules.crafting_registry import get_recipe, all_recipes  # noqa: F401
 from modules.game_data.classes import get_primary_damage_profile
 from modules.game_data import rarity as rarity_tables  # ATTR_COUNT_BY_RARITY, BASE_STATS_BY_RARITY etc.
-from modules.game_data import runes_data
+from modules import clan_manager
 
 # =========================
-#    Utilitários básicos 
+# Utilitários básicos
 # =========================
 
 def _as_dict(obj: Any, default: Dict | None = None) -> Dict:
@@ -39,24 +41,31 @@ def _as_tuple_2(val: Any, fallback: Tuple[int, int] = (1, 1)) -> Tuple[int, int]
         pass
     return fallback
 
-# Em modules/crafting_engine.py
-
+# <<< CORREÇÃO 1: Adiciona async def >>>
 async def _seconds_with_perks(player_data: dict, base_seconds: int) -> int:
-    # user_id = player_data['user_id']  <-- Correto, não precisamos disto
-
-    # Passa 'player_data' (Corrigido)
-    craft_mult_raw = player_manager.get_perk_value(player_data, "craft_speed_multiplier", None)
-
+    user_id = player_data['user_id']
+    
+    # <<< CORREÇÃO 2: Adiciona await (Assumindo que get_perk_value é async) >>>
+    # Se for síncrono (como em premium.py), remova o await.
+    # Mas é mais seguro assumir que é async se chama o player_manager.
+    craft_mult_raw = await player_manager.get_perk_value(user_id, "craft_speed_multiplier", None)
+    
     if craft_mult_raw is None:
-    # Passa 'player_data' (Corrigido)
-        mult = float(player_manager.get_perk_value(player_data, "refine_speed_multiplier", 1.0))
+        # <<< CORREÇÃO 3: Adiciona await >>>
+        mult = float(await player_manager.get_perk_value(user_id, "refine_speed_multiplier", 1.0))
     else:
         mult = float(craft_mult_raw)
-
+        
     clan_id = player_data.get("clan_id")
-    
+    if clan_id:
+        # <<< CORREÇÃO 4: Adiciona await >>>
+        clan_buffs = await clan_manager.get_clan_buffs(clan_id) # Chama função async
+        speed_bonus_percent = clan_buffs.get("crafting_speed_percent", 0)
+        if speed_bonus_percent > 0:
+            mult += (speed_bonus_percent / 100.0)
+            
     mult = max(0.25, min(4.0, mult)) # Síncrono
- 
+    
     return max(1, int(base_seconds / mult)) # Síncrono
 
 def _has_materials(player_data: dict, inputs: dict) -> bool:
@@ -92,17 +101,12 @@ def _get_item_info(base_id: str) -> dict:
     e cai para ITEMS_DATA se preciso.
     """
     try:
-        # CORREÇÃO 1: Adiciona fallback para ITEM_BASES
         info = game_data.get_item_info(base_id)
         if info:
             return dict(info)
     except Exception:
         pass
-    # Tenta ITEMS_DATA
-    data = _as_dict(getattr(game_data, "ITEMS_DATA", {})).get(base_id, {}) or {}
-    if data: return data
-    # Tenta ITEM_BASES (para pegar o slot)
-    return _as_dict(getattr(game_data, "ITEM_BASES", {})).get(base_id, {}) or {}
+    return _as_dict(getattr(game_data, "ITEMS_DATA", {})).get(base_id, {}) or {}
 
 def _get_player_class_key(player_data: dict) -> str | None:
     candidates = [
@@ -189,18 +193,11 @@ async def start_craft(user_id: int, recipe_id: str):
 # =========================
 
 def _attr_to_enchant_key(attr_name: str) -> str:
-    """Normaliza nomes para as chaves usadas em 'enchantments'."""
+    """
+    Normaliza nomes para as chaves usadas em 'enchantments'.
+    (Mantemos 'dmg' exclusivo para cálculo; não exibimos como atributo visível.)
+    """
     a = str(attr_name or "").lower()
-    
-    # --- Mapeamentos CRÍTICOS para Magia/Foco/Recursos ---
-    if a in {"inteligencia", "magia", "poder_magico", "dano_magico"}:
-        return "magic_attack" # Chave usada para dano de feitiços
-    if a in {"mana", "mp", "mana_max", "max_mana"}:
-        return "max_mana"
-    if a in {"foco", "disciplina", "tenacidade", "tenacity"}:
-        return "tenacity" # Exemplo de atributo secundário
-    # ----------------------------------------------------
-
     if a in {"forca", "força", "ataque", "attack", "dano", "damage", "dmg", "poder", "ofensivo"}:
         return "dmg"
     if a in {"vida", "hp", "saude", "saúde", "health"}:
@@ -211,8 +208,7 @@ def _attr_to_enchant_key(attr_name: str) -> str:
         return "initiative"
     if a in {"sorte", "luck"}:
         return "luck"
-        
-    # Atributos de classe (bushido, carisma, letalidade, etc.)
+    # atributos de classe (bushido, carisma, foco, letalidade, etc.) permanecem como vêm
     return a
 
 def _class_primary_attr(player_class: str | None) -> str:
@@ -236,8 +232,7 @@ def _secondary_attr_pool(recipe: dict, player_class: str | None) -> List[str]:
     """
     Monta a pool de candidatos (sem primário): pools da receita + 'geral' + pool da classe.
     """
-    # CORREÇÃO 2: Usa o game_data.attributes.AFFIX_POOLS que é importado no __init__ do game_data
-    AFFIX_POOLS = getattr(game_data, "AFFIX_POOLS", {}) or {} 
+    AFFIX_POOLS = getattr(game_data, "AFFIX_POOLS", {}) or {}
     combined: List[str] = []
 
     for pool_name in (recipe.get("affix_pools_to_use") or []):
@@ -346,18 +341,12 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     final_rarity = _roll_rarity(player_data, recipe)
     base_id = recipe["result_base_id"]
 
-    # <<< CORREÇÃO (Parte 1): Buscamos o slot ANTES de criar o item >>>
-    info = _get_item_info(base_id)
-    slot = (info.get("slot") or "").lower()
-    
+    # 1. Lógica de Slots (Sockets) por Raridade
+    # Lendário = 3, Épico = 2, Raro = 1, Outros = 0
     SOCKETS_MAP = {
-        "comum": 0,
-        "bom": 0,
-        "raro": 1,      
-        "epico": 2,     
-        "lendario": 3   
+        "comum": 0, "bom": 0, 
+        "raro": 1, "epico": 2, "lendario": 3
     }
-
     num_sockets = SOCKETS_MAP.get(final_rarity, 0)
     initial_sockets = [None] * num_sockets
 
@@ -365,29 +354,41 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         "uuid": str(uuid.uuid4()),
         "base_id": base_id,
         "rarity": final_rarity,
-        "slot": slot,  
-        "upgrade_level": 1,
-        "durability": [20, 20],
-        "sockets": initial_sockets,
+        "upgrade_level": 1,          # nasce no +1
+        "durability": [20, 20],      # [cur/max]
+        
+        # --- CAMPO NOVO ESSENCIAL ---
+        "sockets": initial_sockets, 
+        # ----------------------------
+        
         "enchantments": {},
     }
 
-    # ===== Classe-alvo: usa class_req da receita se existir; senão, cai para a classe do jogador =====
+    info = _get_item_info(base_id)
+    slot = (info.get("slot") or "").lower()
+
+    # ===== Classe-alvo =====
     if isinstance(recipe.get("class_req"), (list, tuple)) and recipe["class_req"]:
         target_class = str(recipe["class_req"][0]).strip().lower()
     else:
         target_class = _get_player_class_key(player_data)
 
-    # Mapa de atributo primário VISÍVEL por classe (para exibição + ícones)
+    # Mapa de atributos REAIS (Correção para ícones e dano funcionarem)
     CLASS_VISIBLE_PRIMARY_ATTR = {
+        # Força
         "guerreiro": "forca",
-        "berserker": "furia",
-        "cacador":   "precisao",
-        "assassino": "letalidade",
-        "bardo":     "carisma",
-        "monge":     "foco",
+        "berserker": "forca", # Era "furia"
+        "samurai":   "forca", # Era "bushido"
+        
+        # Agilidade
+        "cacador":   "agilidade", # Era "precisao"
+        "assassino": "agilidade", # Era "letalidade"
+        "monge":     "agilidade", # Era "foco"
+        
+        # Inteligência
         "mago":      "inteligencia",
-        "samurai":   "bushido",
+        "bardo":     "inteligencia", # Era "carisma"
+        "curandeiro": "inteligencia" # Novo
     }
 
     # 1) escolher o primário "visível"
@@ -395,12 +396,11 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         primary_attr = CLASS_VISIBLE_PRIMARY_ATTR.get((target_class or ""), "forca")
         mirror_dmg = True
 
-        # Metadados descritivos de dano (tooltip). Não afetam os valores dos atributos.
         dmg_info = _as_dict(recipe.get("damage_info"))
         dmin, dmax = _as_tuple_2(dmg_info, (10, 20))
-        # se não vier 'scales_with' na receita, usa o perfil da classe-alvo
         class_profile = get_primary_damage_profile(target_class or "")
         scales_with = str(dmg_info.get("scales_with", class_profile.get("scales_with", "for")))
+        
         new_item["damage"] = {
             "type": str(dmg_info.get("type", class_profile.get("type", "fisico"))),
             "min": int(dmg_info.get("min_damage", dmin)),
@@ -408,12 +408,10 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
             "scales_with": scales_with,
         }
     else:
-        # Primário padrão de não-armas: vida (hp).
-        # Se quiser por slot (elmo/armadura/…): trocar por uma função que leia BASE_STATS_BY_RARITY.
-        primary_attr = "hp"
+        primary_attr = "hp" # Padrão para armaduras
         mirror_dmg = False
 
-    # 2) lista final de atributos pela raridade (inclui primário + secundários)
+    # 2) lista final de atributos pela raridade
     attr_keys = _pick_attribute_keys_for_item(final_rarity, primary_attr, recipe, target_class)
 
     # 3) aplica TODOS com valor = upgrade_level
@@ -422,23 +420,23 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         source = "primary" if idx == 0 else "affix"
         _apply_attr_with_upgrade(new_item, _attr_to_enchant_key(ak), upg, source)
 
-    # 4) espelho em 'dmg' só se for arma (para os cálculos)
+    # 4) espelho em 'dmg' só se for arma
     if mirror_dmg and attr_keys:
         first_key = _attr_to_enchant_key(attr_keys[0])
         if first_key != "dmg":
             new_item["enchantments"]["dmg"] = {"value": upg, "source": "primary_mirror"}
 
-    # 5) metadados amigáveis
+    # 5) metadados amigáveis (Nome e Emoji)
     dn = info.get("display_name") or info.get("nome_exibicao") or info.get("name") or base_id.replace("_", " ").title()
     if dn:
         new_item["display_name"] = str(dn)
-
-    # CORREÇÃO: Tenta pegar do item base (info), se não tiver, pega da receita (recipe)
+    
+    # CORREÇÃO DO EMOJI (Pega da receita se não tiver no item base)
     emoji_found = info.get("emoji") or recipe.get("emoji")
     if emoji_found:
         new_item["emoji"] = emoji_found
 
-    # 6) requisito de classe (se a receita definir)
+    # 6) requisito de classe
     class_req = recipe.get("class_req")
     if isinstance(class_req, (list, tuple)):
         new_item["class_req"] = [str(x).strip().lower() for x in class_req if str(x).strip()]
@@ -446,6 +444,7 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         new_item["class_req"] = [class_req.strip().lower()]
 
     return new_item
+
 
 # =========================
 # Finish / XP
