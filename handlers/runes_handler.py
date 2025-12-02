@@ -191,10 +191,10 @@ async def npc_rune_master_main(update: Update, context: ContextTypes.DEFAULT_TYP
     # --- CENÁRIO 1: SEM ITENS (Visual Triste) ---
     if not valid_items:
         text = (
-            "🏜️ **Tenda do Místico**\n\n"
+            "🏜️ 𝕋𝕖𝕟𝕕𝕒 𝕕𝕠 𝕄𝕚́𝕤𝕥𝕚𝕔𝕠\n\n"
             "O velho mago olha para o seu equipamento e suspira com desprezo...\n\n"
             "🧙‍♂️ _\"Você vem até mim com essa sucata? A magia rúnica exige recipientes de poder!_\n"
-            "_Volte quando tiver uma arma ou armadura **Rara, Épica ou Lendária** equipada.\"_"
+            "_Volte quando tiver uma arma ou armadura 𝐑𝐚𝐫𝐚, 𝐄́𝐩𝐢𝐜𝐚 𝐨𝐮 𝐋𝐞𝐧𝐝𝐚́𝐫𝐢𝐚 equipada.\"_"
         )
         kb = [[InlineKeyboardButton("🔙 Voltar", callback_data="show_kingdom_menu")]] # Ajuste o voltar se preferir
         
