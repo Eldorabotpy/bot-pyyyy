@@ -5,11 +5,11 @@
 
 # Padrão de raridade (comum, bom, raro, epico, lendario)
 RARITY_T1 = {
-    "comum": 0.80,
-    "bom": 0.18,
-    "raro": 0.018,
-    "epico": 0.0018,
-    "lendario": 0.0002,
+    "comum": 0.90,     # Aumentei para 90% (mais lixo)
+    "bom": 0.09,       # Diminuí para 9%
+    "raro": 0.009,     # 0.9%
+    "epico": 0.0009,   # 0.09%
+    "lendario": 0.0001 # 0.01% (Extremamente raro)
 }
 
 RECIPES = {

@@ -9,11 +9,11 @@ from modules.crafting_registry import register_recipe
 
 # Padrão de raridade T2 (comum, bom, raro, épico, lendário)
 RARITY_T2 = {
-    "comum": 0.72,
-    "bom": 0.25,
-    "raro": 0.025,
-    "epico": 0.004,
-    "lendario": 0.001,
+    "comum": 0.90,     # Aumentei para 90% (mais lixo)
+    "bom": 0.09,       # Diminuí para 9%
+    "raro": 0.009,     # 0.9%
+    "epico": 0.0009,   # 0.09%
+    "lendario": 0.0001 # 0.01% (Extremamente raro)
 }
 
 RECIPES: Dict[str, Dict[str, Any]] = {
