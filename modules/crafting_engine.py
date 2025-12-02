@@ -419,8 +419,11 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     dn = info.get("display_name") or info.get("nome_exibicao") or info.get("name") or base_id.replace("_", " ").title()
     if dn:
         new_item["display_name"] = str(dn)
-    if info.get("emoji"):
-        new_item["emoji"] = info["emoji"]
+
+    # CORREÇÃO: Tenta pegar do item base (info), se não tiver, pega da receita (recipe)
+    emoji_found = info.get("emoji") or recipe.get("emoji")
+    if emoji_found:
+        new_item["emoji"] = emoji_found
 
     # 6) requisito de classe (se a receita definir)
     class_req = recipe.get("class_req")
