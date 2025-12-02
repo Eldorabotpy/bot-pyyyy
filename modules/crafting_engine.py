@@ -272,9 +272,15 @@ def _roll_rarity(player_data: dict, recipe: dict) -> str:
     level_diff = max(0, prof_level - level_req)
 
     base_chances = dict(recipe.get("rarity_chances", {"comum": 1.0}))
-    bonus_per_level = 0.01  # +1% por nível acima em 'bom'+
+    
+    # <<< ALTERAÇÃO AQUI >>>
+    # 0.01 = 1% por nível (Padrão)
+    # 0.005 = 0.5% por nível (Sua escolha)
+    # Isso significa que 2 níveis acima = +1% de chance extra em raridades altas
+    bonus_per_level = 0.005
 
     def _add_bonus(k: str, v: float) -> float:
+        # Aplica o bônus apenas para bom, raro, epico, lendario
         return max(0.0, v + (level_diff * bonus_per_level)) if k in ("bom", "raro", "epico", "lendario") else max(0.0, v)
 
     adjusted = {k: _add_bonus(k, float(v)) for k, v in base_chances.items()}
@@ -289,7 +295,6 @@ def _roll_rarity(player_data: dict, recipe: dict) -> str:
         if roll < acc:
             return r
     return "comum"
-
 
 # =========================
 # Aplicação de atributos (= upgrade_level)

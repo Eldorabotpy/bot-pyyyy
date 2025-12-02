@@ -13,12 +13,24 @@ from modules import recipes as recipes_package
 
 logger = logging.getLogger(__name__)
 
-_RECIPES: Dict[str, Dict[str, Any]] = {}
+_RECIPES: Dict[str, Dict[str, Any]] = {} 
 
 # ... (Toda a sua lógica de raridade pode continuar aqui, ela está correta)
 RARITY_ORDER = ("comum", "bom", "raro", "epico", "lendario")
-DEFAULT_RARITY_T1 = {"comum": 0.78, "bom": 0.20, "raro": 0.02, "epico": 0.00, "lendario": 0.00}
-DEFAULT_RARITY_T2 = {"comum": 0.74, "bom": 0.23, "raro": 0.02, "epico": 0.01, "lendario": 0.00}
+DEFAULT_RARITY_T1 = {
+    "comum": 0.90,      # 90%
+    "bom": 0.09,        # 9%
+    "raro": 0.009,      # 0.9%
+    "epico": 0.0009,    # 0.09%
+    "lendario": 0.0001  # 0.01%
+}
+DEFAULT_RARITY_T2 = {
+    "comum": 0.90,
+    "bom": 0.09,
+    "raro": 0.009,
+    "epico": 0.0009,
+    "lendario": 0.0001
+}
 
 def _guess_tier_from_level(level_req: int | None) -> int:
     if level_req is None: return 1
