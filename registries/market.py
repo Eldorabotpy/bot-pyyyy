@@ -61,7 +61,7 @@ def register_market_handlers(application: Application):
         # --- NOVO: Captura de Texto (Nome do Jogador) ---
         # Adiciona o handler que importamos lá em cima.
         # Ele já contem o MessageHandler(filters.TEXT...) configurado no market_handler.py
-        application.add_handler(market_catch_input_text_handler)
+        application.add_handler(market_catch_input_text_handler, group=1)
 
         # ===============================================================
         # 2. OUTROS MERCADOS (GEMAS / REINO)

@@ -47,9 +47,28 @@ def _reset_prof_one(p: dict) -> None:
 
 async def _resolve_user_id(text: str) -> int | None:
     text = (text or "").strip()
-    if text.isdigit(): return int(text)
-    uid, _ = await player_manager.find_player_by_name_norm(text) or (None, None)
-    return uid
+    
+    # 1. Se for ID numérico, converte e retorna
+    if text.isdigit(): 
+        return int(text)
+    
+    # 2. Se for texto, tenta buscar pelo nome usando a função que vimos no seu arquivo
+    try:
+        # Tenta buscar exato primeiro
+        found = await player_manager.find_player_by_name(text)
+        
+        # Se não achar, tenta buscar normalizado (minúsculas, sem acento) se existir
+        if not found and hasattr(player_manager, 'find_player_by_name_norm'):
+            found = await player_manager.find_player_by_name_norm(text)
+            
+        if found:
+            # A função retorna (id, data), queremos só o ID (índice 0)
+            return found[0] 
+            
+    except Exception as e:
+        logger.error(f"Erro ao buscar jogador '{text}': {e}")
+        
+    return None
 
 # --- Funções da Conversa ---
 
@@ -109,24 +128,44 @@ async def _ask_player_for_idle_reset(update: Update, context: ContextTypes.DEFAU
 
 # Recebe o texto, encontra o jogador e executa o RESPEC
 async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    target_id = await _resolve_user_id(update.message.text)
+    user_input = update.message.text
+    
+    # Tenta achar o ID
+    target_id = await _resolve_user_id(user_input)
+    
+    # Recupera a ação (points, class, prof)
     action = context.user_data.get('reset_action')
 
-    if not target_id or not action:
-        await update.message.reply_text("❌ Jogador não encontrado ou ação inválida. Tente novamente.")
+    # --- LOG DE DEBUG NO TERMINAL ---
+    logger.info(f"ADM RESET: Input='{user_input}' | ID Encontrado={target_id} | Action={action}")
+
+    # Checagem 1: A ação sumiu?
+    if not action:
+        await update.message.reply_text(
+            "⚠️ <b>Sessão Expirada (Ação Inválida)</b>\n\n"
+            "O bot 'esqueceu' qual botão você clicou. Por favor, volte ao menu e clique em 'Zerar Pontos' novamente.",
+            parse_mode="HTML"
+        )
         return ASKING_PLAYER_RESPEC
 
+    # Checagem 2: O jogador não foi achado?
+    if not target_id:
+        await update.message.reply_text(
+            f"❌ <b>Jogador não encontrado:</b> <code>{user_input}</code>\n\n"
+            "Dica: Tente usar o <b>User ID numérico</b> (ex: 123456789) que é infalível.",
+            parse_mode="HTML"
+        )
+        return ASKING_PLAYER_RESPEC
+
+    # Se chegou aqui, tudo certo. Prossegue com o reset.
     pdata = await player_manager.get_player_data(target_id)
     if not pdata:
-        await update.message.reply_text("❌ Jogador não encontrado.")
+        await update.message.reply_text("❌ Erro de Banco de Dados: ID existe mas dados estão vazios.")
         return ASKING_PLAYER_RESPEC
 
     summary = []
     if action == 'points':
-        
-        # 👇 [CORREÇÃO 4] Adicionado "await"
         rec = await _reset_points_one(pdata)
-        
         summary.append(f"pontos (recuperados: {rec})")
     elif action == 'class':
         _reset_class_one(pdata)
@@ -136,10 +175,17 @@ async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAU
         summary.append("profissão")
 
     await player_manager.save_player_data(target_id, pdata)
-    await update.message.reply_text(f"✅ Reset de `{', '.join(summary)}` aplicado para o jogador `{target_id}`.")
+    
+    # Confirmação bonita
+    char_name = pdata.get('character_name', 'Desconhecido')
+    await update.message.reply_text(
+        f"✅ <b>Sucesso!</b>\n"
+        f"Reset de <b>{', '.join(summary)}</b> aplicado em:\n"
+        f"👤 <b>{char_name}</b> (<code>{target_id}</code>)", 
+        parse_mode="HTML"
+    )
     
     context.user_data.pop('reset_action', None)
-    # Volta para o menu principal de reset
     await _entry_point(update, context)
     return MAIN_MENU
 
