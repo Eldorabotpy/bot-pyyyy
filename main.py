@@ -169,11 +169,12 @@ async def check_stale_actions_on_startup(application: Application):
 
 async def broadcast_startup_message(application: Application):
     """
-    Envia broadcast. Se a imagem falhar, envia texto.
+    Envia broadcast para TODOS os jogadores.
+    Se não tiver 'last_chat_id', tenta usar o próprio '_id' (User ID).
     """
     if player_core.players_collection is None: return
 
-    logging.info("[Broadcast] Iniciando envio de mensagem global de reinício...")
+    logging.info("[Broadcast] Iniciando envio de mensagem global...")
     
     mensagem = (
         "📢 <b>Mundo de Eldora Atualizado!</b>\n\n"
@@ -183,23 +184,26 @@ async def broadcast_startup_message(application: Application):
         "<i>Bom jogo, aventureiro!</i>"
     )
 
-    # Lógica inteligente para imagem
-    tem_imagem = STARTUP_IMAGE_ID is not None and isinstance(STARTUP_IMAGE_ID, str) and len(STARTUP_IMAGE_ID) > 5
+    tem_imagem = STARTUP_IMAGE_ID is not None and isinstance(STARTUP_IMAGE_ID, str)
 
     try:
-        cursor = player_core.players_collection.find(
-            {"last_chat_id": {"$exists": True, "$ne": None}}, 
-            {"last_chat_id": 1}
-        )
+        # MUDANÇA: Removemos o filtro. Pegamos TODOS os jogadores.
+        # Projetamos apenas os campos necessários para economizar memória.
+        cursor = player_core.players_collection.find({}, {"_id": 1, "last_chat_id": 1})
         
         count = 0
+        success_count = 0
+        
         for doc in cursor: 
-            chat_id = doc.get("last_chat_id")
-            if not chat_id: continue
-
+            # Tenta pegar o chat_id salvo. Se não tiver, usa o _id (User ID)
+            chat_id = doc.get("last_chat_id") or doc.get("_id")
+            
+            if not chat_id: continue # Se mesmo assim não tiver ID, pula
+            
+            count += 1
             enviado = False
             
-            # 1. Tenta com IMAGEM (se estiver ativado)
+            # 1. Tenta com IMAGEM
             if tem_imagem:
                 try:
                     await application.bot.send_photo(
@@ -209,16 +213,17 @@ async def broadcast_startup_message(application: Application):
                         parse_mode="HTML"
                     )
                     enviado = True
-                except BadRequest as e:
-                    # Se der erro de ID inválido, desativa a imagem para SEMPRE neste loop
-                    # e cai para o envio de texto abaixo
-                    if "Wrong file identifier" in str(e) or "invalid file_id" in str(e):
-                        logging.warning(f"[Broadcast] ID de imagem inválido! Desativando imagem e enviando texto. Erro: {e}")
-                        tem_imagem = False 
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    if "wrong file identifier" in err_msg or "invalid file_id" in err_msg:
+                        logging.warning(f"[Broadcast] ID de imagem inválido! Mudando para modo texto.")
+                        tem_imagem = False
+                    elif "forbidden" in err_msg or "chat not found" in err_msg:
+                        pass 
                     else:
-                        logging.warning(f"[Broadcast] Erro ao enviar foto para {chat_id}: {e}")
+                        pass # Erro genérico de foto, tenta texto
 
-            # 2. Tenta com TEXTO (se imagem falhou ou não tem imagem)
+            # 2. Tenta com TEXTO (se foto falhou ou desativada)
             if not enviado:
                 try:
                     await application.bot.send_message(
@@ -228,17 +233,16 @@ async def broadcast_startup_message(application: Application):
                     )
                     enviado = True
                 except Exception as e:
-                    if "Forbidden" not in str(e):
-                        logging.warning(f"[Broadcast] Falha total para {chat_id}: {e}")
+                    pass # Ignora erros silenciosamente para não sujar o log
 
             if enviado:
-                count += 1
+                success_count += 1
                 await asyncio.sleep(0.5) 
 
-        logging.info(f"[Broadcast] Mensagem enviada para {count} jogadores.")
+        logging.info(f"[Broadcast] Finalizado. Enviado para {success_count} de {count} jogadores encontrados.")
 
     except Exception as e:
-        logging.error(f"[Broadcast] Erro crítico no loop de envio: {e}")
+        logging.error(f"[Broadcast] Erro crítico no loop: {e}")
 
 async def post_init_tasks(application: Application):
     if ADMIN_ID:
