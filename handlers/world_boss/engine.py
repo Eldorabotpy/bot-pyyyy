@@ -44,14 +44,14 @@ SKILL_REWARD_POOL = [
     "mago_bola_de_fogo", "bardo_melodia_restauradora",
     "assassino_ataque_furtivo", "samurai_corte_iaijutsu"
 ]
-SKILL_CHANCE = 5.0 # (5%)
+SKILL_CHANCE = 2.0 # (2%)
 
 SKIN_REWARD_POOL = [
     'guerreiro_armadura_negra', 'guerreiro_placas_douradas',
-    'mago_traje_arcano', 'assassino_manto_espectral',
-    'cacador_patrulheiro_elfico', 'berserker_pele_urso',
-    'monge_quimono_dragao', 'bardo_traje_maestro',
-    'samurai_armadura_shogun'
+    'mago_traje_arcano', 'mago_arquimago_caos', 'assassino_manto_espectral',
+    'cacador_patrulheiro_elfico', 'cacador_cacador_dragoes', 'berserker_pele_urso',
+    'berserker_infernal', 'monge_quimono_dragao', 'monge_aspecto_asura', 'bardo_traje_maestro',
+    'bardo_requiem_sombrio', 'samurai_armadura_shogun', 'samurai_armadura_demoniaca'
 ]
 SKIN_CHANCE = 1.0 # (1%)
 

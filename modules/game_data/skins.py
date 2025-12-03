@@ -14,11 +14,18 @@ SKIN_CATALOG = {
         'media_key': 'classe_guerreiro_placas_douradas_media',
         'description': 'Uma armadura de elite para os campeões do reino.'
     },
+    # --- Mago ---
     'mago_traje_arcano': {
         'display_name': 'Traje Arcano',
         'class': 'mago',
         'media_key': 'classe_mago_traje_arcano_media',
         'description': 'Vestes que canalizam pura energia mágica.'
+    },
+    'mago_arquimago_caos': {
+        'display_name': 'Arquimago do Caos',
+        'class': 'mago',
+        'media_key': 'classe_mago_arquimago_caos_media', # Lembre de adicionar a foto no file_ids.py depois!
+        'description': 'Vestes que tremeluzem com energia mágica instável e pura.'
     },
     # --- Assassino ---
     'assassino_manto_espectral': {
@@ -35,7 +42,13 @@ SKIN_CATALOG = {
         'media_key': 'classe_cacador_patrulheiro_elfico_media',
         'description': 'Trajes leves de couro e folhas, perfeitos para se mover em silêncio.'
     },
-
+    'cacador_cacador_dragoes': {
+        'display_name': 'Caçador de Dragões',
+        'class': 'cacador',
+        'media_key': 'classe_cacador_cacador_dragoes_media', # Lembre da imagem depois!
+        'description': 'Armadura forjada com escamas impenetráveis das feras mais antigas.'
+    },
+    
     # --- Berserker ---
     'berserker_pele_urso': {
         'display_name': 'Pele de Urso Selvagem',
@@ -43,13 +56,24 @@ SKIN_CATALOG = {
         'media_key': 'classe_berserker_pele_urso_media',
         'description': 'Armadura primal feita da pele e do crânio de um grande urso.'
     },
-
+     'berserker_infernal': {
+        'display_name': 'Berserker Infernal',
+        'class': 'berserker',
+        'media_key': 'classe_berserker_infernal_media', # Lembre da imagem!
+        'description': 'Pele queimada e armadura fundida com o calor do submundo.'
+    },
     # --- Monge ---
     'monge_quimono_dragao': {
         'display_name': 'Quimono do Dragão Espiritual',
         'class': 'monge',
         'media_key': 'classe_monge_quimono_dragao_media',
         'description': 'Vestes de seda adornadas com o bordado de um dragão celestial.'
+    },
+    'monge_aspecto_asura': {
+        'display_name': 'Aspecto de Asura',
+        'class': 'monge',
+        'media_key': 'classe_monge_aspecto_asura_media', # Lembre da imagem!
+        'description': 'A aura de um deus da guerra envolve seus punhos, emanando poder bruto.'
     },
 
     # --- Bardo ---
@@ -59,7 +83,12 @@ SKIN_CATALOG = {
         'media_key': 'classe_bardo_traje_maestro_media',
         'description': 'Um fraque sofisticado, digno de um virtuoso musical.'
     },
-
+    'bardo_requiem_sombrio': {
+        'display_name': 'Requiem Sombrio',
+        'class': 'bardo',
+        'media_key': 'classe_bardo_requiem_sombrio_media', # Lembre da imagem!
+        'description': 'Trajes fúnebres que tocam a melodia final para os seus inimigos.'
+    },
     # --- Samurai ---
     'samurai_armadura_shogun': {
         'display_name': 'Armadura do Shogun',

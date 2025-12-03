@@ -1,4 +1,4 @@
-# handlers/autohunt_handler.py (VERSÃO FINAL E CORRIGIDA)
+# handlers/autohunt_handler.py (VERSÃO KILL SWITCH)
 
 import logging
 from telegram import Update
@@ -12,51 +12,100 @@ from handlers.hunt_handler import hunt_job
 logger = logging.getLogger(__name__)
 
 async def start_autohunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ativa o modo de auto-caça e agenda a primeira tarefa."""
+    """Ativa o modo de auto-caça."""
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    player_data = player_manager.get_player_data(user_id)
+    
+    # 1. Carrega dados FRESCOS do banco (evita cache velho)
+    # Se seu manager tiver método de limpar cache, use-o ou garanta que get_player_data pegue do DB
+    player_data = await player_manager.get_player_data(user_id)
 
-    # Verificações de segurança
-    if not PremiumManager(player_data).is_premium(): return
-    if player_data.get('player_state', {}).get('action') != 'idle':
-        await query.answer("Você precisa terminar sua ação atual primeiro!", show_alert=True)
+    # Verificações
+    if not PremiumManager(player_data).is_premium(): 
         return
+        
+    # Se já estiver caçando, avisa e para.
+    # Se o bot reiniciou e o status ficou preso, permitimos que ele "sobrescreva" se for idle ou null
+    current_action = player_data.get('player_state', {}).get('action')
+    if current_action not in [None, 'idle']:
+        # Se for auto_hunting, é provável que seja um status "zumbi" de um reinício anterior.
+        # Vamos deixar passar APENAS se o usuário estiver clicando no botão de novo, 
+        # mas idealmente o botão 'stop' deve ser usado.
+        if current_action != 'auto_hunting':
+            await query.answer(f"Ocupado: {current_action}", show_alert=True)
+            return
+
+    # Verificação de Energia
     if player_data.get('energy', 0) <= 0:
-        await query.answer("Você não tem energia para iniciar a caça automática!", show_alert=True)
+        await query.answer("Sem energia!", show_alert=True)
         return
 
+    # 2. Define estado e SALVA
     player_data['player_state'] = {'action': 'auto_hunting'}
-    player_manager.save_player_data(user_id, player_data)
+    await player_manager.save_player_data(user_id, player_data)
 
     try:
-        await query.edit_message_caption(caption="👑 Modo de Caça Automática ativado. A preparar a primeira batalha...", reply_markup=None)
+        await query.edit_message_caption(caption="♾️ Caça Automática INICIADA. Buscando monstros...", reply_markup=None)
     except BadRequest:
-        try: await query.edit_message_text("👑 Modo de Caça Automática ativado. A preparar a primeira batalha...", reply_markup=None)
+        try: await query.edit_message_text("♾️ Caça Automática INICIADA. Buscando monstros...", reply_markup=None)
         except BadRequest: pass
 
-    # Agenda a primeira tarefa de caça para ser executada em 1 segundo
+    # 3. Limpa jobs antigos (por segurança) antes de criar um novo
+    job_name = f"autohunt_{user_id}"
+    old_jobs = context.job_queue.get_jobs_by_name(job_name)
+    for j in old_jobs: j.schedule_removal()
+
+    # 4. Agenda o loop
     context.job_queue.run_once(
         hunt_job,
         when=1,
         data={'user_id': user_id, 'chat_id': query.message.chat.id},
-        name=f"autohunt_{user_id}" # Um nome único para a tarefa
+        name=job_name
     )
 
 async def stop_autohunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Interrompe o ciclo de tarefas de auto-caça."""
+    """
+    KILL SWITCH: Força a parada, removendo jobs e limpando o banco.
+    Funciona mesmo após reinício do bot.
+    """
     query = update.callback_query
-    await query.answer("Caça automática será interrompida após esta batalha.", show_alert=True)
-
     user_id = update.effective_user.id
-    player_data = player_manager.get_player_data(user_id)
+    
+    # Feedback visual imediato (para o usuário não clicar 10 vezes)
+    await query.answer("Parando...", show_alert=False)
 
-    # Apenas remove a flag. O loop irá parar naturalmente na próxima verificação.
+    # 1. TENTATIVA DE MATAR O PROCESSO NA MEMÓRIA (JobQueue)
+    # Isso para o loop se o bot NÃO tiver reiniciado.
+    job_name = f"autohunt_{user_id}"
+    current_jobs = context.job_queue.get_jobs_by_name(job_name)
+    jobs_found = len(current_jobs)
+    
+    for job in current_jobs:
+        job.schedule_removal()
+    
+    logger.info(f"[AUTOHUNT] Parando {user_id}. Jobs removidos: {jobs_found}")
+
+    # 2. LIMPEZA DO BANCO DE DADOS (Persistência)
+    # Pegamos os dados frescos
+    player_data = await player_manager.get_player_data(user_id)
+    
+    # Independente de estar 'auto_hunting' ou travado, forçamos 'idle'
     if player_data.get('player_state', {}).get('action') == 'auto_hunting':
         player_data['player_state'] = {'action': 'idle'}
-        player_manager.save_player_data(user_id, player_data)
-        
+        await player_manager.save_player_data(user_id, player_data)
+        msg_text = "🛑 Caça automática finalizada com sucesso."
+    else:
+        # Se já estava idle (caso de reinício onde o user já clicou antes), apenas confirma
+        msg_text = "🛑 O sistema já está parado."
+
+    # 3. Atualiza a mensagem
+    try:
+        await query.edit_message_caption(caption=msg_text, reply_markup=None)
+    except BadRequest:
+        try: await query.edit_message_text(msg_text, reply_markup=None)
+        except BadRequest: pass
+
 # Exporta os handlers
 autohunt_start_handler = CallbackQueryHandler(start_autohunt_callback, pattern=r'^autohunt_start$')
 autohunt_stop_handler = CallbackQueryHandler(stop_autohunt_callback, pattern=r'^autohunt_stop$')
