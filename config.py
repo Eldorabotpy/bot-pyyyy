@@ -1,3 +1,5 @@
+# Arquivo: config.py
+
 import os
 from dotenv import load_dotenv
 
@@ -23,10 +25,9 @@ except (ValueError, TypeError):
 # --- CONFIGURAÇÕES DO JOGO ---
 JOB_TIMEZONE = os.getenv("JOB_TIMEZONE", "America/Sao_Paulo")
 
-
 # --- 👇 MUDANÇA PRINCIPAL AQUI 👇 ---
 
-# Horários de início e fim dos 4 eventos
+# Horários de início e fim dos 4 eventos (Defesa do Reino)
 # Formato: (hora_inicio, min_inicio, hora_fim, min_fim)
 EVENT_TIMES = [
     (9,  10,   9, 40),  # Evento das 09:00 (dura 30 min)
@@ -35,9 +36,15 @@ EVENT_TIMES = [
     (22, 0,  22, 30),  # Evento das 22:00 (dura 30 min)
 ]
 
+# Horários do World Boss
 WORLD_BOSS_TIMES = [
     (8,  0,   9, 0),  # Evento das 08:00 (duração: 1 hora)
     (14, 0,  15, 0),  # Evento das 14:00 (duração: 1 hora)
     (19, 0,  20, 0),  # Evento das 19:00 (duração: 1 hora)
     (23, 0,   1, 0),  # Evento das 23:00 (duração: 2 horas, termina à 01:00 do dia seguinte)
 ]
+
+# --- IMAGEM DE BROADCAST (REINÍCIO) ---
+# Cole o ID da imagem que você pegou com o bot dentro das aspas.
+# Se não quiser imagem, deixe como None (sem aspas).
+STARTUP_IMAGE_ID = "AgACAgEAAxkBAAECOz5pL533_VndqEmAavHC3Rw2BYcu1QAChwtrGxz-eUV_qi1GsCu9cAEAAwIAA3kAAzYE"

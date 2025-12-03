@@ -1,5 +1,4 @@
 # handlers/profession_handler.py
-# (VERSÃO 3.1: FALLBACK INTELIGENTE PARA TEXTO SE NÃO HOUVER IMAGEM)
 
 import math
 import logging
@@ -8,7 +7,6 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data, file_ids, crafting_registry
 from modules.game_data.refining import REFINING_RECIPES
-from modules.player import stats as player_stats
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +35,9 @@ def _get_profession_info(player_data: dict):
     elif isinstance(prof_data, str):
         key = prof_data
     return key, level, xp
+
+def _prof_label(key: str, data: dict) -> str:
+    return f"{data.get('emoji','💼')} {data.get('display_name', key.capitalize())}"
 
 def _get_recipes_for_profession(prof_key: str, category: str) -> list:
     filtered = []
@@ -79,7 +80,6 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
     1. Procura imagem específica > pai > genérica.
     2. Se achar imagem: Tenta editar a mídia ou envia nova foto.
     3. Se NÃO achar imagem (None): Edita apenas o texto ou envia nova mensagem de texto.
-    Isso impede que o bot quebre em ambientes de teste sem imagens configuradas.
     """
     fd = None
     
@@ -100,7 +100,7 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
     media_type = (fd.get("type") or "photo").lower() if fd else "photo"
 
     # --- TENTATIVA DE EDIÇÃO ---
-    if query.message:
+    if query and query.message:
         try:
             if media_id:
                 # Tem imagem nova para mostrar
@@ -108,15 +108,15 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
                 await query.edit_message_media(media=media, reply_markup=reply_markup)
             else:
                 # Não tem imagem (ou não achou no banco): Edita só o texto
-                # Se a mensagem anterior tinha foto, isso pode falhar, caindo no except
                 await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
             return
         except Exception:
-            pass # Falha na edição (ex: mudar de foto pra texto), tenta reenvio limpo
+            pass # Falha na edição, tenta reenvio limpo
 
     # --- REENVIO LIMPO (Fallback) ---
-    try: await query.delete_message()
-    except: pass
+    if query and query.message:
+        try: await query.delete_message()
+        except: pass
     
     if media_id:
         try:
@@ -125,29 +125,88 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
             else:
                 await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
             return
-        except: pass # Se falhar enviar a foto (ID inválido), cai para o texto
+        except: pass 
         
     # Último recurso: Apenas texto
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 # ==================================================================
-# 1. MENU PRINCIPAL DA PROFISSÃO
+# 1. LÓGICA DE ESCOLHA DE PROFISSÃO (Se não tiver)
+# ==================================================================
+
+async def show_profession_choose_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, player_data: dict):
+    """Mostra o menu de escolha se o jogador não tiver profissão."""
+    q = update.callback_query
+    chat_id = q.message.chat_id
+
+    # Diagnóstico: Verifica se existem profissões carregadas
+    all_profs = game_data.PROFESSIONS_DATA or {}
+    if not all_profs:
+        await _safe_edit_or_send(q, context, chat_id, "⚠️ Nenhuma profissão foi configurada no sistema ainda.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]]))
+        return
+
+    title = "💼 <b>Escolher Profissão</b>\nSelecione uma profissão para desbloquear coletas, refino e criação de itens.\n"
+    kb = []
+    
+    for key, data in all_profs.items():
+        # O callback data usa o ID da profissão
+        kb.append([InlineKeyboardButton(_prof_label(key, data), callback_data=f"job_pick_{key}")])
+        
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="profile")])
+
+    await _safe_edit_or_send(q, context, chat_id, title, InlineKeyboardMarkup(kb))
+
+async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Define a profissão selecionada."""
+    q = update.callback_query
+    await q.answer()
+    user_id = q.from_user.id
+    chat_id = q.message.chat_id
+
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return
+
+    # Verifica novamente
+    if (pdata.get('profession') or {}).get('type'):
+        await q.answer("Você já possui uma profissão.", show_alert=True)
+        return
+
+    prefix = "job_pick_"
+    data = q.data or ""
+    if not data.startswith(prefix): return
+    prof_key = data[len(prefix):]
+
+    all_profs = game_data.PROFESSIONS_DATA or {}
+    if prof_key not in all_profs:
+        await q.answer(f"Profissão '{prof_key}' inválida.", show_alert=True)
+        return
+
+    # Define a profissão
+    pdata['profession'] = {"type": prof_key, "level": 1, "xp": 0}
+    await player_manager.save_player_data(user_id, pdata)
+
+    # Redireciona para o menu da profissão recém-adquirida
+    await job_menu_callback(update, context)
+
+# ==================================================================
+# 2. MENU PRINCIPAL DA PROFISSÃO (Se já tiver)
 # ==================================================================
 
 async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
+    if query: await query.answer()
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
     
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
     prof_key, prof_level, prof_xp = _get_profession_info(player_data)
     
+    # SE NÃO TIVER PROFISSÃO: Mostra o menu de escolha
     if not prof_key:
-        text = "🚫 <b>Você ainda não tem uma profissão.</b>\n\nVá ao mestre de ofícios na cidade para aprender uma!"
-        kb = [[InlineKeyboardButton("🔙 Voltar", callback_data="profile")]]
-        await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(kb))
+        if query:
+            await show_profession_choose_menu(update, context, player_data)
         return
 
     prof_info = (game_data.PROFESSIONS_DATA or {}).get(prof_key, {})
@@ -177,10 +236,10 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     img_key = f"img_prof_{prof_key}"
-    await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(keyboard), media_key=img_key)
+    await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(keyboard), media_key=img_key)
 
 # ==================================================================
-# 2. LISTA DE RECEITAS (Paginada e Separada)
+# 3. LISTA DE RECEITAS (Paginada e Separada)
 # ==================================================================
 
 async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -188,6 +247,7 @@ async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     
     try:
+        # Formato esperado: job_list_MODO_PAGINA
         _, _, mode, page_str = query.data.split("_")
         page = int(page_str)
     except:
@@ -244,16 +304,19 @@ async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if page > 1: nav_row.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"job_list_{mode}_{page-1}"))
     nav_row.append(InlineKeyboardButton("🔙 Menu Profissão", callback_data="job_menu"))
     if page < total_pages: nav_row.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"job_list_{mode}_{page+1}"))
-    keyboard.append(nav_row)
+    if nav_row: keyboard.append(nav_row)
     
     img_key = f"img_prof_{prof_key}_{mode}"
     await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(keyboard), media_key=img_key)
 
 # ==================================================================
-# GANCHOS
+# GANCHOS (HANDLERS)
 # ==================================================================
 job_menu_handler = CallbackQueryHandler(job_menu_callback, pattern=r'^job_menu$')
+job_pick_handler = CallbackQueryHandler(pick_profession_callback, pattern=r'^job_pick_.+$')
 job_view_handler = CallbackQueryHandler(job_recipes_callback, pattern=r'^job_list_')
-async def _noop(u, c): await u.callback_query.answer("Em desenvolvimento.")
+
+async def _noop(u, c): 
+    if u.callback_query: await u.callback_query.answer("Em desenvolvimento.")
 job_confirm_handler = CallbackQueryHandler(_noop, pattern=r'^job_confirm')
 job_guide_handler = CallbackQueryHandler(_noop, pattern=r'^job_guide')

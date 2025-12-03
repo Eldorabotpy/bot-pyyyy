@@ -500,51 +500,66 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         name=f"refining:{user_id}" 
     )
 
+# Em handlers/refining_handler.py
+
 async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Job que finaliza o refino.
+    (Versão SEGURA: Sem dependência de missões ou clã para evitar travamentos)
+    """
     job = context.job
     user_id, chat_id = job.user_id, job.chat_id
     job_data = job.data
+    # O recipe_id não é estritamente necessário aqui se confiarmos no estado do jogador,
+    # mas ajuda se quisermos logs futuros.
     
-    message_id_to_delete = job_data.get("message_id_to_delete")
-    if message_id_to_delete:
-        try:
-            await context.bot.delete_message(chat_id, message_id_to_delete)
-        except Exception:
-            pass
-
+    # 1. Carrega dados do jogador
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
+        # Se não achar o jogador, apenas loga e avisa (evita crash)
+        logger.error(f"finish_refine_job: Não foi possível carregar pdata para {user_id}")
+        await context.bot.send_message(chat_id=chat_id, text="❗ Erro ao finalizar refino: dados do jogador não encontrados.")
         return
 
+    # 2. Executa a finalização na engine (Async)
+    # Isso entrega os itens e dá o XP
     res = await finish_refine(pdata)
     
     if isinstance(res, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ {res}")
         return
     if not res:
-        logger.warning(f"finish_refine_job para user {user_id}: finish_refine retornou {res}.")
+        # Se retornou vazio ou None sem erro explícito
         return
 
-    outs = res.get("outputs") or {}
-    xp_gained = res.get("xp_gained", 0)
-
-    # --- SALVAMENTO (Sem Missões) ---
-    await player_manager.save_player_data(user_id, pdata)
+    # 3. O 'finish_refine' já salvou os dados no banco?
+    # Sim, a nova versão da engine que fizemos já salva. 
+    # Mas por segurança extra em sistemas críticos, podemos salvar novamente se alterarmos algo aqui.
+    # Como removemos as missões, não estamos alterando 'pdata' aqui, então não é estritamente necessário salvar de novo.
     
+    outs = res.get("outputs") or {}
+    
+    # --- BLOCO DE MISSÕES REMOVIDO PARA EVITAR BUGS ---
+    # As chamadas para mission_manager e clan_manager foram retiradas.
+    # Isso garante que se o sistema de missões falhar, o jogador ainda recebe o item.
+    # --------------------------------------------------
+
+    # 4. Mensagem de Sucesso
     lines = ["✅ <b>Refino concluído!</b>", "Você obteve:"]
     for k, v in outs.items():
+        # _fmt_item_line é helper interno do handler
         lines.append(f"• {_fmt_item_line(k, v)}")
-        
-    if xp_gained > 0:
-        lines.append(f"✨ <b>+{xp_gained} XP</b> de Profissão")
-        
+    
     caption = "\n".join(lines)
+    
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 à𝐬 𝐫𝐞𝐜𝐞𝐢𝐭𝐚𝐬", callback_data="ref_main")]
     ])
 
+    # 5. Envio com Mídia
     specific_media_key = None
-    if outs and len(outs) > 0:
+    if outs:
+        # Tenta pegar a imagem do primeiro item produzido
         item_id_para_imagem = list(outs.keys())[0]
         item_info = (game_data.ITEMS_DATA or {}).get(item_id_para_imagem, {})
         specific_media_key = item_info.get("media_key")
@@ -556,7 +571,6 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
         kb,
         media_key=specific_media_key
     )
-
 # =========================
 # Definição dos Handlers
 # =========================
