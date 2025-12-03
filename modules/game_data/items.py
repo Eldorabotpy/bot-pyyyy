@@ -1,4 +1,3 @@
-# modules/game_data/items.py
 import logging
 
 # --- 1. IMPORTAÇÕES DOS MÓDULOS DE DADOS (Blindados) ---
@@ -38,7 +37,8 @@ ITEMS_DATA.update(RUNE_ITEMS_DATA)
 
 # --- 3. ALIAS E HELPERS (Compatibilidade) ---
 # Para garantir que códigos antigos que buscam "ferro" em vez de "minerio_de_ferro" funcionem
-ITEMS_DATA["ferro"] = ITEMS_DATA.get("minerio_de_ferro")
+if "minerio_de_ferro" in ITEMS_DATA:
+    ITEMS_DATA["ferro"] = ITEMS_DATA["minerio_de_ferro"]
 
 # Apelidos globais para outros módulos usarem
 ITEM_BASES = ITEMS_DATA
@@ -84,32 +84,44 @@ def _register_item_safe(item_id: str, data: dict, market_price: int | None = Non
 
 # --- 5. GERAÇÃO AUTOMÁTICA (Skills e Skins) ---
 def _generate_auto_items():
-    """Lê Skills e Skins e cria os itens 'Tomo' e 'Caixa' automaticamente."""
+    """
+    Lê Skills e Skins e cria os itens 'Tomo' e 'Caixa' automaticamente.
+    Importante: Fazemos o import DENTRO da função para evitar Ciclo de Importação.
+    """
     generated = 0
     
     # A. GERAÇÃO DE TOMOS DE SKILL
     try:
+        # Import local para evitar erro circular (items -> skills -> items)
         from modules.game_data.skills import SKILL_DATA
+        
         for skill_id, info in SKILL_DATA.items():
             tomo_id = f"tomo_{skill_id}"
+            skill_name = info.get('display_name', skill_id)
             
-            # Cria o Tomo se não existir
+            # Cria o Tomo se não existir manualmente
             if tomo_id not in ITEMS_DATA:
                 ITEMS_DATA[tomo_id] = {
-                    "display_name": f"Tomo: {info.get('display_name', skill_id)}",
+                    "display_name": f"Tomo: {skill_name}",
                     "emoji": "📚",
                     "type": "consumable",
                     "category": "aprendizado", 
-                    "description": f"Ensina a habilidade: {info.get('display_name', skill_id)}.",
-                    "stackable": True, "tradable": True, "market_currency": "gems",
-                    "on_use": {"effect": "grant_skill", "skill_id": skill_id}
+                    "description": f"Ensina a habilidade: {skill_name}.",
+                    "stackable": True, 
+                    "tradable": True, 
+                    "market_currency": "gems",
+                    # AQUI ESTÁ A MÁGICA PARA O INVENTORY_HANDLER:
+                    "on_use": {
+                        "effect": "grant_skill", 
+                        "skill_id": skill_id
+                    }
                 }
                 generated += 1
             
-            # Legado: Item com ID da skill
+            # Legado: Item com ID da skill (caso o jogador tenha itens antigos)
             if skill_id not in ITEMS_DATA:
                 ITEMS_DATA[skill_id] = ITEMS_DATA[tomo_id].copy()
-                ITEMS_DATA[skill_id]["display_name"] += " (Antigo)"
+                ITEMS_DATA[skill_id]["display_name"] += " (Item)"
 
     except Exception as e:
         logger.error(f"Auto-Items Skill Error: {e}")
@@ -117,16 +129,24 @@ def _generate_auto_items():
     # B. GERAÇÃO DE CAIXAS DE SKIN
     try:
         from modules.game_data.skins import SKIN_CATALOG
+        
         for skin_id, info in SKIN_CATALOG.items():
             caixa_id = f"caixa_{skin_id}"
+            skin_name = info.get('display_name', skin_id)
+            
             item_def = {
-                "display_name": f"Cx. Skin: {info.get('display_name', skin_id)}",
+                "display_name": f"Cx. Skin: {skin_name}",
                 "emoji": "👘", 
                 "type": "consumable",
                 "category": "aprendizado",
-                "description": f"Desbloqueia a aparência: {info.get('display_name', skin_id)}.",
-                "stackable": True, "tradable": True, "market_currency": "gems",
-                "on_use": {"effect": "grant_skin", "skin_id": skin_id}
+                "description": f"Desbloqueia a aparência: {skin_name}.",
+                "stackable": True, 
+                "tradable": True, 
+                "market_currency": "gems",
+                "on_use": {
+                    "effect": "grant_skin", 
+                    "skin_id": skin_id
+                }
             }
 
             if caixa_id not in ITEMS_DATA:
@@ -135,15 +155,13 @@ def _generate_auto_items():
             
             # Legado
             if skin_id not in ITEMS_DATA:
-                legacy_item = item_def.copy()
-                legacy_item["display_name"] = f"Skin: {info.get('display_name')} (Item)"
-                ITEMS_DATA[skin_id] = legacy_item
-                generated += 1
+                ITEMS_DATA[skin_id] = item_def.copy()
+                ITEMS_DATA[skin_id]["display_name"] = f"Skin: {skin_name} (Item)"
 
     except Exception as e:
         logger.error(f"Auto-Items Skin Error: {e}")
         
-    print(f">>> ITEMS: {generated} itens automáticos gerados.")
+    print(f">>> ITEMS: {generated} itens automáticos (Skills/Skins) gerados.")
 
 # Executa geração dinâmica
 _generate_auto_items()

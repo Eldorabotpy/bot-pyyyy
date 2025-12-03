@@ -168,13 +168,19 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
 # 2. LISTA DE ITENS (COM TRAVA DE CLASSE)
 # -----------------------------------------------------------
 
-async def inventory_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def inventory_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, manual_data=None):
     """Exibe os itens de uma categoria específica."""
     query = update.callback_query
-    await query.answer()
+    # Tenta responder ao clique apenas se não for uma chamada manual
+    if not manual_data:
+        await query.answer()
     
+    # === CORREÇÃO: Usa dados manuais se fornecidos, senão usa os do clique ===
+    target_data = manual_data if manual_data else query.data
+
     try:
-        _, _, cat_key, page_str = query.data.split("_")
+        # Usa target_data em vez de query.data
+        _, _, cat_key, page_str = target_data.split("_")
         page = int(page_str)
     except:
         await inventory_menu_callback(update, context)
@@ -253,12 +259,10 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
 
             # Gera o botão certo (Ativo ou Travado)
             if is_locked:
-                # Botão travado que mostra alerta
                 display_locked = f"🔒 {display} ({req_class_label})"
                 cb_data = f"noop_inventory:{req_class_label}"
                 item_buttons.append([InlineKeyboardButton(display_locked, callback_data=cb_data)])
             else:
-                # Botão normal de uso
                 cb_data = f"inv_use_item:{item['id']}"
                 item_buttons.append([InlineKeyboardButton(display, callback_data=cb_data)])
 
@@ -308,6 +312,7 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f"O item '{item_name}' não tem uso direto.", show_alert=True)
         return
 
+    # Tenta remover o item antes de aplicar o efeito
     if not player_manager.remove_item_from_inventory(player_data, item_id, 1):
         await query.answer("Item não encontrado.", show_alert=True)
         query.data = f"inv_open_{_determine_tab(base_id, 1)}_1"
@@ -320,8 +325,38 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     skin_id = effect_data_to_use.get("skin_id")
     
     try:
+        # === CORREÇÃO: Lógica para APRENDER e EQUIPAR Skill ===
         if effect == "grant_skill" and skill_id:
-            feedback_msg = f"📚 Você leu o tomo! Verifique em 'Minhas Skills'."
+            # 1. Valida se a skill existe nos dados do jogo
+            if skill_id not in skills_data.SKILL_DATA:
+                raise ValueError(f"Skill ID {skill_id} não encontrada no banco de dados.")
+
+            # 2. Inicializa dicionários se o jogador for antigo
+            if "skills" not in player_data or not isinstance(player_data["skills"], dict):
+                player_data["skills"] = {}
+            
+            if "equipped_skills" not in player_data:
+                player_data["equipped_skills"] = []
+
+            # 3. Verifica se o jogador já possui a skill
+            if skill_id in player_data["skills"]:
+                await query.answer("Você já conhece esta habilidade!", show_alert=True)
+                # Devolve o item pois não foi gasto
+                player_manager.add_item_to_inventory(player_data, item_id, 1)
+                return
+
+            # 4. Grava a skill no jogador (formato correto com raridade)
+            player_data["skills"][skill_id] = {
+                "rarity": "comum", 
+                "progress": 0
+            }
+
+            # 5. Equipa automaticamente para aparecer no combate
+            if skill_id not in player_data["equipped_skills"]:
+                player_data["equipped_skills"].append(skill_id)
+
+            skill_name_display = skills_data.SKILL_DATA[skill_id].get("display_name", skill_id)
+            feedback_msg = f"📚 Você aprendeu a habilidade: <b>{skill_name_display}</b>!\nEla foi equipada automaticamente."
             
         elif effect == "grant_skin" and skin_id:
             skins = player_data.setdefault("unlocked_skins", [])
@@ -359,15 +394,16 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Erro usando item {item_id}: {e}")
+        # Se der erro, devolve o item
         player_manager.add_item_to_inventory(player_data, item_id, 1) 
-        feedback_msg = "Erro interno. Item devolvido."
+        feedback_msg = "Erro interno ao usar item. Ele foi devolvido."
 
     await player_manager.save_player_data(user_id, player_data)
     await query.answer(feedback_msg, show_alert=True)
 
     tab = _determine_tab(base_id, 1)
-    query.data = f"inv_open_{tab}_1"
-    await inventory_category_callback(update, context)
+    target_data_str = f"inv_open_{tab}_1"
+    await inventory_category_callback(update, context, manual_data=target_data_str)
 
 # -----------------------------------------------------------
 # 4. NOOP HANDLER (Para cliques em itens travados)

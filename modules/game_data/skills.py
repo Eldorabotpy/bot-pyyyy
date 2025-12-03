@@ -3,7 +3,7 @@
 SKILL_DATA = {
 
     # ===================================================================
-    # ================> NOVAS SKILLS DE EVOLUÇÃO (T2-T6) <===============
+    # ================> SKILLS DE EVOLUÇÃO (T2-T6) <===============
     # ===================================================================
 
     # --- Novas Habilidades de Evolução do Guerreiro (Defesa) ---
@@ -1978,7 +1978,7 @@ SKILL_DATA = {
     # ====================================================================
 
     "guerreiro_corte_perfurante": {
-        "display_name": "Corte Perfurante", 
+        "display_name": "𝐂𝐨𝐫𝐭𝐞 𝐏𝐞𝐫𝐟𝐮𝐫𝐚𝐧𝐭𝐞", 
         "type": "active", 
         "description": "Um golpe focado que perfura a armadura, reduzindo a defesa inimiga.",
         "allowed_classes": ["guerreiro"],
@@ -2001,7 +2001,7 @@ SKILL_DATA = {
         }
     },
     "berserker_golpe_selvagem": {
-        "display_name": "Golpe Selvagem", "type": "active", 
+        "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐒𝐞𝐥𝐯𝐚𝐠𝐞𝐦", "type": "active", 
         "description": "Um ataque poderoso que causa mais dano quanto menos vida você tiver.",
         "allowed_classes": ["berserker"],
         "rarity_effects": {
@@ -2023,7 +2023,7 @@ SKILL_DATA = {
         }
     },
     "cacador_flecha_precisa": {
-        "display_name": "Flecha Precisa", "type": "active", 
+        "display_name": "𝐅𝐥𝐞𝐜𝐡𝐚 𝐏𝐫𝐞𝐜𝐢𝐬𝐚", "type": "active", 
         "description": "Um tiro certeiro com chance de acerto crítico bônus.",
         "allowed_classes": ["cacador"],
         "rarity_effects": {
@@ -2045,7 +2045,7 @@ SKILL_DATA = {
         }
     },
     "monge_rajada_de_punhos": {
-        "display_name": "Rajada de Punhos", "type": "active", 
+        "display_name": "𝐑𝐚𝐣𝐚𝐝𝐚 𝐝𝐞 𝐏𝐮𝐧𝐡𝐨𝐬", "type": "active", 
         "description": "Ataca rapidamente, golpeando o inimigo várias vezes.",
         "allowed_classes": ["monge"],
         "rarity_effects": {
@@ -2067,30 +2067,30 @@ SKILL_DATA = {
         }
     },
     "mago_bola_de_fogo": {
-        "display_name": "Bola de Fogo", "type": "active", 
+        "display_name": "𝐁𝐨𝐥𝐚 𝐝𝐞 𝐅𝐨𝐠𝐨", "type": "active", 
         "description": "Um feitiço de alvo único que causa alto dano de fogo (Mágico).",
         "allowed_classes": ["mago"],
         "rarity_effects": {
             "comum": {
                 "description": "Comum (CD 0, Mana 25): Dano 2.5x (Mágico).",
-                "mana_cost": 25,
-                "effects": {"cooldown_turns": 5, "damage_multiplier": 2.5, "damage_type": "magic"}
+                "mana_cost": 75,
+                "effects": {"cooldown_turns": 5, "damage_multiplier": 1.7, "damage_type": "magic"}
             },
             "epica": {
                 "description": "Épica (CD 0, Mana 22): Dano 2.8x (Mágico).",
-                "mana_cost": 22,
-                "effects": {"cooldown_turns": 4, "damage_multiplier": 2.8, "damage_type": "magic"}
+                "mana_cost": 122,
+                "effects": {"cooldown_turns": 4, "damage_multiplier": 2.1, "damage_type": "magic"}
             },
             "lendaria": {
                 "description": "Lendária (CD 0, Mana 20): Dano 3.0x (Mágico). Aplica 'Queimadura'.",
-                "mana_cost": 20,
-                "effects": {"cooldown_turns": 3, "damage_multiplier": 3.0, "damage_type": "magic",
+                "mana_cost": 180,
+                "effects": {"cooldown_turns": 3, "damage_multiplier": 2.4, "damage_type": "magic",
                             "chance_on_hit": {"effect": "dot", "chance": 1.0, "scale": "magic_attack", "value": 0.15, "duration_turns": 2}}
             }
         }
     },
     "bardo_melodia_restauradora": {
-        "display_name": "Melodia Restauradora", "type": "support",
+        "display_name": "𝐌𝐞𝐥𝐨𝐝𝐢𝐚 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐝𝐨𝐫𝐚", "type": "support",
         "description": "Uma melodia suave que cura todos os aliados.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
@@ -2113,7 +2113,7 @@ SKILL_DATA = {
         }
     },
     "assassino_ataque_furtivo": {
-        "display_name": "Ataque Furtivo", "type": "active", 
+        "display_name": "𝐀𝐭𝐚𝐪𝐮𝐞 𝐅𝐮𝐫𝐭𝐢𝐯𝐨", "type": "active", 
         "description": "Um golpe letal que ignora parte da defesa do inimigo.",
         "allowed_classes": ["assassino"],
         "rarity_effects": {
@@ -2135,7 +2135,7 @@ SKILL_DATA = {
         }
     },
     "samurai_corte_iaijutsu": {
-        "display_name": "Corte Iaijutsu", "type": "active", 
+        "display_name": "𝐂𝐨𝐫𝐭𝐞 𝐈𝐚𝐢𝐣𝐮𝐭𝐬𝐮", "type": "active", 
         "description": "Um saque rápido e mortal com a katana.",
         "allowed_classes": ["samurai"],
         "rarity_effects": {
@@ -2157,7 +2157,7 @@ SKILL_DATA = {
         }
     },
     "samurai_sombra_demoniaca": {
-        "display_name": "Sombra Demoníaca",
+        "display_name": "𝐒𝐨𝐦𝐛𝐫𝐚 𝐃𝐞𝐦𝐨𝐧𝐢́𝐚𝐜𝐚",
         "description": "Ataca duas vezes com 100% de chance de acerto crítico.",
         "type": "active", 
         "allowed_classes": ["samurai"],

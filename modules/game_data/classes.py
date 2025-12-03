@@ -128,20 +128,20 @@ CLASSES_DATA = {
     'mago': {
         'display_name': 'Mago', 'emoji': '🧙',
         'description': 'Poder arcano ofensivo.',
-        'stat_modifiers': {'hp': 3.0, 'max_mana': 2.5, 'attack': 1.7, 'defense': 0.7, 'initiative': 0.9, 'luck': 0.9},
+        'stat_modifiers': {'hp': 3.0, 'max_mana': 2.0, 'attack': 1.7, 'defense': 0.7, 'initiative': 0.9, 'luck': 0.9},
         'file_id_name': 'classe_mago_media',
         'tier': 1
     },
     # EVOLUÇÕES TIER 2 #
     'feiticeiro': {'display_name': 'Feiticeiro', 'emoji': '🔮', 
         'description': 'Mestre das maldições e do dano contínuo (DoT).', 
-        'stat_modifiers': {'hp': 2.8, 'max_mana': 2.8, 'attack': 1.9, 'defense': 0.7, 'initiative': 1.0, 'luck': 1.2},
+        'stat_modifiers': {'hp': 2.8, 'max_mana': 2.3, 'attack': 1.9, 'defense': 0.7, 'initiative': 1.0, 'luck': 1.2},
         'file_id_name': 'classe_mago_media',
         'tier': 2
     },
     'elementalista': {'display_name': 'Elementalista', 'emoji': '☄️', 
         'description': 'Especialista em dano elemental massivo e em área.', 
-        'stat_modifiers': {'hp': 2.9, 'max_mana': 2.9, 'attack': 2.0, 'defense': 0.8, 'initiative': 1.1, 'luck': 0.9},
+        'stat_modifiers': {'hp': 2.9, 'max_mana': 2.4, 'attack': 2.0, 'defense': 0.8, 'initiative': 1.1, 'luck': 0.9},
         'file_id_name': 'classe_mago_media',
         'tier': 2
     },

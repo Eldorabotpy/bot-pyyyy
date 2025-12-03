@@ -69,14 +69,26 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
     battle_cache = context.user_data.get('battle_cache')
     
     player_data = await player_manager.get_player_data(user_id)
+
+    # =================================================================================
+    # CORREÇÃO: SEGURANÇA PARA SKILLS NÃO EQUIPADAS
+    # Se a lista de equipadas estiver vazia, mas o jogador tiver skills aprendidas,
+    # equipa todas automaticamente. Isso resolve o problema de skills sumindo.
+    # =================================================================================
+    if not player_data.get("equipped_skills") and player_data.get("skills"):
+        # Pega todas as chaves do dicionário de skills (os IDs)
+        all_known_skills = list(player_data["skills"].keys())
+        player_data["equipped_skills"] = all_known_skills
+        # Salva para corrigir o perfil permanentemente
+        await player_manager.save_player_data(user_id, player_data)
+    
     equipped_skills = player_data.get("equipped_skills", [])
+    # =================================================================================
     
     active_cooldowns = {}
 
     if battle_cache and battle_cache.get('player_id') == user_id:
-
         active_cooldowns = battle_cache.get("skill_cooldowns", {})
-        
     else:
         # --- MODO CALABOUÇO (LEGADO) ---
         state = player_data.get('player_state', {})
@@ -88,6 +100,7 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
     for skill_id in equipped_skills: 
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
 
+        # Filtra skills inválidas ou passivas (que não têm botão de uso)
         if not skill_info or skill_info.get("type") not in ("active", "support"):
             continue
 
@@ -110,7 +123,7 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
         keyboard_rows.append([use_button, info_button])
 
     if not keyboard_rows:
-        keyboard_rows.append([InlineKeyboardButton("Você não tem skills equipadas.", callback_data="noop")])
+        keyboard_rows.append([InlineKeyboardButton("Você não tem skills ativas equipadas.", callback_data="noop")])
 
     keyboard_rows.append([InlineKeyboardButton("⬅️ Voltar à Batalha", callback_data="combat_attack_menu")])
 
@@ -119,7 +132,7 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
     except BadRequest as e:
         if "not modified" not in str(e):
             logger.warning(f"Erro ao editar markup para menu de skills: {e}")
-
+            
 async def combat_skill_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra um pop-up (alert) com a descrição da skill."""
     query = update.callback_query
