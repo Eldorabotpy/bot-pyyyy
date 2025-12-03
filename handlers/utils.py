@@ -245,18 +245,18 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
 
     # 5. Blocos de Status Consolidados
     player_block = (
-        f"<b>{p_name}</b>\n"
+        f"<b>ㅤㅤㅤㅤㅤㅤㅤ👤{p_name}</b>\n"
         f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
         f"💙 𝐌𝐏: {p_current_mp}/{p_max_mp}\n"
-        f"⚔️ 𝐀𝐓𝐊: {p_atk} | 🛡 𝐃𝐄𝐅: {p_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini}  | 🍀 𝐒𝐑𝐓: {p_srt}"
+        f"⚔️ 𝐀𝐓𝐊: {p_atk} ­ㅤㅤ­|­ㅤ­ㅤ 🛡 𝐃𝐄𝐅: {p_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini}   ㅤㅤ| ­ㅤ­ㅤ🍀 𝐒𝐑𝐓: {p_srt}"
     )
 
     monster_block = (
-        f"<b>{m_name}</b>\n"
+        f"<b>­ㅤ­ㅤ­ㅤ­ㅤ­ㅤ­👹{m_name}</b>\n"
         f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
-        f"⚔️ 𝐀𝐓𝐊: {m_atk} | 🛡 𝐃𝐄𝐅: {m_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini}  | 🍀 𝐒𝐑𝐓: {m_srt}"
+        f"⚔️ 𝐀𝐓𝐊: {m_atk} ­ㅤ­ㅤ| ­ㅤ­ㅤ🛡 𝐃𝐄𝐅: {m_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini}  ­ㅤ­ㅤ| ­ㅤ­ㅤ🍀 𝐒𝐑𝐓: {m_srt}"
     )
 
     # 6. Montagem do Log
@@ -283,8 +283,7 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
     )
 
     return final_message
-# ---------- Mensagem de dungeon (sempre inteiros) ----------
-# Em: handlers/utils.py
+
 
 
 async def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict) -> str:
@@ -460,7 +459,7 @@ async def format_catacomb_interface(session: dict, current_user_id: int, all_pla
         f"{heroes_section}\n"
         f"╠═══════════ ⚔️ ═══════════╣\n"
         f"{mobs_section}\n"
-        f"╚══════════════════════════╝\n"
+        f"╚═══════════════════════════╝\n"
         f"📜 <b>Log:</b>\n"
         f"<code>{log_block}</code>"
     )

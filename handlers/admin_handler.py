@@ -66,6 +66,7 @@ HTML = "HTML"
 (SELECT_TEST_ACTION, ASK_WAVE_NUMBER) = range(2, 4)
 (ASK_DELETE_ID, CONFIRM_DELETE_ACTION) = range(4, 6)
 ASK_GHOST_CLAN_ID = 6
+(ASK_OLD_ID_CHANGE, ASK_NEW_ID_CHANGE, CONFIRM_ID_CHANGE) = range(7, 10)
 # =========================================================
 # MENUS E TECLADOS (Keyboards)
 # =========================================================
@@ -212,6 +213,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎨 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝔸𝕡𝕒𝕣𝕖̂𝕟𝕔𝕚𝕒 (Skin) 𓂀", callback_data="admin_grant_skin")],
         [InlineKeyboardButton("👥 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤 𓂀", callback_data="admin_pmanage_main")],
         [InlineKeyboardButton("👤 𓂀 𝔼𝕕𝕚𝕥𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣 𓂀", callback_data="admin_edit_player")], 
+        [InlineKeyboardButton("🆔 𓂀 𝐓𝐑𝐎𝐂𝐀𝐑 𝐈𝐃 (𝐌𝐢𝐠𝐫𝐚𝐫) 𓂀", callback_data="admin_change_id_start")],
         [InlineKeyboardButton("🏚️ Limpar Clã Fantasma", callback_data="admin_fix_clan_start")],
         [InlineKeyboardButton("💀 𝐃𝐄𝐋𝐄𝐓𝐀𝐑 𝐂𝐎𝐍𝐓𝐀 (Perigo)", callback_data="admin_delete_start")],
         [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
@@ -1044,6 +1046,157 @@ async def _handle_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Edita a mensagem para mostrar o texto de ajuda
     await _safe_edit_text(update, context, ADMIN_HELP_TEXT, reply_markup)
+
+# =========================================================
+# LÓGICA DE TROCA DE ID (VISUAL)
+# =========================================================
+
+async def _change_id_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Inicia o processo de troca de ID."""
+    if not await ensure_admin(update): return ConversationHandler.END
+    await _safe_answer(update)
+    
+    text = (
+        "🆔 <b>MIGRAÇÃO DE ID DE JOGADOR</b> 🆔\n\n"
+        "Esta ferramenta permite mudar o ID numérico de uma conta sem perder os itens.\n"
+        "O sistema irá clonar a conta, atualizar o inventário/pets/clã e deletar a conta velha.\n\n"
+        "1️⃣ <b>Digite o ID ATUAL (Velho) do jogador:</b>\n"
+        "Ou use /cancelar para sair."
+    )
+    await _safe_edit_text(update, context, text)
+    return ASK_OLD_ID_CHANGE
+
+async def _change_id_ask_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Recebe o ID velho e pede o novo."""
+    try:
+        old_id = int(update.message.text.strip())
+    except ValueError:
+        await update.message.reply_text("❌ O ID deve ser um número. Tente novamente.")
+        return ASK_OLD_ID_CHANGE
+
+    # Verifica se o ID velho existe
+    player = await get_player_data(old_id)
+    if not player:
+        await update.message.reply_text(f"❌ Não encontrei nenhum jogador com ID <code>{old_id}</code>. Tente outro ID ou /cancelar.")
+        return ASK_OLD_ID_CHANGE
+
+    # Salva no contexto
+    context.user_data['change_id_old'] = old_id
+    char_name = player.get('character_name', 'Sem Nome')
+
+    await update.message.reply_text(
+        f"✅ ID Antigo encontrado: <b>{char_name}</b> (<code>{old_id}</code>)\n\n"
+        f"2️⃣ <b>Agora, digite o NOVO ID para esta conta:</b>"
+    , parse_mode=HTML)
+    return ASK_NEW_ID_CHANGE
+
+async def _change_id_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Recebe o ID novo e pede confirmação."""
+    try:
+        new_id = int(update.message.text.strip())
+    except ValueError:
+        await update.message.reply_text("❌ O ID deve ser um número.")
+        return ASK_NEW_ID_CHANGE
+
+    # Verifica se o ID novo já existe (para não sobrescrever)
+    if await get_player_data(new_id):
+        await update.message.reply_text(f"⛔ PERIGO: O ID <code>{new_id}</code> já existe no banco! Escolha outro ID livre.")
+        return ASK_NEW_ID_CHANGE
+
+    context.user_data['change_id_new'] = new_id
+    old_id = context.user_data['change_id_old']
+
+    # Botões de confirmação
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ CONFIRMAR MIGRAÇÃO", callback_data="do_change_id_yes")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="admin_main")]
+    ])
+
+    await update.message.reply_text(
+        f"⚠️ <b>CONFIRMAÇÃO FINAL</b> ⚠️\n\n"
+        f"➡️ <b>De:</b> <code>{old_id}</code>\n"
+        f"➡️ <b>Para:</b> <code>{new_id}</code>\n\n"
+        f"Todos os itens, pets e dados serão movidos.\n"
+        f"A conta antiga ({old_id}) será <b>DELETADA</b>.\n\n"
+        f"Proceder?",
+        reply_markup=kb,
+        parse_mode=HTML
+    )
+    return CONFIRM_ID_CHANGE
+
+async def _change_id_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Executa a troca no banco de dados."""
+    query = update.callback_query
+    await query.answer()
+
+    old_id = context.user_data.get('change_id_old')
+    new_id = context.user_data.get('change_id_new')
+
+    if not old_id or not new_id:
+        await _safe_edit_text(update, context, "❌ Erro nos dados. Operação cancelada.")
+        return ConversationHandler.END
+
+    await _safe_edit_text(update, context, "⏳ <b>Processando migração...</b> (Não mexa em nada)")
+
+    try:
+        # 1. Pega o banco de dados direto da collection de players (não precisa criar nova conexão)
+        db = players_collection.database
+        
+        # 2. Clona o Jogador
+        old_doc = await get_player_data(old_id)
+        if not old_doc:
+            await _safe_edit_text(update, context, "❌ Erro: Jogador sumiu durante o processo.")
+            return ConversationHandler.END
+            
+        old_doc['_id'] = new_id # Troca o ID na memória
+        players_collection.insert_one(old_doc) # Salva como novo
+        
+        # 3. Atualiza Referências (Inventory, Pets, etc)
+        # LISTE AQUI SUAS TABELAS E OS CAMPOS DE ID
+        collections_to_update = [
+            ("inventory", "user_id"),
+            ("pets", "owner_id"),
+            ("quests", "player_id"),
+            ("clan_members", "member_id"),
+            ("market", "seller_id"),
+            ("equipped_items", "user_id")
+        ]
+        
+        log_msg = []
+        for col_name, field_name in collections_to_update:
+            try:
+                res = db[col_name].update_many(
+                    {field_name: old_id},
+                    {"$set": {field_name: new_id}}
+                )
+                if res.modified_count > 0:
+                    log_msg.append(f"📦 {col_name}: {res.modified_count}")
+            except Exception:
+                pass # Se a tabela não existir, ignora
+        
+        # 4. Deleta o Antigo e Limpa Cache
+        delete_player(old_id) # Essa função já existe no seu import
+        clear_player_cache(old_id)
+        clear_player_cache(new_id)
+
+        final_msg = (
+            f"✅ <b>MIGRAÇÃO CONCLUÍDA!</b>\n\n"
+            f"👤 ID alterado de <code>{old_id}</code> para <code>{new_id}</code>.\n"
+            f"📂 Dados movidos:\n" + ", ".join(log_msg) if log_msg else "Nenhuma referência extra encontrada."
+        )
+        await _safe_edit_text(update, context, final_msg, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
+
+    except Exception as e:
+        logger.error(f"Erro na migração de ID: {e}", exc_info=True)
+        await _safe_edit_text(update, context, f"❌ <b>ERRO CRÍTICO:</b>\n{str(e)}")
+
+    return ConversationHandler.END
+
+async def _change_id_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Operação cancelada.")
+    await _send_admin_menu(update.effective_chat.id, context)
+    return ConversationHandler.END
+    
 # =========================================================
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
 # =========================================================
@@ -1150,6 +1303,23 @@ fix_clan_conv_handler = ConversationHandler(
     per_message=False
 )
 
+change_id_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(_change_id_entry, pattern=r"^admin_change_id_start$")],
+    states={
+        ASK_OLD_ID_CHANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), _change_id_ask_new)],
+        ASK_NEW_ID_CHANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), _change_id_confirm)],
+        CONFIRM_ID_CHANGE: [
+            CallbackQueryHandler(_change_id_perform, pattern="^do_change_id_yes$"),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+        ]
+    },
+    fallbacks=[
+        CommandHandler("cancelar", _change_id_cancel, filters=filters.User(ADMIN_LIST)),
+        CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+    ],
+    per_message=False
+)
+
 # Lista final de handlers para exportar (certifique-se que todos os handlers importados existem)
 all_admin_handlers = [
     admin_command_handler,
@@ -1183,7 +1353,8 @@ all_admin_handlers = [
     admin_help_handler,
     delete_player_conv_handler,
     hard_respec_all_handler, 
-    clean_clan_handler,   
+    clean_clan_handler, 
+    change_id_conv_handler,  
     fix_ghost_clan_handler,
     fix_clan_conv_handler,
 ]

@@ -1,7 +1,8 @@
 # Arquivo: registries/admin.py
-# (Versão Corrigida - Adiciona o Painel PvP)
+# (Versão Corrigida)
 
-from telegram.ext import Application
+# 1. ADICIONADO: Import do CommandHandler aqui
+from telegram.ext import Application, CommandHandler
 
 # Importa a lista principal de handlers (comandos, painel principal)
 from handlers.admin_handler import all_admin_handlers
@@ -19,6 +20,10 @@ except ImportError:
 # Importa a CONVERSA de edição de jogador
 from handlers.admin.player_edit_panel import create_admin_edit_player_handler 
 
+# 2. CORRIGIDO: O import deve apontar para a pasta 'handlers.admin'
+# Certifique-se que o arquivo admin_tools.py está dentro de handlers/admin/
+from handlers.admin.admin_tools import cmd_trocar_id
+
 def register_admin_handlers(application: Application):
     
     # Regista os comandos principais de admin (ex: /admin)
@@ -26,6 +31,9 @@ def register_admin_handlers(application: Application):
     
     # <<< 2. REGISTA os handlers do Painel PvP (botões) >>>
     application.add_handlers(pvp_panel_handlers)
+    
+    # 3. COMANDO TROCAR ID
+    application.add_handler(CommandHandler("trocarid", cmd_trocar_id))
     
     # Regista o comando /premium (se existir)
     if PREMIUM_COMMAND_HANDLER_EXISTS:
