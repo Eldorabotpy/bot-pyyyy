@@ -238,10 +238,26 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
 
     sellable_items = []
     
-    for base_id, qty_have in inv.items():
-        if not (isinstance(qty_have, int) and qty_have > 0):
+    # --- CORREÇÃO: Varre o inventário detectando STACKS e ITENS ÚNICOS ---
+    for key, val in inv.items():
+        base_id = None
+        qty_have = 0
+
+        # Caso 1: Stack simples (Ex: "essencia_furia": 10)
+        if isinstance(val, (int, float)):
+            if val > 0:
+                base_id = key
+                qty_have = int(val)
+        
+        # Caso 2: Item Único (Ex: "uid_123": {"base_id": "tomo_..."})
+        elif isinstance(val, dict):
+            base_id = val.get("base_id") or val.get("tpl")
+            qty_have = 1 # Itens únicos contam como 1 unidade
+            
+        if not base_id or qty_have <= 0:
             continue
             
+        # Filtros de Categoria e Classe
         item_class_ok = False
         
         if item_type == "evo" and base_id in EVOLUTION_ITEMS:
@@ -249,6 +265,7 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
                 item_class_ok = True
         
         elif item_type == "skill" and base_id in SKILL_BOOK_ITEMS:
+            # Remove prefixo se necessário para checar skill data
             skill_id = base_id.replace("tomo_", "")
             allowed = skills_data.SKILL_DATA.get(skill_id, {}).get("allowed_classes", [])
             if class_key in allowed: 
@@ -261,14 +278,25 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
                 item_class_ok = True
         
         if item_class_ok:
-            sellable_items.append({
-                "base_id": base_id, 
-                "qty_have": qty_have,
-                "label": f"{_item_label(base_id)} (x{qty_have})"
-            })
+            # Verifica se já não adicionamos esse base_id (para agrupar itens únicos iguais)
+            found = False
+            for it in sellable_items:
+                if it["base_id"] == base_id:
+                    it["qty_have"] += qty_have
+                    it["label"] = f"{_item_label(base_id)} (x{it['qty_have']})"
+                    found = True
+                    break
+            
+            if not found:
+                sellable_items.append({
+                    "base_id": base_id, 
+                    "qty_have": qty_have,
+                    "label": f"{_item_label(base_id)} (x{qty_have})"
+                })
             
     sellable_items.sort(key=lambda x: x["label"])
 
+    # Paginação
     ITEMS_PER_PAGE = 8
     start_index = (page - 1) * ITEMS_PER_PAGE
     end_index = start_index + ITEMS_PER_PAGE
@@ -304,7 +332,7 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
         
     keyboard_rows.append(nav_buttons)
     await _safe_edit_or_send(q, context, chat_id, caption, InlineKeyboardMarkup(keyboard_rows))
-
+    
 # ==============================
 #  Fluxo de Compra (Buy Flow)
 # ==============================

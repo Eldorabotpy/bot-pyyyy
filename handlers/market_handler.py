@@ -701,3 +701,4 @@ market_lote_qty_confirm_handler = CallbackQueryHandler(market_lote_qty_confirm, 
 market_price_spin_handler = CallbackQueryHandler(market_price_spin, pattern=r'^mktp_(inc|dec)_[0-9]+$')
 market_price_confirm_handler = CallbackQueryHandler(market_price_confirm, pattern=r'^mktp_confirm$')
 market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^market_cancel_new$')
+market_catch_input_text_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_catch_input_text)

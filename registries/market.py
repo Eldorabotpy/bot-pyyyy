@@ -9,11 +9,10 @@ def register_market_handlers(application: Application):
         # ===============================================================
         # 1. MERCADO DO AVENTUREIRO (OURO)
         # ===============================================================
-        # CORREÇÃO: Importando tudo do novo arquivo unificado 'handlers.market_handler'
         
         from handlers.market_handler import (
             market_open_handler, 
-            market_adventurer_handler, # Adicionado explicitamente
+            market_adventurer_handler,
             market_list_handler, market_my_handler,
             market_sell_handler, market_buy_handler, market_cancel_handler,
             market_pick_unique_handler, market_pick_stack_handler,
@@ -25,7 +24,8 @@ def register_market_handlers(application: Application):
             # Lógica de Venda Privada
             market_type_public,
             market_type_private,
-            market_catch_input_text
+            # IMPORTANTE: Aqui importamos o HANDLER PRONTO que criamos no market_handler.py
+            market_catch_input_text_handler
         )
         
         # Menu Principal
@@ -54,18 +54,18 @@ def register_market_handlers(application: Application):
         application.add_handler(market_price_confirm_handler) 
         application.add_handler(market_cancel_new_handler)
         
-        # --- NOVOS: Decisão Público/Privado ---
+        # Decisão Público/Privado
         application.add_handler(CallbackQueryHandler(market_type_public, pattern="^mkt_type_public$"))
         application.add_handler(CallbackQueryHandler(market_type_private, pattern="^mkt_type_private$"))
         
         # --- NOVO: Captura de Texto (Nome do Jogador) ---
-        # Filtra apenas texto e ignora comandos para não atrapalhar o bot
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, market_catch_input_text))
+        # Adiciona o handler que importamos lá em cima.
+        # Ele já contem o MessageHandler(filters.TEXT...) configurado no market_handler.py
+        application.add_handler(market_catch_input_text_handler)
 
         # ===============================================================
         # 2. OUTROS MERCADOS (GEMAS / REINO)
         # ===============================================================
-        # Mantive os try/except para evitar erro se você não tiver esses arquivos ainda
         
         # Casa de Leilões (Gemas)
         try:
@@ -137,5 +137,4 @@ def register_market_handlers(application: Application):
 
     except ImportError as e:
         logging.error(f"### ERRO FATAL AO REGISTRAR MERCADOS ###: {e}")
-        logging.exception("Verifique se o arquivo 'handlers/market_handler.py' existe.")
-        
+        logging.exception("Verifique se o arquivo 'handlers/market_handler.py' existe e exporta 'market_catch_input_text_handler'.")

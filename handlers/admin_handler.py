@@ -1095,16 +1095,32 @@ async def _change_id_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         new_id = int(update.message.text.strip())
     except ValueError:
-        await update.message.reply_text("❌ O ID deve ser um número.")
+        await update.message.reply_text("❌ O ID deve ser um número válido. Tente novamente.")
         return ASK_NEW_ID_CHANGE
 
-    # Verifica se o ID novo já existe (para não sobrescrever)
+    # 1. Verifica se o usuário está tentando usar o MESMO ID (Erro comum)
+    old_id = context.user_data.get('change_id_old')
+    if new_id == old_id:
+        await update.message.reply_text("❌ Você digitou o mesmo ID antigo! Digite o NOVO ID para onde os dados vão.")
+        return ASK_NEW_ID_CHANGE
+
+    # 2. Verifica se o ID novo já existe (para não sobrescrever outra pessoa)
+    # Adicionamos um botão de "Cancelar" aqui para não prender você no loop
     if await get_player_data(new_id):
-        await update.message.reply_text(f"⛔ PERIGO: O ID <code>{new_id}</code> já existe no banco! Escolha outro ID livre.")
+        kb_erro = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar e Sair", callback_data="admin_main")]])
+        
+        await update.message.reply_text(
+            f"⛔ <b>PERIGO: ID JÁ EXISTE!</b>\n\n"
+            f"O ID <code>{new_id}</code> já tem uma conta registrada.\n"
+            f"Eu impedi a ação para você não apagar a conta dessa pessoa sem querer.\n\n"
+            f"👇 <b>Digite outro ID livre</b> ou cancele abaixo:",
+            reply_markup=kb_erro,
+            parse_mode=HTML
+        )
         return ASK_NEW_ID_CHANGE
 
+    # Se passou nos testes, salva e pede confirmação final
     context.user_data['change_id_new'] = new_id
-    old_id = context.user_data['change_id_old']
 
     # Botões de confirmação
     kb = InlineKeyboardMarkup([
@@ -1175,7 +1191,8 @@ async def _change_id_perform(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 pass # Se a tabela não existir, ignora
         
         # 4. Deleta o Antigo e Limpa Cache
-        delete_player(old_id) # Essa função já existe no seu import
+        await clear_player_cache(old_id) 
+        await clear_player_cache(new_id) # Essa função já existe no seu import
         clear_player_cache(old_id)
         clear_player_cache(new_id)
 
