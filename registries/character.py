@@ -1,5 +1,5 @@
 # registries/character.py
-# (VERSÃO BLINDADA FINAL: FILTRO DE SEGURANÇA NO REGISTRO)
+# (VERSÃO CORRIGIDA: JOB PICK HANDLER ADICIONADO E COM PRIORIDADE)
 
 import logging
 from telegram.ext import Application, BaseHandler 
@@ -61,9 +61,10 @@ from handlers.class_evolution_handler import (
     start_trial_execute_handler,
 )
 
-# 6. Profissões
+# 6. Profissões (IMPORT COMPLETO AGORA)
 from handlers.profession_handler import (
     job_menu_handler,
+    job_pick_handler,  # <--- Faltava este!
     job_view_handler,
     job_confirm_handler,
     job_guide_handler,
@@ -89,7 +90,11 @@ def register_character_handlers(application: Application):
     """Regista todos os handlers relacionados ao personagem."""
 
     # Lista inicial de handlers
+    # ATENÇÃO: job_pick_handler deve vir PRIMEIRO para garantir o clique
     raw_handlers = [
+        # --- PRIORIDADE MÁXIMA ---
+        job_pick_handler,  # <--- Adicionado aqui no topo!
+        
         # Básicos
         start_command_handler,
         name_command_handler,
@@ -136,7 +141,7 @@ def register_character_handlers(application: Application):
         start_trial_confirmation_handler,
         start_trial_execute_handler,
         
-        # Profissões
+        # Profissões (Outros menus)
         job_menu_handler,
         job_view_handler,     
         job_confirm_handler,  
@@ -157,13 +162,11 @@ def register_character_handlers(application: Application):
         raw_handlers.extend(all_guild_handlers)
     
     # === FILTRO DE SEGURANÇA ===
-    # Isso remove qualquer "None" ou lixo que esteja causando o erro TypeError
     clean_handlers = []
     for h in raw_handlers:
         if isinstance(h, BaseHandler):
             clean_handlers.append(h)
         elif h is None:
-            # Apenas ignora silenciosamente ou avisa no log
             continue
         else:
             logger.warning(f"⚠️ Ignorando handler inválido no registro: {type(h)}")
@@ -171,5 +174,5 @@ def register_character_handlers(application: Application):
     # Registra apenas os handlers válidos e limpos
     application.add_handlers(clean_handlers)
 
-    # Registra criação de personagem (grupo 1)
-    application.add_handler(character_creation_handler, group=1)
+    # Registra criação de personagem (grupo 0 para evitar conflitos)
+    application.add_handler(character_creation_handler, group=0)

@@ -39,19 +39,19 @@ def _get_video_abertura_id() -> str | None:
     return VIDEO_ABERTURA_ID_FALLBACK
 
 # --- Função /start com a "Caixa Preta" ---
+# Em handlers/start_handler.py
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message: return
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
     logger.info("[START] /start uid=%s", uid)
 
-    # <<< CORREÇÃO 1: Adiciona await >>>
     player_data = await player_manager.get_player_data(uid) 
 
-    # JÁ TEM CONTA → vai pro menu
-    if player_data:
+    # JÁ TEM CONTA (Verifica se tem nome para garantir que não é conta fantasma)
+    if player_data and player_data.get("character_name"):
         try:
-            # <<< CORREÇÃO 2: Adiciona await (Atualiza chat ID) >>>
             await player_manager.set_last_chat_id(uid, chat_id) 
         except Exception as e:
             logger.debug("set_last_chat_id falhou: %s", e)
@@ -62,7 +62,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
         try:
-            # <<< CORREÇÃO 3: Adiciona await e PASSA player_data >>>
             await resume_game_state(update, context, player_data=player_data) 
         except Exception as e:
             logger.error("resume_game_state falhou: %s", e, exc_info=True)
@@ -71,7 +70,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # NÃO TEM CONTA → fluxo de criação
+    # NÃO TEM CONTA (ou dados corrompidos sem nome) -> fluxo de criação
     if not context.user_data.get("intro_sent"):
         vid = _get_video_abertura_id()
         if vid:
@@ -86,6 +85,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning("Falha ao enviar vídeo de abertura: %s", e)
         context.user_data["intro_sent"] = True
 
+    # Ativa o estado de espera de nome
     context.user_data["awaiting_name"] = True
     texto = (
         f"Olá, <b>{html.escape(update.effective_user.first_name)}</b>!\n\n"

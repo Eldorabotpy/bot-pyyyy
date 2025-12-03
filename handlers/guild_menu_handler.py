@@ -64,7 +64,7 @@ def _mini_bar(current, total):
     filled = int(ratio * blocks)
     # ▪️ (Vazio) ▫️ (Cheio - invertido visualmente para dar contraste em alguns temas)
     # Vamos usar ■ e □ que são mais universais
-    return "■" * filled + "□" * (blocks - filled)
+    return "▪️" * filled + "▫️" * (blocks - filled)
 def _get_time_until_reset():
     """Calcula tempo até meia-noite UTC."""
     now = datetime.now(timezone.utc)

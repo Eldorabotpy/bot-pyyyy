@@ -1,4 +1,5 @@
 # handlers/profession_handler.py
+# (VERSÃO COM DIAGNÓSTICO DE CLIQUE)
 
 import math
 import logging
@@ -10,7 +11,6 @@ from modules.game_data.refining import REFINING_RECIPES
 
 logger = logging.getLogger(__name__)
 
-# Itens por página nas listas
 RECIPES_PER_PAGE = 6
 
 # ==================================================================
@@ -25,14 +25,17 @@ def _bar(current: int, total: int, blocks: int = 10, filled_char: str = '🟧', 
     return filled_char * filled + empty_char * (blocks - filled)
 
 def _get_profession_info(player_data: dict):
-    """Extrai dados normalizados da profissão."""
     prof_data = player_data.get("profession")
     key, level, xp = None, 1, 0
+    # Proteção contra dados corrompidos (dicionários vazios)
     if isinstance(prof_data, dict):
         key = prof_data.get("type")
+        # Se 'type' for None ou string vazia, considera como sem profissão
+        if not key: 
+            return None, 1, 0
         level = int(prof_data.get("level", 1))
         xp = int(prof_data.get("xp", 0))
-    elif isinstance(prof_data, str):
+    elif isinstance(prof_data, str) and prof_data:
         key = prof_data
     return key, level, xp
 
@@ -49,7 +52,6 @@ def _get_recipes_for_profession(prof_key: str, category: str) -> list:
 
     for item_result_id, recipe_data in all_pool.items():
         req_prof = recipe_data.get("profession")
-        # Verifica se a profissão bate (suporta string ou lista)
         if isinstance(req_prof, list):
             if prof_key not in req_prof: continue
         elif req_prof != prof_key: continue
@@ -75,121 +77,99 @@ def _get_recipes_for_profession(prof_key: str, category: str) -> list:
     return filtered
 
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML', media_key="img_profissao"):
-    """
-    Função Inteligente de Envio:
-    1. Procura imagem específica > pai > genérica.
-    2. Se achar imagem: Tenta editar a mídia ou envia nova foto.
-    3. Se NÃO achar imagem (None): Edita apenas o texto ou envia nova mensagem de texto.
-    """
     fd = None
-    
-    # 1. Tenta chave específica (ex: img_prof_armeiro_craft)
-    if media_key:
-        fd = file_ids.get_file_data(media_key)
-    
-    # 2. Tenta chave pai (ex: img_prof_armeiro)
+    if media_key: fd = file_ids.get_file_data(media_key)
     if not fd and media_key and "_" in media_key:
         parent_key = media_key.rsplit("_", 1)[0]
         fd = file_ids.get_file_data(parent_key)
-        
-    # 3. Tenta genérica (img_profissao)
-    if not fd:
-        fd = file_ids.get_file_data("img_profissao")
+    if not fd: fd = file_ids.get_file_data("img_profissao")
 
     media_id = fd.get("id") if fd else None
     media_type = (fd.get("type") or "photo").lower() if fd else "photo"
 
-    # --- TENTATIVA DE EDIÇÃO ---
     if query and query.message:
         try:
             if media_id:
-                # Tem imagem nova para mostrar
                 media = InputMediaVideo(media_id, caption=text, parse_mode=parse_mode) if media_type == "video" else InputMediaPhoto(media_id, caption=text, parse_mode=parse_mode)
                 await query.edit_message_media(media=media, reply_markup=reply_markup)
             else:
-                # Não tem imagem (ou não achou no banco): Edita só o texto
                 await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
             return
-        except Exception:
-            pass # Falha na edição, tenta reenvio limpo
+        except Exception: pass
 
-    # --- REENVIO LIMPO (Fallback) ---
-    if query and query.message:
-        try: await query.delete_message()
-        except: pass
+    try: await query.delete_message()
+    except: pass
     
     if media_id:
         try:
-            if media_type == "video":
-                await context.bot.send_video(chat_id=chat_id, video=media_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
-            else:
-                await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            if media_type == "video": await context.bot.send_video(chat_id=chat_id, video=media_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            else: await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
             return
         except: pass 
-        
-    # Último recurso: Apenas texto
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 # ==================================================================
-# 1. LÓGICA DE ESCOLHA DE PROFISSÃO (Se não tiver)
+# 1. MENU E ESCOLHA
 # ==================================================================
 
 async def show_profession_choose_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, player_data: dict):
-    """Mostra o menu de escolha se o jogador não tiver profissão."""
     q = update.callback_query
     chat_id = q.message.chat_id
-
-    # Diagnóstico: Verifica se existem profissões carregadas
     all_profs = game_data.PROFESSIONS_DATA or {}
+    
     if not all_profs:
-        await _safe_edit_or_send(q, context, chat_id, "⚠️ Nenhuma profissão foi configurada no sistema ainda.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]]))
+        await _safe_edit_or_send(q, context, chat_id, "⚠️ Nenhuma profissão configurada.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]]))
         return
 
     title = "💼 <b>Escolher Profissão</b>\nSelecione uma profissão para desbloquear coletas, refino e criação de itens.\n"
     kb = []
-    
     for key, data in all_profs.items():
-        # O callback data usa o ID da profissão
         kb.append([InlineKeyboardButton(_prof_label(key, data), callback_data=f"job_pick_{key}")])
-        
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="profile")])
 
     await _safe_edit_or_send(q, context, chat_id, title, InlineKeyboardMarkup(kb))
 
 async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Define a profissão selecionada."""
+    """ Handler que processa o clique no botão de profissão. """
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
-    chat_id = q.message.chat_id
+    
+    # --- DEBUG NO CONSOLE ---
+    print(f"DEBUG: Clique recebido! Data: {q.data}")
+    # ------------------------
 
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return
 
-    # Verifica novamente
-    if (pdata.get('profession') or {}).get('type'):
+    # Verifica se já tem profissão REAL (ignora {} vazio ou corrompido)
+    prof_key_atual, _, _ = _get_profession_info(pdata)
+    if prof_key_atual:
         await q.answer("Você já possui uma profissão.", show_alert=True)
         return
 
     prefix = "job_pick_"
-    data = q.data or ""
-    if not data.startswith(prefix): return
-    prof_key = data[len(prefix):]
+    if not q.data.startswith(prefix): return
+    prof_key = q.data[len(prefix):]
 
+    # Valida se a profissão existe no game_data
     all_profs = game_data.PROFESSIONS_DATA or {}
     if prof_key not in all_profs:
-        await q.answer(f"Profissão '{prof_key}' inválida.", show_alert=True)
+        print(f"DEBUG: Profissão '{prof_key}' não encontrada em game_data!")
+        await q.answer(f"Profissão '{prof_key}' inválida ou removida.", show_alert=True)
         return
 
-    # Define a profissão
+    # SALVA A PROFISSÃO
     pdata['profession'] = {"type": prof_key, "level": 1, "xp": 0}
     await player_manager.save_player_data(user_id, pdata)
+    
+    print(f"DEBUG: Profissão salva com sucesso: {prof_key}")
 
-    # Redireciona para o menu da profissão recém-adquirida
+    # Redireciona
     await job_menu_callback(update, context)
 
 # ==================================================================
-# 2. MENU PRINCIPAL DA PROFISSÃO (Se já tiver)
+# 2. MENU PRINCIPAL (JÁ COM PROFISSÃO)
 # ==================================================================
 
 async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -203,10 +183,9 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     prof_key, prof_level, prof_xp = _get_profession_info(player_data)
     
-    # SE NÃO TIVER PROFISSÃO: Mostra o menu de escolha
+    # Se não tiver profissão, manda escolher
     if not prof_key:
-        if query:
-            await show_profession_choose_menu(update, context, player_data)
+        if query: await show_profession_choose_menu(update, context, player_data)
         return
 
     prof_info = (game_data.PROFESSIONS_DATA or {}).get(prof_key, {})
@@ -239,7 +218,7 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(keyboard), media_key=img_key)
 
 # ==================================================================
-# 3. LISTA DE RECEITAS (Paginada e Separada)
+# 3. LISTA DE RECEITAS
 # ==================================================================
 
 async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -247,7 +226,6 @@ async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     
     try:
-        # Formato esperado: job_list_MODO_PAGINA
         _, _, mode, page_str = query.data.split("_")
         page = int(page_str)
     except:
@@ -262,10 +240,10 @@ async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if mode == "craft":
         title = "🔨 RECEITAS DE CRIAÇÃO"
-        empty_msg = "Nenhuma receita de equipamento encontrada para esta profissão."
+        empty_msg = "Nenhuma receita de equipamento encontrada."
     else:
         title = "🔥 RECEITAS DE REFINO"
-        empty_msg = "Nenhuma receita de refino encontrada para esta profissão."
+        empty_msg = "Nenhuma receita de refino encontrada."
 
     total_items = len(recipes_list)
     total_pages = math.ceil(total_items / RECIPES_PER_PAGE) or 1
@@ -310,7 +288,7 @@ async def job_recipes_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(keyboard), media_key=img_key)
 
 # ==================================================================
-# GANCHOS (HANDLERS)
+# HANDLERS (Regex Permissivo: pega tudo após 'job_pick_')
 # ==================================================================
 job_menu_handler = CallbackQueryHandler(job_menu_callback, pattern=r'^job_menu$')
 job_pick_handler = CallbackQueryHandler(pick_profession_callback, pattern=r'^job_pick_.+$')
