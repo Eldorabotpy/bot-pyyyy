@@ -1,5 +1,5 @@
 # handlers/combat/main_handler.py
-# (VERSÃO SUPREMA: AUTO-RECUPERAÇÃO DE SESSÃO PERDIDA)
+# (VERSÃO CORRIGIDA: RECUPERA CAÇADAS NORMAIS E DUNGEONS)
 
 import logging
 import random
@@ -49,7 +49,6 @@ async def _edit_media_or_caption(context: ContextTypes.DEFAULT_TYPE, battle_cach
             reply_markup=reply_markup
         )
     except Exception:
-        # Se falhar a edição (ex: mensagem muito antiga), deleta e manda nova
         try:
             try: await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
             except: pass
@@ -120,7 +119,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     battle_cache = context.user_data.get('battle_cache')
     
     # =========================================================================
-    # 🚑 SISTEMA DE AUTO-RECUPERAÇÃO DE SESSÃO (AQUI ESTÁ A CORREÇÃO)
+    # 🚑 AUTO-RECUPERAÇÃO (CORRIGIDA PARA CAÇADAS NORMAIS)
     # =========================================================================
     if not battle_cache or battle_cache.get('player_id') != user_id:
         player_data = await player_manager.get_player_data(user_id)
@@ -129,29 +128,64 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         if player_data and player_data.get('player_state', {}).get('action') == 'in_combat':
             details = player_data['player_state'].get('details', {})
             
-            # Se for Dungeon, reconstrói o cache e continua!
+            # --- RECUPERAÇÃO DE DUNGEON ---
             if "dungeon_ctx" in details:
-                # Chama a função de update cache do runtime
                 from modules.dungeons import runtime as d_rt
                 msg_id = query.message.message_id if query and query.message else None
-                
-                # Recria a memória RAM baseada no Banco de Dados
                 await d_rt._update_battle_cache(
                     context, user_id, player_data, details, 
                     message_id=msg_id, chat_id=chat_id
                 )
-                
-                # REINICIA A FUNÇÃO COM O CACHE RESTAURADO
                 return await combat_callback(update, context, action)
             
-            # Se for caçada normal antiga (sem cache), usa legacy
-            await _legacy_combat_callback(update, context, action, player_data)
-            return
+            # --- RECUPERAÇÃO DE CAÇADA NORMAL ---
+            else:
+                # Reconstrói o cache manualmente para caçadas normais
+                p_stats = await player_manager.get_player_total_stats(player_data)
+                
+                # Mapeia os dados do DB para o formato do cache
+                monster_stats = {
+                    'name': details.get('monster_name', details.get('name', 'Inimigo')),
+                    'hp': details.get('monster_hp', 1),
+                    'max_hp': details.get('monster_max_hp', 1),
+                    'attack': details.get('monster_attack', 1),
+                    'defense': details.get('monster_defense', 0),
+                    'initiative': details.get('monster_initiative', 0),
+                    'luck': details.get('monster_luck', 0),
+                    'xp_reward': details.get('monster_xp_reward', 0),
+                    'gold_drop': details.get('monster_gold_drop', 0),
+                    'id': details.get('id'),
+                    'loot_table': details.get('loot_table', [])
+                }
+                
+                p_media = _get_class_media(player_data, purpose="combate")
+                
+                new_cache = {
+                    'player_id': user_id,
+                    'chat_id': chat_id,
+                    'message_id': query.message.message_id if query and query.message else None,
+                    'player_stats': p_stats,
+                    'monster_stats': monster_stats,
+                    'player_hp': player_data.get('current_hp'),
+                    'player_mp': player_data.get('current_mp'),
+                    'battle_log': details.get('battle_log', []),
+                    'turn': 'player',
+                    'player_media_id': p_media.get("id") if p_media else None,
+                    'player_media_type': p_media.get("type", "photo") if p_media else "photo",
+                    'monster_media_id': details.get('file_id_name') or details.get('image'),
+                    'monster_media_type': 'photo',
+                    'dungeon_ctx': None, # Garante que sabe que NÃO é dungeon
+                    'region_key': details.get('region_key')
+                }
+                
+                context.user_data['battle_cache'] = new_cache
+                # Reinicia a função com o cache restaurado
+                return await combat_callback(update, context, action)
         
         else:
-            # Realmente expirou e não está em combate
+            # Se não estiver em combate no DB, aí sim expira
             if query:
-                try: await query.edit_message_caption(caption="⚠️ Sessão inválida. Retornando ao menu...", reply_markup=None)
+                try: await query.edit_message_caption(caption="⚠️ Sessão expirada. Retornando...", reply_markup=None)
                 except: pass
                 await asyncio.sleep(1)
                 await send_region_menu(context, user_id, chat_id)
@@ -355,9 +389,5 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
           [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]]
     
     await _edit_media_or_caption(context, battle_cache, caption_m, battle_cache['monster_media_id'], battle_cache['monster_media_type'], InlineKeyboardMarkup(kb))
-
-async def _legacy_combat_callback(update, context, action, player_data):
-    if "dungeon_ctx" in player_data.get('player_state', {}).get('details', {}):
-        await send_region_menu(context, player_data['user_id'], update.effective_chat.id)
 
 combat_handler = CallbackQueryHandler(combat_callback, pattern=r'^(combat_attack|combat_flee|combat_attack_menu|combat_return_to_map)$')
