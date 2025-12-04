@@ -496,6 +496,98 @@ REGIONAL_DUNGEONS = {
         ] 
     },
     
+    # --- Adicione isto ao regions.py logo após a "pedreira_granito" ---
+    "pico_grifo": {
+        "label": "Pico do Grifo",
+        "emoji": "🦅",
+        "key_item": "cristal_de_abertura",
+        "gold_base": 1200, # Baseado no "infernal" do registry antigo
+        "menu_media_key": "media_calabouco_pico_grifo",
+        "floors": [
+            MobDef(
+                key="ninho_de_wyverns",
+                display="Ninho de Wyverns",
+                emoji="🐉🪺",
+                media_key="ninho_de_wyverns_media",
+                stats_base={"max_hp": 450, "attack": 28, "defense": 20, "initiative": 15, "luck": 5},
+            ),
+            MobDef(
+                key="manticora_jovem",
+                display="Manticora Jovem",
+                emoji="🦁",
+                media_key="manticora_jovem_media",
+                stats_base={"max_hp": 560, "attack": 22, "defense": 18, "initiative": 40, "luck": 15},
+            ),
+            MobDef(
+                key="roc_o_passaro_trovao",
+                display="Roc, o Pássaro Trovão",
+                emoji="🦤⚡️",
+                media_key="roc_o_passaro_provao_media",
+                stats_base={"max_hp": 680, "attack": 20, "defense": 18, "initiative": 8, "luck": 10},
+            ),
+            MobDef(
+                key="elemental_da_tempestade",
+                display="Elemental da Tempestade",
+                emoji="⛈",
+                media_key="elemental_da_tempestade_media",
+                stats_base={"max_hp": 700, "attack": 14, "defense": 12, "initiative": 20, "luck": 20},
+            ),
+            MobDef(
+                key="gigante_das_nuvens",
+                display="Gigante das Nuvens",
+                emoji="🌬☁️",
+                media_key="gigante_das_nuvens_media",
+                stats_base={"max_hp": 850, "attack": 15, "defense": 15, "initiative": 15, "luck": 25},
+            ),
+            # --- O BOSS ---
+            MobDef(
+                key="grifo_alfa",
+                display="Grifo Alfa",
+                emoji="🐦‍🔥",
+                media_key="grifo_alfa_media",
+                stats_base={
+                    "max_hp": 900, "attack": 18, "defense": 20, "initiative": 12, "luck": 30,
+                    "is_boss": True,
+                    "xp_reward": 150,
+                    "gold_drop": 800,
+                    "loot_table": [
+                        {"item_id": "emblema_guerreiro", "drop_chance": 3},
+                        {"item_id": "essencia_guardia", "drop_chance": 3},
+                        {"item_id": "essencia_furia", "drop_chance": 3},
+                        {"item_id": "selo_sagrado", "drop_chance": 3},
+                        {"item_id": "essencia_luz", "drop_chance": 3},
+                        {"item_id": "emblema_berserker", "drop_chance": 3},
+                        {"item_id": "totem_ancestral", "drop_chance": 3},
+                        {"item_id": "emblema_cacador", "drop_chance": 3},
+                        {"item_id": "essencia_precisao", "drop_chance": 3},
+                        {"item_id": "marca_predador", "drop_chance": 3},
+                        {"item_id": "essencia_fera", "drop_chance": 3},
+                        {"item_id": "emblema_monge", "drop_chance": 3},
+                        {"item_id": "reliquia_mistica", "drop_chance": 3},
+                        {"item_id": "essencia_ki", "drop_chance": 3},
+                        {"item_id": "emblema_mago", "drop_chance": 3},
+                        {"item_id": "essencia_arcana", "drop_chance": 3},
+                        {"item_id": "essencia_elemental", "drop_chance": 3},
+                        {"item_id": "grimorio_arcano", "drop_chance": 3},
+                        {"item_id": "emblema_bardo", "drop_chance": 3},
+                        {"item_id": "essencia_harmonia", "drop_chance": 3},
+                        {"item_id": "essencia_encanto", "drop_chance": 3},
+                        {"item_id": "batuta_maestria", "drop_chance": 3},
+                        {"item_id": "emblema_assassino", "drop_chance": 3},
+                        {"item_id": "essencia_sombra", "drop_chance": 3},
+                        {"item_id": "essencia_letal", "drop_chance": 3},
+                        {"item_id": "manto_eterno", "drop_chance": 3},
+                        {"item_id": "emblema_samurai", "drop_chance": 3},
+                        {"item_id": "essencia_corte", "drop_chance": 3},
+                        {"item_id": "essencia_disciplina", "drop_chance": 3},
+                        {"item_id": "lamina_sagrada", "drop_chance": 3},
+                    ]
+                }
+            ),
+        ]
+    },
+
+
     # --- Adicione aqui outros calabouços para outras regiões ---
     # "cavernas_de_gelo": {
     #     "label": "Gruta Congelada",

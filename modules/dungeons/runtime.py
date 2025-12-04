@@ -22,7 +22,7 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-# ... (Helpers _inv, _consume_keys, _load_region_dungeon, _final_gold_for, _key_cost_for, _key_item_for continuam iguais) ...
+
 def _inv(p: dict) -> dict:
     inv = p.get("inventory") or p.get("inventario") or {}
     return inv if isinstance(inv, dict) else {}
@@ -54,7 +54,12 @@ def _key_item_for(dungeon_cfg: dict) -> str: return str(dungeon_cfg.get("key_ite
 # 🛠️ CACHE BRIDGE
 # ============================================================
 async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int, pdata: dict, combat_details: dict, message_id: int = None, chat_id: int = None):
+    """
+    Atualiza o cache de batalha com TODOS os dados necessários, incluindo o NOME.
+    """
     p_stats = await player_manager.get_player_total_stats(pdata)
+    
+    # 1. Prepara Stats do Monstro
     monster_stats = {
         'name': combat_details.get('monster_name', 'Inimigo'),
         'hp': combat_details.get('monster_hp', 100),
@@ -69,24 +74,35 @@ async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int,
         'id': combat_details.get('id'),
         'flee_bias': combat_details.get('flee_bias', 0.0)
     }
+    
     p_media = _get_class_media(pdata, purpose="combate")
     
+    player_name_fixed = pdata.get("character_name", "Herói")
+
+    # 3. Cria o Cache
     cache = {
-        'player_id': user_id, 'chat_id': chat_id, 'message_id': message_id, 
-        'player_stats': p_stats, 'monster_stats': monster_stats,
-        'player_hp': pdata.get('current_hp'), 'player_mp': pdata.get('current_mp'),
-        'battle_log': combat_details.get('battle_log', []), 'turn': 'player',
+        'player_id': user_id, 
+        'chat_id': chat_id, 
+        'message_id': message_id, 
+        'player_name': player_name_fixed, 
+        'player_stats': p_stats, 
+        'monster_stats': monster_stats,
+        'player_hp': pdata.get('current_hp'), 
+        'player_mp': pdata.get('current_mp'),
+        'battle_log': combat_details.get('battle_log', []), 
+        'turn': 'player',
         'region_key': combat_details.get('region_key'),
         'player_media_id': p_media.get("id") if p_media else None,
         'player_media_type': p_media.get("type", "photo") if p_media else "photo",
-        'monster_media_id': combat_details.get('file_id_name'), 'monster_media_type': 'photo', 
+        'monster_media_id': combat_details.get('file_id_name'), 
+        'monster_media_type': 'photo', 
         'dungeon_ctx': combat_details.get('dungeon_ctx'),
         'skill_cooldowns': combat_details.get('skill_cooldowns', {}) 
     }
+    
     context.user_data['battle_cache'] = cache
     set_pending_battle(user_id, combat_details.get('dungeon_ctx'))
 
-# ... (UI Functions iguais) ...
 def build_region_dungeon_button(region_key: str) -> InlineKeyboardButton:
     return InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨 🏰", callback_data=f"dungeon_open:{region_key}")
 
@@ -108,7 +124,6 @@ async def _send_battle_media(context, chat_id, caption, file_id_name, reply_mark
         return sent_msg.message_id
     except: return None
 
-# ... (_open_menu igual) ...
 async def _open_menu(update, context, region_key):
     q = update.callback_query
     if q: 
@@ -132,7 +147,7 @@ async def _open_menu(update, context, region_key):
         if not meta: continue
         if i <= h_idx + 1: kb.append([InlineKeyboardButton(f"{meta.emoji} {meta.label}", callback_data=f"dungeon_pick:{diff_key}:{region_key}")])
         else: kb.append([InlineKeyboardButton(f"🔒 {meta.label}", callback_data="dungeon_locked")])
-    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="continue_after_action")])
+    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="combat_return_to_map")])
     await _send_battle_media(context, update.effective_chat.id, caption, dungeon.get("menu_media_key"), InlineKeyboardMarkup(kb))
 
 # ============================================================
@@ -247,6 +262,9 @@ async def resume_dungeon_after_battle(context, user_id, dungeon_ctx, victory):
     await advance_after_victory(None, context, user_id, user_id, details, rewards)
 
 async def fail_dungeon_run(update, context, user_id, chat_id, reason):
+    # 👇 1. APAGA A MENSAGEM ANTERIOR AQUI
+    await _delete_previous_battle_msg(context, user_id)
+
     pdata = await player_manager.get_player_data(user_id)
     if pdata:
         stats = await player_manager.get_player_total_stats(pdata) 
@@ -254,9 +272,11 @@ async def fail_dungeon_run(update, context, user_id, chat_id, reason):
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(user_id, pdata)
+    
+    # Envia a nova mensagem de derrota
     await _send_battle_media(context, chat_id, f"💀 **Fim da Linha!**\n{reason}.", "media_dungeon_defeat", 
                              InlineKeyboardMarkup([[InlineKeyboardButton("⚰️ Sair", callback_data="combat_return_to_map")]]))
-
+    
 async def advance_after_victory(update, context, user_id, chat_id, combat_details, rewards):
     pdata = await player_manager.get_player_data(user_id) or {}
     run = pdata.get("player_state") or {}
@@ -279,8 +299,11 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     
     active_cds = combat_details.get("skill_cooldowns", {})
 
+    # --- CASO 1: VITÓRIA TOTAL (Fim do Calabouço) ---
     if next_stg >= len(floors):
-        # Vitória Final
+        # 👇 APAGA A MENSAGEM DO ÚLTIMO BOSS AQUI
+        await _delete_previous_battle_msg(context, user_id)
+
         pdata.setdefault("dungeon_progress", {}).setdefault(reg_key, {})
         pdata["dungeon_progress"][reg_key]["highest_completed"] = diff_key
         bonus = _final_gold_for(dungeon, diff_cfg)
@@ -294,15 +317,16 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         
         summ = f"🏆 <b>CALABOUÇO CONCLUÍDO!</b>\nBônus: {bonus} Ouro"
         if items: summ += "\n\nLoot Final:\n" + "\n".join([f"• {q}x {i}" for i,q,_ in items])
+        
+        # Envia a mensagem de Vitória
         await _send_battle_media(context, chat_id, summ, "media_dungeon_victory", 
                                  InlineKeyboardMarkup([[InlineKeyboardButton("🎉 Continuar", callback_data="combat_return_to_map")]]))
         return
 
-    # Próximo Mob
+    # --- CASO 2: PRÓXIMO MONSTRO ---
     try: next_mob = floors[next_stg]
     except: return
 
-    # 🔥 PASSA OS COOLDOWNS PARA A FUNÇÃO QUE VAI REDUZI-LOS 🔥
     combat = _build_combat_details(next_mob, diff_cfg, reg_key, next_stg, active_cooldowns=active_cds)
     
     run["action"] = "in_combat"
@@ -314,10 +338,13 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu")],
           [InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")]]
     
+    # 👇 APAGA A MENSAGEM DO MONSTRO ANTERIOR AQUI
+    await _delete_previous_battle_msg(context, user_id)
+
+    # Envia o próximo monstro
     msg_id = await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), InlineKeyboardMarkup(kb))
     await _update_battle_cache(context, user_id, pdata, combat, message_id=msg_id, chat_id=chat_id)
 
-# ... (Handlers de callback e registro iguais ao anterior) ...
 async def _open_menu_cb(update, context): await _open_menu(update, context, update.callback_query.data.split(":")[1])
 async def _pick_diff_cb(update, context): 
     d = update.callback_query.data.split(":")
@@ -369,6 +396,20 @@ async def open_combat_skill_menu(update: Update, context: ContextTypes.DEFAULT_T
         
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="combat_menu_return")])
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
+
+async def _delete_previous_battle_msg(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """Tenta apagar a mensagem de batalha anterior salva no cache."""
+    cache = context.user_data.get('battle_cache')
+    # Verifica se o cache pertence ao usuário atual
+    if cache and cache.get('player_id') == user_id:
+        chat_id = cache.get('chat_id')
+        msg_id = cache.get('message_id')
+        if chat_id and msg_id:
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+            except Exception as e:
+                # Ignora erros se a mensagem já foi apagada ou é muito antiga
+                pass
 
 async def open_combat_potion_menu(update, context):
     q = update.callback_query

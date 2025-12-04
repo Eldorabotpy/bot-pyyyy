@@ -206,9 +206,11 @@ def _format_log_line(line: str) -> str:
     
     return html.escape(line) # Garante que o HTML é seguro para o bloco <code>
 
+# Em handlers/utils.py
+
 async def format_combat_message(player_data: dict, player_stats: dict | None = None) -> str:
     """
-    Formata o estado atual do combate com a estrutura original e async correto.
+    Formata o estado atual do combate (Início da Luta).
     """
     if not player_data: return "Erro: Dados do jogador não encontrados."
     state = player_data.get('player_state', {})
@@ -216,26 +218,28 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
     details = state.get('details', {})
     log_raw = details.get('battle_log', [])
 
-    # 1. Carrega Stats Totais (se não passados)
+    # 1. Carrega Stats
     if player_stats is None:
         player_stats = await player_manager.get_player_total_stats(player_data)
         if not player_stats: return "Erro: Não foi possível carregar stats do jogador."
 
-    # 2. Obter Dados da Região e Nomes
+    # 2. Dados da Região
     regiao_id = details.get('region_key', 'reino_eldora')
     region_info = (game_data.REGIONS_DATA or {}).get(regiao_id, {})
     titulo = f"{region_info.get('emoji', '🗺️')} <b>{region_info.get('display_name', 'Região')}</b>"
 
+    # --- CORREÇÃO DO NOME ---
+    # Pega o nome do personagem. Se tiver emoji de classe no nome, ele virá junto.
     p_name = player_data.get('character_name', 'Herói')
     m_name = details.get('monster_name', 'Inimigo')
 
-    # 3. Status do Jogador (Usa os stats já carregados ou passados)
+    # 3. Status Jogador
     p_max_hp, p_atk, p_def, p_ini, p_srt = _fmt_player_stats_as_ints(player_stats)
     p_current_hp = max(0, min(_i(player_data.get('current_hp', p_max_hp)), p_max_hp))
     p_max_mp = _i(player_stats.get('max_mana', 10))
     p_current_mp = max(0, min(_i(player_data.get('current_mp', p_max_mp)), p_max_mp))
     
-    # 4. Status do Monstro
+    # 4. Status Monstro
     m_hp = _i(details.get('monster_hp', 0))
     m_max = _i(details.get('monster_max_hp', 0))
     m_atk = _i(details.get('monster_attack', 0))
@@ -243,9 +247,9 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
     m_ini = _i(details.get('monster_initiative', 0))
     m_srt = _i(details.get('monster_luck', 0))
 
-    # 5. Blocos de Status Consolidados
+    # --- BLOCO VISUAL (Padronizado) ---
     player_block = (
-        f"<b>ㅤㅤㅤㅤㅤㅤㅤ👤{p_name}</b>\n"
+        f"<b>ㅤㅤㅤㅤㅤㅤ👤 {p_name}</b>\n"
         f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
         f"💙 𝐌𝐏: {p_current_mp}/{p_max_mp}\n"
         f"⚔️ 𝐀𝐓𝐊: {p_atk} ­ㅤㅤ­|­ㅤ­ㅤ 🛡 𝐃𝐄𝐅: {p_def}\n"
@@ -253,31 +257,24 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
     )
 
     monster_block = (
-        f"<b>­ㅤ­ㅤ­ㅤ­ㅤ­ㅤ­👹{m_name}</b>\n"
+        f"<b>­ㅤ­ㅤ­ㅤ­­👹 {m_name}</b>\n"
         f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
         f"⚔️ 𝐀𝐓𝐊: {m_atk} ­ㅤ­ㅤ| ­ㅤ­ㅤ🛡 𝐃𝐄𝐅: {m_def}\n"
         f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini}  ­ㅤ­ㅤ| ­ㅤ­ㅤ🍀 𝐒𝐑𝐓: {m_srt}"
     )
 
-    # 6. Montagem do Log
-    log_lines = [_format_log_line(line) for line in log_raw[-4:]] # Pega as últimas 4 linhas
+    log_lines = [_format_log_line(line) for line in log_raw[-6:]] 
     log_block = "\n".join(log_lines)
-    # Mensagem padrão se o log estiver vazio (início do combate)
-    if not log_block:
-         log_block = "Aguardando sua ação..."
+    if not log_block: log_block = "Aguardando sua ação..."
 
-    # 7. Construção da Caixa Final (Usando a tua estrutura original)
     final_message = (
         f"{titulo}\n"
         f"⚔️ 𝑽𝑺 <b>{m_name}</b>\n"
         "╔════════════ ◆◈◆ ════════════╗\n"
-        # Bloco do Jogador
         f"{player_block}\n"
         "══════════════════════════════\n"
-        # Bloco do Monstro
         f"{monster_block}\n"
         "═════════════ 📜 ═════════════\n"
-        # Log formatado dentro de <code>
         f"<code>{log_block}</code>\n"
         "╚════════════ ◆◈◆ ════════════╝"
     )
@@ -285,6 +282,78 @@ async def format_combat_message(player_data: dict, player_stats: dict | None = N
     return final_message
 
 
+async def format_combat_message_from_cache(battle_cache: dict) -> str:
+    """
+    Formata a mensagem de combate lendo do cache (Durante a Luta).
+    """
+    if not battle_cache: return "Erro: Cache de batalha não encontrado."
+
+    region_key = battle_cache.get('region_key', 'reino_eldora')
+    region_info = (game_data.REGIONS_DATA or {}).get(region_key, {})
+    titulo = f"{region_info.get('emoji', '🗺️')} <b>{region_info.get('display_name', 'Região')}</b>"
+
+    # --- CORREÇÃO CRÍTICA DO NOME ---
+    # 1. Tenta pegar 'player_name' direto do cache
+    p_name = battle_cache.get('player_name')
+    
+    # 2. Se não achar, tenta pegar de DENTRO dos stats (onde geralmente fica salvo)
+    if not p_name:
+         p_name = battle_cache.get('player_stats', {}).get('character_name')
+
+    # 3. Último caso, usa Herói
+    if not p_name:
+        p_name = 'Herói'
+
+    m_stats = battle_cache.get('monster_stats', {})
+    m_name = m_stats.get('name', 'Inimigo')
+
+    p_stats = battle_cache.get('player_stats', {})
+    p_max_hp, p_atk, p_def, p_ini, p_srt = _fmt_player_stats_as_ints(p_stats)
+    p_current_hp = max(0, min(_i(battle_cache.get('player_hp', p_max_hp)), p_max_hp))
+    p_max_mp = _i(p_stats.get('max_mana', 10))
+    p_current_mp = max(0, min(_i(battle_cache.get('player_mp', p_max_mp)), p_max_mp))
+    
+    m_hp = _i(m_stats.get('hp', 0))
+    m_max = _i(m_stats.get('max_hp', 0))
+    m_atk = _i(m_stats.get('attack', 0))
+    m_def = _i(m_stats.get('defense', 0))
+    m_ini = _i(m_stats.get('initiative', 0))
+    m_srt = _i(m_stats.get('luck', 0))
+
+    # --- BLOCO VISUAL (Idêntico ao de cima) ---
+    player_block = (
+        f"<b>ㅤㅤㅤㅤㅤㅤ👤 {p_name}</b>\n"
+        f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
+        f"💙 𝐌𝐏: {p_current_mp}/{p_max_mp}\n"
+        f"⚔️ 𝐀𝐓𝐊: {p_atk} ­ㅤㅤ­|­ㅤ­ㅤ 🛡 𝐃𝐄𝐅: {p_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini}   ㅤㅤ| ­ㅤ­ㅤ🍀 𝐒𝐑𝐓: {p_srt}"
+    )
+
+    monster_block = (
+        f"<b>­ㅤ­ㅤ­ㅤ­­👹 {m_name}</b>\n"
+        f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
+        f"⚔️ 𝐀𝐓𝐊: {m_atk} ­ㅤ­ㅤ| ­ㅤ­ㅤ🛡 𝐃𝐄𝐅: {m_def}\n"
+        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini}  ­ㅤ­ㅤ| ­ㅤ­ㅤ🍀 𝐒𝐑𝐓: {m_srt}"
+    )
+
+    log_raw = battle_cache.get('battle_log', [])
+    log_lines = [_format_log_line(line) for line in log_raw[-4:]] 
+    log_block = "\n".join(log_lines)
+    if not log_block: log_block = "Aguardando sua ação..."
+
+    final_message = (
+        f"{titulo}\n"
+        f"⚔️ 𝑽𝑺 <b>{m_name}</b>\n"
+        "╔════════════ ◆◈◆ ════════════╗\n"
+        f"{player_block}\n"
+        "══════════════════════════════\n"
+        f"{monster_block}\n"
+        "═════════════ 📜 ═════════════\n"
+        f"<code>{log_block}</code>\n"
+        "╚════════════ ◆◈◆ ════════════╝"
+    )
+
+    return final_message
 
 async def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict) -> str:
     """
@@ -581,81 +650,5 @@ def format_buffs_text(buffs_dict: dict) -> str:
     # Adicione aqui a formatação para outros buffs que você tiver
     return text if text else "   - Nenhum\n"
 
-# Em: handlers/utils.py
 
-# ... (imports no topo) ...
-# ... (função _format_log_line) ...
-
-
-# --- 👇 ADICIONE ESTA NOVA FUNÇÃO COMPLETA 👇 ---
-
-async def format_combat_message_from_cache(battle_cache: dict) -> str:
-    """
-    Formata a mensagem de combate (para Caçadas) lendo os dados 
-    diretamente do 'battle_cache' (context.user_data['battle_cache']).
-    """
-    if not battle_cache:
-        return "Erro: Cache de batalha não encontrado."
-
-    # 1. Obter Dados da Região e Nomes
-    region_key = battle_cache.get('region_key', 'reino_eldora')
-    region_info = (game_data.REGIONS_DATA or {}).get(region_key, {})
-    titulo = f"{region_info.get('emoji', '🗺️')} <b>{region_info.get('display_name', 'Região')}</b>"
-
-    p_name = battle_cache.get('player_name', 'Herói')
-    m_stats = battle_cache.get('monster_stats', {})
-    m_name = m_stats.get('name', 'Inimigo')
-
-    # 2. Status do Jogador (lido do cache)
-    p_stats = battle_cache.get('player_stats', {})
-    p_max_hp, p_atk, p_def, p_ini, p_srt = _fmt_player_stats_as_ints(p_stats)
-    p_current_hp = max(0, min(_i(battle_cache.get('player_hp', p_max_hp)), p_max_hp))
-    p_max_mp = _i(p_stats.get('max_mana', 10))
-    p_current_mp = max(0, min(_i(battle_cache.get('player_mp', p_max_mp)), p_max_mp))
-    
-    # 3. Status do Monstro (lido do cache)
-    m_hp = _i(m_stats.get('hp', 0))
-    m_max = _i(m_stats.get('max_hp', 0))
-    m_atk = _i(m_stats.get('attack', 0))
-    m_def = _i(m_stats.get('defense', 0))
-    m_ini = _i(m_stats.get('initiative', 0))
-    m_srt = _i(m_stats.get('luck', 0))
-
-    # 4. Blocos de Status Consolidados
-    player_block = (
-        f"<b>{p_name}</b>\n"
-        f"❤️ 𝐇𝐏: {p_current_hp}/{p_max_hp}\n"
-        f"💙 𝐌𝐏: {p_current_mp}/{p_max_mp}\n"
-        f"⚔️ 𝐀𝐓𝐊: {p_atk} | 🛡 𝐃𝐄𝐅: {p_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {p_ini} | 🍀 𝐒𝐑𝐓: {p_srt}"
-    )
-
-    monster_block = (
-        f"<b>{m_name}</b>\n"
-        f"❤️ 𝐇𝐏: {m_hp}/{m_max}\n"
-        f"⚔️ 𝐀𝐓𝐊: {m_atk} | 🛡 𝐃𝐄𝐅: {m_def}\n"
-        f"🏃‍♂️ 𝐕𝐄𝐋: {m_ini} | 🍀 𝐒𝐑𝐓: {m_srt}"
-    )
-
-    # 5. Montagem do Log
-    log_raw = battle_cache.get('battle_log', [])
-    log_lines = [_format_log_line(line) for line in log_raw[-4:]] # Pega as últimas 4 linhas
-    log_block = "\n".join(log_lines)
-    if not log_block:
-        log_block = "Aguardando sua ação..."
-
-    # 6. Construção da Caixa Final
-    final_message = (
-        f"{titulo}\n"
-        f"⚔️ 𝑽𝑺 <b>{m_name}</b>\n"
-        "╔════════════ ◆◈◆ ════════════╗\n"
-        f"{player_block}\n"
-        "══════════════════════════════\n"
-        f"{monster_block}\n"
-        "═════════════ 📜 ═════════════\n"
-        f"<code>{log_block}</code>\n"
-        "╚════════════ ◆◈◆ ════════════╝"
-    )
-
-    return final_message
 
