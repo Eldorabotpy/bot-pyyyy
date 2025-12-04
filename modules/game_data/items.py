@@ -1,27 +1,50 @@
 import logging
 
-# --- 1. IMPORTAÇÕES DOS MÓDULOS DE DADOS (Blindados) ---
-# Tenta importar cada categoria. Se o arquivo não existir ou der erro,
-# cria um dicionário vazio para o jogo não travar.
+# Configuração de log
+logger = logging.getLogger(__name__)
 
-try: from modules.game_data.items_materials import MATERIALS_DATA
-except ImportError: MATERIALS_DATA = {}
+print(">>> INICIANDO CARREGAMENTO DE ITENS...")
 
-try: from modules.game_data.items_consumables import CONSUMABLES_DATA
-except ImportError: CONSUMABLES_DATA = {}
+# --- 1. IMPORTAÇÕES DOS MÓDULOS DE DADOS (SEM BLINDAGEM) ---
+# Removemos o try/except. Se o arquivo tiver erro, o jogo DEVE parar e avisar.
+# Isso corrige o problema de "itens sumindo" silenciosamente.
 
-try: from modules.game_data.items_equipments import EQUIPMENTS_DATA
-except ImportError: EQUIPMENTS_DATA = {}
+try:
+    from modules.game_data.items_materials import MATERIALS_DATA
+    print(f"✅ Materiais carregados: {len(MATERIALS_DATA)}")
+except ImportError as e:
+    print(f"❌ ERRO FATAL em items_materials: {e}")
+    raise e
 
-try: from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
-except ImportError: EVOLUTION_ITEMS_DATA = {}
+try:
+    from modules.game_data.items_consumables import CONSUMABLES_DATA
+    print(f"✅ Consumíveis carregados: {len(CONSUMABLES_DATA)}")
+except ImportError as e:
+    print(f"❌ ERRO FATAL em items_consumables: {e}")
+    raise e
 
-try: from modules.game_data.items_runes import RUNE_ITEMS_DATA
-except ImportError: RUNE_ITEMS_DATA = {}
+try:
+    from modules.game_data.items_equipments import EQUIPMENTS_DATA
+    print(f"✅ Equipamentos carregados: {len(EQUIPMENTS_DATA)}")
+except ImportError as e:
+    print(f"❌ ERRO FATAL em items_equipments: {e}")
+    raise e
+
+try:
+    from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
+    print(f"✅ Itens Evolução carregados: {len(EVOLUTION_ITEMS_DATA)}")
+except ImportError as e:
+    print(f"❌ ERRO FATAL em items_evolution: {e}")
+    raise e
+
+try:
+    from modules.game_data.items_runes import RUNE_ITEMS_DATA
+    print(f"✅ Runas carregadas: {len(RUNE_ITEMS_DATA)}")
+except ImportError as e:
+    print(f"❌ ERRO FATAL em items_runes: {e}")
+    raise e
 
 # -------------------------------------------------------
-
-logger = logging.getLogger(__name__)
 
 # Dicionários Principais
 ITEMS_DATA = {}
@@ -34,6 +57,8 @@ ITEMS_DATA.update(CONSUMABLES_DATA)
 ITEMS_DATA.update(EQUIPMENTS_DATA)
 ITEMS_DATA.update(EVOLUTION_ITEMS_DATA)
 ITEMS_DATA.update(RUNE_ITEMS_DATA)
+
+print(f"📦 TOTAL DE ITENS NO SISTEMA: {len(ITEMS_DATA)}")
 
 # --- 3. ALIAS E HELPERS (Compatibilidade) ---
 # Para garantir que códigos antigos que buscam "ferro" em vez de "minerio_de_ferro" funcionem
@@ -93,6 +118,7 @@ def _generate_auto_items():
     # A. GERAÇÃO DE TOMOS DE SKILL
     try:
         # Import local para evitar erro circular (items -> skills -> items)
+        # Se der erro aqui, queremos ver no console
         from modules.game_data.skills import SKILL_DATA
         
         for skill_id, info in SKILL_DATA.items():
@@ -123,6 +149,9 @@ def _generate_auto_items():
                 ITEMS_DATA[skill_id] = ITEMS_DATA[tomo_id].copy()
                 ITEMS_DATA[skill_id]["display_name"] += " (Item)"
 
+    except ImportError:
+        # Se skills.py não existir ou tiver erro, apenas avisamos, não crashamos tudo
+        print("⚠️ Aviso: SKILL_DATA não encontrado. Tomos não gerados.")
     except Exception as e:
         logger.error(f"Auto-Items Skill Error: {e}")
 
@@ -158,6 +187,8 @@ def _generate_auto_items():
                 ITEMS_DATA[skin_id] = item_def.copy()
                 ITEMS_DATA[skin_id]["display_name"] = f"Skin: {skin_name} (Item)"
 
+    except ImportError:
+         print("⚠️ Aviso: SKIN_CATALOG não encontrado. Caixas de Skin não geradas.")
     except Exception as e:
         logger.error(f"Auto-Items Skin Error: {e}")
         
