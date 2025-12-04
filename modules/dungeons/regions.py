@@ -1,38 +1,31 @@
 # Em modules/dungeons/regions.py
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-# ===================================================================
-# 1. A ESTRUTURA DE UM MONSTRO (MobDef)
-# Usamos um dataclass para manter tudo organizado.
-# ===================================================================
+
 @dataclass
 class MobDef:
-    key: str  # ID único do monstro, ex: "goblin_arqueiro"
-    display: str  # Nome que aparece para o jogador, ex: "Goblin Arqueiro"
+    key: str  
+    display: str  
     emoji: str = "💀"
-    media_key: Optional[str] = None  # Chave para a imagem/vídeo no file_ids.json
-    stats_base: Dict[str, int] = field(default_factory=dict) # Stats base (max_hp, attack, etc.)
+    media_key: Optional[str] = None  
+    stats_base: Dict[str, int] = field(default_factory=dict) 
 
-# ===================================================================
-# 2. A DEFINIÇÃO DOS CALABOUÇOS
-# Este é o dicionário principal que o registry.py lê.
-# ===================================================================
 REGIONAL_DUNGEONS = {
-    # --- Exemplo de Calabouço para a Floresta Sombria ---
+    
     "pradaria_inicial": {
-        "label": "Pradaria dos Slimes",
+        "label": "𝙿𝚛𝚊𝚍𝚊𝚛𝚒𝚊 𝚍𝚘𝚜 𝚂𝚕𝚒𝚖𝚎𝚜",
         "emoji": "🌱",
-        "key_item": "cristal_de_abertura", # Item necessário para entrar
-        "gold_base": 400, # Recompensa de ouro na dificuldade Normal
+        "key_item": "cristal_de_abertura", 
+        "gold_base": 400, 
         "menu_media_key": "media_calabouco_pradaria_iniciala",
-        # A sequência de monstros (6 combates)
         "floors": [
              
             MobDef(
                 key="slime_bebe",
-                display="Slime Bebé",
+                display="𝕊𝕝𝕚𝕞𝕖 𝔹𝕖𝕓𝕖́",
                 emoji="💧",
                 media_key="media_slime_bebe",
                 stats_base={"max_hp": 20, 
@@ -43,7 +36,7 @@ REGIONAL_DUNGEONS = {
             ),
             MobDef(
                 key="slime_verde",
-                display="Slime Verde",
+                display="𝕊𝕝𝕚𝕞𝕖 𝕍𝕖𝕣𝕕𝕖",
                 emoji="🟢",
                 media_key="slime_verde_media",
                 stats_base={"max_hp": 35, 
@@ -54,7 +47,7 @@ REGIONAL_DUNGEONS = {
             ),
              MobDef(
                 key="slime_azul",
-                display="Slime Azul",
+                display="𝕊𝕝𝕚𝕞𝕖 𝔸𝕫𝕦𝕝",
                 emoji="🔵",
                 media_key="slime_azul_media",
                 stats_base={"max_hp": 40, 
@@ -65,7 +58,7 @@ REGIONAL_DUNGEONS = {
             ),
             MobDef(
                 key="slime_vermelho",
-                display="Slime Vermelho",
+                display="𝕊𝕝𝕚𝕞𝕖 𝕍𝕖𝕣𝕞𝕖𝕝𝕙𝕠",
                 emoji="🔴",
                 media_key="slime_vermelho_media",
                 stats_base={"max_hp": 50, 
@@ -76,7 +69,7 @@ REGIONAL_DUNGEONS = {
             ),
             MobDef(
                 key="slime_pradaria",
-                display="Slime da Pradaria",
+                display="𝕊𝕝𝕚𝕞𝕖 𝕕𝕒 ℙ𝕣𝕒𝕕𝕒𝕣𝕚𝕒",
                 emoji="🌿",
                 media_key="slime_da_pradaria_media",
                 stats_base={"max_hp": 60, 
@@ -88,7 +81,7 @@ REGIONAL_DUNGEONS = {
             # --- 👇 O BOSS (Com a tabela de loot correta) 👇 ---
             MobDef(
                 key="rei_slime",
-                display="Rei Slime",
+                display="ℝ𝕖𝕚 𝕊𝕝𝕚𝕞𝕖",
                 emoji="👑",
                 media_key="rei_slime_media",
                 stats_base={
@@ -136,22 +129,20 @@ REGIONAL_DUNGEONS = {
                    ]
                 }
             ),
-        ] # <-- Fim da lista "floors"
-    }, # <-- Fim do calabouço "floresta_sombria"
+        ] 
+    }, 
 
-    # --- Exemplo de Calabouço para a Floresta Sombria ---
     "floresta_sombria": {
-        "label": "Coração da Floresta",
+        "label": "𝙲𝚘𝚛𝚊𝚌̧𝚊̃𝚘 𝚍𝚊 𝙵𝚕𝚘𝚛𝚎𝚜𝚝𝚊",
         "emoji": "🌳",
-        "key_item": "cristal_de_abertura", # Item necessário para entrar
-        "gold_base": 800, # Recompensa de ouro na dificuldade Normal
+        "key_item": "cristal_de_abertura", 
+        "gold_base": 800, 
         "menu_media_key": "media_calabouco_floresta_sombria",
-        # A sequência de monstros (6 combates)
         "floors": [
              
             MobDef(
                 key="guardiao_raizes",
-                display="Guardião de Raízes",
+                display="𝔾𝕦𝕒𝕣𝕕𝕚𝕒̃𝕠 𝕕𝕖 ℝ𝕒𝕚́𝕫𝕖𝕤",
                 emoji="🌱",
                 media_key="guardiao_raizes_media",
                 stats_base={"max_hp": 60, 
@@ -162,7 +153,7 @@ REGIONAL_DUNGEONS = {
             ),
             MobDef(
                 key="enxame_de_vagalumes_cortantes",
-                display="Enxame de Vagalumes Cortantes",
+                display="𝔼𝕟𝕩𝕒𝕞𝕖 𝕕𝕖 𝕍𝕒𝕘𝕒𝕝𝕦𝕞𝕖𝕤",
                 emoji="🦟",
                 media_key="enxame_de_vagalumes_cortantes_media",
                 stats_base={"max_hp": 65, 
@@ -173,7 +164,7 @@ REGIONAL_DUNGEONS = {
             ),
              MobDef(
                 key="lobo_alfa_da_matilha",
-                display="Lobo Alfa da Matilha",
+                display="𝕃𝕠𝕓𝕠 𝔸𝕝𝕗𝕒",
                 emoji="🐺",
                 media_key="lobo_alfa_da_matilha_media",
                 stats_base={"max_hp": 70, 
@@ -184,7 +175,7 @@ REGIONAL_DUNGEONS = {
             ),
             MobDef(
                 key="ent_protetor",
-                display="Ent Protetor",
+                display="𝔼𝕟𝕥 ℙ𝕣𝕠𝕥𝕖𝕥𝕠𝕣",
                 emoji="🌳",
                 media_key="ent_protetor_media",
                 stats_base={"max_hp": 70, 
@@ -195,7 +186,7 @@ REGIONAL_DUNGEONS = {
             ),
             MobDef(
                 key="aranha_gigante_da_tocaia",
-                display="Aranha Gigante da Tocaia",
+                display="𝔸𝕣𝕒𝕟𝕙𝕒 𝔾𝕚𝕘𝕒𝕟𝕥𝕖",
                 emoji="🌳",
                 media_key="aranha_gigante_da_tocaia_media",
                 stats_base={"max_hp": 80, 
@@ -207,21 +198,18 @@ REGIONAL_DUNGEONS = {
             # --- 👇 O BOSS (Com a tabela de loot correta) 👇 ---
             MobDef(
                 key="boss_anciao",
-                display="O Ancião da Floresta",
+                display="𝕆 𝔸𝕟𝕔𝕚𝕒̃𝕠 𝕕𝕒 𝔽𝕝𝕠𝕣𝕖𝕤𝕥𝕒",
                 emoji="🌀",
                 media_key="anciao_floresta_media",
                 stats_base={
-                    # Stats de Combate (os que tinhas)
                     "max_hp": 100, 
                     "attack": 10, 
                     "defense": 10, 
                     "initiative": 18, 
                     "luck": 15,
                     "is_boss": True,
-                    "xp_reward": 120,    # XP base (será multiplicado pela dificuldade)
-                    "gold_drop": 50,     # Ouro base (será multiplicado pela dificuldade)
-                      
-                    # A Tabela de Loot que me enviaste
+                    "xp_reward": 120,    
+                    "gold_drop": 50,
                     "loot_table": [
                         {"item_id": "emblema_guerreiro", "drop_chance": 5},
                         {"item_id": "essencia_guardia", "drop_chance": 5},
@@ -256,9 +244,8 @@ REGIONAL_DUNGEONS = {
                    ]
                 }
             ),
-        ] # <-- Fim da lista "floors"
-    }, # <-- Fim do calabouço "floresta_sombria"
-    # --- Exemplo de Calabouço para a Floresta Sombria ---
+        ] 
+    }, 
     "campos_linho": {
         "label": "Onde o vento dança entre as fibras douradas.",
         "emoji": "🌾",

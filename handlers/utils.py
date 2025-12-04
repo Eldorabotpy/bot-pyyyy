@@ -337,7 +337,7 @@ async def format_combat_message_from_cache(battle_cache: dict) -> str:
     )
 
     log_raw = battle_cache.get('battle_log', [])
-    log_lines = [_format_log_line(line) for line in log_raw[-4:]] 
+    log_lines = [_format_log_line(line) for line in log_raw[-6:]] 
     log_block = "\n".join(log_lines)
     if not log_block: log_block = "Aguardando sua ação..."
 

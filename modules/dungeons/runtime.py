@@ -171,9 +171,9 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
     
     mob_name = floor_mob.display
     if mob_name.lower().startswith(("o ", "a ", "os ", "as ")):
-        intro_text = f"Você avança! <b>{mob_name}</b> bloqueia seu caminho!"
+        intro_text = f"𝗩𝗼𝗰𝗲̂ 𝗮𝘃𝗮𝗻𝗰̧𝗮! {mob_name} 𝗯𝗹𝗼𝗾𝘂𝗲𝗶𝗮 𝘀𝗲𝘂 𝗰𝗮𝗺𝗶𝗻𝗵𝗼!"
     else:
-        intro_text = f"Você avança! Um <b>{mob_name}</b> aparece das sombras!"
+        intro_text = f"𝗩𝗼𝗰𝗲̂ 𝗮𝘃𝗮𝗻𝗰̧𝗮! 𝗨𝗺 {mob_name} 𝗮𝗽𝗮𝗿𝗲𝗰𝗲 𝗱𝗮𝘀 𝘀𝗼𝗺𝗯𝗿𝗮𝘀!"
 
     # 🔥 CORREÇÃO: Reduz 1 turno de todos os cooldowns ativos 🔥
     processed_cooldowns = {}
@@ -215,7 +215,7 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
     key_cost = _key_cost_for(diff_cfg)
     pdata = await player_manager.get_player_data(user_id) or {}
     if not _consume_keys(pdata, key_item, key_cost):
-        await context.bot.send_message(chat_id, f"Falta {key_cost}x {key_item}.")
+        await context.bot.send_message(chat_id, f"𝗙𝗮𝗹𝘁𝗮 {key_cost}x {key_item}.")
         return
     floors = list(dungeon.get("floors") or [])
     if not floors: return
@@ -229,8 +229,8 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
     await player_manager.save_player_data(user_id, pdata)
     
     caption = await format_combat_message(pdata)
-    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu")],
-          [InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")]]
+    kb = [[InlineKeyboardButton("⚔️ 𝘼𝙩𝙖𝙘𝙖𝙧", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡𝙨", callback_data="combat_skill_menu")],
+          [InlineKeyboardButton("🧪 𝗣𝗼𝗰̧𝗼̃𝗲𝘀", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝙁𝙪𝙜𝙞𝙧", callback_data="combat_flee")]]
     msg_id = await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), InlineKeyboardMarkup(kb))
     await _update_battle_cache(context, user_id, pdata, combat, message_id=msg_id, chat_id=chat_id)
 
@@ -274,8 +274,8 @@ async def fail_dungeon_run(update, context, user_id, chat_id, reason):
         await player_manager.save_player_data(user_id, pdata)
     
     # Envia a nova mensagem de derrota
-    await _send_battle_media(context, chat_id, f"💀 **Fim da Linha!**\n{reason}.", "media_dungeon_defeat", 
-                             InlineKeyboardMarkup([[InlineKeyboardButton("⚰️ Sair", callback_data="combat_return_to_map")]]))
+    await _send_battle_media(context, chat_id, f"💀 𝗙𝗶𝗺 𝗱𝗮 𝗟𝗶𝗻𝗵𝗮\n{reason}.", "media_dungeon_defeat", 
+                             InlineKeyboardMarkup([[InlineKeyboardButton("⚰️ 𝙎𝙖𝙞𝙧", callback_data="combat_return_to_map")]]))
     
 async def advance_after_victory(update, context, user_id, chat_id, combat_details, rewards):
     pdata = await player_manager.get_player_data(user_id) or {}
@@ -335,8 +335,8 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     await player_manager.save_player_data(user_id, pdata)
 
     caption = await format_combat_message(pdata)
-    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu")],
-          [InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")]]
+    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡", callback_data="combat_skill_menu")],
+          [InlineKeyboardButton("🧪 𝙋𝙤𝙘̧𝙖̃𝙤", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")]]
     
     # 👇 APAGA A MENSAGEM DO MONSTRO ANTERIOR AQUI
     await _delete_previous_battle_msg(context, user_id)
