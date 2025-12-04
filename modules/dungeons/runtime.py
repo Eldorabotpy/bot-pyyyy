@@ -1,5 +1,6 @@
 # modules/dungeons/runtime.py
-# (VERSÃO CORRIGIDA: AGORA OS COOLDOWNS DIMINUEM CORRETAMENTE)
+# (VERSÃO CORRIGIDA: Cooldowns lidos direto do Player Data)
+
 from __future__ import annotations
 import logging
 import random
@@ -54,12 +55,8 @@ def _key_item_for(dungeon_cfg: dict) -> str: return str(dungeon_cfg.get("key_ite
 # 🛠️ CACHE BRIDGE
 # ============================================================
 async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int, pdata: dict, combat_details: dict, message_id: int = None, chat_id: int = None):
-    """
-    Atualiza o cache de batalha com TODOS os dados necessários, incluindo o NOME.
-    """
     p_stats = await player_manager.get_player_total_stats(pdata)
     
-    # 1. Prepara Stats do Monstro
     monster_stats = {
         'name': combat_details.get('monster_name', 'Inimigo'),
         'hp': combat_details.get('monster_hp', 100),
@@ -76,10 +73,8 @@ async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int,
     }
     
     p_media = _get_class_media(pdata, purpose="combate")
-    
     player_name_fixed = pdata.get("character_name", "Herói")
 
-    # 3. Cria o Cache
     cache = {
         'player_id': user_id, 
         'chat_id': chat_id, 
@@ -97,7 +92,8 @@ async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int,
         'monster_media_id': combat_details.get('file_id_name'), 
         'monster_media_type': 'photo', 
         'dungeon_ctx': combat_details.get('dungeon_ctx'),
-        'skill_cooldowns': combat_details.get('skill_cooldowns', {}) 
+        # Tenta pegar do player data se não vier no details, para garantir sincronia inicial
+        'skill_cooldowns': combat_details.get('skill_cooldowns', pdata.get('cooldowns', {})) 
     }
     
     context.user_data['battle_cache'] = cache
@@ -162,7 +158,6 @@ def _new_run_state(region_key: str, difficulty: str) -> dict:
         }
     }
 
-# 🔥 CORREÇÃO AQUI: REDUÇÃO DE COOLDOWNS AO AVANÇAR MOB 🔥
 def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_key: str, stage: int, active_cooldowns: dict = None) -> dict:
     base_stats = floor_mob.stats_base
     stat_mult = difficulty_cfg.stat_mult
@@ -175,12 +170,12 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
     else:
         intro_text = f"𝗩𝗼𝗰𝗲̂ 𝗮𝘃𝗮𝗻𝗰̧𝗮! 𝗨𝗺 {mob_name} \n𝗮𝗽𝗮𝗿𝗲𝗰𝗲 𝗱𝗮𝘀 𝘀𝗼𝗺𝗯𝗿𝗮𝘀!"
 
-    # 🔥 CORREÇÃO: Reduz 1 turno de todos os cooldowns ativos 🔥
+    # Processa cooldowns: só repassa skills que têm turnos > 0
     processed_cooldowns = {}
     if active_cooldowns:
         for skill_id, turns in active_cooldowns.items():
             if turns > 0:
-                processed_cooldowns[skill_id] = turns  # <--- Mantém o valor original
+                processed_cooldowns[skill_id] = turns 
 
     return {
         "monster_name":       f"{floor_mob.emoji} {floor_mob.display}",
@@ -200,7 +195,7 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
         "is_boss":       bool(base_stats.get("is_boss", False)),
         "region_key":    region_key, "difficulty": difficulty_cfg.key, "dungeon_stage": stage,
         
-        "skill_cooldowns": processed_cooldowns
+        "skill_cooldowns": processed_cooldowns 
     }
 
 async def _start_first_fight(update, context, region_key, difficulty_key):
@@ -219,7 +214,10 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
     if not floors: return
 
     state = _new_run_state(region_key, difficulty_key)
-    combat = _build_combat_details(floors[0], diff_cfg, region_key, 0)
+    
+    # Pega cooldowns atuais do jogador para iniciar a dungeon
+    current_cooldowns = pdata.get("cooldowns", {})
+    combat = _build_combat_details(floors[0], diff_cfg, region_key, 0, active_cooldowns=current_cooldowns)
     
     state["action"] = "in_combat"
     state["details"] = combat
@@ -236,71 +234,22 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
 # Avanço Pós-Combate
 # ============================================================
 async def resume_dungeon_after_battle(context, user_id, dungeon_ctx, victory):
-    """
-    Ponte segura para chamar o runtime.py.
-    VERSÃO CORRIGIDA: Força a leitura do HP da memória (Cache) sem verificações de ID restritas.
-    """
-    # 1. Pega dados do Cache (Memória Visual)
-    # context.user_data JÁ É isolado por usuário, não precisamos checar ID de novo.
+    # Pega dados do cache apenas para HP/MP, cooldowns pegaremos do DB
     cache = context.user_data.get('battle_cache') or {}
+    final_hp = cache.get('player_hp')
+    final_mp = cache.get('player_mp')
     
-    # Pega o HP/MP que estava na tela no momento da vitória
-    cache_hp = cache.get('player_hp')
-    cache_mp = cache.get('player_mp')
-    
-    # 2. Pega dados do Banco de Dados para complementar
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata: return
-    run = pdata.get("player_state", {})
-    details = run.get("details", {})
-    
-    # Pega Cooldowns do Banco de Dados (onde a lógica de combate salvou)
-    db_cds = details.get("skill_cooldowns", {})
-
-    # 👇 A CORREÇÃO PRINCIPAL 👇
-    # Se o cache tiver um valor de HP (mesmo que seja 0 ou baixo), USAMOS ELE.
-    # Só usamos o do banco de dados (pdata) se o cache for None (não existir).
-    if cache_hp is not None:
-        final_hp = cache_hp
-    else:
-        final_hp = pdata.get("current_hp")
-
-    if cache_mp is not None:
-        final_mp = cache_mp
-    else:
-        final_mp = pdata.get("current_mp")
-
-    # Verifica derrota
-    if not victory:
-        await fail_dungeon_run(None, context, user_id, user_id, "Derrotado")
-        return
-
-    if not dungeon_ctx: dungeon_ctx = details.get("dungeon_ctx")
-    if not dungeon_ctx: return
-
-    items = []
-    loot = details.get("loot_table", [])
-    if loot:
-        for e in loot:
-            if random.uniform(0, 100) <= e.get("drop_chance", 0): items.append((e.get("item_id"), 1, {}))
-            
-    rewards = {
-        "xp": details.get("monster_xp_reward", 0), "gold": details.get("monster_gold_drop", 0),
-        "items": items
-    }
-    
-    # Envia os dados para a função de avanço
     await advance_after_victory(
-        None, context, user_id, user_id, details, rewards, 
+        None, context, user_id, user_id, 
+        dungeon_ctx, {}, 
         current_hp=final_hp, 
-        current_mp=final_mp, 
-        current_cds=db_cds 
+        current_mp=final_mp,
+        # Passamos None nos cooldowns para forçar o advance a ler do DB
+        current_cds=None
     )
 
 async def fail_dungeon_run(update, context, user_id, chat_id, reason):
-    # 👇 1. APAGA A MENSAGEM ANTERIOR AQUI
     await _delete_previous_battle_msg(context, user_id)
-
     pdata = await player_manager.get_player_data(user_id)
     if pdata:
         stats = await player_manager.get_player_total_stats(pdata) 
@@ -309,22 +258,24 @@ async def fail_dungeon_run(update, context, user_id, chat_id, reason):
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(user_id, pdata)
     
-    # Envia a nova mensagem de derrota
     await _send_battle_media(context, chat_id, f"💀 𝗙𝗶𝗺 𝗱𝗮 𝗟𝗶𝗻𝗵𝗮\n{reason}.", "media_dungeon_defeat", 
                              InlineKeyboardMarkup([[InlineKeyboardButton("⚰️ 𝙎𝙖𝙞𝙧", callback_data="combat_return_to_map")]]))
     
 async def advance_after_victory(update, context, user_id, chat_id, combat_details, rewards, current_hp=None, current_mp=None, current_cds=None):
+    if context and context.user_data.get('battle_cache'):
+        cache = context.user_data['battle_cache']
+        if current_hp is None: current_hp = cache.get('player_hp')
+        if current_mp is None: current_mp = cache.get('player_mp')
+    
     pdata = await player_manager.get_player_data(user_id) or {}
     run = pdata.get("player_state") or {}
     
-    # Atualiza HP/MP
     if current_hp is not None: pdata['current_hp'] = int(current_hp)
     if current_mp is not None: pdata['current_mp'] = int(current_mp)
     
     xp, gold, items = rewards.get("xp",0), rewards.get("gold",0), rewards.get("items",[])
     pdata['xp'] = int(pdata.get('xp', 0)) + xp
     
-    # Verifica Level Up
     levelup_text = ""
     try:
         if hasattr(player_manager, 'check_and_apply_level_up'):
@@ -351,11 +302,8 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     cur_stg = int(combat_details.get("dungeon_stage", 0))
     next_stg = cur_stg + 1
     
-    # 👇 GARANTE O USO DOS CDS PASSADOS
-    if current_cds is not None:
-        active_cds = current_cds
-    else:
-        active_cds = combat_details.get("skill_cooldowns", {})
+    # 🔴 CORREÇÃO PRINCIPAL: Pega sempre do player_data (DB), que é onde o main_handler salvou
+    active_cds = pdata.get("cooldowns", {})
 
     # --- VITÓRIA FINAL ---
     if next_stg >= len(floors):
@@ -383,21 +331,19 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     try: next_mob = floors[next_stg]
     except: return
 
-    # O _build_combat_details vai reduzir 1 turno aqui
     combat = _build_combat_details(next_mob, diff_cfg, reg_key, next_stg, active_cooldowns=active_cds)
     
     run["action"] = "in_combat"
     run["details"] = combat
     pdata["player_state"] = run
+    
     await player_manager.save_player_data(user_id, pdata)
 
     caption = await format_combat_message(pdata)
     kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡", callback_data="combat_skill_menu")],
-          [InlineKeyboardButton("🧪 𝙋𝙤𝙘̧𝙖̃𝙤", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")]]
+          [InlineKeyboardButton("🧪 𝙋𝙤𝙘̧𝙖̃𝙤", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝙧", callback_data="combat_flee")]]
     
     await _delete_previous_battle_msg(context, user_id)
-    
-    # Se subiu de nível, manda uma mensagem extra avisando antes do próximo mob
     if levelup_text:
         await context.bot.send_message(chat_id, f"🆙 𝙑𝙤𝙘𝙚̂ 𝙨𝙪𝙗𝙞𝙪 𝙙𝙚 𝙣𝙞́𝙫𝙚𝙡 𝙙𝙪𝙧𝙖𝙣𝙩𝙚 𝙖 𝙢𝙖𝙨𝙢𝙤𝙧𝙧𝙖!\n𝙎𝙪𝙖𝙨 𝙚𝙣𝙚𝙧𝙜𝙞𝙖𝙨 𝙛𝙤𝙧𝙖𝙢 𝙧𝙚𝙨𝙩𝙖𝙪𝙧𝙖𝙙𝙖𝙨!", parse_mode="HTML")
 
@@ -412,21 +358,24 @@ async def _pick_diff_cb(update, context):
     await _start_first_fight(update, context, d[2], d[1])
 async def _dungeon_locked_cb(update, context): await update.callback_query.answer("Trancado!", show_alert=True)
 
+# ====================================================================
+# 🔴 MENU DE SKILLS CORRIGIDO (Lê do pdata, não do cache)
+# ====================================================================
 async def open_combat_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try: await query.answer()
     except: pass
     user_id = update.effective_user.id
     
-    # Carrega dados
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return
     learned_skills = pdata.get("skills") or pdata.get("learned_skills") or []
     
-    # 🔥 Pega os cooldowns da memória 🔥
-    battle_cache = context.user_data.get('battle_cache', {})
-    active_cds = battle_cache.get('skill_cooldowns', {})
-
+    # 🔴 AQUI ESTAVA O ERRO!
+    # Antes: active_cds = battle_cache.get('skill_cooldowns', {})  <-- LIA COISA VELHA
+    # Agora:
+    active_cds = pdata.get('cooldowns', {}) # <-- LÊ COISA NOVA
+    
     kb = []
     row = []
     if not learned_skills:
@@ -434,16 +383,12 @@ async def open_combat_skill_menu(update: Update, context: ContextTypes.DEFAULT_T
     else:
         for skill_id in learned_skills:
             skill_name = str(skill_id).replace("_", " ").title()
-            
-            # Verifica se tem tempo restante
             turns_left = active_cds.get(skill_id, 0)
             
             if turns_left > 0:
-                # Mostra ampulheta e tempo
                 btn_text = f"⏳ {skill_name} ({turns_left}t)"
                 cb_data = "ignore"
             else:
-                # Libera o uso
                 btn_text = f"✨ {skill_name}"
                 cb_data = f"combat_use_skill:{skill_id}"
                 
@@ -457,18 +402,13 @@ async def open_combat_skill_menu(update: Update, context: ContextTypes.DEFAULT_T
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
 
 async def _delete_previous_battle_msg(context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """Tenta apagar a mensagem de batalha anterior salva no cache."""
     cache = context.user_data.get('battle_cache')
-    # Verifica se o cache pertence ao usuário atual
     if cache and cache.get('player_id') == user_id:
         chat_id = cache.get('chat_id')
         msg_id = cache.get('message_id')
         if chat_id and msg_id:
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-            except Exception as e:
-                # Ignora erros se a mensagem já foi apagada ou é muito antiga
-                pass
+            try: await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+            except Exception: pass
 
 async def open_combat_potion_menu(update, context):
     q = update.callback_query
