@@ -173,15 +173,14 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
     if mob_name.lower().startswith(("o ", "a ", "os ", "as ")):
         intro_text = f"𝗩𝗼𝗰𝗲̂ 𝗮𝘃𝗮𝗻𝗰̧𝗮! {mob_name} 𝗯𝗹𝗼𝗾𝘂𝗲𝗶𝗮 𝘀𝗲𝘂 𝗰𝗮𝗺𝗶𝗻𝗵𝗼!"
     else:
-        intro_text = f"𝗩𝗼𝗰𝗲̂ 𝗮𝘃𝗮𝗻𝗰̧𝗮! 𝗨𝗺 {mob_name} 𝗮𝗽𝗮𝗿𝗲𝗰𝗲 𝗱𝗮𝘀 𝘀𝗼𝗺𝗯𝗿𝗮𝘀!"
+        intro_text = f"𝗩𝗼𝗰𝗲̂ 𝗮𝘃𝗮𝗻𝗰̧𝗮! 𝗨𝗺 {mob_name} \n𝗮𝗽𝗮𝗿𝗲𝗰𝗲 𝗱𝗮𝘀 𝘀𝗼𝗺𝗯𝗿𝗮𝘀!"
 
     # 🔥 CORREÇÃO: Reduz 1 turno de todos os cooldowns ativos 🔥
     processed_cooldowns = {}
     if active_cooldowns:
         for skill_id, turns in active_cooldowns.items():
-            new_turns = turns - 1
-            if new_turns > 0:
-                processed_cooldowns[skill_id] = new_turns
+            if turns > 0:
+                processed_cooldowns[skill_id] = turns  # <--- Mantém o valor original
 
     return {
         "monster_name":       f"{floor_mob.emoji} {floor_mob.display}",
@@ -201,7 +200,6 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
         "is_boss":       bool(base_stats.get("is_boss", False)),
         "region_key":    region_key, "difficulty": difficulty_cfg.key, "dungeon_stage": stage,
         
-        # Passa os cooldowns reduzidos para a próxima luta
         "skill_cooldowns": processed_cooldowns
     }
 
@@ -238,14 +236,45 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
 # Avanço Pós-Combate
 # ============================================================
 async def resume_dungeon_after_battle(context, user_id, dungeon_ctx, victory):
-    if not victory:
-        await fail_dungeon_run(None, context, user_id, user_id, "Derrotado")
-        return
+    """
+    Ponte segura para chamar o runtime.py.
+    VERSÃO CORRIGIDA: Força a leitura do HP da memória (Cache) sem verificações de ID restritas.
+    """
+    # 1. Pega dados do Cache (Memória Visual)
+    # context.user_data JÁ É isolado por usuário, não precisamos checar ID de novo.
+    cache = context.user_data.get('battle_cache') or {}
+    
+    # Pega o HP/MP que estava na tela no momento da vitória
+    cache_hp = cache.get('player_hp')
+    cache_mp = cache.get('player_mp')
+    
+    # 2. Pega dados do Banco de Dados para complementar
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return
     run = pdata.get("player_state", {})
     details = run.get("details", {})
     
+    # Pega Cooldowns do Banco de Dados (onde a lógica de combate salvou)
+    db_cds = details.get("skill_cooldowns", {})
+
+    # 👇 A CORREÇÃO PRINCIPAL 👇
+    # Se o cache tiver um valor de HP (mesmo que seja 0 ou baixo), USAMOS ELE.
+    # Só usamos o do banco de dados (pdata) se o cache for None (não existir).
+    if cache_hp is not None:
+        final_hp = cache_hp
+    else:
+        final_hp = pdata.get("current_hp")
+
+    if cache_mp is not None:
+        final_mp = cache_mp
+    else:
+        final_mp = pdata.get("current_mp")
+
+    # Verifica derrota
+    if not victory:
+        await fail_dungeon_run(None, context, user_id, user_id, "Derrotado")
+        return
+
     if not dungeon_ctx: dungeon_ctx = details.get("dungeon_ctx")
     if not dungeon_ctx: return
 
@@ -259,7 +288,14 @@ async def resume_dungeon_after_battle(context, user_id, dungeon_ctx, victory):
         "xp": details.get("monster_xp_reward", 0), "gold": details.get("monster_gold_drop", 0),
         "items": items
     }
-    await advance_after_victory(None, context, user_id, user_id, details, rewards)
+    
+    # Envia os dados para a função de avanço
+    await advance_after_victory(
+        None, context, user_id, user_id, details, rewards, 
+        current_hp=final_hp, 
+        current_mp=final_mp, 
+        current_cds=db_cds 
+    )
 
 async def fail_dungeon_run(update, context, user_id, chat_id, reason):
     # 👇 1. APAGA A MENSAGEM ANTERIOR AQUI
@@ -277,12 +313,30 @@ async def fail_dungeon_run(update, context, user_id, chat_id, reason):
     await _send_battle_media(context, chat_id, f"💀 𝗙𝗶𝗺 𝗱𝗮 𝗟𝗶𝗻𝗵𝗮\n{reason}.", "media_dungeon_defeat", 
                              InlineKeyboardMarkup([[InlineKeyboardButton("⚰️ 𝙎𝙖𝙞𝙧", callback_data="combat_return_to_map")]]))
     
-async def advance_after_victory(update, context, user_id, chat_id, combat_details, rewards):
+async def advance_after_victory(update, context, user_id, chat_id, combat_details, rewards, current_hp=None, current_mp=None, current_cds=None):
     pdata = await player_manager.get_player_data(user_id) or {}
     run = pdata.get("player_state") or {}
     
+    # Atualiza HP/MP
+    if current_hp is not None: pdata['current_hp'] = int(current_hp)
+    if current_mp is not None: pdata['current_mp'] = int(current_mp)
+    
     xp, gold, items = rewards.get("xp",0), rewards.get("gold",0), rewards.get("items",[])
     pdata['xp'] = int(pdata.get('xp', 0)) + xp
+    
+    # Verifica Level Up
+    levelup_text = ""
+    try:
+        if hasattr(player_manager, 'check_and_apply_level_up'):
+            lvls, pts, msg = player_manager.check_and_apply_level_up(pdata)
+            if lvls > 0:
+                stats = await player_manager.get_player_total_stats(pdata)
+                pdata['current_hp'] = stats.get('max_hp', 100)
+                pdata['current_mp'] = stats.get('max_mana', 50)
+                levelup_text = f"\n\n🆙 <b>LEVEL UP!</b>\n{msg}"
+    except Exception as e:
+        print(f"Erro no level up: {e}")
+
     if gold > 0: player_manager.add_gold(pdata, gold)
     for i, q, _ in items: player_manager.add_item_to_inventory(pdata, i, q)
 
@@ -297,13 +351,15 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     cur_stg = int(combat_details.get("dungeon_stage", 0))
     next_stg = cur_stg + 1
     
-    active_cds = combat_details.get("skill_cooldowns", {})
+    # 👇 GARANTE O USO DOS CDS PASSADOS
+    if current_cds is not None:
+        active_cds = current_cds
+    else:
+        active_cds = combat_details.get("skill_cooldowns", {})
 
-    # --- CASO 1: VITÓRIA TOTAL (Fim do Calabouço) ---
+    # --- VITÓRIA FINAL ---
     if next_stg >= len(floors):
-        # 👇 APAGA A MENSAGEM DO ÚLTIMO BOSS AQUI
         await _delete_previous_battle_msg(context, user_id)
-
         pdata.setdefault("dungeon_progress", {}).setdefault(reg_key, {})
         pdata["dungeon_progress"][reg_key]["highest_completed"] = diff_key
         bonus = _final_gold_for(dungeon, diff_cfg)
@@ -313,20 +369,21 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         pdata['current_hp'] = stats.get('max_hp', 50)
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
+        
         await player_manager.save_player_data(user_id, pdata)
         
-        summ = f"🏆 <b>CALABOUÇO CONCLUÍDO!</b>\nBônus: {bonus} Ouro"
-        if items: summ += "\n\nLoot Final:\n" + "\n".join([f"• {q}x {i}" for i,q,_ in items])
-        
-        # Envia a mensagem de Vitória
+        summ = f"🏆 <b>CALABOUÇO CONCLUÍDO!</b>\n\n✨ <b>XP Ganho:</b> {xp}\n💰 <b>Bônus Ouro:</b> {bonus}"
+        summ += levelup_text
+        if items: summ += "\n\n🎒 <b>Loot Final:</b>\n" + "\n".join([f"• {q}x {i}" for i,q,_ in items])
         await _send_battle_media(context, chat_id, summ, "media_dungeon_victory", 
                                  InlineKeyboardMarkup([[InlineKeyboardButton("🎉 Continuar", callback_data="combat_return_to_map")]]))
         return
 
-    # --- CASO 2: PRÓXIMO MONSTRO ---
+    # --- PRÓXIMO MONSTRO ---
     try: next_mob = floors[next_stg]
     except: return
 
+    # O _build_combat_details vai reduzir 1 turno aqui
     combat = _build_combat_details(next_mob, diff_cfg, reg_key, next_stg, active_cooldowns=active_cds)
     
     run["action"] = "in_combat"
@@ -338,10 +395,12 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡", callback_data="combat_skill_menu")],
           [InlineKeyboardButton("🧪 𝙋𝙤𝙘̧𝙖̃𝙤", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data="combat_flee")]]
     
-    # 👇 APAGA A MENSAGEM DO MONSTRO ANTERIOR AQUI
     await _delete_previous_battle_msg(context, user_id)
+    
+    # Se subiu de nível, manda uma mensagem extra avisando antes do próximo mob
+    if levelup_text:
+        await context.bot.send_message(chat_id, f"🆙 𝙑𝙤𝙘𝙚̂ 𝙨𝙪𝙗𝙞𝙪 𝙙𝙚 𝙣𝙞́𝙫𝙚𝙡 𝙙𝙪𝙧𝙖𝙣𝙩𝙚 𝙖 𝙢𝙖𝙨𝙢𝙤𝙧𝙧𝙖!\n𝙎𝙪𝙖𝙨 𝙚𝙣𝙚𝙧𝙜𝙞𝙖𝙨 𝙛𝙤𝙧𝙖𝙢 𝙧𝙚𝙨𝙩𝙖𝙪𝙧𝙖𝙙𝙖𝙨!", parse_mode="HTML")
 
-    # Envia o próximo monstro
     msg_id = await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), InlineKeyboardMarkup(kb))
     await _update_battle_cache(context, user_id, pdata, combat, message_id=msg_id, chat_id=chat_id)
 

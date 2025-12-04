@@ -1,11 +1,11 @@
 # handlers/combat/main_handler.py
-# (VERSÃO CORRIGIDA: RECUPERA CAÇADAS NORMAIS E DUNGEONS)
+# (VERSÃO CORRIGIDA: Restaura HP/MP em Vitória E Derrota)
 
 import logging
 import random
 import asyncio
 from typing import Optional
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo, InputMediaPhoto, CallbackQuery
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo, InputMediaPhoto
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
 
@@ -93,11 +93,13 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     user_id = query.from_user.id if query else update.effective_user.id
     chat_id = query.message.chat_id if query else update.effective_chat.id
 
+    # --- Retorno ao Mapa ---
     if action == 'combat_return_to_map':
         if query: await _safe_answer(query)
         context.user_data.pop('battle_cache', None)
         player_data = await player_manager.get_player_data(user_id)
         if player_data:
+            # Garante que o estado está limpo
             player_data['player_state'] = {'action': 'idle'}
             await player_manager.save_player_data(user_id, player_data)
             await send_region_menu(context, user_id, chat_id)
@@ -105,6 +107,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             except: pass
         return
 
+    # --- Menu de Ataque ---
     if action == 'combat_attack_menu':
         if not query: return
         await _safe_answer(query)
@@ -207,7 +210,10 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         context.user_data.pop('battle_cache', None)
         player_data = await player_manager.get_player_data(user_id)
         player_data['player_state'] = {'action': 'idle'}
+        
+        # Fuga = 10% de HP restante (penalidade)
         player_data['current_hp'] = max(1, int(player_stats.get('max_hp', 100) * 0.1))
+        
         await player_manager.save_player_data(user_id, player_data)
         try: await query.delete_message()
         except: pass
@@ -282,7 +288,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             try:
                 log.append(f"🏆 <b>{monster_stats.get('name')} derrotado!</b>")
                 
-                # --- LÓGICA DE DUNGEON ---
+                # --- LÓGICA DE DUNGEON (Não altera HP) ---
                 if in_dungeon:
                     combat_details_recon = {
                          "region_key": battle_cache.get("region_key"),
@@ -336,13 +342,15 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     if mid: await mission_manager.update_mission_progress(user_id, "hunt", mid, 1)
                 except: pass
                 
-                # Reset Player
+                # --- [CORREÇÃO] RESTAURAÇÃO COMPLETA PÓS-VITÓRIA ---
+                # Recalcula stats (pois o nível pode ter subido) e força HP/MP Max
                 stats = await player_manager.get_player_total_stats(player_data)
                 player_data['current_hp'] = stats.get('max_hp', 100)
                 player_data['current_mp'] = stats.get('max_mana', 50)
-                player_data['player_state'] = {'action': 'idle'}
                 
+                player_data['player_state'] = {'action': 'idle'}
                 await player_manager.save_player_data(user_id, player_data)
+                
                 context.user_data.pop('battle_cache', None)
                 
                 await _edit_media_or_caption(context, battle_cache, summary, battle_cache['player_media_id'], battle_cache['player_media_type'], kb_voltar)
@@ -350,6 +358,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
             except Exception as e:
                 logger.error(f"Erro vitória: {e}")
+                # Fallback de segurança: salva como idle
                 player_data['player_state'] = {'action': 'idle'}
                 await player_manager.save_player_data(user_id, player_data)
                 context.user_data.pop('battle_cache', None)
@@ -373,11 +382,19 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     await dungeons_runtime.fail_dungeon_run(update, context, user_id, chat_id, "Derrota")
                     return
                 
-                # Derrota Normal
+                # --- [CORREÇÃO] Derrota Normal ---
                 xp_loss = int(monster_stats.get('xp_reward', 0) * 0.5)
                 player_data['xp'] = max(0, player_data.get('xp', 0) - xp_loss)
+                
+                # <<< RESTAURAÇÃO ADICIONADA AQUI >>>
+                # Mesmo na derrota, o jogador volta à vida "na cidade"
+                stats_rec = await player_manager.get_player_total_stats(player_data)
+                player_data['current_hp'] = stats_rec.get('max_hp', 100)
+                player_data['current_mp'] = stats_rec.get('max_mana', 50)
+                
                 player_data['player_state'] = {'action': 'idle'}
                 await player_manager.save_player_data(user_id, player_data)
+                
                 context.user_data.pop('battle_cache', None)
                 media_derrota = (file_id_manager.get_file_data("media_derrota_cacada") or {}).get('id')
                 await _edit_media_or_caption(context, battle_cache, f"☠️ <b>Derrota!</b> -{xp_loss} XP", media_derrota, "photo", kb_voltar)
