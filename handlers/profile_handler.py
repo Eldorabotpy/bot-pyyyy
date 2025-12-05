@@ -1,5 +1,5 @@
 # handlers/profile_handler.py
-# (VERSÃO CORRIGIDA: Botão Voltar Dinâmico - Respeita a Localização Atual)
+# (VERSÃO FINAL: Blindada contra erro de mensagem não encontrada e envio de mídia)
 
 import logging
 import unicodedata
@@ -423,11 +423,10 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("💼 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data='job_menu')])
 
     # Define o callback de voltar DINAMICAMENTE
-    # Se estiver no Reino, manda pra lá. Se estiver na Floresta, manda pra Floresta.
     if location_key == "reino_eldora":
-        back_callback = "back_to_kingdom" # Esse handler já existe e leva ao reino
+        back_callback = "back_to_kingdom"
     else:
-        back_callback = f"open_region:{location_key}" # Esse abre a região atual
+        back_callback = f"open_region:{location_key}"
 
     keyboard.extend([
         [InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚 𝐝𝐞 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨𝐬 🏰", callback_data='adventurer_guild_main')],
@@ -439,15 +438,23 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🎨 𝐌𝐮𝐝𝐚𝐫 𝐀𝐩𝐚𝐫𝐞̂𝐧𝐜𝐢𝐚 🎨", callback_data='skin_menu')],
         [InlineKeyboardButton("🔄 𝐂𝐨𝐧𝐯𝐞𝐫𝐭𝐞𝐫 𝐑𝐞𝐜𝐨𝐦𝐩𝐞𝐧𝐬𝐚𝐬 🔄", callback_data='conv:main')],
         
-        # --- BOTÃO CORRIGIDO AQUI ---
         [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 ⬅️", callback_data=back_callback)],
     ])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     media = _get_class_media(player_data, "personagem")
+    
+    # --- LÓGICA DE ENVIO BLINDADA ---
+    # 1. Tenta deletar mensagem antiga (se existir)
+    if query:
+        try:
+            await query.delete_message()
+        except Exception:
+            pass # Ignora se já foi deletada
+
+    # 2. Tenta enviar com foto/vídeo
     if media and media.get("id"):
         try:
-            if query: await query.delete_message()
             fid  = media["id"]
             ftyp = (media.get("type") or "photo").lower()
             if ftyp == "video":
@@ -457,11 +464,10 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return 
         except Exception as e:
             logger.error(f"Falha ao enviar mídia do perfil: {e}")
+            # Se falhar a mídia, cai para o envio de texto abaixo (fallback)
 
-    if query:
-        await _safe_edit_or_send(query, context, chat_id, profile_text, reply_markup=reply_markup, parse_mode='HTML')
-    else:
-        await context.bot.send_message(chat_id=chat_id, text=profile_text, reply_markup=reply_markup, parse_mode="HTML")
+    # 3. Fallback: Envia apenas texto se não tiver mídia ou se a mídia falhou
+    await context.bot.send_message(chat_id=chat_id, text=profile_text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ====================================================================
 # EXPORTAÇÕES

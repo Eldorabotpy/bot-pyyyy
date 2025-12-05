@@ -1,17 +1,21 @@
 # handlers/gem_shop_handler.py
+# (VERSÃO FINAL 3.0: Com Notificação de Hype no Grupo)
 
 import logging
 from typing import Dict, List
+from datetime import datetime, timedelta, timezone
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from modules.player.core import clear_player_cache
-# Importe tudo que é necessário
 from modules import player_manager, game_data
-from modules.player.premium import PremiumManager
 from modules import file_id_manager
 
 logger = logging.getLogger(__name__)
+
+# CONFIGURAÇÃO DE LOG / NOTIFICAÇÃO
+LOG_GROUP_ID = -1002881364171
+LOG_TOPIC_ID = 24475
 
 # ----------------------------------------------------------------------
 # Helpers e Configurações Gerais
@@ -24,64 +28,55 @@ def _set_gems(pdata: dict, value: int):
     pdata["gems"] = max(0, int(value))
 
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
-    try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception: pass
+    if query:
+        try:
+            await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            return
+        except Exception:
+            try:
+                await query.delete_message()
+            except Exception:
+                pass
+    
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 async def _send_with_media(chat_id: int, context: ContextTypes.DEFAULT_TYPE, caption: str, kb: InlineKeyboardMarkup, media_keys: List[str]):
-    """
-    Tenta enviar uma mensagem com mídia usando uma lista de chaves.
-    Se falhar, envia como texto simples.
-    """
     media_sent = False
     for key in media_keys:
-        # Tenta obter dados da mídia usando a chave
-        # <<< VERIFICA se 'file_id_manager' é o nome correto que importaste >>>
         fd = file_id_manager.get_file_data(key) 
         
         if fd and fd.get("id"):
             fid, ftype = fd["id"], fd.get("type", "photo").lower() 
-            
             try:
                 if ftype in ("video", "animation"): 
                     await context.bot.send_animation(chat_id=chat_id, animation=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
                 else: 
                     await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=caption, reply_markup=kb, parse_mode="HTML")
-                
                 media_sent = True 
                 break 
-                
             except Exception as e:
-                logger.warning(f"Falha ao enviar mídia com chave '{key}' (ID: {fid}, Tipo: {ftype}). Erro: {e}. Tentando a próxima chave.")
                 continue 
     
     if not media_sent:
-        logger.info(f"Nenhuma mídia válida encontrada para as chaves {media_keys}. Enviando como texto.")
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=kb, parse_mode="HTML")
 
 async def gem_shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Exibe o menu principal da Loja de Gemas com as categorias (AGORA COM MÍDIA)."""
     q = update.callback_query
     
     if q:
         await q.answer()
         user_id = q.from_user.id
-        chat_id = q.message.chat.id # Pega chat_id da mensagem original da query
+        chat_id = q.message.chat.id 
         try:
-            # Tenta apagar a mensagem anterior se veio de um botão
             await q.delete_message()
-        except Exception:
-            pass # Ignora se falhar
-    else: # Se chamado via /gemas (não tem query)
+        except Exception: pass 
+    else: 
         user_id = update.effective_user.id
-        chat_id = update.effective_chat.id # Pega chat_id do update da mensagem
+        chat_id = update.effective_chat.id 
 
-    # Carrega dados do jogador (Já estava correto com await)
     pdata = await player_manager.get_player_data(user_id)
     current_gems = _get_gems(pdata) 
 
-    # Texto da legenda (caption)
     caption = (
         "💎 <b>Loja de Gemas</b>\n\n"
         "Bem-vindo, aventureiro! Use suas gemas com sabedoria.\n\n"
@@ -89,23 +84,15 @@ async def gem_shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "O que você deseja ver?"
     )
 
-    # Teclado (keyboard)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🛒 Comprar Itens de Evolução", callback_data="gem_shop_items")],
         [InlineKeyboardButton("⭐ Comprar Planos Premium", callback_data="gem_shop_premium")],
         [InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market")] 
     ])
 
-    # <<< NOVA LÓGICA DE MÍDIA AQUI >>>
-    # Define as chaves de mídia a tentar, por ordem de preferência
     media_keys = ["loja_gemas", "gem_store", "premium_shop_img", "market"] 
-    
-    # Chama a função _send_with_media para enviar a mensagem com a mídia
     await _send_with_media(chat_id, context, caption, kb, media_keys)
 
-#
-# >>> FIM DO CÓDIGO MODIFICADO (gem_shop_menu) <<<
-#
 # -- Configuração dos Itens --
 EVOLUTION_ITEMS = [
     "cristal_de_abertura", "emblema_guerreiro", "essencia_guardia", "essencia_furia",
@@ -120,7 +107,6 @@ EVOLUTION_ITEMS = [
 DEFAULT_GEM_PRICE = 10
 GEM_SHOP_PRICES: Dict[str, int] = { }
 
-# -- Funções Auxiliares de Itens --
 def _item_label_for(base_id: str) -> str:
     info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
     name = info.get("display_name", base_id)
@@ -139,22 +125,21 @@ def _item_state(context: ContextTypes.DEFAULT_TYPE) -> dict:
 
 # -- Handlers da Loja de Itens --
 async def gem_shop_items_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra a interface de compra de itens."""
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
+    chat_id = q.message.chat.id
 
-    st = _item_state(context) # Síncrono
+    st = _item_state(context) 
     base_id, qty = st["base_id"], st["qty"]
-    # <<< CORREÇÃO 2: Adiciona await >>>
+    
     pdata = await player_manager.get_player_data(user_id)
-    gems_now = _get_gems(pdata) # Síncrono
+    gems_now = _get_gems(pdata) 
 
     text = (f"💎 <b>Loja de Itens</b>\n\n"
             f"Gemas: <b>{gems_now}</b> 💎\n\n"
-            f"Selecionado: <b>{_item_label_for(base_id)}</b> — {_item_price_for(base_id)} 💎/un") # Síncrono
+            f"Selecionado: <b>{_item_label_for(base_id)}</b> — {_item_price_for(base_id)} 💎/un") 
 
-    # Construção do teclado (síncrona)
     row: List[InlineKeyboardButton] = []
     item_buttons: List[List[InlineKeyboardButton]] = []
     for i, item_id in enumerate(EVOLUTION_ITEMS, 1):
@@ -166,7 +151,7 @@ async def gem_shop_items_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     qty_row = [
         InlineKeyboardButton("➖", callback_data="gem_item_qty_minus"),
-        InlineKeyboardButton(f"Qtd: {qty}", callback_data="noop"), # 'noop' assumido como callback que não faz nada
+        InlineKeyboardButton(f"Qtd: {qty}", callback_data="noop"), 
         InlineKeyboardButton("➕", callback_data="gem_item_qty_plus"),
     ]
     actions = [
@@ -174,7 +159,7 @@ async def gem_shop_items_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_shop")]
     ]
     kb = InlineKeyboardMarkup(item_buttons + [qty_row] + actions)
-    await _safe_edit_or_send(q, context, q.message.chat_id, text, kb) # Já usa await
+    await _safe_edit_or_send(q, context, chat_id, text, kb) 
 
 async def gem_item_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -198,63 +183,57 @@ async def gem_item_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
+    chat_id = q.message.chat.id
 
-    st = _item_state(context) # Síncrono
+    st = _item_state(context) 
     base_id, qty = st["base_id"], st["qty"]
-    total_price = _item_price_for(base_id) * qty # Síncrono
+    total_price = _item_price_for(base_id) * qty 
 
-    # <<< CORREÇÃO 3: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id)
 
-    # Verificação síncrona
     if _get_gems(pdata) < total_price:
         await q.answer("Gemas insuficientes.", show_alert=True); return
 
-    # Modificações síncronas no pdata
     _set_gems(pdata, _get_gems(pdata) - total_price)
     player_manager.add_item_to_inventory(pdata, base_id, qty)
 
-    # <<< CORREÇÃO 4: Adiciona await >>>
     await player_manager.save_player_data(user_id, pdata)
 
-    # Usa edit_message_text diretamente pois sabemos que veio de um callback
-    await q.edit_message_text(
+    await _safe_edit_or_send(
+        q, context, chat_id,
         f"✅ Você comprou {qty}× {_item_label_for(base_id)} por {total_price} 💎.",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_shop_items")]])
     )
 
 # ----------------------------------------------------------------------
-# --- SEÇÃO 2: COMPRA DE PLANOS PREMIUM (Nosso código anterior) ---
+# --- SEÇÃO 2: COMPRA DE PLANOS PREMIUM ---
 # ----------------------------------------------------------------------
 
 async def gem_shop_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra a interface de compra de planos premium."""
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
+    chat_id = q.message.chat.id
 
-    # <<< CORREÇÃO 5: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id)
-    current_gems = _get_gems(pdata) # Síncrono
+    current_gems = _get_gems(pdata) 
 
     text = (f"⭐ <b>Loja de Planos Premium</b>\n\n"
             f"Seu saldo: <b>{current_gems}</b> 💎\n\n"
             "Selecione um plano para comprar:")
 
-    # Construção síncrona do teclado
     kb_rows = []
-    # Assumindo que PREMIUM_PLANS_FOR_SALE é carregado sincronamente
     for plan_id, plan in game_data.PREMIUM_PLANS_FOR_SALE.items():
         btn_text = f"{plan['name']} - {plan['price']} 💎"
         kb_rows.append([InlineKeyboardButton(btn_text, callback_data=f"gem_prem_confirm:{plan_id}")])
 
     kb_rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="gem_shop")])
-    await _safe_edit_or_send(q, context, q.message.chat_id, text, InlineKeyboardMarkup(kb_rows)) # Já usa await
+    await _safe_edit_or_send(q, context, chat_id, text, InlineKeyboardMarkup(kb_rows)) 
 
 async def gem_shop_premium_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Tela de confirmação para compra de plano."""
     q = update.callback_query
     await q.answer()
+    chat_id = q.message.chat.id
     plan_id = q.data.split(":")[1]
     plan = game_data.PREMIUM_PLANS_FOR_SALE.get(plan_id)
     if not plan: return
@@ -265,56 +244,97 @@ async def gem_shop_premium_confirm(update: Update, context: ContextTypes.DEFAULT
         [InlineKeyboardButton("✅ Confirmar", callback_data=f"gem_prem_execute:{plan_id}")],
         [InlineKeyboardButton("❌ Cancelar", callback_data="gem_shop_premium")]
     ])
-    await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
+    await _safe_edit_or_send(q, context, chat_id, text, kb)
 
 async def gem_shop_premium_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Executa a compra do plano."""
+    """Executa a compra do plano e NOTIFICA O GRUPO."""
     q = update.callback_query
     user_id = q.from_user.id
+    chat_id = q.message.chat.id
     plan_id = q.data.split(":")[1]
-    plan = game_data.PREMIUM_PLANS_FOR_SALE.get(plan_id) # Síncrono
+    plan = game_data.PREMIUM_PLANS_FOR_SALE.get(plan_id) 
     if not plan:
-        await q.answer("Plano inválido.", show_alert=True) # Adiciona feedback
+        await q.answer("Plano inválido.", show_alert=True) 
         return
 
-    # <<< CORREÇÃO 6: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id)
 
-    # Verificação síncrona
     if _get_gems(pdata) < plan['price']:
         await q.answer("Gemas insuficientes.", show_alert=True); return
 
-    await q.answer("Processando...") # Já usa await
+    await q.answer("Processando...") 
 
-    # Modificações síncronas no pdata
+    # 1. Desconta Gemas
     _set_gems(pdata, _get_gems(pdata) - plan['price'])
-    premium = PremiumManager(pdata) # Síncrono
-    premium.grant_days(tier=plan['tier'], days=plan['days']) # Síncrono
 
-    # <<< CORREÇÃO 7: Adiciona await >>>
-    await player_manager.save_player_data(user_id, premium.player_data) # Usa pdata modificado
+    # 2. Lógica Manual de Premium
+    now = datetime.now(timezone.utc)
+    current_tier = pdata.get("premium_tier", "free")
+    current_exp_str = pdata.get("premium_expiration")
+    
+    new_tier = plan['tier']
+    days_to_add = int(plan['days'])
 
-    clear_player_cache(user_id) # Assumindo síncrono
+    start_date = now
+    if current_exp_str and current_tier != "free":
+        try:
+            current_exp = datetime.fromisoformat(current_exp_str)
+            if current_exp > now:
+                start_date = current_exp
+        except ValueError:
+            pass
 
-    await _safe_edit_or_send(q, context, q.message.chat_id, # Já usa await
-        f"✅ Compra concluída!\n\nVocê adquiriu o <b>{plan['name']}</b>.",
+    new_expiration = start_date + timedelta(days=days_to_add)
+
+    pdata["premium_tier"] = new_tier
+    pdata["premium_expiration"] = new_expiration.isoformat()
+
+    # 3. Salva no Banco de Dados
+    await player_manager.save_player_data(user_id, pdata) 
+    clear_player_cache(user_id) 
+
+    # 4. Mensagem para o Jogador (Privado)
+    fmt_date = new_expiration.strftime('%d/%m/%Y')
+    await _safe_edit_or_send(q, context, chat_id, 
+        f"✅ Compra concluída!\n\n"
+        f"👑 <b>Novo Plano:</b> {plan['name']}\n"
+        f"📅 <b>Válido até:</b> {fmt_date}",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_shop_premium")]])
     )
+
+    # 5. NOTIFICAÇÃO DE HYPE NO GRUPO (NOVA PARTE)
+    try:
+        char_name = pdata.get("character_name", q.from_user.first_name)
+        
+        hype_msg = (
+            "🎉 <b>UM NOVO MEMBRO DE ELITE SURGIU!</b> 🎉\n\n"
+            f"O aventureiro <b>{char_name}</b> acaba de adquirir o plano:\n"
+            f"🌟 <b>{plan['name']}</b> 🌟\n\n"
+            f"<i>Agora ele possui bônus de XP, Drop e Vantagens Exclusivas!</i>\n\n"
+            "💎 Quer se tornar VIP também? Digite /gemas ou vá ao Mercado!"
+        )
+
+        await context.bot.send_message(
+            chat_id=LOG_GROUP_ID,
+            message_thread_id=LOG_TOPIC_ID,
+            text=hype_msg,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.warning(f"Falha ao enviar notificação de VIP no grupo: {e}")
+
 # ----------------------------------------------------------------------
-# --- EXPORTS DE HANDLERS (TODOS JUNTOS) ---
+# --- EXPORTS DE HANDLERS ---
 # ----------------------------------------------------------------------
 gem_shop_command_handler = CommandHandler("gemas", gem_shop_menu)
 
-# Menu Principal
 gem_shop_menu_handler = CallbackQueryHandler(gem_shop_menu, pattern=r'^gem_shop$')
 
-# Handlers da Loja de Itens
 gem_shop_items_handler = CallbackQueryHandler(gem_shop_items_menu, pattern=r'^gem_shop_items$')
 gem_item_pick_handler = CallbackQueryHandler(gem_item_pick, pattern=r'^gem_item_pick_')
 gem_item_qty_handler = CallbackQueryHandler(gem_item_qty, pattern=r'^(gem_item_qty_minus|gem_item_qty_plus)$')
 gem_item_buy_handler = CallbackQueryHandler(gem_item_buy, pattern=r'^gem_item_buy$')
 
-# Handlers da Loja de Planos Premium
 gem_shop_premium_handler = CallbackQueryHandler(gem_shop_premium_menu, pattern=r'^gem_shop_premium$')
 gem_prem_confirm_handler = CallbackQueryHandler(gem_shop_premium_confirm, pattern=r'^gem_prem_confirm:')
 gem_prem_execute_handler = CallbackQueryHandler(gem_shop_premium_execute, pattern=r'^gem_prem_execute:')
