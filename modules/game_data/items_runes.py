@@ -29,7 +29,7 @@ RUNE_ITEMS_DATA = {
         "display_name": "Runa da Crueldade Menor", "emoji": "☠️",
         "type": "runa", "category": "socketable",
         "description": "Aumenta levemente o Dano Crítico.",
-        "stackable": True, "tier": 1,
+        "stackable": True, "tier": 1, 
         "media_key": "item_runa_vermelha"
     },
     "runa_precisao_menor": {

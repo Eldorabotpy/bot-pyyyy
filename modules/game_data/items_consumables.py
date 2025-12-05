@@ -4,45 +4,53 @@ CONSUMABLES_DATA = {
     # --- POÇÕES & ALIMENTOS ---
     "frasco_com_agua": {
         "display_name": "Frasco com Água", "emoji": "💧", "type": "reagent",
-        "description": "A base para a maioria das poções.", "stackable": True
+        "description": "A base para a maioria das poções.", 
+        "stackable": True
     },
     "pocao_cura_leve": {
         "display_name": "Poção de Cura Leve", "emoji": "❤️", "type": "potion",
         "category": "consumivel", "description": "Recupera 50 HP.",
-        "stackable": True, "effects": {"heal": 50}
+        "stackable": True, 
+        "effects": {"heal": 50}
     },
     "pocao_cura_media": {
         "display_name": "Poção de Cura Média", "emoji": "❤️‍🩹", "type": "potion",
         "category": "consumivel", "description": "Recupera 150 HP.",
-        "stackable": True, "effects": {"heal": 150}
+        "stackable": True, 
+        "effects": {"heal": 150}
     },
     "pocao_energia_fraca": {
         "display_name": "Poção de Energia Fraca", "emoji": "⚡️", "type": "potion",
         "category": "consumivel", "description": "Recupera 10 Energia.",
-        "stackable": True, "effects": {"add_energy": 10}
+        "stackable": True, 
+        "effects": {"add_energy": 10}
     },
     "frasco_sabedoria": {
         "display_name": "Frasco de Sabedoria", "emoji": "🧠", "type": "potion",
         "category": "consumivel", "description": "Concede 500 XP.",
-        "stackable": True, "effects": {"add_xp": 500}
+        "stackable": True, 
+        "effects": {"add_xp": 500}
     },
     "seiva_escura": {
         "display_name": "Seiva Escura", "emoji": "🩸", 
         "type": "consumivel", "category": "buff",
         "description": "+10 Vida Máxima por 60 min.", "stackable": True,
-        "on_use": {"effect_id": "buff_hp_flat", "value": 10, "duration_sec": 3600}
+        "on_use": {"effect_id": "buff_hp_flat", 
+                   "duration_sec": 3600}
     },
 
     # --- TICKETS E ACESSOS ---
     "fragmento_bravura": {
         "display_name": "Fragmento de Bravura", "emoji": "🏅", 
         "type": "especial", "category": "evento", 
-        "description": "Obtido ao defender o reino.", "stackable": True
+        "description": "Obtido ao defender o reino.", 
+        "stackable": True
     },
     "ticket_defesa_reino": {
         "display_name": "Ticket de Defesa", "emoji": "🎟️", 
         "type": "event_ticket", "category": "evento", 
-        "description": "Entrada para Defesa do Reino.", "stackable": True
+        "description": "Entrada para Defesa do Reino.", 
+        "stackable": True
     },
     "ticket_arena": {
         "display_name": "Entrada da Arena", "emoji": "🎟️", 

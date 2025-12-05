@@ -1,7 +1,7 @@
 # modules/game_data/items_equipments.py
 
 EQUIPMENTS_DATA = {
-    # --ASSASSINO T1--
+    # --ASSASSINO T1--#
     "adaga_sorrateira_assassino": {
         "display_name": "Adaga Sorrateira", "emoji": "🔪",
         "slot": "arma", "type": "equipamento", "category": "arma",
@@ -65,7 +65,7 @@ EQUIPMENTS_DATA = {
         "media_key": "item_brinco_sorrateiro_assassino",
         "class_req": ["assassino"]
     },
-    # --ASSASSINO T2--
+    # --ASSASSINO T2--#
     "adaga_sombra_assassino": {
         "display_name": "Adaga da Sombra", "emoji": "🔪",
         "slot": "arma", "type": "equipamento", "category": "arma",
@@ -129,7 +129,7 @@ EQUIPMENTS_DATA = {
         "media_key": "item_brinco_sombra_assassino",
         "class_req": ["assassino"]
     },
-    # — Bardo T1
+    # — Bardo T1#
     "alaude_simples_bardo": {
         "display_name": "Alaúde Simples do Bardo", "emoji": "🎻",
         "slot": "arma", "type": "equipamento", "category": "arma",
@@ -193,7 +193,7 @@ EQUIPMENTS_DATA = {
         "media_key": "item_brinco_melodico_bardo",
         "class_req": ["bardo"]
     },
-    # — BARDO T2
+    # — BARDO T2#
    
     "alaude_ornamentado_bardo": {
         "display_name": "Alaúde Ornamentado do Bardo", "emoji": "🎻",
@@ -267,7 +267,7 @@ EQUIPMENTS_DATA = {
         "media_key": "item_brinco_prata_bardo",
         "class_req": ["bardo"]
     },
-    # — Berserker T1
+    # — Berserker T1#
     "machado_rustico_berserker": {
         "display_name": "Machado Rústico do Berserker", "emoji": "🪓",
         "slot": "arma", "type": "equipamento", "category": "arma",
@@ -331,7 +331,7 @@ EQUIPMENTS_DATA = {
         "media_key": "item_brinco_osso_berserker",
         "class_req": ["berserker"]
     },
-    # — BERSERKER T2
+    # — BERSERKER T2#
     "machado_aco_berserker": {
         "display_name": "Machado de Aço do Berserker", "emoji": "🪓",
         "type": "equipment_base", "slot": "arma",
@@ -404,7 +404,7 @@ EQUIPMENTS_DATA = {
         "media_key": "item_brinco_troll_berserker",
         "class_req": ["berserker"]
     },
-    # — CAÇADOR T1
+    # — CAÇADOR T1#
     
     "arco_batedor_cacador": {
         "display_name": "Arco de Batedor", "emoji": "🏹",
@@ -469,96 +469,96 @@ EQUIPMENTS_DATA = {
         "media_key": "item_brinco_batedor_cacador",
         "class_req": ["cacador"]
     },
-    # — CAÇADOR T2
+    # — CAÇADOR T2#
     "arco_patrulheiro_cacador": {
-        "display_name": "Arco de Patrulheiro",
-        "emoji": "🏹",
-        "type": "arma",
-        "category": "equipamento",
-        "description": "Arco de alta precisão usado por patrulheiros experientes.",
-        "stackable": False,
-        "media_key": "item_arco_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "capuz_patrulheiro_cacador": {
-        "display_name": "Capuz de Patrulheiro",
-        "emoji": "🪖",
-        "type": "elmo",
-        "category": "equipamento",
-        "description": "Capuz reforçado para proteger caçadores nas emboscadas.",
-        "stackable": False,
-        "media_key": "item_capuz_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "peitoral_patrulheiro_cacador": {
-        "display_name": "Peitoral de Patrulheiro",
-        "emoji": "👕",
-        "type": "armadura",
-        "category": "equipamento",
-        "description": "Proteção robusta de couro reforçado para longas caçadas.",
-        "stackable": False,
-        "media_key": "item_peitoral_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "calcas_patrulheiro_cacador": {
-        "display_name": "Calças de Patrulheiro",
-        "emoji": "👖",
-        "type": "calca",
-        "category": "equipamento",
-        "description": "Calças resistentes, ideais para movimentação rápida na floresta.",
-        "stackable": False,
-        "media_key": "item_calcas_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "botas_patrulheiro_cacador": {
-        "display_name": "Botas de Patrulheiro",
-        "emoji": "🥾",
-        "type": "botas",
-        "category": "equipamento",
-        "description": "Botas firmes que garantem passos silenciosos e estáveis.",
-        "stackable": False,
-        "media_key": "item_botas_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "luvas_patrulheiro_cacador": {
-        "display_name": "Luvas de Patrulheiro",
-        "emoji": "🧤",
-        "type": "luvas",
-        "category": "equipamento",
-        "description": "Luvas reforçadas para melhor precisão e agilidade no arco.",
-        "stackable": False,
-        "media_key": "item_luvas_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "anel_patrulheiro_cacador": {
-        "display_name": "Anel de Patrulheiro",
-        "emoji": "💍",
-        "type": "anel",
-        "category": "equipamento",
-        "description": "Anel mágico que aprimora a mira e a percepção do caçador.",
-        "stackable": False,
-        "media_key": "item_anel_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "colar_patrulheiro_cacador": {
-        "display_name": "Colar de Patrulheiro",
-        "emoji": "📿",
-        "type": "colar",
-        "category": "equipamento",
-        "description": "Colar encantado que conecta o caçador aos instintos da natureza.",
-        "stackable": False,
-        "media_key": "item_colar_patrulheiro_cacador",
-        "class_req": ["cacador"]
-    },
-    "brinco_patrulheiro_cacador": {
-        "display_name": "Brinco de Patrulheiro",
-        "emoji": "🧿",
-        "type": "brinco",
-        "category": "equipamento",
-        "description": "Brinco talismânico que aumenta a atenção e reflexos do caçador.",
-        "stackable": False,
-        "media_key": "item_brinco_patrulheiro_cacador",
-        "class_req": ["cacador"]
+    "display_name": "Arco de Patrulheiro",
+    "emoji": "🏹",
+    "type": "arma",
+    "category": "equipamento",
+    "description": "Arco de alta precisão usado por patrulheiros experientes.",
+    "stackable": False,
+    "media_key": "item_arco_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"capuz_patrulheiro_cacador": {
+    "display_name": "Capuz de Patrulheiro",
+    "emoji": "🪖",
+    "type": "elmo",
+    "category": "equipamento",
+    "description": "Capuz reforçado para proteger caçadores nas emboscadas.",
+    "stackable": False,
+    "media_key": "item_capuz_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"peitoral_patrulheiro_cacador": {
+    "display_name": "Peitoral de Patrulheiro",
+    "emoji": "👕",
+    "type": "armadura",
+    "category": "equipamento",
+    "description": "Proteção robusta de couro reforçado para longas caçadas.",
+    "stackable": False,
+    "media_key": "item_peitoral_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"calcas_patrulheiro_cacador": {
+    "display_name": "Calças de Patrulheiro",
+    "emoji": "👖",
+    "type": "calca",
+    "category": "equipamento",
+    "description": "Calças resistentes, ideais para movimentação rápida na floresta.",
+    "stackable": False,
+    "media_key": "item_calcas_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"botas_patrulheiro_cacador": {
+    "display_name": "Botas de Patrulheiro",
+    "emoji": "🥾",
+    "type": "botas",
+    "category": "equipamento",
+    "description": "Botas firmes que garantem passos silenciosos e estáveis.",
+    "stackable": False,
+    "media_key": "item_botas_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"luvas_patrulheiro_cacador": {
+    "display_name": "Luvas de Patrulheiro",
+    "emoji": "🧤",
+    "type": "luvas",
+    "category": "equipamento",
+    "description": "Luvas reforçadas para melhor precisão e agilidade no arco.",
+    "stackable": False,
+    "media_key": "item_luvas_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"anel_patrulheiro_cacador": {
+    "display_name": "Anel de Patrulheiro",
+    "emoji": "💍",
+    "type": "anel",
+    "category": "equipamento",
+    "description": "Anel mágico que aprimora a mira e a percepção do caçador.",
+    "stackable": False,
+    "media_key": "item_anel_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"colar_patrulheiro_cacador": {
+    "display_name": "Colar de Patrulheiro",
+    "emoji": "📿",
+    "type": "colar",
+    "category": "equipamento",
+    "description": "Colar encantado que conecta o caçador aos instintos da natureza.",
+    "stackable": False,
+    "media_key": "item_colar_patrulheiro_cacador",
+    "class_req": ["cacador"]
+},
+"brinco_patrulheiro_cacador": {
+    "display_name": "Brinco de Patrulheiro",
+    "emoji": "🧿",
+    "type": "brinco",
+    "category": "equipamento",
+    "description": "Brinco talismânico que aumenta a atenção e reflexos do caçador.",
+    "stackable": False,
+    "media_key": "item_brinco_patrulheiro_cacador",
+    "class_req": ["cacador"]
     },
     #— Guerreiro T1
     "espada_ferro_guerreiro": {
@@ -715,7 +715,6 @@ EQUIPMENTS_DATA = {
         "stackable": False,
         "media_key": "item_brinco_aco_guerreiro",
         "class_req": ["guerreiro"]
-
     },
     # — Mago T1
     "cajado_aprendiz_mago": {
@@ -792,12 +791,12 @@ EQUIPMENTS_DATA = {
         "class_req": ["mago"]
     },
     "chapeu_veludo_mago": {
-    "display_name": "Chapéu de Veludo do Mago",
-    "emoji": "🎩",
-    "type": "equipamento",
-    "slot": "elmo",
-    "media_key": "item_chapel_veludo_mago",
-    "class_req": ["mago"]
+        "display_name": "Chapéu de Veludo do Mago",
+        "emoji": "🎩",
+        "type": "equipamento",
+        "slot": "elmo",
+        "media_key": "item_chapel_veludo_mago",
+        "class_req": ["mago"]
     },
     "tunica_veludo_mago": {
         "display_name": "Túnica de Veludo do Mago",

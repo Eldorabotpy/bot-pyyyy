@@ -2,7 +2,7 @@
 
 EVOLUTION_ITEMS_DATA = {}
 
-# 1. Emblemas
+# 1. Emblemas S
 _EVOLUTION_EMBLEMS = {
     "emblema_guerreiro": "⚔️", "emblema_berserker": "🪓", "emblema_cacador": "🏹",
     "emblema_monge": "🧘", "emblema_mago": "🪄", "emblema_bardo": "🎶",
