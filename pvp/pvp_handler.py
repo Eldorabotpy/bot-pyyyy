@@ -458,4 +458,4 @@ def pvp_handlers() -> list:
         CallbackQueryHandler(ranking_callback, pattern=f'^{PVP_RANKING}$'),
         CallbackQueryHandler(historico_callback, pattern=f'^{PVP_HISTORICO}$'),
         CallbackQueryHandler(pvp_battle_action_callback, pattern=r'^pvp_battle_attack$'),
-    ]
+    ]      
