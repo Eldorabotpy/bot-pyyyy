@@ -110,7 +110,8 @@ REFINING_RECIPES = {
         "profession": ["fundidor", "ferreiro", "armeiro", ],
         "level_req": 1,
         "time_seconds": 8 * 60,
-        "inputs": {"ferro": 1, "minerio_estanho": 1},
+        # CORRIGIDO: Era "ferro", agora é "minerio_de_ferro" para bater com o inventário
+        "inputs": {"minerio_de_ferro": 1, "minerio_estanho": 1},
         "outputs": {"barra_bronze": 1},
         "xp_gain": 3
     },
@@ -197,7 +198,7 @@ REFINING_RECIPES = {
         "profession": ["ferreiro", "armeiro", "fundidor"],
         "level_req": 1,
         "time_seconds": 6 * 60,
-        "inputs": {"minerio_de_ferro": 2},
+        "inputs": {"minerio_de_ferro": 2}, # Já estava certo aqui
         "outputs": {"barra_de_ferro": 1},
         "xp_gain": 3,
         "emoji": "⛏️",
@@ -283,5 +284,4 @@ REFINING_RECIPES = {
         "outputs": {"tabua_ancestral": 1},
         "xp_gain": 50
     },
-    
 }

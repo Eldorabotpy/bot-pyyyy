@@ -1,6 +1,10 @@
 # modules/game_data/attributes.py
 
-ATTRIBUTE_ICONS = {
+# ============================================================================
+# 1. EMOJIS DOS ATRIBUTOS (STAT_EMOJI)
+# ============================================================================
+# O sistema procura por "STAT_EMOJI", então renomeamos para corresponder.
+STAT_EMOJI = {
     "vida": "❤️‍🩹",
     "hp": "❤️‍🩹",
     "defesa": "🛡️",
@@ -19,37 +23,24 @@ ATTRIBUTE_ICONS = {
     "foco": "🧘",
     "bushido": "🥷",
 
-    "dmg": "⚔️",  # se algum lugar exibir diretamente a chave dmg
+    "dmg": "⚔️",
+    "attack": "⚔️", # Adicionado alias comum
+    "energy": "⚡",  # Adicionado alias comum
+    "xp": "✨",      # Adicionado alias comum
+    "gold": "💰"     # Adicionado alias comum
 }
 
-# O dicionário AFFIXES conterá os valores e o escalonamento, 
-# mas primeiro listamos todos para referência.
-ALL_ATTRIBUTES = {
-    "vida": {"display_name": "Vida"},
-    "defesa": {"display_name": "Defesa"},
-    "sorte": {"display_name": "Sorte"},
-    "agilidade": {"display_name": "Agilidade"},
-    "forca": {"display_name": "Força"},
-    "inteligencia": {"display_name": "Inteligência"},
-    "furia": {"display_name": "Fúria"},
-    "precisao": {"display_name": "Precisão"},
-    "letalidade": {"display_name": "Letalidade"},
-    "carisma": {"display_name": "Carisma"},
-    "foco": {"display_name": "Foco"},
-    "bushido": {"display_name": "Bushido"}
-}
+# Alias para compatibilidade se algum módulo antigo usar ATTRIBUTE_ICONS
+ATTRIBUTE_ICONS = STAT_EMOJI
 
 # ============================================================================
-# PARTE 2: POOLS DE AFIXOS PARA GERAÇÃO ALEATÓRIA
+# 2. POOLS DE AFIXOS PARA GERAÇÃO ALEATÓRIA
 # ============================================================================
-# Define quais atributos podem ser sorteados como bônus secundários para cada classe.
-
 AFFIX_POOLS = {
     # A pool "geral" contém atributos úteis para qualquer classe.
     "geral": ["sorte", "defesa", "agilidade", "vida"],
     
-    # As pools de classe contêm seu atributo principal, garantindo que ele
-    # possa aparecer como um bônus secundário em itens que não o têm como primário.
+    # Pools de classe
     "guerreiro": ["forca"],
     "mago": ["inteligencia"],
     "berserker": ["furia"],
@@ -60,13 +51,15 @@ AFFIX_POOLS = {
     "samurai": ["bushido"]
 }
 
-
-# Afixos secundários com seus ranges por raridade
+# ============================================================================
+# 3. VALORES DOS AFIXOS (RANGES)
+# ============================================================================
 AFFIXES = {
     "vida":         {"values": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7],  "lendario":[7,10]}},
     "defesa":       {"values": {"comum":[1,2], "bom":[2,4], "raro":[4,6], "epico":[6,9],  "lendario":[9,12]}},
     "sorte":        {"values": {"comum":[1,1], "bom":[1,2], "raro":[2,3], "epico":[3,4],  "lendario":[4,6]}},
     "agilidade":    {"values": {"comum":[1,1], "bom":[1,2], "raro":[2,3], "epico":[3,4],  "lendario":[4,6]}},
+    
     "forca":        {"values": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7],  "lendario":[7,10]}},
     "inteligencia": {"values": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7],  "lendario":[7,10]}},
     "furia":        {"values": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7],  "lendario":[7,10]}},

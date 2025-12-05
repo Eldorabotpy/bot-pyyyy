@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 from telegram.error import BadRequest, Forbidden
-
+from modules.combat import durability
 from modules import player_manager, game_data
 from handlers.utils import format_combat_message
 from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER, Difficulty
@@ -302,7 +302,10 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     cur_stg = int(combat_details.get("dungeon_stage", 0))
     next_stg = cur_stg + 1
     
-    # 🔴 CORREÇÃO PRINCIPAL: Pega sempre do player_data (DB), que é onde o main_handler salvou
+    # Aplica desgaste
+    dummy_log = []
+    durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
+    
     active_cds = pdata.get("cooldowns", {})
 
     # --- VITÓRIA FINAL ---
@@ -318,11 +321,25 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
         
+        if "cooldowns" in pdata:
+            pdata.pop("cooldowns", None)
+        
         await player_manager.save_player_data(user_id, pdata)
         
         summ = f"🏆 <b>CALABOUÇO CONCLUÍDO!</b>\n\n✨ <b>XP Ganho:</b> {xp}\n💰 <b>Bônus Ouro:</b> {bonus}"
         summ += levelup_text
-        if items: summ += "\n\n🎒 <b>Loot Final:</b>\n" + "\n".join([f"• {q}x {i}" for i,q,_ in items])
+        
+        # --- CORREÇÃO DE LOOT DA DUNGEON ---
+        if items:
+            loot_lines = []
+            for i, q, _ in items:
+                info = (game_data.ITEMS_DATA or {}).get(i, {})
+                name = info.get("display_name") or i.replace("_", " ").title()
+                emoji = info.get("emoji", "")
+                loot_lines.append(f"• {q}x {emoji} {name}")
+            summ += "\n\n🎒 <b>Loot Final:</b>\n" + "\n".join(loot_lines)
+        # -----------------------------------
+
         await _send_battle_media(context, chat_id, summ, "media_dungeon_victory", 
                                  InlineKeyboardMarkup([[InlineKeyboardButton("🎉 Continuar", callback_data="combat_return_to_map")]]))
         return
