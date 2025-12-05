@@ -1,44 +1,49 @@
 # handlers/admin/pvp_panel_handler.py
-# (VERSÃO CORRIGIDA - Chama a função CERTA)
+# (VERSÃO ATUALIZADA: Com opção de ZERAR PONTOS MANUALMENTE)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
+# --- Importação do Banco de Dados para Operações em Massa ---
+from modules.player.core import players_collection
+
 # --- 1. Importar as Funções de Job ---
 try:
-    # Importa o reset de entradas E o NOVO job de ticket de arena
     from handlers.daily_jobs import daily_pvp_entry_reset_job, daily_arena_ticket_job
 except ImportError:
-    # Fallback 
     from handlers.jobs import daily_pvp_entry_reset_job
     try:
         from handlers.jobs import daily_arena_ticket_job
     except ImportError:
-         logging.error("NÃO FOI POSSÍVEL encontrar 'daily_arena_ticket_job'. O botão falhará.")
-         async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE):
+         logging.error("NÃO FOI POSSÍVEL encontrar 'daily_arena_ticket_job'.")
+         async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE, force_run=False):
              raise ImportError("Função daily_arena_ticket_job não encontrada.")
 
 from handlers.jobs import distribute_pvp_rewards, reset_pvp_season
-# (Já não precisamos de 'daily_event_ticket_job' aqui)
 
 logger = logging.getLogger(__name__)
 
-# --- Função Principal do Menu (Correta) ---
+# --- Função Principal do Menu ---
 async def admin_pvp_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    text = "⚔️ <b>Painel de Controle de PvP</b> ⚔️\n\n" \
-           "Selecione uma ação manual para executar imediatamente.\n\n" \
-           "<b>Atenção:</b> Estas ações afetam <u>todos</u> os jogadores."
+    text = (
+        "⚔️ <b>Painel de Controle de PvP</b> ⚔️\n\n"
+        "Selecione uma ação manual para executar imediatamente.\n\n"
+        "⚠️ <b>Atenção:</b> Estas ações afetam <u>todos</u> os jogadores."
+    )
            
     keyboard = [
         [InlineKeyboardButton("🎫 0. Entregar Tickets de Arena", callback_data="admin_pvp_trigger_give_ticket")],
         [InlineKeyboardButton("🎟️ 1. Resetar Entradas (Contador)", callback_data="admin_pvp_trigger_tickets")],
         [InlineKeyboardButton("🏆 2. Entregar Prêmios da Temporada", callback_data="admin_pvp_trigger_rewards")],
-        [InlineKeyboardButton("🔄 3. Resetar Temporada (!! CUIDADO !!)", callback_data="admin_pvp_trigger_reset")],
-        [InlineKeyboardButton("⬅️ Voltar ao Painel Admin", callback_data="admin_panel")] 
+        [InlineKeyboardButton("🔄 3. Resetar Temporada (Completo)", callback_data="admin_pvp_trigger_reset")],
+        # --- NOVO BOTÃO ---
+        [InlineKeyboardButton("💀 4. APENAS ZERAR PONTOS (Sem prêmios)", callback_data="admin_pvp_zero_points")],
+        # ------------------
+        [InlineKeyboardButton("⬅️ Voltar ao Painel Admin", callback_data="admin_main")] 
     ]
     
     await query.edit_message_text(
@@ -47,106 +52,142 @@ async def admin_pvp_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-# --- Callbacks dos Botões (Corrigidos) ---
+# --- Callbacks dos Botões ---
 
 async def admin_trigger_pvp_give_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Dispara manualmente o job de entregar 'ticket_arena', forçando a execução."""
+    """Dispara manualmente o job de entregar 'ticket_arena'."""
     query = update.callback_query
-    await query.answer("Iniciando job: FORÇAR Entrega de Tickets...")
-    admin_id = query.from_user.id
-    logger.info(f"Admin {admin_id} disparou 'daily_arena_ticket_job' (FORÇADO).") 
+    await query.answer("Processando...")
     
     try:
-        # <<< CORREÇÃO APLICADA: Passa force_run=True >>>
-        await daily_arena_ticket_job(context, force_run=True) 
-        
+        await daily_arena_ticket_job(context, force_run=True)
         await query.edit_message_text(
-            "✅ <b>Job Forçado Concluído!</b>\n"
-            "Os <b>Tickets de Arena</b> foram (re)entregues a todos os jogadores elegíveis.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar ao Painel PvP", callback_data="admin_pvp_menu")]]),
+            "✅ <b>Tickets Entregues!</b>\nTodos os jogadores receberam seus tickets de arena.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
             parse_mode="HTML"
         )
     except Exception as e:
-        logger.error(f"Erro ao forçar 'daily_arena_ticket_job': {e}", exc_info=True) 
-        await query.edit_message_text(
-            f"❌ <b>Erro ao executar job:</b>\n<code>{e}</code>",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar ao Painel PvP", callback_data="admin_pvp_menu")]]),
-            parse_mode="HTML"
-        )
+        logger.error(f"Erro tickets pvp: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
 
 async def admin_trigger_pvp_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Dispara manualmente o job de resetar entradas diárias, forçando a execução."""
+    """Dispara manualmente o reset de entradas diárias."""
     query = update.callback_query
-    await query.answer("Iniciando job: FORÇAR Reset de Entradas...")
-    admin_id = query.from_user.id
-    logger.info(f"Admin {admin_id} disparou 'daily_pvp_entry_reset_job' (FORÇADO).")
+    await query.answer("Processando...")
     
     try:
-        # <<< CORREÇÃO APLICADA: Passa force_run=True >>>
         await daily_pvp_entry_reset_job(context, force_run=True)
-        
         await query.edit_message_text(
-            "✅ <b>Job Forçado Concluído!</b>\n"
-            "As entradas diárias de PvP (contador) foram (re)resetadas para todos.",
+            "✅ <b>Entradas Resetadas!</b>\nO contador de lutas diárias foi zerado.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
             parse_mode="HTML"
-            )
+        )
     except Exception as e:
-        logger.error(f"Erro ao forçar 'daily_pvp_entry_reset_job': {e}", exc_info=True)
-        await query.edit_message_text(
-            f"Erro ao executar job: {e}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
-            parse_mode="HTML"
-            )
-        
+        logger.error(f"Erro reset entradas: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+
 async def admin_trigger_pvp_rewards(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Dispara manualmente a distribuição de prêmios da temporada."""
+    """Dispara a entrega de prêmios."""
     query = update.callback_query
-    await query.answer("Iniciando job: Entregar Prêmios da Temporada...")
-    admin_id = query.from_user.id
-    logger.info(f"Admin {admin_id} disparou 'distribute_pvp_rewards' manualmente.")
+    await query.answer("Processando...")
     
     try:
         await distribute_pvp_rewards(context)
         await query.edit_message_text(
-            "✅ Job 'Entregar Prêmios da Temporada' executado com sucesso!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+            "✅ <b>Prêmios Distribuídos!</b>\nVerifique os logs para detalhes dos vencedores.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
+            parse_mode="HTML"
+        )
     except Exception as e:
-        logger.error(f"Erro ao disparar 'distribute_pvp_rewards': {e}", exc_info=True)
-        await query.edit_message_text(
-            f"Erro ao executar job: {e}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+        logger.error(f"Erro rewards pvp: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
 
 async def admin_trigger_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Dispara manualmente o reset da temporada PvP."""
+    """Dispara o Reset de Temporada (Geralmente Prêmios + Zerar)."""
     query = update.callback_query
-    await query.answer("Iniciando job: Resetar Temporada PvP...")
-    admin_id = query.from_user.id
-    logger.info(f"Admin {admin_id} disparou 'reset_pvp_season' manualmente.")
+    await query.answer("Iniciando Reset Completo...")
     
     try:
+        # Chama a função que você já tem no handlers/jobs.py
         await reset_pvp_season(context)
+        
         await query.edit_message_text(
-            "✅ Job 'Resetar Temporada PvP' executado com sucesso!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+            "✅ <b>Temporada Resetada!</b>\nO ciclo foi reiniciado.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
+            parse_mode="HTML"
+        )
     except Exception as e:
-        logger.error(f"Erro ao disparar 'reset_pvp_season': {e}", exc_info=True)
+        logger.error(f"Erro reset season: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+
+# --- NOVA FUNÇÃO: ZERAR PONTOS APENAS ---
+async def admin_trigger_pvp_zero_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Ação Drástica: Zera os pontos de TODOS os jogadores no banco de dados.
+    Não entrega prêmios. Apenas limpa a pontuação.
+    """
+    query = update.callback_query
+    
+    # 1. Confirmação (Pequena barreira de segurança)
+    if "confirm" not in query.data:
         await query.edit_message_text(
-            f"Erro ao executar job: {e}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+            "⚠️ <b>PERIGO: ZERAR PONTOS</b> ⚠️\n\n"
+            "Isso vai definir <code>pvp_points = 0</code> para <b>TODOS</b> os jogadores.\n"
+            "Nenhum prêmio será entregue.\n\n"
+            "Tem certeza?",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ SIM, ZERAR TUDO", callback_data="admin_pvp_zero_points_confirm")],
+                [InlineKeyboardButton("❌ Cancelar", callback_data="admin_pvp_menu")]
+            ]),
+            parse_mode="HTML"
+        )
+        return
+
+    # 2. Execução
+    await query.answer("Zerando pontos no banco de dados...")
+    
+    try:
+        if players_collection is None:
+            raise Exception("Sem conexão com o banco de dados.")
+
+        # Update Massivo (Muito rápido)
+        result = players_collection.update_many(
+            {"pvp_points": {"$gt": 0}}, # Filtro: Quem tem mais que 0
+            {"$set": {"pvp_points": 0}} # Ação: Setar para 0
+        )
+        
+        msg = (
+            f"💀 <b>HARD RESET CONCLUÍDO</b>\n\n"
+            f"Jogadores afetados: <b>{result.modified_count}</b>\n"
+            f"Todos agora têm 0 pontos de PvP."
+        )
+        
+        await query.edit_message_text(
+            msg,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
+            parse_mode="HTML"
+        )
+        logger.warning(f"Admin {query.from_user.id} zerou os pontos PvP de {result.modified_count} jogadores.")
+
+    except Exception as e:
+        logger.error(f"Erro ao zerar pontos pvp: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro Crítico: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
 
 
-# --- Lista de Handlers (Correta) ---
+# --- Lista de Handlers ---
 admin_pvp_menu_handler = CallbackQueryHandler(admin_pvp_menu, pattern=r'^admin_pvp_menu$')
 admin_trigger_pvp_tickets_handler = CallbackQueryHandler(admin_trigger_pvp_tickets, pattern=r'^admin_pvp_trigger_tickets$')
 admin_trigger_pvp_rewards_handler = CallbackQueryHandler(admin_trigger_pvp_rewards, pattern=r'^admin_pvp_trigger_rewards$')
 admin_trigger_pvp_reset_handler = CallbackQueryHandler(admin_trigger_pvp_reset, pattern=r'^admin_pvp_trigger_reset$')
 admin_trigger_pvp_give_ticket_handler = CallbackQueryHandler(admin_trigger_pvp_give_ticket, pattern=r'^admin_pvp_trigger_give_ticket$')
+# Novo Handler (Captura tanto o clique inicial quanto a confirmação)
+admin_trigger_pvp_zero_points_handler = CallbackQueryHandler(admin_trigger_pvp_zero_points, pattern=r'^admin_pvp_zero_points')
 
 pvp_panel_handlers = [
     admin_pvp_menu_handler,
     admin_trigger_pvp_tickets_handler,
     admin_trigger_pvp_rewards_handler,
     admin_trigger_pvp_reset_handler,
-    admin_trigger_pvp_give_ticket_handler, # (A tua lista já estava correta aqui)
+    admin_trigger_pvp_give_ticket_handler,
+    admin_trigger_pvp_zero_points_handler, # <--- Adicionado
 ]

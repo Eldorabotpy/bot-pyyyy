@@ -13,6 +13,7 @@ from handlers.utils import format_pvp_result
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from modules import player_manager, file_ids, game_data
+from modules.player.core import players_collection
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,40 @@ PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
 PVP_HISTORICO = "pvp_historico"
 
-# Em: pvp/pvp_handler.py
+async def aplicar_resultado_pvp_seguro(user_id, pontos_delta, ouro_delta=0):
+    """
+    Usa o MongoDB direto para somar/subtrair pontos e ouro.
+    Isso é 'Atomic Update': Não depende de carregar o perfil e evita perda de dados.
+    """
+    if not players_collection:
+        return False
+        
+    try:
+        # Prepara o comando de atualização ($inc = increment/add)
+        updates = {}
+        if pontos_delta != 0:
+            updates["pvp_points"] = pontos_delta
+        if ouro_delta != 0:
+            updates["gold"] = ouro_delta # Assumindo que o ouro fica na raiz 'gold'
+            
+        if not updates:
+            return True
 
+        # Envia direto pro banco (Milissegundos)
+        await players_collection.update_one(
+            {"_id": user_id},
+            {"$inc": updates}
+        )
+        
+        # Opcional: Atualiza o cache local para o bot não ficar com dados velhos na memória
+        # Isso é só visual, o banco já está salvo e seguro.
+        await player_manager.clear_player_cache(user_id)
+        
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao salvar resultado PvP atômico para {user_id}: {e}")
+        return False
+    
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query.message:
@@ -144,21 +177,22 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 log_final.append("💰 <b>Dia da Ganância!</b> Ouro dobrado!")
             
             if vencedor_id == user_id:
-                player_manager.add_gold(player_data, OURO_FINAL_RECOMPENSA)
-                player_manager.add_pvp_points(player_data, elo_ganho)
-                player_manager.add_pvp_points(opponent_data, -elo_perdido)
+                # === VOCÊ VENCEU (ATUALIZAÇÃO SEGURA) ===
+                # Salva: Seus Pontos (+), Seu Ouro (+), Pontos Oponente (-)
+                await aplicar_resultado_pvp_seguro(user_id, elo_ganho, OURO_FINAL_RECOMPENSA)
+                await aplicar_resultado_pvp_seguro(final_opponent_id, -elo_perdido, 0)
+                
                 log_final.append(f"\n🏆 Você ganhou <b>+{elo_ganho}</b> pontos de Elo!")
                 log_final.append(f"💰 Você recebeu <b>{OURO_FINAL_RECOMPENSA}</b> de ouro pela vitória!")
-                # Drops extras podem ser adicionados aqui
 
             elif vencedor_id == final_opponent_id:
-                player_manager.add_pvp_points(player_data, -elo_perdido)
-                player_manager.add_pvp_points(opponent_data, elo_ganho)
+                # === VOCÊ PERDEU (ATUALIZAÇÃO SEGURA) ===
+                # Salva: Seus Pontos (-), Pontos Oponente (+)
+                await aplicar_resultado_pvp_seguro(user_id, -elo_perdido, 0)
+                await aplicar_resultado_pvp_seguro(final_opponent_id, elo_ganho, 0)
+                
                 log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
-            
-            await player_manager.save_player_data(user_id, player_data)
-            await player_manager.save_player_data(final_opponent_id, opponent_data)
-
+                
             # =========================================================================
             # 👇 ANIMAÇÃO DE SUBSTITUIÇÃO (ESTILO FILME) 👇
             # =========================================================================
