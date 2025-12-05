@@ -1,100 +1,166 @@
-# pvp/pvp_scheduler.py
-import logging
-import datetime
-from telegram.ext import ContextTypes
+# handlers/admin/pvp_panel_handler.py
+# (VERSÃO FINAL: Conectada ao Novo Scheduler Robusto)
 
-# Importa a conexão do banco de dados existente
-from modules.database import players_col
-from modules import player_manager, game_data
-from pvp.pvp_config import MONTHLY_RANKING_REWARDS
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CallbackQueryHandler
+
+# --- Importação do Banco de Dados para Operações em Massa ---
+from modules.player.core import players_collection
+
+# --- IMPORTANTE: Importa a nova lógica de reset robusta ---
+from pvp.pvp_scheduler import executar_reset_pvp
+
+# --- Importar Jobs Antigos (Mantemos para tickets/rewards) ---
+try:
+    from handlers.daily_jobs import daily_pvp_entry_reset_job, daily_arena_ticket_job
+except ImportError:
+    from handlers.jobs import daily_pvp_entry_reset_job
+    try:
+        from handlers.jobs import daily_arena_ticket_job
+    except ImportError:
+         logging.error("NÃO FOI POSSÍVEL encontrar 'daily_arena_ticket_job'.")
+         async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE, force_run=False):
+             raise ImportError("Função daily_arena_ticket_job não encontrada.")
+
+from handlers.jobs import distribute_pvp_rewards
 
 logger = logging.getLogger(__name__)
 
-async def executar_reset_pvp(context_bot, force_run=False):
-    """
-    Função central que executa a lógica do reset.
-    Pode ser chamada pelo Job automático ou manualmente.
-    """
-    agora = datetime.datetime.now()
-    mes_atual_str = f"{agora.year}-{agora.month}"
+# --- Função Principal do Menu ---
+async def admin_pvp_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
     
-    # Se NÃO for forçado, verifica se já rodou hoje ou se é dia 1
-    if not force_run:
-        if agora.day != 1:
-            return
-        
-        # Verifica se já rodou este mês para evitar duplicidade
-        ultimo_reset = game_data.SYSTEM_DATA.get("pvp_last_reset_month")
-        if ultimo_reset == mes_atual_str:
-            return
+    text = (
+        "⚔️ <b>Painel de Controle de PvP</b> ⚔️\n\n"
+        "Selecione uma ação manual para executar imediatamente.\n\n"
+        "⚠️ <b>Atenção:</b> Estas ações afetam <u>todos</u> os jogadores."
+    )
+           
+    keyboard = [
+        [InlineKeyboardButton("🎫 0. Entregar Tickets de Arena", callback_data="admin_pvp_trigger_give_ticket")],
+        [InlineKeyboardButton("🎟️ 1. Resetar Entradas (Contador)", callback_data="admin_pvp_trigger_tickets")],
+        [InlineKeyboardButton("🏆 2. Entregar Prêmios da Temporada", callback_data="admin_pvp_trigger_rewards")],
+        # Este botão agora chama a função NOVA e SEGURA
+        [InlineKeyboardButton("🔄 3. Resetar Temporada (Completo)", callback_data="admin_pvp_trigger_reset")],
+        [InlineKeyboardButton("💀 4. APENAS ZERAR PONTOS (Sem prêmios)", callback_data="admin_pvp_zero_points")],
+        [InlineKeyboardButton("⬅️ Voltar ao Painel Admin", callback_data="admin_main")] 
+    ]
+    
+    await query.edit_message_text(
+        text=text, 
+        reply_markup=InlineKeyboardMarkup(keyboard), 
+        parse_mode="HTML"
+    )
 
-    logger.info(f"🔄 [PvP] INICIANDO RESET DE TEMPORADA! (Mês: {mes_atual_str}, Forçado: {force_run})")
+# --- Callbacks dos Botões ---
 
-    if players_col is None:
-        logger.error("❌ [PvP] Cancelando reset: 'players_col' é None. Verifique a conexão com o banco.")
-        return
-
-    # --- FASE 1: PREMIAR OS VENCEDORES (Top 5) ---
+async def admin_trigger_pvp_give_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Dispara manualmente o job de entregar 'ticket_arena'."""
+    query = update.callback_query
+    await query.answer("Processando...")
     try:
-        # Busca apenas os top 5 jogadores com pontos > 0
-        cursor = players_col.find({"pvp_points": {"$gt": 0}}).sort("pvp_points", -1).limit(5)
-        top_players = list(cursor) # Converte cursor para lista (síncrono/pymongo padrão) ou await se for motor
-        # Nota: Se estiver usando Motor (Async), seria: await cursor.to_list(length=5)
-        # Assumindo PyMongo padrão pelo seu core.py:
-        
-        msg_recompensa = "🏆 <b>Nova Temporada PvP Iniciada!</b>\nParabéns! Você ficou entre os melhores da temporada passada:"
-
-        for i, p_data in enumerate(top_players):
-            user_id = p_data.get("_id") # MongoDB usa _id
-            rank = i + 1
-            reward_gems = MONTHLY_RANKING_REWARDS.get(rank, 0)
-
-            if reward_gems > 0:
-                # Adiciona Gemas usando seu player_manager (Safe)
-                # Precisamos garantir que player_manager tenha add_gems ou similar
-                # Se add_gems for async, use await. Se for sync, chame direto.
-                # Assumindo async baseada no contexto:
-                try:
-                    p_data_loaded = await player_manager.get_player_data(user_id)
-                    player_manager.add_gems(p_data_loaded, reward_gems)
-                    await player_manager.save_player_data(user_id, p_data_loaded)
-                    
-                    # Notifica
-                    await context_bot.send_message(
-                        chat_id=user_id, 
-                        text=f"{msg_recompensa}\n💎 <b>+{reward_gems} Gemas</b> (Rank #{rank})"
-                    )
-                    logger.info(f"✅ [PvP] Prêmio entregue para Rank #{rank} (ID: {user_id})")
-                except Exception as e_reward:
-                    logger.error(f"⚠️ Erro ao premiar ID {user_id}: {e_reward}")
-
+        await daily_arena_ticket_job(context, force_run=True)
+        await query.edit_message_text("✅ <b>Tickets Entregues!</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]), parse_mode="HTML")
     except Exception as e:
-        logger.error(f"⚠️ [PvP] Erro ao processar ranking: {e}")
+        logger.error(f"Erro tickets pvp: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
 
-    # --- FASE 2: O RESET TOTAL (Bulk Update) ---
-    # Isso é instantâneo e não trava o bot
+async def admin_trigger_pvp_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Dispara manualmente o reset de entradas diárias."""
+    query = update.callback_query
+    await query.answer("Processando...")
     try:
-        result = players_col.update_many(
-            {"pvp_points": {"$gt": 0}},  # Filtro: Quem tem pontos positivos
-            {"$set": {"pvp_points": 0}}  # Ação: Zera
+        await daily_pvp_entry_reset_job(context, force_run=True)
+        await query.edit_message_text("✅ <b>Entradas Resetadas!</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]), parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Erro reset entradas: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+
+async def admin_trigger_pvp_rewards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Dispara a entrega de prêmios."""
+    query = update.callback_query
+    await query.answer("Processando...")
+    try:
+        await distribute_pvp_rewards(context)
+        await query.edit_message_text("✅ <b>Prêmios Distribuídos!</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]), parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Erro rewards pvp: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+
+async def admin_trigger_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Dispara o Reset de Temporada COMPLETO.
+    Usa a nova função 'executar_reset_pvp' que é segura e atômica.
+    """
+    query = update.callback_query
+    await query.answer("Iniciando Reset Completo...")
+    
+    try:
+        # AQUI ESTÁ A MUDANÇA: Usamos a função nova do scheduler
+        # force_run=True obriga a rodar mesmo não sendo dia 1º
+        await executar_reset_pvp(context.bot, force_run=True)
+        
+        await query.edit_message_text(
+            "✅ <b>Temporada Resetada com Sucesso!</b>\n"
+            "Os prêmios foram entregues (Top 5) e todos os pontos foram zerados via MongoDB.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
+            parse_mode="HTML"
         )
-        logger.info(f"✅ [PvP] Pontos zerados com sucesso via MongoDB. Jogadores afetados: {result.modified_count}")
-        
     except Exception as e:
-        logger.error(f"❌ [PvP] Erro Crítico ao zerar pontos no banco: {e}")
+        logger.error(f"Erro reset season: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+
+async def admin_trigger_pvp_zero_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ação Drástica: Zera os pontos de TODOS sem dar prêmios."""
+    query = update.callback_query
+    
+    if "confirm" not in query.data:
+        await query.edit_message_text(
+            "⚠️ <b>PERIGO: ZERAR PONTOS</b> ⚠️\n\n"
+            "Isso vai definir <code>pvp_points = 0</code> para <b>TODOS</b>.\n"
+            "Nenhum prêmio será entregue.\n\n"
+            "Tem certeza?",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ SIM, ZERAR TUDO", callback_data="admin_pvp_zero_points_confirm")],
+                [InlineKeyboardButton("❌ Cancelar", callback_data="admin_pvp_menu")]
+            ]),
+            parse_mode="HTML"
+        )
         return
 
-    # --- FASE 3: MARCAR COMO FEITO ---
-    game_data.SYSTEM_DATA["pvp_last_reset_month"] = mes_atual_str
-    # Salvar system data se necessário (depende da sua implementação de game_data)
-    
-    # Aviso para o Admin
-    from config import ADMIN_ID
-    if ADMIN_ID:
-        try:
-            await context_bot.send_message(chat_id=ADMIN_ID, text=f"✅ <b>PvP Resetado com Sucesso!</b>\nJogadores zerados: {result.modified_count}")
-        except: pass
+    await query.answer("Zerando pontos...")
+    try:
+        if players_collection is None: raise Exception("Sem banco de dados.")
+        
+        result = players_collection.update_many(
+            {"pvp_points": {"$gt": 0}}, 
+            {"$set": {"pvp_points": 0}}
+        )
+        
+        await query.edit_message_text(
+            f"💀 <b>HARD RESET CONCLUÍDO</b>\nJogadores zerados: <b>{result.modified_count}</b>",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao zerar pontos pvp: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro Crítico: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
 
-async def job_pvp_monthly_reset(context: ContextTypes.DEFAULT_TYPE):
-    """Job automático (roda todo dia)."""
-    await executar_reset_pvp(context.bot, force_run=False)
+# --- Lista de Handlers ---
+admin_pvp_menu_handler = CallbackQueryHandler(admin_pvp_menu, pattern=r'^admin_pvp_menu$')
+admin_trigger_pvp_tickets_handler = CallbackQueryHandler(admin_trigger_pvp_tickets, pattern=r'^admin_pvp_trigger_tickets$')
+admin_trigger_pvp_rewards_handler = CallbackQueryHandler(admin_trigger_pvp_rewards, pattern=r'^admin_pvp_trigger_rewards$')
+admin_trigger_pvp_reset_handler = CallbackQueryHandler(admin_trigger_pvp_reset, pattern=r'^admin_pvp_trigger_reset$')
+admin_trigger_pvp_give_ticket_handler = CallbackQueryHandler(admin_trigger_pvp_give_ticket, pattern=r'^admin_pvp_trigger_give_ticket$')
+admin_trigger_pvp_zero_points_handler = CallbackQueryHandler(admin_trigger_pvp_zero_points, pattern=r'^admin_pvp_zero_points')
+
+pvp_panel_handlers = [
+    admin_pvp_menu_handler,
+    admin_trigger_pvp_tickets_handler,
+    admin_trigger_pvp_rewards_handler,
+    admin_trigger_pvp_reset_handler,
+    admin_trigger_pvp_give_ticket_handler,
+    admin_trigger_pvp_zero_points_handler,
+]
