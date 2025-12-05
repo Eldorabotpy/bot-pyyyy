@@ -1,5 +1,5 @@
 # handlers/guild/missions.py
-# (VERSÃO CORRIGIDA: LENDO DO GUILD_MISSIONS_CATALOG)
+# (VERSÃO FINAL: Corrigido erro de 'edit_message_text' em mensagens com foto)
 
 import logging
 import random
@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, clan_manager
 from modules.database import db
 
-# Tenta importar o catálogo novo. Se falhar, usa um fallback vazio para não quebrar.
+# Tenta importar o catálogo novo. Se falhar, usa um fallback vazio.
 try:
     from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG
 except ImportError:
@@ -21,10 +21,7 @@ logger = logging.getLogger(__name__)
 # 1. VISUALIZAR DETALHES DA MISSÃO ATIVA
 # ==============================================================================
 async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o status detalhado da missão mantendo a imagem do clã."""
     query = update.callback_query
-    
-    # Importação Tardia do Renderizador (Evita erro circular)
     from handlers.guild.dashboard import _render_clan_screen
     
     user_id = query.from_user.id
@@ -35,47 +32,39 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
         await query.answer("Sem clã!", show_alert=True)
         return
 
-    # Busca dados do clã
     clan = await clan_manager.get_clan(clan_id)
     if not clan: return
 
     mission = clan.get("active_mission")
     is_leader = (str(clan.get("leader_id")) == str(user_id))
 
-    # [PROTEÇÃO] Remove missões de coleta antigas/bugadas
     if mission and str(mission.get('type')).upper() == 'COLLECT':
         mission = None
 
-    # --- CENÁRIO 1: SEM MISSÃO ATIVA ---
     if not mission:
         text = (
             "🛡️ <b>QUADRO DE CONTRATOS</b>\n"
             f"Clã: {clan.get('display_name')}\n"
             "━━━━━━━━━━━━━━━━━━━\n\n"
             "<i>Nenhuma missão ativa no momento.</i>\n\n"
-            "O Líder deve selecionar um contrato para iniciar a caçada e ganhar Prestígio."
+            "O Líder deve selecionar um contrato para iniciar a caçada."
         )
         kb = []
         if is_leader:
             kb.append([InlineKeyboardButton("⚔️ Iniciar Nova Caçada", callback_data="gld_mission_select_menu")])
         
         kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="clan_menu")])
-        
-        # Renderiza com imagem
         await _render_clan_screen(update, context, clan, text, kb)
         return
 
-    # --- CENÁRIO 2: MISSÃO ATIVA ---
     title = mission.get("title", "Missão de Caça")
     desc = mission.get("description", "Derrote os monstros.")
     prog = mission.get("current_progress", 0)
     target = mission.get("target_count", 10)
     
-    # Formata nome do monstro
     monster_id = mission.get("target_monster_id", "Monstro")
     monster_name = str(monster_id).replace("_", " ").title()
     
-    # Barra de Progresso
     percent = (prog / target) * 100 if target > 0 else 0
     percent = min(100, percent)
     blocks = int(percent / 10)
@@ -92,23 +81,16 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     )
 
     kb = []
-    
     if is_leader:
-        # Se completou, mostra o botão de finalizar
         if prog >= target:
              text += "\n\n✅ <b>MISSÃO COMPLETA!</b>"
              kb.append([InlineKeyboardButton("🏆 Finalizar e Receber Prêmios", callback_data="gld_mission_finish")])
-        
-        # [CORREÇÃO] O botão Cancelar agora é adicionado SEMPRE para o líder
-        # Isso permite apagar missões bugadas mesmo que estejam 100%
         kb.append([InlineKeyboardButton("❌ Cancelar Missão (Líder)", callback_data="gld_mission_cancel")])
     
     elif prog >= target:
         text += "\n\n✅ <b>Aguardando Líder finalizar.</b>"
     
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="clan_menu")])
-
-    # Renderiza com imagem
     await _render_clan_screen(update, context, clan, text, kb)
 
 
@@ -116,9 +98,8 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
 # 2. MENU DE SELEÇÃO (LÍDER)
 # ==============================================================================
 async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra opções de dificuldade usando renderizador."""
     query = update.callback_query
-    from handlers.guild.dashboard import _render_clan_screen # Import tardio
+    from handlers.guild.dashboard import _render_clan_screen
 
     user_id = query.from_user.id
     pdata = await player_manager.get_player_data(user_id)
@@ -141,66 +122,18 @@ async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFA
         [InlineKeyboardButton("🔴 Caçada Difícil (Nv. 30+)", callback_data="gld_start_hunt:hard")],
         [InlineKeyboardButton("🔙 Cancelar", callback_data="clan_mission_details")]
     ]
-    
     await _render_clan_screen(update, context, clan, text, kb)
 
 
 # ==============================================================================
-# 3. LÓGICA DE INICIAR A MISSÃO
+# 3. LÓGICA DE INICIAR A MISSÃO (CORRIGIDO)
 # ==============================================================================
 async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Gera a missão e salva no banco."""
+    """Gera a missão a partir do CATÁLOGO externo e exibe com MÍDIA."""
     query = update.callback_query
-    from handlers.guild.dashboard import _render_clan_screen # Import tardio
-
-    try: difficulty = query.data.split(":")[1]
-    except: difficulty = "easy"
-        
-    user_id = query.from_user.id
-    pdata = await player_manager.get_player_data(user_id)
-    clan_id = pdata.get("clan_id")
-    clan = await clan_manager.get_clan(clan_id)
+    # IMPORTAÇÃO TARDIA CRÍTICA
+    from handlers.guild.dashboard import _render_clan_screen
     
-    # Filtra catálogo
-    available_keys = [
-        k for k, v in GUILD_MISSIONS_CATALOG.items() 
-        if v.get("difficulty") == difficulty and v.get("type") == "HUNT"
-    ]
-    
-    if not available_keys:
-        await query.answer("Nenhuma missão encontrada para essa dificuldade.", show_alert=True)
-        return
-
-    # Sorteia
-    chosen_key = random.choice(available_keys)
-    m_template = GUILD_MISSIONS_CATALOG[chosen_key]
-
-    # Prepara objeto
-    monster_name = str(m_template.get("target_monster_id")).replace("_", " ").title()
-    
-    # Usa a função do clan_manager para garantir consistência
-    await clan_manager.assign_mission_to_clan(clan_id, chosen_key, user_id)
-            
-    # Feedback Visual
-    text = (
-        f"✅ <b>CONTRATO ACEITO!</b>\n\n"
-        f"📜 <b>{m_template['title']}</b>\n"
-        f"<i>{m_template['description']}</i>\n\n"
-        f"🎯 <b>Alvo:</b> {monster_name}\n"
-        f"💀 <b>Meta:</b> {m_template['target_count']} abates\n\n"
-        f"Avisem os membros do clã! A caçada começou."
-    )
-    kb = [[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]]
-    
-    await _render_clan_screen(update, context, clan, text, kb)
-
-
-# ==============================================================================
-# 3. LÓGICA DE INICIAR A MISSÃO (AGORA USA O CATÁLOGO)
-# ==============================================================================
-async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Gera a missão a partir do CATÁLOGO externo."""
-    query = update.callback_query
     await query.answer()
     
     try:
@@ -211,31 +144,27 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
     user_id = query.from_user.id
     pdata = await player_manager.get_player_data(user_id)
     clan_id = pdata.get("clan_id")
+    clan = await clan_manager.get_clan(clan_id) # Precisamos do objeto clan para renderizar
     
     # --- FILTRAGEM DO CATÁLOGO ---
-    # Encontra todas as chaves no catálogo que batem com a dificuldade
     available_keys = [
         k for k, v in GUILD_MISSIONS_CATALOG.items() 
         if v.get("difficulty") == selected_difficulty and v.get("type") == "HUNT"
     ]
     
-    # Se não achar nenhuma (ou catálogo vazio), usa fallback genérico
     if not available_keys:
         logger.warning(f"Nenhuma missão encontrada no catálogo para diff: {selected_difficulty}. Usando fallback.")
-        # Fallback de segurança
         mission_data = {
             "title": "Caçada de Emergência",
             "description": "Mate monstros aleatórios.",
-            "target_monster_id": "slime_verde", # Monster default
+            "target_monster_id": "slime_verde",
             "target_count": 10,
             "rewards": {"clan_xp": 100, "clan_gold": 500}
         }
     else:
-        # Sorteia uma missão do catálogo daquela dificuldade
         chosen_key = random.choice(available_keys)
         mission_data = GUILD_MISSIONS_CATALOG[chosen_key]
 
-    # Prepara o objeto para salvar no banco
     monster_id = mission_data.get("target_monster_id")
     monster_name = str(monster_id).replace("_", " ").title()
     target_count = mission_data.get("target_count", 10)
@@ -254,23 +183,26 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     try:
         # Salva no banco
-        if hasattr(clan_manager, "set_active_mission"):
-            await clan_manager.set_active_mission(clan_id, new_mission)
-        else:
-            db.clans.update_one({"_id": clan_id}, {"$set": {"active_mission": new_mission}})
+        db.clans.update_one({"_id": clan_id}, {"$set": {"active_mission": new_mission}})
+        
+        # Atualiza o objeto clan local para refletir a nova missão na tela
+        clan["active_mission"] = new_mission
             
-        await query.edit_message_text(
-            f"✅ <b>Contrato Aceito!</b>\n\n"
+        text = (
+            f"✅ <b>CONTRATO ACEITO!</b>\n\n"
             f"📜 <b>{new_mission['title']}</b>\n"
-            f"🎯 Alvo: <b>{monster_name}</b>\n"
-            f"💀 Meta: {target_count} abates.\n\n"
-            f"Avisem os membros do clã! Cada abate conta.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]])
-        , parse_mode="HTML")
+            f"🎯 <b>Alvo:</b> {monster_name}\n"
+            f"💀 <b>Meta:</b> {target_count} abates.\n\n"
+            f"Avisem os membros do clã! Cada abate conta."
+        )
+        kb = [[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]]
+        
+        # USA O RENDERIZADOR QUE SUPORTA MÍDIA
+        await _render_clan_screen(update, context, clan, text, kb)
         
     except Exception as e:
         logger.error(f"Erro ao iniciar missão: {e}")
-        await query.edit_message_text("Erro técnico ao iniciar missão. Tente novamente.")
+        await query.answer("Erro técnico ao iniciar missão.", show_alert=True)
 
 
 # ==============================================================================
@@ -278,8 +210,6 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
 # ==============================================================================
 async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    
-    # IMPORTAÇÃO TARDIA DO RENDERIZADOR (ESSENCIAL)
     from handlers.guild.dashboard import _render_clan_screen
 
     user_id = query.from_user.id
@@ -292,12 +222,10 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.answer("Nenhuma missão ativa.", show_alert=True)
         return
 
-    # Verificação de Líder
     if str(clan.get("leader_id")) != str(user_id):
         await query.answer("Apenas o líder pode finalizar.", show_alert=True)
         return
 
-    # Verificação de Progresso (Com margem de segurança)
     current = mission.get("current_progress", 0)
     target = mission.get("target_count", 1)
     
@@ -305,12 +233,10 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.answer(f"Incompleta! {current}/{target}", show_alert=True)
         return
 
-    # Entrega Recompensas
     rewards = mission.get("rewards", {})
     xp = rewards.get("clan_xp") or rewards.get("guild_xp") or 0
     gold = rewards.get("clan_gold") or rewards.get("gold") or 0
     
-    # Atualiza banco
     db.clans.update_one(
         {"_id": clan_id},
         {
@@ -319,7 +245,6 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         }
     )
     
-    # Recarrega dados atualizados para exibir
     updated_clan = await clan_manager.get_clan(clan_id)
     
     text = (
@@ -330,7 +255,6 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         f"Bom trabalho, líder! O clã está mais forte."
     )
     kb = [[InlineKeyboardButton("🛡️ Voltar", callback_data="clan_menu")]]
-    
     await _render_clan_screen(update, context, updated_clan, text, kb)
 
 # ==============================================================================
@@ -354,12 +278,15 @@ async def cancel_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         {"$unset": {"active_mission": ""}}
     )
     
+    # Atualiza o objeto local para remover a missão visualmente
+    if "active_mission" in clan:
+        del clan["active_mission"]
+
     text = (
         "❌ <b>Missão Cancelada.</b>\n\n"
         "O contrato foi rasgado. Você pode escolher outra missão no mural."
     )
     kb = [[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]]
-    
     await _render_clan_screen(update, context, clan, text, kb)
 
 

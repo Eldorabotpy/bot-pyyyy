@@ -186,6 +186,81 @@ async def broadcast_startup_message(application: Application):
     except Exception as e:
         logging.error(f"[Broadcast] Erro: {e}")
 
+async def check_stale_actions_on_startup(application: Application):
+    """
+    1. Busca no MongoDB quem está 'preso' fazendo algo (ex: forjando).
+    2. Calcula quanto tempo falta (ou se já acabou).
+    3. Reagenda a entrega do item.
+    """
+    if player_core.players_collection is None: return
+
+    logging.info("[Watchdog] 🔍 Iniciando varredura no Banco de Dados...")
+    now = utcnow()
+    
+    # --- CONFIGURAÇÃO: O que vamos buscar? ---
+    # Aqui definimos que queremos buscar quem está 'crafting' (forjando)
+    query = {
+        "player_state.action": "crafting"
+    }
+
+    try:
+        # Busca no Mongo
+        cursor = player_core.players_collection.find(query)
+        count = 0
+        
+        for pdata in cursor:
+            user_id = pdata.get("_id")
+            chat_id = pdata.get("last_chat_id")
+            
+            # Pega os detalhes salvos
+            state = pdata.get("player_state", {})
+            details = state.get("details", {})
+            finish_iso = state.get("finish_time")
+            
+            # Se não tem data de fim, algo está errado, ignora
+            if not finish_iso: continue
+            
+            end_time = _parse_iso(finish_iso)
+            if not end_time: continue
+
+            # --- A LÓGICA DE TEMPO ---
+            seconds_left = (end_time - now).total_seconds()
+            
+            # Se seconds_left for negativo (ex: -300), significa que acabou há 5 minutos.
+            # Se for positivo (ex: 600), significa que faltam 10 minutos.
+            
+            # Definimos o 'delay' para rodar o job.
+            # Se já acabou, delay = 1 segundo (executa "agora").
+            delay = max(1, seconds_left)
+            
+            job_name = f"fix_craft_{user_id}"
+            
+            # Se o job já estiver na memória (raro no boot), pula
+            if application.job_queue.get_jobs_by_name(job_name):
+                continue
+
+            # Agenda a finalização!
+            application.job_queue.run_once(
+                finish_craft_notification_job, 
+                when=delay, 
+                user_id=user_id, 
+                chat_id=chat_id,
+                data={"recipe_id": details.get("recipe_id")}, 
+                name=job_name
+            )
+            
+            status_msg = "Finalizando AGORA" if delay == 1 else f"Faltam {int(delay)}s"
+            logging.info(f"[Watchdog] 🔨 Forja recuperada para User {user_id}. Status: {status_msg}")
+            count += 1
+            
+        if count > 0:
+            logging.info(f"[Watchdog] ✅ Total de {count} forjas recuperadas do banco de dados!")
+        else:
+            logging.info("[Watchdog] Nenhuma forja pendente encontrada no banco.")
+                
+    except Exception as e:
+        logging.error(f"[Watchdog] ❌ Erro ao ler o banco de dados: {e}")
+        
 async def post_init_tasks(application: Application):
     if ADMIN_ID:
         try: await application.bot.send_message(chat_id=ADMIN_ID, text="🤖 <b>Sistema Online!</b>", parse_mode="HTML")

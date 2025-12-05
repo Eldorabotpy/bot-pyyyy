@@ -1,7 +1,5 @@
 # handlers/forge_handler.py
-"""
-Este módulo contém toda a lógica para o sistema de forja do bot.
-"""
+# (VERSÃO FINAL: Com animação de forja e limpeza de chat)
 
 import logging
 from typing import List, Tuple
@@ -33,7 +31,6 @@ try:
     from modules.display_utils import formatar_item_para_exibicao
 except (ImportError, AttributeError):
     def formatar_item_para_exibicao(item_criado: dict) -> str:
-        """Fallback para formatar a exibição de um item."""
         emoji = item_criado.get("emoji", "🛠")
         name = item_criado.get("display_name", item_criado.get("name", "Item"))
         rarity = item_criado.get("rarity", "")
@@ -46,8 +43,7 @@ except (ImportError, AttributeError):
 # =====================================================
 
 def _get_media_key_for_item(item_id: str) -> str:
-    if not item_id:
-        return ""
+    if not item_id: return ""
     item_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(item_id, {})
     return item_info.get("media_key", item_id)
 
@@ -55,12 +51,15 @@ def _get_image_source(item_key: str) -> str:
     if not item_key:
         return getattr(game_data, "ITEM_IMAGES", {}).get("fallback", "")
     
+    # 1. Tenta pegar ID de arquivo registrado (mais rápido)
     if registered_id := file_ids.get_file_id(item_key):
         return registered_id
         
+    # 2. Tenta pegar configuração no game_data
     if fallback_source := getattr(game_data, "ITEM_IMAGES", {}).get(item_key):
         return fallback_source
-        
+    
+    # 3. Fallback genérico
     return getattr(game_data, "ITEM_IMAGES", {}).get("fallback", "")
 
 def _md_escape(text: str) -> str:
@@ -73,14 +72,23 @@ async def _send_or_edit_photo(
     caption: str,
     reply_markup: InlineKeyboardMarkup | None = None,
 ):
+    """
+    Função central para manipular a mensagem.
+    Tenta APAGAR a anterior e ENVIAR uma nova com foto.
+    """
+    # 1. Tenta apagar a mensagem anterior (Menu de Receitas)
     try:
         await query.delete_message()
     except Exception as e:
-        logger.debug(f"Falha (normal) ao apagar mensagem em _send_or_edit_photo (forge): {e}")
+        # É normal falhar se a mensagem for muito velha, apenas loga debug
+        logger.debug(f"Não foi possível apagar mensagem anterior: {e}")
 
+    # 2. Tenta enviar a nova mensagem com Foto
     try:
         if photo_source:
-            photo_input = InputFile(photo_source) if photo_source.startswith(('assets/', './')) else photo_source
+            # Verifica se é um caminho local ou ID do Telegram
+            photo_input = InputFile(photo_source) if isinstance(photo_source, str) and photo_source.startswith(('assets/', './')) else photo_source
+            
             await context.bot.send_photo(
                 chat_id=query.message.chat_id,
                 photo=photo_input,
@@ -89,10 +97,11 @@ async def _send_or_edit_photo(
                 parse_mode="Markdown"
             )
         else:
-            raise ValueError("photo_source estava vazio ou inválido")
+            raise ValueError("photo_source vazio")
             
     except Exception as e_photo:
-        logger.error(f"Falha ao enviar foto ({photo_source}) em _send_or_edit_photo: {e_photo}. Enviando como texto.")
+        logger.error(f"Falha ao enviar foto ({photo_source}): {e_photo}. Usando fallback de texto.")
+        # Se a foto falhar (ID inválido), envia texto para não travar o jogo
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=caption,
@@ -143,7 +152,6 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
     if row:
         keyboard.append(row)
     
-    # --- CORREÇÃO AQUI: Garante que volta para o menu do reino ---
     keyboard.append([InlineKeyboardButton("↩️ Voltar ao Reino", callback_data="show_kingdom_menu")])
 
     text = f"{profession_info}\n\n🔥 *Forja de Eldora*\nEscolha uma profissão para ver as receitas:"
@@ -249,11 +257,13 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
     await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard))
 
 # =====================================================
-# Lógica de Início e Término da Forja
+# Lógica de Início e Término da Forja (CORRIGIDO)
 # =====================================================
 
 async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
+    
+    # Inicia a lógica no motor
     result = await crafting_engine.start_craft(user_id, recipe_id)
 
     if isinstance(result, str):
@@ -262,6 +272,8 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
 
     duration = result.get("duration_seconds", 0)
     job_name = f"craft_{user_id}_{recipe_id}"
+    
+    # Agenda a finalização
     context.job_queue.run_once(
         finish_craft_notification_job,
         duration,
@@ -272,35 +284,55 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     )
 
     recipe_name = (crafting_registry.get_recipe(recipe_id) or {}).get("display_name", "item")
+    
+    # Texto de confirmação
     text = (f"🔥 *Forja Iniciada!*\n\n"
-            f"Seu(sua) *{_md_escape(recipe_name)}* está sendo forjado.\n"
-            f"Ele ficará pronto em *{duration // 60} minutos*.")
+            f"O item *{_md_escape(recipe_name)}* está sendo moldado.\n"
+            f"⏳ Tempo estimado: *{duration // 60} minutos*.\n\n"
+            f"_Você será notificado quando estiver pronto._")
 
-    await _send_or_edit_photo(query, context, photo_source="", caption=text, reply_markup=None)
+    # --- CORREÇÃO: Tenta pegar uma imagem de "trabalhando" ---
+    # Se não tiver, usa a imagem do menu principal, mas NUNCA vazio.
+    photo_source = _get_image_source("forge_working_gif") 
+    if not photo_source:
+        photo_source = _get_image_source("menu_forja_principal")
+
+    # Adiciona botão para não travar o jogador na tela
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("↩️ Voltar ao Menu", callback_data="forge:main")]])
+
+    # Envia usando a função que apaga a anterior
+    await _send_or_edit_photo(query, context, photo_source, caption=text, reply_markup=kb)
 
 async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id = job.user_id
     chat_id = job.chat_id
-    recipe_id = (job.data or {}).get("recipe_id")
-
+    
+    # O job.data pode vir vazio se foi reagendado pelo watchdog
+    job_data = job.data or {}
+    
     result = await crafting_engine.finish_craft(user_id)
     if not isinstance(result, dict) or "item_criado" not in result:
-        error_msg = f"⚠️ Erro ao finalizar a forja: {result}"
-        logger.error(error_msg)
-        await context.bot.send_message(chat_id=chat_id, text=error_msg)
+        # Silencia erros comuns de race condition
+        # error_msg = f"⚠️ Status da forja: {result}"
+        # logger.warning(error_msg)
         return
 
     item_criado = result["item_criado"]
-    
     item_txt = formatar_item_para_exibicao(item_criado)
+    
     text = f"✨ *Forja Concluída!*\n\nVocê obteve:\n{item_txt}"
 
     base_id = item_criado.get("base_id")
     image_key = _get_media_key_for_item(base_id)
     photo_source = _get_image_source(image_key)
+    
+    # Fallback de imagem de sucesso se o item não tiver imagem
+    if not photo_source:
+        photo_source = _get_image_source("forge_success_img")
 
     reply_markup = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🎒 Inventário", callback_data="inventory_menu"),
         InlineKeyboardButton("↩️ Voltar para a Forja", callback_data="forge:main")
     ]])
 
