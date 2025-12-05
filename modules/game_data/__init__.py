@@ -17,7 +17,7 @@ def get_xp_for_next_combat_level(level: int) -> int:
 # ==============================================================================
 # 1. IMPORTAÇÕES PRINCIPAIS (ITENS & MERCADO)
 # ==============================================================================
-# Importamos diretamente para garantir que os dados existem.
+# O items.py é o "Gerente". Se ele falhar, o jogo NÃO pode abrir.
 try:
     from .items import (
         ITEMS_DATA, 
@@ -29,16 +29,19 @@ try:
         is_stackable
     )
 except ImportError as e:
-    logger.critical(f"FALHA FATAL ao importar items.py: {e}")
+    logger.critical(f"❌ ERRO FATAL ao importar items.py (Verifique imports circulares): {e}")
     raise e
 
-# Função wrapper para manter compatibilidade com códigos antigos que chamam item_display_name
+# Função wrapper para manter compatibilidade
 def item_display_name(base_id: str) -> str:
     return get_display_name(base_id)
 
 # ==============================================================================
-# 2. CLASSES E ATRIBUTOS
+# 2. CLASSES E ATRIBUTOS (AQUI ESTAVA O PROBLEMA DO LENDÁRIO)
 # ==============================================================================
+# Removemos o try/except para obrigar o jogo a carregar os atributos.
+# Se isso falhar, saberemos que é culpa do attributes.py.
+
 try:
     from .classes import (
         CLASSES_DATA, 
@@ -47,22 +50,35 @@ try:
         get_primary_damage_profile, 
         get_stat_modifiers
     )
-except ImportError:
+except ImportError as e:
+    logger.error(f"Erro ao carregar Classes: {e}")
+    # Fallback mínimo para não crashar imediatamente, mas avisa no log
     CLASSES_DATA = {}
     CLASS_PRIMARY_DAMAGE = {}
-    CLASS_DMG_EMOJI = {}
     def get_primary_damage_profile(*args): return {}
     def get_stat_modifiers(*args): return {}
 
+# --- A CORREÇÃO PRINCIPAL ---
+# O erro dos itens "sem status" vinha daqui. O except silencioso definia AFFIX_POOLS vazio.
+# Agora, se der erro, ele vai avisar no console.
 try:
     from .attributes import (
         STAT_EMOJI, 
         AFFIX_POOLS, 
         AFFIXES
     )
-except ImportError:
-    STAT_EMOJI = {}
-    AFFIX_POOLS = {"geral": []}
+except ImportError as e:
+    logger.critical(f"❌ ERRO CRÍTICO EM ATTRIBUTES.PY: {e}")
+    # Definimos um fallback DE EMERGÊNCIA para itens não saírem bugados
+    logger.warning("⚠️ Usando Pool de Atributos de Emergência!")
+    STAT_EMOJI = {"hp": "❤️", "atk": "⚔️", "def": "🛡️"}
+    AFFIX_POOLS = {
+        "geral": ["hp", "defense", "initiative", "luck", "critical_chance"],
+        "guerreiro": ["forca"], "mago": ["inteligencia"], 
+        "cacador": ["agilidade"], "berserker": ["forca"],
+        "assassino": ["agilidade"], "monge": ["agilidade"],
+        "bardo": ["inteligencia"], "samurai": ["forca"]
+    }
     AFFIXES = {}
 
 # Fallback para atributo primário se não definido
@@ -104,16 +120,12 @@ except ImportError:
     def get_profession_for_resource(*args): return None
 
 # ==============================================================================
-# 4. SISTEMAS (Refino, Clãs, Premium, Raridade)
+# 4. SISTEMAS
 # ==============================================================================
 try:
     from .refining import REFINING_RECIPES
 except ImportError:
-    # Tenta importar do arquivo de receitas se o módulo principal falhar
-    try:
-        from .refining import REFINING_RECIPES
-    except ImportError:
-        REFINING_RECIPES = {}
+    REFINING_RECIPES = {}
 
 try:
     from .clans import CLAN_CONFIG, CLAN_PRESTIGE_LEVELS
@@ -134,7 +146,7 @@ except ImportError:
     RARITY_DATA = {}
 
 # ==============================================================================
-# 5. EQUIPAMENTOS E SLOTS (Legado + Novo)
+# 5. EQUIPAMENTOS E SLOTS
 # ==============================================================================
 try:
     from .equipment import (
@@ -147,7 +159,6 @@ try:
     SLOT_EMOJI = EQ_SLOT_EMOJI
     SLOT_ORDER = EQ_SLOT_ORDER
 except ImportError:
-    # Definições Padrão se o arquivo equipment.py falhar
     SLOT_EMOJI = {
         "elmo": "🪖", "armadura": "👕", "calca": "👖", "luvas": "🧤",
         "botas": "🥾", "colar": "📿", "anel": "💍", "brinco": "🧿", "arma": "⚔️",
@@ -156,7 +167,6 @@ except ImportError:
     ITEM_SLOTS = {}
     ITEM_DATABASE = {}
 
-# Fallback essencial para forja se ITEM_SLOTS estiver vazio
 if not ITEM_SLOTS:
     ITEM_SLOTS = {
         "arma":      {"primary_stat_type": "class_attribute"},
@@ -174,30 +184,19 @@ if not ITEM_SLOTS:
 # 6. EXPORTAÇÃO (__all__)
 # ==============================================================================
 __all__ = [
-    # Constantes e Helpers
     "TRAVEL_TIME_MINUTES", "COLLECTION_TIME_MINUTES", "TRAVEL_DEFAULT_SECONDS",
     "get_xp_for_next_collection_level", "get_xp_for_next_combat_level",
-    
-    # Itens Base
     "ITEMS_DATA", "ITEM_BASES", "MARKET_ITEMS", 
     "get_item", "get_item_info", "get_display_name", "item_display_name",
-    
-    # Classes e Atributos
     "CLASSES_DATA", "CLASS_PRIMARY_DAMAGE", "CLASS_DMG_EMOJI",
     "get_primary_damage_profile", "get_stat_modifiers",
     "CLASS_PRIMARY_ATTRIBUTE",
     "STAT_EMOJI", "AFFIX_POOLS", "AFFIXES",
-    
-    # Mundo e Monstros
     "WORLD_MAP", "REGIONS_DATA", "REGION_TARGET_POWER", "REGION_SCALING_ENABLED",
     "MONSTERS_DATA", "PROFESSIONS_DATA", "get_profession_for_resource",
-    
-    # Sistemas
     "REFINING_RECIPES",
     "CLAN_CONFIG", "CLAN_PRESTIGE_LEVELS",
     "PREMIUM_TIERS", "PREMIUM_PLANS_FOR_SALE",
     "BASE_STATS_BY_RARITY", "RARITY_DATA",
-    
-    # Equipamentos
     "SLOT_EMOJI", "SLOT_ORDER", "ITEM_SLOTS", "ITEM_DATABASE"
 ]
