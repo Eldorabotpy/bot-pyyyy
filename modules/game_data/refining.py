@@ -197,7 +197,7 @@ REFINING_RECIPES = {
         "profession": ["ferreiro", "armeiro", "fundidor"],
         "level_req": 1,
         "time_seconds": 6 * 60,
-        "inputs": {"ferro": 2},
+        "inputs": {"minerio_de_ferro": 2},
         "outputs": {"barra_de_ferro": 1},
         "xp_gain": 3,
         "emoji": "⛏️",

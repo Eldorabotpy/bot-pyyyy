@@ -85,9 +85,22 @@ def is_stackable(item_id: str) -> bool:
     return bool(meta.get("stackable", True))
 
 def get_display_name(item_id: str) -> str:
-    """Retorna o nome bonito do item."""
-    meta = ITEMS_DATA.get(item_id) or {}
-    return meta.get("display_name", item_id)
+    """
+    Retorna o nome bonito do item.
+    Se não achar, transforma 'pano_simples' em 'Pano Simples'.
+    """
+    if not item_id:
+        return "Item Desconhecido"
+        
+    # Tenta pegar do dicionário mestre
+    meta = ITEMS_DATA.get(item_id)
+    
+    # Se achou e tem display_name, retorna ele
+    if meta and "display_name" in meta:
+        return meta["display_name"]
+    
+    # Se não achou, formata o ID para ficar legível (Fallback)
+    return item_id.replace("_", " ").title()
 
 def _register_item_safe(item_id: str, data: dict, market_price: int | None = None):
     """
