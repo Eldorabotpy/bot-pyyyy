@@ -25,7 +25,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, ContextTypes
 from telegram.error import BadRequest, Forbidden, Conflict, NetworkError # <--- IMPORTS DE ERRO
-
+from pvp.pvp_scheduler import job_pvp_monthly_reset, executar_reset_pvp
 # --- CONFIGURAÇÕES ---
 from config import (
     ADMIN_ID, 
@@ -265,8 +265,18 @@ async def post_init_tasks(application: Application):
     if ADMIN_ID:
         try: await application.bot.send_message(chat_id=ADMIN_ID, text="🤖 <b>Sistema Online!</b>", parse_mode="HTML")
         except: pass
+    
     await check_stale_actions_on_startup(application)
     asyncio.create_task(broadcast_startup_message(application))
+
+    # ======================================================================
+    # 🚨 ATENÇÃO: GATILHO DE RESET MANUAL (Use SÓ HOJE) 🚨
+    # Isso vai zerar os pontos e entregar prêmios assim que o bot ligar.
+    # ======================================================================
+    logging.info("⚠️ EXECUTANDO RESET FORÇADO DO PVP (MANUAL)...")
+    # force_run=True faz ele ignorar a data e rodar agora
+    asyncio.create_task(executar_reset_pvp(application.bot, force_run=True)) 
+    # ======================================================================
 
 def register_jobs(application: Application):
     j = application.job_queue
@@ -278,6 +288,7 @@ def register_jobs(application: Application):
     j.run_daily(daily_crystal_grant_job, time=dt_time(0,0,tzinfo=local_tz), name="daily_crystals")
     j.run_daily(daily_arena_ticket_job, time=dt_time(2,0,tzinfo=local_tz), name="daily_arena_tickets")
     j.run_daily(afternoon_event_reminder_job, time=dt_time(13,30,tzinfo=local_tz), name="reminder")
+    j.run_daily(job_pvp_monthly_reset, time=dt_time(4, 0, tzinfo=local_tz), name="pvp_monthly_reset")
 
     if EVENT_TIMES:
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
