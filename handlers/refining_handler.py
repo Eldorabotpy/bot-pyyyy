@@ -371,42 +371,52 @@ async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     user_id, chat_id = job.user_id, job.chat_id
     job_details = job.data
     
-    # Tenta apagar a mensagem de "processando" se houver ID (Melhoria visual)
+    # =========================================================================
+    # 1. LIMPEZA VISUAL (PRIORIDADE)
+    # Tenta apagar a mensagem de "Desmontando..." imediatamente.
+    # Fazemos isso no início para garantir que ela suma mesmo se der erro depois.
+    # =========================================================================
     message_id_to_delete = job_details.get("message_id_to_delete")
     if message_id_to_delete:
         try:
             await context.bot.delete_message(chat_id, message_id_to_delete)
         except Exception:
+            # Ignora erros se a mensagem já tiver sido apagada ou não existir
             pass
 
-    # 1. Carrega dados do jogador
+    # 2. Carrega dados do jogador
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
+        # Se não achar o jogador, para por aqui (mensagem visual já foi apagada)
         return
 
-    # 2. Chama a engine (agora async) para processar a lógica
-    # A engine retorna uma string em caso de erro, ou uma tupla (nome, materiais) em caso de sucesso
+    # 3. Chama a engine para processar a lógica (remover item, dar materiais)
+    # A engine deve retornar:
+    #   - string: em caso de erro
+    #   - tupla (item_name, returned_materials): em caso de sucesso
     result = await dismantle_engine.finish_dismantle(player_data, job_details)
 
+    # Tratamento de erro vindo da engine
     if isinstance(result, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ Erro ao finalizar desmontagem: {result}")
         return
 
-    # 3. Sucesso: Desempacota os dados
+    # 4. Sucesso: Desempacota os dados
     item_name, returned_materials = result
 
-    # 4. Salvamento de segurança (Garante que o estado 'idle' e inventário fiquem salvos)
+    # 5. Salvamento de segurança 
+    # (Garante que o estado 'idle' e as mudanças no inventário fiquem salvos)
     if player_data:
         await player_manager.save_player_data(user_id, player_data)
 
-    # 5. Monta a mensagem de resposta
+    # 6. Monta a mensagem de resposta
     caption_lines = [f"♻️ <b>{item_name}</b> foi desmontado com sucesso!", "\nVocê recuperou:"]
     
     if not returned_materials:
         caption_lines.append(" - Nenhum material foi recuperado.")
     else:
         for mat_id, mat_qty in returned_materials.items():
-            # _fmt_item_line é uma função auxiliar interna do refining_handler.py
+            # _fmt_item_line é uma função auxiliar definida no escopo global deste arquivo (refining_handler.py)
             caption_lines.append(f"• {_fmt_item_line(mat_id, mat_qty)}")
 
     keyboard = [
@@ -505,49 +515,42 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Job que finaliza o refino.
-    (Versão SEGURA: Sem dependência de missões ou clã para evitar travamentos)
+    CORREÇÃO: Apaga a mensagem de 'Refinando...' antes de enviar o resultado.
     """
     job = context.job
     user_id, chat_id = job.user_id, job.chat_id
     job_data = job.data
-    # O recipe_id não é estritamente necessário aqui se confiarmos no estado do jogador,
-    # mas ajuda se quisermos logs futuros.
     
+    # --- NOVO BLOCO: Tenta apagar a mensagem de progresso imediatamente ---
+    message_id_to_delete = job_data.get("message_id_to_delete")
+    if message_id_to_delete:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
+        except Exception as e:
+            logger.warning(f"Não foi possível apagar mensagem antiga de refino: {e}")
+    # ---------------------------------------------------------------------
+
     # 1. Carrega dados do jogador
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        # Se não achar o jogador, apenas loga e avisa (evita crash)
         logger.error(f"finish_refine_job: Não foi possível carregar pdata para {user_id}")
         await context.bot.send_message(chat_id=chat_id, text="❗ Erro ao finalizar refino: dados do jogador não encontrados.")
         return
 
-    # 2. Executa a finalização na engine (Async)
-    # Isso entrega os itens e dá o XP
+    # 2. Executa a finalização na engine
     res = await finish_refine(pdata)
     
     if isinstance(res, str):
         await context.bot.send_message(chat_id=chat_id, text=f"❗ {res}")
         return
     if not res:
-        # Se retornou vazio ou None sem erro explícito
         return
 
-    # 3. O 'finish_refine' já salvou os dados no banco?
-    # Sim, a nova versão da engine que fizemos já salva. 
-    # Mas por segurança extra em sistemas críticos, podemos salvar novamente se alterarmos algo aqui.
-    # Como removemos as missões, não estamos alterando 'pdata' aqui, então não é estritamente necessário salvar de novo.
-    
     outs = res.get("outputs") or {}
-    
-    # --- BLOCO DE MISSÕES REMOVIDO PARA EVITAR BUGS ---
-    # As chamadas para mission_manager e clan_manager foram retiradas.
-    # Isso garante que se o sistema de missões falhar, o jogador ainda recebe o item.
-    # --------------------------------------------------
 
     # 4. Mensagem de Sucesso
     lines = ["✅ <b>Refino concluído!</b>", "Você obteve:"]
     for k, v in outs.items():
-        # _fmt_item_line é helper interno do handler
         lines.append(f"• {_fmt_item_line(k, v)}")
     
     caption = "\n".join(lines)

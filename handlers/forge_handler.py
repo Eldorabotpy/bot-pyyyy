@@ -1,16 +1,13 @@
 # handlers/forge_handler.py
-# (VERSÃO FINAL: Com animação de forja e limpeza de chat)
+# (VERSÃO FINAL 3.0: Suporte total a VÍDEO MP4 e FOTO na forja)
 
 import logging
-from typing import List, Tuple
-
 from telegram import (
     Update,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InputFile,
-    InputMediaPhoto,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.helpers import escape_markdown
@@ -42,71 +39,96 @@ except (ImportError, AttributeError):
 # Funções Auxiliares (Helpers)
 # =====================================================
 
-def _get_media_key_for_item(item_id: str) -> str:
-    if not item_id: return ""
-    item_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(item_id, {})
-    return item_info.get("media_key", item_id)
-
-def _get_image_source(item_key: str) -> str:
-    if not item_key:
-        return getattr(game_data, "ITEM_IMAGES", {}).get("fallback", "")
+def _get_media_data(key: str) -> dict:
+    """
+    Busca os dados completos da mídia (ID e TIPO).
+    Retorna: {'id': '...', 'type': 'video'/'photo'} ou None
+    """
+    if not key: return None
     
-    # 1. Tenta pegar ID de arquivo registrado (mais rápido)
-    if registered_id := file_ids.get_file_id(item_key):
-        return registered_id
-        
-    # 2. Tenta pegar configuração no game_data
-    if fallback_source := getattr(game_data, "ITEM_IMAGES", {}).get(item_key):
-        return fallback_source
-    
-    # 3. Fallback genérico
-    return getattr(game_data, "ITEM_IMAGES", {}).get("fallback", "")
+    # 1. Busca no gerenciador de arquivos (Prioridade)
+    if hasattr(file_ids, "get_file_data"):
+        data = file_ids.get_file_data(key)
+        if data and data.get("id"):
+            return data
+            
+    # 2. Fallback para apenas ID (assume foto se não tiver tipo)
+    if hasattr(file_ids, "get_file_id"):
+        fid = file_ids.get_file_id(key)
+        if fid:
+            return {"id": fid, "type": "photo"}
+            
+    return None
 
 def _md_escape(text: str) -> str:
     return escape_markdown(str(text))
 
-async def _send_or_edit_photo(
+async def _send_or_edit_media(
     query: CallbackQuery,
     context: ContextTypes.DEFAULT_TYPE,
-    photo_source: str,
+    media_data: dict,
     caption: str,
     reply_markup: InlineKeyboardMarkup | None = None,
 ):
     """
-    Função central para manipular a mensagem.
-    Tenta APAGAR a anterior e ENVIAR uma nova com foto.
+    Função inteligente que envia Foto ou Vídeo e limpa o chat.
     """
-    # 1. Tenta apagar a mensagem anterior (Menu de Receitas)
+    chat_id = query.message.chat_id
+
+    # 1. Limpa a mensagem anterior (Menu)
     try:
         await query.delete_message()
-    except Exception as e:
-        # É normal falhar se a mensagem for muito velha, apenas loga debug
-        logger.debug(f"Não foi possível apagar mensagem anterior: {e}")
+    except Exception:
+        pass
 
-    # 2. Tenta enviar a nova mensagem com Foto
+    # 2. Prepara o envio
+    media_id = media_data.get("id")
+    media_type = media_data.get("type", "photo").lower()
+
     try:
-        if photo_source:
-            # Verifica se é um caminho local ou ID do Telegram
-            photo_input = InputFile(photo_source) if isinstance(photo_source, str) and photo_source.startswith(('assets/', './')) else photo_source
-            
-            await context.bot.send_photo(
-                chat_id=query.message.chat_id,
-                photo=photo_input,
-                caption=caption,
-                reply_markup=reply_markup,
-                parse_mode="Markdown"
-            )
+        if not media_id:
+            raise ValueError("ID de mídia vazio")
+
+        # Verifica se é link (URL) -> Trata como Vídeo ou Foto URL
+        if isinstance(media_id, str) and media_id.startswith("http"):
+            if media_type == "video" or media_id.endswith(".mp4"):
+                 await context.bot.send_video(
+                    chat_id=chat_id, video=media_id, caption=caption, 
+                    reply_markup=reply_markup, parse_mode="Markdown"
+                )
+            else:
+                # Tenta como animação (GIF) se for URL genérica
+                try:
+                    await context.bot.send_animation(
+                        chat_id=chat_id, animation=media_id, caption=caption, 
+                        reply_markup=reply_markup, parse_mode="Markdown"
+                    )
+                except:
+                    # Se falhar, tenta foto
+                    await context.bot.send_photo(
+                        chat_id=chat_id, photo=media_id, caption=caption,
+                        reply_markup=reply_markup, parse_mode="Markdown"
+                    )
+        
+        # Se for File ID do Telegram
         else:
-            raise ValueError("photo_source vazio")
-            
-    except Exception as e_photo:
-        logger.error(f"Falha ao enviar foto ({photo_source}): {e_photo}. Usando fallback de texto.")
-        # Se a foto falhar (ID inválido), envia texto para não travar o jogo
+            if media_type == "video":
+                await context.bot.send_video(
+                    chat_id=chat_id, video=media_id, caption=caption, 
+                    reply_markup=reply_markup, parse_mode="Markdown"
+                )
+            else:
+                # Padrão é foto
+                await context.bot.send_photo(
+                    chat_id=chat_id, photo=media_id, caption=caption, 
+                    reply_markup=reply_markup, parse_mode="Markdown"
+                )
+
+    except Exception as e:
+        logger.error(f"Falha ao enviar mídia ({media_type}): {e}. Enviando texto.")
         await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=caption,
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
+            chat_id=chat_id, text=caption, 
+            reply_markup=reply_markup, parse_mode="Markdown"
         )
 
 def _pretty_item_name(item_id: str) -> str:
@@ -155,9 +177,14 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
     keyboard.append([InlineKeyboardButton("↩️ Voltar ao Reino", callback_data="show_kingdom_menu")])
 
     text = f"{profession_info}\n\n🔥 *Forja de Eldora*\nEscolha uma profissão para ver as receitas:"
-    photo_source = _get_image_source("menu_forja_principal")
+    
+    # Busca dados da mídia
+    media_data = _get_media_data("menu_forja_principal")
+    # Fallback
+    if not media_data:
+        media_data = {"id": "https://i.pinimg.com/originals/a8/2f/30/a82f3073995eb879d74709d437033527.gif", "type": "photo"}
 
-    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard))
+    await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, profession_id: str, page: int):
     user_id = query.from_user.id
@@ -206,9 +233,11 @@ async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTyp
     else:
         text = f"🔥 *Forja — Receitas de {_md_escape(prof_name)} (Pág. {page})*\n\nEscolha um item para forjar:"
 
-    photo_source = _get_image_source(f"profissao_{profession_id}_menu") or _get_image_source("menu_forja_principal")
+    media_data = _get_media_data(f"profissao_{profession_id}_menu")
+    if not media_data:
+        media_data = {"id": "https://i.pinimg.com/originals/a8/2f/30/a82f3073995eb879d74709d437033527.gif", "type": "photo"}
 
-    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard))
+    await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, recipe_id: str):
     user_id = query.from_user.id
@@ -251,19 +280,21 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
         text += "\n\n*Você não possui os materiais ou o nível/profissão necessários.*"
 
     output_item_id = recipe_data.get("output_item_id", recipe_id)
-    image_key = _get_media_key_for_item(output_item_id)
-    photo_source = _get_image_source(image_key)
+    # Tenta pegar imagem do item
+    media_data = _get_media_data(f"item_{output_item_id}")
+    if not media_data:
+        # Fallback genérico
+        media_data = {"id": "https://media.tenor.com/J1y9Y_5y4B0AAAAC/blacksmith-forge.gif", "type": "video"}
 
-    await _send_or_edit_photo(query, context, photo_source, text, InlineKeyboardMarkup(keyboard))
+    await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 # =====================================================
-# Lógica de Início e Término da Forja (CORRIGIDO)
+# Lógica de Início e Término da Forja (AGORA COM VIDEO)
 # =====================================================
 
 async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     
-    # Inicia a lógica no motor
     result = await crafting_engine.start_craft(user_id, recipe_id)
 
     if isinstance(result, str):
@@ -273,7 +304,6 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     duration = result.get("duration_seconds", 0)
     job_name = f"craft_{user_id}_{recipe_id}"
     
-    # Agenda a finalização
     context.job_queue.run_once(
         finish_craft_notification_job,
         duration,
@@ -285,37 +315,32 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
 
     recipe_name = (crafting_registry.get_recipe(recipe_id) or {}).get("display_name", "item")
     
-    # Texto de confirmação
     text = (f"🔥 *Forja Iniciada!*\n\n"
             f"O item *{_md_escape(recipe_name)}* está sendo moldado.\n"
             f"⏳ Tempo estimado: *{duration // 60} minutos*.\n\n"
             f"_Você será notificado quando estiver pronto._")
 
-    # --- CORREÇÃO: Tenta pegar uma imagem de "trabalhando" ---
-    # Se não tiver, usa a imagem do menu principal, mas NUNCA vazio.
-    photo_source = _get_image_source("forge_working_gif") 
-    if not photo_source:
-        photo_source = _get_image_source("menu_forja_principal")
+    # --- CORREÇÃO PRINCIPAL ---
+    # Busca a mídia. Se você cadastrou "forge_working_gif" como type="video" no file_ids.py,
+    # ele vai retornar {'id': '...', 'type': 'video'} e a função _send_or_edit_media vai usar send_video.
+    media_data = _get_media_data("forge_working_gif") 
+    
+    # Fallback se não tiver no banco
+    if not media_data:
+        media_data = {"id": "https://media.tenor.com/J1y9Y_5y4B0AAAAC/blacksmith-forge.gif", "type": "video"}
 
-    # Adiciona botão para não travar o jogador na tela
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("↩️ Voltar ao Menu", callback_data="forge:main")]])
 
-    # Envia usando a função que apaga a anterior
-    await _send_or_edit_photo(query, context, photo_source, caption=text, reply_markup=kb)
+    # Envia a Mídia (Video ou Foto) e apaga o anterior
+    await _send_or_edit_media(query, context, media_data, caption=text, reply_markup=kb)
 
 async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id = job.user_id
     chat_id = job.chat_id
     
-    # O job.data pode vir vazio se foi reagendado pelo watchdog
-    job_data = job.data or {}
-    
     result = await crafting_engine.finish_craft(user_id)
     if not isinstance(result, dict) or "item_criado" not in result:
-        # Silencia erros comuns de race condition
-        # error_msg = f"⚠️ Status da forja: {result}"
-        # logger.warning(error_msg)
         return
 
     item_criado = result["item_criado"]
@@ -324,12 +349,13 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     text = f"✨ *Forja Concluída!*\n\nVocê obteve:\n{item_txt}"
 
     base_id = item_criado.get("base_id")
-    image_key = _get_media_key_for_item(base_id)
-    photo_source = _get_image_source(image_key)
     
-    # Fallback de imagem de sucesso se o item não tiver imagem
-    if not photo_source:
-        photo_source = _get_image_source("forge_success_img")
+    # Busca a imagem do item criado
+    media_data = _get_media_data(f"item_{base_id}")
+    
+    if not media_data:
+        # Fallback se item criado não tem foto (GIF Tenor)
+        media_data = {"id": "https://media.tenor.com/images/157d605055627255953059275727c62d/tenor.gif", "type": "video"}
 
     reply_markup = InlineKeyboardMarkup([[
         InlineKeyboardButton("🎒 Inventário", callback_data="inventory_menu"),
@@ -337,22 +363,17 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     ]])
 
     try:
-        if photo_source:
-            await context.bot.send_photo(
-                chat_id=chat_id, photo=photo_source, caption=text,
-                parse_mode="Markdown", reply_markup=reply_markup,
-            )
+        # Usa send_video se for vídeo, senão send_photo
+        if media_data.get("type") == "video" or str(media_data.get("id")).endswith(".mp4"):
+             await context.bot.send_video(chat_id=chat_id, video=media_data["id"], caption=text, parse_mode="Markdown", reply_markup=reply_markup)
         else:
-            raise ValueError("Fonte da foto não encontrada")
+            await context.bot.send_photo(chat_id=chat_id, photo=media_data["id"], caption=text, parse_mode="Markdown", reply_markup=reply_markup)
     except Exception as e:
-        logger.error(f"Falha ao enviar foto do item criado ({e}). Enviando como texto.")
-        await context.bot.send_message(
-            chat_id=chat_id, text=text,
-            parse_mode="Markdown", reply_markup=reply_markup,
-        )
+        logger.error(f"Falha ao enviar mídia final ({e}). Enviando texto.")
+        await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=reply_markup)
         
 # =====================================================
-# Roteador Principal de Callbacks da Forja
+# Roteador
 # =====================================================
 
 async def forge_callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -383,18 +404,10 @@ async def forge_callback_router(update: Update, context: ContextTypes.DEFAULT_TY
             await confirm_craft_start(query, recipe_id, context)
 
         else:
-            logger.warning(f"Ação desconhecida no roteador da forja: {action}")
             await query.edit_message_text("❌ Ação da forja desconhecida.")
 
-    except (IndexError, ValueError) as e:
-        logger.error(f"Erro de formato no callback da forja: '{data}'. Erro: {e}")
-        await query.edit_message_text("❌ Callback com formato inválido.")
     except Exception as e:
         logger.exception(f"Erro fatal ao processar callback da forja '{data}':")
-        await query.edit_message_text("❌ Ocorreu um erro interno na forja. Tente novamente.")
+        await query.edit_message_text("❌ Ocorreu um erro interno na forja.")
         
-# =====================================================
-# Registro do Handler
-# =====================================================
-
 forge_handler = CallbackQueryHandler(forge_callback_router, pattern=r"^forge:")
