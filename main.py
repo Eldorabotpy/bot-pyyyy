@@ -169,80 +169,60 @@ async def check_stale_actions_on_startup(application: Application):
 
 async def broadcast_startup_message(application: Application):
     """
-    Envia broadcast para TODOS os jogadores.
-    Se não tiver 'last_chat_id', tenta usar o próprio '_id' (User ID).
+    Envia mensagem de inicialização para um TÓPICO ESPECÍFICO de um Grupo.
     """
-    if player_core.players_collection is None: return
+    # --- CONFIGURAÇÃO (Coloque os IDs aqui ou no config.py) ---
+    # O ID do grupo geralmente começa com -100...
+    GRUPO_ID = -1002881364171 
+    # O ID do tópico (Message Thread ID). Se for o chat "Geral", pode ser None ou 1 (depende do grupo).
+    TOPIC_ID = 21           
+    # -----------------------------------------------------------
 
-    logging.info("[Broadcast] Iniciando envio de mensagem global...")
-    
+    logging.info(f"[Broadcast] Iniciando envio para o Grupo {GRUPO_ID} no Tópico {TOPIC_ID}...")
+
     mensagem = (
         "📢 <b>Mundo de Eldora Atualizado!</b>\n\n"
         "O sistema foi reiniciado para melhorias.\n"
         "✅ Suas ações em andamento (refino, craft) foram preservadas ou finalizadas.\n"
         "⚡ Energia e recursos sincronizados.\n\n"
-        "<i>Bom jogo, aventureiro!</i>"
+        "<i>Bom jogo, aventureiros!</i>"
     )
 
+    # Verifica se a imagem existe e é uma string válida
     tem_imagem = STARTUP_IMAGE_ID is not None and isinstance(STARTUP_IMAGE_ID, str)
 
     try:
-        # MUDANÇA: Removemos o filtro. Pegamos TODOS os jogadores.
-        # Projetamos apenas os campos necessários para economizar memória.
-        cursor = player_core.players_collection.find({}, {"_id": 1, "last_chat_id": 1})
-        
-        count = 0
-        success_count = 0
-        
-        for doc in cursor: 
-            # Tenta pegar o chat_id salvo. Se não tiver, usa o _id (User ID)
-            chat_id = doc.get("last_chat_id") or doc.get("_id")
-            
-            if not chat_id: continue # Se mesmo assim não tiver ID, pula
-            
-            count += 1
-            enviado = False
-            
-            # 1. Tenta com IMAGEM
-            if tem_imagem:
-                try:
-                    await application.bot.send_photo(
-                        chat_id=chat_id,
-                        photo=STARTUP_IMAGE_ID, 
-                        caption=mensagem,       
-                        parse_mode="HTML"
-                    )
-                    enviado = True
-                except Exception as e:
-                    err_msg = str(e).lower()
-                    if "wrong file identifier" in err_msg or "invalid file_id" in err_msg:
-                        logging.warning(f"[Broadcast] ID de imagem inválido! Mudando para modo texto.")
-                        tem_imagem = False
-                    elif "forbidden" in err_msg or "chat not found" in err_msg:
-                        pass 
-                    else:
-                        pass # Erro genérico de foto, tenta texto
+        enviado = False
 
-            # 2. Tenta com TEXTO (se foto falhou ou desativada)
-            if not enviado:
-                try:
-                    await application.bot.send_message(
-                        chat_id=chat_id,
-                        text=mensagem,
-                        parse_mode="HTML"
-                    )
-                    enviado = True
-                except Exception as e:
-                    pass # Ignora erros silenciosamente para não sujar o log
+        # 1. Tenta enviar com IMAGEM
+        if tem_imagem:
+            try:
+                await application.bot.send_photo(
+                    chat_id=GRUPO_ID,
+                    message_thread_id=TOPIC_ID,  # <--- O segredo para enviar na aba correta
+                    photo=STARTUP_IMAGE_ID,
+                    caption=mensagem,
+                    parse_mode="HTML"
+                )
+                enviado = True
+                logging.info("[Broadcast] Foto enviada com sucesso para o grupo.")
+            except Exception as e:
+                err_msg = str(e).lower()
+                logging.warning(f"[Broadcast] Falha ao enviar foto ({err_msg}). Tentando texto puro...")
+                # Se der erro na imagem, cai para o bloco de texto abaixo
 
-            if enviado:
-                success_count += 1
-                await asyncio.sleep(0.5) 
-
-        logging.info(f"[Broadcast] Finalizado. Enviado para {success_count} de {count} jogadores encontrados.")
+        # 2. Tenta enviar apenas TEXTO (se a imagem falhou ou não existe)
+        if not enviado:
+            await application.bot.send_message(
+                chat_id=GRUPO_ID,
+                message_thread_id=TOPIC_ID, # <--- O segredo para enviar na aba correta
+                text=mensagem,
+                parse_mode="HTML"
+            )
+            logging.info("[Broadcast] Texto enviado com sucesso para o grupo.")
 
     except Exception as e:
-        logging.error(f"[Broadcast] Erro crítico no loop: {e}")
+        logging.error(f"[Broadcast] Erro crítico ao enviar para o grupo: {e}")
 
 async def post_init_tasks(application: Application):
     if ADMIN_ID:
