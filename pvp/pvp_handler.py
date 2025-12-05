@@ -114,7 +114,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 
     except Exception as e_iter:
         logger.error(f"Erro CRÍTICO durante player_manager.iter_players(): {e_iter}", exc_info=True)
-        error_message = ("🛡️ **Falha na Busca** 🛡️\n\nOcorreu um erro ao procurar oponentes.")
+        error_message = ("🛡️ Falha na Busca 🛡️\n\nOcorreu um erro ao procurar oponentes.")
         keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
         original_message_is_media = bool(query.message.photo or query.message.video or query.message.animation)
         try:
@@ -192,7 +192,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                 await aplicar_resultado_pvp_seguro(final_opponent_id, elo_ganho, 0)
                 
                 log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
-                
+
             # =========================================================================
             # 👇 ANIMAÇÃO DE SUBSTITUIÇÃO (ESTILO FILME) 👇
             # =========================================================================
@@ -247,7 +247,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
         except Exception as e_battle: # Captura de Erro da Batalha
             logger.error(f"Erro CRÍTICO durante a simulação da batalha: {e_battle}", exc_info=True)
-            error_message = ("🛡️ **Falha na Batalha** 🛡️\n\nOcorreu um erro crítico.\nSua entrada foi consumida.")
+            error_message = ("🛡️ Falha na Batalha 🛡️\n\nOcorreu um erro crítico.\nSua entrada foi consumida.")
             keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]; reply_markup = InlineKeyboardMarkup(keyboard)
             try: 
                 if original_message_is_media: await query.edit_message_caption(caption=error_message, reply_markup=reply_markup, parse_mode="HTML")
@@ -291,7 +291,7 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Lógica síncrona de ordenação e formatação (Mantida)
     all_players_ranked.sort(key=lambda p: p["points"], reverse=True)
-    ranking_text_lines = ["🏆 **Ranking da Arena de Eldora** 🏆\n"]; top_n = 10; player_rank = -1
+    ranking_text_lines = ["🏆 𝐑𝐚𝐧𝐤𝐢𝐧𝐠 𝐝𝐚 𝐀𝐫𝐞𝐧𝐚 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 🏆\n"]; top_n = 10; player_rank = -1
     if not all_players_ranked: ranking_text_lines.append("Ainda não há jogadores classificados...")
     else:
         for i, player in enumerate(all_players_ranked):
@@ -304,7 +304,7 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             my_player_data = next((p for p in all_players_ranked if p["user_id"] == user_id), None)
             if my_player_data: _, my_elo_display = pvp_utils.get_player_elo_details(my_player_data["points"]); ranking_text_lines.append(f"{player_rank}. {my_elo_display} - {html.escape(my_player_data['name'])} ({my_player_data['points']} Pts) (Você)")
 
-    ranking_text_lines.append("\n\n💎 **Recompensas Mensais (Top 5):**") 
+    ranking_text_lines.append("\n\n💎 𝗥𝗲𝗰𝗼𝗺𝗽𝗲𝗻𝘀𝗮𝘀 𝗠𝗲𝗻𝘀𝗮𝗶𝘀 (𝗧𝗼𝗽 𝟱):") 
     for rank, reward in sorted(MONTHLY_RANKING_REWARDS.items()): ranking_text_lines.append(f"   {rank}º Lugar: {reward} Gemas (Dimas)")
     ranking_text_lines.append("_(Próximo reset em ~30 dias)_")
     ranking_text_lines.append(f"\nTotal de jogadores no ranking: {len(all_players_ranked)}")
@@ -366,10 +366,10 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         keyboard = [
-            [InlineKeyboardButton("⚔️ Procurar Oponente (Ranqueado)", callback_data=PVP_PROCURAR_OPONENTE)],
-            [InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
-             InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO)],
-            [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")],
+            [InlineKeyboardButton("⚔️ 𝐏𝐫𝐨𝐜𝐮𝐫𝐚𝐫 𝐎𝐩𝐨𝐧𝐞𝐧𝐭𝐞 (Ranqueado)", callback_data=PVP_PROCURAR_OPONENTE)],
+            [InlineKeyboardButton("🏆 𝐑𝐚𝐧𝐤𝐢𝐧𝐠", callback_data=PVP_RANKING),
+             InlineKeyboardButton("📜 𝐇𝐢𝐬𝐭𝐨́𝐫𝐢𝐜𝐨", callback_data=PVP_HISTORICO)],
+            [InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓 𝒂𝒐 𝑹𝒆𝒊𝒏𝒐", callback_data="show_kingdom_menu")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
