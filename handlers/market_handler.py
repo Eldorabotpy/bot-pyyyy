@@ -568,6 +568,8 @@ async def market_cancel_new(update, context):
 # ==============================
 #  COMPRA (CORREÇÃO DE PAGAMENTO)
 # ==============================
+# handlers/market_handler.py (Substituir a função market_buy)
+
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     try: await q.answer()
@@ -581,77 +583,124 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         return
 
-    try:
-        buyer = await player_manager.get_player_data(buyer_id)
-        if not player_manager.has_premium_plan(buyer):
-            await q.answer("Apenas VIPs podem comprar.", show_alert=True)
-            return
+    # 1. RECUPERA A LISTAGEM ANTES DE TUDO (Para garantir que temos o ID do vendedor)
+    listing = market_manager.get_listing(lid)
+    if not listing:
+        await q.answer("Este item já foi vendido ou removido!", show_alert=True)
+        # Tenta atualizar a mensagem para remover o botão antigo
+        await _safe_edit_or_send(q, context, chat_id, "❌ Item indisponível.", 
+             InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]]))
+        return
 
-        updated_listing, cost = market_manager.purchase_listing(
+    seller_id = int(listing.get("seller_id", 0))
+    price = int(listing.get("price") or listing.get("unit_price", 0))
+    qty_listing = int(listing.get("quantity", 1)) # Quantidade de lotes sendo comprados
+    
+    # Custo total (Preço unitário * quantidade se aplicável, mas geralmente market_buy é o lote todo)
+    # Assumindo que o preço no listing já é o final ou unitário. 
+    # Ajuste aqui se seu sistema permite comprar parcial. 
+    # No seu código original parecia ser compra única de 1 unidade da listagem.
+    cost = price 
+
+    # 2. VERIFICAÇÃO DE SALDO E PREMIUM
+    buyer = await player_manager.get_player_data(buyer_id)
+    
+    # Se for mercado de GEMAS, mude "gold" para "gems" aqui e nas linhas abaixo
+    buyer_balance = int(buyer.get("gold", 0)) 
+
+    if buyer_balance < cost:
+        await q.answer(f"Ouro insuficiente! Você precisa de {cost}.", show_alert=True)
+        return
+
+    # Bloqueio VIP (mantido do original)
+    if not player_manager.has_premium_plan(buyer):
+        await q.answer("🔒 Apenas VIPs podem comprar no mercado.", show_alert=True)
+        return
+
+    try:
+        # 3. EXECUTA A TRANSAÇÃO NO GERENCIADOR (Remove do banco de dados do mercado)
+        # Passamos quantity=1 pois estamos comprando "uma listagem" inteira
+        updated_listing, _ = market_manager.purchase_listing(
             buyer_id=buyer_id, listing_id=lid, quantity=1
         )
         
-        item_data = updated_listing.get("item", {})
+        # 4. PROCESSA O ITEM (Adiciona ao Comprador)
+        item_data = listing.get("item", {}) # Usamos 'listing' original que é mais seguro
         item_type = item_data.get("type")
         item_name_display = "Item"
 
         if item_type == "stack":
             base_id = item_data.get("base_id")
-            qty_per_lote = int(item_data.get("qty", 1))
-            inventory.add_item_to_inventory(buyer, base_id, qty_per_lote)
+            # Se for um lote (ex: 10 poções), a quantidade é qtd_item * qtd_lotes
+            qty_per_pack = int(item_data.get("qty", 1))
+            total_qty = qty_per_pack * qty_listing
+            
+            # ADICIONA AO INVENTÁRIO
+            inventory.add_item_to_inventory(buyer, base_id, total_qty)
             name = _item_label_from_base(base_id)
-            item_name_display = f"{name} x{qty_per_lote}"
+            item_name_display = f"{name} x{total_qty}"
 
         elif item_type == "unique":
             real_item = item_data.get("item")
             if real_item:
                 inventory.add_unique_item(buyer, real_item)
-                item_name_display = real_item.get("display_name") or "Equipamento"
+                item_name_display = real_item.get("display_name") or "Equipamento Raro"
             else:
-                raise Exception("Dados vazios.")
+                raise Exception("Dados do item único corrompidos.")
 
-        # --- CORREÇÃO DE PAGAMENTO ---
-        # Força a dedução do comprador na memória
-        buyer_gold = int(buyer.get("gold", 0))
-        buyer["gold"] = max(0, buyer_gold - cost)
+        # 5. PAGAMENTO E SALVAMENTO (ATÔMICO)
+        
+        # DEDUZ DO COMPRADOR
+        buyer["gold"] = max(0, int(buyer.get("gold", 0)) - cost)
         await player_manager.save_player_data(buyer_id, buyer)
 
-        # Força o pagamento ao vendedor na memória
-        seller_id = updated_listing.get("seller_id")
-        if seller_id:
+        # PAGA AO VENDEDOR
+        if seller_id and seller_id != 0:
             seller = await player_manager.get_player_data(seller_id)
             if seller:
-                seller_gold = int(seller.get("gold", 0))
-                seller["gold"] = seller_gold + cost
+                seller_balance = int(seller.get("gold", 0))
+                seller["gold"] = seller_balance + cost
                 await player_manager.save_player_data(seller_id, seller)
+                
+                # Opcional: Notificar o vendedor se ele estiver online (try/except)
+                try:
+                    await context.bot.send_message(
+                        seller_id, 
+                        f"💰 <b>Venda realizada!</b>\nSeu item <b>{item_name_display}</b> foi vendido por {cost} moedas.",
+                        parse_mode="HTML"
+                    )
+                except: pass
 
+        # 6. FEEDBACK
         await _safe_edit_or_send(q, context, chat_id, 
-            f"✅ <b>Compra realizada!</b>\n\n"
+            f"✅ <b>Compra realizada com sucesso!</b>\n\n"
             f"📦 <b>Recebido:</b> {item_name_display}\n"
             f"💰 <b>Pago:</b> {cost} 🪙",
             InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_list")]])
         )
 
+        # LOG NO GRUPO
         try:
             buyer_name = buyer.get("character_name") or q.from_user.first_name
-            seller_name = "Alguém"
-            if seller_id and seller:
-                seller_name = seller.get("character_name", "Vendedor")
+            seller_name = "Desconhecido"
+            if seller_id:
+                # Tentamos pegar o nome do vendedor sem carregar o objeto todo de novo se possível
+                seller_name = listing.get("seller_name") or "Vendedor"
 
             log_text = (
-                f"💸 <b>NOVA TRANSAÇÃO!</b>\n\n"
+                f"💸 <b>MERCADO (OURO)</b>\n\n"
                 f"👤 <b>Comprador:</b> {buyer_name}\n"
                 f"📦 <b>Item:</b> {item_name_display}\n"
                 f"💰 <b>Valor:</b> {cost} 🪙\n"
-                f"🤝 <b>Vendedor:</b> {seller_name}"
+                f"🤝 <b>Vendedor ID:</b> {seller_id}"
             )
             await context.bot.send_message(chat_id=LOG_GROUP_ID, message_thread_id=LOG_TOPIC_ID, text=log_text, parse_mode="HTML")
         except Exception as e_log:
-            logger.warning(f"Falha ao enviar log: {e_log}")
+            logger.warning(f"Log error: {e_log}")
 
     except Exception as e:
-        logger.error(f"Erro compra {lid}: {e}")
-        await context.bot.send_message(chat_id, f"❌ Erro na compra: {e}")
+        logger.error(f"Erro CRÍTICO na compra {lid}: {e}", exc_info=True)
+        await q.answer("Ocorreu um erro ao processar a compra.", show_alert=True)
 
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()

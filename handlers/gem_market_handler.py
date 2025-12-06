@@ -833,75 +833,106 @@ async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_T
     await _safe_edit_or_send(q, context, chat_id, text, kb)
 
 async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Executa a compra e ENVIA LOG PARA O GRUPO."""
+    """
+    CORREÇÃO DE PAGAMENTO:
+    Garante que as gemas sejam descontadas da variável local antes de salvar o inventário.
+    """
     q = update.callback_query
-    await q.answer("A processar compra...")
+    await q.answer("Processando compra...")
     chat_id = update.effective_chat.id
     buyer_id = q.from_user.id
     
     try: lid = int(q.data.replace("gem_buy_execute_", ""))
     except: await q.answer("ID inválido.", show_alert=True); return
         
+    # --- 1. Carrega a Listagem e Valida ---
     listing = gem_market_manager.get_listing(lid)
     if not listing or not listing.get("active"):
-        await q.answer("Esta listagem não está mais disponível.", show_alert=True)
-        await gem_market_main(update, context); return
+        await q.answer("Item já vendido ou removido!", show_alert=True)
+        # Atualiza a interface para remover o botão antigo
+        await gem_market_main(update, context)
+        return
         
-    seller_id = listing.get("seller_id")
+    seller_id = int(listing.get("seller_id", 0))
     if buyer_id == seller_id:
         await q.answer("Você não pode comprar de si mesmo.", show_alert=True); return
 
+    # --- 2. Carrega Dados dos Jogadores ---
     buyer_pdata = await player_manager.get_player_data(buyer_id)
     seller_pdata = await player_manager.get_player_data(seller_id)
     
-    if not buyer_pdata or not seller_pdata:
-        await q.answer("Erro ao carregar dados do comprador ou vendedor.", show_alert=True)
+    if not buyer_pdata:
+        await q.answer("Erro ao carregar seus dados.", show_alert=True); return
+
+    # --- 3. Verifica Saldo (GEMAS) ---
+    price = int(listing.get("unit_price_gems", 0))
+    total_cost = price # Quantidade é 1 lote
+    
+    buyer_gems = int(buyer_pdata.get("gems", 0))
+    if buyer_gems < total_cost:
+        await q.answer(f"Gemas insuficientes! Você precisa de {total_cost} 💎.", show_alert=True)
         return
 
+    # --- 4. Executa a Baixa no Gerenciador de Mercado ---
     try:
-        updated_listing, total_price = gem_market_manager.purchase_listing( 
+        # Isso marca a listing como "sold" no banco de dados do mercado
+        updated_listing, _ = gem_market_manager.purchase_listing( 
             buyer_pdata=buyer_pdata,
             seller_pdata=seller_pdata,
             listing_id=lid,
             quantity=1
         )
-    except gem_market_manager.GemMarketError as e:
-        await q.answer(f"Falha na compra: {e}", show_alert=True)
-        return
     except Exception as e:
-        logger.error(f"[GemMarket] Erro crítico na compra L{lid} por B{buyer_id}: {e}", exc_info=True)
-        await q.answer("Ocorreu um erro inesperado.", show_alert=True)
+        logger.error(f"[GemMarket] Erro ao processar listing: {e}")
+        await q.answer("Erro ao finalizar a venda. Tente novamente.", show_alert=True)
         return
 
+    # --- 5. OPERAÇÃO ATÔMICA (Troca Item e Gemas na Memória) ---
+    
     item_payload = listing.get("item", {})
     base_id = item_payload.get("base_id")
-    pack_qty = item_payload.get("qty", 1)
+    pack_qty = int(item_payload.get("qty", 1))
     item_label = _item_label(base_id)
     
     if base_id:
+        # A) Entrega o Item
         player_manager.add_item_to_inventory(buyer_pdata, base_id, pack_qty)
-    else:
-        logger.error(f"[GemMarket] Compra L{lid} por B{buyer_id} não tinha base_id no payload!")
-
-    await player_manager.save_player_data(buyer_id, buyer_pdata)
-    await player_manager.save_player_data(seller_id, seller_pdata)
-
-    # === LOG DE VENDA (CASA DE LEILÕES) ===
-    # Envia a notificação para o grupo de logs
-    try:
-        buyer_name = q.from_user.first_name
-        if buyer_pdata: 
-            buyer_name = buyer_pdata.get("character_name", buyer_name)
         
-        seller_name = "Alguém"
-        if seller_pdata: 
-            seller_name = seller_pdata.get("character_name", "Vendedor")
+        # B) DESCONTA AS GEMAS (A Correção Principal)
+        # Atualizamos a variável buyer_pdata ANTES de salvar
+        buyer_pdata["gems"] = max(0, buyer_gems - total_cost)
+        
+        # C) Paga o Vendedor
+        if seller_pdata:
+            seller_gems = int(seller_pdata.get("gems", 0))
+            seller_pdata["gems"] = seller_gems + total_cost
+            await player_manager.save_player_data(seller_id, seller_pdata)
+            
+            # Notifica vendedor
+            try:
+                await context.bot.send_message(
+                    seller_id,
+                    f"💎 <b>Venda Realizada!</b>\nVocê vendeu <b>{item_label}</b> por <b>{total_cost} Gemas</b>."
+                )
+            except: pass
+    else:
+        logger.error(f"[GemMarket] Item sem base_id na listagem {lid}!")
+        await q.answer("Erro crítico: Item inválido.", show_alert=True)
+        return
+
+    # --- 6. Salva o Comprador (Agora com Item + Saldo Novo) ---
+    await player_manager.save_player_data(buyer_id, buyer_pdata)
+
+    # --- 7. Logs e Feedback ---
+    try:
+        buyer_name = buyer_pdata.get("character_name", q.from_user.first_name)
+        seller_name = seller_pdata.get("character_name", "Vendedor") if seller_pdata else "Desconhecido"
         
         log_text = (
             f"💎 <b>CASA DE LEILÕES (VENDA)</b>\n\n"
             f"👤 <b>Comprador:</b> {buyer_name}\n"
             f"📦 <b>Item:</b> {item_label} x{pack_qty}\n"
-            f"💰 <b>Valor:</b> {total_price} Gemas\n"
+            f"💰 <b>Valor:</b> {total_cost} Gemas\n"
             f"🤝 <b>Vendedor:</b> {seller_name}"
         )
         
@@ -912,10 +943,10 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="HTML"
         )
     except Exception as e_log:
-        logger.warning(f"Falha ao enviar log de venda (Gemas): {e_log}")
+        logger.warning(f"Log error: {e_log}")
 
-    text = f"✅ Compra concluída! Você comprou 1 lote de {item_label} por 💎 {total_price}."
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar às Categorias", callback_data="gem_list_cats")]])
+    text = f"✅ Compra concluída! Recebeste <b>{item_label} (x{pack_qty})</b> por 💎 {total_cost}."
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_list_cats")]])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
 
 async def gem_market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
