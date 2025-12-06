@@ -11,7 +11,7 @@ from telegram import (
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.helpers import escape_markdown
-
+from telegram.error import BadRequest
 # --- Módulos do Jogo ---
 from modules import (
     player_manager,
@@ -376,9 +376,12 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
 # Roteador
 # =====================================================
 
-async def forge_callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def forge_callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except BadRequest:
+        pass
 
     data = query.data
     parts = data.split(":")
