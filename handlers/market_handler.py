@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, fil
 from modules import player_manager, game_data, file_id_manager, market_manager
 from modules.market_manager import render_listing_line as _mm_render_listing_line
 from modules.player import inventory
-
+from modules import market_utils
 # --- CONFIGURAÇÃO DE LOGS ---
 LOG_GROUP_ID = -1002881364171
 LOG_TOPIC_ID = 24475
@@ -329,42 +329,39 @@ async def market_pick_stack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["market_pending"] = {"type": "stack", "base_id": base_id, "qty_have": qty, "qty": 1}
     await _show_pack_qty_spinner(q, context, update.effective_chat.id)
 
-def _render_spinner_kb(value, prefix_inc, prefix_dec, label, confirm_cb):
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("-100", callback_data=f"{prefix_dec}100"),
-            InlineKeyboardButton("-10", callback_data=f"{prefix_dec}10"),
-            InlineKeyboardButton("-1", callback_data=f"{prefix_dec}1"),
-            InlineKeyboardButton("+1", callback_data=f"{prefix_inc}1"),
-            InlineKeyboardButton("+10", callback_data=f"{prefix_inc}10"),
-            InlineKeyboardButton("+100", callback_data=f"{prefix_inc}100")
-        ],
-        [
-            InlineKeyboardButton("−5k", callback_data=f"{prefix_dec}5000"),
-            InlineKeyboardButton("−1k", callback_data=f"{prefix_dec}1000"),
-            InlineKeyboardButton("+1k", callback_data=f"{prefix_inc}1000"),
-            InlineKeyboardButton("+5k", callback_data=f"{prefix_inc}5000")
-        ],
-        [InlineKeyboardButton(f"{label}: {value}", callback_data="noop")],
-        [InlineKeyboardButton("✅ Confirmar", callback_data=confirm_cb), InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
-    ])
-
 async def _show_pack_qty_spinner(q, context, chat_id):
     pending = context.user_data.get("market_pending")
     cur = pending["qty"]
     max_val = pending["qty_have"]
     item_name = _item_label_from_base(pending["base_id"])
-    kb = _render_spinner_kb(cur, "mkt_pack_inc_", "mkt_pack_dec_", "Itens/Lote", "mkt_pack_confirm")
+    
+    # MUDANÇA AQUI: Usa a função de renderização centralizada
+    kb = market_utils.render_spinner_kb(
+        value=cur,
+        prefix_inc="mkt_pack_inc_", 
+        prefix_dec="mkt_pack_dec_", 
+        label="Itens/Lote", 
+        confirm_cb="mkt_pack_confirm",
+        allow_large_steps=False # Não precisamos de passos de 1k/5k para quantidade de lote
+    )    
     await _safe_edit_or_send(q, context, chat_id, f"Item: <b>{item_name}</b> (Total: {max_val})\n\nDefina o tamanho do lote:", kb)
 
 async def market_pack_qty_spin(update, context):
     q = update.callback_query; await q.answer()
     pending = context.user_data.get("market_pending")
     if not pending: await market_cancel_new(update, context); return
-    action = q.data
-    step = int(action.split("_")[-1])
-    if "_inc_" in action: pending["qty"] = min(pending["qty_have"], pending["qty"] + step)
-    else: pending["qty"] = max(1, pending["qty"] - step)
+    
+    # MUDANÇA AQUI: Usa a função de cálculo centralizada
+    cur = market_utils.calculate_spin_value(
+        current_value=pending["qty"],
+        action_data=q.data,
+        prefix_inc="mkt_pack_inc_",
+        prefix_dec="mkt_pack_dec_",
+        min_value=1,
+        max_value=pending["qty_have"]
+    )
+    
+    pending["qty"] = cur
     context.user_data["market_pending"] = pending
     await _show_pack_qty_spinner(q, context, update.effective_chat.id)
 
@@ -380,17 +377,30 @@ async def _show_lote_qty_spinner(q, context, chat_id):
     context.user_data["market_lote_max"] = max_lotes
     cur_lotes = min(context.user_data.get("market_lote_qty", 1), max_lotes)
     context.user_data["market_lote_qty"] = cur_lotes
-    kb = _render_spinner_kb(cur_lotes, "mkt_lote_inc_", "mkt_lote_dec_", "Qtd Lotes", "mkt_lote_confirm")
+    kb = market_utils.render_spinner_kb(
+        value=cur_lotes, 
+        prefix_inc="mkt_lote_inc_", 
+        prefix_dec="mkt_lote_dec_", 
+        label="Qtd Lotes", 
+        confirm_cb="mkt_lote_confirm",
+        allow_large_steps=False # Não precisamos de passos de 1k/5k para quantidade de lote
+    )
     await _safe_edit_or_send(q, context, chat_id, f"Tamanho do Lote: {pack_size}\n\nDefina quantos lotes vender:", kb)
 
 async def market_lote_qty_spin(update, context):
     q = update.callback_query; await q.answer()
     max_lotes = context.user_data.get("market_lote_max", 1)
-    cur = context.user_data.get("market_lote_qty", 1)
-    action = q.data
-    step = int(action.split("_")[-1])
-    if "_inc_" in action: cur = min(max_lotes, cur + step)
-    else: cur = max(1, cur - step)
+    
+    # MUDANÇA AQUI: Usa a função de cálculo centralizada
+    cur = market_utils.calculate_spin_value(
+        current_value=context.user_data.get("market_lote_qty", 1),
+        action_data=q.data,
+        prefix_inc="mkt_lote_inc_",
+        prefix_dec="mkt_lote_dec_",
+        min_value=1,
+        max_value=max_lotes
+    )
+
     context.user_data["market_lote_qty"] = cur
     await _show_lote_qty_spinner(q, context, update.effective_chat.id)
 
@@ -401,16 +411,29 @@ async def market_lote_qty_confirm(update, context):
 
 async def _show_price_spinner(q, context, chat_id, text="Defina o preço:"):
     price = context.user_data.get("market_price", 10)
-    kb = _render_spinner_kb(price, "mktp_inc_", "mktp_dec_", "Preço", "mktp_confirm")
+    kb = market_utils.render_spinner_kb(
+        value=price, 
+        prefix_inc="mktp_inc_", 
+        prefix_dec="mktp_dec_", 
+        label="Preço", 
+        confirm_cb="mktp_confirm",
+        currency_emoji="🪙",
+        allow_large_steps=True
+    )
     await _safe_edit_or_send(q, context, chat_id, f"{text} <b>{price} 🪙</b>", kb)
 
 async def market_price_spin(update, context):
     q = update.callback_query; await q.answer()
-    cur = context.user_data.get("market_price", 10)
-    action = q.data
-    step = int(action.split("_")[-1])
-    if "_inc_" in action: cur += step
-    else: cur = max(1, cur - step)
+    
+    # MUDANÇA AQUI: Usa a função de cálculo centralizada
+    cur = market_utils.calculate_spin_value(
+        current_value=context.user_data.get("market_price", 10),
+        action_data=q.data,
+        prefix_inc="mktp_inc_",
+        prefix_dec="mktp_dec_",
+        min_value=market_utils.MIN_GOLD_PRICE # Usa a constante definida
+    )
+    
     context.user_data["market_price"] = cur
     await _show_price_spinner(q, context, update.effective_chat.id)
 

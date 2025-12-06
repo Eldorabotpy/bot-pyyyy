@@ -308,13 +308,6 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     effects_data = item_info.get("effects", {}) or {}
     effect_data_to_use = on_use_data or effects_data
 
-    # 2. SE não tiver efeito, mas o ID estiver no Catálogo de Skins, cria o efeito manualmente
-    if not effect_data_to_use and base_id in SKIN_CATALOG:
-        effect_data_to_use = {
-            "effect": "grant_skin",
-            "skin_id": base_id
-        }
-
     if not effect_data_to_use:
         await query.answer(f"O item '{item_name}' não tem uso direto.", show_alert=True)
         return

@@ -13,6 +13,7 @@ from modules import player_manager, game_data, file_ids
 from modules import gem_market_manager # O "Backend"
 from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
+from modules import market_utils
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,9 @@ SKIN_BOX_ITEMS: set[str] = {
     'caixa_berserker_pele_urso', 
     'berserker_pele_urso', 
     'caixa_monge_quimono_dragao', 
-    'monge_quimono_dragao', 
+    'monge_quimono_dragao',
+    'caixa_monge_aspecto_asura'
+    'monge_aspecto_asura' 
     'caixa_bardo_traje_maestro',
     'bardo_traje_maestro',
     'caixa_samurai_armadura_shogun',
@@ -292,11 +295,15 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
             if class_key in allowed: 
                 item_class_ok = True
         
-        elif item_type == "skin" and base_id in SKIN_BOX_ITEMS:
-            skin_id = base_id.replace("caixa_", "")
-            allowed = SKIN_CATALOG.get(skin_id, {}).get("class")
-            if class_key == allowed: 
-                item_class_ok = True
+        elif item_type == "skin":
+            if base_id.startswith("caixa_"):
+                skin_id = base_id.replace("caixa_", "")
+                
+                if SKIN_CATALOG.get(skin_id):
+                    item_class_ok = True
+            #allowed = SKIN_CATALOG.get(skin_id, {}).get("class")
+            #if class_key == allowed: 
+                #item_class_ok = True
         
         if item_class_ok:
             # Verifica se já não adicionamos esse base_id (para agrupar itens únicos iguais)
@@ -483,39 +490,19 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
 #  SPINNERS E FUNÇÕES DE FINALIZAÇÃO
 # ==============================
 
-def _render_gem_price_spinner(price: int) -> InlineKeyboardMarkup:
-    # AQUI: Mudei de 1 para 10
-    price = max(10, int(price)) 
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("−100", callback_data="gem_p_dec_100"),
-            InlineKeyboardButton("−10",  callback_data="gem_p_dec_10"),
-            # O botão de -1 ainda existe, mas a lógica vai travar no 10
-            InlineKeyboardButton("−1",   callback_data="gem_p_dec_1"),
-            InlineKeyboardButton("+1",   callback_data="gem_p_inc_1"),
-            InlineKeyboardButton("+10",  callback_data="gem_p_inc_10"),
-            InlineKeyboardButton("+100", callback_data="gem_p_inc_100"),
-        ],
-        [InlineKeyboardButton(f"💎 {price} Diamantes", callback_data="noop")],
-        [InlineKeyboardButton("✅ Confirmar Preço", callback_data="gem_p_confirm")],
-        [InlineKeyboardButton("❌ Cancelar Venda",  callback_data="gem_market_cancel_new")]
-    ])
 
 async def gem_market_price_spin(update, context):
-    q = update.callback_query
-    await q.answer()
+    q = update.callback_query; await q.answer()
     chat_id = update.effective_chat.id
-
-    # AQUI: Inicia com no mínimo 10
-    cur = max(10, int(context.user_data.get("gem_market_price", 10)))
-    action = q.data
     
-    if action.startswith("gem_p_inc_"):
-        step = int(action.split("_")[-1]); cur += step
-    elif action.startswith("gem_p_dec_"):
-        step = int(action.split("_")[-1])
-        # AQUI: Garante que nunca desça para menos de 10 ao clicar em -1, -10, etc.
-        cur = max(10, cur - step)
+    # MUDANÇA AQUI: Usa a função de cálculo centralizada
+    cur = market_utils.calculate_spin_value(
+        current_value=context.user_data.get("gem_market_price", market_utils.MIN_GEM_PRICE),
+        action_data=q.data,
+        prefix_inc="gem_p_inc_",
+        prefix_dec="gem_p_dec_",
+        min_value=market_utils.MIN_GEM_PRICE # Usa a constante de Gemas
+    )
     
     context.user_data["gem_market_price"] = cur
     
@@ -532,7 +519,15 @@ async def gem_market_price_spin(update, context):
         f"Lotes: <b>{lote_qty}</b>\n\n"
         f"Defina o <b>preço por lote</b> (Mínimo: 10 💎):"
     )
-    kb = _render_gem_price_spinner(cur)
+    kb = market_utils.render_spinner_kb(
+        value=cur,
+        prefix_inc="gem_p_inc_",
+        prefix_dec="gem_p_dec_",
+        label="Preço por lote",
+        confirm_cb="gem_p_confirm",
+        currency_emoji="💎",
+        allow_large_steps=False # Não precisamos de passos grandes de 1k/5k para gemas
+    )
     await _safe_edit_or_send(q, context, chat_id, f"{caption} <b>💎 {cur}</b>", kb)
 
 async def gem_market_price_confirm(update, context):
@@ -547,22 +542,6 @@ async def gem_market_price_confirm(update, context):
 
     await q.answer()
     await gem_market_finalize_listing(update, context, price)
-
-def _render_gem_lote_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
-    qty = max(1, int(qty)); max_qty = max(1, int(max_qty))
-    current_qty = max(1, min(int(qty), max_qty))
-    
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("−10", callback_data="gem_lote_dec_10"),
-            InlineKeyboardButton("−1",  callback_data="gem_lote_dec_1"),
-            InlineKeyboardButton(f"📦 {current_qty} / {max_qty} Lotes", callback_data="noop"),
-            InlineKeyboardButton("+1",  callback_data="gem_lote_inc_1"),
-            InlineKeyboardButton("+10", callback_data="gem_lote_inc_10"),
-        ],
-        [InlineKeyboardButton("✅ Confirmar Lotes", callback_data="gem_lote_confirm")],
-        [InlineKeyboardButton("❌ Cancelar Venda", callback_data="gem_market_cancel_new")]
-    ])
 
 async def _show_gem_lote_spinner(q, context, chat_id: int):
     pending = context.user_data.get("gem_market_pending")
@@ -579,7 +558,14 @@ async def _show_gem_lote_spinner(q, context, chat_id: int):
     current_lotes = min(current_lotes, max_lotes)
     context.user_data["gem_market_lotes"] = current_lotes
 
-    kb = _render_gem_lote_spinner(current_lotes, max_lotes)
+    kb = market_utils.render_spinner_kb(
+        value=current_lotes, 
+        prefix_inc="gem_lote_inc_", 
+        prefix_dec="gem_lote_dec_", 
+        label=f"📦 {current_lotes} / {max_lotes} Lotes", # Ajusta o label para incluir a info Max/Cur
+        confirm_cb="gem_lote_confirm",
+        allow_large_steps=False
+    )
     
     item_label = _item_label(pending["base_id"])
     caption = (
@@ -594,24 +580,28 @@ async def gem_market_lote_spin(update, context):
     await q.answer()
     chat_id = update.effective_chat.id
 
-    cur = max(1, int(context.user_data.get("gem_market_lotes", 1)))
-    max_qty = max(1, int(context.user_data.get("gem_market_lote_max", 1)))
+    # CORREÇÃO: Carregar o valor máximo de lotes (que foi definido em _show_gem_lote_spinner)
+    max_qty = max(1, int(context.user_data.get("gem_market_lote_max", 1))) 
+
+    cur = market_utils.calculate_spin_value(
+        current_value=context.user_data.get("gem_market_lotes", 1),
+        action_data=q.data,
+        prefix_inc="gem_lote_inc_",
+        prefix_dec="gem_lote_dec_",
+        min_value=1,
+        max_value=max_qty # Agora max_qty está definido
+    )
     
-    action = q.data
-    if action.startswith("gem_lote_inc_"):
-        step = int(action.split("_")[-1]); cur = min(max_qty, cur + step)
-    elif action.startswith("gem_lote_dec_"):
-        step = int(action.split("_")[-1]); cur = max(1, cur - step)
-        
     context.user_data["gem_market_lotes"] = cur
     await _show_gem_lote_spinner(q, context, chat_id)
 
-async def gem_market_lote_confirm(update, context):
+async def gem_market_lote_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     chat_id = update.effective_chat.id
     
-    context.user_data["gem_market_price"] = 10 
+    # Inicializa o preço mínimo para 10 (constante em market_utils)
+    context.user_data["gem_market_price"] = market_utils.MIN_GEM_PRICE 
     
     pending = context.user_data.get("gem_market_pending")
     item_label = _item_label(pending["base_id"])
@@ -625,24 +615,19 @@ async def gem_market_lote_confirm(update, context):
     )
     
     price = context.user_data["gem_market_price"]
-    kb = _render_gem_price_spinner(price)
-    await _safe_edit_or_send(q, context, chat_id, f"{caption_prefix} <b>💎 {price}</b>", kb)
-
-def _render_gem_pack_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
-    qty = max(1, int(qty)); max_qty = max(1, int(max_qty))
-    current_qty = max(1, min(int(qty), max_qty))
     
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("−10", callback_data="gem_pack_dec_10"),
-            InlineKeyboardButton("−1",  callback_data="gem_pack_dec_1"),
-            InlineKeyboardButton(f"📦 {current_qty} / {max_qty} Itens", callback_data="noop"),
-            InlineKeyboardButton("+1",  callback_data="gem_pack_inc_1"),
-            InlineKeyboardButton("+10", callback_data="gem_pack_inc_10"),
-        ],
-        [InlineKeyboardButton("✅ Confirmar Tamanho", callback_data="gem_pack_confirm")],
-        [InlineKeyboardButton("❌ Cancelar Venda", callback_data="gem_market_cancel_new")]
-    ])
+    # CORREÇÃO AQUI: Usa a função genérica de renderização
+    kb = market_utils.render_spinner_kb(
+        value=price, 
+        prefix_inc="gem_p_inc_", 
+        prefix_dec="gem_p_dec_", 
+        label="Preço por lote", 
+        confirm_cb="gem_p_confirm",
+        currency_emoji="💎",
+        allow_large_steps=False # Não permite passos de 1k/5k para gemas
+    )
+    
+    await _safe_edit_or_send(q, context, chat_id, f"{caption_prefix} <b>💎 {price}</b>", kb)
 
 async def _show_gem_pack_spinner(q, context, chat_id: int):
     pending = context.user_data.get("gem_market_pending")
@@ -656,7 +641,14 @@ async def _show_gem_pack_spinner(q, context, chat_id: int):
     pending["qty"] = current_pack_qty
     context.user_data["gem_market_pending"] = pending
 
-    kb = _render_gem_pack_spinner(current_pack_qty, qty_have)
+    kb = market_utils.render_spinner_kb(
+        value=current_pack_qty, 
+        prefix_inc="gem_pack_inc_", 
+        prefix_dec="gem_pack_dec_", 
+        label=f"📦 {current_pack_qty} / {qty_have} Itens",
+        confirm_cb="gem_pack_confirm",
+        allow_large_steps=False
+    )
     
     item_label = _item_label(pending["base_id"])
     caption = (
@@ -667,24 +659,29 @@ async def _show_gem_pack_spinner(q, context, chat_id: int):
     await _safe_edit_or_send(q, context, chat_id, caption, kb)
 
 async def gem_market_pack_spin(update, context):
-    q = update.callback_query
-    await q.answer()
-    chat_id = update.effective_chat.id
+    q = update.callback_query; await q.answer()
+    # CORREÇÃO: Define chat_id explicitamente
+    chat_id = update.effective_chat.id 
     
     pending = context.user_data.get("gem_market_pending")
     if not pending: await gem_market_cancel_new(update, context); return
-
-    cur = max(1, int(pending.get("qty", 1)))
+    
     max_qty = max(1, int(pending.get("qty_have", 1)))
     
-    action = q.data
-    if action.startswith("gem_pack_inc_"):
-        step = int(action.split("_")[-1]); cur = min(max_qty, cur + step)
-    elif action.startswith("gem_pack_dec_"):
-        step = int(action.split("_")[-1]); cur = max(1, cur - step)
+    # MUDANÇA AQUI: Usa a função de cálculo centralizada
+    cur = market_utils.calculate_spin_value(
+        current_value=pending.get("qty", 1),
+        action_data=q.data,
+        prefix_inc="gem_pack_inc_",
+        prefix_dec="gem_pack_dec_",
+        min_value=1,
+        max_value=max_qty
+    )
         
     pending["qty"] = cur
     context.user_data["gem_market_pending"] = pending
+    
+    # CORREÇÃO: Agora chat_id está definido
     await _show_gem_pack_spinner(q, context, chat_id)
 
 async def gem_market_pack_confirm(update, context):
@@ -872,7 +869,9 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     """
     q = update.callback_query
     await q.answer("Processando compra...")
-    chat_id = update.effective_chat.id
+    
+    # CORREÇÃO: chat_id deve ser definido aqui
+    chat_id = update.effective_chat.id 
     buyer_id = q.from_user.id
     
     try: lid = int(q.data.replace("gem_buy_execute_", ""))
@@ -882,8 +881,8 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     listing = gem_market_manager.get_listing(lid)
     if not listing or not listing.get("active"):
         await q.answer("Item já vendido ou removido!", show_alert=True)
-        # Atualiza a interface para remover o botão antigo
-        await gem_market_main(update, context)
+        # Tenta atualizar a interface. Usa chat_id definido acima.
+        await gem_market_main(update, context) 
         return
         
     seller_id = int(listing.get("seller_id", 0))
@@ -923,37 +922,43 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     # --- 5. OPERAÇÃO ATÔMICA (Troca Item e Gemas na Memória) ---
     
     item_payload = listing.get("item", {})
+    # O Mercado de Gemas lida apenas com items em stack (Tomo, Caixa, Evo Item)
     base_id = item_payload.get("base_id")
     pack_qty = int(item_payload.get("qty", 1))
     item_label = _item_label(base_id)
     
-    if base_id:
-        # A) Entrega o Item
-        player_manager.add_item_to_inventory(buyer_pdata, base_id, pack_qty)
+    if not (base_id and pack_qty > 0):
+         # CORREÇÃO: Item inválido deve retornar o item ao vendedor e notificar
+         logger.error(f"[GemMarket] Item sem base_id/pack_qty na listagem {lid}!")
+         await q.answer("Erro crítico: Item inválido.", show_alert=True)
+         # Seria ideal aqui chamar uma função de rollback se o item ainda estiver no inventário do mercado.
+         return
+   
+    # A) Entrega o Item
+    player_manager.add_item_to_inventory(buyer_pdata, base_id, pack_qty)
+    
+    # B) DESCONTA AS GEMAS (A Correção Principal)
+    # Atualizamos a variável buyer_pdata ANTES de salvar
+    buyer_pdata["gems"] = max(0, buyer_gems - total_cost)
+    
+    # C) Paga o Vendedor
+    if seller_pdata:
+        seller_gems = int(seller_pdata.get("gems", 0))
+        seller_pdata["gems"] = seller_gems + total_cost
+        # O save do vendedor é feito AQUI para que ele receba as gemas
+        await player_manager.save_player_data(seller_id, seller_pdata)
         
-        # B) DESCONTA AS GEMAS (A Correção Principal)
-        # Atualizamos a variável buyer_pdata ANTES de salvar
-        buyer_pdata["gems"] = max(0, buyer_gems - total_cost)
-        
-        # C) Paga o Vendedor
-        if seller_pdata:
-            seller_gems = int(seller_pdata.get("gems", 0))
-            seller_pdata["gems"] = seller_gems + total_cost
-            await player_manager.save_player_data(seller_id, seller_pdata)
-            
-            # Notifica vendedor
-            try:
-                await context.bot.send_message(
-                    seller_id,
-                    f"💎 <b>Venda Realizada!</b>\nVocê vendeu <b>{item_label}</b> por <b>{total_cost} Gemas</b>."
-                )
-            except: pass
-    else:
-        logger.error(f"[GemMarket] Item sem base_id na listagem {lid}!")
-        await q.answer("Erro crítico: Item inválido.", show_alert=True)
-        return
+        # Notifica vendedor (mantido)
+        try:
+            await context.bot.send_message(
+                seller_id,
+                f"💎 𝚅𝚎𝚗𝚍𝚊 𝚁𝚎𝚊𝚕𝚒𝚣𝚊𝚍𝚊!\n𝚅𝚘𝚌𝚎̂ 𝚟𝚎𝚗𝚍𝚎𝚞 {item_label} por {total_cost} 𝙶𝚎𝚖𝚊𝚜.",
+                parse_mode="HTML"
+            )
+        except: pass
 
     # --- 6. Salva o Comprador (Agora com Item + Saldo Novo) ---
+    # Este save finaliza a transação para o comprador
     await player_manager.save_player_data(buyer_id, buyer_pdata)
 
     # --- 7. Logs e Feedback ---
@@ -968,7 +973,7 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
             f"💰 <b>Valor:</b> {total_cost} Gemas\n"
             f"🤝 <b>Vendedor:</b> {seller_name}"
         )
-        
+        # Assumindo que LOG_GROUP_ID e LOG_TOPIC_ID estão definidos no topo do módulo
         await context.bot.send_message(
             chat_id=LOG_GROUP_ID, 
             message_thread_id=LOG_TOPIC_ID, 

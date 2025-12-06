@@ -94,22 +94,19 @@ async def converter_list_items(update: Update, context: ContextTypes.DEFAULT_TYP
     if item_type == "skill":
         title = "📚 Converter Skills"
         learned_skills = pdata.get("skills", [])
-        # Se for dicionário (novo formato), pega as chaves
+        # Suporte a lista ou dict (novo formato)
         if isinstance(learned_skills, dict):
             learned_skills = list(learned_skills.keys())
             
         for skill_id in learned_skills:
-            item_id = f"tomo_{skill_id}"
-            # Se a lista de permitidos estiver vazia (erro de import), libera tudo para teste
-            if not SKILL_BOOK_ITEMS or item_id in SKILL_BOOK_ITEMS:
+            if isinstance(skill_id, str) and skill_id in skills_data.SKILL_DATA:
                 convertible_items.append((skill_id, _get_skill_name(skill_id)))
-                
+            
     else: # skin
         title = "🎨 Converter Skins"
         unlocked_skins = pdata.get("unlocked_skins", [])
         for skin_id in unlocked_skins:
-            item_id = f"caixa_{skin_id}"
-            if not SKIN_BOX_ITEMS or item_id in SKIN_BOX_ITEMS:
+            if isinstance(skin_id, str) and skin_id in SKIN_CATALOG:
                 convertible_items.append((skin_id, _get_skin_name(skin_id)))
 
     convertible_items.sort(key=lambda x: x[1])
