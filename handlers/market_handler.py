@@ -705,19 +705,31 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # LOG NO GRUPO
         try:
             buyer_name = buyer.get("character_name") or q.from_user.first_name
+        
+            # CORREÇÃO: Usar o nome do vendedor do listing ou do objeto seller_pdata
+            # Se seller_pdata foi carregado (o que acontece se seller_id > 0), use character_name
             seller_name = "Desconhecido"
-            if seller_id:
-                # Tentamos pegar o nome do vendedor sem carregar o objeto todo de novo se possível
-                seller_name = listing.get("seller_name") or "Vendedor"
-
+            if seller_id and seller_id != 0:
+                # O listing armazena seller_name, ou tentamos buscar do pdata, se o sistema for unificado
+                # Vamos assumir que list_active (chamado anteriormente) não pega o nome, mas o purchase_listing sim.
+                # Se seller_pdata foi carregado, use-o (embora aqui só temos o ID do vendedor na variável seller)
+                # Para este handler, vamos confiar que o listing tem o nome ou buscá-lo.
+                # No market_manager.py, o nome é armazenado no listing se for privado, mas aqui usamos o ID para o log.
+            
+                # Vamos buscar o nome do vendedor se estiver disponível.
+                # O market_buy original não recarrega o vendedor, então usamos o ID como fallback.
+                seller = await player_manager.get_player_data(seller_id) # Recarregamos rapidamente para pegar o nome
+                seller_name = seller.get("character_name", f"ID: {seller_id}")
+        
             log_text = (
                 f"💸 <b>MERCADO (OURO)</b>\n\n"
                 f"👤 <b>Comprador:</b> {buyer_name}\n"
                 f"📦 <b>Item:</b> {item_name_display}\n"
                 f"💰 <b>Valor:</b> {cost} 🪙\n"
-                f"🤝 <b>Vendedor:</b> {seller_name}\n"
-                f"🔗 <b>Listagem ID:</b> {lid}"
+                f"🤝 <b>Vendedor:</b> {seller_name}\n" # <-- Agora inclui o nome
+                f"🔗 <b>Listagem ID:</b> {lid}"      # <-- Agora inclui o ID da listagem
             )
+        
             await context.bot.send_message(chat_id=LOG_GROUP_ID, message_thread_id=LOG_TOPIC_ID, text=log_text, parse_mode="HTML")
         except Exception as e_log:
             logger.warning(f"Log error: {e_log}")
