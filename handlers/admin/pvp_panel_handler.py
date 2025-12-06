@@ -113,67 +113,84 @@ async def admin_trigger_pvp_reset(update: Update, context: ContextTypes.DEFAULT_
 
 async def admin_trigger_pvp_zero_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Opção 4: ZERA TUDO (Banco + Memória RAM).
+    Opção 4: HARD RESET COM VARREDURA (Corrige bugs de Texto vs Número).
     """
     query = update.callback_query
     
     if "confirm" not in query.data:
         await query.edit_message_text(
-            "⚠️ <b>PERIGO: HARD RESET NUCLEAR</b> ⚠️\n\n"
-            "Esta ação vai:\n"
-            "1. Definir <code>pvp_points = 0</code> no MongoDB.\n"
-            "2. <b>Forçar 0</b> na memória RAM de todos os jogadores online.\n"
-            "3. Limpar o cache.\n\n"
-            "Isso resolve o problema de 'pontos que não zeram'.",
+            "⚠️ <b>HARD RESET: MODO VARREDURA</b> ⚠️\n\n"
+            "O reset anterior falhou em achar todos?\n"
+            "Este modo vai verificar <b>JOGADOR POR JOGADOR</b>.\n\n"
+            "Isso corrige erros onde pontos estão salvos como Texto ('100') em vez de Número (100).\n\n"
+            "Confirmar?",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ SIM, ZERAR TUDO", callback_data="admin_pvp_zero_points_confirm")],
+                [InlineKeyboardButton("✅ SIM, VARRER TUDO", callback_data="admin_pvp_zero_points_confirm")],
                 [InlineKeyboardButton("❌ Cancelar", callback_data="admin_pvp_menu")]
             ]),
             parse_mode="HTML"
         )
         return
 
-    await query.answer("Executando limpeza completa...")
+    await query.answer("Iniciando varredura...")
     
     try:
-        if players_collection is None: 
-            raise Exception("Sem conexão com o banco de dados.")
+        if players_collection is None: raise Exception("Sem banco de dados.")
         
-        # --- PASSO 1: ZERAR NO BANCO (MongoDB) ---
+        count_db = 0
+        count_manual = 0
+        
+        # --- PASSO 1: O Update Rápido (Pega os Números) ---
         result = players_collection.update_many(
             {"pvp_points": {"$gt": 0}}, 
             {"$set": {"pvp_points": 0}}
         )
+        count_db = result.modified_count
         
-        # --- PASSO 2: ZERAR NA MEMÓRIA (O Segredo!) ---
-        # Se não fizermos isso, o bot salva os pontos velhos de volta no banco.
-        cached_count = 0
-        if hasattr(player_manager, "PLAYER_CACHE"):
-            # Itera sobre todos os jogadores carregados na memória e zera na marra
-            for user_id, p_data in player_manager.PLAYER_CACHE.items():
-                if p_data.get("pvp_points", 0) > 0:
-                    p_data["pvp_points"] = 0
-                    cached_count += 1
+        # --- PASSO 2: A Varredura Manual (Pega os Textos/Erros) ---
+        # Iteramos sobre TODOS os jogadores para garantir
+        # (Nota: Se tiver 10k+ jogadores, isso pode demorar alguns segundos, mas para <1000 é instantâneo)
+        
+        # Importante: precisamos iterar sobre a coleção direto, não só o cache
+        cursor = players_collection.find({}, {"pvp_points": 1}) # Traz só ID e Pontos para ser leve
+        
+        for doc in cursor:
+            user_id = doc.get("_id")
+            raw_points = doc.get("pvp_points", 0)
             
-            # Depois de garantir que estão zerados, limpamos o cache para forçar recarga
+            needs_fix = False
+            
+            # Tenta converter para inteiro para ver se é > 0
+            try:
+                val = int(raw_points)
+                if val != 0: needs_fix = True
+            except:
+                # Se der erro de conversão (ex: texto sujo), provavelmente precisa zerar
+                needs_fix = True
+            
+            if needs_fix:
+                players_collection.update_one({"_id": user_id}, {"$set": {"pvp_points": 0}})
+                count_manual += 1
+
+        # --- PASSO 3: Limpar Memória ---
+        if hasattr(player_manager, "PLAYER_CACHE"):
             player_manager.PLAYER_CACHE.clear()
         
+        total_zerados = count_db + count_manual
+        
         await query.edit_message_text(
-            f"💀 <b>HARD RESET CONCLUÍDO!</b>\n\n"
-            f"✅ Banco de Dados: <b>{result.modified_count}</b> jogadores zerados.\n"
-            f"✅ Memória RAM: <b>{cached_count}</b> jogadores corrigidos.\n"
-            f"✅ Cache: <b>Limpo</b>.\n\n"
-            "Agora o Ranking deve aparecer vazio!",
+            f"💀 <b>VARREDURA COMPLETA!</b>\n\n"
+            f"✅ Reset Rápido (Números): <b>{count_db}</b>\n"
+            f"✅ Reset Manual (Textos/Bugs): <b>{count_manual}</b>\n"
+            f"🏁 Total Zerados: <b>{total_zerados}</b>\n"
+            f"🧹 Cache: <b>Limpo</b>",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
             parse_mode="HTML"
         )
         
     except Exception as e:
-        logger.error(f"Erro ao zerar pontos pvp: {e}", exc_info=True)
-        await query.edit_message_text(
-            f"❌ Erro Crítico: {e}", 
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]])
-        )
+        logger.error(f"Erro varredura pvp: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
 
 # --- Lista de Handlers ---
 admin_pvp_menu_handler = CallbackQueryHandler(admin_pvp_menu, pattern=r'^admin_pvp_menu$')
