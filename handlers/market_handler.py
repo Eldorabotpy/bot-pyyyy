@@ -715,7 +715,8 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"👤 <b>Comprador:</b> {buyer_name}\n"
                 f"📦 <b>Item:</b> {item_name_display}\n"
                 f"💰 <b>Valor:</b> {cost} 🪙\n"
-                f"🤝 <b>Vendedor ID:</b> {seller_id}"
+                f"🤝 <b>Vendedor:</b> {seller_name}\n"
+                f"🔗 <b>Listagem ID:</b> {lid}"
             )
             await context.bot.send_message(chat_id=LOG_GROUP_ID, message_thread_id=LOG_TOPIC_ID, text=log_text, parse_mode="HTML")
         except Exception as e_log:
