@@ -8,6 +8,12 @@ SKIN_CATALOG = {
         'media_key': 'classe_guerreiro_armadura_negra_media', # A chave para o file_id
         'description': 'Uma armadura imponente forjada nas sombras.'
     },
+    'guerreiro_armadura_jade': {
+        'display_name': 'Armadura de jade',
+        'class': 'guerreiro',  
+        'media_key': 'classe_guerreiro_armadura_jade_media', # A chave para o file_id
+        'description': 'Uma armadura imponente forjada com os poderes de uma joia .'
+    },
     'guerreiro_placas_douradas': {
         'display_name': 'Placas Douradas',
         'class': 'guerreiro',
