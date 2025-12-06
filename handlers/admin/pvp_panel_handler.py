@@ -113,50 +113,67 @@ async def admin_trigger_pvp_reset(update: Update, context: ContextTypes.DEFAULT_
 
 async def admin_trigger_pvp_zero_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Opção 4: ZERA TUDO SEM DÓ (Sem prêmios).
-    Agora inclui limpeza de cache para evitar bugs.
+    Opção 4: ZERA TUDO (Banco + Memória RAM).
     """
     query = update.callback_query
     
     if "confirm" not in query.data:
         await query.edit_message_text(
-            "⚠️ <b>PERIGO: HARD RESET</b> ⚠️\n\n"
-            "Isso vai definir <code>pvp_points = 0</code> para <b>TODOS</b>.\n"
-            "• Ninguém recebe prêmios.\n"
-            "• O Cache será limpo (pode causar leve lag).\n\n"
-            "Tem certeza absoluta?",
+            "⚠️ <b>PERIGO: HARD RESET NUCLEAR</b> ⚠️\n\n"
+            "Esta ação vai:\n"
+            "1. Definir <code>pvp_points = 0</code> no MongoDB.\n"
+            "2. <b>Forçar 0</b> na memória RAM de todos os jogadores online.\n"
+            "3. Limpar o cache.\n\n"
+            "Isso resolve o problema de 'pontos que não zeram'.",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ SIM, APAGUE TUDO", callback_data="admin_pvp_zero_points_confirm")],
+                [InlineKeyboardButton("✅ SIM, ZERAR TUDO", callback_data="admin_pvp_zero_points_confirm")],
                 [InlineKeyboardButton("❌ Cancelar", callback_data="admin_pvp_menu")]
             ]),
             parse_mode="HTML"
         )
         return
 
-    await query.answer("Executando Hard Reset...")
+    await query.answer("Executando limpeza completa...")
+    
     try:
-        if players_collection is None: raise Exception("Sem banco de dados.")
+        if players_collection is None: 
+            raise Exception("Sem conexão com o banco de dados.")
         
-        # 1. Zera no Banco
+        # --- PASSO 1: ZERAR NO BANCO (MongoDB) ---
         result = players_collection.update_many(
             {"pvp_points": {"$gt": 0}}, 
             {"$set": {"pvp_points": 0}}
         )
         
-        # 2. LIMPEZA DE CACHE (CRUCIAL ADICIONADA)
+        # --- PASSO 2: ZERAR NA MEMÓRIA (O Segredo!) ---
+        # Se não fizermos isso, o bot salva os pontos velhos de volta no banco.
+        cached_count = 0
         if hasattr(player_manager, "PLAYER_CACHE"):
+            # Itera sobre todos os jogadores carregados na memória e zera na marra
+            for user_id, p_data in player_manager.PLAYER_CACHE.items():
+                if p_data.get("pvp_points", 0) > 0:
+                    p_data["pvp_points"] = 0
+                    cached_count += 1
+            
+            # Depois de garantir que estão zerados, limpamos o cache para forçar recarga
             player_manager.PLAYER_CACHE.clear()
         
         await query.edit_message_text(
-            f"💀 <b>HARD RESET CONCLUÍDO</b>\n"
-            f"Jogadores zerados: <b>{result.modified_count}</b>\n"
-            f"Memória limpa: <b>Sim</b>",
+            f"💀 <b>HARD RESET CONCLUÍDO!</b>\n\n"
+            f"✅ Banco de Dados: <b>{result.modified_count}</b> jogadores zerados.\n"
+            f"✅ Memória RAM: <b>{cached_count}</b> jogadores corrigidos.\n"
+            f"✅ Cache: <b>Limpo</b>.\n\n"
+            "Agora o Ranking deve aparecer vazio!",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
             parse_mode="HTML"
         )
+        
     except Exception as e:
-        logger.error(f"Erro hard reset: {e}", exc_info=True)
-        await query.edit_message_text(f"❌ Erro: {e}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]))
+        logger.error(f"Erro ao zerar pontos pvp: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ Erro Crítico: {e}", 
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]])
+        )
 
 # --- Lista de Handlers ---
 admin_pvp_menu_handler = CallbackQueryHandler(admin_pvp_menu, pattern=r'^admin_pvp_menu$')
