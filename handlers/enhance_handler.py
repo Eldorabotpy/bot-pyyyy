@@ -136,7 +136,7 @@ def _compute_upgrade_costs_from_recipe(inst: dict, include_joia_forja: bool, inc
 # =========================
 # Helpers de UI
 # =========================
-async def _edit_caption_or_text(query, text: str, reply_markup: InlineKeyboardMarkup | None = None):
+async def _edit_caption_or_text(query, text: str, reply_markup: InlineKeyboardMarkup | None = None, context: ContextTypes.DEFAULT_TYPE = None):
     try:
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode="HTML"); return
     except Exception:
@@ -145,9 +145,16 @@ async def _edit_caption_or_text(query, text: str, reply_markup: InlineKeyboardMa
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML"); return
     except Exception:
         pass
-    await query.message.bot.send_message(
-        chat_id=query.message.chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML"
-    )
+    
+    # --- CORREÇÃO DO ERRO ---
+    # Usamos context.bot para garantir o envio, pois query.message.bot pode não existir
+    if context:
+        await context.bot.send_message(
+            chat_id=query.message.chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML"
+        )
+    else:
+        # Fallback antigo (pode falhar)
+        await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
 
 def _equip_list(pdata: dict):
     equip = pdata.get('equipment', {}) or {}
@@ -192,8 +199,8 @@ async def show_enhance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "\n<i>𝑵𝒆𝒏𝒉𝒖𝒎 𝒆𝒒𝒖𝒊𝒑𝒂𝒎𝒆𝒏𝒕𝒐 𝒖́𝒏𝒊𝒄𝒐 𝒆𝒔𝒕𝒂́ 𝒆𝒒𝒖𝒊𝒑𝒂𝒅𝒐.</i>\n"
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
-    # <<< CORREÇÃO 2: Adiciona await >>>
-    await _edit_caption_or_text(q, text, InlineKeyboardMarkup(kb)) # Chama função async
+    # <<< CORREÇÃO 2: Adiciona await e context >>>
+    await _edit_caption_or_text(q, text, InlineKeyboardMarkup(kb), context=context)
 
 async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -259,8 +266,8 @@ async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb.append([InlineKeyboardButton("📜 𝑹𝒆𝒔𝒕𝒂𝒖𝒓𝒂𝒓 𝑫𝒖𝒓𝒂𝒃𝒊𝒍𝒊𝒅𝒂𝒅𝒆", callback_data=f"enh_rest_{uid}")])
     kb.append([InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓", callback_data="enhance_menu")])
 
-    # <<< CORREÇÃO 4: Adiciona await >>>
-    await _edit_caption_or_text(q, "\n".join(text_lines), InlineKeyboardMarkup(kb)) # Chama função async
+    # <<< CORREÇÃO 4: Adiciona await e context >>>
+    await _edit_caption_or_text(q, "\n".join(text_lines), InlineKeyboardMarkup(kb), context=context)
 
 # =========================
 # Ações
@@ -291,17 +298,6 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await enhance_item_menu(update, context) # Chama função async
             return
 
-        # --- GATILHO DE MISSÃO (REMOVIDO) ---
-        # if res.get("success"):
-        #     try:
-        #         # Chama a missão no padrão correto: (user_id, mission_type, item_id, quantity)
-        #         # 'enhance' é um tipo comum, 'any' significa qualquer item, 1 é a quantidade
-        #         await mission_manager.update_mission_progress(user_id, 'enhance', 'any', 1)
-        #     except Exception:
-        #         # Se falhar, ignora para não travar o jogo
-        #         pass
-        # --- FIM DO GATILHO DE MISSÃO ---
-
         # <<< CORREÇÃO 7: Adiciona await (SALVA APÓS ENHANCE) >>>
         await player_manager.save_player_data(user_id, pdata)
 
@@ -319,7 +315,7 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else: # Falhou
             if res.get("protected"):
                 header = "⚠️ <b>𝑭𝒂𝒍𝒉𝒐𝒖, 𝒎𝒂𝒔 𝒑𝒓𝒐𝒕𝒆𝒈𝒊𝒅𝒐.</b>"
-                body = f"𝐎 ✨ 𝐒𝐢𝐠𝐢𝐥𝐨 𝐝𝐞 𝐏𝐫𝐨𝐭𝐞𝐜̧𝐚̃𝒐 𝐦𝐚𝐧𝐭𝐞𝐯𝐞 𝐨 𝐧𝐢́𝐯𝐞𝐥 𝐞𝐦 <b>+{up}</b>."
+                body = f"𝐎 ✨ 𝐒𝐢𝐠𝐢𝐥𝐨 𝐝𝐞 𝐏𝐫𝐨𝐭𝐞𝐜̧𝐚̃𝒐 𝐦𝐚𝐧𝐭𝐞𝐯𝐞 𝐨 𝐧𝐢́𝐯𝐞𝒍 𝐞𝐦 <b>+{up}</b>."
             else: # Falhou e não estava protegido
                 header = "❌⚠️ <b>𝑨𝒑𝒓𝒊𝒎𝒐𝒓𝒂𝒎𝒆𝒏𝒕𝒐 𝒇𝒂𝒍𝒉𝒐𝒖.</b>"
                 body = f"𝑶 𝒏𝒊́𝒗𝒆𝒍 𝒄𝒂𝒊𝒖 𝒑𝒂𝒓𝒂 <b>+{up}</b>." # Mostra o novo nível após cair
@@ -336,8 +332,8 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔁 𝐕𝐨𝐥𝐭𝐚𝐫 a 𝐦𝐞𝐥𝐡𝐨𝐫𝐚𝐫 𝐞𝐬𝐭𝐞 𝐢𝐭𝐞𝐦", callback_data=f"enh_sel_{uid}")],
             [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨𝐬 𝐞𝐪𝐮𝐢𝐩𝐚𝐝𝐨𝐬", callback_data="enhance_menu")],
         ])
-        # <<< CORREÇÃO 8: Adiciona await >>>
-        await _edit_caption_or_text(q, text, kb) # Chama função async
+        # <<< CORREÇÃO 8: Adiciona await e context >>>
+        await _edit_caption_or_text(q, text, kb, context=context)
         return
 
     # === RESTAURAR DURABILIDADE ===
@@ -368,8 +364,8 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔧 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚 𝐦𝐞𝐥𝐡𝐨𝐫𝐚𝐫 𝐞𝐬𝐭𝐞 𝐢𝐭𝐞𝐦", callback_data=f"enh_sel_{uid}")],
             [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨𝐬 𝐞𝐪𝐮𝐢𝐩𝐚𝐝𝐨𝐬", callback_data="enhance_menu")],
         ])
-        # <<< CORREÇÃO 11: Adiciona await >>>
-        await _edit_caption_or_text(q, text, kb) # Chama função async
+        # <<< CORREÇÃO 11: Adiciona await e context >>>
+        await _edit_caption_or_text(q, text, kb, context=context)
         
 enhance_menu_handler   = CallbackQueryHandler(show_enhance_menu, pattern=r'^enhance_menu$')
 enhance_select_handler = CallbackQueryHandler(enhance_item_menu, pattern=r'^enh_sel_')
