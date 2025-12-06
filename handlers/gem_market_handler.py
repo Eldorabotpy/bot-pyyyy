@@ -463,11 +463,13 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
 # ==============================
 
 def _render_gem_price_spinner(price: int) -> InlineKeyboardMarkup:
-    price = max(1, int(price))
+    # AQUI: Mudei de 1 para 10
+    price = max(10, int(price)) 
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("−100", callback_data="gem_p_dec_100"),
             InlineKeyboardButton("−10",  callback_data="gem_p_dec_10"),
+            # O botão de -1 ainda existe, mas a lógica vai travar no 10
             InlineKeyboardButton("−1",   callback_data="gem_p_dec_1"),
             InlineKeyboardButton("+1",   callback_data="gem_p_inc_1"),
             InlineKeyboardButton("+10",  callback_data="gem_p_inc_10"),
@@ -483,13 +485,16 @@ async def gem_market_price_spin(update, context):
     await q.answer()
     chat_id = update.effective_chat.id
 
-    cur = max(1, int(context.user_data.get("gem_market_price", 10)))
+    # AQUI: Inicia com no mínimo 10
+    cur = max(10, int(context.user_data.get("gem_market_price", 10)))
     action = q.data
     
     if action.startswith("gem_p_inc_"):
         step = int(action.split("_")[-1]); cur += step
     elif action.startswith("gem_p_dec_"):
-        step = int(action.split("_")[-1]); cur = max(1, cur - step)
+        step = int(action.split("_")[-1])
+        # AQUI: Garante que nunca desça para menos de 10 ao clicar em -1, -10, etc.
+        cur = max(10, cur - step)
     
     context.user_data["gem_market_price"] = cur
     
@@ -504,15 +509,22 @@ async def gem_market_price_spin(update, context):
     caption = (
         f"Item: <b>{item_label} ×{pack_qty}</b>\n"
         f"Lotes: <b>{lote_qty}</b>\n\n"
-        f"Defina o <b>preço por lote</b> (em Diamantes):"
+        f"Defina o <b>preço por lote</b> (Mínimo: 10 💎):"
     )
     kb = _render_gem_price_spinner(cur)
     await _safe_edit_or_send(q, context, chat_id, f"{caption} <b>💎 {cur}</b>", kb)
 
 async def gem_market_price_confirm(update, context):
     q = update.callback_query
+    # AQUI: Se por algum milagre o valor for menor que 10, força subir para 10
+    price = max(10, int(context.user_data.get("gem_market_price", 10)))
+    
+    # Validação visual (opcional, mas bom pra feedback)
+    if price < 10:
+        await q.answer("O preço mínimo é 10 Gemas!", show_alert=True)
+        return
+
     await q.answer()
-    price = max(1, int(context.user_data.get("gem_market_price", 1)))
     await gem_market_finalize_listing(update, context, price)
 
 def _render_gem_lote_spinner(qty: int, max_qty: int) -> InlineKeyboardMarkup:
