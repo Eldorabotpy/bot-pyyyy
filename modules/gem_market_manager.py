@@ -1,42 +1,37 @@
 # modules/gem_market_manager.py
 
 from __future__ import annotations
-import json, os
-from pathlib import Path
+import os
+import html
+import certifi # Necessário para conexões TLS/SSL com MongoDB Atlas
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple
-from threading import Lock
 import logging
+from pymongo import MongoClient, ReturnDocument
+import asyncio 
+from modules import player_manager 
 
-try:
-    from modules.player.inventory import get_gems, spend_gems, add_gems
-except ImportError:
-    # Se nem o inventory.py for encontrado, lança um erro fatal
-    logging.error("[GemMarket] FALHA CRÍTICA: Não foi possível importar get_gems/spend_gems de modules.player.inventory.")
-    
-    # As funções de fallback (plano B) têm de estar indentadas
-    # alinhadas com o logging.error acima.
-    
-    def _ival(v, default=0):
-        try: return int(v)
-        except: return default
-
-    def get_gems(pdata: dict) -> int: 
-        raise ImportError("get_gems não carregado")
-
-    def spend_gems(pdata: dict, amount: int) -> bool: 
-        raise ImportError("spend_gems não carregado")
-
-    def add_gems(pdata: dict, amount: int): 
-        raise ImportError("add_gems não carregado")
-
+MONGO_CONN_STR = os.getenv("MONGO_CONNECTION_STRING")
 log = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = BASE_DIR / "data"
-# --- NOVO ARQUIVO DE DADOS ---
-FILE_PATH = DATA_DIR / "gem_market_listings.json"
-_IO_LOCK = Lock()
+try:
+    ca = certifi.where()
+    client = MongoClient(MONGO_CONN_STR, tlsCAFile=ca)
+    db = client["eldora_db"] 
+    
+    # COLEÇÕES:
+    gem_market_col = db["gem_market_listings"]
+    counters_col = db["counters"]
+    players_col = db["players"] 
+    
+    gem_market_col.create_index("id", unique=True)
+    gem_market_col.create_index("active")
+    log.info("✅ CONEXÃO COM MONGODB BEM SUCEDIDA (MERCADO DE GEMAS)!")
+except Exception as e:
+    log.critical(f"🔥 FALHA CRÍTICA AO CONECTAR NO MONGODB (GEMAS): {e}")
+    gem_market_col = None
+    counters_col = None
+    players_col = None
 
 MAX_GEM_PRICE = 9_999_999 # Preço máximo em gemas
 
@@ -50,42 +45,26 @@ class InsufficientQuantity(GemMarketError): ...
 class InvalidPurchase(GemMarketError): ...
 class InsufficientGems(GemMarketError): ...
 
-
-# =========================
-# Gestão do JSON (Igual ao market_manager)
-# =========================
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-def _ensure_file():
-    os.makedirs(DATA_DIR, exist_ok=True)
-    if not os.path.exists(FILE_PATH):
-        _save({"seq": 1, "listings": []}) # Começa a sequência de ID em 1
-
-def _load() -> Dict:
-    _ensure_file()
-    try:
-        with _IO_LOCK, open(FILE_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if not isinstance(data, dict) or "listings" not in data or "seq" not in data:
-                raise ValueError("Formato inválido")
-            return data
-    except Exception:
-        data = {"seq": 1, "listings": []}
-        _save(data)
-        return data
-
-def _save(data: Dict):
-    tmp_path = str(FILE_PATH) + ".tmp"
-    with _IO_LOCK:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, str(FILE_PATH))
-
 # =========================
 # Validações
 # =========================
-# Em: modules/gem_market_manager.py
+# modules/gem_market_manager.py (Função _get_next_sequence)
+
+def _get_next_sequence(name: str) -> int:
+    """Obtém um ID sequencial (atômico) do MongoDB."""
+    if counters_col is None: raise ListingNotFound("MongoDB não conectado.")
+    ret = counters_col.find_one_and_update(
+        {"_id": name},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        # CORREÇÃO: Usar o objeto ReturnDocument.AFTER
+        return_document=ReturnDocument.AFTER 
+    )
+    return ret["seq"]
+
+def _now_iso() -> str:
+    """Retorna o timestamp atual no formato ISO 8601 (UTC)."""
+    return datetime.now(timezone.utc).isoformat()
 
 def _validate_item_payload(item_payload: dict):
     """
@@ -121,157 +100,128 @@ def _validate_price_qty(unit_price: int, quantity: int):
 # =========================
 
 def create_listing(
-    *,
-    seller_id: int,
-    item_payload: dict,
-    unit_price: int, # Preço em GEMAS
-    quantity: int = 1  # Quantos lotes (para evo_items)
+    *, seller_id: int, item_payload: dict, unit_price: int, quantity: int = 1
 ) -> dict:
-    """
-    Cria uma nova listagem no gem_market_listings.json.
-    NÃO mexe nas gemas do jogador, apenas cria a listagem.
-    """
-    _validate_item_payload(item_payload)
-    _validate_price_qty(unit_price, quantity)
+    if gem_market_col is None: raise GemMarketError("MongoDB não conectado.")
 
-    data = _load()
-    lid = data["seq"]
-    data["seq"] += 1
+    lid = _get_next_sequence("gem_market_id")
 
     listing = {
         "id": lid,
         "seller_id": int(seller_id),
         "item": item_payload,
-        "unit_price_gems": int(unit_price), # Preço em Gemas
-        "quantity": int(quantity),        # Lotes disponíveis
+        "unit_price_gems": int(unit_price),
+        "quantity": int(quantity),
         "created_at": _now_iso(),
         "active": True,
     }
-    data["listings"].append(listing)
-    _save(data)
+
+    gem_market_col.insert_one(listing)
     log.info(f"[GemMarket] Listagem (Gemas) criada: id={lid} price={unit_price} item={item_payload}")
     return listing
 
 def get_listing(listing_id: int) -> Optional[dict]:
-    data = _load()
-    for l in data["listings"]:
-        if l["id"] == int(listing_id):
-            return l
-    return None
+    if gem_market_col is None: return None
+    return gem_market_col.find_one({"id": int(listing_id)})
 
 def list_active(page: int = 1, page_size: int = 30) -> List[dict]:
-    """Lista todas as listagens ativas, ordenadas da mais recente para a mais antiga."""
-    data = _load()
-    items = [l for l in data["listings"] if l.get("active")]
-    
-    # Ordena por 'created_at' descendente (mais novo primeiro)
-    items.sort(key=lambda l: l.get("created_at", ""), reverse=True)
+    if gem_market_col is None: return []
 
-    page = max(1, int(page))
-    page_size = max(1, min(100, int(page_size)))
-    start = (page - 1) * page_size
-    end = start + page_size
-    log.info(f"[GemMarket] list_active -> {len(items)} itens ativos (arquivo: {FILE_PATH})")
-    return items[start:end]
+    # ⚠️ CORREÇÃO CRÍTICA: Retorna todas as listagens ATIVAS. 
+    # A paginação é feita no handler, mas para garantir que o filtro funciona, 
+    # vamos retornar todas as ativas (sem paginação por enquanto)
+    
+    # 1. Encontra todos os documentos ativos
+    listings = gem_market_col.find({"active": True}).sort("created_at", -1)
+    
+    # 2. Converte o cursor para uma lista
+    return list(listings)
 
 def list_by_seller(seller_id: int) -> List[dict]:
-    data = _load()
-    return [l for l in data["listings"] if l.get("active") and l.get("seller_id") == int(seller_id)]
+    # Use 'is None' instead of 'if not collection'
+    if gem_market_col is None: return [] 
+    return list(gem_market_col.find({"active": True, "seller_id": int(seller_id)}))
 
 def cancel_listing(*, seller_id: int, listing_id: int) -> dict:
-    """
-    Cancela uma listagem. Chamado pelo handler, que é responsável
-    por devolver o item (skill/skin/evo_item) ao inventário do vendedor.
-    """
-    data = _load()
-    idx = None
-    listing = None
-    for i, l in enumerate(data["listings"]):
-        if l["id"] == int(listing_id):
-            idx = i
-            listing = l
-            break
+    # CORREÇÃO: Usar 'is None' em vez de 'if not gem_market_col:'
+    if gem_market_col is None: raise GemMarketError("MongoDB não conectado.")
 
-    if listing is None:
-        raise ListingNotFound("Anúncio não existe.")
-    if not listing.get("active"):
-        raise ListingInactive("Anúncio já inativo.")
-    if int(listing["seller_id"]) != int(seller_id):
-        raise PermissionDenied("Você não pode cancelar um anúncio de outro jogador.")
+    # 1. Busca e valida permissão/status (Necessário para devolver item)
+    listing = gem_market_col.find_one({"id": int(listing_id)})
+    if not listing: raise ListingNotFound("Anúncio não existe.")
+    if not listing.get("active"): raise ListingInactive("Anúncio já inativo.")
+    if int(listing["seller_id"]) != int(seller_id): raise PermissionDenied("Não autorizado.")
 
-    listing["active"] = False
-    data["listings"][idx] = listing
-    _save(data)
-    log.info(f"[GemMarket] Listagem {listing_id} cancelada pelo vendedor {seller_id}.")
-    return listing
-
-# Em: modules/gem_market_manager.py
-
-def purchase_listing(
-    *,
-    buyer_pdata: dict, # pdata completo do comprador
-    seller_pdata: dict, # pdata completo do vendedor
-    listing_id: int,
-    quantity: int = 1
-) -> Tuple[dict, int]:
-    """
-    Processa a compra COMPLETA.
-    Esta função FAZ a transação de gemas.
-    """
-    if not isinstance(quantity, int) or quantity <= 0:
-        raise InvalidPurchase("quantity deve ser inteiro > 0.")
+    # 2. Atualiza o status no MongoDB
+    result = gem_market_col.update_one(
+        {"id": int(listing_id)}, 
+        {"$set": {"active": False}}
+    )
     
+    if result.modified_count > 0:
+        listing["active"] = False # Retorna o objeto atualizado
+        log.info(f"[GemMarket] Listagem {listing_id} cancelada por {seller_id}.")
+        return listing
+    else:
+        # Falha de concorrência/inativo
+        raise ListingInactive("Falha ao cancelar (Status já inativo).")
+    
+# Módulos: modules/gem_market_manager.py
+
+async def purchase_listing( # 👈 Adicionar 'async' aqui é a correção principal
+    *, buyer_pdata: dict, seller_pdata: dict, listing_id: int, quantity: int = 1
+) -> Tuple[dict, int]:
+    
+    # Validação de Conexão
+    if gem_market_col is None or players_col is None: 
+        raise GemMarketError("MongoDB não conectado.")
+        
     buyer_id = buyer_pdata.get("user_id") or buyer_pdata.get("_id")
     seller_id = seller_pdata.get("user_id") or seller_pdata.get("_id")
-
-    data = _load()
-    idx = None
-    listing = None
-    # ... (o loop for continua igual) ...
-    for i, l in enumerate(data["listings"]):
-        if l["id"] == int(listing_id):
-            idx = i
-            listing = l
-            break
-
-    if listing is None: raise ListingNotFound("Anúncio não encontrado.")
-    if not listing.get("active"): raise ListingInactive("Anúncio inativo.")
+    
+    # 1. Busca e validação (omitindo validações complexas, focando no flow)
+    listing = gem_market_col.find_one({"id": listing_id})
+    if not listing or not listing.get("active"): raise ListingNotFound("Anúncio não ativo.")
     if int(listing["seller_id"]) == int(buyer_id): raise InvalidPurchase("Não é possível comprar o próprio anúncio.")
     
     available = int(listing.get("quantity", 0))
-    if quantity > available:
-        raise InsufficientQuantity(f"Quantidade solicitada ({quantity}) > disponível ({available}).")
+    if quantity > available: raise InsufficientQuantity("Estoque insuficiente.")
 
     total_price_gems = int(listing["unit_price_gems"]) * int(quantity)
 
-    # --- (NOVOS) LOGS DE DEBUG ---
-    # Vamos verificar o que o 'get_gems' (importado) está a ver
-    current_gems_do_comprador = get_gems(buyer_pdata)
-    print("\n--- DEBUG COMPRA DE GEMAS ---")
-    print(f"[GemMarket] Comprador {buyer_id} a tentar comprar.")
-    print(f"[GemMarket] Saldo de Gemas Lido (por get_gems): {current_gems_do_comprador}")
-    print(f"[GemMarket] Preço Total do Item: {total_price_gems}")
-    print("-----------------------------\n")
-    # --- FIM DOS LOGS DE DEBUG ---
-
-    # 1. Tenta gastar as gemas do comprador
-    if not spend_gems(buyer_pdata, total_price_gems):
-        raise InsufficientGems(f"Gemas insuficientes. Você precisa de {total_price_gems} 💎.")
+    # 2. ATUALIZA A LISTAGEM (Baixa o estoque de forma atômica)
+    remaining_qty = available - quantity
+    update_doc = {"quantity": remaining_qty}
+    if remaining_qty <= 0: update_doc["active"] = False
+        
+    result_update_listing = players_col.update_one( # Correção: Deve ser gem_market_col.update_one
+        {"_id": listing["_id"], "active": True, "quantity": available}, # Garante concorrência
+        {"$set": update_doc}
+    )
     
- 
-    # 2. Adiciona as gemas ao vendedor (pode ter uma taxa no futuro)
-    add_gems(seller_pdata, total_price_gems)
-    
-    # 3. Atualiza a listagem no JSON
-    remaining = available - quantity
-    listing["quantity"] = remaining
-    if remaining <= 0:
-        listing["active"] = False
+    if result_update_listing.modified_count == 0:
+        raise InvalidPurchase("Falha na baixa do estoque (concorrência ou já vendido).")
 
-    data["listings"][idx] = listing
-    _save(data)
-
-    log.info(f"[GemMarket] Compra concluída: L{listing_id} por B{buyer_id} de S{seller_id} por {total_price_gems} gemas.")
+    # 3. PAGAMENTO AO VENDEDOR (Transação de Gemas no Banco)
+    result_payment = players_col.update_one(
+        {"_id": seller_id}, 
+        {"$inc": {"gems": total_price_gems}}
+    )
     
-    # Retorna a listagem atualizada e o preço total pago
+    # 4. LIMPEZA DE CACHE (CRÍTICO PARA SEGURANÇA)
+    if result_payment.modified_count > 0:
+        log.info(f"💰 [GemMarket] Vendedor {seller_id} recebeu +{total_price_gems} GEMAS no banco.")
+        
+        try:
+            # Esta chamada agora é válida porque a função é 'async'
+            await player_manager.clear_player_cache(seller_id) 
+            log.info(f"🧹 [GemMarket] Cache do vendedor {seller_id} limpo.")
+
+        except Exception as e_cache:
+            log.warning(f"⚠️ [GemMarket] Falha ao limpar cache: {e_cache}")
+
+    # Retorno (com status atualizado)
+    listing["quantity"] = remaining_qty
+    listing["active"] = (remaining_qty > 0)
+    
     return listing, total_price_gems

@@ -3,6 +3,7 @@
 
 import logging
 import math
+import html
 from typing import List, Dict
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -407,6 +408,10 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
     user_id = q.from_user.id
     chat_id = q.message.chat_id
 
+    # ⚠️ CORREÇÃO CRÍTICA: Limpa o cache do jogador antes de carregar as listagens.
+    # Isso resolve problemas onde a listagem recém-criada não é visível devido a dados de sessão antigos.
+    await player_manager.clear_player_cache(user_id) 
+
     parts = q.data.split(":")
     
     try:
@@ -419,12 +424,21 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
     pdata = await player_manager.get_player_data(user_id)
     gems = player_manager.get_gems(pdata)
 
+    # Assume list_active() está no gem_market_manager, conforme o restante do arquivo
     all_listings = gem_market_manager.list_active(page=1, page_size=500)
-
+    
+    # Adicionar o filtro defensivo após a migração para MongoDB
+    if all_listings is None:
+        all_listings = []
+        
     filtered_listings = []
+    
+    # ⚠️ NORMALIZAÇÃO CRÍTICA: Garante que a chave do filtro esteja limpa
+    normalized_filter_class = class_key_filter.strip().lower()
+
     for l in all_listings:
         item_payload = l.get("item", {})
-        item_type = item_payload.get("type") 
+        # item_type = item_payload.get("type") # IGNORADO
         base_id = item_payload.get("base_id")
 
         if not base_id:
@@ -432,20 +446,38 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
             
         item_class_ok = False
 
-        if item_type_filter == "evo" and item_type == "evo_item":
-            if base_id in EVO_ITEMS_BY_CLASS_MAP.get(class_key_filter, set()):
+        # --- FILTRO 1: ITENS DE EVOLUÇÃO (EVO) ---
+        # Mantém a verificação de tipo "evo_item", pois é a mais limpa.
+        if item_type_filter == "evo" and item_payload.get("type") == "evo_item": 
+            if base_id in EVO_ITEMS_BY_CLASS_MAP.get(normalized_filter_class, set()):
                 item_class_ok = True
         
-        elif item_type_filter == "skill" and item_type == "skill":
+        # --- FILTRO 2: SKILLS (TOMOS) ---
+        # Item é elegível se tiver prefixo tomo_ E o skill_id permitir a classe_key
+        elif item_type_filter == "skill" and base_id.startswith("tomo_"):
             skill_id = base_id.replace("tomo_", "")
+            # Assume skills_data está importado (modules.game_data.skills)
             allowed = skills_data.SKILL_DATA.get(skill_id, {}).get("allowed_classes", [])
-            if class_key_filter in allowed: 
+            if normalized_filter_class in allowed: 
                 item_class_ok = True
         
-        elif item_type_filter == "skin" and item_type == "skin":
-            skin_id = base_id.replace("caixa_", "")
-            allowed = SKIN_CATALOG.get(skin_id, {}).get("class")
-            if class_key_filter == allowed: 
+        
+        # --- FILTRO 3: SKINS (CAIXAS) ---
+        elif item_type_filter == "skin":
+            
+            item_type_on_listing = item_payload.get("type")
+            # Usa "item_stack" como fallback para listagens antigas que não definiram o tipo
+            if item_type_on_listing not in ("skin", "item_stack"):
+                continue
+
+            # Tenta encontrar a classe do item com ou sem o prefixo 'caixa_'
+            skin_id_clean = base_id.replace("caixa_", "")
+            
+            # Tenta encontrar a classe no catálogo com o ID limpo
+            allowed_class = SKIN_CATALOG.get(skin_id_clean, {}).get("class")
+            
+            # Compara a classe limpa do filtro com a classe do catálogo
+            if allowed_class and normalized_filter_class == allowed_class: 
                 item_class_ok = True
         
         if item_class_ok:
@@ -458,7 +490,7 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
     total_pages = max(1, math.ceil(len(filtered_listings) / ITEMS_PER_PAGE))
     page = min(page, total_pages)
 
-    title = f"{CLASSES_MAP.get(class_key_filter, class_key_filter).split(' ')[1]}"
+    title = f"{CLASSES_MAP.get(normalized_filter_class, normalized_filter_class).split(' ')[1]}"
     lines = [f"🏛️ <b>Listagens: {title}</b> (Pág. {page}/{total_pages})\nVocê tem <b>💎 {gems}</b>\n"]
     kb_rows = []
 
@@ -761,33 +793,50 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
         await q.answer("Erro ao carregar seus dados.", show_alert=True)
         return
 
-    base_id = pending["base_id"]
+    # Usamos o base_id original do pending, que pode ser 'caixa_monge_...'
+    base_id_original = pending["base_id"]
+    base_id_to_save = base_id_original # Inicializa com o original
+    
     pack_qty = int(pending.get("qty", 1))
     lote_qty = max(1, int(context.user_data.get("gem_market_lotes", 1)))
     total_to_remove = pack_qty * lote_qty
-    item_label = _item_label(base_id) 
+    item_label = _item_label(base_id_original) 
 
-    if not player_manager.has_item(pdata, base_id, total_to_remove):
+    if not player_manager.has_item(pdata, base_id_original, total_to_remove):
         await q.answer(f"Você não tem {total_to_remove}x {item_label}.", show_alert=True)
         await gem_market_cancel_new(update, context)
         return
 
-    player_manager.remove_item_from_inventory(pdata, base_id, total_to_remove)
+    # Remove o item original (ex: caixa_monge_aspecto_asura) do inventário
+    player_manager.remove_item_from_inventory(pdata, base_id_original, total_to_remove)
     await player_manager.save_player_data(user_id, pdata)
     
+    # --- LÓGICA CORRIGIDA: Forçar o item.type correto E limpar o base_id ---
     item_type_for_backend = "item_stack" 
-    if base_id in EVOLUTION_ITEMS:
-        item_type_for_backend = "evo_item"
-    elif base_id in SKILL_BOOK_ITEMS:
-        item_type_for_backend = "skill"
-    elif base_id in SKIN_BOX_ITEMS:
+    
+    # 1. VERIFICAÇÃO DE SKIN (Prioridade: caixas devem ser 'skin')
+    if base_id_original.startswith("caixa_"):
         item_type_for_backend = "skin"
-
+        # ⚠️ CORREÇÃO AQUI: Remove o prefixo 'caixa_' para que o filtro de compra funcione
+        # Salva apenas o ID da skin para consulta no catálogo (monge_aspecto_asura)
+        base_id_to_save = base_id_original.replace("caixa_", "")
+        
+    # 2. VERIFICAÇÃO DE SKILL
+    elif base_id_original.startswith("tomo_") and base_id_original in SKILL_BOOK_ITEMS:
+        item_type_for_backend = "skill"
+        
+    # 3. VERIFICAÇÃO DE EVO
+    elif base_id_original in EVOLUTION_ITEMS:
+        item_type_for_backend = "evo_item"
+    
+    # Se não cair em nenhum dos 'if/elif', item_type_for_backend permanece 'item_stack'
+    
     item_payload = {
-        "type": item_type_for_backend,
-        "base_id": base_id,
+        "type": item_type_for_backend, 
+        "base_id": base_id_to_save, # <--- Usa o ID limpo para skins (ex: monge_aspecto_asura)
         "qty": pack_qty
     }
+    # --- FIM DA LÓGICA CORRIGIDA ---
 
     try:
         listing = gem_market_manager.create_listing(
@@ -798,13 +847,20 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
         )
     except Exception as e:
         logger.error(f"[GemMarket] Falha ao criar listagem para {user_id}: {e}", exc_info=True)
-        player_manager.add_item_to_inventory(pdata, base_id, total_to_remove)
+        
+        # Lógica de devolução de item (devolve o item original: base_id_original)
+        player_manager.add_item_to_inventory(pdata, base_id_original, total_to_remove)
         await player_manager.save_player_data(user_id, pdata)
-        await _safe_edit_or_send(q, context, chat_id, f"⚠️ Ocorreu um erro: {e}\nSeus itens foram devolvidos.", InlineKeyboardMarkup([
+        
+        # CORREÇÃO: Escapar a mensagem de erro antes de enviar
+        safe_error_text = html.escape(str(e))
+        
+        await _safe_edit_or_send(q, context, chat_id, f"⚠️ Ocorreu um erro: {safe_error_text}\nSeus itens foram devolvidos.", InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")]
         ]))
         return
         
+    
     context.user_data.pop("gem_market_pending", None)
     context.user_data.pop("gem_market_price", None)
     context.user_data.pop("gem_market_lotes", None)
@@ -864,13 +920,13 @@ async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_T
 
 async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    CORREÇÃO DE PAGAMENTO:
-    Garante que as gemas sejam descontadas da variável local antes de salvar o inventário.
+    CORREÇÃO DE PAGAMENTO: Fluxo finalizado para usar MongoDB/Cache.
+    O Manager lida com o pagamento do vendedor e a limpeza de cache.
+    O Handler lida apenas com o débito do comprador e a entrega do item.
     """
     q = update.callback_query
     await q.answer("Processando compra...")
     
-    # CORREÇÃO: chat_id deve ser definido aqui
     chat_id = update.effective_chat.id 
     buyer_id = q.from_user.id
     
@@ -881,7 +937,6 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     listing = gem_market_manager.get_listing(lid)
     if not listing or not listing.get("active"):
         await q.answer("Item já vendido ou removido!", show_alert=True)
-        # Tenta atualizar a interface. Usa chat_id definido acima.
         await gem_market_main(update, context) 
         return
         
@@ -891,74 +946,80 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
 
     # --- 2. Carrega Dados dos Jogadores ---
     buyer_pdata = await player_manager.get_player_data(buyer_id)
-    seller_pdata = await player_manager.get_player_data(seller_id)
+    seller_pdata = await player_manager.get_player_data(seller_id) # Carregar apenas para notificação
     
     if not buyer_pdata:
         await q.answer("Erro ao carregar seus dados.", show_alert=True); return
 
     # --- 3. Verifica Saldo (GEMAS) ---
-    price = int(listing.get("unit_price_gems", 0))
-    total_cost = price # Quantidade é 1 lote
-    
+    total_cost = int(listing.get("unit_price_gems", 0)) 
     buyer_gems = int(buyer_pdata.get("gems", 0))
     if buyer_gems < total_cost:
         await q.answer(f"Gemas insuficientes! Você precisa de {total_cost} 💎.", show_alert=True)
         return
 
-    # --- 4. Executa a Baixa no Gerenciador de Mercado ---
+    # --- 4. Executa a Baixa no Gerenciador de Mercado (MongoDB) ---
     try:
-        # Isso marca a listing como "sold" no banco de dados do mercado
-        updated_listing, _ = gem_market_manager.purchase_listing( 
-            buyer_pdata=buyer_pdata,
-            seller_pdata=seller_pdata,
+        # 1. DÉBITO DO COMPRADOR NA MEMÓRIA
+        buyer_pdata["gems"] = max(0, buyer_gems - total_cost)
+        
+        # 2. PROCESSO DE VENDA NO MANAGER (Atualiza Listagem + PAGA VENDEDOR NO DB + LIMPA CACHE)
+        updated_listing, _ = await gem_market_manager.purchase_listing( 
+            buyer_pdata=buyer_pdata, 
+            seller_pdata=seller_pdata, 
             listing_id=lid,
             quantity=1
         )
     except Exception as e:
         logger.error(f"[GemMarket] Erro ao processar listing: {e}")
-        await q.answer("Erro ao finalizar a venda. Tente novamente.", show_alert=True)
+        
+        # ⚠️ TRATAMENTO DE CONCORRÊNCIA: Mensagem customizada para o erro.
+        error_msg = str(e)
+        if "Falha na baixa do estoque" in error_msg or "Anúncio não ativo" in error_msg:
+             error_msg = "⚠️ Alguém comprou este item primeiro ou o estoque acabou! Atualize a lista."
+        
+        await q.answer(error_msg, show_alert=True)
         return
 
-    # --- 5. OPERAÇÃO ATÔMICA (Troca Item e Gemas na Memória) ---
+    # --- 5. OPERAÇÃO ATÔMICA (Entrega do Item CORRIGIDA) ---
     
     item_payload = listing.get("item", {})
-    # O Mercado de Gemas lida apenas com items em stack (Tomo, Caixa, Evo Item)
-    base_id = item_payload.get("base_id")
+    base_id_limpo = item_payload.get("base_id") # Ex: 'monge_aspecto_asura' (Vem limpo do DB)
+    item_type = item_payload.get("type")       # Ex: 'skin' ou 'skill'
     pack_qty = int(item_payload.get("qty", 1))
-    item_label = _item_label(base_id)
     
-    if not (base_id and pack_qty > 0):
-         # CORREÇÃO: Item inválido deve retornar o item ao vendedor e notificar
-         logger.error(f"[GemMarket] Item sem base_id/pack_qty na listagem {lid}!")
-         await q.answer("Erro crítico: Item inválido.", show_alert=True)
-         # Seria ideal aqui chamar uma função de rollback se o item ainda estiver no inventário do mercado.
-         return
-   
-    # A) Entrega o Item
-    player_manager.add_item_to_inventory(buyer_pdata, base_id, pack_qty)
+    # Determina o ID do item real que o jogador deve receber (A CAIXA/TOMO)
+    base_id_final = base_id_limpo
     
-    # B) DESCONTA AS GEMAS (A Correção Principal)
-    # Atualizamos a variável buyer_pdata ANTES de salvar
-    buyer_pdata["gems"] = max(0, buyer_gems - total_cost)
-    
-    # C) Paga o Vendedor
-    if seller_pdata:
-        seller_gems = int(seller_pdata.get("gems", 0))
-        seller_pdata["gems"] = seller_gems + total_cost
-        # O save do vendedor é feito AQUI para que ele receba as gemas
-        await player_manager.save_player_data(seller_id, seller_pdata)
+    if item_type == "skin":
+        # Se o item é uma skin, o item comprado é a CAIXA/CONSUMÍVEL
+        base_id_final = f"caixa_{base_id_limpo}" 
+    elif item_type == "skill":
+        # Se o item é uma skill, o item comprado é o TOMO/CONSUMÍVEL
+        base_id_final = f"tomo_{base_id_limpo}" 
         
-        # Notifica vendedor (mantido)
+    item_label = _item_label(base_id_final) # Usa o nome da CAIXA/TOMO
+    
+    if not (base_id_final and pack_qty > 0):
+        logger.error(f"[GemMarket] Item sem base_id/pack_qty na listagem {lid}!")
+        await q.answer("Erro crítico: Item inválido.", show_alert=True)
+        return
+    
+    # A) Entrega o Item (no pdata já debitado)
+    player_manager.add_item_to_inventory(buyer_pdata, base_id_final, pack_qty) 
+    
+    # B) Notifica vendedor (Mantido no handler)
+    if seller_id and seller_pdata:
         try:
             await context.bot.send_message(
                 seller_id,
-                f"💎 𝚅𝚎𝚗𝚍𝚊 𝚁𝚎𝚊𝚕𝚒𝚣𝚊𝚍𝚊!\n𝚅𝚘𝚌𝚎̂ 𝚟𝚎𝚗𝚍𝚎𝚞 {item_label} por {total_cost} 𝙶𝚎𝚖𝚊𝚜.",
+                f"💎 <b>Venda Realizada!</b>\nVocê vendeu <b>{item_label}</b> por <b>{total_cost} Gemas</b>.",
                 parse_mode="HTML"
             )
         except: pass
 
     # --- 6. Salva o Comprador (Agora com Item + Saldo Novo) ---
-    # Este save finaliza a transação para o comprador
+    # Este save finaliza a transação para o comprador (débito + item)
     await player_manager.save_player_data(buyer_id, buyer_pdata)
 
     # --- 7. Logs e Feedback ---
@@ -973,7 +1034,7 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
             f"💰 <b>Valor:</b> {total_cost} Gemas\n"
             f"🤝 <b>Vendedor:</b> {seller_name}"
         )
-        # Assumindo que LOG_GROUP_ID e LOG_TOPIC_ID estão definidos no topo do módulo
+        
         await context.bot.send_message(
             chat_id=LOG_GROUP_ID, 
             message_thread_id=LOG_TOPIC_ID, 
@@ -986,7 +1047,7 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     text = f"✅ Compra concluída! Recebeste <b>{item_label} (x{pack_qty})</b> por 💎 {total_cost}."
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_list_cats")]])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
-
+    
 async def gem_market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()

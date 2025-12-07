@@ -11,6 +11,8 @@ MIN_GEM_PRICE = 10
 # 1. Funções de Renderização de Teclado (Keyboards)
 # ==========================================================
 
+# modules/market_utils.py (Função render_spinner_kb - CORRIGIDA)
+
 def render_spinner_kb(
     value: int,
     prefix_inc: str,
@@ -24,7 +26,7 @@ def render_spinner_kb(
     
     value = max(1, int(value))
     
-    # Linha principal de passos pequenos
+    # Linha principal de passos pequenos (row1 permanece igual)
     row1 = [
         InlineKeyboardButton("-100", callback_data=f"{prefix_dec}100"),
         InlineKeyboardButton("-10", callback_data=f"{prefix_dec}10"),
@@ -49,16 +51,16 @@ def render_spinner_kb(
     # Linha do valor atual
     kb.append([InlineKeyboardButton(f"{label}: {currency_emoji} {value}", callback_data="noop")])
     
-    # Linha de Ação
+    # Linha de Ação (Ajustada para lidar com o callback de cancelamento no momento da criação)
+    
+    cancel_cb_data = "market_cancel_new"
+    if "gem" in confirm_cb:
+        cancel_cb_data = "gem_market_cancel_new"
+        
     kb.append([
         InlineKeyboardButton("✅ Confirmar", callback_data=confirm_cb), 
-        InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")
+        InlineKeyboardButton("❌ Cancelar", callback_data=cancel_cb_data) # <--- USO DO CALLBACK CORRIGIDO
     ])
-    
-    # Ajuste do callback de cancelamento para o Mercado de Gemas
-    if "gem" in confirm_cb:
-        # Usa o cancelamento específico para Gemas, se for o caso
-        kb[-1][1].callback_data = "gem_market_cancel_new"
 
     return InlineKeyboardMarkup(kb)
 
