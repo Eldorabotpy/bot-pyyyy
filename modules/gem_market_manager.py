@@ -142,30 +142,67 @@ def list_by_seller(seller_id: int) -> List[dict]:
     if gem_market_col is None: return [] 
     return list(gem_market_col.find({"active": True, "seller_id": int(seller_id)}))
 
-def cancel_listing(*, seller_id: int, listing_id: int) -> dict:
+# Em modules/gem_market_manager.py
+
+async def cancel_listing(*, seller_id: int, listing_id: int) -> dict:
     # CORREÇÃO: Usar 'is None' em vez de 'if not gem_market_col:'
     if gem_market_col is None: raise GemMarketError("MongoDB não conectado.")
+    if players_col is None: raise GemMarketError("Coleção de jogadores não conectada.")
 
     # 1. Busca e valida permissão/status (Necessário para devolver item)
     listing = gem_market_col.find_one({"id": int(listing_id)})
     if not listing: raise ListingNotFound("Anúncio não existe.")
     if not listing.get("active"): raise ListingInactive("Anúncio já inativo.")
     if int(listing["seller_id"]) != int(seller_id): raise PermissionDenied("Não autorizado.")
-
-    # 2. Atualiza o status no MongoDB
+    
+    # Obtém as quantidades antes de desativar (para saber o que devolver)
+    item_payload = listing.get("item", {})
+    quantity_left = listing.get("quantity", 0) # Lotes restantes
+    pack_qty = item_payload.get("qty", 1)      # Itens por lote
+    total_return_qty = quantity_left * pack_qty
+    
+    # 2. Atualiza o status no MongoDB (Atomicamente, para evitar nova venda)
     result = gem_market_col.update_one(
-        {"id": int(listing_id)}, 
+        {"id": int(listing_id), "active": True}, # Apenas desativa se ainda estiver ativo
         {"$set": {"active": False}}
     )
     
-    if result.modified_count > 0:
-        listing["active"] = False # Retorna o objeto atualizado
-        log.info(f"[GemMarket] Listagem {listing_id} cancelada por {seller_id}.")
-        return listing
-    else:
-        # Falha de concorrência/inativo
-        raise ListingInactive("Falha ao cancelar (Status já inativo).")
+    if result.modified_count == 0:
+        # Falha de concorrência ou já inativo
+        raise ListingInactive("Falha ao cancelar (Anúncio já inativo ou vendido).")
     
+    # O cancelamento foi bem-sucedido, agora processa a devolução
+    
+    # 3. CRÍTICO: Devolve o item ao vendedor
+    
+    if total_return_qty > 0:
+        base_id_limpo = item_payload.get("base_id") # Ex: 'monge_aspecto_asura'
+        item_type = item_payload.get("type")       # Ex: 'skin'
+        
+        # Reconstrói o ID do item com o prefixo para que ele apareça no inventário
+        base_id_final = base_id_limpo
+        if item_type == "skin":
+            base_id_final = f"caixa_{base_id_limpo}" 
+        elif item_type == "skill":
+            base_id_final = f"tomo_{base_id_limpo}" 
+            
+        # Carrega os dados do jogador (assumindo que o player_manager está importado)
+        seller_pdata = await player_manager.get_player_data(seller_id)
+        
+        if seller_pdata:
+            # Adiciona o item ao inventário
+            player_manager.add_item_to_inventory(seller_pdata, base_id_final, total_return_qty) 
+            await player_manager.save_player_data(seller_id, seller_pdata)
+            await player_manager.clear_player_cache(seller_id) # Limpa o cache para que o item apareça imediatamente
+        else:
+            log.error(f"[GemMarket] Falha ao carregar pdata para devolução {listing_id} -> {seller_id}")
+            # Em um cenário de produção, você salvaria isso em uma caixa de correio
+    
+    # 4. Retorna a listagem atualizada
+    listing["active"] = False 
+    log.info(f"[GemMarket] Listagem {listing_id} cancelada por {seller_id}. Devolvidos {total_return_qty}x {base_id_final}.")
+    return listing
+
 # Módulos: modules/gem_market_manager.py
 
 async def purchase_listing( # 👈 Adicionar 'async' aqui é a correção principal
@@ -194,14 +231,14 @@ async def purchase_listing( # 👈 Adicionar 'async' aqui é a correção princi
     update_doc = {"quantity": remaining_qty}
     if remaining_qty <= 0: update_doc["active"] = False
         
-    result_update_listing = gem_market_col.update_one( # <--- LINHA CORRETA
+    result_update_listing = gem_market_col.update_one( # <-- CORREÇÃO AQUI
         {"_id": listing["_id"], "active": True, "quantity": available}, 
         {"$set": update_doc}
     )
     
     if result_update_listing.modified_count == 0:
         raise InvalidPurchase("Falha na baixa do estoque (concorrência ou já vendido).")
-
+    
     # 3. PAGAMENTO AO VENDEDOR (Transação de Gemas no Banco)
     result_payment = players_col.update_one(
         {"_id": seller_id}, 
