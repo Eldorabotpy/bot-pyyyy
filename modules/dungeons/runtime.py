@@ -2,7 +2,7 @@
 # (VERSÃO CORRIGIDA: Cooldowns lidos direto do Player Data)
 
 from __future__ import annotations
-import logging
+import logging 
 import random
 from typing import List, Dict, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -304,7 +304,7 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     
     # Aplica desgaste
     dummy_log = []
-    durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
+    # ❌ A CHAMADA DUPLICADA DE DURABILIDADE FOI REMOVIDA DAQUI
     
     active_cds = pdata.get("cooldowns", {})
 
@@ -315,6 +315,9 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         pdata["dungeon_progress"][reg_key]["highest_completed"] = diff_key
         bonus = _final_gold_for(dungeon, diff_cfg)
         if bonus > 0: player_manager.add_gold(pdata, bonus)
+        
+        # ✅ APLICAMOS DURABILIDADE APÓS O ÚLTIMO COMBATE
+        durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
         
         stats = await player_manager.get_player_total_stats(pdata)
         pdata['current_hp'] = stats.get('max_hp', 50)
@@ -347,6 +350,9 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     # --- PRÓXIMO MONSTRO ---
     try: next_mob = floors[next_stg]
     except: return
+
+    # ✅ APLICAMOS DURABILIDADE ANTES DE COMEÇAR O PRÓXIMO COMBATE
+    durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
 
     combat = _build_combat_details(next_mob, diff_cfg, reg_key, next_stg, active_cooldowns=active_cds)
     

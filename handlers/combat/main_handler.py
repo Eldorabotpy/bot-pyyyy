@@ -284,7 +284,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             if "cooldowns" in player_data:
                 player_data.pop("cooldowns", None)
             
-            durability.apply_end_of_battle_wear(player_data, battle_cache, log)
+            #durability.apply_end_of_battle_wear(player_data, battle_cache, log)
             await player_manager.save_player_data(user_id, player_data)
 
             try:
@@ -311,6 +311,9 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     pkg = {"xp": xp, "gold": gold, "items": fmt_items}
                     await dungeons_runtime.advance_after_victory(update, context, user_id, chat_id, combat_details_recon, pkg)
                     return
+                
+                durability.apply_end_of_battle_wear(player_data, battle_cache, log) # <-- Desgaste aplicado 1x
+                await player_manager.save_player_data(user_id, player_data) # <-- Salvamos
 
                 # Vitória Normal
                 r_ctx = battle_cache.copy()
