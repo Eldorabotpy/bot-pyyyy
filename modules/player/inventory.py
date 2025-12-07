@@ -101,8 +101,6 @@ async def _sanitize_and_migrate_gold(player_data: dict) -> bool:
 # INVENTÁRIO E ITENS
 # ========================================
 
-# Em modules/player/inventory.py
-
 def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1):
     qty = int(quantity)
     if qty == 0:
@@ -121,27 +119,29 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1):
     # ================================================
     # --- (INÍCIO DA CORREÇÃO DE SKIN) ---
     # ================================================
-    # Verifica se o ID do "item" é, na verdade, uma SKIN
-    if item_id in SKIN_CATALOG:
-        skin_info = SKIN_CATALOG[item_id]
+    
+    # 1. Tenta limpar o ID para ver se é uma Caixa de Skin
+    is_skin_box = item_id.startswith("caixa_")
+    # Usa o ID limpo se for caixa, ou o ID original se não for (caso seja skin direta)
+    skin_id_to_check = item_id.replace("caixa_", "") if is_skin_box else item_id
+
+    # 2. Verifica se o ID limpo existe no catálogo de skins
+    if skin_id_to_check in SKIN_CATALOG:
+        skin_info = SKIN_CATALOG[skin_id_to_check]
         skin_class_req = skin_info.get('class')
         
-        # Pega a classe BASE do jogador (ex: "guerreiro", não "templario")
         try:
             player_base_class = player_stats_helper._get_class_key_normalized(player_data)
         except Exception:
-            # Fallback se a função de stats falhar
+
             player_base_class = (player_data.get("class") or "").lower()
 
-        # Verifica se a skin é da classe base do jogador
         if skin_class_req == player_base_class:
             unlocked_list = player_data.setdefault("unlocked_skins", [])
-            if item_id not in unlocked_list:
-                unlocked_list.append(item_id)
+            
+            if skin_id_to_check not in unlocked_list:
+                unlocked_list.append(skin_id_to_check)
                 player_data["unlocked_skins"] = unlocked_list
-                # (Aqui você poderia adicionar um log se quisesse)
-        
-        # IMPORTANTE: Retorna aqui para NÃO adicionar a skin ao inventário normal
         return player_data 
     # ================================================
     # --- (FIM DA CORREÇÃO DE SKIN) ---
