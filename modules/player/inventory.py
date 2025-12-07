@@ -127,22 +127,32 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1):
 
     # 2. Verifica se o ID limpo existe no catálogo de skins
     if skin_id_to_check in SKIN_CATALOG:
-        skin_info = SKIN_CATALOG[skin_id_to_check]
-        skin_class_req = skin_info.get('class')
         
-        try:
-            player_base_class = player_stats_helper._get_class_key_normalized(player_data)
-        except Exception:
-
-            player_base_class = (player_data.get("class") or "").lower()
-
-        if skin_class_req == player_base_class:
-            unlocked_list = player_data.setdefault("unlocked_skins", [])
+        # SE FOR UMA CAIXA, o item deve ir para o inventário como item empilhável, 
+        # (A lógica de consumo da caixa deveria estar em outro handler, ou forçamos o item a ser tratado como stack)
+        if is_skin_box:
+            pass # Continua para a seção de item normal abaixo
+        
+        # SE FOR O ID LIMPO (skin direta), o item é consumido imediatamente para desbloqueio
+        else:
+            skin_info = SKIN_CATALOG[skin_id_to_check]
+            skin_class_req = skin_info.get('class')
             
-            if skin_id_to_check not in unlocked_list:
-                unlocked_list.append(skin_id_to_check)
-                player_data["unlocked_skins"] = unlocked_list
-        return player_data 
+            # Pega a classe BASE do jogador... (lógica de verificação de classe)
+            try:
+                player_base_class = player_stats_helper._get_class_key_normalized(player_data)
+            except Exception:
+                player_base_class = (player_data.get("class") or "").lower()
+
+            # Desbloqueia a skin APENAS se for o ID LIMPO e da classe correta
+            if skin_class_req == player_base_class:
+                unlocked_list = player_data.setdefault("unlocked_skins", [])
+                if skin_id_to_check not in unlocked_list:
+                    unlocked_list.append(skin_id_to_check)
+                    player_data["unlocked_skins"] = unlocked_list
+            
+            # Item LIMPO consumido: RETORNA
+            return player_data
     # ================================================
     # --- (FIM DA CORREÇÃO DE SKIN) ---
     # ================================================
