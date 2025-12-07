@@ -194,8 +194,8 @@ async def purchase_listing( # 👈 Adicionar 'async' aqui é a correção princi
     update_doc = {"quantity": remaining_qty}
     if remaining_qty <= 0: update_doc["active"] = False
         
-    result_update_listing = players_col.update_one( # Correção: Deve ser gem_market_col.update_one
-        {"_id": listing["_id"], "active": True, "quantity": available}, # Garante concorrência
+    result_update_listing = gem_market_col.update_one( # <--- LINHA CORRETA
+        {"_id": listing["_id"], "active": True, "quantity": available}, 
         {"$set": update_doc}
     )
     
