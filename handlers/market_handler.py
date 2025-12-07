@@ -592,7 +592,6 @@ async def market_cancel_new(update, context):
 #  COMPRA (CORREÇÃO DE PAGAMENTO)
 # ==============================
 # handlers/market_handler.py (Substituir a função market_buy)
-
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     try: await q.answer()
@@ -606,7 +605,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         return
 
-    # 1. RECUPERA A LISTAGEM ANTES DE TUDO (Para garantir que temos o ID do vendedor)
+    # 1. RECUPERA A LISTAGEM ANTES DE TUDO
     listing = market_manager.get_listing(lid)
     if not listing:
         await q.answer("Este item já foi vendido ou removido!", show_alert=True)
@@ -617,38 +616,29 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     seller_id = int(listing.get("seller_id", 0))
     price = int(listing.get("price") or listing.get("unit_price", 0))
-    qty_listing = int(listing.get("quantity", 1)) # Quantidade de lotes sendo comprados
+    qty_listing = int(listing.get("quantity", 1)) 
     
-    # Custo total (Preço unitário * quantidade se aplicável, mas geralmente market_buy é o lote todo)
-    # Assumindo que o preço no listing já é o final ou unitário. 
-    # Ajuste aqui se seu sistema permite comprar parcial. 
-    # No seu código original parecia ser compra única de 1 unidade da listagem.
     cost = price 
-
-    # 2. VERIFICAÇÃO DE SALDO E PREMIUM
     buyer = await player_manager.get_player_data(buyer_id)
-    
-    # Se for mercado de GEMAS, mude "gold" para "gems" aqui e nas linhas abaixo
     buyer_balance = int(buyer.get("gold", 0)) 
 
     if buyer_balance < cost:
         await q.answer(f"Ouro insuficiente! Você precisa de {cost}.", show_alert=True)
         return
 
-    # Bloqueio VIP (mantido do original)
+    # Bloqueio VIP 
     if not player_manager.has_premium_plan(buyer):
         await q.answer("🔒 Apenas VIPs podem comprar no mercado.", show_alert=True)
         return
 
     try:
-        # 3. EXECUTA A TRANSAÇÃO NO GERENCIADOR (Remove do banco de dados do mercado)
-        # Passamos quantity=1 pois estamos comprando "uma listagem" inteira
+        # 3. EXECUTA A TRANSAÇÃO NO GERENCIADOR (Remove do DB do mercado E PAGA O VENDEDOR atomicamente)
         updated_listing, _ = market_manager.purchase_listing(
             buyer_id=buyer_id, listing_id=lid, quantity=1
         )
         
         # 4. PROCESSA O ITEM (Adiciona ao Comprador)
-        item_data = listing.get("item", {}) # Usamos 'listing' original que é mais seguro
+        item_data = listing.get("item", {}) 
         item_type = item_data.get("type")
         item_name_display = "Item"
 
@@ -673,26 +663,24 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 5. PAGAMENTO E SALVAMENTO (ATÔMICO)
         
-        # DEDUZ DO COMPRADOR
+        # DEDUZ O OURO DO COMPRADOR E SALVA O ITEM NO INVENTÁRIO (OPERAÇÃO ÚNICA)
         buyer["gold"] = max(0, int(buyer.get("gold", 0)) - cost)
         await player_manager.save_player_data(buyer_id, buyer)
 
-        # PAGA AO VENDEDOR
+        # PAGA AO VENDEDOR (APENAS NOTIFICAÇÃO)
         if seller_id and seller_id != 0:
-            seller = await player_manager.get_player_data(seller_id)
-            if seller:
-                seller_balance = int(seller.get("gold", 0))
-                seller["gold"] = seller_balance + cost
-                await player_manager.save_player_data(seller_id, seller)
+            # O pagamento já foi feito pelo market_manager. Apenas notifique.
+            try:
+                # Recarregamos apenas para obter o nome para o Log, e notificação, se necessário.
+                # Não usamos para salvar, pois o market_manager já limpou seu cache.
+                seller = await player_manager.get_player_data(seller_id)
                 
-                # Opcional: Notificar o vendedor se ele estiver online (try/except)
-                try:
-                    await context.bot.send_message(
-                        seller_id, 
-                        f"💰 <b>Venda realizada!</b>\nSeu item <b>{item_name_display}</b> foi vendido por {cost} moedas.",
-                        parse_mode="HTML"
-                    )
-                except: pass
+                await context.bot.send_message(
+                    seller_id, 
+                    f"💰 <b>Venda realizada!</b>\nSeu item <b>{item_name_display}</b> foi vendido por {cost} moedas.",
+                    parse_mode="HTML"
+                )
+            except Exception: pass
 
         # 6. FEEDBACK
         await _safe_edit_or_send(q, context, chat_id, 
@@ -705,20 +693,13 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # LOG NO GRUPO
         try:
             buyer_name = buyer.get("character_name") or q.from_user.first_name
-        
-            # CORREÇÃO: Usar o nome do vendedor do listing ou do objeto seller_pdata
-            # Se seller_pdata foi carregado (o que acontece se seller_id > 0), use character_name
             seller_name = "Desconhecido"
             if seller_id and seller_id != 0:
-                # O listing armazena seller_name, ou tentamos buscar do pdata, se o sistema for unificado
-                # Vamos assumir que list_active (chamado anteriormente) não pega o nome, mas o purchase_listing sim.
-                # Se seller_pdata foi carregado, use-o (embora aqui só temos o ID do vendedor na variável seller)
-                # Para este handler, vamos confiar que o listing tem o nome ou buscá-lo.
-                # No market_manager.py, o nome é armazenado no listing se for privado, mas aqui usamos o ID para o log.
-            
-                # Vamos buscar o nome do vendedor se estiver disponível.
-                # O market_buy original não recarrega o vendedor, então usamos o ID como fallback.
-                seller = await player_manager.get_player_data(seller_id) # Recarregamos rapidamente para pegar o nome
+                # Recarrega o vendedor para o nome (se não falhou na etapa 5)
+                # Reutilizamos a variável 'seller' se ela foi carregada na notificação acima.
+                if 'seller' not in locals():
+                     seller = await player_manager.get_player_data(seller_id)
+                
                 seller_name = seller.get("character_name", f"ID: {seller_id}")
         
             log_text = (
@@ -726,8 +707,8 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"👤 <b>Comprador:</b> {buyer_name}\n"
                 f"📦 <b>Item:</b> {item_name_display}\n"
                 f"💰 <b>Valor:</b> {cost} 🪙\n"
-                f"🤝 <b>Vendedor:</b> {seller_name}\n" # <-- Agora inclui o nome
-                f"🔗 <b>Listagem ID:</b> {lid}"      # <-- Agora inclui o ID da listagem
+                f"🤝 <b>Vendedor:</b> {seller_name}\n"
+                f"🔗 <b>Listagem ID:</b> {lid}"
             )
         
             await context.bot.send_message(chat_id=LOG_GROUP_ID, message_thread_id=LOG_TOPIC_ID, text=log_text, parse_mode="HTML")
@@ -737,7 +718,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erro CRÍTICO na compra {lid}: {e}", exc_info=True)
         await q.answer("Ocorreu um erro ao processar a compra.", show_alert=True)
-
+        
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
     lid = int(q.data.replace("market_cancel_", ""))
