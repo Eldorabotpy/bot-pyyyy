@@ -308,15 +308,19 @@ class KingdomDefenseManager:
 
         mob_hp = self.boss_global_hp if is_boss_fight else mob['hp']
 
+        # 🚨 CORREÇÃO: Inicializa loot_msg para evitar UnboundLocalError,
+        # caso o caminho de código não-boss seja ignorado ou em caso de derrota de Boss.
+        loot_msg = ""
+
         # --- MONSTRO DERROTADO ---
         if mob_hp <= 0:
             logs.append(f"☠️ {mob['name']} foi derrotado!")
-            
+        
             # 1. Reduz Cooldowns e aplica regeneração final (mantido)
             from modules.cooldowns import iniciar_turno 
             player_data, msgs_cd = iniciar_turno(player_data)
             if msgs_cd: logs.extend(msgs_cd)
-            
+        
             # Sincroniza HP/MP do estado local com o player_data atualizado (mantido)
             player_state['player_hp'] = player_data.get('current_hp')
             player_state['player_mp'] = player_data.get('current_mp')
@@ -332,7 +336,7 @@ class KingdomDefenseManager:
                 # --- GERA RECOMPENSA (LOOT CONSOLIDADO) ---
                 # ==========================================================
                 drops = []
-                
+            
                 # Loot Padrão (Fragmento de Bravura)
                 item_id = 'fragmento_bravura'
                 reward_amount = 1
@@ -340,25 +344,25 @@ class KingdomDefenseManager:
                 item_info = game_items.ITEMS_DATA.get(item_id, {})
                 item_name = item_info.get('display_name', 'Fragmento de Bravura')
                 drops.append(f"1x {item_name}")
-                
+            
                 # Drop de Item Raro (1% chance)
-                novo_item_id = 'sigilo_protecao' # Usando o ID fornecido
+                novo_item_id = 'sigilo_protecao' 
                 drop_chance = 0.01
-                
+            
                 if random.random() < drop_chance:
                     novo_drop_amount = 1
                     player_manager.add_item_to_inventory(player_data, novo_item_id, novo_drop_amount)
-                    
+                
                     novo_item_info = game_items.ITEMS_DATA.get(novo_item_id, {})
                     novo_item_name = novo_item_info.get('display_name', novo_item_id)
                     novo_item_emoji = novo_item_info.get('emoji', '🛡️')
-                    
-                    drops.append(f"{novo_item_emoji} {novo_drop_amount}x {novo_item_name} (Raro!)")
                 
+                    drops.append(f"{novo_item_emoji} {novo_drop_amount}x {novo_item_name} (Raro!)")
+            
                 # 3. CONSOLIDAÇÃO E LOG FINAL (ÚNICO APPEND)
                 loot_msg = f"💎 𝐋𝐨𝐨𝐭: {', '.join(drops)}" 
                 logs.append(loot_msg) 
-                
+            
                 # ✅ CORREÇÃO CRUCIAL: Remove o monstro morto da piscina global
                 if self.current_wave_mob_pool:
                     self.current_wave_mob_pool.pop(0)
@@ -368,30 +372,31 @@ class KingdomDefenseManager:
                     self.boss_mode_active = True
                     boss_id = self.wave_definitions[self.current_wave].get("boss_id")
                     boss_template = _find_monster_template(boss_id) if boss_id else {}
-                    
+                
                     # Configura HP do Boss
                     num_participantes = len(self.player_states)
                     hp_base = boss_template.get("hp", 500)
                     escala_base = 40
                     hp_extra = escala_base * self.current_wave * num_participantes
-                    
+                
                     self.boss_max_hp = int(hp_base + hp_extra)
                     self.boss_global_hp = self.boss_max_hp
-                    
+                
                     boss_name = boss_template.get("name", "Chefe")
                     logs.append(f"\n🚨 <b>{boss_name}</b> APARECEU COM {self.boss_global_hp:,} HP! 🚨")
 
             if user_id in self.player_states:
                 # Carrega o PRÓXIMO monstro (agora será um novo, pois demos pop no antigo)
                 await self._setup_player_battle_state(user_id, player_data)
-                
+            
                 # Salva os dados do jogador novamente (agora com o novo loot e estado de batalha atualizado)
                 await player_manager.save_player_data(user_id, player_data) 
 
+                # loot_message estará definido ('loot_msg' de mobs, ou "" de boss)
                 return {
                     "monster_defeated": True, 
                     "action_log": "\n".join(logs), 
-                    "loot_message": loot_msg # Retorna a mensagem consolidada
+                    "loot_message": loot_msg 
                 }
             else:
                 return {
@@ -403,40 +408,40 @@ class KingdomDefenseManager:
         else:
             if is_boss_fight:
                 self.boss_attack_counter += 1
-            
+        
             special_attack_data = mob.get("special_attack")
 
             # Ataque Especial em Área (Boss)
             if is_boss_fight and special_attack_data and special_attack_data.get("is_aoe") and self.boss_attack_counter % 3 == 0:
                 logs.append(f"👑 <b>{special_attack_data['name']}</b> (Em Área!)")
                 aoe_results = []
-                
+            
                 for fighter_id in list(self.active_fighters):
                     f_state = self.player_states.get(fighter_id)
                     f_data = await player_manager.get_player_data(fighter_id)
                     if not f_state or not f_data: continue
-                    
+                
                     f_stats = await player_manager.get_player_total_stats(f_data)
                     base_dmg, _, _ = criticals.roll_damage(mob, f_stats, {})
                     final_dmg = int(base_dmg * special_attack_data.get("damage_multiplier", 1.0))
-                    
+                
                     f_state['player_hp'] = max(0, f_state['player_hp'] - final_dmg)
-                    
+                
                     logs.append(f"🔥 {f_data.get('character_name','Herói')} sofreu {final_dmg}!")
-                    
+                
                     was_defeated = f_state['player_hp'] <= 0
                     aoe_results.append({"user_id": fighter_id, "was_defeated": was_defeated})
-                    
+                
                     if was_defeated:
                         self.active_fighters.remove(fighter_id)
                         await self._promote_next_player()
-                    
+                
                     # Salva o estado do jogador afetado (HP/MP atualizado)
                     f_data['current_hp'] = f_state['player_hp']
                     f_data['mana'] = f_state['player_mp']
                     f_data['current_mp'] = f_state['player_mp']
                     await player_manager.save_player_data(fighter_id, f_data)
-                
+            
                 # Não aplica iniciar_turno aqui, pois o ataque AOE não finaliza o turno do atacante original.
                 return { "monster_defeated": False, "action_log": "\n".join(logs), "aoe_results": aoe_results }
 
@@ -447,13 +452,13 @@ class KingdomDefenseManager:
                     logs.append(f"💨 Você se esquivou do ataque!")
                 else:
                     mob_damage, mob_is_crit, mob_is_mega = criticals.roll_damage(mob, player_full_stats, {})
-                    
+                
                     if is_boss_fight and special_attack_data and not special_attack_data.get("is_aoe") and self.boss_attack_counter % 3 == 0:
                         mob_damage = int(mob_damage * special_attack_data.get("damage_multiplier", 1.0))
                         logs.append(f"👑 <b>{special_attack_data['name']}!</b>")
-                    
+                
                     player_state['player_hp'] = max(0, player_state['player_hp'] - mob_damage)
-                    
+                
                     if mob_is_mega: logs.append(f"‼️ <b>MEGA CRÍTICO!</b> Recebeu {mob_damage} de dano!")
                     elif mob_is_crit: logs.append(f"❗️ <b>CRÍTICO!</b> Recebeu {mob_damage} de dano!")
                     else: logs.append(f"🩸 Recebeu {mob_damage} de dano.")
@@ -462,29 +467,29 @@ class KingdomDefenseManager:
                     logs.append("\n💀 <b>VOCÊ FOI DERROTADO!</b>")
                     self.active_fighters.remove(user_id)
                     await self._promote_next_player()
-                    
+                
                     # Sincroniza HP/MP (derrotado)
                     player_data['current_hp'] = 1 # O ideal é resetar para 1 para evitar loop ou estado inconsistente.
                     player_data['player_state'] = {"action": "idle"}
                     await player_manager.save_player_data(user_id, player_data)
-                    
+                
                     return { "game_over": True, "action_log": "\n".join(logs) }
 
                 # 🚀 1. Avança o turno (reduz cooldowns, aplica regen HP/MP)
                 from modules.cooldowns import iniciar_turno 
                 player_data, msgs_cd = iniciar_turno(player_data)
-                
+            
                 # Sincroniza o estado de batalha com os novos valores (regenerados)
                 player_state['player_hp'] = player_data.get('current_hp')
                 player_state['player_mp'] = player_data.get('current_mp')
-                
+            
                 logs.extend(msgs_cd)
-                
+            
                 # 💾 2. Salva o estado final do jogador
                 await player_manager.save_player_data(user_id, player_data)
 
                 return { "monster_defeated": False, "game_over": False, "action_log": "\n".join(logs) }
-            
+                
     # Arquivo: kingdom_defense/engine.py (process_player_attack CORRIGIDO)
 
     async def process_player_attack(self, user_id, player_data, player_full_stats):
