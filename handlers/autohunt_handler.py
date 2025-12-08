@@ -18,30 +18,28 @@ async def start_autohunt_callback(update: Update, context: ContextTypes.DEFAULT_
     user_id = update.effective_user.id
     
     # 1. Carrega dados FRESCOS do banco (evita cache velho)
-    # Se seu manager tiver método de limpar cache, use-o ou garanta que get_player_data pegue do DB
     player_data = await player_manager.get_player_data(user_id)
 
     # Verificações
     if not PremiumManager(player_data).is_premium(): 
+        await query.answer("Recurso exclusivo para jogadores Premium.", show_alert=True)
         return
         
     # Se já estiver caçando, avisa e para.
-    # Se o bot reiniciou e o status ficou preso, permitimos que ele "sobrescreva" se for idle ou null
     current_action = player_data.get('player_state', {}).get('action')
-    if current_action not in [None, 'idle']:
-        # Se for auto_hunting, é provável que seja um status "zumbi" de um reinício anterior.
-        # Vamos deixar passar APENAS se o usuário estiver clicando no botão de novo, 
-        # mas idealmente o botão 'stop' deve ser usado.
-        if current_action != 'auto_hunting':
-            await query.answer(f"Ocupado: {current_action}", show_alert=True)
-            return
-
+    
+    # Adicionando verificação explícita: se for qualquer coisa, exceto idle ou auto_hunting
+    if current_action not in [None, 'idle', 'auto_hunting']:
+        await query.answer(f"Ocupado com outra ação: {current_action}", show_alert=True)
+        return
+    
     # Verificação de Energia
     if player_data.get('energy', 0) <= 0:
         await query.answer("Sem energia!", show_alert=True)
         return
 
     # 2. Define estado e SALVA
+    # Se estava preso em auto_hunting, sobrescreve o estado, o que é seguro.
     player_data['player_state'] = {'action': 'auto_hunting'}
     await player_manager.save_player_data(user_id, player_data)
 

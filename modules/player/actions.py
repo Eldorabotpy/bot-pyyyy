@@ -357,6 +357,7 @@ async def check_stale_actions_on_startup(application: Application):
     logger.info("[Watchdog] Iniciando verificação de ações presas (viagem, caça, etc.)...")
     now = utcnow()
 
+    # Adicionado 'auto_hunting' para que possamos limpá-lo se estiver preso sem finish_time
     actions_to_check = (
         "auto_hunting", "travel", "collecting",
         "crafting", "working", "refining", "dismantling"
@@ -375,7 +376,7 @@ async def check_stale_actions_on_startup(application: Application):
 
         for pdata in player_docs_cursor:
             user_id = pdata.get("_id")
-            chat_id = pdata.get("last_chat_id")
+            chat_id = pdata.get("last_chat_id", user_id) # Garante que chat_id tenha fallback
             state = pdata.get("player_state", {})
             action = state.get("action")
 
@@ -383,14 +384,22 @@ async def check_stale_actions_on_startup(application: Application):
             details = details_raw if isinstance(details_raw, dict) else {}
 
             finish_time_iso = state.get("finish_time")
-            if not finish_time_iso:
+            hora_de_termino = _parse_iso(finish_time_iso) if finish_time_iso else None
+
+            # --- LÓGICA DE LIMPEZA DO AUTO-HUNT QUEBRADO ---
+            if action == "auto_hunting" and not hora_de_termino:
+                # Se for auto_hunting mas não tem finish_time (caça infinita perdida), limpa imediatamente
+                pdata["player_state"] = {"action": "idle"}
+                await save_player_data(user_id, pdata)
+                count_finalizados_imediatos += 1
+                logger.warning(f"[Watchdog] Auto-hunt infinito de {user_id} limpo por não ter finish_time.")
+                continue # Pula para o próximo jogador
+            # --- FIM DA LÓGICA DE LIMPEZA ---
+            
+            if not hora_de_termino:
                 continue
 
             try:
-                hora_de_termino = _parse_iso(finish_time_iso)
-                if not hora_de_termino:
-                    continue
-
                 job_name_prefix = f"watchdog_fix_{action}_{user_id}"
 
                 if now >= hora_de_termino:
@@ -401,6 +410,7 @@ async def check_stale_actions_on_startup(application: Application):
                     count_reagendados += 1
 
                 if action == "auto_hunting":
+                    # Este bloco lida com caçadas auto_hunting TEMPORIZADAS (e.g., autohunt_start_10)
                     job_data = {
                         "user_id": user_id, "chat_id": chat_id,
                         "message_id": state.get("message_id"),
@@ -425,7 +435,8 @@ async def check_stale_actions_on_startup(application: Application):
                 elif action == "collecting":
                     job_data = {
                         'resource_id': details.get("resource_id"),
-                        'item_id_yielded': details.get("item_id_yielded"),
+                        # CORREÇÃO AQUI: Garante que o item_id_yielded seja repassado para o job
+                        'item_id_yielded': details.get("item_id_yielded"), 
                         'energy_cost': details.get("energy_cost", 1),
                         'speed_mult': details.get("speed_mult", 1.0)
                     }
