@@ -291,36 +291,60 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
 # HANDLERS DE SKILLS CORRIGIDOS
 # =============================================================================
 
+# Arquivo: kingdom_defense/handler.py (show_skill_menu CORRIGIDO)
+
 async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
     player_data = await player_manager.get_player_data(user_id) 
     if not player_data: return
+    
     equipped_skills = player_data.get("equipped_skills", [])
     if not equipped_skills:
         await query.answer("Nenhuma habilidade equipada!", show_alert=True); return
+
+    # --- NOVO: Obtém o estado de cooldown do jogador ---
+    active_cooldowns = player_data.get("cooldowns", {})
+    # ---------------------------------------------------
 
     keyboard, current_mana = [], player_data.get("mana", 0)
     for skill_id in equipped_skills:
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
         skill_type = skill_info.get("type", "unknown")
         if not skill_info or skill_type == "passive": continue 
+        
         mana_cost = skill_info.get('mana_cost', 0)
+        
+        # --- NOVO: Obtém os turnos restantes ---
+        turns_left = active_cooldowns.get(skill_id, 0)
+        cooldown_tag = f" (CD: {turns_left})" if turns_left > 0 else ""
+        # ---------------------------------------
+
         is_single_target = skill_type == "support_heal" 
-        button_text_base = f"{skill_info['display_name']} ({mana_cost} MP)"
+        
+        button_text_base = f"{skill_info['display_name']} ({mana_cost} MP){cooldown_tag}"
+        
         if is_single_target:
-            button_text = f"❌ {button_text_base}" if current_mana < mana_cost else f"🎯 {button_text_base}"
+            # O botão deve refletir o CD e o custo de Mana
+            if current_mana < mana_cost or turns_left > 0:
+                 button_text = f"❌ {button_text_base}"
+            else:
+                 button_text = f"🎯 {button_text_base}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"select_target:{skill_id}")])
         else:
-            button_text = f"❌ {button_text_base}" if current_mana < mana_cost else button_text_base
+            # O botão deve refletir o CD e o custo de Mana
+            if current_mana < mana_cost or turns_left > 0:
+                button_text = f"❌ {button_text_base}" 
+            else:
+                button_text = f"💥 {button_text_base}" # Adiciona emoji para habilidades ativas (ataque/aoe)
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"use_skill:{skill_id}")])
     
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="back_to_battle")])
     text_content = "<b>Menu de Habilidades</b>\n\nEscolha uma habilidade para usar:"
     if query.message.photo: await query.edit_message_caption(caption=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     else: await query.edit_message_text(text=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-
+    
 async def select_skill_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
