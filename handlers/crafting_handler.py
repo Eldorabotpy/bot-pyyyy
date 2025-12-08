@@ -47,18 +47,20 @@ async def _safe_edit_or_send(
     evitando erros caso a mensagem original não possa ser editada.
     """
     try:
+        # Tenta editar a legenda: MANTÉM a mídia (vídeo/imagem) original.
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
         return
     except Exception:
         pass  # Ignora erro de edição de legenda e tenta a próxima
     try:
+        # Tenta editar o texto: REMOVE a mídia (se houver) ou edita a mensagem de texto.
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
         return
     except Exception:
         pass  # Ignora erro de edição de texto e envia uma nova mensagem
     
+    # Envia uma nova mensagem: Usado se nenhuma edição for possível.
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-
 
 async def craft_open_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

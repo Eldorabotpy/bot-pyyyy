@@ -12,6 +12,7 @@ from telegram import (
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.helpers import escape_markdown
 from telegram.error import BadRequest
+from telegram.error import Forbidden
 # --- Módulos do Jogo ---
 from modules import (
     player_manager,
@@ -329,7 +330,7 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     if not media_data:
         media_data = {"id": "https://media.tenor.com/J1y9Y_5y4B0AAAAC/blacksmith-forge.gif", "type": "video"}
 
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("↩️ Voltar ao Menu", callback_data="forge:main")]])
+    kb = InlineKeyboardMarkup([])
 
     # Envia a Mídia (Video ou Foto) e apaga o anterior
     await _send_or_edit_media(query, context, media_data, caption=text, reply_markup=kb)
@@ -339,10 +340,26 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     user_id = job.user_id
     chat_id = job.chat_id
     
+    # 1. Tenta pegar o ID da mensagem de notificação anterior para apagar
+    message_id_antiga = job.data.get("message_id_notificacao") # Assume que o ID foi salvo aqui
+    
+    # 2. Finaliza a lógica do jogo (adiciona item, XP, etc.)
     result = await crafting_engine.finish_craft(user_id)
     if not isinstance(result, dict) or "item_criado" not in result:
+        # Se a forja falhou ou já estava 'idle', apenas retorna
         return
 
+    # 3. Apaga a notificação anterior ("Forja Iniciada!")
+    if message_id_antiga:
+        try:
+            # Chama a função para apagar a mensagem anterior
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id_antiga)
+        except Exception as e:
+            # Ignora erros se a mensagem já foi apagada ou o bot não tem permissão
+            logger.warning(f"Falha ao apagar notificação {message_id_antiga} no chat {chat_id}: {e}")
+            pass
+
+    # 4. Prepara e Envia a notificação de item obtido
     item_criado = result["item_criado"]
     item_txt = formatar_item_para_exibicao(item_criado)
     
@@ -362,16 +379,24 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton("↩️ Voltar para a Forja", callback_data="forge:main")
     ]])
 
+    # --- NOVO BLOCO TRY/EXCEPT PARA TRATAR ERROS DE COMUNICAÇÃO ---
     try:
-        # Usa send_video se for vídeo, senão send_photo
+        # Tenta enviar a mensagem de item obtido (pode falhar com Forbidden)
         if media_data.get("type") == "video" or str(media_data.get("id")).endswith(".mp4"):
-             await context.bot.send_video(chat_id=chat_id, video=media_data["id"], caption=text, parse_mode="Markdown", reply_markup=reply_markup)
+            await context.bot.send_video(chat_id=chat_id, video=media_data["id"], caption=text, parse_mode="Markdown", reply_markup=reply_markup)
         else:
             await context.bot.send_photo(chat_id=chat_id, photo=media_data["id"], caption=text, parse_mode="Markdown", reply_markup=reply_markup)
-    except Exception as e:
-        logger.error(f"Falha ao enviar mídia final ({e}). Enviando texto.")
-        await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=reply_markup)
+            
+    except Forbidden:
+        # Erro de bloqueio: o bot não pode enviar a mensagem, mas a lógica do jogo está correta.
+        logger.warning(f"Usuário {user_id} bloqueou o bot. Notificação de forja falhou.")
+        return # Sai sem tentar o fallback de texto
         
+    except Exception as e:
+        # Trata outros erros de envio de mídia
+        logger.error(f"Falha ao enviar mídia final ({e}). Enviando texto como fallback.")
+        await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=reply_markup)
+               
 # =====================================================
 # Roteador
 # =====================================================

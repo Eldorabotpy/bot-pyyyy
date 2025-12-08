@@ -376,7 +376,17 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
             "scales_with": scales_with,
         }
     else:
-        primary_attr = "hp"
+        # CORREÇÃO: Acessa BASE_STATS_BY_RARITY diretamente via 'rarity_tables' 
+        # (importado no topo), resolvendo o AttributeError.
+        slot_stats = _as_dict(getattr(rarity_tables, "BASE_STATS_BY_RARITY", {})).get(slot)
+        
+        if slot_stats:
+            # Pega o primeiro (e esperado único) atributo primário do slot na tabela
+            primary_attr = next(iter(slot_stats.keys()), "hp")
+        else:
+            # Fallback seguro
+            primary_attr = "hp"
+            
         mirror_dmg = False
 
     attr_keys = _pick_attribute_keys_for_item(final_rarity, primary_attr, recipe, target_class)
@@ -409,7 +419,6 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         new_item["class_req"] = [class_req.strip().lower()]
 
     return new_item
-
 
 # =========================
 # Finish / XP
