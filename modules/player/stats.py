@@ -156,9 +156,12 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
 # ========================================
 # --- FUNÇÃO MESTRA DE STATS (ATUALIZADA) ---
 # ========================================
+# Em modules/player/stats.py
+
 async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = None) -> dict:
-    # IMPORT LOCAL PARA EVITAR CICLO
+    # IMPORT LOCAL PARA EVITAR CICLO (Importante!)
     from modules import player_manager
+    from modules.player.premium import PremiumManager  # <--- NOVA IMPORTAÇÃO AQUI
 
     lvl = _ival(player_data.get("level"), 1)
     ckey = _get_class_key_normalized(player_data)
@@ -173,9 +176,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
 
     # 2. Equipamentos (Enchantments)
     inventory = player_data.get('inventory', {}) or {}
-    equipped = player_data.get('equipment', {}) or {} # Atenção: seu save usa 'equipments' ou 'equipment'? 
-    # (Nota: No rune_handler usamos 'equipments', verifique se o seu save usa o mesmo nome. 
-    # O código original aqui usa 'equipment', vou manter o original para não quebrar equips.)
+    equipped = player_data.get('equipment', {}) or {}
     
     if isinstance(equipped, dict):
         for slot, unique_id in equipped.items():
@@ -187,6 +188,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
             for stat_key, data in ench.items():
                 val = _ival((data or {}).get('value', 0), 0)
                 k = stat_key.lower()
+                # ... (Mantenha seus mapeamentos de enchantments aqui) ...
                 if k in ("inteligencia", "magia", "poder_magico", "dano_magico"): stat_key = "magic_attack"
                 elif k in ("furia", "forca_bruta", "dmg"): stat_key = "attack"
                 elif k in ("precisao", "mira"): stat_key = "crit_chance_flat"
@@ -205,14 +207,40 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
             clan_buffs = clan_manager.get_clan_buffs(clan_id) or {}
             if "all_stats_percent" in clan_buffs:
                 percent_bonus = 1 + (float(clan_buffs.get("all_stats_percent", 0)) / 100.0)
-                total['max_hp'] = int(total.get('max_hp', 0) * percent_bonus)
-                total['attack'] = int(total.get('attack', 0) * percent_bonus)
-                total['defense'] = int(total.get('defense', 0) * percent_bonus)
+                # Aplica percentual em HP, ATK e DEF
+                for st in ['max_hp', 'attack', 'defense']:
+                     total[st] = int(total.get(st, 0) * percent_bonus)
+
             if "flat_hp_bonus" in clan_buffs:
                 total['max_hp'] = total.get('max_hp', 0) + int(clan_buffs.get("flat_hp_bonus", 0))
         except: pass
 
-    # 4. Passivas e Auras
+    # ==========================================================
+    # 4. [NOVO] BÔNUS PREMIUM / VIP
+    # ==========================================================
+    try:
+        premium = PremiumManager(player_data)
+        if premium.is_premium():
+            # Pega o bônus percentual (ex: no game_data definir "all_stats_percent": 10 para VIP)
+            vip_percent = float(premium.get_perk_value("all_stats_percent", 0))
+            if vip_percent > 0:
+                mult_vip = 1 + (vip_percent / 100.0)
+                # Aplica em todos os stats principais + ataque mágico
+                stats_affected = ['max_hp', 'attack', 'defense', 'initiative', 'luck', 'magic_attack']
+                for st in stats_affected:
+                    current_val = total.get(st, 0)
+                    total[st] = int(current_val * mult_vip)
+            
+            # Pega bônus fixos se houver (ex: "bonus_luck": 5)
+            vip_luck = int(premium.get_perk_value("bonus_luck", 0))
+            if vip_luck > 0:
+                total['luck'] = total.get('luck', 0) + vip_luck
+
+    except Exception as e:
+        logger.error(f"Erro ao calcular stats Premium: {e}")
+    # ==========================================================
+
+    # 5. Passivas e Auras
     try:
         _apply_passive_skill_bonuses(player_data, total)
         if ally_user_ids:
@@ -222,28 +250,20 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
                 if ally_data: _apply_party_aura_bonuses(ally_data, total)
     except: pass
 
-    # --- 5.5 [NOVO] INTEGRAÇÃO DE RUNAS ---
-    # Soma os bônus vindos das runas (calculados no player_manager)
+    # 6. Runas
     try:
         rune_bonuses = player_manager.get_rune_bonuses(player_data)
         for stat, value in rune_bonuses.items():
-            # Se for porcentagem (ex: 5% gold), mantém float
-            # Se for atributo base (ex: attack), soma int
-            
-            # Normalização de chaves para bater com o sistema de stats
             if stat == "magic_attack": 
                 total["magic_attack"] = total.get("magic_attack", 0) + int(value)
             elif stat in total:
-                # Se já existe (ex: max_hp, attack), soma direto
-                total[stat] += value # Assume que value é do tipo certo
+                total[stat] += value
             else:
-                # Se é novo (ex: lifesteal, crit_damage_mult), cria
                 total[stat] = total.get(stat, 0) + value
     except Exception as e:
         logger.error(f"Erro ao calcular bônus de runas: {e}")
-    # --------------------------------------
 
-    # 6. Unificação de Dano (Mágico vs Físico)
+    # 7. Unificação de Dano (Mágico vs Físico)
     base_attack = total.get('attack', 0)
     magic_bonus = total.get('magic_attack', 0)
     is_magic = real_class_key in MAGIC_CLASSES
@@ -262,10 +282,10 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
         ini_bonus = int(total.get('initiative', 0) * 0.25)
         total['attack'] += ini_bonus
 
-    # 7. MANA CALCULATION
+    # 8. MANA CALCULATION
     _calculate_mana(player_data, total, ckey_fallback=ckey)
 
-    # 8. Sanitização
+    # 9. Sanitização
     for k in _BASELINE_KEYS:
         total[k] = max(0, _ival(total.get(k), 0))
     total['max_mana'] = max(0, _ival(total.get('max_mana', 10)))

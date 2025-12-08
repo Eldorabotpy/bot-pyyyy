@@ -1,8 +1,12 @@
-# modules/player/durability.py (ou modules/combat/durability.py dependendo da sua pasta)
+# modules/player/durability.py (CORRIGIDO E ADICIONADO REPARO)
 from modules import player_manager
 
 _WEAPON_SLOTS = ("weapon", "primary_weapon", "arma")
-_ARMOR_SLOTS  = ("elmo", "armadura", "calca", "luvas", "botas", "anel", "colar", "brinco")
+_ARMOR_SLOTS  = ("elmo", "armadura", "calca", "luvas", "botas", "anel", "colar", "brinco")
+
+# --- NOVO: ID do Pergaminho de Reparo ---
+REPAIR_SCROLL_ID = "pergaminho_reparo"
+# ----------------------------------------
 
 def _get_equipped_uid(player_data: dict, slot_names) -> str | None:
     equip = (player_data or {}).get("equipment", {}) or {}
@@ -37,7 +41,21 @@ def _dur_tuple(raw) -> tuple[int, int]:
     mx = max(1, mx)
     return cur, mx
 
-# --- NOVA FUNÇÃO IMPORTANTE ---
+# --- FUNÇÃO DE REPARO CENTRAL (USADA PELA FORJA E PELO PERGAMINHO) ---
+def _restore_item_durability_to_max(item_inst: dict) -> bool:
+    """Restaura a durabilidade de uma instância de item equipada para o máximo."""
+    if not item_inst or item_inst.get("durability") is None:
+        return False
+
+    cur, mx = _dur_tuple(item_inst.get("durability"))
+    
+    if cur < mx:
+        item_inst["durability"] = [mx, mx]
+        return True
+        
+    return False
+
+# --- FUNÇÃO DE VERIFICAÇÃO (MANTIDA) ---
 def is_item_broken(item_inst: dict) -> bool:
     """Retorna True se o item estiver com durabilidade 0."""
     if not item_inst: 
@@ -49,8 +67,45 @@ def is_item_broken(item_inst: dict) -> bool:
         
     cur, _ = _dur_tuple(dur_data)
     return cur <= 0
-# ------------------------------
 
+# --- FUNÇÃO DE REPARO TOTAL (USO DO PERGAMINHO) ---
+async def repair_all_equipped_with_scroll(player_data: dict) -> str:
+    """
+    Restaura a durabilidade de todos os equipamentos equipados, consumindo 1 Pergaminho de Reparo.
+    """
+    scroll_quantity = 1
+    
+    # 1. VERIFICA E CONSUME O PERGAMINHO
+    current_scrolls = player_data.get("inventory", {}).get(REPAIR_SCROLL_ID, 0)
+    if current_scrolls < scroll_quantity:
+        return f"Você precisa de {scroll_quantity}x Pergaminho de Reparo para consertar seus equipamentos!"
+        
+    if not player_manager.remove_item_from_inventory(player_data, REPAIR_SCROLL_ID, scroll_quantity):
+        return "⚠️ Erro ao consumir o pergaminho. Tente novamente."
+
+    # 2. APLICA O REPARO EM TODOS OS ITENS EQUIPADOS
+    repaired_count = 0
+    all_slots = list(_WEAPON_SLOTS) + list(_ARMOR_SLOTS)
+
+    for slot in all_slots:
+        w_uid = _get_equipped_uid(player_data, [slot])
+        inst = _get_unique_inst(player_data, w_uid)
+        
+        if _restore_item_durability_to_max(inst):
+            repaired_count += 1
+            
+    # 3. SALVA E RETORNA
+    user_id = player_data.get('user_id')
+    if user_id:
+        await player_manager.save_player_data(user_id, player_data)
+        
+    if repaired_count > 0:
+        return f"✨ Durabilidade de {repaired_count} item(s) restaurada para 100% com 1 Pergaminho de Reparo!"
+    else:
+        # Se consumiu o pergaminho, mas não havia nada para reparar.
+        return "Nenhum item equipado precisava de reparo. O pergaminho foi consumido."
+# ----------------------------------------
+    
 def consume_durability(player_data: dict, uid: str, amount: int = 1) -> tuple[int, int, bool]:
     inv = player_data.get("inventory", {}) or {}
     inst = inv.get(uid)
