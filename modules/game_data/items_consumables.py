@@ -91,7 +91,15 @@ CONSUMABLES_DATA = {
         "type": "material", "category": "consumivel", 
         "stackable": True, "value": 40
     },
-    "gems": {
+    "sigilo_protecao": {
+        "display_name": "Sigilo de Proteção",
+        "emoji": "🛡️", 
+        "type": "consumable",
+        "stackable": True, 
+        "description": "Um selo mágico imbuído com energia defensiva. Concede proteção temporária ou é usado em receitas de aprimoramento.",
+        "category": "material" 
+    },
+        "gems": {
         "display_name": "Diamante", "emoji": "💎", 
         "type": "currency", "stackable": True, 
         "description": "Moeda premium."
