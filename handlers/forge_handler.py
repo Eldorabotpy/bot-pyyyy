@@ -334,7 +334,7 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     
     if not media_data:
         # Fallback padrão para forja em andamento
-        media_data = {"id": "https://media.tenor.com/J1y9Y_5y4B0AAAAC/blacksmith-forge.gif", "type": "video"}
+        media_data = {"id": "AgACAgEAAxkBAAECtXNpNkGsTyrOVt3x3r-rtQ_JkqM2UAACIgtrG5_1mEWdopXF6XTxrAEAAwIAA3kAAzYE"}
 
     # --- CORREÇÃO PRINCIPAL: Substituir a mensagem de 'Confirmar Criação' ---
     # Tenta editar o conteúdo, preservando a mídia original (se for o GIF de preview).
@@ -351,7 +351,7 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
 
     # Note: O message_id salvo em job_data agora aponta para a mensagem de 'Confirmar Criação', 
     # o que garante que esta mensagem será removida quando a forja terminar.
-    
+
 async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id = job.user_id
