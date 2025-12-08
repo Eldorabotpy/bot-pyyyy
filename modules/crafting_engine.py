@@ -177,10 +177,19 @@ def _attr_to_enchant_key(attr_name: str) -> str:
         return "hp"
     if a in {"defesa", "defense", "armor", "blindagem"}:
         return "defense"
-    if a in {"iniciativa", "initiative", "velocidade", "agilidade", "speed"}:
+        
+    # --- CORREÇÃO DE CHAVE: Garante que Agilidade e Iniciativa são diferentes ---
+    if a in {"iniciativa", "initiative", "velocidade", "speed"}:
         return "initiative"
+        
+    if a in {"agilidade", "agility"}:
+        return "agilidade" 
+    # --------------------------------------------------------------------------
+    
     if a in {"sorte", "luck"}:
         return "luck"
+        
+    # Retorna a própria chave se for um atributo especializado (Letalidade, Furia, Bushido)
     return a
 
 def _class_primary_attr(player_class: str | None) -> str:
@@ -354,15 +363,22 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     else:
         target_class = _get_player_class_key(player_data)
 
+    # --- CORREÇÃO CRÍTICA: Mapeia o atributo primário visível para o atributo ESPECÍFICO da classe ---
     CLASS_VISIBLE_PRIMARY_ATTR = {
-        "guerreiro": "forca", "berserker": "forca", "samurai": "forca",
-        "cacador": "agilidade", "assassino": "agilidade", "monge": "agilidade",
-        "mago": "inteligencia", "bardo": "inteligencia", "curandeiro": "inteligencia"
+        "guerreiro": "forca", 
+        "berserker": "furia", 
+        "samurai": "bushido",
+        "cacador": "precisao", 
+        "assassino": "letalidade", # <-- CORREÇÃO: Usa Letalidade (☠️) como chave primária
+        "monge": "foco",
+        "mago": "inteligencia", 
+        "bardo": "carisma", 
+        "curandeiro": "inteligencia"
     }
 
     if _is_weapon_slot(slot):
         primary_attr = CLASS_VISIBLE_PRIMARY_ATTR.get((target_class or ""), "forca")
-        mirror_dmg = True
+        mirror_dmg = True # Permite que o atributo dmg seja espelhado
 
         dmg_info = _as_dict(recipe.get("damage_info"))
         dmin, dmax = _as_tuple_2(dmg_info, (10, 20))
@@ -376,32 +392,34 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
             "scales_with": scales_with,
         }
     else:
-        # CORREÇÃO: Acessa BASE_STATS_BY_RARITY diretamente via 'rarity_tables' 
-        # (importado no topo), resolvendo o AttributeError.
+        # Lógica para equipamentos (HP, Sorte, Agilidade)
         slot_stats = _as_dict(getattr(rarity_tables, "BASE_STATS_BY_RARITY", {})).get(slot)
         
         if slot_stats:
-            # Pega o primeiro (e esperado único) atributo primário do slot na tabela
             primary_attr = next(iter(slot_stats.keys()), "hp")
         else:
-            # Fallback seguro
             primary_attr = "hp"
             
         mirror_dmg = False
 
     attr_keys = _pick_attribute_keys_for_item(final_rarity, primary_attr, recipe, target_class)
 
+    # REMOÇÃO DA LÓGICA DE FORÇAR DMG: 
+    # O atributo da classe (Letalidade/Furia) agora é o primeiro encantamento (idx=0).
+
     upg = int(new_item["upgrade_level"])
     for idx, ak in enumerate(attr_keys):
         source = "primary" if idx == 0 else "affix"
         _apply_attr_with_upgrade(new_item, _attr_to_enchant_key(ak), upg, source)
 
+    # BLOCO MIRROR_DMG: Garante que a chave 'dmg' existe (se for arma) e tem o mesmo valor do upgrade.
     if mirror_dmg:
         has_dmg = False
         for k in new_item["enchantments"]:
             if k == "dmg": has_dmg = True
         
         if not has_dmg:
+             # O atributo DMG é adicionado em segundo plano, não como o PRIMÁRIO VISÍVEL na lista de afixos.
              new_item["enchantments"]["dmg"] = {"value": upg, "source": "primary_mirror"}
 
     dn = info.get("display_name") or info.get("nome_exibicao") or info.get("name") or base_id.replace("_", " ").title()

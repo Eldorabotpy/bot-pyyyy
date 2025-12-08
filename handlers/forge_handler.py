@@ -295,6 +295,8 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
 
 async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
+    chat_id = query.message.chat_id
+    message_id_antiga = query.message.message_id # ID da mensagem de 'Confirmar Criação'
     
     result = await crafting_engine.start_craft(user_id, recipe_id)
 
@@ -305,36 +307,51 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     duration = result.get("duration_seconds", 0)
     job_name = f"craft_{user_id}_{recipe_id}"
     
+    # 1. SALVA message_id_antiga NO JOB DATA para que finish_craft_notification_job apague DEPOIS.
+    job_data = {"recipe_id": recipe_id, "message_id_notificacao": message_id_antiga}
+    
     context.job_queue.run_once(
         finish_craft_notification_job,
         duration,
-        chat_id=query.message.chat_id,
+        chat_id=chat_id,
         user_id=user_id,
         name=job_name,
-        data={"recipe_id": recipe_id}
+        data=job_data
     )
 
     recipe_name = (crafting_registry.get_recipe(recipe_id) or {}).get("display_name", "item")
     
     text = (f"🔥 *Forja Iniciada!*\n\n"
-            f"O item *{_md_escape(recipe_name)}* está sendo moldado.\n"
-            f"⏳ Tempo estimado: *{duration // 60} minutos*.\n\n"
-            f"_Você será notificado quando estiver pronto._")
+              f"O item *{_md_escape(recipe_name)}* está sendo moldado.\n"
+              f"⏳ Tempo estimado: *{duration // 60} minutos*.\n\n"
+              f"_Você será notificado quando estiver pronto._")
 
-    # --- CORREÇÃO PRINCIPAL ---
-    # Busca a mídia. Se você cadastrou "forge_working_gif" como type="video" no file_ids.py,
-    # ele vai retornar {'id': '...', 'type': 'video'} e a função _send_or_edit_media vai usar send_video.
+    # Teclado vazio (mantém a correção de remover o botão Voltar)
+    kb = InlineKeyboardMarkup([]) 
+    
+    # Busca a mídia da forja ativa
     media_data = _get_media_data("forge_working_gif") 
     
-    # Fallback se não tiver no banco
     if not media_data:
+        # Fallback padrão para forja em andamento
         media_data = {"id": "https://media.tenor.com/J1y9Y_5y4B0AAAAC/blacksmith-forge.gif", "type": "video"}
 
-    kb = InlineKeyboardMarkup([])
+    # --- CORREÇÃO PRINCIPAL: Substituir a mensagem de 'Confirmar Criação' ---
+    # Tenta editar o conteúdo, preservando a mídia original (se for o GIF de preview).
+    try:
+        await query.edit_message_caption(caption=text, reply_markup=kb, parse_mode="Markdown")
+        
+    except Exception as e:
+        # Se falhar (e.g., a mensagem não tem mídia, ou é um link ruim), tenta enviar a nova.
+        logger.warning(f"Falha na edição da legenda da forja. Tentando enviar nova mensagem. {e}")
+        
+        # Como o delete_message está dentro de _send_or_edit_media, usaremos ele aqui.
+        # NOTE: query.delete_message() dentro de _send_or_edit_media apagará a mensagem anterior.
+        await _send_or_edit_media(query, context, media_data, caption=text, reply_markup=kb)
 
-    # Envia a Mídia (Video ou Foto) e apaga o anterior
-    await _send_or_edit_media(query, context, media_data, caption=text, reply_markup=kb)
-
+    # Note: O message_id salvo em job_data agora aponta para a mensagem de 'Confirmar Criação', 
+    # o que garante que esta mensagem será removida quando a forja terminar.
+    
 async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     user_id = job.user_id
@@ -396,7 +413,7 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
         # Trata outros erros de envio de mídia
         logger.error(f"Falha ao enviar mídia final ({e}). Enviando texto como fallback.")
         await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=reply_markup)
-               
+
 # =====================================================
 # Roteador
 # =====================================================
