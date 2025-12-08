@@ -12,6 +12,7 @@ import traceback
 from handlers.menu.kingdom import show_kingdom_menu
 from modules.game_data.skills import SKILL_DATA
 from telegram.error import BadRequest
+from modules.game_data.class_evolution import can_player_use_skill
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +294,8 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
 
 # Arquivo: kingdom_defense/handler.py (show_skill_menu CORRIGIDO)
 
+# Arquivo: kingdom_defense/handler.py (show_skill_menu CORRIGIDO)
+
 async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -300,44 +303,47 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_data = await player_manager.get_player_data(user_id) 
     if not player_data: return
     
+    player_class = player_data.get("class_key") or player_data.get("class") # Classe atual
     equipped_skills = player_data.get("equipped_skills", [])
+    
     if not equipped_skills:
         await query.answer("Nenhuma habilidade equipada!", show_alert=True); return
 
-    # --- NOVO: Obtém o estado de cooldown do jogador ---
     active_cooldowns = player_data.get("cooldowns", {})
-    # ---------------------------------------------------
 
     keyboard, current_mana = [], player_data.get("mana", 0)
     for skill_id in equipped_skills:
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
         skill_type = skill_info.get("type", "unknown")
+        
         if not skill_info or skill_type == "passive": continue 
-        
+
+        # --- NOVA VERIFICAÇÃO DE CLASSE/EVOLUÇÃO ---
+        allowed_classes = skill_info.get("allowed_classes", [])
+        if not can_player_use_skill(player_class, allowed_classes):
+            # Se a classe atual não está na hierarquia permitida, pula a skill
+            continue 
+        # -------------------------------------------
+
         mana_cost = skill_info.get('mana_cost', 0)
-        
-        # --- NOVO: Obtém os turnos restantes ---
         turns_left = active_cooldowns.get(skill_id, 0)
         cooldown_tag = f" (CD: {turns_left})" if turns_left > 0 else ""
-        # ---------------------------------------
-
-        is_single_target = skill_type == "support_heal" 
         
+        is_single_target = skill_type == "support_heal" # Assumindo que support_heal é o único que exige target no KD
+
         button_text_base = f"{skill_info['display_name']} ({mana_cost} MP){cooldown_tag}"
         
         if is_single_target:
-            # O botão deve refletir o CD e o custo de Mana
             if current_mana < mana_cost or turns_left > 0:
                  button_text = f"❌ {button_text_base}"
             else:
                  button_text = f"🎯 {button_text_base}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"select_target:{skill_id}")])
         else:
-            # O botão deve refletir o CD e o custo de Mana
             if current_mana < mana_cost or turns_left > 0:
                 button_text = f"❌ {button_text_base}" 
             else:
-                button_text = f"💥 {button_text_base}" # Adiciona emoji para habilidades ativas (ataque/aoe)
+                button_text = f"💥 {button_text_base}" 
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"use_skill:{skill_id}")])
     
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="back_to_battle")])
