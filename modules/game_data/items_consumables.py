@@ -95,6 +95,7 @@ CONSUMABLES_DATA = {
         "display_name": "Sigilo de Proteção",
         "emoji": "🛡️", 
         "type": "consumable",
+        "category": "consumivel",
         "stackable": True, 
         "description": "Um selo mágico imbuído com energia defensiva. Concede proteção temporária ou é usado em receitas de aprimoramento.",
         "category": "material" 

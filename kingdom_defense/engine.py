@@ -312,23 +312,53 @@ class KingdomDefenseManager:
         if mob_hp <= 0:
             logs.append(f"☠️ {mob['name']} foi derrotado!")
             
+            # 1. Reduz Cooldowns e aplica regeneração final (mantido)
+            from modules.cooldowns import iniciar_turno 
+            player_data, msgs_cd = iniciar_turno(player_data)
+            if msgs_cd: logs.extend(msgs_cd)
+            
+            # Sincroniza HP/MP do estado local com o player_data atualizado (mantido)
+            player_state['player_hp'] = player_data.get('current_hp')
+            player_state['player_mp'] = player_data.get('current_mp')
+            await player_manager.save_player_data(user_id, player_data) # Salva o estado com regeneração
+
             if is_boss_fight:
                 logs.append(f"🎉 A ONDA {self.current_wave} FOI CONCLUÍDA! 🎉")
                 await self.setup_wave(self.current_wave + 1)
                 if not self.is_active:
                     return {"event_over": True, "action_log": "\n".join(logs)}
             else:
-                # --- GERA RECOMPENSA (LOOT) ---
-                reward_amount = 1
-                item_id = 'fragmento_bravura'
-                player_manager.add_item_to_inventory(player_data, item_id, reward_amount)
+                # ==========================================================
+                # --- GERA RECOMPENSA (LOOT CONSOLIDADO) ---
+                # ==========================================================
+                drops = []
                 
+                # Loot Padrão (Fragmento de Bravura)
+                item_id = 'fragmento_bravura'
+                reward_amount = 1
+                player_manager.add_item_to_inventory(player_data, item_id, reward_amount)
                 item_info = game_items.ITEMS_DATA.get(item_id, {})
                 item_name = item_info.get('display_name', 'Fragmento de Bravura')
+                drops.append(f"1x {item_name}")
                 
-                loot_msg = f"💎 𝐋𝐨𝐨𝐭: {reward_amount}x {item_name}"
+                # Drop de Item Raro (1% chance)
+                novo_item_id = 'sigilo_protecao' # Usando o ID fornecido
+                drop_chance = 0.01
+                
+                if random.random() < drop_chance:
+                    novo_drop_amount = 1
+                    player_manager.add_item_to_inventory(player_data, novo_item_id, novo_drop_amount)
+                    
+                    novo_item_info = game_items.ITEMS_DATA.get(novo_item_id, {})
+                    novo_item_name = novo_item_info.get('display_name', novo_item_id)
+                    novo_item_emoji = novo_item_info.get('emoji', '🛡️')
+                    
+                    drops.append(f"{novo_item_emoji} {novo_drop_amount}x {novo_item_name} (Raro!)")
+                
+                # 3. CONSOLIDAÇÃO E LOG FINAL (ÚNICO APPEND)
+                loot_msg = f"💎 𝐋𝐨𝐨𝐭: {', '.join(drops)}" 
                 logs.append(loot_msg) 
-
+                
                 # ✅ CORREÇÃO CRUCIAL: Remove o monstro morto da piscina global
                 if self.current_wave_mob_pool:
                     self.current_wave_mob_pool.pop(0)
@@ -354,10 +384,14 @@ class KingdomDefenseManager:
             if user_id in self.player_states:
                 # Carrega o PRÓXIMO monstro (agora será um novo, pois demos pop no antigo)
                 await self._setup_player_battle_state(user_id, player_data)
+                
+                # Salva os dados do jogador novamente (agora com o novo loot e estado de batalha atualizado)
+                await player_manager.save_player_data(user_id, player_data) 
+
                 return {
                     "monster_defeated": True, 
                     "action_log": "\n".join(logs), 
-                    "loot_message": loot_msg if 'loot_msg' in locals() else ""
+                    "loot_message": loot_msg # Retorna a mensagem consolidada
                 }
             else:
                 return {
@@ -396,7 +430,14 @@ class KingdomDefenseManager:
                     if was_defeated:
                         self.active_fighters.remove(fighter_id)
                         await self._promote_next_player()
+                    
+                    # Salva o estado do jogador afetado (HP/MP atualizado)
+                    f_data['current_hp'] = f_state['player_hp']
+                    f_data['mana'] = f_state['player_mp']
+                    f_data['current_mp'] = f_state['player_mp']
+                    await player_manager.save_player_data(fighter_id, f_data)
                 
+                # Não aplica iniciar_turno aqui, pois o ataque AOE não finaliza o turno do atacante original.
                 return { "monster_defeated": False, "action_log": "\n".join(logs), "aoe_results": aoe_results }
 
             # Ataque Normal ou Especial Single-Target
@@ -421,9 +462,30 @@ class KingdomDefenseManager:
                     logs.append("\n💀 <b>VOCÊ FOI DERROTADO!</b>")
                     self.active_fighters.remove(user_id)
                     await self._promote_next_player()
+                    
+                    # Sincroniza HP/MP (derrotado)
+                    player_data['current_hp'] = 1 # O ideal é resetar para 1 para evitar loop ou estado inconsistente.
+                    player_data['player_state'] = {"action": "idle"}
+                    await player_manager.save_player_data(user_id, player_data)
+                    
                     return { "game_over": True, "action_log": "\n".join(logs) }
 
+                # 🚀 1. Avança o turno (reduz cooldowns, aplica regen HP/MP)
+                from modules.cooldowns import iniciar_turno 
+                player_data, msgs_cd = iniciar_turno(player_data)
+                
+                # Sincroniza o estado de batalha com os novos valores (regenerados)
+                player_state['player_hp'] = player_data.get('current_hp')
+                player_state['player_mp'] = player_data.get('current_mp')
+                
+                logs.extend(msgs_cd)
+                
+                # 💾 2. Salva o estado final do jogador
+                await player_manager.save_player_data(user_id, player_data)
+
                 return { "monster_defeated": False, "game_over": False, "action_log": "\n".join(logs) }
+            
+    # Arquivo: kingdom_defense/engine.py (process_player_attack CORRIGIDO)
 
     async def process_player_attack(self, user_id, player_data, player_full_stats):
         """Calcula o dano do ataque básico usando o 'combat_engine' unificado."""
@@ -435,7 +497,8 @@ class KingdomDefenseManager:
             self.active_fighters.discard(user_id) 
             return {"error": "Seu estado de batalha não foi encontrado. Tente reentrar no evento."}
 
-        self._tick_effects(user_id) 
+        # ❌ REMOVIDO: self._tick_effects(user_id)
+        # -> O avanço de turno (tick de cooldowns/efeitos) será feito no _resolve_turn
         
         player_state = self.player_states[user_id]
         mob = player_state['current_mob']
@@ -452,10 +515,10 @@ class KingdomDefenseManager:
         )
         
         # 1. CHAMA O CÉREBRO UNIFICADO
+        logs.append("⚔️ Ataque básico.") # Loga a ação básica
         
-        # --- CORREÇÃO AQUI (passar player_data) ---
         resultado_combate = await combat_engine.processar_acao_combate(
-            attacker_pdata=player_data, # <--- ADICIONADO
+            attacker_pdata=player_data, 
             attacker_stats=attacker_combat_stats,
             target_stats=target_combat_stats,
             skill_id=None, # 'None' significa ataque básico
@@ -473,51 +536,57 @@ class KingdomDefenseManager:
             mob['hp'] = max(0, mob['hp'] - damage)
         
         # 3. CHAMA A RESOLUÇÃO DO TURNO
+        # Não precisa salvar player_data aqui, pois _resolve_turn chama 'iniciar_turno'
+        # e salva o estado final (HP/MP, Cooldowns, etc.).
         return await self._resolve_turn(user_id, player_data, logs)
 
     async def process_player_skill(self, user_id, player_data, skill_id, target_id=None):
-        """Processa o uso de skill, usando o 'combat_engine' para skills de ataque."""
+        """
+        Processa o uso de skill, usando o 'combat_engine' para skills de ataque,
+        e utilizando o sistema central de Cooldowns e Mana.
+        """
         
         if user_id not in self.active_fighters:
             return {"error": "Você não está em uma batalha ativa."}
 
-        # 1. AVANÇA OS TURNOS (Cooldowns diminuem aqui)
-        self._tick_effects(user_id)
-
         player_state = self.player_states[user_id]
         
-        # 2. VERIFICAÇÃO DE COOLDOWN
-        current_cooldowns = player_state.get('skill_cooldowns', {})
-        if current_cooldowns.get(skill_id, 0) > 0:
-            turns_left = current_cooldowns[skill_id]
-            return {"error": f"Habilidade em recarga! Aguarde {turns_left} turnos."}
+        # 1. VERIFICAÇÃO DE COOLDOWN CENTRALIZADA
+        # Usamos o player_data, que deve ser a fonte de verdade para cooldowns
+        # (O estado local 'skill_cooldowns' e a chamada a self._tick_effects foram removidos daqui.)
+        from modules.cooldowns import verificar_cooldown
+        pode_usar, msg_cd = verificar_cooldown(player_data, skill_id)
+        if not pode_usar:
+            # Não faz a ação nem gasta mana.
+            return {"error": msg_cd}
 
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
         if not skill_info: return {"error": "Habilidade desconhecida."}
 
         mana_cost = skill_info.get("mana_cost", 0)
         
-        # Verifica no estado da batalha (que é o mais atualizado)
+        # Verifica Mana no estado da batalha (mais atualizado)
         current_mp = player_state.get('player_mp', 0)
         
         if current_mp < mana_cost:
             return {"error": f"Mana insuficiente! ({current_mp}/{mana_cost})"}
         
-        # --- GASTO DE MANA ---
+        # --- 2. GASTO DE MANA E SINCRONIZAÇÃO CRUCIAL ---
         player_state['player_mp'] -= mana_cost
         
-        # ✅ CORREÇÃO DE SINCRONIA (CRUCIAL):
-        # Atualiza o player_data IMEDIATAMENTE para que o save funcione.
-        # Atualizamos as duas chaves possíveis ('current_mp' e 'mana') para garantir que interface e banco fiquem iguais.
+        # Atualiza o player_data IMEDIATAMENTE antes de aplicar cooldown/resolver turno
         player_data['current_mp'] = player_state['player_mp']
         player_data['mana'] = player_state['player_mp'] 
+        await player_manager.save_player_data(user_id, player_data) # <--- SINCRONIZAÇÃO DE MANA
         
         logs = [f"Você usa {skill_info['display_name']}! (-{mana_cost} MP)"]
 
-        # 3. APLICA O COOLDOWN
-        cooldown_turns = skill_info.get("effects", {}).get("cooldown_turns", 0)
-        if cooldown_turns > 0:
-            player_state.setdefault('skill_cooldowns', {})[skill_id] = cooldown_turns + 1
+        # --- 3. APLICAÇÃO DE COOLDOWN CENTRALIZADA ---
+        from modules.cooldowns import aplicar_cooldown
+        rarity = player_data.get("skills", {}).get(skill_id, {}).get("rarity", "comum")
+        player_data = aplicar_cooldown(player_data, skill_id, rarity)
+        # O save (acima) já inclui o cooldown aplicado se a função 'aplicar_cooldown' for síncrona
+        # e modificar player_data, como esperado.
 
         # --- LÓGICA DA SKILL ---
         skill_type = skill_info.get("type")
@@ -525,10 +594,11 @@ class KingdomDefenseManager:
         mob = player_state['current_mob']
         is_boss_fight = mob.get('is_boss', False)
         
-        # SKILL DE ATAQUE
+        # SKILL DE ATAQUE (ACTIVE)
         if skill_type == "active": 
             player_full_stats = await player_manager.get_player_total_stats(player_data)
             
+            # Note: _get_stats_with_effects e combat_engine.processar_acao_combate já estão corretos.
             attacker_stats = self._get_stats_with_effects(player_full_stats, player_state.get('active_effects', []))
             target_stats = self._get_stats_with_effects(mob, mob.get('active_effects', []))
             
@@ -551,8 +621,10 @@ class KingdomDefenseManager:
                 debuff = skill_effects["debuff_target"]
                 mob.setdefault('active_effects', []).append({"stat": debuff["stat"], "multiplier": debuff["value"], "turns_left": debuff["duration_turns"]})
                 logs.append(f"🛡️ Defesa inimiga reduzida!")
+            
+            # Chamamos _resolve_turn que faz o save final do turno.
 
-        # SKILL DE SUPORTE
+        # SKILL DE SUPORTE (SUPPORT)
         elif skill_type == "support": 
             heal_applied = False
             player_full_stats = await player_manager.get_player_total_stats(player_data)
@@ -570,17 +642,18 @@ class KingdomDefenseManager:
                     for ally_id in list(self.active_fighters):
                         ally_state = self.player_states.get(ally_id)
                         if ally_state:
-                            ally_state['player_hp'] += heal_amount
+                            ally_state['player_hp'] = min(ally_state['player_max_hp'], ally_state['player_hp'] + heal_amount) # Aplica HEAL
                             heal_applied = True
                     if heal_applied: logs.append(f"✨ Grupo curado em {heal_amount} HP!")
             
             if not heal_applied:
                 logs.append("🎶 Efeitos de suporte ativados!")
 
-            # Salva o player_data (que agora tem a mana atualizada)
-            await player_manager.save_player_data(user_id, player_data) 
+            # O player_data (com mana e cooldowns) JÁ FOI SALVO mais acima.
+            # A skill de suporte pula o turno do monstro, então retornamos o resultado.
             return { "monster_defeated": False, "action_log": "\n".join(logs), "skip_monster_turn": True }
         
+        # 4. Continua para o turno do monstro (se for skill de ataque)
         return await self._resolve_turn(user_id, player_data, logs)
 
     def get_battle_data(self, user_id):
@@ -629,19 +702,17 @@ class KingdomDefenseManager:
         return modified_stats
     
     def _tick_effects(self, user_id: int):
-        """Reduz a duração dos efeitos e dos COOLDOWNS."""
+        """
+        Reduz a duração dos efeitos LOCAIS (Buffs/Debuffs) armazenados no estado da batalha.
+        A redução dos COOLDOWNS de Skills é gerenciada pela função iniciar_turno do módulo cooldowns.
+        """
         player_state = self.player_states.get(user_id)
         if not player_state: return
 
-        # ✅ 1. Reduz Cooldowns das Skills (Lógica Nova)
-        if 'skill_cooldowns' in player_state:
-            new_cooldowns = {}
-            for skill_id, turns in player_state['skill_cooldowns'].items():
-                if turns > 1:
-                    new_cooldowns[skill_id] = turns - 1
-                # Se for 1, vira 0 e não entra na nova lista (ou seja, liberado)
-            player_state['skill_cooldowns'] = new_cooldowns
-
+        # ❌ 1. Lógica de redução de 'skill_cooldowns' removida daqui
+        #    pois o avanço de cooldowns é responsabilidade de modules.cooldowns.iniciar_turno.
+        #    Os dados 'skill_cooldowns' no player_state devem ser ignorados/removidos.
+        
         # 2. Efeitos do Jogador (Buffs)
         if player_state.get('active_effects'):
             player_updated_effects = []
