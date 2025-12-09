@@ -18,6 +18,7 @@ from handlers.menu.region import (
     restore_durability_fix_handler,
     collect_handler  # <--- ADICIONADO AQUI (Vem do region.py)
 )
+from handlers.christmas_shop import christmas_shop_handler, christmas_buy_handler
 
 # (Removido: from handlers.collection_handler import collection_handler)
 
@@ -67,3 +68,7 @@ def register_regions_handlers(application: Application):
     # --- Grupo 4: NPCs ---
     if all_npc_handlers:
         application.add_handlers(all_npc_handlers)
+        # 👇👇👇 ADICIONE O NATAL AQUI 👇👇👇
+        # 🎅 Loja de Natal (Evento)
+        application.add_handler(christmas_shop_handler)
+        application.add_handler(christmas_buy_handler)

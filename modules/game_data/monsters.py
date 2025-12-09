@@ -1159,33 +1159,47 @@ MONSTERS_DATA = {
 # Coloque isso no FINAL do arquivo monsters.py
 # ==============================================================================
 
-ENABLE_CHRISTMAS_EVENT = True  # Mude para False quando o evento acabar
+ENABLE_CHRISTMAS_EVENT = True 
 
 if ENABLE_CHRISTMAS_EVENT:
-    print("🎅 HO HO HO! O Evento de Natal foi ativado nos monstros!")
+    print("🎅 HO HO HO! Injetando Presentes de Natal nos Monstros...")
     
-    # Configuração dos Drops
-    DROP_COMUM = {"item_id": "presente_perdido", "drop_chance": 12.0}  # 25% de chance
-    DROP_RARO =  {"item_id": "presente_dourado", "drop_chance": 0.8}   # 2.5% de chance (Skins)
+    # Configuração dos Drops (Aumentei um pouco para teste)
+    DROP_COMUM = {"item_id": "presente_perdido", "drop_chance": 25.0}  # A cada 4 monstros 1 cai
+    DROP_RARO =  {"item_id": "presente_dourado", "drop_chance": 2.0}   # Difícil (Skins)
 
-    # Itera sobre todas as regiões (pradaria, floresta, etc)
+    count_updated = 0
+
     for region_key, monster_list in MONSTERS_DATA.items():
-        # Ignora a lista de bosses de evolução se não quiser que eles dropem
-        if region_key == "_evolution_trials":
+        # Pula listas que não são de monstros comuns (ex: bosses de evolução)
+        if region_key.startswith("_"): 
             continue
 
-        # Itera sobre cada monstro da lista
         for monster in monster_list:
-            # Garante que o monstro tem uma loot_table
+            # 1. Garante que existe uma lista de loot
             if "loot_table" not in monster:
                 monster["loot_table"] = []
             
-            # Adiciona os presentes à tabela de loot do monstro
-            # Usamos .append para não apagar os itens originais
-            monster["loot_table"].append(DROP_COMUM.copy())
-            monster["loot_table"].append(DROP_RARO.copy())
+            # 2. Verifica quais itens esse monstro JÁ tem (para não duplicar)
+            existing_ids = [item.get("item_id") for item in monster["loot_table"]]
 
-            # Opcional: Monstros Chefes (is_boss) podem ter chance maior
+            # 3. Adiciona Presente Perdido se não tiver
+            if DROP_COMUM["item_id"] not in existing_ids:
+                monster["loot_table"].append(DROP_COMUM.copy())
+            
+            # 4. Adiciona Presente Dourado se não tiver
+            if DROP_RARO["item_id"] not in existing_ids:
+                monster["loot_table"].append(DROP_RARO.copy())
+            
+            # 5. Bônus para Bosses (Garante drop e aumenta chance do raro)
             if monster.get("is_boss"):
-                 monster["loot_table"].append({"item_id": "presente_perdido", "drop_chance": 100.0}) # Garante 1 extra
-                 monster["loot_table"].append({"item_id": "presente_dourado", "drop_chance": 10.0}) # Chance aumentada
+                # Removemos a versão normal para por a versão 'turbinada' do boss
+                monster["loot_table"] = [x for x in monster["loot_table"] 
+                                       if x["item_id"] not in [DROP_COMUM["item_id"], DROP_RARO["item_id"]]]
+                
+                monster["loot_table"].append({"item_id": "presente_perdido", "drop_chance": 100.0})
+                monster["loot_table"].append({"item_id": "presente_dourado", "drop_chance": 10.0})
+
+            count_updated += 1
+
+    print(f"🎅 Natal Ativo: {count_updated} monstros receberam presentes no bolso!")
