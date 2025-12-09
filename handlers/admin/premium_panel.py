@@ -3,11 +3,9 @@
 from __future__ import annotations
 import os
 import logging
-# --- IMPORTS CORRIGIDOS DE TEMPO ---
 from datetime import datetime, timezone, timedelta 
 from typing import Tuple, Optional
 
-# --- IMPORT PARA TRATAR O ERRO 400 ---
 from telegram.error import BadRequest 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -20,19 +18,18 @@ from telegram.ext import (
 )
 from modules import player_manager, game_data
 from handlers.admin.utils import ensure_admin
-from modules.player.premium import PremiumManager
 
 logger = logging.getLogger(__name__)
 
 # ---- States da conversa ----
 (ASK_NAME,) = range(1)
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0")) # Previne erro se .env falhar
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0")) 
 
 # ---------------------------------------------------------
 # Utilidades
 # ---------------------------------------------------------
 def _fmt_date(iso: Optional[str]) -> str:
-    if not iso: return "Permanente"
+    if not iso: return "Permanente / Indefinido"
     try:
         dt = datetime.fromisoformat(iso)
         if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
@@ -49,9 +46,9 @@ def _set_user_target(context: ContextTypes.DEFAULT_TYPE, uid: int, name: str) ->
 def _panel_text(user_id: int, pdata: dict) -> str:
     name = pdata.get("character_name") or f"Jogador {user_id}"
     
-    # Lê direto do dicionário para garantir que mostre o que está no banco
+    # --- CORREÇÃO AQUI: Lê a chave correta 'premium_expires_at' ---
     tier = pdata.get("premium_tier")
-    exp_iso = pdata.get("premium_expiration")
+    exp_iso = pdata.get("premium_expires_at") # <--- CORRIGIDO
     
     tier_disp = game_data.PREMIUM_TIERS.get(tier, {}).get("display_name", "Free") if tier else "Free"
     exp_disp = _fmt_date(exp_iso)
@@ -145,20 +142,12 @@ async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     return ASK_NAME
 
-# ---------------------------------------------------------
-# Ações do painel (Callbacks)
-# ---------------------------------------------------------
-
 async def _safe_edit(query, text, keyboard):
-    """Tenta editar a mensagem ignorando erro de 'não modificado'."""
     try:
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
     except BadRequest as e:
-        if "not modified" in str(e) or "Message is not modified" in str(e):
-            pass 
-        else:
-            logger.error(f"Erro no _safe_edit: {e}")
-            # Não damos raise para não quebrar o fluxo, apenas logamos
+        if "not modified" in str(e): pass 
+        else: logger.error(f"Erro no _safe_edit: {e}")
     except Exception as e:
         logger.error(f"Erro genérico ao editar mensagem: {e}")
 
@@ -177,17 +166,16 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Dados não encontrados.")
 
-        # Define direto
         pdata["premium_tier"] = new_tier
-        # Se virou Free, remove a data. Se virou outro, mantem a data (ou deixa permanente se não tiver)
+        
+        # --- CORREÇÃO AQUI: Usa a chave correta ---
         if new_tier == "free":
-            pdata["premium_expiration"] = None
+            pdata["premium_expires_at"] = None # <--- CORRIGIDO
         
         await player_manager.save_player_data(target_uid, pdata)
 
         updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
-        
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
@@ -197,9 +185,6 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return ASK_NAME
 
 async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    VERSÃO DETETIVE: Limpeza profunda e LOG das chaves no terminal para debug.
-    """
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
     target_uid = _get_user_target(context)
@@ -214,82 +199,57 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     except:
         return ASK_NAME
 
-    await query.answer(f"Limpando dados e definindo +{days} dias...")
+    await query.answer(f"Adicionando +{days} dias...")
 
     try:
         pdata = await player_manager.get_player_data(target_uid)
         if not pdata: raise ValueError("Jogador não encontrado.")
 
-        # --- 1. LOG PARA DEBUG (Olhe no seu terminal após clicar!) ---
-        logger.info(f"--- CHAVES ATUAIS DO JOGADOR {target_uid} ---")
-        keys_list = list(pdata.keys())
-        logger.info(f"Chaves: {keys_list}")
-        # Se houver sub-dicionários suspeitos, logamos também
-        if "premium" in pdata and isinstance(pdata["premium"], dict):
-            logger.info(f"Conteúdo de 'premium': {pdata['premium']}")
-        if "vip" in pdata:
-            logger.info(f"Conteúdo de 'vip': {pdata['vip']}")
-        logger.info("------------------------------------------------")
+        # --- LIMPEZA DE LIXO (CHAVES VELHAS) ---
+        trash_keys = ["premium_expiration", "is_permanent", "infinite_premium", "lifetime", "vip_data"]
+        for k in trash_keys:
+            if k in pdata: del pdata[k]
 
-        # --- 2. LIMPEZA AGRESSIVA ---
-        # Lista de chaves suspeitas que podem travar o perfil em Permanente
-        suspeitos = [
-            "is_permanent", "permanent", "premium_permanent", "infinite_premium", 
-            "is_founder", "lifetime", "donator", "patron", "vip_permanent",
-            "vip_data", "premium_flags", "custom_title"
-        ]
-        
-        removidos = []
-        for chave in suspeitos:
-            if chave in pdata:
-                del pdata[chave]
-                removidos.append(chave)
-        
-        # Verifica se existe um sub-dicionário antigo 'premium' e o remove/limpa
-        # (Algumas versões salvam pdata['premium'] = {'permanent': True})
-        if "premium" in pdata and isinstance(pdata["premium"], dict):
-            removidos.append(f"premium_dict: {pdata['premium']}")
-            del pdata["premium"] # Deleta o objeto inteiro para recriar limpo se precisar
-
-        if removidos:
-            logger.info(f"♻️ LIMPEZA: Removeu as chaves travadas: {removidos}")
-
-        # --- 3. DEFINE A DATA ---
+        # --- LÓGICA DE DATA CORRIGIDA ---
         now = datetime.now(timezone.utc)
-        current_exp_iso = pdata.get("premium_expiration")
+        
+        # Usa a chave certa: premium_expires_at
+        current_exp_iso = pdata.get("premium_expires_at") 
         new_date = None
 
-        # Lógica de soma de data
         if not current_exp_iso:
+            # Se não tinha data, começa de agora
             new_date = now + timedelta(days=days)
         else:
             try:
                 current_date = datetime.fromisoformat(current_exp_iso)
                 if current_date.tzinfo is None: current_date = current_date.replace(tzinfo=timezone.utc)
+                
                 if current_date > now:
+                    # Se ainda é válido, soma ao final
                     new_date = current_date + timedelta(days=days)
                 else:
+                    # Se já venceu, soma a partir de agora
                     new_date = now + timedelta(days=days)
             except:
                 new_date = now + timedelta(days=days)
 
-        pdata["premium_expiration"] = new_date.isoformat()
+        # Salva na chave certa
+        pdata["premium_expires_at"] = new_date.isoformat() # <--- CORRIGIDO
         
-        # Garante o Tier
+        # Se estava free, vira Premium automaticamente para o tempo contar
         tier_atual = pdata.get("premium_tier")
         if not tier_atual or tier_atual == "free":
              pdata["premium_tier"] = "premium"
 
-        # --- 4. SALVA E ATUALIZA ---
         await player_manager.save_player_data(target_uid, pdata)
 
         updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
-        
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
-        logger.error(f"Erro detetive add days: {e}", exc_info=True)
+        logger.error(f"Erro add days: {e}", exc_info=True)
         await query.answer(f"❌ Erro: {e}", show_alert=True)
 
     return ASK_NAME
@@ -309,13 +269,14 @@ async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         if not pdata: raise ValueError("Dados não encontrados.")
 
         pdata["premium_tier"] = "free"
-        pdata["premium_expiration"] = None
+        
+        # Usa a chave certa para limpar
+        pdata["premium_expires_at"] = None # <--- CORRIGIDO
         
         await player_manager.save_player_data(target_uid, pdata)
 
         updated_pdata = await player_manager.get_player_data(target_uid)
         text = _panel_text(target_uid, updated_pdata)
-        
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
