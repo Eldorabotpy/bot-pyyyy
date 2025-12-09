@@ -1165,8 +1165,8 @@ if ENABLE_CHRISTMAS_EVENT:
     print("🎅 HO HO HO! O Evento de Natal foi ativado nos monstros!")
     
     # Configuração dos Drops
-    DROP_COMUM = {"item_id": "presente_perdido", "drop_chance": 25.0}  # 25% de chance
-    DROP_RARO =  {"item_id": "presente_dourado", "drop_chance": 2.5}   # 2.5% de chance (Skins)
+    DROP_COMUM = {"item_id": "presente_perdido", "drop_chance": 12.0}  # 25% de chance
+    DROP_RARO =  {"item_id": "presente_dourado", "drop_chance": 0.8}   # 2.5% de chance (Skins)
 
     # Itera sobre todas as regiões (pradaria, floresta, etc)
     for region_key, monster_list in MONSTERS_DATA.items():
