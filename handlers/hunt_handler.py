@@ -428,17 +428,14 @@ async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     region_key = (query.data or "").replace("hunt_", "", 1)
     
     await start_hunt(user_id, chat_id, context, is_auto_mode=False, region_key=region_key, query=query)
-
+    
 
 async def start_auto_hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Callback que lê os dados do botão (10, 25, 35) e chama o engine.
     """
     query = update.callback_query
-    try:
-        await query.answer()
-    except BadRequest:
-        pass
+    await query.answer()
     
     try:
         # Callback: "autohunt_start_COUNT_REGION"
