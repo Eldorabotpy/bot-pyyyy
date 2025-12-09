@@ -16,6 +16,8 @@ from handlers.menu.kingdom import show_kingdom_menu
 from modules.dungeons.registry import get_dungeon_for_region
 from modules.game_data.worldmap import WORLD_MAP
 from modules.game_data import monsters as monsters_data
+from handlers.christmas_shop import is_event_active
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -395,7 +397,10 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         
         if final_region_key == 'deserto_ancestral':
             keyboard.append([InlineKeyboardButton("🧙‍♂️ Cabana do Místico (Runas)", callback_data='rune_npc:main')])
-            
+
+        if final_region_key == 'picos_gelados' and is_event_active():
+             keyboard.append([InlineKeyboardButton("🎅 Cabana do Noel", callback_data="christmas_shop_open")])
+                 
         keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstro ", callback_data=f"hunt_{final_region_key}")])
 
         if premium.is_premium():
