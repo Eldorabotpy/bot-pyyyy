@@ -414,19 +414,31 @@ async def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
 async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler que é chamado pelo botão 'Caçar' manual."""
     query = update.callback_query
-    await query.answer()
+    
+    # --- CORREÇÃO AQUI ---
+    try:
+        await query.answer()
+    except BadRequest:
+        # Se a query for muito antiga, ignoramos o erro e continuamos a caça
+        pass
+    # ---------------------
+
     user_id = query.from_user.id
     chat_id = query.message.chat.id
     region_key = (query.data or "").replace("hunt_", "", 1)
     
     await start_hunt(user_id, chat_id, context, is_auto_mode=False, region_key=region_key, query=query)
 
+
 async def start_auto_hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Callback que lê os dados do botão (10, 25, 35) e chama o engine.
     """
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except BadRequest:
+        pass
     
     try:
         # Callback: "autohunt_start_COUNT_REGION"

@@ -95,14 +95,30 @@ CONSUMABLES_DATA = {
         "display_name": "Sigilo de Proteção",
         "emoji": "🛡️", 
         "type": "consumable",
-        "category": "consumivel",
         "stackable": True, 
         "description": "Um selo mágico imbuído com energia defensiva. Concede proteção temporária ou é usado em receitas de aprimoramento.",
-        "category": "material" 
+        "category": "material"
     },
         "gems": {
         "display_name": "Diamante", "emoji": "💎", 
         "type": "currency", "stackable": True, 
         "description": "Moeda premium."
-    }
+    },
+    "presente_perdido": {
+        "display_name": "Presente Perdido",
+        "emoji": "🎁",
+        "type": "material",
+        "description": "Um presente que caiu do trenó. O Noel troca por recompensas.",
+        "stackable": True,
+        "category": "evento"
+    },
+    
+    "presente_dourado": {
+        "display_name": "Presente Dourado",
+        "emoji": "🎁🌟",
+        "type": "material",
+        "description": "Um presente raro e brilhante! Troque por visuais exclusivos.",
+        "stackable": True,
+        "category": "evento"
+    },
 }

@@ -127,4 +127,60 @@ SKIN_CATALOG = {
         'description': 'Uma armadura de batalha ornamentada, símbolo de liderança e poder.'
     },
 }
+    #=====================================================================================
+    #evento de NATAL 2025
+    #======================================================================================
+
+event_skins = {
+    'sombra_de_krampus': {
+        'display_name': 'Sombra de Krampus',
+        'class': 'assassino',
+        'media_key': 'classe_assassino_sombra_de_krampus_media',
+        'description': 'Krampus é o "anti-Papai Noel" que pune os maus. Um assassino que se funde às sombras da noite de inverno.'
+    },
+    'santo_da_nevasca': {
+        'display_name': 'Santo da Nevasca',
+        'class': 'mago',
+        'media_key': 'classe_mago_santo_da_nevasca_media',
+        'description': 'Inspirado na mitologia russa, este mago do inverno comanda nevascas com um simples gesto.'
+    },
+    'espirito_da_rena_dourada': {
+        'display_name': 'Espírito da Rena Dourada',
+        'class': 'monge',
+        'media_key': 'classe_monge_espirito_da_rena_dourada_media',
+        'description': 'Seus punhos carregam a luz guia do natal. Uma aura dourada de rena protege este lutador sagrado.'
+    },
+    'oni_de_natal': {
+        'display_name': 'Oni de Natal',
+        'class': 'samurai',
+        'media_key': 'classe_samurai_oni_de_natal_media',
+        'description': 'Um demônio guerreiro redimido pelo espírito natalino, trajando armadura festiva e lâmina de gelo.'
+    },
+    'lamina_da_estrela_guia': {
+        'display_name': 'Lâmina da Estrela Guia',
+        'class': 'guerreiro',
+        'media_key': 'classe_guerreiro_lamina_da_estrela_guia_media',
+        'description': 'Sua montante carrega a própria Estrela de Belém na ponta, iluminando o caminho dos justos.'
+    },
+    'patrulheiro_do_polo_norte': {
+        'display_name': 'Patrulheiro do Polo Norte',
+        'class': 'cacador',
+        'media_key': 'classe_cacador_patrulheiro_do_polo_norte_media',
+        'description': 'O guardião silencioso das fronteiras geladas. Nenhum invasor passa despercebido em sua vigília.'
+    },
+    'esmagador_de_chamines': {
+        'display_name': 'Esmagador de Chaminés',
+        'class': 'beserker',
+        'media_key': 'classe_beserker_esmagador_de_chamines_media',
+        'description': 'Por que descer pela chaminé se você pode derrubar a casa inteira? Cuidado com seu Martelo-Presente!'
+    },
+    'maestro_da_noite_feliz': {
+        'display_name': 'Maestro da Noite Feliz',
+        'class': 'bardo',
+        'media_key': 'classe_bardo_maestro_feliz_media',
+        'description': 'Ele rege a magia como uma sinfonia. A música da noite de natal é sua arma mais poderosa.'
+    }
+}
+       
+
     # Adiciona aqui outras skins para as tuas outras classes...
