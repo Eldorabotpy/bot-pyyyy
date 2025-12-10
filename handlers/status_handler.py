@@ -114,7 +114,7 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
             keyboard_rows.append([InlineKeyboardButton(f"➕ 🍀 𝐒𝐎𝐑𝐓𝐄 (+{gains.get('luck', 1)})", callback_data='upgrade_luck')])
 
     # Botões fixos de navegação
-    keyboard_rows.append([InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data="open_evolution_menu")])
+    #keyboard_rows.append([InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data="open_evolution_menu")])
     keyboard_rows.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='profile')]) 
 
     return status_text, InlineKeyboardMarkup(keyboard_rows)
