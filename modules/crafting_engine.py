@@ -396,7 +396,14 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         slot_stats = _as_dict(getattr(rarity_tables, "BASE_STATS_BY_RARITY", {})).get(slot)
         
         if slot_stats:
-            primary_attr = next(iter(slot_stats.keys()), "hp")
+            # Pega a chave definida na tabela de raridade (ex: "__class_primary__" para anel/brinco)
+            raw_primary = next(iter(slot_stats.keys()), "hp")
+            
+            # === CORREÇÃO: Resolve a tag especial para o atributo da classe ===
+            if raw_primary == "__class_primary__":
+                primary_attr = CLASS_VISIBLE_PRIMARY_ATTR.get((target_class or ""), "hp")
+            else:
+                primary_attr = raw_primary
         else:
             primary_attr = "hp"
             
