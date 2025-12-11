@@ -3,153 +3,160 @@
 PREMIUM_TIERS = {
     "free": {
         "display_name": "Aventureiro Comum",
-        "color": "#AAAAAA",
         "perks": {
-            # Profissões / Coleta
-            "gather_speed_multiplier": 1.0,
-            "gather_xp_multiplier": 1.0,
-            "gather_energy_cost": 1,
-
-            # Progressão / Recompensas
+            "auto_hunt": False,
             "xp_multiplier": 1.0,
             "gold_multiplier": 1.0,
-
-            # Refino
-            "refine_speed_multiplier": 1.0,
-
-            # Energia
+            "refine_speed_multiplier": 1.0, # Normal
             "max_energy_bonus": 0,
-            "energy_regen_seconds": 420,
-
-            # Viagem (opcional; se quiser viagem instantânea para pagos)
-            "travel_time_multiplier": 1.0,  # free = normal
+            "energy_regen_seconds": 420, # 7 min
+            "travel_time_multiplier": 1.0,
+            "gather_speed_multiplier": 1.0,
+            "gather_energy_cost": 1,
         }
     },
     "premium": {
         "display_name": "Aventureiro Premium",
-        "color": "#FFD700",
         "perks": {
-            "gather_speed_multiplier": 1.5,
-            "gather_xp_multiplier": 1.5,
+            "auto_hunt": True,
+            "xp_multiplier": 1.25,      # 1.25x XP
+            "gold_multiplier": 1.25,    # 1.25x Ouro
+            "refine_speed_multiplier": 1.25, # 25% mais rápido
+            "max_energy_bonus": 5,      # Total 25
+            "energy_regen_seconds": 300, # 5 min
+            "travel_time_multiplier": 0.0,
+            "gather_speed_multiplier": 1.5, # 1.5x Coleta
             "gather_energy_cost": 1,
-
-            "xp_multiplier": 1.25,
-            "gold_multiplier": 1.25,
-
-            "refine_speed_multiplier": 1.25,
-
-            "max_energy_bonus": 5,
-            "energy_regen_seconds": 300,
-
-            "travel_time_multiplier": 0.0,  # viagem instantânea
         }
     },
     "vip": {
         "display_name": "Aventureiro VIP",
-        "color": "#FF4500",
         "perks": {
-            "gather_speed_multiplier": 2.0,
-            "gather_xp_multiplier": 2.0,
-            "gather_energy_cost": 0,
-
-            "xp_multiplier": 1.5,
-            "gold_multiplier": 1.5,
-
-            "refine_speed_multiplier": 1.5,
-
-            "max_energy_bonus": 10,
-            "energy_regen_seconds": 180,
-
+            "auto_hunt": True,
+            "xp_multiplier": 1.5,       # 1.5x XP
+            "gold_multiplier": 1.5,     # 1.5x Ouro
+            "refine_speed_multiplier": 1.5, # 50% mais rápido
+            "max_energy_bonus": 10,     # Total 30
+            "energy_regen_seconds": 180, # 3 min
             "travel_time_multiplier": 0.0,
+            "gather_speed_multiplier": 2.0, # 2x Coleta
+            "gather_energy_cost": 0,    # Coleta grátis? (No texto dizia custo 0)
         }
     },
     "lenda": {
         "display_name": "Aventureiro Lenda",
-        "color": "#B300FF",
         "perks": {
-            "gather_speed_multiplier": 2.5,
-            "gather_xp_multiplier": 2.5,
-            "gather_energy_cost": 0,
-
-            "xp_multiplier": 1.75,
-            "gold_multiplier": 1.5,
-
-            "refine_speed_multiplier": 2.0,
-
-            "max_energy_bonus": 15,
-            "energy_regen_seconds": 120,
-
+            "auto_hunt": True,
+            "xp_multiplier": 1.75,      # 1.75x XP
+            "gold_multiplier": 1.5,     # 1.5x Ouro
+            "refine_speed_multiplier": 2.0, # 2x mais rápido (100%)
+            "max_energy_bonus": 15,     # Total 35 (Base 20 + 15)
+            "energy_regen_seconds": 120, # 2 min
             "travel_time_multiplier": 0.0,
+            "gather_speed_multiplier": 2.5, # 2.5x Coleta
+            "gather_energy_cost": 0,    # Coleta sem gastar energia
         }
     }
 }
 
 # =================================================================
-# PLANOS PREMIUM À VENDA NA LOJA DE GEMAS (VERSÃO CORRIGIDA)
+# PLANOS E PREÇOS (AJUSTADOS PARA A ECONOMIA DO JOGO)
 # =================================================================
-# Agora, cada plano vende um TIER específico dos seus PREMIUM_TIERS.
 PREMIUM_PLANS_FOR_SALE = {
+    # --- PREMIUM (~R$ 20,00) ---
     "premium_30d": {
-        "name": "Aventureiro Premium (30 Dias)",
-        "description": "Ativa todas as vantagens do tier Premium.",
-        "price": 120, # Preço em gemas
-        "tier": "premium", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "Premium (30 Dias)", 
+        "price": 120, # Exatamente o pacote Básico
+        "tier": "premium", 
         "days": 30
     },
     "premium_15d": {
-        "name": "Aventureiro Premium (15 Dias)",
-        "description": "Ativa todas as vantagens do tier Premium.",
-        "price": 90, # Preço em gemas
-        "tier": "premium", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "Premium (15 Dias)", 
+        "price": 70, 
+        "tier": "premium", 
         "days": 15
     },
-    "premium_7d": {
-        "name": "Aventureiro Premium (7 Dias)",
-        "description": "Ativa todas as vantagens do tier Premium.",
-        "price": 40, # Preço em gemas
-        "tier": "premium", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+    "premium_7d":  {
+        "name": "Premium (7 Dias)",  
+        "price": 35, 
+        "tier": "premium", 
         "days": 7
     },
+    
+    # --- VIP (~R$ 40,00) ---
     "vip_30d": {
-        "name": "Aventureiro VIP (30 Dias)",
-        "description": "Ativa as vantagens incríveis do tier VIP.",
-        "price": 240, # Preço em gemas
-        "tier": "vip", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "VIP (30 Dias)",     
+        "price": 300, # Aprox R$ 40~42
+        "tier": "vip", 
         "days": 30
     },
     "vip_15d": {
-        "name": "Aventureiro VIP (15 Dias)",
-        "description": "Ativa as vantagens incríveis do tier VIP.",
-        "price": 130, # Preço em gemas
-        "tier": "vip", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "VIP (15 Dias)",     
+        "price": 160, 
+        "tier": "vip", 
         "days": 15
     },
     "vip_7d": {
-        "name": "Aventureiro VIP (7 Dias)",
-        "description": "Ativa as vantagens incríveis do tier VIP.",
-        "price": 70, # Preço em gemas
-        "tier": "vip", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "VIP (7 Dias)",      
+        "price": 80,  
+        "tier": "vip", 
         "days": 7
     },
+
+    # --- LENDA (~R$ 65,00) ---
     "lenda_30d": {
-        "name": "Aventureiro Lenda (30 Dias)",
-        "description": "Torne-se uma Lenda por um mês inteiro!",
-        "price": 360, # Preço em gemas
-        "tier": "lenda", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "Lenda (30 Dias)",   
+        "price": 500, # Aprox R$ 65,00
+        "tier": "lenda", 
         "days": 30
     },
     "lenda_15d": {
-        "name": "Aventureiro Lenda (15 Dias)",
-        "description": "Torne-se uma Lenda por um mês inteiro!",
-        "price": 190, # Preço em gemas
-        "tier": "lenda", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "Lenda (15 Dias)",   
+        "price": 270, 
+        "tier": "lenda", 
         "days": 15
     },
     "lenda_7d": {
-        "name": "Aventureiro Lenda (7 Dias)",
-        "description": "Torne-se uma Lenda por um mês inteiro!",
-        "price": 100, # Preço em gemas
-        "tier": "lenda", # <--- Mapeia diretamente para a chave em PREMIUM_TIERS
+        "name": "Lenda (7 Dias)",    
+        "price": 140, 
+        "tier": "lenda", 
         "days": 7
     },
 }
+
+def get_benefits_text(tier_key: str) -> str:
+    """Gera um texto bonito com as vantagens do tier."""
+    data = PREMIUM_TIERS.get(tier_key, {}).get("perks", {})
+    if not data: return "Sem benefícios."
+
+    lines = []
+    
+    # Auto Caça
+    if data.get("auto_hunt"):
+        lines.append("🤖 <b>Auto Caça:</b> Liberado")
+    
+    # Coleta
+    gather_speed = data.get("gather_speed_multiplier", 1.0)
+    gather_cost = data.get("gather_energy_cost", 1)
+    if gather_speed > 1.0:
+        lines.append(f"⚡️ <b>Coleta:</b> {gather_speed}x mais rápida")
+    if gather_cost == 0:
+        lines.append("💥 <b>Coleta:</b> Energia ZERO")
+
+    # Multiplicadores
+    xp = int((data.get("xp_multiplier", 1.0) - 1) * 100)
+    gold = int((data.get("gold_multiplier", 1.0) - 1) * 100)
+    refine = int((data.get("refine_speed_multiplier", 1.0) - 1) * 100)
+    
+    if xp > 0: lines.append(f"📈 <b>XP:</b> +{xp}%")
+    if gold > 0: lines.append(f"💰 <b>Ouro:</b> +{gold}%")
+    if refine > 0: lines.append(f"⚒ <b>Refino:</b> +{refine}% Vel.")
+    
+    # Energia
+    bonus_e = data.get("max_energy_bonus", 0)
+    
+    if bonus_e > 0: 
+        base = 20
+        lines.append(f"💚 <b>Energia Máx:</b> +{bonus_e} ({base}→{base+bonus_e})")
+
+    return "\n".join(lines)

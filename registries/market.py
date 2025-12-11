@@ -101,24 +101,27 @@ def register_market_handlers(application: Application):
         except ImportError:
             logging.warning("Gem Market handlers not found (optional).")
 
-        # Loja de Gemas (Bot)
         try:
             from handlers.gem_shop_handler import (
-                gem_shop_command_handler, gem_shop_menu_handler, gem_shop_items_handler,
-                gem_item_pick_handler, gem_item_qty_handler, gem_item_buy_handler,
-                gem_shop_premium_handler, gem_prem_confirm_handler, gem_prem_execute_handler,
+                gem_shop_open_handler,
+                gem_tab_handler,          # <--- NOVO
+                gem_pick_handler,
+                gem_qty_minus_handler,
+                gem_qty_plus_handler,
+                gem_buy_handler,
+                gem_shop_command_handler
             )
+            
+            application.add_handler(gem_shop_open_handler)
+            application.add_handler(gem_tab_handler)  # <--- NOVO (Registra o clique na aba)
+            application.add_handler(gem_pick_handler)
+            application.add_handler(gem_qty_minus_handler)
+            application.add_handler(gem_qty_plus_handler)
+            application.add_handler(gem_buy_handler)
             application.add_handler(gem_shop_command_handler)
-            application.add_handler(gem_shop_menu_handler)
-            application.add_handler(gem_shop_items_handler)
-            application.add_handler(gem_item_pick_handler)
-            application.add_handler(gem_item_qty_handler)
-            application.add_handler(gem_item_buy_handler)
-            application.add_handler(gem_shop_premium_handler)
-            application.add_handler(gem_prem_confirm_handler)
-            application.add_handler(gem_prem_execute_handler)
-        except ImportError:
-            logging.warning("Gem Shop handlers not found (optional).")
+            
+        except ImportError as e:
+            logging.error(f"Erro ao importar Gem Shop handlers: {e}")
 
         # Loja do Reino
         try:

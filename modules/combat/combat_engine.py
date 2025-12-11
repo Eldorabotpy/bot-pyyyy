@@ -1,5 +1,5 @@
 # modules/combat/combat_engine.py
-# (VERSÃO CORRIGIDA: Importando durability da pasta correta 'modules.combat')
+# (VERSÃO CORRIGIDA: SEM PENALIDADE DE DANO QUANDO ARMA QUEBRA)
 
 import random
 import logging
@@ -8,11 +8,7 @@ from typing import Optional, Dict, Any
 from modules.game_data.skills import SKILL_DATA
 from modules.combat import criticals
 from modules import player_manager
-
-# --- CORREÇÃO AQUI ---
-# Como o arquivo está em modules/combat/durability.py, importamos dele:
 from modules.combat import durability 
-# ---------------------
 
 logger = logging.getLogger(__name__)
 
@@ -69,22 +65,21 @@ async def processar_acao_combate(
     log_messages = [] 
 
     # =========================================================================
-    # 🛡️ 1. VERIFICAÇÃO DE ARMA QUEBRADA (Reduz Ataque)
+    # 🛡️ 1. VERIFICAÇÃO DE ARMA QUEBRADA (CORRIGIDO: Apenas Aviso)
     # =========================================================================
     is_weapon_broken, weapon_uid, (w_cur, w_max) = durability.is_weapon_broken(attacker_pdata)
     
     if is_weapon_broken:
-        # PENALIDADE: Reduz o ataque em 90%
-        original_atk = attacker_stats_modified.get('attack', 10)
-        attacker_stats_modified['attack'] = max(1, int(original_atk * 0.1))
-        
+        # APENAS AVISO VISUAL - NÃO REDUZ MAIS O DANO
         log_messages.append(f"⚠️ <b>Sua arma está QUEBRADA ({w_cur}/{w_max})!</b>")
-        log_messages.append("<i>Seu dano foi drasticamente reduzido.</i>")
+        # log_messages.append("<i>Seu dano foi drasticamente reduzido.</i>") # Removido
     
     # =========================================================================
-    # 🛡️ 2. VERIFICAÇÃO DE ARMADURA QUEBRADA (Reduz Defesa)
+    # 🛡️ 2. VERIFICAÇÃO DE ARMADURA QUEBRADA (Mantém penalidade de defesa?)
     # =========================================================================
-    # Lista de slots de armadura para verificar
+    # Se quiser remover a penalidade de defesa também, basta comentar o bloco abaixo.
+    # Por enquanto, mantive a penalidade de defesa pois faz sentido "apanhar mais" sem armadura.
+    
     armor_slots = ["elmo", "armadura", "calca", "luvas", "botas", "anel", "colar", "brinco"]
     broken_armor_count = 0
     
