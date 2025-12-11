@@ -1,4 +1,5 @@
 # handlers/admin/premium_panel.py
+# (VERSÃO CORRIGIDA: REMOÇÃO DE 'PERMANENTE' E LIMPEZA DE DADOS ANTIGOS)
 
 from __future__ import annotations
 import os
@@ -29,12 +30,20 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 # Utilidades
 # ---------------------------------------------------------
 def _fmt_date(iso: Optional[str]) -> str:
-    if not iso: return "Permanente / Indefinido"
+    # SE NÃO TIVER DATA, É FREE / SEM ASSINATURA (NÃO MAIS PERMANENTE)
+    if not iso: return "Nenhuma (Free)"
+    
     try:
         dt = datetime.fromisoformat(iso)
         if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+        
+        # Verifica se já venceu
+        now = datetime.now(timezone.utc)
+        if dt < now:
+            return "Expirado"
+            
         return dt.astimezone(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
-    except Exception: return iso
+    except Exception: return "Data Inválida"
 
 def _get_user_target(context: ContextTypes.DEFAULT_TYPE) -> Optional[int]:
     return context.user_data.get("premium_target_uid")
@@ -46,46 +55,52 @@ def _set_user_target(context: ContextTypes.DEFAULT_TYPE, uid: int, name: str) ->
 def _panel_text(user_id: int, pdata: dict) -> str:
     name = pdata.get("character_name") or f"Jogador {user_id}"
     
-    # --- CORREÇÃO AQUI: Lê a chave correta 'premium_expires_at' ---
     tier = pdata.get("premium_tier")
-    exp_iso = pdata.get("premium_expires_at") # <--- CORRIGIDO
+    exp_iso = pdata.get("premium_expires_at")
     
-    tier_disp = game_data.PREMIUM_TIERS.get(tier, {}).get("display_name", "Free") if tier else "Free"
-    exp_disp = _fmt_date(exp_iso)
+    # Se tier for None ou 'free', força exibição correta
+    if not tier or tier == "free":
+        tier_disp = "Aventureiro Comum (Free)"
+        exp_disp = "-"
+    else:
+        tier_disp = game_data.PREMIUM_TIERS.get(tier, {}).get("display_name", tier.title())
+        exp_disp = _fmt_date(exp_iso)
 
     return (
-        "🔥 <b>Painel Premium</b>\n\n"
-        f"<b>Usuário:</b> {name} <code>({user_id})</code>\n"
-        f"<b>Tier Atual:</b> {tier_disp}\n"
-        f"<b>Expira em:</b> {exp_disp}\n\n"
-        "Selecione uma ação:"
+        "🔥 <b>PAINEL DE GESTÃO PREMIUM</b>\n\n"
+        f"👤 <b>Usuário:</b> {name} <code>({user_id})</code>\n"
+        f"👑 <b>Plano Atual:</b> {tier_disp}\n"
+        f"📅 <b>Vencimento:</b> {exp_disp}\n\n"
+        "👇 <b>Selecione uma ação:</b>"
     )
 
 def _panel_keyboard() -> InlineKeyboardMarkup:
     rows = [
         [
-            InlineKeyboardButton("🆓 Free", callback_data="prem_tier:free"),
+            InlineKeyboardButton("🆓 Definir FREE", callback_data="prem_tier:free"),
             InlineKeyboardButton("⭐ Premium", callback_data="prem_tier:premium"),
+        ],
+        [
             InlineKeyboardButton("💎 VIP", callback_data="prem_tier:vip"),
             InlineKeyboardButton("👑 Lenda", callback_data="prem_tier:lenda"),
         ],
         [
-            InlineKeyboardButton("➕ 1 Dia", callback_data="prem_add:1"),
-            InlineKeyboardButton("➕ 7 Dias", callback_data="prem_add:7"),
-            InlineKeyboardButton("➕ 30 Dias", callback_data="prem_add:30"),
+            InlineKeyboardButton("📅 +1 Dia", callback_data="prem_add:1"),
+            InlineKeyboardButton("📅 +7 Dias", callback_data="prem_add:7"),
+            InlineKeyboardButton("📅 +30 Dias", callback_data="prem_add:30"),
         ],
         [
-             InlineKeyboardButton("🚫 Remover Premium", callback_data="prem_clear"),
+             InlineKeyboardButton("🗑️ LIMPAR TUDO (Reset)", callback_data="prem_clear"),
         ],
         [
-            InlineKeyboardButton("🔎 Trocar Usuário", callback_data="prem_change_user"),
-            InlineKeyboardButton("❌ Fechar Painel", callback_data="prem_close"),
+            InlineKeyboardButton("🔎 Outro Usuário", callback_data="prem_change_user"),
+            InlineKeyboardButton("❌ Sair", callback_data="prem_close"),
         ],
     ]
     return InlineKeyboardMarkup(rows)
 
 # ---------------------------------------------------------
-# Entrada e Gestão da Conversa
+# Lógica
 # ---------------------------------------------------------
 async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): return ConversationHandler.END
@@ -94,11 +109,11 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     except: pass
 
     prompt = (
-        "🔥 <b>Painel Premium</b>\n\n"
-        "Envie o <b>User ID</b> ou o <b>nome exato do personagem</b>.\n"
-        "Use /cancelar para sair."
+        "🔥 <b>GESTOR PREMIUM</b>\n\n"
+        "Envie o <b>ID Numérico</b> ou <b>Nome do Personagem</b> para editar.\n"
+        "<i>Use /cancelar para sair.</i>"
     )
-    keyboard = [[InlineKeyboardButton("❌ Fechar", callback_data="prem_close")]]
+    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data="prem_close")]]
     
     try:
         await query.edit_message_text(prompt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -129,8 +144,7 @@ async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if not pdata:
         await update.message.reply_text(
-            "❌ Jogador não encontrado. Tente novamente com o <b>User ID</b> ou o <b>nome exato</b>.\n"
-            "Use /cancelar para sair.", parse_mode="HTML"
+            "❌ Jogador não encontrado. Tente novamente ou use /cancelar.", parse_mode="HTML"
         )
         return ASK_NAME
 
@@ -145,11 +159,8 @@ async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def _safe_edit(query, text, keyboard):
     try:
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
-    except BadRequest as e:
-        if "not modified" in str(e): pass 
-        else: logger.error(f"Erro no _safe_edit: {e}")
-    except Exception as e:
-        logger.error(f"Erro genérico ao editar mensagem: {e}")
+    except BadRequest: pass 
+    except Exception as e: logger.error(f"Erro edit: {e}")
 
 async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): return ConversationHandler.END
@@ -157,30 +168,32 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await query.answer()
     target_uid = _get_user_target(context)
     if not target_uid:
-        await query.answer("Erro: Alvo perdido.", show_alert=True)
+        await query.answer("Sessão expirada.", show_alert=True)
         return ASK_NAME
 
     new_tier = (query.data or "prem_tier:free").split(":", 1)[1]
 
     try:
         pdata = await player_manager.get_player_data(target_uid)
-        if not pdata: raise ValueError("Dados não encontrados.")
-
+        
         pdata["premium_tier"] = new_tier
         
-        # --- CORREÇÃO AQUI: Usa a chave correta ---
         if new_tier == "free":
-            pdata["premium_expires_at"] = None # <--- CORRIGIDO
+            # Se virou Free, remove a data para não mostrar "Expirado"
+            pdata["premium_expires_at"] = None 
+        else:
+            # Se definiu um tier pago manualmente, dá 30 dias por padrão se não tiver data
+            if not pdata.get("premium_expires_at"):
+                now = datetime.now(timezone.utc)
+                pdata["premium_expires_at"] = (now + timedelta(days=30)).isoformat()
         
         await player_manager.save_player_data(target_uid, pdata)
 
-        updated_pdata = await player_manager.get_player_data(target_uid)
-        text = _panel_text(target_uid, updated_pdata)
+        text = _panel_text(target_uid, pdata)
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
-        logger.error(f"Erro set tier: {e}")
-        await query.answer(f"❌ Erro: {e}", show_alert=True)
+        await query.answer(f"Erro: {e}", show_alert=True)
 
     return ASK_NAME
 
@@ -188,112 +201,90 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
     target_uid = _get_user_target(context)
-    
-    if not target_uid:
-        await query.answer("Erro: Alvo perdido.", show_alert=True)
-        return ASK_NAME
+    if not target_uid: return ASK_NAME
 
     try:
-        days_str = (query.data or "prem_add:1").split(":", 1)[1]
-        days = int(days_str)
-    except:
-        return ASK_NAME
+        days = int(query.data.split(":")[1])
+    except: return ASK_NAME
 
-    await query.answer(f"Adicionando +{days} dias...")
+    await query.answer(f"Adicionando {days} dias...")
 
     try:
         pdata = await player_manager.get_player_data(target_uid)
-        if not pdata: raise ValueError("Jogador não encontrado.")
-
-        # --- LIMPEZA DE LIXO (CHAVES VELHAS) ---
-        trash_keys = ["premium_expiration", "is_permanent", "infinite_premium", "lifetime", "vip_data"]
-        for k in trash_keys:
+        
+        # Limpeza de chaves legadas que podiam causar o bug "Permanente"
+        for k in ["is_permanent", "infinite_premium", "lifetime"]:
             if k in pdata: del pdata[k]
 
-        # --- LÓGICA DE DATA CORRIGIDA ---
         now = datetime.now(timezone.utc)
-        
-        # Usa a chave certa: premium_expires_at
         current_exp_iso = pdata.get("premium_expires_at") 
         new_date = None
 
         if not current_exp_iso:
-            # Se não tinha data, começa de agora
             new_date = now + timedelta(days=days)
         else:
             try:
-                current_date = datetime.fromisoformat(current_exp_iso)
-                if current_date.tzinfo is None: current_date = current_date.replace(tzinfo=timezone.utc)
+                curr = datetime.fromisoformat(current_exp_iso)
+                if curr.tzinfo is None: curr = curr.replace(tzinfo=timezone.utc)
                 
-                if current_date > now:
-                    # Se ainda é válido, soma ao final
-                    new_date = current_date + timedelta(days=days)
-                else:
-                    # Se já venceu, soma a partir de agora
-                    new_date = now + timedelta(days=days)
+                if curr > now: new_date = curr + timedelta(days=days)
+                else: new_date = now + timedelta(days=days)
             except:
                 new_date = now + timedelta(days=days)
 
-        # Salva na chave certa
-        pdata["premium_expires_at"] = new_date.isoformat() # <--- CORRIGIDO
+        pdata["premium_expires_at"] = new_date.isoformat()
         
-        # Se estava free, vira Premium automaticamente para o tempo contar
-        tier_atual = pdata.get("premium_tier")
-        if not tier_atual or tier_atual == "free":
+        # Se estava free, vira Premium básico pra contar o tempo
+        if not pdata.get("premium_tier") or pdata.get("premium_tier") == "free":
              pdata["premium_tier"] = "premium"
 
         await player_manager.save_player_data(target_uid, pdata)
 
-        updated_pdata = await player_manager.get_player_data(target_uid)
-        text = _panel_text(target_uid, updated_pdata)
+        text = _panel_text(target_uid, pdata)
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
-        logger.error(f"Erro add days: {e}", exc_info=True)
-        await query.answer(f"❌ Erro: {e}", show_alert=True)
+        logger.error(f"Erro add days: {e}")
 
     return ASK_NAME
 
 async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Reseta totalmente o status premium do jogador (Vira Free e sem data)."""
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
     target_uid = _get_user_target(context)
-    if not target_uid:
-        await query.answer("Erro: Alvo perdido.", show_alert=True)
-        return ASK_NAME
-
-    await query.answer("Removendo Premium...")
+    
+    await query.answer("Limpando dados premium...")
 
     try:
         pdata = await player_manager.get_player_data(target_uid)
-        if not pdata: raise ValueError("Dados não encontrados.")
-
-        pdata["premium_tier"] = "free"
         
-        # Usa a chave certa para limpar
-        pdata["premium_expires_at"] = None # <--- CORRIGIDO
+        # ZERA TUDO
+        pdata["premium_tier"] = "free"
+        pdata["premium_expires_at"] = None
+        
+        # Remove lixo legado
+        for k in ["premium_expiration", "is_permanent", "infinite_premium", "lifetime", "vip_data"]:
+            if k in pdata: del pdata[k]
         
         await player_manager.save_player_data(target_uid, pdata)
 
-        updated_pdata = await player_manager.get_player_data(target_uid)
-        text = _panel_text(target_uid, updated_pdata)
+        text = _panel_text(target_uid, pdata)
         await _safe_edit(query, text, _panel_keyboard())
 
     except Exception as e:
         logger.error(f"Erro clear: {e}")
-        await query.answer(f"❌ Erro: {e}", show_alert=True)
 
     return ASK_NAME
 
 async def _action_change_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await ensure_admin(update): return ConversationHandler.END
     return await _entry_from_callback(update, context)
 
 async def _action_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
-    try: await query.answer()
-    except: pass
-    try: await query.delete_message()
+    try: 
+        await query.answer()
+        await query.delete_message()
     except: pass
     context.user_data.clear()
     return ConversationHandler.END
@@ -302,23 +293,6 @@ async def _cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await update.message.reply_text("Operação cancelada.")
     context.user_data.clear()
     return ConversationHandler.END
-
-async def _premium_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
-    if not context.args:
-        await update.message.reply_text("Uso: /premium_user <user_id>")
-        return
-    try: uid = int(context.args[0])
-    except: return
-
-    pdata = await player_manager.get_player_data(uid)
-    if not pdata:
-        await update.message.reply_text("Não encontrado.")
-        return
-
-    player_name = pdata.get("character_name", f"ID: {uid}")
-    _set_user_target(context, uid, player_name)
-    await update.message.reply_text(_panel_text(uid, pdata), parse_mode="HTML", reply_markup=_panel_keyboard())
 
 # ---------------------------------------------------------
 # Exports
@@ -330,8 +304,8 @@ premium_panel_handler = ConversationHandler(
     states={
         ASK_NAME: [
             MessageHandler(filters.TEXT & ~filters.COMMAND, _receive_name_or_id),
-            CallbackQueryHandler(_action_set_tier, pattern=r"^prem_tier:(free|premium|vip|lenda)$"),
-            CallbackQueryHandler(_action_add_days, pattern=r"^prem_add:(\d+)$"),
+            CallbackQueryHandler(_action_set_tier, pattern=r"^prem_tier:"),
+            CallbackQueryHandler(_action_add_days, pattern=r"^prem_add:"),
             CallbackQueryHandler(_action_clear, pattern=r"^prem_clear$"),
             CallbackQueryHandler(_action_change_user, pattern=r"^prem_change_user$"),
             CallbackQueryHandler(_action_close, pattern=r"^prem_close$"),
@@ -344,5 +318,3 @@ premium_panel_handler = ConversationHandler(
     name="premium_panel_conv",
     persistent=False,
 )
-
-premium_command_handler = CommandHandler("premium_user", _premium_user_cmd, filters=filters.User(ADMIN_ID))
