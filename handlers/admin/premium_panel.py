@@ -1,5 +1,5 @@
 # handlers/admin/premium_panel.py
-# (VERSÃO CORRIGIDA: REMOÇÃO DE 'PERMANENTE' E LIMPEZA DE DADOS ANTIGOS)
+# (VERSÃO FINAL: COM BOTÕES DE REMOVER DIAS E FIX DE 'PERMANENTE')
 
 from __future__ import annotations
 import os
@@ -30,7 +30,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 # Utilidades
 # ---------------------------------------------------------
 def _fmt_date(iso: Optional[str]) -> str:
-    # SE NÃO TIVER DATA, É FREE / SEM ASSINATURA (NÃO MAIS PERMANENTE)
+    # SE NÃO TIVER DATA, É FREE / SEM ASSINATURA (CORREÇÃO DE 'PERMANENTE')
     if not iso: return "Nenhuma (Free)"
     
     try:
@@ -89,6 +89,12 @@ def _panel_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📅 +7 Dias", callback_data="prem_add:7"),
             InlineKeyboardButton("📅 +30 Dias", callback_data="prem_add:30"),
         ],
+        # --- NOVOS BOTÕES DE REMOVER DIAS ---
+        [
+            InlineKeyboardButton("🔻 -1 Dia", callback_data="prem_add:-1"),
+            InlineKeyboardButton("🔻 -5 Dias", callback_data="prem_add:-5"),
+        ],
+        # ------------------------------------
         [
              InlineKeyboardButton("🗑️ LIMPAR TUDO (Reset)", callback_data="prem_clear"),
         ],
@@ -179,10 +185,8 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         pdata["premium_tier"] = new_tier
         
         if new_tier == "free":
-            # Se virou Free, remove a data para não mostrar "Expirado"
             pdata["premium_expires_at"] = None 
         else:
-            # Se definiu um tier pago manualmente, dá 30 dias por padrão se não tiver data
             if not pdata.get("premium_expires_at"):
                 now = datetime.now(timezone.utc)
                 pdata["premium_expires_at"] = (now + timedelta(days=30)).isoformat()
@@ -207,12 +211,14 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         days = int(query.data.split(":")[1])
     except: return ASK_NAME
 
-    await query.answer(f"Adicionando {days} dias...")
+    # Feedback visual (Adicionando ou Removendo)
+    action_text = f"Adicionando {days}" if days > 0 else f"Removendo {abs(days)}"
+    await query.answer(f"{action_text} dias...")
 
     try:
         pdata = await player_manager.get_player_data(target_uid)
         
-        # Limpeza de chaves legadas que podiam causar o bug "Permanente"
+        # Limpa lixo legado
         for k in ["is_permanent", "infinite_premium", "lifetime"]:
             if k in pdata: del pdata[k]
 
@@ -221,20 +227,25 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         new_date = None
 
         if not current_exp_iso:
+            # Se não tem data, começa de agora (só funciona bem se days > 0)
             new_date = now + timedelta(days=days)
         else:
             try:
                 curr = datetime.fromisoformat(current_exp_iso)
                 if curr.tzinfo is None: curr = curr.replace(tzinfo=timezone.utc)
                 
-                if curr > now: new_date = curr + timedelta(days=days)
-                else: new_date = now + timedelta(days=days)
+                if curr > now:
+                    # Se ainda é válido, soma (ou subtrai) da data final
+                    new_date = curr + timedelta(days=days)
+                else:
+                    # Se já venceu, começa de agora
+                    new_date = now + timedelta(days=days)
             except:
                 new_date = now + timedelta(days=days)
 
+        # Se a subtração resultar numa data passada, ainda salvamos (vai aparecer como Expirado)
         pdata["premium_expires_at"] = new_date.isoformat()
         
-        # Se estava free, vira Premium básico pra contar o tempo
         if not pdata.get("premium_tier") or pdata.get("premium_tier") == "free":
              pdata["premium_tier"] = "premium"
 
@@ -249,7 +260,6 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return ASK_NAME
 
 async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Reseta totalmente o status premium do jogador (Vira Free e sem data)."""
     if not await ensure_admin(update): return ConversationHandler.END
     query = update.callback_query
     target_uid = _get_user_target(context)
@@ -259,11 +269,9 @@ async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     try:
         pdata = await player_manager.get_player_data(target_uid)
         
-        # ZERA TUDO
         pdata["premium_tier"] = "free"
         pdata["premium_expires_at"] = None
         
-        # Remove lixo legado
         for k in ["premium_expiration", "is_permanent", "infinite_premium", "lifetime", "vip_data"]:
             if k in pdata: del pdata[k]
         
