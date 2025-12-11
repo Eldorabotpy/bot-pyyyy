@@ -1,5 +1,5 @@
 # handlers/profile_handler.py
-# (VERSÃO FINAL: Blindada contra erro de mensagem não encontrada e envio de mídia)
+# (VERSÃO CORRIGIDA: Lê a chave correta 'premium_expires_at')
 
 import logging
 import unicodedata
@@ -339,14 +339,14 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chance_esquiva = int((await player_manager.get_player_dodge_chance(player_data)) * 100)
     chance_ataque_duplo = int((await player_manager.get_player_double_attack_chance(player_data)) * 100)
 
-    # --- CORREÇÃO DO LOCAL: Pega a localização exata ---
     location_key = player_data.get('current_location', 'reino_eldora')
     location_name = (game_data.REGIONS_DATA or {}).get(location_key, {}).get('display_name', 'Lugar Desconhecido')
 
-    # ===== BLOCO PREMIUM =====
+    # ===== BLOCO PREMIUM CORRIGIDO =====
     premium_line = ""
     raw_tier = player_data.get("premium_tier")
-    raw_exp = player_data.get("premium_expiration")
+    # AQUI ESTAVA O ERRO: Trocamos 'premium_expiration' por 'premium_expires_at'
+    raw_exp = player_data.get("premium_expires_at") 
 
     if raw_tier and raw_tier != "free":
         tier_name = raw_tier.capitalize()
@@ -359,7 +359,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Data Inválida)"
         else:
-            premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Permanente)"
+            # Se ainda cair aqui é porque o DB realmente está sem data (Free ou Bug)
+            premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Sem Data)"
     
     max_energy  = int(player_manager.get_player_max_energy(player_data))
     combat_level = int(player_data.get('level', 1))
@@ -415,14 +416,12 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     profile_text = "\n".join(lines)
 
-    # ===== TECLADO DO PERFIL =====
     keyboard = []
     if player_manager.needs_class_choice(player_data):
         keyboard.append([InlineKeyboardButton("✨ 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐂𝐥𝐚𝐬𝐬𝐞", callback_data='class_open')])
     if not prof_norm:
         keyboard.append([InlineKeyboardButton("💼 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data='job_menu')])
 
-    # Define o callback de voltar DINAMICAMENTE
     if location_key == "reino_eldora":
         back_callback = "back_to_kingdom"
     else:
@@ -444,15 +443,10 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     media = _get_class_media(player_data, "personagem")
     
-    # --- LÓGICA DE ENVIO BLINDADA ---
-    # 1. Tenta deletar mensagem antiga (se existir)
     if query:
-        try:
-            await query.delete_message()
-        except Exception:
-            pass # Ignora se já foi deletada
+        try: await query.delete_message()
+        except Exception: pass
 
-    # 2. Tenta enviar com foto/vídeo
     if media and media.get("id"):
         try:
             fid  = media["id"]
@@ -464,9 +458,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return 
         except Exception as e:
             logger.error(f"Falha ao enviar mídia do perfil: {e}")
-            # Se falhar a mídia, cai para o envio de texto abaixo (fallback)
 
-    # 3. Fallback: Envia apenas texto se não tiver mídia ou se a mídia falhou
     await context.bot.send_message(chat_id=chat_id, text=profile_text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ====================================================================
