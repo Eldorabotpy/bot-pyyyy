@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from telegram.ext import ContextTypes
 from collections import Counter
+from telegram.error import Forbidden
 
 from telegram import (
     InlineKeyboardMarkup, InlineKeyboardButton, Update,
@@ -209,17 +210,16 @@ async def execute_hunt_completion(
     keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Região", callback_data=f"open_region:{region_key}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # --- Envio Visual ---
-    # Se não temos message_id (chamada via Recovery), mandamos nova mensagem
-    if not message_id:
-        await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
-        return
-
-    # Tenta editar a mensagem existente (chamada via Job)
-    media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
-    file_data = file_id_manager.get_file_data(media_key)
-    
     try:
+        # Se não temos message_id (chamada via Recovery), mandamos nova mensagem
+        if not message_id:
+            await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
+            return
+
+        # Tenta editar a mensagem existente (chamada via Job)
+        media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
+        file_data = file_id_manager.get_file_data(media_key)
+        
         if file_data and file_data.get("id"):
             media_type = (file_data.get("type") or "photo").lower()
             InputMediaClass = InputMediaPhoto if media_type == "photo" else InputMediaVideo
@@ -233,9 +233,17 @@ async def execute_hunt_completion(
                 chat_id=chat_id, message_id=message_id,
                 caption=final_caption, parse_mode="HTML", reply_markup=reply_markup
             )
-    except Exception:
+
+    except Forbidden:
+        logger.warning(f"[AutoHunt] Usuário {user_id} bloqueou o bot. Recompensa entregue, mas notificação falhou.")
+        # Não faz nada, pois o jogador já recebeu os itens/XP no banco de dados.
+    except Exception as e:
+        logger.error(f"[AutoHunt] Erro visual para {user_id}: {e}")
         # Fallback se edição falhar (ex: mensagem muito antiga)
-        await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
+        try:
+            await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
+        except Forbidden:
+            pass # Ignora bloqueio no fallback também
 
 # ==========================================
 # 3. O JOB WRAPPER (Ponte para o Scheduler)

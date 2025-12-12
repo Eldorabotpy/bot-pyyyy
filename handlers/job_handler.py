@@ -5,7 +5,7 @@ import random
 import logging
 import math
 from typing import Any
-
+from telegram.error import Forbidden
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -184,6 +184,9 @@ async def execute_collection_logic(
                 await context.bot.send_photo(chat_id, file_data["id"], caption=msg_text, reply_markup=kb, parse_mode='HTML')
         else:
             await context.bot.send_message(chat_id, msg_text, reply_markup=kb, parse_mode='HTML')
+            
+    except Forbidden:
+        logger.warning(f"[Collection] Usuário {user_id} bloqueou o bot. Item entregue.")
     except Exception as e:
         logger.warning(f"Erro ao enviar msg final coleta {user_id}: {e}")
 

@@ -1,33 +1,39 @@
 # modules/recovery_manager.py
-# (VERSÃO CORRIGIDA: Usa job_handler em vez de collection_engine)
+# (VERSÃO CORRIGIDA: Loop síncrono para iter_player_ids)
 
 import logging
 from datetime import datetime, timezone
 from telegram.ext import Application
 from modules import player_manager
 
-# Importa os Engines
+# Engines & Handlers
 from modules import auto_hunt_engine 
-# CORREÇÃO: Importa o job_handler em vez do collection_engine inexistente
-from handlers import job_handler 
+from handlers import job_handler, forge_handler, refining_handler
 
 logger = logging.getLogger(__name__)
 
 async def recover_active_hunts(app: Application):
     """
-    Varre o banco de dados ao iniciar o bot para:
-    1. Finalizar ações que acabaram enquanto o bot estava desligado.
-    2. Reagendar ações que ainda não acabaram.
+    Varre o banco de dados ao iniciar o bot para recuperar ações.
     """
     logger.info("🔄 [RECOVERY] Iniciando varredura de ações interrompidas...")
     
     count_recovered = 0
     count_errors = 0
     
-    # Itera de forma segura sobre os IDs
-    async for user_id in player_manager.iter_player_ids():
+    # CORREÇÃO: Pega a lista de IDs primeiro (síncrono) e depois processa (assíncrono)
+    # Isso evita o erro de 'async for' em gerador síncrono
+    try:
+        # Tenta pegar todos os IDs numa lista para não travar o cursor
+        all_user_ids = list(player_manager.iter_player_ids())
+    except Exception as e:
+        logger.error(f"[RECOVERY] Falha ao listar jogadores: {e}")
+        return
+
+    # Agora iteramos sobre a lista normalmente
+    for user_id in all_user_ids:
         try:
-            # Carrega dados
+            # Carrega dados (Isso é async, então precisa de await)
             pdata = await player_manager.get_player_data(user_id)
             if not pdata: continue
 
@@ -38,8 +44,9 @@ async def recover_active_hunts(app: Application):
             if not action or action == 'idle': 
                 continue
 
-            # Apenas nos interessa Auto-Hunt e Coleta
-            if action not in ['auto_hunting', 'collecting']:
+            # Lista de ações suportadas
+            SUPPORTED_ACTIONS = ['auto_hunting', 'collecting', 'crafting', 'refining', 'dismantling']
+            if action not in SUPPORTED_ACTIONS:
                 continue
 
             details = state.get('details', {})
@@ -66,7 +73,7 @@ async def recover_active_hunts(app: Application):
             is_expired = time_diff <= 0
             
             # ====================================================
-            # 1. RECUPERAÇÃO DE AUTO HUNT
+            # 1. AUTO HUNT
             # ====================================================
             if action == 'auto_hunting':
                 hunt_count = details.get('hunt_count', 1)
@@ -80,7 +87,7 @@ async def recover_active_hunts(app: Application):
                         context=app, message_id=None
                     )
                 else:
-                    logger.info(f"[RECOVERY] ⏱️ Reagendando CAÇA para {user_id} (Faltam {time_diff:.1f}s)")
+                    logger.info(f"[RECOVERY] ⏱️ Reagendando CAÇA para {user_id}")
                     app.job_queue.run_once(
                         auto_hunt_engine.finish_auto_hunt_job,
                         when=time_diff,
@@ -94,7 +101,7 @@ async def recover_active_hunts(app: Application):
                 count_recovered += 1
 
             # ====================================================
-            # 2. RECUPERAÇÃO DE COLETA (CORRIGIDO)
+            # 2. COLETA
             # ====================================================
             elif action == 'collecting':
                 resource_id = details.get('resource_id')
@@ -104,7 +111,6 @@ async def recover_active_hunts(app: Application):
 
                 if is_expired:
                     logger.info(f"[RECOVERY] ⛏️ Finalizando COLETA para {user_id}")
-                    # CORREÇÃO: Chama job_handler.execute_collection_logic
                     await job_handler.execute_collection_logic(
                         user_id=user_id,
                         chat_id=chat_id,
@@ -115,8 +121,7 @@ async def recover_active_hunts(app: Application):
                         message_id_to_delete=msg_id
                     )
                 else:
-                    logger.info(f"[RECOVERY] ⏱️ Reagendando COLETA para {user_id} (Faltam {time_diff:.1f}s)")
-                    # CORREÇÃO: Chama job_handler.finish_collection_job
+                    logger.info(f"[RECOVERY] ⏱️ Reagendando COLETA para {user_id}")
                     app.job_queue.run_once(
                         job_handler.finish_collection_job,
                         when=time_diff,
@@ -129,9 +134,87 @@ async def recover_active_hunts(app: Application):
                     )
                 count_recovered += 1
 
+            # ====================================================
+            # 3. FORJA (CRAFTING)
+            # ====================================================
+            elif action == 'crafting':
+                recipe_id = details.get("recipe_id")
+                msg_id = details.get("message_id_notificacao")
+
+                if is_expired:
+                    logger.info(f"[RECOVERY] 🔨 Finalizando FORJA para {user_id}")
+                    await forge_handler.execute_craft_logic(
+                        user_id=user_id,
+                        chat_id=chat_id,
+                        recipe_id=recipe_id,
+                        context=app,
+                        message_id_to_delete=msg_id
+                    )
+                else:
+                    logger.info(f"[RECOVERY] ⏱️ Reagendando FORJA para {user_id}")
+                    app.job_queue.run_once(
+                        forge_handler.finish_craft_notification_job,
+                        when=time_diff,
+                        chat_id=chat_id, user_id=user_id,
+                        data={"recipe_id": recipe_id, "message_id_notificacao": msg_id},
+                        name=f"craft_{user_id}"
+                    )
+                count_recovered += 1
+
+            # ====================================================
+            # 4. REFINO (REFINING)
+            # ====================================================
+            elif action == 'refining':
+                msg_id = details.get("message_id_to_delete")
+
+                if is_expired:
+                    logger.info(f"[RECOVERY] 🔧 Finalizando REFINO para {user_id}")
+                    await refining_handler.execute_refine_logic(
+                        user_id=user_id,
+                        chat_id=chat_id,
+                        context=app,
+                        message_id_to_delete=msg_id
+                    )
+                else:
+                    logger.info(f"[RECOVERY] ⏱️ Reagendando REFINO para {user_id}")
+                    app.job_queue.run_once(
+                        refining_handler.finish_refine_job,
+                        when=time_diff,
+                        user_id=user_id, chat_id=chat_id,
+                        data={"message_id_to_delete": msg_id},
+                        name=f"refine_{user_id}"
+                    )
+                count_recovered += 1
+
+            # ====================================================
+            # 5. DESMONTE (DISMANTLING)
+            # ====================================================
+            elif action == 'dismantling':
+                msg_id = details.get("message_id_to_delete")
+
+                if is_expired:
+                    logger.info(f"[RECOVERY] ♻️ Finalizando DESMONTE para {user_id}")
+                    await refining_handler.execute_dismantle_logic(
+                        user_id=user_id,
+                        chat_id=chat_id,
+                        context=app,
+                        job_details=details,
+                        message_id_to_delete=msg_id
+                    )
+                else:
+                    logger.info(f"[RECOVERY] ⏱️ Reagendando DESMONTE para {user_id}")
+                    app.job_queue.run_once(
+                        refining_handler.finish_dismantle_job,
+                        when=time_diff,
+                        user_id=user_id, chat_id=chat_id,
+                        data=details,
+                        name=f"dismantle_{user_id}"
+                    )
+                count_recovered += 1
+
         except Exception as e:
             logger.error(f"[RECOVERY] Erro ao processar user_id {user_id}: {e}", exc_info=True)
             count_errors += 1
             continue
 
-    logger.info(f"✅ [RECOVERY] Sistema restaurado. {count_recovered} ações recuperadas.")
+    logger.info(f"✅ [RECOVERY] Sistema restaurado. {count_recovered} ações recuperadas. {count_errors} erros.")
