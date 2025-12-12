@@ -1,39 +1,21 @@
 # handlers/job_handler.py
-import re
+# (VERSÃO REFATORADA: Compatível com JobQueue E Recovery System)
+
 import random
 import logging
 import math
-from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
+from typing import Any
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
-from telegram.error import BadRequest, Forbidden
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
 
 # Módulos do Jogo
-from modules import player_manager, game_data, clan_manager, mission_manager, file_ids
+from modules import player_manager, game_data, mission_manager, file_ids
 from modules.player.premium import PremiumManager
-# (Outros imports mantidos conforme sua necessidade)
 
 logger = logging.getLogger(__name__)
 
-# --- CONSTANTES ---
-DAILY_CRYSTAL_ITEM_ID = "cristal_de_abertura"
-DAILY_CRYSTAL_BASE_QTY = 4
-
-# -------------------------
-# Helpers
-# -------------------------
-def _humanize(seconds: int) -> str:
-    seconds = int(seconds)
-    if seconds < 60:
-        return f"{seconds} s"
-    m = math.floor(seconds / 60)
-    s = seconds % 60
-    if s > 0:
-        return f"{m} min {s} s"
-    return f"{m} min"
-
+# --- Helpers ---
 def _int(v: Any, default: int = 0) -> int:
     try: return int(v)
     except Exception: return int(default)
@@ -43,99 +25,107 @@ def _clamp_float(v: Any, lo: float, hi: float, default: float) -> float:
     except Exception: f = default
     return max(lo, min(hi, f))
 
-# -------------------------
-# JOB DE FINALIZAÇÃO (Apenas Lógica, sem UI de início)
-# -------------------------
-async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
+# ==============================================================================
+# 1. A LÓGICA PURA (Pode ser chamada pelo Job ou pelo Recovery)
+# ==============================================================================
+async def execute_collection_logic(
+    user_id: int,
+    chat_id: int,
+    resource_id: str,
+    item_id_yielded: str,
+    quantity_base: int, # Geralmente 1
+    context: ContextTypes.DEFAULT_TYPE,
+    message_id_to_delete: int = None
+):
     """
-    Finaliza a coleta, calcula recompensas e notifica.
-    (VERSÃO SEGURA: Sem dependência de missões de Guilda)
+    Executa a matemática da coleta, entrega itens e notifica.
+    Independente de contexto de Job.
     """
-    job = context.job
-    if not job: return
-
-    user_id, chat_id = job.user_id, job.chat_id
-    job_data = job.data or {}
-    resource_id = job_data.get('resource_id')
-
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
+    # 1. Limpeza de Estado
     state = player_data.get('player_state') or {}
-    details = state.get('details') or {}
-    
-    # Validações básicas
-    item_info = game_data.ITEMS_DATA.get(resource_id, {}) or {}
-    if not resource_id or not item_info:
-        if state.get('action') == 'collecting':
-            player_data['player_state'] = {'action': 'idle'}
-            await player_manager.save_player_data(user_id, player_data)
-        try: await context.bot.send_message(chat_id=chat_id, text="Erro: Recurso de coleta inválido.")
-        except: pass
-        return 
-
-    # Limpa estado se ainda estiver coletando
     if state.get('action') == 'collecting':
         player_data['player_state'] = {'action': 'idle'}
-    
-    item_id_a_receber = job_data.get('item_id_yielded') or details.get('item_id_yielded', resource_id)
 
-    # --- Cálculo de Recompensas ---
-    XP_BASE_POR_ITEM = 3
-    CHANCE_CRITICA_BASE = 3.0
-    
+    # 2. Tenta deletar mensagem antiga de "Coletando..."
+    if message_id_to_delete:
+        try: await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
+        except: pass
+
+    # 3. Validações de Dados
+    if not resource_id:
+        return # Dados inválidos, aborta silenciosamente para não spammar erro
+
+    # --- CÁLCULOS (Mantendo sua lógica original) ---
     prof = player_data.get('profession', {}) or {}
     prof_level = _int(prof.get('level', 1), 1)
     
     total_stats = await player_manager.get_player_total_stats(player_data)
     luck_stat = _int(total_stats.get("luck", 5))
 
-    quantidade_base = 1 + prof_level 
-    quantidade_final = quantidade_base
+    # Quantidade: Base + Nível Profissão
+    quantidade_final = quantity_base + prof_level 
+    
+    # Crítico (Base 3% + Bônus Nível + Bônus Sorte)
     is_crit = False
-    critical_message = ""
-
-    # Crítico
-    chance_critica = CHANCE_CRITICA_BASE + (prof_level * 0.1) + (luck_stat * 0.05) 
+    chance_critica = 3.0 + (prof_level * 0.1) + (luck_stat * 0.05)
+    
     if random.uniform(0, 100) < chance_critica:
         is_crit = True
-        quantidade_final *= 2 # Dobra
-        critical_message = "✨ <b>Sorte!</b> Você coletou o dobro!\n"
-
-    # Entrega Item (Usa função segura do player_manager se disponível, ou inventory direto)
-    player_manager.add_item_to_inventory(player_data, item_id_a_receber, quantidade_final)
+        quantidade_final *= 2
     
-    # Atualiza Missões Pessoais (Isso geralmente é seguro, mas se quiser remover também, apague a linha abaixo)
+    # --- ENTREGA DO ITEM ---
+    final_item_id = item_id_yielded or resource_id
+    player_manager.add_item_to_inventory(player_data, final_item_id, quantidade_final)
+
+    # --- ATUALIZA MISSÕES ---
     try:
-        mission_manager.update_mission_progress(player_data, 'GATHER', details={'item_id': item_id_a_receber, 'quantity': quantidade_final})
+        # Tenta atualizar missões de coleta
+        if mission_manager:
+            await mission_manager.update_mission_progress(user_id, 'collect', final_item_id, quantidade_final)
+            # Mantendo suporte ao seu formato antigo 'GATHER' se necessário
+            # mission_manager.update_mission_progress(player_data, 'GATHER', details={'item_id': final_item_id, 'quantity': quantidade_final})
     except Exception: pass
-    
-    # --- BLOCO DE GUILDA REMOVIDO PARA EVITAR BUGS ---
-    # (O código que chamava clan_manager foi apagado aqui)
-    # --------------------------------------------------
 
-    # --- XP de Profissão ---
+    # --- XP DE PROFISSÃO ---
     xp_ganho = 0
     level_up_text = ""
     required_profession = game_data.get_profession_for_resource(resource_id)
     
+    # Só ganha XP se tiver a profissão certa
     if prof.get('type') == required_profession:
-        xp_base = quantidade_base * XP_BASE_POR_ITEM
+        # XP Base: 3 * Quantidade (sem critico na base, mas a sua lógica multiplicava a base)
+        # Sua lógica: xp_base = quantidade_base * 3. Se critico, xp * 2.
+        
+        # Vamos replicar exato:
+        xp_base_unit = 3
+        base_calc = (1 + prof_level) * xp_base_unit # Base sem o critico de quantidade
+        
         premium = PremiumManager(player_data)
         xp_mult = _clamp_float(premium.get_perk_value('gather_xp_multiplier', 1.0), 1.0, 5.0, 1.0)
         
-        xp_ganho = int(xp_base * xp_mult)
-        if is_crit: xp_ganho *= 2
+        xp_ganho = int(base_calc * xp_mult)
         
+        if is_crit: 
+            xp_ganho *= 2 # Dobra XP no critico também
+        
+        # Aplica XP
         prof['xp'] = _int(prof.get('xp', 0)) + xp_ganho
         
-        # Level Up
+        # Level Up Loop
         cur_level = prof_level
         while True:
-            try: xp_need = int(game_data.get_xp_for_next_collection_level(cur_level))
-            except: xp_need = 999999
+            try: 
+                xp_need = int(game_data.get_xp_for_next_collection_level(cur_level))
+            except: 
+                # Fallback de segurança se game_data falhar
+                xp_need = int(100 * (cur_level ** 1.5))
             
-            if xp_need <= 0 or prof['xp'] < xp_need: break
+            if xp_need <= 0 or prof['xp'] < xp_need: 
+                break
+                
             prof['xp'] -= xp_need
             cur_level += 1
             prof['level'] = cur_level
@@ -143,46 +133,93 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
             
         player_data['profession'] = prof
 
-    # --- Item Raro (1% a 5%) ---
+    # --- ITEM RARO (Sorte) ---
     rare_msg = ""
-    current_location = player_data.get('current_location', 'reino_eldora')
-    region_info = (game_data.REGIONS_DATA or {}).get(current_location, {})
-    rare_cfg = region_info.get("rare_resource")
-    
-    if isinstance(rare_cfg, dict) and rare_cfg.get("key"):
-        if random.random() < (0.01 + (luck_stat / 2000.0)):
-            rare_key = rare_cfg["key"]
-            rare_name = (game_data.ITEMS_DATA.get(rare_key, {})).get("display_name", rare_key)
-            player_manager.add_item_to_inventory(player_data, rare_key, 1)
-            rare_msg = f"💎 <b>Achado Raro!</b> +1 {rare_name}\n"
+    try:
+        current_loc = player_data.get('current_location', 'reino_eldora')
+        region_info = (game_data.REGIONS_DATA or {}).get(current_loc, {})
+        rare_cfg = region_info.get("rare_resource")
+        
+        if isinstance(rare_cfg, dict) and rare_cfg.get("key"):
+            # Chance: 1% base + Sorte/2000
+            chance = 0.01 + (luck_stat / 2000.0)
+            if random.random() < chance:
+                rare_key = rare_cfg["key"]
+                r_info = (game_data.ITEMS_DATA.get(rare_key, {}))
+                r_name = r_info.get("display_name", rare_key)
+                player_manager.add_item_to_inventory(player_data, rare_key, 1)
+                rare_msg = f"\n💎 <b>Achado Raro!</b> +1 {r_name}"
+    except Exception: pass
 
-    # Salva tudo no final
+    # --- SALVAR NO BANCO ---
     await player_manager.save_player_data(user_id, player_data)
 
-    # --- Notificação ---
-    item_recebido_name = (game_data.ITEMS_DATA.get(item_id_a_receber, {})).get("display_name", item_id_a_receber)
+    # --- NOTIFICAÇÃO ---
+    item_info = (game_data.ITEMS_DATA.get(final_item_id, {}))
+    item_name = item_info.get("display_name", final_item_id)
+    
+    crit_msg = "✨ <b>Sorte!</b> Coleta Crítica!\n" if is_crit else ""
     xp_txt = f" (+{xp_ganho} XP)" if xp_ganho > 0 else ""
     
-    msg = (
-        f"{critical_message}{rare_msg}"
-        f"✅ Coleta finalizada!\n"
-        f"Recebeu: <b>{quantidade_final}x {item_recebido_name}</b>{xp_txt}"
+    msg_text = (
+        f"{crit_msg}{rare_msg}"
+        f"✅ <b>Coleta Finalizada!</b>\n"
+        f"Recebeu: <b>{quantidade_final}x {item_name}</b>{xp_txt}"
         f"{level_up_text}"
     )
-    
-    # Mídia e Botão
-    media_key = item_info.get("media_key", "coleta_sucesso")
+
+    # Mídia
+    media_key = item_info.get("media_key") or "coleta_sucesso"
     file_data = file_ids.get_file_data(media_key)
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_location}")]])
+    
+    current_loc = player_data.get('current_location', 'reino_eldora')
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]])
 
     try:
         if file_data and file_data.get("id"):
             ftyp = file_data.get("type", "photo")
             if ftyp == "video":
-                await context.bot.send_video(chat_id, file_data["id"], caption=msg, reply_markup=kb, parse_mode='HTML')
+                await context.bot.send_video(chat_id, file_data["id"], caption=msg_text, reply_markup=kb, parse_mode='HTML')
             else:
-                await context.bot.send_photo(chat_id, file_data["id"], caption=msg, reply_markup=kb, parse_mode='HTML')
+                await context.bot.send_photo(chat_id, file_data["id"], caption=msg_text, reply_markup=kb, parse_mode='HTML')
         else:
-            await context.bot.send_message(chat_id, msg, reply_markup=kb, parse_mode='HTML')
-    except Exception:
-        pass
+            await context.bot.send_message(chat_id, msg_text, reply_markup=kb, parse_mode='HTML')
+    except Exception as e:
+        logger.warning(f"Erro ao enviar msg final coleta {user_id}: {e}")
+
+
+# ==============================================================================
+# 2. O WRAPPER DO TELEGRAM (Mantém compatibilidade com JobQueue)
+# ==============================================================================
+async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Job chamado pelo scheduler. Extrai dados e chama a lógica.
+    """
+    job = context.job
+    if not job: return
+
+    job_data = job.data or {}
+    
+    # Extrai dados do job
+    user_id = job_data.get('user_id') or job.user_id
+    chat_id = job_data.get('chat_id') or job.chat_id
+    
+    # Busca message_id para apagar a msg de "Trabalhando..." se existir
+    msg_id = job_data.get('message_id')
+    if not msg_id:
+        # Tenta buscar do player_data se não vier no job (fallback)
+        try:
+            pdata = await player_manager.get_player_data(user_id)
+            if pdata:
+                msg_id = pdata.get('player_state', {}).get('details', {}).get('collect_message_id')
+        except: pass
+
+    await execute_collection_logic(
+        user_id=user_id,
+        chat_id=chat_id,
+        resource_id=job_data.get('resource_id'),
+        item_id_yielded=job_data.get('item_id_yielded'),
+        quantity_base=job_data.get('quantity', 1),
+        context=context,
+        message_id_to_delete=msg_id
+    )

@@ -23,6 +23,7 @@ load_dotenv()
 from flask import Flask
 from telegram import Update
 from telegram.constants import ParseMode
+from modules.recovery_manager import recover_active_hunts
 from telegram.ext import Application, ContextTypes
 from telegram.error import BadRequest, Forbidden, Conflict, NetworkError # <--- IMPORTS DE ERRO
 from pvp.pvp_scheduler import job_pvp_monthly_reset, executar_reset_pvp
@@ -263,9 +264,19 @@ async def check_stale_actions_on_startup(application: Application):
         
 async def post_init_tasks(application: Application):
     if ADMIN_ID:
-        try: await application.bot.send_message(chat_id=ADMIN_ID, text="🤖 <b>Sistema Online!</b>", parse_mode="HTML")
+        try: 
+            await application.bot.send_message(chat_id=ADMIN_ID, text="🤖 <b>Sistema Online!</b>", parse_mode="HTML")
         except: pass
+    
+    # Verificações antigas (Craft/Refine/Travel)
     await check_stale_actions_on_startup(application)
+    
+    # >>> ADICIONE ESTAS LINHAS AQUI (RECUPERAÇÃO DO AUTO HUNT) <<<
+    logging.info("[Startup] Iniciando recuperação de caças ativas...")
+    asyncio.create_task(recover_active_hunts(application))
+    # -------------------------------------------------------------
+
+    # Broadcast de reinício
     asyncio.create_task(broadcast_startup_message(application))
 
 def register_jobs(application: Application):
