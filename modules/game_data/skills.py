@@ -1210,7 +1210,7 @@ SKILL_DATA = {
             }
         }
     }, 
-    "active_whirlwind": {
+    "guerreiro_redemoinho_aco": {
         "display_name": "Redemoinho de Aço", "type": "active", 
         "description": "Um ataque giratório que atinge múltiplos alvos.", 
         "allowed_classes": ["guerreiro"],
@@ -1234,7 +1234,7 @@ SKILL_DATA = {
             }
         }
     }, 
-    "active_holy_blessing": {
+    "guerreiro_bencao_sagrada": {
         "display_name": "Bênção Sagrada", "type": "support", 
         "description": "Invoca poder divino para curar aliados.", 
         "allowed_classes": ["guerreiro"], # Mantido como 'guerreiro'
@@ -1257,7 +1257,7 @@ SKILL_DATA = {
         }
     },
 
-    "passive_colossal_defense": { 
+    "guerreiro_colossal_defense": { 
         "display_name": "Defesa Colossal", "type": "passive", 
         "description": "Reduz o dano recebido permanentemente.",
         "allowed_classes": ["guerreiro"],
@@ -1299,7 +1299,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_unbreakable_charge": {
+    "berserker_investida_inquebravel": {
         "display_name": "Investida Inquebrável", "type": "active", 
         "description": "Avança, ignorando parte do dano no próximo turno.", 
         "allowed_classes": ["berserker"],
@@ -1323,7 +1323,7 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_last_stand": {
+    "berserker_ultimo_recurso": {
         "display_name": "Último Recurso", "type": "passive", 
         "description": "O seu dano aumenta massivamente quando a sua vida está baixa.", 
         "allowed_classes": ["berserker"],
@@ -1342,7 +1342,7 @@ SKILL_DATA = {
             }
         }
     },
-    "berserker_placeholder_t6_atk": {
+    "berserker_golpe_divino_da_ira": {
         "display_name": "Golpe Divino da Ira", "type": "active", 
         "description": "Um ataque supremo que ignora defesa e causa dano massivo.",
         "allowed_classes": ["berserker"],

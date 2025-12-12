@@ -299,7 +299,7 @@ def register_jobs(application: Application):
         for i, (sh, sm, eh, em) in enumerate(WORLD_BOSS_TIMES):
             j.run_daily(iniciar_world_boss_job, time=dt_time(sh,sm,tzinfo=local_tz), name=f"start_boss_{i}", data={"duration_hours": 1})
             j.run_daily(end_world_boss_job, time=dt_time(eh,em,tzinfo=local_tz), name=f"end_boss_{i}")
-
+            
 # ==============================================================================
 # 5. EXECUÇÃO PRINCIPAL (COM RETRY LOGIC)
 # ==============================================================================

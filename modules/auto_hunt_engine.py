@@ -187,27 +187,27 @@ async def execute_hunt_completion(
     reg_name = region_data.get('display_name', region_key.title())
     
     summary_msg = [
-        "🏁 <b>Caçada Rápida Concluída!</b> 🏁",
+        "🏁 <b>𝐂𝐚𝐜̧𝐚𝐝𝐚 𝐑𝐚́𝐩𝐢𝐝𝐚 𝐂𝐨𝐧𝐜𝐥𝐮𝐢́𝐝𝐚!</b> 🏁",
         f"Região: {reg_name}",
-        f"Resultado: <b>{wins} vitórias</b>, <b>{losses} derrotas</b>",
+        f"𝐑𝐞𝐬𝐮𝐥𝐭𝐚𝐝𝐨: <b>{wins} 𝐯𝐢𝐭𝐨́𝐫𝐢𝐚𝐬</b>, <b>{losses} 𝐝𝐞𝐫𝐫𝐨𝐭𝐚𝐬</b>",
         "---",
-        f"💰 Ouro: {total_gold}",
-        f"✨ XP: {total_xp}",
+        f"💰 𝙊𝙪𝙧𝙤: {total_gold}",
+        f"⏫🆙 𝙓𝙋: {total_xp}",
     ]
     
     if items_log_list:
-        summary_msg.append("\n📦 Itens:")
+        summary_msg.append("\n📦 𝑰𝒕𝒆𝒏𝒔:")
         summary_msg.extend(items_log_list)
     else:
-        summary_msg.append("\n📦 Nenhum item encontrado.")
+        summary_msg.append("\n📦 𝑵𝒆𝒏𝒉𝒖𝒎 𝒊𝒕𝒆𝒎 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒂𝒅𝒐.")
         
     if losses > 0:
-        summary_msg.append(f"\n⚠️ <i>Parou após derrota.</i>")
+        summary_msg.append(f"\n⚠️ <i>𝑷𝒂𝒓𝒐𝒖 𝒂𝒑𝒐́𝒔 𝒅𝒆𝒓𝒓𝒐𝒕𝒂.</i>")
     if level_up_msg:
         summary_msg.append(level_up_msg)
     
     final_caption = "\n".join(summary_msg)
-    keyboard = [[InlineKeyboardButton("⬅️ Voltar para a Região", callback_data=f"open_region:{region_key}")]]
+    keyboard = [[InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐩𝐚𝐫𝐚 𝐚 𝐑𝐞𝐠𝐢𝐚̃𝐨", callback_data=f"open_region:{region_key}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     try:
@@ -280,7 +280,7 @@ async def start_auto_hunt(
 
         # 1. Checagem Premium
         if not PremiumManager(player_data).is_premium():
-            await query.answer("⭐️ Funcionalidade exclusiva para Premium.", show_alert=True)
+            await query.answer("⭐️ 𝗙𝘂𝗻𝗰𝗶𝗼𝗻𝗮𝗹𝗶𝗱𝗮𝗱𝗲 𝗲𝘅𝗰𝗹𝘂𝘀𝗶𝘃𝗮 𝗽𝗮𝗿𝗮 𝗣𝗿𝗲𝗺𝗶𝘂𝗺.", show_alert=True)
             return
 
         # 2. Anti-Deadlock (Cura Estado Travado)
@@ -298,7 +298,7 @@ async def start_auto_hunt(
                 is_stuck = True # Data inválida = travado
 
         if current_state != 'idle' and not is_stuck:
-            await query.answer(f"Você está ocupado: {current_state}", show_alert=True)
+            await query.answer(f"𝗩𝗼𝗰𝗲̂ 𝗲𝘀𝘁𝗮́ 𝗼𝗰𝘂𝗽𝗮𝗱𝗼: {current_state}", show_alert=True)
             return
         
         # 3. Cálculo de Energia (LOCAL - Sem Import Circular)
@@ -312,13 +312,13 @@ async def start_auto_hunt(
         total_cost = cost_per_hunt * hunt_count
         
         if player_data.get('energy', 0) < total_cost:
-            await query.answer(f"Energia insuficiente. Precisa de {total_cost}⚡.", show_alert=True)
+            await query.answer(f"𝗘𝗻𝗲𝗿𝗴𝗶𝗮 𝗶𝗻𝘀𝘂𝗳𝗶𝗰𝗶𝗲𝗻𝘁𝗲. 𝗣𝗿𝗲𝗰𝗶𝘀𝗮 𝗱𝗲 {total_cost}⚡.", show_alert=True)
             return
 
         # 4. Gasto e Setup
         success = player_manager.spend_energy(player_data, total_cost)
         if not success:
-            await query.answer("Erro ao processar energia.", show_alert=True)
+            await query.answer("𝗘𝗿𝗿𝗼 𝗮𝗼 𝗽𝗿𝗼𝗰𝗲𝘀𝘀𝗮𝗿 𝗲𝗻𝗲𝗿𝗴𝗶𝗮.", show_alert=True)
             return
 
         duration_seconds = SECONDS_PER_HUNT * hunt_count 
@@ -341,11 +341,11 @@ async def start_auto_hunt(
         duration_min = duration_seconds / 60
         
         msg = (
-            f"⏱ <b>Caçada Rápida Iniciada!</b>\n"
-            f"Simulando {hunt_count} combates em <b>{region_name}</b>...\n\n"
-            f"⚡ Custo: {total_cost} energia\n"
-            f"⏳ Tempo: <b>{duration_min:.1f} minutos</b>.\n\n"
-            f"Aguarde o relatório final."
+            f"⏱ <b>𝑪𝒂𝒄̧𝒂𝒅𝒂 𝑹𝒂́𝒑𝒊𝒅𝒂 𝑰𝒏𝒊𝒄𝒊𝒂𝒅𝒂!</b>\n"
+            f"𝑺𝒊𝒎𝒖𝒍𝒂𝒏𝒅𝒐 {hunt_count} 𝒄𝒐𝒎𝒃𝒂𝒕𝒆𝒔 𝒆𝒎 <b>{region_name}</b>...\n\n"
+            f"⚡ 𝑪𝒖𝒔𝒕𝒐: {total_cost} 𝒆𝒏𝒆𝒓𝒈𝒊𝒂\n"
+            f"⏳ 𝑻𝒆𝒎𝒑𝒐: <b>{duration_min:.1f} 𝒎𝒊𝒏𝒖𝒕𝒐𝒔</b>.\n\n"
+            f"𝑨𝒈𝒖𝒂𝒓𝒅𝒆 𝒐 𝒓𝒆𝒍𝒂𝒕𝒐́𝒓𝒊𝒐 𝒇𝒊𝒏𝒂𝒍."
         )
         
         sent_message = None

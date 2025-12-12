@@ -310,8 +310,8 @@ async def show_dismantle_preview_callback(update: Update, context: ContextTypes.
     for k, v in ret.items(): txt += f"\n• {_fmt_item_line(k, v)}"
     txt += "\n\n⚠️ Irreversível!"
     
-    kb = [[InlineKeyboardButton("✅ Confirmar", callback_data=f"ref_dismantle_confirm:{iuid}")],
-          [InlineKeyboardButton("⬅️ Voltar", callback_data="ref_dismantle_list")]]
+    kb = [[InlineKeyboardButton("✅ 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐚𝐫", callback_data=f"ref_dismantle_confirm:{iuid}")],
+          [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="ref_dismantle_list")]]
           
     mkey = (game_data.ITEMS_DATA.get(item.get("base_id")) or {}).get("media_key")
     await _safe_edit_or_send_with_media(q, context, txt, InlineKeyboardMarkup(kb), media_key=mkey)
