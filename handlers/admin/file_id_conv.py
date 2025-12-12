@@ -4,7 +4,7 @@ from __future__ import annotations
 import html
 import logging
 from typing import Tuple, Optional
-
+from telegram.error import BadRequest
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
@@ -115,14 +115,26 @@ async def ask_for_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     context.user_data["file_type_to_get"] = kind
     logger.info("[FILEIDS] Tipo solicitado: %s", kind)
 
-    await q.edit_message_text(
-        text=(
-            f"Ok! Envie agora o arquivo de <b>{_human_file_kind(kind)}</b>.\n\n"
-            "• Pode ser foto/vídeo direto, video note, ou documento (imagem/vídeo).\n"
-            "• Use /cancelar para sair."
-        ),
-        parse_mode="HTML",
-    )
+    # --- INICIO DA CORREÇÃO ---
+    try:
+        await q.edit_message_text(
+            text=(
+                f"Ok! Envie agora o arquivo de <b>{_human_file_kind(kind)}</b>.\n\n"
+                "• Pode ser foto/vídeo direto, video note, ou documento (imagem/vídeo).\n"
+                "• Use /cancelar para sair."
+            ),
+            parse_mode="HTML",
+        )
+    except BadRequest as e:
+        # Se o erro for "não modificado", a gente ignora (pass)
+        if "not modified" in str(e):
+            pass 
+        else:
+            # Se for outro erro (ex: texto muito longo), a gente avisa no log e relança
+            logger.error(f"Erro ao editar mensagem: {e}")
+            raise e
+    # --- FIM DA CORREÇÃO ---
+
     return STATE_GET_FILE
 
 # =========================
