@@ -12,9 +12,9 @@ from modules.world_boss.engine import (
     distribute_loot_and_announce
 )
 from handlers.menu.region import send_region_menu
-from modules import player_manager, file_ids
+from modules import player_manager, game_data, file_ids
 from modules.game_data.skills import SKILL_DATA
-
+from modules.player import actions as player_actions
 logger = logging.getLogger(__name__)
 
 BOSS_MEDIA = "boss_raid" 
@@ -343,6 +343,77 @@ async def wb_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb.append([InlineKeyboardButton("🔙 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="wb_fight_return")])
     await query.edit_message_caption("Selecione a Habilidade:", reply_markup=InlineKeyboardMarkup(kb))
 
+async def wb_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    inventory = pdata.get("inventory", {})
+    
+    kb = []
+    has_potions = False
+    
+    for item_id, qty in inventory.items():
+        item_info = game_data.ITEMS_DATA.get(item_id, {})
+        if item_info.get("type") == "potion":
+            has_potions = True
+            name = item_info.get("display_name", item_id)
+            emoji = item_info.get("emoji", "🧪")
+            # Usa callback especial wb_use_potion para manter fluxo do boss
+            kb.append([InlineKeyboardButton(f"{emoji} {name} (x{qty})", callback_data=f"wb_use_potion:{item_id}")])
+    
+    if not has_potions:
+        kb.append([InlineKeyboardButton("❌ Sem Poções", callback_data="noop")])
+        
+    kb.append([InlineKeyboardButton("🔙 Voltar", callback_data="wb_fight_return")])
+    await query.edit_message_caption("🧪 <b>Selecione uma poção:</b>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+async def wb_use_potion(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    data = query.data
+    
+    try:
+        item_id = data.split(":")[1]
+    except: return
+
+    pdata = await player_manager.get_player_data(user_id)
+    
+    # 1. Remove Item
+    if not player_manager.remove_item_from_inventory(pdata, item_id, 1):
+        await query.answer("Acabou!", show_alert=True)
+        await wb_potion_menu(update, context)
+        return
+
+    # 2. Aplica Efeitos
+    item_info = game_data.ITEMS_DATA.get(item_id, {})
+    effects = item_info.get("effects", {})
+    msg_feed = ""
+    
+    if 'heal' in effects:
+        await player_actions.heal_player(pdata, effects['heal'])
+        msg_feed = f"Recuperou {effects['heal']} HP"
+    elif 'add_mana' in effects:
+        await player_actions.add_mana(pdata, effects['add_mana'])
+        msg_feed = f"Recuperou {effects['add_mana']} MP"
+    elif 'buff' in effects:
+        player_actions.add_buff(pdata, effects['buff'])
+        msg_feed = "Buff aplicado!"
+    
+    # 3. Atualiza Estado do World Boss Manager (IMPORTANTE PARA SINCRONIA)
+    state = world_boss_manager.player_states.get(user_id)
+    if state:
+        state['hp'] = pdata.get("current_hp")
+        state['mp'] = pdata.get("current_mp")
+        # Registra no log do boss
+        if msg_feed:
+            current_log = state.get('log', '')
+            state['log'] = current_log + f"\n🧪 {msg_feed}"
+
+    # 4. Salva e Atualiza Tela
+    await player_manager.save_player_data(user_id, pdata)
+    await query.answer(f"🧪 {msg_feed}")
+    await wb_fight_screen(update, context)
+
 async def wb_fight_return(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await wb_fight_screen(update, context)
 
@@ -353,6 +424,8 @@ wb_menu_handler = CallbackQueryHandler(wb_start_menu, pattern="^wb_menu$")
 wb_join_handler = CallbackQueryHandler(wb_join, pattern="^wb_join$")
 wb_router_handler = CallbackQueryHandler(wb_router, pattern="^(wb_set_target|wb_targets|wb_leave|wb_act|wb_skill:)")
 wb_skill_menu_handler = CallbackQueryHandler(wb_skill_menu, pattern="^wb_skills$")
+wb_potion_menu_handler = CallbackQueryHandler(wb_potion_menu, pattern="^wb_potion$") # Handler do Menu
+wb_use_potion_handler = CallbackQueryHandler(wb_use_potion, pattern="^wb_use_potion:") # Handler de Uso
 wb_fight_return_handler = CallbackQueryHandler(wb_fight_return, pattern="^wb_fight_return$")
 wb_map_handler = CallbackQueryHandler(wb_return_to_map, pattern="^wb_return_map$")
 wb_noop_handler = CallbackQueryHandler(lambda u,c: u.callback_query.answer("Indisponível"), pattern="^noop$")
@@ -360,5 +433,6 @@ wb_noop_handler = CallbackQueryHandler(lambda u,c: u.callback_query.answer("Indi
 all_world_boss_handlers = [
     wb_start_cmd, wb_stop_cmd, wb_cmd_handler, wb_menu_handler,
     wb_join_handler, wb_router_handler, wb_skill_menu_handler,
+    wb_potion_menu_handler, wb_use_potion_handler,
     wb_fight_return_handler, wb_map_handler, wb_noop_handler
 ]

@@ -1,6 +1,5 @@
 # handlers/combat/potion_handler.py
 
-
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -28,8 +27,14 @@ async def combat_potion_menu_callback(update: Update, context: ContextTypes.DEFA
             potion_buttons.append(InlineKeyboardButton(f"{item_emoji} {item_name} (x{quantity})", callback_data=f"combat_use:{item_id}"))
 
     keyboard = [[btn] for btn in potion_buttons]
+    # Botão de voltar genérico (o router principal decide para onde vai)
     keyboard.append([InlineKeyboardButton("⬅️ Voltar à Batalha", callback_data="combat_attack_menu")])
-    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    try:
+        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+    except BadRequest:
+        # Se não der para editar markup (ex: msg muito antiga), manda msg nova
+        await context.bot.send_message(query.message.chat_id, "Selecione uma poção:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa o uso de uma poção em combate."""
@@ -58,10 +63,7 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
 
     if 'heal' in effects:
         heal_amount = effects['heal']
-        
-        # <<< [MUDANÇA] Adiciona 'await' >>>
         await player_actions.heal_player(player_data, heal_amount)
-        
         feedback_message = f"Você usou {item_info.get('display_name')} e recuperou {heal_amount} HP!"
     
     elif 'add_energy' in effects:
@@ -71,17 +73,13 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
     
     elif 'add_mana' in effects:
         mana_amount = effects['add_mana']
-        
-        # <<< [MUDANÇA] Adiciona 'await' >>>
         await player_actions.add_mana(player_data, mana_amount)
-        
         feedback_message = f"Você usou {item_info.get('display_name')} e recuperou {mana_amount} de Mana!"
         
     elif 'add_xp' in effects:
         xp_amount = effects['add_xp']
         player_data['xp'] = player_data.get('xp', 0) + xp_amount
         niveis, pontos, level_up_msg = player_manager.check_and_apply_level_up(player_data)
-        
         feedback_message = f"Você usou {item_info.get('display_name')} e ganhou {xp_amount} XP!"
         if level_up_msg:
             feedback_message += "\n\n" + level_up_msg
@@ -90,49 +88,45 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
         buff = effects['buff']
         player_actions.add_buff(player_data, buff)
         stat_name = buff.get('stat', 'um atributo').replace("_", " ").capitalize()
-        feedback_message = f"Você usou {item_info.get('display_name')} e ganhou um bónus de {stat_name}!"
+        feedback_message = f"Você usou {item_info.get('display_name')} e ganhou um bônus de {stat_name}!"
     
     else:
         await query.answer("Esta poção não tem um efeito reconhecido.", show_alert=True)
-        # Devolve o item
+        # Devolve o item se falhar
         player_manager.add_item_to_inventory(player_data, item_id_to_use, 1)
         await player_manager.save_player_data(user_id, player_data)
         return
 
-    # Adiciona a ação ao log de combate
+    # --- LOG DE COMBATE SEGURO ---
     state = player_data.get('player_state', {})
-    if state.get('action') == 'in_combat':
+    # Só tenta escrever no log se a estrutura existir (evita crash no World Boss)
+    if state.get('action') == 'in_combat' and 'details' in state and 'battle_log' in state['details']:
         state['details']['battle_log'].append(f"✨ {feedback_message.splitlines()[0]}")
+    # -----------------------------
 
     # Salva os dados
     await player_manager.save_player_data(user_id, player_data)
     
+    # Feedback visual (Toast)
     await query.answer(feedback_message, show_alert=True)
     
-    # <<< [MUDANÇA] Adiciona 'await' >>>
-    # (Este era o segundo crash 'TypeError: coroutine not serializable')
-    new_text = await format_combat_message(player_data)
-    
-    kb = [
-        [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
-        [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu')],
-        [InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
-    ]
-    
+    # Tenta atualizar a mensagem de combate (se possível)
     try:
-        await query.edit_message_caption(caption=new_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
-    except BadRequest as e:
-        # Fallback se a msg for de texto (ex: /start)
-        if "message can't be edited" in str(e).lower():
-            try:
-                await query.message.delete()
-                # (Precisamos de uma função 'send_battle_media' aqui, mas por agora
-                # vamos apenas enviar texto para evitar mais erros)
-                await context.bot.send_message(chat_id=user_id, text=new_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
-            except Exception:
-                pass # Ignora se falhar
-        elif "message is not modified" not in str(e).lower():
-            logger.warning(f"Erro ao editar caption em potion_handler: {e}")
+        new_text = await format_combat_message(player_data)
+        kb = [
+            [InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
+            [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu')],
+            [InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
+        ]
+        
+        # Verifica se é uma mensagem editável (com foto e legenda)
+        if "Inimigo:" in new_text: 
+            await query.edit_message_caption(caption=new_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            
+    except Exception:
+        # Se falhar (ex: World Boss que usa outra estrutura, ou erro de API), não faz nada.
+        # O jogador pode clicar em "Voltar" ou usar o menu do WB.
+        pass
 
 # Exporta os handlers
 combat_potion_menu_handler = CallbackQueryHandler(combat_potion_menu_callback, pattern=r'^combat_potion_menu$')
