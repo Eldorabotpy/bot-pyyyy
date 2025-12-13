@@ -65,7 +65,8 @@ except ImportError:
     logging.warning("Job 'finish_travel_job' não encontrado.")
     finish_travel_job = None
 
-from handlers.world_boss.engine import (
+# CORRETO (Novo endereço na pasta modules):
+from modules.world_boss.engine import (
     iniciar_world_boss_job,
     end_world_boss_job
 )

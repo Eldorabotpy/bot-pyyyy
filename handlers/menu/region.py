@@ -17,7 +17,7 @@ from modules.game_data.worldmap import WORLD_MAP
 from modules.dungeons.registry import get_dungeon_for_region
 
 # --- IMPORTS DE HANDLERS ESPECÍFICOS ---
-from handlers.world_boss.engine import world_boss_manager, BOSS_STATS
+from modules.world_boss.engine import world_boss_manager
 from handlers.christmas_shop import is_event_active
 
 logger = logging.getLogger(__name__)
@@ -236,15 +236,24 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         return 
 
     # --- LÓGICA DO WORLD BOSS ---
-    if world_boss_manager.is_active and final_region_key == world_boss_manager.boss_location:
-        caption = (f"‼️ **PERIGO IMINENTE** ‼️\nO **Demônio Dimensional** está aqui!\n\n{world_boss_manager.get_status_text()}")
+    if world_boss_manager.state["is_active"] and final_region_key == world_boss_manager.state["location"]:
+        # Texto do HUD (Barras de Vida)
+        # Nota: Chamamos a função assíncrona corretamente com await
+        hud_text = await world_boss_manager.get_battle_hud()
+        
+        caption = (f"‼️ **PERIGO IMINENTE** ‼️\nO **Demônio Dimensional** está aqui!\n\n{hud_text}")
+        
+        # Botão para entrar no menu de Raid
         keyboard = [
-            [InlineKeyboardButton("⚔️ ATACAR BOSS ⚔️", callback_data='wb_attack')],
+            [InlineKeyboardButton("⚔️ ENTRAR NA RAID ⚔️", callback_data='wb_menu')],
             [InlineKeyboardButton("👤 Perfil", callback_data='profile')],
             [InlineKeyboardButton("🗺️ Fugir", callback_data='travel')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        file_data = media_ids.get_file_data(BOSS_STATS.get("media_key"))
+        
+        # CORREÇÃO: Busca a imagem usando a chave correta 'boss_raid'
+        file_data = media_ids.get_file_data("boss_raid")
+        
     else:
         # --- MENU NORMAL ---
         premium = PremiumManager(player_data)

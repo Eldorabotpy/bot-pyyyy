@@ -1,4 +1,4 @@
-# modules/world_boss/engine.py (VERSÃO FINAL: TRINDADE + SMART HEAL + PERSISTÊNCIA)
+# modules/world_boss/engine.py
 
 import json
 import os
@@ -7,23 +7,28 @@ import logging
 import asyncio
 import html
 from datetime import datetime, timedelta
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.error import Forbidden, TelegramError
 
-from modules import player_manager, game_data
-from modules.combat import criticals
+from modules import player_manager, game_data, file_ids
+from modules.combat import criticals, combat_engine
 from modules.player import stats as player_stats_engine
-from modules import file_ids
+
+# --- NOVO: IMPORTANDO O SISTEMA DE COOLDOWNS ---
+from modules.cooldowns import verificar_cooldown, aplicar_cooldown, iniciar_turno
+
 # Importa dados de Skill e Skins
 from modules.game_data.skills import SKILL_DATA
 from modules.game_data.skins import SKIN_CATALOG
 
 logger = logging.getLogger(__name__)
 
-# --- CONFIGURAÇÕES ---
+# --- CONFIGURAÇÕES DE LOOT E CONSTANTES ---
 BOSS_STATE_FILE = "world_boss_state.json"
-ANNOUNCEMENT_CHAT_ID = -1002881364171
-ANNOUNCEMENT_THREAD_ID = 24
+ANNOUNCEMENT_CHAT_ID = -1002881364171 
+ANNOUNCEMENT_THREAD_ID = 24           
 
 POSSIBLE_LOCATIONS = [
     "pradaria_inicial", "floresta_sombria", "pedreira_granito",
@@ -31,463 +36,369 @@ POSSIBLE_LOCATIONS = [
     "forja_abandonada", "pantano_maldito"
 ]
 
-# Configurações Iniciais do Evento
-INITIAL_STATE = {
-    "is_active": False,
-    "location": None,
-    "start_time": None,
-    "environment_hazard": False, 
-    "entities": {
-        "boss": {
-            "name": "Demônio Dimensional",
-            "max_hp": 50000,
-            "hp": 50000,
-            "alive": True,
-            "stats": {"attack": 150, "defense": 80, "luck": 50, "initiative": 50}
-        },
-        "witch_heal": {
-            "name": "Bruxa do Tormento (Cura)",
-            "max_hp": 15000,
-            "hp": 15000,
-            "alive": True,
-            "stats": {"attack": 80, "defense": 40, "luck": 30, "initiative": 30}
-        },
-        "witch_buff": {
-            "name": "Bruxa da Ruína (Buff)",
-            "max_hp": 15000,
-            "hp": 15000,
-            "alive": True,
-            "stats": {"attack": 80, "defense": 40, "luck": 30, "initiative": 30}
-        }
-    },
-    "damage_leaderboard": {}, # {user_id_str: dano_total}
-    "last_hitter_id": None
-}
-
 # Loot Tables
 SKILL_REWARD_POOL = [
-    "guerreiro_corte_perfurante", "guerreiro_colossal_defense", 
-    "guerreiro_bencao_sagrada", "guerreiro_redemoinho_aco",
-    "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira", 
-    "berserker_ultimo_recurso", "berserker_investida_inquebravel",
-    "cacador_flecha_precisa", "active_ricochet_arrow", 
-    "passive_apex_predator", "active_deadeye_shot",
-    "monge_rajada_de_punhos", "active_thunder_palm", 
-    "active_transcendence", "passive_elemental_strikes",
-    "mago_bola_de_fogo", "active_arcane_ward", 
-    "active_meteor_swarm", "passive_elemental_attunement", 
-    "bardo_melodia_restauradora", "passive_perfect_pitch",
-    "passive_symphony_of_power", "active_dissonant_melody",
-    "assassino_ataque_furtivo","active_guillotine_strike",
-    "active_dance_of_a_thousand_cuts", "passive_potent_toxins",
-    "samurai_corte_iaijutsu","passive_iai_stance",
-    "active_parry_and_riposte","active_banner_of_command"
+    "samurai_sombra_demoniaca", "samurai_corte_iaijutsu",
+    "samurai_passive_perfect_parry", 
+    "assassino_ataque_furtivo", "assassino_active_guillotine_strike",
+    "assassino_passive_potent_toxins",
+    "bardo_melodia_restauradora", "bardo_passive_perfect_pitch",
+    "bardo_passive_symphony_of_power",
+    "mago_bola_de_fogo", "mago_active_arcane_ward",
+    "mago_active_meteor_swarm",
+    "monge_rajada_de_punhos", "monge_active_thunder_palm",
+    "monge_active_transcendence",
+    "cacador_flecha_precisa","cacador_active_ricochet_arrow",
+    "cacador_passive_apex_predator",
+    "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira",
+    "berserker_ultimo_recurso",
+    "guerreiro_corte_perfurante", "guerreiro_colossal_defense",
+    "guerreiro_bencao_sagrada",
+
 ]
-SKILL_CHANCE = 4.0 # 4%
+SKILL_CHANCE = 4.0 
 
 SKIN_REWARD_POOL = [
-    'guerreiro_armadura_negra', 'guerreiro_placas_douradas',
-    'mago_traje_arcano', 'mago_arquimago_caos', 'assassino_manto_espectral',
-    'cacador_patrulheiro_elfico', 'cacador_cacador_dragoes', 'berserker_pele_urso',
-    'berserker_infernal', 'monge_quimono_dragao', 'monge_aspecto_asura', 'bardo_traje_maestro',
-    'bardo_requiem_sombrio', 'samurai_armadura_shogun', 'samurai_armadura_demoniaca'
+    "samurai_armadura_shogun", "samurai_armadura_demoniaca",
+    "bardo_requiem_sombrio", "bardo_traje_maestro", 
+    "monge_aspecto_asura", "monge_quimono_dragao", 
+    "berserker_infernal", "berserker_pele_urso",
+    "cacador_cacador_dragoes", "cacador_patrulheiro_elfico",
+    "assassino_manto_espectral", 
+    "mago_arquimago_caos", "mago_traje_arcano",
+    "guerreiro_placas_douradas", "guerreiro_armadura_negra", "guerreiro_armadura_jade",  
+
 ]
-SKIN_CHANCE = 2.0 # 2%
+SKIN_CHANCE = 2.0 
 
 LOOT_REWARD_POOL = [
-    ("pocao_cura_media", 3, 5),
-    ("pedra_do_aprimoramento", 3, 5),
-    ("gems", 1, 1),
-    ("pergaminho_durabilidade", 5, 10),
-    ("cristal_de_abertura", 5, 10),
-    ("frasco_sabedoria", 2, 4),
-    ("sigilo_protecao", 1, 2)
+    ("pocao_cura_leve", 3, 5), ("pocao_cura_media", 3, 5),
+    ("gems", 1, 1), ("frasco_sabedoria", 5, 10),
+    ("cristal_de_abertura", 5, 10), ("pedra_do_aprimoramento", 3, 14),
+    ("pergaminho_durabilidade", 5, 10), ("sigilo_protecao", 1, 10),
+
 ]
-LOOT_CHANCE = 30.0 # 30% de chance de ganhar algo dessa lista
+LOOT_CHANCE = 30.0
+
+# --- CLASSE PRINCIPAL ---
 
 class WorldBossManager:
     def __init__(self):
-        self.state = self.load_state()
-
-    def load_state(self):
-        """Carrega o estado do arquivo JSON para sobreviver a restarts."""
-        if os.path.exists(BOSS_STATE_FILE):
-            try:
-                with open(BOSS_STATE_FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if "entities" not in data: return INITIAL_STATE.copy()
-                    return data
-            except Exception as e:
-                logger.error(f"Erro ao carregar World Boss: {e}")
-                return INITIAL_STATE.copy()
-        return INITIAL_STATE.copy()
-
-    def save_state(self):
-        """Salva o estado atual no disco."""
-        try:
-            with open(BOSS_STATE_FILE, 'w', encoding='utf-8') as f:
-                json.dump(self.state, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"Erro ao salvar World Boss: {e}")
-
-    def start_event(self):
-        if self.state["is_active"]:
-            return {"error": "O evento já está ativo."}
+        self.is_active = False
+        self.location = "Terras Devastadas"
         
-        # Reinicia o estado
-        self.state = INITIAL_STATE.copy() # Reset total
-        self.state["is_active"] = True
-        self.state["location"] = random.choice(POSSIBLE_LOCATIONS)
-        self.state["start_time"] = datetime.now().isoformat()
-        
-        # Randomiza um pouco os HPs para variar a dificuldade
-        hp_mult = random.uniform(0.9, 1.2)
-        for key in self.state["entities"]:
-            base = self.state["entities"][key]["max_hp"]
-            new_hp = int(base * hp_mult)
-            self.state["entities"][key]["max_hp"] = new_hp
-            self.state["entities"][key]["hp"] = new_hp
-
-        self.save_state()
-        logger.info(f"WB START: {self.state['location']}")
-        return {"success": True, "location": self.state["location"]}
-
-    def end_event(self, reason: str):
-        if not self.state["is_active"]: return {}
-        
-        results = {
-            "leaderboard": self.state["damage_leaderboard"].copy(),
-            "last_hitter_id": self.state["last_hitter_id"],
-            "boss_defeated": (reason == "Boss derrotado")
+        # Estado Global das Entidades
+        self.entities = {
+            "boss": {
+                "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", 
+                "hp": 1000000, "max_hp": 1000000, 
+                "alive": True, 
+                "stats": {"attack": 80, "defense": 20, "initiative": 50, "luck": 20},
+                "turn_counter": 0 
+            },
+            "witch_heal": {
+                "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚", 
+                "hp": 50000, "max_hp": 50000, 
+                "alive": True, 
+                "stats": {"attack": 15, "defense": 10, "initiative": 40, "luck": 10},
+                "turn_counter": 0 
+            },
+            "witch_debuff": {
+                "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬", 
+                "hp": 50000, "max_hp": 50000, 
+                "alive": True, 
+                "stats": {"attack": 20, "defense": 10, "initiative": 60, "luck": 15},
+                "turn_counter": 0 
+            },
         }
         
-        # Reset lógico
-        self.state["is_active"] = False
-        self.save_state()
+        # Sistema de Fila
+        self.active_fighters = set() 
+        self.waiting_queue = []      
+        self.player_states = {}      
+        self.max_concurrent_fighters = 15
         
-        # Limpa o arquivo
-        if os.path.exists(BOSS_STATE_FILE):
-            os.remove(BOSS_STATE_FILE)
-            
-        return results
-
-    # =========================================================================
-    # --- HELPER: TRIAGEM INTELIGENTE (Smart Triage) ---
-    # =========================================================================
-    async def _get_most_injured_player(self):
-        """Retorna o (user_id, player_data, cur_hp, max_hp) do jogador com menor % de vida."""
-        most_injured = None
-        lowest_pct = 1.1
-
-        # Varre participantes (limitado a 50 para performance)
-        active_ids = list(self.state["damage_leaderboard"].keys())
-        random.shuffle(active_ids) # Randomiza para não curar sempre o mesmo se houver empate
+        # Mecânica de Queimadura (Hazard)
+        self.environment_hazard = False
+        self.hazard_turns = 0
         
-        check_ids = active_ids[:50] 
+        # Leaderboard Global para Loot
+        self.damage_leaderboard = {}
+        self.last_hitter_id = None
 
-        for uid_str in check_ids:
-            try:
-                uid = int(uid_str)
-                pdata = await player_manager.get_player_data(uid)
-                if not pdata: continue
-                
-                # Stats básicos (sem chamar calculation pesada)
-                max_hp = pdata.get("base_stats", {}).get("max_hp", 100)
-                # Se tiver buffs salvos, o max_hp pode ser maior, mas vamos usar o base para ser rápido
-                cur_hp = pdata.get("current_hp", max_hp)
-                
-                if cur_hp >= max_hp: continue 
-                
-                pct = cur_hp / max_hp
-                if pct < lowest_pct:
-                    lowest_pct = pct
-                    most_injured = (uid, pdata, cur_hp, max_hp)
-            except: continue
-        
-        return most_injured
-
-    # =========================================================================
-    # --- HELPER: CURA EM MASSA (Mass Heal / AoE) ---
-    # =========================================================================
-    async def _perform_mass_heal(self, healer_id, heal_amount, max_targets=15):
-        """Cura múltiplos aliados em paralelo."""
-        candidate_ids = [int(uid) for uid in self.state["damage_leaderboard"].keys() if int(uid) != healer_id]
-        if not candidate_ids: return 0, 0
-
-        random.shuffle(candidate_ids)
-        targets = candidate_ids[:max_targets]
-        
-        count_healed = 0
-        total_restored = 0
-        
-        async def _heal_single(target_id):
-            nonlocal count_healed, total_restored
-            try:
-                pdata = await player_manager.get_player_data(target_id)
-                if not pdata: return
-                
-                max_hp = pdata.get("base_stats", {}).get("max_hp", 100)
-                # Ajuste de segurança se o HP atual for maior que o base (devido a buffs)
-                if pdata.get("current_hp", 0) > max_hp: max_hp = pdata["current_hp"]
-                
-                current = pdata.get("current_hp", max_hp)
-                if current < max_hp:
-                    new_val = min(max_hp, current + heal_amount)
-                    diff = new_val - current
-                    if diff > 0:
-                        pdata["current_hp"] = new_val
-                        await player_manager.save_player_data(target_id, pdata)
-                        return diff
-            except: pass
-            return 0
-
-        # Executa em paralelo
-        results = await asyncio.gather(*[_heal_single(uid) for uid in targets])
-        
-        for res in results:
-            if res and res > 0:
-                count_healed += 1
-                total_restored += res
-                
-        return count_healed, total_restored
-
-    # =========================================================================
-    # --- MOTOR DE AÇÃO PRINCIPAL ---
-    # =========================================================================
-    async def perform_action(self, user_id: int, player_data: dict, action_type: str, target_key: str = None, skill_id: str = None):
-        """
-        Action Types: 'attack', 'heal_ally', 'defend_ally'
-        """
-        if not self.state["is_active"]:
-            return {"error": "Evento encerrado."}
-        
-        if player_data.get("current_location") != self.state["location"]:
-            return {"error": "Você precisa estar no local do evento para agir."}
-
-        log_msgs = []
-        player_stats = await player_manager.get_player_total_stats(player_data)
-
-        # ---------------------------------------------------------------------
-        # 1. AÇÃO: SUPORTE (CURA)
-        # ---------------------------------------------------------------------
-        if action_type == 'heal_ally':
-            # Verifica se é AoE (Bardo) ou Single Target
-            is_aoe = False
-            heal_base_scale = 2.5
-            
-            if skill_id:
-                skill_data = SKILL_DATA.get(skill_id, {})
-                effects = skill_data.get("rarity_effects", {}).get("comum", {}).get("effects", {})
-                if "party_heal" in effects:
-                    is_aoe = True
-                    heal_base_scale = effects["party_heal"].get("heal_scale", 1.5)
-            
-            magic_atk = player_stats.get('magic_attack', 10)
-            heal_amount = int(magic_atk * heal_base_scale)
-
-            # >> MODO CURA EM MASSA (AoE) <<
-            if is_aoe:
-                count, total = await self._perform_mass_heal(user_id, heal_amount)
-                if count > 0:
-                    # Score no leaderboard (Cura conta como dano/contribuição)
-                    self.state["damage_leaderboard"][str(user_id)] = self.state["damage_leaderboard"].get(str(user_id), 0) + total
-                    
-                    log_msgs.append(f"🎵 <b>MELODIA RESTAURADORA!</b>")
-                    log_msgs.append(f"Sua música alcançou <b>{count} aliados</b>, restaurando um total de <b>{total} HP</b>!")
-                else:
-                    log_msgs.append("🎵 Você tocou sua música, mas todos parecem saudáveis.")
-                
-                return {"success": True, "log": "\n".join(log_msgs)}
-
-            # >> MODO CURA ÚNICA (Smart Triage) <<
-            else:
-                target_info = await self._get_most_injured_player()
-                if not target_info:
-                    return {"log": "✅ <b>Todos os aliados visíveis estão saudáveis!</b>"}
-                
-                t_id, t_data, t_cur, t_max = target_info
-                
-                # Bônus percentual na cura single target
-                bonus_heal = int(t_max * 0.05)
-                final_heal = heal_amount + bonus_heal
-                
-                new_hp = min(t_max, t_cur + final_heal)
-                real_healed = new_hp - t_cur
-                
-                t_data["current_hp"] = new_hp
-                await player_manager.save_player_data(t_id, t_data)
-                
-                # Score
-                self.state["damage_leaderboard"][str(user_id)] = self.state["damage_leaderboard"].get(str(user_id), 0) + real_healed
-
-                t_name = html.escape(t_data.get("character_name", "Aliado"))
-                pct_before = int((t_cur / t_max) * 100)
-                pct_after = int((new_hp / t_max) * 100)
-                
-                log_msgs.append(f"💚 <b>CURA SALVADORA!</b>")
-                log_msgs.append(f"Você socorreu <b>{t_name}</b> ({pct_before}%) restaurando <b>{real_healed} HP</b>!")
-                log_msgs.append(f"O aliado agora está com {pct_after}% de vida.")
-                
-                return {"success": True, "log": "\n".join(log_msgs)}
-
-        # ---------------------------------------------------------------------
-        # 2. AÇÃO: SUPORTE (DEFESA)
-        # ---------------------------------------------------------------------
-        if action_type == 'defend_ally':
-            # Tank limpa hazards (chão de fogo/meteoros)
-            if self.state["environment_hazard"]:
-                self.state["environment_hazard"] = False
-                log_msgs.append(f"🛡️ <b>INTERCEPTAÇÃO!</b> Você se lançou à frente e protegeu o grupo da Chuva de Meteoros!")
-            else:
-                log_msgs.append(f"🛡️ Você ergueu seu escudo! A moral do grupo aumentou.")
-            return {"success": True, "log": "\n".join(log_msgs)}
-
-        # ---------------------------------------------------------------------
-        # 3. AÇÃO: ATAQUE
-        # ---------------------------------------------------------------------
-        target_entity = self.state["entities"].get(target_key)
-        if not target_entity or not target_entity["alive"]:
-            return {"error": "Alvo inválido ou já derrotado."}
-
-        # Verifica Escudo das Bruxas
-        witches_alive = self.state["entities"]["witch_heal"]["alive"] or self.state["entities"]["witch_buff"]["alive"]
-        damage_reduction = 0.90 if (target_key == "boss" and witches_alive) else 0.0
-
-        skill_effects = {}
-        # (Futuro: extrair dados da skill_id se passado)
-
-        # Rola o dano
-        dmg, is_crit, is_mega = criticals.roll_damage(player_stats, target_entity["stats"], skill_effects)
-        
-        # Redução do Escudo
-        if damage_reduction > 0:
-            dmg = int(dmg * (1.0 - damage_reduction))
-            log_msgs.append("🛡️ <b>O Escudo das Bruxas absorveu 90% do dano!</b>")
-
-        dmg = max(1, dmg)
-        target_entity["hp"] -= dmg
-        self.state["damage_leaderboard"][str(user_id)] = self.state["damage_leaderboard"].get(str(user_id), 0) + dmg
-        self.state["last_hitter_id"] = user_id
-        
-        hit_icon = "💥" if is_crit else "⚔️"
-        log_msgs.append(f"{hit_icon} Você causou <b>{dmg}</b> de dano em {target_entity['name']}.")
-
-        # Morte do Mob
-        if target_entity["hp"] <= 0:
-            target_entity["hp"] = 0
-            target_entity["alive"] = False
-            log_msgs.append(f"💀 <b>{target_entity['name']} FOI DERROTADO!</b>")
-            
-            if target_key == "boss":
-                res = self.end_event("Boss derrotado")
-                return {"boss_defeated": True, "log": "\n".join(log_msgs), "battle_results": res}
-
-        # IA dos Mobs (Reação)
-        await self._mob_ai_turn(user_id, log_msgs)
-        
-        self.save_state()
-        return {"success": True, "log": "\n".join(log_msgs)}
-
-    async def _mob_ai_turn(self, user_id, log_msgs):
-        """IA simples para os mobs reagirem."""
-        # 1. Bruxa Healer
-        witch_heal = self.state["entities"]["witch_heal"]
-        if witch_heal["alive"] and random.random() < 0.15: # 15% chance
-            heal = int(witch_heal["max_hp"] * 0.05)
-            # Cura quem tiver menos vida entre os mobs
-            targets = [e for e in self.state["entities"].values() if e["alive"] and e["hp"] < e["max_hp"]]
-            if targets:
-                t = random.choice(targets)
-                t["hp"] = min(t["max_hp"], t["hp"] + heal)
-                log_msgs.append(f"🧙‍♀️ {witch_heal['name']} curou {t['name']} em {heal} HP!")
-
-        # 2. Boss AoE
-        boss = self.state["entities"]["boss"]
-        if boss["alive"]:
-            # Dano passivo se tiver hazard
-            if self.state["environment_hazard"]:
-                log_msgs.append("🔥 <b>O solo em chamas queima você!</b> (Dano Ambiental)")
-            
-            # Chance de ativar Hazard
-            if random.random() < 0.10 and not self.state["environment_hazard"]:
-                self.state["environment_hazard"] = True
-                log_msgs.append("☄️ <b>O Demônio invoca uma Chuva de Meteoros! O campo está perigoso!</b>")
-
-    # =========================================================================
-    # --- VISUAL HUD (ASYNC para buscar nomes) ---
-    # =========================================================================
-    async def get_battle_hud(self) -> str:
-        def _bar(cur, max_v, length=8):
-            pct = cur / max_v
-            filled = int(pct * length)
-            return "█" * filled + "░" * (length - filled)
-
-        ents = self.state["entities"]
-        
-        # Boss Display
+    @property
+    def state(self):
+        return {
+            "is_active": self.is_active,
+            "location": self.location,
+            "entities": self.entities
+        }
+    
+    async def get_battle_hud(self):
+        ents = self.entities
         boss = ents["boss"]
-        boss_status = "🛡️ PROTEGIDO" if (ents["witch_heal"]["alive"] or ents["witch_buff"]["alive"]) else "🔥 VULNERÁVEL"
-        if not boss["alive"]: boss_status = "💀 MORTO"
         
-        txt = f"👹 <b>{boss['name']}</b>\n"
-        txt += f"HP: `{_bar(boss['hp'], boss['max_hp'])}` {boss['hp']}/{boss['max_hp']} ({boss_status})\n\n"
+        if not self.is_active or not boss["alive"]:
+            return "O Boss foi derrotado!"
+
+        pct = boss["hp"] / boss["max_hp"]
+        fill = int(pct * 10)
+        bar = "🟩" * fill + "⬜" * (10 - fill)
         
-        # Witches Display
+        txt = f"👹 <b>{boss['name']}</b>\n{bar} {boss['hp']:,}\n"
+        
         w1 = ents["witch_heal"]
-        w1_icon = "💀" if not w1["alive"] else "🧙‍♀️"
-        txt += f"{w1_icon} <b>{w1['name']}</b>: `{_bar(w1['hp'], w1['max_hp'], 6)}`\n"
+        w2 = ents["witch_debuff"]
         
-        w2 = ents["witch_buff"]
-        w2_icon = "💀" if not w2["alive"] else "🧙"
-        txt += f"{w2_icon} <b>{w2['name']}</b>: `{_bar(w2['hp'], w2['max_hp'], 6)}`\n"
-
-        if self.state["environment_hazard"]:
-            txt += "\n⚠️ <b>ALERTA:</b> Chuva de Meteoros ativa! Tanks, usem [Proteger]!\n"
-
-        # --- SEÇÃO DE ALERTA MÉDICO (Quem está morrendo?) ---
-        txt += "\n" + ("-"*20) + "\n"
+        w1_st = "𝗖𝘂𝗿𝗮 💚" if w1["alive"] else "💀"
+        w2_st = "𝗖𝗮𝗼𝘀 ☠️" if w2["alive"] else "💀"
         
-        critical_names = []
-        check_ids = list(self.state["damage_leaderboard"].keys())
-        # Ordena por quem bateu mais (geralmente os ativos), pega top 20 para checar vida
-        # (Idealmente ordenaria por timestamp de ultima ação, mas leaderboard serve de proxy)
-        sorted_ids = sorted(check_ids, key=lambda x: self.state["damage_leaderboard"][x], reverse=True)[:20]
-
-        for uid in sorted_ids:
-            try:
-                p = await player_manager.get_player_data(int(uid))
-                if not p: continue
-                
-                cur = p.get("current_hp", 100)
-                max_h = p.get("base_stats", {}).get("max_hp", 100)
-                
-                if cur < (max_h * 0.30): # Menos de 30% HP
-                    name = p.get("character_name", "Herói").split()[0]
-                    pct_val = int((cur/max_h)*100)
-                    critical_names.append(f"{name} ({pct_val}%)")
-                    if len(critical_names) >= 3: break 
-            except: continue
-
-        if critical_names:
-            txt += f"🚨 <b>PERIGO CRÍTICO:</b> " + ", ".join(critical_names)
-        else:
-            txt += "✅ Grupo Estável"
-
+        txt += f"Bruxas: {w1_st} | {w2_st}\n"
+        
+        if self.environment_hazard:
+            txt += "🔥 𝘾𝘼𝙈𝙋𝙊 𝙀𝙈 𝘾𝙃𝘼𝙈𝘼𝙎!"
+            
         return txt
+
+    def start_event(self):
+        if self.is_active: return {"error": "𝕁𝕒́ 𝕒𝕥𝕚𝕧𝕠."}
+        self.is_active = True
+        self.location = random.choice(POSSIBLE_LOCATIONS)
+        self.active_fighters.clear()
+        self.waiting_queue.clear()
+        self.player_states.clear()
+        self.damage_leaderboard.clear()
+        self.environment_hazard = False
+        self.hazard_turns = 0
+        
+        # Reset Entidades e Turnos
+        for k, v in self.entities.items():
+            v["hp"] = v["max_hp"]
+            v["alive"] = True
+            v["turn_counter"] = 0
+            
+        return {"success": True, "location": self.location}
+
+    def end_event(self, reason="Ｔｅｍｐｏ　ｅｓｇｏｔａｄｏ"):
+        active_status = self.is_active
+        self.is_active = False
+        self.active_fighters.clear()
+        
+        if not active_status: return {}
+        
+        return {
+            "leaderboard": self.damage_leaderboard.copy(),
+            "last_hitter_id": self.last_hitter_id,
+            "boss_defeated": (reason == "Boss derrotado")
+        }
+
+    # --- GERENCIAMENTO DE FILA ---
+    async def add_player_to_event(self, user_id, player_data):
+        if not self.is_active: return "inactive"
+        if user_id in self.active_fighters: return "active"
+        if user_id in self.waiting_queue: return "waiting"
+
+        if len(self.active_fighters) < self.max_concurrent_fighters:
+            self.active_fighters.add(user_id)
+            await self._setup_player_state(user_id, player_data)
+            return "active"
+        else:
+            self.waiting_queue.append(user_id)
+            return "waiting"
+
+    async def _setup_player_state(self, user_id, player_data):
+        stats = await player_manager.get_player_total_stats(player_data)
+        self.player_states[user_id] = {
+            'hp': min(player_data.get('current_hp', 999), stats['max_hp']),
+            'max_hp': stats['max_hp'],
+            'mp': min(player_data.get('current_mp', 999), stats['max_mana']),
+            'max_mp': stats['max_mana'],
+            'current_target': 'boss', 
+            'log': '𝗘𝗻𝘁𝗿𝗼𝘂 𝗻𝗮 𝗯𝗮𝘁𝗮𝗹𝗵𝗮!'
+        }
+
+    def set_target(self, user_id, target_key):
+        if user_id in self.player_states and target_key in self.entities:
+            self.player_states[user_id]['current_target'] = target_key
+            return True
+        return False
+
+    # --- LÓGICA DE COMBATE ---
+    async def process_action(self, user_id, player_data, action_type, skill_id=None):
+        if user_id not in self.active_fighters: return {"error": "𝙑𝙤𝙘𝙚̂ 𝙣𝙖̃𝙤 𝙚𝙨𝙩𝙖́ 𝙣𝙖 𝙡𝙪𝙩𝙖."}
+        
+        state = self.player_states[user_id]
+        target_key = state['current_target']
+        target = self.entities.get(target_key)
+        
+        if not target or not target["alive"]:
+            return {"error": "𝗔𝗹𝘃𝗼 𝗷𝗮́ 𝗱𝗲𝗿𝗿𝗼𝘁𝗮𝗱𝗼! 𝗘𝘀𝗰𝗼𝗹𝗵𝗮 𝗼𝘂𝘁𝗿𝗼."}
+
+        logs = []
+        p_stats = await player_manager.get_player_total_stats(player_data)
+        current_mp_db = player_data.get("current_mp", 0)
+        state['mp'] = current_mp_db # Sincroniza visual
+        # 1. AÇÃO DO JOGADOR
+        dmg = 0
+        
+        # Verifica Imunidade do Boss
+        witches_alive = self.entities["witch_heal"]["alive"] or self.entities["witch_debuff"]["alive"]
+        boss_immune = (target_key == "boss" and witches_alive)
+
+        if boss_immune:
+            logs.append("🛡️ 𝗕𝗢𝗦𝗦 𝗜𝗠𝗨𝗡𝗘! 𝗗𝗲𝗿𝗿𝗼𝘁𝗲 𝗮𝘀 𝗕𝗿𝘂𝘅𝗮𝘀 𝗽𝗿𝗶𝗺𝗲𝗶𝗿𝗼!")
+            dmg = 0 
+        else:
+            if action_type == "attack":
+                res = await combat_engine.processar_acao_combate(player_data, p_stats, target["stats"], None, state['hp'])
+                dmg = res["total_damage"]
+                logs.append(f"⚔️ 𝙑𝙤𝙘𝙚̂ 𝙘𝙖𝙪𝙨𝙤𝙪 {dmg} 𝗲𝗺 {target['name']}")
+            
+            elif action_type == "skill":
+                # --- PASSO 1: VERIFICA COOLDOWN ---
+                s_info = SKILL_DATA.get(skill_id, {})
+                mana_cost = s_info.get("mana_cost", 0)
+
+                if current_mp_db < mana_cost:
+                    return {"error": f"Mana insuficiente! ({current_mp_db}/{mana_cost})"}
+                
+                pode_usar, msg_cd = verificar_cooldown(player_data, skill_id)
+                if not pode_usar:
+                    return {"error": msg_cd} # Retorna erro para o usuário (toast)
+                
+                player_data["current_mp"] -= mana_cost
+                state['mp'] = player_data["current_mp"] # Atualiza visual
+
+                # --- PASSO 2: EXECUTA SKILL ---
+                res = await combat_engine.processar_acao_combate(player_data, p_stats, target["stats"], skill_id, state['hp'])
+                dmg = res["total_damage"]
+                logs.append(f"✨ 𝙑𝙤𝙘𝙚̂ 𝙪𝙨𝙤𝙪 𝙎𝙠𝙞𝙡𝙡: {dmg} 𝙙𝙖𝙣𝙤 𝙚𝙢 {target['name']}")
+                
+                # --- PASSO 3: APLICA COOLDOWN ---
+                # Busca a raridade da skill no player para aplicar tempo correto
+                player_skills = player_data.get("skills", {})
+                rarity = "comum"
+                if skill_id in player_skills:
+                    rarity = player_skills[skill_id].get("rarity", "comum")
+                
+                # Modifica o player_data aplicando o CD
+                player_data = aplicar_cooldown(player_data, skill_id, rarity)
+
+            # Aplica Dano na Entidade Global
+            target["hp"] = max(0, target["hp"] - dmg)
+            
+            # Registra Dano para Loot
+            self.damage_leaderboard[str(user_id)] = self.damage_leaderboard.get(str(user_id), 0) + dmg
+            self.last_hitter_id = user_id
+
+            if target["hp"] <= 0:
+                target["alive"] = False
+                logs.append(f"💀 {target['name']} 𝗙𝗢𝗜 𝗗𝗘𝗥𝗥𝗢𝗧𝗔𝗗𝗢!")
+                if target_key == "boss":
+                    return {"boss_defeated": True, "log": "𝗢 𝗥𝗘𝗜 𝗖𝗔𝗜𝗨!"}
+
+        # 2. IA DOS MOBS (Ciclos de Habilidade)
+        await self._process_mobs_turn(user_id, state, p_stats, logs)
+
+        if state['hp'] <= 0:
+            if user_id in self.active_fighters: self.active_fighters.remove(user_id)
+            if self.waiting_queue:
+                nid = self.waiting_queue.pop(0)
+            return {"game_over": True, "log": f"𝗩𝗼𝗰𝗲̂ 𝗰𝗮𝗶𝘂 𝗲𝗺 𝗰𝗼𝗺𝗯𝗮𝘁𝗲."}
+
+        # 3. FINALIZAÇÃO DO TURNO (Reduz Cooldowns)
+        # --- PASSO 4: REDUZ COOLDOWNS ---
+        player_data, msgs_cd = iniciar_turno(player_data)
+        if msgs_cd:
+            # Adiciona avisos de skill pronta no log
+            for m in msgs_cd: logs.append(m)
+
+        state['log'] = "\n".join(logs[-6:]) 
+        player_data['current_hp'] = state['hp']
+        player_data['current_mp'] = state['mp']
+        
+        await player_manager.save_player_data(user_id, player_data)
+        
+        return {"success": True, "state": state}
+
+    async def _process_mobs_turn(self, user_id, state, p_stats, logs):
+        # A) Dano de Queimadura (Campo em Chamas)
+        if self.environment_hazard:
+            burn_dmg = int(state['max_hp'] * 0.05) 
+            state['hp'] -= burn_dmg
+            logs.append(f"🔥 𝐕𝐨𝐜𝐞̂ 𝐬𝐨𝐟𝐫𝐞𝐮 𝐪𝐮𝐞𝐢𝐦𝐚𝐝𝐮𝐫𝐚: -{burn_dmg} HP")
+            self.hazard_turns -= 1
+            if self.hazard_turns <= 0: self.environment_hazard = False
+
+        # B) Turno do Boss (Meteoro a cada 3 turnos)
+        boss = self.entities["boss"]
+        if boss["alive"]:
+            boss["turn_counter"] += 1
+            if boss["turn_counter"] % 3 == 0:
+                # Meteoro
+                aoe_dmg = int(boss["stats"]["attack"] * 1.5)
+                state['hp'] -= aoe_dmg
+                logs.append(f"☄️ 𝐌𝐄𝐓𝐄𝐎𝐑𝐎! 𝐕𝐨𝐜𝐞̂ 𝐭𝐨𝐦𝐨𝐮 -{aoe_dmg} HP!")
+                
+                # Ativa chamas
+                self.environment_hazard = True
+                self.hazard_turns = 2 
+                logs.append("🔥 𝙊 𝙘𝙖𝙢𝙥𝙤 𝙚𝙨𝙩𝙖́ 𝙚𝙢 𝙘𝙝𝙖𝙢𝙖𝙨!")
+                
+                # Aplica dano "silencioso" aos outros
+                for fid in list(self.active_fighters):
+                    if fid != user_id and fid in self.player_states:
+                        self.player_states[fid]['hp'] -= aoe_dmg
+            else:
+                # Ataque Normal
+                enemy_stats = boss["stats"]
+                enemy_dmg, is_crit, _ = criticals.roll_damage(enemy_stats, p_stats, {})
+                state['hp'] -= enemy_dmg
+                hit_txt = "Crítico" if is_crit else "Ataque"
+                logs.append(f"🤕 𝗕𝗼𝘀𝘀 𝘁𝗲 𝗮𝗰𝗲𝗿𝘁𝗼𝘂 ({hit_txt}): -{enemy_dmg} HP")
+
+        # C) Bruxa da Cura
+        w_heal = self.entities["witch_heal"]
+        if w_heal["alive"]:
+            w_heal["turn_counter"] += 1
+            if w_heal["turn_counter"] % 4 == 1: 
+                heal_amt = int(boss["max_hp"] * 0.05) 
+                boss["hp"] = min(boss["max_hp"], boss["hp"] + heal_amt)
+                logs.append(f"💚 𝗕𝗼𝘀𝘀 𝘁𝗲 𝗮𝗰𝗲𝗿𝘁𝗼𝘂 (+{heal_amt} 𝐇𝐏)!")
+            else:
+                dmg = int(w_heal["stats"]["attack"] * 0.5)
+                state['hp'] -= dmg
+                logs.append(f"🪄 𝗕𝗿𝘂𝘅𝗮 𝗱𝗮 𝗖𝘂𝗿𝗮 𝘁𝗲 𝗮𝘁𝗮𝗰𝗼𝘂: -{dmg} 𝐇𝐏")
+
+        # D) Bruxa de Debuff
+        w_debuff = self.entities["witch_debuff"]
+        if w_debuff["alive"]:
+            w_debuff["turn_counter"] += 1
+            if w_debuff["turn_counter"] % 4 == 1:
+                debuff_dmg = int(state['max_hp'] * 0.10)
+                state['hp'] -= debuff_dmg
+                logs.append(f"☠️ 𝗠𝗮𝗹𝗱𝗶𝗰̧𝗮̃𝗼 𝗱𝗮 𝗕𝗿𝘂𝘅𝗮! 𝗩𝗼𝗰𝗲̂ 𝗽𝗲𝗿𝗱𝗲𝘂 -{debuff_dmg} 𝐇𝐏!")
+            else:
+                dmg = int(w_debuff["stats"]["attack"] * 0.6)
+                state['hp'] -= dmg
+                logs.append(f"🪄 𝗕𝗿𝘂𝘅𝗮 𝗱𝗼 𝗖𝗮𝗼𝘀 𝘁𝗲 𝗮𝘁𝗮𝗰𝗼𝘂: -{dmg} 𝐇𝐏")
+
+    def get_battle_view(self, user_id):
+        return self.player_states.get(user_id)
 
 # Instância Global
 world_boss_manager = WorldBossManager()
 
 # ======================================================
-# --- FUNÇÕES DE LOOT E ANÚNCIO (RESTAURADO) ---
+# --- JOBS E BROADCAST ---
 # ======================================================
 
 async def _send_dm_to_winner(context: ContextTypes.DEFAULT_TYPE, user_id: int, loot_messages: list[str]):
     if not loot_messages: return
     loot_str = "\n".join([f"• {item}" for item in loot_messages])
     message = (
-        f"🎉 <b>Recompensas do Demônio Dimensional</b> 🎉\n\n"
-        f"Parabéns! Por sua bravura na batalha, você recebeu:\n{loot_str}"
+        f"🎉 𝑹𝒆𝒄𝒐𝒎𝒑𝒆𝒏𝒔𝒂𝒔 𝒅𝒐 𝑫𝒆𝒎𝒐̂𝒏𝒊𝒐 𝑫𝒊𝒎𝒆𝒏𝒔𝒊𝒐𝒏𝒂𝒍 🎉\n\n"
+        f"𝑷𝒂𝒓𝒂𝒃𝒆́𝒏𝒔! 𝑷𝒐𝒓 𝒔𝒖𝒂 𝒃𝒓𝒂𝒗𝒖𝒓𝒂 𝒏𝒂 𝒃𝒂𝒕𝒂𝒍𝒉𝒂, 𝒗𝒐𝒄𝒆̂ 𝒓𝒆𝒄𝒆𝒃𝒆𝒖:\n{loot_str}"
     )
     try:
         await context.bot.send_message(chat_id=user_id, text=message, parse_mode='HTML')
@@ -497,14 +408,12 @@ async def _send_dm_to_winner(context: ContextTypes.DEFAULT_TYPE, user_id: int, l
         return False
 
 async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battle_results: dict):
-    """Distribui loot e anuncia resultados."""
     leaderboard = battle_results.get("leaderboard", {})
     last_hitter_id = battle_results.get("last_hitter_id")
     boss_defeated = battle_results.get("boss_defeated", False)
 
     if not leaderboard: return
 
-    # Carrega dados dos participantes
     participant_data = {}
     for user_id_str in leaderboard.keys():
         try:
@@ -515,13 +424,11 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     
     if not participant_data: return
 
-    # Listas para o anúncio global
     skill_winners_msg = []
     skin_winners_msg = []
-    loot_winners_count = 0 # Para não flodar o chat global com poções
+    loot_winners_count = 0
     last_hit_msg = ""
     
-    # Monta Top 3
     sorted_ranking = sorted(leaderboard.items(), key=lambda item: item[1], reverse=True)
     top_3_msg = []
     medals = ["🥇", "🥈", "🥉"]
@@ -532,96 +439,77 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
         medal = medals[i] if i < 3 else "🏅"
         top_3_msg.append(f"{medal} {name} ({dmg:,} pts)")
 
-    # === DISTRIBUIÇÃO ===
     for user_id, pdata in participant_data.items():
         if leaderboard.get(str(user_id), 0) <= 0: continue
         
-        try:
-            player_name = pdata.get("character_name", f"ID {user_id}")
-            loot_won_messages = [] # Mensagens privadas para o jogador
-            player_mudou = False
+        # --- [MUDANÇA] SÓ ENTREGA LOOT SE O BOSS FOI DERROTADO ---
+        if boss_defeated:
+            try:
+                player_name = pdata.get("character_name", f"ID {user_id}")
+                loot_won_messages = []
+                player_mudou = False
 
-            # 1. Roll SKILL (5%)
-            if random.random() * 100 <= SKILL_CHANCE:
-                won_skill_id = random.choice(SKILL_REWARD_POOL)
-                won_item_id = f"tomo_{won_skill_id}" 
-                item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
-                display_name = item_info.get("display_name", won_skill_id)
+                if random.random() * 100 <= SKILL_CHANCE:
+                    won_skill_id = random.choice(SKILL_REWARD_POOL)
+                    won_item_id = f"tomo_{won_skill_id}" 
+                    item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
+                    display_name = item_info.get("display_name", won_skill_id)
+                    player_manager.add_item_to_inventory(pdata, won_item_id, 1)
+                    loot_won_messages.append(f"📚 <b>SKILL RARA:</b> {display_name}")
+                    skill_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
+                    player_mudou = True
+
+                if random.random() * 100 <= SKIN_CHANCE:
+                    won_skin_id = random.choice(SKIN_REWARD_POOL)
+                    won_item_id = f"caixa_{won_skin_id}"
+                    item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
+                    display_name = item_info.get("display_name", won_skin_id)
+                    player_manager.add_item_to_inventory(pdata, won_item_id, 1)
+                    loot_won_messages.append(f"🎨 <b>SKIN LENDÁRIA:</b> {display_name}")
+                    skin_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
+                    player_mudou = True
+
+                if random.random() * 100 <= LOOT_CHANCE:
+                    loot_choice = random.choice(LOOT_REWARD_POOL)
+                    if isinstance(loot_choice, tuple):
+                        l_id = loot_choice[0]
+                        l_qty = random.randint(loot_choice[1], loot_choice[2])
+                    else:
+                        l_id = loot_choice
+                        l_qty = 1
+                    player_manager.add_item_to_inventory(pdata, l_id, l_qty)
+                    i_info = game_data.ITEMS_DATA.get(l_id, {})
+                    i_name = i_info.get("display_name", l_id.replace("_", " ").title())
+                    i_emoji = i_info.get("emoji", "📦")
+                    loot_won_messages.append(f"{i_emoji} <b>Loot:</b> {l_qty}x {i_name}")
+                    loot_winners_count += 1
+                    player_mudou = True
+
+                if player_mudou:
+                    await player_manager.save_player_data(user_id, pdata)
                 
-                player_manager.add_item_to_inventory(pdata, won_item_id, 1)
-                loot_won_messages.append(f"📚 <b>SKILL RARA:</b> {display_name}")
-                skill_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
-                player_mudou = True
+                if loot_won_messages:
+                    await _send_dm_to_winner(context, user_id, loot_won_messages)
 
-            # 2. Roll SKIN (2%)
-            if random.random() * 100 <= SKIN_CHANCE:
-                won_skin_id = random.choice(SKIN_REWARD_POOL)
-                won_item_id = f"caixa_{won_skin_id}"
-                item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
-                display_name = item_info.get("display_name", won_skin_id)
-                
-                player_manager.add_item_to_inventory(pdata, won_item_id, 1)
-                loot_won_messages.append(f"🎨 <b>SKIN LENDÁRIA:</b> {display_name}")
-                skin_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
-                player_mudou = True
+                if user_id == last_hitter_id:
+                    last_hit_msg = f"💥 <b>Último Golpe:</b> {html.escape(player_name)}"
 
-            # 3. Roll LOOT COMUM (50%) - NOVO!
-            if random.random() * 100 <= LOOT_CHANCE:
-                # Escolhe um item da lista
-                loot_choice = random.choice(LOOT_REWARD_POOL)
-                
-                # Verifica se é tupla ("item", min, max) ou só string "item"
-                if isinstance(loot_choice, tuple):
-                    l_id = loot_choice[0]
-                    l_qty = random.randint(loot_choice[1], loot_choice[2])
-                else:
-                    l_id = loot_choice
-                    l_qty = 1
-                
-                # Adiciona ao inventário
-                player_manager.add_item_to_inventory(pdata, l_id, l_qty)
-                
-                # Pega nome bonito
-                i_info = game_data.ITEMS_DATA.get(l_id, {})
-                i_name = i_info.get("display_name", l_id.replace("_", " ").title())
-                i_emoji = i_info.get("emoji", "📦")
-                
-                loot_won_messages.append(f"{i_emoji} <b>Loot:</b> {l_qty}x {i_name}")
-                loot_winners_count += 1
-                player_mudou = True
+            except Exception as e:
+                logger.error(f"[WB_LOOT] Erro no player {user_id}: {e}")
+        # ------------------------------------------------------------
 
-            # Salva Player
-            if player_mudou:
-                await player_manager.save_player_data(user_id, pdata)
-            
-            # Envia DM com resumo do que ele ganhou
-            if loot_won_messages:
-                await _send_dm_to_winner(context, user_id, loot_won_messages)
-
-            # Checa Last Hit
-            if user_id == last_hitter_id:
-                last_hit_msg = f"💥 <b>Último Golpe:</b> {html.escape(player_name)}"
-
-        except Exception as e:
-            logger.error(f"[WB_LOOT] Erro no player {user_id}: {e}")
-
-    # === ANÚNCIO NO CANAL ===
     if not boss_defeated:
-        title = "👹 <b>O Demônio Dimensional Escapou!</b> 👹"
-        body = "O monstro era muito poderoso e retirou-se.\n\nMais sorte da próxima vez!"
+        title = "👹 𝗢 𝗗𝗲𝗺𝗼̂𝗻𝗶𝗼 𝗗𝗶𝗺𝗲𝗻𝘀𝗶𝗼𝗻𝗮𝗹 𝗘𝘀𝗰𝗮𝗽𝗼𝘂! 👹"
+        body = "O ᴍᴏɴsᴛʀᴏ ᴇʀᴀ ᴍᴜɪᴛᴏ ᴘᴏᴅᴇʀᴏsᴏ ᴇ ʀᴇᴛɪʀᴏᴜ-sᴇ.\n\nMᴀɪs sᴏʀᴛᴇ ᴅᴀ ᴘʀᴏ́xɪᴍᴀ ᴠᴇᴢ!\n\n"
+        body += "Ranking de Contribuição (Top 3):\n" + "\n".join(top_3_msg)
     else:
-        title = "🎉 <b>O Demônio Dimensional Foi Derrotado!</b> 🎉"
-        body = "A ameaça foi contida!\n\n<b>Ranking de Contribuição (Top 3):</b>\n" + "\n".join(top_3_msg)
-        
+        title = "🎉 𝐎 𝐃𝐞𝐦𝐨̂𝐧𝐢𝐨 𝐃𝐢𝐦𝐞𝐧𝐬𝐢𝐨𝐧𝐚𝐥 𝐅𝐨𝐢 𝐃𝐞𝐫𝐫𝐨𝐭𝐚𝐝𝐨! 🎉"
+        body = "A ᴀᴍᴇᴀᴄ̧ᴀ ғᴏɪ ᴄᴏɴᴛɪᴅᴀ!\n\n Rᴀɴᴋɪɴɢ ᴅᴇ Cᴏɴᴛʀɪʙᴜɪᴄ̧ᴀ̃ᴏ (Tᴏᴘ 3):\n" + "\n".join(top_3_msg)
         if last_hit_msg: body += f"\n{last_hit_msg}"
-        
-        # Lista Skins e Skills (Itens raros merecem destaque)
-        if skin_winners_msg: body += "\n\n🎨 <b>Skins Encontradas:</b>\n" + "\n".join(skin_winners_msg)
-        if skill_winners_msg: body += "\n\n✨ <b>Skills Encontradas:</b>\n" + "\n".join(skill_winners_msg)
-        
-        # Apenas menciona quantos ganharam loot comum, pra não poluir
+        if skin_winners_msg: body += "\n\n🎨 𝐒𝐤𝐢𝐧𝐬 𝐄𝐧𝐜𝐨𝐧𝐭𝐫𝐚𝐝𝐚𝐬:\n" + "\n".join(skin_winners_msg)
+        if skill_winners_msg: body += "\n\n✨ 𝐒𝐤𝐢𝐥𝐥𝐬 𝐄𝐧𝐜𝐨𝐧𝐭𝐫𝐚𝐝𝐚𝐬:\n" + "\n".join(skill_winners_msg)
         if loot_winners_count > 0:
-            body += f"\n\n📦 <b>{loot_winners_count} guerreiros</b> receberam espólios de guerra (Poções/Materiais)."
+            body += f"\n\n📦 {loot_winners_count} 𝐠𝐮𝐞𝐫𝐫𝐞𝐢𝐫𝐨𝐬 ʀᴇᴄᴇʙᴇʀᴀᴍ ᴇsᴘᴏ́ʟɪᴏs ᴅᴇ ɢᴜᴇʀʀᴀ."
 
     try:
         await context.bot.send_message(
@@ -633,21 +521,56 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     except Exception as e:
         logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
-async def broadcast_boss_announcement(application, location_key: str):
-    """Anuncia início para todos com IMAGEM (se houver)."""
+async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):
+    """Anuncia início com IMAGEM e BOTÃO DE MAPA."""
     location_name = (game_data.REGIONS_DATA.get(location_key) or {}).get("display_name", location_key)
     
-    # Pega o ID da imagem
-    media_id = file_ids.get_file_id("boss_raid")
+    media_id = forced_media_id
+    if not media_id:
+        try:
+            file_ids.refresh_cache()
+            media_id = file_ids.get_file_id("boss_raid")
+        except: pass
+
+    # Texto atualizado
+    anuncio = f"🚨 𝐀𝐋𝐄𝐑𝐓𝐀 𝐆𝐋𝐎𝐁𝐀𝐋 🚨\nᴜᴍ ᴅᴇᴍôɴɪᴏ ᴅɪᴍᴇɴsɪᴏɴᴀʟ sᴜʀɢɪᴜ ᴇᴍ {location_name}!\n\nᴄʟɪǫᴜᴇ ᴀʙᴀɪxᴏ ᴘᴀʀᴀ ᴠɪᴀᴊᴀʀ!"
     
-    anuncio = f"🚨 **ALERTA GLOBAL** 🚨\nUm Demônio Dimensional surgiu em <b>{location_name}</b>!\n\nUse /worldboss para ajudar na defesa!"
-    
+    # Botão de Viagem (Map)
+    keyboard = [[InlineKeyboardButton("🗺️ 𝔸𝔹ℝ𝕀ℝ 𝕄𝔸ℙ𝔸 𝔻𝔼 𝕍𝕀𝔸𝔾𝔼𝕄 🗺️", callback_data="travel")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    count = 0
     async for user_id, _ in player_manager.iter_players():
         try:
             if media_id:
-                await application.bot.send_photo(chat_id=user_id, photo=media_id, caption=anuncio, parse_mode='HTML')
+                await application.bot.send_photo(chat_id=user_id, photo=media_id, caption=anuncio, parse_mode='HTML', reply_markup=reply_markup)
             else:
-                await application.bot.send_message(chat_id=user_id, text=anuncio, parse_mode='HTML')
+                await application.bot.send_message(chat_id=user_id, text=anuncio, parse_mode='HTML', reply_markup=reply_markup)
             
+            count += 1
+            if count % 20 == 0: await asyncio.sleep(1)
+            else: await asyncio.sleep(0.05) 
+        except: continue
+
+async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
+    """Finaliza o evento por tempo."""
+    battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
+    await distribute_loot_and_announce(context, battle_results)
+    
+    async for user_id, _ in player_manager.iter_players():
+        try:
+            await context.bot.send_message(chat_id=user_id, text="⏳ 𝗢 𝘁𝗲𝗺𝗽𝗼 𝗮𝗰𝗮𝗯𝗼𝘂! 𝗢 𝗗𝗲𝗺𝗼̂𝗻𝗶𝗼 𝗗𝗶𝗺𝗲𝗻𝘀𝗶𝗼𝗻𝗮𝗹 𝗱𝗲𝘀𝗮𝗽𝗮𝗿𝗲𝗰𝗲𝘂...")
             await asyncio.sleep(0.05) 
         except: continue
+
+async def iniciar_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
+    """Inicia o evento automaticamente (agendado)."""
+    if world_boss_manager.is_active: return
+
+    result = world_boss_manager.start_event()
+    if result.get("success"):
+        # Anuncia com imagem e botão
+        await broadcast_boss_announcement(context.application, result["location"])
+        
+        duration_hours = context.job.data.get("duration_hours", 1) if context.job.data else 1
+        context.job_queue.run_once(end_world_boss_job, when=timedelta(hours=duration_hours))

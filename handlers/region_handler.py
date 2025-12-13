@@ -9,7 +9,7 @@ from modules import file_ids as file_id_manager
 from handlers.menu.kingdom import show_kingdom_menu
 from modules.dungeons.registry import get_dungeon_for_region
 from modules.player.premium import PremiumManager
-from world_boss.engine import world_boss_manager, BOSS_STATS
+from modules.world_boss.engine import world_boss_manager, BOSS_STATS
 from datetime import datetime, timezone, timedelta
 logger = logging.getLogger(__name__)
 

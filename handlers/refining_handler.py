@@ -145,6 +145,39 @@ def _fmt_item_line(item_id: str, qty: int) -> str:
     emoji = info.get("emoji", "")
     return f"{emoji} <b>{display}</b> x{int(qty)}"
 
+def _fmt_item_details(item_data: dict) -> str:
+    """Formata os detalhes do item (Raridade, Atributos, Level) para exibição."""
+    lines = []
+    
+    # 1. Raridade e Nome
+    rarity = item_data.get("rarity", "comum").upper()
+    # Tenta pegar level ou refino (ajuste a chave conforme seu banco de dados, ex: 'enhancement', 'level', 'plus')
+    plus = item_data.get("enhancement", item_data.get("level", 0))
+    plus_str = f"+{plus}" if plus > 0 else ""
+    
+    lines.append(f"🆔 <b>[{rarity}] {item_data.get('display_name')} {plus_str}</b>")
+    
+    # 2. Atributos (Stats)
+    stats = item_data.get("stats", {})
+    if stats:
+        lines.append("📊 <i>Atributos:</i>")
+        # Mapeamento simples de ícones para chaves comuns
+        icons = {
+            "atk": "⚔️", "attack": "⚔️", "dano": "⚔️", "str": "💪",
+            "def": "🛡️", "defense": "🛡️", "armor": "🛡️", "vit": "❤️",
+            "hp": "❤️", "life": "❤️", "agi": "🦶", "dex": "🏹",
+            "int": "🔮", "crit": "💥", "luck": "🍀"
+        }
+        
+        for key, val in stats.items():
+            # Pega o ícone ou usa um padrão
+            icon = icons.get(key.lower(), "🔹") 
+            # Formata chave (ex: "atk_phys" -> "Atk Phys")
+            key_fmt = key.replace("_", " ").title()
+            lines.append(f"  {icon} {key_fmt}: <b>{val}</b>")
+            
+    return "\n".join(lines)
+
 async def _safe_send_with_media(context, chat_id, caption, reply_markup=None, media_key=None, fallback_key="refino_universal"):
     keys = [k for k in [media_key, fallback_key] if k]
     for key in keys:
@@ -292,30 +325,50 @@ async def show_dismantle_preview_callback(update: Update, context: ContextTypes.
     q = update.callback_query
     await q.answer()
     uid, iuid = q.from_user.id, q.data.split(':')[1]
+    
     pdata = await player_manager.get_player_data(uid)
     
+    # Busca o item exato no inventário pelo ID Único
     item = pdata.get("inventory", {}).get(iuid)
     if not item: 
-        await show_dismantle_list_callback(update, context); return
+        # Se o item sumiu, volta pra lista
+        await show_dismantle_list_callback(update, context)
+        return
 
+    # Calcula materiais de retorno
     rec = crafting_registry.get_recipe_by_item_id(item.get("base_id"))
     inputs = rec.get("inputs", {})
     ret = {}
     for k, v in inputs.items():
-        if k != "nucleo_forja_fraco":
+        if k != "nucleo_forja_fraco": # Exemplo: não devolve núcleo
             amt = v // 2
             if amt > 0: ret[k] = amt
             
-    txt = f"♻️ <b>Desmontar {item.get('display_name')}?</b>\n\nRetorno estimado:"
-    for k, v in ret.items(): txt += f"\n• {_fmt_item_line(k, v)}"
-    txt += "\n\n⚠️ Irreversível!"
+    # --- CONSTRUÇÃO DO TEXTO ---
+    # 1. Pega os detalhes visuais do item (stats, raridade)
+    details_txt = _fmt_item_details(item)
     
+    txt = f"♻️ <b>DESMONTAR ITEM?</b>\n\n"
+    txt += f"{details_txt}\n\n" # Exibe os stats aqui
+    txt += "📉 <b>Retorno estimado:</b>"
+    
+    if not ret:
+        txt += "\n• <i>Nenhum material recuperável.</i>"
+    else:
+        for k, v in ret.items(): 
+            txt += f"\n• {_fmt_item_line(k, v)}"
+            
+    txt += "\n\n⚠️ <b>Atenção:</b> Esta ação é irreversível!"
+    
+    # Botões
     kb = [[InlineKeyboardButton("✅ 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐚𝐫", callback_data=f"ref_dismantle_confirm:{iuid}")],
           [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="ref_dismantle_list")]]
           
+    # Mídia
     mkey = (game_data.ITEMS_DATA.get(item.get("base_id")) or {}).get("media_key")
+    
     await _safe_edit_or_send_with_media(q, context, txt, InlineKeyboardMarkup(kb), media_key=mkey)
-
+    
 async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     uid, iuid = q.from_user.id, q.data.split(':')[1]

@@ -1234,6 +1234,7 @@ SKILL_DATA = {
             }
         }
     }, 
+    # evento portal 
     "guerreiro_bencao_sagrada": {
         "display_name": "Bênção Sagrada", "type": "support", 
         "description": "Invoca poder divino para curar aliados.", 
@@ -1323,6 +1324,7 @@ SKILL_DATA = {
             }
         }
     },
+    # evento portal
     "berserker_ultimo_recurso": {
         "display_name": "Último Recurso", "type": "passive", 
         "description": "O seu dano aumenta massivamente quando a sua vida está baixa.", 
@@ -1366,7 +1368,7 @@ SKILL_DATA = {
     },
     # --- HABILIDADES DE EVENTO (Caçador) ---
 
-    "passive_animal_companion": {
+    "cacador_passive_animal_companion": {
         "display_name": "Companheiro Animal", "type": "passive", 
         "description": "Um lobo leal luta ao seu lado, atacando ocasionalmente.", 
         "allowed_classes": ["cacador"],
@@ -1387,7 +1389,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_deadeye_shot": {
+    "cacador_active_deadeye_shot": {
         "display_name": "Tiro de Mira Mortal", "type": "active", 
         "description": "Aumenta a chance de crítico do próximo ataque.", 
         "allowed_classes": ["cacador"],
@@ -1409,7 +1411,8 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_apex_predator": {
+    #evento portal
+    "cacador_passive_apex_predator": {
         "display_name": "Predador Alfa", "type": "passive", 
         "description": "Causa dano extra a monstros do tipo 'Boss'.", 
         "allowed_classes": ["cacador"],
@@ -1430,7 +1433,7 @@ SKILL_DATA = {
         }
     },
     # ID do placeholder antigo foi renomeado para ficar mais limpo
-    "active_ricochet_arrow": {
+    "cacador_active_ricochet_arrow": {
         "display_name": "Flecha Ricocheteante", "type": "active", 
         "description": "Atira uma flecha que acerta o alvo principal e ricocheteia.",
         "allowed_classes": ["cacador"],
@@ -1455,8 +1458,7 @@ SKILL_DATA = {
         }
     },
     # --- HABILIDADES DE EVENTO (Monge) ---
-
-    "active_iron_skin": {
+    "monge_active_iron_skin": {
         "display_name": "Pele de Ferro", "type": "support", 
         "description": "Endurece o corpo com Ki, reduzindo o dano recebido.", 
         "allowed_classes": ["monge"],
@@ -1478,7 +1480,7 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_elemental_strikes": {
+    "monge_passive_elemental_strikes": {
         "display_name": "Golpes Elementais", "type": "passive", 
         "description": "Os seus ataques têm uma chance de causar dano elemental extra (Magia).", 
         "allowed_classes": ["monge"],
@@ -1499,7 +1501,8 @@ SKILL_DATA = {
             }
         }
     },
-    "active_transcendence": {
+    #evento portal
+    "monge_active_transcendence": {
         "display_name": "Transcendência", "type": "support", 
         "description": "Medita (pulando um turno) para recuperar HP e MP.", 
         "allowed_classes": ["monge"],
@@ -1522,7 +1525,7 @@ SKILL_DATA = {
         }
     },
     # ID do placeholder antigo foi renomeado para ficar mais limpo
-    "active_thunder_palm": {
+    "monge_active_thunder_palm": {
         "display_name": "Palma do Trovão", "type": "active", 
         "description": "Libera uma onda de Ki que causa dano em área e tem chance de atordoar.",
         "allowed_classes": ["monge"],
@@ -1549,7 +1552,7 @@ SKILL_DATA = {
 
     # --- HABILIDADES DE EVENTO (Mago) ---
 
-    "active_curse_of_weakness": {
+    "mago_active_curse_of_weakness": {
         "display_name": "Maldição da Fraqueza", "type": "support", 
         "description": "Amaldiçoa o alvo, reduzindo o seu ataque.", 
         "allowed_classes": ["mago"],
@@ -1572,7 +1575,7 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_elemental_attunement": {
+    "mago_passive_elemental_attunement": {
         "display_name": "Sintonia Elemental", "type": "passive", 
         "description": "Aumenta o dano mágico e o ataque base.", 
         "allowed_classes": ["mago"],
@@ -1591,7 +1594,8 @@ SKILL_DATA = {
             }
         }
     },
-    "active_meteor_swarm": {
+    #evento portal
+    "mago_active_meteor_swarm": {
         "display_name": "Chuva de Meteoros", "type": "active", 
         "description": "Invoca uma chuva de meteoros que atinge todos os inimigos.", 
         "allowed_classes": ["mago"],
@@ -1614,7 +1618,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_arcane_ward": {
+    "mago_active_arcane_ward": {
         "display_name": "Escudo Arcano", "type": "support",
         "description": "Cria uma barreira de mana que reduz o dano MÁGICO recebido pelo grupo.",
         "allowed_classes": ["mago"],
@@ -1640,7 +1644,7 @@ SKILL_DATA = {
 
     # --- HABILIDADES DE EVENTO (Bardo) ---
 
-    "active_song_of_valor": {
+    "bardo_active_song_of_valor": {
         "display_name": "Canção do Valor", "type": "support",
         "description": "Inspira os aliados, aumentando o ataque de todos no grupo.",
         "allowed_classes": ["bardo"],
@@ -1662,7 +1666,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_dissonant_melody": {
+    "bardo_active_dissonant_melody": {
         "display_name": "Melodia Dissonante", "type": "support",
         "description": "Confunde o inimigo, com chance de o fazer perder o próximo turno (Stun).",
         "allowed_classes": ["bardo"],
@@ -1685,7 +1689,8 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_symphony_of_power": {
+    # evento portal
+    "bardo_passive_symphony_of_power": {
         "display_name": "Sinfonia do Poder", "type": "passive",
         "description": "Os efeitos dos seus buffs de grupo são ampliados.",
         "allowed_classes": ["bardo"],
@@ -1704,7 +1709,7 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_perfect_pitch": {
+    "bardo_passive_perfect_pitch": {
         "display_name": "Tom Perfeito", "type": "passive",
         "description": "Suas músicas são infalíveis, garantindo a aplicação de buffs.",
         "allowed_classes": ["bardo"],
@@ -1727,7 +1732,7 @@ SKILL_DATA = {
 
     # --- HABILIDADES DE EVENTO (Assassino) ---
 
-    "active_shadow_strike": {
+    "assassino_active_shadow_strike": {
         "display_name": "Golpe Sombrio", "type": "active", 
         "description": "Um ataque rápido das sombras que não pode ser esquivado.", 
         "allowed_classes": ["assassino"],
@@ -1749,7 +1754,8 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_potent_toxins": {
+    # evento portal
+    "assassino_passive_potent_toxins": {
         "display_name": "Toxinas Potentes", "type": "passive", 
         "description": "Os seus ataques têm chance de aplicar veneno.", 
         "allowed_classes": ["assassino"],
@@ -1770,7 +1776,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_dance_of_a_thousand_cuts": {
+    "assassino_active_dance_of_a_thousand_cuts": {
         "display_name": "Dança das Mil Lâminas", "type": "active", 
         "description": "Desfere uma rajada de golpes rápidos.", 
         "allowed_classes": ["assassino"],
@@ -1793,7 +1799,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_guillotine_strike": {
+    "assassino_active_guillotine_strike": {
         "display_name": "Golpe Guilhotina", "type": "active", 
         "description": "Ataque massivo com dano bônus contra alvos com HP baixo (Execução).",
         "allowed_classes": ["assassino"],
@@ -1819,7 +1825,7 @@ SKILL_DATA = {
 
     # --- HABILIDADES DE EVENTO (Samurai) ---
 
-    "passive_iai_stance": {
+    "samurai_passive_iai_stance": {
         "display_name": "Postura Iai", "type": "passive", 
         "description": "O primeiro ataque em cada combate tem uma chance de crítico aumentada.", 
         "allowed_classes": ["samurai"],
@@ -1838,7 +1844,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_parry_and_riposte": {
+    "samurai_active_parry_and_riposte": {
         "display_name": "Aparar e Ripostar", "type": "active", 
         "description": "Assume uma postura que, se atacado, anula o dano e contra-ataca.", 
         "allowed_classes": ["samurai"],
@@ -1861,7 +1867,7 @@ SKILL_DATA = {
             }
         }
     },
-    "active_banner_of_command": {
+    "samurai_active_banner_of_command": {
         "display_name": "Estandarte de Comando", "type": "support", 
         "description": "Ergue um estandarte que aumenta a defesa dos aliados.", 
         "allowed_classes": ["samurai"],
@@ -1884,7 +1890,8 @@ SKILL_DATA = {
             }
         }
     },
-    "passive_perfect_parry": {
+    #evento portal dimen
+    "samurai_passive_perfect_parry": {
         "display_name": "Aparar Perfeito", "type": "passive", 
         "description": "Chance de aparar automaticamente e anular o dano de ataques físicos.",
         "allowed_classes": ["samurai"],
