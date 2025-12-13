@@ -91,21 +91,21 @@ class WorldBossManager:
         self.entities = {
             "boss": {
                 "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", 
-                "hp": 1000000, "max_hp": 1000000, 
+                "hp": 100000, "max_hp": 100000, 
                 "alive": True, 
                 "stats": {"attack": 80, "defense": 20, "initiative": 50, "luck": 20},
                 "turn_counter": 0 
             },
             "witch_heal": {
                 "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚", 
-                "hp": 50000, "max_hp": 50000, 
+                "hp": 5000, "max_hp": 5000, 
                 "alive": True, 
                 "stats": {"attack": 15, "defense": 10, "initiative": 40, "luck": 10},
                 "turn_counter": 0 
             },
             "witch_debuff": {
                 "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬", 
-                "hp": 50000, "max_hp": 50000, 
+                "hp": 5000, "max_hp": 5000, 
                 "alive": True, 
                 "stats": {"attack": 20, "defense": 10, "initiative": 60, "luck": 15},
                 "turn_counter": 0 
