@@ -27,14 +27,14 @@ async def combat_potion_menu_callback(update: Update, context: ContextTypes.DEFA
             potion_buttons.append(InlineKeyboardButton(f"{item_emoji} {item_name} (x{quantity})", callback_data=f"combat_use:{item_id}"))
 
     keyboard = [[btn] for btn in potion_buttons]
-    # Botão de voltar genérico (o router principal decide para onde vai)
+    # Botão de voltar genérico (o router principal decide para onde vai ou o player clica em atacar depois)
     keyboard.append([InlineKeyboardButton("⬅️ Voltar à Batalha", callback_data="combat_attack_menu")])
     
     try:
         await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
     except BadRequest:
-        # Se não der para editar markup (ex: msg muito antiga), manda msg nova
-        await context.bot.send_message(query.message.chat_id, "Selecione uma poção:", reply_markup=InlineKeyboardMarkup(keyboard))
+        # Fallback se não der para editar (ex: msg muito antiga ou sem markup anterior)
+        pass
 
 async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa o uso de uma poção em combate."""
@@ -97,12 +97,14 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
         await player_manager.save_player_data(user_id, player_data)
         return
 
-    # --- LOG DE COMBATE SEGURO ---
+    # --- [CORREÇÃO] LOG DE COMBATE SEGURO ---
     state = player_data.get('player_state', {})
-    # Só tenta escrever no log se a estrutura existir (evita crash no World Boss)
+    
+    # Verifica se 'details' existe antes de tentar acessar. 
+    # No World Boss, 'details' geralmente NÃO existe, então ele pula essa parte e evita o crash.
     if state.get('action') == 'in_combat' and 'details' in state and 'battle_log' in state['details']:
         state['details']['battle_log'].append(f"✨ {feedback_message.splitlines()[0]}")
-    # -----------------------------
+    # ----------------------------------------
 
     # Salva os dados
     await player_manager.save_player_data(user_id, player_data)
@@ -110,7 +112,7 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
     # Feedback visual (Toast)
     await query.answer(feedback_message, show_alert=True)
     
-    # Tenta atualizar a mensagem de combate (se possível)
+    # Tenta atualizar a mensagem de combate (apenas se for combate padrão PvE)
     try:
         new_text = await format_combat_message(player_data)
         kb = [
@@ -119,13 +121,13 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
             [InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]
         ]
         
-        # Verifica se é uma mensagem editável (com foto e legenda)
+        # Verifica se a mensagem gerada é válida (tem inimigo) antes de editar
         if "Inimigo:" in new_text: 
             await query.edit_message_caption(caption=new_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             
     except Exception:
-        # Se falhar (ex: World Boss que usa outra estrutura, ou erro de API), não faz nada.
-        # O jogador pode clicar em "Voltar" ou usar o menu do WB.
+        # Se der erro aqui (ex: World Boss, ou mensagem sem foto), apenas ignoramos.
+        # O jogador já recebeu o feedback visual e os efeitos foram aplicados.
         pass
 
 # Exporta os handlers
