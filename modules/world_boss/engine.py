@@ -91,9 +91,9 @@ class WorldBossManager:
         self.entities = {
             "boss": {
                 "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", 
-                "hp": 50000, "max_hp": 50000, 
+                "hp": 25000, "max_hp": 25000, 
                 "alive": True, 
-                "stats": {"attack": 80, "defense": 20, "initiative": 50, "luck": 20},
+                "stats": {"attack": 50, "defense": 20, "initiative": 50, "luck": 20},
                 "turn_counter": 0 
             },
             "witch_heal": {
@@ -116,7 +116,7 @@ class WorldBossManager:
         self.active_fighters = set() 
         self.waiting_queue = []      
         self.player_states = {}      
-        self.max_concurrent_fighters = 15
+        self.max_concurrent_fighters = 20
         
         # Mecânica de Queimadura (Hazard)
         self.environment_hazard = False
