@@ -91,7 +91,7 @@ class WorldBossManager:
         self.entities = {
             "boss": {
                 "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", 
-                "hp": 100000, "max_hp": 100000, 
+                "hp": 50000, "max_hp": 50000, 
                 "alive": True, 
                 "stats": {"attack": 80, "defense": 20, "initiative": 50, "luck": 20},
                 "turn_counter": 0 
