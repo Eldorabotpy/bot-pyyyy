@@ -37,9 +37,9 @@ BASE_SUCCESS_BY_TARGET = {
     4: 1.00,
     5: 1.00,
     6: 1.00,
-    7: 0.58,
-    8: 0.57,
-    9: 0.40,
+    7: 0.98,
+    8: 0.97,
+    9: 0.60,
     10: 0.45,
     11: 0.30,
     12: 0.36,
@@ -461,3 +461,58 @@ def restore_durability(player_data: dict, unique_id: str) -> dict:
     inv[unique_id] = item
     player_data['inventory'] = inv
     return {"status": "ok", "durability": item['durability']}
+
+async def restore_all_equipped_durability(player_data: dict) -> dict:
+    """
+    Restaura a durabilidade de TODOS os itens equipados consumindo APENAS 1 Pergaminho.
+    """
+    inv = player_data.get('inventory', {}) or {}
+    equip = player_data.get('equipment', {}) or {}
+    
+    # 1. Verifica se tem pelo menos 1 pergaminho
+    if _inv_qty(player_data, PARCHMENT_ID) <= 0:
+        return {"error": "Você precisa de 1x Pergaminho de Durabilidade."}
+
+    # 2. Identifica itens equipados que são válidos
+    items_to_repair = []
+    # Coleta IDs únicos dos valores do dicionário de equipamentos
+    equipped_ids = set(uid for uid in equip.values() if uid)
+    
+    for uid in equipped_ids:
+        item = inv.get(uid)
+        # Verifica se o item existe e é válido
+        if isinstance(item, dict) and item.get('base_id'):
+            items_to_repair.append(uid)
+
+    if not items_to_repair:
+        return {"error": "Nenhum equipamento equipado encontrado para restaurar."}
+
+    # 3. Consome APENAS 1 pergaminho (Regra solicitada)
+    player_manager.remove_item_from_inventory(player_data, PARCHMENT_ID, 1)
+
+    # 4. Aplica o reparo em todos
+    count = 0
+    for uid in items_to_repair:
+        item = inv[uid]
+        
+        # --- Lógica de Durabilidade Máxima Real (Fix que discutimos antes) ---
+        base_id = item.get("base_id")
+        info = _get_item_info(base_id)
+        
+        real_max = 20 # Fallback padrão
+        raw_dur = info.get("durability")
+        
+        # Tenta extrair do formato [atual, max] ou int
+        if isinstance(raw_dur, list) and len(raw_dur) > 1:
+            real_max = int(raw_dur[1])
+        elif isinstance(raw_dur, int):
+            real_max = raw_dur
+            
+        # Restaura totalmente
+        _set_dur(item, real_max, real_max)
+        inv[uid] = item # Salva no inventário temporário
+        count += 1
+
+    # Atualiza o inventário do player data
+    player_data['inventory'] = inv
+    return {"success": True, "count": count}

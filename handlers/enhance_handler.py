@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data, crafting_registry
 # REMOVIDO: import mission_manager
-from modules.profession_engine import enhance_item, restore_durability
+from modules.profession_engine import enhance_item, restore_durability, restore_all_equipped_durability
 # --- DISPLAY UTILS opcional (fallback simples) ---
 try:
     from modules import display_utils  # deve ter: formatar_item_para_exibicao(item_dict) -> str
@@ -179,17 +179,19 @@ def _equip_list(pdata: dict):
 # =========================
 # Menus
 # =========================
+# Em handlers/enhance_handler.py -> show_enhance_menu
+
 async def show_enhance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
-    # <<< CORREÇÃO 1: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id)
 
     text = "<b>✨ 𝐀𝐩𝐫𝐢𝐦𝐨𝐫𝐚𝐦𝐞𝐧𝐭𝐨 & 𝐃𝐮𝐫𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞</b>\n𝑺𝒆𝒍𝒆𝒄𝒊𝒐𝒏𝒆 𝒖𝒎 𝒊𝒕𝒆𝒎 <u>equipado</u>:\n"
     kb = []
     found_any = False
-    # _equip_list é síncrono
+    
+    # Lista os itens individuais
     for _, uid, label, _inst in _equip_list(pdata):
         found_any = True
         btn_text = label if len(label) <= 64 else (label[:61] + "…")
@@ -197,9 +199,13 @@ async def show_enhance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not found_any:
         text += "\n<i>𝑵𝒆𝒏𝒉𝒖𝒎 𝒆𝒒𝒖𝒊𝒑𝒂𝒎𝒆𝒏𝒕𝒐 𝒖́𝒏𝒊𝒄𝒐 𝒆𝒔𝒕𝒂́ 𝒆𝒒𝒖𝒊𝒑𝒂𝒅𝒐.</i>\n"
+    else:
+        # === NOVO BOTÃO AQUI ===
+        # Só mostra se tiver itens equipados
+        kb.append([InlineKeyboardButton("📜 Restaurar Todos (1x 📜)", callback_data="enh_rest_all")])
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
-    # <<< CORREÇÃO 2: Adiciona await e context >>>
+    
     await _edit_caption_or_text(q, text, InlineKeyboardMarkup(kb), context=context)
 
 async def enhance_item_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -281,6 +287,34 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pdata = await player_manager.get_player_data(user_id)
 
     data = q.data
+
+    if data == "enh_rest_all":
+        # Chama a função nova
+        res = await restore_all_equipped_durability(pdata)
+        
+        if res.get("error"):
+            await q.answer(res["error"], show_alert=True)
+            # Recarrega o menu
+            await show_enhance_menu(update, context) 
+            return
+
+        # Salva o progresso
+        await player_manager.save_player_data(user_id, pdata)
+        
+        count = res.get("count", 0)
+        text = (
+            f"✨ <b>Reparo Completo!</b>\n"
+            f"Foram restaurados <b>{count}</b> equipamentos equipados.\n"
+            f"Foi consumido <b>1x Pergaminho de Durabilidade</b>."
+        )
+        
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="enhance_menu")]
+        ])
+        
+        await _edit_caption_or_text(q, text, kb, context=context)
+        return
+    
     # === APRIMORAR ===
     if data.startswith("enh_go_"):
         try:

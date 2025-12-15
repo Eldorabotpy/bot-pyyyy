@@ -286,7 +286,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             ])
 
         if build_region_dungeon_button:
-            if btn := build_region_dungeon_button(final_region_key): keyboard.append([btn])
+            if btn := build_region_dungeon_button(final_region_key): keyboard.append([btn]) 
         elif get_dungeon_for_region(final_region_key):
             keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
 
@@ -523,29 +523,42 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
     q = update.callback_query
     await q.answer()
     uid = q.from_user.id
+    # Garante leitura atualizada
     pdata = await player_manager.get_player_data(uid) or {}
     
     lines = ["<b>📜 Restaurar Durabilidade</b>\n"]
-    kb = []
+    lines.append("<i>Restaura TODOS os itens equipados consumindo apenas 1 Pergaminho.</i>\n")
+
     inv, equip = pdata.get("inventory", {}), pdata.get("equipment", {})
     
+    # Helper para ler durabilidade
     def _d(raw): 
         try: return int(raw[0]), int(raw[1])
         except: return 20, 20
 
-    has_fix = False
+    items_broken_count = 0
+    
+    # 1. Apenas LISTA os itens (sem criar botões individuais)
     for slot, uid_item in equip.items():
+        if not uid_item: continue
+        
         inst = inv.get(uid_item)
         if isinstance(inst, dict):
             cur, mx = _d(inst.get("durability"))
             if cur < mx:
-                has_fix = True
+                items_broken_count += 1
                 nm = (game_data.ITEMS_DATA or {}).get(inst.get("base_id"), {}).get("display_name", "Item")
-                lines.append(f"• {nm} ({cur}/{mx})")
-                kb.append([InlineKeyboardButton(f"Reparar {nm}", callback_data=f"rd_fix_{uid_item}")])
+                lines.append(f"• {nm} <b>({cur}/{mx})</b>")
     
-    if not has_fix: lines.append("<i>Tudo 100%.</i>")
+    kb = []
     
+    # 2. Se houver itens quebrados, mostra o ÚNICO botão de ação
+    if items_broken_count > 0:
+        kb.append([InlineKeyboardButton(f"✨ REPARAR TUDO (Gasta 1x 📜)", callback_data="rd_fix_all")])
+    else:
+        lines.append("✅ <i>Todos os equipamentos estão perfeitos.</i>")
+    
+    # Botão Voltar
     loc = pdata.get("current_location", "reino_eldora")
     back = 'continue_after_action' if loc == 'reino_eldora' else f"open_region:{loc}"
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data=back)])
@@ -553,28 +566,45 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
     await _safe_edit_or_send(q, context, q.message.chat_id, "\n".join(lines), InlineKeyboardMarkup(kb))
 
 async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Gerencia APENAS o 'Reparar Tudo'.
+    """
     q = update.callback_query
     await q.answer()
     uid = q.from_user.id
-    pdata = await player_manager.get_player_data(uid)
-    item_uid = q.data.replace("rd_fix_", "", 1)
+    
+    target = q.data.replace("rd_fix_", "", 1)
+    
+    # Se por acaso clicar num botão antigo individual, ignoramos ou tratamos como erro
+    if target != "all":
+        await q.answer("Opção antiga inválida. Use 'Reparar Tudo'.", show_alert=True)
+        await show_restore_durability_menu(update, context)
+        return
 
-    from modules.profession_engine import restore_durability
-    res = restore_durability(pdata, item_uid)
+    pdata = await player_manager.get_player_data(uid)
+    
+    # Importação da função do motor
+    from modules.profession_engine import restore_all_equipped_durability
+    
+    # Executa reparo em massa
+    res = await restore_all_equipped_durability(pdata)
     
     if isinstance(res, dict) and res.get("error"):
         await q.answer(res["error"], show_alert=True)
     else:
+        count = res.get("count", 0)
+        # Salva o jogador após a modificação
         await player_manager.save_player_data(uid, pdata)
-        await q.answer("Reparado!", show_alert=True)
+        await q.answer(f"✨ Sucesso! {count} itens reparados!", show_alert=True)
     
+    # Recarrega o menu
     await show_restore_durability_menu(update, context)
 
-# REGISTRO
+# REGISTRO DOS HANDLERS
 region_handler = CallbackQueryHandler(region_callback, pattern=r"^region_[A-Za-z0-9_]+$")
 travel_handler = CallbackQueryHandler(show_travel_menu, pattern=r"^travel$")
 collect_handler = CallbackQueryHandler(collect_callback, pattern=r"^collect_[A-Za-z0-9_]+$")
 open_region_handler = CallbackQueryHandler(open_region_callback, pattern=r"^open_region:")
 restore_durability_menu_handler = CallbackQueryHandler(show_restore_durability_menu, pattern=r"^restore_durability_menu$")
-restore_durability_fix_handler = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_.+$")
+restore_durability_fix_handler = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_all$") # Pattern restrito ao 'all' agora
 region_info_handler = CallbackQueryHandler(region_info_callback, pattern=r"^region_info:.*$")
