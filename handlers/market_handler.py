@@ -3,7 +3,7 @@
 
 import logging
 from typing import List, Dict
-
+from telegram.error import BadRequest
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
@@ -423,7 +423,11 @@ async def _show_price_spinner(q, context, chat_id, text="Defina o preço:"):
     await _safe_edit_or_send(q, context, chat_id, f"{text} <b>{price} 🪙</b>", kb)
 
 async def market_price_spin(update, context):
-    q = update.callback_query; await q.answer()
+    q = update.callback_query
+    try:
+        await q.answer()
+    except BadRequest:
+        pass
     
     # MUDANÇA AQUI: Usa a função de cálculo centralizada
     cur = market_utils.calculate_spin_value(

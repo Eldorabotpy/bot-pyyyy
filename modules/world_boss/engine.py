@@ -1,5 +1,5 @@
 # modules/world_boss/engine.py
-# (VERSÃO BLINDADA: Com Persistência JSON e Proteção contra Reset)
+# (VERSÃO CORRIGIDA: Integração com Skills de Raridade + Persistência JSON)
 
 import json
 import os
@@ -18,7 +18,8 @@ from modules.combat import criticals, combat_engine
 from modules.player import stats as player_stats_engine
 # Sistema de Cooldowns e Skills
 from modules.cooldowns import verificar_cooldown, aplicar_cooldown, iniciar_turno
-from modules.game_data.skills import SKILL_DATA
+# ✅ IMPORTAÇÃO CORRIGIDA: Traz a função que lê a raridade correta
+from modules.game_data.skills import SKILL_DATA, get_skill_data_with_rarity
 from modules.game_data.skins import SKIN_CATALOG
 from modules.combat.party_engine import process_party_effects
 
@@ -273,16 +274,14 @@ class WorldBossManager:
         if not target or not target["alive"]:
             return {"error": "𝗔𝗹𝘃𝗼 𝗷𝗮́ 𝗱𝗲𝗿𝗿𝗼𝘁𝗮𝗱𝗼! 𝗘𝘀𝗰𝗼𝗹𝗵𝗮 𝗼𝘂𝘁𝗿𝗼."}
 
-        # --- INICIALIZAÇÃO DE VARIÁVEIS (Correção de erros) ---
         logs = []
-        effects = {}  # <--- CORREÇÃO: Inicializa vazio para evitar erro no Ataque Básico
-        player_skills = player_data.get("skills", {}) # <--- CORREÇÃO: Disponível para toda a função
+        effects = {}
+        player_skills = player_data.get("skills", {})
         
         p_stats = await player_manager.get_player_total_stats(player_data)
         current_mp_db = player_data.get("current_mp", 0)
         state['mp'] = current_mp_db 
         
-        # Nome para logs
         caster_name = player_data.get("character_name", "Aliado")
         
         dmg = 0
@@ -290,7 +289,7 @@ class WorldBossManager:
         boss_immune = (target_key == "boss" and witches_alive)
 
         # =========================================================
-        # 1. PROCESSAMENTO DA AÇÃO (ATAQUE OU SKILL)
+        # 1. PROCESSAMENTO DA AÇÃO
         # =========================================================
         
         # --- ATAQUE BÁSICO ---
@@ -308,7 +307,11 @@ class WorldBossManager:
         
         # --- SKILL ---
         elif action_type == "skill":
-            s_info = SKILL_DATA.get(skill_id, {})
+            # ✅ CORREÇÃO AQUI: Usa a função nova para pegar os dados mesclados
+            s_info = get_skill_data_with_rarity(player_data, skill_id)
+            if not s_info:
+                return {"error": "Skill inválida ou não encontrada."}
+
             mana_cost = s_info.get("mana_cost", 0)
 
             if current_mp_db < mana_cost:
@@ -327,7 +330,7 @@ class WorldBossManager:
                 rarity = player_skills[skill_id].get("rarity", "comum")
             player_data = aplicar_cooldown(player_data, skill_id, rarity)
 
-            effects = s_info.get("effects", {}) # Carrega os efeitos da skill
+            effects = s_info.get("effects", {})
 
             # === LÓGICA DE STUN ===
             if "chance_to_stun" in effects:
@@ -341,17 +344,19 @@ class WorldBossManager:
             # === LÓGICA DE DEBUFF (Visual) ===
             if "debuff_target" in effects:
                 db = effects["debuff_target"]
-                logs.append(f"🔻 {target['name']} sofreu quebra de {db.get('stat')} ({db.get('value')})!")
+                stat_name = db.get('stat', 'Atributo')
+                val = db.get('value', '??')
+                logs.append(f"🔻 {target['name']} sofreu quebra de {stat_name} ({val})!")
 
             skill_type = s_info.get("type", "active")
 
             # --- TIPO: SUPORTE (Party Engine) ---
             if skill_type == "support":
-                from modules.combat.party_engine import process_party_effects # Importação local para evitar ciclo
+                from modules.combat.party_engine import process_party_effects
                 support_logs = process_party_effects(
                     caster_id=user_id,
                     caster_name=caster_name,
-                    skill_data=s_info,
+                    skill_data=s_info, # Agora s_info tem os dados corretos (merged)
                     caster_stats=p_stats,
                     all_active_states=self.player_states
                 )
@@ -365,6 +370,7 @@ class WorldBossManager:
                 if boss_immune:
                     logs.append("🛡️ 𝗕𝗢𝗦𝗦 𝗜𝗠𝗨𝗡𝗘! 𝗗𝗲𝗿𝗿𝗼𝘁𝗲 𝗮𝘀 𝗕𝗿𝘂𝘅𝗮𝘀 𝗽𝗿𝗶𝗺𝗲𝗶𝗿𝗼!")
                 else:
+                    # Aqui o combat_engine também usa get_skill_data_with_rarity internamente
                     res = await combat_engine.processar_acao_combate(player_data, p_stats, target["stats"], skill_id, state['hp'])
                     dmg = res["total_damage"]
                     target["hp"] = max(0, target["hp"] - dmg)
@@ -382,7 +388,7 @@ class WorldBossManager:
                 return {"boss_defeated": True, "log": "𝗢 𝗥𝗘𝗜 𝗖𝗔𝗜𝗨!"}
 
         # =========================================================
-        # 2. IA DOS MOBS (Boss Ataca de volta)
+        # 2. IA DOS MOBS
         # =========================================================
         await self._process_mobs_turn(user_id, state, p_stats, logs)
 
@@ -390,35 +396,36 @@ class WorldBossManager:
         # 3. VERIFICAÇÃO DE MORTE DO JOGADOR + MILAGRE
         # =========================================================
         if state['hp'] <= 0:
-            # Verifica passivas de todas as skills equipadas
             has_miracle = False
             # Verifica Auras e Buffs Lendários (prevent_death)
             for sk_id in player_skills:
-                sk_data = SKILL_DATA.get(sk_id, {})
-                # Checa na Aura
-                aura = sk_data.get("rarity_effects", {}).get("lendaria", {}).get("effects", {}).get("party_aura", {})
+                # Usa a função auxiliar aqui também para garantir leitura correta
+                sk_data = get_skill_data_with_rarity(player_data, sk_id)
+                if not sk_data: continue
+                
+                eff = sk_data.get("effects", {})
+                
+                # Checa na Aura (se tiver)
+                aura = eff.get("party_aura", {})
                 if aura.get("prevent_death_mechanic"):
                     has_miracle = True
                     break
-                # Checa no Buff Ativo (ex: Égide do Guerreiro)
-                eff = sk_data.get("rarity_effects", {}).get("lendaria", {}).get("effects", {})
-                if eff.get("prevent_death"):
-                    # Aqui precisaria verificar se o buff está ativo, mas simplificamos para a passiva por enquanto
-                    pass
+                
+                # Checa efeito direto
+                if eff.get("ignore_death_once"): # Campo padronizado do Berserker/Guerreiro
+                    has_miracle = True
+                    break
 
-            # Se tiver Milagre e ainda não usou nesta luta
             if has_miracle and not state.get("miracle_used"):
-                state['hp'] = 1 # Salva com 1 de vida
+                state['hp'] = 1 
                 state['miracle_used'] = True
-                logs.append(f"✨ <b>MILAGRE!</b> {player_data['character_name']} recusou-se a morrer!")
+                logs.append(f"✨ <b>MILAGRE!</b> {player_data.get('character_name','Herói')} recusou-se a morrer!")
             
             else:
-                # MORTE REAL
                 if user_id in self.active_fighters: 
                     self.active_fighters.remove(user_id)
                 if self.waiting_queue:
                     nid = self.waiting_queue.pop(0)
-                    # Opcional: Avisar quem entrou
                 
                 self.save_state()
                 return {"game_over": True, "log": f"𝗩𝗼𝗰𝗲̂ 𝗰𝗮𝗶𝘂 𝗲𝗺 𝗰𝗼𝗺𝗯𝗮𝘁𝗲."}
@@ -430,7 +437,6 @@ class WorldBossManager:
         if msgs_cd:
             for m in msgs_cd: logs.append(m)
 
-        # Atualiza log (Mescla logs antigos de curas recebidas com logs novos)
         current_log_lines = state.get('log', '').split('\n')
         all_logs = current_log_lines + logs
         state['log'] = "\n".join(all_logs[-6:]) 
@@ -444,7 +450,6 @@ class WorldBossManager:
         return {"success": True, "state": state}
     
     async def _process_mobs_turn(self, user_id, state, p_stats, logs):
-        # Queimadura (Hazard) continua igual...
         if self.environment_hazard:
             burn_dmg = int(state['max_hp'] * 0.05) 
             state['hp'] -= burn_dmg
@@ -454,14 +459,10 @@ class WorldBossManager:
 
         boss = self.entities["boss"]
         
-        # === LÓGICA DE STUN: BOSS PERDE O TURNO ===
         if boss.get("is_stunned", False):
             logs.append(f"💫 <b>{boss['name']} está atordoado e não pode atacar!</b>")
-            boss["is_stunned"] = False # Consome o Stun (ele volta ao normal no próximo)
-            return # <--- O RETURN IMPEDE O BOSS E AS BRUXAS DE ATACAREM NESTE TURNO
-        # ==========================================
-
-        if boss["alive"]:boss = self.entities["boss"]
+            boss["is_stunned"] = False 
+            return 
 
         if boss["alive"]:
             boss["turn_counter"] += 1
