@@ -1,11 +1,10 @@
 # modules/combat/combat_engine.py
-# (VERSÃO CORRIGIDA: Corrige o bug de 0 Dano em Skills de 1 hit)
+# (VERSÃO FINAL: Corrige logs invisíveis e falta de números)
 
 import random
 import logging
 from typing import Optional, Dict, Any
 
-# ✅ Certifique-se que o caminho está correto para o seu projeto
 from modules.game_data.skills import SKILL_DATA
 from modules.combat import criticals
 from modules.combat import durability 
@@ -13,30 +12,22 @@ from modules.combat import durability
 logger = logging.getLogger(__name__)
 
 def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dict]:
-    """
-    Busca os dados base da skill e aplica os efeitos da raridade que o jogador possui.
-    """
+    """Busca os dados base da skill e aplica os efeitos da raridade."""
     base_skill = SKILL_DATA.get(skill_id)
-    if not base_skill: 
-        return None
+    if not base_skill: return None
 
     if "rarity_effects" not in base_skill:
-        return base_skill
+        return base_skill.copy()
 
     player_skills = pdata.get("skills", {})
-    if not isinstance(player_skills, dict):
-        rarity = "comum"
-    else:
-        player_skill_instance = player_skills.get(skill_id)
-        if not player_skill_instance:
-            rarity = "comum"
-        else:
-            rarity = player_skill_instance.get("rarity", "comum")
+    rarity = "comum"
+    if isinstance(player_skills, dict):
+        skill_inst = player_skills.get(skill_id)
+        if skill_inst: rarity = skill_inst.get("rarity", "comum")
 
     merged_data = base_skill.copy()
     rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
     merged_data.update(rarity_data)
-    
     return merged_data
 
 async def processar_acao_combate(
@@ -46,152 +37,94 @@ async def processar_acao_combate(
     skill_id: str | None,
     attacker_current_hp: int = 9999, 
 ) -> dict:
-    """
-    CÉREBRO UNIFICADO DO COMBATE
-    Processa ataques, skills, durabilidade e buffs.
-    """
     
-    # 1. Recupera dados da Skill
+    # --- 1. PREPARAÇÃO ---
     skill_info = None
     if skill_id:
         skill_info = _get_player_skill_data_by_rarity(attacker_pdata, skill_id)
 
     skill_effects = skill_info.get("effects", {}) if skill_info else {}        
     
-    # Cria cópias dos status para não alterar o original permanentemente
     attacker_stats_modified = attacker_stats.copy()
     target_stats_modified = target_stats.copy()
     
     log_messages = [] 
 
-    # =========================================================================
-    # 🛡️ 1. VERIFICAÇÃO DE ARMA QUEBRADA
-    # =========================================================================
-    is_weapon_broken, weapon_uid, (w_cur, w_max) = durability.is_weapon_broken(attacker_pdata)
-    
+    # --- 2. DURABILIDADE ---
+    is_weapon_broken, _, (w_cur, w_max) = durability.is_weapon_broken(attacker_pdata)
     if is_weapon_broken:
-        log_messages.append(f"⚠️ <b>Sua arma está QUEBRADA ({w_cur}/{w_max})!</b>")
+        log_messages.append(f"⚠️ Sᴜᴀ ᴀʀᴍᴀ ᴇsᴛᴀ́ QUEBRADA!")
     
-    # =========================================================================
-    # 🛡️ 2. VERIFICAÇÃO DE ARMADURA QUEBRADA
-    # =========================================================================
-    armor_slots = ["elmo", "armadura", "calca", "luvas", "botas", "anel", "colar", "brinco"]
-    broken_armor_count = 0
+    # --- 3. MULTIPLICADORES ---
+    # Força 1 hit se não definido
+    raw_hits = skill_effects.get("multi_hit", 1)
+    num_attacks = int(raw_hits)
+    if num_attacks <= 0: num_attacks = 1 
     
-    equip = attacker_pdata.get("equipment", {})
-    inv = attacker_pdata.get("inventory", {})
-    
-    for slot in armor_slots:
-        uid = equip.get(slot)
-        if uid and uid in inv:
-            item = inv[uid]
-            if durability.is_item_broken(item):
-                broken_armor_count += 1
-                
-    if broken_armor_count > 0:
-        penalty_percent = min(0.80, 0.10 * broken_armor_count)
-        original_def = attacker_stats_modified.get('defense', 0)
-        new_def = int(original_def * (1.0 - penalty_percent))
-        attacker_stats_modified['defense'] = new_def
-        
-        log_messages.append(f"⚠️ <b>{broken_armor_count} equipamentos quebrados!</b>")
-        log_messages.append(f"<i>Defesa reduzida em {int(penalty_percent*100)}%.</i>")
-
-    # =========================================================================
-    # ⚔️ 3. CÁLCULOS DE SKILLS E PASSIVAS
-    # =========================================================================
-
-    # 🔴 CORREÇÃO CRÍTICA AQUI: Padrão é 1 hit, não 0
-    num_attacks = int(skill_effects.get("multi_hit", 1))
-    
-    # Compatibilidade: Algumas skills usam 'damage_scale', outras 'damage_multiplier'
     dmg_mult = float(skill_effects.get("damage_multiplier", skill_effects.get("damage_scale", 1.0)))
+    defense_pen = float(skill_effects.get("defense_penetration", skill_effects.get("armor_penetration", 0.0)))
+    magic_pen = float(skill_effects.get("magic_penetration", 0.0))
     
-    defense_penetration = float(skill_effects.get("defense_penetration", skill_effects.get("armor_penetration", 0.0)))
-    magic_penetration = float(skill_effects.get("magic_penetration", 0.0))
-    
-    # Bônus de Crítico
-    active_bonus_crit = float(skill_effects.get("bonus_crit_chance", 0.0))
-    passive_crit_flat = float(attacker_stats_modified.get("crit_chance_flat", 0.0))
-
-    # --- LÓGICA DE ATAQUE BÁSICO & ATAQUE DUPLO ---
-    if not skill_id: # Apenas para ataques básicos
+    # --- 4. ATAQUE BÁSICO / DUPLO ---
+    if not skill_id:
         num_attacks = 1
+        ini = attacker_stats_modified.get('initiative', 0)
+        chance = (ini * 0.25) + attacker_stats_modified.get('double_attack_chance_flat', 0)
         
-        initiative = attacker_stats_modified.get('initiative', 0)
-        base_chance = initiative * 0.25
-        flat_bonus = attacker_stats_modified.get('double_attack_chance_flat', 0)
-        total_double_chance = base_chance + flat_bonus
-        
-        if (random.random() * 100.0) < total_double_chance:
+        if (random.random() * 100.0) < chance:
             num_attacks = 2
-            log_messages.append("⚡ 𝐀𝐓𝐀Q𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
+            log_messages.append("⚡ 𝐀𝐓𝐀𝐐𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
 
-    # --- PENETRAÇÃO DE DEFESA ---
+    # --- 5. PENETRAÇÃO ---
     passive_pen = float(attacker_stats_modified.get("armor_penetration", 0.0))
-    total_penetration = defense_penetration + passive_pen
+    total_pen = min(1.0, defense_pen + passive_pen)
     
-    if total_penetration > 0:
-        total_penetration = min(1.0, total_penetration)
-        target_stats_modified['defense'] = int(target_stats_modified['defense'] * (1.0 - total_penetration))
-        if total_penetration >= 0.1: 
-            log_messages.append(f"💨 Ignorou {total_penetration*100:.0f}% da defesa!")
-            
-    # Penetração Mágica (apenas reduz a M.Res, não a Defesa física)
-    if magic_penetration > 0:
-         target_stats_modified['magic_resist'] = int(target_stats_modified.get('magic_resist', 0) * (1.0 - magic_penetration))
+    if total_pen > 0:
+        original_def = target_stats_modified.get('defense', 0)
+        target_stats_modified['defense'] = int(original_def * (1.0 - total_pen))
+        if total_pen >= 0.1:
+            log_messages.append(f"💨 Iɢɴᴏʀᴏᴜ {int(total_pen*100)}% ᴅᴀ ᴅᴇғᴇsᴀ!")
 
-    # --- APLICAÇÃO DE BÔNUS DE CRÍTICO ---
-    luck_bonus = 0
-    if active_bonus_crit > 0: luck_bonus += int(active_bonus_crit * 140)
-    if passive_crit_flat > 0: luck_bonus += int(passive_crit_flat * 1.4)
-    if luck_bonus > 0:
-        attacker_stats_modified['luck'] += luck_bonus
-
-    # --- BÔNUS DE DANO POR BAIXA VIDA (BERSERK) ---
-    # Cria um dicionário de opções para passar ao criticals.py
-    roll_options = skill_effects.copy()
-    roll_options["damage_multiplier"] = dmg_mult # Força o uso do multiplicador unificado
-
+    # --- 6. BERSERK / LIFE CHECK ---
+    roll_opts = skill_effects.copy()
+    roll_opts["damage_multiplier"] = dmg_mult
+    
     if "low_hp_dmg_boost" in skill_effects:
-        attacker_max_hp = attacker_stats.get('max_hp', 1) or 1
-        player_hp_percent = attacker_current_hp / attacker_max_hp
-        
-        threshold = float(skill_effects["low_hp_dmg_boost"].get("hp_threshold", 0.3)) # Padrão 30%
-        bonus = float(skill_effects["low_hp_dmg_boost"].get("bonus_mult", 0.0)) # Bônus da skill
+        max_hp = attacker_stats.get('max_hp', 1)
+        if (attacker_current_hp / max_hp) < 0.3:
+            bonus = float(skill_effects["low_hp_dmg_boost"].get("bonus_mult", 0.0))
+            roll_opts["damage_multiplier"] += bonus
+            log_messages.append("🩸 𝙁𝙪́𝙧𝙞𝙖 𝘼𝙩𝙞𝙫𝙖𝙙𝙖!")
 
-        if player_hp_percent < threshold: 
-            current_mult = dmg_mult
-            new_mult = current_mult + bonus # Soma o bônus (ex: 1.5 + 0.5 = 2.0x)
-            roll_options["damage_multiplier"] = new_mult
-            log_messages.append(f"🩸 Fúria: Dano Aumentado!")
-
-    # =========================================================================
-    # ⚔️ 4. LOOP DE DANO
-    # =========================================================================
+    # --- 7. LOOP DE DANO E LOGS ---
     total_damage = 0
     
     for i in range(num_attacks):
-        player_damage_raw, is_crit, is_mega = criticals.roll_damage(
+        dmg_raw, is_crit, is_mega = criticals.roll_damage(
             attacker_stats_modified, 
             target_stats_modified, 
-            roll_options # Passa as opções corrigidas
+            roll_opts 
         )
         
-        player_damage = max(1, int(player_damage_raw))
-        total_damage += player_damage
+        final_hit = max(1, int(dmg_raw))
+        total_damage += final_hit
         
-        if num_attacks > 1:
-            log_messages.append(f"➡️ Golpe {i+1}: {player_damage} dano.")
+        # --- CONSTROI A MENSAGEM DO GOLPE ---
+        hit_msg = ""
+        if is_mega:
+            hit_msg = f"💥💥 𝑴𝑬𝑮𝑨 𝑪𝑹𝑰́𝑻𝑰𝑪𝑶: {final_hit}!"
+        elif is_crit:
+            hit_msg = f"💥 𝗖𝗥𝗜́𝗧𝗜𝗖𝗢: {final_hit}!"
         else:
-            # Se for skill de 1 hit, a mensagem genérica é adicionada pelo chamador (engine.py)
-            # Mas podemos adicionar o detalhe do crítico aqui
-            pass
+            # Golpe normal agora tem texto
+            hit_msg = f"⚔️ Dᴀɴᴏ: {final_hit}"
 
-        if is_mega: 
-            log_messages.append("💥💥 𝐌𝐄𝐆𝐀 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!")
-        elif is_crit: 
-            log_messages.append("💥 𝐂𝐑𝐈́𝐓𝐈𝐂𝐎!")
+        # Adiciona ao log principal
+        if num_attacks > 1:
+            log_messages.append(f"➡️ Gᴏʟᴘᴇ {i+1}: {hit_msg}")
+        else:
+            # Se for 1 hit, joga direto
+            log_messages.append(hit_msg)
 
     return {
         "total_damage": total_damage,    

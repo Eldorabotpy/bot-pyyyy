@@ -1,4 +1,4 @@
-# modules/game_data/xp.py (CORRIGIDO)
+# modules/game_data/xp.py (VERSÃO ULTRA-HARDCORE TIERED)
 from __future__ import annotations
 from typing import Dict, Optional, Tuple
 
@@ -12,14 +12,32 @@ MAX_LEVEL: int = 100
 def _xp_formula(level: int) -> int:
     """
     XP necessário para passar do 'level' atual para o próximo.
-    Fórmula suave e crescente.
+    Usa sistema de TIERS para dificultar drasticamente o mid/end game.
     """
     if level >= MAX_LEVEL:
         return 0
-    base = 100      # XP base para sair do nível 1
-    lin  = 35 * (level - 1)
-    quad = 10 * (level - 1) * (level - 1)
-    return int(base + lin + quad)
+    
+    # 1. Cálculo Base (Curva Quadrática Forte)
+    # Aumentamos a base quadrática de 25 para 40
+    base = 200
+    lin  = 100 * (level - 1)
+    quad = 40 * (level - 1) * (level - 1)
+    
+    raw_xp = int(base + lin + quad)
+
+    # 2. Multiplicadores de Dificuldade por Faixa de Nível (O "Muro")
+    multiplier = 1.0
+
+    if level < 20:
+        multiplier = 1.0      # Início: Normal
+    elif 20 <= level < 50:
+        multiplier = 1.5      # Mid Game: +50% XP necessário
+    elif 50 <= level < 80:
+        multiplier = 2.5      # Late Game: +150% XP necessário
+    elif level >= 80:
+        multiplier = 4.0      # End Game: +300% XP necessário (Brutal)
+
+    return int(raw_xp * multiplier)
 
 def get_xp_for_next_combat_level(level: int) -> int:
     """Compat: usado pela UI para exibir o alvo do próximo nível."""
@@ -43,7 +61,6 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
     Retorna resumo (old_level, new_level, levels_gained, points_awarded, current_xp, next_level_xp).
     """
     if not isinstance(player_data, dict):
-        # defensive: se invocado com None, inicializar um dict mínimo
         player_data = {"level": 1, "xp": 0}
 
     level_before = int(player_data.get("level", 1) or 1)
@@ -53,7 +70,6 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
     while True:
         need = get_xp_for_next_combat_level(level_before + levels_gained)
         if need <= 0:
-            # chegou ao nível máximo
             xp_curr = 0
             break
         if xp_curr < need:
@@ -69,21 +85,16 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
         player_data["level"] = new_level
         player_data["xp"]    = xp_curr
 
-        # migrar estruturas legado / garantir campos
         if "point_pool" not in player_data:
-            try:
-                player_data["point_pool"] = int(player_data.get("stat_points", 0) or 0)
-            except Exception:
-                player_data["point_pool"] = 0
+            try: player_data["point_pool"] = int(player_data.get("stat_points", 0) or 0)
+            except: player_data["point_pool"] = 0
 
         if "invested" not in player_data or not isinstance(player_data["invested"], dict):
             player_data["invested"] = {"hp": 0, "attack": 0, "defense": 0, "initiative": 0, "luck": 0}
 
-        # drenar stat_points legado
-        try:
-            legacy = int(player_data.get("stat_points", 0) or 0)
-        except Exception:
-            legacy = 0
+        try: legacy = int(player_data.get("stat_points", 0) or 0)
+        except: legacy = 0
+        
         if legacy > 0:
             player_data["point_pool"] = int(player_data.get("point_pool", 0)) + legacy
             player_data["stat_points"] = 0
@@ -114,19 +125,12 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
 # ================================
 # API Pública
 # ================================
-def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]: # <<< CORREÇÃO DE NOME AQUI
-    """
-    Adiciona XP ao jogador em memória e processa level ups.
-    Não salva em disco. Retorna resumo do resultado.
-    """
+def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]:
     if not isinstance(player_data, dict):
-        # defensive: evitar crash se chamado com None
         player_data = {"level": 1, "xp": 0}
 
-    try:
-        amount = int(amount)
-    except Exception:
-        amount = 0
+    try: amount = int(amount)
+    except: amount = 0
 
     if amount <= 0:
         lvl = int(player_data.get("level", 1) or 1)
@@ -139,15 +143,10 @@ def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]: # <
             "next_level_xp": get_xp_for_next_combat_level(lvl),
         }
 
-    # garante campos mínimos
-    try:
-        player_data["level"] = int(player_data.get("level", 1) or 1)
-    except Exception:
-        player_data["level"] = 1
-    try:
-        player_data["xp"] = int(player_data.get("xp", 0) or 0)
-    except Exception:
-        player_data["xp"] = 0
+    try: player_data["level"] = int(player_data.get("level", 1) or 1)
+    except: player_data["level"] = 1
+    try: player_data["xp"] = int(player_data.get("xp", 0) or 0)
+    except: player_data["xp"] = 0
 
     if int(player_data["level"]) >= MAX_LEVEL:
         player_data["xp"] = 0
@@ -164,11 +163,7 @@ def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]: # <
     player_data["xp"] += amount
     return _apply_level_ups_inplace(player_data)
 
-async def add_combat_xp(user_id: int, amount: int) -> Dict[str, int]: # <<< CORREÇÃO DE NOME AQUI
-    """
-    Carrega o jogador, adiciona XP, processa level ups e salva.
-    Agora é async: usa await player_manager.get_player_data / save_player_data.
-    """
+async def add_combat_xp(user_id: int, amount: int) -> Dict[str, int]:
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         return {
@@ -180,8 +175,6 @@ async def add_combat_xp(user_id: int, amount: int) -> Dict[str, int]: # <<< CORR
             "next_level_xp": get_xp_for_next_combat_level(1),
         }
     
-    # Chama a função síncrona com o nome corrigido
     result = add_combat_xp_inplace(pdata, amount) 
-    
     await player_manager.save_player_data(user_id, pdata)
     return result
