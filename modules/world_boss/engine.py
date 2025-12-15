@@ -94,18 +94,18 @@ class WorldBossManager:
     def _reset_entities(self):
         self.entities = {
             "boss": {
-                "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", "hp": 25000, "max_hp": 25000, 
-                "alive": True, "stats": {"attack": 50, "defense": 20, "initiative": 50, "luck": 20},
+                "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", "hp": 35000, "max_hp": 25000, 
+                "alive": True, "stats": {"attack": 50, "defense": 20, "initiative": 5, "luck": 20},
                 "turn_counter": 0 
             },
             "witch_heal": {
                 "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚", "hp": 5000, "max_hp": 5000, 
-                "alive": True, "stats": {"attack": 15, "defense": 10, "initiative": 40, "luck": 10},
+                "alive": True, "stats": {"attack": 15, "defense": 10, "initiative": 5, "luck": 10},
                 "turn_counter": 0 
             },
             "witch_debuff": {
                 "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬", "hp": 5000, "max_hp": 5000, 
-                "alive": True, "stats": {"attack": 20, "defense": 10, "initiative": 60, "luck": 15},
+                "alive": True, "stats": {"attack": 20, "defense": 10, "initiative": 5, "luck": 15},
                 "turn_counter": 0 
             },
         }
