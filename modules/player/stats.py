@@ -142,6 +142,8 @@ def _apply_party_aura_bonuses(ally_data: dict, target_stats: dict):
         if aura_bonuses.get("cannot_be_dodged", False): target_stats["cannot_be_dodged"] = True
         if "hp_regen_percent" in aura_bonuses:
              target_stats["hp_regen_percent"] = target_stats.get("hp_regen_percent", 0.0) + float(aura_bonuses["hp_regen_percent"])
+        if "mp_regen_percent" in aura_bonuses:
+             target_stats["mp_regen_percent"] = target_stats.get("mp_regen_percent", 0.0) + float(aura_bonuses["mp_regen_percent"])
 
 def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
     ckey = _get_class_key_normalized(pdata) or ckey_fallback

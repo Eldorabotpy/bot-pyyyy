@@ -1,4 +1,5 @@
 # modules/world_boss/engine.py
+# (VERSÃO BLINDADA: Com Persistência JSON e Proteção contra Reset)
 
 import json
 import os
@@ -15,20 +16,20 @@ from telegram.error import Forbidden, TelegramError
 from modules import player_manager, game_data, file_ids
 from modules.combat import criticals, combat_engine
 from modules.player import stats as player_stats_engine
-
-# --- NOVO: IMPORTANDO O SISTEMA DE COOLDOWNS ---
+# Sistema de Cooldowns e Skills
 from modules.cooldowns import verificar_cooldown, aplicar_cooldown, iniciar_turno
-
-# Importa dados de Skill e Skins
 from modules.game_data.skills import SKILL_DATA
 from modules.game_data.skins import SKIN_CATALOG
+from modules.combat.party_engine import process_party_effects
 
 logger = logging.getLogger(__name__)
 
-# --- CONFIGURAÇÕES DE LOOT E CONSTANTES ---
+# --- CONSTANTES ---
 BOSS_STATE_FILE = "world_boss_state.json"
 ANNOUNCEMENT_CHAT_ID = -1002881364171 
 ANNOUNCEMENT_THREAD_ID = 24           
+PARTICIPATION_XP = 400  # XP fixo para todos que participaram
+PARTICIPATION_GOLD = 1000 # Ouro fixo para todos
 
 POSSIBLE_LOCATIONS = [
     "pradaria_inicial", "floresta_sombria", "pedreira_granito",
@@ -36,27 +37,18 @@ POSSIBLE_LOCATIONS = [
     "forja_abandonada", "pantano_maldito"
 ]
 
-# Loot Tables
+# Loot Tables (Mantidas)
 SKILL_REWARD_POOL = [
-    "samurai_sombra_demoniaca", "samurai_corte_iaijutsu",
-    "samurai_passive_perfect_parry", 
-    "assassino_ataque_furtivo", "assassino_active_guillotine_strike",
-    "assassino_passive_potent_toxins",
-    "bardo_melodia_restauradora", "bardo_passive_perfect_pitch",
-    "bardo_passive_symphony_of_power",
-    "mago_bola_de_fogo", "mago_active_arcane_ward",
-    "mago_active_meteor_swarm",
-    "monge_rajada_de_punhos", "monge_active_thunder_palm",
-    "monge_active_transcendence",
-    "cacador_flecha_precisa","cacador_active_ricochet_arrow",
-    "cacador_passive_apex_predator",
-    "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira",
-    "berserker_ultimo_recurso",
-    "guerreiro_corte_perfurante", "guerreiro_colossal_defense",
-    "guerreiro_bencao_sagrada",
-
+    "samurai_sombra_demoniaca", "samurai_corte_iaijutsu", "samurai_passive_perfect_parry", 
+    "assassino_ataque_furtivo", "assassino_active_guillotine_strike", "assassino_passive_potent_toxins",
+    "bardo_melodia_restauradora", "bardo_passive_perfect_pitch", "bardo_passive_symphony_of_power",
+    "mago_bola_de_fogo", "mago_active_arcane_ward", "mago_active_meteor_swarm",
+    "monge_rajada_de_punhos", "monge_active_thunder_palm", "monge_active_transcendence",
+    "cacador_flecha_precisa","cacador_active_ricochet_arrow", "cacador_passive_apex_predator",
+    "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira", "berserker_ultimo_recurso",
+    "guerreiro_corte_perfurante", "guerreiro_colossal_defense", "guerreiro_bencao_sagrada"
 ]
-SKILL_CHANCE = 4.0 
+SKILL_CHANCE = 5.0 
 
 SKIN_REWARD_POOL = [
     "samurai_armadura_shogun", "samurai_armadura_demoniaca",
@@ -64,68 +56,113 @@ SKIN_REWARD_POOL = [
     "monge_aspecto_asura", "monge_quimono_dragao", 
     "berserker_infernal", "berserker_pele_urso",
     "cacador_cacador_dragoes", "cacador_patrulheiro_elfico",
-    "assassino_manto_espectral", 
-    "mago_arquimago_caos", "mago_traje_arcano",
-    "guerreiro_placas_douradas", "guerreiro_armadura_negra", "guerreiro_armadura_jade",  
-
+    "assassino_manto_espectral", "mago_arquimago_caos", "mago_traje_arcano",
+    "guerreiro_placas_douradas", "guerreiro_armadura_negra", "guerreiro_armadura_jade"
 ]
-SKIN_CHANCE = 2.0 
+SKIN_CHANCE = 3.0 
 
 LOOT_REWARD_POOL = [
     ("pocao_cura_leve", 3, 5), ("pocao_cura_media", 3, 5),
-    ("gems", 1, 1), ("frasco_sabedoria", 5, 10),
+    ("gems", 3, 5), ("frasco_sabedoria", 5, 10),
     ("cristal_de_abertura", 5, 10), ("pedra_do_aprimoramento", 3, 14),
-    ("pergaminho_durabilidade", 5, 10), ("sigilo_protecao", 1, 10),
-
+    ("pergaminho_durabilidade", 5, 10), ("sigilo_protecao", 1, 10)
 ]
-LOOT_CHANCE = 30.0
-
-# --- CLASSE PRINCIPAL ---
+LOOT_CHANCE = 40.0
 
 class WorldBossManager:
     def __init__(self):
+        # Inicializa valores padrão
         self.is_active = False
         self.location = "Terras Devastadas"
-        
-        # Estado Global das Entidades
-        self.entities = {
-            "boss": {
-                "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", 
-                "hp": 25000, "max_hp": 25000, 
-                "alive": True, 
-                "stats": {"attack": 50, "defense": 20, "initiative": 50, "luck": 20},
-                "turn_counter": 0 
-            },
-            "witch_heal": {
-                "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚", 
-                "hp": 5000, "max_hp": 5000, 
-                "alive": True, 
-                "stats": {"attack": 15, "defense": 10, "initiative": 40, "luck": 10},
-                "turn_counter": 0 
-            },
-            "witch_debuff": {
-                "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬", 
-                "hp": 5000, "max_hp": 5000, 
-                "alive": True, 
-                "stats": {"attack": 20, "defense": 10, "initiative": 60, "luck": 15},
-                "turn_counter": 0 
-            },
-        }
-        
-        # Sistema de Fila
+        self.entities = {}
         self.active_fighters = set() 
         self.waiting_queue = []      
         self.player_states = {}      
         self.max_concurrent_fighters = 20
-        
-        # Mecânica de Queimadura (Hazard)
         self.environment_hazard = False
         self.hazard_turns = 0
-        
-        # Leaderboard Global para Loot
         self.damage_leaderboard = {}
         self.last_hitter_id = None
+        
+        # Carrega estado anterior se existir (PERSISTÊNCIA)
+        self.load_state()
 
+        # Se não carregou nada (primeira vez), reinicia as entidades
+        if not self.entities:
+            self._reset_entities()
+
+    def _reset_entities(self):
+        self.entities = {
+            "boss": {
+                "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", "hp": 25000, "max_hp": 25000, 
+                "alive": True, "stats": {"attack": 50, "defense": 20, "initiative": 50, "luck": 20},
+                "turn_counter": 0 
+            },
+            "witch_heal": {
+                "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚", "hp": 5000, "max_hp": 5000, 
+                "alive": True, "stats": {"attack": 15, "defense": 10, "initiative": 40, "luck": 10},
+                "turn_counter": 0 
+            },
+            "witch_debuff": {
+                "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬", "hp": 5000, "max_hp": 5000, 
+                "alive": True, "stats": {"attack": 20, "defense": 10, "initiative": 60, "luck": 15},
+                "turn_counter": 0 
+            },
+        }
+
+    # --- PERSISTÊNCIA (JSON) ---
+    def save_state(self):
+        """Salva o estado atual da batalha em arquivo JSON."""
+        data = {
+            "is_active": self.is_active,
+            "location": self.location,
+            "entities": self.entities,
+            "active_fighters": list(self.active_fighters), # Set -> List
+            "waiting_queue": self.waiting_queue,
+            "player_states": {str(k): v for k, v in self.player_states.items()}, # Keys str
+            "environment_hazard": self.environment_hazard,
+            "hazard_turns": self.hazard_turns,
+            "damage_leaderboard": self.damage_leaderboard,
+            "last_hitter_id": self.last_hitter_id
+        }
+        try:
+            with open(BOSS_STATE_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Erro ao salvar estado do World Boss: {e}")
+
+    def load_state(self):
+        """Carrega o estado do arquivo JSON se existir."""
+        if not os.path.exists(BOSS_STATE_FILE):
+            return
+
+        try:
+            with open(BOSS_STATE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            self.is_active = data.get("is_active", False)
+            self.location = data.get("location", "Terras Devastadas")
+            self.entities = data.get("entities", {})
+            
+            # Converte lista de volta para set e chaves str para int
+            self.active_fighters = set(data.get("active_fighters", []))
+            self.waiting_queue = data.get("waiting_queue", [])
+            
+            p_states_raw = data.get("player_states", {})
+            self.player_states = {int(k): v for k, v in p_states_raw.items()}
+            
+            self.environment_hazard = data.get("environment_hazard", False)
+            self.hazard_turns = data.get("hazard_turns", 0)
+            self.damage_leaderboard = data.get("damage_leaderboard", {})
+            self.last_hitter_id = data.get("last_hitter_id")
+            
+            logger.info("Estado do World Boss carregado com sucesso.")
+        except Exception as e:
+            logger.error(f"Erro ao carregar estado do World Boss: {e}")
+            self._reset_entities() # Fallback
+
+    # --- CONTROLE DE EVENTO ---
+    
     @property
     def state(self):
         return {
@@ -136,9 +173,9 @@ class WorldBossManager:
     
     async def get_battle_hud(self):
         ents = self.entities
-        boss = ents["boss"]
+        boss = ents.get("boss")
         
-        if not self.is_active or not boss["alive"]:
+        if not self.is_active or not boss or not boss["alive"]:
             return "O Boss foi derrotado!"
 
         pct = boss["hp"] / boss["max_hp"]
@@ -147,11 +184,11 @@ class WorldBossManager:
         
         txt = f"👹 <b>{boss['name']}</b>\n{bar} {boss['hp']:,}\n"
         
-        w1 = ents["witch_heal"]
-        w2 = ents["witch_debuff"]
+        w1 = ents.get("witch_heal", {})
+        w2 = ents.get("witch_debuff", {})
         
-        w1_st = "𝗖𝘂𝗿𝗮 💚" if w1["alive"] else "💀"
-        w2_st = "𝗖𝗮𝗼𝘀 ☠️" if w2["alive"] else "💀"
+        w1_st = "𝗖𝘂𝗿𝗮 💚" if w1.get("alive") else "💀"
+        w2_st = "𝗖𝗮𝗼𝘀 ☠️" if w2.get("alive") else "💀"
         
         txt += f"Bruxas: {w1_st} | {w2_st}\n"
         
@@ -162,6 +199,7 @@ class WorldBossManager:
 
     def start_event(self):
         if self.is_active: return {"error": "𝕁𝕒́ 𝕒𝕥𝕚𝕧𝕠."}
+        
         self.is_active = True
         self.location = random.choice(POSSIBLE_LOCATIONS)
         self.active_fighters.clear()
@@ -170,19 +208,16 @@ class WorldBossManager:
         self.damage_leaderboard.clear()
         self.environment_hazard = False
         self.hazard_turns = 0
+        self._reset_entities()
         
-        # Reset Entidades e Turnos
-        for k, v in self.entities.items():
-            v["hp"] = v["max_hp"]
-            v["alive"] = True
-            v["turn_counter"] = 0
-            
+        self.save_state() # Salva início
         return {"success": True, "location": self.location}
 
     def end_event(self, reason="Ｔｅｍｐｏ　ｅｓｇｏｔａｄｏ"):
         active_status = self.is_active
         self.is_active = False
         self.active_fighters.clear()
+        self.save_state() # Salva fim
         
         if not active_status: return {}
         
@@ -201,9 +236,11 @@ class WorldBossManager:
         if len(self.active_fighters) < self.max_concurrent_fighters:
             self.active_fighters.add(user_id)
             await self._setup_player_state(user_id, player_data)
+            self.save_state() # Salva entrada
             return "active"
         else:
             self.waiting_queue.append(user_id)
+            self.save_state() # Salva fila
             return "waiting"
 
     async def _setup_player_state(self, user_id, player_data):
@@ -220,12 +257,14 @@ class WorldBossManager:
     def set_target(self, user_id, target_key):
         if user_id in self.player_states and target_key in self.entities:
             self.player_states[user_id]['current_target'] = target_key
+            self.save_state()
             return True
         return False
 
     # --- LÓGICA DE COMBATE ---
     async def process_action(self, user_id, player_data, action_type, skill_id=None):
-        if user_id not in self.active_fighters: return {"error": "𝙑𝙤𝙘𝙚̂ 𝙣𝙖̃𝙤 𝙚𝙨𝙩𝙖́ 𝙣𝙖 𝙡𝙪𝙩𝙖."}
+        if user_id not in self.active_fighters: 
+            return {"error": "𝙑𝙤𝙘𝙚̂ 𝙣𝙖̃𝙤 𝙚𝙨𝙩𝙖́ 𝙣𝙖 𝙡𝙪𝙩𝙖."}
         
         state = self.player_states[user_id]
         target_key = state['current_target']
@@ -234,95 +273,178 @@ class WorldBossManager:
         if not target or not target["alive"]:
             return {"error": "𝗔𝗹𝘃𝗼 𝗷𝗮́ 𝗱𝗲𝗿𝗿𝗼𝘁𝗮𝗱𝗼! 𝗘𝘀𝗰𝗼𝗹𝗵𝗮 𝗼𝘂𝘁𝗿𝗼."}
 
+        # --- INICIALIZAÇÃO DE VARIÁVEIS (Correção de erros) ---
         logs = []
+        effects = {}  # <--- CORREÇÃO: Inicializa vazio para evitar erro no Ataque Básico
+        player_skills = player_data.get("skills", {}) # <--- CORREÇÃO: Disponível para toda a função
+        
         p_stats = await player_manager.get_player_total_stats(player_data)
         current_mp_db = player_data.get("current_mp", 0)
-        state['mp'] = current_mp_db # Sincroniza visual
-        # 1. AÇÃO DO JOGADOR
-        dmg = 0
+        state['mp'] = current_mp_db 
         
-        # Verifica Imunidade do Boss
+        # Nome para logs
+        caster_name = player_data.get("character_name", "Aliado")
+        
+        dmg = 0
         witches_alive = self.entities["witch_heal"]["alive"] or self.entities["witch_debuff"]["alive"]
         boss_immune = (target_key == "boss" and witches_alive)
 
-        if boss_immune:
-            logs.append("🛡️ 𝗕𝗢𝗦𝗦 𝗜𝗠𝗨𝗡𝗘! 𝗗𝗲𝗿𝗿𝗼𝘁𝗲 𝗮𝘀 𝗕𝗿𝘂𝘅𝗮𝘀 𝗽𝗿𝗶𝗺𝗲𝗶𝗿𝗼!")
-            dmg = 0 
-        else:
-            if action_type == "attack":
+        # =========================================================
+        # 1. PROCESSAMENTO DA AÇÃO (ATAQUE OU SKILL)
+        # =========================================================
+        
+        # --- ATAQUE BÁSICO ---
+        if action_type == "attack":
+            if boss_immune:
+                logs.append("🛡️ 𝗕𝗢𝗦𝗦 𝗜𝗠𝗨𝗡𝗘! 𝗗𝗲𝗿𝗿𝗼𝘁𝗲 𝗮𝘀 𝗕𝗿𝘂𝘅𝗮𝘀 𝗽𝗿𝗶𝗺𝗲𝗶𝗿𝗼!")
+            else:
                 res = await combat_engine.processar_acao_combate(player_data, p_stats, target["stats"], None, state['hp'])
                 dmg = res["total_damage"]
+                target["hp"] = max(0, target["hp"] - dmg)
                 logs.append(f"⚔️ 𝙑𝙤𝙘𝙚̂ 𝙘𝙖𝙪𝙨𝙤𝙪 {dmg} 𝗲𝗺 {target['name']}")
+                
+                self.damage_leaderboard[str(user_id)] = self.damage_leaderboard.get(str(user_id), 0) + dmg
+                self.last_hitter_id = user_id
+        
+        # --- SKILL ---
+        elif action_type == "skill":
+            s_info = SKILL_DATA.get(skill_id, {})
+            mana_cost = s_info.get("mana_cost", 0)
+
+            if current_mp_db < mana_cost:
+                return {"error": f"Mana insuficiente! ({current_mp_db}/{mana_cost})"}
             
-            elif action_type == "skill":
-                # --- PASSO 1: VERIFICA COOLDOWN ---
-                s_info = SKILL_DATA.get(skill_id, {})
-                mana_cost = s_info.get("mana_cost", 0)
-
-                if current_mp_db < mana_cost:
-                    return {"error": f"Mana insuficiente! ({current_mp_db}/{mana_cost})"}
-                
-                pode_usar, msg_cd = verificar_cooldown(player_data, skill_id)
-                if not pode_usar:
-                    return {"error": msg_cd} # Retorna erro para o usuário (toast)
-                
-                player_data["current_mp"] -= mana_cost
-                state['mp'] = player_data["current_mp"] # Atualiza visual
-
-                # --- PASSO 2: EXECUTA SKILL ---
-                res = await combat_engine.processar_acao_combate(player_data, p_stats, target["stats"], skill_id, state['hp'])
-                dmg = res["total_damage"]
-                logs.append(f"✨ 𝙑𝙤𝙘𝙚̂ 𝙪𝙨𝙤𝙪 𝙎𝙠𝙞𝙡𝙡: {dmg} 𝙙𝙖𝙣𝙤 𝙚𝙢 {target['name']}")
-                
-                # --- PASSO 3: APLICA COOLDOWN ---
-                # Busca a raridade da skill no player para aplicar tempo correto
-                player_skills = player_data.get("skills", {})
-                rarity = "comum"
-                if skill_id in player_skills:
-                    rarity = player_skills[skill_id].get("rarity", "comum")
-                
-                # Modifica o player_data aplicando o CD
-                player_data = aplicar_cooldown(player_data, skill_id, rarity)
-
-            # Aplica Dano na Entidade Global
-            target["hp"] = max(0, target["hp"] - dmg)
+            pode_usar, msg_cd = verificar_cooldown(player_data, skill_id)
+            if not pode_usar:
+                return {"error": msg_cd}
             
-            # Registra Dano para Loot
-            self.damage_leaderboard[str(user_id)] = self.damage_leaderboard.get(str(user_id), 0) + dmg
-            self.last_hitter_id = user_id
+            # Consome Mana / Aplica CD
+            player_data["current_mp"] -= mana_cost
+            state['mp'] = player_data["current_mp"] 
+            
+            rarity = "comum"
+            if skill_id in player_skills:
+                rarity = player_skills[skill_id].get("rarity", "comum")
+            player_data = aplicar_cooldown(player_data, skill_id, rarity)
 
-            if target["hp"] <= 0:
-                target["alive"] = False
-                logs.append(f"💀 {target['name']} 𝗙𝗢𝗜 𝗗𝗘𝗥𝗥𝗢𝗧𝗔𝗗𝗢!")
-                if target_key == "boss":
-                    return {"boss_defeated": True, "log": "𝗢 𝗥𝗘𝗜 𝗖𝗔𝗜𝗨!"}
+            effects = s_info.get("effects", {}) # Carrega os efeitos da skill
 
-        # 2. IA DOS MOBS (Ciclos de Habilidade)
+            # === LÓGICA DE STUN ===
+            if "chance_to_stun" in effects:
+                chance = float(effects["chance_to_stun"])
+                if random.random() < chance:
+                    target["is_stunned"] = True
+                    logs.append(f"💫 <b>{target['name']} foi ATORDOADO!</b> (Perde o próximo turno)")
+                else:
+                    logs.append(f"💫 {target['name']} resistiu à melodia.")
+            
+            # === LÓGICA DE DEBUFF (Visual) ===
+            if "debuff_target" in effects:
+                db = effects["debuff_target"]
+                logs.append(f"🔻 {target['name']} sofreu quebra de {db.get('stat')} ({db.get('value')})!")
+
+            skill_type = s_info.get("type", "active")
+
+            # --- TIPO: SUPORTE (Party Engine) ---
+            if skill_type == "support":
+                from modules.combat.party_engine import process_party_effects # Importação local para evitar ciclo
+                support_logs = process_party_effects(
+                    caster_id=user_id,
+                    caster_name=caster_name,
+                    skill_data=s_info,
+                    caster_stats=p_stats,
+                    all_active_states=self.player_states
+                )
+                logs.extend(support_logs)
+                
+                if not support_logs:
+                    logs.append("✨ Skill de suporte usada.")
+
+            # --- TIPO: ATAQUE/OUTROS ---
+            else:
+                if boss_immune:
+                    logs.append("🛡️ 𝗕𝗢𝗦𝗦 𝗜𝗠𝗨𝗡𝗘! 𝗗𝗲𝗿𝗿𝗼𝘁𝗲 𝗮𝘀 𝗕𝗿𝘂𝘅𝗮𝘀 𝗽𝗿𝗶𝗺𝗲𝗶𝗿𝗼!")
+                else:
+                    res = await combat_engine.processar_acao_combate(player_data, p_stats, target["stats"], skill_id, state['hp'])
+                    dmg = res["total_damage"]
+                    target["hp"] = max(0, target["hp"] - dmg)
+                    logs.append(f"✨ 𝙑𝙤𝙘𝙚̂ 𝙪𝙨𝙤𝙪 𝙎𝙠𝙞𝙡𝙡: {dmg} 𝙙𝙖𝙣𝙤 𝙚𝙢 {target['name']}")
+                    
+                    self.damage_leaderboard[str(user_id)] = self.damage_leaderboard.get(str(user_id), 0) + dmg
+                    self.last_hitter_id = user_id
+
+        # Verifica se o ALVO morreu
+        if target["hp"] <= 0:
+            target["alive"] = False
+            logs.append(f"💀 {target['name']} 𝗙𝗢𝗜 𝗗𝗘𝗥𝗥𝗢𝗧𝗔𝗗𝗢!")
+            if target_key == "boss":
+                self.save_state()
+                return {"boss_defeated": True, "log": "𝗢 𝗥𝗘𝗜 𝗖𝗔𝗜𝗨!"}
+
+        # =========================================================
+        # 2. IA DOS MOBS (Boss Ataca de volta)
+        # =========================================================
         await self._process_mobs_turn(user_id, state, p_stats, logs)
 
+        # =========================================================
+        # 3. VERIFICAÇÃO DE MORTE DO JOGADOR + MILAGRE
+        # =========================================================
         if state['hp'] <= 0:
-            if user_id in self.active_fighters: self.active_fighters.remove(user_id)
-            if self.waiting_queue:
-                nid = self.waiting_queue.pop(0)
-            return {"game_over": True, "log": f"𝗩𝗼𝗰𝗲̂ 𝗰𝗮𝗶𝘂 𝗲𝗺 𝗰𝗼𝗺𝗯𝗮𝘁𝗲."}
+            # Verifica passivas de todas as skills equipadas
+            has_miracle = False
+            # Verifica Auras e Buffs Lendários (prevent_death)
+            for sk_id in player_skills:
+                sk_data = SKILL_DATA.get(sk_id, {})
+                # Checa na Aura
+                aura = sk_data.get("rarity_effects", {}).get("lendaria", {}).get("effects", {}).get("party_aura", {})
+                if aura.get("prevent_death_mechanic"):
+                    has_miracle = True
+                    break
+                # Checa no Buff Ativo (ex: Égide do Guerreiro)
+                eff = sk_data.get("rarity_effects", {}).get("lendaria", {}).get("effects", {})
+                if eff.get("prevent_death"):
+                    # Aqui precisaria verificar se o buff está ativo, mas simplificamos para a passiva por enquanto
+                    pass
 
-        # 3. FINALIZAÇÃO DO TURNO (Reduz Cooldowns)
-        # --- PASSO 4: REDUZ COOLDOWNS ---
+            # Se tiver Milagre e ainda não usou nesta luta
+            if has_miracle and not state.get("miracle_used"):
+                state['hp'] = 1 # Salva com 1 de vida
+                state['miracle_used'] = True
+                logs.append(f"✨ <b>MILAGRE!</b> {player_data['character_name']} recusou-se a morrer!")
+            
+            else:
+                # MORTE REAL
+                if user_id in self.active_fighters: 
+                    self.active_fighters.remove(user_id)
+                if self.waiting_queue:
+                    nid = self.waiting_queue.pop(0)
+                    # Opcional: Avisar quem entrou
+                
+                self.save_state()
+                return {"game_over": True, "log": f"𝗩𝗼𝗰𝗲̂ 𝗰𝗮𝗶𝘂 𝗲𝗺 𝗰𝗼𝗺𝗯𝗮𝘁𝗲."}
+
+        # =========================================================
+        # 4. FINALIZAÇÃO DO TURNO
+        # =========================================================
         player_data, msgs_cd = iniciar_turno(player_data)
         if msgs_cd:
-            # Adiciona avisos de skill pronta no log
             for m in msgs_cd: logs.append(m)
 
-        state['log'] = "\n".join(logs[-6:]) 
+        # Atualiza log (Mescla logs antigos de curas recebidas com logs novos)
+        current_log_lines = state.get('log', '').split('\n')
+        all_logs = current_log_lines + logs
+        state['log'] = "\n".join(all_logs[-6:]) 
+        
         player_data['current_hp'] = state['hp']
         player_data['current_mp'] = state['mp']
         
         await player_manager.save_player_data(user_id, player_data)
+        self.save_state() 
         
         return {"success": True, "state": state}
-
+    
     async def _process_mobs_turn(self, user_id, state, p_stats, logs):
-        # A) Dano de Queimadura (Campo em Chamas)
+        # Queimadura (Hazard) continua igual...
         if self.environment_hazard:
             burn_dmg = int(state['max_hp'] * 0.05) 
             state['hp'] -= burn_dmg
@@ -330,34 +452,38 @@ class WorldBossManager:
             self.hazard_turns -= 1
             if self.hazard_turns <= 0: self.environment_hazard = False
 
-        # B) Turno do Boss (Meteoro a cada 3 turnos)
         boss = self.entities["boss"]
+        
+        # === LÓGICA DE STUN: BOSS PERDE O TURNO ===
+        if boss.get("is_stunned", False):
+            logs.append(f"💫 <b>{boss['name']} está atordoado e não pode atacar!</b>")
+            boss["is_stunned"] = False # Consome o Stun (ele volta ao normal no próximo)
+            return # <--- O RETURN IMPEDE O BOSS E AS BRUXAS DE ATACAREM NESTE TURNO
+        # ==========================================
+
+        if boss["alive"]:boss = self.entities["boss"]
+
         if boss["alive"]:
             boss["turn_counter"] += 1
             if boss["turn_counter"] % 3 == 0:
-                # Meteoro
                 aoe_dmg = int(boss["stats"]["attack"] * 1.5)
                 state['hp'] -= aoe_dmg
                 logs.append(f"☄️ 𝐌𝐄𝐓𝐄𝐎𝐑𝐎! 𝐕𝐨𝐜𝐞̂ 𝐭𝐨𝐦𝐨𝐮 -{aoe_dmg} HP!")
                 
-                # Ativa chamas
                 self.environment_hazard = True
                 self.hazard_turns = 2 
                 logs.append("🔥 𝙊 𝙘𝙖𝙢𝙥𝙤 𝙚𝙨𝙩𝙖́ 𝙚𝙢 𝙘𝙝𝙖𝙢𝙖𝙨!")
                 
-                # Aplica dano "silencioso" aos outros
                 for fid in list(self.active_fighters):
                     if fid != user_id and fid in self.player_states:
                         self.player_states[fid]['hp'] -= aoe_dmg
             else:
-                # Ataque Normal
                 enemy_stats = boss["stats"]
                 enemy_dmg, is_crit, _ = criticals.roll_damage(enemy_stats, p_stats, {})
                 state['hp'] -= enemy_dmg
                 hit_txt = "Crítico" if is_crit else "Ataque"
                 logs.append(f"🤕 𝗕𝗼𝘀𝘀 𝘁𝗲 𝗮𝗰𝗲𝗿𝘁𝗼𝘂 ({hit_txt}): -{enemy_dmg} HP")
 
-        # C) Bruxa da Cura
         w_heal = self.entities["witch_heal"]
         if w_heal["alive"]:
             w_heal["turn_counter"] += 1
@@ -370,7 +496,6 @@ class WorldBossManager:
                 state['hp'] -= dmg
                 logs.append(f"🪄 𝗕𝗿𝘂𝘅𝗮 𝗱𝗮 𝗖𝘂𝗿𝗮 𝘁𝗲 𝗮𝘁𝗮𝗰𝗼𝘂: -{dmg} 𝐇𝐏")
 
-        # D) Bruxa de Debuff
         w_debuff = self.entities["witch_debuff"]
         if w_debuff["alive"]:
             w_debuff["turn_counter"] += 1
@@ -386,11 +511,10 @@ class WorldBossManager:
     def get_battle_view(self, user_id):
         return self.player_states.get(user_id)
 
-# Instância Global
 world_boss_manager = WorldBossManager()
 
 # ======================================================
-# --- JOBS E BROADCAST ---
+# --- JOBS E BROADCAST (MANTIDOS) ---
 # ======================================================
 
 async def _send_dm_to_winner(context: ContextTypes.DEFAULT_TYPE, user_id: int, loot_messages: list[str]):
@@ -414,6 +538,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
 
     if not leaderboard: return
 
+    # Carrega dados dos participantes
     participant_data = {}
     for user_id_str in leaderboard.keys():
         try:
@@ -429,6 +554,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     loot_winners_count = 0
     last_hit_msg = ""
     
+    # Prepara o Top 3 para o anúncio
     sorted_ranking = sorted(leaderboard.items(), key=lambda item: item[1], reverse=True)
     top_3_msg = []
     medals = ["🥇", "🥈", "🥉"]
@@ -439,16 +565,40 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
         medal = medals[i] if i < 3 else "🏅"
         top_3_msg.append(f"{medal} {name} ({dmg:,} pts)")
 
+    # --- LOOP DE DISTRIBUIÇÃO ---
     for user_id, pdata in participant_data.items():
+        # Ignora quem não deu dano
         if leaderboard.get(str(user_id), 0) <= 0: continue
         
-        # --- [MUDANÇA] SÓ ENTREGA LOOT SE O BOSS FOI DERROTADO ---
         if boss_defeated:
             try:
                 player_name = pdata.get("character_name", f"ID {user_id}")
                 loot_won_messages = []
                 player_mudou = False
 
+                # ==========================================================
+                # 💰 1. RECOMPENSA GARANTIDA (OURO + XP) PARA TODOS
+                # ==========================================================
+                
+                # Adiciona Ouro (pdata está correto aqui)
+                player_manager.add_gold(pdata, PARTICIPATION_GOLD)
+                loot_won_messages.append(f"💰 <b>Ouro:</b> +{PARTICIPATION_GOLD}")
+                
+                # Adiciona XP (CORRIGIDO: de player_data para pdata)
+                pdata["xp"] = pdata.get("xp", 0) + PARTICIPATION_XP
+                loot_won_messages.append(f"✨ <b>XP:</b> +{PARTICIPATION_XP}")
+
+                # Verifica se subiu de nível com esse XP
+                try:
+                    _, _, level_up_msg = player_manager.check_and_apply_level_up(pdata)
+                    if level_up_msg:
+                        loot_won_messages.append(level_up_msg)
+                except Exception: pass
+                
+                player_mudou = True
+                # ==========================================================
+
+                # 🎲 2. SORTEIOS DE ITENS RAROS
                 if random.random() * 100 <= SKILL_CHANCE:
                     won_skill_id = random.choice(SKILL_REWARD_POOL)
                     won_item_id = f"tomo_{won_skill_id}" 
@@ -485,19 +635,22 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     loot_winners_count += 1
                     player_mudou = True
 
+                # Salva alterações do jogador
                 if player_mudou:
                     await player_manager.save_player_data(user_id, pdata)
                 
+                # Envia DM para o jogador com o resumo
                 if loot_won_messages:
                     await _send_dm_to_winner(context, user_id, loot_won_messages)
 
+                # Verifica Último Golpe
                 if user_id == last_hitter_id:
                     last_hit_msg = f"💥 <b>Último Golpe:</b> {html.escape(player_name)}"
 
             except Exception as e:
                 logger.error(f"[WB_LOOT] Erro no player {user_id}: {e}")
-        # ------------------------------------------------------------
 
+    # --- ANÚNCIO NO CANAL ---
     if not boss_defeated:
         title = "👹 𝗢 𝗗𝗲𝗺𝗼̂𝗻𝗶𝗼 𝗗𝗶𝗺𝗲𝗻𝘀𝗶𝗼𝗻𝗮𝗹 𝗘𝘀𝗰𝗮𝗽𝗼𝘂! 👹"
         body = "O ᴍᴏɴsᴛʀᴏ ᴇʀᴀ ᴍᴜɪᴛᴏ ᴘᴏᴅᴇʀᴏsᴏ ᴇ ʀᴇᴛɪʀᴏᴜ-sᴇ.\n\nMᴀɪs sᴏʀᴛᴇ ᴅᴀ ᴘʀᴏ́xɪᴍᴀ ᴠᴇᴢ!\n\n"
@@ -506,10 +659,13 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
         title = "🎉 𝐎 𝐃𝐞𝐦𝐨̂𝐧𝐢𝐨 𝐃𝐢𝐦𝐞𝐧𝐬𝐢𝐨𝐧𝐚𝐥 𝐅𝐨𝐢 𝐃𝐞𝐫𝐫𝐨𝐭𝐚𝐝𝐨! 🎉"
         body = "A ᴀᴍᴇᴀᴄ̧ᴀ ғᴏɪ ᴄᴏɴᴛɪᴅᴀ!\n\n Rᴀɴᴋɪɴɢ ᴅᴇ Cᴏɴᴛʀɪʙᴜɪᴄ̧ᴀ̃ᴏ (Tᴏᴘ 3):\n" + "\n".join(top_3_msg)
         if last_hit_msg: body += f"\n{last_hit_msg}"
+        
+        body += f"\n\n💰 𝐓𝐨𝐝𝐨𝐬 𝐨𝐬 𝐩𝐚𝐫𝐭𝐢𝐜𝐢𝐩𝐚𝐧𝐭𝐞𝐬 𝐫𝐞𝐜𝐞𝐛𝐞𝐫𝐚𝐦:\n• {PARTICIPATION_GOLD} Ouro\n• {PARTICIPATION_XP} XP"
+
         if skin_winners_msg: body += "\n\n🎨 𝐒𝐤𝐢𝐧𝐬 𝐄𝐧𝐜𝐨𝐧𝐭𝐫𝐚𝐝𝐚𝐬:\n" + "\n".join(skin_winners_msg)
         if skill_winners_msg: body += "\n\n✨ 𝐒𝐤𝐢𝐥𝐥𝐬 𝐄𝐧𝐜𝐨𝐧𝐭𝐫𝐚𝐝𝐚𝐬:\n" + "\n".join(skill_winners_msg)
         if loot_winners_count > 0:
-            body += f"\n\n📦 {loot_winners_count} 𝐠𝐮𝐞𝐫𝐫𝐞𝐢𝐫𝐨𝐬 ʀᴇᴄᴇʙᴇʀᴀᴍ ᴇsᴘᴏ́ʟɪᴏs ᴅᴇ ɢᴜᴇʀʀᴀ."
+            body += f"\n\n📦 {loot_winners_count} 𝐠𝐮𝐞𝐫𝐫𝐞𝐢𝐫𝐨𝐬 ʀᴇᴄᴇʙᴇʀᴀᴍ ᴇsᴘᴏ́ʟɪᴏs ᴇxᴛʀᴀs."
 
     try:
         await context.bot.send_message(
@@ -522,9 +678,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
         logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
 async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):
-    """Anuncia início com IMAGEM e BOTÃO DE MAPA."""
     location_name = (game_data.REGIONS_DATA.get(location_key) or {}).get("display_name", location_key)
-    
     media_id = forced_media_id
     if not media_id:
         try:
@@ -532,10 +686,7 @@ async def broadcast_boss_announcement(application, location_key: str, forced_med
             media_id = file_ids.get_file_id("boss_raid")
         except: pass
 
-    # Texto atualizado
     anuncio = f"🚨 𝐀𝐋𝐄𝐑𝐓𝐀 𝐆𝐋𝐎𝐁𝐀𝐋 🚨\nᴜᴍ ᴅᴇᴍôɴɪᴏ ᴅɪᴍᴇɴsɪᴏɴᴀʟ sᴜʀɢɪᴜ ᴇᴍ {location_name}!\n\nᴄʟɪǫᴜᴇ ᴀʙᴀɪxᴏ ᴘᴀʀᴀ ᴠɪᴀᴊᴀʀ!"
-    
-    # Botão de Viagem (Map)
     keyboard = [[InlineKeyboardButton("🗺️ 𝔸𝔹ℝ𝕀ℝ 𝕄𝔸ℙ𝔸 𝔻𝔼 𝕍𝕀𝔸𝔾𝔼𝕄 🗺️", callback_data="travel")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -553,7 +704,6 @@ async def broadcast_boss_announcement(application, location_key: str, forced_med
         except: continue
 
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
-    """Finaliza o evento por tempo."""
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
     await distribute_loot_and_announce(context, battle_results)
     
@@ -564,13 +714,10 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
         except: continue
 
 async def iniciar_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
-    """Inicia o evento automaticamente (agendado)."""
     if world_boss_manager.is_active: return
 
     result = world_boss_manager.start_event()
     if result.get("success"):
-        # Anuncia com imagem e botão
         await broadcast_boss_announcement(context.application, result["location"])
-        
         duration_hours = context.job.data.get("duration_hours", 1) if context.job.data else 1
         context.job_queue.run_once(end_world_boss_job, when=timedelta(hours=duration_hours))

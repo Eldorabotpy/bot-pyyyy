@@ -118,7 +118,8 @@ async def processar_acao_combate(
         # Ataque Básico
         initiative = attacker_stats_modified.get('initiative', 0)
         double_attack_chance = (initiative * 0.25) / 100.0
-        num_attacks = 2 if random.random() < min(double_attack_chance, 0.50) else 1
+        double_attack_chance += attacker_stats_modified.get('double_attack_chance_flat', 0)
+        num_attacks = 2 if random.random() < (double_attack_chance / 100.0) else 1
         
         if num_attacks == 2:
             log_messages.append("⚡ 𝐀𝐓𝐀Q𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")

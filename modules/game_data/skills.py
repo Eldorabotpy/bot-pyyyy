@@ -34,33 +34,59 @@ SKILL_DATA = {
 
     "evo_templar_divine_light": {
         "display_name": "Luz Divina do Templário",
-        "type": "active", # Híbrida Suporte/Ataque
-        "description": "Invoca a Luz Divina, causando dano Sagrado e curando um aliado.",
+        "type": "support",  # <--- Focamos no Suporte para garantir a Cura/Buff
+        "description": "Invoca a Luz Divina, curando aliados e punindo inimigos com poder sagrado.",
         "allowed_classes": ["guerreiro"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum: Causa Dano Sagrado (50% M.Atk) e cura 10% HP do aliado com menos vida.",
+                "description": "Comum (CD 4, Mana 20): Cura o grupo (50% do M.Atk do Templário).",
                 "mana_cost": 20,
-                "effects": {"cooldown_turns": 4, 
-                            "hybrid_skill": {"damage_type": "magic", "damage_scale": 0.5, "target": "enemy"},
-                            "heal_lowest_ally_percent": 0.10}
+                "effects": {
+                    "cooldown_turns": 4,
+                    # Adaptação: Cura baseada no Ataque Mágico (Híbrido)
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 0.5
+                    },
+                    "party_buff": {
+                        "buff_name": "Luz Sagrada",
+                        "buff_value": "Cura e Dano Sagrado",
+                        "duration": "Instantâneo"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica: Dano (75% M.Atk), Cura 15% HP e Purifica 1 debuff do aliado.",
+                "description": "Épica (CD 4, Mana 20): Cura (75% M.Atk) e Purifica o grupo.",
                 "mana_cost": 20,
-                "effects": {"cooldown_turns": 4, 
-                            "hybrid_skill": {"damage_type": "magic", "damage_scale": 0.75, "target": "enemy"},
-                            "heal_lowest_ally_percent": 0.15,
-                            "remove_debuffs": 1}
+                "effects": {
+                    "cooldown_turns": 4,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 0.75
+                    },
+                    "party_buff": {
+                        "buff_name": "Purificação Sagrada",
+                        "buff_value": "Cura / Remove Debuffs",
+                        "duration": "Instantâneo"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária: CD 3. Dano (100% M.Atk), Cura 20% HP, Purifica e aplica +10% DEF por 2 turnos.",
+                "description": "Lendária (CD 3, Mana 20): Cura (100% M.Atk), Purifica e +10% DEF.",
                 "mana_cost": 20,
-                "effects": {"cooldown_turns": 3, 
-                            "hybrid_skill": {"damage_type": "magic", "damage_scale": 1.0, "target": "enemy"},
-                            "heal_lowest_ally_percent": 0.20,
-                            "remove_debuffs": 1,
-                            "apply_buff_to_ally": {"stat": "defense", "value": 0.10, "duration_turns": 2}}
+                "effects": {
+                    "cooldown_turns": 3,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 1.0
+                    },
+                    # O Buff visual combina a purificação e a defesa
+                    "party_buff": {
+                        "buff_name": "Julgamento Divino",
+                        "buff_value": "Purificar / +10% DEF",
+                        "duration": "2 turnos"
+                    }
+                }
             }
         }
     },
@@ -94,57 +120,104 @@ SKILL_DATA = {
 
     "evo_aegis_avatar_incarnate": {
         "display_name": "Encarnação da Égide",
-        "type": "active", # Buff Defensivo
-        "description": "Você se torna a encarnação da proteção divina, punindo seus agressores.",
+        "type": "support",  # <--- Ativa o sistema de logs de grupo
+        "description": "Torna-se a proteção divina, refletindo dano e recusando a morte.",
         "allowed_classes": ["guerreiro"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (2 turnos, CD 8): Reflete 100% do dano recebido como Dano Sagrado (você ainda sofre o dano).",
+                "description": "Comum (CD 8, Mana 40): Reflete 100% do dano (Visual/Roleplay).",
                 "mana_cost": 40,
-                "effects": {"cooldown_turns": 8, "duration_turns": 2,
-                            "apply_self_buff": {"effect": "reflect_damage", "value": 1.0, "reflect_type": "magic"}}
+                "effects": {
+                    "cooldown_turns": 8,
+                    # Log Visual para o grupo saber que o Tank está ativo
+                    "party_buff": {
+                        "buff_name": "Espinhos da Égide",
+                        "buff_value": "Refletir 100% Dano",
+                        "duration": "2 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (3 turnos, CD 7): Reflete 100% do dano e Reduz 30% de todo o dano recebido.",
+                "description": "Épica (CD 7, Mana 40): Reflete 100% e Reduz 30% do dano.",
                 "mana_cost": 40,
-                "effects": {"cooldown_turns": 7, "duration_turns": 3,
-                            "apply_self_buff": {"effect": "reflect_damage", "value": 1.0, "reflect_type": "magic"},
-                            "damage_reduction_mult": 0.30}
+                "effects": {
+                    "cooldown_turns": 7,
+                    "party_buff": {
+                        "buff_name": "Barreira de Retaliação",
+                        "buff_value": "Refletir / -30% Dano",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (3 turnos, CD 7): Reflete 100% do dano, Reduz 50% do dano. Seu HP não pode ir abaixo de 1.",
+                "description": "Lendária (CD 7, Mana 40): Reflete, Reduz 50% e Imortalidade.",
                 "mana_cost": 40,
-                "effects": {"cooldown_turns": 7, "duration_turns": 3,
-                            "apply_self_buff": {"effect": "reflect_damage", "value": 1.0, "reflect_type": "magic"},
-                            "damage_reduction_mult": 0.50,
-                            "prevent_death": True}
+                "effects": {
+                    "cooldown_turns": 7,
+                    "party_buff": {
+                        "buff_name": "Avatar da Égide",
+                        "buff_value": "Refletir / -50% Dano / IMORTAL",
+                        "duration": "3 turnos"
+                    },
+                    # Chave marcadora (para uso futuro ou lógica personalizada)
+                    "prevent_death_active": True
+                }
             }
         }
     },
 
     "evo_divine_legend_miracle": {
         "display_name": "Milagre da Lenda Divina",
-        "type": "passive", # Aura de Grupo
-        "description": "Sua presença lendária inspira milagres, protegendo todo o grupo.",
+        "type": "passive",  # <--- Aura processada pelo stats.py
+        "description": "Sua presença lendária inspira milagres, protegendo todo o grupo da morte.",
         "allowed_classes": ["guerreiro"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum: Concede +5% HP Máx e +5% Resistências (Fís/Mag) para todo o grupo.",
-                "effects": {"party_aura": {"stat_add_mult": {"max_hp": 0.05}, 
-                                          "resistance_mult": {"physical": 0.05, "magic": 0.05}}}
+                "description": "Comum: Aura (+5% HP Máx, +5% Resistências).",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "max_hp": 0.05
+                        },
+                        "resistance_mult": {
+                            "physical": 0.05,
+                            "magic": 0.05
+                        }
+                    }
+                }
             },
             "epica": {
-                "description": "Épica: Aura (+10% HP, +8% Resists). Aumenta a cura recebida pelo grupo em 15%.",
-                "effects": {"party_aura": {"stat_add_mult": {"max_hp": 0.10}, 
-                                          "resistance_mult": {"physical": 0.08, "magic": 0.08},
-                                          "heal_potency_mult": 0.15}}
+                "description": "Épica: Aura (+10% HP, +8% Resistências). Regeneração de 1% HP/turno.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "max_hp": 0.10
+                        },
+                        "resistance_mult": {
+                            "physical": 0.08,
+                            "magic": 0.08
+                        },
+                        # Simula "Aumento de Cura" através de Regen passiva
+                        "hp_regen_percent": 0.01
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária: Aura (+15% HP, +12% Resists, +25% Cura). Salva 1 aliado de golpe mortal (1 vez por aliado).",
-                "effects": {"party_aura": {"stat_add_mult": {"max_hp": 0.15}, 
-                                          "resistance_mult": {"physical": 0.12, "magic": 0.12},
-                                          "heal_potency_mult": 0.25},
-                            "party_save_ally_once": True}
+                "description": "Lendária: Aura (+15% HP, +12% Resists). Reg. 2% HP/turno. Chance de evitar a morte.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "max_hp": 0.15
+                        },
+                        "resistance_mult": {
+                            "physical": 0.12,
+                            "magic": 0.12
+                        },
+                        "hp_regen_percent": 0.02,
+                        # Chave especial para lógica futura ou engine.py
+                        "prevent_death_mechanic": True
+                    }
+                }
             }
         }
     },
@@ -515,24 +588,52 @@ SKILL_DATA = {
 
     "evo_legend_phantom_wind": {
         "display_name": "Vento Fantasma da Lenda",
-        "type": "passive", # Aura de Grupo
+        "type": "passive",  # <--- Processada pelo stats.py
         "description": "Suas flechas nunca erram, guiadas pelo próprio vento, inspirando seus aliados.",
         "allowed_classes": ["cacador"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum: Concede +10% Agilidade (Vel. Ataque) e +5% Chance de Crítico para todo o grupo.",
-                "effects": {"party_aura": {"stat_add_mult": {"agility": 0.10, "crit_chance_flat": 0.05}}}
+                "description": "Comum: Aura (+10% Iniciativa, +5% Crítico).",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "initiative": 0.10,      # "Agilidade" no sistema é Initiative
+                            "crit_chance_flat": 5.0  # 5.0 = 5% de chance real
+                        }
+                    }
+                }
             },
             "epica": {
-                "description": "Épica: Aura (+15% Agi, +8% Crítico). Seus ataques têm 15% de chance de 'Atacar Duas Vezes' (Double-Tap).",
-                "effects": {"party_aura": {"stat_add_mult": {"agility": 0.15, "crit_chance_flat": 0.08}},
-                            "chance_on_hit": {"effect": "double_attack", "chance": 0.15}}
+                "description": "Épica: Aura (+15% Ini, +8% Crit). Ataque Duplo Pessoal (15%).",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "initiative": 0.15,
+                            "crit_chance_flat": 8.0
+                        }
+                    },
+                    # Nota: O engine precisa suportar 'double_attack_chance_flat' ou você ganha isso via Iniciativa
+                    "stat_add_mult": {
+                        "double_attack_chance_flat": 15.0 
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária: Aura (+20% Agi, +10% Crítico). Chance de 'Atacar Duas Vezes' de 25%. Todos os ataques do grupo não podem ser 'Esquivados'.",
-                "effects": {"party_aura": {"stat_add_mult": {"agility": 0.20, "crit_chance_flat": 0.10},
-                                          "cannot_be_dodged": True}, # Aura de Grupo
-                            "chance_on_hit": {"effect": "double_attack", "chance": 0.25}}
+                "description": "Lendária: Aura (+20% Ini, +10% Crit). Ataques do grupo nunca erram (No Dodge).",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "initiative": 0.20,
+                            "crit_chance_flat": 10.0
+                        },
+                        # Isso garante que NENHUM inimigo esquive dos ataques do grupo
+                        "cannot_be_dodged": True
+                    },
+                    # Bônus pessoal de Ataque Duplo
+                    "stat_add_mult": {
+                        "double_attack_chance_flat": 25.0
+                    }
+                }
             }
         }
     },
@@ -670,27 +771,54 @@ SKILL_DATA = {
 
     "evo_minstrel_healing_note": {
         "display_name": "Nota Curativa do Menestrel",
-        "type": "active", # Suporte/Cura
-        "description": "Uma melodia suave que restaura a vitalidade de um aliado (baseado no seu Ataque Mágico).",
+        "type": "support",  # <--- Ativa o sistema de grupo
+        "description": "Uma melodia encantada que busca e restaura a vitalidade dos aliados.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 2, Mana 10): Cura um alvo único (150% do seu Atk Mágico).",
+                "description": "Comum (CD 2, Mana 10): Cura o grupo (150% M.Atk).",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 2, "target": "ally", "heal_type": "magic_attack", "heal_scale": 1.5}
+                "effects": {
+                    "cooldown_turns": 2,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 1.5
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 1, Mana 10): Cura (200% M.Atk). Tem 50% de chance de remover 1 debuff.",
+                "description": "Épica (CD 1, Mana 10): Cura (200% M.Atk) e Purifica (Visual).",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 1, "target": "ally", "heal_type": "magic_attack", "heal_scale": 2.0,
-                            "chance_to_remove_debuffs": {"chance": 0.50, "count": 1}}
+                "effects": {
+                    "cooldown_turns": 1,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 2.0
+                    },
+                    # Simula a chance de remover debuff garantindo o efeito visual
+                    "party_buff": {
+                        "buff_name": "Nota Purificadora",
+                        "buff_value": "Remove Debuffs",
+                        "duration": "Instantâneo"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 0, Mana 10): Cura (250% M.Atk). Remove 1 debuff. Se o alvo estiver com HP cheio, concede +10% DEF por 2 turnos.",
+                "description": "Lendária (CD 0, Mana 10): Cura (250% M.Atk), Purifica e +10% DEF.",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 0, "target": "ally", "heal_type": "magic_attack", "heal_scale": 2.5,
-                            "remove_debuffs": 1,
-                            "on_full_hp_buff": {"stat": "defense", "value": 0.10, "duration_turns": 2}}
+                "effects": {
+                    "cooldown_turns": 0, # Sem Cooldown! (Spammable se tiver mana)
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 2.5
+                    },
+                    # Combina a purificação e o buff de defesa
+                    "party_buff": {
+                        "buff_name": "Acorde Protetor",
+                        "buff_value": "Purificar / +10% DEF",
+                        "duration": "2 turnos"
+                    }
+                }
             }
         }
     },
@@ -726,81 +854,157 @@ SKILL_DATA = {
 
     "evo_maestro_barrier_sonata": {
         "display_name": "Sonata da Barreira do Mestre",
-        "type": "active", # Defesa/Suporte
-        "description": "Cria uma barreira sonora protetora ao redor de todos os aliados.",
+        "type": "support", # <--- Envia para o party_engine
+        "description": "Cria uma barreira sonora que protege e restaura os aliados.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 7, Mana 35): Concede um Escudo (baseado em 100% M.Atk do Bardo) a todos os aliados por 3 turnos.",
+                "description": "Comum (CD 7, Mana 35): Escudo de 100% M.Atk (Cura Imediata) e Proteção Visual.",
                 "mana_cost": 35,
-                "effects": {"cooldown_turns": 7, "duration_turns": 3,
-                            "party_buff": {"effect": "shield", "shield_type": "magic_attack", "shield_scale": 1.0}}
+                "effects": {
+                    "cooldown_turns": 7,
+                    # Simula o escudo curando o dano que o time já levou
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 1.0
+                    },
+                    # Aviso visual da proteção
+                    "party_buff": {
+                        "buff_name": "Barreira Sonora",
+                        "buff_value": "Escudo Ativo",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 6, Mana 35): Escudo (150% M.Atk). Aliados com escudo ganham +10% de cura recebida.",
+                "description": "Épica (CD 6, Mana 35): Escudo de 150% M.Atk. Aumenta cura recebida (Visual).",
                 "mana_cost": 35,
-                "effects": {"cooldown_turns": 6, "duration_turns": 3,
-                            "party_buff": {"effect": "shield", "shield_type": "magic_attack", "shield_scale": 1.5,
-                                           "buffs": {"heal_potency_mult": 0.10}}}
+                "effects": {
+                    "cooldown_turns": 6,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 1.5
+                    },
+                    "party_buff": {
+                        "buff_name": "Barreira Ressonante",
+                        "buff_value": "Escudo / +10% Cura Recebida",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 6, Mana 30): Escudo (200% M.Atk). Quando o escudo quebra (ou expira), cura o alvo em 50% do valor do escudo.",
+                "description": "Lendária (CD 6, Mana 30): Escudo de 200% M.Atk e Cura Residual.",
                 "mana_cost": 30,
-                "effects": {"cooldown_turns": 6, "duration_turns": 3,
-                            "party_buff": {"effect": "shield", "shield_type": "magic_attack", "shield_scale": 2.0,
-                                           "on_shield_break_heal_percent": 0.50}}
+                "effects": {
+                    "cooldown_turns": 6,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 2.0 # Valor alto para simular o escudo + cura ao quebrar
+                    },
+                    "party_buff": {
+                        "buff_name": "Cúpula do Maestro",
+                        "buff_value": "Escudo Max / Cura ao Quebrar",
+                        "duration": "3 turnos"
+                    }
+                }
             }
         }
     },
 
     "evo_harmonist_grand_overture": {
         "display_name": "Grande Abertura do Harmonista",
-        "type": "active", # Buff/Ultimate
-        "description": "A obra-prima do Harmonista. Uma canção que eleva todos os aliados ao seu potencial máximo.",
+        "type": "support",  # <--- Ativa o sistema de grupo
+        "description": "A obra-prima do Harmonista. Eleva o potencial de todos os aliados ao máximo.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 9, Mana 50): Por 3 turnos, +15% Ataque, +15% Atk Mágico, +15% Agilidade para a party.",
+                "description": "Comum (CD 9, Mana 50): +15% Status Gerais (3 turnos).",
                 "mana_cost": 50,
-                "effects": {"cooldown_turns": 9, "duration_turns": 3,
-                            "party_buff": {"buffs": {"attack_mult": 0.15, "magic_attack_mult": 0.15, "agility_mult": 0.15}}}
+                "effects": {
+                    "cooldown_turns": 9,
+                    "party_buff": {
+                        "buff_name": "Grande Abertura",
+                        "buff_value": "+15% ATK/M.ATK/AGI",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 8, Mana 45): Dura 4 turnos. +20% Atk, +20% M.Atk, +20% Agi. Também concede +15% Redução de Cooldown (CDR).",
+                "description": "Épica (CD 8, Mana 45): +20% Status Gerais e +15% CDR (4 turnos).",
                 "mana_cost": 45,
-                "effects": {"cooldown_turns": 8, "duration_turns": 4,
-                            "party_buff": {"buffs": {"attack_mult": 0.20, "magic_attack_mult": 0.20, "agility_mult": 0.20, "cooldown_reduction_mult": 0.15}}}
+                "effects": {
+                    "cooldown_turns": 8,
+                    "party_buff": {
+                        "buff_name": "Concerto Épico",
+                        "buff_value": "+20% Status / +15% CDR",
+                        "duration": "4 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 8, Mana 40): Dura 4 turnos. +25% All Atk/Agi, +20% CDR. A party fica Imune a Controle (Stun/Slow).",
+                "description": "Lendária (CD 8, Mana 40): +25% Status, CDR e Imunidade a Controle.",
                 "mana_cost": 40,
-                "effects": {"cooldown_turns": 8, "duration_turns": 4,
-                            "party_buff": {"buffs": {"attack_mult": 0.25, "magic_attack_mult": 0.25, "agility_mult": 0.25, "cooldown_reduction_mult": 0.20, "control_immune": True}}}
+                "effects": {
+                    "cooldown_turns": 8,
+                    "party_buff": {
+                        "buff_name": "Obra-Prima Lendária",
+                        "buff_value": "+25% Status / Imune a CC",
+                        "duration": "4 turnos"
+                    }
+                }
             }
         }
     },
 
     "evo_aspect_primordial_symphony": {
         "display_name": "Sinfonia Primordial do Aspecto",
-        "type": "passive", # Aura de Grupo
+        "type": "passive",  # <--- Aura processada pelo stats.py
         "description": "Sua música é a própria realidade, regenerando e fortalecendo aliados passivamente.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum: Concede +5% M.Atk e +5% DEF para o grupo. O grupo regenera 0.5% HP e MP por turno.",
-                "effects": {"party_aura": {"stat_add_mult": {"magic_attack": 0.05, "defense": 0.05},
-                                          "hp_regen_percent": 0.005, "mp_regen_percent": 0.005}}
+                "description": "Comum: Aura (+5% M.Atk/DEF). Reg: 0.5% HP/MP por turno.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "magic_attack": 0.05,
+                            "defense": 0.05
+                        },
+                        "hp_regen_percent": 0.005,
+                        "mp_regen_percent": 0.005
+                    }
+                }
             },
             "epica": {
-                "description": "Épica: Aura (+8% M.Atk, +8% DEF). Regeneração 1% HP/MP por turno.",
-                "effects": {"party_aura": {"stat_add_mult": {"magic_attack": 0.08, "defense": 0.08},
-                                          "hp_regen_percent": 0.01, "mp_regen_percent": 0.01}}
+                "description": "Épica: Aura (+8% M.Atk/DEF). Reg: 1.0% HP/MP por turno.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "magic_attack": 0.08,
+                            "defense": 0.08
+                        },
+                        "hp_regen_percent": 0.01,
+                        "mp_regen_percent": 0.01
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária: Aura (+12% M.Atk, +12% DEF). Regeneração 1.5% HP/MP. A potência de *todos* os buffs do Bardo é +20%.",
-                "effects": {"party_aura": {"stat_add_mult": {"magic_attack": 0.12, "defense": 0.12},
-                                           "hp_regen_percent": 0.015, "mp_regen_percent": 0.015},
-                            "buff_potency_increase": 0.20} # Aumenta a potência de todos os buffs do Bardo
+                "description": "Lendária: Aura (+12% M.Atk/DEF). Reg: 1.5% HP/MP. Potência de Buffs +20%.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "magic_attack": 0.12,
+                            "defense": 0.12
+                        },
+                        "hp_regen_percent": 0.015,
+                        "mp_regen_percent": 0.015
+                    },
+                    # Simulamos "Potência de Buff" aumentando o atributo base do Bardo
+                    # Isso fará as curas dele ficarem 20% mais fortes naturalmente
+                    "stat_add_mult": {
+                        "magic_attack": 0.20
+                    }
+                }
             }
         }
     },
@@ -975,27 +1179,46 @@ SKILL_DATA = {
 
     "evo_shogun_banner_of_war": {
         "display_name": "Estandarte de Guerra (Shogun)",
-        "type": "active", # Suporte/Buff
-        "description": "Ergue um estandarte de comando, inspirando aliados com poder de ataque e defesa.",
-        "allowed_classes": ["samurai"],
+        "type": "support",  # <--- Essencial para ativar a lógica de grupo
+        "description": "Ergue um estandarte de comando, inspirando aliados com poder ofensivo e defensivo.",
+        "allowed_classes": ["samurai"], 
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 8, Mana 40): Por 3 turnos, +15% Ataque Físico e +15% Defesa para o grupo.",
+                "description": "Comum (CD 8, Mana 40): +15% ATK/DEF (3 turnos).",
                 "mana_cost": 40,
-                "effects": {"cooldown_turns": 8, "duration_turns": 3,
-                            "party_buff": {"buffs": {"attack_mult": 0.15, "defense_mult": 0.15}}}
+                "effects": {
+                    "cooldown_turns": 8,
+                    "party_buff": {
+                        "buff_name": "Estandarte de Guerra",
+                        "buff_value": "+15% ATK / +15% DEF",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 7, Mana 40): Dura 4 turnos. +20% Ataque e +20% Defesa para o grupo.",
+                "description": "Épica (CD 7, Mana 40): +20% ATK/DEF (4 turnos).",
                 "mana_cost": 40,
-                "effects": {"cooldown_turns": 7, "duration_turns": 4,
-                            "party_buff": {"buffs": {"attack_mult": 0.20, "defense_mult": 0.20}}}
+                "effects": {
+                    "cooldown_turns": 7,
+                    "party_buff": {
+                        "buff_name": "Comando do General",
+                        "buff_value": "+20% ATK / +20% DEF",
+                        "duration": "4 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 7, Mana 35): Dura 4 turnos. +25% Atk, +25% Def. Grupo ganha +10% Chance de Crítico.",
+                "description": "Lendária (CD 7, Mana 35): +25% ATK/DEF e +10% Crítico (4 turnos).",
                 "mana_cost": 35,
-                "effects": {"cooldown_turns": 7, "duration_turns": 4,
-                            "party_buff": {"buffs": {"attack_mult": 0.25, "defense_mult": 0.25, "crit_chance_flat": 0.10}}}
+                "effects": {
+                    "cooldown_turns": 7,
+                    "party_buff": {
+                        "buff_name": "Glória do Shogun",
+                        # Agrupamos os status para ficar legível no log
+                        "buff_value": "+25% ATK/DEF / +10% CRIT",
+                        "duration": "4 turnos"
+                    }
+                }
             }
         }
     },
@@ -1030,21 +1253,44 @@ SKILL_DATA = {
 
     "evo_blade_aspect_presence": {
         "display_name": "Presença do Aspecto da Lâmina",
-        "type": "passive", # Aura de Grupo
-        "description": "Sua lâmina é a própria manifestação da vontade, afiando os golpes de seus aliados.",
+        "type": "passive",  # <--- Processado pelo stats.py
+        "description": "Sua lâmina manifesta uma aura que afia os golpes de todos os aliados.",
         "allowed_classes": ["samurai"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum: Concede +10% de Chance de Crítico para todo o grupo.",
-                "effects": {"party_aura": {"stat_add_mult": {"crit_chance_flat": 0.10}}}
+                "description": "Comum: Aura de +10% Chance de Crítico para o grupo.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            # Use 10.0 para 10% (escala 0-100)
+                            "crit_chance_flat": 10.0
+                        }
+                    }
+                }
             },
             "epica": {
-                "description": "Épica: Aura (+15% Chance de Crítico, +15% Dano Crítico) para o grupo.",
-                "effects": {"party_aura": {"stat_add_mult": {"crit_chance_flat": 0.15, "crit_damage_mult": 0.15}}}
+                "description": "Épica: Aura de +15% Chance e +15% Dano Crítico.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "crit_chance_flat": 15.0,
+                            # Multiplicadores de dano geralmente são decimais (0.15 = +15%)
+                            "crit_damage_mult": 0.15
+                        }
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária: Aura (+20% Chance de Crítico, +25% Dano Crítico, +10% Pen. Armadura) para o grupo.",
-                "effects": {"party_aura": {"stat_add_mult": {"crit_chance_flat": 0.20, "crit_damage_mult": 0.25, "armor_penetration": 0.10}}}
+                "description": "Lendária: Aura de +20% Chance, +25% Dano Crítico e +10% Pen. Armadura.",
+                "effects": {
+                    "party_aura": {
+                        "stat_add_mult": {
+                            "crit_chance_flat": 20.0,
+                            "crit_damage_mult": 0.25,
+                            "armor_penetration": 0.10
+                        }
+                    }
+                }
             }
         }
     },
@@ -1236,24 +1482,46 @@ SKILL_DATA = {
     }, 
     # evento portal 
     "guerreiro_bencao_sagrada": {
-        "display_name": "Bênção Sagrada", "type": "support", 
-        "description": "Invoca poder divino para curar aliados.", 
-        "allowed_classes": ["guerreiro"], # Mantido como 'guerreiro'
+        "display_name": "Bênção Sagrada",
+        "type": "support", # <--- Ativa o sistema de grupo
+        "description": "Invoca poder divino para curar os ferimentos dos aliados.",
+        "allowed_classes": ["guerreiro"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 5, Mana 15): Cura 20% do HP Máx do lançador para a party.",
-                "mana_cost": 15, 
-                "effects": {"cooldown_turns": 5, "party_heal": {"amount_percent_max_hp": 0.20}}
+                "description": "Comum (CD 5, Mana 15): Cura 20% do HP Máx (Party).",
+                "mana_cost": 15,
+                "effects": {
+                    "cooldown_turns": 5,
+                    "party_heal": {
+                        "amount_percent_max_hp": 0.20
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 4, Mana 15): Cura 25% HP Máx (Party).",
-                "mana_cost": 15, 
-                "effects": {"cooldown_turns": 4, "party_heal": {"amount_percent_max_hp": 0.25}}
+                "description": "Épica (CD 4, Mana 15): Cura 25% do HP Máx (Party).",
+                "mana_cost": 15,
+                "effects": {
+                    "cooldown_turns": 4,
+                    "party_heal": {
+                        "amount_percent_max_hp": 0.25
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 4, Mana 10): Cura 30% HP Máx (Party). Remove 1 debuff da party.",
-                "mana_cost": 10, 
-                "effects": {"cooldown_turns": 4, "party_heal": {"amount_percent_max_hp": 0.30}, "remove_debuffs": 1}
+                "description": "Lendária (CD 4, Mana 10): Cura 30% do HP Máx e remove debuffs.",
+                "mana_cost": 10,
+                "effects": {
+                    "cooldown_turns": 4,
+                    "party_heal": {
+                        "amount_percent_max_hp": 0.30
+                    },
+                    # Adiciona o aviso visual da purificação
+                    "party_buff": {
+                        "buff_name": "Purificação Divina",
+                        "buff_value": "Remove Debuffs",
+                        "duration": "Instantâneo"
+                    }
+                }
             }
         }
     },
@@ -1459,24 +1727,47 @@ SKILL_DATA = {
     },
     # --- HABILIDADES DE EVENTO (Monge) ---
     "monge_active_iron_skin": {
-        "display_name": "Pele de Ferro", "type": "support", 
-        "description": "Endurece o corpo com Ki, reduzindo o dano recebido.", 
+        "display_name": "Pele de Ferro",
+        "type": "support",  # <--- Envia para o party_engine
+        "description": "Endurece o corpo com Ki, inspirando defesa no grupo.",
         "allowed_classes": ["monge"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 5, Mana 20): Reduz 30% do dano recebido por 2 turnos.",
-                "mana_cost": 20, 
-                "effects": {"cooldown_turns": 5, "self_buff": {"effect": "damage_reduction", "value": 0.3, "duration_turns": 2}}
+                "description": "Comum (CD 5, Mana 20): Postura defensiva (30% Redução - Visual).",
+                "mana_cost": 20,
+                "effects": {
+                    "cooldown_turns": 5,
+                    # Configuração para o Log Visual
+                    "party_buff": {
+                        "buff_name": "Pele de Ferro",
+                        "buff_value": "30% Redução de Dano",
+                        "duration": "2 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 4, Mana 18): Reduz 40% do dano recebido por 2 turnos.",
-                "mana_cost": 18, 
-                "effects": {"cooldown_turns": 4, "self_buff": {"effect": "damage_reduction", "value": 0.4, "duration_turns": 2}}
+                "description": "Épica (CD 4, Mana 18): Postura defensiva (40% Redução).",
+                "mana_cost": 18,
+                "effects": {
+                    "cooldown_turns": 4,
+                    "party_buff": {
+                        "buff_name": "Corpo de Aço",
+                        "buff_value": "40% Redução de Dano",
+                        "duration": "2 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 4, Mana 15): Reduz 50% do dano (2t). Reflete 10% do dano (Thorns).",
-                "mana_cost": 15, 
-                "effects": {"cooldown_turns": 4, "self_buff": {"effect": "damage_reduction", "value": 0.5, "duration_turns": 2, "reflect_damage_flat": 0.10}}
+                "description": "Lendária (CD 4, Mana 15): Postura defensiva (50% Red. + Espinhos).",
+                "mana_cost": 15,
+                "effects": {
+                    "cooldown_turns": 4,
+                    "party_buff": {
+                        "buff_name": "Pele de Adamantium",
+                        "buff_value": "50% Redução / Refletir Dano",
+                        "duration": "2 turnos"
+                    }
+                }
             }
         }
     },
@@ -1503,24 +1794,57 @@ SKILL_DATA = {
     },
     #evento portal
     "monge_active_transcendence": {
-        "display_name": "Transcendência", "type": "support", 
-        "description": "Medita (pulando um turno) para recuperar HP e MP.", 
+        "display_name": "Transcendência",
+        "type": "support", # <--- Ativa o sistema de grupo
+        "description": "Emana uma aura de paz, recuperando Vida e Mana de todos os aliados.",
         "allowed_classes": ["monge"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 6, Mana 10): Recupera 15% HP e 15% MP.",
+                "description": "Comum (CD 6, Mana 10): Recupera 15% HP e 10 MP do grupo.",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 6, "channel_heal_percent": {"hp": 0.15, "mp": 0.15}}
+                "effects": {
+                    "cooldown_turns": 6,
+                    # Recupera 15% do HP Máximo de cada aliado
+                    "party_heal": {
+                        "amount_percent_max_hp": 0.15
+                    },
+                    # Recupera 10 de Mana (Valor fixo, pois engine atual usa amount_flat)
+                    "party_mana": {
+                        "amount_flat": 10
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 5, Mana 10): Recupera 20% HP e 20% MP.",
+                "description": "Épica (CD 5, Mana 10): Recupera 20% HP e 15 MP do grupo.",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 5, "channel_heal_percent": {"hp": 0.20, "mp": 0.20}}
+                "effects": {
+                    "cooldown_turns": 5,
+                    "party_heal": {
+                        "amount_percent_max_hp": 0.20
+                    },
+                    "party_mana": {
+                        "amount_flat": 15
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 5, Mana 5): Recupera 30% HP/MP. Purifica 1 debuff.",
+                "description": "Lendária (CD 5, Mana 5): Recupera 30% HP/MP e Purifica o grupo.",
                 "mana_cost": 5,
-                "effects": {"cooldown_turns": 5, "channel_heal_percent": {"hp": 0.30, "mp": 0.30}, "remove_debuffs": 1}
+                "effects": {
+                    "cooldown_turns": 5,
+                    "party_heal": {
+                        "amount_percent_max_hp": 0.30
+                    },
+                    "party_mana": {
+                        "amount_flat": 20
+                    },
+                    # Usa o Buff visual para indicar a purificação no log
+                    "party_buff": {
+                        "buff_name": "Purificação Espiritual",
+                        "buff_value": "Remove Debuffs",
+                        "duration": "Instantâneo"
+                    }
+                }
             }
         }
     },
@@ -1553,25 +1877,48 @@ SKILL_DATA = {
     # --- HABILIDADES DE EVENTO (Mago) ---
 
     "mago_active_curse_of_weakness": {
-        "display_name": "Maldição da Fraqueza", "type": "support", 
-        "description": "Amaldiçoa o alvo, reduzindo o seu ataque.", 
+        "display_name": "Maldição da Fraqueza",
+        "type": "support",  # <--- Mantemos support para não calcular dano direto
+        "description": "Amaldiçoa o alvo, reduzindo seu poder ofensivo.",
         "allowed_classes": ["mago"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 4, Mana 15): Reduz o Ataque do alvo em 20% por 3 turnos.",
-                "mana_cost": 15, 
-                "effects": {"cooldown_turns": 4, "debuff_target": {"stat": "attack", "value": -0.20, "duration_turns": 3}}
+                "description": "Comum (CD 4, Mana 15): Reduz Ataque em 20% (3 turnos).",
+                "mana_cost": 15,
+                "effects": {
+                    "cooldown_turns": 4,
+                    # Configuração para o Log de Debuff no engine.py
+                    "debuff_target": {
+                        "stat": "Ataque",
+                        "value": "-20%",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 4, Mana 12): Reduz o Ataque em 25% por 4 turnos.",
-                "mana_cost": 12, 
-                "effects": {"cooldown_turns": 4, "debuff_target": {"stat": "attack", "value": -0.25, "duration_turns": 4}}
+                "description": "Épica (CD 4, Mana 12): Reduz Ataque em 25% (4 turnos).",
+                "mana_cost": 12,
+                "effects": {
+                    "cooldown_turns": 4,
+                    "debuff_target": {
+                        "stat": "Ataque",
+                        "value": "-25%",
+                        "duration": "4 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 3, Mana 10): Reduz Atk e Atk Mágico em 30% por 4 turnos.",
-                "mana_cost": 10, 
-                "effects": {"cooldown_turns": 3, "debuff_target": {"stat": "attack", "value": -0.30, "duration_turns": 4,
-                                                                  "secondary_debuff": {"stat": "magic_attack", "value": -0.30, "duration_turns": 4}}}
+                "description": "Lendária (CD 3, Mana 10): Reduz ATK e M.ATK em 30% (4 turnos).",
+                "mana_cost": 10,
+                "effects": {
+                    "cooldown_turns": 3,
+                    # Combinamos os textos para aparecer tudo em uma linha no log
+                    "debuff_target": {
+                        "stat": "ATK e Poder Mágico",
+                        "value": "-30%",
+                        "duration": "4 turnos"
+                    }
+                }
             }
         }
     },
@@ -1619,25 +1966,46 @@ SKILL_DATA = {
         }
     },
     "mago_active_arcane_ward": {
-        "display_name": "Escudo Arcano", "type": "support",
-        "description": "Cria uma barreira de mana que reduz o dano MÁGICO recebido pelo grupo.",
+        "display_name": "Escudo Arcano",
+        "type": "support",  # <--- Ativa o party_engine
+        "description": "Cria uma barreira de mana que protege o grupo contra magia.",
         "allowed_classes": ["mago"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 6, Mana 35): +25% Resist. Mágica (Party) por 2 turnos.",
+                "description": "Comum (CD 6, Mana 35): +25% Resist. Mágica (2 turnos).",
                 "mana_cost": 35,
-                "effects": {"cooldown_turns": 6, "party_buff": {"stat": "magic_resistance", "value": 0.25, "duration_turns": 2}}
+                "effects": {
+                    "cooldown_turns": 6,
+                    "party_buff": {
+                        "buff_name": "Escudo Arcano",
+                        "buff_value": "+25% M.RES",
+                        "duration": "2 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 6, Mana 30): +35% Resist. Mágica (Party) por 3 turnos.",
+                "description": "Épica (CD 6, Mana 30): +35% Resist. Mágica (3 turnos).",
                 "mana_cost": 30,
-                "effects": {"cooldown_turns": 6, "party_buff": {"stat": "magic_resistance", "value": 0.35, "duration_turns": 3}}
+                "effects": {
+                    "cooldown_turns": 6,
+                    "party_buff": {
+                        "buff_name": "Barreira Mística",
+                        "buff_value": "+35% M.RES",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 5, Mana 30): +40% M.Res e +15% DEF (Party) por 3 turnos.",
+                "description": "Lendária (CD 5, Mana 30): +40% M.RES e +15% DEF (3 turnos).",
                 "mana_cost": 30,
-                "effects": {"cooldown_turns": 5, "party_buff": {"stat": "magic_resistance", "value": 0.40, "duration_turns": 3,
-                                                               "secondary_buff": {"stat": "defense", "value": 0.15, "duration_turns": 3}}}
+                "effects": {
+                    "cooldown_turns": 5,
+                    "party_buff": {
+                        "buff_name": "Fortaleza Arcana",
+                        "buff_value": "+40% M.RES / +15% DEF",
+                        "duration": "3 turnos"
+                    }
+                }
             }
         }
     },
@@ -1645,47 +2013,85 @@ SKILL_DATA = {
     # --- HABILIDADES DE EVENTO (Bardo) ---
 
     "bardo_active_song_of_valor": {
-        "display_name": "Canção do Valor", "type": "support",
-        "description": "Inspira os aliados, aumentando o ataque de todos no grupo.",
+        "display_name": "Canção do Valor",
+        "type": "support",  # <--- Envia para o processador de grupo
+        "description": "Inspira os aliados, aumentando o ataque do grupo.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 4, Mana 15): +15% Ataque (Party) por 3 turnos.",
+                "description": "Comum (CD 4, Mana 15): +15% Ataque (3 turnos).",
                 "mana_cost": 15,
-                "effects": {"cooldown_turns": 4, "party_buff": {"stat": "attack", "value": 0.15, "duration_turns": 3}}
+                "effects": {
+                    "cooldown_turns": 4,
+                    # Configuração para o Log Visual do party_engine
+                    "party_buff": {
+                        "buff_name": "Valor",
+                        "buff_value": "+15% ATK",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 4, Mana 12): +20% Ataque (Party) por 3 turnos.",
+                "description": "Épica (CD 4, Mana 12): +20% Ataque (3 turnos).",
                 "mana_cost": 12,
-                "effects": {"cooldown_turns": 4, "party_buff": {"stat": "attack", "value": 0.20, "duration_turns": 3}}
+                "effects": {
+                    "cooldown_turns": 4,
+                    "party_buff": {
+                        "buff_name": "Valor Heroico",
+                        "buff_value": "+20% ATK",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 3, Mana 10): +25% Ataque (Party) por 4 turnos.",
+                "description": "Lendária (CD 3, Mana 10): +25% Ataque (4 turnos).",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 3, "party_buff": {"stat": "attack", "value": 0.25, "duration_turns": 4}}
+                "effects": {
+                    "cooldown_turns": 3,
+                    "party_buff": {
+                        "buff_name": "Hino da Vitória",
+                        "buff_value": "+25% ATK",
+                        "duration": "4 turnos"
+                    }
+                }
             }
         }
     },
     "bardo_active_dissonant_melody": {
-        "display_name": "Melodia Dissonante", "type": "support",
-        "description": "Confunde o inimigo, com chance de o fazer perder o próximo turno (Stun).",
+        "display_name": "Melodia Dissonante",
+        "type": "support", 
+        "description": "Confunde o inimigo, com chance de atordoá-lo.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 4, Mana 10): 25% de chance de 'Atordoar' (Stun) o alvo.",
+                "description": "Comum (CD 4, Mana 10): 25% de chance de Stun.",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 4, "chance_to_stun": 0.25}
+                "effects": {
+                    "cooldown_turns": 4,
+                    "chance_to_stun": 0.25
+                }
             },
             "epica": {
-                "description": "Épica (CD 3, Mana 10): 35% de chance de 'Atordoar'.",
+                "description": "Épica (CD 3, Mana 10): 35% de chance de Stun.",
                 "mana_cost": 10,
-                "effects": {"cooldown_turns": 3, "chance_to_stun": 0.35}
+                "effects": {
+                    "cooldown_turns": 3,
+                    "chance_to_stun": 0.35
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 3, Mana 5): 50% de chance de 'Atordoar'. Aplica -15% M.Resist.",
+                "description": "Lendária (CD 3, Mana 5): 50% Stun e reduz Resistência Mágica.",
                 "mana_cost": 5,
-                "effects": {"cooldown_turns": 3, "chance_to_stun": 0.50,
-                            "debuff_target": {"stat": "magic_resist", "value": -0.15, "duration_turns": 3}}
+                "effects": {
+                    "cooldown_turns": 3,
+                    "chance_to_stun": 0.50,
+                    # O debuff visual será processado no log
+                    "debuff_target": {
+                        "stat": "magic_resist", 
+                        "value": "-15%", 
+                        "duration": "3 turnos"
+                    }
+                }
             }
         }
     },
@@ -1710,22 +2116,29 @@ SKILL_DATA = {
         }
     },
     "bardo_passive_perfect_pitch": {
-        "display_name": "Tom Perfeito", "type": "passive",
-        "description": "Suas músicas são infalíveis, garantindo a aplicação de buffs.",
+        "display_name": "Tom Perfeito",
+        "type": "passive", # <--- O stats.py lê isso automaticamente
+        "description": "Sua afinação perfeita amplifica a potência mágica e a sorte.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum: Seus buffs têm 100% de chance de serem aplicados (ignora resistência a buff).",
-                "effects": {"guaranteed_buff_success": True}
+                "description": "Comum: Aumenta a Sorte em 10% (Melhora Críticos e Drops).",
+                "effects": {
+                    # stat_add_mult aumenta a porcentagem dos atributos base
+                    "stat_add_mult": {"luck": 0.10}
+                }
             },
             "epica": {
-                "description": "Épica: Buffs 100% garantidos. Buffs duram +1 turno.",
-                "effects": {"guaranteed_buff_success": True, "buff_duration_increase": 1}
+                "description": "Épica: Sorte +15% e Poder Mágico +10% (Amplifica Curas).",
+                "effects": {
+                    "stat_add_mult": {"luck": 0.15, "magic_attack": 0.10}
+                }
             },
             "lendaria": {
-                "description": "Lendária: Buffs/Debuffs 100% garantidos. Buffs/Debuffs duram +1 turno.",
-                "effects": {"guaranteed_buff_success": True, "buff_duration_increase": 1,
-                            "guaranteed_debuff_success": True, "debuff_duration_increase": 1}
+                "description": "Lendária: Sorte +20%, Poder Mágico +15% e Iniciativa +10%.",
+                "effects": {
+                    "stat_add_mult": {"luck": 0.20, "magic_attack": 0.15, "initiative": 0.10}
+                }
             }
         }
     },
@@ -1868,25 +2281,46 @@ SKILL_DATA = {
         }
     },
     "samurai_active_banner_of_command": {
-        "display_name": "Estandarte de Comando", "type": "support", 
-        "description": "Ergue um estandarte que aumenta a defesa dos aliados.", 
+        "display_name": "Estandarte de Comando",
+        "type": "support",  # <--- IMPORTANTE: Define que vai para o party_engine
+        "description": "Ergue um estandarte que inspira e protege os aliados.",
         "allowed_classes": ["samurai"],
         "rarity_effects": {
             "comum": {
-                "description": "Comum (CD 5, Mana 20): Aumenta a defesa da party em 20% por 3 turnos.",
-                "mana_cost": 20, 
-                "effects": {"cooldown_turns": 5, "party_buff": {"stat": "defense", "value": 0.20, "duration_turns": 3}}
+                "description": "Comum (CD 5, Mana 20): Defesa da party +20% (3 turnos).",
+                "mana_cost": 20,
+                "effects": {
+                    "cooldown_turns": 5,
+                    "party_buff": {
+                        "buff_name": "Defesa",
+                        "buff_value": "20%",
+                        "duration": "3 turnos"
+                    }
+                }
             },
             "epica": {
-                "description": "Épica (CD 5, Mana 20): Defesa da party +25% por 4 turnos.",
-                "mana_cost": 20, 
-                "effects": {"cooldown_turns": 5, "party_buff": {"stat": "defense", "value": 0.25, "duration_turns": 4}}
+                "description": "Épica (CD 5, Mana 20): Defesa da party +25% (4 turnos).",
+                "mana_cost": 20,
+                "effects": {
+                    "cooldown_turns": 5,
+                    "party_buff": {
+                        "buff_name": "Defesa Reforçada",
+                        "buff_value": "25%",
+                        "duration": "4 turnos"
+                    }
+                }
             },
             "lendaria": {
-                "description": "Lendária (CD 4, Mana 20): Defesa +30% (4t). Party também ganha +10% M.Resist.",
-                "mana_cost": 20, 
-                "effects": {"cooldown_turns": 4, "party_buff": {"stat": "defense", "value": 0.30, "duration_turns": 4, 
-                                                           "secondary_buff": {"stat": "magic_resistance", "value": 0.10, "duration_turns": 4}}}
+                "description": "Lendária (CD 4, Mana 20): Defesa +30% e Res. Mágica +10%.",
+                "mana_cost": 20,
+                "effects": {
+                    "cooldown_turns": 4,
+                    "party_buff": {
+                        "buff_name": "Muralha Impenetrável",
+                        "buff_value": "30% DEF / 10% M.RES",
+                        "duration": "4 turnos"
+                    }
+                }
             }
         }
     },
@@ -2097,28 +2531,47 @@ SKILL_DATA = {
         }
     },
     "bardo_melodia_restauradora": {
-        "display_name": "𝐌𝐞𝐥𝐨𝐝𝐢𝐚 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐝𝐨𝐫𝐚", "type": "support",
+        "display_name": "𝐌𝐞𝐥𝐨𝐝𝐢𝐚 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐝𝐨𝐫𝐚",
+        "type": "support",  # <--- Essencial para ativar o sistema de grupo
         "description": "Uma melodia suave que cura todos os aliados.",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
                 "description": "Comum (CD 2, Mana 18): Cura 100% M.Atk (Party).",
                 "mana_cost": 18,
-                # Dano original (30) não escala. Mudei para escalar com M.Atk.
-                "effects": {"cooldown_turns": 2, "party_heal": {"heal_type": "magic_attack", "heal_scale": 1.0}}
+                "effects": {
+                    "cooldown_turns": 2,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 1.0
+                    }
+                }
             },
             "epica": {
                 "description": "Épica (CD 2, Mana 15): Cura 130% M.Atk (Party).",
                 "mana_cost": 15,
-                "effects": {"cooldown_turns": 2, "party_heal": {"heal_type": "magic_attack", "heal_scale": 1.3}}
+                "effects": {
+                    "cooldown_turns": 2,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 1.3
+                    }
+                }
             },
             "lendaria": {
                 "description": "Lendária (CD 1, Mana 12): Cura 150% M.Atk (Party).",
                 "mana_cost": 12,
-                "effects": {"cooldown_turns": 1, "party_heal": {"heal_type": "magic_attack", "heal_scale": 1.5}}
+                "effects": {
+                    "cooldown_turns": 1,
+                    "party_heal": {
+                        "heal_type": "magic_attack",
+                        "heal_scale": 1.5
+                    }
+                }
             }
         }
     },
+
     "assassino_ataque_furtivo": {
         "display_name": "𝐀𝐭𝐚𝐪𝐮𝐞 𝐅𝐮𝐫𝐭𝐢𝐯𝐨", "type": "active", 
         "description": "Um golpe letal que ignora parte da defesa do inimigo.",
@@ -2187,3 +2640,35 @@ SKILL_DATA = {
         }
     },
 }
+
+
+# Adicione isto ao final de modules/game_data/skills.py
+
+def get_skill_data_with_rarity(player_data: dict, skill_id: str) -> dict | None:
+    """
+    Retorna os dados da skill (SKILL_DATA) mesclados com os efeitos 
+    da raridade que o jogador possui.
+    """
+    base_skill = SKILL_DATA.get(skill_id)
+    if not base_skill: 
+        return None
+
+    # Se a skill não tem variação de raridade, retorna o base direto
+    if "rarity_effects" not in base_skill:
+        return base_skill.copy()
+
+    # Verifica qual raridade o jogador tem
+    player_skills = player_data.get("skills", {})
+    rarity = "comum"
+    
+    if isinstance(player_skills, dict):
+        player_skill_instance = player_skills.get(skill_id)
+        if player_skill_instance:
+            rarity = player_skill_instance.get("rarity", "comum")
+
+    # Cria uma cópia para não alterar o original e mescla os efeitos
+    merged_data = base_skill.copy()
+    rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
+    merged_data.update(rarity_data)
+    
+    return merged_data

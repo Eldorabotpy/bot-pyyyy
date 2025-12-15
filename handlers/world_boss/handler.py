@@ -1,4 +1,5 @@
 # handlers/world_boss/handler.py
+# (VERSÃO REFATORADA: Limpeza e Centralização)
 
 import logging
 import html
@@ -13,31 +14,16 @@ from modules.world_boss.engine import (
 )
 from handlers.menu.region import send_region_menu
 from modules import player_manager, game_data, file_ids
-from modules.game_data.skills import SKILL_DATA
 from modules.player import actions as player_actions
+
+# ✅ IMPORTAÇÃO CENTRALIZADA
+from modules.game_data.skills import get_skill_data_with_rarity
+from modules.cooldowns import verificar_cooldown
+
 logger = logging.getLogger(__name__)
 
 BOSS_MEDIA = "boss_raid" 
 ADMIN_ID = 7262799478
-
-# --- HELPER DE DADOS DA SKILL (CORREÇÃO DE MANA) ---
-def _get_skill_info(player_data, skill_id):
-    """Retorna dados da skill mesclando raridade para pegar custo correto."""
-    base_skill = SKILL_DATA.get(skill_id)
-    if not base_skill: return {}
-    
-    # Clona para não alterar original
-    skill_info = base_skill.copy()
-    
-    # Verifica raridade equipada
-    player_skills = player_data.get("skills", {})
-    if isinstance(player_skills, dict) and skill_id in player_skills:
-        rarity = player_skills[skill_id].get("rarity", "comum")
-        # Pega dados da raridade se existirem
-        rarity_data = base_skill.get("rarity_effects", {}).get(rarity, base_skill.get("rarity_effects", {}).get("comum", {}))
-        skill_info.update(rarity_data)
-        
-    return skill_info
 
 def _format_log_line(text):
     return f"• {text}"
@@ -323,14 +309,13 @@ async def wb_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = []
     
     for sid in equipped:
-        # USA A NOVA FUNÇÃO PARA PEGAR DADOS REAIS DA RARIDADE
-        sdata = _get_skill_info(pdata, sid)
+        # ✅ USA A NOVA FUNÇÃO CENTRALIZADA
+        sdata = get_skill_data_with_rarity(pdata, sid)
         if not sdata: continue
         
         name = sdata.get("display_name", sid)
         cost = sdata.get("mana_cost", 0)
         
-        from modules.cooldowns import verificar_cooldown
         pode, msg = verificar_cooldown(pdata, sid)
         
         if not pode:
@@ -358,7 +343,6 @@ async def wb_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             has_potions = True
             name = item_info.get("display_name", item_id)
             emoji = item_info.get("emoji", "🧪")
-            # Usa callback especial wb_use_potion para manter fluxo do boss
             kb.append([InlineKeyboardButton(f"{emoji} {name} (x{qty})", callback_data=f"wb_use_potion:{item_id}")])
     
     if not has_potions:
@@ -411,6 +395,7 @@ async def wb_use_potion(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 4. Salva e Atualiza Tela
     await player_manager.save_player_data(user_id, pdata)
+    world_boss_manager.save_state() # Salva o estado do boss também
     await query.answer(f"🧪 {msg_feed}")
     await wb_fight_screen(update, context)
 

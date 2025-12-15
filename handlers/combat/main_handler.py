@@ -1,5 +1,5 @@
 # handlers/combat/main_handler.py
-# (VERSÃO CORRIGIDA: Exibe nomes bonitos dos itens no Loot)
+# (VERSÃO REFATORADA: Skills Centralizadas + Loot Bonito)
 
 import logging
 import random
@@ -22,7 +22,9 @@ from handlers.class_evolution_handler import open_evolution_menu
 from handlers.profile_handler import _get_class_media
 from modules.dungeons.runtime import _send_battle_media
 from modules import file_ids as file_id_manager
-from modules.game_data.skills import SKILL_DATA
+
+# ✅ IMPORTAÇÃO CENTRALIZADA (Novo)
+from modules.game_data.skills import SKILL_DATA, get_skill_data_with_rarity
 
 logger = logging.getLogger(__name__)
 
@@ -70,18 +72,7 @@ async def _edit_media_or_caption(context: ContextTypes.DEFAULT_TYPE, battle_cach
                 if msg: battle_cache['message_id'] = msg.message_id
             except: pass
 
-def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> Optional[dict]:
-    base_skill = SKILL_DATA.get(skill_id)
-    if not base_skill: return None
-    if "rarity_effects" not in base_skill: return base_skill
-    player_skills = pdata.get("skills", {})
-    if not isinstance(player_skills, dict): rarity = "comum"
-    else:
-        skill = player_skills.get(skill_id)
-        rarity = skill.get("rarity", "comum") if skill else "comum"
-    merged = base_skill.copy()
-    merged.update(base_skill["rarity_effects"].get(rarity, {}))
-    return merged
+# (Função _get_player_skill_data_by_rarity REMOVIDA DAQUI - Agora usamos a do skills.py)
 
 # ================================================
 # MOTOR DE COMBATE
@@ -95,6 +86,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     user_id = query.from_user.id if query else update.effective_user.id
     chat_id = query.message.chat_id if query else update.effective_chat.id
 
+    # 1. Retornar ao Mapa
     if action == 'combat_return_to_map':
         if query: await _safe_answer(query)
         context.user_data.pop('battle_cache', None)
@@ -110,6 +102,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             except: pass
         return
 
+    # 2. Menu de Ataque
     if action == 'combat_attack_menu':
         if not query: return
         await _safe_answer(query)
@@ -121,6 +114,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
     if query: await _safe_answer(query)
     
+    # 3. Recuperação/Criação do Cache de Batalha
     battle_cache = context.user_data.get('battle_cache')
     
     if not battle_cache or battle_cache.get('player_id') != user_id:
@@ -183,6 +177,9 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
     kb_voltar = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar para o Mapa", callback_data='combat_return_to_map')]])
     
+    # ============================================
+    # AÇÃO: FUGA
+    # ============================================
     if action == 'combat_flee':
         context.user_data.pop('battle_cache', None)
         player_data = await player_manager.get_player_data(user_id)
@@ -204,6 +201,9 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         await _send_battle_media(context, chat_id, "🏃 <b>FUGA!</b>\n\nEscapou por pouco.", media_fuga, kb_voltar)
         return
 
+    # ============================================
+    # AÇÃO: ATAQUE / SKILL
+    # ============================================
     elif action == 'combat_attack':
         player_data = await player_manager.get_player_data(user_id)
         if not player_data: return
@@ -212,16 +212,20 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         skill_id = battle_cache.pop('skill_to_use', None) 
         action_type = battle_cache.pop('action_type', 'attack')
         
+        # Verifica Cooldown novamente (segurança)
         if skill_id:
             pode_usar, msg_cd = verificar_cooldown(player_data, skill_id)
             if not pode_usar:
                 if query: await query.answer(msg_cd, show_alert=True)
                 return 
 
-        skill_info = _get_player_skill_data_by_rarity(player_data, skill_id) if skill_id else None
+        # ✅ USA A FUNÇÃO CENTRALIZADA
+        skill_info = get_skill_data_with_rarity(player_data, skill_id) if skill_id else None
+        
         skip_monster_turn = False
         player_damage = 0 
 
+        # --- TURNO DO JOGADOR ---
         if skill_info:
             mana_cost = skill_info.get("mana_cost", 0)
             log.append(f"✨ {skill_info['display_name']}! (-{mana_cost} MP)")
@@ -249,17 +253,20 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 player_damage = res["total_damage"]
                 log.extend(res["log_messages"])
             
+            # Aplica Cooldown
             raridade = "comum"
             if player_data.get("skills") and skill_id in player_data["skills"]:
                 raridade = player_data["skills"][skill_id].get("rarity", "comum")
             player_data = aplicar_cooldown(player_data, skill_id, raridade)
 
         else:
+            # Ataque Básico
             log.append("⚔️ Ataque básico.")
             res = await combat_engine.processar_acao_combate(player_data, player_stats, monster_stats, None, battle_cache.get('player_hp'))
             player_damage = res["total_damage"]
             log.extend(res["log_messages"])
 
+        # Aplica Dano no Monstro
         if not skip_monster_turn:
             if 'hp' not in monster_stats: monster_stats['hp'] = monster_stats.get('max_hp', 100)
             monster_stats['hp'] = int(monster_stats['hp']) - player_damage
@@ -269,6 +276,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         
         caption_p = await format_combat_message_from_cache(battle_cache)
         
+        # Se foi skill de suporte, atualiza tela mas não dá turno ao monstro
         if skip_monster_turn:
             player_data, msgs_cd = iniciar_turno(player_data)
             if msgs_cd:
@@ -280,16 +288,19 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             await _edit_media_or_caption(context, battle_cache, caption_p, battle_cache['player_media_id'], battle_cache['player_media_type'], InlineKeyboardMarkup(kb))
             return 
             
+        # ============================================
+        # VITÓRIA
+        # ============================================
         if monster_defeated:
             if "cooldowns" in player_data:
                 player_data.pop("cooldowns", None)
             
-            #durability.apply_end_of_battle_wear(player_data, battle_cache, log)
             await player_manager.save_player_data(user_id, player_data)
 
             try:
                 log.append(f"🏆 <b>{monster_stats.get('name')} derrotado!</b>")
                 
+                # CASO 1: Dungeon
                 if in_dungeon:
                     combat_details_recon = {
                          "region_key": battle_cache.get("region_key"),
@@ -312,10 +323,10 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     await dungeons_runtime.advance_after_victory(update, context, user_id, chat_id, combat_details_recon, pkg)
                     return
                 
-                durability.apply_end_of_battle_wear(player_data, battle_cache, log) # <-- Desgaste aplicado 1x
-                await player_manager.save_player_data(user_id, player_data) # <-- Salvamos
+                # CASO 2: Combate Normal
+                durability.apply_end_of_battle_wear(player_data, battle_cache, log) 
+                await player_manager.save_player_data(user_id, player_data)
 
-                # Vitória Normal
                 r_ctx = battle_cache.copy()
                 r_ctx.update(monster_stats)
                 xp, gold, items = rewards.calculate_victory_rewards(player_data, r_ctx)
@@ -323,6 +334,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 player_data["xp"] = player_data.get("xp", 0) + xp
                 player_data["gold"] = player_data.get("gold", 0) + gold
                 
+                # Processamento de Loot com formatação
                 processed_loot = []
                 for i in items:
                      if isinstance(i, str): processed_loot.append((i, 1))
@@ -333,17 +345,17 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
                 summary = f"🏆 <b>VITÓRIA!</b>\n\nDerrotou {monster_stats.get('name')}!\n✨ XP: +{xp}\n💰 Ouro: +{gold}\n"
                 
-                # --- CORREÇÃO DE EXIBIÇÃO DE LOOT ---
+                # ✅ CORREÇÃO VISUAL DE LOOT
                 if processed_loot:
-                    loot_lines = []
-                    for i_id, qty in processed_loot:
-                        # Busca nome bonito
-                        item_info = (game_data.ITEMS_DATA or {}).get(i_id, {})
+                    summary += "\n📦 <b>Loot Encontrado:</b>\n"
+                    for item_data in processed_loot:
+                        i_id, qty = item_data
+                        
+                        item_info = game_data.ITEMS_DATA.get(i_id, {})
                         i_name = item_info.get("display_name") or i_id.replace("_", " ").title()
-                        i_emoji = item_info.get("emoji", "")
-                        loot_lines.append(f"• {qty}x {i_emoji} {i_name}")
-                    
-                    summary += "\n📦 Loot:\n" + "\n".join(loot_lines)
+                        i_emoji = item_info.get("emoji", "🎲")
+                        
+                        summary += f"• {qty}x {i_emoji} {i_name}\n"
                 # -------------------------------------
 
                 try:
@@ -372,6 +384,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 await context.bot.send_message(chat_id, "⚠️ Erro na vitória.", reply_markup=kb_voltar)
                 return
 
+        # --- TURNO DO MONSTRO ---
         battle_cache['turn'] = 'monster'
         
         dodge = min((player_stats.get('initiative', 0) * 0.4)/100, 0.75)
@@ -387,6 +400,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             log.append(f"⬅️ Recebeu {dmg} dano.")
             battle_cache['player_hp'] = int(battle_cache.get('player_hp', 0)) - dmg
             
+            # Derrota do Jogador
             if battle_cache['player_hp'] <= 0:
                 log.append("☠️ <b>Derrota!</b>")
                 
@@ -417,6 +431,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             
             await player_manager.save_player_data(user_id, player_data)
 
+    # Atualização Visual do Turno
     battle_cache['battle_log'] = log[-12:]
     caption_m = await format_combat_message_from_cache(battle_cache)
     kb = [[InlineKeyboardButton("⚔️ Atacar", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
