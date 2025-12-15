@@ -1,5 +1,5 @@
 # modules/dungeons/runtime.py
-# (VERSÃO CORRIGIDA: Cooldowns lidos direto do Player Data)
+# (VERSÃO CORRIGIDA: Corrige o bug de voltar para o Reino ao clicar em Continuar)
 
 from __future__ import annotations
 import logging 
@@ -256,6 +256,12 @@ async def fail_dungeon_run(update, context, user_id, chat_id, reason):
         pdata['current_hp'] = stats.get('max_hp', 50)
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
+        
+        # Recupera a chave da região do cache se possível para manter o player lá
+        cache = context.user_data.get('battle_cache') or {}
+        if cache.get('region_key'):
+             pdata["location"] = cache.get('region_key')
+
         await player_manager.save_player_data(user_id, pdata)
     
     await _send_battle_media(context, chat_id, f"💀 𝗙𝗶𝗺 𝗱𝗮 𝗟𝗶𝗻𝗵𝗮\n{reason}.", "media_dungeon_defeat", 
@@ -304,7 +310,6 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     
     # Aplica desgaste
     dummy_log = []
-    # ❌ A CHAMADA DUPLICADA DE DURABILIDADE FOI REMOVIDA DAQUI
     
     active_cds = pdata.get("cooldowns", {})
 
@@ -323,6 +328,9 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         pdata['current_hp'] = stats.get('max_hp', 50)
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
+        
+        # 🟢 [CORREÇÃO CRÍTICA] Força a localização para a região da masmorra
+        pdata["location"] = reg_key 
         
         if "cooldowns" in pdata:
             pdata.pop("cooldowns", None)
@@ -363,8 +371,8 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     await player_manager.save_player_data(user_id, pdata)
 
     caption = await format_combat_message(pdata)
-    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡", callback_data="combat_skill_menu")],
-          [InlineKeyboardButton("🧪 𝙋𝙤𝙘̧𝙖̃𝙤", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝙧", callback_data="combat_flee")]]
+    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡𝙨", callback_data="combat_skill_menu")],
+          [InlineKeyboardButton("🧪 𝙋𝙤𝙘̧𝗼̃𝗲𝘀", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝙧", callback_data="combat_flee")]]
     
     await _delete_previous_battle_msg(context, user_id)
     if levelup_text:
@@ -381,49 +389,6 @@ async def _pick_diff_cb(update, context):
     await _start_first_fight(update, context, d[2], d[1])
 async def _dungeon_locked_cb(update, context): await update.callback_query.answer("Trancado!", show_alert=True)
 
-# ====================================================================
-# 🔴 MENU DE SKILLS CORRIGIDO (Lê do pdata, não do cache)
-# ====================================================================
-async def open_combat_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    try: await query.answer()
-    except: pass
-    user_id = update.effective_user.id
-    
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata: return
-    learned_skills = pdata.get("skills") or pdata.get("learned_skills") or []
-    
-    # 🔴 AQUI ESTAVA O ERRO!
-    # Antes: active_cds = battle_cache.get('skill_cooldowns', {})  <-- LIA COISA VELHA
-    # Agora:
-    active_cds = pdata.get('cooldowns', {}) # <-- LÊ COISA NOVA
-    
-    kb = []
-    row = []
-    if not learned_skills:
-        kb.append([InlineKeyboardButton("🚫 Sem skills", callback_data="ignore")])
-    else:
-        for skill_id in learned_skills:
-            skill_name = str(skill_id).replace("_", " ").title()
-            turns_left = active_cds.get(skill_id, 0)
-            
-            if turns_left > 0:
-                btn_text = f"⏳ {skill_name} ({turns_left}t)"
-                cb_data = "ignore"
-            else:
-                btn_text = f"✨ {skill_name}"
-                cb_data = f"combat_use_skill:{skill_id}"
-                
-            row.append(InlineKeyboardButton(btn_text, callback_data=cb_data))
-            if len(row) == 2: 
-                kb.append(row)
-                row = []
-        if row: kb.append(row)
-        
-    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="combat_menu_return")])
-    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
-
 async def _delete_previous_battle_msg(context: ContextTypes.DEFAULT_TYPE, user_id: int):
     cache = context.user_data.get('battle_cache')
     if cache and cache.get('player_id') == user_id:
@@ -433,36 +398,6 @@ async def _delete_previous_battle_msg(context: ContextTypes.DEFAULT_TYPE, user_i
             try: await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
             except Exception: pass
 
-async def open_combat_potion_menu(update, context):
-    q = update.callback_query
-    try: await q.answer()
-    except: pass
-    uid = q.from_user.id
-    pd = await player_manager.get_player_data(uid)
-    inv = _inv(pd)
-    kb = []
-    pids = ["hp_potion", "mp_potion", "pocao_vida", "pocao_mana"]
-    f = False
-    for i, q in inv.items():
-        if int(q)>0 and any(x in i for x in pids):
-            f=True
-            n = i.replace("_", " ").title()
-            kb.append([InlineKeyboardButton(f"🧪 {n} (x{q})", callback_data=f"combat_use_item:{i}")])
-    if not f: kb.append([InlineKeyboardButton("🚫 Vazio", callback_data="ignore")])
-    kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="combat_menu_return")])
-    await q.edit_message_reply_markup(InlineKeyboardMarkup(kb))
-
-async def return_to_main_combat_menu(update, context):
-    q = update.callback_query
-    try: await q.answer()
-    except: pass
-    kb = [[InlineKeyboardButton("⚔️ Atacar", callback_data="combat_attack"), InlineKeyboardButton("✨ Skills", callback_data="combat_skill_menu")],
-          [InlineKeyboardButton("🧪 Poções", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 Fugir", callback_data="combat_flee")]]
-    await q.edit_message_reply_markup(InlineKeyboardMarkup(kb))
-
 dungeon_open_handler = CallbackQueryHandler(_open_menu_cb, pattern=r"^dungeon_open:[A-Za-z0-9_]+$")
 dungeon_pick_handler = CallbackQueryHandler(_pick_diff_cb, pattern=r"^dungeon_pick:[A-Za-z0-9_]+:[A-Za-z0-9_]+$")
 dungeon_locked_handler = CallbackQueryHandler(_dungeon_locked_cb, pattern=r'^dungeon_locked$')
-combat_skill_handler = CallbackQueryHandler(open_combat_skill_menu, pattern="^combat_skill_menu$")
-combat_potion_handler = CallbackQueryHandler(open_combat_potion_menu, pattern="^combat_potion_menu$")
-combat_return_handler = CallbackQueryHandler(return_to_main_combat_menu, pattern="^combat_menu_return$")
