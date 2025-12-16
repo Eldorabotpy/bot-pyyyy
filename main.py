@@ -38,6 +38,13 @@ from registries import register_all_handlers
 from handlers.jobs import (
     regenerate_energy_job,
     daily_crystal_grant_job,
+    afternoon_event_reminder_job,
+    start_kingdom_defense_event,
+    end_kingdom_defense_event,
+    daily_arena_ticket_job,
+    # Adicione estas duas que criamos agora:
+    start_world_boss_job,
+    end_world_boss_job,
     job_pvp_monthly_reset
 )
 
@@ -133,16 +140,16 @@ async def post_init_tasks(application: Application):
 
     # --- C. World Boss ---
     if WORLD_BOSS_TIMES:
-        from handlers.jobs import start_world_boss_job, end_world_boss_job
-        
-        # Config: [(18, 0, 19, 0), ...]
+        # Note que não precisamos importar aqui dentro se já importamos lá em cima
         for i, (sh, sm, eh, em) in enumerate(WORLD_BOSS_TIMES):
             try:
+                # Nasce
                 jq.run_daily(
                     start_world_boss_job, 
                     time=dt_time(hour=sh, minute=sm, tzinfo=tz), 
                     name=f"start_boss_{i}"
                 )
+                # Foge
                 jq.run_daily(
                     end_world_boss_job, 
                     time=dt_time(hour=eh, minute=em, tzinfo=tz), 
