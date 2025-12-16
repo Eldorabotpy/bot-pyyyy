@@ -1,4 +1,4 @@
-# Arquivo: handlers/jobs.py (VERSÃO CORRIGIDA E INTEGRADA)
+# Arquivo: handlers/jobs.py (VERSÃO CORRIGIDA - COM FUNÇÕES ADMIN)
 
 from __future__ import annotations
 
@@ -16,13 +16,13 @@ import certifi
 from modules import player_manager
 from modules.player_manager import (
     save_player_data, get_perk_value, 
-    add_item_to_inventory
+    add_item_to_inventory, iter_player_ids
 )
 
 # --- CONFIG & MANAGERS ---
 from config import EVENT_TIMES, JOB_TIMEZONE
 
-# ✅ CORREÇÃO 1: Importações corretas dos Engines
+# Importações dos Engines (Boss e Defesa)
 try:
     from modules.world_boss.engine import (
         world_boss_manager, 
@@ -38,7 +38,6 @@ except ImportError:
     event_manager = None
 
 from pvp.pvp_config import MONTHLY_RANKING_REWARDS
-from modules.player.actions import _parse_iso as _parse_iso_utc 
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
     return now.date().isoformat()
 
 # ==============================================================================
-# 👹 JOB: WORLD BOSS (CORRIGIDO)
+# 👹 JOB: WORLD BOSS
 # ==============================================================================
 async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -87,14 +86,12 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
         logger.error("⚠️ [JOB] Manager do Boss não encontrado/importado.")
         return
 
-    # Usa a propriedade correta 'is_active' do engine.py
     if world_boss_manager.is_active:
          logger.info("👹 [JOB] Boss já está vivo. Ignorando spawn.")
          return
 
     logger.info("👹 [JOB] Invocando World Boss...")
     
-    # Chama o método correto 'start_event'
     result = world_boss_manager.start_event()
     
     if result.get("success"):
@@ -109,7 +106,7 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Erro ao enviar no canal: {e}")
 
-        # 2. Broadcast (DM para os players) - Importado do engine.py
+        # 2. Broadcast (DM para os players)
         try:
             await broadcast_boss_announcement(context.application, result["location"])
         except Exception as e:
@@ -123,21 +120,17 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """
     if not world_boss_manager: return
 
-    # Usa a propriedade correta 'is_active'
     if not world_boss_manager.is_active:
         logger.info("👹 [JOB] Horário de fim chegou, mas Boss já estava morto.")
         return
 
     logger.info("👹 [JOB] O tempo acabou! Removendo o Boss...")
     
-    # Chama o método correto 'end_event' e pega os resultados
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
-    
-    # Chama a função de distribuição de loot e notificação do engine.py
     await distribute_loot_and_announce(context, battle_results)
 
 # ==============================================================================
-# 🛡️ JOB: KINGDOM DEFENSE (CORRIGIDO)
+# 🛡️ JOB: KINGDOM DEFENSE
 # ==============================================================================
 async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -147,14 +140,13 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
         logger.error("⚠️ [JOB] Event Manager (KD) não encontrado.")
         return
 
-    # Pega duração definida no main.py -> config.py
     job_data = context.job.data or {}
     duration_minutes = job_data.get("event_duration_minutes", 30)
 
     try:
         await event_manager.start_event()
         
-        msg_text = f"⚔️ 𝑰𝑵𝑽𝑨𝑺𝑨̃𝑶 𝑨𝑶 𝑹𝑬𝑰𝑵𝑶!\nO evento começou e durará {duration_minutes} minutos!\nPreparem suas defesas!"
+        msg_text = f"⚔️ <b>INVASÃO AO REINO!</b>\nO evento começou e durará {duration_minutes} minutos!\nPreparem suas defesas!"
 
         # 1. Notifica no CANAL
         try:
@@ -168,11 +160,10 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Erro ao notificar canal KD: {e}")
         
         # 2. Notifica JOGADORES (Broadcast)
-        # Adicionamos este loop para avisar no privado também
         async for user_id, _ in player_manager.iter_players():
             try:
                 await context.bot.send_message(chat_id=user_id, text=msg_text, parse_mode="HTML")
-                await asyncio.sleep(0.05) # Evita flood limits
+                await asyncio.sleep(0.05) 
             except Exception: 
                 continue
 
@@ -202,6 +193,66 @@ async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erro ao finalizar Kingdom Defense: {e}")
 
+# ==============================================================================
+# 🔧 FUNÇÕES ADMINISTRATIVAS (Restauradas)
+# ==============================================================================
+
+async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Distribui tickets de evento (Usado pelo Admin Handler)."""
+    job_data = context.job.data or {} if context.job else {}
+    event_time_str = job_data.get("event_time", "breve")
+    TICKET_ID = "ticket_defesa_reino"
+    delivered = 0
+    
+    all_player_ids = []
+    try: all_player_ids = list(player_manager.iter_player_ids())
+    except Exception: return 0
+
+    for user_id in all_player_ids:
+        try:
+            if players_col is not None:
+                players_col.update_one(
+                    {"_id": user_id},
+                    {"$inc": {f"inventory.{TICKET_ID}": 1}}
+                )
+                delivered += 1
+            else:
+                pdata = await player_manager.get_player_data(user_id)
+                if not pdata: continue
+                player_manager.add_item_to_inventory(pdata, TICKET_ID, 1)
+                await save_player_data(user_id, pdata)
+                delivered += 1
+            
+            try:
+                await context.bot.send_message(chat_id=user_id, text=f"🎟️ Recebeu 1 Ticket para o evento das {event_time_str}!", parse_mode='HTML')
+                await asyncio.sleep(0.05) 
+            except Exception: pass
+        except Exception: pass
+            
+    logger.info(f"[JOB_KD_TICKET] {delivered} tickets entregues.")
+    return delivered
+
+async def daily_event_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Wrapper para distribuição de tickets."""
+    return await distribute_kingdom_defense_ticket_job(context)
+
+async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Força entrega de cristais (Admin)."""
+    granted = 0
+    try:
+        async for user_id, pdata in player_manager.iter_players():
+            try:
+                if not pdata: continue
+                player_manager.add_item_to_inventory(pdata, DAILY_CRYSTAL_ITEM_ID, DAILY_CRYSTAL_BASE_QTY)
+                if "daily_awards" not in pdata: pdata["daily_awards"] = {}
+                pdata["daily_awards"]["last_crystal_date"] = _today_str()
+                await save_player_data(user_id, pdata)
+                granted += 1
+                try: await context.bot.send_message(chat_id=user_id, text=f"🎁 Admin enviou {DAILY_CRYSTAL_BASE_QTY}x Cristais!")
+                except Exception: pass
+            except Exception: pass
+    except Exception: pass
+    return granted
 
 # ==============================================================================
 # ⚔️ JOB: RESET MENSAL PVP
@@ -220,7 +271,6 @@ async def job_pvp_monthly_reset(context: ContextTypes.DEFAULT_TYPE):
     await reset_pvp_season(context)
 
 async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
-    # (Lógica simplificada para caber no arquivo, mantendo a sua original)
     all_players_ranked = []
     try:
         async for user_id, p_data in player_manager.iter_players():
@@ -253,7 +303,7 @@ async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
     except: pass
 
 # ==============================================================================
-# OUTROS JOBS (DAILY, ENERGY, ETC) - Mantidos iguais
+# OUTROS JOBS (DAILY, ENERGY, ETC)
 # ==============================================================================
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
