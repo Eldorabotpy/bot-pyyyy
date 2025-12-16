@@ -5,8 +5,6 @@ import re
 import unicodedata
 import logging
 import asyncio
-from datetime import datetime, timezone
-# --- IMPORTAÇÕES CORRIGIDAS ---
 from typing import Optional
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, CallbackQuery
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -14,27 +12,24 @@ from telegram.error import BadRequest
 
 from modules import player_manager, game_data
 from modules import file_ids as file_id_manager
-from handlers.utils import format_combat_message
+from handlers.utils import format_combat_message_from_cache
 from modules.player.premium import PremiumManager
 from modules import auto_hunt_engine
-from handlers.utils import format_combat_message_from_cache
 from handlers.profile_handler import _get_class_media
+
+# Importa a DB de skills para garantir acesso (se necessário no futuro)
+from modules.game_data.monsters import MONSTER_SKILLS_DB
 
 logger = logging.getLogger(__name__)
 
 # =========================
 # Elites
 # =========================
-DEFAULT_ELITE_CHANCE = getattr(game_data, "ELITE_CHANCE", 0.12)  # 12% base
+DEFAULT_ELITE_CHANCE = getattr(game_data, "ELITE_CHANCE", 0.12)
 ELITE_MULTS = {
-    "hp": 2.0,
-    "attack": 1.4,
-    "defense": 1.3,
-    "initiative_add": 2,
-    "luck_add": 5,
-    "gold": 2.5,
-    "xp": 3.0,
-    "loot_bonus_pct": 10,
+    "hp": 2.0, "attack": 1.4, "defense": 1.3,
+    "initiative_add": 2, "luck_add": 5,
+    "gold": 2.5, "xp": 3.0, "loot_bonus_pct": 10,
 }
 
 # =========================
@@ -42,10 +37,8 @@ ELITE_MULTS = {
 # =========================
 def _slugify(text: str) -> str:
     if not text: return ""
-    norm = unicodedata.normalize("NFKD", text)
-    norm = norm.encode("ascii", "ignore").decode("ascii")
-    norm = re.sub(r"\s+", "_", norm.strip().lower())
-    norm = re.sub(r"[^a-z0-9_]", "", norm)
+    norm = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    norm = re.sub(r"[^a-z0-9_]", "", re.sub(r"\s+", "_", norm.strip().lower()))
     return norm
 
 def _get_region_info(region_key: str) -> dict:
@@ -59,8 +52,7 @@ def _get_monsters_from_region_dict(region_key: str):
 def _get_monsters_from_region_field(region_key: str):
     info = _get_region_info(region_key)
     mons = info.get("monsters")
-    if isinstance(mons, list) and mons:
-        return mons
+    if isinstance(mons, list) and mons: return mons
     return None
 
 def _lookup_monster_by_id(mon_id: str) -> dict | None:
@@ -69,148 +61,186 @@ def _lookup_monster_by_id(mon_id: str) -> dict | None:
     return dict(v) if isinstance(v, dict) else None
 
 def _coerce_monster_entry(entry) -> dict | None:
-    if isinstance(entry, dict):
-        return dict(entry)
-    if isinstance(entry, str):
-        return _lookup_monster_by_id(entry)
+    if isinstance(entry, dict): return dict(entry)
+    if isinstance(entry, str): return _lookup_monster_by_id(entry)
     return None
 
 def _pick_monster_template(region_key: str, player_level: int) -> dict:
-    # 1) MONSTERS_DATA[region_key] (lista de dicts)
+    # Tenta pegar da lista principal
     lst = _get_monsters_from_region_dict(region_key)
     if lst:
         pool = [e for e in lst if isinstance(e, dict)]
-        if pool:
-            return dict(random.choice(pool))
+        if pool: return dict(random.choice(pool))
 
-    # 2) REGIONS_DATA[region]['monsters'] (lista de dicts ou ids)
+    # Tenta pegar da definição da região
     mons = _get_monsters_from_region_field(region_key)
     if mons:
         pool = []
         for e in mons:
             m = _coerce_monster_entry(e)
-            if m:
-                pool.append(m)
-        if pool:
-            return dict(random.choice(pool))
+            if m: pool.append(m)
+        if pool: return dict(random.choice(pool))
 
-    # 3) Fallback genérico escalonado
+    # Fallback Genérico
     base_hp = 20 + player_level * 5
-    base_atk = 3 + player_level // 2
-    base_def = 2 + max(0, player_level // 3)
-    base_ini = 4 + max(0, player_level // 4)
-    base_luk = 3 + max(0, player_level // 6)
-
     return {
-        "id": f"generic_{region_key}", "name": "Criatura da Região",
-        "hp": base_hp, "attack": base_atk, "defense": base_def,
-        "initiative": base_ini, "luck": base_luk,
-        "xp_reward": 8 + player_level * 2, "gold_drop": 4 + player_level * 2,
+        "id": f"generic_{region_key}", "name": "Criatura Sombria",
+        "hp": base_hp, "max_hp": base_hp, # Garante max_hp
+        "attack": 3 + player_level // 2, "defense": 2,
+        "initiative": 4, "luck": 3,
+        "xp_reward": 8 + player_level, "gold_drop": 4 + player_level,
         "loot_table": [],
     }
 
 def _roll_is_elite(luck_stat: int) -> bool:
     bonus = min(0.08, max(0.0, luck_stat / 2000.0)) 
-    p = DEFAULT_ELITE_CHANCE + bonus
-    return random.random() < p
+    return random.random() < (DEFAULT_ELITE_CHANCE + bonus)
 
 def _apply_elite_scaling(mon: dict) -> dict:
     m = dict(mon)
-    name = m.get("name") or m.get("monster_name") or "Inimigo"
+    name = m.get("name") or "Inimigo"
     m["name"] = f"{name} (🅴🅻I🆃🅴) 👑"
-    hp_max = int(m.get("hp") or m.get("max_hp") or m.get("monster_max_hp") or 1)
-    atk = int(m.get("attack") or m.get("monster_attack") or 1)
-    deff = int(m.get("defense") or m.get("monster_defense") or 0)
-    ini = int(m.get("initiative") or m.get("monster_initiative") or 0)
-    luk = int(m.get("luck") or m.get("monster_luck") or 0)
-    gold = int(m.get("gold_drop") or m.get("monster_gold_drop") or 0)
-    xp = int(m.get("xp_reward") or m.get("monster_xp_reward") or 0)
-    hp_max = int(hp_max * ELITE_MULTS["hp"])
-    atk = int(round(atk * ELITE_MULTS["attack"]))
-    deff = int(round(deff * ELITE_MULTS["defense"]))
-    ini = ini + ELITE_MULTS["initiative_add"]
-    luk = luk + ELITE_MULTS["luck_add"]
-    gold = int(round(gold * ELITE_MULTS["gold"]))
-    xp = int(round(xp * ELITE_MULTS["xp"]))
-    m["max_hp"] = hp_max
-    m["hp"] = hp_max
-    m["attack"] = atk
-    m["defense"] = deff
-    m["initiative"] = ini
-    m["luck"] = luk
-    m["gold_drop"] = gold
-    m["xp_reward"] = xp
+    m["_elite"] = True
+    
+    # Aplica multiplicadores de Elite
+    keys_mult = [("max_hp", "hp"), ("attack", "attack"), ("defense", "defense"), 
+                 ("xp_reward", "xp"), ("gold_drop", "gold")]
+    
+    for k_mon, k_mult in keys_mult:
+        base = int(m.get(k_mon, 0))
+        m[k_mon] = int(base * ELITE_MULTS[k_mult])
+    
+    m["hp"] = m["max_hp"] # Cura total
+    m["initiative"] = int(m.get("initiative", 0)) + ELITE_MULTS["initiative_add"]
+    m["luck"] = int(m.get("luck", 0)) + ELITE_MULTS["luck_add"]
+    
+    # Loot extra
     loot = []
     for it in (m.get("loot_table") or []):
-        if not isinstance(it, dict): continue
         it2 = dict(it)
-        try:
-            it2["drop_chance"] = min(100.0, float(it2.get("drop_chance", 0.0)) + ELITE_MULTS["loot_bonus_pct"])
-        except Exception:
-            it2["drop_chance"] = min(100.0, 10.0 + ELITE_MULTS["loot_bonus_pct"])
+        it2["drop_chance"] = min(100.0, float(it2.get("drop_chance", 0.0)) + ELITE_MULTS["loot_bonus_pct"])
         loot.append(it2)
     m["loot_table"] = loot
-    m["_elite"] = True
     return m
 
-def _build_combat_details_from_template(mon: dict) -> dict:
-    name = mon.get("monster_name") or mon.get("name") or "Inimigo"
-    max_hp = int(mon.get("monster_max_hp", mon.get("max_hp", mon.get("hp", 1))))
+# --- NOVA FUNÇÃO: ESCALA HÍBRIDA (CORRIGIDA) ---
+def _scale_monster_stats(mon: dict, player_level: int) -> dict:
+    """Escala o monstro e garante que max_hp esteja setado."""
+    
+    # 1. Normalização Inicial de HP
+    if "max_hp" not in mon and "hp" in mon:
+        mon["max_hp"] = mon["hp"]
+    elif "max_hp" not in mon:
+        mon["max_hp"] = 10 
+
+    # 2. Definição do Nível
+    min_lvl = mon.get("min_level", 1)
+    max_lvl = mon.get("max_level", player_level + 2)
+    target_lvl = max(min_lvl, min(player_level + random.randint(-1, 1), max_lvl))
+    mon["level"] = target_lvl
+
+    # 3. Atualiza Nome 
+    raw_name = mon.get("name", "Inimigo").replace("Lv.", "").strip()
+    raw_name = re.sub(r"^\d+\s+", "", raw_name) 
+    mon["name"] = f"Lv.{target_lvl} {raw_name}"
+
+    if target_lvl <= 1:
+        mon["hp"] = mon["max_hp"]
+        return mon
+
+    # ==========================================================
+    # 📉 AJUSTE DE BALANCEAMENTO (NERF NA XP E OURO)
+    # ==========================================================
+    # Antes estava 15 HP / 12 XP. Agora vamos deixar mais suave:
+    
+    GROWTH_HP = 12       # HP continua subindo bem (era 15)
+    GROWTH_ATK = 2.0     # Dano sobe devagar (era 2.5)
+    GROWTH_DEF = 1.0     # Defesa sobe pouco (era 1.5)
+    
+    GROWTH_XP = 3        # <--- REDUZIDO DRASTICAMENTE (Era 12)
+                         # Agora Lv.10 dá +30 XP extra, não +120
+                         
+    GROWTH_GOLD = 1.5    # <--- REDUZIDO (Era 5)
+                         # Agora Lv.10 dá +15 Gold extra, não +50
+    
+    scaling_bonus = 1 + (target_lvl * 0.02) 
+
+    # 5. Aplica Fórmula
+    base_hp = int(mon.get("max_hp", 10))
+    base_atk = int(mon.get("attack", 2))
+    base_def = int(mon.get("defense", 0))
+    base_xp = int(mon.get("xp_reward", 5))
+    base_gold = int(mon.get("gold_drop", 1))
+
+    mon["max_hp"] = int((base_hp * scaling_bonus) + (target_lvl * GROWTH_HP))
+    mon["hp"] = mon["max_hp"]
+    mon["attack"] = int((base_atk * scaling_bonus) + (target_lvl * GROWTH_ATK))
+    mon["defense"] = int((base_def * scaling_bonus) + (target_lvl * GROWTH_DEF))
+    
+    # XP e Ouro ajustados
+    mon["xp_reward"] = int((base_xp * scaling_bonus) + (target_lvl * GROWTH_XP))
+    mon["gold_drop"] = int((base_gold * scaling_bonus) + (target_lvl * GROWTH_GOLD))
+    
+    return mon
+
+def _build_combat_details_from_template(mon: dict, player_level: int = 1) -> dict:
+    m = mon.copy()
+    
+    # Normaliza chaves legadas antes de escalar
+    if "monster_max_hp" in m: m["max_hp"] = m.pop("monster_max_hp")
+    if "monster_attack" in m: m["attack"] = m.pop("monster_attack")
+    if "monster_defense" in m: m["defense"] = m.pop("monster_defense")
+    if "monster_name" in m: m["name"] = m.pop("monster_name")
+
+    # Aplica a Escala (que agora garante max_hp e nome)
+    m = _scale_monster_stats(m, player_level)
     
     return {
-        "id": mon.get("id"),
-        "name": name,
-        "hp": int(mon.get("monster_hp", mon.get("hp", max_hp))),
-        "max_hp": max_hp,
-        "attack": int(mon.get("monster_attack", mon.get("attack", 1))),
-        "defense": int(mon.get("monster_defense", mon.get("defense", 0))),
-        "initiative": int(mon.get("monster_initiative", mon.get("initiative", 0))),
-        "luck": int(mon.get("monster_luck", mon.get("luck", 0))),
-        "gold_drop": int(mon.get("monster_gold_drop", mon.get("gold_drop", 0))),
-        "xp_reward": int(mon.get("monster_xp_reward", mon.get("xp_reward", 0))),
-        "loot_table": mon.get("loot_table", []),
-        "is_elite": bool(mon.get("_elite", False) or mon.get("is_elite", False)),
-        "is_boss": bool(mon.get("is_boss", False)),
+        "id": m.get("id"),
+        "name": m.get("name"),
+        "level": m.get("level", 1),
+        "hp": int(m.get("hp", 1)),
+        "max_hp": int(m.get("max_hp", 1)), # Agora deve vir correto da escala
+        "attack": int(m.get("attack", 1)),
+        "defense": int(m.get("defense", 0)),
+        "initiative": int(m.get("initiative", 0)),
+        "luck": int(m.get("luck", 0)),
+        "gold_drop": int(m.get("gold_drop", 0)),
+        "xp_reward": int(m.get("xp_reward", 0)),
+        "loot_table": m.get("loot_table", []),
+        "is_elite": bool(m.get("_elite", False) or m.get("is_elite", False)),
+        "is_boss": bool(m.get("is_boss", False)),
+        "skills": m.get("skills", [])
     }
 
-# =========================
-# Mídia do monstro
-# =========================
 def _get_monster_media(mon_tpl: dict, region_key: str, is_elite: bool):
     cands = []
-    raw_name = mon_tpl.get("monster_name") or mon_tpl.get("name") or ""
-    raw_id   = mon_tpl.get("id") or ""
+    # Tenta usar o ID ou nome limpo para achar a mídia
+    raw_name = mon_tpl.get("name", "").replace("Lv.", "").strip().split(" ")[-1] # Pega ultima palavra se tiver Lv.
+    raw_id = mon_tpl.get("id", "")
     
     for k in ("file_id_name", "file_id_key", "media_key"):
-        v = mon_tpl.get(k)
-        if isinstance(v, str) and v.strip():
-            cands.append(v.strip())
+        if v := mon_tpl.get(k): cands.append(v)
 
-    base_slugs = []
-    if slug_name := _slugify(raw_name): base_slugs.append(slug_name)
-    if slug_id := _slugify(raw_id): 
-        if slug_id not in base_slugs:
-            base_slugs.append(slug_id)
-
-    if is_elite:
-        for s in base_slugs:
-            cands.extend([f"mob_{s}_elite", f"{s}_elite_media", f"{s}_elite_video"])
-
-    for s in base_slugs:
-        cands.extend([f"mob_{s}", f"mob_video_{s}", f"{s}_media", f"video_{s}"])
-
-    cands.extend([f"hunt_{region_key}", f"regiao_{region_key}"])
+    slug_id = _slugify(raw_id)
+    if is_elite: cands.append(f"mob_{slug_id}_elite")
+    cands.append(f"mob_{slug_id}")
+    cands.append(f"hunt_{region_key}")
     
     for key in cands:
-        if "abertura" in key.lower(): continue
         fd = file_id_manager.get_file_data(key)
-        if fd and fd.get("id"):
-            return fd 
-            
+        if fd and fd.get("id"): return fd 
     return None
 
+async def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
+    base = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
+    reg_info = _get_region_info(region_key)
+    base = int(reg_info.get("hunt_energy_cost", base))
+    premium = PremiumManager(player_data)
+    return int(premium.get_perk_value("hunt_energy_cost", base))
+
 # =========================
-# FUNÇÃO NÚCLEO (CORRIGIDA)
+# HANDLERS
 # =========================
 async def start_hunt(
     user_id: int, 
@@ -220,103 +250,65 @@ async def start_hunt(
     region_key: str, 
     query: Optional[CallbackQuery] = None
 ):
-    """Função núcleo que inicia uma caçada, criando o BATTLE CACHE."""
-    
     from handlers.combat.main_handler import combat_callback
 
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        if query: await query.answer("Erro: Não foi possível carregar seus dados.", show_alert=True)
+        if query: await query.answer("Erro: Dados não encontrados.", show_alert=True)
         return
 
+    # Custo e Missão
     cost = await _hunt_energy_cost(pdata, region_key)
-    
-    # -------------------------------------------------------------
-    # [CORREÇÃO] Gasto de Energia + Atualização de Missão
-    # -------------------------------------------------------------
     if cost > 0:
         if not player_manager.spend_energy(pdata, cost):
-            if is_auto_mode:
-                await context.bot.send_message(chat_id, "⚡️ Sua energia acabou! Caça automática finalizada.")
-            elif query:
-                await query.answer(f"Energia insuficiente para caçar (precisa de {cost}).", show_alert=True)
+            msg = "⚡️ Sem energia!"
+            if is_auto_mode: await context.bot.send_message(chat_id, msg)
+            elif query: await query.answer(msg, show_alert=True)
             return
         
         await player_manager.save_player_data(user_id, pdata)
-
-        # >>> INÍCIO DA ATUALIZAÇÃO DA MISSÃO <<<
         try:
             from modules import mission_manager 
-            # Atualiza a missão "spend_energy" com a quantidade gasta (cost)
             await mission_manager.update_mission_progress(user_id, "spend_energy", "any", cost)
-        except Exception as e:
-            logger.error(f"[HUNT] Erro ao atualizar missão de energia: {e}")
-        # >>> FIM DA ATUALIZAÇÃO DA MISSÃO <<<
+        except: pass
 
-    # --- Preparação da Batalha ---
-    tpl = _pick_monster_template(region_key, int(pdata.get("level", 1)))
-    total_stats_jogador = await player_manager.get_player_total_stats(pdata)
-    is_elite = _roll_is_elite(int(total_stats_jogador.get("luck", 5)))
+    # --- SETUP DA BATALHA ---
+    player_lvl = int(pdata.get("level", 1))
     
-    if is_elite:
-        tpl = _apply_elite_scaling(tpl)
+    # 1. Escolhe e Escala Monstro
+    tpl = _pick_monster_template(region_key, player_lvl)
+    
+    # Elite Check
+    total_stats = await player_manager.get_player_total_stats(pdata)
+    is_elite = _roll_is_elite(int(total_stats.get("luck", 5)))
+    if is_elite: tpl = _apply_elite_scaling(tpl)
 
-    monster_stats = _build_combat_details_from_template(tpl)
+    # Constrói stats finais
+    monster_stats = _build_combat_details_from_template(tpl, player_level=player_lvl)
     monster_media = _get_monster_media(tpl, region_key, is_elite)
+    player_media = _get_class_media(pdata, purpose="combate")
 
-    player_media_data = _get_class_media(pdata, purpose="combate") # Pega skin/classe
+    # Sincronia HP/MP
+    max_hp = total_stats.get('max_hp', 50)
+    max_mp = total_stats.get('max_mana', 10)
+    cur_hp = min(pdata.get('current_hp', max_hp), max_hp)
+    cur_mp = min(pdata.get('current_mp', max_mp), max_mp)
 
-    # --- Sincronização de HP/MP ---
-    # 1. Pega o HP e MP MÁXIMOS dos stats totais
-    max_hp = total_stats_jogador.get('max_hp', 50)
-    max_mp = total_stats_jogador.get('max_mana', 10)
+    # 2. CACHE DA BATALHA (Aqui adicionamos o Nível do Player ao Nome)
+    char_name = pdata.get('character_name', 'Herói')
     
-    # 2. Pega o HP e MP atuais da base de dados
-    current_hp = pdata.get('current_hp', max_hp)
-    current_mp = pdata.get('current_mp', max_mp)
-    
-    # 3. Garante que o HP e MP atuais não sejam maiores que o máximo
-    current_hp = min(current_hp, max_hp)
-    current_mp = min(current_mp, max_mp)
-
-    # --- Normalização defensiva de XP/Ouro do monstro ---
-    try:
-        def _first_int(d, *keys, default=0):
-            for k in keys:
-                if isinstance(d, dict) and k in d:
-                    try:
-                        return int(float(d.get(k, 0)))
-                    except Exception:
-                        continue
-            return int(default)
-
-        monster_stats['xp_reward'] = _first_int(monster_stats, 'xp_reward', 'xp', 'monster_xp_reward', default=0)
-        monster_stats['gold_drop'] = _first_int(monster_stats, 'gold_drop', 'gold', 'monster_gold_drop', default=0)
-
-        # Propaga nomes alternativos para compatibilidade
-        if 'monster_xp_reward' not in monster_stats:
-            monster_stats['monster_xp_reward'] = monster_stats['xp_reward']
-        if 'monster_gold_drop' not in monster_stats:
-            monster_stats['monster_gold_drop'] = monster_stats['gold_drop']
-
-    except Exception as e:
-        logger.exception(f"[HUNT DEBUG] Falha ao normalizar monster_stats: {e}")
-
-    # 5. CRIA O CACHE DE BATALHA
     battle_cache = {
         'player_id': user_id,
         'chat_id': chat_id,
-        'player_name': pdata.get('character_name', 'Herói'),
-        'player_stats': total_stats_jogador, # Stats totais
+        # CORREÇÃO: Injeta o nível no nome para aparecer na interface
+        'player_name': f"Lv.{player_lvl} {char_name}", 
+        'player_stats': total_stats,
+        'player_hp': cur_hp,
+        'player_mp': cur_mp,
+        'player_media_id': player_media.get('id') if player_media else None,
+        'player_media_type': (player_media.get('type') or 'photo').lower() if player_media else 'photo',
         
-        # --- Usa os valores sincronizados ---
-        'player_hp': current_hp,
-        'player_mp': current_mp, 
-        
-        'player_media_id': player_media_data.get('id') if player_media_data else None,
-        'player_media_type': (player_media_data.get('type') or 'photo').lower() if player_media_data else 'photo',
-        
-        'monster_stats': monster_stats, # Stats totais do monstro
+        'monster_stats': monster_stats,
         'monster_media_id': monster_media.get('id') if monster_media else None,
         'monster_media_type': (monster_media.get('type') or 'photo').lower() if monster_media else 'photo',
         
@@ -325,136 +317,73 @@ async def start_hunt(
         'battle_log': ["Aguardando sua ação..."],
         'turn': 'player', 
         'message_id': None, 
-        'skill_cooldowns': {}, 
     }
 
-    # 6. Atualiza o Estado do Jogador
     pdata["player_state"] = {"action": "in_combat"}
-    pdata["current_hp"] = current_hp
-    pdata["current_mp"] = current_mp
+    pdata["current_hp"] = cur_hp
+    pdata["current_mp"] = cur_mp
     await player_manager.save_player_data(user_id, pdata)
 
-    # 7. Formata a Mensagem Inicial
     caption = await format_combat_message_from_cache(battle_cache) 
-
+    
+    kb = []
     if is_auto_mode:
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("🛑 PARAR AUTO-CAÇA", callback_data='autohunt_stop')]])
+        kb = [[InlineKeyboardButton("🛑 PARAR AUTO-CAÇA", callback_data='autohunt_stop')]]
     else:
-        kb = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data='combat_attack'),
-                InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu'),
-            ],[
-                InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'),
-                InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='combat_flee')
-            ]
-        ])
+        kb = [
+            [InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data='combat_attack'), InlineKeyboardButton("✨ Skills", callback_data='combat_skill_menu')],
+            [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='combat_flee')]
+        ]
 
     if query:
         try: await query.delete_message()
-        except Exception: pass
+        except: pass
 
-    # 8. Envia a Mídia Inicial (Monstro)
-    media_sent = False
-    sent_message = None
+    # Envio da Mídia
+    sent_msg = None
+    mid = battle_cache['monster_media_id']
+    mtype = battle_cache['monster_media_type']
     
-    if battle_cache['monster_media_id']:
+    if mid:
         try:
-            media_type = battle_cache['monster_media_type']
-            media_id = battle_cache['monster_media_id']
-            
-            if media_type == "video":
-                sent_message = await context.bot.send_video(
-                    chat_id=chat_id, video=media_id, caption=caption, 
-                    reply_markup=kb, parse_mode="HTML"
-                )
+            if mtype == "video":
+                sent_msg = await context.bot.send_video(chat_id, video=mid, caption=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             else:
-                sent_message = await context.bot.send_photo(
-                    chat_id=chat_id, photo=media_id, caption=caption, 
-                    reply_markup=kb, parse_mode="HTML"
-                )
-            media_sent = True
-        except Exception as e:
-            logger.warning(f"Falha ao enviar mídia do monstro ({media_id}): {e}. Usando fallback.")
-
-    if not media_sent:
-        sent_message = await context.bot.send_message(
-            chat_id=chat_id, text=caption, 
-            reply_markup=kb, parse_mode="HTML"
-        )
+                sent_msg = await context.bot.send_photo(chat_id, photo=mid, caption=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        except Exception: pass
     
-    # 9. Salva o ID da Mensagem no Cache (CRUCIAL)
-    if sent_message:
-        battle_cache['message_id'] = sent_message.message_id
+    if not sent_msg:
+        sent_msg = await context.bot.send_message(chat_id, text=caption, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     
-    # 10. Salva o cache na memória do bot
-    context.user_data['battle_cache'] = battle_cache
+    if sent_msg:
+        battle_cache['message_id'] = sent_msg.message_id
+        context.user_data['battle_cache'] = battle_cache
 
-    # 11. Inicia o combate automático (se necessário)
     if is_auto_mode:
-        fake_user = type("User", (), {"id": user_id})()
-        fake_query = CallbackQuery(id=f"auto_{user_id}", from_user=fake_user, chat_instance="auto", data="combat_attack")
-        fake_update = Update(update_id=0, callback_query=fake_query)
+        # Fake trigger para auto hunt
+        fake_u = type("User", (), {"id": user_id})()
+        fake_q = CallbackQuery(id=f"auto_{user_id}", from_user=fake_u, chat_instance="auto", data="combat_attack")
+        fake_up = Update(update_id=0, callback_query=fake_q)
         await asyncio.sleep(2)
-        await combat_callback(fake_update, context, action='combat_attack')
-                
-async def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
-    """
-    Custo de energia para caçar, agora com bónus premium a funcionar (assíncrono).
-    """
-    # Síncrono
-    base = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
-    base = int(((getattr(game_data, "REGIONS_DATA", {}) or {}).get(region_key, {}) or {}).get("hunt_energy_cost", base))
-
-    premium = PremiumManager(player_data) # Síncrono
-    perk_val = int( premium.get_perk_value("hunt_energy_cost", base))
-
-    return max(0, perk_val)
+        await combat_callback(fake_up, context, action='combat_attack')
 
 async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler que é chamado pelo botão 'Caçar' manual."""
     query = update.callback_query
+    try: await query.answer()
+    except: pass
     
-    # --- CORREÇÃO AQUI ---
-    try:
-        await query.answer()
-    except BadRequest:
-        # Se a query for muito antiga, ignoramos o erro e continuamos a caça
-        pass
-    # ---------------------
-
-    user_id = query.from_user.id
-    chat_id = query.message.chat.id
     region_key = (query.data or "").replace("hunt_", "", 1)
-    
-    await start_hunt(user_id, chat_id, context, is_auto_mode=False, region_key=region_key, query=query)
-    
+    await start_hunt(query.from_user.id, query.message.chat.id, context, False, region_key, query)
 
 async def start_auto_hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Callback que lê os dados do botão (10, 25, 35) e chama o engine.
-    """
     query = update.callback_query
     await query.answer()
-    
     try:
-        # Callback: "autohunt_start_COUNT_REGION"
         parts = query.data.split('_')
         hunt_count = int(parts[2])
-        # A região pode ter underlines, então junta o resto
         region_key = "_".join(parts[3:]) 
-        
-        if not region_key:
-            raise ValueError("Region key estava vazia.")
-
         await auto_hunt_engine.start_auto_hunt(update, context, hunt_count, region_key)
-        
-    except (IndexError, ValueError, TypeError) as e:
-        logger.error(f"Callback de Auto-Hunt inválido: {query.data} | Erro: {e}")
-        try:
-            await query.edit_message_text("Erro ao processar o seu pedido de caçada rápida.")
-        except:
-            pass
+    except Exception: pass
 
 autohunt_start_handler = CallbackQueryHandler(start_auto_hunt_callback, pattern=r'^autohunt_start_')        
 hunt_handler = CallbackQueryHandler(hunt_callback, pattern=r"^hunt_")

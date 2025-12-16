@@ -1,5 +1,5 @@
 {
-  "is_active": true,
+  "is_active": false,
   "location": "mina_ferro",
   "entities": {
     "boss": {
@@ -42,9 +42,7 @@
       "turn_counter": 24
     }
   },
-  "active_fighters": [
-    6499640658
-  ],
+  "active_fighters": [],
   "waiting_queue": [],
   "player_states": {
     "7262799478": {

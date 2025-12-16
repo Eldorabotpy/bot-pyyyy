@@ -25,6 +25,7 @@ from modules import file_ids as file_id_manager
 
 # ✅ IMPORTAÇÃO CENTRALIZADA (Novo)
 from modules.game_data.skills import SKILL_DATA, get_skill_data_with_rarity
+from modules.game_data.monsters import MONSTER_SKILLS_DB
 
 logger = logging.getLogger(__name__)
 
@@ -181,10 +182,17 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     # AÇÃO: FUGA
     # ============================================
     if action == 'combat_flee':
+        # Salva o HP atual da batalha ANTES de limpar o cache
+        hp_atual_batalha = battle_cache.get('player_hp')
+        
         context.user_data.pop('battle_cache', None)
         player_data = await player_manager.get_player_data(user_id)
+        
+        # CORREÇÃO: Mantém o HP que estava na batalha em vez de setar para 10%
+        if hp_atual_batalha is not None:
+            player_data['current_hp'] = int(hp_atual_batalha)
+            
         player_data['player_state'] = {'action': 'idle'}
-        player_data['current_hp'] = max(1, int(player_stats.get('max_hp', 100) * 0.1))
         
         if "cooldowns" in player_data:
             player_data.pop("cooldowns", None)
@@ -198,7 +206,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
              return
 
         media_fuga = (file_id_manager.get_file_data("media_fuga_sucesso") or {}).get("id")
-        await _send_battle_media(context, chat_id, "🏃 <b>FUGA!</b>\n\nEscapou por pouco.", media_fuga, kb_voltar)
+        await _send_battle_media(context, chat_id, "🏃 <b>FUGA!</b>\n\nEscapou com segurança.", media_fuga, kb_voltar)
         return
 
     # ============================================
@@ -384,23 +392,86 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 await context.bot.send_message(chat_id, "⚠️ Erro na vitória.", reply_markup=kb_voltar)
                 return
 
-        # --- TURNO DO MONSTRO ---
+    # ============================================
+    # TURNO DO MONSTRO (Substitua o bloco existente)
+    # ============================================
         battle_cache['turn'] = 'monster'
         
-        dodge = min((player_stats.get('initiative', 0) * 0.4)/100, 0.75)
-        if random.random() < dodge:
-            log.append("💨 Esquivou!")
-            player_data, msgs_cd = iniciar_turno(player_data)
-            if msgs_cd:
-                for msg in msgs_cd: log.append(msg)
-            await player_manager.save_player_data(user_id, player_data)
+        # 1. Esquiva do Jogador
+        dodge_chance = min((player_stats.get('initiative', 0) * 0.4)/100, 0.75)
+        # Se tiver passiva de esquiva
+        dodge_chance += player_stats.get('dodge_chance_flat', 0)
+        
+        # Monstros "inerráveis" (opcional)
+        cannot_miss = monster_stats.get("cannot_be_dodged", False)
 
+        if not cannot_miss and random.random() < dodge_chance:
+            log.append(f"💨 Você esquivou do ataque de {monster_stats['name']}!")
+            player_data, msgs_cd = iniciar_turno(player_data)
+            if msgs_cd: log.extend(msgs_cd)
+            await player_manager.save_player_data(user_id, player_data)
+        
         else:
-            dmg, _, _ = criticals.roll_damage(monster_stats, player_stats, {})
-            log.append(f"⬅️ Recebeu {dmg} dano.")
-            battle_cache['player_hp'] = int(battle_cache.get('player_hp', 0)) - dmg
+            # === IA DO MONSTRO ===
+            skill_used = None
+            damage_dealt = 0
             
-            # Derrota do Jogador
+            # Pega lista de skills do monstro (ex: ['esmagar', 'mordida_feroz'])
+            mob_skills = monster_stats.get("skills", [])
+            
+            # Tenta escolher uma skill
+            if mob_skills:
+                chosen_id = random.choice(mob_skills)
+                s_data = MONSTER_SKILLS_DB.get(chosen_id)
+                
+                # Rola a chance da skill ativar (ex: 25%)
+                if s_data and random.random() < s_data.get("chance", 0.2):
+                    skill_used = s_data
+
+            # Se ativou Skill
+            if skill_used:
+                # Texto personalizado (Ex: "O Lobo crava as presas...")
+                action_msg = skill_used.get("log", "{mob} ataca violentamente!").format(mob=monster_stats['name'])
+                log.append(f"⚠️ {action_msg}")
+                
+                # Tipo 1: Cura
+                if "heal_pct" in skill_used:
+                    heal_val = int(monster_stats['max_hp'] * skill_used['heal_pct'])
+                    monster_stats['hp'] = min(monster_stats['max_hp'], monster_stats['hp'] + heal_val)
+                    log.append(f"💚 {monster_stats['name']} recuperou {heal_val} HP!")
+                    damage_dealt = 0 # Cura não dá dano
+                
+                # Tipo 2: Dano (Físico ou Mágico)
+                else:
+                    mult = skill_used.get("damage_mult", 1.0)
+                    is_magic = skill_used.get("magic", False)
+                    
+                    raw_dmg = int(monster_stats['attack'] * mult)
+                    
+                    # Defesa apropriada
+                    def_val = player_stats.get('magic_resistance', 0) if is_magic else player_stats.get('defense', 0)
+                    
+                    # Cálculo simples de redução (ajuste se quiser)
+                    final_dmg = max(1, raw_dmg - int(def_val * 0.5))
+                    
+                    damage_dealt = final_dmg
+                    battle_cache['player_hp'] = int(battle_cache.get('player_hp', 0)) - final_dmg
+                    
+                    log.append(f"💥 Recebeu {final_dmg} dano! ({skill_used['name']})")
+
+            # Se NÃO ativou Skill -> Ataque Básico
+            else:
+                dmg, is_crit, _ = criticals.roll_damage(monster_stats, player_stats, {})
+                damage_dealt = dmg
+                
+                crit_txt = " (CRÍTICO!)" if is_crit else ""
+                log.append(f"⬅️ Recebeu {dmg}{crit_txt} dano.")
+                
+                battle_cache['player_hp'] = int(battle_cache.get('player_hp', 0)) - dmg
+
+            # --- FIM DA AÇÃO ---
+
+            # Verifica Derrota do Jogador
             if battle_cache['player_hp'] <= 0:
                 log.append("☠️ <b>Derrota!</b>")
                 
@@ -425,6 +496,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 await _edit_media_or_caption(context, battle_cache, f"☠️ <b>Derrota!</b> -{xp_loss} XP", media_derrota, "photo", kb_voltar)
                 return
 
+            # Prepara próximo turno do jogador
             player_data, msgs_cd = iniciar_turno(player_data)
             if msgs_cd:
                 for msg in msgs_cd: log.append(msg)

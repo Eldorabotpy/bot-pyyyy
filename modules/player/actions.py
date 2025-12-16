@@ -127,7 +127,8 @@ def sanitize_and_cap_energy(player_data: dict):
 def _get_regen_seconds(player_data: dict) -> int:
     """Obtém o tempo de regeneração de energia com base nos perks do jogador."""
     premium = PremiumManager(player_data)
-    return int(premium.get_perk_value('energy_regen_seconds', 300))
+    # Alterado de 300 para 420 para garantir que o padrão seja 7 min (Free)
+    return int(premium.get_perk_value('energy_regen_seconds', 420))
 
 def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
     """

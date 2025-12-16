@@ -181,6 +181,6 @@ event_skins = {
         'description': 'Ele rege a magia como uma sinfonia. A música da noite de natal é sua arma mais poderosa.'
     }
 }
-       
+SKIN_CATALOG.update(event_skins)       
 
     # Adiciona aqui outras skins para as tuas outras classes...

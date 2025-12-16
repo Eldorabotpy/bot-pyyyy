@@ -44,16 +44,17 @@ async def _send_media_menu(query, context, text, keyboard, media_key=None):
         except Exception: pass
 
         if media_type == "video":
-            await context.bot.send_video(chat_id=chat_id, video=media_id, caption=text, reply_markup=reply_markup, parse_mode="Markdown")
+            # handlers/runes_handler.py (Linha ~49)
+            await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode="HTML")
         else:
-            await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode="Markdown")
+            await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode="HTML")
     else:
         if query.message.photo or query.message.video:
             try: await query.delete_message()
             except: pass
-            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
         else:
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ==============================================================================
 # 2. LÓGICA DE BACKEND (CORRIGIDA)

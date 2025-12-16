@@ -7,9 +7,9 @@ PREMIUM_TIERS = {
             "auto_hunt": False,
             "xp_multiplier": 1.0,
             "gold_multiplier": 1.0,
-            "refine_speed_multiplier": 1.0, # Normal
+            "refine_speed_multiplier": 1.0,
             "max_energy_bonus": 0,
-            "energy_regen_seconds": 420, # 7 min
+            "energy_regen_seconds": 420,  # ✅ 7 Minutos (Padrão)
             "travel_time_multiplier": 1.0,
             "gather_speed_multiplier": 1.0,
             "gather_energy_cost": 1,
@@ -19,13 +19,13 @@ PREMIUM_TIERS = {
         "display_name": "Aventureiro Premium",
         "perks": {
             "auto_hunt": True,
-            "xp_multiplier": 1.25,      # 1.25x XP
-            "gold_multiplier": 1.25,    # 1.25x Ouro
-            "refine_speed_multiplier": 1.25, # 25% mais rápido
-            "max_energy_bonus": 5,      # Total 25
-            "energy_regen_seconds": 300, # 5 min
+            "xp_multiplier": 1.25,
+            "gold_multiplier": 1.25,
+            "refine_speed_multiplier": 1.25,
+            "max_energy_bonus": 5,
+            "energy_regen_seconds": 300,  # ✅ 5 Minutos
             "travel_time_multiplier": 0.0,
-            "gather_speed_multiplier": 1.5, # 1.5x Coleta
+            "gather_speed_multiplier": 1.5,
             "gather_energy_cost": 1,
         }
     },
@@ -33,28 +33,28 @@ PREMIUM_TIERS = {
         "display_name": "Aventureiro VIP",
         "perks": {
             "auto_hunt": True,
-            "xp_multiplier": 1.5,       # 1.5x XP
-            "gold_multiplier": 1.5,     # 1.5x Ouro
-            "refine_speed_multiplier": 1.5, # 50% mais rápido
-            "max_energy_bonus": 10,     # Total 30
-            "energy_regen_seconds": 180, # 3 min
+            "xp_multiplier": 1.5,
+            "gold_multiplier": 1.5,
+            "refine_speed_multiplier": 1.5,
+            "max_energy_bonus": 10,
+            "energy_regen_seconds": 180,  # ✅ 3 Minutos
             "travel_time_multiplier": 0.0,
-            "gather_speed_multiplier": 2.0, # 2x Coleta
-            "gather_energy_cost": 0,    # Coleta grátis? (No texto dizia custo 0)
+            "gather_speed_multiplier": 2.0,
+            "gather_energy_cost": 0,
         }
     },
     "lenda": {
         "display_name": "Aventureiro Lenda",
         "perks": {
             "auto_hunt": True,
-            "xp_multiplier": 1.75,      # 1.75x XP
-            "gold_multiplier": 1.5,     # 1.5x Ouro
-            "refine_speed_multiplier": 2.0, # 2x mais rápido (100%)
-            "max_energy_bonus": 15,     # Total 35 (Base 20 + 15)
-            "energy_regen_seconds": 120, # 2 min
+            "xp_multiplier": 1.75,
+            "gold_multiplier": 1.5,
+            "refine_speed_multiplier": 2.0,
+            "max_energy_bonus": 15,
+            "energy_regen_seconds": 120,  # ✅ 2 Minutos
             "travel_time_multiplier": 0.0,
-            "gather_speed_multiplier": 2.5, # 2.5x Coleta
-            "gather_energy_cost": 0,    # Coleta sem gastar energia
+            "gather_speed_multiplier": 2.5,
+            "gather_energy_cost": 0,
         }
     }
 }

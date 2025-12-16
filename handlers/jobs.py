@@ -40,6 +40,16 @@ try:
 except ImportError:
     pass 
 
+try:
+    from kingdom_defense.engine import event_manager
+except ImportError:
+    event_manager = None
+
+try:
+    from modules.world_boss import world_boss_manager
+except ImportError:
+    world_boss_manager = None
+
 from modules.player.actions import _parse_iso as _parse_iso_utc 
 from pvp.pvp_config import MONTHLY_RANKING_REWARDS
 
@@ -79,9 +89,98 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
     return now.date().isoformat()
 
 # ==============================================================================
+# 👹 JOB: WORLD BOSS
+# ==============================================================================
+async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Nasce o World Boss no horário agendado (sh, sm).
+    """
+    if not world_boss_manager:
+        logger.error("⚠️ [JOB] Manager do Boss não encontrado.")
+        return
+
+    if world_boss_manager.is_boss_alive():
+         logger.info("👹 [JOB] Boss já está vivo. Ignorando spawn.")
+         return
+
+    logger.info("👹 [JOB] Invocando World Boss...")
+    await world_boss_manager.spawn_boss(context)
+    
+    # Aviso Global
+    try:
+        await context.bot.send_message(
+            chat_id=ANNOUNCEMENT_CHAT_ID, 
+            message_thread_id=ANNOUNCEMENT_THREAD_ID, 
+            text="👹 <b>WORLD BOSS SURGIU!</b>\nO monstro despertou! Corram para derrotá-lo!", 
+            parse_mode="HTML"
+        )
+    except Exception: pass
+
+async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Remove o World Boss no horário agendado (eh, em) se ele ainda estiver vivo.
+    """
+    if not world_boss_manager: return
+
+    if not world_boss_manager.is_boss_alive():
+        logger.info("👹 [JOB] Horário de fim chegou, mas Boss já estava morto.")
+        return
+
+    logger.info("👹 [JOB] O tempo acabou! Removendo o Boss...")
+    
+    # Lógica de Despawn (Você precisa implementar o despawn_boss no seu manager ou limpar a variável)
+    # Se o manager não tiver despawn, podemos forçar assim:
+    try:
+        if hasattr(world_boss_manager, "despawn_boss"):
+            await world_boss_manager.despawn_boss(context)
+        else:
+            # Fallback se não tiver a função pronta
+            world_boss_manager.current_boss = None 
+            
+        await context.bot.send_message(
+            chat_id=ANNOUNCEMENT_CHAT_ID, 
+            message_thread_id=ANNOUNCEMENT_THREAD_ID, 
+            text="👹 <b>O WORLD BOSS FUGIU!</b>\nO tempo acabou e a criatura retornou às sombras...", 
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao remover boss: {e}")
+
+# ==============================================================================
 # JOBS (AGORA COM ATUALIZAÇÃO ATÔMICA EM TUDO)
 # ==============================================================================
 
+# ==============================================================================
+# ⚔️ JOB: RESET MENSAL PVP
+# ==============================================================================
+async def job_pvp_monthly_reset(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Job agendado para rodar todo dia à meia-noite. 
+    Verifica se é o dia 1º do mês para resetar o PvP.
+    """
+    # 1. Pega a data e hora atual no Fuso Horário do Jogo
+    try:
+        tz = ZoneInfo(JOB_TIMEZONE)
+    except Exception:
+        tz = datetime.timezone.utc
+        
+    now = datetime.datetime.now(tz)
+    
+    # 2. Verifica se hoje é dia 1
+    if now.day != 1:
+        # Se não for dia 1, não faz nada e termina silenciosamente
+        return
+
+    logger.info("⚔️ [JOB PVP] É dia 1º! Executando encerramento da temporada...")
+    
+    # 3. Distribui os prêmios da temporada que acabou
+    # (Essa função já existe no seu arquivo, só estamos chamando ela)
+    await distribute_pvp_rewards(context)
+    
+    # 4. Zera os pontos de todo mundo para a nova temporada
+    # (Essa função também já existe no seu arquivo)
+    await reset_pvp_season(context)
+    
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Regenera energia usando UPDATE ATÔMICO ($inc) e limpa o cache via MANAGER.
