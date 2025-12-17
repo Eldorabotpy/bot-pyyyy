@@ -233,9 +233,17 @@ def _get_monster_media(mon_tpl: dict, region_key: str, is_elite: bool):
     return None
 
 async def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
-    base = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
+    # 1. Define 1 como custo base padrão
+    base = 1 
+    
+    # 2. Tenta ler a configuração global (se houver)
+    base = int(getattr(game_data, "HUNT_ENERGY_COST", base))
+    
+    # 3. Verifica se a região específica tem um custo diferente
     reg_info = _get_region_info(region_key)
     base = int(reg_info.get("hunt_energy_cost", base))
+    
+    # 4. Aplica os bônus/reduções de Premium (Lenda/VIP podem ter custo reduzido)
     premium = PremiumManager(player_data)
     return int(premium.get_perk_value("hunt_energy_cost", base))
 

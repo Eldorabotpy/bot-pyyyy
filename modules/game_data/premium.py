@@ -1,5 +1,9 @@
 # modules/game_data/premium.py
+HUNT_ENERGY_COST = 1
+COLLECTION_TIME_MINUTES = 1
 
+# Probabilidades
+ELITE_CHANCE = 0.12  # 12% de chance base de aparecer Elite
 PREMIUM_TIERS = {
     "free": {
         "display_name": "Aventureiro Comum",
@@ -9,10 +13,11 @@ PREMIUM_TIERS = {
             "gold_multiplier": 1.0,
             "refine_speed_multiplier": 1.0,
             "max_energy_bonus": 0,
-            "energy_regen_seconds": 420,  # ✅ 7 Minutos (Padrão)
+            "energy_regen_seconds": 420,  # 7 Minutos
             "travel_time_multiplier": 1.0,
             "gather_speed_multiplier": 1.0,
             "gather_energy_cost": 1,
+            "hunt_energy_cost": 1,        # ✅ Adicionado para garantir o custo
         }
     },
     "premium": {
@@ -23,10 +28,11 @@ PREMIUM_TIERS = {
             "gold_multiplier": 1.25,
             "refine_speed_multiplier": 1.25,
             "max_energy_bonus": 5,
-            "energy_regen_seconds": 300,  # ✅ 5 Minutos
+            "energy_regen_seconds": 300,  # 5 Minutos
             "travel_time_multiplier": 0.0,
             "gather_speed_multiplier": 1.5,
             "gather_energy_cost": 1,
+            "hunt_energy_cost": 1,        # ✅ Custa 1
         }
     },
     "vip": {
@@ -37,10 +43,11 @@ PREMIUM_TIERS = {
             "gold_multiplier": 1.5,
             "refine_speed_multiplier": 1.5,
             "max_energy_bonus": 10,
-            "energy_regen_seconds": 180,  # ✅ 3 Minutos
+            "energy_regen_seconds": 180,  # 3 Minutos
             "travel_time_multiplier": 0.0,
             "gather_speed_multiplier": 2.0,
-            "gather_energy_cost": 0,
+            "gather_energy_cost": 0,      # Coleta Grátis
+            "hunt_energy_cost": 1,        # Caça custa 1
         }
     },
     "lenda": {
@@ -51,14 +58,14 @@ PREMIUM_TIERS = {
             "gold_multiplier": 1.5,
             "refine_speed_multiplier": 2.0,
             "max_energy_bonus": 15,
-            "energy_regen_seconds": 120,  # ✅ 2 Minutos
+            "energy_regen_seconds": 120,  # 2 Minutos
             "travel_time_multiplier": 0.0,
             "gather_speed_multiplier": 2.5,
-            "gather_energy_cost": 0,
+            "gather_energy_cost": 0,      # Coleta Grátis
+            "hunt_energy_cost": 1,        # ✅ CAÇA GRÁTIS (Exclusivo Lenda)
         }
     }
 }
-
 # =================================================================
 # PLANOS E PREÇOS (AJUSTADOS PARA A ECONOMIA DO JOGO)
 # =================================================================
