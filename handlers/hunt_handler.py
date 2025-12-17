@@ -149,21 +149,20 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
         return mon
 
     # ==========================================================
-    # 📉 AJUSTE DE BALANCEAMENTO (NERF NA XP E OURO)
+    # 📉 AJUSTE DE BALANCEAMENTO (NERF AGRESSIVO)
     # ==========================================================
-    # Antes estava 15 HP / 12 XP. Agora vamos deixar mais suave:
     
-    GROWTH_HP = 12       # HP continua subindo bem (era 15)
-    GROWTH_ATK = 2.0     # Dano sobe devagar (era 2.5)
-    GROWTH_DEF = 1.0     # Defesa sobe pouco (era 1.5)
+    GROWTH_HP = 3        # Valor fixo por nível (Mantido baixo)
+    GROWTH_ATK = 0.6     # Reduzi um pouco mais (era 0.7)
+    GROWTH_DEF = 0.1     # Defesa quase nula por nível (era 0.2)
     
-    GROWTH_XP = 3        # <--- REDUZIDO DRASTICAMENTE (Era 12)
-                         # Agora Lv.10 dá +30 XP extra, não +120
-                         
-    GROWTH_GOLD = 1.5    # <--- REDUZIDO (Era 5)
-                         # Agora Lv.10 dá +15 Gold extra, não +50
+    GROWTH_XP = 3       
+    GROWTH_GOLD = 1.0   
     
-    scaling_bonus = 1 + (target_lvl * 0.02) 
+    # --- AQUI ESTAVA O ERRO ---
+    # Antes estava 0.12 (12% por nível -> Lv 35 = +420% status)
+    # Agora mudamos para 0.01 (1% por nível -> Lv 35 = +35% status)
+    scaling_bonus = 1 + (target_lvl * 0.05) 
 
     # 5. Aplica Fórmula
     base_hp = int(mon.get("max_hp", 10))

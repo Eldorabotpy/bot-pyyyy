@@ -1,4 +1,5 @@
-# Em modules/player/actions.py
+# modules/player/actions.py
+
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import time
@@ -45,7 +46,7 @@ def _parse_iso(dt_str: str) -> Optional[datetime]:
 
 def _ival(x, default=0):
     try:
-        return int(x)
+        return int(float(x)) # Suporta floats que viram ints (ex: 35.0 -> 35)
     except Exception:
         return int(default)
 
@@ -53,10 +54,6 @@ def _ival(x, default=0):
 # Funções de recompensa de coleta (obsoleta/segura)
 # -------------------------
 def _calculate_gathering_rewards(player_data: dict, details: dict) -> tuple[int, list[tuple[str, int]], str]:
-    """
-    Função mantida apenas para compatibilidade de import.
-    NÃO deve ser usada — a lógica real de coleta deve estar em job_handler.finish_collection_job.
-    """
     try:
         user_id_log = player_data.get('user_id', '???')
         logger.warning(f"Função obsoleta _calculate_gathering_rewards foi chamada para user_id {user_id_log}")
@@ -101,9 +98,20 @@ def get_player_max_energy(player_data: dict) -> int:
 
 def spend_energy(player_data: dict, amount: int = 1) -> bool:
     amount = max(0, int(amount))
+    if amount == 0: return True
+    
+    max_e = get_player_max_energy(player_data)
     cur = _ival(player_data.get('energy', 0))
+    
     if cur < amount:
         return False
+        
+    # CORREÇÃO CRÍTICA: Se a energia estava cheia (ou mais), e agora vai baixar,
+    # precisamos resetar o relógio para AGORA. Caso contrário, o sistema vai achar
+    # que passamos horas com a energia cheia e vai regenerar tudo instantaneamente.
+    if cur >= max_e:
+        player_data['energy_last_ts'] = utcnow().isoformat()
+        
     player_data['energy'] = cur - amount
     return True
 
@@ -117,25 +125,36 @@ def add_energy(player_data: dict, amount: int = 1) -> dict:
 def sanitize_and_cap_energy(player_data: dict):
     """Garante que a energia está dentro dos limites e o timestamp existe."""
     max_e = get_player_max_energy(player_data)
-    player_data["energy"] = max(0, min(_ival(player_data.get("energy"), max_e), max_e))
+    
+    # Obtém valor atual com segurança. Se não existir, assume max_e (novo player ou bug), 
+    # mas se existir e for bugado, tenta converter.
+    current_raw = player_data.get("energy")
+    
+    if current_raw is None:
+        current_val = max_e
+    else:
+        # Se falhar a conversão, usa 0 como fallback seguro para não dar energia infinita
+        current_val = _ival(current_raw, 0) 
+        
+    player_data["energy"] = max(0, min(current_val, max_e))
+    
     if not player_data.get('energy_last_ts'):
         anchor = _parse_iso(player_data.get('last_energy_ts')) or utcnow()
         player_data['energy_last_ts'] = anchor.isoformat()
+        
     if player_data.get('last_energy_ts'):
         player_data.pop('last_energy_ts', None)
 
 def _get_regen_seconds(player_data: dict) -> int:
     """Obtém o tempo de regeneração de energia com base nos perks do jogador."""
     premium = PremiumManager(player_data)
-    # Alterado de 300 para 420 para garantir que o padrão seja 7 min (Free)
-    return int(premium.get_perk_value('energy_regen_seconds', 420))
-
-# Em modules/player/actions.py
+    # Padrão: 7 minutos (420s)
+    val = int(premium.get_perk_value('energy_regen_seconds', 420))
+    return max(1, val) # Garante que nunca seja 0 ou negativo
 
 def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
     """
     Aplica regeneração de energia com base em tempo decorrido.
-    Versão Corrigida: Reseta timestamps inválidos (futuro) e força atualização.
     """
     changed = False
     max_e = get_player_max_energy(player_data)
@@ -145,35 +164,22 @@ def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
     now = utcnow()
     last_ts = _parse_iso(last_raw)
 
-    # --- CORREÇÃO DE SEGURANÇA ---
-    # Se não tiver data, ou se a data for no FUTURO (bug de relógio), reseta para AGORA.
+    # 1. Reset de segurança para timestamps inválidos
     if last_ts is None or last_ts > now:
-        logger.warning(f"Resetando timestamp de energia inválido/futuro para user {player_data.get('user_id')}.")
         player_data['energy_last_ts'] = now.isoformat()
-        return True # Força salvamento para corrigir o bug
-    # -----------------------------
+        return True 
 
     regen_s = _get_regen_seconds(player_data)
     
-    # Se energia já está cheia, apenas atualiza o relógio para agora
+    # 2. Se já está cheio, mantém cheio e atualiza o relógio
     if cur >= max_e:
-        if cur > max_e: # Se estiver acima do máximo (ex: poção), não reduz, só mantém
-            pass 
         player_data['energy_last_ts'] = now.isoformat()
         return last_raw != player_data['energy_last_ts']
-
-    if regen_s <= 0:
-        # Se regeneração for instantânea (bug ou config errada), enche tudo
-        if cur < max_e:
-            player_data['energy'] = max_e
-            changed = True
-        player_data['energy_last_ts'] = now.isoformat()
-        return changed
 
     elapsed = (now - last_ts).total_seconds()
     
     if elapsed < regen_s:
-        return False # Ainda não passou tempo suficiente para 1 ponto
+        return False # Ainda não deu tempo de regenerar 1 ponto
 
     gained = int(elapsed // regen_s)
     
@@ -183,19 +189,23 @@ def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
             player_data['energy'] = new_energy
             changed = True
         
-        # Avança o relógio apenas o necessário (preserva os segundos "sobrando" para o próximo ponto)
-        remainder_seconds = elapsed % regen_s
-        new_anchor = now - timedelta(seconds=remainder_seconds)
-        player_data['energy_last_ts'] = new_anchor.isoformat()
+        # Avança o relógio apenas o necessário (preserva os segundos sobrando)
+        # Se encheu tudo, reseta para agora
+        if new_energy >= max_e:
+            player_data['energy_last_ts'] = now.isoformat()
+        else:
+            remainder_seconds = elapsed % regen_s
+            new_anchor = now - timedelta(seconds=remainder_seconds)
+            player_data['energy_last_ts'] = new_anchor.isoformat()
+        
         changed = True
         
     return changed
+
 # -------------------------
 # Funções de COLETA (NOVAS)
 # -------------------------
 def _collect_duration_seconds(player_data: dict) -> int:
-    """Calcula o tempo de coleta baseado em perks e configurações."""
-    # Tempo base (padrão 1 minuto se não configurado)
     base_minutes = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1))
     base_seconds = base_minutes * 60
     
@@ -204,28 +214,24 @@ def _collect_duration_seconds(player_data: dict) -> int:
         speed_mult = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
     except:
         speed_mult = 1.0
-        
-    # Garante que o multiplicador seja positivo e não quebre a divisão
-    speed_mult = max(0.1, speed_mult)
     
-    # Quanto maior o multiplicador, menor o tempo
+    speed_mult = max(0.1, speed_mult)
     return max(1, int(base_seconds / speed_mult))
 
 def _gather_cost(player_data: dict) -> int:
-    """Calcula o custo de energia da coleta."""
     try:
         premium = PremiumManager(player_data)
         return int(premium.get_perk_value("gather_energy_cost", 1))
     except:
-        return 1 # Custo padrão
+        return 1
 
 def _gather_xp_mult(player_data: dict) -> float:
-    """Calcula o multiplicador de XP de coleta."""
     try:
         premium = PremiumManager(player_data)
         return float(premium.get_perk_value("gather_xp_multiplier", 1.0))
     except:
         return 1.0
+
 # -------------------------
 # Ações temporizadas & Estado
 # -------------------------
@@ -250,10 +256,6 @@ def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | N
     return pdata
 
 async def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
-    """
-    Verifica e finaliza ações "presas" (TRAVEL, EXPLORING, CRAFTING, WORKING, AUTO_HUNTING).
-    Retorna (True, mensagem) se finalizou/destravou algo.
-    """
     player_data = await get_player_data(user_id)
     if not player_data:
         return False, None
@@ -383,7 +385,6 @@ async def check_stale_actions_on_startup(application: Application):
     logger.info("[Watchdog] Iniciando verificação de ações presas (viagem, caça, etc.)...")
     now = utcnow()
 
-    # Adicionado 'auto_hunting' para que possamos limpá-lo se estiver preso sem finish_time
     actions_to_check = (
         "auto_hunting", "travel", "collecting",
         "crafting", "working", "refining", "dismantling"
@@ -402,7 +403,7 @@ async def check_stale_actions_on_startup(application: Application):
 
         for pdata in player_docs_cursor:
             user_id = pdata.get("_id")
-            chat_id = pdata.get("last_chat_id", user_id) # Garante que chat_id tenha fallback
+            chat_id = pdata.get("last_chat_id", user_id) 
             state = pdata.get("player_state", {})
             action = state.get("action")
 
@@ -412,15 +413,12 @@ async def check_stale_actions_on_startup(application: Application):
             finish_time_iso = state.get("finish_time")
             hora_de_termino = _parse_iso(finish_time_iso) if finish_time_iso else None
 
-            # --- LÓGICA DE LIMPEZA DO AUTO-HUNT QUEBRADO ---
             if action == "auto_hunting" and not hora_de_termino:
-                # Se for auto_hunting mas não tem finish_time (caça infinita perdida), limpa imediatamente
                 pdata["player_state"] = {"action": "idle"}
                 await save_player_data(user_id, pdata)
                 count_finalizados_imediatos += 1
                 logger.warning(f"[Watchdog] Auto-hunt infinito de {user_id} limpo por não ter finish_time.")
-                continue # Pula para o próximo jogador
-            # --- FIM DA LÓGICA DE LIMPEZA ---
+                continue 
             
             if not hora_de_termino:
                 continue
@@ -436,7 +434,6 @@ async def check_stale_actions_on_startup(application: Application):
                     count_reagendados += 1
 
                 if action == "auto_hunting":
-                    # Este bloco lida com caçadas auto_hunting TEMPORIZADAS (e.g., autohunt_start_10)
                     job_data = {
                         "user_id": user_id, "chat_id": chat_id,
                         "message_id": state.get("message_id"),
@@ -461,7 +458,6 @@ async def check_stale_actions_on_startup(application: Application):
                 elif action == "collecting":
                     job_data = {
                         'resource_id': details.get("resource_id"),
-                        # CORREÇÃO AQUI: Garante que o item_id_yielded seja repassado para o job
                         'item_id_yielded': details.get("item_id_yielded"), 
                         'energy_cost': details.get("energy_cost", 1),
                         'speed_mult': details.get("speed_mult", 1.0)
