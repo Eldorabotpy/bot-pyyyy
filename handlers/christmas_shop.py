@@ -55,37 +55,37 @@ TROCAS_NOEL = {
     # --- 🟡 TROCAS POR PRESENTE DOURADO (Skins de Natal - Uma por Classe) ---
     # Skins Físicas
     "sombra_de_krampus": {
-        "nome": "Skin: Sombra de Krampus",
+        "nome": "Skin:Assassino Sombra de Krampus",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "sombra_de_krampus", 
         "tipo": "skin"
     },
     "santo_da_nevasca": {
-        "nome": "Skin: Santo da Nevasca",
+        "nome": "Skin:Mago Santo da Nevasca",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "santo_da_nevasca", 
         "tipo": "skin"
     },
-    "espirito_da_rena_dourada": {
-        "nome": "Skin: Espírito da Rena Dourada",
+    "discipulo_de_nicolau": {
+        "nome": "Skin:Monge Discípulo de Nicolau",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "espirito_da_rena_dourada", 
         "tipo": "skin"
     },
     "oni_de_natal": {
-        "nome": "Skin: Oni de Natal",
+        "nome": "Skin:Samurai Oni de Natal",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "oni_de_natal", 
         "tipo": "skin"
     },
     "lamina_da_estrela_guia": {
-        "nome": "Skin: Lâmina da Estrela Guia",
+        "nome": "Skin: Guerreiro Lâmina da Estrela Guia",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "lamina_da_estrela_guia", 
         "tipo": "skin"
     },
     "patrulheiro_do_polo_norte": {
-        "nome": "Skin: Patrulheiro do Polo Norte",
+        "nome": "Skin:Caçad Patrulheiro do Polo Norte",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "patrulheiro_do_polo_norte", 
         "tipo": "skin"
@@ -93,13 +93,13 @@ TROCAS_NOEL = {
 
     # Skins Mágicas
     "esmagador_de_chamines": {
-        "nome": "Skin: Esmagador de Chaminés",
+        "nome": "Skin:Beserker Esmagador de Chaminés",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "esmagador_de_chamines", 
         "tipo": "skin"
     },
     "maestro_da_noite_feliz": {
-        "nome": "Skin: Maestro da Noite Feliz",
+        "nome": "Skin:Bardo Maestro da Noite Feliz",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "maestro_da_noite_feliz", 
         "tipo": "skin"

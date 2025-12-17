@@ -144,8 +144,8 @@ event_skins = {
         'media_key': 'classe_mago_santo_da_nevasca_media',
         'description': 'Inspirado na mitologia russa, este mago do inverno comanda nevascas com um simples gesto.'
     },
-    'espirito_da_rena_dourada': {
-        'display_name': 'Espírito da Rena Dourada',
+    'discipulo_de_nicolau': {
+        'display_name': 'Discípulo de Nicolau',
         'class': 'monge',
         'media_key': 'classe_monge_espirito_da_rena_dourada_media',
         'description': 'Seus punhos carregam a luz guia do natal. Uma aura dourada de rena protege este lutador sagrado.'
