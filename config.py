@@ -25,8 +25,6 @@ except (ValueError, TypeError):
 # --- CONFIGURAÇÕES DO JOGO ---
 JOB_TIMEZONE = os.getenv("JOB_TIMEZONE", "America/Sao_Paulo")
 
-# --- 👇 MUDANÇA PRINCIPAL AQUI 👇 ---
-
 # Horários de início e fim dos 4 eventos (Defesa do Reino)
 # Formato: (hora_inicio, min_inicio, hora_fim, min_fim)
 EVENT_TIMES = [
@@ -48,3 +46,10 @@ WORLD_BOSS_TIMES = [
 # Cole o ID da imagem que você pegou com o bot dentro das aspas.
 # Se não quiser imagem, deixe como None (sem aspas).
 STARTUP_IMAGE_ID = "AgACAgEAAxkBAAECOz5pL533_VndqEmAavHC3Rw2BYcu1QAChwtrGxz-eUV_qi1GsCu9cAEAAwIAA3kAAzYE"
+
+# --- CONFIGURAÇÃO DE GRUPOS E CANAIS (ADICIONADO) ---
+# ID do seu grupo de avisos
+ANNOUNCEMENT_CHAT_ID = -1002881364171 
+
+# ID do tópico (se usar tópicos). Se for grupo normal, use None.
+ANNOUNCEMENT_THREAD_ID = 24

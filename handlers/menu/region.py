@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data
 from modules import file_ids as file_id_manager
 from modules.player.premium import PremiumManager
+from modules.player import actions as player_actions
 from modules.game_data import monsters as monsters_data
 from modules.game_data.worldmap import WORLD_MAP
 from modules.dungeons.registry import get_dungeon_for_region
@@ -221,7 +222,7 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     if player_data is None:
         player_data = await player_manager.get_player_data(user_id) or {}
-    
+    player_actions._apply_energy_autoregen_inplace(player_data)
     final_region_key = region_key or player_data.get("current_location", "reino_eldora")
     player_data['current_location'] = final_region_key
     
@@ -355,40 +356,69 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     uid, cid = q.from_user.id, q.message.chat_id
+    
+    # Finaliza viagens anteriores pendentes se o tempo já passou
     await _auto_finalize_travel_if_due(context, uid)
 
     dest = q.data.replace("region_", "", 1)
     if dest not in (game_data.REGIONS_DATA or {}):
-        await q.answer("Região inválida.", show_alert=True); return
+        await q.answer("Região inválida.", show_alert=True)
+        return
 
     pdata = await player_manager.get_player_data(uid)
+    if not pdata:
+        return
+
     cur = pdata.get("current_location", "reino_eldora")
     
-    vip = PremiumManager(pdata).is_premium()
-    # Verifica vizinho (import local para evitar ciclo se WORLD_MAP tiver deps, mas aqui é safe)
+    # Verifica VIP e Vizinhança
+    vip = False
+    try:
+        vip = PremiumManager(pdata).is_premium()
+    except Exception:
+        pass
+
     is_neighbor = dest in WORLD_MAP.get(cur, []) or cur == dest
     if not vip and not is_neighbor:
-        await q.answer("Muito longe para viajar a pé.", show_alert=True); return
+        await q.answer("Muito longe para viajar a pé.", show_alert=True)
+        return
 
+    # Calcula custo de viagem
     cost = int(((game_data.REGIONS_DATA or {}).get(dest, {}) or {}).get("travel_cost", 0))
-    if cost > 0 and int(pdata.get("energy", 0)) < cost:
-        await q.answer("Energia insuficiente.", show_alert=True); return
+    
+    # Verifica se tem energia suficiente
+    # Nota: get_player_data já deve ter atualizado o regen, mas verificamos o valor atual
+    current_energy = int(pdata.get("energy", 0))
+    if cost > 0 and current_energy < cost:
+        await q.answer(f"Energia insuficiente. Precisa de {cost}⚡.", show_alert=True)
+        return
 
-    # Inicia Viagem
-    if cost > 0: pdata["energy"] = int(pdata.get("energy", 0)) - cost
+    # --- CORREÇÃO: Consome energia de forma segura ---
+    if cost > 0:
+        player_manager.spend_energy(pdata, cost)
+    # ------------------------------------------------
+
     secs = _get_travel_time_seconds(pdata, dest)
 
-    if secs <= 0: # Instantâneo
+    # Viagem Instantânea (0 segundos)
+    if secs <= 0:
         pdata["current_location"] = dest
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(uid, pdata)
+        
         try: await q.delete_message()
         except: pass
+        
         await send_region_menu(context, uid, cid)
         return
 
+    # Viagem com Tempo
     finish = datetime.now(timezone.utc) + timedelta(seconds=secs)
-    pdata["player_state"] = {"action": "travel", "finish_time": finish.isoformat(), "details": {"destination": dest}}
+    pdata["player_state"] = {
+        "action": "travel", 
+        "finish_time": finish.isoformat(), 
+        "details": {"destination": dest}
+    }
     await player_manager.save_player_data(uid, pdata)
 
     try: await q.delete_message()
@@ -400,7 +430,7 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await context.bot.send_message(chat_id=cid, text=txt, parse_mode="HTML")
     context.job_queue.run_once(finish_travel_job, when=secs, user_id=uid, chat_id=cid, data={"dest": dest}, name=f"finish_travel_{uid}")
-
+    
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     uid, cid, dest = job.user_id, job.chat_id, (job.data or {}).get("dest")
