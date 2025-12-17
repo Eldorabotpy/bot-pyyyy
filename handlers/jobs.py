@@ -23,15 +23,13 @@ from modules.player_manager import (
 # Importa IDs do Grupo e da Aba de Avisos
 from config import EVENT_TIMES, JOB_TIMEZONE, ANNOUNCEMENT_CHAT_ID, ANNOUNCEMENT_THREAD_ID
 
-# Importações dos Engines
-try:
-    from modules.world_boss.engine import (
-        world_boss_manager, 
-        broadcast_boss_announcement, 
-        distribute_loot_and_announce
-    )
-except ImportError:
-    world_boss_manager = None
+# --- IMPORTAÇÃO DOS ENGINES (SEM TRY/EXCEPT PARA MOSTRAR ERROS REAIS) ---
+# Se der erro aqui, queremos que o bot avise no console, e não que esconda!
+from modules.world_boss.engine import (
+    world_boss_manager, 
+    broadcast_boss_announcement, 
+    distribute_loot_and_announce
+)
 
 try:
     from kingdom_defense.engine import event_manager
@@ -78,26 +76,27 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
 # ==============================================================================
 async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """
-    Nasce o World Boss e notifica:
-    1. Grupo na Aba de Avisos (Com local formatado).
-    2. Jogadores no Privado (Broadcast).
+    Nasce o World Boss e notifica.
     """
-    if not world_boss_manager:
-        logger.error("⚠️ [JOB] Manager do Boss não encontrado/importado.")
+    # Verificação de segurança: Se o manager for None (erro de import), avisa.
+    if world_boss_manager is None:
+        logger.error("⚠️ [JOB] CRÍTICO: world_boss_manager é None! Verifique imports em modules/world_boss/engine.py")
         return
 
+    # CORREÇÃO DO ESTADO FANTASMA:
+    # Se o arquivo diz que está ativo, mas não tem ninguém na lista de lutadores há muito tempo,
+    # pode ser um estado travado. Mas por segurança, apenas logamos.
     if world_boss_manager.is_active:
-         logger.info("👹 [JOB] Boss já está vivo. Ignorando spawn.")
+         logger.info("👹 [JOB] O Scheduler tentou iniciar o Boss, mas o sistema diz que já está vivo. Ignorando.")
          return
 
-    logger.info("👹 [JOB] Invocando World Boss...")
+    logger.info("👹 [JOB] Iniciando sequência de spawn do World Boss...")
     
     # Inicia e recebe o local (ex: "floresta_sombria")
     result = world_boss_manager.start_event()
     
     if result.get("success"):
         location_key = result.get('location', 'desconhecido')
-        # Formata o texto para ficar bonito no grupo (ex: "Floresta Sombria")
         location_display = location_key.replace("_", " ").title()
         
         # 1. Notifica no Canal/Grupo (Aba de Avisos)
@@ -111,7 +110,7 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
                 
                 await context.bot.send_message(
                     chat_id=ANNOUNCEMENT_CHAT_ID, 
-                    message_thread_id=ANNOUNCEMENT_THREAD_ID, # ✅ Envia para a Aba correta
+                    message_thread_id=ANNOUNCEMENT_THREAD_ID, 
                     text=msg_text, 
                     parse_mode="HTML"
                 )
@@ -119,7 +118,6 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"❌ ERRO NOTIFICAR GRUPO (BOSS): {e}")
         
         # 2. Broadcast (DM para os players)
-        # Passamos a chave original, o engine.py cuida de buscar o nome oficial do game_data
         try:
             await broadcast_boss_announcement(context.application, location_key)
         except Exception as e:
@@ -160,19 +158,19 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
             f"Preparem suas defesas!"
         )
 
-        # 1. Notifica no Grupo (Aba de Avisos)
+        # 1. Notifica no Grupo
         if ANNOUNCEMENT_CHAT_ID:
             try:
                 await context.bot.send_message(
                     chat_id=ANNOUNCEMENT_CHAT_ID, 
-                    message_thread_id=ANNOUNCEMENT_THREAD_ID, # ✅ Aba correta
+                    message_thread_id=ANNOUNCEMENT_THREAD_ID,
                     text=msg_text, 
                     parse_mode="HTML"
                 )
             except Exception as e:
                 logger.error(f"❌ ERRO NOTIFICAR GRUPO (KD): {e}")
         
-        # 2. Notifica JOGADORES (Broadcast DM)
+        # 2. Notifica JOGADORES
         async for user_id, _ in player_manager.iter_players():
             try:
                 await context.bot.send_message(chat_id=user_id, text=msg_text, parse_mode="HTML")
@@ -209,42 +207,47 @@ async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Erro ao finalizar Kingdom Defense: {e}")
 
 # ==============================================================================
-# 🔧 FUNÇÕES ADMINISTRATIVAS
+# 🔧 FUNÇÕES ADMINISTRATIVAS (Tickets e Recompensas)
 # ==============================================================================
 
-async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE):
+    """Distribui 1 ticket de defesa para todos os jogadores."""
     job_data = context.job.data or {} if context.job else {}
-    event_time_str = job_data.get("event_time", "breve")
+    event_time_str = job_data.get("event_time", "agora")
     TICKET_ID = "ticket_defesa_reino"
     delivered = 0
     
-    all_player_ids = []
-    try: all_player_ids = list(player_manager.iter_player_ids())
-    except Exception: return 0
+    logger.info(f"[JOB] Distribuindo tickets para evento das {event_time_str}...")
 
-    for user_id in all_player_ids:
-        try:
-            if players_col is not None:
-                players_col.update_one(
-                    {"_id": user_id},
-                    {"$inc": {f"inventory.{TICKET_ID}": 1}}
-                )
-                delivered += 1
-            else:
-                pdata = await player_manager.get_player_data(user_id)
-                if not pdata: continue
-                player_manager.add_item_to_inventory(pdata, TICKET_ID, 1)
-                await save_player_data(user_id, pdata)
-                delivered += 1
-            
+    try:
+        async for user_id, pdata in player_manager.iter_players():
             try:
-                await context.bot.send_message(chat_id=user_id, text=f"🎟️ Recebeu 1 Ticket para o evento das {event_time_str}!", parse_mode='HTML')
-                await asyncio.sleep(0.05) 
+                # Se usar MongoDB direto
+                if players_col is not None:
+                    players_col.update_one(
+                        {"_id": user_id},
+                        {"$inc": {f"inventory.{TICKET_ID}": 1}}
+                    )
+                    delivered += 1
+                else:
+                    # Fallback JSON/Memória
+                    if not pdata: continue
+                    player_manager.add_item_to_inventory(pdata, TICKET_ID, 1)
+                    await save_player_data(user_id, pdata)
+                    delivered += 1
+                
+                # Notificação Opcional (comente se for muito spam)
+                # try:
+                #    await context.bot.send_message(chat_id=user_id, text=f"🎟️ Recebeu 1 Ticket para o evento!", parse_mode='HTML')
+                # except Exception: pass
+                
             except Exception: pass
-        except Exception: pass
-    return delivered
+    except Exception as e:
+        logger.error(f"Erro distribuindo tickets: {e}")
+        
+    logger.info(f"[JOB] Tickets distribuídos: {delivered}")
 
-async def daily_event_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+async def daily_event_ticket_job(context: ContextTypes.DEFAULT_TYPE):
     return await distribute_kingdom_defense_ticket_job(context)
 
 async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:

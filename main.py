@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO CORRIGIDA: SEM PORTAL DIMENSIONAL)
+# (VERSÃO CORRIGIDA: COM ENTREGA DE TICKETS)
 
 from __future__ import annotations
 import asyncio
@@ -34,7 +34,6 @@ from config import (
 from registries import register_all_handlers
 
 # --- IMPORTAÇÃO DOS JOBS ---
-# (Removido o portal daqui para não dar erro)
 from handlers.jobs import (
     regenerate_energy_job,
     daily_crystal_grant_job,
@@ -42,10 +41,10 @@ from handlers.jobs import (
     start_kingdom_defense_event,
     end_kingdom_defense_event,
     daily_arena_ticket_job,
-    # Adicione estas duas que criamos agora:
     start_world_boss_job,
     end_world_boss_job,
-    job_pvp_monthly_reset
+    job_pvp_monthly_reset,
+    distribute_kingdom_defense_ticket_job # <--- ADICIONADO AQUI
 )
 
 # Configuração de Logs
@@ -116,11 +115,9 @@ async def post_init_tasks(application: Application):
     # --- A. Reset Diário ---
     jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
     
-    # --- B. Defesa do Reino ---
+    # --- B. Defesa do Reino (Evento + Tickets) ---
     if EVENT_TIMES:
-        from handlers.jobs import start_kingdom_defense_event
-        
-        # Config: [(9, 10, 9, 40), ...]
+        # Loop para configurar cada horário de evento
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
             try:
                 start_min = sh * 60 + sm
@@ -128,19 +125,29 @@ async def post_init_tasks(application: Application):
                 duration = end_min - start_min
                 if duration < 0: duration += 1440 
 
+                # 1. Agendar o INÍCIO do evento
                 jq.run_daily(
                     start_kingdom_defense_event, 
                     time=dt_time(hour=sh, minute=sm, tzinfo=tz), 
                     name=f"kingdom_defense_{i}",
                     data={"event_duration_minutes": duration}
                 )
-                logging.info(f"🛡️ Defesa agendada: {sh:02d}:{sm:02d} ({duration} min)")
+
+                # 2. Agendar a ENTREGA DE TICKETS (Novo)
+                # Estamos agendando para o mesmo horário do início.
+                jq.run_daily(
+                    distribute_kingdom_defense_ticket_job,
+                    time=dt_time(hour=sh, minute=sm, tzinfo=tz),
+                    name=f"ticket_giveaway_{i}",
+                    data={"event_time": f"{sh:02d}:{sm:02d}"}
+                )
+
+                logging.info(f"🛡️ Defesa agendada: {sh:02d}:{sm:02d} ({duration} min) + Tickets.")
             except Exception as e:
                 logging.error(f"Erro ao agendar Defesa {i}: {e}")
 
     # --- C. World Boss ---
     if WORLD_BOSS_TIMES:
-        # Note que não precisamos importar aqui dentro se já importamos lá em cima
         for i, (sh, sm, eh, em) in enumerate(WORLD_BOSS_TIMES):
             try:
                 # Nasce
@@ -161,7 +168,6 @@ async def post_init_tasks(application: Application):
 
     # --- D. PvP Mensal ---
     try:
-        # Tenta importar só se existir no jobs.py
         from handlers.jobs import job_pvp_monthly_reset
         jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=0, minute=0, tzinfo=tz), name="pvp_monthly_check")
     except ImportError:
