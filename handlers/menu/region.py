@@ -1,5 +1,5 @@
 # handlers/menu/region.py
-# (VERSÃO FINAL LIMPA: Sem duplicações e Sem Erro de Import)
+# (VERSÃO CORRIGIDA: Salva Energia ao Visualizar para Evitar Dessincronia)
 
 import time
 import logging
@@ -222,7 +222,15 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     if player_data is None:
         player_data = await player_manager.get_player_data(user_id) or {}
-    player_actions._apply_energy_autoregen_inplace(player_data)
+    
+    # ⚡ CORREÇÃO CRÍTICA DE SINCRONIA ⚡
+    # Aplica regeneração e, se mudou algo, SALVA imediatamente.
+    # Isso garante que a energia "visual" mostrada no menu seja a mesma "real" do banco.
+    energy_changed = player_actions._apply_energy_autoregen_inplace(player_data)
+    if energy_changed:
+        await player_manager.save_player_data(user_id, player_data)
+    # ----------------------------------------------------------------
+
     final_region_key = region_key or player_data.get("current_location", "reino_eldora")
     player_data['current_location'] = final_region_key
     
@@ -238,21 +246,16 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
     # --- LÓGICA DO WORLD BOSS ---
     if world_boss_manager.state["is_active"] and final_region_key == world_boss_manager.state["location"]:
-        # Texto do HUD (Barras de Vida)
-        # Nota: Chamamos a função assíncrona corretamente com await
         hud_text = await world_boss_manager.get_battle_hud()
         
         caption = (f"‼️ **PERIGO IMINENTE** ‼️\nO **Demônio Dimensional** está aqui!\n\n{hud_text}")
         
-        # Botão para entrar no menu de Raid
         keyboard = [
             [InlineKeyboardButton("⚔️ ENTRAR NA RAID ⚔️", callback_data='wb_menu')],
             [InlineKeyboardButton("👤 Perfil", callback_data='profile')],
             [InlineKeyboardButton("🗺️ Fugir", callback_data='travel')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        # CORREÇÃO: Busca a imagem usando a chave correta 'boss_raid'
         file_data = media_ids.get_file_data("boss_raid")
         
     else:
