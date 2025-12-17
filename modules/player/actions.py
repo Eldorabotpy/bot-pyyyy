@@ -130,40 +130,65 @@ def _get_regen_seconds(player_data: dict) -> int:
     # Alterado de 300 para 420 para garantir que o padrão seja 7 min (Free)
     return int(premium.get_perk_value('energy_regen_seconds', 420))
 
+# Em modules/player/actions.py
+
 def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
     """
     Aplica regeneração de energia com base em tempo decorrido.
-    Retorna True se as mudanças foram aplicadas.
+    Versão Corrigida: Reseta timestamps inválidos (futuro) e força atualização.
     """
     changed = False
     max_e = get_player_max_energy(player_data)
     cur = _ival(player_data.get('energy'), 0)
+    
     last_raw = player_data.get('energy_last_ts') or player_data.get('last_energy_ts')
-    last_ts = _parse_iso(last_raw) or utcnow()
-    regen_s = _get_regen_seconds(player_data)
     now = utcnow()
+    last_ts = _parse_iso(last_raw)
+
+    # --- CORREÇÃO DE SEGURANÇA ---
+    # Se não tiver data, ou se a data for no FUTURO (bug de relógio), reseta para AGORA.
+    if last_ts is None or last_ts > now:
+        logger.warning(f"Resetando timestamp de energia inválido/futuro para user {player_data.get('user_id')}.")
+        player_data['energy_last_ts'] = now.isoformat()
+        return True # Força salvamento para corrigir o bug
+    # -----------------------------
+
+    regen_s = _get_regen_seconds(player_data)
+    
+    # Se energia já está cheia, apenas atualiza o relógio para agora
     if cur >= max_e:
+        if cur > max_e: # Se estiver acima do máximo (ex: poção), não reduz, só mantém
+            pass 
         player_data['energy_last_ts'] = now.isoformat()
         return last_raw != player_data['energy_last_ts']
+
     if regen_s <= 0:
+        # Se regeneração for instantânea (bug ou config errada), enche tudo
         if cur < max_e:
             player_data['energy'] = max_e
             changed = True
         player_data['energy_last_ts'] = now.isoformat()
-        return changed or (last_raw != player_data['energy_last_ts'])
+        return changed
+
     elapsed = (now - last_ts).total_seconds()
+    
     if elapsed < regen_s:
-        return False
+        return False # Ainda não passou tempo suficiente para 1 ponto
+
     gained = int(elapsed // regen_s)
+    
     if gained > 0:
         new_energy = min(max_e, cur + gained)
         if new_energy != cur:
             player_data['energy'] = new_energy
             changed = True
+        
+        # Avança o relógio apenas o necessário (preserva os segundos "sobrando" para o próximo ponto)
         remainder_seconds = elapsed % regen_s
         new_anchor = now - timedelta(seconds=remainder_seconds)
         player_data['energy_last_ts'] = new_anchor.isoformat()
         changed = True
+        
     return changed
 # -------------------------
 # Funções de COLETA (NOVAS)

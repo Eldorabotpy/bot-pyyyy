@@ -1,15 +1,13 @@
 # handlers/profile_handler.py
-# (VERSÃO CORRIGIDA: Lê a chave correta 'premium_expires_at')
+# (VERSÃO CORRIGIDA: Atualização de Energia em Tempo Real e Fix do Visual)
 
 import logging
 import unicodedata
 import re
-import json
 import html
 from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
-from telegram.error import BadRequest
 from modules.player.premium import PremiumManager
 from modules import player_manager, game_data
 from modules import file_ids
@@ -17,6 +15,9 @@ from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
 from modules.player import stats as player_stats
 from modules.game_data.class_evolution import can_player_use_skill
+
+# --- NOVO IMPORT NECESSÁRIO PARA CORRIGIR A ENERGIA ---
+from modules.player import actions as player_actions
 
 logger = logging.getLogger(__name__)
 
@@ -324,6 +325,14 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else: await context.bot.send_message(chat_id, text)
         return
     
+    # --- CORREÇÃO: FORÇAR ATUALIZAÇÃO DA ENERGIA NO PERFIL ---
+    # Isso garante que a barra não fique "cinza" (0/35) se o jogador tiver energia regenerada no cache.
+    try:
+        player_actions._apply_energy_autoregen_inplace(player_data)
+    except Exception as e:
+        logger.error(f"Erro ao regenerar energia no profile: {e}")
+    # ---------------------------------------------------------
+    
     totals = await player_manager.get_player_total_stats(player_data)
     
     total_hp_max = int(totals.get('max_hp', 50))
@@ -345,7 +354,6 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ===== BLOCO PREMIUM CORRIGIDO =====
     premium_line = ""
     raw_tier = player_data.get("premium_tier")
-    # AQUI ESTAVA O ERRO: Trocamos 'premium_expiration' por 'premium_expires_at'
     raw_exp = player_data.get("premium_expires_at") 
 
     if raw_tier and raw_tier != "free":
@@ -359,7 +367,6 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Data Inválida)"
         else:
-            # Se ainda cair aqui é porque o DB realmente está sem data (Free ou Bug)
             premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Sem Data)"
     
     max_energy  = int(player_manager.get_player_max_energy(player_data))
