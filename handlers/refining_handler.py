@@ -210,8 +210,8 @@ def _fmt_item_line(item_id: str, qty: int) -> str:
 
 def _fmt_item_details_styled(item_data: dict) -> str:
     """
-    Formata o item com visual rico.
-    Ex: 『[19/20] 🔪 Adaga Sorrateira [12][Lendario]: ☠️ +12 』
+    Formata o item com visual rico e mapeamento COMPLETO de atributos.
+    Ex: 『[19/20] 🔪 Adaga Sorrateira [12][Lendario]: ☠️ +12, 🍀 +1 』
     """
     # 1. Durabilidade
     cur_dur = item_data.get("durability")
@@ -240,37 +240,82 @@ def _fmt_item_details_styled(item_data: dict) -> str:
     lvl = item_data.get("enhancement", item_data.get("level", 0))
     lvl_str = f" [+ {lvl}]" if lvl > 0 else ""
 
-    # 5. Atributos (Ícones Corrigidos)
+    # 5. Atributos - O GRANDE DICIONÁRIO DE ÍCONES
+    # Mapeia Inglês, Português e variações para o mesmo emoji
     stat_icons = {
-        "forca": "💪", "inteligencia": "🧠", "destreza": "🏃", "agilidade": "⚡", 
-        "sorte": "🍀", "vida": "❤️", "hp": "❤️", "max_hp": "❤️",
-        "defesa": "🛡️", "defense": "🛡️", "ataque": "⚔️", "attack": "⚔️", 
-        "iniciativa": "⚡", "furia": "💢", "precisao": "🎯", "fe": "🙏",
-        "bushido": "👹", "foco": "🧿", "letalidade": "☠️", "cura": "❤️‍🩹",
-        "mana": "💧", "crit_chance_flat": "💥", "armor_penetration": "🔩"
+        # --- HP / VIDA ---
+        "vida": "❤️", "hp": "❤️", "max_hp": "❤️", "health": "❤️", "vitalidade": "❤️", "vit": "❤️",
+        
+        # --- MANA / MP ---
+        "mana": "💧", "max_mana": "💧", "mp": "💧", "max_mp": "💧", "inteligencia": "🧠", "intelligence": "🧠", "int": "🧠",
+
+        # --- ATAQUE / FORÇA ---
+        "ataque": "⚔️", "attack": "⚔️", "atk": "⚔️", "dano": "⚔️", "damage": "⚔️",
+        "forca": "💪", "strength": "💪", "str": "💪", "fisico": "💪",
+
+        # --- DEFESA / RESISTÊNCIA ---
+        "defesa": "🛡️", "defense": "🛡️", "def": "🛡️", "armadura": "🛡️", "armor": "🛡️",
+        "resistencia": "🛡️", "resistance": "🛡️", "res": "🛡️", "block": "🛡️",
+
+        # --- VELOCIDADE / AGILIDADE ---
+        "agilidade": "🏃", "agility": "🏃", "agi": "🏃",
+        "iniciativa": "⚡", "initiative": "⚡", "ini": "⚡", "velocidade": "⚡",
+
+        # --- SORTE / CRITICO ---
+        "sorte": "🍀", "luck": "🍀", "lucky": "🍀", "luk": "🍀",
+        "critico": "💥", "crit": "💥", "crit_chance": "💥", "crit_chance_flat": "💥",
+        "dano_critico": "🩸", "crit_damage": "🩸", "crit_damage_mult": "🩸",
+
+        # --- ESPECIAIS DE CLASSE ---
+        "furia": "💢", "rage": "💢",
+        "precisao": "🎯", "mira": "🎯", "precision": "🎯", "accuracy": "🎯",
+        "fe": "🙏", "faith": "🙏",
+        "carisma": "👄", "charisma": "👄",
+        "bushido": "👹", "honra": "👹",
+        "foco": "🧿", "focus": "🧿", "chi": "☯️",
+        "letalidade": "☠️", "lethality": "☠️", "morte": "☠️",
+        "cura": "❤️‍🩹", "heal": "❤️‍🩹", "heal_potency": "❤️‍🩹",
+        "magia": "🔮", "magic": "🔮", "magic_attack": "🔮", "poder_magico": "🔮",
+
+        # --- OUTROS / SECUNDÁRIOS ---
+        "esquiva": "💨", "dodge": "💨",
+        "penetracao": "🔩", "penetration": "🔩", "armor_penetration": "🔩",
+        "roubo_vida": "🧛", "lifesteal": "🧛", "vampirismo": "🧛",
+        "tenacidade": "🏰", "tenacity": "🏰"
     }
 
     stats_str_list = []
+    
+    # Combina Stats Base + Encantamentos
     stats = dict(item_data.get("stats") or {})
     ench = item_data.get("enchantments", {})
     
-    # Soma encantamentos
     for k, v in ench.items():
         val = v["value"] if isinstance(v, dict) and "value" in v else (v if isinstance(v, (int, float)) else 0)
         if val > 0: stats[k] = stats.get(k, 0) + val
 
-    ignored = {"durability", "max_durability", "level", "enhancement"}
+    ignored_keys = {"durability", "max_durability", "level", "enhancement"}
+    
     for key, val in stats.items():
-        k_clean = str(key).lower().replace(" ", "_")
-        if k_clean in ignored or not isinstance(val, (int, float)) or val == 0: continue
+        # Normaliza a chave: remove espaços, tudo minúsculo
+        k_clean = str(key).lower().strip().replace(" ", "_")
         
+        if k_clean in ignored_keys or not isinstance(val, (int, float)) or val == 0: continue
+        
+        # Busca o ícone
         icon = stat_icons.get(k_clean, "🔹")
-        if icon == "🔹": # Mostra o nome se não tiver ícone
-            stats_str_list.append(f"{icon} {key.title()} +{val}")
+        
+        if icon == "🔹": 
+            # Se não achou ícone, mostra o nome original (ex: "Luck") para debug visual, mas mantém o layout
+            k_display = str(key).replace("_", " ").title()
+            stats_str_list.append(f"{icon} {k_display} +{val}")
         else:
+            # Se achou o ícone, mostra só o ícone + valor (Layout Limpo)
             stats_str_list.append(f"{icon} +{val}")
 
-    stats_display = ", ".join(stats_str_list) or "Sem atributos"
+    stats_display = ", ".join(stats_str_list)
+    if not stats_display: stats_display = "Sem atributos"
+
     total_slots = item_data.get("slots", 0) 
     slots_visual = f" ({'⚪️' * int(total_slots)})" if total_slots > 0 else ""
 
