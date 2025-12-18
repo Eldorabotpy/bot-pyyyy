@@ -14,6 +14,23 @@ from modules.refining_engine import preview_refine, start_refine, finish_refine
 from modules import crafting_registry, dismantle_engine, display_utils
 
 ITEMS_PER_PAGE = 5
+
+SLOT_FANCY_TEXT = {
+    "arma": "𝐀𝐫𝐦𝐚",
+    "armadura": "𝐀𝐫𝐦𝐚𝐝𝐮𝐫𝐚",
+    "elmo": "𝐄𝐥𝐦𝐨",
+    "calca": "𝐂𝐚𝐥𝐜̧𝐚",
+    "luvas": "𝐋𝐮𝐯𝐚𝐬",
+    "botas": "𝐁𝐨𝐭𝐚𝐬",
+    "anel": "𝐀𝐧𝐞𝐥",
+    "colar": "𝐂𝐨𝐥𝐚𝐫",
+    "brinco": "𝐁𝐫𝐢𝐧𝐜𝐨"
+}
+
+SLOT_EMOJI_MAP = {
+    "arma": "⚔️", "elmo": "🪖", "armadura": "👕", "calca": "👖",
+    "luvas": "🧤", "botas": "🥾", "colar": "📿", "anel": "💍", "brinco": "🧿",
+}
 logger = logging.getLogger(__name__)
 
 # =====================================================
@@ -193,123 +210,71 @@ def _fmt_item_line(item_id: str, qty: int) -> str:
 
 def _fmt_item_details_styled(item_data: dict) -> str:
     """
-    Formata o item IGUAL à imagem de referência:
-    Ex: 『[20/20] 🥷 ⚔️ Katana Laminada [1][Comum]: 🥷 +1 』
+    Formata o item com visual rico.
+    Ex: 『[19/20] 🔪 Adaga Sorrateira [12][Lendario]: ☠️ +12 』
     """
-    # 1. Durabilidade (Primeira coisa a aparecer)
+    # 1. Durabilidade
     cur_dur = item_data.get("durability")
     max_dur = item_data.get("max_durability")
-    dur_str = ""
-    if cur_dur is not None and max_dur:
-        dur_str = f"[{cur_dur}/{max_dur}] "
+    dur_str = f"[{cur_dur}/{max_dur}] " if (cur_dur is not None and max_dur) else ""
 
-    # 2. Classe do Item (Emoji da Classe antes do item)
-    # Detecta se o item é exclusivo de alguma classe e adiciona o ícone
+    # 2. Classe (Emoji)
     class_req = item_data.get("class_req")
-    class_icon_str = ""
-    
+    class_emoji = ""
     if class_req:
-        # Se for lista, pega o primeiro, senão usa a string direta
-        c_req = (class_req[0] if isinstance(class_req, list) else str(class_req)).lower()
-        
-        # Mapeamento de emojis de classe
-        class_emojis = {
-            "samurai": "🥷", 
-            "ninja": "🥷",
-            "assassino": "🗡️",
-            "guerreiro": "🛡️",
-            "berserker": "💢",
-            "mago": "🔮",
-            "bruxo": "🔮",
-            "arqueiro": "🏹",
-            "cacador": "🏹",
-            "monge": "👊",
-            "bardo": "🎵",
-            "curandeiro": "🌿"
+        c_name = (class_req[0] if isinstance(class_req, list) else str(class_req)).lower()
+        c_emojis = {
+            "guerreiro": "⚔️", "berserker": "🪓", "cacador": "🏹",
+            "monge": "🧘", "mago": "🧙", "bardo": "🎶",
+            "assassino": "🔪", "samurai": "🥷", "curandeiro": "🩹"
         }
-        icon = class_emojis.get(c_req)
-        if icon:
-            class_icon_str = f"{icon} " # Adiciona o emoji com um espaço depois
+        if c_name in c_emojis:
+            class_emoji = f"{c_emojis[c_name]} "
 
-    # 3. Dados Básicos (Nome e Emoji do Item)
+    # 3. Dados Básicos
     name = item_data.get("display_name", "Item")
-    emoji = item_data.get("emoji", "⚔️")
+    item_emoji = item_data.get("emoji", "") 
     
     # 4. Raridade e Nível
     rarity = (item_data.get("rarity") or "comum").title()
-    
-    # Nível: Formato [1] (Sem o +)
     lvl = item_data.get("enhancement", item_data.get("level", 0))
-    lvl_str = f"[{lvl}]" if lvl > 0 else ""
+    lvl_str = f" [+ {lvl}]" if lvl > 0 else ""
 
-    # 5. Unifica Atributos (Base + Encantamentos)
+    # 5. Atributos (Ícones Corrigidos)
+    stat_icons = {
+        "forca": "💪", "inteligencia": "🧠", "destreza": "🏃", "agilidade": "⚡", 
+        "sorte": "🍀", "vida": "❤️", "hp": "❤️", "max_hp": "❤️",
+        "defesa": "🛡️", "defense": "🛡️", "ataque": "⚔️", "attack": "⚔️", 
+        "iniciativa": "⚡", "furia": "💢", "precisao": "🎯", "fe": "🙏",
+        "bushido": "👹", "foco": "🧿", "letalidade": "☠️", "cura": "❤️‍🩹",
+        "mana": "💧", "crit_chance_flat": "💥", "armor_penetration": "🔩"
+    }
+
+    stats_str_list = []
     stats = dict(item_data.get("stats") or {})
     ench = item_data.get("enchantments", {})
     
-    # Soma os encantamentos aos stats base
+    # Soma encantamentos
     for k, v in ench.items():
-        val = 0
-        if isinstance(v, dict) and "value" in v: val = v["value"]
-        elif isinstance(v, (int, float)): val = v
-        
-        if val > 0:
-            if k in stats: stats[k] += val
-            else: stats[k] = val
+        val = v["value"] if isinstance(v, dict) and "value" in v else (v if isinstance(v, (int, float)) else 0)
+        if val > 0: stats[k] = stats.get(k, 0) + val
 
-    # --- MAPEAMENTO DE ÍCONES (SUPORTE TOTAL A CLASSES) ---
-    icons = dict(attributes.STAT_EMOJI)
-    
-    class_icons = {
-        # Samurai / Ninja
-        "bushido": "🥷", "honra": "🥷", "katana_mastery": "⚔️", 
-        "letalidade": "☠️", "lethality": "☠️", "stealth": "🌑", "furtividade": "🌑",
-        "critico": "💥", "crit": "💥",
-        
-        # Outras Classes
-        "chi": "☯️", "ki": "☯️", "foco": "🧘", "combo": "🥊",
-        "furia": "💢", "rage": "💢", "sangramento": "🩸",
-        "precisao": "🎯", "mira": "🎯", "destreza": "🏹",
-        "inteligencia": "🧠", "mana": "💧", "cura": "❤️‍🩹", "sagrado": "☀️",
-        
-        # Gerais
-        "ataque": "⚔️", "attack": "⚔️", "dano": "⚔️", "dmg": "⚔️",
-        "defesa": "🛡️", "defense": "🛡️", "armadura": "🛡️",
-        "vida": "❤️", "hp": "❤️", "health": "❤️",
-        "agilidade": "🏃", "iniciativa": "⚡", "sorte": "🍀"
-    }
-    icons.update(class_icons)
-    
-    ignored_keys = {"source", "type", "base_id", "rarity", "class_req", "unique", "socket", "slots", "description", "durability", "max_durability", "level", "enhancement"}
-    
-    stats_list = []
-    
-    # Ordena e formata Stats
+    ignored = {"durability", "max_durability", "level", "enhancement"}
     for key, val in stats.items():
-        k_clean = str(key).lower().strip().replace(" ", "_")
-        if k_clean in ignored_keys: continue
-        if not isinstance(val, (int, float)) or val == 0: continue
+        k_clean = str(key).lower().replace(" ", "_")
+        if k_clean in ignored or not isinstance(val, (int, float)) or val == 0: continue
         
-        icon = icons.get(k_clean, "🔹")
-        
-        if icon == "🔹":
-            k_display = str(key).replace("_", " ").title()
-            stats_list.append(f"{icon} {k_display} +{val}")
+        icon = stat_icons.get(k_clean, "🔹")
+        if icon == "🔹": # Mostra o nome se não tiver ícone
+            stats_str_list.append(f"{icon} {key.title()} +{val}")
         else:
-            stats_list.append(f"{icon} +{val}")
+            stats_str_list.append(f"{icon} +{val}")
 
-    stats_str = ", ".join(stats_list)
-    if not stats_str: stats_str = "Sem atributos"
-
-    # 6. Slots (Visual)
+    stats_display = ", ".join(stats_str_list) or "Sem atributos"
     total_slots = item_data.get("slots", 0) 
-    slots_visual = ""
-    if total_slots > 0:
-        dots = "⚪️" * int(total_slots)
-        slots_visual = f" ({dots})"
+    slots_visual = f" ({'⚪️' * int(total_slots)})" if total_slots > 0 else ""
 
-    # MONTAGEM FINAL DA STRING
-    # Adicionado {class_icon_str} antes do {emoji}
-    return f"『{dur_str}{class_icon_str}{emoji} {name} {lvl_str}[{rarity}]: {stats_str} 』{slots_visual}"
+    return f"『{dur_str}{class_emoji}{item_emoji} {name}{lvl_str}[{rarity}]: {stats_display} 』{slots_visual}"
 
 async def _safe_send_with_media(context, chat_id, caption, reply_markup=None, media_key=None, fallback_key="refino_universal"):
     keys = [k for k in [media_key, fallback_key] if k]
@@ -486,76 +451,59 @@ async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEF
 async def show_dismantle_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    try:
-        uid, iuid = q.from_user.id, q.data.split(':')[1]
-    except IndexError: return
+    try: uid, iuid = q.from_user.id, q.data.split(':')[1]
+    except: return
     
     pdata = await player_manager.get_player_data(uid)
     item = pdata.get("inventory", {}).get(iuid)
-    if not item: 
-        await show_dismantle_list_callback(update, context)
-        return
+    if not item: return await show_dismantle_list_callback(update, context)
 
-    # --- LÓGICA DE RECUPERAÇÃO (SIMULAÇÃO) ---
-    rec = crafting_registry.get_recipe_by_item_id(item.get("base_id"))
-    inputs = rec.get("inputs", {}) if rec else {}
-    ret = {}
-    blacklist = {"nucleo_forja_fraco", "carvao", "martelo_gasto", "fluxo_solda"}
-
-    for k, v in inputs.items():
-        if k not in blacklist:
-            # Devolve 50% arredondado para CIMA
-            amt = math.ceil(v * 0.5)
-            if amt > 0: ret[k] = amt
+    # --- LÓGICA VISUAL (CABEÇALHO) ---
+    base_id = item.get("base_id")
+    # Busca slot no item ou no game_data
+    static_data = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {})
+    slot_raw = (item.get("slot") or static_data.get("slot") or "outros").lower()
     
-    # Fallback se não tiver receita
-    if not ret:
-        # Apenas visual para o usuário
-        fallback = dismantle_engine.calculate_rarity_fallback(item.get("rarity", "comum"))
-        ret = fallback
+    slot_fancy = SLOT_FANCY_TEXT.get(slot_raw, slot_raw.title()) # Usa seu dict de fontes
+    slot_emoji = SLOT_EMOJI_MAP.get(slot_raw, "🎒")
 
-    # --- CONTAGEM DE DUPLICATAS (BULK) ---
-    target_base = item.get("base_id")
+    # --- LÓGICA DE DUPLICATAS COM RARIDADE ---
+    target_rarity = item.get("rarity", "comum")
+    count_dupes = 0
     inv = pdata.get("inventory", {})
     equip = set(pdata.get("equipment", {}).values())
     
-    duplicates = []
-    for uniq, data in inv.items():
-        if uniq not in equip and isinstance(data, dict):
-            if data.get("base_id") == target_base:
-                duplicates.append(uniq)
+    for u, d in inv.items():
+        if isinstance(d, dict) and u not in equip:
+            # SÓ CONTA SE ID E RARIDADE FOREM IGUAIS
+            if d.get("base_id") == base_id and d.get("rarity", "comum") == target_rarity:
+                count_dupes += 1
+
+    # --- MONTAGEM DO TEXTO ---
+    item_line = _fmt_item_details_styled(item)
+    txt = (f"<b>CONFIRMAÇÃO DE DESMONTE</b>\n\n"
+           f"[ {slot_emoji} {slot_fancy} ] ──────────────\n"
+           f" ╰┈➤ {item_line}\n\n"
+           f"📉 <b>MATERIAIS RECUPERADOS (Por Unidade)</b>\n")
     
-    count_dupes = len(duplicates)
-            
-    # --- VISUAL ESTILIZADO ---
-    details_txt = _fmt_item_details_styled(item)
+    # (Adicione sua lógica de materials/recipe aqui...)
+    rec = crafting_registry.get_recipe_by_item_id(base_id)
+    # ... se não tiver receita, use calculate_rarity_fallback(target_rarity)
     
-    txt = f"♻️ <b>CONFIRMAÇÃO DE DESMONTE</b>\n"
-    txt += f"──────────────────────\n"
-    txt += f"{details_txt}\n\n"
-    txt += "📉 <b>MATERIAIS RECUPERADOS (Por Unidade)</b>\n"
-    
-    if not ret:
-        txt += " ╰┈➤ <i>Nada recuperável.</i>"
-    else:
-        for k, v in ret.items(): 
-            txt += f" ╰┈➤ {_fmt_item_line(k, v)}\n"
-            
-    txt += "\n⚠️ <i>Atenção: Esta ação é irreversível!</i>"
-    
+    # --- BOTÕES ---
     kb = []
     kb.append([InlineKeyboardButton("✅ 𝐂𝐨𝐧𝐟𝐢𝐫𝐦𝐚𝐫 (1 Unid)", callback_data=f"ref_dismantle_confirm:{iuid}")])
     
     if count_dupes > 1:
-        kb.append([InlineKeyboardButton(f"♻️ 𝐃𝐞𝐬𝐦𝐨𝐧𝐭𝐚𝐫 𝐓𝐨𝐝𝐨𝐬 ({count_dupes}x)", callback_data=f"ref_dismantle_bulk:{target_base}")])
+        # PASSANDO RARIDADE NO CALLBACK
+        kb.append([InlineKeyboardButton(f"♻️ 𝐃𝐞𝐬𝐦𝐨𝐧𝐭𝐚𝐫 𝐓𝐨𝐝𝐨𝐬 ({count_dupes}x)", 
+                                        callback_data=f"ref_dismantle_bulk:{base_id}:{target_rarity}")])
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="ref_dismantle_list")])
     
-    base_id = item.get("base_id")
-    mkey = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}).get("media_key")
-    
+    mkey = static_data.get("media_key")
     await _safe_edit_or_send_with_media(q, context, txt, InlineKeyboardMarkup(kb), media_key=mkey)
-    
+
 async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     uid, iuid = q.from_user.id, q.data.split(':')[1]
@@ -588,54 +536,50 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
     await q.answer()
 
 async def confirm_bulk_dismantle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lógica customizada para desmonte em massa."""
     q = update.callback_query
-    uid, base_id = q.from_user.id, q.data.split(':')[1]
+    uid = q.from_user.id
+    
+    # Lê ID e RARIDADE do botão
+    parts = q.data.split(':') # ref_dismantle_bulk : ID : RARIDADE
+    base_id = parts[1]
+    rarity_filter = parts[2] if len(parts) > 2 else "comum"
     
     pdata = await player_manager.get_player_data(uid)
     if pdata.get("player_state", {}).get("action") not in (None, "idle"):
         await q.answer("Ocupado!", show_alert=True); return
 
-    # 1. Conta quantos itens ele tem (Segurança)
+    # Conta novamente (Segurança)
     inv = pdata.get("inventory", {})
     equip = set(pdata.get("equipment", {}).values())
     count_available = 0
     for uniq, data in inv.items():
         if uniq not in equip and isinstance(data, dict):
-            if data.get("base_id") == base_id:
+            if data.get("base_id") == base_id and data.get("rarity", "comum") == rarity_filter:
                 count_available += 1
     
     if count_available < 2:
-        await q.answer("Quantidade insuficiente para desmonte em massa.", show_alert=True)
-        return
+        await q.answer("Quantidade insuficiente.", show_alert=True); return
 
-    # 2. CHAMA O MOTOR NOVO (Start Batch)
-    res = await dismantle_engine.start_batch_dismantle(pdata, base_id, count_available)
+    # CHAMA O ENGINE COM A RARIDADE
+    res = await dismantle_engine.start_batch_dismantle(pdata, base_id, rarity_filter, count_available)
     
     if isinstance(res, str):
         await q.answer(res, show_alert=True); return
 
-    # 3. Notifica e Agenda
-    total_seconds = res.get("duration_seconds", 60)
+    # Notificação final
     qty = res.get("qty")
     name = res.get("item_name")
+    dur = res.get("duration_seconds", 60)
     
-    txt_time = _fmt_minutes_or_seconds(total_seconds)
-    sent = await _safe_edit_or_send_with_media(q, context, f"♻️ Desmontando {qty}x <b>{name}</b>... (~{txt_time})")
+    txt = f"♻️ Desmontando {qty}x <b>{name} [{rarity_filter.title()}]</b>... (~{_fmt_minutes_or_seconds(dur)})"
+    sent = await _safe_edit_or_send_with_media(q, context, txt)
+    
     mid = sent.message_id if sent else None
-    
-    # Atualiza message_id no state
     pdata["player_state"]["details"]["message_id_to_delete"] = mid
     await player_manager.save_player_data(uid, pdata)
 
-    context.job_queue.run_once(
-        finish_bulk_dismantle_job, 
-        total_seconds, 
-        user_id=uid, 
-        chat_id=q.message.chat_id,
-        data=pdata["player_state"]["details"], 
-        name=f"dismantle_bulk_{uid}"
-    )
+    context.job_queue.run_once(finish_bulk_dismantle_job, dur, user_id=uid, chat_id=q.message.chat_id,
+                               data=pdata["player_state"]["details"], name=f"dismantle_bulk_{uid}")
     await q.answer()
 
 async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

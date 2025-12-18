@@ -132,35 +132,33 @@ async def finish_dismantle(player_data: dict, details: dict) -> tuple[str, dict]
 
 # --- FUNÇÕES DE LOTE (BATCH / BULK) ---
 
-async def start_batch_dismantle(player_data: dict, base_id_filter: str, qty_requested: int) -> Dict[str, Any] | str:
+async def start_batch_dismantle(player_data: dict, base_id_filter: str, rarity_filter: str, qty_requested: int) -> Dict[str, Any] | str:
     """
-    Inicia desmonte de MÚLTIPLOS itens iguais (pelo Base ID).
-    Remove os itens e define um tempo acumulativo.
+    Inicia desmonte de MÚLTIPLOS itens iguais (mesmo Base ID e mesma Raridade).
     """
     user_id = player_data.get("user_id")
     inventory = player_data.get("inventory", {})
     equipped = set(player_data.get("equipment", {}).values())
 
-    # 1. Encontrar Candidatos (Pelo Base ID para garantir que são o mesmo item)
+    # 1. Encontrar Candidatos (Pelo Base ID E Raridade)
     candidates = []
-    item_reference = None # Para pegar nome e raridade
+    item_reference = None 
 
     for uid, item in inventory.items():
-        # --- CORREÇÃO DE SEGURANÇA ---
-        # Pula itens que não são dicionários (como Ouro, Gemas ou lixo de memória)
-        if not isinstance(item, dict):
-            continue
-        # -----------------------------
-
+        if not isinstance(item, dict): continue
         if uid in equipped: continue
         
-        if item.get("base_id") == base_id_filter:
+        # --- AQUI ESTÁ A SEGURANÇA ---
+        # Verifica se o ID bate E se a raridade é a mesma
+        item_rarity = item.get("rarity", "comum")
+        if item.get("base_id") == base_id_filter and item_rarity == rarity_filter:
             candidates.append(uid)
             if not item_reference: item_reference = item
+        # ---------------------------
 
-    if not candidates: return "Nenhum item disponível para desmontar."
+    if not candidates: return "Nenhum item com essa raridade disponível para desmontar."
     
-    # Validação extra: se a quantidade pedida for maior que a disponível
+    # Validação extra
     real_qty = min(qty_requested, len(candidates))
     if real_qty < 1: return "Quantidade inválida."
     
@@ -169,7 +167,6 @@ async def start_batch_dismantle(player_data: dict, base_id_filter: str, qty_requ
     
     # 3. Remove Itens
     for uid in uids_to_remove:
-        # Verifica se ainda existe antes de deletar (segurança)
         if uid in inventory:
             del inventory[uid]
         
@@ -179,12 +176,12 @@ async def start_batch_dismantle(player_data: dict, base_id_filter: str, qty_requ
     
     # 5. Define Estado Batch
     player_data["player_state"] = {
-        "action": "dismantling_batch", # Ação Batch
+        "action": "dismantling_batch", 
         "finish_time": finish_time.isoformat(),
         "details": {
             "base_id": base_id_filter,
             "item_name": item_reference.get("display_name", "Itens"),
-            "rarity": item_reference.get("rarity", "comum"),
+            "rarity": rarity_filter, # Salva a raridade correta
             "qty_dismantling": real_qty,
             "uids_removed": uids_to_remove 
         }

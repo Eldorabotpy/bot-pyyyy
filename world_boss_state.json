@@ -1,10 +1,10 @@
 {
   "is_active": false,
-  "location": "pico_grifo",
+  "location": "floresta_sombria",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",
-      "hp": 25000,
+      "hp": 35000,
       "max_hp": 25000,
       "alive": true,
       "stats": {
@@ -13,11 +13,11 @@
         "initiative": 5,
         "luck": 20
       },
-      "turn_counter": 6
+      "turn_counter": 0
     },
     "witch_heal": {
       "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚",
-      "hp": 2602,
+      "hp": 5000,
       "max_hp": 5000,
       "alive": true,
       "stats": {
@@ -26,7 +26,7 @@
         "initiative": 5,
         "luck": 10
       },
-      "turn_counter": 6
+      "turn_counter": 0
     },
     "witch_debuff": {
       "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬",
@@ -39,25 +39,14 @@
         "initiative": 5,
         "luck": 15
       },
-      "turn_counter": 6
+      "turn_counter": 0
     }
   },
   "active_fighters": [],
   "waiting_queue": [],
-  "player_states": {
-    "7262799478": {
-      "hp": -34,
-      "max_hp": 292,
-      "mp": 540,
-      "max_mp": 660,
-      "current_target": "witch_heal",
-      "log": "🪄 𝗕𝗿𝘂𝘅𝗮 𝗱𝗼 𝗖𝗮𝗼𝘀 𝘁𝗲 𝗮𝘁𝗮𝗰𝗼𝘂: -12 𝐇𝐏\n✨ 𝙑𝙤𝙘𝙚̂ 𝙪𝙨𝙤𝙪 𝙎𝙠𝙞𝙡𝙡: 527 𝙙𝙖𝙣𝙤 𝙚𝙢 𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚\n🔥 𝐕𝐨𝐜𝐞̂ 𝐬𝐨𝐟𝐫𝐞𝐮 𝐪𝐮𝐞𝐢𝐦𝐚𝐝𝐮𝐫𝐚: -14 HP\n🤕 𝗕𝗼𝘀𝘀 𝘁𝗲 𝗮𝗰𝗲𝗿𝘁𝗼𝘂 (Ataque): -1 HP\n💚 𝗕𝗼𝘀𝘀 𝘁𝗲 𝗮𝗰𝗲𝗿𝘁𝗼𝘂 (+1250 𝐇𝐏)!\n☠️ 𝗠𝗮𝗹𝗱𝗶𝗰̧𝗮̃𝗼 𝗱𝗮 𝗕𝗿𝘂𝘅𝗮! 𝗩𝗼𝗰𝗲̂ 𝗽𝗲𝗿𝗱𝗲𝘂 -29 𝐇𝐏!"
-    }
-  },
-  "environment_hazard": true,
-  "hazard_turns": 2,
-  "damage_leaderboard": {
-    "7262799478": 2398
-  },
+  "player_states": {},
+  "environment_hazard": false,
+  "hazard_turns": 0,
+  "damage_leaderboard": {},
   "last_hitter_id": 7262799478
 }
