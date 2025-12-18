@@ -8,7 +8,7 @@ import asyncio
 from zoneinfo import ZoneInfo
 from typing import Dict, Optional, Any
 from telegram.ext import ContextTypes
-
+from modules import game_data
 # --- MONGODB IMPORTS ---
 from pymongo import MongoClient
 import certifi
@@ -78,33 +78,35 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Nasce o World Boss e notifica.
     """
-    # Verificação de segurança: Se o manager for None (erro de import), avisa.
     if world_boss_manager is None:
-        logger.error("⚠️ [JOB] CRÍTICO: world_boss_manager é None! Verifique imports em modules/world_boss/engine.py")
+        logger.error("⚠️ [JOB] CRÍTICO: world_boss_manager é None!")
         return
 
-    # CORREÇÃO DO ESTADO FANTASMA:
-    # Se o arquivo diz que está ativo, mas não tem ninguém na lista de lutadores há muito tempo,
-    # pode ser um estado travado. Mas por segurança, apenas logamos.
+    # Se já estiver ativo, não faz nada (agora o main.py limpa isso no reinício)
     if world_boss_manager.is_active:
-         logger.info("👹 [JOB] O Scheduler tentou iniciar o Boss, mas o sistema diz que já está vivo. Ignorando.")
+         logger.info("👹 [JOB] Boss já está vivo. Ignorando spawn duplicado.")
          return
 
     logger.info("👹 [JOB] Iniciando sequência de spawn do World Boss...")
     
-    # Inicia e recebe o local (ex: "floresta_sombria")
+    # Inicia e recebe o local
     result = world_boss_manager.start_event()
     
     if result.get("success"):
         location_key = result.get('location', 'desconhecido')
-        location_display = location_key.replace("_", " ").title()
+        
+        # --- CORREÇÃO DO NOME DO LOCAL ---
+        # Busca o nome bonito no game_data, fallback para o ID formatado
+        region_info = (game_data.REGIONS_DATA.get(location_key) or {})
+        location_display = region_info.get("display_name", location_key.replace("_", " ").title())
+        # ---------------------------------
         
         # 1. Notifica no Canal/Grupo (Aba de Avisos)
         if ANNOUNCEMENT_CHAT_ID:
             try:
                 msg_text = (
-                    f"👹 <b>WORLD BOSS SURGIU!</b>\n\n"
-                    f"📍 <b>Local:</b> {location_display}\n\n"
+                    f"👹 𝕎𝕆ℝ𝕃𝔻 𝔹𝕆𝕊𝕊 𝕊𝕌ℝ𝔾𝕀𝕌!\n\n"
+                    f"📍 𝕃𝕠𝕔𝕒𝕝: {location_display}\n\n"
                     f"O monstro despertou! Corram para derrotá-lo!"
                 )
                 

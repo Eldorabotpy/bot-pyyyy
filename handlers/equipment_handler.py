@@ -1,13 +1,14 @@
 # handlers/equipment_handler.py
-# (VERSÃO CORRIGIDA - 'await' ADICIONADOS E '_item_slot_from_base' MELHORADO)
+# (VERSÃO ESTILIZADA: HUD Moderno + Setas Elegantes)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data
-from modules import display_utils  # usa formatar_item_para_exibicao para a linha bonita
+from modules import display_utils  # usa formatar_item_para_exibicao
+from modules.player.stats import get_player_total_stats
 
-# Preferimos as constantes globais dos slots (mesma ordem/emoji do inventário)
+# Preferimos as constantes globais dos slots
 try:
     from modules.game_data.equipment import SLOT_EMOJI as _SLOT_EMOJI, SLOT_ORDER as _SLOT_ORDER
     SLOT_EMOJIS = dict(_SLOT_EMOJI)
@@ -16,15 +17,8 @@ except Exception:
     # fallback seguro
     SLOTS_ORDER = ["arma", "elmo", "armadura", "calca", "luvas", "botas", "anel", "colar", "brinco"]
     SLOT_EMOJIS = {
-        "arma": "⚔️",
-        "elmo": "🪖",
-        "armadura": "👕",
-        "calca": "👖",
-        "luvas": "🧤",
-        "botas": "🥾",
-        "colar": "📿",
-        "anel": "💍",
-        "brinco": "🧿",
+        "arma": "⚔️", "elmo": "🪖", "armadura": "👕", "calca": "👖",
+        "luvas": "🧤", "botas": "🥾", "colar": "📿", "anel": "💍", "brinco": "🧿",
     }
 
 SLOT_LABELS = {
@@ -57,55 +51,28 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
 
 
 # =============================================================
-# --- INÍCIO DA CORREÇÃO DO BUG DA ARMADURA ---
-# (Função _item_slot_from_base tornada mais inteligente)
+# --- HELPERS DE SLOT E RENDERIZAÇÃO ---
 # =============================================================
 def _item_slot_from_base(base_id: str) -> str | None:
-    """
-    Descobre o slot do item base. Tenta "slot" primeiro, depois "type" como fallback.
-    """
-    if not base_id:
-        return None
-    
+    if not base_id: return None
     info = {}
-    try:
-        # Tenta a função moderna primeiro (se existir em game_data/__init__.py)
-        info = game_data.get_item_info(base_id) or {}
-    except Exception:
-        # Tenta o acesso legado direto ao ITEMS_DATA
-        info = getattr(game_data, "ITEMS_DATA", {}).get(base_id) or {}
+    try: info = game_data.get_item_info(base_id) or {}
+    except Exception: info = getattr(game_data, "ITEMS_DATA", {}).get(base_id) or {}
 
-    # 1. Tenta a chave "slot" (ex: "slot": "armadura")
     slot = info.get("slot")
-    if slot and isinstance(slot, str):
-        slot_lower = slot.lower()
-        if slot_lower in SLOTS_ORDER:
-            return slot_lower
+    if slot and isinstance(slot, str) and slot.lower() in SLOTS_ORDER:
+        return slot.lower()
             
-    # 2. Fallback: Tenta a chave "type" (ex: "type": "armadura")
-    #    Isso corrige o bug dos itens T2 (Caçador, Mago, etc.)
     slot_type = info.get("type")
-    if slot_type and isinstance(slot_type, str):
-        slot_type_lower = slot_type.lower()
-        # Verifica se o 'type' é um nome de slot válido
-        if slot_type_lower in SLOTS_ORDER:
-            return slot_type_lower
+    if slot_type and isinstance(slot_type, str) and slot_type.lower() in SLOTS_ORDER:
+        return slot_type.lower()
             
-    return None # Não encontrou
-# =============================================================
-# --- FIM DA CORREÇÃO DO BUG DA ARMADURA ---
-# =============================================================
-
+    return None
 
 def _render_item_line_full(inst: dict) -> str:
-    """
-    Usa o formato unificado:
-      『[20/20] ⚔️ Katana Laminada [1][Bom]: 🥷 +1, 🍀 +1 』
-    """
     try:
         return display_utils.formatar_item_para_exibicao(inst)
     except Exception:
-        # fallback simples
         base_id = inst.get("base_id", "")
         info = (getattr(game_data, "ITEM_BASES", {}).get(base_id) or
                 getattr(game_data, "ITEMS_DATA", {}).get(base_id) or {})
@@ -113,35 +80,22 @@ def _render_item_line_full(inst: dict) -> str:
         rar = (inst.get("rarity") or "").capitalize()
         return f"{name} [{rar}]" if rar else name
 
-
 def _list_equippable_items_for_slot(player_data: dict, slot: str) -> list[tuple[str, str]]:
-    """
-    Retorna [(unique_id, label)] para o slot escolhido.
-    """
     inv = player_data.get("inventory", {}) or {}
     out: list[tuple[str, str]] = []
     for uid, val in inv.items():
-        if not isinstance(val, dict):
-            continue
-        # (Agora usa a função corrigida)
-        if _item_slot_from_base(val.get("base_id")) != slot:
-            continue
+        if not isinstance(val, dict): continue
+        if _item_slot_from_base(val.get("base_id")) != slot: continue
         pretty = _render_item_line_full(val)
         out.append((uid, pretty))
-    out.sort(key=lambda t: t[1])  # estável
+    out.sort(key=lambda t: t[1])
     return out
 
 
 # =========================
-# HUB (sem boneco)
+# HUB PRINCIPAL (Estilizado)
 # =========================
 async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Mostra:
-      - lista do que está equipado (1 linha por slot), já no formato 『[...] …』
-      - botões por slot para abrir a listagem (Escolher para {slot})
-      - botões ❌ {ícone} para desequipar, apenas onde houver item
-    """
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
@@ -152,49 +106,82 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
         return
 
+    # --- 1. BLOCO DE STATUS (Estilo HUD Moderno) ---
+    total_stats = await get_player_total_stats(pdata)
+    
+    hp_total = int(total_stats.get('max_hp', 0))
+    atk_total = int(total_stats.get('attack', 0))
+    def_total = int(total_stats.get('defense', 0))
+    ini_total = int(total_stats.get('initiative', 0))
+    luck_total = int(total_stats.get('luck', 0))
+
+    # Usamos <code> para dar destaque visual (fundo cinza) nos números
+    stats_block = (
+        f"📊 <b>RESUMO DE ATRIBUTOS</b>\n"
+        f"├─ 🧡 <b>HP....</b> <code>{hp_total}</code>\n"
+        f"├─ ⚔️ <b>ATK...</b> <code>{atk_total}</code>\n"
+        f"├─ 🛡 <b>DEF...</b> <code>{def_total}</code>\n"
+        f"├─ 🏃 <b>INI...</b> <code>{ini_total}</code>\n"
+        f"└─ 🍀 <b>LUK...</b> <code>{luck_total}</code>"
+    )
+
+    # --- 2. LISTA DE EQUIPAMENTOS (Estilo Setas Elegantes) ---
     inv = pdata.get("inventory", {}) or {}
     eq = pdata.get("equipment", {}) or {}
 
-    lines = ["<b>𝑶 𝒒𝒖𝒆 𝒆𝒔𝒕𝒂́ 𝒆𝒒𝒖𝒊𝒑𝒂𝒅𝒐:</b>"]
+    equip_lines = ["\n🛡 <b>SET DE EQUIPAMENTOS</b>"]
+    
     for slot in SLOTS_ORDER:
         uid = eq.get(slot)
+        slot_label = SLOT_LABELS.get(slot, slot.title()).upper() # Nome em MAIÚSCULO para destaque
+        slot_emoji = SLOT_EMOJIS.get(slot, '❓')
+        
+        # Cabeçalho do Slot
+        header = f"<b>[ {slot_emoji} {slot_label} ]</b> ──────────────"
+
         if uid and isinstance(inv.get(uid), dict):
-            line = _render_item_line_full(inv[uid])
+            item_line = _render_item_line_full(inv[uid])
+            # Seta elegante apontando para o item
+            block = f"{header}\n ╰┈➤ {item_line}"
         else:
-            line = "—"
-        lines.append(f"{SLOT_EMOJIS.get(slot,'❓')} <b>{SLOT_LABELS.get(slot, slot.title())}:</b> {line}")
+            # Vazio estilizado
+            block = f"{header}\n ╰┈➤ <code>— Vazio —</code>"
+            
+        equip_lines.append(block)
 
-    text = "\n".join(lines)
+    text = stats_block + "\n".join(equip_lines)
 
+    # --- 3. TECLADO (Mantido funcional) ---
     keyboard: list[list[InlineKeyboardButton]] = []
+    
+    # Botões de Desequipar (❌)
     row: list[InlineKeyboardButton] = []
     for slot in SLOTS_ORDER:
         if eq.get(slot):
-            row.append(InlineKeyboardButton(f"❌ {SLOT_EMOJIS.get(slot,'❓')}", callback_data=f"equip_unequip_{slot}"))
+            row.append(InlineKeyboardButton(f"❌ {SLOT_EMOJIS.get(slot,'')}", callback_data=f"equip_unequip_{slot}"))
             if len(row) == 3:
                 keyboard.append(row); row = []
-    if row:
-        keyboard.append(row)
+    if row: keyboard.append(row)
 
+    # Botões de Escolher Slot
     row = []
     for slot in SLOTS_ORDER:
-        row.append(InlineKeyboardButton(f"{SLOT_EMOJIS.get(slot,'❓')} {SLOT_LABELS.get(slot, slot.title())}",
+        row.append(InlineKeyboardButton(f"{SLOT_EMOJIS.get(slot,'')} {SLOT_LABELS.get(slot, slot.title())}",
                                           callback_data=f"equip_slot_{slot}"))
         if len(row) == 3:
             keyboard.append(row); row = []
-    if row:
-        keyboard.append(row)
+    if row: keyboard.append(row)
 
     keyboard.append([InlineKeyboardButton("📦 𝐀𝐛𝐫𝐢𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data="inventory_CAT_especial_PAGE_1")]) 
     keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")]) 
 
     await _safe_edit_or_send(q, context, chat_id, text, InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
+
 # =========================
-# Listagem/Equipar/Remover
+# HANDLERS DE AÇÃO
 # =========================
 async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lista os itens equipáveis para o slot escolhido."""
     q = update.callback_query
     await q.answer()
     slot = q.data.replace("equip_slot_", "")
@@ -208,19 +195,14 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     st = (pdata.get("player_state") or {}).get("action")
     if st not in (None, "idle"):
-        await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True)
-        return
+        await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True); return
 
-    slot_label = SLOT_LABELS.get(slot, slot.capitalize() or "Equipamento")
-    items = _list_equippable_items_for_slot(pdata, slot) # Síncrono
+    slot_label = SLOT_LABELS.get(slot, slot.capitalize())
+    items = _list_equippable_items_for_slot(pdata, slot)
 
     if not items:
         kb = [[InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="equipment_menu")]]
-        await _safe_edit_or_send(
-            q, context, chat_id,
-            f"𝑵𝒂̃𝒐 𝒉𝒂́ 𝒊𝒕𝒆𝒏𝒔 𝒆𝒒𝒖𝒊𝒑𝒂́𝒗𝒆𝒊𝒔 𝒑𝒂𝒓𝒂 <b>{slot_label}</b>.",
-            InlineKeyboardMarkup(kb)
-        )
+        await _safe_edit_or_send(q, context, chat_id, f"𝑵𝒂̃𝒐 𝒉𝒂́ 𝒊𝒕𝒆𝒏𝒔 𝒆𝒒𝒖𝒊𝒑𝒂́𝒗𝒆𝒊𝒔 𝒑𝒂𝒓𝒂 <b>{slot_label}</b>.", InlineKeyboardMarkup(kb))
         return
 
     lines = [f"<b>𝑬𝒔𝒄𝒐𝒍𝒉𝒆𝒓 𝒑𝒂𝒓𝒂 {slot_label}</b>"]
@@ -233,7 +215,6 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await _safe_edit_or_send(q, context, chat_id, "\n".join(lines), InlineKeyboardMarkup(kb))
 
 async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Equipa o unique_id escolhido usando a lógica central do player_manager."""
     q = update.callback_query
     await q.answer()
     uid = q.data.replace("equip_pick_", "")
@@ -241,51 +222,27 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = q.message.chat.id
 
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
-        return
+    if not pdata: return
 
     st = (pdata.get("player_state") or {}).get("action")
     if st not in (None, "idle"):
         await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True); return
 
-    inv = pdata.get("inventory", {}) or {}
-    inst = inv.get(uid)
-    if not isinstance(inst, dict):
-        await q.answer("𝑰𝒕𝒆𝒎 𝒊𝒏𝒗𝒂́ʟ𝒊𝒅𝒐 𝒐𝒖 𝒏𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒂𝒅𝒐.", show_alert=True); return
-
-    tpl = (getattr(game_data, "ITEMS_DATA", {}).get(inst.get("base_id")) or
-           getattr(game_data, "ITEM_BASES", {}).get(inst.get("base_id")) or {})
-
-    lvl_req = int(tpl.get("level_req", 0))
-    try:
-        player_level = int(pdata.get("level") or pdata.get("𝐥𝐞𝐯𝐞𝐥") or 1)
-    except Exception:
-        player_level = 1
-    if lvl_req and player_level < lvl_req:
-        await q.answer(f"𝑹𝒆𝒒𝒖𝒆𝒓 𝒏𝒊́ᴠᴇʟ {lvl_req}.", show_alert=True); return
-
     success, message = await player_manager.equip_unique_item_for_user(user_id, uid)
-
     if not success:
-        await q.answer(message, show_alert=True)
-        return
+        await q.answer(message, show_alert=True); return
 
     await q.answer("𝑬𝒒𝒖𝒊𝒑𝒂𝒅𝒐!", show_alert=False)
-    await equipment_menu(update, context) # Chama função async
+    await equipment_menu(update, context)
     
 async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Desequipa o item do slot (se houver)."""
     q = update.callback_query
     await q.answer()
     slot = q.data.replace("equip_unequip_", "")
     user_id = q.from_user.id
-    chat_id = q.message.chat.id
-
+    
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
-        return
+    if not pdata: return
 
     st = (pdata.get("player_state") or {}).get("action")
     if st not in (None, "idle"):
@@ -297,11 +254,10 @@ async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     eq[slot] = None
     pdata["equipment"] = eq
-
     await player_manager.save_player_data(user_id, pdata)
 
     await q.answer("𝑹𝒆𝒎𝒐𝒗𝒊𝒅𝒐.", show_alert=False)
-    await equipment_menu(update, context) # Chama função async
+    await equipment_menu(update, context)
     
 
 # ---------- Exporta handlers ----------

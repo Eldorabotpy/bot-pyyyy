@@ -1,5 +1,5 @@
 # handlers/profile_handler.py
-# (VERSÃO CORRIGIDA: Atualização de Energia em Tempo Real e Fix do Visual)
+# (VERSÃO ESTILIZADA: HUD Moderno + Termo RPG para Premium)
 
 import logging
 import unicodedata
@@ -16,7 +16,7 @@ from modules.game_data import skills as skills_data
 from modules.player import stats as player_stats
 from modules.game_data.class_evolution import can_player_use_skill
 
-# --- NOVO IMPORT NECESSÁRIO PARA CORRIGIR A ENERGIA ---
+# Import para correção de energia
 from modules.player import actions as player_actions
 
 logger = logging.getLogger(__name__)
@@ -69,231 +69,6 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
             return fd
     return None
 
-async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    chat_id = query.message.chat.id
-    player_data = await player_manager.get_player_data(user_id)
-    if not player_data:
-        await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
-        return
-    
-    player_class_key = player_stats._get_class_key_normalized(player_data)
-    
-    player_skill_ids = player_data.get("skills", [])
-    if not player_skill_ids:
-        text = "📚 <b>Suas Habilidades</b>\n\nVocê ainda não aprendeu nenhuma habilidade."
-        kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")]]
-        await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
-        return
-
-    active_skills_lines = []
-    passive_skills_lines = []
-    
-    for skill_id in player_skill_ids:
-        skill_info = skills_data.SKILL_DATA.get(skill_id)
-        if not skill_info: continue
-            
-        allowed_classes = skill_info.get("allowed_classes", [])
-        if not can_player_use_skill(player_class_key, allowed_classes):
-            continue 
-            
-        name = skill_info.get("display_name", skill_id)
-        desc = skill_info.get("description", "Sem descrição.")
-        mana_cost = skill_info.get("mana_cost")
-        skill_type = skill_info.get("type", "unknown")
-        line = f"• <b>{name}</b>"
-        if mana_cost is not None:
-            line += f" ({mana_cost} MP)"
-        line += f": <i>{html.escape(desc)}</i>"
-        if skill_type == "active" or skill_type.startswith("support"):
-            active_skills_lines.append(line)
-        elif skill_type == "passive":
-            passive_skills_lines.append(line)
-            
-    text_parts = ["📚 <b>Suas Habilidades</b>\n"]
-    if active_skills_lines:
-        text_parts.append("✨ <b><u>Habilidades Ativas</u></b> ✨")
-        text_parts.extend(active_skills_lines)
-        text_parts.append("(Você pode equipar até 6 skills ativas para usar em combate)")
-        text_parts.append("")
-    if passive_skills_lines:
-        text_parts.append("🛡️ <b><u>Habilidades Passivas</u></b> 🛡️")
-        text_parts.extend(passive_skills_lines)
-        text_parts.append("")
-        
-    if not active_skills_lines and not passive_skills_lines:
-        text_parts.append("<i>Você não possui nenhuma habilidade que sua classe atual possa usar.</i>")
-
-    kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")]]
-    if active_skills_lines:
-        kb.insert(0, [InlineKeyboardButton("⚙️ Equipar Skills Ativas", callback_data="skills_equip_menu")])
-    
-    final_text = "\n".join(text_parts)
-    reply_markup = InlineKeyboardMarkup(kb)
-    await _safe_edit_or_send(query, context, chat_id, final_text, reply_markup)
-
-async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    chat_id = query.message.chat.id
-    
-    player_data = await player_manager.get_player_data(user_id)
-    if not player_data: return
-
-    player_class_key = player_stats._get_class_key_normalized(player_data)
-
-    all_skill_ids = player_data.get("skills", [])
-    equipped_ids = player_data.get("equipped_skills", [])
-    if not isinstance(equipped_ids, list):
-        equipped_ids = []
-        player_data["equipped_skills"] = equipped_ids
-
-    active_skill_ids = []
-    for skill_id in all_skill_ids:
-        skill_type = skills_data.SKILL_DATA.get(skill_id, {}).get("type", "unknown")
-        if skill_type == "active" or skill_type.startswith("support"):
-            active_skill_ids.append(skill_id)
-
-    if not active_skill_ids:
-        text = "⚙️ Equipar Skills Ativas\n\nVocê não possui nenhuma skill ativa para equipar."
-        kb = [[InlineKeyboardButton("⬅️ Voltar (Habilidades)", callback_data="skills_menu_open")]]
-        await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
-        return
-    
-    text_parts = [f"⚙️ <b>Equipar Skills Ativas</b> (Limite: {len(equipped_ids)}/{MAX_EQUIPPED_SKILLS})\n"]
-    kb_rows = []
-    text_parts.append("✅ <b><u>Equipadas Atualmente</u></b> ✅")
-    
-    if not equipped_ids:
-        text_parts.append("<i>Nenhuma skill ativa equipada.</i>")
-    else:
-        for skill_id in equipped_ids:
-            skill_info = skills_data.SKILL_DATA.get(skill_id)
-            if not skill_info: continue
-            
-            allowed_classes = skill_info.get("allowed_classes", [])
-            if not can_player_use_skill(player_class_key, allowed_classes):
-                name = skill_info.get("display_name", skill_id)
-                text_parts.append(f"• <s><b>{name}</b> (Classe Inválida)</s>")
-            else:
-                name = skill_info.get("display_name", skill_id)
-                mana_cost = skill_info.get("mana_cost")
-                line = f"• <b>{name}</b>"
-                if mana_cost is not None: line += f" ({mana_cost} MP)"
-                text_parts.append(line)
-            
-            kb_rows.append([InlineKeyboardButton(f"➖ Desequipar {name}", callback_data=f"unequip_skill:{skill_id}")])
-
-    text_parts.append("\n" + ("─" * 20) + "\n")
-    text_parts.append("➕ <b><u>Disponíveis para Equipar</u></b> ➕")
-    
-    slots_free = MAX_EQUIPPED_SKILLS - len(equipped_ids)
-    available_to_equip_found = False
-
-    for skill_id in active_skill_ids:
-        if skill_id not in equipped_ids:
-            skill_info = skills_data.SKILL_DATA.get(skill_id)
-            if not skill_info: continue
-
-            allowed_classes = skill_info.get("allowed_classes", [])
-            if not can_player_use_skill(player_class_key, allowed_classes):
-                continue 
-
-            available_to_equip_found = True
-            name = skill_info.get("display_name", skill_id)
-            mana_cost = skill_info.get("mana_cost")
-            line = f"• <b>{name}</b>"
-            if mana_cost is not None: line += f" ({mana_cost} MP)"
-            text_parts.append(line)
-            
-            if slots_free > 0:
-                kb_rows.append([InlineKeyboardButton(f"➕ Equipar {name}", callback_data=f"equip_skill:{skill_id}")])
-            else:
-                kb_rows.append([InlineKeyboardButton(f"🚫 Limite Atingido", callback_data="noop")])
-
-    if not available_to_equip_found:
-        text_parts.append("<i>Não há outras skills ativas disponíveis.</i>")
-    
-    kb_rows.append([InlineKeyboardButton("⬅️ Voltar (Habilidades)", callback_data="skills_menu_open")])
-    final_text = "\n".join(text_parts)
-    reply_markup = InlineKeyboardMarkup(kb_rows)
-    await _safe_edit_or_send(query, context, chat_id, final_text, reply_markup)
-
-async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-
-    try:
-        skill_id = query.data.split(":", 1)[1]
-    except IndexError:
-        return
-
-    player_data = await player_manager.get_player_data(user_id)
-    if not player_data: return
-
-    skill_info = skills_data.SKILL_DATA.get(skill_id)
-    if not skill_info: return
-
-    player_class_key = player_stats._get_class_key_normalized(player_data)
-    allowed_classes = skill_info.get("allowed_classes", [])
-    
-    if not can_player_use_skill(player_class_key, allowed_classes):
-        await query.answer("Sua classe não pode equipar esta habilidade!", show_alert=True)
-        await show_equip_skills_menu(update, context)
-        return
-
-    equipped_skills = player_data.setdefault("equipped_skills", [])
-    if not isinstance(equipped_skills, list):
-        equipped_skills = []
-        player_data["equipped_skills"] = equipped_skills
-    
-    if skill_id in equipped_skills:
-        await show_equip_skills_menu(update, context)
-        return
-    
-    if len(equipped_skills) >= MAX_EQUIPPED_SKILLS:
-        await query.answer(f"Limite atingido!", show_alert=True)
-        await show_equip_skills_menu(update, context)
-        return
-    
-    equipped_skills.append(skill_id)
-    await player_manager.save_player_data(user_id, player_data)
-    
-    await show_equip_skills_menu(update, context)
-
-async def unequip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    try: skill_id = query.data.split(":", 1)[1]
-    except IndexError: return
-    player_data = await player_manager.get_player_data(user_id)
-    if not player_data: return
-    equipped_skills = player_data.get("equipped_skills", [])
-    if skill_id in equipped_skills:
-        equipped_skills.remove(skill_id)
-        await player_manager.save_player_data(user_id, player_data)
-    await show_equip_skills_menu(update, context)
-
-async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer("Ação inválida ou limite atingido!")
-
-async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
-    try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception: pass
-    try:
-        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception: pass
-    try:
-        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-    except Exception as e: logger.error(f"Falha ao enviar mensagem: {e}")
-
 def _bar(current: int, total: int, blocks: int = 10, filled_char: str = '🟧', empty_char: str = '⬜️') -> str:
     if total <= 0: filled = blocks
     else:
@@ -311,6 +86,181 @@ def _normalize_profession(raw):
             return (k, 1, 0)
     return None
 
+async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
+    try:
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+    except Exception: pass
+    try:
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
+    except Exception: pass
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as e: logger.error(f"Falha ao enviar mensagem: {e}")
+
+# ====================================================================
+# MENUS DE SKILLS
+# ====================================================================
+async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    chat_id = query.message.chat.id
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
+        return
+    
+    player_class_key = player_stats._get_class_key_normalized(player_data)
+    player_skill_ids = player_data.get("skills", [])
+    
+    if not player_skill_ids:
+        text = "📚 <b>Suas Habilidades</b>\n\nVocê ainda não aprendeu nenhuma habilidade."
+        kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")]]
+        await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
+        return
+
+    active_skills_lines = []
+    passive_skills_lines = []
+    
+    for skill_id in player_skill_ids:
+        skill_info = skills_data.SKILL_DATA.get(skill_id)
+        if not skill_info: continue
+        allowed_classes = skill_info.get("allowed_classes", [])
+        if not can_player_use_skill(player_class_key, allowed_classes): continue 
+            
+        name = skill_info.get("display_name", skill_id)
+        desc = skill_info.get("description", "Sem descrição.")
+        mana_cost = skill_info.get("mana_cost")
+        skill_type = skill_info.get("type", "unknown")
+        line = f"• <b>{name}</b>"
+        if mana_cost is not None: line += f" ({mana_cost} MP)"
+        line += f": <i>{html.escape(desc)}</i>"
+        
+        if skill_type == "active" or skill_type.startswith("support"):
+            active_skills_lines.append(line)
+        elif skill_type == "passive":
+            passive_skills_lines.append(line)
+            
+    text_parts = ["📚 <b>GRIMOIRE DE HABILIDADES</b>\n"]
+    if active_skills_lines:
+        text_parts.append("✨ <b><u>Ativas & Suporte</u></b>")
+        text_parts.extend(active_skills_lines)
+        text_parts.append("")
+    if passive_skills_lines:
+        text_parts.append("🛡️ <b><u>Passivas</u></b>")
+        text_parts.extend(passive_skills_lines)
+        text_parts.append("")
+        
+    kb = [[InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")]]
+    if active_skills_lines:
+        kb.insert(0, [InlineKeyboardButton("⚙️ Equipar Skills Ativas", callback_data="skills_equip_menu")])
+    
+    final_text = "\n".join(text_parts)
+    await _safe_edit_or_send(query, context, chat_id, final_text, InlineKeyboardMarkup(kb))
+
+async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    chat_id = query.message.chat.id
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data: return
+
+    player_class_key = player_stats._get_class_key_normalized(player_data)
+    all_skill_ids = player_data.get("skills", [])
+    equipped_ids = player_data.get("equipped_skills", [])
+    if not isinstance(equipped_ids, list):
+        equipped_ids = []
+        player_data["equipped_skills"] = equipped_ids
+
+    active_skill_ids = []
+    for skill_id in all_skill_ids:
+        skill_type = skills_data.SKILL_DATA.get(skill_id, {}).get("type", "unknown")
+        if skill_type == "active" or skill_type.startswith("support"):
+            active_skill_ids.append(skill_id)
+
+    if not active_skill_ids:
+        text = "⚙️ Equipar Skills\n\nVocê não possui skills ativas."
+        kb = [[InlineKeyboardButton("⬅️ Voltar", callback_data="skills_menu_open")]]
+        await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(kb))
+        return
+    
+    text_parts = [f"⚙️ <b>EQUIPAR SKILLS</b> (Slots: {len(equipped_ids)}/{MAX_EQUIPPED_SKILLS})\n"]
+    kb_rows = []
+    
+    # Equipadas
+    text_parts.append("✅ <b><u>Em Uso</u></b>")
+    if not equipped_ids:
+        text_parts.append("<i>Nenhuma.</i>")
+    else:
+        for skill_id in equipped_ids:
+            skill_info = skills_data.SKILL_DATA.get(skill_id)
+            if not skill_info: continue
+            name = skill_info.get("display_name", skill_id)
+            kb_rows.append([InlineKeyboardButton(f"➖ Remover {name}", callback_data=f"unequip_skill:{skill_id}")])
+            text_parts.append(f"• <b>{name}</b>")
+
+    text_parts.append("\n➕ <b><u>Disponíveis</u></b>")
+    slots_free = MAX_EQUIPPED_SKILLS - len(equipped_ids)
+    
+    for skill_id in active_skill_ids:
+        if skill_id not in equipped_ids:
+            skill_info = skills_data.SKILL_DATA.get(skill_id)
+            if not skill_info: continue
+            allowed_classes = skill_info.get("allowed_classes", [])
+            if not can_player_use_skill(player_class_key, allowed_classes): continue 
+
+            name = skill_info.get("display_name", skill_id)
+            text_parts.append(f"• {name}")
+            if slots_free > 0:
+                kb_rows.append([InlineKeyboardButton(f"➕ Equipar {name}", callback_data=f"equip_skill:{skill_id}")])
+            else:
+                kb_rows.append([InlineKeyboardButton(f"🚫 {name} (Slot Cheio)", callback_data="noop")])
+
+    kb_rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="skills_menu_open")])
+    await _safe_edit_or_send(query, context, chat_id, "\n".join(text_parts), InlineKeyboardMarkup(kb_rows))
+
+async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    try: skill_id = query.data.split(":", 1)[1]
+    except IndexError: return
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data: return
+
+    equipped = player_data.setdefault("equipped_skills", [])
+    if len(equipped) >= MAX_EQUIPPED_SKILLS:
+        await query.answer("Limite de skills atingido!", show_alert=True)
+        return
+    
+    if skill_id not in equipped:
+        equipped.append(skill_id)
+        await player_manager.save_player_data(user_id, player_data)
+    
+    await show_equip_skills_menu(update, context)
+
+async def unequip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    try: skill_id = query.data.split(":", 1)[1]
+    except IndexError: return
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data: return
+    equipped = player_data.setdefault("equipped_skills", [])
+    if skill_id in equipped:
+        equipped.remove(skill_id)
+        await player_manager.save_player_data(user_id, player_data)
+    await show_equip_skills_menu(update, context)
+
+async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer("Ação indisponível.", show_alert=True)
+
+# ====================================================================
+# PERFIL PRINCIPAL (AQUI ESTÁ A MUDANÇA)
+# ====================================================================
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
@@ -325,148 +275,142 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else: await context.bot.send_message(chat_id, text)
         return
     
-    # --- CORREÇÃO: FORÇAR ATUALIZAÇÃO DA ENERGIA NO PERFIL ---
-    # Isso garante que a barra não fique "cinza" (0/35) se o jogador tiver energia regenerada no cache.
-    try:
-        player_actions._apply_energy_autoregen_inplace(player_data)
-    except Exception as e:
-        logger.error(f"Erro ao regenerar energia no profile: {e}")
-    # ---------------------------------------------------------
+    # Atualiza energia visual
+    try: player_actions._apply_energy_autoregen_inplace(player_data)
+    except: pass
     
+    # Stats Totais
     totals = await player_manager.get_player_total_stats(player_data)
     
-    total_hp_max = int(totals.get('max_hp', 50))
-    total_atk = int(totals.get('attack', 0))
-    total_def = int(totals.get('defense', 0))
-    total_ini = int(totals.get('initiative', 0))
-    total_luck = int(totals.get('luck', 0))
-    total_mp_max = int(totals.get('max_mana', 10))
-
-    current_hp = max(0, min(int(player_data.get('current_hp', total_hp_max)), total_hp_max))
-    current_mp = max(0, min(int(player_data.get('current_mp', total_mp_max)), total_mp_max))
+    max_hp = int(totals.get('max_hp', 50))
+    max_mp = int(totals.get('max_mana', 10))
+    atk = int(totals.get('attack', 0))
+    defense = int(totals.get('defense', 0))
+    ini = int(totals.get('initiative', 0))
+    luck = int(totals.get('luck', 0))
     
-    chance_esquiva = int((await player_manager.get_player_dodge_chance(player_data)) * 100)
-    chance_ataque_duplo = int((await player_manager.get_player_double_attack_chance(player_data)) * 100)
+    cur_hp = max(0, min(int(player_data.get('current_hp', max_hp)), max_hp))
+    cur_mp = max(0, min(int(player_data.get('current_mp', max_mp)), max_mp))
+    cur_energy = int(player_data.get('energy', 0))
+    max_energy = int(player_manager.get_player_max_energy(player_data))
 
-    location_key = player_data.get('current_location', 'reino_eldora')
-    location_name = (game_data.REGIONS_DATA or {}).get(location_key, {}).get('display_name', 'Lugar Desconhecido')
+    dodge = int((await player_manager.get_player_dodge_chance(player_data)) * 100)
+    double_atk = int((await player_manager.get_player_double_attack_chance(player_data)) * 100)
 
-    # ===== BLOCO PREMIUM CORRIGIDO =====
-    premium_line = ""
+    # Info Básica
+    char_name = player_data.get('character_name', 'Aventureiro')
+    loc_key = player_data.get('current_location', 'reino_eldora')
+    loc_name = (game_data.REGIONS_DATA or {}).get(loc_key, {}).get('display_name', 'Desconhecido')
+    
+    cls_key = (player_data.get("class") or "no_class").lower()
+    cls_cfg = (game_data.CLASSES_DATA or {}).get(cls_key, {})
+    cls_name = cls_cfg.get("display_name", cls_key.title())
+    cls_emoji = cls_cfg.get("emoji", "👤")
+
+    # --- MUDANÇA DE NOME: PREMIUM -> BÊNÇÃO ---
+    premium_txt = ""
     raw_tier = player_data.get("premium_tier")
-    raw_exp = player_data.get("premium_expires_at") 
-
     if raw_tier and raw_tier != "free":
-        tier_name = raw_tier.capitalize()
-        if raw_exp:
+        exp = player_data.get("premium_expires_at")
+        date_str = "Permanente"
+        if exp:
             try:
-                dt_exp = datetime.fromisoformat(raw_exp)
-                if dt_exp.tzinfo is None: dt_exp = dt_exp.replace(tzinfo=timezone.utc)
-                fmt_date = dt_exp.strftime('%d/%m/%Y %H:%M UTC')
-                premium_line = f"\n👑 <b>Status Premium:</b> {tier_name}\n(Expira em: {fmt_date})"
-            except Exception:
-                premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Data Inválida)"
-        else:
-            premium_line = f"\n👑 <b>Status Premium:</b> {tier_name} (Sem Data)"
-    
-    max_energy  = int(player_manager.get_player_max_energy(player_data))
-    combat_level = int(player_data.get('level', 1))
-    combat_xp = int(player_data.get('xp', 0))
-    try: combat_next = int(game_data.get_xp_for_next_combat_level(combat_level))
-    except Exception: combat_next = 0
-    combat_bar = _bar(combat_xp, combat_next)
+                dt = datetime.fromisoformat(exp)
+                date_str = dt.strftime('%d/%m/%Y')
+            except: pass
+        # AQUI MUDAMOS O TEXTO
+        premium_txt = f"\n✨ <b>Bênção:</b> {raw_tier.capitalize()} <code>({date_str})</code>"
 
-    prof_line = "" 
+    # Progressão (Nível e Profissão)
+    lvl = int(player_data.get('level', 1))
+    xp = int(player_data.get('xp', 0))
+    try: next_xp = int(game_data.get_xp_for_next_combat_level(lvl))
+    except: next_xp = 0
+    xp_bar = _bar(xp, next_xp)
+
+    prof_block = ""
     prof_norm = _normalize_profession(player_data.get('profession'))
     if prof_norm:
-        prof_key, prof_level, prof_xp = prof_norm
-        prof_name = (game_data.PROFESSIONS_DATA or {}).get(prof_key, {}).get('display_name', prof_key)
-        try: prof_next = int(game_data.get_xp_for_next_collection_level(prof_level))
-        except Exception: prof_next = 0
-        prof_bar = _bar(prof_xp, prof_next, blocks=10, filled_char='🟨', empty_char='⬜️')
-        prof_line = f"\n💼 <b>Profissão:</b> {prof_name} — Nível {prof_level}\n<code>[{prof_bar}]</code> {prof_xp}/{prof_next} XP"
+        p_key, p_lvl, p_xp = prof_norm
+        p_name = (game_data.PROFESSIONS_DATA or {}).get(p_key, {}).get('display_name', p_key)
+        try: p_next = int(game_data.get_xp_for_next_collection_level(p_lvl))
+        except: p_next = 0
+        p_bar = _bar(p_xp, p_next, blocks=8, filled_char='🟨', empty_char='⬜️')
+        prof_block = (
+            f"\n💼 <b>Profissão:</b> {p_name} <code>Nv.{p_lvl}</code>\n"
+            f" ╰┈➤ <code>[{p_bar}]</code> {p_xp}/{p_next}"
+        )
+
+    pts = int(player_data.get("stat_points", 0) or 0)
     
-    class_banner = ""
+    # MONTAGEM DO LAYOUT (ESTILO HUD MODERNO + SETAS)
+    text = (
+        f"👤 <b>PERFIL DE {char_name.upper()}</b>{premium_txt}\n"
+        f"──────────────────────\n"
+        f"🛡 <b>Classe:</b> {cls_emoji} {cls_name}\n"
+        f"📍 <b>Local:</b> {loc_name}\n\n"
+        
+        f"📊 <b>BARRAS VITAIS</b>\n"
+        f"├─ ❤️ <b>HP.....</b> <code>{cur_hp}/{max_hp}</code>\n"
+        f"├─ 💙 <b>MP.....</b> <code>{cur_mp}/{max_mp}</code>\n"
+        f"└─ ⚡️ <b>ENE....</b> <code>{cur_energy}/{max_energy}</code>\n\n"
+
+        f"⚔️ <b>ATRIBUTOS DE COMBATE</b>\n"
+        f"├─ ⚔️ <b>ATK....</b> <code>{atk}</code>\n"
+        f"├─ 🛡 <b>DEF....</b> <code>{defense}</code>\n"
+        f"├─ 🏃 <b>INI....</b> <code>{ini}</code>\n"
+        f"└─ 🍀 <b>LUK....</b> <code>{luck}</code>\n\n"
+        
+        f"🎲 <b>CHANCES SECUNDÁRIAS</b>\n"
+        f" ╰┈➤ 💨 Esquiva: <code>{dodge}%</code>\n"
+        f" ╰┈➤ ⚔️ Atk Duplo: <code>{double_atk}%</code>\n\n"
+        
+        f"🎖 <b>PROGRESSÃO</b>\n"
+        f" ╰┈➤ 🎯 Pontos Livres: <code>{pts}</code>\n"
+        f" ╰┈➤ ⚔️ Nível {lvl}: <code>[{xp_bar}]</code> {xp}/{next_xp}"
+        f"{prof_block}"
+    )
+    
     if player_manager.needs_class_choice(player_data):
-        class_banner = "\n\n✨ <b>Escolha sua Classe!</b>"
+        text += "\n\n⚠️ <b>AÇÃO NECESSÁRIA:</b> Escolha sua classe!"
 
-    current_class_key = (player_data.get("class") or "no_class").lower()
-    class_config = (game_data.CLASSES_DATA or {}).get(current_class_key, {})
-    class_name = class_config.get("display_name", current_class_key.title())
-    class_emoji = class_config.get("emoji", "👤")
-
-    char_name = player_data.get('character_name','Aventureiro(a)')
-    available_points = int(player_data.get("stat_points", 0) or 0)
-
-    lines = [
-        f"👤 <b>Pᴇʀғɪʟ ᴅᴇ {char_name}</b>{premium_line}",
-        f"{class_emoji} <b>Classe:</b> {class_name}", 
-        f"📍 <b>𝑳𝒐𝒄𝒂𝒍𝒊𝒛𝒂𝒄̧𝒂̃𝒐 𝑨𝒕𝒖𝒂𝒍:</b> {location_name}",
-        "",
-        f"❤️ <b>𝐇𝐏:</b> {current_hp} / {total_hp_max}",
-        f"💙 <b>𝐌𝐚𝐧𝐚:</b> {current_mp} / {total_mp_max}",
-        f"⚡️ <b>𝐄𝐧𝐞𝐫𝐠𝐢𝐚:</b> {int(player_data.get('energy', 0))} / {max_energy}",
-        "",
-        f"🧡 <b>𝐇𝐏 𝐌𝐚́𝐱𝐢𝐦𝐨:</b> {total_hp_max}",
-        f"⚔️ <b>𝐀𝐭𝐚𝐪𝐮𝐞:</b> {total_atk}",
-        f"🛡️ <b>𝐃𝐞𝐟𝐞𝐬𝐚:</b> {total_def}",
-        f"🏃 <b>𝐈𝐧𝐢𝐜𝐢𝐚𝐭𝐢𝐯𝐚:</b> {total_ini}",
-        f"🍀 <b>𝐒𝐨𝐫𝐭𝐞:</b> {total_luck}",
-        f"⚡️ <b>Chance de Esquiva:</b> {chance_esquiva}%",
-        f"⚔️ <b>Chance de Ataque Duplo:</b> {chance_ataque_duplo}%",
-        "",
-        f"🎯 <b>𝑷𝒐𝒏𝒕𝒐𝒔 𝒅𝒆 𝑨𝒕𝒓𝒊𝒃𝒖𝒕𝒐 𝒅𝒊𝒔𝒑𝒐𝒏𝒊́𝒗𝒆𝒊𝒔:</b> {available_points}",
-        f"🎖️ <b>𝑵𝒊́𝒗𝒆𝒍 𝒅𝒆 𝑪𝒐𝒎𝒃𝒂𝒕𝒆:</b> {combat_level}\n<code>[{combat_bar}]</code> {combat_xp}/{combat_next} 𝐗𝐏",
-    ]
-    if prof_line: lines.append(prof_line)
-    if class_banner: lines.append(class_banner)
-
-    profile_text = "\n".join(lines)
-
+    # --- TECLADO ---
     keyboard = []
     if player_manager.needs_class_choice(player_data):
         keyboard.append([InlineKeyboardButton("✨ 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐂𝐥𝐚𝐬𝐬𝐞", callback_data='class_open')])
     if not prof_norm:
         keyboard.append([InlineKeyboardButton("💼 𝐄𝐬𝐜𝐨𝐥𝐡𝐞𝐫 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data='job_menu')])
 
-    if location_key == "reino_eldora":
-        back_callback = "back_to_kingdom"
-    else:
-        back_callback = f"open_region:{location_key}"
+    back_cb = "back_to_kingdom" if loc_key == "reino_eldora" else f"open_region:{loc_key}"
 
     keyboard.extend([
-        [InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚 𝐝𝐞 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨𝐬 🏰", callback_data='adventurer_guild_main')],
-        [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬 📊", callback_data='status_open')],
-        [InlineKeyboardButton("💼 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨 💼", callback_data="job_menu")],
-        [InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨𝐬 🧰", callback_data='equipment_menu')],
-        [InlineKeyboardButton("🎒 𝐕𝐞𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨 🎒", callback_data='inventory_menu')],
-        [InlineKeyboardButton("📚 𝐇𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞𝐬 📚", callback_data='skills_menu_open')],
-        [InlineKeyboardButton("🎨 𝐌𝐮𝐝𝐚𝐫 𝐀𝐩𝐚𝐫𝐞̂𝐧𝐜𝐢𝐚 🎨", callback_data='skin_menu')],
+        [InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚", callback_data='adventurer_guild_main')],
+        [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬", callback_data='status_open'), InlineKeyboardButton("🧰 𝐄𝐪𝐮𝐢𝐩𝐬", callback_data='equipment_menu')],
+        [InlineKeyboardButton("🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data='inventory_menu'), InlineKeyboardButton("📚 𝐒𝐤𝐢𝐥𝐥𝐬", callback_data='skills_menu_open')],
+        [InlineKeyboardButton("💼 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data="job_menu"), InlineKeyboardButton("🎨 𝐒𝐤𝐢𝐧𝐬", callback_data='skin_menu')],
         [InlineKeyboardButton("🔄 𝐂𝐨𝐧𝐯𝐞𝐫𝐭𝐞𝐫 𝐑𝐞𝐜𝐨𝐦𝐩𝐞𝐧𝐬𝐚𝐬 🔄", callback_data='conv:main')],
-        
-        [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 ⬅️", callback_data=back_callback)],
+        [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data=back_cb)],
     ])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    media = _get_class_media(player_data, "personagem")
     
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    media = _get_class_media(player_data, "personagem")
+
     if query:
         try: await query.delete_message()
-        except Exception: pass
+        except: pass
 
     if media and media.get("id"):
         try:
-            fid  = media["id"]
+            fid = media["id"]
             ftyp = (media.get("type") or "photo").lower()
-            if ftyp == "video":
-                await context.bot.send_video(chat_id=chat_id, video=fid, caption=profile_text, reply_markup=reply_markup, parse_mode="HTML")
-            else:
-                await context.bot.send_photo(chat_id=chat_id, photo=fid, caption=profile_text, reply_markup=reply_markup, parse_mode="HTML")
-            return 
+            send_func = context.bot.send_video if ftyp == "video" else context.bot.send_photo
+            kw = {"video": fid} if ftyp == "video" else {"photo": fid}
+            await send_func(chat_id=chat_id, caption=text, reply_markup=reply_markup, parse_mode="HTML", **kw)
+            return
         except Exception as e:
-            logger.error(f"Falha ao enviar mídia do perfil: {e}")
+            logger.error(f"Erro mídia perfil: {e}")
 
-    await context.bot.send_message(chat_id=chat_id, text=profile_text, reply_markup=reply_markup, parse_mode="HTML")
+    await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ====================================================================
 # EXPORTAÇÕES

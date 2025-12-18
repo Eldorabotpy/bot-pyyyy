@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO CORRIGIDA: COM ENTREGA DE TICKETS)
+# (VERSÃO CORRIGIDA: Limpa Boss Travado no Reinício)
 
 from __future__ import annotations
 import asyncio
@@ -44,8 +44,14 @@ from handlers.jobs import (
     start_world_boss_job,
     end_world_boss_job,
     job_pvp_monthly_reset,
-    distribute_kingdom_defense_ticket_job # <--- ADICIONADO AQUI
+    distribute_kingdom_defense_ticket_job
 )
+
+# Importa o Manager para verificar estado preso
+try:
+    from modules.world_boss.engine import world_boss_manager
+except ImportError:
+    world_boss_manager = None
 
 # Configuração de Logs
 logging.basicConfig(
@@ -76,24 +82,31 @@ def start_keep_alive():
 async def post_init_tasks(application: Application):
     """Executa agendamentos, recuperações e avisos após o bot iniciar."""
     
-    # 1. Notificação Admin
+    # 1. Limpeza de "Boss Fantasma" (CORREÇÃO DO BUG)
+    # Se o bot reiniciou e o JSON diz que tem boss, matamos ele pois o Timer foi perdido.
+    if world_boss_manager and world_boss_manager.is_active:
+        logger.warning("⚠️ Detectado World Boss ativo de sessão anterior (sem timer). Encerrando forçadamente...")
+        world_boss_manager.end_event(reason="Reinício do Sistema")
+        # Opcional: Avisar no log ou admin que foi limpo
+    
+    # 2. Notificação Admin
     if ADMIN_ID:
         try: 
-            msg_text = "🤖 <b>Sistema Online!</b>\n<i>Defesa do Reino e World Boss configurados.</i>"
+            msg_text = "🤖 <b>Sistema Online!</b>\n<i>Estado do World Boss foi verificado e limpo.</i>"
             if STARTUP_IMAGE_ID:
                 await application.bot.send_photo(chat_id=ADMIN_ID, photo=STARTUP_IMAGE_ID, caption=msg_text, parse_mode="HTML")
             else:
                 await application.bot.send_message(chat_id=ADMIN_ID, text=msg_text, parse_mode="HTML")
         except Exception as e:
-            logger.warning(f"Msg Admin falhou (verifique STARTUP_IMAGE_ID no config): {e}")
+            logger.warning(f"Msg Admin falhou: {e}")
     
-    # 2. Watchdog
+    # 3. Watchdog (Recupera ações de players)
     try:
         from modules.player.actions import check_stale_actions_on_startup
         await check_stale_actions_on_startup(application)
     except ImportError: pass
     
-    # 3. Recuperação de Caças
+    # 4. Recuperação de Caças
     try:
         from modules.recovery_manager import recover_active_hunts
         logging.info("[Startup] Recuperando caças ativas...")
@@ -115,9 +128,8 @@ async def post_init_tasks(application: Application):
     # --- A. Reset Diário ---
     jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
     
-    # --- B. Defesa do Reino (Evento + Tickets) ---
+    # --- B. Defesa do Reino ---
     if EVENT_TIMES:
-        # Loop para configurar cada horário de evento
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
             try:
                 start_min = sh * 60 + sm
@@ -125,16 +137,13 @@ async def post_init_tasks(application: Application):
                 duration = end_min - start_min
                 if duration < 0: duration += 1440 
 
-                # 1. Agendar o INÍCIO do evento
                 jq.run_daily(
                     start_kingdom_defense_event, 
                     time=dt_time(hour=sh, minute=sm, tzinfo=tz), 
                     name=f"kingdom_defense_{i}",
                     data={"event_duration_minutes": duration}
                 )
-
-                # 2. Agendar a ENTREGA DE TICKETS (Novo)
-                # Estamos agendando para o mesmo horário do início.
+                
                 jq.run_daily(
                     distribute_kingdom_defense_ticket_job,
                     time=dt_time(hour=sh, minute=sm, tzinfo=tz),
@@ -142,7 +151,7 @@ async def post_init_tasks(application: Application):
                     data={"event_time": f"{sh:02d}:{sm:02d}"}
                 )
 
-                logging.info(f"🛡️ Defesa agendada: {sh:02d}:{sm:02d} ({duration} min) + Tickets.")
+                logging.info(f"🛡️ Defesa agendada: {sh:02d}:{sm:02d} ({duration} min)")
             except Exception as e:
                 logging.error(f"Erro ao agendar Defesa {i}: {e}")
 
@@ -156,7 +165,8 @@ async def post_init_tasks(application: Application):
                     time=dt_time(hour=sh, minute=sm, tzinfo=tz), 
                     name=f"start_boss_{i}"
                 )
-                # Foge
+                
+                # Foge (Calcula duração correta se virar o dia)
                 jq.run_daily(
                     end_world_boss_job, 
                     time=dt_time(hour=eh, minute=em, tzinfo=tz), 
@@ -170,8 +180,7 @@ async def post_init_tasks(application: Application):
     try:
         from handlers.jobs import job_pvp_monthly_reset
         jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=0, minute=0, tzinfo=tz), name="pvp_monthly_check")
-    except ImportError:
-        logging.warning("Job de PvP Mensal não encontrado, pulando.")
+    except ImportError: pass
 
     logging.info("✅ Jobs agendados.")
 
