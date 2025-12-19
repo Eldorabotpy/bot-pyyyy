@@ -422,9 +422,6 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
         # O NOME DO ITEM EM NEGRITO (Destaque)
         lines.append(f"\n{status_icon} <b>{r['name']}</b>")
         
-        # DETALHES COM CONECTORES (Estilo Árvore)
-        # ├─ Tempo
-        # └─ Status
         lines.append(f"   ├─ ⏳ <code>{r['time']}</code>")
         lines.append(f"   └─ ⚒️ <i>{status_txt}</i>")
 
@@ -439,7 +436,7 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     # Lista de Botões de Receitas
     for r in current:
         # Nome mais limpo no botão
-        btn_txt = f"🔨 Forjar: {r['name'].split(' ')[-1]}" # Pega só a última palavra ou usa o nome todo se preferir
+        btn_txt = f"🔨 REFINAR: {r['name'].split(' ')[-1]}" # Pega só a última palavra ou usa o nome todo se preferir
         # Eu prefiro o nome completo, mas se ficar grande, corte:
         btn_txt = r['name']
         kb.append([InlineKeyboardButton(btn_txt, callback_data=f"ref_sel_{r['id']}")])
@@ -447,7 +444,7 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     # Navegação
     nav = []
     if page > 1: nav.append(InlineKeyboardButton("◀️ Anterior", callback_data=f"ref_main_PAGE_{page-1}"))
-    nav.append(InlineKeyboardButton("⟳ Atualizar", callback_data="noop_ref_page"))
+    nav.append(InlineKeyboardButton("💫 Atualizar", callback_data="noop_ref_page"))
     if page < total_p: nav.append(InlineKeyboardButton("Próxima ▶️", callback_data=f"ref_main_PAGE_{page+1}"))
     if nav: kb.append(nav)
     

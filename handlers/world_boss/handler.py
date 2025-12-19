@@ -110,9 +110,10 @@ async def encerrar_worldboss_command(update: Update, context: ContextTypes.DEFAU
     if not world_boss_manager.is_active:
         await update.message.reply_text("⚠️ 𝗡𝗮̃𝗼 𝗵𝗮́ 𝗲𝘃𝗲𝗻𝘁𝗼 𝗮𝘁𝗶𝘃𝗼.")
         return
-    battle_results = world_boss_manager.end_event(reason="Forçado por Admin")
+    battle_results = world_boss_manager.end_event(reason="Boss derrotado") 
+    
     await distribute_loot_and_announce(context, battle_results)
-    await update.message.reply_text("🛑 𝗘𝗻𝗰𝗲𝗿𝗿𝗮𝗱𝗼.")
+    await update.message.reply_text("🛑 𝗘𝗻𝗰𝗲𝗿𝗿𝗮𝗱𝗼 (Simulando Vitória).")
 
 async def wb_return_to_map(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -241,10 +242,21 @@ async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     txt = _format_battle_screen(user_id, pdata, stats)
     
+    # --- AQUI ESTAVA FALTANDO O BOTÃO DE POÇÃO ---
     kb = [
-        [InlineKeyboardButton("⚔️ 𝐀𝐓𝐀𝐂𝐀𝐑", callback_data='wb_act:attack'), InlineKeyboardButton("✨ 𝐒𝐊𝐈𝐋𝐋𝐒", callback_data='wb_skills')],
-        [InlineKeyboardButton("🎯 𝐌𝐮𝐝𝐚𝐫 𝐀𝐥𝐯𝐨", callback_data='wb_targets'), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='wb_leave')]
+        [
+            InlineKeyboardButton("⚔️ 𝐀𝐓𝐀𝐂𝐀𝐑", callback_data='wb_act:attack'), 
+            InlineKeyboardButton("✨ 𝐒𝐊𝐈𝐋𝐋𝐒", callback_data='wb_skills')
+        ],
+        [
+            InlineKeyboardButton("🧪 𝐏𝐨𝐜̧𝐨̃𝐞𝐬", callback_data='wb_potion'),  # <--- ADICIONEI ESTE BOTÃO
+            InlineKeyboardButton("🎯 𝐌𝐮𝐝𝐚𝐫 𝐀𝐥𝐯𝐨", callback_data='wb_targets')
+        ],
+        [
+            InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='wb_leave')
+        ]
     ]
+    # ---------------------------------------------
     
     try:
         await query.edit_message_caption(caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
@@ -290,8 +302,18 @@ async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(last_log[:100])
 
         if res.get("boss_defeated"):
+            
+            battle_results = world_boss_manager.end_event(reason="Boss derrotado")
+            
+            await distribute_loot_and_announce(context, battle_results)
+            # ---------------------
+
             kb_vic = [[InlineKeyboardButton("🌍 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨 𝐌𝐚𝐩𝐚", callback_data='wb_return_map')]]
-            await query.edit_message_caption("🏆 𝑽𝑰𝑻𝑶́𝑹𝑰𝑨! 𝑶 𝑩𝑶𝑺𝑺 𝑭𝑶𝑰 𝑫𝑬𝑹𝑹𝑶𝑻𝑨𝑫𝑶!", reply_markup=InlineKeyboardMarkup(kb_vic), parse_mode="HTML")
+            await query.edit_message_caption(
+                "🏆 𝑽𝑰𝑻𝑶́𝑹𝑰𝑨! 𝑶 𝑩𝑶𝑺𝑺 𝑭𝑶𝑰 𝑫𝑬𝑹𝑹𝑶𝑻𝑨𝑫𝑶!\n\n💰 𝑂𝑠 𝑝𝑟𝑒̂𝑚𝑖𝑜𝑠 𝑓𝑜𝑟𝑎𝑚 𝑒𝑛𝑣𝑖𝑎𝑑𝑜𝑠 𝑝𝑜𝑟 𝑚𝑒𝑛𝑠𝑎𝑔𝑒𝑚 𝑝𝑟𝑖𝑣𝑎𝑑𝑎!", 
+                reply_markup=InlineKeyboardMarkup(kb_vic), 
+                parse_mode="HTML"
+            )
             return
         
         if res.get("game_over"):

@@ -49,7 +49,7 @@ SKILL_REWARD_POOL = [
     "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira", "berserker_ultimo_recurso",
     "guerreiro_corte_perfurante", "guerreiro_colossal_defense", "guerreiro_bencao_sagrada"
 ]
-SKILL_CHANCE = 5.0 
+SKILL_CHANCE = 6.0 
 
 SKIN_REWARD_POOL = [
     "samurai_armadura_shogun", "samurai_armadura_demoniaca",
@@ -63,9 +63,9 @@ SKIN_REWARD_POOL = [
 SKIN_CHANCE = 3.0 
 
 LOOT_REWARD_POOL = [
-    ("pocao_cura_leve", 3, 5), ("pocao_cura_media", 3, 5),
+    ("pocao_cura_leve", 3, 7), ("pocao_cura_media", 3, 7),
     ("gems", 3, 5), ("frasco_sabedoria", 5, 10),
-    ("cristal_de_abertura", 5, 10), ("pedra_do_aprimoramento", 3, 14),
+    ("cristal_de_abertura", 4, 10), ("pedra_do_aprimoramento", 3, 14),
     ("pergaminho_durabilidade", 5, 10), ("sigilo_protecao", 1, 10)
 ]
 LOOT_CHANCE = 40.0
