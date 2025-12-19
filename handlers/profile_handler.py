@@ -367,7 +367,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         f"🎖 <b>PROGRESSÃO</b>\n"
         f" ╰┈➤ 🎯 Pontos Livres: <code>{pts}</code>\n"
-        f" ╰┈➤ ⚔️ Nível {lvl}: <code>[{xp_bar}]</code> {xp}/{next_xp}"
+        f" ╰┈➤ ⚔️ Nível {lvl} <code>\n"
+        f" ╰┈➤[{xp_bar}]</code> {xp}/{next_xp}"
         f"{prof_block}"
     )
     

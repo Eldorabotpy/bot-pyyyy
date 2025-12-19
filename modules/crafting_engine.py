@@ -168,28 +168,64 @@ async def start_craft(user_id: int, recipe_id: str):
 # =========================
 
 def _attr_to_enchant_key(attr_name: str) -> str:
+    """
+    Padroniza o nome do atributo para as chaves usadas no attributes.py e rarity.py.
+    Força o padrão em PORTUGUÊS para garantir que os emojis apareçam no menu.
+    """
     a = str(attr_name or "").lower().strip()
-    if not a: return "hp"
+    if not a: return "vida"
     
-    if a in {"forca", "força", "ataque", "attack", "dano", "damage", "dmg", "poder", "ofensivo"}:
-        return "dmg"
-    if a in {"vida", "hp", "saude", "saúde", "health"}:
-        return "hp"
-    if a in {"defesa", "defense", "armor", "blindagem"}:
-        return "defense"
-        
-    # --- CORREÇÃO DE CHAVE: Garante que Agilidade e Iniciativa são diferentes ---
-    if a in {"iniciativa", "initiative", "velocidade", "speed"}:
-        return "initiative"
-        
-    if a in {"agilidade", "agility"}:
-        return "agilidade" 
-    # --------------------------------------------------------------------------
+    # --- MAPEAMENTO DE TRADUÇÃO/PADRONIZAÇÃO ---
     
-    if a in {"sorte", "luck"}:
-        return "luck"
+    # VIDA / HP
+    if a in {"vida", "hp", "saude", "saúde", "health", "max_hp", "vitalidade"}:
+        return "vida"
         
-    # Retorna a própria chave se for um atributo especializado (Letalidade, Furia, Bushido)
+    # ATAQUE / DANO (Genérico, geralmente vira Força ou Ataque)
+    if a in {"ataque", "attack", "dano", "damage", "dmg", "poder"}:
+        return "ataque"
+        
+    # FORÇA (Específico)
+    if a in {"forca", "força", "strength", "str"}:
+        return "forca"
+
+    # DEFESA
+    if a in {"defesa", "defense", "def", "armor", "blindagem", "resistencia"}:
+        return "defesa"
+        
+    # INICIATIVA (Velocidade de Turno)
+    if a in {"iniciativa", "initiative", "velocidade", "speed", "ini"}:
+        return "iniciativa"
+        
+    # AGILIDADE (Stat Base)
+    if a in {"agilidade", "agility", "agi"}:
+        return "agilidade"
+    
+    # SORTE
+    if a in {"sorte", "luck", "lucky", "luk"}:
+        return "sorte"
+        
+    # INTELIGÊNCIA
+    if a in {"inteligencia", "intelligence", "int"}:
+        return "inteligencia"
+        
+    # PRECISÃO
+    if a in {"precisao", "mira", "precision", "accuracy"}:
+        return "precisao"
+        
+    # LETALIDADE
+    if a in {"letalidade", "lethality", "morte"}:
+        return "letalidade"
+        
+    # FÚRIA
+    if a in {"furia", "rage", "fury"}:
+        return "furia"
+        
+    # CRÍTICO
+    if a in {"crit", "critico", "critical", "crit_chance", "crit_chance_flat"}:
+        return "crit_chance_flat"
+
+    # Retorna a própria chave se não cair em nenhum filtro (ex: bushido, carisma, foco)
     return a
 
 def _class_primary_attr(player_class: str | None) -> str:
@@ -369,11 +405,11 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         "berserker": "furia", 
         "samurai": "bushido",
         "cacador": "precisao", 
-        "assassino": "letalidade", # <-- CORREÇÃO: Usa Letalidade (☠️) como chave primária
+        "assassino": "letalidade", 
         "monge": "foco",
         "mago": "inteligencia", 
         "bardo": "carisma", 
-        "curandeiro": "inteligencia"
+        "curandeiro": "fe" # ou "inteligencia" dependendo do seu sistema
     }
 
     if _is_weapon_slot(slot):

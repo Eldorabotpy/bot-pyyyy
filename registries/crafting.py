@@ -18,11 +18,15 @@ from handlers.refining_handler import (
     refining_main_handler,
     ref_select_handler,
     ref_confirm_handler,
+    # --- NOVOS HANDLERS DE LOTE (IMPORTADOS AGORA) ---
+    ref_batch_menu_handler,  
+    ref_batch_go_handler,    
+    # -------------------------------------------------
     dismantle_list_handler,
     dismantle_preview_handler,
     dismantle_confirm_handler,
-    dismantle_bulk_handler,  # <<< ADICIONADO: Handler do botão "Desmontar Todos"
-    noop_handler,            # <<< ADICIONADO: Handler para paginação (botão de refresh)
+    dismantle_bulk_handler,
+    noop_handler,
 )
 
 def register_crafting_handlers(application: Application):
@@ -39,10 +43,16 @@ def register_crafting_handlers(application: Application):
     
     # --- Grupo 3: Refino e Desmontagem ---
     application.add_handler(refining_main_handler)
-    application.add_handler(noop_handler)              # <<< REGISTRADO
+    application.add_handler(noop_handler)
     application.add_handler(ref_select_handler)
     application.add_handler(ref_confirm_handler)
+    
+    # --- REGISTRO DOS NOVOS BOTÕES DE LOTE ---
+    application.add_handler(ref_batch_menu_handler) # Menu de escolher quantidade
+    application.add_handler(ref_batch_go_handler)   # Ação de confirmar lote
+    # -------------------------------------------
+
     application.add_handler(dismantle_list_handler)
     application.add_handler(dismantle_preview_handler)
     application.add_handler(dismantle_confirm_handler)
-    application.add_handler(dismantle_bulk_handler)    # <<< REGISTRADO: Agora o botão vai funcionar!
+    application.add_handler(dismantle_bulk_handler)
