@@ -562,10 +562,10 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     
     if not participant_data: return
 
-    # --- VARIÁVEIS DE CONTAGEM (Novas) ---
+    # --- 1. INICIALIZAÇÃO DAS VARIÁVEIS (Essenciais para não dar erro) ---
     skill_winners_msg = []
     skin_winners_msg = []
-    loot_summary = {} # Dicionário para agrupar itens: {"Nome do Item": quantidade}
+    loot_summary = {} 
     
     total_participants = 0
     total_gold_distributed = 0
@@ -582,15 +582,14 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
         pdata = participant_data.get(uid)
         name = html.escape(pdata.get('character_name', 'Herói')) if pdata else "Herói Desconhecido"
         medal = medals[i] if i < 3 else "🏅"
-        top_3_msg.append(f"{medal} {name} ({dmg:,} pts)")
+        top_3_msg.append(f"{medal} {name} (<code>{dmg:,}</code> pts)")
 
-    # --- LOOP DE DISTRIBUIÇÃO ---
+    # --- 2. LOOP DE DISTRIBUIÇÃO E CONTAGEM ---
     for user_id, pdata in participant_data.items():
         # Ignora quem não deu dano
         if leaderboard.get(str(user_id), 0) <= 0: continue
         
-        # Conta participante real
-        total_participants += 1
+        total_participants += 1 # Conta +1 jogador
 
         if boss_defeated:
             try:
@@ -598,15 +597,16 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 loot_won_messages = []
                 player_mudou = False
 
-                # 1. RECOMPENSA GARANTIDA (Soma aos totais gerais)
+                # --- Garante Ouro e XP ---
                 player_manager.add_gold(pdata, PARTICIPATION_GOLD)
                 loot_won_messages.append(f"💰 <b>Ouro:</b> +{PARTICIPATION_GOLD}")
-                total_gold_distributed += PARTICIPATION_GOLD
+                total_gold_distributed += PARTICIPATION_GOLD # Soma no total geral
                 
                 pdata["xp"] = pdata.get("xp", 0) + PARTICIPATION_XP
                 loot_won_messages.append(f"✨ <b>XP:</b> +{PARTICIPATION_XP}")
-                total_xp_distributed += PARTICIPATION_XP
+                total_xp_distributed += PARTICIPATION_XP # Soma no total geral
 
+                # Verifica Level Up
                 try:
                     _, _, level_up_msg = player_manager.check_and_apply_level_up(pdata)
                     if level_up_msg: loot_won_messages.append(level_up_msg)
@@ -614,8 +614,8 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 
                 player_mudou = True
 
-                # 2. SORTEIOS
-                # --- Skill ---
+                # --- Sorteios ---
+                # Skill
                 if random.random() * 100 <= SKILL_CHANCE:
                     won_skill_id = random.choice(SKILL_REWARD_POOL)
                     won_item_id = f"tomo_{won_skill_id}" 
@@ -627,7 +627,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     skill_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
                     player_mudou = True
 
-                # --- Skin ---
+                # Skin
                 if random.random() * 100 <= SKIN_CHANCE:
                     won_skin_id = random.choice(SKIN_REWARD_POOL)
                     won_item_id = f"caixa_{won_skin_id}"
@@ -639,7 +639,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     skin_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
                     player_mudou = True
 
-                # --- Loot Comum ---
+                # Loot Comum
                 if random.random() * 100 <= LOOT_CHANCE:
                     loot_choice = random.choice(LOOT_REWARD_POOL)
                     if isinstance(loot_choice, tuple):
@@ -660,9 +660,11 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     # Adiciona ao resumo geral
                     loot_summary[i_name] = loot_summary.get(i_name, 0) + l_qty
 
+                # Salva Player
                 if player_mudou:
                     await player_manager.save_player_data(user_id, pdata)
                 
+                # Envia DM
                 if loot_won_messages:
                     await _send_dm_to_winner(context, user_id, loot_won_messages)
 
@@ -672,90 +674,80 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
             except Exception as e:
                 logger.error(f"[WB_LOOT] Erro no player {user_id}: {e}")
 
-    # --- MONTAGEM DA MENSAGEM ---
-    # ... (código anterior de contagem de itens e stats continua igual) ...
-
     # =========================================================================
-    # --- MONTAGEM DA MENSAGEM ESTILIZADA (RPG STYLE) ---
+    # --- 3. MONTAGEM DA MENSAGEM DO GRUPO (ESTILO RPG) ---
     # =========================================================================
     
     separator = "━━━━━━━━━━━━━━━━━━"
     
     if not boss_defeated:
-        # --- CENÁRIO DE DERROTA/FUGA ---
         title = "☁️ <b>AS SOMBRAS PERMANECEM...</b>"
         body = (
             "<i>O inimigo provou ser poderoso demais e recuou para as trevas.\n"
             "Os heróis devem treinar mais para a próxima batalha!</i>\n\n"
         )
-        
         body += f"🛡️ <b>Resistência (Top 3):</b>\n" + "\n".join(top_3_msg)
         body += f"\n\n👥 <b>Guerreiros Ativos:</b> <code>{total_participants}</code>"
         
     else:
-        # --- CENÁRIO DE VITÓRIA ---
         title = "⚔️ <b>A LENDA FOI ESCRITA!</b>"
-        
-        # Cabeçalho e Flavor Text
         body = (
             "<i>O chão treme e o silêncio reina... O inimigo caiu!\n"
             "A glória deste dia será cantada nas tavernas!</i>\n\n"
         )
         
-        # Seção 1: MVPs
+        # Seção MVP
         body += f"🏆 <b>HALL DA GLÓRIA (MVP)</b>\n"
-        # Reformata o Top 3 para ficar bonito (Ex: 🥇 Nome <code>Dano</code>)
-        formatted_top3 = []
-        for line in top_3_msg:
-             # Pequeno ajuste pra colocar o dano em monospace se possível, ou mantém o original
-            formatted_top3.append(line.replace("(", "<code>").replace(")", "</code>")) 
-        body += "\n".join(formatted_top3)
+        body += "\n".join(top_3_msg)
         
         if last_hit_msg:
-            # Remove o prefixo padrão e estiliza
             hitter_name = last_hit_msg.split(":")[-1].strip()
             body += f"\n💥 <b>Golpe Final:</b> {hitter_name}"
             
-        # Seção 2: Estatísticas Globais (Totalizadores)
+        # Seção Stats Globais
         body += f"\n\n{separator}\n"
         body += "🌍 <b>ESPÓLIOS DE GUERRA</b>\n"
         body += f"├ ⚔️ <b>Heróis:</b> <code>{total_participants}</code>\n"
         body += f"├ 💰 <b>Ouro Total:</b> <code>{total_gold_distributed:,}</code>\n"
         body += f"└ ✨ <b>XP Total:</b> <code>{total_xp_distributed:,}</code>\n"
         
-        # Seção 3: Loot Comum (Agrupado)
+        # Seção Loot Agrupado
         if loot_summary:
             body += f"{separator}\n"
             body += "📦 <b>RECURSOS COLETADOS</b>\n"
-            # Lista mais compacta e bonita
             for item_name, qtd in loot_summary.items():
                 body += f"▪️ <code>{qtd}x</code> {item_name}\n"
         
-        # Seção 4: Drops Raros (Destaque Máximo)
+        # Seção Raros
         has_rares = skin_winners_msg or skill_winners_msg
         if has_rares:
             body += f"\n🚨 <b>ARTEFATOS LENDÁRIOS</b>\n"
-            
             if skin_winners_msg:
                 for msg in skin_winners_msg:
-                    # Limpa o bullet point antigo para usar o novo
                     clean_msg = msg.replace("• ", "").strip()
                     body += f"🌟 {clean_msg}\n"
-            
             if skill_winners_msg:
                 for msg in skill_winners_msg:
                     clean_msg = msg.replace("• ", "").strip()
                     body += f"📜 {clean_msg}\n"
 
-    # Envio da Mensagem
+    # --- 4. ENVIO DA MENSAGEM ---
     try:
-        await context.bot.send_message(
-            chat_id=ANNOUNCEMENT_CHAT_ID,
-            message_thread_id=ANNOUNCEMENT_THREAD_ID,
-            text=f"{title}\n\n{body}",
-            parse_mode="HTML"
-        )
+        # Verifica se o ID do chat está definido
+        if ANNOUNCEMENT_CHAT_ID:
+            await context.bot.send_message(
+                chat_id=ANNOUNCEMENT_CHAT_ID,
+                message_thread_id=ANNOUNCEMENT_THREAD_ID, # Remova essa linha se seu grupo não tiver tópicos
+                text=f"{title}\n\n{body}",
+                parse_mode="HTML"
+            )
+            print("✅ Notificação do Boss enviada no grupo!") # Log de sucesso
+        else:
+            print("⚠️ AVISO: ANNOUNCEMENT_CHAT_ID não configurado.")
+            
     except Exception as e:
+        # Isso vai imprimir o erro exato no seu terminal se falhar
+        print(f"❌ ERRO AO ENVIAR NOTIFICAÇÃO NO GRUPO: {e}")
         logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
 async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):

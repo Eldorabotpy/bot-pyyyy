@@ -292,11 +292,10 @@ async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ------------------------------------
     
     try:
-        # Se a mensagem for idêntica (tempo não mudou o suficiente), o telegram dá erro.
-        # O try/except ignora esse erro para não travar o bot.
+        
         await query.edit_message_caption(caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     except BadRequest: 
-        # As vezes o relógio bate no mesmo segundo e o Telegram reclama que não tem o que editar
+        
         pass
 
 async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
