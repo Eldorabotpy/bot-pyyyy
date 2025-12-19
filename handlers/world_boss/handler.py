@@ -3,6 +3,7 @@
 
 import logging
 import html
+import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from telegram.error import BadRequest
@@ -32,6 +33,18 @@ def _format_battle_screen(user_id, player_data, total_stats):
     state = world_boss_manager.get_battle_view(user_id)
     if not state: return "Erro de estado."
     
+    # --- LÓGICA DE VISUALIZAÇÃO DE RESPAWN (NOVO) ---
+    is_dead = False
+    wait_txt = ""
+    respawn_until = state.get('respawn_until', 0)
+    now = time.time()
+    
+    if respawn_until > now:
+        is_dead = True
+        remaining = int(respawn_until - now)
+        wait_txt = f"👻 𝐑𝐄𝐒𝐒𝐔𝐒𝐂𝐈𝐓𝐀𝐍𝐃𝐎: {remaining}𝐬"
+    # ------------------------------------------------
+
     p_name = player_data.get('character_name', 'Herói')
     p_current_hp, p_max_hp = state['hp'], state['max_hp']
     p_current_mp, p_max_mp = state['mp'], state['max_mp']
@@ -72,9 +85,14 @@ def _format_battle_screen(user_id, player_data, total_stats):
     log_block = "\n".join(log_lines)
     if not log_block: log_block = "Aguardando sua ação..."
     
+    # --- ATUALIZAÇÃO DO TÍTULO ---
     titulo = "🌋 𝐑𝐀𝐈𝐃 𝐁𝐎𝐒𝐒"
-    if world_boss_manager.environment_hazard:
+    
+    if is_dead:
+        titulo += f" | {wait_txt}"  # Mostra o contador se estiver morto
+    elif world_boss_manager.environment_hazard:
         titulo += " | 🔥 𝗖𝗔𝗠𝗣𝗢 𝗘𝗠 𝗖𝗛𝗔𝗠𝗔𝗦"
+    # -----------------------------
     
     witches_alive = world_boss_manager.entities["witch_heal"]["alive"] or world_boss_manager.entities["witch_debuff"]["alive"]
     if t_key == "boss" and witches_alive:
@@ -242,25 +260,44 @@ async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     txt = _format_battle_screen(user_id, pdata, stats)
     
-    # --- AQUI ESTAVA FALTANDO O BOTÃO DE POÇÃO ---
-    kb = [
-        [
-            InlineKeyboardButton("⚔️ 𝐀𝐓𝐀𝐂𝐀𝐑", callback_data='wb_act:attack'), 
-            InlineKeyboardButton("✨ 𝐒𝐊𝐈𝐋𝐋𝐒", callback_data='wb_skills')
-        ],
-        [
-            InlineKeyboardButton("🧪 𝐏𝐨𝐜̧𝐨̃𝐞𝐬", callback_data='wb_potion'),  # <--- ADICIONEI ESTE BOTÃO
-            InlineKeyboardButton("🎯 𝐌𝐮𝐝𝐚𝐫 𝐀𝐥𝐯𝐨", callback_data='wb_targets')
-        ],
-        [
-            InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='wb_leave')
+    # --- LÓGICA DE BOTÕES INTELIGENTE ---
+    state = world_boss_manager.get_battle_view(user_id)
+    respawn_until = state.get('respawn_until', 0) if state else 0
+    import time
+    now = time.time()
+    
+    kb = []
+    
+    if respawn_until > now:
+        remaining = int(respawn_until - now)
+        kb = [
+            [InlineKeyboardButton(f"⏳ 𝐑𝐞𝐬𝐬𝐮𝐬𝐜𝐢𝐭𝐚𝐧𝐝𝐨... ({remaining}𝐬)", callback_data='wb_fight_return')],
+            [InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫 / 𝐒𝐚𝐢𝐫", callback_data='wb_leave')]
         ]
-    ]
-    # ---------------------------------------------
+        
+    else:
+        kb = [
+            [
+                InlineKeyboardButton("⚔️ 𝐀𝐓𝐀𝐂𝐀𝐑", callback_data='wb_act:attack'), 
+                InlineKeyboardButton("✨ 𝐒𝐊𝐈𝐋𝐋𝐒", callback_data='wb_skills')
+            ],
+            [
+                InlineKeyboardButton("🧪 𝐏𝐨ç𝐨̃𝐞𝐬", callback_data='wb_potion'),
+                InlineKeyboardButton("🎯 𝐌𝐮𝐝𝐚𝐫 𝐀𝐥𝐯𝐨", callback_data='wb_targets')
+            ],
+            [
+                InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝐫", callback_data='wb_leave')
+            ]
+        ]
+    # ------------------------------------
     
     try:
+        # Se a mensagem for idêntica (tempo não mudou o suficiente), o telegram dá erro.
+        # O try/except ignora esse erro para não travar o bot.
         await query.edit_message_caption(caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
-    except BadRequest: pass
+    except BadRequest: 
+        # As vezes o relógio bate no mesmo segundo e o Telegram reclama que não tem o que editar
+        pass
 
 async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -296,7 +333,14 @@ async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(res['error'], show_alert=True)
             if "derrotado" in res['error']: await wb_target_selection(update, context)
             return
-
+        
+        if res.get("respawning"):
+            wait = res.get("wait_time", 60)
+            await query.answer(f"☠️ Morto! Aguarde {wait}s", show_alert=True)
+            
+            await wb_fight_screen(update, context) 
+            return
+        
         log_lines = res.get("state", {}).get("log", "").split("\n")
         last_log = log_lines[-1] if log_lines else "Ação OK"
         await query.answer(last_log[:100])

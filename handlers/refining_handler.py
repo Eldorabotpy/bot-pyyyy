@@ -589,7 +589,7 @@ async def ref_batch_confirm_callback(update: Update, context: ContextTypes.DEFAU
         f"──────────────────────\n"
         f" ╰┈➤ ⏳ <b>Tempo Total:</b> <code>{_fmt_minutes_or_seconds(seconds)}</code>\n"
         f" ╰┈➤ ✨ <b>XP Previsto:</b> <code>{xp}</code>\n"
-        f" ╰┈➤ ⏲️<i>Produção em massa iniciada...</i>"
+        f" ╰┈➤ ⏲️ <i>Produção em massa iniciada...</i>"
     )
     
     # Envia a mensagem de progresso nova
