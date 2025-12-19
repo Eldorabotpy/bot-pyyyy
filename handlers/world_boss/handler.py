@@ -33,7 +33,7 @@ def _format_battle_screen(user_id, player_data, total_stats):
     state = world_boss_manager.get_battle_view(user_id)
     if not state: return "Erro de estado."
     
-    # --- LÓGICA DE VISUALIZAÇÃO DE RESPAWN (NOVO) ---
+    # --- LÓGICA DE VISUALIZAÇÃO DE RESPAWN ---
     is_dead = False
     wait_txt = ""
     respawn_until = state.get('respawn_until', 0)
@@ -43,10 +43,14 @@ def _format_battle_screen(user_id, player_data, total_stats):
         is_dead = True
         remaining = int(respawn_until - now)
         wait_txt = f"👻 𝐑𝐄𝐒𝐒𝐔𝐒𝐂𝐈𝐓𝐀𝐍𝐃𝐎: {remaining}𝐬"
-    # ------------------------------------------------
+    # -----------------------------------------
 
     p_name = player_data.get('character_name', 'Herói')
-    p_current_hp, p_max_hp = state['hp'], state['max_hp']
+    
+    # ✅ CORREÇÃO AQUI: Garante que nunca mostre vida negativa (max(0, ...))
+    p_current_hp = max(0, state['hp']) 
+    p_max_hp = state['max_hp']
+    
     p_current_mp, p_max_mp = state['mp'], state['max_mp']
     p_atk = int(total_stats.get('attack', 0))
     p_def = int(total_stats.get('defense', 0))
@@ -85,14 +89,12 @@ def _format_battle_screen(user_id, player_data, total_stats):
     log_block = "\n".join(log_lines)
     if not log_block: log_block = "Aguardando sua ação..."
     
-    # --- ATUALIZAÇÃO DO TÍTULO ---
     titulo = "🌋 𝐑𝐀𝐈𝐃 𝐁𝐎𝐒𝐒"
     
     if is_dead:
-        titulo += f" | {wait_txt}"  # Mostra o contador se estiver morto
+        titulo += f" | {wait_txt}"
     elif world_boss_manager.environment_hazard:
         titulo += " | 🔥 𝗖𝗔𝗠𝗣𝗢 𝗘𝗠 𝗖𝗛𝗔𝗠𝗔𝗦"
-    # -----------------------------
     
     witches_alive = world_boss_manager.entities["witch_heal"]["alive"] or world_boss_manager.entities["witch_debuff"]["alive"]
     if t_key == "boss" and witches_alive:

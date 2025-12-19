@@ -96,7 +96,7 @@ class WorldBossManager:
     def _reset_entities(self):
         self.entities = {
             "boss": {
-                "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", "hp": 35000, "max_hp": 25000, 
+                "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", "hp": 35000, "max_hp": 35000, 
                 "alive": True, "stats": {"attack": 50, "defense": 20, "initiative": 5, "luck": 20},
                 "turn_counter": 0 
             },
