@@ -405,20 +405,12 @@ class WorldBossManager:
             has_miracle = False
             # Verifica Auras e Buffs Lendários (prevent_death)
             for sk_id in player_skills:
-                # Usa a função auxiliar aqui também para garantir leitura correta
                 sk_data = get_skill_data_with_rarity(player_data, sk_id)
                 if not sk_data: continue
-                
                 eff = sk_data.get("effects", {})
                 
-                # Checa na Aura (se tiver)
-                aura = eff.get("party_aura", {})
-                if aura.get("prevent_death_mechanic"):
-                    has_miracle = True
-                    break
-                
-                # Checa efeito direto
-                if eff.get("ignore_death_once"): # Campo padronizado do Berserker/Guerreiro
+                # Checa na Aura ou efeito direto
+                if eff.get("party_aura", {}).get("prevent_death_mechanic") or eff.get("ignore_death_once"):
                     has_miracle = True
                     break
 
@@ -428,16 +420,23 @@ class WorldBossManager:
                 logs.append(f"✨ <b>MILAGRE!</b> {player_data.get('character_name','Herói')} recusou-se a morrer!")
             
             else:
-                # --- LÓGICA DE RESPAWN DE 1 MINUTO ---
-                state['hp'] = state['max_hp'] # Restaura Vida
-                state['mp'] = state['max_mp'] # Restaura Mana
-                state['respawn_until'] = time.time() + 60 # Define espera de 60s
+                # --- LÓGICA DE RESPAWN ---
+                # 1. Restaura na Memória da Raid
+                state['hp'] = state['max_hp']
+                state['mp'] = state['max_mp']
+                state['respawn_until'] = time.time() + 60 
+                
+                # 2. Restaura no Objeto do Jogador (CRUCIAL!)
+                player_data['current_hp'] = state['max_hp']
+                player_data['current_mp'] = state['max_mp']
                 
                 logs.append(f"☠️ 𝐕𝐎𝐂𝐄̂ 𝐌𝐎𝐑𝐑𝐄𝐔! (Curando... Retorno em 60s)")
-                state['log'] = "\n".join(logs[-5:]) # Salva o log
+                state['log'] = "\n".join(logs[-5:]) 
+                
+                # 3. Salva no Banco de Dados IMEDIATAMENTE e Salva o Estado
+                await player_manager.save_player_data(user_id, player_data)
                 self.save_state()
                 
-                # Retorna um status especial para o handler atualizar a tela
                 return {"respawning": True, "wait_time": 60, "state": state}
 
         # =========================================================
