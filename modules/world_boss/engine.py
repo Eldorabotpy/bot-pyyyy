@@ -541,14 +541,15 @@ async def _send_dm_to_winner(context: ContextTypes.DEFAULT_TYPE, user_id: int, l
     except (Forbidden, TelegramError):
         return False
 
-# Em modules/world_boss/engine.py
-
 async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battle_results: dict):
     leaderboard = battle_results.get("leaderboard", {})
     last_hitter_id = battle_results.get("last_hitter_id")
     boss_defeated = battle_results.get("boss_defeated", False)
 
-    if not leaderboard: return
+    # 1. Trava de Segurança: Se ninguém bateu, cancela (evita erro de lista vazia)
+    if not leaderboard: 
+        print("⚠️ [WB] Leaderboard vazio. Ninguém atacou o boss.")
+        return
 
     # Carrega dados dos participantes
     participant_data = {}
@@ -561,7 +562,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     
     if not participant_data: return
 
-    # --- 1. INICIALIZAÇÃO DAS VARIÁVEIS (Essenciais para não dar erro) ---
+    # Variáveis de Texto
     skill_winners_msg = []
     skin_winners_msg = []
     loot_summary = {} 
@@ -572,81 +573,86 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     
     last_hit_msg = ""
     
-    # Prepara o Top 3
+    # --- PREPARAÇÃO DO TOP 3 (COM SEGURANÇA DE HTML) ---
     sorted_ranking = sorted(leaderboard.items(), key=lambda item: item[1], reverse=True)
     top_3_msg = []
     medals = ["🥇", "🥈", "🥉"]
+    
     for i, (uid_str, dmg) in enumerate(sorted_ranking[:3]):
         uid = int(uid_str)
         pdata = participant_data.get(uid)
-        name = html.escape(pdata.get('character_name', 'Herói')) if pdata else "Herói Desconhecido"
+        
+        # [BLINDAGEM 1] Limpa o nome aqui para o Ranking
+        raw_name = pdata.get('character_name', 'Herói') if pdata else "Herói Desconhecido"
+        safe_name = html.escape(raw_name) 
+        
         medal = medals[i] if i < 3 else "🏅"
-        top_3_msg.append(f"{medal} {name} (<code>{dmg:,}</code> pts)")
+        top_3_msg.append(f"{medal} {safe_name} (<code>{dmg:,}</code> pts)")
 
-    # --- 2. LOOP DE DISTRIBUIÇÃO E CONTAGEM ---
+    # --- LOOP DE DISTRIBUIÇÃO ---
     for user_id, pdata in participant_data.items():
-        # Ignora quem não deu dano
         if leaderboard.get(str(user_id), 0) <= 0: continue
         
-        total_participants += 1 # Conta +1 jogador
+        total_participants += 1
 
         if boss_defeated:
             try:
-                player_name = pdata.get("character_name", f"ID {user_id}")
+                # [BLINDAGEM 2] Limpa o nome aqui para uso geral
+                # Qualquer emoji, barra ou <tag> será convertido para texto seguro
+                player_name_raw = pdata.get("character_name", f"ID {user_id}")
+                player_name = html.escape(player_name_raw)
+                
                 loot_won_messages = []
                 player_mudou = False
 
-                # --- Garante Ouro e XP ---
+                # 1. Ouro e XP
                 player_manager.add_gold(pdata, PARTICIPATION_GOLD)
                 loot_won_messages.append(f"💰 <b>Ouro:</b> +{PARTICIPATION_GOLD}")
-                total_gold_distributed += PARTICIPATION_GOLD # Soma no total geral
+                total_gold_distributed += PARTICIPATION_GOLD
                 
                 pdata["xp"] = pdata.get("xp", 0) + PARTICIPATION_XP
                 loot_won_messages.append(f"✨ <b>XP:</b> +{PARTICIPATION_XP}")
-                total_xp_distributed += PARTICIPATION_XP # Soma no total geral
+                total_xp_distributed += PARTICIPATION_XP
 
-                # Verifica Level Up
                 try:
                     _, _, level_up_msg = player_manager.check_and_apply_level_up(pdata)
                     if level_up_msg: loot_won_messages.append(level_up_msg)
                 except Exception: pass
-                
                 player_mudou = True
 
-                # --- Sorteios ---
-                # Skill
+                # 2. Sorteios
+                # --- SKILL ---
                 if random.random() * 100 <= SKILL_CHANCE:
                     won_skill_id = random.choice(SKILL_REWARD_POOL)
                     won_item_id = f"tomo_{won_skill_id}" 
                     item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
-                    display_name = item_info.get("display_name", won_skill_id)
+                    d_name = item_info.get("display_name", won_skill_id)
                     player_manager.add_item_to_inventory(pdata, won_item_id, 1)
                     
-                    loot_won_messages.append(f"📚 <b>SKILL RARA:</b> {display_name}")
-                    skill_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
+                    loot_won_messages.append(f"📚 <b>SKILL RARA:</b> {d_name}")
+                    # player_name aqui já está protegido pela Blindagem 2
+                    skill_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
                     player_mudou = True
 
-                # Skin
+                # --- SKIN ---
                 if random.random() * 100 <= SKIN_CHANCE:
                     won_skin_id = random.choice(SKIN_REWARD_POOL)
                     won_item_id = f"caixa_{won_skin_id}"
                     item_info = game_data.ITEMS_DATA.get(won_item_id) or {}
-                    display_name = item_info.get("display_name", won_skin_id)
+                    d_name = item_info.get("display_name", won_skin_id)
                     player_manager.add_item_to_inventory(pdata, won_item_id, 1)
                     
-                    loot_won_messages.append(f"🎨 <b>SKIN LENDÁRIA:</b> {display_name}")
-                    skin_winners_msg.append(f"• {html.escape(player_name)} obteve <b>{display_name}</b>!")
+                    loot_won_messages.append(f"🎨 <b>SKIN LENDÁRIA:</b> {d_name}")
+                    skin_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
                     player_mudou = True
 
-                # Loot Comum
+                # --- LOOT COMUM ---
                 if random.random() * 100 <= LOOT_CHANCE:
                     loot_choice = random.choice(LOOT_REWARD_POOL)
                     if isinstance(loot_choice, tuple):
-                        l_id = loot_choice[0]
-                        l_qty = random.randint(loot_choice[1], loot_choice[2])
+                        l_id = loot_choice[0]; l_qty = random.randint(loot_choice[1], loot_choice[2])
                     else:
-                        l_id = loot_choice
-                        l_qty = 1
+                        l_id = loot_choice; l_qty = 1
                     
                     player_manager.add_item_to_inventory(pdata, l_id, l_qty)
                     i_info = game_data.ITEMS_DATA.get(l_id, {})
@@ -654,27 +660,25 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     i_emoji = i_info.get("emoji", "📦")
                     
                     loot_won_messages.append(f"{i_emoji} <b>Loot:</b> {l_qty}x {i_name}")
-                    player_mudou = True
-                    
-                    # Adiciona ao resumo geral
                     loot_summary[i_name] = loot_summary.get(i_name, 0) + l_qty
+                    player_mudou = True
 
-                # Salva Player
                 if player_mudou:
                     await player_manager.save_player_data(user_id, pdata)
                 
-                # Envia DM
                 if loot_won_messages:
                     await _send_dm_to_winner(context, user_id, loot_won_messages)
 
                 if user_id == last_hitter_id:
-                    last_hit_msg = f"💥 <b>Último Golpe:</b> {html.escape(player_name)}"
+                    # player_name já protegido
+                    last_hit_msg = f"💥 <b>Golpe Final:</b> {player_name}"
 
             except Exception as e:
-                logger.error(f"[WB_LOOT] Erro no player {user_id}: {e}")
+                logger.error(f"[WB_LOOT] Erro ao processar player {user_id}: {e}")
+                print(f"❌ Erro ao processar player {user_id}: {e}")
 
     # =========================================================================
-    # --- 3. MONTAGEM DA MENSAGEM DO GRUPO (ESTILO RPG) ---
+    # --- MONTAGEM DA MENSAGEM DO GRUPO ---
     # =========================================================================
     
     separator = "━━━━━━━━━━━━━━━━━━"
@@ -686,7 +690,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
             "Os heróis devem treinar mais para a próxima batalha!</i>\n\n"
         )
         body += f"🛡️ <b>Resistência (Top 3):</b>\n" + "\n".join(top_3_msg)
-        body += f"\n\n👥 <b>Guerreiros Ativos:</b> <code>{total_participants}</code>"
+        body += f"\n\n👥 <b>Participantes:</b> <code>{total_participants}</code>"
         
     else:
         title = "⚔️ <b>A LENDA FOI ESCRITA!</b>"
@@ -694,59 +698,54 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
             "<i>O chão treme e o silêncio reina... O inimigo caiu!\n"
             "A glória deste dia será cantada nas tavernas!</i>\n\n"
         )
-        
-        # Seção MVP
         body += f"🏆 <b>HALL DA GLÓRIA (MVP)</b>\n"
         body += "\n".join(top_3_msg)
         
         if last_hit_msg:
-            hitter_name = last_hit_msg.split(":")[-1].strip()
-            body += f"\n💥 <b>Golpe Final:</b> {hitter_name}"
+            # Remove o HTML de negrito para extrair o nome limpo se necessário, 
+            # mas aqui queremos apenas exibir a linha pronta que já montamos com segurança.
+            # O split anterior estava arriscado se o nome tivesse ':'. Vamos simplificar:
+            body += f"\n{last_hit_msg}"
             
-        # Seção Stats Globais
         body += f"\n\n{separator}\n"
         body += "🌍 <b>ESPÓLIOS DE GUERRA</b>\n"
         body += f"├ ⚔️ <b>Heróis:</b> <code>{total_participants}</code>\n"
         body += f"├ 💰 <b>Ouro Total:</b> <code>{total_gold_distributed:,}</code>\n"
         body += f"└ ✨ <b>XP Total:</b> <code>{total_xp_distributed:,}</code>\n"
         
-        # Seção Loot Agrupado
         if loot_summary:
             body += f"{separator}\n"
             body += "📦 <b>RECURSOS COLETADOS</b>\n"
             for item_name, qtd in loot_summary.items():
                 body += f"▪️ <code>{qtd}x</code> {item_name}\n"
         
-        # Seção Raros
-        has_rares = skin_winners_msg or skill_winners_msg
-        if has_rares:
+        # Mostra Raros
+        if skin_winners_msg or skill_winners_msg:
             body += f"\n🚨 <b>ARTEFATOS LENDÁRIOS</b>\n"
-            if skin_winners_msg:
-                for msg in skin_winners_msg:
-                    clean_msg = msg.replace("• ", "").strip()
-                    body += f"🌟 {clean_msg}\n"
-            if skill_winners_msg:
-                for msg in skill_winners_msg:
-                    clean_msg = msg.replace("• ", "").strip()
-                    body += f"📜 {clean_msg}\n"
+            # As mensagens já estão formatadas e escapadas no loop acima
+            for msg in skin_winners_msg: 
+                clean_msg = msg.replace("• ", "").strip()
+                body += f"🌟 {clean_msg}\n"
+            for msg in skill_winners_msg: 
+                clean_msg = msg.replace("• ", "").strip()
+                body += f"📜 {clean_msg}\n"
 
-    # --- 4. ENVIO DA MENSAGEM ---
+    # --- ENVIO DA MENSAGEM ---
     try:
-        # Verifica se o ID do chat está definido
         if ANNOUNCEMENT_CHAT_ID:
             await context.bot.send_message(
                 chat_id=ANNOUNCEMENT_CHAT_ID,
-                message_thread_id=ANNOUNCEMENT_THREAD_ID, # Remova essa linha se seu grupo não tiver tópicos
+                message_thread_id=ANNOUNCEMENT_THREAD_ID,
                 text=f"{title}\n\n{body}",
                 parse_mode="HTML"
             )
-            print("✅ Notificação do Boss enviada no grupo!") # Log de sucesso
+            print("✅ [WB] Notificação do Boss enviada no grupo com sucesso!")
         else:
-            print("⚠️ AVISO: ANNOUNCEMENT_CHAT_ID não configurado.")
+            print("⚠️ [WB] AVISO: ID do grupo não configurado no engine.py.")
             
     except Exception as e:
-        # Isso vai imprimir o erro exato no seu terminal se falhar
-        print(f"❌ ERRO AO ENVIAR NOTIFICAÇÃO NO GRUPO: {e}")
+        # Se cair aqui, o terminal vai te dizer EXATAMENTE o motivo.
+        print(f"❌ [WB] FALHA AO ENVIAR NOTIFICAÇÃO: {e}")
         logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
 async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):
