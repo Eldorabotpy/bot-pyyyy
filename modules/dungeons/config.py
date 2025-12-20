@@ -25,11 +25,14 @@ DEFAULT_DIFFICULTY_ORDER = ("iniciante", "infernal", "pesadelo")
 
 # O resto do ficheiro permanece igual
 ENTRY_KEY_ITEM_ID = "cristal_de_abertura"
+# ✅ AGORA É SEGURO ATUALIZAR
 EVOLUTION_ITEM_POOL: List[str] = [
-    "evo_fragmento_guerreiro",
-    "evo_fragmento_mago",
-    "evo_fragmento_bardo",
-    "evo_fragmento_monge",
-    "evo_fragmento_assassino",
-    "evo_fragmento_samurai",
+    "emblema_guerreiro",
+    "emblema_mago",
+    "emblema_bardo",
+    "emblema_monge",
+    "emblema_assassino",
+    "emblema_samurai",
+    "emblema_berserker",
+    "emblema_cacador",
 ]

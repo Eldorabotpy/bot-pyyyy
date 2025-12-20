@@ -308,6 +308,32 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             try:
                 log.append(f"🏆 <b>{monster_stats.get('name')} derrotado!</b>")
                 
+                state_action = player_data.get('player_state', {}).get('action')
+                
+                if state_action == 'evolution_combat':
+                    # 1. Limpa estado
+                    context.user_data.pop('battle_cache', None)
+                    if "cooldowns" in player_data: player_data.pop("cooldowns", None)
+                    
+                    # 2. Recupera qual era a classe alvo e chama o serviço
+                    details = player_data.get('player_state', {}).get('details', {})
+                    target_class = details.get('target_class_reward')
+                    
+                    # Importe class_evolution_service no topo do arquivo se der erro!
+                    success, msg_evo = await class_evolution_service.finalize_evolution(user_id, target_class)
+                    
+                    # 3. Define estado Idle e Salva
+                    player_data['player_state'] = {'action': 'idle'}
+                    await player_manager.save_player_data(user_id, player_data) # Recarrega pdata atualizado
+
+                    # 4. Mídia de Vitória
+                    media_sucesso = (file_id_manager.get_file_data("media_evolution_success") or {}).get('id')
+                    final_text = f"🏆 <b>VITÓRIA LENDÁRIA!</b>\n\n{msg_evo}\n\n<i>Seus atributos aumentaram e novas habilidades foram desbloqueadas.</i>"
+                    kb_fim = [[InlineKeyboardButton("📜 Ver Perfil", callback_data="profile")]]
+                    
+                    await _edit_media_or_caption(context, battle_cache, final_text, media_sucesso, "photo", InlineKeyboardMarkup(kb_fim))
+                    return
+                
                 # CASO 1: Dungeon
                 if in_dungeon:
                     combat_details_recon = {

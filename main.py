@@ -32,6 +32,7 @@ from config import (
     STARTUP_IMAGE_ID
 )
 from registries import register_all_handlers
+from registries.class_evolution import register_evolution_handlers
 
 # --- IMPORTAÇÃO DOS JOBS ---
 from handlers.jobs import (
@@ -189,7 +190,8 @@ if __name__ == '__main__':
 
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init_tasks).build()
     register_all_handlers(application)
-    
+    register_evolution_handlers(application)
+
     logging.info("🤖 Bot configurado. Iniciando...")
 
     MAX_RETRIES = 100

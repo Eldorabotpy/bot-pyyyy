@@ -2142,7 +2142,28 @@ SKILL_DATA = {
             }
         }
     },
-
+    "bardo_nota_cortante": { # [NOVO] Essencial para solar
+        "display_name": "𝐍𝐨𝐭𝐚 𝐂𝐨𝐫𝐭𝐚𝐧𝐭𝐞", "type": "active", 
+        "description": "Lança uma onda sonora afiada que corta o inimigo.",
+        "allowed_classes": ["bardo"],
+        "rarity_effects": {
+            "comum": {
+                "description": "Comum (CD 0, Mana 15): Dano 1.5x (Mágico).",
+                "mana_cost": 15,
+                "effects": {"cooldown_turns": 0, "damage_multiplier": 1.5, "damage_type": "magic"}
+            },
+            "epica": {
+                "description": "Épica (CD 0, Mana 12): Dano 1.7x (Mágico).",
+                "mana_cost": 12,
+                "effects": {"cooldown_turns": 0, "damage_multiplier": 1.7, "damage_type": "magic"}
+            },
+            "lendaria": {
+                "description": "Lendária (CD 0, Mana 10): Dano 2.0x (Mágico).",
+                "mana_cost": 10,
+                "effects": {"cooldown_turns": 0, "damage_multiplier": 2.0, "damage_type": "magic"}
+            }
+        }
+    },
     # --- HABILIDADES DE EVENTO (Assassino) ---
 
     "assassino_active_shadow_strike": {
@@ -2639,10 +2660,32 @@ SKILL_DATA = {
             }
         }
     },
+    "curandeiro_chama_sagrada": { # [NOVO] Essencial para solar
+        "display_name": "𝐂𝐡𝐚𝐦𝐚 𝐒𝐚𝐠𝐫𝐚𝐝𝐚", "type": "active", 
+        "description": "Queima o inimigo com fogo sagrado.",
+        "allowed_classes": ["curandeiro"],
+        "rarity_effects": {
+            "comum": {
+                "description": "Comum (CD 0, Mana 15): Dano 1.5x (Mágico).",
+                "mana_cost": 15,
+                "effects": {"cooldown_turns": 0, "damage_multiplier": 1.5, "damage_type": "magic"}
+            },
+            "epica": {
+                "description": "Épica (CD 0, Mana 12): Dano 1.8x (Mágico).",
+                "mana_cost": 12,
+                "effects": {"cooldown_turns": 0, "damage_multiplier": 1.8, "damage_type": "magic"}
+            },
+            "lendaria": {
+                "description": "Lendária (CD 0, Mana 10): Dano 2.2x (Mágico).",
+                "mana_cost": 10,
+                "effects": {"cooldown_turns": 0, "damage_multiplier": 2.2, "damage_type": "magic"}
+            }
+        }
+    },
+    
+    
 }
 
-
-# Adicione isto ao final de modules/game_data/skills.py
 
 def get_skill_data_with_rarity(player_data: dict, skill_id: str) -> dict | None:
     """

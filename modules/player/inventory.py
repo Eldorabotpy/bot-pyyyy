@@ -378,3 +378,45 @@ async def equip_unique_item_for_user(user_id: int, unique_id: str, expected_slot
     await save_player_data(user_id, pdata)
     name = item.get("display_name") or base_id or "Item"
     return True, f"Equipado {name} em {slot_from_item}."
+
+# No final de modules/player/inventory.py
+
+def migrate_legacy_evolution_items(player_data: dict) -> bool:
+    """
+    Converte itens antigos (evo_fragmento) para os novos (emblema).
+    Retorna True se houve alguma mudança.
+    """
+    # Mapa: "Nome Antigo" -> "Nome Novo"
+    MIGRATION_MAP = {
+        "evo_fragmento_guerreiro": "emblema_guerreiro",
+        "evo_fragmento_mago":      "emblema_mago",
+        "evo_fragmento_bardo":     "emblema_bardo",
+        "evo_fragmento_monge":     "emblema_monge",
+        "evo_fragmento_assassino": "emblema_assassino",
+        "evo_fragmento_samurai":   "emblema_samurai",
+        "evo_fragmento_berserker": "emblema_berserker",
+        "evo_fragmento_cacador":   "emblema_cacador",
+        # Adicione outros se houver (ex: cura, paladino, etc)
+    }
+
+    inventory = player_data.get("inventory", {})
+    changed = False
+
+    # Precisamos listar as chaves para evitar erro de modificar dicionário durante iteração
+    for old_id, new_id in MIGRATION_MAP.items():
+        if old_id in inventory:
+            qty = inventory[old_id]
+            if qty > 0:
+                # Adiciona ao novo item
+                current_new = inventory.get(new_id, 0)
+                inventory[new_id] = current_new + qty
+                
+                # Remove o item antigo
+                del inventory[old_id]
+                changed = True
+            else:
+                # Limpa lixo (item com quantidade 0)
+                del inventory[old_id]
+                changed = True
+    
+    return changed

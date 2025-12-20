@@ -98,7 +98,11 @@ async def get_player_data(user_id: int) -> Optional[dict]:
         if hasattr(inventory, "_sanitize_and_migrate_gold"):
             res = inventory._sanitize_and_migrate_gold(data)
             if asyncio.iscoroutine(res): await res
-        
+        # NOVA MIGRAÇÃO DE ITENS DE EVOLUÇÃO
+        if hasattr(inventory, "migrate_legacy_evolution_items"):
+            if inventory.migrate_legacy_evolution_items(data):
+                changed = True
+
         # 2. Energia
         if actions._apply_energy_autoregen_inplace(data): changed = True
         

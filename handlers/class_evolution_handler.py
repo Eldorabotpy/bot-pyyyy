@@ -1,5 +1,5 @@
 # handlers/class_evolution_handler.py
-# (VERSÃO CORRIGIDA - SUPORTE A SKILLS TIER 1)
+# (VERSÃO CORRIGIDA - Botão Voltar leva para a Região Atual)
 
 import logging
 from typing import Dict, Tuple, Optional, List, Any
@@ -12,6 +12,9 @@ from modules import class_evolution_service as evo_service
 from modules.game_data import class_evolution as evo_data
 from modules.game_data.skills import SKILL_DATA
 from modules.player import stats as player_stats
+
+# Importamos o novo módulo de batalha para iniciar a apresentação visual
+from modules import evolution_battle
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +69,9 @@ async def open_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     current_class_name = _get_player_class_name(pdata)
     level = pdata.get("level", 1)
     
+    # Recupera a localização atual para o botão de voltar
+    current_location = pdata.get("current_location", "reino_eldora")
+    
     caption_lines = [
         f"⛩️ <b>Caminho da Ascensão</b> ⛩️",
         f"Classe: {current_class_name} (Nível {level})",
@@ -98,16 +104,17 @@ async def open_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
             caption_lines.append("\n<b>Caminho completo!</b> O Teste Final aguarda.")
             keyboard.append([InlineKeyboardButton(f"⚔️ Iniciar Teste: {target_class.title()}", callback_data=f"evo_start_trial_confirm:{target_class}")])
     
-    # Botão de Skills (Passo 5B)
-    # Mostra sempre que o jogador tiver skills, para poder ver o menu mesmo no T1
+    # Botão de Skills
     keyboard.append([InlineKeyboardButton("💎 Aprimorar Skills de Evolução", callback_data="evo_skill_ascend_menu")])
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="open_profile_menu")])
+    
+    # [CORREÇÃO] Botão Voltar agora aponta para a região atual
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Mapa", callback_data=f"open_region:{current_location}")])
     
     try: await query.edit_message_text("\n".join(caption_lines), reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     except BadRequest: pass
 
 # ================================================
-# LÓGICA DE CUSTO DE SKILL (CORRIGIDA)
+# LÓGICA DE CUSTO DE SKILL
 # ================================================
 
 RARITY_UPGRADE_PATH_EVO = {
@@ -117,29 +124,22 @@ RARITY_UPGRADE_PATH_EVO = {
 }
 
 def _get_skill_upgrade_cost(pdata: dict, skill_id: str, current_rarity: str) -> Optional[dict]:
-    """
-    Calcula o custo para aprimorar uma skill.
-    CORREÇÃO: Agora suporta skills T1 (Iniciais).
-    """
+    """Calcula o custo para aprimorar uma skill."""
     skill_data = SKILL_DATA.get(skill_id)
     if not skill_data: return None
 
     base_class = player_stats._get_class_key_normalized(pdata)
     
     # 1. Tenta descobrir o Tier da Skill
-    target_tier = 1 # Assume Tier 1 por padrão (Skills Iniciais)
-    
-    # Verifica se a skill pertence a uma evolução (T2+)
+    target_tier = 1 
     for evo in evo_data.EVOLUTIONS.get(base_class, []):
         if skill_id in evo.get("unlocks_skills", []):
             target_tier = evo.get("tier_num")
             break
             
     # 2. Define o Tier do material de custo (Sempre Tier + 1)
-    # Ex: Skill T1 usa item da evolução T2 (Emblema)
-    # Ex: Skill T2 usa item da evolução T3 (Relíquia)
     cost_tier = target_tier + 1
-    if target_tier >= 6: cost_tier = 6 # Cap no T6
+    if target_tier >= 6: cost_tier = 6
 
     # 3. Encontra a evolução que contém o material de custo
     cost_evolution = None
@@ -148,13 +148,11 @@ def _get_skill_upgrade_cost(pdata: dict, skill_id: str, current_rarity: str) -> 
             cost_evolution = evo
             break
             
-    # Se não achou a evolução de custo (ex: não existe T7), usa um custo padrão alto ou aborta
     if not cost_evolution:
-        # Tenta pegar custo da última evolução disponível se for lendária
         if current_rarity == "lendaria": return None
-        return {"gold": 50000} # Fallback seguro
+        return {"gold": 50000} 
 
-    # 4. Extrai o ID do material do primeiro nó da árvore dessa evolução
+    # 4. Extrai o ID do material
     material_id = None
     asc_path = cost_evolution.get("ascension_path", [])
     if asc_path:
@@ -164,9 +162,9 @@ def _get_skill_upgrade_cost(pdata: dict, skill_id: str, current_rarity: str) -> 
                 material_id = item
                 break
     
-    if not material_id: return {"gold": 50000} # Fallback
+    if not material_id: return {"gold": 50000}
 
-    # 5. Define quantidades baseadas na raridade
+    # 5. Define quantidades
     cost = {}
     if current_rarity == "comum":
         cost[material_id] = 10
@@ -231,13 +229,14 @@ async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE
     try: target = query.data.split(":", 1)[1]
     except: return
 
+    # 1. Verifica se pode iniciar (service)
     result = await evo_service.start_evolution_trial(user_id, target)
     if not result.get("success"):
         await query.answer(result.get("message"), show_alert=True)
         return
 
-    from modules.dungeons import runtime as dungeons_runtime
-    await dungeons_runtime.start_evolution_trial_battle(update, context, user_id, result["trial_monster_id"], target)
+    # 2. Inicia a apresentação visual (agora usando o NOVO módulo)
+    await evolution_battle.start_evolution_presentation(update, context, user_id, target)
 
 # --- SKILL ASCENSION HANDLERS ---
 
@@ -250,16 +249,13 @@ async def show_skill_ascension_menu(update: Update, context: ContextTypes.DEFAUL
     text = "💎 <b>Aprimorar Skills</b> 💎\nSelecione uma skill para evoluir sua raridade.\n"
     kb = []
     
-    # Filtra skills aprimoráveis (que começam com 'evo_' OU são skills de classe conhecidas)
-    # Para simplificar, vamos listar todas que estão no dicionário novo
     valid_skills = []
     for sid, sdata in skills.items():
-        # Verifica se é um dicionário (formato novo) e se tem dados no SKILL_DATA
         if isinstance(sdata, dict) and sid in SKILL_DATA:
             valid_skills.append(sid)
             
     if not valid_skills:
-        text += "\n<i>Nenhuma skill aprimorável encontrada. Evolua sua classe para ganhar novas skills!</i>"
+        text += "\n<i>Nenhuma skill aprimorável encontrada.</i>"
     
     for sid in valid_skills:
         sdata = skills[sid]
@@ -318,19 +314,16 @@ async def confirm_skill_ascension(update: Update, context: ContextTypes.DEFAULT_
         await query.answer("Erro no custo.", show_alert=True)
         return
 
-    # Consome Ouro
     if not evo_service._consume_gold(pdata, cost.get("gold", 0)):
         await query.answer("Ouro insuficiente!", show_alert=True)
         return
         
-    # Consome Itens
     items_only = {k:v for k,v in cost.items() if k!="gold"}
     if not evo_service._consume_items(pdata, items_only):
-        player_manager.add_gold(pdata, cost.get("gold", 0)) # Reembolsa
+        player_manager.add_gold(pdata, cost.get("gold", 0))
         await query.answer("Itens insuficientes!", show_alert=True)
         return
         
-    # Aplica Upgrade
     sdata["progress"] = sdata.get("progress", 0) + 1
     path = RARITY_UPGRADE_PATH_EVO.get(sdata["rarity"])
     

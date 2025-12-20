@@ -1,5 +1,4 @@
 # handlers/menu/region.py
-# (VERSÃO CORRIGIDA: Salva Energia ao Visualizar para Evitar Dessincronia)
 
 import time
 import logging
@@ -20,7 +19,7 @@ from modules.dungeons.registry import get_dungeon_for_region
 # --- IMPORTS DE HANDLERS ESPECÍFICOS ---
 from modules.world_boss.engine import world_boss_manager
 from handlers.christmas_shop import is_event_active
-
+from modules.player.stats import can_see_evolution_menu
 logger = logging.getLogger(__name__)
 
 # Fallbacks de Importação Segura
@@ -313,6 +312,11 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             keyboard.append([InlineKeyboardButton("⛺ 𝐓𝐞𝐧𝐝𝐚 𝐝𝐨 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta')])
         if final_region_key == 'deserto_ancestral':
             keyboard.append([InlineKeyboardButton("🧙‍♂️ 𝐂𝐚𝐛𝐚𝐧𝐚 𝐝𝐨 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main')])
+        if final_region_key == 'deserto_ancestral': # Você pode mudar a região aqui se quiser
+            # Verifica se o jogador pode evoluir (nível máximo, etc)
+            from modules.player.stats import can_see_evolution_menu
+            if can_see_evolution_menu(player_data):
+                keyboard.append([InlineKeyboardButton("⛩️ 𝐓𝐞𝐦𝐩𝐥𝐨 𝐝𝐚 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu')])
         if final_region_key == 'picos_gelados' and is_event_active():
              keyboard.append([InlineKeyboardButton("🎅 𝐂𝐚𝐛𝐚𝐧𝐚 𝐝𝐨 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
                  
