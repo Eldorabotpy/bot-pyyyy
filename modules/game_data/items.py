@@ -1,5 +1,5 @@
 # modules/items.py
-# (VERSÃO FINAL: Geração Automática de Tomos com a Chave 'effects' Correta)
+# (VERSÃO CORRIGIDA: Inclui restrição de classe 'class_req' nos tomos automáticos)
 
 import logging
 
@@ -16,7 +16,6 @@ try:
     print(f"✅ Materiais carregados: {len(MATERIALS_DATA)}")
 except ImportError as e:
     print(f"❌ ERRO FATAL em items_materials: {e}")
-    # Materiais são essenciais, mantemos o raise se falhar
     raise e
 
 try:
@@ -44,7 +43,6 @@ try:
     from modules.game_data.items_runes import RUNE_ITEMS_DATA
     print(f"✅ Runas carregadas: {len(RUNE_ITEMS_DATA)}")
 except ImportError as e:
-    # CORREÇÃO: Não trava o bot se não tiver runas ainda
     print(f"⚠️ Aviso: items_runes não encontrado ou com erro ({e}). Ignorando.")
     RUNE_ITEMS_DATA = {}
 
@@ -52,7 +50,6 @@ except ImportError as e:
 # 2. FUSÃO DOS DADOS
 # ==============================================================================
 
-# Dicionários Principais
 ITEMS_DATA = {}
 MARKET_ITEMS = {} 
 
@@ -104,11 +101,12 @@ def _generate_auto_items():
             tomo_id = f"tomo_{skill_id}"
             skill_name = info.get('display_name', skill_id)
             
-            # Se o item não existe (não foi criado manualmente), cria agora
             if tomo_id not in ITEMS_DATA:
                 
-                # Define emoji baseado na classe (Visual)
+                # Pega as classes permitidas da skill
                 classes = info.get("allowed_classes", [])
+                
+                # Define emoji visual
                 emoji = "📘"
                 if "guerreiro" in classes or "berserker" in classes: emoji = "📕"
                 elif "cacador" in classes or "assassino" in classes: emoji = "📗"
@@ -117,22 +115,26 @@ def _generate_auto_items():
                 ITEMS_DATA[tomo_id] = {
                     "display_name": f"Tomo: {skill_name}",
                     "emoji": emoji,
-                    "type": "skill_book",     # Tipo para filtros de inventário
+                    "type": "skill_book",
                     "category": "aprendizado", 
                     "description": f"Ensina a habilidade: {skill_name}.",
                     "stackable": True, 
                     "tradable": True, 
                     "market_currency": "gems",
                     "price": 100, 
-                    # ✅ CORREÇÃO CRÍTICA AQUI:
-                    # Usamos 'effects' em vez de 'on_use' para bater com o sistema de consumo
+                    
+                    # ✅ CORREÇÃO 1: Adiciona restrição de classe ao item
+                    # Se 'classes' estiver vazio, qualquer um pode usar (comum em skills básicas)
+                    # Se tiver classes, o inventário bloqueará o uso se não for a classe certa.
+                    "class_req": classes,
+                    
+                    # ✅ CORREÇÃO 2: Usa 'effects' padrão
                     "effects": {
                         "learn_skill": skill_id
                     }
                 }
                 generated += 1
                 
-            # Cria um alias reverso se necessário (opcional, para segurança)
             if skill_id not in ITEMS_DATA:
                 ITEMS_DATA[skill_id] = ITEMS_DATA[tomo_id].copy()
                 ITEMS_DATA[skill_id]["display_name"] += " (Item)"
@@ -156,7 +158,6 @@ def _generate_auto_items():
                 "tradable": True, 
                 "market_currency": "gems",
                 "price": 200,
-                # Skins geralmente usam logicas diferentes, mas padronizando 'effects' é seguro
                 "on_use": {"effect": "grant_skin", "skin_id": skin_id}
             }
             if caixa_id not in ITEMS_DATA:
@@ -170,27 +171,23 @@ def _generate_auto_items():
         
     print(f">>> ITEMS: {generated} itens automáticos gerados.")
 
-# Executa a geração
 _generate_auto_items()
 
 # ==============================================================================
-# 6. INDEXAÇÃO DO MERCADO (PREÇO AUTOMÁTICO)
+# 6. INDEXAÇÃO DO MERCADO
 # ==============================================================================
 
 def _calculate_auto_price(item_data: dict) -> int:
-    """Calcula um preço base se o item não tiver preço definido."""
     rarity = str(item_data.get("rarity", "comum")).lower()
     itype = str(item_data.get("type", "misc")).lower()
     
-    # Preço base por tipo
     base = 10
     if itype in ("material", "resource"): base = 5
     elif itype == "consumable": base = 25
     elif itype == "equipamento": base = 100
     elif itype == "rune": base = 150
-    elif itype == "skill_book": base = 500 # Valoriza os livros
+    elif itype == "skill_book": base = 500
     
-    # Multiplicador por raridade
     mult = 1
     if rarity == "incomum" or rarity == "bom": mult = 3
     elif rarity == "raro": mult = 10
@@ -200,26 +197,17 @@ def _calculate_auto_price(item_data: dict) -> int:
     return base * mult
 
 def _rebuild_market_index():
-    """
-    Indexa todos os itens no mercado. Se não tiver preço, gera um automático.
-    """
     global MARKET_ITEMS
     count = 0
     for item_id, data in ITEMS_DATA.items():
-        # Ignora itens marcados como não trocáveis
         if data.get("tradable") is False or data.get("tradeable") is False:
             continue
 
-        # Verifica se tem preço manual
         price = data.get("value") or data.get("price")
-        
-        # Se não tiver, calcula automático
         if not price:
             price = _calculate_auto_price(data)
-            # Salva no dicionário para uso futuro
             data["value"] = price
         
-        # Adiciona ao mercado se tiver preço válido
         if int(price) > 0:
             MARKET_ITEMS[item_id] = {
                 "price": int(price),

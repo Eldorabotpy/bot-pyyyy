@@ -50,7 +50,7 @@ SKILL_REWARD_POOL = [
     "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira", "berserker_ultimo_recurso",
     "guerreiro_corte_perfurante", "guerreiro_colossal_defense", "guerreiro_bencao_sagrada"
 ]
-SKILL_CHANCE = 6.0 
+SKILL_CHANCE = 5.0 
 
 SKIN_REWARD_POOL = [
     "samurai_armadura_shogun", "samurai_armadura_demoniaca",
