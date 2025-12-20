@@ -56,7 +56,7 @@ RECIPES: Dict[str, Dict] = {
         "time_seconds": 600,  # 10 minutos
         "xp_gain": 35,
         "inputs": {"couro_curtido": 12, "pano_simples": 5, "nucleo_forja_fraco": 1},
-        "result_base_id": "couraça_sorrateira_assassino",
+        "result_base_id": "couraca_sorrateira_assassino",
         "unique": True,
         "class_req": ["assassino"],
         "rarity_chances": dict(RARITY_T1),
