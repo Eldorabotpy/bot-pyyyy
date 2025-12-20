@@ -148,63 +148,103 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
 
     job_data = context.job.data or {}
     duration_minutes = job_data.get("event_duration_minutes", 30)
-    location_name = "🏰 Portões do Reino" # Local Fixo
+    location_name = "🏰 Portões do Reino" 
 
     try:
-        await event_manager.start_event()
+        # Tenta iniciar
+        result = await event_manager.start_event()
         
-        msg_text = (
-            f"⚔️ <b>INVASÃO AO REINO!</b>\n\n"
-            f"📍 <b>Local:</b> {location_name}\n"
-            f"⏳ <b>Duração:</b> {duration_minutes} minutos\n\n"
-            f"Preparem suas defesas!"
+        # Se retornou erro (ex: evento já ativo), não anuncia
+        if result and "error" in result:
+            logger.warning(f"[KD] Tentativa de iniciar falhou: {result['error']}")
+            return
+
+        # Mensagem para o GRUPO (Mais chamativa)
+        group_msg = (
+            "🔥 <b>INVASÃO EM ANDAMENTO!</b> 🔥\n\n"
+            "‼️ <b>ATENÇÃO HERÓIS DE ELDORA!</b>\n"
+            f"Monstros estão atacando os <b>{location_name}</b>!\n\n"
+            f"⏳ <b>Tempo Restante:</b> {duration_minutes} minutos\n"
+            "🎟️ <i>É necessário 1 Ticket de Defesa para entrar.</i>\n\n"
+            "👉 <b>CORRAM PARA O MENU 'DEFESA DO REINO'!</b>"
         )
 
-        # 1. Notifica no Grupo
+        # Mensagem para o PRIVADO (Curta e direta)
+        private_msg = (
+            "⚔️ <b>A BATALHA COMEÇOU!</b>\n\n"
+            "O Reino está sob ataque! Junte-se à defesa agora!\n"
+            f"📍 Local: {location_name}"
+        )
+
+        # 1. Notifica no Grupo (Verificando Thread ID)
         if ANNOUNCEMENT_CHAT_ID:
             try:
+                # Verifica se existe ID de tópico configurado
+                thread_id = ANNOUNCEMENT_THREAD_ID if ANNOUNCEMENT_THREAD_ID else None
+                
                 await context.bot.send_message(
                     chat_id=ANNOUNCEMENT_CHAT_ID, 
-                    message_thread_id=ANNOUNCEMENT_THREAD_ID,
-                    text=msg_text, 
+                    message_thread_id=thread_id,
+                    text=group_msg, 
                     parse_mode="HTML"
                 )
             except Exception as e:
-                logger.error(f"❌ ERRO NOTIFICAR GRUPO (KD): {e}")
+                logger.error(f"❌ ERRO NOTIFICAR GRUPO (KD START): {e}")
         
-        # 2. Notifica JOGADORES
+        # 2. Notifica JOGADORES no privado
         async for user_id, _ in player_manager.iter_players():
             try:
-                await context.bot.send_message(chat_id=user_id, text=msg_text, parse_mode="HTML")
+                await context.bot.send_message(chat_id=user_id, text=private_msg, parse_mode="HTML")
                 await asyncio.sleep(0.05) 
             except Exception: 
                 continue
 
-        # 3. Agenda o FIM
+        # 3. Agenda o FIM automático
         context.job_queue.run_once(
             end_kingdom_defense_event, 
             when=duration_minutes * 60,
             name="auto_end_kingdom_defense"
         )
-        logger.info(f"🛡️ Defesa Iniciada.")
+        logger.info(f"🛡️ Defesa Iniciada e Notificada.")
 
     except Exception as e:
         logger.error(f"Erro ao iniciar Kingdom Defense: {e}")
 
 async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
+    """Finaliza o evento e posta o resultado no grupo."""
     if not event_manager: return
+    
+    # Se já não estiver ativo, evita postar mensagem duplicada
+    if not event_manager.is_active:
+        return
+
     try:
-        success, msg = await event_manager.end_event()
-        if success:
-            if ANNOUNCEMENT_CHAT_ID:
-                try:
-                    await context.bot.send_message(
-                        chat_id=ANNOUNCEMENT_CHAT_ID, 
-                        message_thread_id=ANNOUNCEMENT_THREAD_ID,
-                        text=f"🛡️ <b>FIM DA INVASÃO!</b>\n{msg}", 
-                        parse_mode="HTML"
-                    )
-                except: pass
+        success_data = await event_manager.end_event() # Agora retorna dict ou msg
+        
+        # O end_event no engine geralmente retorna um dict ou string. 
+        # Vamos assumir que se deu certo, precisamos avisar.
+        
+        # Mensagem de encerramento
+        end_msg = (
+            "🏁 <b>FIM DA INVASÃO!</b> 🏁\n\n"
+            "As poeiras da batalha baixaram.\n"
+            "Obrigado a todos os defensores!\n\n"
+            "🏆 <i>Verifique o Ranking no menu do evento para ver os maiores danos!</i>"
+        )
+
+        if ANNOUNCEMENT_CHAT_ID:
+            try:
+                thread_id = ANNOUNCEMENT_THREAD_ID if ANNOUNCEMENT_THREAD_ID else None
+                
+                await context.bot.send_message(
+                    chat_id=ANNOUNCEMENT_CHAT_ID, 
+                    message_thread_id=thread_id,
+                    text=end_msg, 
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                 logger.error(f"❌ ERRO NOTIFICAR GRUPO (KD END): {e}")
+                 
     except Exception as e:
         logger.error(f"Erro ao finalizar Kingdom Defense: {e}")
 
@@ -395,3 +435,53 @@ async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     return 0
+
+async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Entrega 1 Ticket de Defesa do Reino diariamente e avisa com estilo RPG.
+    """
+    today = _today_str() 
+    granted = 0
+    
+    # Texto chamativo estilo RPG
+    msg_ticket = (
+        "📜 <b>CONVOCAÇÃO REAL</b> 📜\n\n"
+        "Guerreiro, o Reino precisa de sua força!\n"
+        "Os batedores relatam movimentos nas sombras...\n\n"
+        "🎁 <b>Você recebeu:</b> 1x 🎟️ <b>Ticket de Defesa do Reino</b>\n"
+        "<i>Esteja pronto quando a trombeta de guerra soar!</i>"
+    )
+
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            daily = pdata.get("daily_awards") or {}
+            
+            # Se já recebeu hoje, pula
+            if daily.get("last_kingdom_ticket_date") == today: 
+                continue
+            
+            if players_col is not None:
+                players_col.update_one(
+                    {"_id": user_id},
+                    {
+                        "$inc": {"inventory.ticket_defesa_reino": 1},
+                        "$set": {"daily_awards.last_kingdom_ticket_date": today}
+                    }
+                )
+                granted += 1
+                
+                # --- NOTIFICAÇÃO AO JOGADOR ---
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id, 
+                        text=msg_ticket, 
+                        parse_mode='HTML'
+                    )
+                    # Pequena pausa para evitar FloodWait se tiver muitos players
+                    await asyncio.sleep(0.05) 
+                except Exception:
+                    pass
+        except Exception: 
+            pass
+            
+    return granted
