@@ -74,6 +74,50 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
 # ==============================================================================
 # 👹 JOB: WORLD BOSS (Lógica de Notificação Ajustada)
 # ==============================================================================
+
+# Em handlers/jobs.py
+
+async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Entrega 1 Ticket para todos os jogadores SEM limite diário.
+    Usado automaticamente quando o evento inicia.
+    """
+    logger.info("[JOB] Distribuindo tickets de evento (sem limite diário)...")
+    
+    # Texto imersivo
+    msg_ticket = (
+        "⚔️ <b>CHAMADO ÀS ARMAS!</b> ⚔️\n\n"
+        "A invasão começou e o Rei convoca seus heróis!\n"
+        "🎁 <b>Você recebeu:</b> 1x 🎟️ <b>Ticket de Defesa do Reino</b>\n"
+        "<i>Use-o agora para defender os portões!</i>"
+    )
+
+    count = 0
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            # Entrega direta no MongoDB
+            if players_col is not None:
+                players_col.update_one(
+                    {"_id": user_id},
+                    {"$inc": {"inventory.ticket_defesa_reino": 1}}
+                )
+            # Fallback para JSON (se não usar Mongo)
+            else:
+                if not pdata: continue
+                player_manager.add_item_to_inventory(pdata, "ticket_defesa_reino", 1)
+                await player_manager.save_player_data(user_id, pdata)
+            
+            # Notifica o jogador
+            try:
+                await context.bot.send_message(chat_id=user_id, text=msg_ticket, parse_mode='HTML')
+                await asyncio.sleep(0.05) # Evita flood
+            except Exception: pass
+            
+            count += 1
+        except Exception: pass
+        
+    logger.info(f"[JOB] Tickets de evento entregues: {count}")
+
 async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Nasce o World Boss e notifica.
@@ -140,48 +184,42 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
 # ==============================================================================
 # 🛡️ JOB: KINGDOM DEFENSE
 # ==============================================================================
+# Em handlers/jobs.py
+
 async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
-    """Inicia o evento e notifica Grupo e Jogadores."""
-    if not event_manager:
-        logger.error("⚠️ [JOB] Event Manager (KD) não encontrado.")
-        return
+    """Inicia o evento, entrega tickets e notifica."""
+    if not event_manager: return
 
     job_data = context.job.data or {}
     duration_minutes = job_data.get("event_duration_minutes", 30)
     location_name = "🏰 Portões do Reino" 
 
     try:
-        # Tenta iniciar
+        # 1. Inicia o Evento no Engine
         result = await event_manager.start_event()
         
-        # Se retornou erro (ex: evento já ativo), não anuncia
+        # Se falhar (já ativo), para aqui e não entrega ticket nem avisa
         if result and "error" in result:
-            logger.warning(f"[KD] Tentativa de iniciar falhou: {result['error']}")
+            logger.warning(f"[KD] Evento já ativo ou erro: {result['error']}")
             return
 
-        # Mensagem para o GRUPO (Mais chamativa)
+        # 2. ENTREGAR TICKETS (Nova chamada)
+        # Isso garante que SEMPRE que o evento ativar, o ticket é entregue
+        await distribute_event_ticket(context)
+
+        # 3. Notificação no Grupo (Aba de Avisos)
         group_msg = (
             "🔥 <b>INVASÃO EM ANDAMENTO!</b> 🔥\n\n"
             "‼️ <b>ATENÇÃO HERÓIS DE ELDORA!</b>\n"
             f"Monstros estão atacando os <b>{location_name}</b>!\n\n"
             f"⏳ <b>Tempo Restante:</b> {duration_minutes} minutos\n"
-            "🎟️ <i>É necessário 1 Ticket de Defesa para entrar.</i>\n\n"
+            "🎟️ <i>Todos os guerreiros receberam 1 Ticket de entrada!</i>\n"
             "👉 <b>CORRAM PARA O MENU 'DEFESA DO REINO'!</b>"
         )
 
-        # Mensagem para o PRIVADO (Curta e direta)
-        private_msg = (
-            "⚔️ <b>A BATALHA COMEÇOU!</b>\n\n"
-            "O Reino está sob ataque! Junte-se à defesa agora!\n"
-            f"📍 Local: {location_name}"
-        )
-
-        # 1. Notifica no Grupo (Verificando Thread ID)
         if ANNOUNCEMENT_CHAT_ID:
             try:
-                # Verifica se existe ID de tópico configurado
                 thread_id = ANNOUNCEMENT_THREAD_ID if ANNOUNCEMENT_THREAD_ID else None
-                
                 await context.bot.send_message(
                     chat_id=ANNOUNCEMENT_CHAT_ID, 
                     message_thread_id=thread_id,
@@ -189,23 +227,15 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="HTML"
                 )
             except Exception as e:
-                logger.error(f"❌ ERRO NOTIFICAR GRUPO (KD START): {e}")
-        
-        # 2. Notifica JOGADORES no privado
-        async for user_id, _ in player_manager.iter_players():
-            try:
-                await context.bot.send_message(chat_id=user_id, text=private_msg, parse_mode="HTML")
-                await asyncio.sleep(0.05) 
-            except Exception: 
-                continue
+                logger.error(f"❌ ERRO NOTIFICAR GRUPO: {e}")
 
-        # 3. Agenda o FIM automático
+        # 4. Agenda o FIM automático
         context.job_queue.run_once(
             end_kingdom_defense_event, 
             when=duration_minutes * 60,
             name="auto_end_kingdom_defense"
         )
-        logger.info(f"🛡️ Defesa Iniciada e Notificada.")
+        logger.info(f"🛡️ Defesa Iniciada com sucesso.")
 
     except Exception as e:
         logger.error(f"Erro ao iniciar Kingdom Defense: {e}")

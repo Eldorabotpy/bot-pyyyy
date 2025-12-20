@@ -144,13 +144,6 @@ async def post_init_tasks(application: Application):
                     name=f"kingdom_defense_{i}",
                     data={"event_duration_minutes": duration}
                 )
-                
-                jq.run_daily(
-                    distribute_kingdom_defense_ticket_job,
-                    time=dt_time(hour=sh, minute=sm, tzinfo=tz),
-                    name=f"ticket_giveaway_{i}",
-                    data={"event_time": f"{sh:02d}:{sm:02d}"}
-                )
 
                 logging.info(f"🛡️ Defesa agendada: {sh:02d}:{sm:02d} ({duration} min)")
             except Exception as e:

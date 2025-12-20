@@ -30,7 +30,7 @@ JOB_TIMEZONE = os.getenv("JOB_TIMEZONE", "America/Sao_Paulo")
 EVENT_TIMES = [
     (9,  10,   9, 40),  # Evento das 09:00 (dura 30 min)
     (12, 0,  12, 30),  # Evento das 12:00 (dura 30 min)
-    (15, 10,  15, 40),  # Evento das 18:00 (dura 30 min)
+    (18, 10,  18, 40),  # Evento das 18:00 (dura 30 min)
     (22, 0,  22, 30),  # Evento das 22:00 (dura 30 min)
 ]
 
