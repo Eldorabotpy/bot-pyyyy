@@ -21,34 +21,41 @@ def _save_leaderboard(data: dict):
     try:
         LEADERBOARD_FILE.write_text(json.dumps(data, indent=4, ensure_ascii=False), encoding="utf-8")
     except IOError as e:
-        print(f"Erro ao salvar o leaderboard: {e}")
+        # Mantemos apenas logs de erro real, se necessário pode remover este print também
+        print(f"Erro crítico ao salvar leaderboard: {e}")
 
 def update_top_score(user_id: int, character_name: str, damage: int):
-    """Verifica se um novo recorde foi estabelecido e o salva."""
+    """
+    Salva o MVP do evento atual.
+    Sobrescreve sempre o anterior para mostrar quem venceu o último evento.
+    """
     leaderboard = _load_leaderboard()
-    top_score = leaderboard.get("top_damage_record", {})
     
-    # Se o novo dano for maior que o recorde anterior, atualiza
-    if damage > top_score.get("damage", 0):
-        new_record = {
-            "user_id": user_id,
-            "character_name": character_name,
-            "damage": damage,
-            "set_on": datetime.date.today().isoformat()
-        }
-        leaderboard["top_damage_record"] = new_record
-        _save_leaderboard(leaderboard)
-        print(f"NOVO RECORDE DE DANO ESTABELECIDO: {character_name} com {damage} de dano!")
+    # Cria o registro do novo vencedor
+    new_record = {
+        "user_id": user_id,
+        "character_name": character_name,
+        "damage": damage,
+        "set_on": datetime.date.today().isoformat()
+    }
+    
+    # Atualiza e salva
+    leaderboard["top_damage_record"] = new_record
+    _save_leaderboard(leaderboard)
 
 def get_top_score_text() -> str:
-    print("\n--- [DEBUG LEITURA] Buscando recorde para o menu do reino...")
+    """
+    Retorna apenas o nome e o dano formatado para o Menu do Reino.
+    Formato: Nome (Dano) 🏆
+    """
     leaderboard = _load_leaderboard()
-    print(f"--- [DEBUG LEITURA] 1. JSON carregado: {leaderboard}")
     top_score = leaderboard.get("top_damage_record")
+    
     if not top_score or not top_score.get("character_name"):
-        print("--- [DEBUG LEITURA] 2. Nenhum recorde válido encontrado.")
         return "" 
+        
     name = top_score['character_name']
     damage = top_score.get('damage', 0)
-    print(f"--- [DEBUG LEITURA] 2. Recorde encontrado: {name} com {damage} de dano.")
-    return f"\n🏆 𝗥𝗲𝗰𝗼𝗿𝗱𝗶𝘀𝘁𝗮 𝗱𝗲 𝗗𝗮𝗻𝗼: <b>{name}</b> ({damage:,}) 🏆"
+    
+    # Retorna limpo para encaixar no layout do kingdom.py
+    return f"<b>{name}</b> ({damage:,}) 🏆"

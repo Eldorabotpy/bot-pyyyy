@@ -106,23 +106,35 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         try: leaderboard_text = leaderboard.get_top_score_text()
         except: leaderboard_text = ""
         
-        status_footer = (
-            f"\n\n═════════════ ◆◈◆ ══════════════\n"
-            f"🛠 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨: {prof_name} (Nv. {prof_lvl})\n"
-            f"💰 𝐎𝐮𝐫𝐨: {p_gold:,}  💎 𝐆𝐞𝐦𝐚𝐬: {p_gems:,}\n"
-            f"❤️ 𝐇𝐏: {p_hp}/{p_max_hp}  💙 𝐌𝐚𝐧𝐚: {p_mp}/{p_max_mp}\n"
-            f"⚡️ 𝐄𝐧𝐞𝐫𝐠𝐢𝐚: {p_energy}/{max_energy}"
+        # --- NOVO VISUAL ESTILO HUD (Com Moldura e Setas) ---
+        status_hud = (
+            f"\n"
+            f"╭────────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
+            f"│ ╰┈➤ 👤 {character_name}\n"
+            f"│ ╰┈➤ 🛠 {prof_name} (Nv. {prof_lvl})\n"
+            f"│ ╰┈➤ ❤️ HP: {p_hp}/{p_max_hp}\n"
+            f"│ ╰┈➤ 💙 MP: {p_mp}/{p_max_mp}\n"
+            f"│ ╰┈➤ ⚡ ENRGIA: 🪫{p_energy}/🔋{max_energy}\n"
+            f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
+            f"╰──────────────────────────➤"
+            
         )
 
         caption = (
-            f"🏰 <b>REINO DE ELDORA</b>\n"
-            f"Bem-vindo(a), {character_name}! As muralhas da cidade oferecem segurança e oportunidades.\n"
-            f"O que você gostaria de fazer hoje?"
-            + status_footer
+            f"🏰 <b>𝐑𝐄𝐈𝐍𝐎 𝐃𝐄 𝐄𝐋𝐃𝐎𝐑𝐀</b>\n"
+            f"╰┈➤ <i>Bem-vindo, {character_name}!</i>\n\n"
+            f"As muralhas da cidade oferecem segurança e oportunidades. "
+            f"O que você gostaria de fazer hoje?\n"
+            f"{status_hud}"
         )
-        if leaderboard_text:
-            caption += f"\n\n🏆 <b>Destaque:</b> {leaderboard_text}"
 
+        if leaderboard_text:
+            # Adiciona o Título e depois o Nome com recuo
+            caption += (
+                f"\n\n🏆 <b>MVP DO EVENTO ATUALIZADO:</b>\n"
+                f"   ╰┈➤ {leaderboard_text.strip()}"  # O espaço antes de {leaderboard} faz o recuo
+                f"\n"
+            )
         # --- TECLADO ---
         keyboard = [
             [InlineKeyboardButton("🗺 𝐕𝐢𝐚𝐣𝐚𝐫 🗺", callback_data='travel')],

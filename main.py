@@ -44,8 +44,7 @@ from handlers.jobs import (
     start_world_boss_job,
     end_world_boss_job,
     job_pvp_monthly_reset,
-    distribute_kingdom_defense_ticket_job,
-    repair_players_job
+    distribute_kingdom_defense_ticket_job
 )
 
 # Importa o Manager para verificar estado preso
@@ -113,7 +112,7 @@ async def post_init_tasks(application: Application):
         logging.info("[Startup] Recuperando caças ativas...")
         asyncio.create_task(recover_active_hunts(application))
     except ImportError: pass
-    application.job_queue.run_once(repair_players_job, when=10, name="startup_player_repair")
+    
     # ==========================================================================
     # 📅 AGENDAMENTO DE JOBS (CRON)
     # ==========================================================================

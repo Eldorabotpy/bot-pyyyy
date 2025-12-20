@@ -259,19 +259,55 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         file_data = media_ids.get_file_data("boss_raid")
         
     else:
-        # --- MENU NORMAL ---
+        # --- MENU NORMAL (HUD ATUALIZADO V2) ---
         premium = PremiumManager(player_data)
         stats = await player_manager.get_player_total_stats(player_data)
         
-        status_footer = (
-            f"\n\n═════════════ ◆◈◆ ══════════════\n"
-            f"💰 𝐎𝐮𝐫𝐨: {player_manager.get_gold(player_data):,}   💎 𝐆𝐞𝐦𝐚𝐬: {player_manager.get_gems(player_data):,}\n"
-            f"❤️ 𝐇𝐏: {int(player_data.get('current_hp',0))}/{int(stats.get('max_hp',0))}   "
-            f"💙 𝐌𝐚𝐧𝐚: {int(player_data.get('current_mp',0))}/{int(stats.get('max_mana',0))}\n"
-            f"⚡️ 𝐄𝐧𝐞𝐫𝐠𝐢𝐚: {int(player_data.get('energy',0))}/{int(player_manager.get_player_max_energy(player_data))}"
-        )
-        caption = f"Você está em <b>{region_info.get('display_name', 'Região')}</b>.\nO que deseja fazer?{status_footer}"
+        # Variáveis de Dados (Nome/Profissão) - Adicionado para o novo layout
+        character_name = player_data.get("character_name", "Aventureiro")
+        prof_data = player_data.get("profession", {})
+        prof_lvl = int(prof_data.get("level", 1))
+        prof_type = prof_data.get("type", "adventurer")
+        prof_name = prof_type.capitalize()
+        # Tenta pegar nome bonito da profissão se disponível
+        try:
+            if hasattr(game_data, 'PROFESSIONS_DATA'):
+                prof_name = game_data.PROFESSIONS_DATA.get(prof_type, {}).get("display_name", prof_name)
+        except: pass
 
+        # Variáveis Auxiliares (Stats)
+        p_gold = player_manager.get_gold(player_data)
+        p_gems = player_manager.get_gems(player_data)
+        
+        p_hp = int(player_data.get('current_hp', 0))
+        max_hp = int(stats.get('max_hp', 1))
+        
+        p_mp = int(player_data.get('current_mp', 0))
+        max_mp = int(stats.get('max_mana', 1))
+        
+        p_en = int(player_data.get('energy', 0))
+        max_en = int(player_manager.get_player_max_energy(player_data))
+
+        # Montagem do HUD (Visual Setas + Bateria)
+        status_hud = (
+            f"\n"
+            f"╭────────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
+            f"│ ╰┈➤ 👤 {character_name}\n"
+            f"│ ╰┈➤ 🛠 {prof_name} (Nv. {prof_lvl})\n"
+            f"│ ╰┈➤ ❤️ HP: {p_hp}/{max_hp}\n"
+            f"│ ╰┈➤ 💙 MP: {p_mp}/{max_mp}\n"
+            f"│ ╰┈➤ ⚡ ENERGIA: 🪫{p_en}/🔋{max_en}\n"
+            f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
+            f"╰──────────────────────────➤"
+        )
+        
+        region_name = region_info.get('display_name', 'Região')
+        
+        caption = (
+            f"🗺️ Você está em <b>{region_name}</b>.\n"
+            f"╰┈➤ <i>O que deseja fazer?</i>\n"
+            f"{status_hud}"
+        )
         keyboard = []
         if final_region_key == 'floresta_sombria':
             keyboard.append([InlineKeyboardButton("⛺ Tenda do Alquimista", callback_data='npc_trade:alquimista_floresta')])
