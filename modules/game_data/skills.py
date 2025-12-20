@@ -2146,7 +2146,7 @@ SKILL_DATA = {
     # --- HABILIDADES DE EVENTO (Assassino) ---
 
     "assassino_active_shadow_strike": {
-        "display_name": "Golpe Sombrio", "type": "active", 
+        "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐒𝐨𝐦𝐛𝐫𝐢𝐨", "type": "active", 
         "description": "Um ataque rápido das sombras que não pode ser esquivado.", 
         "allowed_classes": ["assassino"],
         "rarity_effects": {
@@ -2169,7 +2169,7 @@ SKILL_DATA = {
     },
     # evento portal
     "assassino_passive_potent_toxins": {
-        "display_name": "Toxinas Potentes", "type": "passive", 
+        "display_name": "𝐓𝐨𝐱𝐢𝐧𝐚𝐬 𝐏𝐨𝐭𝐞𝐧𝐭𝐞𝐬", "type": "passive", 
         "description": "Os seus ataques têm chance de aplicar veneno.", 
         "allowed_classes": ["assassino"],
         "rarity_effects": {
@@ -2190,7 +2190,7 @@ SKILL_DATA = {
         }
     },
     "assassino_active_dance_of_a_thousand_cuts": {
-        "display_name": "Dança das Mil Lâminas", "type": "active", 
+        "display_name": "𝐃𝐚𝐧𝐜̧𝐚 𝐝𝐚𝐬 𝐌𝐢𝐥 𝐋𝐚̂𝐦𝐢𝐧𝐚𝐬", "type": "active", 
         "description": "Desfere uma rajada de golpes rápidos.", 
         "allowed_classes": ["assassino"],
         "rarity_effects": {
@@ -2213,7 +2213,7 @@ SKILL_DATA = {
         }
     },
     "assassino_active_guillotine_strike": {
-        "display_name": "Golpe Guilhotina", "type": "active", 
+        "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐆𝐮𝐢𝐥𝐡𝐨𝐭𝐢𝐧𝐚", "type": "active", 
         "description": "Ataque massivo com dano bônus contra alvos com HP baixo (Execução).",
         "allowed_classes": ["assassino"],
         "rarity_effects": {

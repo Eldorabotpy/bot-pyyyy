@@ -34,7 +34,7 @@ RECIPES: Dict[str, Dict] = {
 
     # --- Armadura da Sombra (Curtidor) ---
     "work_mascara_sombra_assassino": {
-        "display_name": "Máscara da Sobra",
+        "display_name": "Máscara da Sombra",
         "emoji": "🪖",
         "profession": "curtidor",
         "level_req": 20,
