@@ -18,7 +18,7 @@ from modules import game_data
 from .stats import get_player_total_stats
 from telegram.ext import Application
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-
+from modules.game_data.skills import SKILL_DATA
 # -------------------------------------------------------------------------
 # ⚠️ REMOVIDO IMPORTS GLOBAIS DE HANDLERS AQUI PARA EVITAR CICLO
 # Eles foram movidos para dentro da função check_stale_actions_on_startup
@@ -90,6 +90,79 @@ def spend_energy(player_data: dict, amount: int = 1) -> bool:
 
     player_data['energy'] = cur - amount
     return True
+
+def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
+    """
+    Aplica os efeitos de um item no jogador.
+    Retorna uma lista de mensagens de feedback.
+    """
+    messages = []
+    
+    # 1. Efeito: Aprender Skill (TOMOS)
+    if "learn_skill" in effects:
+        skill_id = effects["learn_skill"]
+        skill_info = SKILL_DATA.get(skill_id)
+        
+        if not skill_info:
+            messages.append("⚠️ A habilidade deste tomo parece não existir mais.")
+        else:
+            # Verifica se já tem a skill
+            current_skills = player_data.get("skills", {})
+            # Garante que é um dicionário (correção de bugs antigos)
+            if not isinstance(current_skills, dict):
+                current_skills = {} 
+                player_data["skills"] = current_skills
+
+            if skill_id in current_skills:
+                messages.append(f"⚠️ Você já conhece a técnica {skill_info['display_name']}!")
+                # Nota: Idealmente você retornaria False para não consumir o item, 
+                # mas aqui vamos apenas avisar.
+            else:
+                # --- A MÁGICA ACONTECE AQUI ---
+                # Salva a skill no formato correto (Dicionário com raridade)
+                player_data["skills"][skill_id] = {
+                    "rarity": "comum",
+                    "progress": 0
+                }
+                messages.append(f"✨ <b>Nova Habilidade Aprendida:</b> {skill_info['display_name']}!")
+
+    # 2. Efeito: Skins
+    if "grant_skin" in effects:
+        skin_id = effects["grant_skin"]
+        unlocked = player_data.get("unlocked_skins", [])
+        if skin_id not in unlocked:
+            unlocked.append(skin_id)
+            player_data["unlocked_skins"] = unlocked
+            messages.append(f"👘 Nova aparência desbloqueada!")
+        else:
+            messages.append("⚠️ Você já possui esta aparência.")
+
+    # 3. Efeitos de Poção (Cura, XP, Energia...)
+    if "heal" in effects:
+        amount = effects["heal"]
+        stats = get_player_total_stats(player_data) # Certifique-se de importar isso
+        old_hp = player_data.get("current_hp", 0)
+        max_hp = stats["max_hp"]
+        new_hp = min(max_hp, old_hp + amount)
+        player_data["current_hp"] = new_hp
+        recovered = new_hp - old_hp
+        if recovered > 0:
+            messages.append(f"❤️ Recuperou {recovered} HP.")
+        else:
+            messages.append("❤️ HP já está cheio.")
+
+    if "add_energy" in effects:
+        amount = effects["add_energy"]
+        player_data["energy"] = player_data.get("energy", 0) + amount
+        messages.append(f"⚡ Recuperou {amount} Energia.")
+
+    if "add_xp" in effects:
+        amount = effects["add_xp"]
+        # Aqui você chamaria sua função de dar XP
+        player_data["xp"] = player_data.get("xp", 0) + amount
+        messages.append(f"🧠 Ganhou {amount} XP.")
+
+    return messages
 
 def add_energy(player_data: dict, amount: int = 1) -> dict:
     max_e = get_player_max_energy(player_data)
