@@ -20,6 +20,7 @@ from handlers.admin.grant_skin import grant_skin_conv_handler
 from handlers.admin.player_management_handler import player_management_conv_handler
 from modules.player.queries import _normalize_char_name
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from handlers.admin.debug_skill import debug_skill_handler
 
 from telegram.ext import (
     CallbackQueryHandler,
@@ -1374,4 +1375,5 @@ all_admin_handlers = [
     change_id_conv_handler,  
     fix_ghost_clan_handler,
     fix_clan_conv_handler,
+    debug_skill_handler,
 ]
