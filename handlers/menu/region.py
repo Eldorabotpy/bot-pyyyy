@@ -310,11 +310,11 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         )
         keyboard = []
         if final_region_key == 'floresta_sombria':
-            keyboard.append([InlineKeyboardButton("⛺ Tenda do Alquimista", callback_data='npc_trade:alquimista_floresta')])
+            keyboard.append([InlineKeyboardButton("⛺ 𝐓𝐞𝐧𝐝𝐚 𝐝𝐨 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta')])
         if final_region_key == 'deserto_ancestral':
-            keyboard.append([InlineKeyboardButton("🧙‍♂️ Cabana do Místico", callback_data='rune_npc:main')])
+            keyboard.append([InlineKeyboardButton("🧙‍♂️ 𝐂𝐚𝐛𝐚𝐧𝐚 𝐝𝐨 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main')])
         if final_region_key == 'picos_gelados' and is_event_active():
-             keyboard.append([InlineKeyboardButton("🎅 Cabana do Noel", callback_data="christmas_shop_open")])
+             keyboard.append([InlineKeyboardButton("🎅 𝐂𝐚𝐛𝐚𝐧𝐚 𝐝𝐨 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
                  
         keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstro", callback_data=f"hunt_{final_region_key}")])
 
@@ -328,11 +328,11 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         if build_region_dungeon_button:
             if btn := build_region_dungeon_button(final_region_key): keyboard.append([btn]) 
         elif get_dungeon_for_region(final_region_key):
-            keyboard.append([InlineKeyboardButton("🏰 Calabouço", callback_data=f"dungeon_open:{final_region_key}")])
+            keyboard.append([InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}")])
 
-        keyboard.append([InlineKeyboardButton("👤 Personagem", callback_data="profile")])
-        keyboard.append([InlineKeyboardButton("📜 Restaurar Durabilidade", callback_data="restore_durability_menu")])
-        keyboard.append([InlineKeyboardButton("ℹ️ Info Região", callback_data=f"region_info:{final_region_key}")])
+        keyboard.append([InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data="profile")])
+        keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐫 𝐃𝐮𝐫𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞", callback_data="restore_durability_menu")])
+        keyboard.append([InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨 𝐑𝐞𝐠𝐢𝐚̃𝐨", callback_data=f"region_info:{final_region_key}")])
         
         # --- BOTÃO DE COLETA ---
         res_id = region_info.get("resource")
@@ -354,7 +354,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
                 keyboard.append([InlineKeyboardButton(f"✋ Coletar {i_name} ({hum_tm}, {c_txt})", callback_data=f"collect_{res_id}")])
 
-        keyboard.append([InlineKeyboardButton("🗺️ Ver Mapa", callback_data="travel")])
+        keyboard.append([InlineKeyboardButton("🗺️ 𝐕𝐞𝐫 𝐌𝐚𝐩𝐚", callback_data="travel")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         file_data = media_ids.get_file_data(f"regiao_{final_region_key}")
 

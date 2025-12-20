@@ -28,69 +28,57 @@ LOG_TOPIC_ID = 24475
 #  LISTAS DE ITENS VENDÁVEIS
 # ==============================
 
+# ==============================
+#  LISTAS DE ITENS VENDÁVEIS (DINÂMICAS)
+# ==============================
+
+# 1. Carrega todos os dados de itens do jogo
+_ALL_GAME_ITEMS = getattr(game_data, "ITEMS_DATA", {})
+
+# 2. Gera lista de Itens de Evolução (Procura por type="evo_item")
 EVOLUTION_ITEMS: set[str] = {
-    "emblema_guerreiro", "essencia_guardia", "essencia_furia", "selo_sagrado", "essencia_luz",
-    "emblema_berserker", "totem_ancestral",
-    "emblema_cacador", "essencia_precisao", "marca_predador", "essencia_fera",
-    "emblema_monge", "reliquia_mistica", "essencia_ki",
-    "emblema_mago", "essencia_arcana", "essencia_elemental", "grimorio_arcano",
-    "emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria",
-    "emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno",
-    "emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada",
+    item_id for item_id, data in _ALL_GAME_ITEMS.items() 
+    if data.get("type") == "evo_item"
 }
+
+# 3. Gera lista de Skills (Pega chaves do SKILL_DATA e adiciona "tomo_")
 SKILL_BOOK_ITEMS: set[str] = {
-    "tomo_passive_bulwark", "tomo_active_whirlwind", "tomo_active_holy_blessing", "tomo_passive_unstoppable",
-    "tomo_active_unbreakable_charge", "tomo_passive_last_stand", "tomo_passive_animal_companion",
-    "tomo_active_deadeye_shot", "tomo_passive_apex_predator", "tomo_active_iron_skin",
-    "tomo_passive_elemental_strikes", "tomo_active_transcendence", "tomo_active_curse_of_weakness", 
-    "tomo_passive_elemental_attunement", "tomo_active_meteor_swarm", "tomo_active_song_of_valor",
-    "tomo_active_dissonant_melody", "tomo_passive_symphony_of_power", "tomo_active_shadow_strike", 
-    "tomo_passive_potent_toxins", "tomo_active_dance_of_a_thousand_cuts", "tomo_passive_iai_stance",
-    "tomo_active_parry_and_riposte", "tomo_active_banner_of_command", 
-    "tomo_guerreiro_corte_perfurante", "tomo_berserker_golpe_selvagem", "tomo_cacador_flecha_precisa",
-    "tomo_monge_rajada_de_punhos", "tomo_mago_bola_de_fogo", "tomo_bardo_melodia_restauradora",
-    "tomo_assassino_ataque_furtivo", "tomo_samurai_corte_iaijutsu",
+    f"tomo_{skill_id}" for skill_id in skills_data.SKILL_DATA.keys()
 }
+
+# 4. Gera lista de Caixas de Skin (Pega chaves do SKIN_CATALOG e adiciona "caixa_")
 SKIN_BOX_ITEMS: set[str] = {
-    'caixa_guerreiro_armadura_negra', 
-    'guerreiro_armadura_negra', 
-    'caixa_guerreiro_placas_douradas',
-    'guerreiro_placas_douradas',
-    'caixa_mago_traje_arcano', 
-    'mago_traje_arcano', 
-    'caixa_assassino_manto_espectral', 
-    'assassino_manto_espectral'
-    'caixa_cacador_patrulheiro_elfico',
-    'cacador_patrulheiro_elfico',
-    'caixa_berserker_pele_urso', 
-    'berserker_pele_urso', 
-    'caixa_monge_quimono_dragao', 
-    'monge_quimono_dragao',
-    'caixa_monge_aspecto_asura'
-    'monge_aspecto_asura' 
-    'caixa_bardo_traje_maestro',
-    'bardo_traje_maestro',
-    'caixa_samurai_armadura_shogun',
-    'samurai_armadura_shogun', 
-    'caixa_samurai_armadura_demoniaca', 
-    'samurai_armadura_demoniaca',
-    'caixa_samurai_encarnacao_sangrenta',
-    'samurai_encarnacao_sangrenta',
-    'caixa_samurai_guardiao_celestial',
-    'samurai_guardiao_celestial', 
-    'caixa_samurai_chama_aniquiladora',
-    'samurai_chama_aniquiladora', 
+    f"caixa_{skin_id}" for skin_id in SKIN_CATALOG.keys()
 }
-EVO_ITEMS_BY_CLASS_MAP = {
-    "guerreiro": {"emblema_guerreiro", "essencia_guardia", "essencia_furia", "selo_sagrado", "essencia_luz"},
-    "berserker": {"emblema_berserker", "totem_ancestral"},
-    "cacador":   {"emblema_cacador", "essencia_precisao", "marca_predador", "essencia_fera"},
-    "monge":     {"emblema_monge", "reliquia_mistica", "essencia_ki"},
-    "mago":      {"emblema_mago", "essencia_arcana", "essencia_elemental", "grimorio_arcano"},
-    "bardo":     {"emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria"},
-    "assassino": {"emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno"},
-    "samurai":   {"emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada"},
-}
+
+# ==============================
+#  MAPEAMENTOS (DINÂMICOS)
+# ==============================
+
+# Gera o mapa de Evolução por Classe automaticamente
+# Ele lê o atributo 'class_req' ou 'class' dentro do item de evolução
+EVO_ITEMS_BY_CLASS_MAP: Dict[str, set] = {}
+
+for evo_id in EVOLUTION_ITEMS:
+    info = _ALL_GAME_ITEMS.get(evo_id, {})
+    # Tenta achar qual classe usa esse item
+    req_class = info.get("class_req") or info.get("class") or info.get("allowed_classes")
+    
+    if req_class:
+        # Se for uma lista de classes (ex: ['mago', 'bruxo']), pega a primeira ou itera
+        if isinstance(req_class, list):
+            for c in req_class:
+                c_norm = c.lower()
+                if c_norm not in EVO_ITEMS_BY_CLASS_MAP:
+                    EVO_ITEMS_BY_CLASS_MAP[c_norm] = set()
+                EVO_ITEMS_BY_CLASS_MAP[c_norm].add(evo_id)
+        elif isinstance(req_class, str):
+            c_norm = req_class.lower()
+            if c_norm not in EVO_ITEMS_BY_CLASS_MAP:
+                EVO_ITEMS_BY_CLASS_MAP[c_norm] = set()
+            EVO_ITEMS_BY_CLASS_MAP[c_norm].add(evo_id)
+
+# Mapeamento estático apenas para exibição (Labels)
 CLASSES_MAP = {
     "guerreiro": "⚔️ Guerreiro",
     "mago": "✨ Mago",
