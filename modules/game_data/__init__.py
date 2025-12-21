@@ -28,6 +28,14 @@ try:
         get_display_name,
         is_stackable
     )
+    try:
+        from .items_evolution import EVOLUTION_ITEMS_DATA
+        # Mescla os itens de evolução dentro do ITEMS_DATA principal
+        ITEMS_DATA.update(EVOLUTION_ITEMS_DATA)
+        logger.info(f"✅ Itens de Evolução carregados: {len(EVOLUTION_ITEMS_DATA)} itens.")
+    except ImportError:
+        logger.warning("⚠️ items_evolution.py não encontrado. Itens de evolução indisponíveis.")
+        
 except ImportError as e:
     logger.critical(f"❌ ERRO FATAL ao importar items.py (Verifique imports circulares): {e}")
     raise e

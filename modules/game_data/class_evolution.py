@@ -9,7 +9,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "guerreiro": [
         # T2 (Lvl 25)
         { 
-            "tier_num": 2, "from": "guerreiro", "to": "cavaleiro", "min_level": 25,
+            "tier_num": 2, 
+            "from": "guerreiro", 
+            "to": "cavaleiro", 
+            "display_name": "Cavaleiro",
+            "min_level": 25,
             "desc": "Defesa elevada e proteção de aliados.",
             
             "ascension_path": [
@@ -34,7 +38,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         { 
-            "tier_num": 3, "from": "cavaleiro", "to": "templario", "min_level": 40,
+            "tier_num": 3, 
+            "from": "cavaleiro", 
+            "to": "templario", 
+            "display_name": "Templario",
+            "min_level": 40,
             "desc": "Paladino sagrado que combina defesa com suporte divino.",
             
             "ascension_path": [
@@ -55,7 +63,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         { 
-            "tier_num": 4, "from": "templario", "to": "guardiao_divino", "min_level": 60,
+            "tier_num": 4, 
+            "from": "templario", 
+            "to": "guardiao_divino",
+            "display_name": "Guardião Divino", 
+            "min_level": 60,
             "desc": "Uma fortaleza impenetrável de fé e aço.",
             
             "ascension_path": [
@@ -76,7 +88,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         { 
-            "tier_num": 5, "from": "guardiao_divino", "to": "avatar_da_egide", "min_level": 80,
+            "tier_num": 5, 
+            "from": "guardiao_divino", 
+            "to": "avatar_da_egide",
+            "display_name": "Avatar da Egide",
+            "min_level": 80,
             "desc": "A encarnação viva da proteção divina, imune a danos mortais.",
             
             "ascension_path": [
@@ -97,7 +113,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         { 
-            "tier_num": 6, "from": "avatar_da_egide", "to": "lenda_divina", "min_level": 100,
+            "tier_num": 6, 
+            "from": "avatar_da_egide", 
+            "to": "lenda_divina",
+            "display_name": "Lenda Divina", 
+            "min_level": 100,
             "desc": "Um herói lendário cuja defesa inspira milagres.",
             
             "ascension_path": [
@@ -122,7 +142,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "berserker": [
         # T2 (Lvl 25)
         {
-            "tier_num": 2, "from": "berserker", "to": "barbaro", "min_level": 25,
+            "tier_num": 2, 
+            "from": "berserker", 
+            "to": "barbaro", 
+            "display_name": "Barbaro",
+            "min_level": 25,
             "desc": "Dano bruto e resistência a controlo.",
             
             "ascension_path": [
@@ -143,7 +167,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "barbaro", "to": "selvagem", "min_level": 40,
+            "tier_num": 3, 
+            "from": "barbaro", 
+            "to": "selvagem",
+            "display_name": "Selvagem",
+            "min_level": 40,
             "desc": "Abraça a fúria total, sacrificando defesa por poder de ataque.",
             
             "ascension_path": [
@@ -169,7 +197,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "selvagem", "to": "ira_primordial", "min_level": 60,
+            "tier_num": 4, 
+            "from": "selvagem", 
+            "to": "ira_primordial",
+            "display_name": "Ira Primordial", 
+            "min_level": 60,
             "desc": "A própria encarnação da raiva, com ataques que não podem ser defendidos.",
             
             "ascension_path": [
@@ -190,7 +222,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "ira_primordial", "to": "avatar_da_calamidade", "min_level": 80,
+            "tier_num": 5, 
+            "from": "ira_primordial", 
+            "to": "avatar_da_calamidade", 
+            "display_name": "Avatar da Calamidade",
+            "min_level": 80,
             "desc": "Um desastre natural ambulante, cuja fúria destrói o mundo.",
             
             "ascension_path": [
@@ -216,7 +252,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "avatar_da_calamidade", "to": "deus_da_ira", "min_level": 100,
+            "tier_num": 6, 
+            "from": "avatar_da_calamidade", 
+            "to": "deus_da_ira",
+            "display_name": "Deus da Ira", 
+            "min_level": 100,
             "desc": "A fúria de um deus. Seus golpes quebram a própria realidade.",
             
             "ascension_path": [
@@ -241,7 +281,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "cacador": [
         # T2 (Lvl 25)
         {
-            "tier_num": 2, "from": "cacador", "to": "franco_atirador", "min_level": 25,
+            "tier_num": 2, 
+            "from": "cacador", 
+            "to": "franco_atirador",
+            "display_name": "Franco Atirador", 
+            "min_level": 25,
             "desc": "Especialista em tiros à distância com dano crítico devastador.",
             
             "ascension_path": [
@@ -267,7 +311,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "franco_atirador", "to": "olho_de_aguia", "min_level": 40,
+            "tier_num": 3, 
+            "from": "franco_atirador", 
+            "to": "olho_de_aguia", 
+            "display_name": "Olho de Aguia",
+            "min_level": 40,
             "desc": "Seus tiros ignoram parcialmente a defesa inimiga.",
             
             "ascension_path": [
@@ -288,7 +336,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "olho_de_aguia", "to": "atirador_espectral", "min_level": 60,
+            "tier_num": 4, 
+            "from": "olho_de_aguia", 
+            "to": "atirador_espectral", 
+            "display_name": "Atirador Espectral",
+            "min_level": 60,
             "desc": "Seus tiros agora ricocheteiam, atingindo múltiplos alvos.",
             
             "ascension_path": [
@@ -309,7 +361,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "atirador_espectral", "to": "o_horizonte_longinquo", "min_level": 80,
+            "tier_num": 5, 
+            "from": "atirador_espectral", 
+            "to": "o_horizonte_longinquo",
+            "display_name": "O Horizonte Longinquo", 
+            "min_level": 80,
             "desc": "Um tiro, um fim. Seu alcance é infinito.",
             
             "ascension_path": [
@@ -330,7 +386,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "o_horizonte_longinquo", "to": "lenda_do_arco", "min_level": 100,
+            "tier_num": 6, 
+            "from": "o_horizonte_longinquo", 
+            "to": "lenda_do_arco", 
+            "display_name": "Lenda do Arco", 
+            "min_level": 100,
             "desc": "Suas flechas nunca erram, guiadas pelo próprio vento.",
             
             "ascension_path": [
@@ -355,7 +415,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "monge": [
         # T2 (Lvl 25)
         {
-            "tier_num": 2, "from": "monge", "to": "punho_elemental", "min_level": 25,
+            "tier_num": 2, 
+            "from": "monge", 
+            "to": "punho_elemental",
+            "display_name": "Punho Elemental", 
+            "min_level": 25,
             "desc": "Lutador que canaliza a fúria dos elementos nos seus punhos.",
             
             "ascension_path": [
@@ -381,7 +445,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "punho_elemental", "to": "ascendente", "min_level": 40,
+            "tier_num": 3, 
+            "from": "punho_elemental", 
+            "to": "ascendente",
+            "display_name": "Ascendente",  
+            "min_level": 40,
             "desc": "Atingiu a transcendência, movendo-se como o vento.",
             
             "ascension_path": [
@@ -402,7 +470,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "ascendente", "to": "punho_divino", "min_level": 60,
+            "tier_num": 4, 
+            "from": "ascendente", 
+            "to": "punho_divino", 
+            "display_name": "Punho Divino", 
+            "min_level": 60,
             "desc": "Seu Ki é tão puro que seus golpes causam dano sagrado.",
             
             "ascension_path": [
@@ -423,7 +495,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "punho_divino", "to": "o_dragao_interior", "min_level": 80,
+            "tier_num": 5, 
+            "from": "punho_divino", 
+            "to": "o_dragao_interior", 
+            "display_name": "O Dragão Interior", 
+            "min_level": 80,
             "desc": "Libera o dragão interior, o mestre supremo das artes marciais.",
             
             "ascension_path": [
@@ -444,7 +520,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "o_dragao_interior", "to": "lenda_do_punho", "min_level": 100,
+            "tier_num": 6, 
+            "from": "o_dragao_interior", 
+            "to": "lenda_do_punho", 
+            "display_name": "Lenda do punho", 
+            "min_level": 100,
             "desc": "Um com o universo. Seus golpes são o próprio equilíbrio.",
             
             "ascension_path": [
@@ -469,7 +549,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "mago": [
         # T2 (Lvl 25)
         {
-            "tier_num": 2, "from": "mago", "to": "elementalista", "min_level": 25,
+            "tier_num": 2, 
+            "from": "mago", 
+            "to": "elementalista", 
+            "display_name": "Elementalista", 
+            "min_level": 25,
             "desc": "Especialista em dano elemental massivo e em área.",
             
             "ascension_path": [
@@ -495,7 +579,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "elementalista", "to": "arquimago", "min_level": 40,
+            "tier_num": 3, 
+            "from": "elementalista", 
+            "to": "arquimago", 
+            "display_name": "Arquuimago", 
+            "min_level": 40,
             "desc": "Um canal de poder arcano puro, mestre de todos os elementos.",
             
             "ascension_path": [
@@ -516,7 +604,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "arquimago", "to": "mago_de_batalha", "min_level": 60,
+            "tier_num": 4, 
+            "from": "arquimago", 
+            "to": "mago_de_batalha",
+            "display_name": "Mago de Batalha", 
+            "min_level": 60,
             "desc": "Combina magia elemental com defesa arcana, lutando na linha de frente.",
             
             "ascension_path": [
@@ -537,7 +629,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "mago_de_batalha", "to": "arcanista_supremo", "min_level": 80,
+            "tier_num": 5, 
+            "from": "mago_de_batalha", 
+            "to": "arcanista_supremo",
+            "display_name": "Arcanista Supremo", 
+            "min_level": 80,
             "desc": "Transcendeu a magia, tornando-se a própria magia.",
             
             "ascension_path": [
@@ -558,7 +654,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "arcanista_supremo", "to": "aspecto_arcano", "min_level": 100,
+            "tier_num": 6, 
+            "from": "arcanista_supremo", 
+            "to": "aspecto_arcano", 
+            "display_name": "Aspecto Arcano", 
+            "min_level": 100,
             "desc": "A realidade se dobra à sua vontade. Um deus da magia.",
             
             "ascension_path": [
@@ -583,7 +683,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "bardo": [
         # T2 (Lvl 25)
         {
-            "tier_num": 2, "from": "bardo", "to": "menestrel", "min_level": 25,
+            "tier_num": 2, 
+            "from": "bardo", 
+            "to": "menestrel",
+            "display_name": "Menestrel",  
+            "min_level": 25,
             "desc": "Foco em canções de suporte e inspiração para a equipe.",
         
             "ascension_path": [
@@ -609,7 +713,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "menestrel", "to": "trovador", "min_level": 40,
+            "tier_num": 3, 
+            "from": "menestrel", 
+            "to": "trovador", 
+            "display_name": "Trovador", 
+            "min_level": 40,
             "desc": "Especialista em controlar o campo de batalha com canções hipnóticas.",
         
             "ascension_path": [
@@ -630,7 +738,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "trovador", "to": "mestre_de_concerto", "min_level": 60,
+            "tier_num": 4, 
+            "from": "trovador", 
+            "to": "mestre_de_concerto", 
+            "display_name": "Mestre de Concerto", 
+            "min_level": 60,
             "desc": "Transforma a música em dano sonoro puro e barreiras protetoras.",
         
             "ascension_path": [
@@ -651,7 +763,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "mestre_de_concerto", "to": "harmonista", "min_level": 80,
+            "tier_num": 5, 
+            "from": "mestre_de_concerto", 
+            "to": "harmonista", 
+            "display_name": "Harmonista", 
+            "min_level": 80,
             "desc": "Um mestre da harmonia, capaz de equilibrar o suporte e o ataque.",
         
             "ascension_path": [
@@ -672,7 +788,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "harmonista", "to": "aspecto_musical", "min_level": 100,
+            "tier_num": 6, 
+            "from": "harmonista", 
+            "to": "aspecto_musical", 
+            "display_name": "Aspecto Musical", 
+            "min_level": 100,
             "desc": "A encarnação do som, sua música reescreve a realidade.",
         
             "ascension_path": [
@@ -697,7 +817,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "assassino": [
         # T2 (Lvl 25)
         { 
-            "tier_num": 2, "from": "assassino", "to": "ladrao_de_sombras", "min_level": 25,
+            "tier_num": 2, 
+            "from": "assassino", 
+            "to": "ladrao_de_sombras", 
+            "display_name": "Ladrão de Sombras", 
+            "min_level": 25,
             "desc": "Especialista em furtividade e ataques de oportunidade com dano extra.",
         
             "ascension_path": [
@@ -725,7 +849,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "ladrao_de_sombras", "to": "ninja", "min_level": 40,
+            "tier_num": 3, 
+            "from": "ladrao_de_sombras", 
+            "to": "ninja", 
+            "display_name": "Ninja", 
+            "min_level": 40,
             "desc": "Foco em velocidade, agilidade e uso de venenos e ferramentas táticas.",
         
             "ascension_path": [
@@ -746,7 +874,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "ninja", "to": "mestre_das_laminas", "min_level": 60,
+            "tier_num": 4, 
+            "from": "ninja",  
+            "to":"mestre_das_laminas",
+            "display_name": "Mestre das Laminas",  
+            "min_level": 60,
             "desc": "Transforma o Assassino em um duelista mortal com foco em ataques críticos.",
         
             "ascension_path": [
@@ -768,7 +900,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "mestre_das_laminas", "to": "ceifador", "min_level": 80,
+            "tier_num": 5, 
+            "from": "mestre_das_laminas", 
+            "to": "ceifador", 
+            "display_name": "Ceifador", 
+            "min_level": 80,
             "desc": "Canaliza a energia da morte, garantindo que nenhum alvo escape de seu destino.",
         
             "ascension_path": [
@@ -789,7 +925,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "ceifador", "to": "aspecto_da_noite", "min_level": 100,
+            "tier_num": 6, 
+            "from": "ceifador", 
+            "to": "aspecto_da_noite", 
+            "display_name": "Aspecto de Noite", 
+            "min_level": 100,
             "desc": "Tornou-se um com o manto da noite, capaz de eliminar qualquer criatura em um instante.",
         
             "ascension_path": [
@@ -814,7 +954,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "samurai": [
         # T2 (Lvl 25)
         {
-            "tier_num": 2, "from": "samurai", "to": "ronin", "min_level": 25,
+            "tier_num": 2, 
+            "from": "samurai", 
+            "to": "ronin", 
+            "display_name": "Ronin", 
+            "min_level": 25,
             "desc": "Um guerreiro errante focado em golpes rápidos e críticos de sobrevivência.",
             
             "ascension_path": [
@@ -840,7 +984,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "ronin", "to": "kenshi", "min_level": 40,
+            "tier_num": 3, 
+            "from": "ronin", 
+            "to": "kenshi",
+            "display_name": "Kenshi",  
+            "min_level": 40,
             "desc": "Um Mestre da Espada que domina técnicas de corte aprimoradas e parry.",
             
             "ascension_path": [
@@ -861,7 +1009,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "kenshi", "to": "shogunato", "min_level": 60,
+            "tier_num": 4, 
+            "from": "kenshi", 
+            "to": "shogunato", 
+            "display_name": "Shogunato", 
+            "min_level": 60,
             "desc": "Guerreiro com capacidade de liderança, que inspira ou intimida seus aliados e inimigos.",
             
             "ascension_path": [
@@ -882,7 +1034,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "shogunato", "to": "mestre_de_bushido", "min_level": 80,
+            "tier_num": 5, 
+            "from": "shogunato", 
+            "to": "mestre_de_bushido", 
+            "display_name": "Mestre de Bushido", 
+            "min_level": 80,
             "desc": "Alcançou a perfeição do bushido, focando em técnica e ataques de precisão final.",
             
             "ascension_path": [
@@ -903,7 +1059,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "mestre_de_bushido", "to": "aspecto_da_lamina", "min_level": 100,
+            "tier_num": 6, 
+            "from": "mestre_de_bushido", 
+            "to": "aspecto_da_lamina", 
+            "display_name": "Aspecto da Lamina", 
+            "min_level": 100,
             "desc": "Sua lâmina é a própria manifestação da vontade. Um corte que transcende a realidade.",
             
             "ascension_path": [
@@ -928,7 +1088,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
     "curandeiro": [
         # T2 (Lvl 25)
         {
-            "tier_num": 2, "from": "curandeiro", "to": "clerigo", "min_level": 25,
+            "tier_num": 2, 
+            "from": "curandeiro", 
+            "to": "clerigo", 
+            "display_name": "clerigo", 
+            "min_level": 25,
             "desc": "Foco em magias de cura de alvo único e purificação.",
             
             "ascension_path": [
@@ -954,7 +1118,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T3 (Lvl 40)
         {
-            "tier_num": 3, "from": "clerigo", "to": "sacerdote", "min_level": 40,
+            "tier_num": 3, 
+            "from": "clerigo", 
+            "to": "sacerdote",
+            "display_name": "Sacerdote",  
+            "min_level": 40,
             "desc": "Especialista em cura em área e fortalecimento de defesas aliadas.",
             
             "ascension_path": [
@@ -975,7 +1143,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T4 (Lvl 60)
         {
-            "tier_num": 4, "from": "sacerdote", "to": "hierofante", "min_level": 60,
+            "tier_num": 4, 
+            "from": "sacerdote", 
+            "to": "hierofante", 
+            "display_name": "Hierofante", 
+            "min_level": 60,
             "desc": "Seu toque restaura até a vida perdida, revertendo o dano.",
             
             "ascension_path": [
@@ -996,7 +1168,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T5 (Lvl 80)
         {
-            "tier_num": 5, "from": "hierofante", "to": "oraculo_celestial", "min_level": 80,
+            "tier_num": 5, 
+            "from": "hierofante", 
+            "to": "oraculo_celestial", 
+            "display_name": "Oraculo Celestial", 
+            "min_level": 80,
             "desc": "Pode prever e anular ataques. Sua fé se manifesta como escudo de luz.",
             
             "ascension_path": [
@@ -1017,7 +1193,11 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
         },
         # T6 (Lvl 100)
         {
-            "tier_num": 6, "from": "oraculo_celestial", "to": "lenda_da_cura", "min_level": 100,
+            "tier_num": 6, 
+            "from": "oraculo_celestial", 
+            "to": "lenda_da_cura",
+            "display_name": "Lenda da Cura",  
+            "min_level": 100,
             "desc": "A própria luz da esperança. Capaz de ressuscitar aliados e curar o impossível.",
             
             "ascension_path": [
