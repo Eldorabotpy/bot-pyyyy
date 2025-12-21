@@ -116,43 +116,64 @@ async def _force_fix_inventory(user_id, player_data):
     if not inventory: return False
     mudou = False
     
-    # Mapeamento ID VELHO -> ID NOVO
+    # Mapeamento ID VELHO (Errado) -> ID NOVO (Certo/Oficial do refino)
     correcoes = {
+        # Ferros
         "minerio_ferro": "minerio_de_ferro",
         "iron_ore": "minerio_de_ferro",
         "pedra_ferro": "minerio_de_ferro",
+        "minerio_bruto": "minerio_de_ferro",
+        "minerio_de_ferro_bruto": "minerio_de_ferro",
+        
+        # Estanhos
         "minerio_estanho": "minerio_de_estanho",
-        "madeira_rara_bruta": "madeira_rara"
+        "tin_ore": "minerio_de_estanho",
+        
+        # Prata
+        "minerio_prata": "minerio_de_prata",
+        "silver_ore": "minerio_de_prata",
+
+        # Madeiras
+        "madeira_rara_bruta": "madeira_rara",
+        "wood_rare": "madeira_rara",
+        
+        # Carvão (caso tenha duplicado)
+        "carvao_mineral": "carvao",
+        "coal": "carvao"
     }
 
     for velho, novo in correcoes.items():
         if velho in inventory:
-            # 1. Descobre quantidade do item velho
+            # 1. Se o ID 'velho' for IGUAL ao 'novo' (por engano na lista), pula
+            if velho == novo: 
+                continue
+
+            # 2. Descobre quantidade do item velho
             dado_velho = inventory[velho]
             qtd_velha = 0
+            
+            # Suporta se o item velho for um dicionário ou um número direto
             if isinstance(dado_velho, dict):
-                qtd_velha = int(dado_velho.get("quantity", 0))
+                qtd_velha = int(dado_velho.get("quantity", 1)) # Default 1 se for dict sem qtd
             else:
                 qtd_velha = int(dado_velho)
             
             if qtd_velha > 0:
-                # 2. Garante que o item novo existe
+                # 3. Garante que o item novo existe no inventário
                 if novo not in inventory:
-                    # Se não existe, cria. Mantém consistência (se sistema usa int ou dict)
-                    # Como seu sistema mistura, vamos criar como int seguro,
-                    # o código abaixo converte se necessário.
                     inventory[novo] = 0
                 
-                # 3. Soma
+                # 4. Soma a quantidade no item novo
+                # Verifica se o destino é dict ou int e soma corretamente
                 if isinstance(inventory[novo], dict):
                     inventory[novo]["quantity"] = int(inventory[novo].get("quantity", 0)) + qtd_velha
                 else:
                     inventory[novo] = int(inventory[novo]) + qtd_velha
                     
-                print(f"🔧 FIX INVENTÁRIO: {user_id} | {qtd_velha}x {velho} -> {novo}")
+                logger.info(f"🔧 FIX INVENTÁRIO: {user_id} | {qtd_velha}x {velho} -> {novo}")
                 mudou = True
             
-            # 4. Remove o velho
+            # 5. Remove o item velho (o impostor)
             del inventory[velho]
             mudou = True
             

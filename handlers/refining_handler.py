@@ -12,11 +12,7 @@ from telegram import (
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules.game_data import attributes
 from modules import game_data, player_manager, file_ids
-from modules.refining_engine import (
-    preview_refine, start_refine, finish_refine, 
-    start_batch_refine, get_max_refine_quantity, 
-    get_total_material_quantity
-)
+from modules.refining_engine import preview_refine, start_refine, finish_refine, start_batch_refine, get_max_refine_quantity
 from modules import crafting_registry, dismantle_engine, display_utils
 
 ITEMS_PER_PAGE = 5
@@ -253,7 +249,7 @@ def _fmt_item_line(item_id: str, qty: int) -> str:
     display = info.get("display_name") or item_id.replace("_", " ").title()
     emoji = info.get("emoji", "📦")
     return f"{emoji} <b>{display}</b> x<code>{int(qty)}</code>"
-
+    
 def _fmt_item_details_styled(item_data: dict) -> str:
     """Formata o item com visual rico."""
     cur_dur = item_data.get("durability")
@@ -347,9 +343,19 @@ async def _safe_send_with_media(context, chat_id, caption, reply_markup=None, me
     return await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
 
 async def _safe_edit_or_send_with_media(query, context, caption, reply_markup=None, media_key="refino_universal"):
-    try: await query.message.delete()
-    except Exception: pass 
+    """
+    MODIFICADO: Sempre APAGA a mensagem anterior e ENVIA uma nova.
+    Isso evita o efeito de 'edição' e deixa o chat mais limpo no estilo log.
+    """
+    try: 
+        # Tenta apagar a mensagem onde o clique ocorreu
+        await query.message.delete()
+    except Exception: 
+        pass # Se não der (ex: muito antiga ou já apagada), vida que segue
+    
+    # Envia a nova mensagem do zero
     return await _safe_send_with_media(context, query.message.chat_id, caption, reply_markup, media_key=media_key)
+
 
 # =========================
 # HANDLERS CALLBACKS
@@ -360,6 +366,14 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     await q.answer()
     uid = q.from_user.id
     
+    # --- ADICIONE ISTO AQUI NO INÍCIO ---
+    # Isso garante que os itens se juntem ANTES de ler o inventário
+    try:
+        await player_manager.corrigir_inventario_automatico(uid)
+    except Exception as e:
+        logger.error(f"Erro ao corrigir inventário no refino: {e}")
+    # ------------------------------------
+
     page = 1
     if "_PAGE_" in q.data: page = int(q.data.split('_PAGE_')[-1])
 
@@ -369,45 +383,81 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     recipes = []
     refining_recipes = getattr(game_data, "REFINING_RECIPES", {}) or {}
     
+    # Filtra e prepara dados
     for rid, rec in refining_recipes.items():
         prev = preview_refine(rid, pdata)
         if prev:
+            # Formata tempo bonito (ex: 05:00m)
             sec = int(prev.get("duration_seconds", 0))
             t_fmt = f"{sec//60:02d}:{sec%60:02d}m"
+            
             recipes.append({
-                "id": rid, "name": rec.get("display_name"),
-                "prev": prev, "time": t_fmt, "req_lvl": rec.get("level_req", 1)
+                "id": rid, 
+                "name": rec.get("display_name"),
+                "prev": prev, 
+                "time": t_fmt,
+                "req_lvl": rec.get("level_req", 1)
             })
 
-    total_p = max(1, math.ceil(len(recipes) / ITEMS_PER_PAGE))
+    # Paginação
+    total_p = max(1, math.ceil(len(recipes) / ITEMS_PER_PAGE)) # Usei ITEMS_PER_PAGE (5) para caber melhor o visual
     page = max(1, min(page, total_p))
     current = recipes[(page-1)*ITEMS_PER_PAGE : page*ITEMS_PER_PAGE]
 
+    # --- MONTAGEM DO TEXTO VISUAL ---
     lines = [_get_profession_header(pdata)]
-    if not current: lines.append("\n<i>Nenhuma receita disponível.</i>")
+    
+    if not current:
+        lines.append("\n<i>Nenhuma receita disponível no momento.</i>")
     
     for r in current:
         can_craft = r["prev"].get("can_refine")
-        status_icon = "🟢" if can_craft else "🔴"
-        status_txt = "Pronto" if can_craft else ("Nível Baixo" if not r["prev"].get("meets_prof") else "Falta Material")
         
+        # Lógica de Ícones
+        if can_craft:
+            status_icon = "🟢" # Verde se pode fazer
+            status_txt = "Pronto para forjar"
+        else:
+            # Tenta descobrir pq não pode (resumido)
+            if not r["prev"].get("meets_prof", True): # Assumindo que preview retorne isso, se não, simplifique
+                 status_icon = "🔒"
+                 status_txt = f"Req. Nvl {r['req_lvl']}"
+            else:
+                 status_icon = "🔴"
+                 status_txt = "Falta Material"
+
+        # O NOME DO ITEM EM NEGRITO (Destaque)
         lines.append(f"\n{status_icon} <b>{r['name']}</b>")
+        
         lines.append(f"   ├─ ⏳ <code>{r['time']}</code>")
         lines.append(f"   └─ ⚒️ <i>{status_txt}</i>")
 
     lines.append(f"\n📄 <b>Página {page}/{total_p}</b>")
     
+    # --- BOTÕES (LAYOUT LIMPO) ---
     kb = []
+    
+    # Botão de Ação Principal (Desmonte) destacado no topo
     kb.append([InlineKeyboardButton("♻️ MODO DE DESMONTAGEM ♻️", callback_data="ref_dismantle_list")])
+    
+    # Lista de Botões de Receitas
     for r in current:
-        kb.append([InlineKeyboardButton(f"🔨 {r['name']}", callback_data=f"ref_sel_{r['id']}")])
+        # Nome mais limpo no botão
+        btn_txt = f"🔨 REFINAR: {r['name'].split(' ')[-1]}" # Pega só a última palavra ou usa o nome todo se preferir
+        # Eu prefiro o nome completo, mas se ficar grande, corte:
+        btn_txt = r['name']
+        kb.append([InlineKeyboardButton(btn_txt, callback_data=f"ref_sel_{r['id']}")])
 
+    # Navegação
     nav = []
-    if page > 1: nav.append(InlineKeyboardButton("◀️ Ant.", callback_data=f"ref_main_PAGE_{page-1}"))
-    if page < total_p: nav.append(InlineKeyboardButton("Prox. ▶️", callback_data=f"ref_main_PAGE_{page+1}"))
+    if page > 1: nav.append(InlineKeyboardButton("◀️ Anterior", callback_data=f"ref_main_PAGE_{page-1}"))
+    nav.append(InlineKeyboardButton("💫 Atualizar", callback_data="noop_ref_page"))
+    if page < total_p: nav.append(InlineKeyboardButton("Próxima ▶️", callback_data=f"ref_main_PAGE_{page+1}"))
     if nav: kb.append(nav)
     
-    kb.append([InlineKeyboardButton("🔙 Fechar", callback_data="continue_after_action")])
+    kb.append([InlineKeyboardButton("🔙 Fechar Menu", callback_data="continue_after_action")])
+
+    # Envia usando seu helper seguro
     await _safe_edit_or_send_with_media(q, context, "\n".join(lines), InlineKeyboardMarkup(kb))
 
 async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -564,8 +614,9 @@ async def ref_batch_confirm_callback(update: Update, context: ContextTypes.DEFAU
     )
 
 async def ref_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Exibe detalhes e confirmação."""
+    """Exibe detalhes da receita e opção de refino."""
     q = update.callback_query
+    # Apaga o menu anterior
     try: await q.delete_message()
     except: pass
 
@@ -577,32 +628,40 @@ async def ref_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not prev: return
     
     rec = game_data.REFINING_RECIPES.get(rid) or {}
-    t_fmt = _fmt_minutes_or_seconds(int(prev.get("duration_seconds", 0)))
     
-    # Valida nível (com correção visual de 0->1)
-    p_prof = pdata.get("profession", {})
-    cur_lvl = max(1, int(p_prof.get("level", 1)))
+    raw_prof = rec.get("profession", "Geral")
+    if isinstance(raw_prof, list):
+        prof_display = str(raw_prof[0]).title() if raw_prof else "Geral"
+    else:
+        prof_display = str(raw_prof).title()
+
+    t_fmt = _fmt_minutes_or_seconds(int(prev.get("duration_seconds", 0)))
     req_lvl = rec.get("level_req", 1)
     
+    p_prof = pdata.get("profession", {})
+    cur_lvl = int(p_prof.get("level", 1))
+    
+    valid_prof = False
+    if isinstance(raw_prof, list): valid_prof = p_prof.get("type") in raw_prof
+    else: valid_prof = p_prof.get("type") == raw_prof
+    
+    if not valid_prof: cur_lvl = 0
+
     lvl_icon = "✅" if cur_lvl >= req_lvl else "❌"
     
     txt = (
         f"⚒️ <b>FORJA: {rec.get('display_name', rid).upper()}</b>\n"
         f"──────────────────────\n"
         f" ╰┈➤ ⏳ <b>Tempo:</b> <code>{t_fmt}</code>\n"
-        f" ╰┈➤ 📚 <b>Nível:</b> <code>{cur_lvl}/{req_lvl}</code> {lvl_icon}\n"
+        f" ╰┈➤ 📚 <b>{prof_display}:</b> <code>Nv. {cur_lvl}/{req_lvl}</code> {lvl_icon}\n"
         f"──────────────────────\n"
     )
     
     txt += "📥 <b>INGREDIENTES:</b>\n"
     inputs = prev.get("inputs") or {}
-    
     for k, qty in inputs.items():
-        # === AQUI ESTÁ A MÁGICA VISUAL ===
-        # Usa a função que soma (Novo + Velho) para mostrar o número real
-        has = get_total_material_quantity(pdata, k)
-        # =================================
-        
+        inv_item = pdata.get("inventory", {}).get(k)
+        has = int(inv_item.get("quantity", 0)) if isinstance(inv_item, dict) else int(inv_item or 0)
         check = "✅" if has >= qty else "❌"
         txt += f" ╰┈➤ {_fmt_item_line(k, qty)}  <code>({has})</code> {check}\n"
 
@@ -617,11 +676,10 @@ async def ref_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         if max_qty > 1:
             kb.append([InlineKeyboardButton(f"📚 Refinar em Lote (Max: {max_qty})", callback_data=f"ref_batch_menu_{rid}")])
     else:
-        reason = "Falta Material" if not prev.get("meets_prof") else "Nível Baixo"
-        if not prev.get("meets_prof"): reason = "Nível/Profissão"
-        kb.append([InlineKeyboardButton(f"🔒 {reason}", callback_data="noop")])
+        kb.append([InlineKeyboardButton("🔒 Requisitos não atendidos", callback_data="noop")])
 
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="ref_main")])
+    
     mkey = rec.get("media_key")
     await _safe_send_with_media(context, q.message.chat_id, txt, InlineKeyboardMarkup(kb), media_key=mkey)
 

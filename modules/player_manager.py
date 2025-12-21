@@ -299,53 +299,72 @@ def corrigir_itens_duplicados(player_data: dict) -> bool:
 
 async def corrigir_inventario_automatico(user_id: int):
     """
-    Detecta itens com IDs antigos (ex: minerio_ferro), 
-    soma sua quantidade ao ID novo (ex: minerio_de_ferro) e deleta o velho.
+    Detecta itens com IDs antigos/errados e funde com os oficiais.
+    Executa a correção e salva se necessário.
     """
-    # 1. Carrega os dados (sem cache para garantir que está fresco)
     pdata = await get_player_data(user_id)
     if not pdata: return
     
     inventory = pdata.get("inventory", {})
     mudou = False
 
-    # MAPA DE CORREÇÃO: "ID_ANTIGO" -> "ID_NOVO"
+    # MAPA: "ID_ERRADO" -> "ID_OFICIAL_DO_REFINO"
+    # Adicionei todas as variações comuns aqui
     migracoes = {
+        # Ferro
         "minerio_ferro": "minerio_de_ferro",
         "iron_ore": "minerio_de_ferro",
         "pedra_ferro": "minerio_de_ferro",
-        "minerio_estanho": "minerio_de_estanho", # Prevenindo erro no estanho também
+        "minerio_bruto": "minerio_de_ferro",
+        
+        # Estanho
+        "minerio_estanho": "minerio_de_estanho",
+        "tin_ore": "minerio_de_estanho",
+        
+        # Prata
+        "minerio_prata": "minerio_de_prata",
+        "silver_ore": "minerio_de_prata",
+
+        # Madeira
+        "madeira_rara_bruta": "madeira_rara",
+        "wood_rare": "madeira_rara",
+        
+        # Carvão
+        "carvao_mineral": "carvao",
+        "coal": "carvao"
     }
 
     for id_velho, id_novo in migracoes.items():
         if id_velho in inventory:
-            # Pega a quantidade do item velho (suporta dict ou int)
+            # Pega a quantidade do item velho com segurança
             item_data = inventory[id_velho]
             qtd_velha = 0
             
             if isinstance(item_data, dict):
-                qtd_velha = int(item_data.get("quantity", 0))
+                qtd_velha = int(item_data.get("quantity", 1))
             else:
                 qtd_velha = int(item_data)
 
             if qtd_velha > 0:
-                # Garante que o item novo existe no inventário
+                # 1. Garante que o item novo existe
                 if id_novo not in inventory:
-                    inventory[id_novo] = 0 # Inicializa como int (stack simples)
+                    # Se não existe, cria. Mantém o padrão (int se for stack simples)
+                    inventory[id_novo] = 0
                 
-                # Se o item novo for dict, soma na chave quantity, se for int, soma direto
+                # 2. Soma a quantidade no item novo
                 if isinstance(inventory[id_novo], dict):
                     inventory[id_novo]["quantity"] = int(inventory[id_novo].get("quantity", 0)) + qtd_velha
                 else:
                     inventory[id_novo] = int(inventory[id_novo]) + qtd_velha
 
-                print(f"♻️ FIX: {user_id} - Migrado {qtd_velha}x {id_velho} -> {id_novo}")
+                print(f"🔧 FIX: {user_id} | {qtd_velha}x {id_velho} -> {id_novo}")
                 mudou = True
             
-            # Deleta o item velho para sumir do inventário
+            # 3. Deleta o item velho
             del inventory[id_velho]
             mudou = True
 
-    # 2. Se houve mudança, salva no banco imediatamente
     if mudou:
         await save_player_data(user_id, pdata)
+        return True
+    return False
