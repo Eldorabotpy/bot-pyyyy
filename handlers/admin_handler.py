@@ -1217,6 +1217,8 @@ async def _change_id_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 # --- COMANDO DE CORREÇÃO DE TOMOS (ADICIONAR EM admin_handler.py) ---
 
+# --- COMANDO DE CORREÇÃO DE TOMOS (Substitua a função anterior por esta) ---
+
 async def admin_fix_tomos_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Comando ADMIN: Varre todos os jogadores e corrige o bug 'Tomo Tomo'.
@@ -1230,13 +1232,15 @@ async def admin_fix_tomos_command(update: Update, context: ContextTypes.DEFAULT_
     total_checked = 0
     
     try:
-        # Importe a função de correção que criamos no player_manager
+        # Importe a função de correção
         from modules.player_manager import corrigir_bug_tomos_duplicados, iter_player_ids
 
-        async for pid in iter_player_ids():
+        # ✅ CORREÇÃO AQUI: Removemos o 'async' antes do 'for'
+        # O iter_player_ids() é uma lista/gerador comum, não precisa de async for.
+        for pid in iter_player_ids():
             total_checked += 1
             
-            # Executa a correção para este jogador
+            # A função de correção continua sendo async, então mantemos o await aqui dentro
             if await corrigir_bug_tomos_duplicados(pid):
                 count_fixed += 1
             
