@@ -369,3 +369,49 @@ async def corrigir_inventario_automatico(user_id: int):
         await save_player_data(user_id, pdata)
         return True
     return False
+
+# --- ADICIONE NO FINAL DE player_manager.py ---
+
+async def corrigir_bug_tomos_duplicados(user_id: int):
+    """
+    Varre o inventário do jogador. Se achar 'tomo_tomo_',
+    converte para 'tomo_' e mantém a quantidade.
+    """
+    pdata = await get_player_data(user_id)
+    if not pdata: return False
+    
+    inventory = pdata.get("inventory", {})
+    mudou = False
+    
+    # Precisamos listar as chaves antes de iterar para poder deletar durante o loop
+    lista_itens = list(inventory.keys())
+
+    for item_id in lista_itens:
+        # Detecta o padrão errado
+        if item_id.startswith("tomo_tomo_"):
+            
+            # 1. Pega a quantidade do item bugado
+            dados_item = inventory[item_id]
+            qtd = 0
+            if isinstance(dados_item, dict):
+                qtd = int(dados_item.get("quantity", 1))
+            else:
+                qtd = int(dados_item)
+
+            if qtd > 0:
+                # 2. Cria o ID correto (remove o primeiro 'tomo_')
+                id_correto = item_id.replace("tomo_tomo_", "tomo_", 1)
+                
+                # 3. Adiciona ao item correto (se já tiver, soma)
+                add_item_to_inventory(pdata, id_correto, qtd)
+                
+                print(f"🔧 FIX TOMO: Jogador {user_id} | {qtd}x {item_id} -> {id_correto}")
+            
+            # 4. Deleta o item bugado
+            del inventory[item_id]
+            mudou = True
+
+    if mudou:
+        await save_player_data(user_id, pdata)
+        return True
+    return False

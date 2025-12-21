@@ -676,17 +676,26 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 CHANCE_DROP_SKILL = 3.0 
                 
                 if random.random() * 100 <= CHANCE_DROP_SKILL and SKILL_REWARD_POOL:
-                    skill_id = random.choice(SKILL_REWARD_POOL) # Pega UMA aleatória
-                    tomo_id = f"tomo_{skill_id}"
+                    skill_id = random.choice(SKILL_REWARD_POOL) 
+                    
+                    # --- CORREÇÃO DO "TOMO TOMO" ---
+                    # Removemos qualquer "tomo_" que já exista para garantir que não duplique
+                    clean_id = skill_id.replace("tomo_", "")
+                    
+                    # Agora montamos o ID oficial único
+                    tomo_id = f"tomo_{clean_id}"
+                    # -------------------------------
                     
                     player_manager.add_item_to_inventory(pdata, tomo_id, 1)
                     
                     # Log
                     s_info = game_data.ITEMS_DATA.get(tomo_id, {})
-                    s_name = s_info.get("display_name", skill_id)
+                    # Se não achar o nome bonito, usa o ID limpo formatado
+                    s_name = s_info.get("display_name", tomo_id.replace("_", " ").title())
+                    
                     loot_won_messages.append(f"📚 <b>SKILL:</b> {s_name}")
                     skill_winners_msg.append(f"• {player_name} obteve <b>{s_name}</b>!")
-
+                    
                 # --- C. SKINS (Muito Raro - Máximo 1 por pessoa) ---
                 # Chance Global de cair UMA skin: 1.5%
                 CHANCE_DROP_SKIN = 1.5

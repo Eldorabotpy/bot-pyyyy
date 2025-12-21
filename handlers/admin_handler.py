@@ -1214,7 +1214,47 @@ async def _change_id_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_text("Operação cancelada.")
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
+
+# --- COMANDO DE CORREÇÃO DE TOMOS (ADICIONAR EM admin_handler.py) ---
+
+async def admin_fix_tomos_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando ADMIN: Varre todos os jogadores e corrige o bug 'Tomo Tomo'.
+    Transforma 'tomo_tomo_X' em 'tomo_X'.
+    """
+    if not await ensure_admin(update): return
+
+    msg = await update.message.reply_text("⏳ <b>Iniciando correção global de Tomos...</b>\nIsso pode levar alguns segundos.", parse_mode=HTML)
     
+    count_fixed = 0
+    total_checked = 0
+    
+    try:
+        # Importe a função de correção que criamos no player_manager
+        from modules.player_manager import corrigir_bug_tomos_duplicados, iter_player_ids
+
+        async for pid in iter_player_ids():
+            total_checked += 1
+            
+            # Executa a correção para este jogador
+            if await corrigir_bug_tomos_duplicados(pid):
+                count_fixed += 1
+            
+            # Pausa a cada 50 players para não travar o bot
+            if total_checked % 50 == 0:
+                await asyncio.sleep(0.1)
+
+        await msg.edit_text(
+            f"✅ <b>CORREÇÃO CONCLUÍDA!</b>\n\n"
+            f"👥 Jogadores verificados: {total_checked}\n"
+            f"🔧 Inventários corrigidos: {count_fixed}\n"
+            f"📚 Todos os 'Tomo Tomo' foram convertidos para Tomos normais."
+        )
+
+    except Exception as e:
+        logger.error(f"Erro no fix_tomos: {e}", exc_info=True)
+        await msg.edit_text(f"❌ Erro crítico durante a correção: {e}")
+
 # =========================================================
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
 # =========================================================
@@ -1232,7 +1272,7 @@ debug_player_handler = CommandHandler("debug_player", debug_player_data, filters
 get_id_command_handler = CommandHandler("get_id", get_id_command)
 fixme_handler = CommandHandler("fixme", fix_my_character, filters=filters.User(ADMIN_LIST))
 hard_respec_all_handler = CommandHandler("hard_respec_all", hard_respec_all_command, filters=filters.User(ADMIN_LIST))
-
+fix_tomos_handler = CommandHandler("fix_tomos", admin_fix_tomos_command, filters=filters.User(ADMIN_LIST))
 
 # Handlers de CallbackQuery (Botões) - Filtros são aplicados dentro das funções
 admin_main_handler = CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
@@ -1376,4 +1416,5 @@ all_admin_handlers = [
     fix_ghost_clan_handler,
     fix_clan_conv_handler,
     debug_skill_handler,
+    fix_tomos_handler,
 ]
