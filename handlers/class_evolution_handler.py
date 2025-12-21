@@ -7,13 +7,12 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
 
-from modules import player_manager
+from modules import player_manager, combat_manager
 from modules import class_evolution_service as evo_service
 from modules.game_data import class_evolution as evo_data
+from modules.game_data.monsters import MONSTERS_DATA
 from modules.game_data.skills import SKILL_DATA
 from modules.player import stats as player_stats
-
-# Importamos o novo módulo de batalha para iniciar a apresentação visual
 from modules import evolution_battle
 
 logger = logging.getLogger(__name__)
@@ -226,19 +225,53 @@ async def start_trial_confirmation(update: Update, context: ContextTypes.DEFAULT
 async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
-    try: target = query.data.split(":", 1)[1]
-    except: return
+    try: 
+        target = query.data.split(":", 1)[1] # Ex: "ladrao_de_sombras"
+    except: 
+        return
 
-    # 1. Verifica se pode iniciar (service)
+    # 1. Verifica se pode iniciar (service) - consome itens, verifica nível etc.
     result = await evo_service.start_evolution_trial(user_id, target)
     if not result.get("success"):
         await query.answer(result.get("message"), show_alert=True)
         return
 
-    # 2. Inicia a apresentação visual (agora usando o NOVO módulo)
-    await evolution_battle.start_evolution_presentation(update, context, user_id, target)
+    # --- CORREÇÃO: INICIAR O COMBATE NO SISTEMA ---
+    
+    # A. Achar a definição da evolução para pegar o ID do monstro
+    evo_def = evo_data.find_evolution_by_target(target)
+    if not evo_def:
+        await query.answer("Erro: Evolução não encontrada.", show_alert=True)
+        return
+        
+    monster_id = evo_def.get("trial_monster_id")
+    
+    # B. Achar os dados do monstro na lista de monstros
+    monster_data = None
+    trials_list = MONSTERS_DATA.get("_evolution_trials", [])
+    
+    # Procura o monstro na lista de trials
+    for mob in trials_list:
+        if mob["id"] == monster_id:
+            monster_data = mob.copy() 
+            break
+            
+    if not monster_data:
+        for region_list in MONSTERS_DATA.values():
+            if isinstance(region_list, list):
+                for mob in region_list:
+                    if mob.get("id") == monster_id:
+                        monster_data = mob.copy()
+                        break
+            if monster_data: break
 
-# --- SKILL ASCENSION HANDLERS ---
+    if monster_data:
+        await combat_manager.start_combat(update, context, monster_data)
+    else:
+        await query.answer(f"Erro: Monstro '{monster_id}' não encontrado.", show_alert=True)
+        return
+
+    await evolution_battle.start_evolution_presentation(update, context, user_id, target)
 
 async def show_skill_ascension_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
