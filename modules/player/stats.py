@@ -584,3 +584,25 @@ async def apply_class_change_and_recalculate(player_data: dict, new_class_key: s
     player_data["current_mp"] = _ival(totals.get("max_mana"))
     player_data["class_choice_offered"] = True
     return player_data
+
+# --- ADICIONE ISTO NO FINAL DO ARQUIVO stats.py ---
+
+def add_xp(player_data: dict, amount: int):
+    """
+    Adiciona XP ao dicionário do jogador de forma segura.
+    Não salva no banco, apenas atualiza a memória.
+    """
+    if not player_data:
+        return
+        
+    current_xp = player_data.get("xp", 0)
+    
+    # Garante que seja inteiro
+    try:
+        amount = int(amount)
+        current_xp = int(current_xp)
+    except:
+        amount = 0
+        
+    player_data["xp"] = current_xp + amount
+    

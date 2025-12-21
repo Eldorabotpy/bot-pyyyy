@@ -33,6 +33,7 @@ from .player.stats import (
     get_player_dodge_chance, 
     get_player_double_attack_chance,
     check_and_apply_level_up, 
+    add_xp,
     allowed_points_for_level, 
     reset_stats_and_refund_points,
     needs_class_choice, 

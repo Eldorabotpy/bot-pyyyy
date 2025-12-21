@@ -1,19 +1,19 @@
 {
   "is_active": false,
-  "location": "forja_abandonada",
+  "location": "floresta_sombria",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",
-      "hp": 35000,
+      "hp": 0,
       "max_hp": 35000,
-      "alive": true,
+      "alive": false,
       "stats": {
         "attack": 50,
         "defense": 20,
         "initiative": 5,
         "luck": 20
       },
-      "turn_counter": 0,
+      "turn_counter": 86,
       "loot_table": [
         [
           "samurai_sombra_demoniaca",
@@ -211,36 +211,47 @@
     },
     "witch_heal": {
       "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚",
-      "hp": 5000,
+      "hp": 0,
       "max_hp": 5000,
-      "alive": true,
+      "alive": false,
       "stats": {
         "attack": 15,
         "defense": 10,
         "initiative": 5,
         "luck": 10
       },
-      "turn_counter": 0
+      "turn_counter": 10
     },
     "witch_debuff": {
       "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬",
-      "hp": 5000,
+      "hp": 0,
       "max_hp": 5000,
-      "alive": true,
+      "alive": false,
       "stats": {
         "attack": 20,
         "defense": 10,
         "initiative": 5,
         "luck": 15
       },
-      "turn_counter": 0
+      "turn_counter": 20
     }
   },
   "active_fighters": [],
   "waiting_queue": [],
-  "player_states": {},
+  "player_states": {
+    "7262799478": {
+      "hp": 319,
+      "max_hp": 336,
+      "mp": 1030,
+      "max_mp": 1070,
+      "current_target": "boss",
+      "log": "𝗘𝗻𝘁𝗿𝗼𝘂 𝗻𝗮 𝗯𝗮𝘁𝗮𝗹𝗵𝗮!\n✨ 𝙑𝙤𝙘𝙚̂ 𝙪𝙨𝙤𝙪 𝙎𝙠𝙞𝙡𝙡: 757 𝙙𝙖𝙣𝙤 𝙚𝙢 𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬\n🔥 𝐕𝐨𝐜𝐞̂ 𝐬𝐨𝐟𝐫𝐞𝐮 𝐪𝐮𝐞𝐢𝐦𝐚𝐝𝐮𝐫𝐚: -16 HP\n🤕 𝗕𝗼𝘀𝘀 𝘁𝗲 𝗮𝗰𝗲𝗿𝘁𝗼𝘂 (Ataque): -1 HP"
+    }
+  },
   "environment_hazard": false,
   "hazard_turns": 0,
-  "damage_leaderboard": {},
+  "damage_leaderboard": {
+    "7262799478": 45376
+  },
   "last_hitter_id": 7262799478
 }
