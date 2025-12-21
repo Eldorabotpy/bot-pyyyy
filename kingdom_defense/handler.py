@@ -341,59 +341,101 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
 
 async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    # 1. Responde imediatamente para parar o "reloginho" de carregamento
+    try: await query.answer()
+    except: pass
+    
     user_id = query.from_user.id
     player_data = await player_manager.get_player_data(user_id) 
     if not player_data: return
     
-    player_class = player_data.get("class_key") or player_data.get("class") # Classe atual
-    equipped_skills = player_data.get("equipped_skills", [])
+    # Previne erro se o player não tiver classe definida (comum em ADMs ou contas novas)
+    player_class = (player_data.get("class_key") or player_data.get("class") or "aventureiro").lower()
     
+    # Garante que equipped_skills seja uma lista
+    equipped_skills = player_data.get("equipped_skills", [])
     if not equipped_skills:
-        await query.answer("Nenhuma habilidade equipada!", show_alert=True); return
+        # Tenta pegar todas as skills se não tiver nenhuma equipada (fallback)
+        if player_data.get("skills"):
+            equipped_skills = list(player_data["skills"].keys())
+        else:
+            await query.answer("Nenhuma habilidade aprendida!", show_alert=True)
+            return
 
     active_cooldowns = player_data.get("cooldowns", {})
-
-    keyboard, current_mana = [], player_data.get("mana", 0)
+    current_mana = player_data.get("mana", 0)
+    
+    keyboard = []
+    
     for skill_id in equipped_skills:
+        # Usa a função local que lida com raridade
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
-        skill_type = skill_info.get("type", "unknown")
         
-        if not skill_info or skill_type == "passive": continue 
-
-        # --- NOVA VERIFICAÇÃO DE CLASSE/EVOLUÇÃO ---
-        allowed_classes = skill_info.get("allowed_classes", [])
-        if not can_player_use_skill(player_class, allowed_classes):
-            # Se a classe atual não está na hierarquia permitida, pula a skill
+        # Pula se a skill não existir ou for passiva
+        if not skill_info or skill_info.get("type") == "passive": 
             continue 
-        # -------------------------------------------
+
+        # --- PROTEÇÃO CONTRA ERRO DE CLASSE ---
+        allowed_classes = skill_info.get("allowed_classes", [])
+        try:
+            # Se a lista de permitidos não for vazia, verifica se pode usar
+            if allowed_classes and can_player_use_skill:
+                if not can_player_use_skill(player_class, allowed_classes):
+                    continue 
+        except Exception as e:
+            # Se der erro na verificação (ex: função não existe), PERMITE o uso para não travar
+            logger.error(f"Erro ao verificar classe da skill {skill_id}: {e}")
+        # ----------------------------------------
 
         mana_cost = skill_info.get('mana_cost', 0)
         turns_left = active_cooldowns.get(skill_id, 0)
-        cooldown_tag = f" (CD: {turns_left})" if turns_left > 0 else ""
         
-        is_single_target = skill_type == "support_heal" # Assumindo que support_heal é o único que exige target no KD
-
-        button_text_base = f"{skill_info['display_name']} ({mana_cost} MP){cooldown_tag}"
+        # Formata o texto do botão
+        status_icon = "💥"
+        if turns_left > 0:
+            status_icon = f"⏳ ({turns_left})"
+        elif current_mana < mana_cost:
+            status_icon = "💧" # Sem mana
+            
+        button_text = f"{status_icon} {skill_info['display_name']} ({mana_cost} MP)"
         
-        if is_single_target:
-            if current_mana < mana_cost or turns_left > 0:
-                 button_text = f"❌ {button_text_base}"
-            else:
-                 button_text = f"🎯 {button_text_base}"
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"select_target:{skill_id}")])
+        # Lógica de alvo (Single Target vs Auto)
+        skill_type = skill_info.get("type", "active")
+        is_single_target = skill_type == "support_heal" # Exemplo de target manual
+        
+        callback_action = ""
+        if turns_left > 0:
+            # Botão de cooldown (apenas informativo)
+            callback_action = f"kd_cooldown_alert:{turns_left}" 
+        elif current_mana < mana_cost:
+            # Botão de sem mana
+            callback_action = "kd_no_mana_alert"
         else:
-            if current_mana < mana_cost or turns_left > 0:
-                button_text = f"❌ {button_text_base}" 
+            if is_single_target:
+                callback_action = f"select_target:{skill_id}"
             else:
-                button_text = f"💥 {button_text_base}" 
-            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"use_skill:{skill_id}")])
+                callback_action = f"use_skill:{skill_id}"
+                
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_action)])
+    
+    # Se depois de filtrar não sobrou nada
+    if not keyboard:
+        keyboard.append([InlineKeyboardButton("🚫 Nenhuma skill ativa disponível", callback_data="noop")])
     
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="back_to_battle")])
-    text_content = "<b>Menu de Habilidades</b>\n\nEscolha uma habilidade para usar:"
-    if query.message.photo: await query.edit_message_caption(caption=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-    else: await query.edit_message_text(text=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     
+    text_content = f"<b>Menu de Habilidades</b>\nClasse: {player_class.title()}\nMana: {current_mana}\n\nEscolha uma habilidade:"
+    
+    try:
+        if query.message.photo: 
+            await query.edit_message_caption(caption=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        else: 
+            await query.edit_message_text(text=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Erro ao exibir menu de skills: {e}")
+        # Tenta mandar uma mensagem nova se a edição falhar
+        await context.bot.send_message(chat_id=user_id, text="Erro ao abrir skills. Tente novamente.", parse_mode="HTML")
+
 async def select_skill_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -613,6 +655,14 @@ async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer("Aguarde.")
     else: await show_event_menu(update, context)
 
+async def alert_cooldown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    turns = query.data.split(":")[1]
+    await query.answer(f"Habilidade recarregando! Aguarde {turns} turnos.", show_alert=True)
+
+async def alert_no_mana(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer("Mana insuficiente!", show_alert=True)
+
 def register_handlers(application):
     application.add_handler(CallbackQueryHandler(show_event_menu, pattern='^defesa_reino_main$'))
     application.add_handler(CallbackQueryHandler(handle_join_and_start_battle, pattern='^kd_join_and_start$'))
@@ -627,3 +677,6 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(apply_skill_handler, pattern='^apply_skill:'))
     application.add_handler(CallbackQueryHandler(select_skill_target, pattern='^select_target:'))
     application.add_handler(CallbackQueryHandler(handle_exit_event, pattern='^kd_exit_event$'))
+    application.add_handler(CallbackQueryHandler(alert_cooldown, pattern='^kd_cooldown_alert:'))
+    application.add_handler(CallbackQueryHandler(alert_no_mana, pattern='^kd_no_mana_alert$'))
+    
