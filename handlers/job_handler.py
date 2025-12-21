@@ -33,10 +33,25 @@ async def execute_collection_logic(
     chat_id: int,
     resource_id: str,
     item_id_yielded: str,
-    quantity_base: int, # Geralmente 1
+    quantity_base: int,
     context: ContextTypes.DEFAULT_TYPE,
     message_id_to_delete: int = None
 ):
+    # --- [INÍCIO DA CORREÇÃO] ADICIONE ISTO AQUI ---
+    # Mapa de correção forçada (ID Antigo -> ID Novo)
+    FIX_IDS = {
+        "minerio_ferro": "minerio_de_ferro",  # Converte o antigo pro novo
+        "iron_ore": "minerio_de_ferro",       # Caso tenha sobrado algo em inglês
+        # Adicione outros se precisar
+    }
+    
+    # Se o ID que chegou for um dos antigos, trocamos pelo novo imediatamente
+    if resource_id in FIX_IDS: 
+        resource_id = FIX_IDS[resource_id]
+    
+    if item_id_yielded in FIX_IDS: 
+        item_id_yielded = FIX_IDS[item_id_yielded]
+        
     """
     Executa a matemática da coleta, entrega itens e notifica.
     Independente de contexto de Job.

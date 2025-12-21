@@ -246,3 +246,51 @@ async def safe_add_xp(user_id: int, xp_amount: int) -> tuple[int, str]:
     await save_player_data(user_id, pdata)
     
     return levels_gained, msg
+
+def corrigir_itens_duplicados(player_data: dict) -> bool:
+    """
+    Detecta itens com IDs antigos, transfere a quantidade para o ID novo e remove o antigo.
+    Retorna True se houve mudança.
+    """
+    inventory = player_data.get("inventory", {})
+    if not inventory: return False
+
+    # Mapa: O que deve sair -> Para onde deve ir
+    migracoes = {
+        "minerio_ferro": "minerio_de_ferro",
+        "iron_ore": "minerio_de_ferro",
+        "pedra_ferro": "minerio_de_ferro"
+    }
+
+    houve_mudanca = False
+
+    for id_velho, id_novo in migracoes.items():
+        if id_velho in inventory:
+            # 1. Pega a quantidade do item velho
+            dados_velho = inventory[id_velho]
+            qtd_velha = 0
+            
+            if isinstance(dados_velho, dict):
+                qtd_velha = int(dados_velho.get("quantity", 0))
+            else:
+                qtd_velha = int(dados_velho) # Caso esteja salvo apenas como int
+            
+            # 2. Se tiver quantidade para migrar
+            if qtd_velha > 0:
+                # Garante que o item novo existe
+                if id_novo not in inventory:
+                    inventory[id_novo] = {"quantity": 0}
+                
+                # Soma no novo
+                inventory[id_novo]["quantity"] = int(inventory[id_novo].get("quantity", 0)) + qtd_velha
+                
+                # Deleta o velho
+                del inventory[id_velho]
+                houve_mudanca = True
+                print(f"♻️ Migrado: {qtd_velha}x {id_velho} -> {id_novo}")
+            else:
+                # Se for 0 ou lixo, só deleta
+                del inventory[id_velho]
+                houve_mudanca = True
+
+    return houve_mudanca
