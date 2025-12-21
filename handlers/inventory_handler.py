@@ -119,6 +119,7 @@ async def _force_fix_inventory(user_id, player_data):
     # Mapeamento ID VELHO (Errado) -> ID NOVO (Certo/Oficial do refino)
     correcoes = {
         # Ferros
+        "ferro": "minerio_de_ferro",
         "minerio_ferro": "minerio_de_ferro",
         "iron_ore": "minerio_de_ferro",
         "pedra_ferro": "minerio_de_ferro",
