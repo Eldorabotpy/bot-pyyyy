@@ -845,7 +845,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             ],
         
             "unlocks_skills": ["evo_shadow_thief_ambush"], 
-            "trial_monster_id": "vigilant_guard",
+            "trial_monster_id": "doppelganger_of_the_throne",
         },
         # T3 (Lvl 40)
         {
@@ -980,7 +980,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             ],
             
             "unlocks_skills": ["evo_ronin_wanderers_focus"], 
-            "trial_monster_id": "lone_brigand_leader",
+            "trial_monster_id": "phantom_of_the_dojo",
         },
         # T3 (Lvl 40)
         {
