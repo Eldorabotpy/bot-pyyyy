@@ -145,6 +145,12 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     user_id = query.from_user.id
     
+    try:
+        if hasattr(player_manager, "corrigir_inventario_automatico"):
+            await player_manager.corrigir_inventario_automatico(user_id)
+    except Exception as e:
+        logger.error(f"Erro ao corrigir inventario: {e}")
+        
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 

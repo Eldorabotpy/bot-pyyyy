@@ -94,11 +94,30 @@ class WorldBossManager:
             self._reset_entities()
 
     def _reset_entities(self):
+        # --- GERAÇÃO DA LOOT TABLE ---
+        # Montamos a lista de drops possíveis para este boss
+        generated_loot = []
+        
+        # 1. Skills (Item ID, Chance)
+        for skill in SKILL_REWARD_POOL:
+            generated_loot.append((skill, SKILL_CHANCE))
+            
+        # 2. Skins (Item ID, Chance)
+        for skin in SKIN_REWARD_POOL:
+            generated_loot.append((skin, SKIN_CHANCE))
+            
+        # 3. Loot Comum (Item ID, Chance)
+        # O Pool original é (id, min, max), vamos adaptar para o loop de chance
+        for item_tuple in LOOT_REWARD_POOL:
+            item_id = item_tuple[0] # Pega só o ID
+            generated_loot.append((item_id, LOOT_CHANCE))
+
         self.entities = {
             "boss": {
                 "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", "hp": 35000, "max_hp": 35000, 
                 "alive": True, "stats": {"attack": 50, "defense": 20, "initiative": 5, "luck": 20},
-                "turn_counter": 0 
+                "turn_counter": 0,
+                "loot_table": generated_loot  # <--- CORREÇÃO: Adicionamos a tabela aqui
             },
             "witch_heal": {
                 "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚", "hp": 5000, "max_hp": 5000, 
@@ -226,10 +245,10 @@ class WorldBossManager:
         return {
             "leaderboard": self.damage_leaderboard.copy(),
             "last_hitter_id": self.last_hitter_id,
-            "boss_defeated": (reason == "Boss derrotado")
+            "boss_defeated": (reason == "Boss derrotado"),
+            "boss": self.entities.get("boss", {}) # <--- CORREÇÃO: Enviando dados do Boss (e loot)
         }
-
-    # --- GERENCIAMENTO DE FILA ---
+    
     async def add_player_to_event(self, user_id, player_data):
         if not self.is_active: return "inactive"
         if user_id in self.active_fighters: return "active"
@@ -626,7 +645,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 player_mudou = True
 
                 # ==========================================================
-                # 2. DROP DO BOSS (CORREÇÃO APLICADA AQUI)
+                # 2. DROP DO BOSS (CORREÇÃO E QUANTIDADE VARIÁVEL)
                 # ==========================================================
                 boss_loot_table = boss_data.get("loot_table", [])
                 
@@ -635,14 +654,23 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     if random.random() * 100 <= chance:
                         
                         final_item_id = item_id
+                        qtd_to_add = 1 # Padrão
                         
+                        # --- CORREÇÃO: Verifica quantidade variável do Pool de Loot ---
+                        for pool_item in LOOT_REWARD_POOL:
+                            # pool_item é ("id", min, max)
+                            if pool_item[0] == item_id:
+                                qtd_to_add = random.randint(pool_item[1], pool_item[2])
+                                break
+                        # -------------------------------------------------------------
+
                         # --- CORREÇÃO: Converte Skill em Tomo ---
                         if item_id in SKILL_DATA:
                             final_item_id = f"tomo_{item_id}"
                         # ----------------------------------------
                         
-                        # Adiciona ao inventário
-                        player_manager.add_item_to_inventory(pdata, final_item_id, 1)
+                        # Adiciona ao inventário com a quantidade certa
+                        player_manager.add_item_to_inventory(pdata, final_item_id, qtd_to_add)
                         player_mudou = True
                         
                         # Formatação para o Log
@@ -661,8 +689,9 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                             loot_won_messages.append(f"🎨 <b>SKIN:</b> {d_name}")
                             skin_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
                         else:
-                            loot_won_messages.append(f"{emoji} <b>Loot:</b> {d_name}")
-                            loot_summary[d_name] = loot_summary.get(d_name, 0) + 1
+                            # Mostra a quantidade no log pessoal
+                            loot_won_messages.append(f"{emoji} <b>Loot:</b> {qtd_to_add}x {d_name}")
+                            loot_summary[d_name] = loot_summary.get(d_name, 0) + qtd_to_add
 
                 # Salva o jogador
                 if player_mudou:
