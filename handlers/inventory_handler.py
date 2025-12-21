@@ -1,8 +1,7 @@
 # handlers/inventory_handler.py
-# (VERSÃO CORRIGIDA: Compatível com "learn_skill" e Trava de Classe)
+# (VERSÃO FINAL BLINDADA: Corrige inventário duplicado NA HORA DE ABRIR)
 
 import math
-import re
 import logging
 from telegram import (
     Update,
@@ -13,10 +12,9 @@ from telegram import (
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
-from modules import player_manager, game_data, display_utils
-from modules import file_ids
-from modules.game_data.skins import SKIN_CATALOG
+from modules import player_manager, game_data, file_ids
 from modules.game_data import skills as skills_data
+from modules.game_data.skins import SKIN_CATALOG
 from modules.player import stats as player_stats
 from modules.game_data.class_evolution import can_player_use_skill
 from modules.player import actions as player_actions
@@ -38,16 +36,8 @@ CATEGORIES = {
 }
 
 # -----------------------------------------------------------
-# Helpers e Ganchos
+# Helpers Locais
 # -----------------------------------------------------------
-try:
-    from handlers.utils_timed import auto_finalize_if_due 
-except Exception:
-    async def auto_finalize_if_due(*args, **kwargs): return
-
-async def _auto_finalize_safe(user_id, context):
-    try: await auto_finalize_if_due(user_id, context, player_manager)
-    except Exception: pass
 
 def _info_for(key: str) -> dict:
     if not key: return {}
@@ -66,47 +56,25 @@ def _display_name_for_instance(uid: str, inst: dict) -> str:
     return f"{emoji} {name}".strip()
 
 def _determine_tab(item_key: str, item_value: dict|int) -> str:
-    """Lógica de separação de categorias."""
     if isinstance(item_value, dict): return "equipamento"
-
     info = _info_for(item_key)
     tipo = (info.get("type") or "").lower()
     cat = (info.get("category") or "").lower()
     
-    # 1. Livros e Aprendizado
-    if "tomo_" in item_key or "caixa_" in item_key or "livro" in item_key: 
-        return "aprendizado"
-        
+    if "tomo_" in item_key or "caixa_" in item_key or "livro" in item_key: return "aprendizado"
     effects = info.get("effects") or info.get("on_use") or {}
-    if effects.get("effect") in ("grant_skill", "grant_skin") or "learn_skill" in effects: 
-        return "aprendizado"
-
-    # 2. Eventos e Tickets
+    if effects.get("effect") in ("grant_skill", "grant_skin") or "learn_skill" in effects: return "aprendizado"
     if cat == "evento" or tipo == "event_ticket" or "ticket" in item_key or "fragmento" in item_key: return "evento"
-    
-    # 3. Equipamentos
     if tipo == "equipamento" or info.get("slot"): return "equipamento"
-    
-    # 4. Caça e Monstros
     if tipo == "material_monstro" or cat == "cacada": return "cacada"
+    if cat == "evolucao" or info.get("evolution_item") is True: return "especial"
+    if tipo in ("material_bruto", "material_refinado", "sucata") or cat == "coletavel": return "refino"
     
-    # --- CORREÇÃO IMPORTANTE AQUI ---
-    # Prioridade para Evolução e Itens Especiais antes de verificar materiais genéricos
-    if cat == "evolucao" or info.get("evolution_item") is True:
-        return "especial"
-    # -------------------------------
-
-    # 5. Materiais de Refino (Genéricos)
-    if tipo in ("material_bruto", "material_refinado", "sucata") or cat == "coletavel":
-        # Removemos o check de evolucao daqui pois já foi tratado acima
-        return "refino"
-
     itens_melhoria = ("pedra_do_aprimoramento", "nucleo_forja_comum", "nucleo_forja_fraco", "pergaminho_durabilidade", "cristal_de_abertura", "nucleo_de_energia_instavel", "essencia_draconica_pura")
     if item_key in itens_melhoria: return "especial"
     
     if cat in ("especial", "evolucao") or "chave" in item_key or "gem" in item_key: return "especial"
     if tipo == "material_magico": return "especial"
-
     return "consumivel"
 
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML', media_key="img_inventario"):
@@ -136,6 +104,64 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
         
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
+# ==========================================================
+# FUNÇÃO DE CORREÇÃO FORÇADA (LOCAL)
+# ==========================================================
+async def _force_fix_inventory(user_id, player_data):
+    """
+    Corrige IDs antigos fundindo no novo e atualiza o player_data EM MEMÓRIA.
+    Retorna True se houve mudança (para salvar).
+    """
+    inventory = player_data.get("inventory", {})
+    if not inventory: return False
+    mudou = False
+    
+    # Mapeamento ID VELHO -> ID NOVO
+    correcoes = {
+        "minerio_ferro": "minerio_de_ferro",
+        "iron_ore": "minerio_de_ferro",
+        "pedra_ferro": "minerio_de_ferro",
+        "minerio_estanho": "minerio_de_estanho",
+        "madeira_rara_bruta": "madeira_rara"
+    }
+
+    for velho, novo in correcoes.items():
+        if velho in inventory:
+            # 1. Descobre quantidade do item velho
+            dado_velho = inventory[velho]
+            qtd_velha = 0
+            if isinstance(dado_velho, dict):
+                qtd_velha = int(dado_velho.get("quantity", 0))
+            else:
+                qtd_velha = int(dado_velho)
+            
+            if qtd_velha > 0:
+                # 2. Garante que o item novo existe
+                if novo not in inventory:
+                    # Se não existe, cria. Mantém consistência (se sistema usa int ou dict)
+                    # Como seu sistema mistura, vamos criar como int seguro,
+                    # o código abaixo converte se necessário.
+                    inventory[novo] = 0
+                
+                # 3. Soma
+                if isinstance(inventory[novo], dict):
+                    inventory[novo]["quantity"] = int(inventory[novo].get("quantity", 0)) + qtd_velha
+                else:
+                    inventory[novo] = int(inventory[novo]) + qtd_velha
+                    
+                print(f"🔧 FIX INVENTÁRIO: {user_id} | {qtd_velha}x {velho} -> {novo}")
+                mudou = True
+            
+            # 4. Remove o velho
+            del inventory[velho]
+            mudou = True
+            
+    if mudou:
+        # Salva no banco para persistir a correção
+        await player_manager.save_player_data(user_id, player_data)
+        
+    return mudou
+
 # -----------------------------------------------------------
 # 1. MENU PRINCIPAL
 # -----------------------------------------------------------
@@ -145,14 +171,16 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     user_id = query.from_user.id
     
-    try:
-        if hasattr(player_manager, "corrigir_inventario_automatico"):
-            await player_manager.corrigir_inventario_automatico(user_id)
-    except Exception as e:
-        logger.error(f"Erro ao corrigir inventario: {e}")
-        
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
+
+    # --- CORREÇÃO LOCAL E IMEDIATA ---
+    # Roda a correção passando o objeto que acabamos de carregar.
+    try:
+        await _force_fix_inventory(user_id, player_data)
+    except Exception as e:
+        logger.error(f"Erro ao corrigir inventario localmente: {e}")
+    # ---------------------------------
 
     gold = player_manager.get_gold(player_data)
     gems = player_manager.get_gems(player_data)
@@ -182,7 +210,7 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(buttons))
 
 # -----------------------------------------------------------
-# 2. LISTA DE ITENS (COM TRAVA DE CLASSE)
+# 2. LISTA DE ITENS
 # -----------------------------------------------------------
 
 async def inventory_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, manual_data=None):
@@ -201,6 +229,11 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
 
     user_id = query.from_user.id
     player_data = await player_manager.get_player_data(user_id)
+    
+    # --- TAMBÉM RODA A CORREÇÃO AQUI (Para garantir quando você clica em Refino) ---
+    try: await _force_fix_inventory(user_id, player_data)
+    except: pass
+    
     inventory = player_data.get("inventory", {})
     player_class_key = player_stats._get_class_key_normalized(player_data)
 
@@ -240,7 +273,6 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
             display = f"{item['name']}"
             if item['qty'] > 1: display += f" (x{item['qty']})"
             
-            # --- LÓGICA DE TRAVA VISUAL ATUALIZADA ---
             is_locked = False
             req_class_label = ""
             
@@ -248,17 +280,13 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
             effects = item_info.get("on_use") or item_info.get("effects") or {}
             eff_type = effects.get("effect")
             
-            # 1. Verifica Class_Req explícito no Item (Prioridade)
             class_req = item_info.get("class_req")
             if class_req and not can_player_use_skill(player_class_key, class_req):
                 is_locked = True
                 req_class_label = class_req[0].capitalize()
 
-            # 2. Verifica Skill ID (Formato Antigo e Novo)
             if not is_locked:
-                # Tenta pegar ID de skill de ambos os formatos
                 sid = effects.get("skill_id") or effects.get("learn_skill")
-                
                 if sid:
                     skill = skills_data.SKILL_DATA.get(sid, {})
                     allowed = skill.get("allowed_classes", [])
@@ -266,7 +294,6 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
                         is_locked = True
                         req_class_label = allowed[0].capitalize()
             
-            # 3. Verifica Skin
             if not is_locked and eff_type == "grant_skin":
                 sid = effects.get("skin_id")
                 if sid:
@@ -321,14 +348,12 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     on_use_data = item_info.get("on_use", {}) or {}
     effects_data = item_info.get("effects", {}) or {}
-    # Mescla para garantir que lemos tudo
     effect_data_to_use = {**on_use_data, **effects_data}
 
     if not effect_data_to_use:
         await query.answer(f"O item '{item_name}' não tem uso direto.", show_alert=True)
         return
 
-    # Tenta remover o item
     if not player_manager.remove_item_from_inventory(player_data, item_id, 1):
         await query.answer("Item não encontrado.", show_alert=True)
         query.data = f"inv_open_{_determine_tab(base_id, 1)}_1"
@@ -337,17 +362,12 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     feedback_msg = f"Você usou {item_name}!"
     effect = effect_data_to_use.get("effect")
-    
-    # --- CORREÇÃO: Tenta ler ID de skill de ambos os formatos ---
     skill_id = effect_data_to_use.get("skill_id") or effect_data_to_use.get("learn_skill")
     skin_id = effect_data_to_use.get("skin_id")
     
     try:
-        # === SKILL: Verifica Formato Antigo ("grant_skill") OU Novo ("learn_skill" existe) ===
         if (effect == "grant_skill" or "learn_skill" in effect_data_to_use) and skill_id:
-            
             if skill_id not in skills_data.SKILL_DATA:
-                # Devolve se skill não existir
                 player_manager.add_item_to_inventory(player_data, item_id, 1)
                 raise ValueError(f"Skill ID {skill_id} inválida.")
 
@@ -362,7 +382,6 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
             player_data["skills"][skill_id] = {"rarity": "comum", "progress": 0}
-
             if skill_id not in player_data["equipped_skills"]:
                 player_data["equipped_skills"].append(skill_id)
 
@@ -376,28 +395,23 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 feedback_msg = f"🎨 Aparência desbloqueada!"
             else:
                 feedback_msg = "Você já possui essa aparência."
-            
         elif effect == "add_pvp_entries":
             val = effect_data_to_use.get("value", 1)
             player_manager.add_pvp_entries(player_data, int(val))
             feedback_msg = f"🎟️ +{val} Entrada(s) na Arena!"
-
         elif "heal" in effect_data_to_use:
             amt = int(effect_data_to_use["heal"])
             await player_actions.heal_player(player_data, amt)
             feedback_msg = f"❤️ +{amt} HP!"
-
         elif "add_energy" in effect_data_to_use:
             amt = int(effect_data_to_use["add_energy"])
             player_actions.add_energy(player_data, amt)
             feedback_msg = f"⚡ +{amt} Energia!"
-            
         elif "add_xp" in effect_data_to_use:
             amt = int(effect_data_to_use["add_xp"])
             player_data['xp'] = player_data.get('xp', 0) + amt
             player_manager.check_and_apply_level_up(player_data)
             feedback_msg = f"🧠 +{amt} XP!"
-
         elif "add_mana" in effect_data_to_use:
             amt = int(effect_data_to_use["add_mana"])
             await player_actions.add_mana(player_data, amt)
