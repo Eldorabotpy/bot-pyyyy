@@ -73,24 +73,37 @@ def _determine_tab(item_key: str, item_value: dict|int) -> str:
     tipo = (info.get("type") or "").lower()
     cat = (info.get("category") or "").lower()
     
+    # 1. Livros e Aprendizado
     if "tomo_" in item_key or "caixa_" in item_key or "livro" in item_key: 
         return "aprendizado"
         
     effects = info.get("effects") or info.get("on_use") or {}
-    # CORREÇÃO: Detecta learn_skill também
     if effects.get("effect") in ("grant_skill", "grant_skin") or "learn_skill" in effects: 
         return "aprendizado"
 
+    # 2. Eventos e Tickets
     if cat == "evento" or tipo == "event_ticket" or "ticket" in item_key or "fragmento" in item_key: return "evento"
+    
+    # 3. Equipamentos
     if tipo == "equipamento" or info.get("slot"): return "equipamento"
+    
+    # 4. Caça e Monstros
     if tipo == "material_monstro" or cat == "cacada": return "cacada"
     
+    # --- CORREÇÃO IMPORTANTE AQUI ---
+    # Prioridade para Evolução e Itens Especiais antes de verificar materiais genéricos
+    if cat == "evolucao" or info.get("evolution_item") is True:
+        return "especial"
+    # -------------------------------
+
+    # 5. Materiais de Refino (Genéricos)
     if tipo in ("material_bruto", "material_refinado", "sucata") or cat == "coletavel":
-        if cat == "evolucao": return "especial"
+        # Removemos o check de evolucao daqui pois já foi tratado acima
         return "refino"
 
     itens_melhoria = ("pedra_do_aprimoramento", "nucleo_forja_comum", "nucleo_forja_fraco", "pergaminho_durabilidade", "cristal_de_abertura", "nucleo_de_energia_instavel", "essencia_draconica_pura")
     if item_key in itens_melhoria: return "especial"
+    
     if cat in ("especial", "evolucao") or "chave" in item_key or "gem" in item_key: return "especial"
     if tipo == "material_magico": return "especial"
 
