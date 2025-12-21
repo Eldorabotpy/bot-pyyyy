@@ -120,7 +120,10 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     
     if not battle_cache or battle_cache.get('player_id') != user_id:
         player_data = await player_manager.get_player_data(user_id)
-        if player_data and player_data.get('player_state', {}).get('action') == 'in_combat':
+        state_action = player_data.get('player_state', {}).get('action')
+            
+        if player_data and state_action in ['in_combat', 'evolution_combat']:
+            # -------------------------------------------------------------
             details = player_data['player_state'].get('details', {})
             if "dungeon_ctx" in details:
                 from modules.dungeons import runtime as d_rt
