@@ -709,12 +709,14 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 {
                     "id": "shadow_node_2",
                     "desc": "Aprimoramento da Lâmina Oculta",
-                    "cost": {"lâmina_afiada": 15, "gold": 10000}
+                    # CORRIGIDO: lâmina -> lamina
+                    "cost": {"lamina_afiada": 15, "gold": 10000}
                 },
                 {
                     "id": "shadow_node_3",
                     "desc": "Transição para as Sombras",
-                    "cost": {"emblema_assassino": 15, "lâmina_afiada": 10, "gold": 15000}
+                    # CORRIGIDO: lâmina -> lamina
+                    "cost": {"emblema_assassino": 15, "lamina_afiada": 10, "gold": 15000}
                 }
             ],
         
@@ -751,7 +753,8 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
                 {
                     "id": "blade_master_node_1",
                     "desc": "Forjar a Lâmina Eterna",
-                    "cost": {"aço_sombrio": 30, "gold": 100000}
+                    # CORRIGIDO: aço -> aco
+                    "cost": {"aco_sombrio": 30, "gold": 100000}
                 },
                 {
                     "id": "blade_master_node_2",
