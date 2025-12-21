@@ -122,7 +122,7 @@ def _format_battle_caption(player_state: dict, player_data: dict, total_stats: d
     m_vel_str = f"🏃‍♂️ VEL: {int(mob.get('initiative', 0))}"
     m_srt_str = f"🍀 SRT: {int(mob.get('luck', 0))}"
     
-    col_width = 16 
+    col_width = 14 
     p_row1 = f"{p_hp_str.ljust(col_width)}{p_mp_str.ljust(col_width)}"
     p_row2 = f"{p_atk_str.ljust(col_width)}{p_def_str.ljust(col_width)}"
     p_row3 = f"{p_vel_str.ljust(col_width)}{p_srt_str.ljust(col_width)}"
@@ -134,7 +134,7 @@ def _format_battle_caption(player_state: dict, player_data: dict, total_stats: d
     progress_text = event_manager.get_queue_status_text().replace('\n', ' | ')
 
     max_width = (col_width * 2) 
-    wave_text = f" 🌊 ONDA {current_wave} 🌊 "
+    wave_text = f"🌊 ONDA {current_wave} 🌊"
     header = f"╔{wave_text.center(max_width, '═')}╗"
     vs_separator = " 𝐕𝐒 ".center(max_width, '─')
     footer_text = " ◆◈◆ "
@@ -169,19 +169,15 @@ def _get_game_over_keyboard() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# Em kingdom_defense/handler.py
-
 async def handle_exit_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Saindo do campo de batalha...")
     
-    # Opcional: Tenta apagar a mensagem da batalha para limpar o chat
     try:
         await query.message.delete()
     except:
         pass
 
-    # Chama o menu principal do Reino (importado de handlers.menu.kingdom)
     await show_kingdom_menu(update, context)
 
 async def _get_target_selection_keyboard(user_id: int, skill_id: str) -> InlineKeyboardMarkup:
@@ -679,4 +675,3 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(handle_exit_event, pattern='^kd_exit_event$'))
     application.add_handler(CallbackQueryHandler(alert_cooldown, pattern='^kd_cooldown_alert:'))
     application.add_handler(CallbackQueryHandler(alert_no_mana, pattern='^kd_no_mana_alert$'))
-    

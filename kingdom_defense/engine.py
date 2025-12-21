@@ -358,22 +358,45 @@ class KingdomDefenseManager:
         if mob_hp <= 0:
             logs.append(f"☠️ {mob['name']} foi derrotado!")
         
-            # 1. Reduz Cooldowns e aplica regeneração final (mantido)
+            # 1. Reduz Cooldowns e aplica regeneração final
             from modules.cooldowns import iniciar_turno 
             player_data, msgs_cd = iniciar_turno(player_data)
             if msgs_cd: logs.extend(msgs_cd)
         
-            # Sincroniza HP/MP do estado local com o player_data atualizado (mantido)
+            # Sincroniza HP/MP
             player_state['player_hp'] = player_data.get('current_hp')
             player_state['player_mp'] = player_data.get('current_mp')
-            await player_manager.save_player_data(user_id, player_data) # Salva o estado com regeneração
+            await player_manager.save_player_data(user_id, player_data)
 
+            # ========================================================
+            # CORREÇÃO AQUI: TRANSIÇÃO DE ONDA (BOSS MORREU)
+            # ========================================================
             if is_boss_fight:
                 logs.append(f"🎉 A ONDA {self.current_wave} FOI CONCLUÍDA! 🎉")
+                
+                # 1. Configura a próxima onda
                 await self.setup_wave(self.current_wave + 1)
+                
+                # 2. Se o evento acabou (não tem mais ondas), retorna Fim
                 if not self.is_active:
                     return {"event_over": True, "action_log": "\n".join(logs)}
+                
+                # 3. SE TEM NOVA ONDA: Carrega o primeiro monstro da nova onda para o jogador
+                await self._setup_player_battle_state(user_id, player_data)
+                
+                # 4. Salva o estado atualizado (com o novo monstro)
+                await player_manager.save_player_data(user_id, player_data)
+                
+                # 5. RETORNA O SUCESSO PARA O HANDLER (Isso faltava!)
+                return {
+                    "monster_defeated": True, 
+                    "action_log": "\n".join(logs), 
+                    "loot_message": f"🌊 Inciando Onda {self.current_wave}!"
+                }
+            # ========================================================
+            
             else:
+
                 # ==========================================================
                 # --- GERA RECOMPENSA (LOOT CONSOLIDADO) ---
                 # ==========================================================

@@ -284,6 +284,20 @@ def _stack_inv_display(base_id: str, qty: int) -> str:
     emoji = info.get("emoji", "")
     return f"{emoji}{name} ×{qty}"
 
+# No arquivo modules/market_manager.py
+
+# --- NOVOS ÍCONES DE RARIDADE (Estilo RPG) ---
+RARITY_ICONS = {
+    "comum": "⚪️",      # Common (Cinza/Branco)
+    "incomum": "🟢",    # Uncommon (Verde)
+    "bom": "🟢",        # (Compatibilidade)
+    "raro": "🔵",       # Rare (Azul)
+    "epico": "🟣",      # Epic (Roxo)
+    "lendario": "🟠",   # Legendary (Laranja/Dourado)
+    "mitico": "🔴",     # Mythic (Vermelho)
+    "divino": "✨"      # Divine
+}
+
 def render_listing_line(
     listing: dict,
     *,
@@ -294,34 +308,91 @@ def render_listing_line(
     it = listing.get("item") or {}
     unit_price = int(listing.get("unit_price", 0))
     lid = listing.get("id")
-    viewer_class = _viewer_class_key(viewer_player_data, "guerreiro")
-
+    available_lots = int(listing.get("quantity", 1))
+    
+    # Identificação do alvo (Venda Privada)
     target_id = listing.get("target_buyer_id")
     target_name = listing.get("target_buyer_name", "Alguém")
     is_private = target_id is not None
-    prefix = "🔒 " if is_private else ""
-    reserved_suf = f" [RESERVADO: {target_name}]" if is_private else ""
-
-    text = ""
+    
+    # Ícones de estado
+    lock_icon = "🔒" if is_private else "🛒"
+    
+    # --- RENDERIZAÇÃO: ITEM ÚNICO (Equipamentos, etc) ---
     if it.get("type") == "unique":
         inst = it.get("item") or {}
-        try:
-            if display_utils: text = display_utils.formatar_item_para_exibicao(inst)
-        except: pass
-        if not text: text = _render_unique_core_line(inst, viewer_class)
         
-        suffix = f" — <b>{unit_price} 🪙</b>"
-        if include_id: suffix += f" (#{lid})"
-        return f"{prefix}{text}{suffix}{reserved_suf}"
+        # Dados básicos
+        base_id = inst.get("base_id") or "item"
+        name = inst.get("display_name") or base_id
+        emoji = inst.get("emoji") or "⚔️"
+        tier = inst.get("tier", 1)
+        rarity_str = str(inst.get("rarity", "comum")).lower()
+        rarity_icon = RARITY_ICONS.get(rarity_str, "⚪️")
+        
+        # Formatação dos Atributos (Simplificada para caber na linha)
+        stats_txt = ""
+        ench = inst.get("enchantments") or {}
+        if isinstance(ench, dict):
+            primary_stats = []
+            for k, v in ench.items():
+                if isinstance(v, dict) and "value" in v:
+                    # Tenta pegar um emoji legal para o stat, ou usa o padrão
+                    val = v["value"]
+                    if val > 0:
+                        primary_stats.append(f"{k.upper()}+{val}")
+            
+            # Pega os 2 primeiros atributos para não poluir
+            if primary_stats:
+                stats_txt = f" │ 🔥 {', '.join(primary_stats[:2])}"
 
-    base_id = it.get("base_id", "")
-    pack_qty = int(it.get("qty", 1))
-    core = _stack_inv_display(base_id, pack_qty)
-    
-    suffix = f" — <b>{unit_price} 🪙</b>/lote"
-    if show_price_per_unit and pack_qty > 0:
-        ppu = int(round(unit_price / pack_qty))
-        suffix += f" (~{ppu} 🪙/un)"
-    
-    if include_id: suffix += f" (#{lid})"
-    return f"{prefix}{core}{suffix}{reserved_suf}"
+        # Montagem da Linha 1: Identificação visual forte
+        line1 = f"<b>{emoji} {name}</b> {rarity_icon} <code>[T{tier}]</code>{stats_txt}"
+        
+        # Montagem da Linha 2: Preço e ID (estilo "ficha técnica")
+        line2_parts = [f"💰 <b>{unit_price}</b>"]
+        if is_private:
+            line2_parts.append(f"👤 Reservado: {target_name}")
+        
+        if include_id:
+            # ID fica discreto no final
+            id_tag = f"🆔 <code>#{lid}</code>"
+        
+        return f"{line1}\n   └ {id_tag} │ {' │ '.join(line2_parts)}"
+
+    # --- RENDERIZAÇÃO: STACK (Poções, Materiais, etc) ---
+    else:
+        base_id = it.get("base_id", "")
+        pack_qty = int(it.get("qty", 1))
+        
+        # Tenta pegar info do game_data
+        info = _get_item_info(base_id)
+        name = info.get("display_name") or base_id
+        emoji = info.get("emoji") or "📦"
+        rarity_str = str(info.get("rarity", "comum")).lower()
+        rarity_icon = RARITY_ICONS.get(rarity_str, "⚪️")
+
+        # Linha 1: Nome e Quantidade do Lote
+        line1 = f"<b>{emoji} {name}</b> {rarity_icon} <code>x{pack_qty}</code>"
+
+        # Linha 2: Preço e Estoque
+        price_txt = f"💰 <b>{unit_price}</b>"
+        stock_txt = ""
+        
+        if available_lots > 1:
+            stock_txt = f"📦 Restam: {available_lots}"
+        else:
+            stock_txt = "📦 Último lote!"
+            
+        unit_calc = ""
+        if show_price_per_unit and pack_qty > 1:
+            ppu = int(unit_price / pack_qty)
+            unit_calc = f"({ppu}/un)"
+
+        parts_l2 = [price_txt + unit_calc]
+        if stock_txt: parts_l2.append(stock_txt)
+        if is_private: parts_l2.append(f"🔒 {target_name}")
+
+        id_tag = f"🆔 <code>#{lid}</code>" if include_id else ""
+
+        return f"{line1}\n   └ {id_tag} │ {' │ '.join(parts_l2)}"
