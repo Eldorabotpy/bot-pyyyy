@@ -645,53 +645,64 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 player_mudou = True
 
                 # ==========================================================
-                # 2. DROP DO BOSS (CORREÇÃO E QUANTIDADE VARIÁVEL)
+                # 2. DROP DO BOSS (SISTEMA BALANCEADO V2)
                 # ==========================================================
-                boss_loot_table = boss_data.get("loot_table", [])
                 
-                for item_id, chance in boss_loot_table:
-                    # Rola o dado (0 a 100)
-                    if random.random() * 100 <= chance:
-                        
-                        final_item_id = item_id
-                        qtd_to_add = 1 # Padrão
-                        
-                        # --- CORREÇÃO: Verifica quantidade variável do Pool de Loot ---
-                        for pool_item in LOOT_REWARD_POOL:
-                            # pool_item é ("id", min, max)
-                            if pool_item[0] == item_id:
-                                qtd_to_add = random.randint(pool_item[1], pool_item[2])
-                                break
-                        # -------------------------------------------------------------
+                # --- A. LOOT COMUM (Garantido: 1 a 2 itens por pessoa) ---
+                # Sorteia quantos itens comuns o player vai pegar (ex: 70% chance de 1, 30% de 2)
+                qtd_drops_comuns = random.choices([1, 2], weights=[70, 30], k=1)[0]
+                
+                # Escolhe quais itens serão dropados da lista geral
+                # LOOT_REWARD_POOL deve ser importado ou acessível aqui
+                drops_escolhidos = random.sample(LOOT_REWARD_POOL, k=min(qtd_drops_comuns, len(LOOT_REWARD_POOL)))
+                
+                for item_tuple in drops_escolhidos:
+                    item_id = item_tuple[0]
+                    min_q, max_q = item_tuple[1], item_tuple[2]
+                    
+                    qtd_final = random.randint(min_q, max_q)
+                    player_manager.add_item_to_inventory(pdata, item_id, qtd_final)
+                    
+                    # Log visual
+                    item_info = game_data.ITEMS_DATA.get(item_id, {})
+                    d_name = item_info.get("display_name", item_id.replace("_", " ").title())
+                    emoji = item_info.get("emoji", "📦")
+                    
+                    loot_won_messages.append(f"{emoji} <b>Loot:</b> {qtd_final}x {d_name}")
+                    loot_summary[d_name] = loot_summary.get(d_name, 0) + qtd_final
 
-                        # --- CORREÇÃO: Converte Skill em Tomo ---
-                        if item_id in SKILL_DATA:
-                            final_item_id = f"tomo_{item_id}"
-                        # ----------------------------------------
-                        
-                        # Adiciona ao inventário com a quantidade certa
-                        player_manager.add_item_to_inventory(pdata, final_item_id, qtd_to_add)
-                        player_mudou = True
-                        
-                        # Formatação para o Log
-                        item_info = game_data.ITEMS_DATA.get(final_item_id, {})
-                        d_name = item_info.get("display_name", final_item_id.replace("_", " ").title())
-                        emoji = item_info.get("emoji", "📦")
-                        
-                        # Verifica se é item raro (Skill/Skin) para destacar no global
-                        is_skill_book = "tomo_" in final_item_id or item_info.get("type") == "skill_book"
-                        is_skin_box = "caixa_" in final_item_id or "skin" in final_item_id
-                        
-                        if is_skill_book:
-                            loot_won_messages.append(f"📚 <b>SKILL:</b> {d_name}")
-                            skill_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
-                        elif is_skin_box:
-                            loot_won_messages.append(f"🎨 <b>SKIN:</b> {d_name}")
-                            skin_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
-                        else:
-                            # Mostra a quantidade no log pessoal
-                            loot_won_messages.append(f"{emoji} <b>Loot:</b> {qtd_to_add}x {d_name}")
-                            loot_summary[d_name] = loot_summary.get(d_name, 0) + qtd_to_add
+                # --- B. SKILLS (Raro - Máximo 1 por pessoa) ---
+                # Chance Global de cair UMA skill: 8.0% (Ajuste conforme desejar)
+                CHANCE_DROP_SKILL = 3.0 
+                
+                if random.random() * 100 <= CHANCE_DROP_SKILL and SKILL_REWARD_POOL:
+                    skill_id = random.choice(SKILL_REWARD_POOL) # Pega UMA aleatória
+                    tomo_id = f"tomo_{skill_id}"
+                    
+                    player_manager.add_item_to_inventory(pdata, tomo_id, 1)
+                    
+                    # Log
+                    s_info = game_data.ITEMS_DATA.get(tomo_id, {})
+                    s_name = s_info.get("display_name", skill_id)
+                    loot_won_messages.append(f"📚 <b>SKILL:</b> {s_name}")
+                    skill_winners_msg.append(f"• {player_name} obteve <b>{s_name}</b>!")
+
+                # --- C. SKINS (Muito Raro - Máximo 1 por pessoa) ---
+                # Chance Global de cair UMA skin: 1.5%
+                CHANCE_DROP_SKIN = 1.5
+                
+                if random.random() * 100 <= CHANCE_DROP_SKIN and SKIN_REWARD_POOL:
+                    skin_id = random.choice(SKIN_REWARD_POOL) # Pega UMA aleatória
+                    
+                    player_manager.add_item_to_inventory(pdata, skin_id, 1)
+                    
+                    # Log
+                    sk_info = game_data.ITEMS_DATA.get(skin_id, {})
+                    sk_name = sk_info.get("display_name", skin_id)
+                    loot_won_messages.append(f"🎨 <b>SKIN:</b> {sk_name}")
+                    skin_winners_msg.append(f"• {player_name} obteve <b>{sk_name}</b>!")
+                    
+                player_mudou = True
 
                 # Salva o jogador
                 if player_mudou:
