@@ -294,3 +294,58 @@ def corrigir_itens_duplicados(player_data: dict) -> bool:
                 houve_mudanca = True
 
     return houve_mudanca
+
+# --- ADICIONE NO FINAL DE player_manager.py ---
+
+async def corrigir_inventario_automatico(user_id: int):
+    """
+    Detecta itens com IDs antigos (ex: minerio_ferro), 
+    soma sua quantidade ao ID novo (ex: minerio_de_ferro) e deleta o velho.
+    """
+    # 1. Carrega os dados (sem cache para garantir que está fresco)
+    pdata = await get_player_data(user_id)
+    if not pdata: return
+    
+    inventory = pdata.get("inventory", {})
+    mudou = False
+
+    # MAPA DE CORREÇÃO: "ID_ANTIGO" -> "ID_NOVO"
+    migracoes = {
+        "minerio_ferro": "minerio_de_ferro",
+        "iron_ore": "minerio_de_ferro",
+        "pedra_ferro": "minerio_de_ferro",
+        "minerio_estanho": "minerio_de_estanho", # Prevenindo erro no estanho também
+    }
+
+    for id_velho, id_novo in migracoes.items():
+        if id_velho in inventory:
+            # Pega a quantidade do item velho (suporta dict ou int)
+            item_data = inventory[id_velho]
+            qtd_velha = 0
+            
+            if isinstance(item_data, dict):
+                qtd_velha = int(item_data.get("quantity", 0))
+            else:
+                qtd_velha = int(item_data)
+
+            if qtd_velha > 0:
+                # Garante que o item novo existe no inventário
+                if id_novo not in inventory:
+                    inventory[id_novo] = 0 # Inicializa como int (stack simples)
+                
+                # Se o item novo for dict, soma na chave quantity, se for int, soma direto
+                if isinstance(inventory[id_novo], dict):
+                    inventory[id_novo]["quantity"] = int(inventory[id_novo].get("quantity", 0)) + qtd_velha
+                else:
+                    inventory[id_novo] = int(inventory[id_novo]) + qtd_velha
+
+                print(f"♻️ FIX: {user_id} - Migrado {qtd_velha}x {id_velho} -> {id_novo}")
+                mudou = True
+            
+            # Deleta o item velho para sumir do inventário
+            del inventory[id_velho]
+            mudou = True
+
+    # 2. Se houve mudança, salva no banco imediatamente
+    if mudou:
+        await save_player_data(user_id, pdata)
