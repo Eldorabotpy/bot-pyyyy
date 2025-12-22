@@ -1,10 +1,11 @@
 # handlers/world_boss/handler.py
-# (VERSÃO REFATORADA: Limpeza e Centralização)
+# (VERSÃO BLINDADA: Suporte total a Vídeo/Foto/Texto e Edição Inteligente)
 
 import logging
 import html
 import time
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from telegram.error import BadRequest
 
@@ -25,6 +26,46 @@ logger = logging.getLogger(__name__)
 
 BOSS_MEDIA = "boss_raid" 
 ADMIN_ID = 7262799478
+
+# ============================================================================
+# 🛠️ HELPER: EDIÇÃO INTELIGENTE (Resolve o travamento de Vídeo vs Texto)
+# ============================================================================
+async def _smart_edit_message(query, text, reply_markup):
+    """
+    Tenta editar a mensagem atual. Se falhar (ex: era vídeo e virou texto),
+    apaga e manda uma nova para destravar o usuário.
+    """
+    try:
+        # 1. Tenta editar LEGENDA (Se for Vídeo/Foto)
+        if query.message.caption is not None:
+            await query.edit_message_caption(
+                caption=text, 
+                reply_markup=reply_markup, 
+                parse_mode="HTML"
+            )
+        # 2. Tenta editar TEXTO (Se for Mensagem Pura)
+        else:
+            await query.edit_message_text(
+                text=text, 
+                reply_markup=reply_markup, 
+                parse_mode="HTML"
+            )
+    except BadRequest:
+        # 3. Fallback: Se a edição falhar (ex: mudou tipo de mídia), apaga e reenvia
+        try:
+            await query.delete_message()
+        except: pass
+        
+        # Reenvia como texto para garantir que o menu apareça
+        await query.message.reply_text(
+            text=text, 
+            reply_markup=reply_markup, 
+            parse_mode="HTML"
+        )
+
+# ============================================================================
+# FORMATADORES
+# ============================================================================
 
 def _format_log_line(text):
     return f"• {text}"
@@ -47,7 +88,6 @@ def _format_battle_screen(user_id, player_data, total_stats):
 
     p_name = player_data.get('character_name', 'Herói')
     
-    # ✅ CORREÇÃO AQUI: Garante que nunca mostre vida negativa (max(0, ...))
     p_current_hp = max(0, state['hp']) 
     p_max_hp = state['max_hp']
     
@@ -114,6 +154,10 @@ def _format_battle_screen(user_id, player_data, total_stats):
 
     return final_message
 
+# ============================================================================
+# HANDLERS DE COMANDO
+# ============================================================================
+
 async def iniciar_worldboss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID: return 
@@ -131,7 +175,6 @@ async def encerrar_worldboss_command(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text("⚠️ 𝗡𝗮̃𝗼 𝗵𝗮́ 𝗲𝘃𝗲𝗻𝘁𝗼 𝗮𝘁𝗶𝘃𝗼.")
         return
     battle_results = world_boss_manager.end_event(reason="Boss derrotado") 
-    
     await distribute_loot_and_announce(context, battle_results)
     await update.message.reply_text("🛑 𝗘𝗻𝗰𝗲𝗿𝗿𝗮𝗱𝗼 (Simulando Vitória).")
 
@@ -152,6 +195,9 @@ async def wb_return_to_map(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
 
 async def wb_start_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Menu inicial do Boss. Suporta Vídeo, Foto e Texto.
+    """
     query = update.callback_query
     if query: 
         try: await query.answer()
@@ -162,15 +208,7 @@ async def wb_start_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not world_boss_manager.is_active:
         msg = "😴 𝐎 𝐁𝐨𝐬𝐬 𝐧𝐚̃𝐨 𝐞𝐬𝐭𝐚́ 𝐚𝐭𝐢𝐯𝐨 𝐧𝐨 𝐦𝐨𝐦𝐞𝐧𝐭𝐨."
         if query:
-            try:
-                if query.message.photo:
-                    await query.edit_message_caption(caption=msg, reply_markup=InlineKeyboardMarkup(kb_inactive), parse_mode="HTML")
-                else:
-                    await query.edit_message_text(text=msg, reply_markup=InlineKeyboardMarkup(kb_inactive), parse_mode="HTML")
-            except BadRequest:
-                try: await query.delete_message()
-                except: pass
-                await context.bot.send_message(update.effective_chat.id, msg, reply_markup=InlineKeyboardMarkup(kb_inactive), parse_mode="HTML")
+            await _smart_edit_message(query, msg, InlineKeyboardMarkup(kb_inactive))
         else:
             await context.bot.send_message(update.effective_chat.id, msg, reply_markup=InlineKeyboardMarkup(kb_inactive), parse_mode="HTML")
         return
@@ -196,28 +234,51 @@ async def wb_start_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     markup = InlineKeyboardMarkup(kb)
+    mid = file_ids.get_file_id(BOSS_MEDIA)
     
+    # Lógica de Envio Robusto (Vídeo > Foto > Texto)
     if query:
+        # Se for atualização de menu (callback)
         try:
-            if query.message.photo:
+            if query.message.caption is not None:
                 await query.edit_message_caption(caption=txt, reply_markup=markup, parse_mode="HTML")
             else:
-                mid = file_ids.get_file_id(BOSS_MEDIA)
-                if mid:
-                    await query.delete_message()
-                    await context.bot.send_photo(update.effective_chat.id, mid, caption=txt, reply_markup=markup, parse_mode="HTML")
-                else:
-                    await query.edit_message_text(text=txt, reply_markup=markup, parse_mode="HTML")
-        except BadRequest: pass
+                # Se não tem caption, pode ser que virou texto. Deleta e recria com mídia.
+                await query.delete_message()
+                raise BadRequest("Recriar com Mídia")
+        except BadRequest:
+            try: await query.delete_message()
+            except: pass
+            
+            if mid:
+                try:
+                    await context.bot.send_video(update.effective_chat.id, mid, caption=txt, reply_markup=markup, parse_mode="HTML")
+                except:
+                    try:
+                        await context.bot.send_photo(update.effective_chat.id, mid, caption=txt, reply_markup=markup, parse_mode="HTML")
+                    except:
+                        await context.bot.send_message(update.effective_chat.id, txt, reply_markup=markup, parse_mode="HTML")
+            else:
+                await context.bot.send_message(update.effective_chat.id, txt, reply_markup=markup, parse_mode="HTML")
     else:
-        mid = file_ids.get_file_id(BOSS_MEDIA)
+        # Se for comando /worldboss
         if mid:
-            await context.bot.send_photo(update.effective_chat.id, mid, caption=txt, reply_markup=markup, parse_mode="HTML")
+            try:
+                await context.bot.send_video(update.effective_chat.id, mid, caption=txt, reply_markup=markup, parse_mode="HTML")
+            except:
+                try:
+                    await context.bot.send_photo(update.effective_chat.id, mid, caption=txt, reply_markup=markup, parse_mode="HTML")
+                except:
+                    await context.bot.send_message(update.effective_chat.id, txt, reply_markup=markup, parse_mode="HTML")
         else:
             await context.bot.send_message(update.effective_chat.id, txt, reply_markup=markup, parse_mode="HTML")
 
 async def wb_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # ✅ FIX: Responde imediatamente para parar o carregamento
+    await query.answer() 
+    
     user_id = query.from_user.id
     pdata = await player_manager.get_player_data(user_id)
     
@@ -227,7 +288,7 @@ async def wb_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await wb_target_selection(update, context)
     elif status == "waiting":
         await query.answer("𝑭𝒊𝒍𝒂 𝒄𝒉𝒆𝒊𝒂! 𝑨𝒈𝒖𝒂𝒓𝒅𝒆.", show_alert=True)
-        await wb_start_menu(update, context)
+        # Não precisa chamar start_menu de novo se já está lá, só avisa
 
 async def wb_target_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -251,7 +312,8 @@ async def wb_target_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     txt = "🏹 𝑺𝑬𝑳𝑬𝑪𝑰𝑶𝑵𝑬 𝑺𝑬𝑼 𝑨𝑳𝑽𝑶\n\nBʀᴜxᴀs ᴘʀᴏᴛᴇɢᴇᴍ ᴏ Bᴏss ᴇ ʟᴀɴᴄ̧ᴀᴍ ᴍᴀʟᴅɪᴄ̧ᴏ̃ᴇs!"
     
-    await query.edit_message_caption(caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    # ✅ FIX: Usa edição inteligente
+    await _smart_edit_message(query, txt, InlineKeyboardMarkup(kb))
 
 async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -265,7 +327,6 @@ async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- LÓGICA DE BOTÕES INTELIGENTE ---
     state = world_boss_manager.get_battle_view(user_id)
     respawn_until = state.get('respawn_until', 0) if state else 0
-    import time
     now = time.time()
     
     kb = []
@@ -293,12 +354,8 @@ async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     # ------------------------------------
     
-    try:
-        
-        await query.edit_message_caption(caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
-    except BadRequest: 
-        
-        pass
+    # ✅ FIX: Usa edição inteligente
+    await _smart_edit_message(query, txt, InlineKeyboardMarkup(kb))
 
 async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -338,32 +395,32 @@ async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if res.get("respawning"):
             wait = res.get("wait_time", 60)
             await query.answer(f"☠️ Morto! Aguarde {wait}s", show_alert=True)
-            
             await wb_fight_screen(update, context) 
             return
         
         log_lines = res.get("state", {}).get("log", "").split("\n")
         last_log = log_lines[-1] if log_lines else "Ação OK"
+        # Trunca para não exceder limite do toast
         await query.answer(last_log[:100])
 
         if res.get("boss_defeated"):
-            
             battle_results = world_boss_manager.end_event(reason="Boss derrotado")
-            
             await distribute_loot_and_announce(context, battle_results)
-            # ---------------------
 
             kb_vic = [[InlineKeyboardButton("🌍 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨 𝐌𝐚𝐩𝐚", callback_data='wb_return_map')]]
-            await query.edit_message_caption(
+            
+            # ✅ FIX: Edição inteligente para tela de vitória
+            await _smart_edit_message(
+                query, 
                 "🏆 𝑽𝑰𝑻𝑶́𝑹𝑰𝑨! 𝑶 𝑩𝑶𝑺𝑺 𝑭𝑶𝑰 𝑫𝑬𝑹𝑹𝑶𝑻𝑨𝑫𝑶!\n\n💰 𝑂𝑠 𝑝𝑟𝑒̂𝑚𝑖𝑜𝑠 𝑓𝑜𝑟𝑎𝑚 𝑒𝑛𝑣𝑖𝑎𝑑𝑜𝑠 𝑝𝑜𝑟 𝑚𝑒𝑛𝑠𝑎𝑔𝑒𝑚 𝑝𝑟𝑖𝑣𝑎𝑑𝑎!", 
-                reply_markup=InlineKeyboardMarkup(kb_vic), 
-                parse_mode="HTML"
+                InlineKeyboardMarkup(kb_vic)
             )
             return
         
         if res.get("game_over"):
             kb_die = [[InlineKeyboardButton("🔙 𝕄𝕖𝕟𝕦 𝕕𝕠 𝔹𝕠𝕤𝕤", callback_data='wb_menu'), InlineKeyboardButton("🌍 𝐌𝐀𝐏𝐀", callback_data='wb_return_map')]]
-            await query.edit_message_caption(f"☠️ 𝐕𝐎𝐂𝐄̂ 𝐌𝐎𝐑𝐑𝐄𝐔!\n\n{res['log']}", reply_markup=InlineKeyboardMarkup(kb_die), parse_mode="HTML")
+            # ✅ FIX: Edição inteligente para tela de morte
+            await _smart_edit_message(query, f"☠️ 𝐕𝐎𝐂𝐄̂ 𝐌𝐎𝐑𝐑𝐄𝐔!\n\n{res['log']}", InlineKeyboardMarkup(kb_die))
             return
             
         await wb_fight_screen(update, context)
@@ -376,7 +433,6 @@ async def wb_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = []
     
     for sid in equipped:
-        # ✅ USA A NOVA FUNÇÃO CENTRALIZADA
         sdata = get_skill_data_with_rarity(pdata, sid)
         if not sdata: continue
         
@@ -393,7 +449,8 @@ async def wb_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb.append([InlineKeyboardButton(f"✨ {name} ({cost} 𝕄ℙ)", callback_data=f"wb_skill:{sid}")])
             
     kb.append([InlineKeyboardButton("🔙 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="wb_fight_return")])
-    await query.edit_message_caption("Selecione a Habilidade:", reply_markup=InlineKeyboardMarkup(kb))
+    
+    await _smart_edit_message(query, "Selecione a Habilidade:", InlineKeyboardMarkup(kb))
 
 async def wb_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -416,7 +473,7 @@ async def wb_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb.append([InlineKeyboardButton("❌ Sem Poções", callback_data="noop")])
         
     kb.append([InlineKeyboardButton("🔙 Voltar", callback_data="wb_fight_return")])
-    await query.edit_message_caption("🧪 <b>Selecione uma poção:</b>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    await _smart_edit_message(query, "🧪 <b>Selecione uma poção:</b>", InlineKeyboardMarkup(kb))
 
 async def wb_use_potion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -429,13 +486,11 @@ async def wb_use_potion(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pdata = await player_manager.get_player_data(user_id)
     
-    # 1. Remove Item
     if not player_manager.remove_item_from_inventory(pdata, item_id, 1):
         await query.answer("Acabou!", show_alert=True)
         await wb_potion_menu(update, context)
         return
 
-    # 2. Aplica Efeitos
     item_info = game_data.ITEMS_DATA.get(item_id, {})
     effects = item_info.get("effects", {})
     msg_feed = ""
@@ -450,19 +505,16 @@ async def wb_use_potion(update: Update, context: ContextTypes.DEFAULT_TYPE):
         player_actions.add_buff(pdata, effects['buff'])
         msg_feed = "Buff aplicado!"
     
-    # 3. Atualiza Estado do World Boss Manager (IMPORTANTE PARA SINCRONIA)
     state = world_boss_manager.player_states.get(user_id)
     if state:
         state['hp'] = pdata.get("current_hp")
         state['mp'] = pdata.get("current_mp")
-        # Registra no log do boss
         if msg_feed:
             current_log = state.get('log', '')
             state['log'] = current_log + f"\n🧪 {msg_feed}"
 
-    # 4. Salva e Atualiza Tela
     await player_manager.save_player_data(user_id, pdata)
-    world_boss_manager.save_state() # Salva o estado do boss também
+    world_boss_manager.save_state()
     await query.answer(f"🧪 {msg_feed}")
     await wb_fight_screen(update, context)
 
@@ -476,8 +528,8 @@ wb_menu_handler = CallbackQueryHandler(wb_start_menu, pattern="^wb_menu$")
 wb_join_handler = CallbackQueryHandler(wb_join, pattern="^wb_join$")
 wb_router_handler = CallbackQueryHandler(wb_router, pattern="^(wb_set_target|wb_targets|wb_leave|wb_act|wb_skill:)")
 wb_skill_menu_handler = CallbackQueryHandler(wb_skill_menu, pattern="^wb_skills$")
-wb_potion_menu_handler = CallbackQueryHandler(wb_potion_menu, pattern="^wb_potion$") # Handler do Menu
-wb_use_potion_handler = CallbackQueryHandler(wb_use_potion, pattern="^wb_use_potion:") # Handler de Uso
+wb_potion_menu_handler = CallbackQueryHandler(wb_potion_menu, pattern="^wb_potion$")
+wb_use_potion_handler = CallbackQueryHandler(wb_use_potion, pattern="^wb_use_potion:")
 wb_fight_return_handler = CallbackQueryHandler(wb_fight_return, pattern="^wb_fight_return$")
 wb_map_handler = CallbackQueryHandler(wb_return_to_map, pattern="^wb_return_map$")
 wb_noop_handler = CallbackQueryHandler(lambda u,c: u.callback_query.answer("Indisponível"), pattern="^noop$")
