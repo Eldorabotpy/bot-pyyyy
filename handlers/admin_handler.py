@@ -1255,7 +1255,75 @@ async def admin_fix_tomos_command(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         logger.error(f"Erro no fix_tomos: {e}", exc_info=True)
         await msg.edit_text(f"❌ Erro crítico: {e}")
+async def admin_clean_market_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando ADMIN: Varre os mercados (Ouro e Gemas) e corrige nomes duplicados
+    (ex: tomo_tomo_... -> tomo_...) para destravar os anúncios.
+    """
+    if not await ensure_admin(update): return
 
+    msg = await update.message.reply_text("⏳ <b>Analisando Mercados...</b>", parse_mode="HTML")
+
+    try:
+        # Acessa o banco de dados principal
+        db = players_collection.database
+        
+        # Tabelas para verificar
+        targets = [
+            ("market", "Ouro"), 
+            ("gem_market_listings", "Gemas")
+        ]
+        
+        total_fixed = 0
+        report = []
+
+        for col_name, label in targets:
+            collection = db[col_name]
+            # Busca itens que começam com duplicidade
+            # Regex busca "tomo_tomo" ou "caixa_caixa"
+            cursor = collection.find({
+                "$or": [
+                    {"item.base_id": {"$regex": "^tomo_tomo_"}},
+                    {"item.base_id": {"$regex": "^caixa_caixa_"}}
+                ],
+                "active": True
+            })
+            
+            count = 0
+            for listing in cursor:
+                listing_id = listing.get("_id")
+                item_data = listing.get("item", {})
+                old_id = item_data.get("base_id", "")
+                
+                # Lógica de Correção
+                new_id = old_id
+                while new_id.startswith("tomo_tomo_"):
+                    new_id = new_id.replace("tomo_tomo_", "tomo_", 1)
+                while new_id.startswith("caixa_caixa_"):
+                    new_id = new_id.replace("caixa_caixa_", "caixa_", 1)
+                
+                if new_id != old_id:
+                    # Atualiza no Banco
+                    collection.update_one(
+                        {"_id": listing_id},
+                        {"$set": {"item.base_id": new_id}}
+                    )
+                    count += 1
+            
+            if count > 0:
+                report.append(f"✅ <b>{label}:</b> {count} anúncios corrigidos.")
+                total_fixed += count
+
+        if total_fixed > 0:
+            final_text = "\n".join(report) + "\n\n🚀 <b>Tudo limpo!</b> Os itens devem aparecer agora."
+        else:
+            final_text = "✅ <b>Nenhum item bugado encontrado.</b> O mercado parece estar limpo."
+
+        await msg.edit_text(final_text, parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Erro no clean market: {e}", exc_info=True)
+        await msg.edit_text(f"❌ Erro ao limpar mercado: {e}")
 # =========================================================
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
 # =========================================================
@@ -1274,6 +1342,7 @@ get_id_command_handler = CommandHandler("get_id", get_id_command)
 fixme_handler = CommandHandler("fixme", fix_my_character, filters=filters.User(ADMIN_LIST))
 hard_respec_all_handler = CommandHandler("hard_respec_all", hard_respec_all_command, filters=filters.User(ADMIN_LIST))
 fix_tomos_handler = CommandHandler("fix_tomos", admin_fix_tomos_command, filters=filters.User(ADMIN_LIST))
+clean_market_handler = CommandHandler("limpar_mercado", admin_clean_market_names, filters=filters.User(ADMIN_LIST))
 
 # Handlers de CallbackQuery (Botões) - Filtros são aplicados dentro das funções
 admin_main_handler = CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
@@ -1418,4 +1487,5 @@ all_admin_handlers = [
     fix_clan_conv_handler,
     debug_skill_handler,
     fix_tomos_handler,
+    clean_market_handler,
 ]
