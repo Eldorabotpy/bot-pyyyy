@@ -813,6 +813,9 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
     elif base_id_original.startswith("tomo_") and base_id_original in SKILL_BOOK_ITEMS:
         item_type_for_backend = "skill"
         
+        # --- CORREÇÃO: Remove o prefixo 'tomo_' para salvar limpo no banco ---
+        base_id_to_save = base_id_original.replace("tomo_", "")
+        
     # 3. VERIFICAÇÃO DE EVO
     elif base_id_original in EVOLUTION_ITEMS:
         item_type_for_backend = "evo_item"
@@ -982,11 +985,16 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     if item_type == "skin":
         # Se o item é uma skin, o item comprado é a CAIXA/CONSUMÍVEL
         base_id_final = f"caixa_{base_id_limpo}" 
-    elif item_type == "skill":
-        # Se o item é uma skill, o item comprado é o TOMO/CONSUMÍVEL
-        base_id_final = f"tomo_{base_id_limpo}" 
         
-    item_label = _item_label(base_id_final) # Usa o nome da CAIXA/TOMO
+    elif item_type == "skill":
+        # --- CORREÇÃO: Verifica se já tem o prefixo antes de adicionar ---
+        if base_id_limpo.startswith("tomo_"):
+            base_id_final = base_id_limpo
+        else:
+            base_id_final = f"tomo_{base_id_limpo}" 
+        # ----------------------------------------------------------------
+        
+    item_label = _item_label(base_id_final)
     
     if not (base_id_final and pack_qty > 0):
         logger.error(f"[GemMarket] Item sem base_id/pack_qty na listagem {lid}!")
