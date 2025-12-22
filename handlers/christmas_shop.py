@@ -66,6 +66,12 @@ TROCAS_NOEL = {
         "recompensa_id": "santo_da_nevasca", 
         "tipo": "skin"
     },
+    "aprendiz_do_santo": {
+        "nome": "Skin:Mago anto da Nevasca",
+        "custo": 100, "moeda": ITEM_RARO,
+        "recompensa_id": "Aprendiz do Santo", 
+        "tipo": "skin"
+    },
     "discipulo_de_nicolau": {
         "nome": "Skin:Monge Discípulo de Nicolau",
         "custo": 100, "moeda": ITEM_RARO,

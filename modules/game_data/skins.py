@@ -144,6 +144,12 @@ event_skins = {
         'media_key': 'classe_mago_santo_da_nevasca_media',
         'description': 'Inspirado na mitologia russa, este mago do inverno comanda nevascas com um simples gesto.'
     },
+    'aprendiz_do_santo': {
+        'display_name': 'Aprendiz do Santo',
+        'class': 'mago',
+        'media_key': 'classe_mago_aprendiz_do_santo_media',
+        'description': 'Inspirado na mitologia russa, este mago do inverno comanda nevascas com um simples gesto.'
+    },
     'discipulo_de_nicolau': {
         'display_name': 'Discípulo de Nicolau',
         'class': 'monge',
