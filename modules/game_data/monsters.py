@@ -1525,7 +1525,7 @@ if ENABLE_CHRISTMAS_EVENT:
                                        if x["item_id"] not in [DROP_COMUM["item_id"], DROP_RARO["item_id"]]]
                 
                 monster["loot_table"].append({"item_id": "presente_perdido", "drop_chance": 100.0})
-                monster["loot_table"].append({"item_id": "presente_dourado", "drop_chance": 10.0})
+                monster["loot_table"].append({"item_id": "presente_dourado", "drop_chance": 15.0})
 
             count_updated += 1
 

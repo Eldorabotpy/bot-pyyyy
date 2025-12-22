@@ -517,6 +517,15 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
             )
         else: # Stack
             base_id = pending["base_id"]
+            
+            # --- CORREÇÃO: Limpeza Preventiva na Venda ---
+            # Remove qualquer prefixo duplicado antes de salvar no banco
+            while base_id.startswith("tomo_tomo_"):
+                base_id = base_id.replace("tomo_tomo_", "tomo_", 1)
+            while base_id.startswith("caixa_caixa_"):
+                base_id = base_id.replace("caixa_caixa_", "caixa_", 1)
+            # ---------------------------------------------
+
             pack_size = pending["qty"]
             lote_qty = context.user_data.get("market_lote_qty", 1)
             total_remove = pack_size * lote_qty
@@ -652,15 +661,15 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if item_type == "stack":
             base_id = item_data.get("base_id")
             
-            # --- CORREÇÃO AQUI ---
-            # Tamanho do pacote (ex: 40 poções por lote)
+            # --- CORREÇÃO: Limpeza Preventiva na Compra ---
+            while base_id.startswith("tomo_tomo_"):
+                base_id = base_id.replace("tomo_tomo_", "tomo_", 1)
+            # ----------------------------------------------
+
+            # Tamanho do pacote
             qty_per_pack = int(item_data.get("qty", 1))
-            
-            # O comprador recebe: (Itens no lote) * (Lotes comprados)
             total_qty = qty_per_pack * qty_to_buy 
-            # Antes estava: qty_per_pack * qty_listing (que era o total disponível, ex: 10)
             
-            # ADICIONA AO INVENTÁRIO
             inventory.add_item_to_inventory(buyer, base_id, total_qty)
             name = _item_label_from_base(base_id)
             item_name_display = f"{name} x{total_qty}"
@@ -720,7 +729,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erro CRÍTICO na compra {lid}: {e}", exc_info=True)
         await q.answer("Ocorreu um erro ao processar a compra.", show_alert=True)
-           
+
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
     lid = int(q.data.replace("market_cancel_", ""))

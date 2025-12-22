@@ -38,7 +38,7 @@ try:
     log.info("✅ CONEXÃO COM MONGODB BEM SUCEDIDA (MERCADO)!")
     
     db = client["eldora_db"] 
-    market_col = db["market_listings"]
+    market_col = db["market"]
     counters_col = db["counters"]
     
     # Índices
