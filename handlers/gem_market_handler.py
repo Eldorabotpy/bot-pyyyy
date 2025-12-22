@@ -983,16 +983,20 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     base_id_final = base_id_limpo
     
     if item_type == "skin":
-        # Se o item é uma skin, o item comprado é a CAIXA/CONSUMÍVEL
-        base_id_final = f"caixa_{base_id_limpo}" 
-        
+        # --- PROTEÇÃO PARA SKINS ---
+        # Se já tiver "caixa_", mantém. Se não, adiciona.
+        if base_id_limpo.startswith("caixa_"):
+            base_id_final = base_id_limpo
+        else:
+            base_id_final = f"caixa_{base_id_limpo}" 
+            
     elif item_type == "skill":
-        # --- CORREÇÃO: Verifica se já tem o prefixo antes de adicionar ---
+        # --- PROTEÇÃO PARA SKILLS ---
+        # Se já tiver "tomo_", mantém. Se não, adiciona.
         if base_id_limpo.startswith("tomo_"):
             base_id_final = base_id_limpo
         else:
             base_id_final = f"tomo_{base_id_limpo}" 
-        # ----------------------------------------------------------------
         
     item_label = _item_label(base_id_final)
     

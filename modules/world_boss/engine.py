@@ -697,17 +697,26 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     skill_winners_msg.append(f"• {player_name} obteve <b>{s_name}</b>!")
                     
                 # --- C. SKINS (Muito Raro - Máximo 1 por pessoa) ---
-                # Chance Global de cair UMA skin: 1.5%
                 CHANCE_DROP_SKIN = 1.5
                 
                 if random.random() * 100 <= CHANCE_DROP_SKIN and SKIN_REWARD_POOL:
                     skin_id = random.choice(SKIN_REWARD_POOL) # Pega UMA aleatória
                     
-                    player_manager.add_item_to_inventory(pdata, skin_id, 1)
+                    # --- CORREÇÃO SEGURA (EVITA CAIXA DUPLA OU SEM CAIXA) ---
+                    # 1. Remove qualquer "caixa_" que já exista (limpeza)
+                    clean_id = skin_id.replace("caixa_", "")
+                    
+                    # 2. Adiciona o prefixo oficial
+                    final_skin_id = f"caixa_{clean_id}"
+                    # --------------------------------------------------------
+                    
+                    player_manager.add_item_to_inventory(pdata, final_skin_id, 1)
                     
                     # Log
-                    sk_info = game_data.ITEMS_DATA.get(skin_id, {})
-                    sk_name = sk_info.get("display_name", skin_id)
+                    sk_info = game_data.ITEMS_DATA.get(final_skin_id, {})
+                    # Tenta pegar nome bonito, senão usa o ID formatado
+                    sk_name = sk_info.get("display_name", final_skin_id.replace("_", " ").title())
+                    
                     loot_won_messages.append(f"🎨 <b>SKIN:</b> {sk_name}")
                     skin_winners_msg.append(f"• {player_name} obteve <b>{sk_name}</b>!")
                     
