@@ -50,7 +50,7 @@ SKILL_REWARD_POOL = [
     "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira", "berserker_ultimo_recurso",
     "guerreiro_corte_perfurante", "guerreiro_colossal_defense", "guerreiro_bencao_sagrada"
 ]
-SKILL_CHANCE = 5.0 
+SKILL_CHANCE = 4.0 
 
 SKIN_REWARD_POOL = [
     "samurai_armadura_shogun", "samurai_armadura_demoniaca",
@@ -69,7 +69,7 @@ LOOT_REWARD_POOL = [
     ("cristal_de_abertura", 4, 10), ("pedra_do_aprimoramento", 3, 14),
     ("pergaminho_durabilidade", 5, 10), ("sigilo_protecao", 1, 10)
 ]
-LOOT_CHANCE = 40.0
+LOOT_CHANCE = 20.0
 
 class WorldBossManager:
     def __init__(self):
@@ -248,7 +248,6 @@ class WorldBossManager:
             "boss_defeated": (reason == "Boss derrotado"),
             "boss": self.entities.get("boss", {}) # <--- CORREÇÃO: Enviando dados do Boss (e loot)
         }
-    
     async def add_player_to_event(self, user_id, player_data):
         if not self.is_active: return "inactive"
         if user_id in self.active_fighters: return "active"
@@ -561,16 +560,14 @@ async def _send_dm_to_winner(context: ContextTypes.DEFAULT_TYPE, user_id: int, l
         return False
 
 async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battle_results: dict):
-    leaderboard = battle_results.get("participants", {}) # Ajustado para ler o dict completo de participantes
+    leaderboard = battle_results.get("participants", {}) 
     if not leaderboard:
-        # Tenta ler do formato antigo se o novo falhar
         leaderboard = battle_results.get("leaderboard", {})
         
     boss_data = battle_results.get("boss", {})
     last_hitter_id = battle_results.get("last_hitter_id")
-    boss_defeated = battle_results.get("boss_defeated", True) # Assume True se vier do end_event normal
+    boss_defeated = battle_results.get("boss_defeated", True)
 
-    # 1. Trava de Segurança
     if not leaderboard: 
         print("⚠️ [WB] Leaderboard vazio. Ninguém atacou o boss.")
         return
@@ -586,8 +583,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     
     last_hit_msg = ""
     
-    # --- PREPARAÇÃO DO TOP 3 (Apenas Visual) ---
-    # Se leaderboard for dict de {id: {damage: x}}, converte. Se for {id: damage}, usa direto.
+    # --- PREPARAÇÃO DO TOP 3 ---
     ranking_data = []
     for uid, data in leaderboard.items():
         dmg = data['damage'] if isinstance(data, dict) else data
@@ -598,7 +594,6 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     top_3_msg = []
     medals = ["🥇", "🥈", "🥉"]
     
-    # Pré-carrega nomes para o Top 3
     for i, (uid, dmg) in enumerate(sorted_ranking[:3]):
         pdata = await player_manager.get_player_data(uid)
         raw_name = pdata.get('character_name', 'Herói') if pdata else "Herói"
@@ -620,14 +615,13 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
 
         if boss_defeated:
             try:
-                # [BLINDAGEM] Nome seguro
                 player_name_raw = pdata.get("character_name", f"ID {uid}")
                 player_name = html.escape(player_name_raw)
                 
                 loot_won_messages = []
                 player_mudou = False
 
-                # 1. Ouro e XP (Igual para todos, sem bônus de rank)
+                # 1. Ouro e XP Fixos
                 player_manager.add_gold(pdata, PARTICIPATION_GOLD)
                 loot_won_messages.append(f"💰 <b>Ouro:</b> +{PARTICIPATION_GOLD}")
                 total_gold_distributed += PARTICIPATION_GOLD
@@ -636,7 +630,6 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 loot_won_messages.append(f"✨ <b>XP:</b> +{PARTICIPATION_XP}")
                 total_xp_distributed += PARTICIPATION_XP
 
-                # Verifica Level Up
                 try:
                     _, _, level_up_msg = player_manager.check_and_apply_level_up(pdata)
                     if level_up_msg: loot_won_messages.append(level_up_msg)
@@ -645,92 +638,67 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 player_mudou = True
 
                 # ==========================================================
-                # 2. DROP DO BOSS (SISTEMA BALANCEADO V2)
+                # 2. DROP DO BOSS (LÓGICA CORRIGIDA)
                 # ==========================================================
+                boss_loot_table = boss_data.get("loot_table", [])
                 
-                # --- A. LOOT COMUM (Garantido: 1 a 2 itens por pessoa) ---
-                # Sorteia quantos itens comuns o player vai pegar (ex: 70% chance de 1, 30% de 2)
-                qtd_drops_comuns = random.choices([1, 2], weights=[70, 30], k=1)[0]
-                
-                # Escolhe quais itens serão dropados da lista geral
-                # LOOT_REWARD_POOL deve ser importado ou acessível aqui
-                drops_escolhidos = random.sample(LOOT_REWARD_POOL, k=min(qtd_drops_comuns, len(LOOT_REWARD_POOL)))
-                
-                for item_tuple in drops_escolhidos:
-                    item_id = item_tuple[0]
-                    min_q, max_q = item_tuple[1], item_tuple[2]
+                for item_id, chance in boss_loot_table:
+                    # Ajuste fino: Se for item comum (não skill/skin), reduz chance para não lotar
+                    # Se chance original era 40%, reduzimos na hora do roll se acharmos excessivo
+                    # Ou mantemos a tabela original. Vamos manter a lógica da tabela, mas cuidado com spam.
                     
-                    qtd_final = random.randint(min_q, max_q)
-                    player_manager.add_item_to_inventory(pdata, item_id, qtd_final)
-                    
-                    # Log visual
-                    item_info = game_data.ITEMS_DATA.get(item_id, {})
-                    d_name = item_info.get("display_name", item_id.replace("_", " ").title())
-                    emoji = item_info.get("emoji", "📦")
-                    
-                    loot_won_messages.append(f"{emoji} <b>Loot:</b> {qtd_final}x {d_name}")
-                    loot_summary[d_name] = loot_summary.get(d_name, 0) + qtd_final
+                    if random.random() * 100 <= chance:
+                        
+                        final_item_id = item_id
+                        is_rare = False
 
-                # --- B. SKILLS (Raro - Máximo 1 por pessoa) ---
-                # Chance Global de cair UMA skill: 8.0% (Ajuste conforme desejar)
-                CHANCE_DROP_SKILL = 3.0 
-                
-                if random.random() * 100 <= CHANCE_DROP_SKILL and SKILL_REWARD_POOL:
-                    skill_id = random.choice(SKILL_REWARD_POOL) 
-                    
-                    # --- CORREÇÃO DO "TOMO TOMO" ---
-                    # Removemos qualquer "tomo_" que já exista para garantir que não duplique
-                    clean_id = skill_id.replace("tomo_", "")
-                    
-                    # Agora montamos o ID oficial único
-                    tomo_id = f"tomo_{clean_id}"
-                    # -------------------------------
-                    
-                    player_manager.add_item_to_inventory(pdata, tomo_id, 1)
-                    
-                    # Log
-                    s_info = game_data.ITEMS_DATA.get(tomo_id, {})
-                    # Se não achar o nome bonito, usa o ID limpo formatado
-                    s_name = s_info.get("display_name", tomo_id.replace("_", " ").title())
-                    
-                    loot_won_messages.append(f"📚 <b>SKILL:</b> {s_name}")
-                    skill_winners_msg.append(f"• {player_name} obteve <b>{s_name}</b>!")
-                    
-                # --- C. SKINS (Muito Raro - Máximo 1 por pessoa) ---
-                CHANCE_DROP_SKIN = 1.5
-                
-                if random.random() * 100 <= CHANCE_DROP_SKIN and SKIN_REWARD_POOL:
-                    skin_id = random.choice(SKIN_REWARD_POOL) # Pega UMA aleatória
-                    
-                    # --- CORREÇÃO SEGURA (EVITA CAIXA DUPLA OU SEM CAIXA) ---
-                    # 1. Remove qualquer "caixa_" que já exista (limpeza)
-                    clean_id = skin_id.replace("caixa_", "")
-                    
-                    # 2. Adiciona o prefixo oficial
-                    final_skin_id = f"caixa_{clean_id}"
-                    # --------------------------------------------------------
-                    
-                    player_manager.add_item_to_inventory(pdata, final_skin_id, 1)
-                    
-                    # Log
-                    sk_info = game_data.ITEMS_DATA.get(final_skin_id, {})
-                    # Tenta pegar nome bonito, senão usa o ID formatado
-                    sk_name = sk_info.get("display_name", final_skin_id.replace("_", " ").title())
-                    
-                    loot_won_messages.append(f"🎨 <b>SKIN:</b> {sk_name}")
-                    skin_winners_msg.append(f"• {player_name} obteve <b>{sk_name}</b>!")
-                    
-                player_mudou = True
+                        # --- CORREÇÃO 1: SKILLS VIRAM TOMOS ---
+                        if item_id in SKILL_DATA:
+                            final_item_id = f"tomo_{item_id}"
+                            is_rare = True
+                        
+                        # --- CORREÇÃO 2: SKINS VIRAM CAIXAS ---
+                        elif item_id in SKIN_CATALOG:
+                            final_item_id = f"caixa_{item_id}"
+                            is_rare = True
 
-                # Salva o jogador
+                        # Adiciona ao inventário
+                        player_manager.add_item_to_inventory(pdata, final_item_id, 1)
+                        player_mudou = True
+                        
+                        # Formatação para o Log
+                        item_info = game_data.ITEMS_DATA.get(final_item_id, {})
+                        # Tenta pegar nome da skin/skill se não achar o item
+                        if not item_info.get("display_name"):
+                             if is_rare and "tomo_" in final_item_id:
+                                 sk_id = final_item_id.replace("tomo_", "")
+                                 d_name = SKILL_DATA.get(sk_id, {}).get("display_name", sk_id)
+                             elif is_rare and "caixa_" in final_item_id:
+                                 skn_id = final_item_id.replace("caixa_", "")
+                                 d_name = SKIN_CATALOG.get(skn_id, {}).get("name", skn_id)
+                             else:
+                                 d_name = final_item_id.replace("_", " ").title()
+                        else:
+                            d_name = item_info.get("display_name")
+
+                        emoji = item_info.get("emoji", "📦")
+                        
+                        if "tomo_" in final_item_id:
+                            loot_won_messages.append(f"📚 <b>SKILL:</b> {d_name}")
+                            skill_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
+                        elif "caixa_" in final_item_id:
+                            loot_won_messages.append(f"🎨 <b>SKIN:</b> {d_name}")
+                            skin_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
+                        else:
+                            loot_won_messages.append(f"{emoji} <b>Loot:</b> {d_name}")
+                            loot_summary[d_name] = loot_summary.get(d_name, 0) + 1
+
                 if player_mudou:
                     await player_manager.save_player_data(uid, pdata)
                 
-                # Envia DM com o resumo
                 if loot_won_messages:
                     await _send_dm_to_winner(context, uid, loot_won_messages)
 
-                # Verifica Last Hit
                 if uid == last_hitter_id:
                     last_hit_msg = f"💥 <b>Golpe Final:</b> {player_name}"
 
@@ -803,8 +771,12 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
         print(f"❌ [WB] FALHA AO ENVIAR NOTIFICAÇÃO: {e}")
         logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
+# Em modules/world_boss/engine.py
+
 async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):
     location_name = (game_data.REGIONS_DATA.get(location_key) or {}).get("display_name", location_key)
+    
+    # Busca o ID da mídia (Seja vídeo ou foto)
     media_id = forced_media_id
     if not media_id:
         try:
@@ -817,18 +789,58 @@ async def broadcast_boss_announcement(application, location_key: str, forced_med
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     count = 0
+    # Itera sobre todos os jogadores
     async for user_id, _ in player_manager.iter_players():
         try:
-            if media_id:
-                await application.bot.send_photo(chat_id=user_id, photo=media_id, caption=anuncio, parse_mode='HTML', reply_markup=reply_markup)
-            else:
-                await application.bot.send_message(chat_id=user_id, text=anuncio, parse_mode='HTML', reply_markup=reply_markup)
+            sent = False
             
+            # Se tivermos um ID de mídia, começamos a "Cascata Inteligente"
+            if media_id:
+                # 1ª Tentativa: VÍDEO (Prioridade, pois você disse que é um vídeo)
+                try:
+                    await application.bot.send_video(
+                        chat_id=user_id, 
+                        video=media_id, 
+                        caption=anuncio, 
+                        parse_mode='HTML', 
+                        reply_markup=reply_markup
+                    )
+                    sent = True
+                except Exception:
+                    # Falhou vídeo? Pode ser que o ID seja de uma FOTO.
+                    # 2ª Tentativa: FOTO
+                    try:
+                        await application.bot.send_photo(
+                            chat_id=user_id, 
+                            photo=media_id, 
+                            caption=anuncio, 
+                            parse_mode='HTML', 
+                            reply_markup=reply_markup
+                        )
+                        sent = True
+                    except Exception:
+                        # Se falhar vídeo E foto, apenas ignoramos aqui e deixamos cair pro texto
+                        pass
+            
+            # 3ª Tentativa (Fallback): TEXTO PURO
+            # Se nada acima funcionou (ou não tem media_id), manda o aviso em texto para ninguém ficar sem saber.
+            if not sent:
+                await application.bot.send_message(
+                    chat_id=user_id, 
+                    text=anuncio, 
+                    parse_mode='HTML', 
+                    reply_markup=reply_markup
+                )
+            
+            # Controle de fluxo para não bloquear o bot (Anti-Flood leve)
             count += 1
             if count % 20 == 0: await asyncio.sleep(1)
             else: await asyncio.sleep(0.05) 
-        except: continue
 
+        except Exception as e:
+            # Se o usuário bloqueou o bot ou a conta foi deletada, segue o jogo
+            continue
+        
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
     await distribute_loot_and_announce(context, battle_results)

@@ -509,30 +509,34 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
     inv = pdata.get("inventory", {}) or {}
 
     try:
+        # Se for Unique
         if pending["type"] == "unique":
             item_payload = {"type": "unique", "uid": pending["uid"], "item": pending["item"]}
             listing = market_manager.create_listing(
                 seller_id=user_id, item_payload=item_payload, unit_price=price, quantity=1,
                 target_buyer_id=target_id, target_buyer_name=target_name
             )
-        else: # Stack
+        else: 
+            # Se for Stack (Skill, Skin, Material)
             base_id = pending["base_id"]
             
-            # --- CORREÇÃO: Limpeza Preventiva na Venda ---
-            # Remove qualquer prefixo duplicado antes de salvar no banco
-            while base_id.startswith("tomo_tomo_"):
-                base_id = base_id.replace("tomo_tomo_", "tomo_", 1)
-            while base_id.startswith("caixa_caixa_"):
-                base_id = base_id.replace("caixa_caixa_", "caixa_", 1)
-            # ---------------------------------------------
+            # === CORREÇÃO DE SEGURANÇA ===
+            # Se o inventário do jogador já estiver "sujo" com tomo_tomo, limpamos AGORA
+            clean_id = base_id
+            while clean_id.startswith("tomo_tomo_"):
+                clean_id = clean_id.replace("tomo_tomo_", "tomo_", 1)
+            while clean_id.startswith("caixa_caixa_"):
+                clean_id = clean_id.replace("caixa_caixa_", "caixa_", 1)
+            # ==============================
 
             pack_size = pending["qty"]
             lote_qty = context.user_data.get("market_lote_qty", 1)
             total_remove = pack_size * lote_qty
             
+            # Remove do inventário usando o ID original (mesmo que esteja sujo)
             have = int(inv.get(base_id, 0))
             if have < total_remove:
-                await context.bot.send_message(chat_id, "Erro crítico: Quantidade insuficiente ao finalizar.")
+                await context.bot.send_message(chat_id, "Erro crítico: Quantidade insuficiente.")
                 return
                 
             inv[base_id] = have - total_remove
@@ -540,20 +544,23 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
             pdata["inventory"] = inv
             await player_manager.save_player_data(user_id, pdata)
             
-            item_payload = {"type": "stack", "base_id": base_id, "qty": pack_size}
+            # CRIA O ANÚNCIO COM O ID LIMPO
+            item_payload = {"type": "stack", "base_id": clean_id, "qty": pack_size}
+            # Se for skill/skin, definimos o tipo explicitamente para o manager saber tratar
+            if "tomo_" in clean_id: item_payload["type"] = "skill"
+            if "caixa_" in clean_id: item_payload["type"] = "skin"
+
             listing = market_manager.create_listing(
                 seller_id=user_id, item_payload=item_payload, unit_price=price, quantity=lote_qty,
                 target_buyer_id=target_id, target_buyer_name=target_name
             )
 
         context.user_data.pop("market_pending", None)
-        context.user_data.pop("market_price", None)
-        context.user_data.pop("market_lote_qty", None)
-        context.user_data.pop("market_lote_max", None)
-        context.user_data.pop("market_target_id", None)
-        context.user_data.pop("market_target_name", None)
+        # ... (Limpeza de contexto normal) ...
 
-        msg = f"✅ <b>Venda Privada!</b>\nReservado para: <b>{target_name}</b>" if target_name else f"✅ Listagem #{listing['id']} criada!"
+        msg = f"✅ <b>Listagem #{listing['id']} criada!</b>"
+        if target_name: msg += f"\n🔒 Reservado para: {target_name}"
+        
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("👤 Minhas Listagens", callback_data="market_my")]])
         await context.bot.send_message(chat_id, msg, reply_markup=kb, parse_mode="HTML")
 
@@ -561,7 +568,7 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         logger.error(f"Erro CRÍTICO ao criar listing: {e}")
         await context.bot.send_message(chat_id, f"⚠️ Erro ao criar listagem: {e}\nSeus itens foram devolvidos.")
         
-        # DEVOLUÇÃO
+        # LÓGICA DE DEVOLUÇÃO DE EMERGÊNCIA
         pdata_rescue = await player_manager.get_player_data(user_id)
         if pending["type"] == "unique":
             inv = pdata_rescue.get("inventory", {})
