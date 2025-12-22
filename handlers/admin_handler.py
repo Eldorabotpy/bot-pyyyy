@@ -1217,47 +1217,48 @@ async def _change_id_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 # --- COMANDO DE CORREÇÃO DE TOMOS (ADICIONAR EM admin_handler.py) ---
 
-# --- COMANDO DE CORREÇÃO DE TOMOS (Substitua a função anterior por esta) ---
-
-async def admin_fix_tomos_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def corrigir_bug_tomos_duplicados(user_id: int):
     """
-    Comando ADMIN: Varre todos os jogadores e corrige o bug 'Tomo Tomo'.
-    Transforma 'tomo_tomo_X' em 'tomo_X'.
+    Varre o inventário e corrige 'tomo_tomo_' recursivamente.
+    Ex: 'tomo_tomo_tomo_skill' vira 'tomo_skill'.
     """
-    if not await ensure_admin(update): return
-
-    msg = await update.message.reply_text("⏳ <b>Iniciando correção global de Tomos...</b>\nIsso pode levar alguns segundos.", parse_mode=HTML)
+    pdata = await get_player_data(user_id)
+    if not pdata: return False
     
-    count_fixed = 0
-    total_checked = 0
+    inventory = pdata.get("inventory", {})
+    mudou = False
     
-    try:
-        # Importe a função de correção
-        from modules.player_manager import corrigir_bug_tomos_duplicados, iter_player_ids
+    lista_itens = list(inventory.keys())
 
-        # ✅ CORREÇÃO AQUI: Removemos o 'async' antes do 'for'
-        # O iter_player_ids() é uma lista/gerador comum, não precisa de async for.
-        for pid in iter_player_ids():
-            total_checked += 1
+    for item_id in lista_itens:
+        # Verifica se começa com o bug (tomo_tomo_)
+        if item_id.startswith("tomo_tomo_"):
             
-            # A função de correção continua sendo async, então mantemos o await aqui dentro
-            if await corrigir_bug_tomos_duplicados(pid):
-                count_fixed += 1
+            # --- LÓGICA RECURSIVA (WHILE) ---
+            # Enquanto o ID começar com "tomo_tomo_", remove um "tomo_"
+            # Isso transforma "tomo_tomo_tomo_skill" -> "tomo_tomo_skill" -> "tomo_skill"
+            id_corrigido = item_id
+            while id_corrigido.startswith("tomo_tomo_"):
+                id_corrigido = id_corrigido.replace("tomo_tomo_", "tomo_", 1)
+            # -------------------------------
             
-            # Pausa a cada 50 players para não travar o bot
-            if total_checked % 50 == 0:
-                await asyncio.sleep(0.1)
+            # Pega a quantidade
+            dados_item = inventory[item_id]
+            qtd = int(dados_item["quantity"]) if isinstance(dados_item, dict) else int(dados_item)
 
-        await msg.edit_text(
-            f"✅ <b>CORREÇÃO CONCLUÍDA!</b>\n\n"
-            f"👥 Jogadores verificados: {total_checked}\n"
-            f"🔧 Inventários corrigidos: {count_fixed}\n"
-            f"📚 Todos os 'Tomo Tomo' foram convertidos para Tomos normais."
-        )
+            if qtd > 0:
+                # Adiciona ao ID limpo
+                add_item_to_inventory(pdata, id_corrigido, qtd)
+                print(f"♻️ FIX PROFUNDO {user_id}: {qtd}x {item_id} -> {id_corrigido}")
+            
+            # Remove o item sujo
+            del inventory[item_id]
+            mudou = True
 
-    except Exception as e:
-        logger.error(f"Erro no fix_tomos: {e}", exc_info=True)
-        await msg.edit_text(f"❌ Erro crítico durante a correção: {e}")
+    if mudou:
+        await save_player_data(user_id, pdata)
+        return True
+    return False
 
 # =========================================================
 # EXPORTAÇÃO DE HANDLERS PARA O REGISTRY
