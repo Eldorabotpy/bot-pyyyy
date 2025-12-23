@@ -33,7 +33,7 @@ from config import (
 )
 from registries import register_all_handlers
 from registries.class_evolution import register_evolution_handlers
-
+from registries.market import register_market_handlers
 # --- IMPORTAÇÃO DOS JOBS ---
 from handlers.jobs import (
     regenerate_energy_job,
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init_tasks).build()
     register_all_handlers(application)
     register_evolution_handlers(application)
-
+    register_market_handlers(application)
     logging.info("🤖 Bot configurado. Iniciando...")
 
     MAX_RETRIES = 100

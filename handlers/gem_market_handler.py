@@ -28,57 +28,69 @@ LOG_TOPIC_ID = 24475
 #  LISTAS DE ITENS VENDÁVEIS
 # ==============================
 
-# ==============================
-#  LISTAS DE ITENS VENDÁVEIS (DINÂMICAS)
-# ==============================
-
-# 1. Carrega todos os dados de itens do jogo
-_ALL_GAME_ITEMS = getattr(game_data, "ITEMS_DATA", {})
-
-# 2. Gera lista de Itens de Evolução (Procura por type="evo_item")
 EVOLUTION_ITEMS: set[str] = {
-    item_id for item_id, data in _ALL_GAME_ITEMS.items() 
-    if data.get("type") == "evo_item"
+    "emblema_guerreiro", "essencia_guardia", "essencia_furia", "selo_sagrado", "essencia_luz",
+    "emblema_berserker", "totem_ancestral",
+    "emblema_cacador", "essencia_precisao", "marca_predador", "essencia_fera",
+    "emblema_monge", "reliquia_mistica", "essencia_ki",
+    "emblema_mago", "essencia_arcana", "essencia_elemental", "grimorio_arcano",
+    "emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria",
+    "emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno",
+    "emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada",
 }
-
-# 3. Gera lista de Skills (Pega chaves do SKILL_DATA e adiciona "tomo_")
 SKILL_BOOK_ITEMS: set[str] = {
-    f"tomo_{skill_id}" for skill_id in skills_data.SKILL_DATA.keys()
+    "tomo_passive_bulwark", "tomo_active_whirlwind", "tomo_active_holy_blessing", "tomo_passive_unstoppable",
+    "tomo_active_unbreakable_charge", "tomo_passive_last_stand", "tomo_passive_animal_companion",
+    "tomo_active_deadeye_shot", "tomo_passive_apex_predator", "tomo_active_iron_skin",
+    "tomo_passive_elemental_strikes", "tomo_active_transcendence", "tomo_active_curse_of_weakness", 
+    "tomo_passive_elemental_attunement", "tomo_active_meteor_swarm", "tomo_active_song_of_valor",
+    "tomo_active_dissonant_melody", "tomo_passive_symphony_of_power", "tomo_active_shadow_strike", 
+    "tomo_passive_potent_toxins", "tomo_active_dance_of_a_thousand_cuts", "tomo_passive_iai_stance",
+    "tomo_active_parry_and_riposte", "tomo_active_banner_of_command", 
+    "tomo_guerreiro_corte_perfurante", "tomo_berserker_golpe_selvagem", "tomo_cacador_flecha_precisa",
+    "tomo_monge_rajada_de_punhos", "tomo_mago_bola_de_fogo", "tomo_bardo_melodia_restauradora",
+    "tomo_assassino_ataque_furtivo", "tomo_samurai_corte_iaijutsu",
 }
-
-# 4. Gera lista de Caixas de Skin (Pega chaves do SKIN_CATALOG e adiciona "caixa_")
 SKIN_BOX_ITEMS: set[str] = {
-    f"caixa_{skin_id}" for skin_id in SKIN_CATALOG.keys()
+    'caixa_guerreiro_armadura_negra', 
+    'guerreiro_armadura_negra', 
+    'caixa_guerreiro_placas_douradas',
+    'guerreiro_placas_douradas',
+    'caixa_mago_traje_arcano', 
+    'mago_traje_arcano', 
+    'caixa_assassino_manto_espectral', 
+    'assassino_manto_espectral'
+    'caixa_cacador_patrulheiro_elfico',
+    'cacador_patrulheiro_elfico',
+    'caixa_berserker_pele_urso', 
+    'berserker_pele_urso', 
+    'caixa_monge_quimono_dragao', 
+    'monge_quimono_dragao',
+    'caixa_monge_aspecto_asura'
+    'monge_aspecto_asura' 
+    'caixa_bardo_traje_maestro',
+    'bardo_traje_maestro',
+    'caixa_samurai_armadura_shogun',
+    'samurai_armadura_shogun', 
+    'caixa_samurai_armadura_demoniaca', 
+    'samurai_armadura_demoniaca',
+    'caixa_samurai_encarnacao_sangrenta',
+    'samurai_encarnacao_sangrenta',
+    'caixa_samurai_guardiao_celestial',
+    'samurai_guardiao_celestial', 
+    'caixa_samurai_chama_aniquiladora',
+    'samurai_chama_aniquiladora', 
 }
-
-# ==============================
-#  MAPEAMENTOS (DINÂMICOS)
-# ==============================
-
-# Gera o mapa de Evolução por Classe automaticamente
-# Ele lê o atributo 'class_req' ou 'class' dentro do item de evolução
-EVO_ITEMS_BY_CLASS_MAP: Dict[str, set] = {}
-
-for evo_id in EVOLUTION_ITEMS:
-    info = _ALL_GAME_ITEMS.get(evo_id, {})
-    # Tenta achar qual classe usa esse item
-    req_class = info.get("class_req") or info.get("class") or info.get("allowed_classes")
-    
-    if req_class:
-        # Se for uma lista de classes (ex: ['mago', 'bruxo']), pega a primeira ou itera
-        if isinstance(req_class, list):
-            for c in req_class:
-                c_norm = c.lower()
-                if c_norm not in EVO_ITEMS_BY_CLASS_MAP:
-                    EVO_ITEMS_BY_CLASS_MAP[c_norm] = set()
-                EVO_ITEMS_BY_CLASS_MAP[c_norm].add(evo_id)
-        elif isinstance(req_class, str):
-            c_norm = req_class.lower()
-            if c_norm not in EVO_ITEMS_BY_CLASS_MAP:
-                EVO_ITEMS_BY_CLASS_MAP[c_norm] = set()
-            EVO_ITEMS_BY_CLASS_MAP[c_norm].add(evo_id)
-
-# Mapeamento estático apenas para exibição (Labels)
+EVO_ITEMS_BY_CLASS_MAP = {
+    "guerreiro": {"emblema_guerreiro", "essencia_guardia", "essencia_furia", "selo_sagrado", "essencia_luz"},
+    "berserker": {"emblema_berserker", "totem_ancestral"},
+    "cacador":   {"emblema_cacador", "essencia_precisao", "marca_predador", "essencia_fera"},
+    "monge":     {"emblema_monge", "reliquia_mistica", "essencia_ki"},
+    "mago":      {"emblema_mago", "essencia_arcana", "essencia_elemental", "grimorio_arcano"},
+    "bardo":     {"emblema_bardo", "essencia_harmonia", "essencia_encanto", "batuta_maestria"},
+    "assassino": {"emblema_assassino", "essencia_sombra", "essencia_letal", "manto_eterno"},
+    "samurai":   {"emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada"},
+}
 CLASSES_MAP = {
     "guerreiro": "⚔️ Guerreiro",
     "mago": "✨ Mago",
@@ -781,53 +793,40 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
         await q.answer("Erro ao carregar seus dados.", show_alert=True)
         return
 
-    # Usamos o base_id original do pending, que pode ser 'caixa_monge_...'
+    # --- CORREÇÃO: Usamos o ID EXATO que está no inventário ---
     base_id_original = pending["base_id"]
-    base_id_to_save = base_id_original # Inicializa com o original
     
     pack_qty = int(pending.get("qty", 1))
     lote_qty = max(1, int(context.user_data.get("gem_market_lotes", 1)))
     total_to_remove = pack_qty * lote_qty
     item_label = _item_label(base_id_original) 
 
+    # Verifica se tem o item
     if not player_manager.has_item(pdata, base_id_original, total_to_remove):
         await q.answer(f"Você não tem {total_to_remove}x {item_label}.", show_alert=True)
         await gem_market_cancel_new(update, context)
         return
 
-    # Remove o item original (ex: caixa_monge_aspecto_asura) do inventário
+    # Remove do inventário
     player_manager.remove_item_from_inventory(pdata, base_id_original, total_to_remove)
     await player_manager.save_player_data(user_id, pdata)
     
-    # --- LÓGICA CORRIGIDA: Forçar o item.type correto E limpar o base_id ---
+    # --- DEFINIÇÃO DE TIPO (Apenas para Filtros Visuais) ---
+    # NÃO alteramos o base_id_original. O ID salvo é o ID real.
     item_type_for_backend = "item_stack" 
     
-    # 1. VERIFICAÇÃO DE SKIN (Prioridade: caixas devem ser 'skin')
     if base_id_original.startswith("caixa_"):
         item_type_for_backend = "skin"
-        # ⚠️ CORREÇÃO AQUI: Remove o prefixo 'caixa_' para que o filtro de compra funcione
-        # Salva apenas o ID da skin para consulta no catálogo (monge_aspecto_asura)
-        base_id_to_save = base_id_original.replace("caixa_", "")
-        
-    # 2. VERIFICAÇÃO DE SKILL
     elif base_id_original.startswith("tomo_") and base_id_original in SKILL_BOOK_ITEMS:
         item_type_for_backend = "skill"
-        
-        # --- CORREÇÃO: Remove o prefixo 'tomo_' para salvar limpo no banco ---
-        base_id_to_save = base_id_original.replace("tomo_", "")
-        
-    # 3. VERIFICAÇÃO DE EVO
     elif base_id_original in EVOLUTION_ITEMS:
         item_type_for_backend = "evo_item"
     
-    # Se não cair em nenhum dos 'if/elif', item_type_for_backend permanece 'item_stack'
-    
     item_payload = {
         "type": item_type_for_backend, 
-        "base_id": base_id_to_save, # <--- Usa o ID limpo para skins (ex: monge_aspecto_asura)
+        "base_id": base_id_original, # SALVA O ID COMPLETO (Ex: tomo_fogo, caixa_skin)
         "qty": pack_qty
     }
-    # --- FIM DA LÓGICA CORRIGIDA ---
 
     try:
         listing = gem_market_manager.create_listing(
@@ -838,20 +837,15 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
         )
     except Exception as e:
         logger.error(f"[GemMarket] Falha ao criar listagem para {user_id}: {e}", exc_info=True)
-        
-        # Lógica de devolução de item (devolve o item original: base_id_original)
+        # Devolve o item em caso de erro
         player_manager.add_item_to_inventory(pdata, base_id_original, total_to_remove)
         await player_manager.save_player_data(user_id, pdata)
         
-        # CORREÇÃO: Escapar a mensagem de erro antes de enviar
-        safe_error_text = html.escape(str(e))
-        
-        await _safe_edit_or_send(q, context, chat_id, f"⚠️ Ocorreu um erro: {safe_error_text}\nSeus itens foram devolvidos.", InlineKeyboardMarkup([
+        await _safe_edit_or_send(q, context, chat_id, f"⚠️ Erro ao criar venda. Item devolvido.", InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")]
         ]))
         return
         
-    
     context.user_data.pop("gem_market_pending", None)
     context.user_data.pop("gem_market_price", None)
     context.user_data.pop("gem_market_lotes", None)
@@ -910,11 +904,6 @@ async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_T
     await _safe_edit_or_send(q, context, chat_id, text, kb)
 
 async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    CORREÇÃO DE PAGAMENTO: Fluxo finalizado para usar MongoDB/Cache.
-    O Manager lida com o pagamento do vendedor e a limpeza de cache.
-    O Handler lida apenas com o débito do comprador e a entrega do item.
-    """
     q = update.callback_query
     await q.answer("Processando compra...")
     
@@ -924,37 +913,30 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     try: lid = int(q.data.replace("gem_buy_execute_", ""))
     except: await q.answer("ID inválido.", show_alert=True); return
         
-    # --- 1. Carrega a Listagem e Valida ---
+    # 1. Validações Básicas
     listing = gem_market_manager.get_listing(lid)
     if not listing or not listing.get("active"):
         await q.answer("Item já vendido ou removido!", show_alert=True)
-        await gem_market_main(update, context) 
-        return
+        await gem_market_main(update, context); return
         
     seller_id = int(listing.get("seller_id", 0))
     if buyer_id == seller_id:
         await q.answer("Você não pode comprar de si mesmo.", show_alert=True); return
 
-    # --- 2. Carrega Dados dos Jogadores ---
     buyer_pdata = await player_manager.get_player_data(buyer_id)
-    seller_pdata = await player_manager.get_player_data(seller_id) # Carregar apenas para notificação
+    seller_pdata = await player_manager.get_player_data(seller_id)
     
     if not buyer_pdata:
         await q.answer("Erro ao carregar seus dados.", show_alert=True); return
 
-    # --- 3. Verifica Saldo (GEMAS) ---
     total_cost = int(listing.get("unit_price_gems", 0)) 
     buyer_gems = int(buyer_pdata.get("gems", 0))
     if buyer_gems < total_cost:
-        await q.answer(f"Gemas insuficientes! Você precisa de {total_cost} 💎.", show_alert=True)
-        return
+        await q.answer(f"Gemas insuficientes! Você precisa de {total_cost} 💎.", show_alert=True); return
 
-    # --- 4. Executa a Baixa no Gerenciador de Mercado (MongoDB) ---
+    # 2. Executa a Transação (Backend)
     try:
-        # 1. DÉBITO DO COMPRADOR NA MEMÓRIA
         buyer_pdata["gems"] = max(0, buyer_gems - total_cost)
-        
-        # 2. PROCESSO DE VENDA NO MANAGER (Atualiza Listagem + PAGA VENDEDOR NO DB + LIMPA CACHE)
         updated_listing, _ = await gem_market_manager.purchase_listing( 
             buyer_pdata=buyer_pdata, 
             seller_pdata=seller_pdata, 
@@ -962,87 +944,42 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
             quantity=1
         )
     except Exception as e:
-        logger.error(f"[GemMarket] Erro ao processar listing: {e}")
-        
-        # ⚠️ TRATAMENTO DE CONCORRÊNCIA: Mensagem customizada para o erro.
         error_msg = str(e)
-        if "Falha na baixa do estoque" in error_msg or "Anúncio não ativo" in error_msg:
-             error_msg = "⚠️ Alguém comprou este item primeiro ou o estoque acabou! Atualize a lista."
-        
-        await q.answer(error_msg, show_alert=True)
-        return
+        if "Falha na baixa" in error_msg or "Anúncio não ativo" in error_msg:
+             error_msg = "⚠️ Estoque acabou ou item indisponível!"
+        await q.answer(error_msg, show_alert=True); return
 
-    # --- 5. OPERAÇÃO ATÔMICA (Entrega do Item CORRIGIDA) ---
-    
+    # 3. Entrega o Item (CORRIGIDO: SEM INVENTAR PREFIXOS)
     item_payload = listing.get("item", {})
-    base_id_limpo = item_payload.get("base_id") # Ex: 'monge_aspecto_asura' (Vem limpo do DB)
-    item_type = item_payload.get("type")       # Ex: 'skin' ou 'skill'
+    
+    # PEGA O ID DIRETO DO BANCO DE DADOS
+    base_id_final = item_payload.get("base_id") 
     pack_qty = int(item_payload.get("qty", 1))
     
-    # Determina o ID do item real que o jogador deve receber (A CAIXA/TOMO)
-    base_id_final = base_id_limpo
+    if not base_id_final:
+        # Fallback de emergência se for uma listagem muito antiga
+        logger.error(f"[GemMarket] Listagem {lid} sem base_id!")
+        await q.answer("Erro crítico no item. Contate suporte.", show_alert=True); return
     
-    if item_type == "skin":
-        # --- PROTEÇÃO PARA SKINS ---
-        # Se já tiver "caixa_", mantém. Se não, adiciona.
-        if base_id_limpo.startswith("caixa_"):
-            base_id_final = base_id_limpo
-        else:
-            base_id_final = f"caixa_{base_id_limpo}" 
-            
-    elif item_type == "skill":
-        # --- PROTEÇÃO PARA SKILLS ---
-        # Se já tiver "tomo_", mantém. Se não, adiciona.
-        if base_id_limpo.startswith("tomo_"):
-            base_id_final = base_id_limpo
-        else:
-            base_id_final = f"tomo_{base_id_limpo}" 
-        
-    item_label = _item_label(base_id_final)
-    
-    if not (base_id_final and pack_qty > 0):
-        logger.error(f"[GemMarket] Item sem base_id/pack_qty na listagem {lid}!")
-        await q.answer("Erro crítico: Item inválido.", show_alert=True)
-        return
-    
-    # A) Entrega o Item (no pdata já debitado)
+    # Entrega exata
     player_manager.add_item_to_inventory(buyer_pdata, base_id_final, pack_qty) 
     
-    # B) Notifica vendedor (Mantido no handler)
+    # 4. Notificações e Salvamento
+    item_label = _item_label(base_id_final)
     if seller_id and seller_pdata:
         try:
-            await context.bot.send_message(
-                seller_id,
-                f"💎 <b>Venda Realizada!</b>\nVocê vendeu <b>{item_label}</b> por <b>{total_cost} Gemas</b>.",
-                parse_mode="HTML"
-            )
+            await context.bot.send_message(seller_id, f"💎 <b>Venda Realizada!</b>\nVocê vendeu <b>{item_label}</b> por <b>{total_cost} Gemas</b>.", parse_mode="HTML")
         except: pass
 
-    # --- 6. Salva o Comprador (Agora com Item + Saldo Novo) ---
-    # Este save finaliza a transação para o comprador (débito + item)
     await player_manager.save_player_data(buyer_id, buyer_pdata)
 
-    # --- 7. Logs e Feedback ---
+    # Log
     try:
-        buyer_name = buyer_pdata.get("character_name", q.from_user.first_name)
+        buyer_name = buyer_pdata.get("character_name", "Desconhecido")
         seller_name = seller_pdata.get("character_name", "Vendedor") if seller_pdata else "Desconhecido"
-        
-        log_text = (
-            f"💎 <b>CASA DE LEILÕES (VENDA)</b>\n\n"
-            f"👤 <b>Comprador:</b> {buyer_name}\n"
-            f"📦 <b>Item:</b> {item_label} x{pack_qty}\n"
-            f"💰 <b>Valor:</b> {total_cost} Gemas\n"
-            f"🤝 <b>Vendedor:</b> {seller_name}"
-        )
-        
-        await context.bot.send_message(
-            chat_id=LOG_GROUP_ID, 
-            message_thread_id=LOG_TOPIC_ID, 
-            text=log_text, 
-            parse_mode="HTML"
-        )
-    except Exception as e_log:
-        logger.warning(f"Log error: {e_log}")
+        log_text = (f"💎 <b>CASA DE LEILÕES (VENDA)</b>\n👤 <b>Comprador:</b> {buyer_name}\n📦 <b>Item:</b> {item_label} x{pack_qty}\n💰 <b>Valor:</b> {total_cost} Gemas\n🤝 <b>Vendedor:</b> {seller_name}")
+        await context.bot.send_message(chat_id=LOG_GROUP_ID, message_thread_id=LOG_TOPIC_ID, text=log_text, parse_mode="HTML")
+    except: pass
 
     text = f"✅ Compra concluída! Recebeste <b>{item_label} (x{pack_qty})</b> por 💎 {total_cost}."
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_list_cats")]])
@@ -1080,13 +1017,16 @@ async def gem_market_cancel_execute(update: Update, context: ContextTypes.DEFAUL
     except: await q.answer("ID inválido.", show_alert=True); return
 
     try:
-        listing = gem_market_manager.cancel_listing(seller_id=user_id, listing_id=lid)
-    except gem_market_manager.GemMarketError as e:
+        # --- CORREÇÃO AQUI: Adicionado 'await' ---
+        listing = await gem_market_manager.cancel_listing(seller_id=user_id, listing_id=lid)
+    except Exception as e:
+        # Se der erro (ex: já cancelado), avisa e volta
         await q.answer(f"Erro: {e}", show_alert=True)
         await gem_market_my(update, context); return
         
     pdata = await player_manager.get_player_data(user_id)
     
+    # Devolução usando ID puro
     item_payload = listing.get("item", {})
     base_id = item_payload.get("base_id")
     pack_qty = item_payload.get("qty", 1)
@@ -1099,7 +1039,7 @@ async def gem_market_cancel_execute(update: Update, context: ContextTypes.DEFAUL
             
     await player_manager.save_player_data(user_id, pdata)
     
-    text = f"✅ Listagem #{lid} ({item_label}) cancelada. Os {total_return} itens foram devolvidos."
+    text = f"✅ Listagem #{lid} ({item_label}) cancelada. Itens devolvidos."
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_my")]])
     await _safe_edit_or_send(q, context, chat_id, text, kb)
 

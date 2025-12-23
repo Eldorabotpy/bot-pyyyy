@@ -1,215 +1,327 @@
-# modules/gem_market_manager.py
-# (VERSÃO CORRIGIDA: FIX TOMO_TOMO E VISIBILIDADE)
-
+# modules/market_manager.py
+# (VERSÃO CORRIGIDA: VARIÁVEL LOG)
 from __future__ import annotations
+import logging
 import os
+import sys
 import certifi
 from datetime import datetime, timezone
-from typing import Optional, List, Tuple
-import logging
-from pymongo import MongoClient, ReturnDocument
+from typing import Optional, Dict, List, Tuple
+from pymongo import MongoClient
+import asyncio
 from modules import player_manager
 
-MONGO_CONN_STR = os.getenv("MONGO_CONNECTION_STRING")
+# --- CONFIGURAÇÃO DE LOGGING ---
+logging.basicConfig(level=logging.INFO)
+# CORREÇÃO: Agora a variável se chama 'log' para bater com o resto do código
 log = logging.getLogger(__name__)
 
+# --- CONFIGURAÇÃO DO BANCO DE DADOS ---
+MONGO_CONN_STR = os.getenv("MONGO_CONNECTION_STRING")
+
+# TRAVA DE SEGURANÇA
+if not MONGO_CONN_STR:
+    # Tenta ler a antiga por garantia
+    MONGO_CONN_STR = os.getenv("MONGO_URL") 
+    if not MONGO_CONN_STR:
+        log.critical("❌ ERRO FATAL: A variável 'MONGO_CONNECTION_STRING' não foi encontrada!")
+        # Fallback apenas para evitar crash de importação, mas a conexão falhará no Render
+        MONGO_CONN_STR = "mongodb://localhost:27017/rpg_bot"
+
 try:
+    # Tenta conectar
     ca = certifi.where()
     client = MongoClient(MONGO_CONN_STR, tlsCAFile=ca)
+    
+    # Força teste
+    client.admin.command('ping')
+    log.info("✅ CONEXÃO COM MONGODB BEM SUCEDIDA (MERCADO)!")
+    
     db = client["eldora_db"] 
-    
-    gem_market_col = db["gem_market_listings"]
+    market_col = db["market_listings"]
     counters_col = db["counters"]
-    players_col = db["players"] 
     
-    # Índices para performance e unicidade
-    gem_market_col.create_index("id", unique=True)
-    gem_market_col.create_index("active")
-    gem_market_col.create_index("created_at") # Ajuda na ordenação
+    # Índices
+    market_col.create_index("id", unique=True)
+    market_col.create_index("active")
     
-    log.info("✅ CONEXÃO COM MONGODB BEM SUCEDIDA (MERCADO DE GEMAS)!")
 except Exception as e:
-    log.critical(f"🔥 FALHA CRÍTICA AO CONECTAR NO MONGODB (GEMAS): {e}")
-    gem_market_col = None
+    log.critical(f"🔥 FALHA CRÍTICA AO CONECTAR NO MONGODB: {e}")
+    market_col = None
     counters_col = None
-    players_col = None
 
-MAX_GEM_PRICE = 9_999_999 
+# Tenta importar display_utils
+try:
+    from modules import display_utils
+except Exception:
+    display_utils = None
 
-class GemMarketError(Exception): ...
-class ListingNotFound(GemMarketError): ...
-class ListingInactive(GemMarketError): ...
-class InvalidListing(GemMarketError): ...
-class PermissionDenied(GemMarketError): ...
-class InsufficientQuantity(GemMarketError): ...
-class InvalidPurchase(GemMarketError): ...
-class InsufficientGems(GemMarketError): ...
+from modules import game_data
 
+MAX_PRICE = 100_000_000_000 
+MAX_QTY = 1_000_000
+
+# =========================
+# Erros
+# =========================
+class MarketError(Exception): ...
+class ListingNotFound(MarketError): ...
+class ListingInactive(MarketError): ...
+class InvalidListing(MarketError): ...
+class PermissionDenied(MarketError): ...
+class InsufficientQuantity(MarketError): ...
+class InvalidPurchase(MarketError): ...
+
+# =========================
+# Helpers
+# =========================
 def _get_next_sequence(name: str) -> int:
-    if counters_col is None: raise ListingNotFound("MongoDB não conectado.")
     ret = counters_col.find_one_and_update(
         {"_id": name},
         {"$inc": {"seq": 1}},
         upsert=True,
-        return_document=ReturnDocument.AFTER 
+        return_document=True
     )
     return ret["seq"]
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-def _validate_item_payload(item_payload: dict):
-    if not isinstance(item_payload, dict):
-        raise InvalidListing("Payload inválido.")
+def _validate_price_qty(unit_price: int, quantity: int):
+    if unit_price <= 0: raise InvalidListing("Preço deve ser maior que 0.")
+    if quantity <= 0: raise InvalidListing("Quantidade deve ser maior que 0.")
 
-    # Aceita skill, skin e evo_item
-    t = item_payload.get("type")
-    valid_types = ("skill", "skin", "evo_item", "stack") # Adicionado stack por segurança
-    if t not in valid_types:
-        raise InvalidListing(f"Tipo inválido: {t}")
+# =========================
+# CRUD
+# =========================
 
-    if not item_payload.get("base_id") or not isinstance(item_payload.get("base_id"), str):
-        raise InvalidListing("Item sem 'base_id' válido.")
-    
-    qty = item_payload.get("qty")
-    if not isinstance(qty, int) or qty <= 0:
-        raise InvalidListing("Quantidade inválida.")
+def create_listing(
+    *,
+    seller_id: int,
+    item_payload: dict,
+    unit_price: int,
+    quantity: int = 1,
+    region_key: Optional[str] = None,
+    target_buyer_id: Optional[int] = None,
+    target_buyer_name: Optional[str] = None
+) -> dict:
+    _validate_price_qty(unit_price, quantity)
 
-# --- API PÚBLICA ---
-
-def create_listing(*, seller_id: int, item_payload: dict, unit_price: int, quantity: int = 1) -> dict:
-    if gem_market_col is None: raise GemMarketError("BD Offline.")
-    
-    _validate_item_payload(item_payload)
-
-    # Limpeza preventiva do ID (Remove prefixos duplicados antes de salvar)
-    base_id = item_payload.get("base_id", "")
-    if item_payload.get("type") == "skill" and base_id.startswith("tomo_tomo_"):
-        item_payload["base_id"] = base_id.replace("tomo_tomo_", "tomo_", 1)
-    
-    lid = _get_next_sequence("gem_market_id")
+    lid = _get_next_sequence("market_id")
 
     listing = {
         "id": lid,
         "seller_id": int(seller_id),
         "item": item_payload,
-        "unit_price_gems": int(unit_price),
+        "unit_price": int(unit_price),
         "quantity": int(quantity),
         "created_at": _now_iso(),
+        "region_key": region_key,
         "active": True,
+        "target_buyer_id": int(target_buyer_id) if target_buyer_id else None,
+        "target_buyer_name": str(target_buyer_name) if target_buyer_name else None
     }
 
-    gem_market_col.insert_one(listing)
-    log.info(f"[GemMarket] Criado #{lid} (Price: {unit_price})")
+    market_col.insert_one(listing)
+    log.info(f"[MARKET] Item #{lid} criado por {seller_id}.")
     return listing
 
-def get_listing(listing_id: int) -> Optional[dict]:
-    if gem_market_col is None: return None
-    return gem_market_col.find_one({"id": int(listing_id)})
+def list_active(
+    *,
+    region_key: Optional[str] = None,
+    base_id: Optional[str] = None,
+    sort_by: str = "created_at",
+    ascending: bool = False,
+    page: int = 1,
+    page_size: int = 20,
+    price_per_unit: bool = False,
+    viewer_id: Optional[int] = None
+) -> List[dict]:
+    query = {"active": True}
 
-def list_active(page: int = 1, page_size: int = 30, viewer_id: int = None) -> List[dict]:
-    if gem_market_col is None: return []
-    # Retorna APENAS ativos, ordenados do mais recente pro mais antigo
-    cursor = gem_market_col.find({"active": True}).sort("created_at", -1)
+    if region_key: query["region_key"] = region_key
+    if base_id: query["item.base_id"] = base_id
+
+    if viewer_id:
+        viewer_id = int(viewer_id)
+        query["$or"] = [
+            {"target_buyer_id": None},
+            {"target_buyer_id": viewer_id},
+            {"seller_id": viewer_id}
+        ]
+    else:
+        query["target_buyer_id"] = None
+
+    sort_dir = 1 if ascending else -1
+    mongo_sort = [("created_at", sort_dir)]
+    if sort_by == "price":
+        mongo_sort = [("unit_price", sort_dir)]
+
+    skip = (max(1, page) - 1) * page_size
+    
+    cursor = market_col.find(query).sort(mongo_sort).skip(skip).limit(page_size)
     return list(cursor)
 
 def list_by_seller(seller_id: int) -> List[dict]:
-    if gem_market_col is None: return [] 
-    return list(gem_market_col.find({"active": True, "seller_id": int(seller_id)}))
+    return list(market_col.find({"active": True, "seller_id": int(seller_id)}))
 
-async def cancel_listing(*, seller_id: int, listing_id: int) -> dict:
-    if gem_market_col is None: raise GemMarketError("BD Offline.")
+def get_listing(listing_id: int) -> Optional[dict]:
+    return market_col.find_one({"id": int(listing_id)})
 
-    # 1. Validações
-    listing = gem_market_col.find_one({"id": int(listing_id)})
-    if not listing: raise ListingNotFound("Anúncio não existe.")
-    if not listing.get("active"): raise ListingInactive("Já cancelado ou vendido.")
-    if int(listing["seller_id"]) != int(seller_id): raise PermissionDenied("Não é seu anúncio.")
-    
-    # 2. Desativa Atomicamente
-    result = gem_market_col.update_one(
-        {"id": int(listing_id), "active": True},
-        {"$set": {"active": False}}
-    )
-    
-    if result.modified_count == 0:
-        raise ListingInactive("Erro de concorrência: Item já vendido.")
-    
-    # 3. Devolução Inteligente (CORREÇÃO TOMO_TOMO)
-    item_payload = listing.get("item", {})
-    qty_left = listing.get("quantity", 0)
-    pack_qty = item_payload.get("qty", 1)
-    total_return = qty_left * pack_qty
-    
-    if total_return > 0:
-        raw_base_id = item_payload.get("base_id")
-        item_type = item_payload.get("type")
-        
-        # Lógica de reconstrução de ID corrigida:
-        base_id_final = raw_base_id
-        
-        if item_type == "skill":
-            # SÓ ADICIONA O PREFIXO SE NÃO TIVER
-            if not raw_base_id.startswith("tomo_"):
-                base_id_final = f"tomo_{raw_base_id}"
-            else:
-                base_id_final = raw_base_id
-                
-        elif item_type == "skin":
-             if not raw_base_id.startswith("caixa_"):
-                base_id_final = f"caixa_{raw_base_id}"
-             else:
-                base_id_final = raw_base_id
+def delete_listing(listing_id: int):
+    market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
 
-        # Devolve ao jogador
-        pdata = await player_manager.get_player_data(seller_id)
-        if pdata:
-            # Força correção de bug de prefixo duplo se existir
-            if base_id_final.startswith("tomo_tomo_"):
-                base_id_final = base_id_final.replace("tomo_tomo_", "tomo_", 1)
-                
-            player_manager.add_item_to_inventory(pdata, base_id_final, total_return)
-            await player_manager.save_player_data(seller_id, pdata)
-            log.info(f"♻️ [GemMarket] Devolvido: {total_return}x {base_id_final} para {seller_id}")
-            
-    listing["active"] = False 
-    return listing
+def purchase_listing(
+    *,
+    buyer_id: int,
+    listing_id: int,
+    quantity: int = 1,
+    context=None
+) -> Tuple[dict, int]:
+    # --- Validações e Buscas ---
+    listing = get_listing(listing_id)
+    if not listing: raise ListingNotFound("Anúncio não encontrado.")
+    if not listing.get("active"): raise ListingInactive("Anúncio inativo.")
+    
+    seller_id = int(listing["seller_id"])
+    buyer_id = int(buyer_id)
 
-async def purchase_listing(*, buyer_pdata: dict, seller_pdata: dict, listing_id: int, quantity: int = 1) -> Tuple[dict, int]:
-    if gem_market_col is None: raise GemMarketError("BD Offline.")
-        
-    buyer_id = buyer_pdata.get("user_id") or buyer_pdata.get("_id")
-    seller_id = seller_pdata.get("user_id") or seller_pdata.get("_id")
-    
-    listing = gem_market_col.find_one({"id": listing_id})
-    if not listing or not listing.get("active"): raise ListingNotFound("Item indisponível.")
-    if int(listing["seller_id"]) == int(buyer_id): raise InvalidPurchase("Você não pode comprar seu item.")
-    
+    if seller_id == buyer_id: raise InvalidPurchase("Não pode comprar seu próprio item.")
+
+    target = listing.get("target_buyer_id")
+    if target is not None and int(target) != buyer_id:
+        raise PermissionDenied(f"🔒 Item reservado para: {listing.get('target_buyer_name')}")
+
     available = int(listing.get("quantity", 0))
-    if quantity > available: raise InsufficientQuantity(f"Só restam {available} lotes.")
+    if quantity > available:
+        raise InsufficientQuantity(f"Estoque insuficiente ({available}).")
 
-    total_price = int(listing["unit_price_gems"]) * int(quantity)
-
-    # Baixa estoque
-    rem = available - quantity
-    update_doc = {"quantity": rem}
-    if rem <= 0: update_doc["active"] = False
+    # --- Cálculos e Atualização do Anúncio ---
+    total_price = int(listing["unit_price"]) * quantity
+    new_qty = available - quantity
+    
+    update_doc = {"quantity": new_qty}
+    if new_qty <= 0: update_doc["active"] = False
+    
+    # Atualiza o anúncio no banco
+    market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
+    
+    # --- PAGAMENTO E LIMPEZA DE CACHE (A CORREÇÃO) ---
+    try:
+        # 1. Paga no Banco de Dados (Isso você já tinha e funcionava)
+        result = db["players"].update_one(
+            {"_id": seller_id}, 
+            {"$inc": {"gold": total_price}}
+        )
         
-    res = gem_market_col.update_one(
-        {"_id": listing["_id"], "active": True, "quantity": available}, 
-        {"$set": update_doc}
-    )
-    
-    if res.modified_count == 0:
-        raise InvalidPurchase("Erro na transação. Tente novamente.")
-    
-    # Pagamento (Gemas vão direto pro Banco/Perfil)
-    players_col.update_one({"_id": seller_id}, {"$inc": {"gems": total_price}})
-    
-    # Limpa cache do vendedor para ele ver as gemas logo
-    await player_manager.clear_player_cache(seller_id)
+        if result.modified_count > 0:
+            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu +{total_price} gold no banco.")
+            
+            # 2. LIMPEZA DE CACHE (A PEÇA QUE FALTAVA)
+            # Isso obriga o bot a ler o banco novamente na próxima ação, 
+            # impedindo que ele sobrescreva o ouro novo com o velho da memória.
+            try:
+                # Cria um novo loop de eventos temporário apenas para rodar essa limpeza
+                # ou usa o loop existente se já estivermos dentro de um.
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(player_manager.clear_player_cache(seller_id))
+                except RuntimeError:
+                    # Se não houver loop rodando, usamos run()
+                    asyncio.run(player_manager.clear_player_cache(seller_id))
+                
+                log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo (Async).")
+            except Exception as e_cache:
+                log.warning(f"⚠️ [MARKET] Falha ao limpar cache: {e_cache}")
 
-    listing["quantity"] = rem
-    listing["active"] = (rem > 0)
+        else:
+            log.warning(f"⚠️ [MARKET] Venda ok, mas vendedor {seller_id} não encontrado no banco.")
+            
+    except Exception as e:
+        log.error(f"🔥 [MARKET] Erro crítico no pagamento: {e}")
+
+    # Retorno
+    listing["quantity"] = new_qty
+    listing["active"] = (new_qty > 0)
     
     return listing, total_price
+
+# =========================
+# Renderização Visual
+# =========================
+RARITY_LABEL = {"comum": "Comum", "bom": "Boa", "raro": "Rara", "epico": "Épica", "lendario": "Lendária"}
+_CLASS_DMG_EMOJI_FALLBACK = {"guerreiro": "⚔️", "berserker": "🪓", "cacador": "🏹", "assassino": "🗡", "bardo": "🎵", "monge": "🙏", "mago": "✨", "samurai": "🗡"}
+
+def _viewer_class_key(pdata: dict, fallback="guerreiro"):
+    if not pdata: return fallback
+    c = pdata.get("class") or pdata.get("class_type") or pdata.get("classe")
+    if isinstance(c, dict): return c.get("type", fallback).lower()
+    if isinstance(c, str): return c.lower()
+    return fallback
+
+def _class_dmg_emoji(pclass: str) -> str:
+    return getattr(game_data, "CLASS_DMG_EMOJI", {}).get(pclass, _CLASS_DMG_EMOJI_FALLBACK.get(pclass, "🗡"))
+
+def _get_item_info(base_id: str) -> dict:
+    try:
+        info = game_data.get_item_info(base_id)
+        if info: return dict(info)
+    except: pass
+    return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
+
+def _render_unique_core_line(inst: dict, viewer_class: str) -> str:
+    base_id = inst.get("base_id") or inst.get("tpl") or "item"
+    info = _get_item_info(base_id)
+    name = inst.get("display_name") or info.get("display_name") or base_id
+    emoji = inst.get("emoji") or info.get("emoji") or _class_dmg_emoji(viewer_class)
+    tier = inst.get("tier", 1)
+    rarity = RARITY_LABEL.get(str(inst.get("rarity", "comum")).lower(), "Comum")
+    return f"{emoji}{name} [T{tier}] [{rarity}]"
+
+def _stack_inv_display(base_id: str, qty: int) -> str:
+    info = _get_item_info(base_id)
+    name = info.get("display_name") or info.get("nome_exibicao") or base_id
+    emoji = info.get("emoji", "")
+    return f"{emoji}{name} ×{qty}"
+
+def render_listing_line(
+    listing: dict,
+    *,
+    viewer_player_data: Optional[dict] = None,
+    show_price_per_unit: bool = False,
+    include_id: bool = True
+) -> str:
+    it = listing.get("item") or {}
+    unit_price = int(listing.get("unit_price", 0))
+    lid = listing.get("id")
+    viewer_class = _viewer_class_key(viewer_player_data, "guerreiro")
+
+    target_id = listing.get("target_buyer_id")
+    target_name = listing.get("target_buyer_name", "Alguém")
+    is_private = target_id is not None
+    prefix = "🔒 " if is_private else ""
+    reserved_suf = f" [RESERVADO: {target_name}]" if is_private else ""
+
+    text = ""
+    if it.get("type") == "unique":
+        inst = it.get("item") or {}
+        try:
+            if display_utils: text = display_utils.formatar_item_para_exibicao(inst)
+        except: pass
+        if not text: text = _render_unique_core_line(inst, viewer_class)
+        
+        suffix = f" — <b>{unit_price} 🪙</b>"
+        if include_id: suffix += f" (#{lid})"
+        return f"{prefix}{text}{suffix}{reserved_suf}"
+
+    base_id = it.get("base_id", "")
+    pack_qty = int(it.get("qty", 1))
+    core = _stack_inv_display(base_id, pack_qty)
+    
+    suffix = f" — <b>{unit_price} 🪙</b>/lote"
+    if show_price_per_unit and pack_qty > 0:
+        ppu = int(round(unit_price / pack_qty))
+        suffix += f" (~{ppu} 🪙/un)"
+    
+    if include_id: suffix += f" (#{lid})"
+    return f"{prefix}{core}{suffix}{reserved_suf}"

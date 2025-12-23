@@ -271,8 +271,6 @@ async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     await _send_with_media(chat_id, context, text, kb, keys)
 
-# adventurer_market_handler.py
-
 async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -289,39 +287,20 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _safe_edit_or_send(q, context, chat_id, "Não há listagens ativas no momento.", kb)
         return
 
-    # --- NOVO CABEÇALHO RPG ---
-    header = (
-        "╔════════════════════╗\n"
-        "      🎒 <b>MERCADO DO AVENTUREIRO</b>      \n"
-        "╚════════════════════╝\n"
-        "<i>Negocie itens, equipamentos e materiais.</i>\n"
-    )
-    
-    lines = [header]
+    lines = ["📦 <b>Listagens ativas</b>\n"]
     if not is_premium_viewer:
-        lines.append("⚠️ <i>Apenas Apoiadores (Premium) podem comprar itens.</i>\n")
-        
-    lines.append("🔻 <b>LISTAGENS RECENTES</b> 🔻\n")
+        lines.append("<i>Apenas Apoiadores (Premium) podem comprar itens.</i>\n")
         
     kb_rows = []
-    
-    # Reduzido para 15 itens para não estourar o limite de tamanho da mensagem com o novo visual
-    for l in listings[:15]: 
-        # Renderiza usando o novo visual (sem o bullet point "• " manual)
-        lines.append(_mm_render_listing_line(l, viewer_player_data=viewer_pdata, show_price_per_unit=True))
+    for l in listings[:30]: 
+        lines.append("• " + _mm_render_listing_line(l, viewer_player_data=viewer_pdata, show_price_per_unit=True))
         
-        # Adiciona um separador visual entre os itens
-        lines.append("〰️〰️〰️")
-        
-        # Botão de compra
         if is_premium_viewer and int(l.get("seller_id", 0)) != user_id:
-            kb_rows.append([InlineKeyboardButton(f"🛒 Comprar #{l['id']}", callback_data=f"market_buy_{l['id']}")])
+            kb_rows.append([InlineKeyboardButton(f"Comprar #{l['id']}", callback_data=f"market_buy_{l['id']}")])
 
     kb_rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")])
-    
-    # Envia a mensagem unindo as linhas
     await _safe_edit_or_send(q, context, chat_id, "\n".join(lines), InlineKeyboardMarkup(kb_rows))
-    
+
 async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()

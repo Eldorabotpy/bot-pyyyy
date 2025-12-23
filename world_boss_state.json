@@ -1,6 +1,6 @@
 {
-  "is_active": true,
-  "location": "floresta_sombria",
+  "is_active": false,
+  "location": "forja_abandonada",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",
