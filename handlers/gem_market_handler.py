@@ -778,54 +778,64 @@ async def gem_market_cancel_new(update, context):
         [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")]
     ]))
 
+# ============================================================================
+# CORREÇÃO: FINALIZAR VENDA (Classificação Automática de Tipo)
+# ============================================================================
 async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, price_gems: int):
     q = update.callback_query
+    # Não usamos await q.answer() aqui pois _safe_edit_or_send cuida disso ou mensagem nova
+    
     user_id = q.from_user.id
     chat_id = q.message.chat_id
 
     pending = context.user_data.get("gem_market_pending")
-    if not pending or pending.get("type") != "item_stack":
-        await q.answer("Erro: Estado de venda inválido. Tente novamente.", show_alert=True)
-        await gem_market_cancel_new(update, context)
+    if not pending:
+        await q.answer("Sessão expirada.", show_alert=True)
+        await gem_market_main(update, context)
         return
         
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        await q.answer("Erro ao carregar seus dados.", show_alert=True)
+        await q.answer("Erro ao carregar dados.", show_alert=True)
         return
 
-    # --- CORREÇÃO: Usamos o ID EXATO que está no inventário ---
+    # Dados do Item
     base_id_original = pending["base_id"]
-    
     pack_qty = int(pending.get("qty", 1))
     lote_qty = max(1, int(context.user_data.get("gem_market_lotes", 1)))
     total_to_remove = pack_qty * lote_qty
-    item_label = _item_label(base_id_original) 
-
-    # Verifica se tem o item
+    
+    # Validação de Estoque
     if not player_manager.has_item(pdata, base_id_original, total_to_remove):
-        await q.answer(f"Você não tem {total_to_remove}x {item_label}.", show_alert=True)
+        await q.answer(f"Você não tem itens suficientes ({total_to_remove}).", show_alert=True)
         await gem_market_cancel_new(update, context)
         return
 
-    # Remove do inventário
+    # Remove do Inventário
     player_manager.remove_item_from_inventory(pdata, base_id_original, total_to_remove)
     await player_manager.save_player_data(user_id, pdata)
     
-    # --- DEFINIÇÃO DE TIPO (Apenas para Filtros Visuais) ---
-    # NÃO alteramos o base_id_original. O ID salvo é o ID real.
-    item_type_for_backend = "item_stack" 
+    # --- CORREÇÃO DE TIPO (AQUI ESTAVA O ERRO) ---
+    # Classifica o item corretamente para aparecer na aba certa
+    item_type_for_backend = "item_stack" # Padrão (Outros)
     
-    if base_id_original.startswith("caixa_"):
+    bid = base_id_original.lower()
+    
+    # 1. Skins
+    if bid.startswith("caixa_") or bid.startswith("skin_") or "skin" in bid:
         item_type_for_backend = "skin"
-    elif base_id_original.startswith("tomo_") and base_id_original in SKILL_BOOK_ITEMS:
+        
+    # 2. Skills (Habilidades) - AGORA RECONHECE TUDO
+    elif bid.startswith("tomo_") or bid.startswith("livro_") or bid.startswith("scroll_") or bid.startswith("pergaminho_"):
         item_type_for_backend = "skill"
-    elif base_id_original in EVOLUTION_ITEMS:
+        
+    # 3. Evolução
+    elif bid in EVOLUTION_ITEMS or "essencia_" in bid or "emblema_" in bid or "cristal_" in bid:
         item_type_for_backend = "evo_item"
     
     item_payload = {
         "type": item_type_for_backend, 
-        "base_id": base_id_original, # SALVA O ID COMPLETO (Ex: tomo_fogo, caixa_skin)
+        "base_id": base_id_original,
         "qty": pack_qty
     }
 
@@ -837,27 +847,39 @@ async def gem_market_finalize_listing(update: Update, context: ContextTypes.DEFA
             quantity=lote_qty
         )
     except Exception as e:
-        logger.error(f"[GemMarket] Falha ao criar listagem para {user_id}: {e}", exc_info=True)
-        # Devolve o item em caso de erro
+        logger.error(f"[GemMarket] Falha ao criar listagem: {e}")
+        # Devolve o item se der erro no banco
         player_manager.add_item_to_inventory(pdata, base_id_original, total_to_remove)
         await player_manager.save_player_data(user_id, pdata)
         
-        await _safe_edit_or_send(q, context, chat_id, f"⚠️ Erro ao criar venda. Item devolvido.", InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")]
-        ]))
+        await q.answer("Erro ao criar venda. Item devolvido.", show_alert=True)
         return
         
+    # Limpa dados temporários
     context.user_data.pop("gem_market_pending", None)
     context.user_data.pop("gem_market_price", None)
     context.user_data.pop("gem_market_lotes", None)
-    context.user_data.pop("gem_market_lote_max", None)
     
-    text = f"✅ Listagem #{listing['id']} criada!\n\n{lote_qty}x lote(s) de {item_label} (x{pack_qty}) por 💎 {price_gems} cada."
+    # Confirmação Visual
+    # Tenta pegar nome bonito
+    dname = base_id_original
+    try:
+        if display_utils: 
+            info = display_utils._item_info(base_id_original)
+            if info: dname = info.get("display_name", base_id_original)
+    except: pass
+    
+    text = f"✅ <b>Venda Criada!</b>\n\n📦 <b>Item:</b> {dname}\n🔢 <b>Qtd:</b> {pack_qty} x {lote_qty} lotes\n💎 <b>Preço:</b> {price_gems} Gemas cada"
+    
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("👤 Minhas Listagens", callback_data="gem_market_my")],
+        [InlineKeyboardButton("👤 Minhas Vendas", callback_data="gem_market_my")],
         [InlineKeyboardButton("⬅️ Voltar", callback_data="gem_market_main")]
     ])
-    await _safe_edit_or_send(q, context, chat_id, text, kb)
+    
+    try:
+        await q.edit_message_text(text, reply_markup=kb, parse_mode="HTML")
+    except:
+        await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode="HTML")
 
 def _render_listing_line(listing: dict) -> str:
     item = listing.get("item", {})
