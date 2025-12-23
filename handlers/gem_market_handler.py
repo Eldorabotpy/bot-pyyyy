@@ -15,7 +15,11 @@ from modules import gem_market_manager # O "Backend"
 from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
 from modules import market_utils
-
+try:
+    from modules import display_utils
+except ImportError:
+    # Fallback caso o arquivo falhe, para o bot não parar
+    display_utils = None
 logger = logging.getLogger(__name__)
 
 # ==============================
@@ -39,7 +43,10 @@ EVOLUTION_ITEMS: set[str] = {
     "emblema_samurai", "essencia_corte", "essencia_disciplina", "lamina_sagrada",
 }
 SKILL_BOOK_ITEMS: set[str] = {
-    "tomo_passive_bulwark", "tomo_active_whirlwind", "tomo_active_holy_blessing", "tomo_passive_unstoppable",
+    "tomo_passive_bulwark", 
+    "tomo_active_whirlwind", 
+    "tomo_active_holy_blessing", 
+    "tomo_passive_unstoppable",
     "tomo_active_unbreakable_charge", "tomo_passive_last_stand", "tomo_passive_animal_companion",
     "tomo_active_deadeye_shot", "tomo_passive_apex_predator", "tomo_active_iron_skin",
     "tomo_passive_elemental_strikes", "tomo_active_transcendence", "tomo_active_curse_of_weakness", 
@@ -243,125 +250,119 @@ async def show_sell_class_picker(update: Update, context: ContextTypes.DEFAULT_T
     await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
 
 async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra a lista de itens de Venda, filtrada por classe E categoria."""
-    q = update.callback_query
-    await q.answer()
-    user_id = q.from_user.id
-    chat_id = q.message.chat_id
-
-    parts = q.data.split(":")
+    query = update.callback_query
+    await query.answer()
     
+    # Pega categoria e página da URL (ex: gem_sell_class:skill:mago:1)
     try:
-        item_type = parts[1] # skill, skin, evo
-        class_key = parts[2] # guerreiro, mago...
-        page = int(parts[3])
-    except (IndexError, ValueError):
-        await q.answer("Erro de callback.", show_alert=True); return
+        _, category, class_filter, page_str = query.data.split(":")
+        page = int(page_str)
+    except:
+        category = "skin"
+        class_filter = "todos"
+        page = 1
 
-    pdata = await player_manager.get_player_data(user_id) or {}
-    inv = pdata.get("inventory", {}) or {}
+    user_id = query.from_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    inv = pdata.get("inventory", {})
 
-    sellable_items = []
-    
-    # --- CORREÇÃO: Varre o inventário detectando STACKS e ITENS ÚNICOS ---
-    for key, val in inv.items():
-        base_id = None
-        qty_have = 0
+    # ====================================================
+    # LÓGICA DE FILTRO CORRIGIDA (DINÂMICA)
+    # ====================================================
+    filtered_items = []
 
-        # Caso 1: Stack simples (Ex: "essencia_furia": 10)
-        if isinstance(val, (int, float)):
-            if val > 0:
-                base_id = key
-                qty_have = int(val)
+    for item_id, item_data in inv.items():
+        # Normaliza ID e Qtd
+        base_id = item_id 
+        qty = 0
+        if isinstance(item_data, dict):
+            qty = item_data.get("quantity", 0)
+        else:
+            qty = int(item_data)
+
+        if qty <= 0: continue
+
+        # --- REGRAS DE CATEGORIA ---
+        match = False
         
-        # Caso 2: Item Único (Ex: "uid_123": {"base_id": "tomo_..."})
-        elif isinstance(val, dict):
-            base_id = val.get("base_id") or val.get("tpl")
-            qty_have = 1 # Itens únicos contam como 1 unidade
-            
-        if not base_id or qty_have <= 0:
-            continue
-            
-        # Filtros de Categoria e Classe
-        item_class_ok = False
-        
-        if item_type == "evo" and base_id in EVOLUTION_ITEMS:
-            if base_id in EVO_ITEMS_BY_CLASS_MAP.get(class_key, set()):
-                item_class_ok = True
-        
-        elif item_type == "skill" and base_id in SKILL_BOOK_ITEMS:
-            # Remove prefixo se necessário para checar skill data
-            skill_id = base_id.replace("tomo_", "")
-            allowed = skills_data.SKILL_DATA.get(skill_id, {}).get("allowed_classes", [])
-            if class_key in allowed: 
-                item_class_ok = True
-        
-        elif item_type == "skin":
-            if base_id.startswith("caixa_"):
-                skin_id = base_id.replace("caixa_", "")
+        # 1. SKINS (Começam com 'skin_' ou 'caixa_skin_')
+        if category == "skin":
+            if "skin_" in base_id or "caixa_" in base_id:
+                match = True
                 
-                if SKIN_CATALOG.get(skin_id):
-                    item_class_ok = True
-            #allowed = SKIN_CATALOG.get(skin_id, {}).get("class")
-            #if class_key == allowed: 
-                #item_class_ok = True
-        
-        if item_class_ok:
-            # Verifica se já não adicionamos esse base_id (para agrupar itens únicos iguais)
-            found = False
-            for it in sellable_items:
-                if it["base_id"] == base_id:
-                    it["qty_have"] += qty_have
-                    it["label"] = f"{_item_label(base_id)} (x{it['qty_have']})"
-                    found = True
-                    break
-            
-            if not found:
-                sellable_items.append({
-                    "base_id": base_id, 
-                    "qty_have": qty_have,
-                    "label": f"{_item_label(base_id)} (x{qty_have})"
-                })
-            
-    sellable_items.sort(key=lambda x: x["label"])
+        # 2. SKILLS (Começam com 'tomo_' ou 'livro_' ou 'pergaminho_')
+        elif category == "skill":
+            if base_id.startswith("tomo_") or base_id.startswith("livro_") or base_id.startswith("scroll_"):
+                match = True
+                # Proteção: Ignora tomos bugados se houver
+                if base_id.startswith("tomo_tomo_"): match = False
 
-    # Paginação
-    ITEMS_PER_PAGE = 8
-    start_index = (page - 1) * ITEMS_PER_PAGE
-    end_index = start_index + ITEMS_PER_PAGE
-    items_for_page = sellable_items[start_index:end_index]
-    total_pages = max(1, math.ceil(len(sellable_items) / ITEMS_PER_PAGE))
-    page = min(page, total_pages)
+        # 3. EVOLUÇÃO (Itens da lista EVOLUTION_ITEMS ou genéricos de evo)
+        elif category == "evo":
+            # Verifica se está na lista fixa OU se tem nome de item de evo comum
+            if base_id in EVOLUTION_ITEMS or "essencia_" in base_id or "emblema_" in base_id or "cristal_" in base_id:
+                match = True
 
-    title = f"{CLASSES_MAP.get(class_key, class_key).split(' ')[1]}"
-    caption = f"💎 <b>Vender: {title}</b> (Pág. {page}/{total_pages})\nSelecione um item para vender:\n"
-    keyboard_rows = []
+        if match:
+            # Filtro de Classe (Opcional, se você quiser filtrar skills por classe depois)
+            # Por enquanto, vamos mostrar tudo para garantir que apareça
+            filtered_items.append({"base_id": base_id, "qty": qty})
 
-    if not sellable_items:
-        caption += f"\n<i>Você não possui itens de '{item_type}' para a classe '{title}' no inventário.</i>"
-    elif not items_for_page:
-        caption += "\n<i>Não há mais itens para mostrar.</i>"
-    else:
-        for item in items_for_page:
-            callback_data = f"gem_sell_item_{item['base_id']}"
-            keyboard_rows.append([InlineKeyboardButton(item["label"], callback_data=callback_data)])
-            
-    nav_buttons = []
-    back_cb = f"gem_sell_filter:{item_type}" 
+    # ====================================================
+    # PAGINAÇÃO E EXIBIÇÃO
+    # ====================================================
+    ITEMS_PER_PAGE = 5
+    total_items = len(filtered_items)
+    total_pages = math.ceil(total_items / ITEMS_PER_PAGE)
+    page = max(1, min(page, total_pages)) if total_pages > 0 else 1
 
-    if page > 1:
-        cb = f"gem_sell_class:{item_type}:{class_key}:{page-1}"
-        nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=cb))
-        
-    nav_buttons.append(InlineKeyboardButton("⬅️ Voltar", callback_data=back_cb))
+    start = (page - 1) * ITEMS_PER_PAGE
+    end = start + ITEMS_PER_PAGE
+    page_items = filtered_items[start:end]
 
-    if end_index < len(sellable_items):
-        cb = f"gem_sell_class:{item_type}:{class_key}:{page+1}"
-        nav_buttons.append(InlineKeyboardButton("➡️", callback_data=cb))
-        
-    keyboard_rows.append(nav_buttons)
-    await _safe_edit_or_send(q, context, chat_id, caption, InlineKeyboardMarkup(keyboard_rows))
+    # Monta a mensagem
+    cat_names = {"skin": "🎨 Skins", "skill": "📜 Habilidades", "evo": "✨ Evolução"}
+    cat_title = cat_names.get(category, category.title())
     
+    text = f"💎 <b>Vender: {cat_title}</b> (Pág {page}/{total_pages})\n\nSelecione um item para vender por Gemas:"
+
+    kb = []
+    
+    if not page_items:
+        text += "\n\n<i>Nenhum item desta categoria encontrado no inventário.</i>"
+    else:
+        for item in page_items:
+            bid = item["base_id"]
+            q_val = item["qty"]
+            # Nome Bonito
+            dname = bid.replace("_", " ").title()
+            
+            # Tenta pegar nome real se tiver display_utils
+            try: 
+                info = display_utils._item_info(bid)
+                if info and "display_name" in info: dname = info["display_name"]
+            except: pass
+
+            btn_text = f"{dname} (x{q_val})"
+            kb.append([InlineKeyboardButton(btn_text, callback_data=f"gem_sell_item_{bid}")])
+
+    # Navegação
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⬅️", callback_data=f"gem_sell_class:{category}:{class_filter}:{page-1}"))
+    
+    nav.append(InlineKeyboardButton("🔙 Categorias", callback_data="gem_sell_menu"))
+    
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("➡️", callback_data=f"gem_sell_class:{category}:{class_filter}:{page+1}"))
+    
+    kb.append(nav)
+
+    try:
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    except:
+        await context.bot.send_message(query.message.chat_id, text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
 # ==============================
 #  Fluxo de Compra (Buy Flow)
 # ==============================
