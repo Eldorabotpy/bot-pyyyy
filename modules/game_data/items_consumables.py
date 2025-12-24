@@ -1,4 +1,5 @@
 # modules/game_data/items_consumables.py
+# (VERSÃO CORRIGIDA: Itens Especiais removidos do mercado)
 
 CONSUMABLES_DATA = {
     # --- POÇÕES & ALIMENTOS ---
@@ -39,35 +40,42 @@ CONSUMABLES_DATA = {
                    "duration_sec": 3600}
     },
 
-    # --- TICKETS E ACESSOS ---
+    # --- TICKETS E ACESSOS (BLOQUEADOS NO MERCADO) ---
     "fragmento_bravura": {
         "display_name": "Fragmento de Bravura", "emoji": "🏅", 
         "type": "especial", "category": "evento", 
         "description": "Obtido ao defender o reino.", 
-        "stackable": True
+        "stackable": True,
+        "tradable": False # 🔴 BLOQUEADO
     },
     "ticket_defesa_reino": {
         "display_name": "Ticket de Defesa", "emoji": "🎟️", 
         "type": "event_ticket", "category": "evento", 
         "description": "Entrada para Defesa do Reino.", 
-        "stackable": True
+        "stackable": True,
+        "tradable": False # 🔴 BLOQUEADO
     },
     "ticket_arena": {
         "display_name": "Entrada da Arena", "emoji": "🎟️", 
         "type": "event_ticket", "category": "evento", 
         "description": "Entrada extra para Arena PvP.", 
         "stackable": True,
-        "on_use": {"effect": "add_pvp_entries", "value": 1}
+        "on_use": {"effect": "add_pvp_entries", "value": 1},
+        "tradable": False # 🔴 BLOQUEADO
     },
     "chave_da_catacumba": {
         "display_name": "Chave da Catacumba", "emoji": "🗝", 
         "type": "especial", "category": "especial", 
-        "description": "Abre a Catacumba do Reino.", "stackable": True
+        "description": "Abre a Catacumba do Reino.", 
+        "stackable": True,
+        "tradable": False # 🔴 BLOQUEADO
     },
     "cristal_de_abertura": {
         "display_name": "Cristal de Abertura", "emoji": "🔹", 
         "type": "especial", "category": "especial", 
-        "description": "Chave arcana para Dungeons.", "stackable": True
+        "description": "Chave arcana para Dungeons.", 
+        "stackable": True,
+        "tradable": False # 🔴 BLOQUEADO
     },
 
     # --- ESPECIAIS / UTILITÁRIOS ---
@@ -97,13 +105,17 @@ CONSUMABLES_DATA = {
         "type": "consumable",
         "stackable": True, 
         "description": "Um selo mágico imbuído com energia defensiva. Concede proteção temporária ou é usado em receitas de aprimoramento.",
-        "category": "material"
+        "category": "material",
+        "tradable": False # 🔴 BLOQUEADO
     },
-        "gems": {
+    "gems": {
         "display_name": "Diamante", "emoji": "💎", 
         "type": "currency", "stackable": True, 
-        "description": "Moeda premium."
+        "description": "Moeda premium.",
+        "tradable": False # 🔴 BLOQUEADO (Segurança extra)
     },
+    
+    # --- EVENTO DE NATAL ---
     "presente_perdido": {
         "display_name": "Presente Perdido",
         "emoji": "🎁",

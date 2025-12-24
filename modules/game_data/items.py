@@ -1,5 +1,5 @@
 # modules/items.py
-# (VERSÃO CORRIGIDA: Inclui restrição de classe 'class_req' nos tomos automáticos)
+# (VERSÃO CORRIGIDA: Tomos e Skins marcados como NÃO TROCÁVEIS)
 
 import logging
 
@@ -119,16 +119,13 @@ def _generate_auto_items():
                     "category": "aprendizado", 
                     "description": f"Ensina a habilidade: {skill_name}.",
                     "stackable": True, 
-                    "tradable": True, 
+                    
+                    # 🔴 ALTERADO: Impede venda no mercado
+                    "tradable": False, 
+                    
                     "market_currency": "gems",
                     "price": 100, 
-                    
-                    # ✅ CORREÇÃO 1: Adiciona restrição de classe ao item
-                    # Se 'classes' estiver vazio, qualquer um pode usar (comum em skills básicas)
-                    # Se tiver classes, o inventário bloqueará o uso se não for a classe certa.
                     "class_req": classes,
-                    
-                    # ✅ CORREÇÃO 2: Usa 'effects' padrão
                     "effects": {
                         "learn_skill": skill_id
                     }
@@ -155,7 +152,10 @@ def _generate_auto_items():
                 "category": "aprendizado",
                 "description": f"Desbloqueia a aparência: {skin_name}.",
                 "stackable": True, 
-                "tradable": True, 
+                
+                # 🔴 ALTERADO: Impede venda no mercado
+                "tradable": False, 
+                
                 "market_currency": "gems",
                 "price": 200,
                 "on_use": {"effect": "grant_skin", "skin_id": skin_id}
@@ -200,6 +200,7 @@ def _rebuild_market_index():
     global MARKET_ITEMS
     count = 0
     for item_id, data in ITEMS_DATA.items():
+        # Se for explicitamente False, pula
         if data.get("tradable") is False or data.get("tradeable") is False:
             continue
 

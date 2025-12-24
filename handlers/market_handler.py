@@ -514,7 +514,19 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             qty_lotes = l.get("quantity", 1)
             card = _render_card_stack(item_data, price, seller_name, qty_lotes)
-
+        
+        target_id = l.get("target_buyer_id")
+        
+        if target_id:
+            target_name = l.get("target_buyer_name", "Alguém")
+            
+            # Se quem está vendo é o dono da reserva
+            if str(target_id) == str(user_id):
+                card += f"\n🔓 <b>RESERVADO PARA VOCÊ!</b>"
+            # Se for outro jogador vendo
+            else:
+                card += f"\n🔒 <b>Reservado para:</b> <i>{target_name}</i>"
+        # ==================================================================
         # Monta a linha com a seta conectando o número ao item
         # Ex: 1️⃣┈➤🧿 Item...
         lines.append(f"{icon_num}┈➤{card}")
