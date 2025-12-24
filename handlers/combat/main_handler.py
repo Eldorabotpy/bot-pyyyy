@@ -325,6 +325,11 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     # Importe class_evolution_service no topo do arquivo se der erro!
                     success, msg_evo = await class_evolution_service.finalize_evolution(user_id, target_class)
                     
+                    # --- CORREÇÃO: RECARREGAR DADOS ---
+                    # Baixa os dados novos (com a classe nova) antes de salvar o estado idle
+                    player_data = await player_manager.get_player_data(user_id) 
+                    # ----------------------------------
+
                     # 3. Define estado Idle e Salva
                     player_data['player_state'] = {'action': 'idle'}
                     await player_manager.save_player_data(user_id, player_data) # Recarrega pdata atualizado

@@ -584,6 +584,8 @@ async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==============================
 #  FLUXO DE VENDA
 # ==============================
+# handlers/market_handler.py
+
 async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -597,13 +599,28 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pclass = _player_class_key(pdata)
     
     sellable = []
+    
+    # --- FILTRO DE LIMPEZA VISUAL ---
+    # Itens que contiverem isso no ID serão ignorados na venda
+    BAD_PATTERNS = ["tomo_tomo_", "livro_livro_", "undefined", "null"]
+    # --------------------------------
+
     for uid, inst in inv.items():
+        # Verifica se é item bugado
+        if any(bad in str(uid) for bad in BAD_PATTERNS): continue
+
         if isinstance(inst, dict):
-            if inst.get("base_id") not in PREMIUM_BLOCK_LIST:
+            base_id = inst.get("base_id", uid)
+            # Verifica se base_id é bugado ou bloqueado
+            if any(bad in str(base_id) for bad in BAD_PATTERNS): continue
+            if base_id not in PREMIUM_BLOCK_LIST:
                 if len(f"market_pick_unique_{uid}") > 60: continue
-                sellable.append({"type": "unique", "uid": uid, "inst": inst, "sort": inst.get("base_id")})
+                sellable.append({"type": "unique", "uid": uid, "inst": inst, "sort": base_id})
                 
     for bid, qty in inv.items():
+        # Verifica se é item bugado
+        if any(bad in str(bid) for bad in BAD_PATTERNS): continue
+
         if isinstance(qty, (int, float)) and qty > 0 and bid not in PREMIUM_BLOCK_LIST:
             sellable.append({"type": "stack", "base_id": bid, "qty": int(qty), "sort": bid})
     
@@ -637,7 +654,7 @@ async def market_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb.append([InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market_adventurer")])
     
     await _safe_edit_or_send(q, context, update.effective_chat.id, f"➕ <b>Vender Item</b> (Página {page})", InlineKeyboardMarkup(kb))
-
+    
 async def market_pick_unique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -981,10 +998,13 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("🔒 Apenas VIPs podem comprar no mercado.", show_alert=True)
         return
 
+    # --- DEFINA A QUANTIDADE DA COMPRA AQUI ---
+    amount_to_buy = 1 
+
     try:
-        # 3. EXECUTA A TRANSAÇÃO NO GERENCIADOR (Remove do DB do mercado E PAGA O VENDEDOR atomicamente)
+        # 3. EXECUTA A TRANSAÇÃO NO GERENCIADOR
         updated_listing, _ = market_manager.purchase_listing(
-            buyer_id=buyer_id, listing_id=lid, quantity=1
+            buyer_id=buyer_id, listing_id=lid, quantity=amount_to_buy
         )
         
         # 4. PROCESSA O ITEM (Adiciona ao Comprador)
@@ -994,14 +1014,21 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if item_type == "stack":
             base_id = item_data.get("base_id")
-            # Se for um lote (ex: 10 poções), a quantidade é qtd_item * qtd_lotes
+            
+            # --- CORREÇÃO AQUI ---
+            # Antes estava: total_qty = qty_per_pack * qty_listing (ERRADO: multiplicava pelo estoque total)
+            
             qty_per_pack = int(item_data.get("qty", 1))
-            total_qty = qty_per_pack * qty_listing
+            total_qty = qty_per_pack * amount_to_buy  # <--- CORRETO: Multiplica pelo que foi comprado (1)
             
             # ADICIONA AO INVENTÁRIO
             inventory.add_item_to_inventory(buyer, base_id, total_qty)
             name = _item_label_from_base(base_id)
+            
+            # Ajuste visual da mensagem
             item_name_display = f"{name} x{total_qty}"
+            if amount_to_buy > 1:
+                item_name_display += f" ({amount_to_buy} lotes)"
 
         elif item_type == "unique":
             real_item = item_data.get("item")

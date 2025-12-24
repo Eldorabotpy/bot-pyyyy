@@ -246,13 +246,12 @@ CLASSES_DATA = {
     },
 
     #------------------------------------------------------------------------------------------------------------
-    'curandeiro': {
-        'display_name': 'Curandeiro', 'emoji': '🩹',
-        'description': 'Suporte focado em cura e buffs.',
-        'stat_modifiers': {'hp': 3.2, 'max_mana': 2.0, 'attack': 0.8, 'defense': 1.5, 'initiative': 1.0, 'luck': 1.5},
-        'file_id_name': 'classe_curandeiro_media',
-        'tier': 1
-    },
+    #'curandeiro': {
+    #    'display_name': 'Curandeiro', 'emoji': '🩹',
+     ##    'stat_modifiers': {'hp': 3.2, 'max_mana': 2.0, 'attack': 0.8, 'defense': 1.5, 'initiative': 1.0, 'luck': 1.5},
+    #    'file_id_name': 'classe_curandeiro_media',
+     #   'tier': 1
+    #},
     # EVOLUÇÕES TIER 2 
     'clerigo': {
         'display_name': 'Clérigo', 'emoji': '✝️',

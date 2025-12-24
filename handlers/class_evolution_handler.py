@@ -44,14 +44,19 @@ def _format_cost_lines(cost: dict) -> str:
     return "\n".join(lines)
 
 def _get_player_class_name(pdata: dict) -> str:
-    class_key = (pdata.get("class") or "N/A").lower()
+    # Pega a classe e remove caracteres especiais comuns (ç, ã) para normalizar
+    raw_class = (pdata.get("class") or "N/A").lower()
+    class_key = raw_class.replace("ç", "c").replace("ã", "a")
+    
     if class_key in evo_data.EVOLUTIONS: return class_key.title()
     try:
         evo_def = evo_data.find_evolution_by_target(class_key)
         if evo_def: return evo_def.get("to", class_key).title()
     except AttributeError:
         pass
-    return class_key.title()
+    
+    # Se não achou normalizado, retorna o original bonitinho
+    return raw_class.title()
 
 # ================================================
 # HANDLER PRINCIPAL (MENU DA ÁRVORE)
@@ -65,7 +70,15 @@ async def open_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return
 
-    status_info = evo_service.get_player_evolution_status(pdata)
+    # --- CORREÇÃO: Cria uma cópia dos dados e normaliza a classe ---
+    # Isso engana o serviço de evolução para ele achar "cacador" mesmo se for "caçador"
+    pdata_for_eval = pdata.copy()
+    if pdata_for_eval.get("class"):
+        pdata_for_eval["class"] = pdata_for_eval["class"].lower().replace("ç", "c").replace("ã", "a")
+    
+    status_info = evo_service.get_player_evolution_status(pdata_for_eval)
+    # -------------------------------------------------------------
+
     current_class_name = _get_player_class_name(pdata)
     level = pdata.get("level", 1)
     

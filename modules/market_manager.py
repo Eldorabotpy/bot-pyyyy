@@ -1,5 +1,5 @@
 # modules/market_manager.py
-# (VERSÃO CORRIGIDA: VARIÁVEL LOG)
+# (VERSÃO ATUALIZADA: Com BLOQUEIO de Itens de Evolução)
 from __future__ import annotations
 import logging
 import os
@@ -11,46 +11,45 @@ from pymongo import MongoClient
 import asyncio
 from modules import player_manager
 
+# ### NOVO: Importa lista de bloqueio ###
+try:
+    from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
+except ImportError:
+    EVOLUTION_ITEMS_DATA = {} 
+
+# --- LISTA NEGRA MANUAL (Itens Especiais) ---
+_BLOCKED_SPECIFIC_IDS = {
+    "sigilo_protecao", "ticket_arena", "chave_da_catacumba", 
+    "cristal_de_abertura", "gems", "presente_perdido", "presente_dourado"
+}
+
 # --- CONFIGURAÇÃO DE LOGGING ---
 logging.basicConfig(level=logging.INFO)
-# CORREÇÃO: Agora a variável se chama 'log' para bater com o resto do código
 log = logging.getLogger(__name__)
 
 # --- CONFIGURAÇÃO DO BANCO DE DADOS ---
 MONGO_CONN_STR = os.getenv("MONGO_CONNECTION_STRING")
-
-# TRAVA DE SEGURANÇA
 if not MONGO_CONN_STR:
-    # Tenta ler a antiga por garantia
     MONGO_CONN_STR = os.getenv("MONGO_URL") 
     if not MONGO_CONN_STR:
         log.critical("❌ ERRO FATAL: A variável 'MONGO_CONNECTION_STRING' não foi encontrada!")
-        # Fallback apenas para evitar crash de importação, mas a conexão falhará no Render
         MONGO_CONN_STR = "mongodb://localhost:27017/rpg_bot"
 
 try:
-    # Tenta conectar
     ca = certifi.where()
     client = MongoClient(MONGO_CONN_STR, tlsCAFile=ca)
-    
-    # Força teste
     client.admin.command('ping')
     log.info("✅ CONEXÃO COM MONGODB BEM SUCEDIDA (MERCADO)!")
-    
     db = client["eldora_db"] 
     market_col = db["market_listings"]
     counters_col = db["counters"]
-    
-    # Índices
     market_col.create_index("id", unique=True)
     market_col.create_index("active")
-    
 except Exception as e:
     log.critical(f"🔥 FALHA CRÍTICA AO CONECTAR NO MONGODB: {e}")
     market_col = None
     counters_col = None
 
-# Tenta importar display_utils
 try:
     from modules import display_utils
 except Exception:
@@ -58,11 +57,8 @@ except Exception:
 
 from modules import game_data
 
-MAX_PRICE = 100_000_000_000 
-MAX_QTY = 1_000_000
-
 # =========================
-# Erros
+# Erros e Helpers
 # =========================
 class MarketError(Exception): ...
 class ListingNotFound(MarketError): ...
@@ -72,15 +68,9 @@ class PermissionDenied(MarketError): ...
 class InsufficientQuantity(MarketError): ...
 class InvalidPurchase(MarketError): ...
 
-# =========================
-# Helpers
-# =========================
 def _get_next_sequence(name: str) -> int:
     ret = counters_col.find_one_and_update(
-        {"_id": name},
-        {"$inc": {"seq": 1}},
-        upsert=True,
-        return_document=True
+        {"_id": name}, {"$inc": {"seq": 1}}, upsert=True, return_document=True
     )
     return ret["seq"]
 
@@ -105,7 +95,22 @@ def create_listing(
     target_buyer_id: Optional[int] = None,
     target_buyer_name: Optional[str] = None
 ) -> dict:
+    # 1. Valida preço e quantidade básica
     _validate_price_qty(unit_price, quantity)
+
+    base_id = item_payload.get("base_id")
+
+    # 2. BLOQUEIO: Itens de Evolução
+    if base_id and base_id in EVOLUTION_ITEMS_DATA:
+        item_name = EVOLUTION_ITEMS_DATA[base_id].get("display_name", "Item de Evolução")
+        raise InvalidListing(
+            f"🚫 <b>Proibido:</b> '{item_name}' é um item raro.\n"
+            "Venda este item no <b>Comércio de Relíquias</b> (Gemas)."
+        )
+
+    # 3. BLOQUEIO: Itens Especiais
+    if base_id and base_id in _BLOCKED_SPECIFIC_IDS:
+        raise InvalidListing(f"🚫 Este item ('{base_id}') não pode ser comercializado aqui.")
 
     lid = _get_next_sequence("market_id")
 
@@ -206,9 +211,9 @@ def purchase_listing(
     # Atualiza o anúncio no banco
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
-    # --- PAGAMENTO E LIMPEZA DE CACHE (A CORREÇÃO) ---
+    # --- PAGAMENTO E LIMPEZA DE CACHE ---
     try:
-        # 1. Paga no Banco de Dados (Isso você já tinha e funcionava)
+        # 1. Paga no Banco de Dados
         result = db["players"].update_one(
             {"_id": seller_id}, 
             {"$inc": {"gold": total_price}}
@@ -217,17 +222,12 @@ def purchase_listing(
         if result.modified_count > 0:
             log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu +{total_price} gold no banco.")
             
-            # 2. LIMPEZA DE CACHE (A PEÇA QUE FALTAVA)
-            # Isso obriga o bot a ler o banco novamente na próxima ação, 
-            # impedindo que ele sobrescreva o ouro novo com o velho da memória.
+            # 2. LIMPEZA DE CACHE
             try:
-                # Cria um novo loop de eventos temporário apenas para rodar essa limpeza
-                # ou usa o loop existente se já estivermos dentro de um.
                 try:
                     loop = asyncio.get_running_loop()
                     loop.create_task(player_manager.clear_player_cache(seller_id))
                 except RuntimeError:
-                    # Se não houver loop rodando, usamos run()
                     asyncio.run(player_manager.clear_player_cache(seller_id))
                 
                 log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo (Async).")
