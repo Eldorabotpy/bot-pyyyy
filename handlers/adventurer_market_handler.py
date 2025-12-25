@@ -285,16 +285,43 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat_id = update.effective_chat.id
+    user_id = query.from_user.id
 
-    text = "🏪 𝐂𝐞𝐧𝐭𝐫𝐨 𝐂𝐨𝐦𝐞𝐫𝐜𝐢𝐚𝐥 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚\n\nAs ʀᴜᴀs ᴅᴏ ᴍᴇʀᴄᴀᴅᴏ ᴇsᴛᴀ̃ᴏ ᴀɢɪᴛᴀᴅᴀs. Oɴᴅᴇ ᴠᴏᴄᴇ̂ ᴅᴇsᴇᴊᴀ ɪʀ?"
+    # 1. Recupera dados para mostrar saldo atualizado
+    try:
+        pdata = await player_manager.get_player_data(user_id)
+        gold = int(pdata.get("gold", 0))
+        gems = int(pdata.get("gems", 0))
+    except:
+        gold = 0
+        gems = 0
+
+    # 2. Texto Imersivo com Status
+    text = (
+        f"🏰 <b>CENTRO COMERCIAL DE ELDORA</b>\n"
+        f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
+        f"│ 🌞 <b>Clima:</b> Ensolarado\n"
+        f"│ 👥 <b>Movimento:</b> Intenso\n"
+        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n"
+        f"<i>Você caminha pelas ruas de paralelepípedos. Mercadores gritam ofertas, ferreiros batem metal e aventureiros negociam relíquias raras.</i>\n\n"
+        f"🎒 <b>SEUS RECURSOS:</b>\n"
+        f"├┈➤ 💰 <b>{gold:,}</b> Ouro\n"
+        f"╰┈➤ 💎 <b>{gems:,}</b> Gemas"
+    )
+
+    # 3. Botões em Grade (Lado a Lado)
+    # Agrupamos Mercado de Ouro e Leilão na mesma linha pois são de jogadores
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎒 𝐌𝐞𝐫𝐜𝐚𝐝𝐨 𝐝𝐞 𝐎𝐮𝐫𝐨", callback_data="market_adventurer")],
-        [InlineKeyboardButton("🏛️ 𝐂𝐚𝐬𝐚 𝐝𝐞 𝐋𝐞𝐢𝐥𝐨̃𝐞𝐬 ", callback_data="gem_market_main")],
-        [InlineKeyboardButton("💎 𝐋𝐨𝐣𝐚 𝐝𝐞 𝐆𝐞𝐦𝐚𝐬 ", callback_data="gem_shop")],
-        [InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓 𝒂𝒐 𝑹𝒆𝒊𝒏𝒐", callback_data="show_kingdom_menu")]
+        [
+            InlineKeyboardButton("🎒 Mercado (Ouro)", callback_data="market_adventurer"),
+            InlineKeyboardButton("🏛️ Leilão (Gemas)", callback_data="gem_market_main")
+        ],
+        [InlineKeyboardButton("💎 Loja Premium (Cash)", callback_data="gem_shop")],
+        [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")]
     ])
-    await _send_smart(query, context, chat_id, text, kb, "market")
 
+    await _send_smart(query, context, chat_id, text, kb, "market")
+    
 async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
