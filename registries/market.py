@@ -38,7 +38,10 @@ def register_market_handlers(application: Application):
             market_lote_qty_confirm_handler,
             market_price_spin_handler, 
             market_price_confirm_handler, 
-            market_cancel_new_handler
+            market_cancel_new_handler,
+            market_finish_public_handler,   # Novo
+            market_ask_private_handler,     # Novo
+            market_input_id_handler
         )
         
         # Menu Principal e Navegação
@@ -66,7 +69,10 @@ def register_market_handlers(application: Application):
         application.add_handler(market_price_spin_handler)
         application.add_handler(market_price_confirm_handler)
         application.add_handler(market_cancel_new_handler)
-
+        application.add_handler(market_finish_public_handler)
+        application.add_handler(market_ask_private_handler)
+        application.add_handler(market_input_id_handler)
+        
         logger.info("✅ Handlers do Mercado de Ouro registrados com sucesso.")
 
     except ImportError as e:

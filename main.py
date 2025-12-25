@@ -189,9 +189,10 @@ if __name__ == '__main__':
         logging.warning(f"⚠️ Erro no servidor Web: {e}")
 
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init_tasks).build()
-    register_all_handlers(application)
-    register_evolution_handlers(application)
+    
     register_market_handlers(application)
+    register_evolution_handlers(application)
+    register_all_handlers(application)
     logging.info("🤖 Bot configurado. Iniciando...")
 
     MAX_RETRIES = 100
