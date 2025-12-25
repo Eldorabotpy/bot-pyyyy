@@ -1526,7 +1526,7 @@ SKILL_DATA = {
         }
     },
 
-    "guerreiro_colossal_defense": { 
+    "guerreiro_colossal_defense": {  
         "display_name": "Defesa Colossal", "type": "passive", 
         "description": "Reduz o dano recebido permanentemente.",
         "allowed_classes": ["guerreiro"],

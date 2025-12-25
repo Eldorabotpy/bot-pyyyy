@@ -3,7 +3,6 @@
 MONSTERS_DATA = {
 
     # --- MONSTROS ESPECIAIS DE EVOLUÇÃO ---
-    # --- MONSTROS ESPECIAIS DE EVOLUÇÃO ---
     "_evolution_trials": [
         
         # ==================== GUARDÕES DO GUERREIRO ====================
@@ -1492,8 +1491,8 @@ if ENABLE_CHRISTMAS_EVENT:
     print("🎅 HO HO HO! Injetando Presentes de Natal nos Monstros...")
     
     # Configuração dos Drops (Aumentei um pouco para teste)
-    DROP_COMUM = {"item_id": "presente_perdido", "drop_chance": 25.0}  # A cada 4 monstros 1 cai
-    DROP_RARO =  {"item_id": "presente_dourado", "drop_chance": 2.0}   # Difícil (Skins)
+    DROP_COMUM = {"item_id": "presente_perdido", "drop_chance": 40.0}  # A cada 4 monstros 1 cai
+    DROP_RARO =  {"item_id": "presente_dourado", "drop_chance": 20.0}   # Difícil (Skins)
 
     count_updated = 0
 

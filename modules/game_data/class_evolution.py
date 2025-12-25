@@ -16,7 +16,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             "min_level": 25,
             "desc": "Defesa elevada e proteção de aliados.",
             
-            "ascension_path": [
+            "ascension_path": [ 
                 {
                     "id": "cav_node_1", 
                     "desc": "Estudar Táticas Defensivas",
