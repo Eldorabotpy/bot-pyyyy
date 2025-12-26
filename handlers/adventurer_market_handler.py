@@ -31,6 +31,8 @@ try:
 except ImportError:
     CLASSES_DATA = {}
 
+MARKET_LOG_GROUP_ID = -1002881364171
+MARKET_LOG_TOPIC_ID = 24475
 logger = logging.getLogger(__name__)
 
 # Fallback para Display Utils
@@ -280,6 +282,63 @@ def _render_my_sale_card(idx: int, listing: dict) -> str:
 # ==============================
 #  HANDLERS PRINCIPAIS
 # ==============================
+async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, seller_name: str, item_payload: dict, price: int, target_name: str = None):
+    """Envia notificação para o grupo de comércio no tópico específico."""
+    if not MARKET_LOG_GROUP_ID:
+        return
+
+    # 1. Formata nome do item
+    if item_payload.get("type") == "stack":
+        base_id = item_payload.get("base_id")
+        qty = item_payload.get("qty", 1)
+        info = _get_item_info(base_id)
+        i_name = info.get("display_name") or base_id.replace("_", " ").title()
+        i_emoji = info.get("emoji", "📦")
+        item_txt = f"{i_emoji} <b>{i_name}</b> x{qty}"
+    else:
+        inst = item_payload.get("item", {})
+        base_id = item_payload.get("uid") 
+        real_base = inst.get("base_id") or base_id
+        info = _get_item_info(real_base)
+        
+        name = inst.get("display_name") or info.get("display_name") or "Item Raro"
+        emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
+        rarity = str(inst.get("rarity", "comum")).upper()
+        lvl = inst.get("upgrade_level", 0)
+        plus = f"+{lvl}" if lvl > 0 else ""
+        
+        item_txt = f"{emoji} <b>{name}{plus}</b> [{rarity}]"
+
+    # 2. Define texto baseados se é Privado ou Público
+    if target_name:
+        title = "🔒 <b>OFERTA PRIVADA</b>"
+        status = f"👤 <b>Reservado para:</b> {target_name}"
+    else:
+        title = "📢 <b>OFERTA NO MERCADO</b>"
+        status = "🌍 <b>Disponível para todos</b>"
+
+    # 3. Monta a mensagem
+    msg = (
+        f"{title}\n"
+        f"➖➖➖➖➖➖➖➖➖➖\n"
+        f"👤 <b>Vendedor:</b> {seller_name}\n"
+        f"🏷️ <b>Item:</b> {item_txt}\n"
+        f"💰 <b>Preço:</b> {price:,} Ouro\n"
+        f"➖➖➖➖➖➖➖➖➖➖\n"
+        f"{status}\n\n"
+        f"👉 <i>Acesse o /mercado no bot para conferir!</i>"
+    )
+
+    # 4. Envia para o Grupo e Tópico Corretos
+    try:
+        await context.bot.send_message(
+            chat_id=MARKET_LOG_GROUP_ID,
+            message_thread_id=MARKET_LOG_TOPIC_ID, # <--- Importante para cair no tópico
+            text=msg,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao enviar log de mercado: {e}")
 
 async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -756,15 +815,17 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         else: await update.effective_message.reply_text(msg)
         return
 
-    # Variáveis para controle de Rollback
     item_removed_successfully = False
     pdata = None
     item_payload = {}
+    seller_name = "Vendedor"
 
     try:
+        # 1. Busca dados do vendedor (Usaremos isso apenas para o LOG, não para o banco)
         pdata = await player_manager.get_player_data(user_id)
+        seller_name = pdata.get("character_name", f"Player {user_id}")
         
-        # --- 1. TENTA REMOVER O ITEM (Memória) ---
+        # --- 2. TENTA REMOVER O ITEM (Memória) ---
         if pending["type"] == "stack":
             base_id = pending["base_id"]
             qty = pending["qty"]
@@ -787,11 +848,12 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
                 if q: await q.answer("❌ Item não encontrado.", show_alert=True)
                 return
 
-        # --- 2. SALVA A REMOÇÃO (Persistência) ---
-        # Aqui o item sai da conta. Se o código parasse aqui sem criar o anúncio, seria perdido.
+        # --- 3. SALVA A REMOÇÃO ---
         await player_manager.save_player_data(user_id, pdata)
 
-        # --- 3. CRIA O ANÚNCIO NO MERCADO ---
+        # --- 4. CRIA O ANÚNCIO NO MERCADO ---
+        # CORREÇÃO: Removemos 'seller_name' daqui pois o seu gerenciador de banco não aceita
+        # Mantemos apenas o que é padrão.
         market_manager.create_listing(
             seller_id=user_id, 
             item_payload=item_payload, 
@@ -799,6 +861,14 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
             target_buyer_id=target_id, 
             target_buyer_name=target_name
         )
+        
+        # --- 5. ENVIA LOG PARA O GRUPO (AQUI usamos o seller_name que pegamos lá em cima) ---
+        try:
+            context.application.create_task(
+                _send_market_log(context, seller_name, item_payload, price, target_name)
+            )
+        except Exception as e_log:
+            logger.error(f"Erro ao enviar log (não crítico): {e_log}")
         
         # --- SUCESSO ---
         context.user_data.pop("market_pending", None)
@@ -809,93 +879,96 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         if target_id: msg_text += f"\n🔒 <b>Reservado para:</b> {target_name}"
         else: msg_text += "\n📢 <b>Público</b>"
 
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("🎒 Voltar", callback_data="market_adventurer")]])
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("🎒 Voltar ao Mercado", callback_data="market_adventurer")]])
         
         if q: await _safe_edit(q, msg_text, kb)
         else: await update.effective_message.reply_text(msg_text, reply_markup=kb, parse_mode="HTML")
             
     except Exception as e:
-        logger.error(f"ERRO CRÍTICO NA VENDA (USER {user_id}): {e}")
+        # Adicionei este print para você ver o erro real no terminal se acontecer de novo
+        logger.error(f"ERRO CRÍTICO NA VENDA: {e}") 
         
-        # --- 4. SISTEMA DE SEGURANÇA (ROLLBACK) ---
+        # --- ROLLBACK EM CASO DE ERRO ---
         if item_removed_successfully and pdata:
-            logger.warning(f"Iniciando devolução de item para {user_id} devido a erro no mercado...")
             try:
-                # Devolve Stack
+                # Devolve o item
                 if pending["type"] == "stack":
                     inv = pdata.setdefault("inventory", {})
                     base_id = pending["base_id"]
                     qty = pending["qty"]
                     inv[base_id] = int(inv.get(base_id, 0)) + qty
-                
-                # Devolve Unique
                 elif pending["type"] == "unique":
                     uid = pending["uid"]
-                    # Recupera os dados do item que estavam no payload ou no cache local
                     if "item" in item_payload:
                         pdata.setdefault("inventory", {})[uid] = item_payload["item"]
                 
-                # Salva a devolução
                 await player_manager.save_player_data(user_id, pdata)
-                
-                err_msg = "⚠️ <b>Erro no Mercado!</b>\nO sistema detectou uma falha ao criar o anúncio, mas seu item foi <b>DEVOLVIDO</b> ao inventário com segurança."
-            except Exception as e_rollback:
-                logger.critical(f"FALHA NO ROLLBACK DO JOGADOR {user_id}: {e_rollback}")
-                err_msg = "❌ <b>Erro Crítico!</b> Contate o suporte imediatamente. (Cod: ROLLBACK_FAIL)"
+                err_msg = "⚠️ <b>Erro no Mercado!</b> Ocorreu uma falha, mas seu item foi devolvido."
+            except Exception:
+                err_msg = "❌ <b>Erro Crítico!</b> Item perdido. Contate admin."
         else:
-            err_msg = "❌ Erro ao processar. Nenhum item foi removido."
+            err_msg = "❌ Erro ao processar. Nenhum item removido."
 
-        if q: await _safe_edit(q, err_msg, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
+        if q: await _safe_edit(q, err_msg, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]) )
         else: await update.effective_message.reply_text(err_msg, parse_mode="HTML")
 
 async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Só processa se o bot estiver esperando um ID para venda privada
+    # 1. Verifica se a flag de venda privada está ativa
     if not context.user_data.get("market_awaiting_id"): 
         return
 
     user_id = update.effective_user.id
+    text = update.message.text.strip()
     target_id = None
     target_name = "Desconhecido"
-    text = update.message.text.strip()
 
     try:
-        # 1. Tenta pegar ID de encaminhamento
+        # A) Se for encaminhamento de mensagem
         if update.message.forward_from:
             target_id = update.message.forward_from.id
             target_name = update.message.forward_from.first_name
         
-        # 2. Se for número direto (ID)
+        # B) Se for ID numérico direto
         elif text.isdigit():
             target_id = int(text)
-            # Tenta achar o nome só pra ficar bonito
             try:
                 pdata = await player_manager.get_player_data(target_id)
                 if pdata: target_name = pdata.get("character_name", "Jogador")
             except: pass
 
-        # 3. Se for Texto (Nome ou @Username) - AQUI ESTÁ A CORREÇÃO
+        # C) Se for Nome ou @Username
         else:
             pdata = None
-            # Tenta por username
-            if text.startswith("@"):
+            try:
                 from modules.player import queries
-                pdata = await queries.find_by_username(text)
-            # Tenta por nome do personagem
-            else:
-                from modules.player import queries
-                res = await queries.find_player_by_name(text)
-                if not res:
-                    res = await queries.find_player_by_name_norm(text)
-                if res:
-                    target_id, pdata = res
+                # Tenta por @username
+                if text.startswith("@"):
+                    pdata = await queries.find_by_username(text)
+                
+                # Tenta por Nome do Personagem
+                if not pdata:
+                    res = await queries.find_player_by_name(text)
+                    if not res:
+                        # Tenta busca flexível se sua função suportar, senão remove essa linha
+                        try: res = await queries.find_player_by_name_norm(text)
+                        except: pass
+                    
+                    if res:
+                        # Adaptação dependendo de como sua query retorna (tupla ou dict)
+                        if isinstance(res, tuple):
+                             target_id_found, pdata = res
+                        else:
+                             pdata = res
 
-            if pdata:
-                target_id = pdata.get("user_id") or pdata.get("_id")
-                target_name = pdata.get("character_name", text)
+                if pdata:
+                    target_id = pdata.get("user_id") or pdata.get("_id")
+                    target_name = pdata.get("character_name", text)
+            except Exception as e:
+                logger.error(f"Erro busca nome: {e}")
 
-        # Validações Finais
+        # --- Validações Finais ---
         if not target_id:
-            await update.message.reply_text("❌ Jogador não encontrado. Verifique o nome exato ou use o ID.")
+            await update.message.reply_text("❌ <b>Jogador não encontrado.</b>\nVerifique se o nome está exato (maiúsculas importam) ou use o ID.", parse_mode="HTML")
             return
 
         if target_id == user_id:
@@ -907,7 +980,7 @@ async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TY
 
     except Exception as e:
         logger.error(f"Erro input ID: {e}")
-        await update.message.reply_text("❌ Erro ao buscar jogador.")
+        await update.message.reply_text("❌ Erro técnico. Tente cancelar e fazer de novo.")
 
 async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer("Cancelado.")

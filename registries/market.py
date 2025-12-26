@@ -71,7 +71,7 @@ def register_market_handlers(application: Application):
         application.add_handler(market_cancel_new_handler)
         application.add_handler(market_finish_public_handler)
         application.add_handler(market_ask_private_handler)
-        application.add_handler(market_input_id_handler)
+        application.add_handler(market_input_id_handler, group=2)
         
         logger.info("✅ Handlers do Mercado de Ouro registrados com sucesso.")
 
