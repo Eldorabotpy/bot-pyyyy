@@ -501,30 +501,21 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     
     sellable = []
     
-    # --- 🛡️ LISTA NEGRA AGRESSIVA (Sem "_" para pegar tudo) ---
-    # Adicionei 'tomo', 'livro', 'skill', 'book' sem traços para bloquear qualquer variação.
+    # LISTA DE BLOQUEIO (Materiais Raros)
     BLOCKED_KEYWORDS = [
-        # Evolução e Materiais Raros
         "essencia", "fragmento", "alma", "emblema", "lamina", "lâmina",
         "poeira", "aco", "aço", "totem", "reliquia", "relíquia", "foco",
         "coracao", "coração", "selo", "calice", "cálice", "espirito", "espírito",
-        "frequencia", "energia", "nevoa", "névoa", "aura", "batuta", 
-        
-        # Skills, Tomos e Livros (O foco do problema)
+        "frequencia", "energia", "nevoa", "névoa", "aura", 
         "tomo", "livro", "pergaminho", "grimorio", "grimório", 
         "skill", "book", "habilidade", "transcendencia", "transcendência",
-        
-        # Cosméticos e Eventos
-        "skin", "traje", "caixa", "chave", "ticket", "sigilo", "cristal", "presente",
-        
-        # Moedas e Recursos
+        "skin", "traje", "caixa", "chave", "ticket", "sigilo", "cristal", "batuta",
         "gemas", "gems", "ouro", "gold", "xp", "experiencia"
     ]
-    # ----------------------------------------------------
-
+    
     for item_id, data in inv.items():
         try:
-            # Normalização dos dados do item
+            # Normalização
             if isinstance(data, dict): 
                 base_id = data.get("base_id") or data.get("tpl") or item_id
                 qty = data.get("qty", 0) or 1
@@ -536,36 +527,43 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
                 is_unique = False
                 inst_data = {}
 
+            # --- IDENTIFICAÇÃO DO TIPO (CRUCIAL PARA O FIX) ---
+            info = _get_item_info(base_id)
+            itype = str(info.get("type", "")).lower()
+            
+            # Verifica se é equipamento REAL (Arma, Armadura, Acessório)
+            is_equipment_type = (is_unique or itype in ["equipamento", "arma", "armadura", "acessorio", "equipment", "weapon", "armor"])
+
             # ================================================================
-            # 🛡️ SISTEMA DE FILTRO (HÍBRIDO & AGRESSIVO)
+            # 🛡️ FILTROS DE SEGURANÇA
             # ================================================================
             
-            # 1. Filtro Oficial (Arquivo items_evolution.py)
+            # 1. Filtro Oficial (Arquivo items_evolution.py) - Bloqueia sempre
             if base_id in EVOLUTION_ITEMS_DATA: 
                 continue
 
-            # 2. Filtro de Texto (Varredura no ID)
-            # Converte para minúsculo e verifica se contém QUALQUER palavra proibida
-            bid_lower = str(base_id).lower()
-            if any(k in bid_lower for k in BLOCKED_KEYWORDS): 
-                continue
+            # 2. Filtro de Texto INTELIGENTE
+            # Só bloqueia palavras-chave se o item NÃO FOR EQUIPAMENTO.
+            # Isso permite "Lâmina do Samurai" (Arma) mas bloqueia "Lâmina Afiada" (Material)
+            if not is_equipment_type:
+                bid_lower = str(base_id).lower()
+                if any(k in bid_lower for k in BLOCKED_KEYWORDS): 
+                    continue
 
-            # 3. Filtro de Consumíveis Intransferíveis (Poções vinculadas)
+            # 3. Filtro de Consumíveis Intransferíveis
             if base_id in CONSUMABLES_DATA:
                 if CONSUMABLES_DATA[base_id].get("tradable") is False: continue
 
             # ================================================================
             
-            info = _get_item_info(base_id)
-            itype = str(info.get("type", "")).lower()
+            # Lógica de Exibição por Categoria do Menu
             should_show = False
 
-            # Lógica de Categorias
-            if category == "equip" and (is_unique or itype in ["equipamento", "arma", "armadura", "acessorio"]): 
+            if category == "equip" and is_equipment_type: 
                 should_show = True
             elif category == "cons" and (not is_unique and itype in ["consumivel", "consumable", "potion", "food", "reagent"]): 
                 should_show = True
-            elif category == "mat" and (not is_unique and itype not in ["consumivel", "potion", "equipamento", "arma", "armadura"]): 
+            elif category == "mat" and (not is_unique and not is_equipment_type and itype not in ["consumivel", "potion", "food", "reagent"]): 
                 should_show = True
 
             if should_show and qty > 0:
@@ -605,7 +603,7 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     if not sellable:
         body_lines.append("🎒 <i>Nenhum item encontrado nesta categoria.</i>")
         if category == "mat": 
-            body_lines.append("\nℹ️ <i>Tomos, Essências e itens raros foram movidos para o Leilão de Gemas.</i>")
+            body_lines.append("\nℹ️ <i>Materiais raros de evolução devem ser negociados por Gemas.</i>")
     elif not items_page:
         body_lines.append("<i>Página vazia.</i>")
     else:
