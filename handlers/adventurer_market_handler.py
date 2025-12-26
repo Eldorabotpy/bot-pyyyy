@@ -310,18 +310,17 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     # 3. Botões em Grade (Lado a Lado)
-    # Agrupamos Mercado de Ouro e Leilão na mesma linha pois são de jogadores
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🎒 Mercado (Ouro)", callback_data="market_adventurer"),
-            InlineKeyboardButton("🏛️ Leilão (Gemas)", callback_data="gem_market_main")
+            InlineKeyboardButton("🎒 𝐌𝐞𝐫𝐜𝐚𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data="market_adventurer"),
+            InlineKeyboardButton("🏛️ 𝐑𝐞𝐥𝐢𝐪𝐮𝐢𝐚𝐬", callback_data="gem_market_main")
         ],
-        [InlineKeyboardButton("💎 Loja Premium (Cash)", callback_data="gem_shop")],
-        [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")]
+        [InlineKeyboardButton("💎 𝐋𝐨𝐣𝐚 𝐏𝐫𝐞𝐦𝐢𝐮𝐦", callback_data="gem_shop")],
+        [InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓 𝒂𝒐 𝑹𝒆𝒊𝒏𝒐", callback_data="show_kingdom_menu")]
     ])
 
     await _send_smart(query, context, chat_id, text, kb, "market")
-    
+
 async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -357,7 +356,7 @@ async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_smart(query, context, update.effective_chat.id, text, kb, "mercado_aventureiro")
 
 # ==============================
-#  LISTAGEM DE COMPRA (BLINDADO)
+#  LISTAGEM DE COMPRA
 # ==============================
 
 async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -502,8 +501,30 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     
     sellable = []
     
+    # --- 🛡️ LISTA NEGRA AGRESSIVA (Sem "_" para pegar tudo) ---
+    # Adicionei 'tomo', 'livro', 'skill', 'book' sem traços para bloquear qualquer variação.
+    BLOCKED_KEYWORDS = [
+        # Evolução e Materiais Raros
+        "essencia", "fragmento", "alma", "emblema", "lamina", "lâmina",
+        "poeira", "aco", "aço", "totem", "reliquia", "relíquia", "foco",
+        "coracao", "coração", "selo", "calice", "cálice", "espirito", "espírito",
+        "frequencia", "energia", "nevoa", "névoa", "aura", "batuta", 
+        
+        # Skills, Tomos e Livros (O foco do problema)
+        "tomo", "livro", "pergaminho", "grimorio", "grimório", 
+        "skill", "book", "habilidade", "transcendencia", "transcendência",
+        
+        # Cosméticos e Eventos
+        "skin", "traje", "caixa", "chave", "ticket", "sigilo", "cristal", "presente",
+        
+        # Moedas e Recursos
+        "gemas", "gems", "ouro", "gold", "xp", "experiencia"
+    ]
+    # ----------------------------------------------------
+
     for item_id, data in inv.items():
         try:
+            # Normalização dos dados do item
             if isinstance(data, dict): 
                 base_id = data.get("base_id") or data.get("tpl") or item_id
                 qty = data.get("qty", 0) or 1
@@ -515,24 +536,37 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
                 is_unique = False
                 inst_data = {}
 
-            # Filtros
-            if base_id in EVOLUTION_ITEMS_DATA: continue
+            # ================================================================
+            # 🛡️ SISTEMA DE FILTRO (HÍBRIDO & AGRESSIVO)
+            # ================================================================
+            
+            # 1. Filtro Oficial (Arquivo items_evolution.py)
+            if base_id in EVOLUTION_ITEMS_DATA: 
+                continue
+
+            # 2. Filtro de Texto (Varredura no ID)
+            # Converte para minúsculo e verifica se contém QUALQUER palavra proibida
+            bid_lower = str(base_id).lower()
+            if any(k in bid_lower for k in BLOCKED_KEYWORDS): 
+                continue
+
+            # 3. Filtro de Consumíveis Intransferíveis (Poções vinculadas)
             if base_id in CONSUMABLES_DATA:
                 if CONSUMABLES_DATA[base_id].get("tradable") is False: continue
 
-            bid_lower = str(base_id).lower()
-            if bid_lower in ["gems", "gemas", "ouro", "gold"]: continue
-            
-            blocked = ["skin_", "traje_", "caixa_skin", "tomo_", "livro_", "pergaminho_skill", "chave_"]
-            if any(k in bid_lower for k in blocked): continue
+            # ================================================================
             
             info = _get_item_info(base_id)
             itype = str(info.get("type", "")).lower()
             should_show = False
 
-            if category == "equip" and (is_unique or itype in ["equipamento", "arma", "armadura", "acessorio"]): should_show = True
-            elif category == "cons" and (not is_unique and itype in ["consumivel", "consumable", "potion", "food", "reagent"]): should_show = True
-            elif category == "mat" and (not is_unique and itype not in ["consumivel", "potion", "equipamento", "arma", "armadura"]): should_show = True
+            # Lógica de Categorias
+            if category == "equip" and (is_unique or itype in ["equipamento", "arma", "armadura", "acessorio"]): 
+                should_show = True
+            elif category == "cons" and (not is_unique and itype in ["consumivel", "consumable", "potion", "food", "reagent"]): 
+                should_show = True
+            elif category == "mat" and (not is_unique and itype not in ["consumivel", "potion", "equipamento", "arma", "armadura"]): 
+                should_show = True
 
             if should_show and qty > 0:
                 rarity_rank = _rarity_to_int(inst_data.get("rarity", "comum")) if is_unique else 0
@@ -541,8 +575,10 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
                     "uid": item_id, "base_id": base_id, "qty": qty, 
                     "inst": inst_data, "sort_name": base_id, "rarity_rank": rarity_rank
                 })
-        except: continue
+        except Exception: 
+            continue
 
+    # Ordenação e Paginação
     sellable.sort(key=lambda x: (0 if x["type"] == "unique" else 1, -x["rarity_rank"], x["sort_name"]))
 
     ITEMS_PER_PAGE = 5
@@ -568,7 +604,8 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
 
     if not sellable:
         body_lines.append("🎒 <i>Nenhum item encontrado nesta categoria.</i>")
-        if category == "mat": body_lines.append("\nℹ️ <i>Itens de Evolução e Skins: Use o Leilão de Gemas.</i>")
+        if category == "mat": 
+            body_lines.append("\nℹ️ <i>Tomos, Essências e itens raros foram movidos para o Leilão de Gemas.</i>")
     elif not items_page:
         body_lines.append("<i>Página vazia.</i>")
     else:
@@ -814,7 +851,7 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         else: await update.effective_message.reply_text(err_msg, parse_mode="HTML")
 
 async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Verifica se o bot está esperando um ID (estado)
+    # Só processa se o bot estiver esperando um ID para venda privada
     if not context.user_data.get("market_awaiting_id"): 
         return
 
@@ -824,21 +861,30 @@ async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TY
     text = update.message.text.strip()
 
     try:
-        # --- BUSCA DO JOGADOR (Sem notificar) ---
-        
-        # 1. Se for mensagem encaminhada
+        # 1. Tenta pegar ID de encaminhamento
         if update.message.forward_from:
             target_id = update.message.forward_from.id
             target_name = update.message.forward_from.first_name
+        
+        # 2. Se for número direto (ID)
+        elif text.isdigit():
+            target_id = int(text)
+            # Tenta achar o nome só pra ficar bonito
+            try:
+                pdata = await player_manager.get_player_data(target_id)
+                if pdata: target_name = pdata.get("character_name", "Jogador")
+            except: pass
 
-        # 2. Se for texto (@username ou Nome do Personagem)
+        # 3. Se for Texto (Nome ou @Username) - AQUI ESTÁ A CORREÇÃO
         else:
             pdata = None
             # Tenta por username
             if text.startswith("@"):
+                from modules.player import queries
                 pdata = await queries.find_by_username(text)
             # Tenta por nome do personagem
             else:
+                from modules.player import queries
                 res = await queries.find_player_by_name(text)
                 if not res:
                     res = await queries.find_player_by_name_norm(text)
@@ -849,21 +895,21 @@ async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TY
                 target_id = pdata.get("user_id") or pdata.get("_id")
                 target_name = pdata.get("character_name", text)
 
-        # --- VALIDAÇÕES ---
+        # Validações Finais
         if not target_id:
-            await update.message.reply_text(f"❌ Jogador '{text}' não encontrado.\nVerifique o nome exato do personagem.")
+            await update.message.reply_text("❌ Jogador não encontrado. Verifique o nome exato ou use o ID.")
             return
 
         if target_id == user_id:
             await update.message.reply_text("❌ Você não pode vender para si mesmo.")
             return
-
-        # --- FINALIZA (Chama a função que cria o item no banco) ---
+        
+        # Finaliza a venda
         await market_finalize_listing(update, context, target_id=target_id, target_name=target_name)
 
     except Exception as e:
-        logger.error(f"Erro ao buscar jogador no mercado: {e}")
-        await update.message.reply_text("❌ Erro interno ao buscar jogador.")
+        logger.error(f"Erro input ID: {e}")
+        await update.message.reply_text("❌ Erro ao buscar jogador.")
 
 async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer("Cancelado.")

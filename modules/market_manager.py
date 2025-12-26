@@ -176,17 +176,24 @@ def get_listing(listing_id: int) -> Optional[dict]:
 def delete_listing(listing_id: int):
     market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
 
-def purchase_listing(
+# ==============================================================================
+#  FUNÇÃO DE COMPRA CORRIGIDA (Substitua a original 'purchase_listing')
+# ==============================================================================
+
+async def purchase_listing(
     *,
     buyer_id: int,
     listing_id: int,
     quantity: int = 1,
     context=None
 ) -> Tuple[dict, int]:
-    # --- Validações e Buscas ---
+    # Importação local para evitar erros de ciclo de importação
+    from modules.player import inventory
+
+    # --- 1. Validações e Buscas Iniciais ---
     listing = get_listing(listing_id)
     if not listing: raise ListingNotFound("Anúncio não encontrado.")
-    if not listing.get("active"): raise ListingInactive("Anúncio inativo.")
+    if not listing.get("active"): raise ListingInactive("Anúncio inativo/esgotado.")
     
     seller_id = int(listing["seller_id"])
     buyer_id = int(buyer_id)
@@ -201,46 +208,71 @@ def purchase_listing(
     if quantity > available:
         raise InsufficientQuantity(f"Estoque insuficiente ({available}).")
 
-    # --- Cálculos e Atualização do Anúncio ---
-    total_price = int(listing["unit_price"]) * quantity
-    new_qty = available - quantity
+    # --- 2. Cálculos ---
+    item_payload = listing.get("item", {})
+    unit_price = int(listing["unit_price"])
+    total_price = unit_price * quantity
+
+    # --- 3. PROCESSAMENTO DO COMPRADOR (Pagamento + Recebimento) ---
+    # Carregamos os dados completos do comprador
+    buyer_data = await player_manager.get_player_data(buyer_id)
+    if not buyer_data: raise ValueError("Comprador não encontrado no sistema.")
+
+    # A. Verifica Saldo
+    buyer_gold = int(buyer_data.get("gold", 0))
+    if buyer_gold < total_price:
+        raise ValueError(f"Saldo insuficiente. Necessário: {total_price:,} 🪙")
+
+    # B. Deduz Ouro
+    buyer_data["gold"] = buyer_gold - total_price
+
+    # C. Entrega o Item ao Inventário
+    item_type = item_payload.get("type")
     
+    if item_type == "stack":
+        # Item empilhável (Materiais, Consumíveis)
+        base_id = item_payload.get("base_id")
+        inventory.add_item_to_inventory(buyer_data, base_id, quantity)
+        
+    elif item_type == "unique":
+        # Item único (Equipamentos)
+        # Importante: Copiar os dados para evitar referências cruzadas
+        base_item_data = item_payload.get("item", {}).copy()
+        
+        # Se comprou mais de 1 (raro para unique, mas possível), entrega N vezes
+        for _ in range(quantity):
+            # add_unique_item gera um novo UUID e coloca no inventário
+            inventory.add_unique_item(buyer_data, base_item_data)
+
+    # D. Salva o Comprador (Commit da transação do lado do comprador)
+    await player_manager.save_player_data(buyer_id, buyer_data)
+
+    # --- 4. ATUALIZAÇÃO DO ANÚNCIO ---
+    new_qty = available - quantity
     update_doc = {"quantity": new_qty}
     if new_qty <= 0: update_doc["active"] = False
     
-    # Atualiza o anúncio no banco
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
-    # --- PAGAMENTO E LIMPEZA DE CACHE ---
+    # --- 5. PAGAMENTO AO VENDEDOR ---
     try:
-        # 1. Paga no Banco de Dados
+        # Paga diretamente no Banco (vendedor pode estar offline)
         result = db["players"].update_one(
             {"_id": seller_id}, 
             {"$inc": {"gold": total_price}}
         )
         
-        if result.modified_count > 0:
-            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu +{total_price} gold no banco.")
+        # Limpa o cache do vendedor para ele ver o ouro atualizado quando entrar
+        try:
+            await player_manager.clear_player_cache(seller_id)
+        except: pass
             
-            # 2. LIMPEZA DE CACHE
-            try:
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(player_manager.clear_player_cache(seller_id))
-                except RuntimeError:
-                    asyncio.run(player_manager.clear_player_cache(seller_id))
-                
-                log.info(f"🧹 [MARKET] Cache do vendedor {seller_id} limpo (Async).")
-            except Exception as e_cache:
-                log.warning(f"⚠️ [MARKET] Falha ao limpar cache: {e_cache}")
+        log.info(f"💰 [MARKET] Venda concluída: {buyer_id} comprou de {seller_id} por {total_price}")
 
-        else:
-            log.warning(f"⚠️ [MARKET] Venda ok, mas vendedor {seller_id} não encontrado no banco.")
-            
     except Exception as e:
-        log.error(f"🔥 [MARKET] Erro crítico no pagamento: {e}")
+        log.error(f"🔥 [MARKET] Erro crítico no pagamento ao vendedor (mas o comprador já pagou): {e}")
 
-    # Retorno
+    # Retorno para a interface
     listing["quantity"] = new_qty
     listing["active"] = (new_qty > 0)
     
