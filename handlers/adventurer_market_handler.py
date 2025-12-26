@@ -560,6 +560,15 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     
     sellable = []
     
+    # 1. LISTA DE EXCEÇÃO (WHITELIST)
+    # Itens que SÃO de evolução ou tem nome bloqueado, mas DEVEM aparecer no mercado de ouro
+    WHITELIST_GOLD = [
+        "couro_de_lobo", 
+        "couro_de_lobo_alfa", 
+        "presa_de_javali", 
+        "couro_lobo" # Variação por segurança
+    ]
+
     # LISTA DE BLOQUEIO (Materiais Raros)
     BLOCKED_KEYWORDS = [
         "essencia", "fragmento", "alma", "emblema", "lamina", "lâmina",
@@ -590,12 +599,14 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
             
             is_equipment_type = (is_unique or itype in ["equipamento", "arma", "armadura", "acessorio", "equipment", "weapon", "armor"])
 
-            if base_id in EVOLUTION_ITEMS_DATA: 
+            # --- MODIFICAÇÃO 1: Permite se estiver na Whitelist ---
+            if base_id in EVOLUTION_ITEMS_DATA and base_id not in WHITELIST_GOLD: 
                 continue
 
             if not is_equipment_type:
                 bid_lower = str(base_id).lower()
-                if any(k in bid_lower for k in BLOCKED_KEYWORDS): 
+                # --- MODIFICAÇÃO 2: Permite se estiver na Whitelist ---
+                if any(k in bid_lower for k in BLOCKED_KEYWORDS) and base_id not in WHITELIST_GOLD: 
                     continue
 
             if base_id in CONSUMABLES_DATA:
