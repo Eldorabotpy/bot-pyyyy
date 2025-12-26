@@ -1,43 +1,51 @@
 # handlers/adventurer_market_handler.py
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
+from telegram.error import BadRequest
 
 # --- MÓDULOS PRINCIPAIS ---
-from modules import player_manager, game_data, file_ids, market_manager
+from modules import player_manager, game_data, file_ids, market_utils
 from modules.market_manager import render_listing_line as _mm_render_listing_line
-from modules import market_utils
+
 from modules.player import queries
 
-# --- DADOS DE JOGO PARA FILTROS PRECISOS ---
+# --- DADOS DE JOGO ---
 try:
-    from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
+    from modules import market_manager
 except ImportError:
-    EVOLUTION_ITEMS_DATA = {}
+    market_manager = None
 
 try:
+
     from modules.game_data.items_consumables import CONSUMABLES_DATA
-except ImportError:
-    CONSUMABLES_DATA = {}
-
-try:
     from modules.game_data.attributes import STAT_EMOJI
-except ImportError:
-    STAT_EMOJI = {} 
-
-try:
     from modules.game_data.classes import CLASSES_DATA
 except ImportError:
+    EVOLUTION_ITEMS_DATA = {}
+    CONSUMABLES_DATA = {}
+    STAT_EMOJI = {}
     CLASSES_DATA = {}
+
+try:
+    from modules import game_data
+    # Tenta importar dados, se falhar define vazios
+    from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
+except ImportError:
+    game_data = None
+    EVOLUTION_ITEMS_DATA = {}
 
 logger = logging.getLogger(__name__)
 
-# Fallback para Display Utils
+# Fallback
 try:
     from modules import display_utils
 except ImportError:
     display_utils = None
+
+
 
 async def _refresh_ui(query, context, text, kb, img_key=None):
     """
@@ -89,10 +97,29 @@ async def _refresh_ui(query, context, text, kb, img_key=None):
             await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=kb, parse_mode="HTML")
     else:
         await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb, parse_mode="HTML")
-        
+
 # ==============================
 #  HELPERS VISUAIS
 # ==============================
+async def _send_smart(query, context, chat_id, text, kb, img_key):
+    """Envia ou edita mensagem com mídia de forma segura."""
+    try: await query.delete_message() # Tenta limpar msg anterior
+    except: pass
+    
+    # Tenta pegar a imagem/video
+    fd = file_ids.get_file_data(img_key) if file_ids else None
+    
+    if fd and fd.get("id"):
+        try:
+            if fd.get("type") == "video":
+                await context.bot.send_video(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await context.bot.send_photo(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
+            return
+        except: pass # Se falhar midia, manda texto
+
+    await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode="HTML")
+
 def _get_item_info(base_id: str) -> dict:
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
@@ -274,6 +301,14 @@ def _render_my_sale_card(idx: int, listing: dict) -> str:
     item_payload = listing.get("item", {})
     qty_stock = listing.get("quantity", 0)
 
+    # --- LÓGICA DE PRIVADO ADICIONADA AQUI ---
+    target_id = listing.get("target_buyer_id")
+    target_name = listing.get("target_buyer_name") or "Alguém"
+    
+    status_icon = "🔐" if target_id else "📢"
+    status_text = f"Reservado: {target_name}" if target_id else "Público"
+    # -----------------------------------------
+
     if item_payload.get("type") == "stack":
         base_id = item_payload.get("base_id")
         lot_size = item_payload.get("qty", 1)
@@ -287,13 +322,18 @@ def _render_my_sale_card(idx: int, listing: dict) -> str:
         header = "⚔️ Item Único"
         details = f"💰 {price:,} 🪙"
 
-    return f"{icon_num}┈➤ {header}\n├┈➤ {details} │ 🆔 <b>#{lid}</b>"
+    return (
+        f"{icon_num}┈➤ {header}\n"
+        f"├┈➤ {details} │ 🆔 <b>#{lid}</b>\n"
+        f"╰┈➤ {status_icon} <b>{status_text}</b>"
+    )
 
 # ==============================
 #  HANDLERS PRINCIPAIS
 # ==============================
 
 async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Abre o menu principal do Centro Comercial."""
     query = update.callback_query
     await query.answer()
     chat_id = update.effective_chat.id
@@ -304,19 +344,16 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gold = int(pdata.get("gold", 0))
         gems = int(pdata.get("gems", 0))
     except:
-        gold = 0
-        gems = 0
+        gold, gems = 0, 0
 
     text = (
         f"🏰 <b>CENTRO COMERCIAL DE ELDORA</b>\n"
         f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
-        f"│ 🌞 <b>Clima:</b> Ensolarado\n"
-        f"│ 👥 <b>Movimento:</b> Intenso\n"
+        f"│ 🎒 <b>SEUS RECURSOS:</b>\n"
+        f"│ 💰 <b>{gold:,}</b> Ouro\n"
+        f"│ 💎 <b>{gems:,}</b> Gemas\n"
         f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n"
-        f"<i>Você caminha pelas ruas de paralelepípedos. Mercadores gritam ofertas, ferreiros batem metal e aventureiros negociam relíquias raras.</i>\n\n"
-        f"🎒 <b>SEUS RECURSOS:</b>\n"
-        f"├┈➤ 💰 <b>{gold:,}</b> Ouro\n"
-        f"╰┈➤ 💎 <b>{gems:,}</b> Gemas"
+        f"<i>Mercadores gritam ofertas e aventureiros negociam itens raros.</i>"
     )
 
     kb = InlineKeyboardMarkup([
@@ -328,6 +365,7 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓 𝒂𝒐 𝑹𝒆𝒊𝒏𝒐", callback_data="show_kingdom_menu")]
     ])
 
+    # Chama o helper restaurado acima
     await _send_smart(query, context, chat_id, text, kb, "market")
 
 async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -368,6 +406,10 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
+    chat_id = update.effective_chat.id # Necessário para o _send_smart
+    
+    # --- IMPORT SEGURO AQUI ---
+    from modules import market_manager
     
     try: 
         if ":" in q.data: page = int(q.data.split(":")[1])
@@ -377,14 +419,19 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         pdata = await player_manager.get_player_data(user_id) or {}
         gold = pdata.get("gold", 0)
+        # Agora usa a importação local garantida
         all_listings = market_manager.list_active(viewer_id=user_id)
     except Exception as e: 
         logger.error(f"Erro ao listar mercado: {e}")
         all_listings = []
     
+    # Se vazio, usa _send_smart também para manter consistência visual (opcional)
     if not all_listings:
-        await _safe_edit(q, "📭 <i>O mercado está vazio no momento.</i>", 
-                         InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
+        # Usa a imagem do mercado mesmo vazio, para ficar bonito
+        text_vazio = "📭 <b>O Mercado está vazio no momento.</b>\n\nSeja o primeiro a vender algo!"
+        kb_vazio = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]])
+        
+        await _send_smart(q, context, chat_id, text_vazio, kb_vazio, "mercado_aventureiro")
         return
 
     ITEMS_PER_PAGE = 5
@@ -438,17 +485,25 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     nav_row = []
     if page > 1: nav_row.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"market_list:{page-1}"))
+    
+    # O botão atualizar agora recarregará a imagem
     nav_row.append(InlineKeyboardButton("🔄 Atualizar", callback_data=f"market_list:{page}"))
+    
     if page < total_pages: nav_row.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"market_list:{page+1}"))
     
     if nav_row: keyboard.append(nav_row)
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="market_adventurer")])
 
-    await _safe_edit(q, full_text, InlineKeyboardMarkup(keyboard))
+    # ====================================================================
+    await _send_smart(q, context, chat_id, full_text, InlineKeyboardMarkup(keyboard), "mercado_aventureiro")
 
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     buyer_id = q.from_user.id
+    
+    # --- IMPORT SEGURO ---
+    from modules import market_manager
+
     try: lid = int(q.data.replace("market_buy_", ""))
     except: await q.answer("ID inválido.", show_alert=True); return
 
@@ -984,6 +1039,9 @@ async def market_ask_private_id(update: Update, context: ContextTypes.DEFAULT_TY
     await _safe_edit(q, text, kb)
 
 async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id=None, target_name=None):
+    # --- IMPORT SEGURO ---
+    from modules import market_manager
+    
     user_id = update.effective_user.id
     q = update.callback_query
     
@@ -1156,6 +1214,9 @@ async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
     user_id = q.from_user.id
     
+    # --- IMPORT SEGURO ---
+    from modules import market_manager
+    
     listings = market_manager.list_by_seller(user_id)
     
     if not listings:
@@ -1180,6 +1241,123 @@ async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_text = "\n".join(lines)
     await _safe_edit(q, full_text, InlineKeyboardMarkup(rows))
 
+async def market_cancel_listing(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancela uma venda ativa."""
+    q = update.callback_query
+    await q.answer()
+    
+    # --- IMPORT SEGURO ---
+    from modules import market_manager
+
+    try:
+        # Extrai o ID do callback "market_cancel_123"
+        lid = int(q.data.replace("market_cancel_", ""))
+        market_manager.delete_listing(lid)
+        await q.answer("✅ Anúncio cancelado.", show_alert=True)
+        # Atualiza a lista
+        await market_my(update, context)
+    except Exception as e:
+        await q.answer(f"Erro ao cancelar: {e}", show_alert=True)
+
+async def market_start_input_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Prepara o bot para receber texto digitado (Lote, Qtd ou Preço)."""
+    q = update.callback_query
+    await q.answer()
+    data = q.data
+
+    msg = ""
+    if "size" in data:
+        context.user_data["market_awaiting_size_input"] = True
+        msg = "o TAMANHO DO LOTE (itens por pacote)"
+    elif "qty" in data:
+        context.user_data["market_awaiting_qty_input"] = True
+        msg = "a QUANTIDADE de lotes"
+    elif "price" in data:
+        context.user_data["market_awaiting_price_input"] = True
+        msg = "o PREÇO TOTAL"
+
+    try:
+        await q.edit_message_caption(f"⌨️ <b>MODO DE TEXTO</b>\n\nDigite {msg} no chat agora:")
+    except:
+        await q.message.reply_text(f"⌨️ <b>MODO DE TEXTO</b>\n\nDigite {msg} no chat agora:", parse_mode="HTML")
+
+async def market_input_handlers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Roteador central de inputs de texto do mercado."""
+    ud = context.user_data
+    text = update.message.text.strip()
+    
+    # --- 1. Input de Tamanho do Lote ---
+    if ud.get("market_awaiting_size_input"):
+        if not text.isdigit(): return await update.message.reply_text("🔢 Digite apenas números.")
+        val = int(text)
+        
+        pending = ud.get("market_pending", {})
+        max_avail = pending.get("qty_have", 1)
+        val = max(1, min(val, max_avail)) # Trava entre 1 e o máx que tem
+        
+        pending["lot_size"] = val
+        ud.pop("market_awaiting_size_input", None) # Limpa estado
+        
+        await update.message.reply_text(f"✅ Tamanho do lote: {val}")
+        await market_lot_size_confirm(update, context)
+
+    # --- 2. Input de Quantidade (Estoque) ---
+    elif ud.get("market_awaiting_qty_input"):
+        if not text.isdigit(): return await update.message.reply_text("🔢 Digite apenas números.")
+        val = int(text)
+        
+        pending = ud.get("market_pending", {})
+        lot_size = pending.get("lot_size", 1)
+        max_avail = pending.get("qty_have", 1)
+        max_stock = max(1, max_avail // lot_size)
+        
+        val = max(1, min(val, max_stock))
+        pending["qty"] = val
+        ud.pop("market_awaiting_qty_input", None)
+        
+        await update.message.reply_text(f"✅ Estoque definido: {val} lotes")
+        await market_qty_confirm(update, context)
+
+    # --- 3. Input de Preço ---
+    elif ud.get("market_awaiting_price_input"):
+        if not text.isdigit(): return await update.message.reply_text("🔢 Digite apenas números.")
+        val = int(text)
+        ud["market_price"] = max(1, val)
+        ud.pop("market_awaiting_price_input", None)
+        
+        await update.message.reply_text(f"✅ Preço definido: {val:,} Ouro")
+        await _show_type_selection(update.message, context)
+
+    # --- 4. Input de ID (Venda Privada) ---
+    elif ud.get("market_awaiting_id"):
+        target_id = None
+        target_name = "Desconhecido"
+
+        # Tenta pegar por encaminhamento, ID numérico ou busca de nome
+        if update.message.forward_from:
+            target_id = update.message.forward_from.id
+            target_name = update.message.forward_from.first_name
+        elif text.isdigit():
+            target_id = int(text)
+        else:
+            # Tenta buscar pelo nome no banco
+            try:
+                from modules.player import queries
+                res = await queries.find_player_by_name(text)
+                if not res: res = await queries.find_player_by_name_norm(text)
+                if res:
+                    target_id, pdata = res
+                    target_name = pdata.get("character_name", text)
+            except: pass
+
+        if target_id:
+            if target_id == update.effective_user.id:
+                await update.message.reply_text("❌ Você não pode vender para si mesmo.")
+            else:
+                await market_finalize_listing(update, context, target_id=target_id, target_name=target_name)
+        else:
+            await update.message.reply_text("❌ Jogador não encontrado. Tente o ID numérico ou encaminhar uma mensagem dele.")
+
 async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
     try:
@@ -1192,19 +1370,6 @@ async def market_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==============================
 #  UTILS
 # ==============================
-async def _send_smart(query, context, chat_id, text, kb, img_key):
-    try: await query.delete_message(); 
-    except: pass
-    fd = file_ids.get_file_data(img_key)
-    if fd and fd.get("id"):
-        try:
-            if fd.get("type") == "video":
-                await context.bot.send_video(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await context.bot.send_photo(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
-            return
-        except: pass
-    await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode="HTML")
 
 async def _safe_edit(query, text, kb):
     if hasattr(query, "edit_message_caption"):
@@ -1249,31 +1414,41 @@ async def market_process_size_input(update: Update, context: ContextTypes.DEFAUL
 # ==============================
 #  EXPORTS
 # ==============================
+# ==============================
+#  EXPORTS (HANDLERS CORRIGIDOS)
+# ==============================
 market_open_handler = CallbackQueryHandler(market_open, pattern=r'^market$')
 market_adventurer_handler = CallbackQueryHandler(market_adventurer, pattern=r'^market_adventurer$')
-market_list_handler = CallbackQueryHandler(market_list, pattern=r'^market_list(:?\d+)?$')
+market_list_handler = CallbackQueryHandler(market_list, pattern=r'^market_list')
 market_buy_handler = CallbackQueryHandler(market_buy, pattern=r'^market_buy_')
 market_sell_menu_handler = CallbackQueryHandler(market_sell_menu, pattern=r'^market_sell_menu$')
 market_sell_cat_handler = CallbackQueryHandler(market_sell_list_category, pattern=r'^market_sell_cat:')
-market_sell_legacy_handler = CallbackQueryHandler(market_sell_menu, pattern=r'^market_sell(:\d+)?$')
-market_cancel_handler = CallbackQueryHandler(market_cancel, pattern=r'^market_cancel_\d+$')
-market_pick_unique_handler= CallbackQueryHandler(market_pick_unique, pattern=r'^market_pick_unique_')
+market_pick_unique_handler = CallbackQueryHandler(market_pick_unique, pattern=r'^market_pick_unique_')
 market_pick_stack_handler = CallbackQueryHandler(market_pick_stack, pattern=r'^market_pick_stack_')
-# Atualizado Regex para incluir 'max'
-market_pack_qty_spin_handler = CallbackQueryHandler(market_qty_spin, pattern=r'^mkt_pack_.*')
-market_pack_qty_confirm_handler = CallbackQueryHandler(market_qty_confirm, pattern=r'^mkt_pack_confirm$')
-market_price_spin_handler = CallbackQueryHandler(market_price_spin,    pattern=r'^mktp_.*')
+
+# --- CORREÇÃO DO TRAVAMENTO AQUI ---
+# O regex anterior '.*' engolia o 'confirm'. Agora usamos (inc|dec|max) especificamente.
+
+# 1. Spinner de Tamanho (Lote)
+market_size_spin_handler = CallbackQueryHandler(market_lot_size_spin, pattern=r'^mkt_size_(inc|dec|max)')
+market_size_confirm_handler = CallbackQueryHandler(market_lot_size_confirm, pattern=r'^mkt_size_confirm$')
+
+# 2. Spinner de Estoque (Pack) - ESTE ERA O ERRO DO PRINT
+market_pack_spin_handler = CallbackQueryHandler(market_qty_spin, pattern=r'^mkt_pack_(inc|dec|max)')
+market_pack_confirm_handler = CallbackQueryHandler(market_qty_confirm, pattern=r'^mkt_pack_confirm$')
+
+# 3. Spinner de Preço
+market_price_spin_handler = CallbackQueryHandler(market_price_spin, pattern=r'^mktp_(inc|dec)')
 market_price_confirm_handler = CallbackQueryHandler(market_ask_type, pattern=r'^mktp_confirm$')
-market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^market_cancel_new$')
-market_lote_qty_spin_handler = CallbackQueryHandler(market_qty_spin, pattern=r'^mkt_lote_.*')
-market_lote_qty_confirm_handler = CallbackQueryHandler(market_qty_confirm, pattern=r'^mkt_lote_confirm$')
-market_finalize_handler = CallbackQueryHandler(market_finalize_listing, pattern=r'^mkt_finalize$')
-market_my_handler = CallbackQueryHandler(market_my, pattern=r'^market_my$')
+
+# 4. Finalização e Outros
 market_finish_public_handler = CallbackQueryHandler(market_finalize_listing, pattern=r'^mkt_finish_public$')
 market_ask_private_handler = CallbackQueryHandler(market_ask_private_id, pattern=r'^mkt_ask_private$')
-# Handlers de Input de Texto
-market_input_qty_start_handler = CallbackQueryHandler(market_start_input_qty, pattern=r'^mkt_input_qty_start$')
-market_input_price_start_handler = CallbackQueryHandler(market_start_input_price, pattern=r'^mkt_input_price_start$')
-market_text_processor_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_process_text_input)
-market_input_id_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_catch_input_id)
-market_text_router_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_text_router)
+market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^market_cancel_new$')
+market_my_handler = CallbackQueryHandler(market_my, pattern=r'^market_my$')
+market_cancel_listing_handler = CallbackQueryHandler(market_cancel_listing, pattern=r'^market_cancel_\d+$')
+
+# Inputs de Texto
+market_input_triggers_handler = CallbackQueryHandler(market_start_input_triggers, pattern=r'^mkt_input_.*')
+market_text_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_input_handlers)
+market_input_id_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_input_handlers) # Redundância segura

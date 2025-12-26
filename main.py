@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO FINAL: Importação direta e ordem de prioridade corrigida)
+# (VERSÃO FINAL: Importação direta, ordem de prioridade corrigida e Loop Estável)
 
 from __future__ import annotations
 import asyncio
@@ -20,7 +20,6 @@ load_dotenv()
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application
-from telegram.error import Conflict, NetworkError
 
 # --- CONFIGURAÇÕES ---
 from config import (
@@ -159,12 +158,14 @@ async def post_init_tasks(application: Application):
 # EXECUÇÃO PRINCIPAL
 # ==============================================================================
 if __name__ == '__main__':
+    # Inicia o servidor Flask para manter o bot vivo (Render/Replit)
     try:
         start_keep_alive()
         logging.info("Servidor Web iniciado.")
     except Exception as e:
         logging.warning(f"Erro no servidor Web: {e}")
 
+    # Constrói a aplicação
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init_tasks).build()
 
     # --- REGISTRO DE HANDLERS (ORDEM IMPORTANTE) ---
@@ -183,24 +184,9 @@ if __name__ == '__main__':
     # 4. Outros Handlers (Chat Global, etc)
     register_all_handlers(application)
 
-    logging.info("Bot iniciado com sucesso.")
+    logging.info("Iniciando Polling...")
 
-    MAX_RETRIES = 100
-    RETRY_DELAY = 10 
-
-    for attempt in range(MAX_RETRIES):
-        try:
-            application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
-            break 
-        except Conflict:
-            logging.warning(f"Conflito: Aguardando {RETRY_DELAY}s...")
-            time.sleep(RETRY_DELAY)
-        except NetworkError:
-            logging.warning("Erro de Rede. Reconectando em 5s...")
-            time.sleep(5)
-        except KeyboardInterrupt:
-            logging.info("Bot paralisado pelo usuário.")
-            break
-        except Exception as e:
-            logging.error(f"Erro fatal: {e}")
-            time.sleep(5)
+    # --- CORREÇÃO DO LOOP ---
+    # removemos o loop manual (while/for) e o try/except manual.
+    # O run_polling já lida com reconexão de rede (NetworkError).
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)

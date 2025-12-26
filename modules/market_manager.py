@@ -1,68 +1,52 @@
 # modules/market_manager.py
-# (VERSÃO CORRIGIDA FINAL: Entrega de itens funcional e imports seguros)
+# (VERSÃO CORRIGIDA: Transação de Ouro e Entrega de Itens Blindada)
 from __future__ import annotations
 import logging
 import os
-import sys
-import certifi
 from datetime import datetime, timezone
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, List, Tuple
 from pymongo import MongoClient
-import asyncio
 from modules import player_manager
-
-# --- IMPORTAÇÃO SEGURA DO INVENTÁRIO ---
-try:
-    from modules.player import inventory
-except ImportError:
-    # Fallback se der erro circular, importamos dentro da função
-    inventory = None
-
-# ### Importa lista de bloqueio ###
-try:
-    from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
-except ImportError:
-    EVOLUTION_ITEMS_DATA = {} 
-
-# --- LISTA NEGRA MANUAL (Itens Especiais) ---
-_BLOCKED_SPECIFIC_IDS = {
-    "sigilo_protecao", "ticket_arena", "chave_da_catacumba", 
-    "cristal_de_abertura", "gems", 
-}
 
 # --- CONFIGURAÇÃO DE LOGGING ---
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 # --- CONFIGURAÇÃO DO BANCO DE DADOS ---
-MONGO_CONN_STR = os.getenv("MONGO_CONNECTION_STRING")
+MONGO_CONN_STR = os.getenv("MONGO_CONNECTION_STRING") or os.getenv("MONGO_URL")
 if not MONGO_CONN_STR:
-    MONGO_CONN_STR = os.getenv("MONGO_URL") 
-    if not MONGO_CONN_STR:
-        log.critical("❌ ERRO FATAL: A variável 'MONGO_CONNECTION_STRING' não foi encontrada!")
-        MONGO_CONN_STR = "mongodb://localhost:27017/rpg_bot"
+    MONGO_CONN_STR = "mongodb://localhost:27017/rpg_bot"
 
 try:
+    import certifi
     ca = certifi.where()
     client = MongoClient(MONGO_CONN_STR, tlsCAFile=ca)
-    client.admin.command('ping')
-    log.info("✅ CONEXÃO COM MONGODB BEM SUCEDIDA (MERCADO)!")
     db = client["eldora_db"] 
     market_col = db["market_listings"]
     counters_col = db["counters"]
+    # Garante índices
     market_col.create_index("id", unique=True)
     market_col.create_index("active")
 except Exception as e:
-    log.critical(f"🔥 FALHA CRÍTICA AO CONECTAR NO MONGODB: {e}")
+    log.critical(f"🔥 FALHA AO CONECTAR MONGODB (MARKET): {e}")
     market_col = None
     counters_col = None
 
+# Tenta importar utilitários de display e dados de jogo
 try:
     from modules import display_utils
-except Exception:
+    from modules import game_data
+    from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
+except ImportError:
     display_utils = None
+    game_data = None
+    EVOLUTION_ITEMS_DATA = {}
 
-from modules import game_data
+# --- LISTA NEGRA MANUAL ---
+_BLOCKED_SPECIFIC_IDS = {
+    "sigilo_protecao", "ticket_arena", "chave_da_catacumba", 
+    "cristal_de_abertura", "gems", 
+}
 
 # =========================
 # Erros e Helpers
@@ -76,6 +60,7 @@ class InsufficientQuantity(MarketError): ...
 class InvalidPurchase(MarketError): ...
 
 def _get_next_sequence(name: str) -> int:
+    if counters_col is None: return 0
     ret = counters_col.find_one_and_update(
         {"_id": name}, {"$inc": {"seq": 1}}, upsert=True, return_document=True
     )
@@ -101,22 +86,19 @@ def create_listing(
     region_key: Optional[str] = None,
     target_buyer_id: Optional[int] = None,
     target_buyer_name: Optional[str] = None,
-    seller_name: Optional[str] = None # Adicionado para compatibilidade com o Handler
+    seller_name: Optional[str] = None
 ) -> dict:
-    # 1. Valida preço e quantidade básica
+    if market_col is None: raise MarketError("Banco de dados offline.")
+    
     _validate_price_qty(unit_price, quantity)
 
     base_id = item_payload.get("base_id")
 
-    # 2. BLOQUEIO: Itens de Evolução
+    # Bloqueios de Itens
     if base_id and base_id in EVOLUTION_ITEMS_DATA:
         item_name = EVOLUTION_ITEMS_DATA[base_id].get("display_name", "Item de Evolução")
-        raise InvalidListing(
-            f"🚫 <b>Proibido:</b> '{item_name}' é um item raro.\n"
-            "Venda este item no <b>Comércio de Relíquias</b> (Gemas)."
-        )
+        raise InvalidListing(f"🚫 '{item_name}' deve ser vendido no Comércio de Relíquias (Gemas).")
 
-    # 3. BLOQUEIO: Itens Especiais
     if base_id and base_id in _BLOCKED_SPECIFIC_IDS:
         raise InvalidListing(f"🚫 Este item ('{base_id}') não pode ser comercializado aqui.")
 
@@ -125,7 +107,7 @@ def create_listing(
     listing = {
         "id": lid,
         "seller_id": int(seller_id),
-        "seller_name": str(seller_name) if seller_name else None, # Salva nome do vendedor
+        "seller_name": str(seller_name) if seller_name else None,
         "item": item_payload,
         "unit_price": int(unit_price),
         "quantity": int(quantity),
@@ -151,6 +133,7 @@ def list_active(
     price_per_unit: bool = False,
     viewer_id: Optional[int] = None
 ) -> List[dict]:
+    if market_col is None: return []
     query = {"active": True}
 
     if region_key: query["region_key"] = region_key
@@ -172,18 +155,20 @@ def list_active(
         mongo_sort = [("unit_price", sort_dir)]
 
     skip = (max(1, page) - 1) * page_size
-    
     cursor = market_col.find(query).sort(mongo_sort).skip(skip).limit(page_size)
     return list(cursor)
 
 def list_by_seller(seller_id: int) -> List[dict]:
+    if market_col is None: return []
     return list(market_col.find({"active": True, "seller_id": int(seller_id)}))
 
 def get_listing(listing_id: int) -> Optional[dict]:
+    if market_col is None: return None
     return market_col.find_one({"id": int(listing_id)})
 
 def delete_listing(listing_id: int):
-    market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
+    if market_col:
+        market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
 
 # ==============================================================================
 #  FUNÇÃO DE COMPRA (CORRIGIDA E BLINDADA)
@@ -197,17 +182,18 @@ async def purchase_listing(
     context=None
 ) -> Tuple[dict, int]:
     
+    # 1. Importação Local para evitar erro circular (CRUCIAL PARA O COMPRADOR RECEBER O ITEM)
     from modules.player import inventory as inv_module
 
-    # --- 1. Validações ---
+    # --- Validações ---
     listing = get_listing(listing_id)
     if not listing: raise ListingNotFound("Anúncio não encontrado.")
-    if not listing.get("active"): raise ListingInactive("Anúncio inativo/esgotado.")
+    if not listing.get("active"): raise ListingInactive("Anúncio inativo ou já vendido.")
     
     seller_id = int(listing["seller_id"])
     buyer_id = int(buyer_id)
 
-    if seller_id == buyer_id: raise InvalidPurchase("Não pode comprar seu próprio item.")
+    if seller_id == buyer_id: raise InvalidPurchase("Você não pode comprar seu próprio item.")
 
     target = listing.get("target_buyer_id")
     if target is not None and int(target) != buyer_id:
@@ -215,35 +201,32 @@ async def purchase_listing(
 
     available = int(listing.get("quantity", 0))
     if quantity > available:
-        raise InsufficientQuantity(f"Estoque insuficiente ({available}).")
+        raise InsufficientQuantity(f"Estoque insuficiente ({available} disponíveis).")
 
-    # --- 2. Cálculos ---
+    # --- Cálculos ---
     item_payload = listing.get("item", {})
     unit_price = int(listing["unit_price"])
     total_price = unit_price * quantity
 
-    # --- 3. PROCESSAMENTO DO COMPRADOR ---
+    # --- A. PROCESSAMENTO DO COMPRADOR ---
     buyer_data = await player_manager.get_player_data(buyer_id)
-    if not buyer_data: raise ValueError("Comprador não encontrado no sistema.")
+    if not buyer_data: raise ValueError("Comprador não encontrado.")
 
+    # Verifica saldo
     buyer_gold = int(buyer_data.get("gold", 0))
     if buyer_gold < total_price:
         raise ValueError(f"Saldo insuficiente. Necessário: {total_price:,} 🪙")
 
+    # 1. Remove o Ouro (Memória)
     buyer_data["gold"] = buyer_gold - total_price
 
-    # C. Entrega o Item ao Inventário (A CORREÇÃO ESTÁ AQUI)
+    # 2. Adiciona o Item (Memória)
     item_type = item_payload.get("type")
     
     if item_type == "stack":
         base_id = item_payload.get("base_id")
-        
-        # Tamanho do lote (Ex: 100 itens por lote)
-        stack_size = int(item_payload.get("qty", 1)) 
-        
-        # Total real a entregar = Lotes Comprados * Tamanho do Lote
+        stack_size = int(item_payload.get("qty", 1)) # Ex: 100 ferros por lote
         total_items_to_give = quantity * stack_size
-        
         inv_module.add_item_to_inventory(buyer_data, base_id, total_items_to_give)
         
     elif item_type == "unique":
@@ -251,24 +234,38 @@ async def purchase_listing(
         for _ in range(quantity):
             inv_module.add_unique_item(buyer_data, base_item_data)
 
+    # 3. SALVA O COMPRADOR (Atomicidade: Ouro sai e Item entra ao mesmo tempo)
     await player_manager.save_player_data(buyer_id, buyer_data)
 
-    # --- 4. ATUALIZAÇÃO DO ANÚNCIO ---
+    # --- B. ATUALIZAÇÃO DO ANÚNCIO ---
     new_qty = available - quantity
     update_doc = {"quantity": new_qty}
     if new_qty <= 0: update_doc["active"] = False
     
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
-    # --- 5. PAGAMENTO AO VENDEDOR ---
+    # --- C. PAGAMENTO AO VENDEDOR (CORRIGIDO) ---
+    # Usamos o player_manager para garantir que o cache seja atualizado
+    # se o vendedor estiver online.
     try:
-        db["players"].update_one({"_id": seller_id}, {"$inc": {"gold": total_price}})
-        try: await player_manager.clear_player_cache(seller_id)
-        except: pass
-        log.info(f"💰 [MARKET] Venda concluída: {buyer_id} comprou de {seller_id} por {total_price}")
+        seller_data = await player_manager.get_player_data(seller_id)
+        if seller_data:
+            current_seller_gold = int(seller_data.get("gold", 0))
+            seller_data["gold"] = current_seller_gold + total_price
+            await player_manager.save_player_data(seller_id, seller_data)
+            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu {total_price} (Via Cache/Manager).")
+        else:
+            # Fallback se não conseguir carregar dados (muito raro, ex: bug no DB)
+            db["players"].update_one({"_id": seller_id}, {"$inc": {"gold": total_price}})
+            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu {total_price} (Via Update Direto).")
+            
     except Exception as e:
-        log.error(f"🔥 [MARKET] Erro crítico no pagamento ao vendedor: {e}")
+        log.error(f"🔥 [MARKET] Erro crítico ao pagar vendedor {seller_id}: {e}")
+        # Tenta fallback de emergência
+        try: db["players"].update_one({"_id": seller_id}, {"$inc": {"gold": total_price}})
+        except: pass
 
+    # Retorna estado atualizado
     listing["quantity"] = new_qty
     listing["active"] = (new_qty > 0)
     
@@ -278,7 +275,6 @@ async def purchase_listing(
 # Renderização Visual
 # =========================
 RARITY_LABEL = {"comum": "Comum", "bom": "Boa", "raro": "Rara", "epico": "Épica", "lendario": "Lendária"}
-_CLASS_DMG_EMOJI_FALLBACK = {"guerreiro": "⚔️", "berserker": "🪓", "cacador": "🏹", "assassino": "🗡", "bardo": "🎵", "monge": "🙏", "mago": "✨", "samurai": "🗡"}
 
 def _viewer_class_key(pdata: dict, fallback="guerreiro"):
     if not pdata: return fallback
@@ -288,14 +284,19 @@ def _viewer_class_key(pdata: dict, fallback="guerreiro"):
     return fallback
 
 def _class_dmg_emoji(pclass: str) -> str:
-    return getattr(game_data, "CLASS_DMG_EMOJI", {}).get(pclass, _CLASS_DMG_EMOJI_FALLBACK.get(pclass, "🗡"))
+    fallback_map = {"guerreiro": "⚔️", "berserker": "🪓", "cacador": "🏹", "assassino": "🗡", "bardo": "🎵", "monge": "🙏", "mago": "✨", "samurai": "🗡"}
+    if game_data:
+        return getattr(game_data, "CLASS_DMG_EMOJI", {}).get(pclass, fallback_map.get(pclass, "🗡"))
+    return fallback_map.get(pclass, "🗡")
 
 def _get_item_info(base_id: str) -> dict:
     try:
-        info = game_data.get_item_info(base_id)
-        if info: return dict(info)
+        if game_data:
+            info = game_data.get_item_info(base_id)
+            if info: return dict(info)
+            return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
     except: pass
-    return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
+    return {}
 
 def _render_unique_core_line(inst: dict, viewer_class: str) -> str:
     base_id = inst.get("base_id") or inst.get("tpl") or "item"
@@ -310,7 +311,7 @@ def _stack_inv_display(base_id: str, qty: int) -> str:
     info = _get_item_info(base_id)
     name = info.get("display_name") or info.get("nome_exibicao") or base_id
     emoji = info.get("emoji", "")
-    return f"{emoji}{name} (Lote: {qty} un.)" # Mudamos visual aqui para indicar Lote
+    return f"{emoji}{name} (Lote: {qty} un.)"
 
 def render_listing_line(
     listing: dict,
@@ -343,8 +344,6 @@ def render_listing_line(
         return f"{prefix}{text}{suffix}{reserved_suf}"
 
     base_id = it.get("base_id", "")
-    
-    # Aqui qty é o TAMANHO DO LOTE (do payload), não o estoque
     pack_size = int(it.get("qty", 1))
     core = _stack_inv_display(base_id, pack_size)
     

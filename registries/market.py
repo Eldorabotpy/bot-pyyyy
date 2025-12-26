@@ -19,41 +19,42 @@ def register_market_handlers(application: Application):
     # Arquivo: handlers/adventurer_market_handler.py
     # ===============================================================
     try:
+        # Importação corrigida para corresponder EXATAMENTE ao que existe no handler
         from handlers.adventurer_market_handler import (
+            # Menus e Navegação
             market_open_handler, 
             market_adventurer_handler,
             market_list_handler, 
             market_my_handler,
             market_sell_menu_handler,
             market_sell_cat_handler,
-            market_sell_legacy_handler,
-            market_buy_handler, 
-            market_cancel_handler,
+            
+            # Ações Principais
             market_pick_unique_handler, 
             market_pick_stack_handler,
-            # Spinners e Confirmações
-            market_pack_qty_spin_handler, 
-            market_pack_qty_confirm_handler,
-            market_lote_qty_spin_handler, 
-            market_lote_qty_confirm_handler,
+            market_buy_handler, 
+            market_cancel_listing_handler, # Nome corrigido (era market_cancel_handler)
+            
+            # Spinners e Confirmações (Nomes Corrigidos)
+            market_size_spin_handler,      # Corrigido de market_lote_qty_spin
+            market_size_confirm_handler,   # Corrigido de market_lote_qty_confirm
+            market_pack_spin_handler,      # Corrigido de market_pack_qty_spin
+            market_pack_confirm_handler,   # Corrigido de market_pack_qty_confirm
             market_price_spin_handler, 
             market_price_confirm_handler, 
+            
+            # Finalização e Fluxos
             market_cancel_new_handler,
             market_finish_public_handler,
             market_ask_private_handler,
-            # Handler de input direto (removido do registro principal para usar o Router)
-            market_input_id_handler, 
-            # NOVOS HANDLERS DE INPUT
-            market_input_qty_start_handler,
-            market_input_price_start_handler,
-            market_text_processor_handler,
-            market_lot_size_spin,      # <--- NOVO
-            market_lot_size_confirm,   # <--- NOVO
-            market_start_input_size,
-            # O ROTEADOR INTELIGENTE
-            market_text_router_handler 
+            
+            # Inputs de Texto (Consolidados)
+            market_input_triggers_handler, # Substitui os handlers individuais de start input
+            market_text_handler            # Substitui o market_text_router_handler
         )
         
+        # --- REGISTRO DOS HANDLERS ---
+
         # Menu Principal e Navegação
         application.add_handler(market_open_handler)
         application.add_handler(market_adventurer_handler)
@@ -63,39 +64,35 @@ def register_market_handlers(application: Application):
         # Fluxo de Venda
         application.add_handler(market_sell_menu_handler)
         application.add_handler(market_sell_cat_handler)
-        application.add_handler(market_sell_legacy_handler) # Compatibilidade
         
         # Ações de Item
         application.add_handler(market_pick_unique_handler)
         application.add_handler(market_pick_stack_handler)
         application.add_handler(market_buy_handler)
-        application.add_handler(market_cancel_handler)
+        application.add_handler(market_cancel_listing_handler)
         
-        # Spinners (Seletores de Quantidade e Preço)
-        application.add_handler(market_pack_qty_spin_handler)
-        application.add_handler(market_pack_qty_confirm_handler)
-        application.add_handler(market_lote_qty_spin_handler)
-        application.add_handler(market_lote_qty_confirm_handler)
+        # Spinners (Tamanho, Estoque, Preço)
+        application.add_handler(market_size_spin_handler)
+        application.add_handler(market_size_confirm_handler)
+        application.add_handler(market_pack_spin_handler)
+        application.add_handler(market_pack_confirm_handler)
         application.add_handler(market_price_spin_handler)
         application.add_handler(market_price_confirm_handler)
+        
+        # Finalização e Cancelamento
         application.add_handler(market_cancel_new_handler)
         application.add_handler(market_finish_public_handler)
         application.add_handler(market_ask_private_handler)
         
-        # NOVOS: Ativação do modo input
-        application.add_handler(market_input_qty_start_handler)
-        application.add_handler(market_input_price_start_handler)
-        application.add_handler(CallbackQueryHandler(market_lot_size_spin, pattern=r'^mkt_size_(inc|dec|max).*'))
-        application.add_handler(CallbackQueryHandler(market_lot_size_confirm, pattern=r'^mkt_size_confirm$'))
-        application.add_handler(CallbackQueryHandler(market_start_input_size, pattern=r'^mkt_input_size_start$'))
-
-        application.add_handler(market_text_router_handler, group=2)
-        # -----------------------------------------------------------
+        # Inputs e Texto
+        application.add_handler(market_input_triggers_handler)
+        # Handler de texto no grupo 2 para não conflitar com comandos
+        application.add_handler(market_text_handler, group=2) 
         
         logger.info("✅ Handlers do Mercado de Ouro registrados com sucesso.")
 
     except ImportError as e:
-        logger.error(f"❌ Erro ao importar Mercado de Ouro (adventurer_market_handler): {e}")
+        logger.error(f"❌ Erro CRÍTICO ao importar Mercado de Ouro (adventurer_market_handler). Verifique os nomes exportados: {e}")
 
     # ===============================================================
     # 2. CASA DE LEILÕES (GEMAS)
