@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # 1. Admin / Ferramentas (Prioridade Máxima)
     # Deve vir antes de tudo para capturar input de configuração
     application.add_handler(file_id_conv_handler)
-
+    register_all_handlers(application)
     # 2. Criação de Personagem (Start/Nome)
     register_character_handlers(application)
     
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     register_evolution_handlers(application)
 
     # 4. Outros Handlers (Chat Global, etc)
-    register_all_handlers(application)
+    
 
     logging.info("Iniciando Polling...")
 

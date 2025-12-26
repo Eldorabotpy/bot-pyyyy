@@ -1,214 +1,153 @@
 # handlers/admin/sell_gems.py
+# (VERSÃO FINAL: FILTRO UNIVERSAL E LOGS)
 
 import re
+import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ContextTypes,
-    CallbackQueryHandler,
-    ConversationHandler,
-    MessageHandler,
-    filters,
-    CommandHandler,
+    ContextTypes, CallbackQueryHandler, ConversationHandler, 
+    MessageHandler, filters, CommandHandler
 )
-from telegram.error import Forbidden
 
-# --- Importações Modificadas para Busca Robusta ---
-from modules import player_manager
-from modules.player.core import players_collection  # Acesso direto ao DB
-from modules.player.queries import _normalize_char_name
+from modules.player.core import players_collection, get_player_data, save_player_data
+from modules.player.inventory import add_gems
 from handlers.admin.utils import ensure_admin
 
-# --- Estados da Conversa ---
+logger = logging.getLogger(__name__)
+
 (ASK_TARGET_PLAYER, ASK_QUANTITY, CONFIRM_GRANT) = range(3)
 
-# --- Funções Auxiliares Locais ---
-
-async def robust_find_player(input_str: str):
-    """
-    Tenta encontrar um jogador de várias formas:
-    1. Pelo ID numérico.
-    2. Pelo nome exato normalizado.
-    3. Pelo nome via Regex (case insensitive).
-    """
-    input_str = input_str.strip()
-
-    # 1. Tenta por ID Numérico
-    if input_str.isdigit():
-        user_id = int(input_str)
-        pdata = await player_manager.get_player_data(user_id)
-        if pdata:
-            return user_id, pdata
-
-    # 2. Tenta por Nome Normalizado (Busca Padrão)
-    normalized = _normalize_char_name(input_str)
-    pdata_norm = players_collection.find_one({"character_name_normalized": normalized})
-    if pdata_norm:
-        return pdata_norm["_id"], pdata_norm
-
-    # 3. Tenta por Regex (Case Insensitive) no nome real
-    # Isso ajuda com caracteres especiais como 'ü' caso a normalização falhe
+def _blocking_search(term: str):
+    if players_collection is None: return None
     try:
-        regex_pattern = f"^{re.escape(input_str)}$"
-        pdata_regex = players_collection.find_one({"character_name": {"$regex": regex_pattern, "$options": "i"}})
-        if pdata_regex:
-            return pdata_regex["_id"], pdata_regex
-    except Exception as e:
-        print(f"Erro na busca regex em sell_gems: {e}")
+        term = str(term).strip()
+        # 1. ID
+        if term.isdigit():
+            doc = players_collection.find_one({"_id": int(term)})
+            if doc: return doc["_id"]
 
+        # 2. Nome Exato
+        doc = players_collection.find_one({"character_name": term})
+        if doc: return doc["_id"]
+
+        # 3. Regex (Haküro)
+        safe = re.escape(term)
+        doc = players_collection.find_one({"character_name": {"$regex": f"^{safe}$", "$options": "i"}})
+        if doc: return doc["_id"]
+        
+        # 4. Normalizado
+        from modules.player.queries import _normalize_char_name
+        norm = _normalize_char_name(term)
+        doc = players_collection.find_one({"character_name_normalized": norm})
+        if doc: return doc["_id"]
+    except Exception as e:
+        logger.error(f"Erro DB: {e}")
     return None
 
-# --- Funções da Conversa ---
-
 async def start_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Inicia a conversa para vender/entregar gemas."""
-    if not await ensure_admin(update):
-        return ConversationHandler.END
+    if not await ensure_admin(update): return ConversationHandler.END
+    await update.callback_query.answer()
     
-    query = update.callback_query
-    await query.answer()
+    # Limpa dados anteriores
+    context.user_data.clear()
     
-    text = (
-        "💎 **Venda de Gemas**\n\n"
-        "Por favor, envie o **User ID** ou o **nome exato do personagem** "
-        "que vai receber as gemas\."
+    await update.callback_query.edit_message_text(
+        "DIAGNOSTICO DE GEMAS V2:\n\n"
+        "Mande o NOME ou ID.\n"
+        "Estou ouvindo tudo (Filtro Universal)."
     )
-    await query.edit_message_text(text, parse_mode="MarkdownV2")
-    
     return ASK_TARGET_PLAYER
 
 async def receive_target_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Recebe o jogador e pede a quantidade de gemas."""
-    target_input = update.message.text
-    
-    # Usa a nova função de busca robusta
-    found_player = await robust_find_player(target_input)
-
-    if not found_player:
-        await update.message.reply_text(
-            f"❌ Jogador '{target_input}' não encontrado.\n"
-            "Tente verificar se há caracteres especiais ou use o **User ID** numérico.",
-            parse_mode="Markdown"
-        )
+    # Captura qualquer coisa que o usuário mandou
+    if update.message and update.message.text:
+        txt = update.message.text
+    else:
+        await update.message.reply_text("Por favor, envie apenas texto.")
         return ASK_TARGET_PLAYER
 
-    user_id, pdata = found_player
+    status = await update.message.reply_text(f"🔍 Buscando: {txt}...")
     
-    context.user_data['gem_target_id'] = user_id
-    context.user_data['gem_target_name'] = pdata.get('character_name', f"ID: {user_id}")
-    
-    char_name = context.user_data['gem_target_name']
-    
-    await update.message.reply_text(
-        f"✅ Jogador selecionado: **{char_name}** (`{user_id}`).\n\n"
-        "Agora, envie a **quantidade** de gemas que deseja entregar.",
-        parse_mode="Markdown"
-    )
-    
-    return ASK_QUANTITY
-
-async def receive_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Recebe a quantidade, mostra o resumo e pede confirmação."""
     try:
-        quantity = int(update.message.text.strip())
-        if quantity <= 0:
-            raise ValueError("A quantidade deve ser positiva.")
-    except ValueError:
-        await update.message.reply_text("❌ Quantidade inválida. Por favor, envie um número inteiro e positivo.")
+        uid = await asyncio.to_thread(_blocking_search, txt)
+
+        if not uid:
+            await status.edit_text(f"❌ '{txt}' não encontrado no DB.")
+            return ASK_TARGET_PLAYER
+
+        pdata = await get_player_data(uid)
+        if not pdata:
+            await status.edit_text("❌ Erro ao carregar dados do jogador.")
+            return ASK_TARGET_PLAYER
+
+        context.user_data['gem_target_id'] = uid
+        context.user_data['gem_target_name'] = pdata.get('character_name', str(uid))
+
+        await status.edit_text(
+            f"✅ ALVO: {context.user_data['gem_target_name']}\n"
+            f"🆔 ID: {uid}\n\n"
+            "Digite a QUANTIDADE:"
+        )
         return ASK_QUANTITY
-        
-    context.user_data['gem_quantity'] = quantity
-    target_name = context.user_data['gem_target_name']
-    user_id = context.user_data['gem_target_id']
-    
-    summary_text = (
-        f"**Resumo da Entrega:**\n\n"
-        f"🔹 **Item:** 💎 Gemas\n"
-        f"🔹 **Quantidade:** {quantity}\n"
-        f"🔹 **Para:** {target_name} (`{user_id}`)\n\n"
-        f"Você confirma a entrega?"
-    )
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Sim, entregar", callback_data="gem_confirm_yes"),
-            InlineKeyboardButton("❌ Não, cancelar", callback_data="gem_confirm_no")
-        ]
-    ]
-    
-    await update.message.reply_text(summary_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-    
-    return CONFIRM_GRANT
 
-async def dispatch_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Executa a entrega das gemas e notifica o jogador."""
-    query = update.callback_query
-    await query.answer()
-
-    user_id = context.user_data['gem_target_id']
-    quantity = context.user_data['gem_quantity']
-    target_name = context.user_data['gem_target_name']
-    
-    # Carrega dados
-    pdata = await player_manager.get_player_data(user_id)
-    
-    if not pdata:
-        await query.edit_message_text(f"❌ Erro crítico! Não foi possível carregar os dados de {target_name} para a entrega.")
-        context.user_data.clear()
+    except Exception as e:
+        logger.error("Erro critico", exc_info=True)
+        await status.edit_text(f"ERRO: {e}")
         return ConversationHandler.END
 
-    # Adiciona Gemas
-    player_manager.add_gems(pdata, quantity)
-    
-    # Salva
-    await player_manager.save_player_data(user_id, pdata)
-    
-    # Confirmação Admin
-    await query.edit_message_text(f"✅ Sucesso! {quantity} 💎 Gemas foram entregues a {target_name}.")
-    
-    # Notificação ao Jogador
+async def receive_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        notification_text = f"🎉 Boas notícias! Você acaba de adquirir **{quantity}** 💎 Gemas!"
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=notification_text,
-            parse_mode="Markdown"
+        qty = int(update.message.text.strip())
+        if qty <= 0: raise ValueError
+        context.user_data['gem_quantity'] = qty
+        
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ ENVIAR", callback_data="gem_confirm_yes")],
+            [InlineKeyboardButton("❌ CANCELAR", callback_data="gem_confirm_no")]
+        ])
+        await update.message.reply_text(
+            f"Confirma {qty} gemas para {context.user_data['gem_target_name']}?",
+            reply_markup=kb
         )
-    except Forbidden:
-        print(f"AVISO: Não foi possível notificar o jogador {user_id} (Bloqueado).")
-    except Exception as e:
-        print(f"ERRO: Falha ao enviar notificação para o jogador {user_id}. Erro: {e}")
+        return CONFIRM_GRANT
+    except:
+        await update.message.reply_text("Número inválido.")
+        return ASK_QUANTITY
 
+async def dispatch_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.callback_query.answer()
+    uid = context.user_data['gem_target_id']
+    qty = context.user_data['gem_quantity']
+    
+    pdata = await get_player_data(uid)
+    if pdata:
+        add_gems(pdata, qty)
+        await save_player_data(uid, pdata)
+        await update.callback_query.edit_message_text(f"✅ Feito! {qty} entregues.")
+        try:
+            await context.bot.send_message(uid, f"💎 Recebidas: {qty} Gemas!")
+        except: pass
+    
     context.user_data.clear()
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancela a conversa a qualquer momento."""
-    message_text = "Operação cancelada."
-    if update.callback_query:
-        await update.callback_query.answer()
-        try:
-            await update.callback_query.edit_message_text(message_text)
-        except:
-            pass
-    elif update.message:
-        await update.message.reply_text(message_text)
-        
+    await update.message.reply_text("Cancelado.")
     context.user_data.clear()
     return ConversationHandler.END
 
-# --- O Handler da Conversa ---
 sell_gems_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(start_sell, pattern=r"^admin_sell_gems$")],
     states={
-        ASK_TARGET_PLAYER: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_target_player)],
+        # USANDO FILTERS.ALL para garantir que pegue TUDO
+        ASK_TARGET_PLAYER: [MessageHandler(filters.ALL & ~filters.COMMAND, receive_target_player)],
         ASK_QUANTITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_quantity)],
         CONFIRM_GRANT: [
             CallbackQueryHandler(dispatch_grant, pattern=r"^gem_confirm_yes$"),
-            CallbackQueryHandler(cancel, pattern=r"^gem_confirm_no$"),
+            CallbackQueryHandler(dispatch_grant, pattern=r"^gem_confirm_no$"), 
         ],
     },
-    fallbacks=[
-        CommandHandler("cancelar", cancel),
-        CallbackQueryHandler(cancel, pattern=r"^grant_cancel$")
-    ],
+    fallbacks=[CommandHandler("cancelar", cancel)],
+    per_message=False # Garante persistência por usuário
 )

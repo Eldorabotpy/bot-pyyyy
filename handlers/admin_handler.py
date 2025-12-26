@@ -10,7 +10,7 @@ import asyncio # Importado para o loop de reset
 from typing import Optional
 from handlers.jobs import distribute_kingdom_defense_ticket_job
 from handlers.admin.grant_item import grant_item_conv_handler 
-from handlers.admin.sell_gems import sell_gems_conv_handler 
+#from handlers.admin.sell_gems import sell_gems_conv_handler 
 from handlers.admin.generate_equip import generate_equip_conv_handler 
 from handlers.admin.file_id_conv import file_id_conv_handler 
 from handlers.admin.premium_panel import premium_panel_handler 
@@ -1468,7 +1468,7 @@ all_admin_handlers = [
     clear_cache_conv_handler, # A conversa de cache
     test_event_conv_handler, # A conversa de teste
     grant_item_conv_handler, # A conversa de dar item
-    sell_gems_conv_handler, # A conversa de vender gemas
+    #sell_gems_conv_handler, # A conversa de vender gemas
     my_data_handler,
     reset_pvp_now_handler,
     generate_equip_conv_handler,
