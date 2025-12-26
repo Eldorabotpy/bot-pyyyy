@@ -27,7 +27,7 @@ except ImportError:
 # --- LISTA NEGRA MANUAL (Itens Especiais) ---
 _BLOCKED_SPECIFIC_IDS = {
     "sigilo_protecao", "ticket_arena", "chave_da_catacumba", 
-    "cristal_de_abertura", "gems", "presente_perdido", "presente_dourado"
+    "cristal_de_abertura", "gems", 
 }
 
 # --- CONFIGURAÇÃO DE LOGGING ---
@@ -193,14 +193,13 @@ async def purchase_listing(
     *,
     buyer_id: int,
     listing_id: int,
-    quantity: int = 1,
+    quantity: int = 1, # Quantidade de LOTES comprados
     context=None
 ) -> Tuple[dict, int]:
     
-    # Importação local segura do inventário
     from modules.player import inventory as inv_module
 
-    # --- 1. Validações e Buscas Iniciais ---
+    # --- 1. Validações ---
     listing = get_listing(listing_id)
     if not listing: raise ListingNotFound("Anúncio não encontrado.")
     if not listing.get("active"): raise ListingInactive("Anúncio inativo/esgotado.")
@@ -223,39 +222,35 @@ async def purchase_listing(
     unit_price = int(listing["unit_price"])
     total_price = unit_price * quantity
 
-    # --- 3. PROCESSAMENTO DO COMPRADOR (Pagamento + Recebimento) ---
-    # Carregamos os dados completos do comprador
+    # --- 3. PROCESSAMENTO DO COMPRADOR ---
     buyer_data = await player_manager.get_player_data(buyer_id)
     if not buyer_data: raise ValueError("Comprador não encontrado no sistema.")
 
-    # A. Verifica Saldo
     buyer_gold = int(buyer_data.get("gold", 0))
     if buyer_gold < total_price:
         raise ValueError(f"Saldo insuficiente. Necessário: {total_price:,} 🪙")
 
-    # B. Deduz Ouro
     buyer_data["gold"] = buyer_gold - total_price
 
-    # C. Entrega o Item ao Inventário (AQUI ESTAVA O ERRO)
+    # C. Entrega o Item ao Inventário (A CORREÇÃO ESTÁ AQUI)
     item_type = item_payload.get("type")
     
     if item_type == "stack":
-        # Item empilhável (Materiais, Consumíveis)
         base_id = item_payload.get("base_id")
-        # Usa a função do módulo inventory corretamente
-        inv_module.add_item_to_inventory(buyer_data, base_id, quantity)
+        
+        # Tamanho do lote (Ex: 100 itens por lote)
+        stack_size = int(item_payload.get("qty", 1)) 
+        
+        # Total real a entregar = Lotes Comprados * Tamanho do Lote
+        total_items_to_give = quantity * stack_size
+        
+        inv_module.add_item_to_inventory(buyer_data, base_id, total_items_to_give)
         
     elif item_type == "unique":
-        # Item único (Equipamentos)
         base_item_data = item_payload.get("item", {}).copy()
-        
-        # Entrega N vezes se necessário
         for _ in range(quantity):
-            # Gera UUID novo e insere no dict do player
             inv_module.add_unique_item(buyer_data, base_item_data)
 
-    # D. Salva o Comprador (Commit da transação)
-    # Isso garante que tanto o gasto do ouro quanto a chegada do item sejam salvos juntos
     await player_manager.save_player_data(buyer_id, buyer_data)
 
     # --- 4. ATUALIZAÇÃO DO ANÚNCIO ---
@@ -267,23 +262,13 @@ async def purchase_listing(
     
     # --- 5. PAGAMENTO AO VENDEDOR ---
     try:
-        # Paga diretamente no Banco (vendedor pode estar offline)
-        db["players"].update_one(
-            {"_id": seller_id}, 
-            {"$inc": {"gold": total_price}}
-        )
-        
-        # Limpa o cache do vendedor para ele ver o ouro atualizado quando entrar
-        try:
-            await player_manager.clear_player_cache(seller_id)
+        db["players"].update_one({"_id": seller_id}, {"$inc": {"gold": total_price}})
+        try: await player_manager.clear_player_cache(seller_id)
         except: pass
-            
         log.info(f"💰 [MARKET] Venda concluída: {buyer_id} comprou de {seller_id} por {total_price}")
-
     except Exception as e:
         log.error(f"🔥 [MARKET] Erro crítico no pagamento ao vendedor: {e}")
 
-    # Retorno para a interface
     listing["quantity"] = new_qty
     listing["active"] = (new_qty > 0)
     
@@ -325,7 +310,7 @@ def _stack_inv_display(base_id: str, qty: int) -> str:
     info = _get_item_info(base_id)
     name = info.get("display_name") or info.get("nome_exibicao") or base_id
     emoji = info.get("emoji", "")
-    return f"{emoji}{name} ×{qty}"
+    return f"{emoji}{name} (Lote: {qty} un.)" # Mudamos visual aqui para indicar Lote
 
 def render_listing_line(
     listing: dict,
@@ -358,12 +343,14 @@ def render_listing_line(
         return f"{prefix}{text}{suffix}{reserved_suf}"
 
     base_id = it.get("base_id", "")
-    pack_qty = int(it.get("qty", 1))
-    core = _stack_inv_display(base_id, pack_qty)
+    
+    # Aqui qty é o TAMANHO DO LOTE (do payload), não o estoque
+    pack_size = int(it.get("qty", 1))
+    core = _stack_inv_display(base_id, pack_size)
     
     suffix = f" — <b>{unit_price} 🪙</b>/lote"
-    if show_price_per_unit and pack_qty > 0:
-        ppu = int(round(unit_price / pack_qty))
+    if show_price_per_unit and pack_size > 0:
+        ppu = int(round(unit_price / pack_size))
         suffix += f" (~{ppu} 🪙/un)"
     
     if include_id: suffix += f" (#{lid})"

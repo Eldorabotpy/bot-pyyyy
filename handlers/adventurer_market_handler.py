@@ -1,7 +1,7 @@
 # handlers/adventurer_market_handler.py
 import logging
 from typing import List, Dict, Any, Optional
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
 # --- MÓDULOS PRINCIPAIS ---
@@ -31,8 +31,6 @@ try:
 except ImportError:
     CLASSES_DATA = {}
 
-MARKET_LOG_GROUP_ID = -1002881364171
-MARKET_LOG_TOPIC_ID = 24475
 logger = logging.getLogger(__name__)
 
 # Fallback para Display Utils
@@ -41,11 +39,69 @@ try:
 except ImportError:
     display_utils = None
 
+async def _refresh_ui(query, context, text, kb, img_key=None):
+    """
+    Função Mestra de Interface:
+    - Tenta EDITAR a mídia se já existir.
+    - Se falhar ou mudar o tipo, apaga e envia novo.
+    """
+    chat_id = query.message.chat_id
+    
+    # 1. Busca Mídia (Foto ou Vídeo)
+    media_id = None
+    media_type = "photo"
+    
+    if img_key and file_ids:
+        fd = file_ids.get_file_data(img_key)
+        if fd: 
+            media_id = fd.get("id")
+            media_type = fd.get("type", "photo") # 'video' ou 'photo'
+
+    # 2. Tenta EDITAR (Para não piscar)
+    try:
+        # Se a mensagem atual tem mídia e queremos manter mídia
+        if media_id and (query.message.photo or query.message.video):
+            if media_type == "video":
+                media = InputMediaVideo(media=media_id, caption=text, parse_mode="HTML")
+            else:
+                media = InputMediaPhoto(media=media_id, caption=text, parse_mode="HTML")
+            
+            await query.edit_message_media(media=media, reply_markup=kb)
+            return
+        
+        # Se a mensagem atual é texto e queremos manter texto
+        elif not media_id and query.message.text:
+            await query.edit_message_text(text=text, reply_markup=kb, parse_mode="HTML")
+            return
+
+    except Exception:
+        # Se falhar a edição (ex: mensagem muito antiga), ignora e vai pro reenvio
+        pass
+
+    # 3. Fallback: DELETAR E ENVIAR NOVO
+    try: await query.delete_message()
+    except: pass
+    
+    if media_id:
+        if media_type == "video":
+            await context.bot.send_video(chat_id=chat_id, video=media_id, caption=text, reply_markup=kb, parse_mode="HTML")
+        else:
+            await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=kb, parse_mode="HTML")
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb, parse_mode="HTML")
+        
 # ==============================
 #  HELPERS VISUAIS
 # ==============================
 def _get_item_info(base_id: str) -> dict:
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
+
+def _get_item_name_from_context(context):
+    pending = context.user_data.get("market_pending", {})
+    if pending.get("type") == "stack":
+        info = _get_item_info(pending["base_id"])
+        return f"{info.get('emoji', '📦')} {info.get('display_name', pending['base_id'])}"
+    return "⚔️ Equipamento"
 
 def _rarity_to_int(rarity):
     order = {"comum": 1, "incomum": 2, "bom": 3, "raro": 4, "epico": 5, "lendario": 6, "mitico": 7, "divino": 8}
@@ -86,46 +142,38 @@ def _get_stat_emoji(key: str) -> str:
     return "✨"
 
 def _render_listing_card(idx: int, listing: dict) -> str:
-    """Renderiza um card de listagem do mercado com indicador de PRIVADO."""
     icons = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
     
     price = int(listing.get("unit_price", 0))
     seller_name = listing.get("seller_name") or f"Vendedor {listing.get('seller_id')}"
     item_payload = listing.get("item", {})
-    
-    # --- LÓGICA DE IDENTIFICAÇÃO PRIVADA ---
+    qty_stock = listing.get("quantity", 0) # Estoque de pacotes
+
     tid = listing.get("target_buyer_id") or listing.get("target_id")
     tname = listing.get("target_buyer_name") or listing.get("target_name") or "Alguém"
-    
-    # Se tiver ID de destino, define os visuais
-    if tid:
-        # Adiciona cadeado no início e linha de reserva
-        lock_emoji = "🔒 " 
-        lock_status = f"🔐 <b>Reservado:</b> {tname}"
-    else:
-        lock_emoji = ""
-        lock_status = ""
-    # ---------------------------------------
+    lock_status = f"🔐 <b>Reservado:</b> {tname}" if tid else ""
+    lock_emoji = "🔒 " if tid else ""
 
     if item_payload.get("type") == "stack":
         base_id = item_payload.get("base_id")
-        qty = item_payload.get("qty", 1)
+        
+        # Tamanho do lote definido na criação
+        lot_size = item_payload.get("qty", 1)
+        
         info = _get_item_info(base_id)
         name = info.get("display_name") or base_id.replace("_", " ").title()
         emoji = info.get("emoji", "📦")
         
-        # Linha final condicional (com ou sem reserva)
         footer = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  👤 {seller_name}"
-        if lock_status:
-            footer += f"\n╰┈➤ {lock_status}"
+        if lock_status: footer += f"\n╰┈➤ {lock_status}"
 
+        # Exibe: Ferro x100 (Estoque: 5 lotes)
         return (
-            f"{icon_num}┈➤ {lock_emoji}{emoji} <b>{name}</b> x{qty}\n"
-            f"├┈➤ 📦 Lote de {qty} un.\n"
+            f"{icon_num}┈➤ {lock_emoji}{emoji} <b>{name}</b> x{lot_size}\n"
+            f"├┈➤ 📦 Estoque: {qty_stock} lotes\n"
             f"{footer}"
         )
-        
     else: # Unique
         inst = item_payload.get("item", {})
         base_id = item_payload.get("base_id") or inst.get("base_id")
@@ -137,7 +185,6 @@ def _render_listing_card(idx: int, listing: dict) -> str:
         cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20,20]
         dura_str = f"[{int(cur_d)}/{int(max_d)}]"
         
-        # Stats
         stats_found = []
         all_stats = {}
         if isinstance(inst.get("attributes"), dict): all_stats.update(inst["attributes"])
@@ -154,7 +201,6 @@ def _render_listing_card(idx: int, listing: dict) -> str:
         stats_str = ", ".join(stats_found[:3]) if stats_found else "---"
         class_str = _detect_class_display(inst, base_id)
 
-        # Linha final condicional
         footer = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  👤 {seller_name}"
         if lock_status:
             footer += f"\n╰┈➤ {lock_status}"
@@ -170,7 +216,6 @@ def _render_sell_card(idx: int, item_wrapper: dict) -> str:
     icons = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
     
-    # === TIPO STACK (Materiais/Consumíveis) ===
     if item_wrapper["type"] == "stack":
         base_id = item_wrapper["base_id"]
         qty = item_wrapper["qty"]
@@ -183,25 +228,20 @@ def _render_sell_card(idx: int, item_wrapper: dict) -> str:
             f"╰┈➤ 📦 Lote de {qty} un."
         )
 
-    # === TIPO UNIQUE (Equipamentos) ===
     else:
         inst = item_wrapper["inst"]
         base_id = item_wrapper["sort_name"]
         info = _get_item_info(base_id)
         
-        # 1. Cabeçalho (Nome + Upgrade + Raridade)
         name = inst.get("display_name") or info.get("display_name") or base_id
         emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
         rarity = str(inst.get("rarity", "comum")).upper()
         upg = inst.get("upgrade_level", 0)
         plus_str = f" +{upg}" if upg > 0 else ""
         
-        # 2. Linha do Meio (Durabilidade + Atributos)
-        # Durabilidade
         cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20,20]
         dura_str = f"[{int(cur_d)}/{int(max_d)}]"
         
-        # Stats
         stats_found = []
         all_stats = {}
         if isinstance(inst.get("attributes"), dict): all_stats.update(inst["attributes"])
@@ -215,13 +255,11 @@ def _render_sell_card(idx: int, item_wrapper: dict) -> str:
                     stats_found.append(f"{icon}+{int(val)}")
             except: continue
             
-        stats_str = ", ".join(stats_found[:4]) # Mostra até 4 status
+        stats_str = ", ".join(stats_found[:4]) 
         if not stats_str: stats_str = ""
 
-        # 3. Rodapé (Classe)
         class_str = _detect_class_display(inst, base_id)
         
-        # Montagem Final
         return (
             f"{icon_num}┈➤ {emoji} <b>{name}{plus_str}</b> [{rarity}]\n"
             f"├┈➤ {dura_str} {stats_str}\n"
@@ -229,165 +267,31 @@ def _render_sell_card(idx: int, item_wrapper: dict) -> str:
         )
 
 def _render_my_sale_card(idx: int, listing: dict) -> str:
-    """Renderiza um card estilizado para a tela 'Minhas Vendas'."""
     icons = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
-    
     lid = listing.get("id")
     price = int(listing.get("unit_price", 0))
     item_payload = listing.get("item", {})
-    
-    # 1. Status (Público ou Privado)
-    tid = listing.get("target_buyer_id") or listing.get("target_id")
-    tname = listing.get("target_buyer_name") or listing.get("target_name") or "Alguém"
-    
-    if tid:
-        status_line = f"🔐 <b>Reservado:</b> {tname}"
-    else:
-        status_line = "📢 <b>Público</b>"
+    qty_stock = listing.get("quantity", 0)
 
-    # 2. Dados do Item
     if item_payload.get("type") == "stack":
         base_id = item_payload.get("base_id")
-        qty = item_payload.get("qty", 1)
+        lot_size = item_payload.get("qty", 1)
         info = _get_item_info(base_id)
-        name = info.get("display_name") or base_id.replace("_", " ").title()
+        name = info.get("display_name") or base_id
         emoji = info.get("emoji", "📦")
         
-        # Formatação Lote
-        header = f"{emoji} <b>{name}</b> x{qty}"
-        details = f"💰 {price:,} 🪙 (Lote)"
-        
-    else: # Unique
-        inst = item_payload.get("item", {})
-        base_id = item_payload.get("base_id") or inst.get("base_id")
-        info = _get_item_info(base_id)
-        name = inst.get("display_name") or info.get("display_name") or base_id
-        emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
-        rarity = str(inst.get("rarity", "comum")).upper()
-        upg = inst.get("upgrade_level", 0)
-        plus_str = f" +{upg}" if upg > 0 else ""
-
-        # Formatação Unique
-        header = f"{emoji} <b>{name}{plus_str}</b> [{rarity}]"
+        header = f"{emoji} <b>{name}</b> (Lote de {lot_size})"
+        details = f"💰 {price:,} 🪙 | Restam: {qty_stock} lotes"
+    else:
+        header = "⚔️ Item Único"
         details = f"💰 {price:,} 🪙"
 
-    # 3. Montagem da Árvore
-    return (
-        f"{icon_num}┈➤ {header}\n"
-        f"├┈➤ {details} │ 🆔 <b>#{lid}</b>\n"
-        f"╰┈➤ {status_line}"
-    )
+    return f"{icon_num}┈➤ {header}\n├┈➤ {details} │ 🆔 <b>#{lid}</b>"
 
 # ==============================
 #  HANDLERS PRINCIPAIS
 # ==============================
-async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, seller_name: str, item_payload: dict, price: int, target_name: str = None):
-    """Envia notificação para o grupo de comércio no tópico específico."""
-    if not MARKET_LOG_GROUP_ID:
-        return
-
-    # 1. Formata nome do item
-    if item_payload.get("type") == "stack":
-        base_id = item_payload.get("base_id")
-        qty = item_payload.get("qty", 1)
-        info = _get_item_info(base_id)
-        i_name = info.get("display_name") or base_id.replace("_", " ").title()
-        i_emoji = info.get("emoji", "📦")
-        item_txt = f"{i_emoji} <b>{i_name}</b> x{qty}"
-    else:
-        inst = item_payload.get("item", {})
-        base_id = item_payload.get("uid") 
-        real_base = inst.get("base_id") or base_id
-        info = _get_item_info(real_base)
-        
-        name = inst.get("display_name") or info.get("display_name") or "Item Raro"
-        emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
-        rarity = str(inst.get("rarity", "comum")).upper()
-        lvl = inst.get("upgrade_level", 0)
-        plus = f"+{lvl}" if lvl > 0 else ""
-        
-        item_txt = f"{emoji} <b>{name}{plus}</b> [{rarity}]"
-
-    # 2. Define texto baseados se é Privado ou Público
-    if target_name:
-        title = "🔒 <b>OFERTA PRIVADA</b>"
-        status = f"👤 <b>Reservado para:</b> {target_name}"
-    else:
-        title = "📢 <b>OFERTA NO MERCADO</b>"
-        status = "🌍 <b>Disponível para todos</b>"
-
-    # 3. Monta a mensagem
-    msg = (
-        f"{title}\n"
-        f"➖➖➖➖➖➖➖➖➖➖\n"
-        f"👤 <b>Vendedor:</b> {seller_name}\n"
-        f"🏷️ <b>Item:</b> {item_txt}\n"
-        f"💰 <b>Preço:</b> {price:,} Ouro\n"
-        f"➖➖➖➖➖➖➖➖➖➖\n"
-        f"{status}\n\n"
-        f"👉 <i>Acesse o Mercado no bot para conferir!</i>"
-    )
-
-    # 4. Envia para o Grupo e Tópico Corretos
-    try:
-        await context.bot.send_message(
-            chat_id=MARKET_LOG_GROUP_ID,
-            message_thread_id=MARKET_LOG_TOPIC_ID, # <--- Importante para cair no tópico
-            text=msg,
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        logger.error(f"Erro ao enviar log de mercado: {e}")
-
-async def _send_purchase_log(context: ContextTypes.DEFAULT_TYPE, buyer_name: str, seller_name: str, item_payload: dict, price: int):
-    """Envia notificação de venda concluída para o grupo de logs."""
-    if not MARKET_LOG_GROUP_ID:
-        return
-
-    # 1. Formata nome do item
-    if item_payload.get("type") == "stack":
-        base_id = item_payload.get("base_id")
-        qty = item_payload.get("qty", 1)
-        info = _get_item_info(base_id)
-        i_name = info.get("display_name") or base_id.replace("_", " ").title()
-        i_emoji = info.get("emoji", "📦")
-        item_txt = f"{i_emoji} <b>{i_name}</b> x{qty}"
-    else:
-        inst = item_payload.get("item", {})
-        base_id = item_payload.get("uid") 
-        real_base = inst.get("base_id") or base_id
-        info = _get_item_info(real_base)
-        
-        name = inst.get("display_name") or info.get("display_name") or "Item Raro"
-        emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
-        rarity = str(inst.get("rarity", "comum")).upper()
-        lvl = inst.get("upgrade_level", 0)
-        plus = f"+{lvl}" if lvl > 0 else ""
-        
-        item_txt = f"{emoji} <b>{name}{plus}</b> [{rarity}]"
-
-    # 2. Monta a mensagem de Sucesso
-    msg = (
-        f"🤝 <b>NEGÓCIO FECHADO!</b>\n"
-        f"➖➖➖➖➖➖➖➖➖➖\n"
-        f"🛒 <b>Comprador:</b> {buyer_name}\n"
-        f"👤 <b>Vendedor:</b> {seller_name}\n"
-        f"📦 <b>Item:</b> {item_txt}\n"
-        f"💰 <b>Valor:</b> {price:,} Ouro\n"
-        f"➖➖➖➖➖➖➖➖➖➖"
-    )
-
-    # 3. Envia para o mesmo Grupo e Tópico
-    try:
-        await context.bot.send_message(
-            chat_id=MARKET_LOG_GROUP_ID,
-            message_thread_id=MARKET_LOG_TOPIC_ID, # Usa o mesmo ID do tópico
-            text=msg,
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        logger.error(f"Erro ao enviar log de compra: {e}")
 
 async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -395,7 +299,6 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = query.from_user.id
 
-    # 1. Recupera dados para mostrar saldo atualizado
     try:
         pdata = await player_manager.get_player_data(user_id)
         gold = int(pdata.get("gold", 0))
@@ -404,7 +307,6 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gold = 0
         gems = 0
 
-    # 2. Texto Imersivo com Status
     text = (
         f"🏰 <b>CENTRO COMERCIAL DE ELDORA</b>\n"
         f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
@@ -417,7 +319,6 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"╰┈➤ 💎 <b>{gems:,}</b> Gemas"
     )
 
-    # 3. Botões em Grade (Lado a Lado)
     kb = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🎒 𝐌𝐞𝐫𝐜𝐚𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data="market_adventurer"),
@@ -434,14 +335,12 @@ async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
 
-    # 1. Busca o saldo atual do jogador para exibir no topo
     try:
         pdata = await player_manager.get_player_data(user_id)
         gold = int(pdata.get("gold", 0))
     except:
         gold = 0
 
-    # 2. Texto Estilizado com Saldo
     text = (
         f"🎒 𝐌𝐄𝐑𝐂𝐀𝐃𝐎 𝐃𝐎 𝐀𝐕𝐄𝐍𝐓𝐔𝐑𝐄𝐈𝐑𝐎\n"
         f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
@@ -450,7 +349,6 @@ async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"<i>O burburinho dos comerciantes preenche o ar. Aqui você pode negociar itens com outros viajantes.</i>"
     )
 
-    # 3. Botões Organizados (Comprar e Vender lado a lado)
     kb = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🛒 𝐂𝐨𝐦𝐩𝐫𝐚𝐫", callback_data="market_list"),
@@ -460,7 +358,6 @@ async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓 ", callback_data="market")]
     ])
 
-    # Mantém a imagem se houver, ou edita o texto
     await _send_smart(query, context, update.effective_chat.id, text, kb, "mercado_aventureiro")
 
 # ==============================
@@ -512,7 +409,6 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         for idx, listing in enumerate(listings_page, start=1):
             try:
-                # Busca nome do vendedor se faltar
                 if "seller_name" not in listing:
                     sid = listing.get("seller_id")
                     try:
@@ -557,41 +453,12 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: await q.answer("ID inválido.", show_alert=True); return
 
     try:
-        # Tenta realizar a compra no gerenciador
         try:
             listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         except TypeError:
             listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
             
         await q.answer(f"✅ Compra realizada! Custo: {cost} ouro", show_alert=True)
-        
-        # --- LOG DE COMPRA (NOVO CÓDIGO) ---
-        try:
-            # 1. Busca nome do Comprador
-            buyer_data = await player_manager.get_player_data(buyer_id)
-            buyer_name = buyer_data.get("character_name", q.from_user.first_name)
-            
-            # 2. Busca nome do Vendedor (tenta pegar do listing ou busca no banco)
-            seller_name = listing.get("seller_name")
-            if not seller_name:
-                seller_id = listing.get("seller_id")
-                try:
-                    s_data = await player_manager.get_player_data(seller_id)
-                    seller_name = s_data.get("character_name", f"Vendedor {seller_id}")
-                except: seller_name = "Desconhecido"
-
-            # 3. Prepara dados do item
-            item_payload = listing.get("item", {})
-
-            # 4. Envia o Log em Background
-            context.application.create_task(
-                _send_purchase_log(context, buyer_name, seller_name, item_payload, cost)
-            )
-        except Exception as e_log:
-            logger.error(f"Erro ao gerar log de compra: {e_log}")
-        # -----------------------------------
-
-        # Atualiza a lista para o usuário
         await market_list(update, context)
         
     except ValueError as ve:
@@ -652,7 +519,6 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     
     for item_id, data in inv.items():
         try:
-            # Normalização
             if isinstance(data, dict): 
                 base_id = data.get("base_id") or data.get("tpl") or item_id
                 qty = data.get("qty", 0) or 1
@@ -664,36 +530,22 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
                 is_unique = False
                 inst_data = {}
 
-            # --- IDENTIFICAÇÃO DO TIPO (CRUCIAL PARA O FIX) ---
             info = _get_item_info(base_id)
             itype = str(info.get("type", "")).lower()
             
-            # Verifica se é equipamento REAL (Arma, Armadura, Acessório)
             is_equipment_type = (is_unique or itype in ["equipamento", "arma", "armadura", "acessorio", "equipment", "weapon", "armor"])
 
-            # ================================================================
-            # 🛡️ FILTROS DE SEGURANÇA
-            # ================================================================
-            
-            # 1. Filtro Oficial (Arquivo items_evolution.py) - Bloqueia sempre
             if base_id in EVOLUTION_ITEMS_DATA: 
                 continue
 
-            # 2. Filtro de Texto INTELIGENTE
-            # Só bloqueia palavras-chave se o item NÃO FOR EQUIPAMENTO.
-            # Isso permite "Lâmina do Samurai" (Arma) mas bloqueia "Lâmina Afiada" (Material)
             if not is_equipment_type:
                 bid_lower = str(base_id).lower()
                 if any(k in bid_lower for k in BLOCKED_KEYWORDS): 
                     continue
 
-            # 3. Filtro de Consumíveis Intransferíveis
             if base_id in CONSUMABLES_DATA:
                 if CONSUMABLES_DATA[base_id].get("tradable") is False: continue
 
-            # ================================================================
-            
-            # Lógica de Exibição por Categoria do Menu
             should_show = False
 
             if category == "equip" and is_equipment_type: 
@@ -713,7 +565,6 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
         except Exception: 
             continue
 
-    # Ordenação e Paginação
     sellable.sort(key=lambda x: (0 if x["type"] == "unique" else 1, -x["rarity_rank"], x["sort_name"]))
 
     ITEMS_PER_PAGE = 5
@@ -772,7 +623,7 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     await _safe_edit(query, full_text, InlineKeyboardMarkup(keyboard))
 
 # ==============================
-#  RESTO DO FLUXO (PREÇO/QTD/PRIVADO)
+#  LÓGICA DE VENDA (PREÇO/QTD/PRIVADO) - ATUALIZADA
 # ==============================
 
 async def market_pick_stack(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -788,94 +639,346 @@ async def market_pick_stack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if qty_have <= 0:
         await q.answer("Você não possui este item.", show_alert=True); return
 
-    context.user_data["market_pending"] = {"type": "stack", "base_id": base_id, "qty_have": qty_have, "qty": 1}
+    # Inicializa: Lote de 1, Estoque de 1
+    context.user_data["market_pending"] = {
+        "type": "stack", 
+        "base_id": base_id, 
+        "qty_have": qty_have, 
+        "lot_size": 1, 
+        "qty": 1  # Este 'qty' agora representa o ESTOQUE (Número de lotes)
+    }
     context.user_data["market_price"] = 50 
-    await _show_qty_spinner(q, context)
+    
+    # 1º Passo: Definir Tamanho do Lote
+    await _show_lot_size_spinner(q, context)
 
 async def market_pick_unique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     unique_id = q.data.replace("market_pick_unique_", "")
-    context.user_data["market_pending"] = {"type": "unique", "uid": unique_id, "qty": 1}
+    context.user_data["market_pending"] = {"type": "unique", "uid": unique_id, "qty": 1, "lot_size": 1}
     context.user_data["market_price"] = 500 
     await _show_price_spinner(q, context)
 
-async def market_qty_spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def _show_lot_size_spinner(q, context):
+    pending = context.user_data.get("market_pending")
+    lot_size = pending["lot_size"]
+    max_avail = pending["qty_have"]
+    item_name = _get_item_name_from_context(context)
+    
+    # Calcula quantos lotes seriam possíveis com esse tamanho
+    possible_stock = max_avail // lot_size
+
+    text = (
+        f"📦 <b>TAMANHO DO LOTE</b>\n"
+        f"Item: {item_name}\n"
+        f"Total na Mochila: {max_avail}\n\n"
+        f"🔢 <b>Itens por Pacote:</b> {lot_size}\n"
+        f"<i>(Isso criaria no máximo {possible_stock} pacotes)</i>"
+    )
+
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("-10", callback_data="mkt_size_dec_10"),
+            InlineKeyboardButton("-1", callback_data="mkt_size_dec_1"),
+            InlineKeyboardButton(f"{lot_size}", callback_data="noop"),
+            InlineKeyboardButton("+1", callback_data="mkt_size_inc_1"),
+            InlineKeyboardButton("+10", callback_data="mkt_size_inc_10")
+        ],
+        [
+            InlineKeyboardButton("🚀 Tudo em 1 Lote", callback_data="mkt_size_max"),
+            InlineKeyboardButton("⌨️ Digitar", callback_data="mkt_input_size_start")
+        ],
+        [
+            InlineKeyboardButton("✅ Confirmar Tamanho", callback_data="mkt_size_confirm"),
+            InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")
+        ]
+    ])
+    
+    await _safe_edit(q, text, kb)
+
+async def market_lot_size_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Avança para o passo 2: Estoque
+    q = update.callback_query
+    if q: await q.answer()
+    
+    pending = context.user_data.get("market_pending")
+    lot_size = pending["lot_size"]
+    max_avail = pending["qty_have"]
+    
+    max_stock = max_avail // lot_size
+    if max_stock < 1:
+        # Se editou texto e colocou valor inválido
+        if q: await q.edit_message_caption("⚠️ Tamanho de lote maior que inventário!")
+        return
+
+    # Reseta o estoque para 1 (ou max se for menor que 1, mas já checamos)
+    pending["qty"] = 1 
+    await _show_stock_spinner(q or update.message, context)
+
+async def _show_stock_spinner(q, context):
+    pending = context.user_data.get("market_pending")
+    stock = pending["qty"] # Aqui 'qty' significa QUANTIDADE DE LOTES
+    lot_size = pending["lot_size"]
+    max_avail = pending["qty_have"]
+    
+    max_stock = max_avail // lot_size
+    total_items_selling = stock * lot_size
+    
+    text = (
+        f"📊 <b>DEFINIR ESTOQUE</b>\n"
+        f"📦 Lote: {lot_size} itens\n\n"
+        f"🔢 <b>Quantos Lotes vender?</b> {stock}\n"
+        f"<i>Total de itens a vender: {total_items_selling} / {max_avail}</i>"
+    )
+
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("-10", callback_data="mkt_pack_dec_10"),
+            InlineKeyboardButton("-1", callback_data="mkt_pack_dec_1"),
+            InlineKeyboardButton(f"{stock}", callback_data="noop"),
+            InlineKeyboardButton("+1", callback_data="mkt_pack_inc_1"),
+            InlineKeyboardButton("+10", callback_data="mkt_pack_inc_10")
+        ],
+        [
+            InlineKeyboardButton("🚀 Vender Todos os Lotes", callback_data="mkt_pack_max"),
+            InlineKeyboardButton("✅ Confirmar Estoque", callback_data="mkt_pack_confirm")
+        ],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
+    ])
+    
+    await _safe_edit(q, text, kb)
+
+async def market_lot_size_spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
     pending = context.user_data.get("market_pending")
     if not pending: return
-    action = q.data
-    cur = pending["qty"]
-    max_q = pending.get("qty_have", 1)
     
-    if "inc" in action: cur += 1
-    elif "dec" in action: cur -= 1
+    action = q.data
+    cur = pending["lot_size"]
+    max_avail = pending["qty_have"]
+    
+    if "max" in action:
+        cur = max_avail
+    else:
+        try: delta = int(action.split("_")[-1])
+        except: delta = 1
+        
+        if "inc" in action: cur += delta
+        elif "dec" in action: cur -= delta
+    
     if cur < 1: cur = 1
-    if cur > max_q: cur = max_q
+    if cur > max_avail: cur = max_avail
+    
+    pending["lot_size"] = cur
+    await _show_lot_size_spinner(q, context)
+
+# --- SPINNERS E HELPERS (ATUALIZADOS) ---
+
+async def _show_qty_spinner(q, context):
+    pending = context.user_data.get("market_pending")
+    cur = pending["qty"]
+    max_q = pending.get("qty_have", 1) # Mostra quanto tem na mochila
+    
+    text = (
+        f"⚖️ <b>QUANTIDADE</b>\n"
+        f"🎒 Disponível: {max_q}\n\n"
+        f"📦 <b>Vender:</b> {cur}"
+    )
+
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("-10", callback_data="mkt_pack_dec_10"), 
+            InlineKeyboardButton("-1", callback_data="mkt_pack_dec_1"),
+            InlineKeyboardButton(f"{cur}", callback_data="noop"),
+            InlineKeyboardButton("+1", callback_data="mkt_pack_inc_1"),
+            InlineKeyboardButton("+10", callback_data="mkt_pack_inc_10")
+        ],
+        [
+            InlineKeyboardButton("⌨️ Digitar", callback_data="mkt_input_qty_start"),
+            InlineKeyboardButton("✅ Confirmar", callback_data="mkt_pack_confirm")
+        ],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
+    ])
+    await _safe_edit(q, text, kb)
+
+async def _show_price_spinner(q, context):
+    cur = context.user_data.get("market_price", 50)
+    qty = context.user_data.get("market_pending", {}).get("qty", 1)
+    total = cur * qty
+
+    # --- CORREÇÃO 2: CLAREZA NO PREÇO ---
+    # Deixamos claro que o input é UNITÁRIO e mostramos o total calculado
+    text = (
+        f"💰 <b>DEFINIR PREÇO</b>\n"
+        f"📦 Quantidade: {qty}\n\n"
+        f"🏷️ <b>Preço por Unidade:</b> {cur:,} 🪙\n"
+        f"💵 <b>Valor Total da Venda:</b> {total:,} 🪙\n"
+    )
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("-1000", callback_data="mktp_dec_1000"), InlineKeyboardButton("-100", callback_data="mktp_dec_100")],
+        [InlineKeyboardButton(f"Unid: {cur}", callback_data="noop")],
+        [InlineKeyboardButton("+100", callback_data="mktp_inc_100"), InlineKeyboardButton("+1000", callback_data="mktp_inc_1000")],
+        [InlineKeyboardButton("⌨️ Digitar Valor Unitário", callback_data="mkt_input_price_start")],
+        [InlineKeyboardButton("✅ Confirmar", callback_data="mktp_confirm"), InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
+    ])
+    
+    await _safe_edit(q, text, kb)
+
+# --- HANDLERS DE AÇÃO ---
+
+async def market_qty_spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Lógica de spin para o ESTOQUE
+    q = update.callback_query; await q.answer()
+    pending = context.user_data.get("market_pending")
+    
+    action = q.data
+    cur = pending["qty"] # Estoque
+    lot_size = pending["lot_size"]
+    max_avail = pending["qty_have"]
+    max_stock = max_avail // lot_size
+    
+    if "max" in action:
+        cur = max_stock
+    else:
+        try: delta = int(action.split("_")[-1])
+        except: delta = 1
+        if "inc" in action: cur += delta
+        elif "dec" in action: cur -= delta
+    
+    if cur < 1: cur = 1
+    if cur > max_stock: cur = max_stock
     
     pending["qty"] = cur
-    await _show_qty_spinner(q, context)
+    await _show_stock_spinner(q, context)
+
+async def market_start_input_size(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query; await q.answer()
+    context.user_data["market_awaiting_size_input"] = True
+    await _safe_edit(q, "⌨️ Digite o <b>tamanho do lote</b> (itens por pacote):", None)
 
 async def market_price_spin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
     cur = context.user_data.get("market_price", 50)
     action = q.data
+    
     if "inc_1000" in action: cur += 1000
     elif "inc_100" in action: cur += 100
     elif "inc_10" in action: cur += 10
     elif "dec_1000" in action: cur -= 1000
     elif "dec_100" in action: cur -= 100
     elif "dec_10" in action: cur -= 10
+    
     if cur < 1: cur = 1
     context.user_data["market_price"] = cur
     await _show_price_spinner(q, context)
 
-async def _show_qty_spinner(q, context):
-    pending = context.user_data.get("market_pending")
-    cur = pending["qty"]
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("-1", callback_data="mkt_pack_dec_1"), InlineKeyboardButton(f"{cur}", callback_data="noop"), InlineKeyboardButton("+1", callback_data="mkt_pack_inc_1")],
-        [InlineKeyboardButton("✅ Confirmar Quantidade", callback_data="mkt_pack_confirm"), InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
-    ])
-    await _safe_edit(q, f"Quantos itens deseja vender?", kb)
-
-async def _show_price_spinner(q, context):
-    cur = context.user_data.get("market_price", 50)
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("-100", callback_data="mktp_dec_100"), InlineKeyboardButton("-10", callback_data="mktp_dec_10")],
-        [InlineKeyboardButton(f"💰 {cur} Ouro", callback_data="noop")],
-        [InlineKeyboardButton("+10", callback_data="mktp_inc_10"), InlineKeyboardButton("+100", callback_data="mktp_inc_100")],
-        [InlineKeyboardButton("✅ Confirmar Preço", callback_data="mktp_confirm"), InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]
-    ])
-    await _safe_edit(q, f"Defina o preço total em Ouro:", kb)
-
 async def market_qty_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Pode vir de botão (CallbackQuery) ou de texto (Message)
+    if update.callback_query:
+        q = update.callback_query
+        await q.answer()
+        await _show_price_spinner(q, context)
+    else:
+        # Se vier de texto, passamos o message como 'q'
+        await _show_price_spinner(update.message, context)
+
+# --- HANDLERS DE INPUT DE TEXTO ---
+
+async def market_start_input_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
-    await _show_price_spinner(q, context)
+    context.user_data["market_awaiting_qty_input"] = True
+    # Edita a legenda para dar feedback
+    try:
+        await q.edit_message_caption("⌨️ <b>MODO DE TEXTO</b>\n\nDigite a quantidade desejada no chat agora:", parse_mode="HTML")
+    except:
+        await q.edit_message_text("⌨️ <b>MODO DE TEXTO</b>\n\nDigite a quantidade desejada no chat agora:", parse_mode="HTML")
 
-# --- PUBLICO / PRIVADO ---
+async def market_start_input_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query; await q.answer()
+    context.user_data["market_awaiting_price_input"] = True
+    try:
+        await q.edit_message_caption("⌨️ <b>MODO DE TEXTO</b>\n\nDigite o preço total (em Ouro) no chat agora:", parse_mode="HTML")
+    except:
+        await q.edit_message_text("⌨️ <b>MODO DE TEXTO</b>\n\nDigite o preço total (em Ouro) no chat agora:", parse_mode="HTML")
 
-async def market_ask_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
+async def market_process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data = context.user_data
+    # Só processa se o bot estiver esperando QTD ou PREÇO
+    if not user_data.get("market_awaiting_qty_input") and not user_data.get("market_awaiting_price_input"):
+        return
+
+    text = update.message.text.strip()
+    
+    # Verifica se é número
+    if not text.isdigit():
+        await update.message.reply_text("🔢 Por favor, digite apenas números inteiros.")
+        return
+
+    value = int(text)
+    
+    # 1. Processando QUANTIDADE
+    if user_data.get("market_awaiting_qty_input"):
+        pending = user_data.get("market_pending")
+        if not pending: return
+
+        max_q = pending.get("qty_have", 1)
+        # Ajusta se passou do limite
+        if value < 1: value = 1
+        if value > max_q: 
+            value = max_q
+            await update.message.reply_text(f"⚠️ Ajustado para o máximo que você tem: {max_q}")
+        else:
+            await update.message.reply_text(f"✅ Quantidade definida: {value}")
+
+        pending["qty"] = value
+        user_data.pop("market_awaiting_qty_input", None)
+        
+        # Avança para o próximo passo (Preço)
+        await market_qty_confirm(update, context)
+
+    # 2. Processando PREÇO
+    elif user_data.get("market_awaiting_price_input"):
+        if value < 1: value = 1
+        
+        user_data["market_price"] = value
+        user_data.pop("market_awaiting_price_input", None)
+        
+        await update.message.reply_text(f"✅ Preço definido: {value:,} Ouro")
+        # Avança para a pergunta de Público/Privado (usando Message como 'q')
+        await _show_type_selection(update.message, context)
+
+async def _show_type_selection(q, context):
+    """Helper para mostrar a seleção de tipo (Público/Privado)."""
     price = context.user_data.get("market_price", 0)
     text = f"💰 <b>Preço Definido:</b> {price:,} Ouro\n\nComo deseja anunciar?"
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 Público", callback_data="mkt_finish_public"), InlineKeyboardButton("🔒 Privado (ID)", callback_data="mkt_ask_private")],
         [InlineKeyboardButton("⬅️ Voltar", callback_data="market_sell_menu")]
     ])
-    await _safe_edit(q, text, kb)
+    
+    if hasattr(q, "edit_message_caption") or hasattr(q, "edit_message_text"):
+        await _safe_edit(q, text, kb)
+    else:
+        await q.reply_text(text, reply_markup=kb, parse_mode="HTML")
+
+# --- PUBLICO / PRIVADO ---
+
+async def market_ask_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    await _show_type_selection(q, context)
 
 async def market_ask_private_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     context.user_data["market_awaiting_id"] = True
     
-    # Texto alterado para pedir NOME
     text = (
         "🔒 <b>Venda Privada</b>\n\n"
-        "Envie o <b>Nome do Personagem</b> (ex: <i>Aragorn</i>).\n"
-        
+        "Envie o <b>Nome do Personagem</b> (ex: <i>Aragorn</i>) ou o <b>@usuario</b> do Telegram do comprador.\n"
+        "<i>Você também pode encaminhar uma mensagem dele.</i>"
     )
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]])
     await _safe_edit(q, text, kb)
@@ -899,22 +1002,29 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
     seller_name = "Vendedor"
 
     try:
-        # 1. Busca dados do vendedor (Usaremos isso apenas para o LOG, não para o banco)
         pdata = await player_manager.get_player_data(user_id)
         seller_name = pdata.get("character_name", f"Player {user_id}")
         
-        # --- 2. TENTA REMOVER O ITEM (Memória) ---
+        item_payload = {}
+        stock_to_create = 1
+        
         if pending["type"] == "stack":
             base_id = pending["base_id"]
-            qty = pending["qty"]
-            if player_manager.remove_item_from_inventory(pdata, base_id, qty):
-                item_payload = {"type": "stack", "base_id": base_id, "qty": qty}
-                item_removed_successfully = True
+            lot_size = pending["lot_size"] # 100
+            stock = pending["qty"]         # 10 lotes
+            
+            total_items_to_remove = stock * lot_size # 1000 itens
+            
+            if player_manager.remove_item_from_inventory(pdata, base_id, total_items_to_remove):
+                # O payload do item diz que CADA UNIDADE contém 'lot_size' itens
+                item_payload = {"type": "stack", "base_id": base_id, "qty": lot_size}
+                stock_to_create = stock
             else:
-                if q: await q.answer("❌ Você não possui itens suficientes.", show_alert=True)
+                if q: await q.answer("❌ Itens insuficientes.", show_alert=True)
                 return
 
         elif pending["type"] == "unique":
+            # ... (código unique mantém igual) ...
             uid = pending["uid"]
             inv = pdata.get("inventory", {})
             if uid in inv:
@@ -922,31 +1032,23 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
                 del inv[uid]
                 item_payload = {"type": "unique", "item": item_data, "uid": uid}
                 item_removed_successfully = True
+                qty = 1 # Unique é sempre 1
             else:
                 if q: await q.answer("❌ Item não encontrado.", show_alert=True)
                 return
 
-        # --- 3. SALVA A REMOÇÃO ---
+        # --- 2. SALVA A REMOÇÃO ---
         await player_manager.save_player_data(user_id, pdata)
 
-        # --- 4. CRIA O ANÚNCIO NO MERCADO ---
-        # CORREÇÃO: Removemos 'seller_name' daqui pois o seu gerenciador de banco não aceita
-        # Mantemos apenas o que é padrão.
         market_manager.create_listing(
-            seller_id=user_id, 
-            item_payload=item_payload, 
-            unit_price=price, 
-            target_buyer_id=target_id, 
-            target_buyer_name=target_name
+            seller_id=user_id,
+            item_payload=item_payload,
+            unit_price=price,
+            quantity=stock_to_create, # Passa o estoque de lotes
+            target_buyer_id=target_id,
+            target_buyer_name=target_name,
+            seller_name=seller_name
         )
-        
-        # --- 5. ENVIA LOG PARA O GRUPO (AQUI usamos o seller_name que pegamos lá em cima) ---
-        try:
-            context.application.create_task(
-                _send_market_log(context, seller_name, item_payload, price, target_name)
-            )
-        except Exception as e_log:
-            logger.error(f"Erro ao enviar log (não crítico): {e_log}")
         
         # --- SUCESSO ---
         context.user_data.pop("market_pending", None)
@@ -957,56 +1059,55 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         if target_id: msg_text += f"\n🔒 <b>Reservado para:</b> {target_name}"
         else: msg_text += "\n📢 <b>Público</b>"
 
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("🎒 Voltar ao Mercado", callback_data="market_adventurer")]])
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("🎒 Voltar", callback_data="market_adventurer")]])
         
         if q: await _safe_edit(q, msg_text, kb)
         else: await update.effective_message.reply_text(msg_text, reply_markup=kb, parse_mode="HTML")
             
     except Exception as e:
-        # Adicionei este print para você ver o erro real no terminal se acontecer de novo
-        logger.error(f"ERRO CRÍTICO NA VENDA: {e}") 
+        logger.error(f"ERRO CRÍTICO NA VENDA (USER {user_id}): {e}")
         
-        # --- ROLLBACK EM CASO DE ERRO ---
+        # --- 4. SISTEMA DE SEGURANÇA (ROLLBACK) ---
         if item_removed_successfully and pdata:
+            logger.warning(f"Iniciando devolução de item para {user_id} devido a erro no mercado...")
             try:
-                # Devolve o item
                 if pending["type"] == "stack":
                     inv = pdata.setdefault("inventory", {})
                     base_id = pending["base_id"]
                     qty = pending["qty"]
                     inv[base_id] = int(inv.get(base_id, 0)) + qty
+                
                 elif pending["type"] == "unique":
                     uid = pending["uid"]
                     if "item" in item_payload:
                         pdata.setdefault("inventory", {})[uid] = item_payload["item"]
                 
                 await player_manager.save_player_data(user_id, pdata)
-                err_msg = "⚠️ <b>Erro no Mercado!</b> Ocorreu uma falha, mas seu item foi devolvido."
-            except Exception:
-                err_msg = "❌ <b>Erro Crítico!</b> Item perdido. Contate admin."
+                err_msg = "⚠️ <b>Erro no Mercado!</b>\nO sistema detectou uma falha, mas seu item foi <b>DEVOLVIDO</b> ao inventário."
+            except Exception as e_rollback:
+                logger.critical(f"FALHA NO ROLLBACK DO JOGADOR {user_id}: {e_rollback}")
+                err_msg = "❌ <b>Erro Crítico!</b> Contate o suporte. (Cod: ROLLBACK_FAIL)"
         else:
             err_msg = "❌ Erro ao processar. Nenhum item removido."
 
-        if q: await _safe_edit(q, err_msg, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]) )
+        if q: await _safe_edit(q, err_msg, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
         else: await update.effective_message.reply_text(err_msg, parse_mode="HTML")
 
 async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Verifica se a flag de venda privada está ativa
+    # Só processa se o bot estiver esperando um ID para venda privada
     if not context.user_data.get("market_awaiting_id"): 
         return
 
     user_id = update.effective_user.id
-    text = update.message.text.strip()
     target_id = None
     target_name = "Desconhecido"
+    text = update.message.text.strip()
 
     try:
-        # A) Se for encaminhamento de mensagem
         if update.message.forward_from:
             target_id = update.message.forward_from.id
             target_name = update.message.forward_from.first_name
         
-        # B) Se for ID numérico direto
         elif text.isdigit():
             target_id = int(text)
             try:
@@ -1014,51 +1115,36 @@ async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TY
                 if pdata: target_name = pdata.get("character_name", "Jogador")
             except: pass
 
-        # C) Se for Nome ou @Username
         else:
             pdata = None
-            try:
+            if text.startswith("@"):
                 from modules.player import queries
-                # Tenta por @username
-                if text.startswith("@"):
-                    pdata = await queries.find_by_username(text)
-                
-                # Tenta por Nome do Personagem
-                if not pdata:
-                    res = await queries.find_player_by_name(text)
-                    if not res:
-                        # Tenta busca flexível se sua função suportar, senão remove essa linha
-                        try: res = await queries.find_player_by_name_norm(text)
-                        except: pass
-                    
-                    if res:
-                        # Adaptação dependendo de como sua query retorna (tupla ou dict)
-                        if isinstance(res, tuple):
-                             target_id_found, pdata = res
-                        else:
-                             pdata = res
+                pdata = await queries.find_by_username(text)
+            else:
+                from modules.player import queries
+                res = await queries.find_player_by_name(text)
+                if not res:
+                    res = await queries.find_player_by_name_norm(text)
+                if res:
+                    target_id, pdata = res
 
-                if pdata:
-                    target_id = pdata.get("user_id") or pdata.get("_id")
-                    target_name = pdata.get("character_name", text)
-            except Exception as e:
-                logger.error(f"Erro busca nome: {e}")
+            if pdata:
+                target_id = pdata.get("user_id") or pdata.get("_id")
+                target_name = pdata.get("character_name", text)
 
-        # --- Validações Finais ---
         if not target_id:
-            await update.message.reply_text("❌ <b>Jogador não encontrado.</b>\nVerifique se o nome está exato (maiúsculas importam) ou use o ID.", parse_mode="HTML")
+            await update.message.reply_text("❌ Jogador não encontrado. Verifique o nome exato ou use o ID.")
             return
 
         if target_id == user_id:
             await update.message.reply_text("❌ Você não pode vender para si mesmo.")
             return
         
-        # Finaliza a venda
         await market_finalize_listing(update, context, target_id=target_id, target_name=target_name)
 
     except Exception as e:
         logger.error(f"Erro input ID: {e}")
-        await update.message.reply_text("❌ Erro técnico. Tente cancelar e fazer de novo.")
+        await update.message.reply_text("❌ Erro ao buscar jogador.")
 
 async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer("Cancelado.")
@@ -1070,7 +1156,6 @@ async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
     user_id = q.from_user.id
     
-    # Busca as vendas do jogador
     listings = market_manager.list_by_seller(user_id)
     
     if not listings:
@@ -1079,22 +1164,17 @@ async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _safe_edit(q, msg, kb)
         return
 
-    # Cabeçalho
     lines = ["👤 𝐌𝐢𝐧𝐡𝐚𝐬 𝐕𝐞𝐧𝐝𝐚𝐬 𝐀𝐭𝐢𝐯𝐚𝐬\n"]
     rows = []
     
-    # Gera a lista com o novo visual
     for idx, l in enumerate(listings, start=1):
-        # Gera o texto do card
         card_text = _render_my_sale_card(idx, l)
         lines.append(card_text)
-        lines.append("") # Linha em branco para separar
+        lines.append("") 
         
-        # Botão de Cancelar correspondente ao ID
         lid = l['id']
         rows.append([InlineKeyboardButton(f"❌ Cancelar Item #{lid}", callback_data=f"market_cancel_{lid}")])
 
-    # Adiciona botão de voltar no final
     rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")])
     
     full_text = "\n".join(lines)
@@ -1127,10 +1207,44 @@ async def _send_smart(query, context, chat_id, text, kb, img_key):
     await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode="HTML")
 
 async def _safe_edit(query, text, kb):
-    try: await query.edit_message_caption(caption=text, reply_markup=kb, parse_mode='HTML')
-    except: 
-        try: await query.edit_message_text(text=text, reply_markup=kb, parse_mode='HTML')
+    if hasattr(query, "edit_message_caption"):
+        try: await query.edit_message_caption(caption=text, reply_markup=kb, parse_mode='HTML'); return
         except: pass
+        try: await query.edit_message_text(text=text, reply_markup=kb, parse_mode='HTML'); return
+        except: pass
+    if hasattr(query, "reply_text"):
+        await query.reply_text(text, reply_markup=kb, parse_mode='HTML')
+        return
+    try: await query.message.reply_text(text, reply_markup=kb, parse_mode='HTML')
+    except: pass
+
+async def market_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ud = context.user_data
+    # Roteamento inteligente
+    if ud.get("market_awaiting_size_input"):
+        await market_process_size_input(update, context)
+    elif ud.get("market_awaiting_qty_input") or ud.get("market_awaiting_price_input"):
+        await market_process_text_input(update, context) # (Função existente renomeada ou mantida)
+    elif ud.get("market_awaiting_id"):
+        await market_catch_input_id(update, context)
+
+async def market_process_size_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    if not text.isdigit(): return
+    val = int(text)
+    
+    pending = context.user_data.get("market_pending")
+    max_avail = pending["qty_have"]
+    
+    if val < 1: val = 1
+    if val > max_avail: val = max_avail
+    
+    pending["lot_size"] = val
+    context.user_data.pop("market_awaiting_size_input", None)
+    
+    # Confirma e vai pro próximo passo
+    await update.message.reply_text(f"✅ Tamanho do lote: {val}")
+    await market_lot_size_confirm(update, context)
 
 # ==============================
 #  EXPORTS
@@ -1145,9 +1259,10 @@ market_sell_legacy_handler = CallbackQueryHandler(market_sell_menu, pattern=r'^m
 market_cancel_handler = CallbackQueryHandler(market_cancel, pattern=r'^market_cancel_\d+$')
 market_pick_unique_handler= CallbackQueryHandler(market_pick_unique, pattern=r'^market_pick_unique_')
 market_pick_stack_handler = CallbackQueryHandler(market_pick_stack, pattern=r'^market_pick_stack_')
-market_pack_qty_spin_handler = CallbackQueryHandler(market_qty_spin, pattern=r'^mkt_pack_(inc|dec)_[0-9]+$')
+# Atualizado Regex para incluir 'max'
+market_pack_qty_spin_handler = CallbackQueryHandler(market_qty_spin, pattern=r'^mkt_pack_.*')
 market_pack_qty_confirm_handler = CallbackQueryHandler(market_qty_confirm, pattern=r'^mkt_pack_confirm$')
-market_price_spin_handler = CallbackQueryHandler(market_price_spin,    pattern=r'^mktp_(inc|dec)_[0-9]+$')
+market_price_spin_handler = CallbackQueryHandler(market_price_spin,    pattern=r'^mktp_.*')
 market_price_confirm_handler = CallbackQueryHandler(market_ask_type, pattern=r'^mktp_confirm$')
 market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^market_cancel_new$')
 market_lote_qty_spin_handler = CallbackQueryHandler(market_qty_spin, pattern=r'^mkt_lote_.*')
@@ -1156,4 +1271,9 @@ market_finalize_handler = CallbackQueryHandler(market_finalize_listing, pattern=
 market_my_handler = CallbackQueryHandler(market_my, pattern=r'^market_my$')
 market_finish_public_handler = CallbackQueryHandler(market_finalize_listing, pattern=r'^mkt_finish_public$')
 market_ask_private_handler = CallbackQueryHandler(market_ask_private_id, pattern=r'^mkt_ask_private$')
+# Handlers de Input de Texto
+market_input_qty_start_handler = CallbackQueryHandler(market_start_input_qty, pattern=r'^mkt_input_qty_start$')
+market_input_price_start_handler = CallbackQueryHandler(market_start_input_price, pattern=r'^mkt_input_price_start$')
+market_text_processor_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_process_text_input)
 market_input_id_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_catch_input_id)
+market_text_router_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, market_text_router)

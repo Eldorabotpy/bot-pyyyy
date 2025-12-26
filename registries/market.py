@@ -39,9 +39,19 @@ def register_market_handlers(application: Application):
             market_price_spin_handler, 
             market_price_confirm_handler, 
             market_cancel_new_handler,
-            market_finish_public_handler,   # Novo
-            market_ask_private_handler,     # Novo
-            market_input_id_handler
+            market_finish_public_handler,
+            market_ask_private_handler,
+            # Handler de input direto (removido do registro principal para usar o Router)
+            market_input_id_handler, 
+            # NOVOS HANDLERS DE INPUT
+            market_input_qty_start_handler,
+            market_input_price_start_handler,
+            market_text_processor_handler,
+            market_lot_size_spin,      # <--- NOVO
+            market_lot_size_confirm,   # <--- NOVO
+            market_start_input_size,
+            # O ROTEADOR INTELIGENTE
+            market_text_router_handler 
         )
         
         # Menu Principal e Navegação
@@ -71,7 +81,16 @@ def register_market_handlers(application: Application):
         application.add_handler(market_cancel_new_handler)
         application.add_handler(market_finish_public_handler)
         application.add_handler(market_ask_private_handler)
-        application.add_handler(market_input_id_handler, group=2)
+        
+        # NOVOS: Ativação do modo input
+        application.add_handler(market_input_qty_start_handler)
+        application.add_handler(market_input_price_start_handler)
+        application.add_handler(CallbackQueryHandler(market_lot_size_spin, pattern=r'^mkt_size_(inc|dec|max).*'))
+        application.add_handler(CallbackQueryHandler(market_lot_size_confirm, pattern=r'^mkt_size_confirm$'))
+        application.add_handler(CallbackQueryHandler(market_start_input_size, pattern=r'^mkt_input_size_start$'))
+
+        application.add_handler(market_text_router_handler, group=2)
+        # -----------------------------------------------------------
         
         logger.info("✅ Handlers do Mercado de Ouro registrados com sucesso.")
 
@@ -89,7 +108,7 @@ def register_market_handlers(application: Application):
             gem_sell_cats_handler,
             gem_list_filter_handler, 
             gem_list_class_handler, 
-            gem_sell_filter_handler,
+            gem_sell_filter_handler, 
             gem_sell_class_handler, 
             gem_market_pick_item_handler, 
             gem_market_cancel_new_handler,
