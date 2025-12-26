@@ -1,5 +1,6 @@
 # handlers/admin/sell_gems.py
 
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
@@ -10,11 +11,51 @@ from telegram.ext import (
     CommandHandler,
 )
 from telegram.error import Forbidden
+
+# --- Importações Modificadas para Busca Robusta ---
 from modules import player_manager
-from handlers.admin.utils import ensure_admin, find_player_from_input
+from modules.player.core import players_collection  # Acesso direto ao DB
+from modules.player.queries import _normalize_char_name
+from handlers.admin.utils import ensure_admin
 
 # --- Estados da Conversa ---
 (ASK_TARGET_PLAYER, ASK_QUANTITY, CONFIRM_GRANT) = range(3)
+
+# --- Funções Auxiliares Locais ---
+
+async def robust_find_player(input_str: str):
+    """
+    Tenta encontrar um jogador de várias formas:
+    1. Pelo ID numérico.
+    2. Pelo nome exato normalizado.
+    3. Pelo nome via Regex (case insensitive).
+    """
+    input_str = input_str.strip()
+
+    # 1. Tenta por ID Numérico
+    if input_str.isdigit():
+        user_id = int(input_str)
+        pdata = await player_manager.get_player_data(user_id)
+        if pdata:
+            return user_id, pdata
+
+    # 2. Tenta por Nome Normalizado (Busca Padrão)
+    normalized = _normalize_char_name(input_str)
+    pdata_norm = players_collection.find_one({"character_name_normalized": normalized})
+    if pdata_norm:
+        return pdata_norm["_id"], pdata_norm
+
+    # 3. Tenta por Regex (Case Insensitive) no nome real
+    # Isso ajuda com caracteres especiais como 'ü' caso a normalização falhe
+    try:
+        regex_pattern = f"^{re.escape(input_str)}$"
+        pdata_regex = players_collection.find_one({"character_name": {"$regex": regex_pattern, "$options": "i"}})
+        if pdata_regex:
+            return pdata_regex["_id"], pdata_regex
+    except Exception as e:
+        print(f"Erro na busca regex em sell_gems: {e}")
+
+    return None
 
 # --- Funções da Conversa ---
 
@@ -38,10 +79,16 @@ async def start_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def receive_target_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Recebe o jogador e pede a quantidade de gemas."""
     target_input = update.message.text
-    found_player = await find_player_from_input(target_input)
+    
+    # Usa a nova função de busca robusta
+    found_player = await robust_find_player(target_input)
 
     if not found_player:
-        await update.message.reply_text("❌ Jogador não encontrado. Tente novamente ou use /cancelar.")
+        await update.message.reply_text(
+            f"❌ Jogador '{target_input}' não encontrado.\n"
+            "Tente verificar se há caracteres especiais ou use o **User ID** numérico.",
+            parse_mode="Markdown"
+        )
         return ASK_TARGET_PLAYER
 
     user_id, pdata = found_player
@@ -50,6 +97,7 @@ async def receive_target_player(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data['gem_target_name'] = pdata.get('character_name', f"ID: {user_id}")
     
     char_name = context.user_data['gem_target_name']
+    
     await update.message.reply_text(
         f"✅ Jogador selecionado: **{char_name}** (`{user_id}`).\n\n"
         "Agora, envie a **quantidade** de gemas que deseja entregar.",
@@ -100,49 +148,35 @@ async def dispatch_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     quantity = context.user_data['gem_quantity']
     target_name = context.user_data['gem_target_name']
     
-    # --- Lógica de entrega CORRIGIDA ---
-    
-    # <<< CORREÇÃO 1: Adiciona await para LER os dados >>>
+    # Carrega dados
     pdata = await player_manager.get_player_data(user_id)
     
-    # Adicionámos uma verificação para garantir que o jogador foi carregado
     if not pdata:
         await query.edit_message_text(f"❌ Erro crítico! Não foi possível carregar os dados de {target_name} para a entrega.")
         context.user_data.clear()
         return ConversationHandler.END
 
-    # Esta função é síncrona (só mexe no dicionário pdata), está correta.
+    # Adiciona Gemas
     player_manager.add_gems(pdata, quantity)
     
-    # <<< CORREÇÃO 2: Adiciona await para SALVAR os dados >>>
+    # Salva
     await player_manager.save_player_data(user_id, pdata)
     
-    # --- Confirmação para o ADMIN (já existia) ---
+    # Confirmação Admin
     await query.edit_message_text(f"✅ Sucesso! {quantity} 💎 Gemas foram entregues a {target_name}.")
     
-    # =======================================================
-    # === INÍCIO DO NOVO CÓDIGO: NOTIFICAÇÃO PARA O JOGADOR ===
-    # (O teu código aqui já estava perfeito!)
-    # =======================================================
+    # Notificação ao Jogador
     try:
-        # 1. Montamos a mensagem para o jogador
         notification_text = f"🎉 Boas notícias! Você acaba de adquirir **{quantity}** 💎 Gemas!"
-        
-        # 2. Tentamos enviar a mensagem para o ID do jogador
         await context.bot.send_message(
             chat_id=user_id,
             text=notification_text,
             parse_mode="Markdown"
         )
     except Forbidden:
-        # O jogador bloqueou o bot. Apenas informamos no console.
-        print(f"AVISO: Não foi possível notificar o jogador {user_id} porque ele bloqueou o bot.")
+        print(f"AVISO: Não foi possível notificar o jogador {user_id} (Bloqueado).")
     except Exception as e:
-        # Outro erro inesperado ao tentar notificar.
         print(f"ERRO: Falha ao enviar notificação para o jogador {user_id}. Erro: {e}")
-    # =======================================================
-    # ================ FIM DO NOVO CÓDIGO ===================
-    # =======================================================
 
     context.user_data.clear()
     return ConversationHandler.END
@@ -152,8 +186,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     message_text = "Operação cancelada."
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(message_text)
-    else:
+        try:
+            await update.callback_query.edit_message_text(message_text)
+        except:
+            pass
+    elif update.message:
         await update.message.reply_text(message_text)
         
     context.user_data.clear()
@@ -172,6 +209,6 @@ sell_gems_conv_handler = ConversationHandler(
     },
     fallbacks=[
         CommandHandler("cancelar", cancel),
-        CallbackQueryHandler(cancel, pattern=r"^grant_cancel$") # Reutilizando o cancel do grant_item
+        CallbackQueryHandler(cancel, pattern=r"^grant_cancel$")
     ],
 )

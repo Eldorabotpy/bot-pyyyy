@@ -556,12 +556,12 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 🤝 NOTIFICAÇÃO RPG DE COMPRA (CORRIGIDA PARA HTML)
         # ======================================================
         rpg_log = (
-            f"╭┈➤🤝 <b>NEGÓCIO FECHADO!</b>\n\n"
-            f"├┈➤👤 <b>Comprador:</b> {buyer_name}\n"
+            f"   🤝 <b>NEGÓCIO FECHADO!</b>\n\n"
+            f"╭┈➤👤 <b>Comprador:</b> {buyer_name}\n"
             f"├┈➤🛒 <b>Adquiriu:</b> {item_display}\n"
             f"├┈➤💸 <b>Pagou:</b> {cost:,} Ouro\n"
-            f"├┈➤🤝 <b>Vendedor:</b> {seller_name}\n\n"
-            f"╰┈➤⚖️ <i>A economia de Eldora segue girando!</i>"
+            f"╰┈➤🤝 <b>Vendedor:</b> {seller_name}\n\n"
+            f"    ⚖️ <i>A economia de Eldora segue girando!</i>"
         )
         context.application.create_task(_send_market_log(context, rpg_log))
         # ======================================================
