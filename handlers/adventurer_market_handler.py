@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 from telegram.error import BadRequest
-
+from telegram.constants import ParseMode
 # --- MÓDULOS PRINCIPAIS ---
 from modules import player_manager, game_data, file_ids, market_utils
 from modules.market_manager import render_listing_line as _mm_render_listing_line
@@ -37,6 +37,7 @@ except ImportError:
     game_data = None
     EVOLUTION_ITEMS_DATA = {}
 
+
 logger = logging.getLogger(__name__)
 
 # Fallback
@@ -45,7 +46,22 @@ try:
 except ImportError:
     display_utils = None
 
+# --- CONFIGURAÇÃO DE LOGS DO MERCADO ---
+MARKET_LOG_GROUP_ID = -1002881364171
+MARKET_LOG_TOPIC_ID = 24475
 
+async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, text: str):
+    """Envia notificação RPG para o canal de logs."""
+    try:
+        await context.bot.send_message(
+            chat_id=MARKET_LOG_GROUP_ID,
+            message_thread_id=MARKET_LOG_TOPIC_ID,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            disable_notification=False
+        )
+    except Exception as e:
+        logger.error(f"Falha ao enviar log de mercado: {e}")
 
 async def _refresh_ui(query, context, text, kb, img_key=None):
     """
@@ -508,11 +524,48 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: await q.answer("ID inválido.", show_alert=True); return
 
     try:
+        # Tenta realizar a compra
         try:
             listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         except TypeError:
             listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
-            
+        
+        # --- SUCESSO NA COMPRA: PREPARAR LOG RPG ---
+        buyer_data = await player_manager.get_player_data(buyer_id)
+        buyer_name = buyer_data.get("character_name", f"Player {buyer_id}")
+        seller_name = listing.get("seller_name", "Desconhecido")
+        
+        # Formata nome do item para o log
+        item_payload = listing.get("item", {})
+        item_display = "Item Misterioso"
+        
+        if item_payload.get("type") == "stack":
+            base_id = item_payload.get("base_id")
+            lot_size = item_payload.get("qty", 1)
+            info = _get_item_info(base_id)
+            i_name = info.get("display_name") or base_id
+            item_display = f"{i_name} (Lote de {lot_size})"
+        else:
+            inst = item_payload.get("item", {})
+            base_id = inst.get("base_id")
+            info = _get_item_info(base_id)
+            i_name = inst.get("display_name") or info.get("display_name") or base_id
+            item_display = f"{i_name} [{str(inst.get('rarity','comum')).upper()}]"
+
+        # ======================================================
+        # 🤝 NOTIFICAÇÃO RPG DE COMPRA (CORRIGIDA PARA HTML)
+        # ======================================================
+        rpg_log = (
+            f"╭┈➤🤝 <b>NEGÓCIO FECHADO!</b>\n\n"
+            f"├┈➤👤 <b>Comprador:</b> {buyer_name}\n"
+            f"├┈➤🛒 <b>Adquiriu:</b> {item_display}\n"
+            f"├┈➤💸 <b>Pagou:</b> {cost:,} Ouro\n"
+            f"├┈➤🤝 <b>Vendedor:</b> {seller_name}\n\n"
+            f"╰┈➤⚖️ <i>A economia de Eldora segue girando!</i>"
+        )
+        context.application.create_task(_send_market_log(context, rpg_log))
+        # ======================================================
+
         await q.answer(f"✅ Compra realizada! Custo: {cost} ouro", show_alert=True)
         await market_list(update, context)
         
@@ -1069,6 +1122,10 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
     pdata = None
     item_payload = {}
     seller_name = "Vendedor"
+    
+    # Variáveis para o Log RPG
+    log_item_name = "Item Misterioso"
+    log_qty = 1
 
     try:
         pdata = await player_manager.get_player_data(user_id)
@@ -1082,6 +1139,12 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
             lot_size = pending["lot_size"] # 100
             stock = pending["qty"]         # 10 lotes
             
+            # Info para o log
+            info = _get_item_info(base_id)
+            i_name = info.get("display_name") or base_id
+            log_item_name = f"{i_name} (Lote de {lot_size})"
+            log_qty = stock
+
             total_items_to_remove = stock * lot_size # 1000 itens
             
             if player_manager.remove_item_from_inventory(pdata, base_id, total_items_to_remove):
@@ -1093,11 +1156,17 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
                 return
 
         elif pending["type"] == "unique":
-            # ... (código unique mantém igual) ...
             uid = pending["uid"]
             inv = pdata.get("inventory", {})
             if uid in inv:
                 item_data = inv[uid]
+                
+                # Info para o log
+                base_id = item_data.get("base_id")
+                info = _get_item_info(base_id)
+                i_name = item_data.get("display_name") or info.get("display_name") or base_id
+                log_item_name = f"{i_name} [{str(item_data.get('rarity','comum')).upper()}]"
+                
                 del inv[uid]
                 item_payload = {"type": "unique", "item": item_data, "uid": uid}
                 item_removed_successfully = True
@@ -1127,6 +1196,27 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         msg_text = f"✅ <b>Anúncio Criado!</b>\n💰 {price:,} Ouro"
         if target_id: msg_text += f"\n🔒 <b>Reservado para:</b> {target_name}"
         else: msg_text += "\n📢 <b>Público</b>"
+        
+        # ======================================================
+        # 📜 NOTIFICAÇÃO RPG DE VENDA (NOVA)
+        # ======================================================
+        rpg_log = (
+            f"📜 <b>NOVA OFERTA NA PRAÇA!</b>\n\n"
+            f"🗣️ <b>Mercador:</b> {seller_name}\n"
+            f"📦 <b>Produto:</b> {log_item_name}\n"
+            f"🔢 <b>Estoque:</b> {stock_to_create} unidade(s)\n"
+            f"💰 <b>Preço:</b> {price:,} Ouro\n"
+        )
+        if target_id:
+            rpg_log += f"🔐 <b>Status:</b> Reservado para {target_name}"
+        else:
+            rpg_log += f"📢 <b>Status:</b> Disponível para todos!"
+            
+        rpg_log += f"\n\n📍 <i>Mercado de Eldora</i>"
+
+        # Envia para o tópico de aviso
+        context.application.create_task(_send_market_log(context, rpg_log))
+        # ======================================================
 
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("🎒 Voltar", callback_data="market_adventurer")]])
         
@@ -1135,8 +1225,8 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
             
     except Exception as e:
         logger.error(f"ERRO CRÍTICO NA VENDA (USER {user_id}): {e}")
-        
-        # --- 4. SISTEMA DE SEGURANÇA (ROLLBACK) ---
+        # ... (código de rollback continua igual aqui para baixo) ...
+        # (Mantenha o resto do bloco except/rollback original da sua função)
         if item_removed_successfully and pdata:
             logger.warning(f"Iniciando devolução de item para {user_id} devido a erro no mercado...")
             try:
