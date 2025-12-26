@@ -326,7 +326,7 @@ async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, seller_name: str,
         f"💰 <b>Preço:</b> {price:,} Ouro\n"
         f"➖➖➖➖➖➖➖➖➖➖\n"
         f"{status}\n\n"
-        f"👉 <i>Acesse o /mercado no bot para conferir!</i>"
+        f"👉 <i>Acesse o Mercado no bot para conferir!</i>"
     )
 
     # 4. Envia para o Grupo e Tópico Corretos
@@ -339,6 +339,55 @@ async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, seller_name: str,
         )
     except Exception as e:
         logger.error(f"Erro ao enviar log de mercado: {e}")
+
+async def _send_purchase_log(context: ContextTypes.DEFAULT_TYPE, buyer_name: str, seller_name: str, item_payload: dict, price: int):
+    """Envia notificação de venda concluída para o grupo de logs."""
+    if not MARKET_LOG_GROUP_ID:
+        return
+
+    # 1. Formata nome do item
+    if item_payload.get("type") == "stack":
+        base_id = item_payload.get("base_id")
+        qty = item_payload.get("qty", 1)
+        info = _get_item_info(base_id)
+        i_name = info.get("display_name") or base_id.replace("_", " ").title()
+        i_emoji = info.get("emoji", "📦")
+        item_txt = f"{i_emoji} <b>{i_name}</b> x{qty}"
+    else:
+        inst = item_payload.get("item", {})
+        base_id = item_payload.get("uid") 
+        real_base = inst.get("base_id") or base_id
+        info = _get_item_info(real_base)
+        
+        name = inst.get("display_name") or info.get("display_name") or "Item Raro"
+        emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
+        rarity = str(inst.get("rarity", "comum")).upper()
+        lvl = inst.get("upgrade_level", 0)
+        plus = f"+{lvl}" if lvl > 0 else ""
+        
+        item_txt = f"{emoji} <b>{name}{plus}</b> [{rarity}]"
+
+    # 2. Monta a mensagem de Sucesso
+    msg = (
+        f"🤝 <b>NEGÓCIO FECHADO!</b>\n"
+        f"➖➖➖➖➖➖➖➖➖➖\n"
+        f"🛒 <b>Comprador:</b> {buyer_name}\n"
+        f"👤 <b>Vendedor:</b> {seller_name}\n"
+        f"📦 <b>Item:</b> {item_txt}\n"
+        f"💰 <b>Valor:</b> {price:,} Ouro\n"
+        f"➖➖➖➖➖➖➖➖➖➖"
+    )
+
+    # 3. Envia para o mesmo Grupo e Tópico
+    try:
+        await context.bot.send_message(
+            chat_id=MARKET_LOG_GROUP_ID,
+            message_thread_id=MARKET_LOG_TOPIC_ID, # Usa o mesmo ID do tópico
+            text=msg,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao enviar log de compra: {e}")
 
 async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -508,12 +557,41 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: await q.answer("ID inválido.", show_alert=True); return
 
     try:
+        # Tenta realizar a compra no gerenciador
         try:
             listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         except TypeError:
             listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
             
         await q.answer(f"✅ Compra realizada! Custo: {cost} ouro", show_alert=True)
+        
+        # --- LOG DE COMPRA (NOVO CÓDIGO) ---
+        try:
+            # 1. Busca nome do Comprador
+            buyer_data = await player_manager.get_player_data(buyer_id)
+            buyer_name = buyer_data.get("character_name", q.from_user.first_name)
+            
+            # 2. Busca nome do Vendedor (tenta pegar do listing ou busca no banco)
+            seller_name = listing.get("seller_name")
+            if not seller_name:
+                seller_id = listing.get("seller_id")
+                try:
+                    s_data = await player_manager.get_player_data(seller_id)
+                    seller_name = s_data.get("character_name", f"Vendedor {seller_id}")
+                except: seller_name = "Desconhecido"
+
+            # 3. Prepara dados do item
+            item_payload = listing.get("item", {})
+
+            # 4. Envia o Log em Background
+            context.application.create_task(
+                _send_purchase_log(context, buyer_name, seller_name, item_payload, cost)
+            )
+        except Exception as e_log:
+            logger.error(f"Erro ao gerar log de compra: {e_log}")
+        # -----------------------------------
+
+        # Atualiza a lista para o usuário
         await market_list(update, context)
         
     except ValueError as ve:
@@ -796,8 +874,8 @@ async def market_ask_private_id(update: Update, context: ContextTypes.DEFAULT_TY
     # Texto alterado para pedir NOME
     text = (
         "🔒 <b>Venda Privada</b>\n\n"
-        "Envie o <b>Nome do Personagem</b> (ex: <i>Aragorn</i>) ou o <b>@usuario</b> do Telegram do comprador.\n"
-        "<i>Você também pode encaminhar uma mensagem dele.</i>"
+        "Envie o <b>Nome do Personagem</b> (ex: <i>Aragorn</i>).\n"
+        
     )
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]])
     await _safe_edit(q, text, kb)

@@ -1,5 +1,5 @@
 # modules/market_manager.py
-# (VERSÃO ATUALIZADA: Com BLOQUEIO de Itens de Evolução)
+# (VERSÃO CORRIGIDA FINAL: Entrega de itens funcional e imports seguros)
 from __future__ import annotations
 import logging
 import os
@@ -11,7 +11,14 @@ from pymongo import MongoClient
 import asyncio
 from modules import player_manager
 
-# ### NOVO: Importa lista de bloqueio ###
+# --- IMPORTAÇÃO SEGURA DO INVENTÁRIO ---
+try:
+    from modules.player import inventory
+except ImportError:
+    # Fallback se der erro circular, importamos dentro da função
+    inventory = None
+
+# ### Importa lista de bloqueio ###
 try:
     from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
 except ImportError:
@@ -93,7 +100,8 @@ def create_listing(
     quantity: int = 1,
     region_key: Optional[str] = None,
     target_buyer_id: Optional[int] = None,
-    target_buyer_name: Optional[str] = None
+    target_buyer_name: Optional[str] = None,
+    seller_name: Optional[str] = None # Adicionado para compatibilidade com o Handler
 ) -> dict:
     # 1. Valida preço e quantidade básica
     _validate_price_qty(unit_price, quantity)
@@ -117,6 +125,7 @@ def create_listing(
     listing = {
         "id": lid,
         "seller_id": int(seller_id),
+        "seller_name": str(seller_name) if seller_name else None, # Salva nome do vendedor
         "item": item_payload,
         "unit_price": int(unit_price),
         "quantity": int(quantity),
@@ -177,7 +186,7 @@ def delete_listing(listing_id: int):
     market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
 
 # ==============================================================================
-#  FUNÇÃO DE COMPRA CORRIGIDA (Substitua a original 'purchase_listing')
+#  FUNÇÃO DE COMPRA (CORRIGIDA E BLINDADA)
 # ==============================================================================
 
 async def purchase_listing(
@@ -187,8 +196,9 @@ async def purchase_listing(
     quantity: int = 1,
     context=None
 ) -> Tuple[dict, int]:
-    # Importação local para evitar erros de ciclo de importação
-    from modules.player import inventory
+    
+    # Importação local segura do inventário
+    from modules.player import inventory as inv_module
 
     # --- 1. Validações e Buscas Iniciais ---
     listing = get_listing(listing_id)
@@ -226,25 +236,26 @@ async def purchase_listing(
     # B. Deduz Ouro
     buyer_data["gold"] = buyer_gold - total_price
 
-    # C. Entrega o Item ao Inventário
+    # C. Entrega o Item ao Inventário (AQUI ESTAVA O ERRO)
     item_type = item_payload.get("type")
     
     if item_type == "stack":
         # Item empilhável (Materiais, Consumíveis)
         base_id = item_payload.get("base_id")
-        inventory.add_item_to_inventory(buyer_data, base_id, quantity)
+        # Usa a função do módulo inventory corretamente
+        inv_module.add_item_to_inventory(buyer_data, base_id, quantity)
         
     elif item_type == "unique":
         # Item único (Equipamentos)
-        # Importante: Copiar os dados para evitar referências cruzadas
         base_item_data = item_payload.get("item", {}).copy()
         
-        # Se comprou mais de 1 (raro para unique, mas possível), entrega N vezes
+        # Entrega N vezes se necessário
         for _ in range(quantity):
-            # add_unique_item gera um novo UUID e coloca no inventário
-            inventory.add_unique_item(buyer_data, base_item_data)
+            # Gera UUID novo e insere no dict do player
+            inv_module.add_unique_item(buyer_data, base_item_data)
 
-    # D. Salva o Comprador (Commit da transação do lado do comprador)
+    # D. Salva o Comprador (Commit da transação)
+    # Isso garante que tanto o gasto do ouro quanto a chegada do item sejam salvos juntos
     await player_manager.save_player_data(buyer_id, buyer_data)
 
     # --- 4. ATUALIZAÇÃO DO ANÚNCIO ---
@@ -257,7 +268,7 @@ async def purchase_listing(
     # --- 5. PAGAMENTO AO VENDEDOR ---
     try:
         # Paga diretamente no Banco (vendedor pode estar offline)
-        result = db["players"].update_one(
+        db["players"].update_one(
             {"_id": seller_id}, 
             {"$inc": {"gold": total_price}}
         )
@@ -270,7 +281,7 @@ async def purchase_listing(
         log.info(f"💰 [MARKET] Venda concluída: {buyer_id} comprou de {seller_id} por {total_price}")
 
     except Exception as e:
-        log.error(f"🔥 [MARKET] Erro crítico no pagamento ao vendedor (mas o comprador já pagou): {e}")
+        log.error(f"🔥 [MARKET] Erro crítico no pagamento ao vendedor: {e}")
 
     # Retorno para a interface
     listing["quantity"] = new_qty
