@@ -84,40 +84,59 @@ async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
     """
     logger.info("[JOB] Distribuindo tickets de evento (sem limite diário)...")
     
-    # Texto imersivo
+    # --- MENSAGEM VISUAL MELHORADA (ESTILO DECRETO) ---
     msg_ticket = (
-        "⚔️ <b>CHAMADO ÀS ARMAS!</b> ⚔️\n\n"
-        "A invasão começou e o Rei convoca seus heróis!\n"
-        "🎁 <b>Você recebeu:</b> 1x 🎟️ <b>Ticket de Defesa do Reino</b>\n"
-        "<i>Use-o agora para defender os portões!</i>"
+        "╭─────── [ 📜 <b>DECRETO REAL</b> ] ───────➤\n"
+        "│\n"
+        "│ ⚔️ <b>AS TROMBETAS SOARAM!</b>\n"
+        "│ <i>As forças das trevas marcham contra</i>\n"
+        "│ <i>os Portões de Eldora!</i>\n"
+        "│\n"
+        "│ 📦 <b>SUPRIMENTO DE GUERRA:</b>\n"
+        "│ ╰┈➤ 🎟️ <b>1x Ticket de Defesa</b>\n"
+        "│\n"
+        "╰──────────────────────────────➤\n"
+        "🔥 <i>Vá ao menu 'Eventos' e lute!</i>"
     )
 
     count = 0
     async for user_id, pdata in player_manager.iter_players():
         try:
-            # Entrega direta no MongoDB
+            # 1. Entrega direta no MongoDB (Rápido)
             if players_col is not None:
                 players_col.update_one(
                     {"_id": user_id},
                     {"$inc": {"inventory.ticket_defesa_reino": 1}}
                 )
-            # Fallback para JSON (se não usar Mongo)
+                
+                # ========================================================
+                # 🛠️ CORREÇÃO TÉCNICA: LIMPEZA DE CACHE
+                # Essencial para o ticket aparecer imediatamente
+                # ========================================================
+                try:
+                    if hasattr(player_manager, "clear_player_cache"):
+                        res = player_manager.clear_player_cache(user_id)
+                        if asyncio.iscoroutine(res): await res
+                except Exception: 
+                    pass
+
+            # 2. Fallback (Caso não use Mongo direto)
             else:
                 if not pdata: continue
                 player_manager.add_item_to_inventory(pdata, "ticket_defesa_reino", 1)
                 await player_manager.save_player_data(user_id, pdata)
             
-            # Notifica o jogador
+            # 3. Envia a mensagem bonita
             try:
                 await context.bot.send_message(chat_id=user_id, text=msg_ticket, parse_mode='HTML')
-                await asyncio.sleep(0.05) # Evita flood
+                await asyncio.sleep(0.05) # Evita bloqueio por spam
             except Exception: pass
             
             count += 1
         except Exception: pass
         
     logger.info(f"[JOB] Tickets de evento entregues: {count}")
-
+    
 async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Nasce o World Boss e notifica.
