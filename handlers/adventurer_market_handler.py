@@ -373,12 +373,18 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     kb = InlineKeyboardMarkup([
+        # LINHA 1: Economia de Ouro (Mercado de Players + Loja do NPC)
         [
-            InlineKeyboardButton("🎒 𝐌𝐞𝐫𝐜𝐚𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data="market_adventurer"),
-            InlineKeyboardButton("🏛️ 𝐑𝐞𝐥𝐢𝐪𝐮𝐢𝐚𝐬", callback_data="gem_market_main")
+            InlineKeyboardButton("🎒 Mercado )", callback_data="market_adventurer"),
+            InlineKeyboardButton("🏰 Loja do Reino", callback_data="market_kingdom")
         ],
-        [InlineKeyboardButton("💎 𝐋𝐨𝐣𝐚 𝐏𝐫𝐞𝐦𝐢𝐮𝐦", callback_data="gem_shop")],
-        [InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓 𝒂𝒐 𝑹𝒆𝒊𝒏𝒐", callback_data="show_kingdom_menu")]
+        # LINHA 2: Economia de Gemas (Leilão + Loja Premium)
+        [
+            InlineKeyboardButton("🏛️ Leilões ", callback_data="gem_market_main"),
+            InlineKeyboardButton("💎 Loja Premium", callback_data="gem_shop")
+        ],
+        # LINHA 3: Voltar
+        [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")]
     ])
 
     # Chama o helper restaurado acima

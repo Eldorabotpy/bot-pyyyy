@@ -112,44 +112,68 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: is_vip = PremiumManager(player_data).is_premium()
     except Exception: pass
 
+    # --- DEFINIÇÃO DOS DESTINOS ---
     if is_vip:
+        # Ordem lógica de progressão do jogo para o menu ficar organizado
         REGION_ORDER = [
             "reino_eldora", "pradaria_inicial", "floresta_sombria", "campos_linho",
             "pedreira_granito", "mina_ferro", "pantano_maldito", "pico_grifo",
             "forja_abandonada", "picos_gelados", "deserto_ancestral"
         ]
         all_regions = list((game_data.REGIONS_DATA or {}).keys())
+        # Ordena: Primeiro os da lista oficial, depois o resto
         all_regions.sort(key=lambda k: REGION_ORDER.index(k) if k in REGION_ORDER else 999)
         possible_destinations = [r for r in all_regions if r != current_location]
         
         caption = (
-            f"🗺 <b>🄼🄰🄿🄰 🄼🅄🄽🄳🄸 (VIP)</b> 🗺\n"
-            f"Você está em <b>{region_info.get('display_name','Desconhecido')}</b>.\n\n"
-            f"Como viajante de elite, a <b>Pedra Dimensional</b> permite viajar para qualquer destino!"
+            f"🗺 <b>🄼ＡＰＡ  ＭＵＮＤＩ (VIP)</b> 🗺\n\n"
+            f"📍 <b>Local Atual:</b> {region_info.get('display_name','Desconhecido')}\n"
+            f"✨ <i>O teletransporte da Pedra Dimensional está ativo.</i>"
         )
     else:
         possible_destinations = WORLD_MAP.get(current_location, [])
         caption = (
-            f"Você está em <b>{region_info.get('display_name','Desconhecido')}</b>.\n"
-            f"Para onde deseja viajar?"
+            f"🧭 <b>ＰＬＡＮＯ  ＤＥ  ＶＩＡＧＥＭ</b>\n\n"
+            f"📍 <b>Local Atual:</b> {region_info.get('display_name','Desconhecido')}\n"
+            f"👣 <i>Para onde seus pés o levarão?</i>"
         )
 
+    # --- MONTAGEM DO GRID (2 Colunas) ---
     keyboard = []
+    row = []
+    
     for dest_key in possible_destinations:
         dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
         if not dest_info: continue
-        button = InlineKeyboardButton(
-            f"{dest_info.get('emoji', '')} {dest_info.get('display_name', dest_key)}",
-            callback_data=f"region_{dest_key}",
-        )
-        keyboard.append([button])
+        
+        # Limpa o nome para não ficar muito grande no botão
+        d_name = dest_info.get('display_name', dest_key)
+        d_emoji = dest_info.get('emoji', '📍')
+        
+        # Adiciona ao buffer da linha
+        row.append(InlineKeyboardButton(
+            f"{d_emoji} {d_name}",
+            callback_data=f"region_{dest_key}"
+        ))
+        
+        # Se a linha tem 2 botões, adiciona ao teclado e limpa o buffer
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+            
+    # Se sobrou algum botão sozinho na última linha, adiciona ele
+    if row:
+        keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐎𝐋𝐓𝐀𝐑", callback_data=f'open_region:{current_location}')])
+    # Botão de Voltar (ocupa linha inteira)
+    keyboard.append([InlineKeyboardButton("⬅️ 𝐂𝐚𝐧𝐜𝐞𝐥𝐚𝐫 𝐕𝐢𝐚𝐠𝐞𝐦", callback_data=f'open_region:{current_location}')])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     try: await query.delete_message()
     except Exception: pass
 
+    # --- ENVIO DA MENSAGEM (Com Mídia do Mapa se houver) ---
     fd = media_ids.get_file_data("mapa_mundo")
     if fd and fd.get("id"):
         try:
@@ -161,7 +185,7 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception: pass
 
     await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
-
+    
 async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -308,20 +332,41 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             f"{status_hud}"
         )
         keyboard = []
+        
+        # --- LINHA 1: INTERAÇÕES ESPECIAIS (NPCs/Lojas) ---
+        special_row = []
         if final_region_key == 'floresta_sombria':
-            keyboard.append([InlineKeyboardButton("⛺ 𝐓𝐞𝐧𝐝𝐚 𝐝𝐨 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta')])
+            special_row.append(InlineKeyboardButton("⛺ 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta'))
+        
         if final_region_key == 'deserto_ancestral':
-            keyboard.append([InlineKeyboardButton("🧙‍♂️ 𝐂𝐚𝐛𝐚𝐧𝐚 𝐝𝐨 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main')])
-        if final_region_key == 'deserto_ancestral': # Você pode mudar a região aqui se quiser
-            # Verifica se o jogador pode evoluir (nível máximo, etc)
-            from modules.player.stats import can_see_evolution_menu
-            if can_see_evolution_menu(player_data):
-                keyboard.append([InlineKeyboardButton("⛩️ 𝐓𝐞𝐦𝐩𝐥𝐨 𝐝𝐚 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu')])
-        if final_region_key == 'picos_gelados' and is_event_active():
-             keyboard.append([InlineKeyboardButton("🎅 𝐂𝐚𝐛𝐚𝐧𝐚 𝐝𝐨 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
-                 
-        keyboard.append([InlineKeyboardButton("⚔️ Caçar Monstro", callback_data=f"hunt_{final_region_key}")])
+             special_row.append(InlineKeyboardButton("🧙‍♂️ 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main'))
+             # Verifica evolução
+             if can_see_evolution_menu(player_data):
+                special_row.append(InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu'))
 
+        if final_region_key == 'picos_gelados' and is_event_active():
+             special_row.append(InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open"))
+        
+        if special_row:
+            keyboard.append(special_row)
+
+        # --- LINHA 2: AÇÃO DE COMBATE (Caçar + Calabouço na mesma linha se possível) ---
+        combat_row = []
+        combat_row.append(InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫", callback_data=f"hunt_{final_region_key}"))
+        
+        # Lógica do Calabouço
+        dungeon_btn = None
+        if build_region_dungeon_button:
+            dungeon_btn = build_region_dungeon_button(final_region_key)
+        elif get_dungeon_for_region(final_region_key):
+            dungeon_btn = InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}")
+        
+        if dungeon_btn:
+            combat_row.append(dungeon_btn)
+            
+        keyboard.append(combat_row)
+
+        # --- LINHA 3: AUTO HUNT (PREMIUM) ---
         if premium.is_premium():
             keyboard.append([
                 InlineKeyboardButton("⏱ 10x", callback_data=f"autohunt_start_10_{final_region_key}"),
@@ -329,16 +374,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
                 InlineKeyboardButton("⏱ 35x", callback_data=f"autohunt_start_35_{final_region_key}"),
             ])
 
-        if build_region_dungeon_button:
-            if btn := build_region_dungeon_button(final_region_key): keyboard.append([btn]) 
-        elif get_dungeon_for_region(final_region_key):
-            keyboard.append([InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}")])
-
-        keyboard.append([InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data="profile")])
-        keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐫 𝐃𝐮𝐫𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞", callback_data="restore_durability_menu")])
-        keyboard.append([InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨 𝐑𝐞𝐠𝐢𝐚̃𝐨", callback_data=f"region_info:{final_region_key}")])
-        
-        # --- BOTÃO DE COLETA ---
+        # --- LINHA 4: COLETA (Ocupa linha inteira pois o texto é longo com timer) ---
         res_id = region_info.get("resource")
         if res_id:
             req_prof = game_data.get_profession_for_resource(res_id)
@@ -356,9 +392,20 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
                 cost = int(premium.get_perk_value("gather_energy_cost", 1))
                 c_txt = "grátis" if cost == 0 else f"-{cost}⚡"
 
-                keyboard.append([InlineKeyboardButton(f"✋ Coletar {i_name} ({hum_tm}, {c_txt})", callback_data=f"collect_{res_id}")])
+                keyboard.append([InlineKeyboardButton(f"⛏️ Coletar {i_name} ({hum_tm}, {c_txt})", callback_data=f"collect_{res_id}")])
 
-        keyboard.append([InlineKeyboardButton("🗺️ 𝐕𝐞𝐫 𝐌𝐚𝐩𝐚", callback_data="travel")])
+        # --- LINHA 5: SISTEMA (Mapa e Perfil lado a lado) ---
+        keyboard.append([
+            InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"),
+            InlineKeyboardButton("👤 𝐏𝐞𝐫𝐟𝐢𝐥", callback_data="profile")
+        ])
+
+        # --- LINHA 6: MANUTENÇÃO E INFO ---
+        keyboard.append([
+            InlineKeyboardButton("📜 𝐑𝐞𝐩𝐚𝐫𝐚𝐫", callback_data="restore_durability_menu"),
+            InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨", callback_data=f"region_info:{final_region_key}")
+        ])
+
         reply_markup = InlineKeyboardMarkup(keyboard)
         file_data = media_ids.get_file_data(f"regiao_{final_region_key}")
 

@@ -122,9 +122,9 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         caption = (
             f"🏰 <b>𝐑𝐄𝐈𝐍𝐎 𝐃𝐄 𝐄𝐋𝐃𝐎𝐑𝐀</b>\n"
-            f"╰┈➤ <i>Bem-vindo, {character_name}!</i>\n\n"
-            f"As muralhas da cidade oferecem segurança e oportunidades. "
-            f"O que você gostaria de fazer hoje?\n"
+            f"╰┈➤ 𝗕𝗲𝗺-𝘃𝗶𝗻𝗱𝗼, {character_name}!\n\n"
+            f"𝗔𝘀 𝗺𝘂𝗿𝗮𝗹𝗵𝗮𝘀 𝗱𝗮 𝗰𝗶𝗱𝗮𝗱𝗲 𝗼𝗳𝗲𝗿𝗲𝗰𝗲𝗺 𝘀𝗲𝗴𝘂𝗿𝗮𝗻𝗰̧𝗮 𝗲 𝗼𝗽𝗼𝗿𝘁𝘂𝗻𝗶𝗱𝗮𝗱𝗲𝘀. "
+            f"𝗢 𝗾𝘂𝗲 𝘃𝗼𝗰𝗲̂ 𝗴𝗼𝘀𝘁𝗮𝗿𝗶𝗮 𝗱𝗲 𝗳𝗮𝘇𝗲𝗿 𝗵𝗼𝗷𝗲?\n"
             f"{status_hud}"
         )
 
@@ -137,16 +137,27 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
         # --- TECLADO ---
         keyboard = [
-            [InlineKeyboardButton("🗺 𝐕𝐢𝐚𝐣𝐚𝐫 🗺", callback_data='travel')],
-            [InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚 𝐝𝐞 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨𝐬 🏰", callback_data='adventurer_guild_main')],
+            # LINHA 1: Ações Principais (Viajar e Perfil)
             [
-                InlineKeyboardButton("🏪 𝐌𝐞𝐫𝐜𝐚𝐝𝐨 🏪", callback_data='market'),
-                InlineKeyboardButton("⚒️ 𝐅𝐨𝐫𝐣𝐚 ⚒️", callback_data='forge:main'),
+                InlineKeyboardButton("🗺 𝐕𝐢𝐚𝐣𝐚𝐫", callback_data='travel'),
+                InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data='profile')
             ],
-            [InlineKeyboardButton("🧪 𝐑𝐞𝐟𝐢𝐧𝐨 🧪", callback_data='refining_main')],
-            [InlineKeyboardButton("🆅🆂 𝐀𝐫𝐞𝐧𝐚 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 🆅🆂", callback_data='pvp_arena')], 
-            [InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬 𝐄𝐬𝐩𝐞𝐜𝐢𝐚𝐢𝐬 💀", callback_data='evt_hub_principal')],
-            [InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦 👤", callback_data='profile')],
+            # LINHA 2: Economia (Mercado e Forja)
+            [
+                InlineKeyboardButton("🏪 𝐌𝐞𝐫𝐜𝐚𝐝𝐨", callback_data='market'),
+                InlineKeyboardButton("⚒️ 𝐅𝐨𝐫𝐣𝐚", callback_data='forge:main'),
+            ],
+            # LINHA 3: Social e Avançado (Guilda e Refino)
+            [
+                InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚", callback_data='adventurer_guild_main'),
+                InlineKeyboardButton("🧪 𝐑𝐞𝐟𝐢𝐧𝐨", callback_data='refining_main'),
+            ],
+            # LINHA 4: Combate e Eventos (Destaque para ação)
+            [
+                InlineKeyboardButton("⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐏𝐯𝐏", callback_data='pvp_arena'), 
+                InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬", callback_data='evt_hub_principal')
+            ],
+            # LINHA 5: Rodapé (Info)
             [InlineKeyboardButton("ℹ️ 𝐒𝐨𝐛𝐫𝐞 𝐨 𝐑𝐞𝐢𝐧𝐨", callback_data='region_info:reino_eldora')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)

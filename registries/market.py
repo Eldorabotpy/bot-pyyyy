@@ -154,6 +154,7 @@ def register_market_handlers(application: Application):
         from handlers.gem_shop_handler import (
             gem_shop_open_handler,
             gem_tab_handler,
+            gem_page_handler,
             gem_pick_handler,
             gem_qty_minus_handler,
             gem_qty_plus_handler,
@@ -163,6 +164,7 @@ def register_market_handlers(application: Application):
         
         application.add_handler(gem_shop_open_handler)
         application.add_handler(gem_tab_handler)
+        application.add_handler(gem_page_handler)
         application.add_handler(gem_pick_handler)
         application.add_handler(gem_qty_minus_handler)
         application.add_handler(gem_qty_plus_handler)

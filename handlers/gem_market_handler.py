@@ -1,5 +1,5 @@
 # handlers/gem_market_handler.py
-# (VERSÃO 6.1 FINAL - CORRIGIDO IMPORT DE FILE_IDS)
+# (VERSÃO RPG UI FINAL - COM CORREÇÃO DE NOMES E CLASSES)
 
 import logging
 import math
@@ -10,7 +10,6 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 
 # --- Nossos Módulos ---
 from modules import player_manager, game_data
-# CORREÇÃO AQUI: Importa file_ids
 from modules import file_ids 
 from modules import gem_market_manager
 from modules import market_utils
@@ -24,26 +23,39 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ==============================
-#  CONFIGURAÇÕES
+#  CONFIGURAÇÕES VISUAIS
 # ==============================
-LOG_GROUP_ID = -1002881364171
-LOG_TOPIC_ID = 24475
+ITEMS_PER_PAGE = 4
 
+# Ícones das Classes
 CLASS_ICONS = {
-    "guerreiro": "🛡️", "cavaleiro": "🛡️", "gladiador": "⚔️",
-    "mago": "🧙‍♂️", "arquimago": "🔮", "feiticeiro": "🔥",
-    "cacador": "🏹", "arqueiro": "🏹",
-    "assassino": "🗡️", "ninja": "🥷",
-    "monge": "👊", "mestre": "🙏",
-    "bardo": "🎵", "musico": "🪕",
-    "berserker": "🪓", "barbaro": "👹",
-    "samurai": "👺", "ronin": "🗡️",
-    "sacerdote": "✝️", "clerigo": "✨",
+    "guerreiro": "🛡️", "cavaleiro": "🛡️", "gladiador": "⚔️", "templario": "⚜️",
+    "mago": "🧙‍♂️", "arquimago": "🔮", "feiticeiro": "🔥", "elementalista": "☄️",
+    "cacador": "🏹", "arqueiro": "🏹", "patrulheiro": "🐾", "franco_atirador": "🎯",
+    "assassino": "🗡️", "ninja": "🥷", "sombra": "💨", "venefico": "☠️",
+    "monge": "👊", "mestre": "🙏", "guardiao": "🏯", "ascendente": "🕊️",
+    "bardo": "🎵", "musico": "🪕", "menestrel": "📜", "maestro": "🎼",
+    "berserker": "🪓", "barbaro": "👹", "juggernaut": "🐗",
+    "samurai": "👺", "ronin": "🧧", "kensei": "🗡️", "shogun": "🏯",
+    "curandeiro": "🩹", "sacerdote": "⛪", "clerigo": "✝️", "druida": "🌳",
     "universal": "🌎"
 }
 
+# Palavras-chave para detectar classe pelo nome do item
+KEYWORD_TO_CLASS = {
+    "bushido": "samurai", "ronin": "samurai", "katana": "samurai", "lâmina": "samurai",
+    "luz": "curandeiro", "sagrado": "curandeiro", "divino": "curandeiro", "fé": "curandeiro", "vida": "curandeiro",
+    "sombra": "assassino", "veneno": "assassino", "letal": "assassino", "adaga": "assassino", "manto": "assassino",
+    "furia": "berserker", "sangue": "berserker", "ira": "berserker", "totem": "berserker",
+    "arcano": "mago", "magia": "mago", "elemental": "mago", "grimorio": "mago", "mana": "mago",
+    "precisao": "cacador", "predador": "cacador", "arco": "cacador", "flecha": "cacador", "fera": "cacador",
+    "harmonia": "bardo", "cancao": "bardo", "melodia": "bardo", "batuta": "bardo", "encanto": "bardo",
+    "ki": "monge", "punho": "monge", "espiritual": "monge", "templo": "monge",
+    "defesa": "guerreiro", "bloqueio": "guerreiro", "escudo": "guerreiro", "aco": "guerreiro"
+}
+
 # ==============================
-#  Helpers
+#  HELPERS VISUAIS
 # ==============================
 def _get_item_info(base_id: str) -> dict:
     try:
@@ -61,30 +73,54 @@ def _item_label(base_id: str) -> str:
     return f"{emoji} {name}"
 
 def _format_class_name(item_info: dict) -> str:
+    """Detecta a classe baseada no ID, Nome ou Descrição."""
     name = item_info.get("display_name", "").lower()
     base_id = item_info.get("id", "").lower()
+    desc = item_info.get("description", "").lower()
+    
+    combined_text = f"{base_id} {name} {desc}"
+
+    # 1. Verifica se tem nome de classe explícito (ex: emblema_guerreiro)
     for cls, icon in CLASS_ICONS.items():
-        if cls in name or cls in base_id:
+        if cls in base_id or cls in name:
             return f"{icon} {cls.capitalize()}"
+
+    # 2. Verifica palavras-chave (ex: bushido -> samurai)
+    for keyword, cls_key in KEYWORD_TO_CLASS.items():
+        if keyword in combined_text:
+            icon = CLASS_ICONS.get(cls_key, "⚔️")
+            return f"{icon} {cls_key.capitalize()}"
+
     return "🌎 Global"
 
-def _render_card_simple(base_id: str, qty: int, price: int = 0, seller_name: str = None, lote_qty: int = 1) -> str:
+def _render_market_card(idx_icon: str, base_id: str, qty_per_pack: int, price: int = 0, seller_name: str = None, lotes: int = 1) -> str:
+    """Renderiza o card no estilo Árvore RPG (Setas) igual à imagem."""
     info = _get_item_info(base_id)
     name = info.get("display_name") or base_id.replace("_", " ").title()
     emoji = info.get("emoji", "📦")
-    desc = info.get("description", "Item Raro")
-    if len(desc) > 30: desc = desc[:29] + "..."
+    # Descrição curta (pega as primeiras palavras)
+    full_desc = info.get("description", "Item místico raro.")
+    desc_short = (full_desc[:35] + "..") if len(full_desc) > 35 else full_desc
     
-    line1 = f"{emoji} <b>{name}</b> (x{qty})"
     class_str = _format_class_name(info)
-    line2 = f"├┈➤ {class_str} │ ℹ️ <i>{desc}</i>"
-
+    
+    # Cabeçalho: [1] -> [ Item (x1) ]
+    qty_str = f"(x{qty_per_pack})" if qty_per_pack > 1 else ""
+    header = f"{idx_icon} ➔ {emoji} <b>{name}</b> {qty_str}"
+    
+    # Linha do Meio: ├➔ 🛡️ Guerreiro | ℹ️ Descrição...
+    mid_line = f"├➔ {class_str} │ ℹ️ <i>{desc_short}</i>"
+    
+    # Linha Inferior: ╰➔ 💎 10 | 📦 1 Lote | 👤 Nome
     if price > 0:
-        seller_txt = f"👤 <i>{seller_name}</i>" if seller_name else ""
-        lote_txt = f"📦 {lote_qty} Lotes" if lote_qty > 1 else "📦 1 Lote"
-        line3 = f"╰┈➤ 💎 <b>{price}</b> │ {lote_txt} │ {seller_txt}"
-        return f"{line1}\n{line2}\n{line3}"
-    return f"{line1}\n╰┈➤ 📦 Estoque: <b>{qty}</b>"
+        # Modo Compra (Vitrine)
+        seller_display = seller_name[:10]+".." if seller_name and len(seller_name) > 10 else (seller_name or "Desconhecido")
+        bot_line = f"╰➔ 💎 <b>{price}</b> │ 📦 {lotes} Lote(s) │ 👤 {seller_display}"
+    else:
+        # Modo Venda (Inventário)
+        bot_line = f"╰➔ 🎒 <b>Disponível:</b> {qty_per_pack}"
+
+    return f"{header}\n{mid_line}\n{bot_line}"
 
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
     try: await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
@@ -94,7 +130,6 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
 
 async def _send_with_media(chat_id, context, text, kb, keys):
     for k in keys:
-        # CORREÇÃO: Usando file_ids
         fd = file_ids.get_file_data(k)
         if fd:
             try:
@@ -113,15 +148,21 @@ async def gem_market_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     text = (
-        "🏛️ <b>𝐂𝐨𝐦𝐞́𝐫𝐜𝐢𝐨 𝐝𝐞 𝐑𝐞𝐥𝐢́𝐪𝐮𝐢𝐚𝐬 ✨</b>\n\n"
-        "Bem-vindo! Aqui podes negociar itens raros (Evolução, Skills, Skins) "
-        "com outros aventureiros usando <b>Diamantes</b> (💎)."
+        "🏛️ <b>𝐂𝐎𝐌𝐄́𝐑𝐂𝐈𝐎 𝐃𝐄 𝐑𝐄𝐋𝐈́𝐐𝐔𝐈𝐀𝐒</b>\n"
+        "╰┈➤ <i>Onde lendas negociam fortunas.</i>\n\n"
+        "Aqui você negocia itens raros com outros jogadores usando <b>Diamantes</b> (💎)."
     )
+    
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📦 Ver Listagens (Comprar)", callback_data="gem_list_cats")],
-        [InlineKeyboardButton("➕ Vender Item", callback_data="gem_sell_cats")],
-        [InlineKeyboardButton("👤 Minhas Listagens", callback_data="gem_market_my")],
-        [InlineKeyboardButton("⬅️ Voltar", callback_data="market")],
+        [
+            InlineKeyboardButton("📦 Comprar", callback_data="gem_list_cats"),
+            InlineKeyboardButton("💰 Vender", callback_data="gem_sell_cats")
+        ],
+        [
+            InlineKeyboardButton("📋 Meus Anúncios", callback_data="gem_market_my"),
+            InlineKeyboardButton("📜 Histórico", callback_data="noop") 
+        ],
+        [InlineKeyboardButton("⬅️ Voltar ao Centro", callback_data="market")],
     ])
 
     keys = ["mercado_gemas", "img_mercado_gemas", "gem_market"]
@@ -158,7 +199,7 @@ async def show_sell_category_menu(update: Update, context: ContextTypes.DEFAULT_
     await _safe_edit_or_send(q, context, q.message.chat_id, text, kb)
 
 # ==============================
-#  LISTAGEM DE COMPRA
+#  LISTAGEM DE COMPRA (CORRIGIDO)
 # ==============================
 async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -184,13 +225,12 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
         if is_match: filtered.append(l)
 
     # Paginação
-    PER_PAGE = 5
     total_items = len(filtered)
-    total_pages = math.ceil(total_items / PER_PAGE)
+    total_pages = math.ceil(total_items / ITEMS_PER_PAGE)
     page = max(1, min(page, total_pages)) if total_pages > 0 else 1
     
-    start = (page - 1) * PER_PAGE
-    end = start + PER_PAGE
+    start = (page - 1) * ITEMS_PER_PAGE
+    end = start + ITEMS_PER_PAGE
     page_items = filtered[start:end]
 
     pdata = await player_manager.get_player_data(user_id)
@@ -210,7 +250,7 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
     num_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 
     for idx, listing in enumerate(page_items):
-        icon_num = num_emojis[idx] if idx < 5 else f"{idx+1}"
+        icon_num = num_emojis[idx] if idx < len(num_emojis) else f"{idx+1}"
         item_data = listing.get("item", {})
         base_id = item_data.get("base_id")
         qty = item_data.get("qty", 1)
@@ -219,18 +259,28 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
         seller_id = listing.get("seller_id")
         lid = listing.get("id")
         
-        seller_name = "Vendedor" 
-        if int(seller_id) == user_id: seller_name = "Você"
+        # --- CORREÇÃO DO NOME DO VENDEDOR ---
+        seller_name = "Desconhecido"
+        if int(seller_id) == user_id:
+            seller_name = "Você"
+        else:
+            # Busca o nome real no banco de dados
+            try:
+                seller_pdata = await player_manager.get_player_data(int(seller_id))
+                if seller_pdata:
+                    seller_name = seller_pdata.get("character_name", "Vendedor")
+            except: pass
 
-        card = _render_card_simple(base_id, qty, price, seller_name, lotes)
-        lines.append(f"{icon_num}┈➤{card}")
+        card = _render_market_card(icon_num, base_id, qty, price, seller_name, lotes)
+        lines.append(card)
         lines.append("") 
-        buttons_map[icon_num] = lid
+        buttons_map[idx+1] = lid
 
+    # --- BOTÕES NUMÉRICOS ---
     kb_rows = []
     btn_row = []
-    for idx, (icon, lid) in enumerate(buttons_map.items()):
-        btn_row.append(InlineKeyboardButton(f"🛒 {icon}", callback_data=f"gem_buy_confirm:{lid}"))
+    for idx, lid in buttons_map.items():
+        btn_row.append(InlineKeyboardButton(f"🛒 {idx}", callback_data=f"gem_buy_confirm:{lid}"))
     if btn_row: kb_rows.append(btn_row)
 
     nav = []
@@ -270,13 +320,12 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
         
         if is_match: sellable.append({"base_id": bid, "qty": qty})
 
-    PER_PAGE = 5
     total_items = len(sellable)
-    total_pages = math.ceil(total_items / PER_PAGE)
+    total_pages = math.ceil(total_items / ITEMS_PER_PAGE)
     page = max(1, min(page, total_pages)) if total_pages > 0 else 1
     
-    start = (page - 1) * PER_PAGE
-    end = start + PER_PAGE
+    start = (page - 1) * ITEMS_PER_PAGE
+    end = start + ITEMS_PER_PAGE
     page_items = sellable[start:end]
 
     lines = [f"➕ <b>VENDER ITEM</b> ({page}/{total_pages})\n<i>Selecione o número para vender:</i>\n"]
@@ -287,19 +336,20 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
     num_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 
     for idx, item in enumerate(page_items):
-        icon_num = num_emojis[idx] if idx < 5 else f"{idx+1}"
+        icon_num = num_emojis[idx] if idx < len(num_emojis) else f"{idx+1}"
         base_id = item["base_id"]
         qty = item["qty"]
         
-        card = _render_card_simple(base_id, qty)
-        lines.append(f"{icon_num}┈➤{card}")
+        # Renderiza card sem preço
+        card = _render_market_card(icon_num, base_id, qty)
+        lines.append(card)
         lines.append("")
-        buttons_map[icon_num] = base_id
+        buttons_map[idx+1] = base_id
 
     kb_rows = []
     btn_row = []
-    for icon, bid in buttons_map.items():
-        btn_row.append(InlineKeyboardButton(f"🛒 {icon}", callback_data=f"gem_sell_item_{bid}"))
+    for idx, bid in buttons_map.items():
+        btn_row.append(InlineKeyboardButton(f"🛒 {idx}", callback_data=f"gem_sell_item_{bid}"))
     if btn_row: kb_rows.append(btn_row)
 
     nav = []
@@ -313,7 +363,7 @@ async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT
     await _safe_edit_or_send(q, context, q.message.chat_id, "\n".join(lines), InlineKeyboardMarkup(kb_rows))
 
 # ==============================
-#  LÓGICA DE COMPRA
+#  LÓGICA DE COMPRA (MANTIDA)
 # ==============================
 
 async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -394,13 +444,6 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
     if seller_id:
         try: await context.bot.send_message(seller_id, f"💎 <b>Venda Realizada!</b>\nVendeste <b>{item_label}</b> por <b>{total_cost} Gemas</b>.", parse_mode="HTML")
         except: pass
-
-    try:
-        buyer_name = buyer_pdata.get("character_name", q.from_user.first_name)
-        seller_name = seller_pdata.get("character_name", "Desconhecido") if seller_pdata else "Desconhecido"
-        log_text = (f"💎 <b>MERCADO GEMAS (VENDA)</b>\n👤 <b>Comprador:</b> {buyer_name}\n📦 <b>Item:</b> {item_label} x{pack_qty}\n💰 <b>Valor:</b> {total_cost} Gemas\n🤝 <b>Vendedor:</b> {seller_name}")
-        await context.bot.send_message(chat_id=LOG_GROUP_ID, message_thread_id=LOG_TOPIC_ID, text=log_text, parse_mode="HTML")
-    except: pass
 
     text = f"✅ <b>Sucesso!</b>\nRecebeste <b>{item_label} (x{pack_qty})</b>.\nCusto: 💎 {total_cost}"
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_list_cats")]])
@@ -589,6 +632,5 @@ gem_market_lote_confirm_handler = CallbackQueryHandler(gem_market_lote_confirm, 
 gem_market_price_spin_handler = CallbackQueryHandler(gem_market_price_spin, pattern=r'^gem_p_(inc|dec)_[0-9]+$')
 gem_market_price_confirm_handler = CallbackQueryHandler(gem_market_price_confirm, pattern=r'^gem_p_confirm$')
 gem_market_cancel_new_handler = CallbackQueryHandler(gem_market_cancel_new, pattern=r'^gem_market_cancel_new$')
-# Handlers de filtro de classe (legado ou futuro)
 gem_list_class_handler = CallbackQueryHandler(show_buy_items_filtered, pattern=r'^gem_list_class:')
 gem_sell_class_handler = CallbackQueryHandler(show_sell_items_filtered, pattern=r'^gem_sell_class:')

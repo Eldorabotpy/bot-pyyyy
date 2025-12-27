@@ -119,15 +119,36 @@ async def dispatch_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.callback_query.answer()
     uid = context.user_data['gem_target_id']
     qty = context.user_data['gem_quantity']
+    name = context.user_data['gem_target_name']
     
     pdata = await get_player_data(uid)
     if pdata:
         add_gems(pdata, qty)
         await save_player_data(uid, pdata)
-        await update.callback_query.edit_message_text(f"✅ Feito! {qty} entregues.")
+        
+        # Feedback para o Admin
+        await update.callback_query.edit_message_text(f"✅ <b>SUCESSO!</b>\n{qty} gemas foram enviadas para {name}.", parse_mode="HTML")
+        
+        # --- NOTIFICAÇÃO RPG PARA O JOGADOR ---
         try:
-            await context.bot.send_message(uid, f"💎 Recebidas: {qty} Gemas!")
-        except: pass
+            msg_rpg = (
+                "👑 ⚜️ <b>𝐃𝐄𝐂𝐑𝐄𝐓𝐎 𝐃𝐄 𝐄𝐋𝐃𝐎𝐑𝐀</b> ⚜️ 👑\n"
+                "═════════════════════════\n"
+                "<i>Por ordem superior, recursos especiais\n"
+                "foram alocados para sua jornada.</i>\n\n"
+                f"💎 <b>𝐐𝐮𝐚𝐧𝐭𝐢𝐝𝐚𝐝𝐞:</b> <code>{qty}</code> Gemas\n"
+                "📦 <b>𝐒𝐭𝐚𝐭𝐮𝐬:</b> Entregue com Sucesso\n\n"
+                "<i>Faça bom uso destas riquezas.</i>\n"
+                "═════════════════════════"
+            )
+            
+            await context.bot.send_message(uid, msg_rpg, parse_mode="HTML")
+        except Exception as e:
+            logger.warning(f"Não foi possível notificar o jogador {uid}: {e}")
+        # --------------------------------------
+        
+    else:
+        await update.callback_query.edit_message_text("❌ Erro ao salvar dados no banco.")
     
     context.user_data.clear()
     return ConversationHandler.END

@@ -1,5 +1,6 @@
 # handlers/gem_shop_handler.py
 import logging
+import math
 from typing import Dict, List
 from datetime import datetime, timezone, timedelta
 
@@ -24,15 +25,8 @@ logger = logging.getLogger(__name__)
 # Configuração de Listas
 # -------------------------------
 
-# 1. PREMIUM: Carrega chaves do arquivo premium
 TAB_PREMIUM = list(PREMIUM_PLANS_FOR_SALE.keys())
-
-# 2. EVOLUÇÃO: Carrega TODAS as chaves do items_evolution.py automaticamente
-# Isso garante que itens Tier 5, 6 e materiais específicos apareçam.
 TAB_EVOLUTION = list(EVOLUTION_ITEMS_DATA.keys())
-
-# 3. AVULSOS: Defina aqui os itens diversos que você quer vender
-# Certifique-se que esses IDs existem no seu items_data ou similar
 TAB_MISC = [
     "sigilo_protecao",
     "ticket_arena",
@@ -40,25 +34,25 @@ TAB_MISC = [
     "pocao_mana_grande"
 ]
 
-# Combina todas as chaves para validação de segurança
 ALL_SHOP_KEYS = TAB_PREMIUM + TAB_EVOLUTION + TAB_MISC
-
-# Preços Padrão (Caso não esteja definido em GEM_SHOP, usa 10)
 DEFAULT_GEM_PRICE = 10
 
-# Dicionário de Preços Específicos (ID -> Preço em Gemas)
-# DICA: Preencha aqui os preços dos itens novos
 GEM_SHOP: Dict[str, int] = {
     "sigilo_protecao": 5,
     "ticket_arena": 5,
     "cristal_de_abertura": 5,
     "pocao_mana_grande": 5,
-   
 }
+
+# Quantidade de itens por página na loja
+ITEMS_PER_PAGE = 3 
 
 # -------------------------------
 # Helpers Básicos
 # -------------------------------
+
+
+
 def _gems(pdata: dict) -> int:
     return max(0, int(pdata.get("gems", 0)))
 
@@ -71,16 +65,11 @@ def _spend_gems(pdata: dict, amount: int) -> bool:
     return True
 
 def _get_item_info(base_id: str) -> dict:
-    # Tenta pegar info do game_data geral
     try:
         info = game_data.get_item_info(base_id)
         if info: return dict(info)
     except: pass
-    
-    # Tenta pegar do items_evolution especificamente
-    if base_id in EVOLUTION_ITEMS_DATA:
-        return EVOLUTION_ITEMS_DATA[base_id]
-        
+    if base_id in EVOLUTION_ITEMS_DATA: return EVOLUTION_ITEMS_DATA[base_id]
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
 def _price_for(base_id: str) -> int:
@@ -90,36 +79,56 @@ def _price_for(base_id: str) -> int:
 
 def _get_button_label(base_id: str) -> str:
     price = _price_for(base_id)
+    
     if base_id in PREMIUM_PLANS_FOR_SALE:
+        # Lógica para Planos VIP (encurta "Dias" para "d")
         plan = PREMIUM_PLANS_FOR_SALE[base_id]
         name = plan.get('name', base_id).replace("Aventureiro ", "")
+        name = name.replace("Premium", "Prem.").replace("Dias", "d").replace("Lenda", "Lenda")
         return f"👑 {name} • {price}💎"
     else:
+        # Lógica para Itens Normais
         info = _get_item_info(base_id)
         name = info.get("display_name") or info.get("nome_exibicao") or base_id
-        emoji = info.get("emoji", "")
-        # Encurta nomes muito longos para caber no botão
-        if len(name) > 16: name = name[:14] + ".."
-        return f"{emoji} {name} • {price}💎"
+        emoji = info.get("emoji", "📦")
+        
+        # --- LIMPEZA DE TEXTO (Aqui está o segredo) ---
+        # Remove prefixos repetitivos para economizar espaço
+        name = name.replace("Emblema: ", "")
+        name = name.replace("Essência da ", "")
+        name = name.replace("Essência do ", "")
+        name = name.replace("Essência ", "")
+        name = name.replace("Pergaminho ", "Perg. ")
+        name = name.replace("Cristal de ", "Cristal ")
+        
+        # Trunca se ainda estiver grande (Max 13 letras)
+        if len(name) > 13: 
+            name = name[:11] + ".."
+            
+        return f"{emoji} {name} ({price})"
 
 def _state(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> dict:
     st = context.user_data.get("gemshop")
     if not st:
-        st = {"tab": "premium", "base_id": None, "qty": 1}
+        # Adicionei 'page' ao estado inicial
+        st = {"tab": "premium", "base_id": None, "qty": 1, "page": 1}
         context.user_data["gemshop"] = st
     return st
 
 # -------------------------------
-# CONSTRUTOR DE TECLADO INTELIGENTE
+# CONSTRUTOR DE TECLADO COM PAGINAÇÃO
 # -------------------------------
-def _build_shop_keyboard(current_tab: str, selected_id: str, qty: int) -> InlineKeyboardMarkup:
+def _build_shop_keyboard(context_state: dict, page_items: list = None) -> InlineKeyboardMarkup:
     
-    # CENÁRIO 1: ITEM SELECIONADO (Tela de Detalhes)
+    current_tab = context_state.get("tab", "premium")
+    selected_id = context_state.get("base_id")
+    qty = context_state.get("qty", 1)
+    page = context_state.get("page", 1)
+
+    # CENÁRIO 1: ITEM SELECIONADO (Detalhes) - Mantém igual
     if selected_id:
         is_plan = selected_id in PREMIUM_PLANS_FOR_SALE
         actions = []
-        
-        # Se for item, deixa escolher quantidade
         if not is_plan:
             qty_row = [
                 InlineKeyboardButton("➖", callback_data="gem_qty_minus"),
@@ -127,55 +136,60 @@ def _build_shop_keyboard(current_tab: str, selected_id: str, qty: int) -> Inline
                 InlineKeyboardButton("➕", callback_data="gem_qty_plus"),
             ]
             actions.append(qty_row)
-
-        buy_text = "✅ CONFIRMAR ASSINATURA" if is_plan else "🛒 CONFIRMAR COMPRA"
-        actions.append([InlineKeyboardButton(buy_text, callback_data="gem_buy")])
-        actions.append([InlineKeyboardButton("⬅️ Voltar para Lista", callback_data=f"gem_pick_{selected_id}")])
         
+        buy_text = "✨ ASSINAR" if is_plan else "🛒 COMPRAR"
+        actions.append([InlineKeyboardButton(buy_text, callback_data="gem_buy")])
+        actions.append([InlineKeyboardButton("🔙 Voltar à Lista", callback_data=f"gem_pick_{selected_id}")]) 
         return InlineKeyboardMarkup(actions)
 
-    # CENÁRIO 2: VITRINE (Nenhum item selecionado)
-    p_mark = " ✅" if current_tab == "premium" else ""
-    e_mark = " ✅" if current_tab == "evolution" else ""
-    m_mark = " ✅" if current_tab == "misc" else "" # Avulsos
+    # CENÁRIO 2: VITRINE (Lista Numerada)
     
-    # Linha de Abas (Agora com 3 opções)
+    # 1. Cabeçalho das Abas
+    tp = "💠 VIP" if current_tab == "premium" else "VIP"
+    te = "💠 Evo" if current_tab == "evolution" else "Evo"
+    tm = "💠 Itens" if current_tab == "misc" else "Itens"
+    
     tabs_row = [
-        InlineKeyboardButton(f"👑 VIP{p_mark}", callback_data="gem_tab_premium"),
-        InlineKeyboardButton(f"🔮 Evo{e_mark}", callback_data="gem_tab_evolution"),
-        InlineKeyboardButton(f"🎒 Avul{m_mark}", callback_data="gem_tab_misc")
+        InlineKeyboardButton(tp, callback_data="gem_tab_premium"),
+        InlineKeyboardButton(te, callback_data="gem_tab_evolution"),
+        InlineKeyboardButton(tm, callback_data="gem_tab_misc")
     ]
     
-    # Seleciona a lista correta
-    items_to_show = []
-    if current_tab == "premium":
-        items_to_show = TAB_PREMIUM
-    elif current_tab == "evolution":
-        items_to_show = TAB_EVOLUTION
-    elif current_tab == "misc":
-        items_to_show = TAB_MISC
-    
-    item_buttons = []
-    
-    if current_tab == "premium":
-        # Lista vertical para planos
-        for base_id in items_to_show:
-            label = _get_button_label(base_id)
-            item_buttons.append([InlineKeyboardButton(label, callback_data=f"gem_pick_{base_id}")])
-    else:
-        # Grade (Grid) para itens (2 por linha)
-        row = []
-        for i, base_id in enumerate(items_to_show, start=1):
-            label = _get_button_label(base_id)
-            row.append(InlineKeyboardButton(label, callback_data=f"gem_pick_{base_id}"))
-            if i % 2 == 0:
-                item_buttons.append(row); row = []
-        if row: item_buttons.append(row)
+    kb_rows = [tabs_row]
 
-    actions = [[InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="market")]]
+    # 2. Botões de Ação Numéricos [ 1 🛒 ] [ 2 🛒 ] ...
+    # Só gera se houver itens na página
+    if page_items:
+        btn_row = []
+        for idx, base_id in enumerate(page_items, start=1):
+            # Cria botão: "1 🛒", "2 🛒"... mapeado para o ID do item
+            btn_row.append(InlineKeyboardButton(f"{idx} 🛒", callback_data=f"gem_pick_{base_id}"))
+            
+            # Quebra linha a cada 5 botões (opcional, ou deixa em uma linha só se couber)
+            if len(btn_row) >= 5:
+                kb_rows.append(btn_row)
+                btn_row = []
+        
+        if btn_row: kb_rows.append(btn_row)
+
+    # 3. Barra de Navegação
+    # Precisa calcular total de páginas novamente ou receber como arg (simplificando aqui)
+    total_pages = context_state.get("total_pages", 1) # Vamos injetar isso no state temporariamente ou recalcular
     
-    # Monta o teclado final
-    return InlineKeyboardMarkup([tabs_row] + item_buttons + actions)
+    nav_row = []
+    if total_pages > 1:
+        if page > 1: nav_row.append(InlineKeyboardButton("⬅️", callback_data="gem_page_prev"))
+        else: nav_row.append(InlineKeyboardButton("🔲", callback_data="noop"))
+            
+        nav_row.append(InlineKeyboardButton(f"📄 {page}/{total_pages}", callback_data="noop"))
+        
+        if page < total_pages: nav_row.append(InlineKeyboardButton("➡️", callback_data="gem_page_next"))
+        else: nav_row.append(InlineKeyboardButton("🔲", callback_data="noop"))
+            
+    if nav_row: kb_rows.append(nav_row)
+    kb_rows.append([InlineKeyboardButton("⬅️ Sair da Loja", callback_data="market")])
+    
+    return InlineKeyboardMarkup(kb_rows)
 
 # -------------------------------
 # Handlers
@@ -194,76 +208,119 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     st = _state(context, user_id)
     current_tab = st.get("tab", "premium")
     base_id = st.get("base_id")
-    qty = max(1, int(st.get("qty", 1)))
-
+    qty = st.get("qty", 1)
+    page = st.get("page", 1)
+    
     pdata = await player_manager.get_player_data(user_id) or {}
     gems_now = _gems(pdata)
 
     lines = [
-        "💎 <b>LOJA DE GEMAS</b>",
-        f"💳 Saldo: <code>{gems_now}</code> 💎",
-        "─────────────────"
+        f"╭┈┈➤➤➤ 💎 𝐋𝐎𝐉𝐀 𝐃𝐄 𝐆𝐄𝐌𝐀𝐒 ",
+        f"│💰 <i>Saldo: {gems_now} diamantes</i>",
+        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤➤➤"
     ]
     
-    # --- MODO DETALHES ---
+    # Define a fonte de itens
+    items_source = []
+    if current_tab == "premium": items_source = TAB_PREMIUM
+    elif current_tab == "evolution": items_source = TAB_EVOLUTION
+    elif current_tab == "misc": items_source = TAB_MISC
+
+    # Cálculos de Paginação
+    total_items = len(items_source)
+    # ITEMS_PER_PAGE deve estar definido no topo do arquivo (ex: 8)
+    total_pages = math.ceil(total_items / ITEMS_PER_PAGE)
+    if total_pages == 0: total_pages = 1
+    if page > total_pages: page = 1; st["page"] = 1 # Correção
+    
+    # Passa total_pages para o builder saber se mostra setas
+    st["total_pages"] = total_pages 
+
+    # MODO DETALHES (Item Selecionado) - Igual ao anterior
     if base_id:
         price = _price_for(base_id)
         if base_id in PREMIUM_PLANS_FOR_SALE:
             plan = PREMIUM_PLANS_FOR_SALE[base_id]
-            tier_key = plan.get("tier", "free")
-            days = plan.get("days", 30)
-            benefits_block = get_benefits_text(tier_key)
-            
             lines.append(f"👑 <b>{plan['name']}</b>")
-            lines.append(f"⏱ <b>Duração:</b> {days} Dias")
+            lines.append(f"⏱ <b>Duração:</b> {plan.get('days', 30)} dias")
             lines.append("")
-            lines.append(benefits_block)
-            lines.append("")
-            
-            current_tier = pdata.get("premium_tier")
-            if current_tier and current_tier != tier_key and current_tier != "free":
-                lines.append("⚠️ <b>Atenção:</b> Isso substituirá seu plano atual.")
-            lines.append("─────────────────")
-            lines.append(f"💰 <b>VALOR: {price} 💎</b>")
-            
+            benefits = get_benefits_text(plan.get("tier", "free"))
+            lines.append(f"<i>{benefits}</i>")
+            lines.append("━━━━━━━━━━━━━━━━━━")
+            lines.append(f"🏷️ <b>Valor: {price} 💎</b>")
         else:
             info = _get_item_info(base_id)
-            name = info.get("display_name", base_id)
-            desc = info.get("description", "Item especial.")
+            name = info.get("display_name", base_id).upper()
+            desc = info.get("description", "Item místico raro.")
             total = price * qty
             
             lines.append(f"📦 <b>{name}</b>")
-            lines.append("")
             lines.append(f"<i>{desc}</i>")
             lines.append("")
-            lines.append(f"💎 Unitário: {price}")
+            lines.append(f"🔹 Preço Unitário: {price} 💎")
             lines.append(f"✖️ Quantidade: {qty}")
-            lines.append("─────────────────")
-            lines.append(f"💰 <b>TOTAL: {total} 💎</b>")
+            lines.append("━━━━━━━━━━━━━━━━━━")
+            lines.append(f"💵 <b>TOTAL: {total} 💎</b>")
+            
+        page_items_for_kb = None # Não gera botões numéricos na tela de detalhes
 
-    # --- MODO VITRINE ---
+    # MODO VITRINE (Lista Numerada)
     else:
-        if current_tab == "premium":
-            lines.append("👑 <b>Planos VIP</b>")
-            lines.append("<i>Vantagens exclusivas para apoiadores.</i>")
-        elif current_tab == "evolution":
-            lines.append("🔮 <b>Materiais de Evolução</b>")
-            lines.append("<i>Itens essenciais para a ascensão de classe.</i>")
-        elif current_tab == "misc":
-            lines.append("🎒 <b>Itens Avulsos</b>")
-            lines.append("<i>Consumíveis e utilitários diversos.</i>")
+        start_idx = (page - 1) * ITEMS_PER_PAGE
+        end_idx = start_idx + ITEMS_PER_PAGE
+        page_items_for_kb = items_source[start_idx:end_idx]
+
+        # Cabeçalho da categoria
+        cat_name = "ITENS DIVERSOS"
+        if current_tab == "premium": cat_name = "PLANOS VIP"
+        elif current_tab == "evolution": cat_name = "MATERIAIS DE EVOLUÇÃO"
+        
+        lines.append(f"📂 <b>{cat_name}</b> ({page}/{total_pages})")
+        lines.append("")
+
+        num_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+        # Gera a lista de texto
+        for idx, item_id in enumerate(page_items_for_kb):
+            # Ícone numérico
+            icon_num = num_emojis[idx] if idx < len(num_emojis) else f"<b>{idx+1}.</b>"
+            
+            price = _price_for(item_id)
+            
+            if current_tab == "premium":
+                # Layout Especial para VIP
+                plan = PREMIUM_PLANS_FOR_SALE.get(item_id, {})
+                p_name = plan.get("name", item_id).replace("Aventureiro ", "")
+                lines.append(f"{icon_num} 👑 <b>{p_name}</b>")
+                lines.append(f"   ╰┈➤ 💎 <b>{price}</b> │ ⏱ {plan.get('days')} Dias")
+            else:
+                # Layout para Itens (Evo/Misc)
+                info = _get_item_info(item_id)
+                i_name = info.get("display_name", item_id).upper()
+                # Limpeza de nome para não ficar gigante
+                i_name = i_name.replace("EMBLEMA: ", "").replace("ESSÊNCIA DA ", "").replace("ESSÊNCIA DO ", "")
+                
+                emoji = info.get("emoji", "🔮")
+                
+                lines.append(f"{icon_num} {emoji} <b>{i_name}</b>")
+                lines.append(f"   ╰┈➤ 💎 <b>{price}</b>")
+            
+            lines.append("") # Espaço entre itens
 
     text_content = "\n".join(lines)
-    kb = _build_shop_keyboard(current_tab, base_id, qty)
+    
+    # Passa os itens da página atual para o builder gerar os botões 1, 2, 3...
+    kb = _build_shop_keyboard(st, page_items_for_kb)
 
     if q:
-        reply_markup = kb
-        try: await q.edit_message_caption(caption=text_content, reply_markup=reply_markup, parse_mode="HTML")
+        try: await q.edit_message_caption(caption=text_content, reply_markup=kb, parse_mode="HTML")
         except BadRequest:
-            try: await q.edit_message_text(text=text_content, reply_markup=reply_markup, parse_mode="HTML")
+            try: await q.edit_message_text(text=text_content, reply_markup=kb, parse_mode="HTML")
             except: pass
     else:
         await context.bot.send_message(chat_id=chat_id, text=text_content, reply_markup=kb, parse_mode="HTML")
+
+# --- HANDLERS DE AÇÃO ---
 
 async def gem_switch_tab(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -276,6 +333,24 @@ async def gem_switch_tab(update: Update, context: ContextTypes.DEFAULT_TYPE):
         st["tab"] = new_tab
         st["base_id"] = None 
         st["qty"] = 1
+        st["page"] = 1 # Reseta página ao trocar aba
+        
+    context.user_data["gemshop"] = st
+    await gem_shop_open(update, context)
+
+async def gem_change_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lida com Avançar/Voltar página"""
+    q = update.callback_query
+    await q.answer()
+    user_id = q.from_user.id
+    st = _state(context, user_id)
+    
+    current_page = st.get("page", 1)
+    if q.data == "gem_page_next":
+        st["page"] = current_page + 1
+    elif q.data == "gem_page_prev":
+        st["page"] = max(1, current_page - 1)
+        
     context.user_data["gemshop"] = st
     await gem_shop_open(update, context)
 
@@ -285,12 +360,7 @@ async def gem_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = q.from_user.id
     base_id = q.data.replace("gem_pick_", "")
 
-    if base_id not in ALL_SHOP_KEYS:
-        # Tenta fallback se o item existe no sistema mas não estava na lista inicial
-        info = _get_item_info(base_id)
-        if not info:
-            await q.answer("Item indisponível.", show_alert=True); return
-
+    # Se clicar no mesmo item, volta pra lista (desmarca)
     st = _state(context, user_id)
     if st["base_id"] == base_id:
         st["base_id"] = None
@@ -306,10 +376,12 @@ async def gem_change_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
     user_id = q.from_user.id
     st = _state(context, user_id)
-    if not st["base_id"] or st["base_id"] in PREMIUM_PLANS_FOR_SALE: return
-    qty = max(1, int(st.get("qty", 1)))
+    if not st["base_id"]: return
+    
+    qty = st.get("qty", 1)
     if q.data == "gem_qty_minus": qty = max(1, qty - 1)
     elif q.data == "gem_qty_plus": qty += 1
+    
     st["qty"] = qty
     context.user_data["gemshop"] = st
     await gem_shop_open(update, context)
@@ -345,17 +417,16 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_vip:
         plan = PREMIUM_PLANS_FOR_SALE[base_id]
         new_tier = plan["tier"]
-        days = plan["days"]
+        days = plan.get("days", 30)
         
         now = datetime.now(timezone.utc)
         curr_iso = buyer.get("premium_expires_at")
-        current_active_tier = buyer.get("premium_tier")
         
-        start_time = now 
-        if current_active_tier == new_tier and curr_iso:
+        # Lógica de extensão de VIP
+        start_time = now
+        if buyer.get("premium_tier") == new_tier and curr_iso:
             try:
                 curr_dt = datetime.fromisoformat(curr_iso)
-                if curr_dt.tzinfo is None: curr_dt = curr_dt.replace(tzinfo=timezone.utc)
                 if curr_dt > now: start_time = curr_dt
             except: pass
             
@@ -373,17 +444,17 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     st["qty"] = 1
     context.user_data["gemshop"] = st
 
+    # Feedback visual final
     reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar à Loja", callback_data="gem_shop")]])
-    
     try: await q.edit_message_caption(caption=msg, reply_markup=reply_markup, parse_mode="HTML")
-    except BadRequest:
-        await q.edit_message_text(text=msg, reply_markup=reply_markup, parse_mode="HTML")
+    except BadRequest: await q.edit_message_text(text=msg, reply_markup=reply_markup, parse_mode="HTML")
 
 # -------------------------------
 # Exports
 # -------------------------------
 gem_shop_open_handler   = CallbackQueryHandler(gem_shop_open, pattern=r'^gem_shop$')
 gem_tab_handler         = CallbackQueryHandler(gem_switch_tab, pattern=r'^gem_tab_')
+gem_page_handler        = CallbackQueryHandler(gem_change_page, pattern=r'^gem_page_') # NOVO HANDLER
 gem_pick_handler        = CallbackQueryHandler(gem_pick_item, pattern=r'^gem_pick_')
 gem_qty_minus_handler   = CallbackQueryHandler(gem_change_qty, pattern=r'^gem_qty_minus$')
 gem_qty_plus_handler    = CallbackQueryHandler(gem_change_qty, pattern=r'^gem_qty_plus$')
