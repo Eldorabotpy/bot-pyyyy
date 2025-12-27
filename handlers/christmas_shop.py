@@ -68,15 +68,21 @@ TROCAS_NOEL = {
     },
     "aprendiz_do_santo": {
         "nome": "Skin:Mago Aprendiz do Santo",
-        "custo": 100, "moeda": ITEM_RARO,
-        "recompensa_id": "Aprendiz do Santo", 
-        "tipo": "skin"
+        "custo": 100, 
+        "moeda": ITEM_RARO,
+        # ANTES ESTAVA: "Aprendiz do Santo"
+        # MUDE PARA:
+        "recompensa_id": "aprendiz_do_santo", 
+        "tipo": "skin",
+        "emoji": "🧙‍♂️"  # Aproveite e adicione o emoji para não dar erro
     },
     "discipulo_de_nicolau": {
         "nome": "Skin:Monge Discípulo de Nicolau",
         "custo": 100, "moeda": ITEM_RARO,
-        "recompensa_id": "espirito_da_rena_dourada", 
-        "tipo": "skin"
+        # CORRIJA AQUI TAMBÉM:
+        "recompensa_id": "discipulo_de_nicolau", 
+        "tipo": "skin",
+        "emoji": "👊"
     },
     "oni_de_natal": {
         "nome": "Skin:Samurai Oni de Natal",
@@ -150,6 +156,8 @@ async def _send_shop_interface(update, context, chat_id, text, reply_markup):
 # ==============================================================================
 #  MENU PRINCIPAL
 # ==============================================================================
+# Em handlers/christmas_shop.py
+
 async def open_christmas_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query: await query.answer()
@@ -205,8 +213,14 @@ async def open_christmas_shop(update: Update, context: ContextTypes.DEFAULT_TYPE
     row = []
     for key, data in items_to_show:
         price_emoji = "🎁" if data["moeda"] == ITEM_COMUM else "🌟"
-        btn_text = f"{data['emoji']} {data['nome']} ({data['custo']}{price_emoji})"
-        # CORREÇÃO AQUI: Usa 'noel_buy:' para bater com o handler
+        
+        # --- CORREÇÃO AQUI: Usa um emoji padrão se não existir no dicionário ---
+        # Se for skin usa 🎭, se for item usa 📦, ou o que estiver configurado
+        default_emoji = "🎭" if data["tipo"] == "skin" else "📦"
+        item_emoji = data.get("emoji", default_emoji) 
+        
+        btn_text = f"{item_emoji} {data['nome']} ({data['custo']}{price_emoji})"
+        
         row.append(InlineKeyboardButton(btn_text, callback_data=f"noel_buy:{key}"))
         
         if len(row) == 2:

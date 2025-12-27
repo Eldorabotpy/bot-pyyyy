@@ -20,20 +20,13 @@ from handlers.menu.region import (
 
 # --- CORREÇÃO DO NATAL AQUI ---
 # Importamos os NOVOS nomes que criamos no arquivo da loja
-try:
-    from handlers.christmas_shop import (
-        open_christmas_shop_handler, 
-        buy_christmas_item_handler, 
-        switch_tab_handler, 
-        christmas_command
-    )
-except ImportError as e:
-    # Se der erro (arquivo faltando), definimos como None para não travar o bot
-    logger.warning(f"⚠️ Falha ao importar Loja de Natal: {e}")
-    open_christmas_shop_handler = None
-    buy_christmas_item_handler = None
-    switch_tab_handler = None
-    christmas_command = None
+from handlers.christmas_shop import (
+    open_christmas_shop_handler, 
+    buy_christmas_item_handler, 
+    switch_tab_handler, 
+    christmas_command
+)
+
 
 # --- Grupo 3: Calabouços (Dungeons) ---
 from modules.dungeons.runtime import (
