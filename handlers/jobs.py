@@ -72,10 +72,94 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
     return now.date().isoformat()
 
 # ==============================================================================
-# 👹 JOB: WORLD BOSS (Lógica de Notificação Ajustada)
+# ⚔️ JOBS DE ARENA PVP (CORRIGIDOS)
 # ==============================================================================
 
-# Em handlers/jobs.py
+async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
+    """Reseta as 10 entradas diárias da Arena PvP."""
+    today = _today_str()
+    count = 0
+    
+    msg_reset = "⚔️ <b>ARENA DE ELDORA</b>\n suas 10 batalhas diárias foram restauradas! Boa sorte."
+
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            # Se já resetou hoje, pula
+            if pdata.get("last_pvp_entry_reset") == today: continue
+            
+            if players_col is not None:
+                # Atualiza no Banco
+                players_col.update_one(
+                    {"_id": user_id},
+                    {
+                        "$set": {
+                            "pvp_entries_left": 10,
+                            "last_pvp_entry_reset": today
+                        }
+                    }
+                )
+                
+                # --- LIMPEZA DE CACHE (CRÍTICO) ---
+                try:
+                    if hasattr(player_manager, "clear_player_cache"):
+                        res = player_manager.clear_player_cache(user_id)
+                        if asyncio.iscoroutine(res): await res
+                except: pass
+                
+                # Notifica (opcional para não spammar, mas bom para engajamento)
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=msg_reset, parse_mode='HTML')
+                    await asyncio.sleep(0.05)
+                except: pass
+                
+                count += 1
+        except Exception: pass
+        
+    logger.info(f"[JOB] PvP Resetado para {count} jogadores.")
+
+async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entrega 10 Tickets de Arena diariamente."""
+    today = _today_str()
+    granted = 0
+    
+    msg_arena = (
+        "🎫 <b>SUPRIMENTO DE BATALHA</b>\n"
+        "Você recebeu <b>10x 🎟️ Ticket de Arena</b>.\n"
+        "<i>Use-os para desafiar oponentes além do limite diário!</i>"
+    )
+
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            daily = pdata.get("daily_awards") or {}
+            if daily.get("last_arena_ticket_date") == today: continue
+            
+            if players_col is not None:
+                players_col.update_one(
+                    {"_id": user_id},
+                    {
+                        "$inc": {"inventory.ticket_arena": 10},
+                        "$set": {"daily_awards.last_arena_ticket_date": today}
+                    }
+                )
+                
+                # --- LIMPEZA DE CACHE (CRÍTICO) ---
+                try:
+                    if hasattr(player_manager, "clear_player_cache"):
+                        res = player_manager.clear_player_cache(user_id)
+                        if asyncio.iscoroutine(res): await res
+                except: pass
+                
+                # Notifica
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=msg_arena, parse_mode='HTML')
+                    await asyncio.sleep(0.05)
+                except: pass
+                
+                granted += 1
+        except: pass
+        
+    logger.info(f"[JOB] Tickets de Arena entregues: {granted}")
+    return granted
 
 async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -136,7 +220,7 @@ async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
         except Exception: pass
         
     logger.info(f"[JOB] Tickets de evento entregues: {count}")
-    
+
 async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Nasce o World Boss e notifica.
@@ -462,25 +546,7 @@ async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     except Exception: pass
     return granted
 
-async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
-    today = _today_str()
-    granted = 0
-    async for user_id, pdata in player_manager.iter_players():
-        try:
-            daily = pdata.get("daily_awards") or {}
-            if daily.get("last_arena_ticket_date") == today: continue
-            
-            if players_col is not None:
-                players_col.update_one(
-                    {"_id": user_id},
-                    {
-                        "$inc": {f"inventory.ticket_arena": 10},
-                        "$set": {"daily_awards.last_arena_ticket_date": today}
-                    }
-                )
-                granted += 1
-        except: pass
-    return granted
+
 
 async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     return 0
@@ -492,7 +558,6 @@ async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
     today = _today_str() 
     granted = 0
     
-    # Texto chamativo estilo RPG
     msg_ticket = (
         "📜 <b>CONVOCAÇÃO REAL</b> 📜\n\n"
         "Guerreiro, o Reino precisa de sua força!\n"
@@ -517,6 +582,16 @@ async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
                         "$set": {"daily_awards.last_kingdom_ticket_date": today}
                     }
                 )
+                
+                # --- [IMPORTANTE] LIMPEZA DE CACHE ADICIONADA AQUI ---
+                # Sem isso, o item não aparece na hora!
+                try:
+                    if hasattr(player_manager, "clear_player_cache"):
+                        res = player_manager.clear_player_cache(user_id)
+                        if asyncio.iscoroutine(res): await res
+                except Exception: pass
+                # -----------------------------------------------------
+
                 granted += 1
                 
                 # --- NOTIFICAÇÃO AO JOGADOR ---
@@ -526,7 +601,6 @@ async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
                         text=msg_ticket, 
                         parse_mode='HTML'
                     )
-                    # Pequena pausa para evitar FloodWait se tiver muitos players
                     await asyncio.sleep(0.05) 
                 except Exception:
                     pass
