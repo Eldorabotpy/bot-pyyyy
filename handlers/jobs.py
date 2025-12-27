@@ -22,7 +22,7 @@ from modules.player_manager import (
 # --- CONFIG & MANAGERS ---
 # Importa IDs do Grupo e da Aba de Avisos
 from config import EVENT_TIMES, JOB_TIMEZONE, ANNOUNCEMENT_CHAT_ID, ANNOUNCEMENT_THREAD_ID
-
+from pvp.pvp_scheduler import executar_reset_pvp
 # --- IMPORTAÇÃO DOS ENGINES (SEM TRY/EXCEPT PARA MOSTRAR ERROS REAIS) ---
 # Se der erro aqui, queremos que o bot avise no console, e não que esconda!
 from modules.world_boss.engine import (
@@ -446,15 +446,23 @@ async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
 # ⚔️ PVP E OUTROS JOBS
 # ==============================================================================
 async def job_pvp_monthly_reset(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Job agendado que roda todo dia, mas só executa o reset no dia 1º.
+    """
     try:
         tz = ZoneInfo(JOB_TIMEZONE)
     except Exception:
         tz = datetime.timezone.utc
+    
     now = datetime.datetime.now(tz)
     
-    if now.day != 1: return
-    await distribute_pvp_rewards(context)
-    await reset_pvp_season(context)
+    # 1. Trava de Segurança: Só roda no dia 1 do mês
+    if now.day != 1: 
+        return
+
+    # 2. Chama a função MESTRA do pvp_scheduler
+    # Ela vai: Premiar Top 5 -> Zerar Pontos -> Limpar Cache -> Salvar Log
+    await executar_reset_pvp(context.bot, force_run=False)
 
 async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
     all_players_ranked = []
@@ -483,9 +491,32 @@ async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
 
 async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
     if players_col is not None:
+        # Zera os pontos de todos
         players_col.update_many({}, {"$set": {"pvp_points": 0}})
+    
     if ANNOUNCEMENT_CHAT_ID:
-        try: await context.bot.send_message(chat_id=ANNOUNCEMENT_CHAT_ID, message_thread_id=ANNOUNCEMENT_THREAD_ID, text="⚔️ <b>Nova Temporada PvP!</b>", parse_mode="HTML")
+        # Mensagem Épica de Nova Temporada
+        msg_season = (
+            "╭────── [ 🏆 <b>NOVA TEMPORADA</b> ] ──────➤\n"
+            "│\n"
+            "│ ⚔️ <b>A ARENA FOI REINICIADA!</b>\n"
+            "│ <i>Os deuses da guerra limparam o sangue</i>\n"
+            "│ <i>da areia. A glória aguarda novos heróis!</i>\n"
+            "│\n"
+            "│ 🔄 <b>Status:</b> Pontos Resetados\n"
+            "│ 💎 <b>Prêmios:</b> Entregues aos Top Rankings\n"
+            "│\n"
+            "╰──────────────────────────────➤\n"
+            "🔥 <i>Vá à Arena e conquiste seu lugar na história!</i>"
+        )
+        
+        try: 
+            await context.bot.send_message(
+                chat_id=ANNOUNCEMENT_CHAT_ID, 
+                message_thread_id=ANNOUNCEMENT_THREAD_ID, 
+                text=msg_season, 
+                parse_mode="HTML"
+            )
         except: pass
 
 async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:

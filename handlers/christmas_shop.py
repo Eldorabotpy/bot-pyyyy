@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 
 from modules import player_manager
 from modules import file_ids
@@ -59,7 +59,7 @@ TROCAS_NOEL = {
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "sombra_de_krampus", 
         "tipo": "skin"
-    },
+    }, 
     "santo_da_nevasca": {
         "nome": "Skin:Mago Santo da Nevasca",
         "custo": 100, "moeda": ITEM_RARO,
@@ -67,7 +67,7 @@ TROCAS_NOEL = {
         "tipo": "skin"
     },
     "aprendiz_do_santo": {
-        "nome": "Skin:Mago anto da Nevasca",
+        "nome": "Skin:Mago Aprendiz do Santo",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "Aprendiz do Santo", 
         "tipo": "skin"
@@ -97,7 +97,6 @@ TROCAS_NOEL = {
         "tipo": "skin"
     },
 
-    # Skins Mágicas
     "esmagador_de_chamines": {
         "nome": "Skin:Beserker Esmagador de Chaminés",
         "custo": 100, "moeda": ITEM_RARO,
@@ -117,160 +116,165 @@ TROCAS_NOEL = {
 # 🎅 FUNÇÕES AUXILIARES
 # ==============================================================================
 
-def is_event_active() -> bool:
-    """Retorna True se ainda for antes de 29/Dez."""
-    return datetime.now(timezone.utc) <= EVENT_END_DATE
+def is_event_active():
+    """Checa se o evento ainda está rolando."""
+    return datetime.now(timezone.utc) < EVENT_END_DATE
 
-def _get_item_count(pdata: dict, item_id: str) -> int:
-    inv = pdata.get("inventory", {})
-    return int(inv.get(item_id, 0))
+async def _send_shop_interface(update, context, chat_id, text, reply_markup):
+    """Envia ou Edita a mensagem da loja."""
+    # Tenta enviar vídeo se disponível e for uma nova mensagem (não callback)
+    # Mas como é navegação, vamos focar em editar texto para ser rápido.
+    if update.callback_query:
+        try:
+            # Tenta editar a legenda (se for foto/video) ou texto
+            try: await update.callback_query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode="HTML")
+            except: await update.callback_query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
+        except:
+            # Se falhar (ex: mensagem muito antiga), envia nova
+            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        # Primeira abertura: Tenta mandar vídeo
+        fd = file_ids.get_file_data(KEY_VIDEO_NOEL)
+        if fd:
+            try:
+                if fd.get("type") == "video":
+                    await context.bot.send_video(chat_id=chat_id, video=fd["id"], caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                else:
+                    await context.bot.send_photo(chat_id=chat_id, photo=fd["id"], caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                return
+            except: pass
+        
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ==============================================================================
-# 🎅 HANDLERS (LÓGICA DA LOJA)
+#  MENU PRINCIPAL
 # ==============================================================================
-
 async def open_christmas_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    # Não usamos answer() ainda pois vamos carregar mídia
+    if query: await query.answer()
     
-    user_id = query.from_user.id
-    pdata = await player_manager.get_player_data(user_id)
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
 
-    # 1. Validações
     if not is_event_active():
-        await query.answer("🎅 O Natal já passou! Volte ano que vem.", show_alert=True)
+        await context.bot.send_message(chat_id, "🎅 <b>Ho Ho Ho... O Natal já acabou!</b>\nVolte ano que vem!", parse_mode="HTML")
         return
 
-    current_loc = pdata.get("current_location")
-    if current_loc != "picos_gelados":
-        await query.answer("❄️ A Cabana fica nos Picos Gelados!", show_alert=True)
-        return
+    # Recupera estado da aba (Padrão: 'items')
+    current_tab = context.user_data.get("xmas_tab", "items")
 
-    # 2. Prepara Texto e Botões
-    qtd_comum = _get_item_count(pdata, ITEM_COMUM)
-    qtd_raro = _get_item_count(pdata, ITEM_RARO)
+    pdata = await player_manager.get_player_data(user_id)
+    inv = pdata.get("inventory", {})
+    
+    # Saldos
+    qtd_comum = int(inv.get(ITEM_COMUM, 0))
+    qtd_raro = int(inv.get(ITEM_RARO, 0))
 
+    # Texto Temático
     text = (
-        "🎅 <b>CABANA DO PAPAI NOEL</b> 🏠\n\n"
-        "<i>Bem-vindo à minha oficina nos Picos Gelados!\n"
-        "Troque seus presentes por itens mágicos ou visuais exclusivos!</i>\n\n"
-        f"⏳ <b>Fim:</b> 29/Dez\n\n"
+        "🎄 <b>CABANA DO PAPAI NOEL</b> 🎄\n"
+        "╰┈➤ <i>Troque seus presentes por recompensas!</i>\n\n"
         f"🎒 <b>Seus Presentes:</b>\n"
-        f"🎁 Perdidos: <b>{qtd_comum}</b>\n"
-        f"🎁🌟 Dourados: <b>{qtd_raro}</b>"
+        f"🎁 <b>Perdidos:</b> {qtd_comum}\n"
+        f"🌟 <b>Dourados:</b> {qtd_raro}\n\n"
+        f"⏳ <i>O evento acaba em breve!</i>"
     )
 
-    keyboard = []
-    # Loop simples para gerar botões (certifique-se que TROCAS_NOEL está completo acima)
-    for key, info in TROCAS_NOEL.items():
-        icone = "🎁" if info["moeda"] == ITEM_COMUM else "🎁🌟"
-        btn_text = f"{info['nome']} ({info['custo']} {icone})"
-        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"noel_buy:{key}")])
-
-    keyboard.append([InlineKeyboardButton("⬅️ Sair da Cabana", callback_data="open_region:picos_gelados")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # 3. LÓGICA INTELIGENTE DE MÍDIA (File IDs)
+    # --- MONTAGEM DO TECLADO ---
+    kb = []
     
-    # Tenta pegar o ID do banco (Rápido ⚡)
-    media_id = file_ids.get_file_id(KEY_VIDEO_NOEL)
+    # 1. Linha de Abas
+    # Destaca a aba ativa com ✅ ou brilho
+    lbl_items = "✅ 🎁 ITENS" if current_tab == "items" else "🎁 Itens"
+    lbl_skins = "✅ 🌟 SKINS" if current_tab == "skins" else "🌟 Skins"
     
-    try:
-        if media_id:
-            # --- CENÁRIO A: VÍDEO JÁ SALVO (Usa ID) ---
-            await query.edit_message_media(
-                media=InputMediaVideo(media=media_id, caption=text, parse_mode="HTML"),
-                reply_markup=reply_markup
-            )
-        else:
-            # --- CENÁRIO B: PRIMEIRO ACESSO (Faz Upload do PC) ---
-            caminho_local = "assets/videos/cabana_noel.mp4"
-            
-            if os.path.exists(caminho_local):
-                with open(caminho_local, 'rb') as f:
-                    # Envia e captura a mensagem retornada
-                    msg = await query.edit_message_media(
-                        media=InputMediaVideo(media=f, caption=text, parse_mode="HTML"),
-                        reply_markup=reply_markup
-                    )
-                    
-                    # SALVA O ID NO BANCO AUTOMATICAMENTE 💾
-                    if msg.video:
-                        file_ids.save_file_id(KEY_VIDEO_NOEL, msg.video.file_id, "video")
-                        logger.info(f"🎅 [NATAL] Novo ID de vídeo salvo: {KEY_VIDEO_NOEL}")
-            else:
-                # Se não tiver vídeo no PC nem no banco, manda sem vídeo
-                logger.error(f"Arquivo não encontrado: {caminho_local}")
-                if query.message.photo:
-                    await query.edit_message_caption(caption=text + "\n(Vídeo off)", reply_markup=reply_markup, parse_mode="HTML")
-                else:
-                    await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
+    kb.append([
+        InlineKeyboardButton(lbl_items, callback_data="xmas_tab_items"),
+        InlineKeyboardButton(lbl_skins, callback_data="xmas_tab_skins")
+    ])
 
-    except Exception as e:
-        # Fallback de erro (ex: mensagem anterior era texto puro e não dá pra editar media)
-        # Deleta e envia novo limpo
-        await query.message.delete()
+    # 2. Grade de Itens (Baseada na Aba)
+    items_to_show = []
+    
+    for key, data in TROCAS_NOEL.items():
+        if current_tab == "items" and data["tipo"] == "item":
+            items_to_show.append((key, data))
+        elif current_tab == "skins" and data["tipo"] == "skin":
+            items_to_show.append((key, data))
+
+    # Monta grade 2x2
+    row = []
+    for key, data in items_to_show:
+        price_emoji = "🎁" if data["moeda"] == ITEM_COMUM else "🌟"
+        btn_text = f"{data['emoji']} {data['nome']} ({data['custo']}{price_emoji})"
         
-        # Tenta usar ID ou Local novamente no envio limpo
-        midia_envio = media_id if media_id else open("assets/videos/cabana_noel.mp4", "rb")
+        row.append(InlineKeyboardButton(btn_text, callback_data=f"xmas_buy_{key}"))
         
-        try:
-            msg = await context.bot.send_video(
-                chat_id=user_id,
-                video=midia_envio,
-                caption=text,
-                reply_markup=reply_markup,
-                parse_mode="HTML"
-            )
-            # Salva ID se foi upload local
-            if not media_id and msg.video:
-                file_ids.save_file_id(KEY_VIDEO_NOEL, msg.video.file_id, "video")
-                
-        except Exception as err_envio:
-            logger.error(f"Erro fatal ao enviar vídeo da loja: {err_envio}")
-            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
+        if len(row) == 2:
+            kb.append(row)
+            row = []
+    if row: kb.append(row) # Adiciona sobras
 
-    await query.answer()
+    # 3. Botão de Voltar (Para a região Picos Gelados)
+    kb.append([InlineKeyboardButton("⬅️ Sair da Cabana", callback_data="open_region:picos_gelados")])
+
+    reply_markup = InlineKeyboardMarkup(kb)
     
-async def buy_christmas_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (Mantenha sua função de compra idêntica à anterior) ...
-    # Só vou colocar o esqueleto aqui pra não faltar no copy-paste
+    await _send_shop_interface(update, context, chat_id, text, reply_markup)
+
+# ==============================================================================
+#  HANDLERS DE AÇÃO
+# ==============================================================================
+
+async def switch_tab_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Troca a aba e recarrega o menu."""
     query = update.callback_query
-    user_id = query.from_user.id
+    new_tab = query.data.replace("xmas_tab_", "")
     
-    try:
-        item_key = query.data.split(":")[1]
-    except IndexError: return
+    # Atualiza estado
+    context.user_data["xmas_tab"] = new_tab
+    
+    # Recarrega menu
+    await open_christmas_shop(update, context)
 
-    offer = TROCAS_NOEL.get(item_key)
+async def buy_christmas_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Processa a compra."""
+    query = update.callback_query
+    # Não damos answer() aqui para poder mandar alerta se falhar, ou mensagem final
+    
+    key = query.data.replace("xmas_buy_", "")
+    offer = TROCAS_NOEL.get(key)
+    
     if not offer:
-        await query.answer("Item inválido.", show_alert=True)
+        await query.answer("Item não encontrado!", show_alert=True)
         return
 
-    if not is_event_active():
-        await query.answer("O evento acabou!", show_alert=True)
-        return
-
+    user_id = update.effective_user.id
     pdata = await player_manager.get_player_data(user_id)
+    inv = pdata.get("inventory", {})
+    
     custo = offer["custo"]
     moeda = offer["moeda"]
-    saldo = _get_item_count(pdata, moeda)
-
+    
+    # Verifica Saldo
+    saldo = int(inv.get(moeda, 0))
     if saldo < custo:
         n_moeda = "Presentes Perdidos" if moeda == ITEM_COMUM else "Presentes Dourados"
         await query.answer(f"❌ Falta {custo - saldo} {n_moeda}!", show_alert=True)
         return
 
-    # Checa Skin Repetida
+    # Verifica Skin Repetida
     if offer["tipo"] == "skin":
         unlocked = pdata.get("unlocked_skins", [])
         if offer["recompensa_id"] in unlocked:
             await query.answer("⚠️ Você já tem essa skin!", show_alert=True)
             return
 
-    # Processa Compra
+    # --- EFETUA A COMPRA ---
+    # 1. Remove moeda
     player_manager.remove_item_from_inventory(pdata, moeda, custo)
     
+    # 2. Entrega Recompensa
     msg_f = ""
     if offer["tipo"] == "item":
         player_manager.add_item_to_inventory(pdata, offer["recompensa_id"], offer["qtd"])
@@ -279,14 +283,18 @@ async def buy_christmas_item(update: Update, context: ContextTypes.DEFAULT_TYPE)
         pdata.setdefault("unlocked_skins", []).append(offer["recompensa_id"])
         msg_f = f"🎉 Skin {offer['nome']} liberada!"
 
+    # 3. Salva
     await player_manager.save_player_data(user_id, pdata)
+    
     await query.answer(msg_f, show_alert=True)
     
-    # Atualiza a loja
+    # 4. Atualiza a loja (para mostrar saldo novo)
     await open_christmas_shop(update, context)
 
 # ==============================================================================
-# 📤 EXPORTS (Adicione no main.py)
+#  REGISTRO DOS HANDLERS (Exportar isso para main.py ou registry)
 # ==============================================================================
-christmas_shop_handler = CallbackQueryHandler(open_christmas_shop, pattern="^christmas_shop_open$")
-christmas_buy_handler = CallbackQueryHandler(buy_christmas_item, pattern="^noel_buy:")
+open_christmas_shop_handler = CallbackQueryHandler(open_christmas_shop, pattern="^christmas_shop_open$")
+switch_tab_handler = CallbackQueryHandler(switch_tab_callback, pattern="^xmas_tab_")
+buy_christmas_item_handler = CallbackQueryHandler(buy_christmas_item, pattern="^xmas_buy_")
+christmas_command = CommandHandler("natal", open_christmas_shop)

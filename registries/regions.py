@@ -1,5 +1,5 @@
 # registries/regions.py
-# (VERSÃO CORRIGIDA: Importando coleta do lugar certo)
+# (VERSÃO FINAL: Compatível com a Nova Loja de Natal)
 
 from telegram.ext import Application
 import logging
@@ -8,7 +8,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 # --- Grupo 1 & 2: Navegação, Menus e COLETA ---
-# Tudo isso vive em handlers/menu/region.py
 from handlers.menu.region import ( 
     region_handler,
     travel_handler,      
@@ -16,11 +15,25 @@ from handlers.menu.region import (
     region_info_handler,
     restore_durability_menu_handler,
     restore_durability_fix_handler,
-    collect_handler  # <--- ADICIONADO AQUI (Vem do region.py)
+    collect_handler
 )
-from handlers.christmas_shop import christmas_shop_handler, christmas_buy_handler
 
-# (Removido: from handlers.collection_handler import collection_handler)
+# --- CORREÇÃO DO NATAL AQUI ---
+# Importamos os NOVOS nomes que criamos no arquivo da loja
+try:
+    from handlers.christmas_shop import (
+        open_christmas_shop_handler, 
+        buy_christmas_item_handler, 
+        switch_tab_handler, 
+        christmas_command
+    )
+except ImportError as e:
+    # Se der erro (arquivo faltando), definimos como None para não travar o bot
+    logger.warning(f"⚠️ Falha ao importar Loja de Natal: {e}")
+    open_christmas_shop_handler = None
+    buy_christmas_item_handler = None
+    switch_tab_handler = None
+    christmas_command = None
 
 # --- Grupo 3: Calabouços (Dungeons) ---
 from modules.dungeons.runtime import (
@@ -32,7 +45,7 @@ from modules.dungeons.runtime import (
 try:
     from handlers.npc_handler import all_npc_handlers
 except ImportError:
-    all_npc_handlers = [] # Fallback se não existir
+    all_npc_handlers = [] 
 
 # Tenta importar handlers do Reino
 try:
@@ -58,7 +71,6 @@ def register_regions_handlers(application: Application):
     application.add_handler(restore_durability_fix_handler)
     
     # --- Grupo 2: Coleta --- 
-    # Usamos o collect_handler que importamos do region.py
     application.add_handler(collect_handler)
 
     # --- Grupo 3: Calabouços ---
@@ -68,7 +80,12 @@ def register_regions_handlers(application: Application):
     # --- Grupo 4: NPCs ---
     if all_npc_handlers:
         application.add_handlers(all_npc_handlers)
-        # 👇👇👇 ADICIONE O NATAL AQUI 👇👇👇
-        # 🎅 Loja de Natal (Evento)
-        application.add_handler(christmas_shop_handler)
-        application.add_handler(christmas_buy_handler)
+
+    # --- 🎅 REGISTRO DA LOJA DE NATAL ---
+    # Só adiciona se a importação lá em cima funcionou
+    if open_christmas_shop_handler:
+        application.add_handler(open_christmas_shop_handler)
+        application.add_handler(buy_christmas_item_handler)
+        application.add_handler(switch_tab_handler)
+        application.add_handler(christmas_command)
+        logger.info("🎄 Loja de Natal registrada com sucesso!")
