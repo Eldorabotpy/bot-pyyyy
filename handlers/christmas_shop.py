@@ -112,39 +112,40 @@ TROCAS_NOEL = {
     
 }
 
-# ==============================================================================
-# 🎅 FUNÇÕES AUXILIARES
-# ==============================================================================
-
 def is_event_active():
-    """Checa se o evento ainda está rolando."""
     return datetime.now(timezone.utc) < EVENT_END_DATE
 
 async def _send_shop_interface(update, context, chat_id, text, reply_markup):
-    """Envia ou Edita a mensagem da loja."""
-    # Tenta enviar vídeo se disponível e for uma nova mensagem (não callback)
-    # Mas como é navegação, vamos focar em editar texto para ser rápido.
+    """Gerencia envio ou edição da mensagem da loja."""
+    # Tenta usar vídeo se disponível
+    media_data = file_ids.get_file_data(KEY_VIDEO_NOEL)
+    
     if update.callback_query:
+        # Tenta editar
         try:
-            # Tenta editar a legenda (se for foto/video) ou texto
-            try: await update.callback_query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode="HTML")
-            except: await update.callback_query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
-        except:
-            # Se falhar (ex: mensagem muito antiga), envia nova
-            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
-    else:
-        # Primeira abertura: Tenta mandar vídeo
-        fd = file_ids.get_file_data(KEY_VIDEO_NOEL)
-        if fd:
-            try:
-                if fd.get("type") == "video":
-                    await context.bot.send_video(chat_id=chat_id, video=fd["id"], caption=text, reply_markup=reply_markup, parse_mode="HTML")
-                else:
-                    await context.bot.send_photo(chat_id=chat_id, photo=fd["id"], caption=text, reply_markup=reply_markup, parse_mode="HTML")
-                return
+            if media_data and update.callback_query.message.video:
+                # Se já tem vídeo e o ID bate, edita só legenda/botões
+                await update.callback_query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode="HTML")
+            else:
+                # Se não tem vídeo ou é texto, tenta editar texto
+                await update.callback_query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
+        except Exception:
+            # Se falhar a edição (ex: mudar de texto pra mídia), apaga e envia novo
+            try: await update.callback_query.delete_message()
             except: pass
-        
-        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
+            
+            if media_data:
+                try: await context.bot.send_video(chat_id, media_data["id"], caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                except: await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
+            else:
+                await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        # Comando /natal
+        if media_data:
+            try: await context.bot.send_video(chat_id, media_data["id"], caption=text, reply_markup=reply_markup, parse_mode="HTML")
+            except: await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ==============================================================================
 #  MENU PRINCIPAL
@@ -157,7 +158,7 @@ async def open_christmas_shop(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
 
     if not is_event_active():
-        await context.bot.send_message(chat_id, "🎅 <b>Ho Ho Ho... O Natal já acabou!</b>\nVolte ano que vem!", parse_mode="HTML")
+        await context.bot.send_message(chat_id, "🎅 <b>O Natal já passou!</b>\nVolte ano que vem!", parse_mode="HTML")
         return
 
     # Recupera estado da aba (Padrão: 'items')
@@ -174,17 +175,16 @@ async def open_christmas_shop(update: Update, context: ContextTypes.DEFAULT_TYPE
     text = (
         "🎄 <b>CABANA DO PAPAI NOEL</b> 🎄\n"
         "╰┈➤ <i>Troque seus presentes por recompensas!</i>\n\n"
-        f"🎒 <b>Seus Presentes:</b>\n"
-        f"🎁 <b>Perdidos:</b> {qtd_comum}\n"
-        f"🌟 <b>Dourados:</b> {qtd_raro}\n\n"
-        f"⏳ <i>O evento acaba em breve!</i>"
+        f"🎒 <b>Seus Recursos:</b>\n"
+        f"🎁 Perdidos: <b>{qtd_comum}</b>\n"
+        f"🌟 Dourados: <b>{qtd_raro}</b>\n\n"
+        f"⏳ <i>Fim: 29/Dez</i>"
     )
 
     # --- MONTAGEM DO TECLADO ---
     kb = []
     
     # 1. Linha de Abas
-    # Destaca a aba ativa com ✅ ou brilho
     lbl_items = "✅ 🎁 ITENS" if current_tab == "items" else "🎁 Itens"
     lbl_skins = "✅ 🌟 SKINS" if current_tab == "skins" else "🌟 Skins"
     
@@ -193,63 +193,56 @@ async def open_christmas_shop(update: Update, context: ContextTypes.DEFAULT_TYPE
         InlineKeyboardButton(lbl_skins, callback_data="xmas_tab_skins")
     ])
 
-    # 2. Grade de Itens (Baseada na Aba)
+    # 2. Grade de Itens
     items_to_show = []
-    
     for key, data in TROCAS_NOEL.items():
         if current_tab == "items" and data["tipo"] == "item":
             items_to_show.append((key, data))
         elif current_tab == "skins" and data["tipo"] == "skin":
             items_to_show.append((key, data))
 
-    # Monta grade 2x2
+    # Grade 2 colunas
     row = []
     for key, data in items_to_show:
         price_emoji = "🎁" if data["moeda"] == ITEM_COMUM else "🌟"
         btn_text = f"{data['emoji']} {data['nome']} ({data['custo']}{price_emoji})"
-        
-        row.append(InlineKeyboardButton(btn_text, callback_data=f"xmas_buy_{key}"))
+        # CORREÇÃO AQUI: Usa 'noel_buy:' para bater com o handler
+        row.append(InlineKeyboardButton(btn_text, callback_data=f"noel_buy:{key}"))
         
         if len(row) == 2:
-            kb.append(row)
-            row = []
-    if row: kb.append(row) # Adiciona sobras
+            kb.append(row); row = []
+    if row: kb.append(row)
 
-    # 3. Botão de Voltar (Para a região Picos Gelados)
+    # 3. Voltar
     kb.append([InlineKeyboardButton("⬅️ Sair da Cabana", callback_data="open_region:picos_gelados")])
 
-    reply_markup = InlineKeyboardMarkup(kb)
-    
-    await _send_shop_interface(update, context, chat_id, text, reply_markup)
+    await _send_shop_interface(update, context, chat_id, text, InlineKeyboardMarkup(kb))
 
 # ==============================================================================
-#  HANDLERS DE AÇÃO
+#  AÇÕES (Abas e Compra)
 # ==============================================================================
 
 async def switch_tab_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Troca a aba e recarrega o menu."""
     query = update.callback_query
     new_tab = query.data.replace("xmas_tab_", "")
-    
-    # Atualiza estado
     context.user_data["xmas_tab"] = new_tab
-    
-    # Recarrega menu
     await open_christmas_shop(update, context)
 
 async def buy_christmas_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a compra."""
     query = update.callback_query
-    # Não damos answer() aqui para poder mandar alerta se falhar, ou mensagem final
+    user_id = query.from_user.id
     
-    key = query.data.replace("xmas_buy_", "")
+    # CORREÇÃO AQUI: Usa split para pegar o ID limpo
+    try: 
+        key = query.data.split(":")[1]
+    except: 
+        return
+
     offer = TROCAS_NOEL.get(key)
-    
     if not offer:
         await query.answer("Item não encontrado!", show_alert=True)
         return
 
-    user_id = update.effective_user.id
     pdata = await player_manager.get_player_data(user_id)
     inv = pdata.get("inventory", {})
     
@@ -270,11 +263,9 @@ async def buy_christmas_item(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await query.answer("⚠️ Você já tem essa skin!", show_alert=True)
             return
 
-    # --- EFETUA A COMPRA ---
-    # 1. Remove moeda
+    # Efetua Compra
     player_manager.remove_item_from_inventory(pdata, moeda, custo)
     
-    # 2. Entrega Recompensa
     msg_f = ""
     if offer["tipo"] == "item":
         player_manager.add_item_to_inventory(pdata, offer["recompensa_id"], offer["qtd"])
@@ -283,18 +274,16 @@ async def buy_christmas_item(update: Update, context: ContextTypes.DEFAULT_TYPE)
         pdata.setdefault("unlocked_skins", []).append(offer["recompensa_id"])
         msg_f = f"🎉 Skin {offer['nome']} liberada!"
 
-    # 3. Salva
     await player_manager.save_player_data(user_id, pdata)
-    
     await query.answer(msg_f, show_alert=True)
     
-    # 4. Atualiza a loja (para mostrar saldo novo)
+    # Recarrega para atualizar saldo
     await open_christmas_shop(update, context)
 
 # ==============================================================================
-#  REGISTRO DOS HANDLERS (Exportar isso para main.py ou registry)
+#  REGISTRO (Estes nomes DEVEM bater com registries/regions.py)
 # ==============================================================================
 open_christmas_shop_handler = CallbackQueryHandler(open_christmas_shop, pattern="^christmas_shop_open$")
 switch_tab_handler = CallbackQueryHandler(switch_tab_callback, pattern="^xmas_tab_")
-buy_christmas_item_handler = CallbackQueryHandler(buy_christmas_item, pattern="^xmas_buy_")
+buy_christmas_item_handler = CallbackQueryHandler(buy_christmas_item, pattern="^noel_buy:")
 christmas_command = CommandHandler("natal", open_christmas_shop)
