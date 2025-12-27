@@ -1348,24 +1348,46 @@ async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_text = "\n".join(lines)
     await _safe_edit(q, full_text, InlineKeyboardMarkup(rows))
 
+# Caso não tenha a função, adicione isso antes dos exports:
+
 async def market_cancel_listing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancela uma venda ativa."""
     q = update.callback_query
-    await q.answer()
     
-    # --- IMPORT SEGURO ---
+    # LOG DE DEPURAÇÃO: Vai aparecer no seu terminal preto/cmd
+    print(f"DEBUG: Botão Cancelar pressionado! Dados: {q.data}")
+    
+    try:
+        await q.answer() # Tenta parar o relógio imediatamente
+    except:
+        pass # Ignora erro de rede ao responder
+
     from modules import market_manager
 
     try:
-        # Extrai o ID do callback "market_cancel_123"
-        lid = int(q.data.replace("market_cancel_", ""))
+        # Extrai o ID. O replace garante que pegamos apenas o número
+        # Ex: "market_cancel_10" vira "10"
+        lid_str = q.data.replace("market_cancel_", "")
+        lid = int(lid_str)
+        
         market_manager.delete_listing(lid)
-        await q.answer("✅ Anúncio cancelado.", show_alert=True)
+        
+        # Tenta avisar
+        try: await q.answer("✅ Anúncio cancelado.", show_alert=True)
+        except: pass
+        
         # Atualiza a lista
         await market_my(update, context)
+        
+    except ValueError:
+        print(f"DEBUG: Erro ao converter ID: {q.data}")
+        try: await q.answer("❌ Erro: ID inválido.", show_alert=True)
+        except: pass
     except Exception as e:
-        await q.answer(f"Erro ao cancelar: {e}", show_alert=True)
-
+        print(f"DEBUG: Erro ao cancelar: {e}")
+        try: await q.answer(f"Erro: {e}", show_alert=True)
+        except: pass
+        
 async def market_start_input_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Prepara o bot para receber texto digitado (Lote, Qtd ou Preço)."""
     q = update.callback_query
@@ -1553,7 +1575,8 @@ market_finish_public_handler = CallbackQueryHandler(market_finalize_listing, pat
 market_ask_private_handler = CallbackQueryHandler(market_ask_private_id, pattern=r'^mkt_ask_private$')
 market_cancel_new_handler = CallbackQueryHandler(market_cancel_new, pattern=r'^market_cancel_new$')
 market_my_handler = CallbackQueryHandler(market_my, pattern=r'^market_my$')
-market_cancel_listing_handler = CallbackQueryHandler(market_cancel_listing, pattern=r'^market_cancel_\d+$')
+# Substitua a linha antiga por esta:
+market_cancel_listing_handler = CallbackQueryHandler(market_cancel_listing, pattern=r'^market_cancel_.*')
 
 # Inputs de Texto
 market_input_triggers_handler = CallbackQueryHandler(market_start_input_triggers, pattern=r'^mkt_input_.*')

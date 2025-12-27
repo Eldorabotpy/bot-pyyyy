@@ -167,9 +167,10 @@ def get_listing(listing_id: int) -> Optional[dict]:
     return market_col.find_one({"id": int(listing_id)})
 
 def delete_listing(listing_id: int):
-    if market_col:
+    # CORREÇÃO: Verifica explicitamente se NÃO é None, em vez de usar bool()
+    if market_col is not None:
         market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
-
+        
 # ==============================================================================
 #  FUNÇÃO DE COMPRA (CORRIGIDA E BLINDADA)
 # ==============================================================================
