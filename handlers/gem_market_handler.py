@@ -14,7 +14,7 @@ from modules import file_ids
 from modules import gem_market_manager
 from modules import market_utils
 from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
-
+from modules.auth_utils import get_current_player_id
 try:
     from modules import display_utils
 except ImportError:
@@ -204,7 +204,7 @@ async def show_sell_category_menu(update: Update, context: ContextTypes.DEFAULT_
 async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    user_id = get_current_player_id(update, context)
     
     parts = q.data.split(":")
     item_type = parts[1] # evo, skill, skin
@@ -252,43 +252,32 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
     for idx, listing in enumerate(page_items):
         icon_num = num_emojis[idx] if idx < len(num_emojis) else f"{idx+1}"
         item_data = listing.get("item", {})
-        base_id = item_data.get("base_id")
-        qty = item_data.get("qty", 1)
-        price = listing.get("unit_price_gems", 0)
-        lotes = listing.get("quantity", 1)
-        seller_id = listing.get("seller_id")
-        lid = listing.get("id")
+        base_id = item_data.get("base_id"); qty = item_data.get("qty", 1)
+        price = listing.get("unit_price_gems", 0); lotes = listing.get("quantity", 1)
+        seller_id = listing.get("seller_id"); lid = listing.get("id")
         
-        # --- CORREÇÃO DO NOME DO VENDEDOR ---
+        # Correção visual para IDs (Str vs Int)
         seller_name = "Desconhecido"
-        if int(seller_id) == user_id:
-            seller_name = "Você"
+        if str(seller_id) == str(user_id): seller_name = "Você"
         else:
-            # Busca o nome real no banco de dados
             try:
-                seller_pdata = await player_manager.get_player_data(int(seller_id))
-                if seller_pdata:
-                    seller_name = seller_pdata.get("character_name", "Vendedor")
+                # get_player_data aceita string/ObjectId agora
+                seller_pdata = await player_manager.get_player_data(seller_id)
+                if seller_pdata: seller_name = seller_pdata.get("character_name", "Vendedor")
             except: pass
 
         card = _render_market_card(icon_num, base_id, qty, price, seller_name, lotes)
-        lines.append(card)
-        lines.append("") 
-        buttons_map[idx+1] = lid
+        lines.append(card); lines.append(""); buttons_map[idx+1] = lid
 
-    # --- BOTÕES NUMÉRICOS ---
-    kb_rows = []
-    btn_row = []
+    kb_rows = []; btn_row = []
     for idx, lid in buttons_map.items():
         btn_row.append(InlineKeyboardButton(f"🛒 {idx}", callback_data=f"gem_buy_confirm:{lid}"))
     if btn_row: kb_rows.append(btn_row)
 
     nav = []
-    if page > 1:
-        nav.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"gem_list_filter:{item_type}:{page-1}"))
+    if page > 1: nav.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"gem_list_filter:{item_type}:{page-1}"))
     nav.append(InlineKeyboardButton("🔙 Menu", callback_data="gem_market_main"))
-    if page < total_pages:
-        nav.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"gem_list_filter:{item_type}:{page+1}"))
+    if page < total_pages: nav.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"gem_list_filter:{item_type}:{page+1}"))
     kb_rows.append(nav)
 
     await _safe_edit_or_send(q, context, q.message.chat_id, "\n".join(lines), InlineKeyboardMarkup(kb_rows))
@@ -299,7 +288,7 @@ async def show_buy_items_filtered(update: Update, context: ContextTypes.DEFAULT_
 async def show_sell_items_filtered(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    user_id = get_current_player_id(update, context)
     
     parts = q.data.split(":")
     item_type = parts[1]
@@ -401,7 +390,11 @@ async def gem_market_buy_confirm(update: Update, context: ContextTypes.DEFAULT_T
 async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer("Processando...")
-    buyer_id = q.from_user.id
+    
+    # --- CORREÇÃO: AUTH HÍBRIDA ---
+    buyer_id = get_current_player_id(update, context)
+    # ------------------------------
+    
     try: lid = int(q.data.replace("gem_buy_execute_", ""))
     except: await q.answer("ID inválido.", show_alert=True); return
         
@@ -410,13 +403,12 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
         await q.answer("Item já vendido!", show_alert=True)
         await gem_market_main(update, context); return
         
-    seller_id = int(listing.get("seller_id", 0))
-    if buyer_id == seller_id:
+    seller_id = listing.get("seller_id", 0) # Pode vir como string ou int
+    if str(buyer_id) == str(seller_id):
         await q.answer("Não podes comprar o teu próprio item.", show_alert=True); return
 
     buyer_pdata = await player_manager.get_player_data(buyer_id)
     seller_pdata = await player_manager.get_player_data(seller_id)
-    
     total_cost = int(listing.get("unit_price_gems", 0)) 
     buyer_gems = int(buyer_pdata.get("gems", 0))
     
@@ -425,18 +417,11 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         buyer_pdata["gems"] = max(0, buyer_gems - total_cost)
-        await gem_market_manager.purchase_listing( 
-            buyer_pdata=buyer_pdata, 
-            seller_pdata=seller_pdata, 
-            listing_id=lid,
-            quantity=1
-        )
-    except Exception as e:
-        await q.answer(f"Erro na transação: {e}", show_alert=True); return
+        # O gem_market_manager deve ser capaz de lidar com pdata direto
+        await gem_market_manager.purchase_listing(buyer_pdata=buyer_pdata, seller_pdata=seller_pdata, listing_id=lid, quantity=1)
+    except Exception as e: await q.answer(f"Erro na transação: {e}", show_alert=True); return
 
-    item_payload = listing.get("item", {})
-    base_id = item_payload.get("base_id") 
-    pack_qty = int(item_payload.get("qty", 1))
+    item_payload = listing.get("item", {}); base_id = item_payload.get("base_id"); pack_qty = int(item_payload.get("qty", 1))
     player_manager.add_item_to_inventory(buyer_pdata, base_id, pack_qty) 
     await player_manager.save_player_data(buyer_id, buyer_pdata)
 
@@ -456,7 +441,7 @@ async def gem_market_buy_execute(update: Update, context: ContextTypes.DEFAULT_T
 async def gem_market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    user_id = get_current_player_id(update, context)
     my_listings = gem_market_manager.list_by_seller(user_id) 
 
     if not my_listings:
@@ -480,7 +465,7 @@ async def gem_market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def gem_market_cancel_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer("A cancelar...")
-    user_id = q.from_user.id
+    user_id = get_current_player_id(update, context)
     try: lid = int(q.data.replace("gem_cancel_", ""))
     except: return
 
@@ -500,7 +485,7 @@ async def gem_market_cancel_execute(update: Update, context: ContextTypes.DEFAUL
 async def gem_market_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    user_id = get_current_player_id(update, context)
     base_id = q.data.replace("gem_sell_item_", "")
     
     pdata = await player_manager.get_player_data(user_id)
@@ -582,7 +567,7 @@ async def gem_market_price_spin(update, context):
 async def gem_market_price_confirm(update, context):
     q = update.callback_query; await q.answer()
     price = context.user_data.get("gem_market_price", 1)
-    user_id = q.from_user.id
+    user_id = get_current_player_id(update, context)
     pending = context.user_data.get("gem_market_pending")
     base_id = pending["base_id"]
     pack_qty = pending["qty"]

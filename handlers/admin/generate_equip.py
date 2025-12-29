@@ -12,6 +12,7 @@ from telegram.ext import (
 )
 from modules import player_manager, game_data, item_factory
 from handlers.admin.utils import ensure_admin
+from handlers.admin.utils import parse_hybrid_id
 
 # --- Estados da Conversa ---
 (SELECT_BASE, SELECT_RARITY, ASK_ATTRIBUTES, ASK_TIER, ASK_DURABILITY, ASK_PLAYER, CONFIRM) = range(7)
@@ -138,18 +139,22 @@ async def receive_durability(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ASK_PLAYER
 
 async def receive_player_and_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Passo 7: Recebe o jogador e mostra a confirmação final com o emoji correto."""
+    """Passo 7: Recebe o jogador e mostra a confirmação."""
     target_input = update.message.text.strip()
-    
-    try:
-        user_id = int(target_input)
-        pdata = player_manager.get_player_data(user_id)
-    except ValueError:
-        found = player_manager.find_player_by_name(target_input)
+    user_id, pdata = None, None
+
+    # --- CORREÇÃO HÍBRIDA ---
+    parsed_id = parse_hybrid_id(target_input)
+    if parsed_id:
+        pdata = await player_manager.get_player_data(parsed_id)
+        if pdata:
+            user_id = parsed_id
+
+    if not pdata:
+        found = await player_manager.find_player_by_name(target_input)
         if found:
             user_id, pdata = found
-        else:
-            user_id, pdata = None, None
+    # ------------------------
 
     if not pdata:
         await update.message.reply_text("❌ Jogador não encontrado. Tente novamente.")
@@ -160,12 +165,9 @@ async def receive_player_and_confirm(update: Update, context: ContextTypes.DEFAU
     item_instance = context.user_data['gen_item']
     base_id = item_instance.get("base_id")
 
-    # ✅ CORREÇÃO: Encontra a classe do ITEM, não do jogador.
     base_item_info = game_data.ITEMS_DATA.get(base_id, {})
-    # Pega na primeira classe da lista de requisitos (ex: ["cacador"])
     item_class_req = (base_item_info.get("class_req") or [None])[0]
     
-    # Usa a classe do ITEM para "desenhar" a pré-visualização.
     preview_line = item_factory.render_item_line(item_instance, item_class_req)
     
     summary_text = (

@@ -1,10 +1,12 @@
 # handlers/menu/kingdom.py
+# (VERSÃO CORRIGIDA: Compatível com novo sistema de Login)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data, file_ids
 from kingdom_defense import leaderboard 
+from modules.auth_utils import get_current_player_id # <--- Importante
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +37,18 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 chat_id = user.id
         
         # 2. (NOVO) Se ainda não achou, tenta pegar de dentro do player_data
-        # Isso corrige o erro quando a função é chamada pelo sistema de viagem sem um 'update' válido
         if not chat_id and player_data:
-            chat_id = player_data.get("user_id")
+            # Tenta pegar o chat ID salvo ou o ID do dono (Telegram ID)
+            chat_id = player_data.get("last_chat_id") or player_data.get("telegram_id_owner")
+            # Se for conta antiga, o próprio _id/user_id é o chat_id
+            if not chat_id:
+                uid = player_data.get("user_id")
+                if isinstance(uid, int):
+                    chat_id = uid
 
         # Se ainda assim falhar, aborta
         if not chat_id:
-            logger.error("ERRO CRÍTICO: Não foi possível identificar o Chat ID no menu Kingdom (Nem via update, nem via player_data).")
+            logger.error("ERRO CRÍTICO: Não foi possível identificar o Chat ID no menu Kingdom.")
             return
         # =================================================================
 
@@ -50,8 +57,15 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             except: pass
 
         # Carrega dados do jogador se não vierem nos argumentos
-        if player_data is None and user:
-            player_data = await player_manager.get_player_data(user.id)
+        if player_data is None:
+            if update:
+                # MUDANÇA CRÍTICA AQUI: Usa a função ponte para pegar o ID correto (Sessão ou Telegram)
+                user_id = get_current_player_id(update, context)
+                player_data = await player_manager.get_player_data(user_id)
+            else:
+                # Se não tem update e nem player_data, não tem como saber quem é.
+                logger.error("show_kingdom_menu chamado sem update e sem player_data.")
+                return
         
         if not player_data:
             # Tenta avisar usando o chat_id recuperado
@@ -61,8 +75,9 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         # Atualiza localização
         player_data['current_location'] = 'reino_eldora'
         # Salva o user_id se ele veio do player_data
-        user_id_save = player_data.get("user_id") or (user.id if user else chat_id)
-        await player_manager.save_player_data(user_id_save, player_data) 
+        user_id_save = player_data.get("user_id")
+        if user_id_save:
+            await player_manager.save_player_data(user_id_save, player_data) 
 
         # --- PREPARAÇÃO DOS DADOS PARA EXIBIÇÃO ---
         character_name = player_data.get("character_name", "Aventureiro(a)")
@@ -106,7 +121,7 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         try: leaderboard_text = leaderboard.get_top_score_text()
         except: leaderboard_text = ""
         
-        # --- NOVO VISUAL ESTILO HUD (Com Moldura e Setas) ---
+        # --- NOVO VISUAL ESTILO HUD ---
         status_hud = (
             f"\n"
             f"╭────────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
@@ -129,10 +144,9 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         )
 
         if leaderboard_text:
-            # Adiciona o Título e depois o Nome com recuo
             caption += (
                 f"\n\n🏆 <b>MVP DO EVENTO ATUALIZADO:</b>\n"
-                f"   ╰┈➤ {leaderboard_text.strip()}"  # O espaço antes de {leaderboard} faz o recuo
+                f"   ╰┈➤ {leaderboard_text.strip()}"
                 f"\n"
             )
         # --- TECLADO ---

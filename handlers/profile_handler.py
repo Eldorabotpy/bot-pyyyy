@@ -390,7 +390,8 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data='inventory_menu'), InlineKeyboardButton("📚 𝐒𝐤𝐢𝐥𝐥𝐬", callback_data='skills_menu_open')],
         [InlineKeyboardButton("💼 𝐏𝐫𝐨𝐟𝐢𝐬𝐬𝐚̃𝐨", callback_data="job_menu"), InlineKeyboardButton("🎨 𝐒𝐤𝐢𝐧𝐬", callback_data='skin_menu')],
         [InlineKeyboardButton("🔄 𝐂𝐨𝐧𝐯𝐞𝐫𝐭𝐞𝐫 𝐑𝐞𝐜𝐨𝐦𝐩𝐞𝐧𝐬𝐚𝐬 🔄", callback_data='conv:main')],
-        [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data=back_cb)],
+        [InlineKeyboardButton("❌ SAIR DA CONTA", callback_data="logout_btn"), InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data=back_cb)],
+        
     ])
     
     reply_markup = InlineKeyboardMarkup(keyboard)

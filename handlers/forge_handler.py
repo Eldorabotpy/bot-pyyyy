@@ -12,7 +12,7 @@ from telegram import (
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.helpers import escape_markdown
 from telegram.error import BadRequest, Forbidden
-
+from modules.auth_utils import get_current_player_id
 # --- Módulos do Jogo ---
 from modules import (
     player_manager,
@@ -54,19 +54,14 @@ def _md_escape(text: str) -> str:
     return escape_markdown(str(text))
 
 async def _send_or_edit_media(query, context, media_data, caption, reply_markup=None):
-    """Envia mídia nova ou edita, lidando com erros de tipo."""
     chat_id = query.message.chat_id
     try: await query.delete_message()
     except Exception: pass
-
     media_id = media_data.get("id")
     media_type = media_data.get("type", "photo").lower()
-
     try:
-        if media_type == "video":
-             await context.bot.send_video(chat_id=chat_id, video=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
-        else:
-             await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
+        if media_type == "video": await context.bot.send_video(chat_id=chat_id, video=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
+        else: await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Erro ao enviar mídia na forja: {e}")
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="Markdown")
@@ -129,7 +124,7 @@ async def execute_craft_logic(
     media_data = _get_media_data(f"item_{base_id}")
     
     if not media_data:
-        media_data = {"id": "https://media.tenor.com/images/157d605055627255953059275727c62d/tenor.gif", "type": "video"}
+        media_data = {"id": "BAACAgEAAxkBAAEEcHBpUX9JS1KW8xJPX8HhLgkhiWQo_gACZgYAAlOKkEYoa0mljmtqoDYE", "type": "video"}
 
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🎒 Inventário", callback_data="inventory_menu"),
@@ -153,7 +148,7 @@ async def execute_craft_logic(
 
 async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = get_current_player_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
 
@@ -192,7 +187,7 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, profession_id: str, page: int):
-    user_id = query.from_user.id
+    user_id = context.user_data.get("logged_player_id") or query.from_user.id
     player_data = await player_manager.get_player_data(user_id)
 
     player_prof = (player_data or {}).get("profession", {})
@@ -238,7 +233,7 @@ async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTyp
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, recipe_id: str):
-    user_id = query.from_user.id
+    user_id = context.user_data.get("logged_player_id") or query.from_user.id
     player_data = await player_manager.get_player_data(user_id)
 
     recipe_data = crafting_registry.get_recipe(recipe_id)
@@ -274,7 +269,7 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
         keyboard.append([back_btn])
         text += "\n\n*Materiais insuficientes.*"
 
-    media_data = _get_media_data(f"item_{recipe_data.get('output_item_id')}") or {"id": "https://media.tenor.com/J1y9Y_5y4B0AAAAC/blacksmith-forge.gif", "type": "video"}
+    media_data = _get_media_data(f"item_{recipe_data.get('output_item_id')}") or {"id": "BAACAgEAAxkBAAEEcHBpUX9JS1KW8xJPX8HhLgkhiWQo_gACZgYAAlOKkEYoa0mljmtqoDYE", "type": "video"}
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -316,7 +311,7 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
 # =====================================================
 
 async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
-    user_id = query.from_user.id
+    user_id = context.user_data.get("logged_player_id") or query.from_user.id
     chat_id = query.message.chat_id
     message_id_antiga = query.message.message_id
     

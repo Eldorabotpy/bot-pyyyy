@@ -6,7 +6,7 @@ import unicodedata
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.error import BadRequest
-
+from modules.auth_utils import get_current_player_id 
 from modules import player_manager, game_data, file_ids
 
 # --- IMPORTS ESSENCIAIS DO STATS.PY ---
@@ -124,7 +124,8 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
 # ==============================================================================
 
 async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    # MUDANÇA AQUI: Usa a função ponte
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id 
     player_data = await player_manager.get_player_data(user_id) 
 
@@ -138,10 +139,8 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     status_text, reply_markup = await _get_status_content(player_data)
 
-    # Lógica de envio (Foto/Vídeo ou Texto)
     if update.callback_query:
         query = update.callback_query
-        # Tenta editar. Se falhar (ex: mudou de texto pra foto), deleta e envia novo.
         try:
             await query.edit_message_caption(caption=status_text, reply_markup=reply_markup, parse_mode='HTML')
         except Exception:
@@ -152,7 +151,6 @@ async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except: pass
                 await _send_fresh_status_message(context, chat_id, player_data, status_text, reply_markup)
     else:
-        # Comando /status
         await _send_fresh_status_message(context, chat_id, player_data, status_text, reply_markup)
 
 async def _send_fresh_status_message(context, chat_id, player_data, text, markup):
@@ -171,14 +169,11 @@ async def _send_fresh_status_message(context, chat_id, player_data, text, markup
 
 
 async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Aplica o upgrade de atributo.
-    CORRIGIDO: Soma o ponto ao status BASE, respeitando a progressão de nível.
-    """
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # MUDANÇA AQUI: Usa a função ponte
+    user_id = get_current_player_id(update, context)
 
-    # 1. Carrega dados
     player_data = await player_manager.get_player_data(user_id) 
     if not player_data:
         await query.answer("Erro ao carregar dados.", show_alert=True)
@@ -187,7 +182,6 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     pool = int(player_data.get("stat_points", 0) or 0)
     if pool <= 0:
         await query.answer("Sem pontos disponíveis!", show_alert=True)
-        # Atualiza o menu para remover botões se necessário
         txt, kb = await _get_status_content(player_data)
         try: await query.edit_message_caption(caption=txt, reply_markup=kb, parse_mode='HTML')
         except: pass
@@ -198,33 +192,25 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("Atributo inválido.", show_alert=True)
         return
 
-    # 2. Consome o ponto
     player_data["stat_points"] = pool - 1
     
     ckey = _get_class_key_normalized(player_data)
     gains = _get_point_gains_for_class(ckey) 
-    increment = gains.get(profile_stat, 1) # Ex: +2, +3
+    increment = gains.get(profile_stat, 1)
 
-    # 3. LÓGICA DE PROGRESSÃO BASE (Vital para stats.py)
     lvl = int(player_data.get("level", 1))
-    # Calcula quanto o personagem deveria ter no nível atual (sem pontos gastos)
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
     
-    # O valor base atual é: O que já está salvo no banco OU a baseline (se for a primeira vez)
     current_base_val = int(player_data.get(profile_stat, class_baseline.get(profile_stat, 0)))
 
-    # Aplica o incremento na base
     player_data[profile_stat] = current_base_val + int(increment)
     
-    # Feedback visual
     await query.answer(f"{profile_stat.replace('max_', '').title()} +{increment}!")
 
-    # Lógica de cura ao aumentar HP (aplica o aumento direto no HP atual)
     if profile_stat == 'max_hp':
         cur_hp = int(player_data.get("current_hp", 0))
         player_data["current_hp"] = cur_hp + int(increment)
 
-    # 4. Salva e Atualiza
     await player_manager.save_player_data(user_id, player_data)
 
     status_text, reply_markup = await _get_status_content(player_data)
@@ -235,8 +221,8 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             await query.edit_message_text(text=status_text, reply_markup=reply_markup, parse_mode='HTML')
         except:
-            pass # Ignora "message is not modified"
-
+            pass
+        
 async def close_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

@@ -5,15 +5,19 @@ from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from modules.player_manager import get_player_data
 from modules.game_data.classes import CLASSES_DATA 
-# IMPORTANTE: Importar a função que busca a evolução
 from modules.game_data.class_evolution import get_evolution_options
+# --- IMPORT NOVO ---
+from modules.auth_utils import get_current_player_id 
 
 async def open_class_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Abre o menu de Evolução de Classe com o nome corrigido."""
+    """Abre o menu de Evolução de Classe com suporte a Login Híbrido."""
     q = update.callback_query
     await q.answer()
 
-    user_id = q.from_user.id
+    # --- ALTERAÇÃO AQUI ---
+    user_id = get_current_player_id(update, context)
+    # ----------------------
+
     pdata = await get_player_data(user_id) or {}
 
     # Dados do jogador
@@ -24,31 +28,22 @@ async def open_class_evolution_menu(update: Update, context: ContextTypes.DEFAUL
     cinfo = CLASSES_DATA.get(pclass, {})
     cname = f"{cinfo.get('emoji','')} {cinfo.get('display_name', pclass.title())}"
 
-    # --- LÓGICA PARA BUSCAR A PRÓXIMA EVOLUÇÃO ---
-    # show_locked=True para mostrar a próxima mesmo se não tiver nível ainda
+    # Busca próxima evolução
     evo_options = get_evolution_options(pclass, plevel, show_locked=True)
     
     if evo_options:
-        next_evo = evo_options[0] # Pega a primeira opção disponível
-        
-        # === AQUI ESTÁ A CORREÇÃO DO NOME ===
+        next_evo = evo_options[0]
         raw_to = next_evo.get("to", "???")
-        
-        # 1. Tenta pegar o display_name (se você adicionou no arquivo anterior)
-        # 2. Se não tiver, pega o ID, troca "_" por espaço e coloca Maiúsculas
         pretty_name = next_evo.get("display_name", raw_to.replace("_", " ").title())
-        
         min_lvl = next_evo.get("min_level", 0)
         desc = next_evo.get("desc", "Sem descrição.")
         
-        # Monta o texto da próxima evolução
         next_evo_text = (
             f"🔮 <b>Próxima Evolução:</b> {pretty_name}\n"
             f"📝 <i>{desc}</i>\n"
-            f"urad📏 Requisito: Nível {min_lvl}"
+            f"📏 Requisito: Nível {min_lvl}"
         )
         
-        # Botão de Ação (se tiver nível)
         if plevel >= min_lvl:
             action_btn = [InlineKeyboardButton("✅ Iniciar Ascensão", callback_data=f"evo_start_{raw_to}")]
         else:
@@ -58,7 +53,6 @@ async def open_class_evolution_menu(update: Update, context: ContextTypes.DEFAUL
         next_evo_text = "<i>Você atingiu o ápice da sua classe atual ou não há evoluções disponíveis.</i>"
         action_btn = []
 
-    # --- MONTAGEM DO TEXTO FINAL ---
     text = (
         f"🧬 <b>ARVORE DE EVOLUÇÃO</b>\n\n"
         f"👤 <b>Atual:</b> {cname}\n"
@@ -67,11 +61,8 @@ async def open_class_evolution_menu(update: Update, context: ContextTypes.DEFAUL
         f"{next_evo_text}\n"
     )
 
-    # Botões
     kb = []
-    if action_btn:
-        kb.append(action_btn)
-    
+    if action_btn: kb.append(action_btn)
     kb.append([InlineKeyboardButton("🔄 Atualizar", callback_data="char_evolution")])
     kb.append([InlineKeyboardButton("⬅️ Voltar ao Personagem", callback_data="status_open")])
 
@@ -80,5 +71,4 @@ async def open_class_evolution_menu(update: Update, context: ContextTypes.DEFAUL
     except Exception:
         await q.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
-# Handler
 evolution_open_handler = CallbackQueryHandler(open_class_evolution_menu, pattern=r"^char_evolution$")

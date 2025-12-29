@@ -4,7 +4,7 @@ REFINING_RECIPES = {
     # ======================
     # Couros e derivados
     # ======================
-    
+    #
     "ref_couro_curtido_rapido": {
         "display_name": "🐑🐾 Curtição de Couro (Rápida)",
         "profession": ["curtidor", "ferreiro", "armeiro",],
@@ -14,6 +14,7 @@ REFINING_RECIPES = {
         "outputs": {"couro_curtido": 1},
         "xp_gain": 5
     },
+
     "ref_couro_reforcado": {
         "display_name": "🐺🔥 Curtimento de Couro Reforçado",
         "profession": ["curtidor"],
@@ -204,6 +205,7 @@ REFINING_RECIPES = {
     },
     
     # --- METALURGIA (Ferreiro / Fundidor / Joalheiro) ---
+    #V
     "ref_aco_temperado": {
         "display_name": "⚔️ Fundição de Aço",
         "profession": ["ferreiro", "armeiro", "fundidor"],
@@ -230,7 +232,7 @@ REFINING_RECIPES = {
         "inputs": {"barra_de_prata": 1},
         "outputs": {"fio_de_prata": 2},
         "xp_gain": 15
-    },
+    }, 
 
     # --- ALFAIATARIA (Tecidos Avançados) ---
     "ref_veludo_runico": {

@@ -1,15 +1,11 @@
 # registries/character.py
-# (VERSÃO CORRIGIDA: JOB PICK HANDLER ADICIONADO E COM PRIORIDADE)
+# (VERSÃO CORRIGIDA: REMOVIDO SISTEMA ANTIGO DE NOME)
 
 import logging
 from telegram.ext import Application, BaseHandler 
 
-# 1. Do fluxo de início e criação de personagem
-from handlers.start_handler import (
-    start_command_handler,
-    name_command_handler,
-    character_creation_handler,
-)
+# 1. Do fluxo de início (Agora só importamos o Menu, pois o Auth cuida do resto)
+from handlers.start_handler import start_command_handler
 
 # 2. Do Status e Perfil
 from handlers.status_handler import (
@@ -61,10 +57,10 @@ from handlers.class_evolution_handler import (
     start_trial_execute_handler,
 )
 
-# 6. Profissões (IMPORT COMPLETO AGORA)
+# 6. Profissões
 from handlers.profession_handler import (
     job_menu_handler,
-    job_pick_handler,  # <--- Faltava este!
+    job_pick_handler,
     job_view_handler,
     job_confirm_handler,
     job_guide_handler,
@@ -87,17 +83,17 @@ from handlers.guild_handler import all_guild_handlers
 logger = logging.getLogger(__name__)
 
 def register_character_handlers(application: Application):
-    """Regista todos os handlers relacionados ao personagem."""
+    """Regista todos os handlers relacionados ao personagem (exceto login)."""
 
     # Lista inicial de handlers
-    # ATENÇÃO: job_pick_handler deve vir PRIMEIRO para garantir o clique
     raw_handlers = [
         # --- PRIORIDADE MÁXIMA ---
-        job_pick_handler,  # <--- Adicionado aqui no topo!
+        job_pick_handler,
         
-        # Básicos
+        # O novo /menu (start_command_handler)
         start_command_handler,
-        name_command_handler,
+        
+        # Status
         status_command_handler,
         status_open_handler,
         status_callback_handler,
@@ -141,7 +137,7 @@ def register_character_handlers(application: Application):
         start_trial_confirmation_handler,
         start_trial_execute_handler,
         
-        # Profissões (Outros menus)
+        # Profissões
         job_menu_handler,
         job_view_handler,     
         job_confirm_handler,  
@@ -173,6 +169,3 @@ def register_character_handlers(application: Application):
 
     # Registra apenas os handlers válidos e limpos
     application.add_handlers(clean_handlers)
-
-    # Registra criação de personagem (grupo 0 para evitar conflitos)
-    application.add_handler(character_creation_handler, group=0)

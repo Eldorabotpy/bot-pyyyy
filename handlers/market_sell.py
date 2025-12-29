@@ -450,8 +450,26 @@ async def market_finalize(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("market_pending", None)
 
 async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query; await q.answer("Cancelado.")
-    context.user_data.pop("market_pending", None)
+    q = update.callback_query
+    if q: 
+        try: await q.answer("Operação Cancelada.")
+        except: pass
+
+    # --- CORREÇÃO CRÍTICA: Limpa TODOS os estados de espera ---
+    # Se não limparmos isso, o bot continua achando que o próximo texto é um ID ou Preço
+    keys_to_remove = [
+        "market_pending", 
+        "market_price",
+        "market_awaiting_id",           # <--- O culpado principal
+        "market_awaiting_qty_input",
+        "market_awaiting_size_input",
+        "market_awaiting_price_input"
+    ]
+    
+    for key in keys_to_remove:
+        context.user_data.pop(key, None)
+
+    # Garante que volta para o menu inicial do mercado
     await market_adventurer(update, context)
 
 # ==============================

@@ -29,6 +29,22 @@ from modules.game_data.monsters import MONSTER_SKILLS_DB
 
 logger = logging.getLogger(__name__)
 
+# 🛠️ HELPER PARA ID HÍBRIDO (Adicionado)
+def _get_combat_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Retorna o ObjectId (Login) ou Int (Telegram) dependendo da sessão."""
+    # 1. Tenta pegar da sessão de login
+    logged_id = context.user_data.get("logged_player_id")
+    if logged_id:
+        return logged_id # Retorna string (ObjectId)
+    
+    # 2. Fallback para ID nativo do Telegram
+    # Tenta pegar do query ou do message
+    if update.callback_query:
+        return update.callback_query.from_user.id
+    if update.effective_user:
+        return update.effective_user.id
+    return None
+
 # ================================================
 # HELPERS VISUAIS
 # ================================================
@@ -84,9 +100,9 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     if action is None and query: action = query.data
     elif action is None and not query: return
 
-    user_id = query.from_user.id if query else update.effective_user.id
+    user_id = _get_combat_user_id(update, context)
     chat_id = query.message.chat_id if query else update.effective_chat.id
-
+    
     # 1. Retornar ao Mapa
     if action == 'combat_return_to_map':
         if query: await _safe_answer(query)
@@ -117,7 +133,9 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     
     # 3. Recuperação/Criação do Cache de Batalha
     battle_cache = context.user_data.get('battle_cache')
-    
+    cache_uid = str(battle_cache.get('player_id')) if battle_cache else None
+    current_uid = str(user_id)
+
     if not battle_cache or battle_cache.get('player_id') != user_id:
         player_data = await player_manager.get_player_data(user_id)
         state_action = player_data.get('player_state', {}).get('action')
@@ -147,7 +165,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 }
                 p_media = _get_class_media(player_data, purpose="combate")
                 new_cache = {
-                    'player_id': user_id,
+                    'player_id': user_id, # ✅ Agora usa o ID Híbrido
                     'chat_id': chat_id,
                     'message_id': query.message.message_id if query and query.message else None,
                     'player_stats': p_stats,

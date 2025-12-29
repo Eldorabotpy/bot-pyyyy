@@ -21,7 +21,9 @@ from handlers.admin.player_management_handler import player_management_conv_hand
 from modules.player.queries import _normalize_char_name
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from handlers.admin.debug_skill import debug_skill_handler
-
+# Adicione junto aos outros imports
+from bson import ObjectId
+from handlers.admin.utils import parse_hybrid_id
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -91,14 +93,16 @@ async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando de admin para diagnosticar cache e DB para um jogador."""
     if not await ensure_admin(update): return 
 
-    user_id_to_check = None
     try:
-        user_id_to_check = int(context.args[0])
+        # CORREÇÃO HÍBRIDA
+        raw_id = context.args[0]
+        user_id_to_check = parse_hybrid_id(raw_id)
+        if not user_id_to_check: raise ValueError
     except (IndexError, ValueError):
-        await update.message.reply_text("Por favor, fornece um ID de utilizador. Uso: /debug_player <user_id>")
+        await update.message.reply_text("Por favor, fornece um ID de utilizador válido. Uso: /debug_player <user_id>")
         return
 
-    report = [f"🕵️ <b>Relatório de Diagnóstico para o Jogador</b> <code>{user_id_to_check}</code> 🕵️\n"] 
+    report = [f"🕵️ <b>Relatório de Diagnóstico para o Jogador</b> <code>{str(user_id_to_check)}</code> 🕵️\n"] 
 
     # 1. Verifica a Cache em Memória
     if user_id_to_check in _player_cache:
@@ -120,9 +124,9 @@ async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             report.append(f"⚠️ <b>MongoDB:</b> Erro ao aceder à base de dados: {e}") 
     else:
-        report.append("🚫 <b>MongoDB:</b> Conexão com a base de dados não existe (está a <code>None</code>).") 
+        report.append("🚫 <b>MongoDB:</b> Conexão com a base de dados não existe.") 
 
-    await update.message.reply_text("\n".join(report), parse_mode=HTML) 
+    await update.message.reply_text("\n".join(report), parse_mode=HTML)
 
 async def find_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -324,17 +328,24 @@ async def _delete_player_command(update: Update, context: ContextTypes.DEFAULT_T
     if not context.args:
         await update.message.reply_text("Uso: /delete_player <user_id>")
         return
+    
+    # CORREÇÃO HÍBRIDA
+    raw_id = context.args[0]
+    user_id_to_delete = parse_hybrid_id(raw_id)
+    
+    if not user_id_to_delete:
+         await update.message.reply_text(f"❌ ID inválido: {raw_id}")
+         return
+
     try:
-        user_id_to_delete = int(context.args[0])
         deleted_ok = delete_player(user_id_to_delete) # <--- SEM AWAIT
         if deleted_ok:
-            await update.message.reply_text(f"✅ Jogador com ID {user_id_to_delete} foi apagado com sucesso.")
+            # str(user_id_to_delete) protege contra erro de visualização se for ObjectId
+            await update.message.reply_text(f"✅ Jogador com ID {str(user_id_to_delete)} foi apagado com sucesso.")
         else:
-            await update.message.reply_text(f"⚠️ Jogador com ID {user_id_to_delete} não foi encontrado.")
-    except (ValueError, IndexError):
-        await update.message.reply_text("Por favor, forneça um ID de usuário numérico válido.")
+            await update.message.reply_text(f"⚠️ Jogador com ID {str(user_id_to_delete)} não foi encontrado.")
     except Exception as e:
-        logger.error(f"Erro ao deletar jogador {context.args[0]}: {e}", exc_info=True)
+        logger.error(f"Erro ao deletar jogador {raw_id}: {e}", exc_info=True)
         await update.message.reply_text(f"Ocorreu um erro ao tentar apagar o jogador.")
 
 # --- Funções de Eventos ---
@@ -551,14 +562,18 @@ async def _fix_clan_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def _delete_resolve_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Busca o usuário e pede confirmação final."""
-    target_input = update.message.text
+    target_input = update.message.text.strip()
     user_id, pdata = None, None
     
-    # Tenta achar por ID ou Nome (Mesma lógica do Cache)
-    try:
-        user_id = int(target_input)
-        pdata = await get_player_data(user_id)
-    except ValueError:
+    # CORREÇÃO HÍBRIDA
+    parsed_id = parse_hybrid_id(target_input)
+    if parsed_id:
+        pdata = await get_player_data(parsed_id)
+        if pdata:
+             user_id = parsed_id
+
+    # Se não achou por ID, tenta nome
+    if not pdata:
         found = await find_player_by_name(target_input)
         if found:
             user_id, pdata = found
@@ -567,12 +582,11 @@ async def _delete_resolve_user(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("❌ Jogador não encontrado. Tente novamente o ID ou Nome, ou use /cancelar.")
         return ASK_DELETE_ID
 
-    # Salva no contexto para o próximo passo
+    # Salva no contexto (converta ObjectId para str se for salvar em JSON, mas aqui é memória RAM, então ok)
     context.user_data['delete_target_id'] = user_id
     char_name = pdata.get('character_name', 'Desconhecido')
     lvl = pdata.get('level', 0)
 
-    # Monta teclado de confirmação
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ SIM, APAGAR PARA SEMPRE", callback_data="confirm_delete_yes")],
         [InlineKeyboardButton("❌ NÃO! CANCELAR!", callback_data="admin_main")]
@@ -581,7 +595,7 @@ async def _delete_resolve_user(update: Update, context: ContextTypes.DEFAULT_TYP
     report = (
         f"⚠️ <b>CONFIRMAÇÃO DE EXCLUSÃO</b> ⚠️\n\n"
         f"👤 <b>Nome:</b> {char_name}\n"
-        f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
+        f"🆔 <b>ID:</b> <code>{str(user_id)}</code>\n"
         f"📊 <b>Nível:</b> {lvl}\n\n"
         f"Você tem certeza absoluta que deseja apagar todos os dados deste jogador?"
     )
@@ -671,28 +685,30 @@ async def _cache_ask_for_user(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def _cache_clear_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Limpa o cache do jogador especificado."""
-    target_input = update.message.text
+    target_input = update.message.text.strip()
     user_id, pdata, found_by = None, None, "ID/Nome"
-    try:
-        user_id = int(target_input)
-        pdata = await get_player_data(user_id)
-        found_by = "ID"
-    except ValueError:
+    
+    # CORREÇÃO HÍBRIDA
+    parsed_id = parse_hybrid_id(target_input)
+    if parsed_id:
+        pdata = await get_player_data(parsed_id)
+        if pdata:
+            user_id = parsed_id
+            found_by = "ID"
+
+    if not pdata:
         try:
             found = await find_player_by_name(target_input)
             if found:
                 user_id, pdata = found
                 found_by = "Nome"
-        except Exception as e:
-            logger.error(f"Erro ao buscar jogador '{target_input}' em _cache_clear_user: {e}")
-            await update.message.reply_text("Ocorreu um erro ao buscar o jogador.")
-            await _send_admin_menu(update.effective_chat.id, context) 
-            return ConversationHandler.END
+        except Exception:
+            pass
 
     if pdata and user_id:
         char_name = pdata.get('character_name', f'ID {user_id}')
-        was_in_cache = clear_player_cache(user_id) # SÍNCRONO
-        msg = f"✅ Cache para <b>{char_name}</b> (<code>{user_id}</code>) foi limpo." if was_in_cache else f"ℹ️ Jogador <b>{char_name}</b> (<code>{user_id}</code>) encontrado, mas não estava no cache."
+        was_in_cache = clear_player_cache(user_id) 
+        msg = f"✅ Cache para <b>{char_name}</b> (<code>{str(user_id)}</code>) foi limpo." if was_in_cache else f"ℹ️ Jogador <b>{char_name}</b> (<code>{str(user_id)}</code>) encontrado, mas não estava no cache."
         await update.message.reply_text(msg, parse_mode=HTML)
     else:
         await update.message.reply_text(f"❌ Não foi possível encontrar um jogador com o {found_by} fornecido.")
@@ -956,45 +972,37 @@ ADMIN_HELP_TEXT = """ℹ️ <b>Ajuda dos Comandos de Admin</b> ℹ️
 """
 
 async def clean_clan_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Comando para limpar o clan_id de um jogador específico.
-    Uso: /limpar_cla <user_id>
-    """
     if not await ensure_admin(update): return
 
     if not context.args:
         await update.message.reply_text("⚠️ Uso: /limpar_cla <user_id>")
         return
 
-    try:
-        target_id = int(context.args[0])
-    except ValueError:
-        await update.message.reply_text("❌ O ID do usuário deve ser um número.")
+    # CORREÇÃO HÍBRIDA
+    raw_id = context.args[0]
+    target_id = parse_hybrid_id(raw_id)
+    
+    if not target_id:
+        await update.message.reply_text("❌ ID inválido.")
         return
 
     player_data = await get_player_data(target_id)
     
     if not player_data:
-        await update.message.reply_text(f"❌ Jogador {target_id} não encontrado.")
+        await update.message.reply_text(f"❌ Jogador {str(target_id)} não encontrado.")
         return
 
-    # Remove o clan_id
     old_clan = player_data.get('clan_id', 'Nenhum')
     player_data['clan_id'] = None
-    
-    # Se houver dados de convite pendente, limpa também
     if 'clan_invite' in player_data:
         del player_data['clan_invite']
 
     await save_player_data(target_id, player_data)
-    
-    # Limpa cache para garantir
     clear_player_cache(target_id)
 
     await update.message.reply_text(
         f"✅ <b>Sucesso!</b>\n"
-        f"O jogador <code>{target_id}</code> foi removido do clã '<code>{old_clan}</code>'.\n"
-        f"Agora ele está livre para entrar em outro.",
+        f"O jogador <code>{str(target_id)}</code> foi removido do clã '<code>{old_clan}</code>'.",
         parse_mode=ParseMode.HTML
     )
 
@@ -1068,62 +1076,50 @@ async def _change_id_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return ASK_OLD_ID_CHANGE
 
 async def _change_id_ask_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Recebe o ID velho e pede o novo."""
-    try:
-        old_id = int(update.message.text.strip())
-    except ValueError:
-        await update.message.reply_text("❌ O ID deve ser um número. Tente novamente.")
+    # CORREÇÃO HÍBRIDA
+    raw_id = update.message.text.strip()
+    old_id = parse_hybrid_id(raw_id)
+    
+    if not old_id:
+        await update.message.reply_text("❌ ID inválido. Tente novamente.")
         return ASK_OLD_ID_CHANGE
 
     # Verifica se o ID velho existe
     player = await get_player_data(old_id)
     if not player:
-        await update.message.reply_text(f"❌ Não encontrei nenhum jogador com ID <code>{old_id}</code>. Tente outro ID ou /cancelar.")
+        await update.message.reply_text(f"❌ Não encontrei jogador com ID <code>{str(old_id)}</code>.")
         return ASK_OLD_ID_CHANGE
 
-    # Salva no contexto
     context.user_data['change_id_old'] = old_id
     char_name = player.get('character_name', 'Sem Nome')
 
     await update.message.reply_text(
-        f"✅ ID Antigo encontrado: <b>{char_name}</b> (<code>{old_id}</code>)\n\n"
+        f"✅ ID Antigo encontrado: <b>{char_name}</b> (<code>{str(old_id)}</code>)\n\n"
         f"2️⃣ <b>Agora, digite o NOVO ID para esta conta:</b>"
     , parse_mode=HTML)
     return ASK_NEW_ID_CHANGE
 
 async def _change_id_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Recebe o ID novo e pede confirmação."""
-    try:
-        new_id = int(update.message.text.strip())
-    except ValueError:
-        await update.message.reply_text("❌ O ID deve ser um número válido. Tente novamente.")
+    # CORREÇÃO HÍBRIDA
+    raw_id = update.message.text.strip()
+    new_id = parse_hybrid_id(raw_id)
+    
+    if not new_id:
+        await update.message.reply_text("❌ ID novo inválido.")
         return ASK_NEW_ID_CHANGE
 
-    # 1. Verifica se o usuário está tentando usar o MESMO ID (Erro comum)
     old_id = context.user_data.get('change_id_old')
-    if new_id == old_id:
-        await update.message.reply_text("❌ Você digitou o mesmo ID antigo! Digite o NOVO ID para onde os dados vão.")
+    if str(new_id) == str(old_id):
+        await update.message.reply_text("❌ O novo ID é igual ao antigo!")
         return ASK_NEW_ID_CHANGE
 
-    # 2. Verifica se o ID novo já existe (para não sobrescrever outra pessoa)
-    # Adicionamos um botão de "Cancelar" aqui para não prender você no loop
     if await get_player_data(new_id):
-        kb_erro = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar e Sair", callback_data="admin_main")]])
-        
-        await update.message.reply_text(
-            f"⛔ <b>PERIGO: ID JÁ EXISTE!</b>\n\n"
-            f"O ID <code>{new_id}</code> já tem uma conta registrada.\n"
-            f"Eu impedi a ação para você não apagar a conta dessa pessoa sem querer.\n\n"
-            f"👇 <b>Digite outro ID livre</b> ou cancele abaixo:",
-            reply_markup=kb_erro,
-            parse_mode=HTML
-        )
+        kb_erro = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="admin_main")]])
+        await update.message.reply_text(f"⛔ O ID <code>{str(new_id)}</code> já existe!", reply_markup=kb_erro, parse_mode=HTML)
         return ASK_NEW_ID_CHANGE
 
-    # Se passou nos testes, salva e pede confirmação final
     context.user_data['change_id_new'] = new_id
 
-    # Botões de confirmação
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ CONFIRMAR MIGRAÇÃO", callback_data="do_change_id_yes")],
         [InlineKeyboardButton("❌ Cancelar", callback_data="admin_main")]
@@ -1131,10 +1127,8 @@ async def _change_id_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await update.message.reply_text(
         f"⚠️ <b>CONFIRMAÇÃO FINAL</b> ⚠️\n\n"
-        f"➡️ <b>De:</b> <code>{old_id}</code>\n"
-        f"➡️ <b>Para:</b> <code>{new_id}</code>\n\n"
-        f"Todos os itens, pets e dados serão movidos.\n"
-        f"A conta antiga ({old_id}) será <b>DELETADA</b>.\n\n"
+        f"➡️ <b>De:</b> <code>{str(old_id)}</code>\n"
+        f"➡️ <b>Para:</b> <code>{str(new_id)}</code>\n\n"
         f"Proceder?",
         reply_markup=kb,
         parse_mode=HTML

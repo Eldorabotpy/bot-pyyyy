@@ -18,7 +18,7 @@ from telegram.ext import (
     filters,
 )
 from modules import player_manager, game_data
-from handlers.admin.utils import ensure_admin
+from handlers.admin.utils import ensure_admin, parse_hybrid_id
 
 logger = logging.getLogger(__name__)
 
@@ -137,20 +137,25 @@ async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE
     target_input = (update.message.text or "").strip()
     user_id, pdata = None, None
 
-    try:
-        user_id_int = int(target_input)
-        pdata_found = await player_manager.get_player_data(user_id_int)
+    # CORREÇÃO: Usa a lógica híbrida
+    parsed_id = parse_hybrid_id(target_input)
+    
+    if parsed_id:
+        # Se for ID válido (int ou ObjectId)
+        pdata_found = await player_manager.get_player_data(parsed_id)
         if pdata_found:
-            user_id = user_id_int
+            user_id = parsed_id
             pdata = pdata_found
-    except ValueError:
+    
+    # Se não achou por ID, tenta por nome
+    if not pdata:
         found_by_name = await player_manager.find_player_by_name(target_input)
         if found_by_name:
             user_id, pdata = found_by_name
 
     if not pdata:
         await update.message.reply_text(
-            "❌ Jogador não encontrado. Tente novamente ou use /cancelar.", parse_mode="HTML"
+            "❌ Jogador não encontrado.", parse_mode="HTML"
         )
         return ASK_NAME
 

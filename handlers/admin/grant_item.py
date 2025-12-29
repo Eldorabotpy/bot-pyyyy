@@ -12,6 +12,7 @@ from telegram.ext import (
 )
 from modules import player_manager, game_data
 from handlers.admin.utils import ensure_admin
+from handlers.admin.utils import parse_hybrid_id
 logger = logging.getLogger(__name__)
 # --- Estados da Conversa ---
 (SELECT_CATEGORY, BROWSE_ITEMS, ASK_QUANTITY, ASK_TARGET_PLAYER, CONFIRM_GRANT) = range(5)
@@ -122,26 +123,29 @@ async def receive_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def receive_target_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Recebe o jogador, mostra a confirmação e finaliza."""
     target_input = update.message.text.strip()
+    user_id, pdata = None, None
+
+    # --- CORREÇÃO HÍBRIDA ---
+    parsed_id = parse_hybrid_id(target_input)
     
-    # Tenta encontrar por ID primeiro
-    try:
-        user_id = int(target_input)
-        # <<< CORREÇÃO 1: Adiciona await >>>
-        pdata = await player_manager.get_player_data(user_id)
-    except ValueError:
-        # Se não for ID, tenta por nome
-        # <<< CORREÇÃO 2: Adiciona await >>>
+    if parsed_id:
+        pdata = await player_manager.get_player_data(parsed_id)
+        if pdata:
+            user_id = parsed_id
+
+    # Se não achou por ID, tenta nome
+    if not pdata:
         found = await player_manager.find_player_by_name(target_input)
         if found:
             user_id, pdata = found
-        else:
-            user_id, pdata = None, None
+    # ------------------------
 
     if not pdata:
         await update.message.reply_text("❌ Jogador não encontrado. Tente novamente.")
         return ASK_TARGET_PLAYER
     
     # Guarda os dados para a confirmação final
+    # (Use str() no ID para evitar erros de serialização se for ObjectId)
     context.user_data['grant_target_id'] = user_id
     context.user_data['grant_target_name'] = pdata.get('character_name', f"ID: {user_id}")
     

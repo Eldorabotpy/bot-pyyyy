@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # FUNÇÕES DE EXIBIÇÃO
 # =============================================================================
-MAX_EQUIPPED_SKILLS = 4
+MAX_EQUIPPED_SKILLS = 6
 
 def _format_enchantments(enchantments: dict) -> str:
     """Formata encantamentos com emojis e usa o VALUE do encanto."""

@@ -13,7 +13,7 @@ from telegram.ext import (
     MessageHandler, 
     filters
 )
-
+from handlers.admin.utils import parse_hybrid_id
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from modules.player_manager import find_player_by_name
@@ -227,23 +227,27 @@ async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     """
     start_time = time.time() # <<< DEBUG TEMPORIZAÇÃO
 
-    user_input = update.message.text
+    user_input = update.message.text.strip()
     target_user_id = None
     pdata = None
     found_by = "ID/Nome"
 
-    # 1. Tenta encontrar por ID
-    try:
-        target_user_id = int(user_input)
-        # <<< CORREÇÃO 1: Adiciona await >>>
-        pdata = await player_manager.get_player_data(target_user_id)
-        found_by = "ID"
+    # --- INÍCIO DA CORREÇÃO ---
+    
+    # 1. Tenta identificar se é um ID Híbrido (Int ou ObjectId)
+    parsed_id = parse_hybrid_id(user_input)
+    
+    # Se o parser identificou que é um formato de ID válido, tenta buscar direto
+    if parsed_id:
+        pdata = await player_manager.get_player_data(parsed_id)
         if pdata:
+            target_user_id = parsed_id
+            found_by = "ID"
             pdata['user_id'] = target_user_id
-    except ValueError:
-        # 2. Se não for ID, tenta encontrar por Nome
+
+    # 2. Se não encontrou por ID (ou não era um ID), tenta buscar por Nome
+    if not pdata:
         try:
-            # <<< CORREÇÃO 2: Adiciona await >>>
             found = await find_player_by_name(user_input)
             if found:
                 target_user_id, pdata = found
@@ -254,6 +258,8 @@ async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             logger.error(f"Erro ao buscar jogador por nome '{user_input}': {e}")
             await update.message.reply_text("Ocorreu um erro ao buscar pelo nome. Tente novamente ou use o ID.")
             return STATE_GET_USER_ID
+            
+    # --- FIM DA CORREÇÃO ---
 
     end_time = time.time() # <<< DEBUG TEMPORIZAÇÃO
     elapsed = end_time - start_time

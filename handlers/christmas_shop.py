@@ -58,13 +58,15 @@ TROCAS_NOEL = {
         "nome": "Skin:Assassino Sombra de Krampus",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "sombra_de_krampus", 
-        "tipo": "skin"
+        "tipo": "skin",
+        "emoji": "☠️"
     }, 
     "santo_da_nevasca": {
         "nome": "Skin:Mago Santo da Nevasca",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "santo_da_nevasca", 
-        "tipo": "skin"
+        "tipo": "skin",
+        "emoji": "🧙‍♂️"
     },
     "aprendiz_do_santo": {
         "nome": "Skin:Mago Aprendiz do Santo",
@@ -88,32 +90,37 @@ TROCAS_NOEL = {
         "nome": "Skin:Samurai Oni de Natal",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "oni_de_natal", 
-        "tipo": "skin"
+        "tipo": "skin",
+        "emoji": "👺"
     },
     "lamina_da_estrela_guia": {
         "nome": "Skin: Guerreiro Lâmina da Estrela Guia",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "lamina_da_estrela_guia", 
-        "tipo": "skin"
+        "tipo": "skin",
+        "emoji": "💪"
     },
     "patrulheiro_do_polo_norte": {
         "nome": "Skin:Caçad Patrulheiro do Polo Norte",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "patrulheiro_do_polo_norte", 
-        "tipo": "skin"
+        "tipo": "skin",
+        "emoji": "🏹"
     },
 
     "esmagador_de_chamines": {
         "nome": "Skin:Beserker Esmagador de Chaminés",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "esmagador_de_chamines", 
-        "tipo": "skin"
+        "tipo": "skin",
+        "emoji": "🪓"
     },
     "maestro_da_noite_feliz": {
         "nome": "Skin:Bardo Maestro da Noite Feliz",
         "custo": 100, "moeda": ITEM_RARO,
         "recompensa_id": "maestro_da_noite_feliz", 
-        "tipo": "skin"
+        "tipo": "skin",
+        "emoji": "😎"
     },
     
 }

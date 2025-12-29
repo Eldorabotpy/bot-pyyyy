@@ -10,11 +10,20 @@ from telegram.error import BadRequest
 
 logger = logging.getLogger(__name__)
 
+
+# 🛠️ HELPER (Pode importar de main_handler se preferir, ou manter local)
+def _get_combat_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data and "logged_player_id" in context.user_data:
+        return context.user_data["logged_player_id"]
+    return update.callback_query.from_user.id
+
 async def combat_potion_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra a lista de poções disponíveis em combate."""
     query = update.callback_query
     await query.answer()
     
+    user_id = _get_combat_user_id(update, context)
+
     player_data = await player_manager.get_player_data(query.from_user.id)
     inventory = player_data.get("inventory", {})
     
@@ -40,6 +49,8 @@ async def combat_use_potion_callback(update: Update, context: ContextTypes.DEFAU
     """Processa o uso de uma poção em combate."""
     query = update.callback_query
     user_id = query.from_user.id
+    
+    user_id = _get_combat_user_id(update, context)
     
     try:
         item_id_to_use = query.data.split(':')[1]

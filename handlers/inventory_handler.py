@@ -11,7 +11,7 @@ from telegram import (
     InputMediaVideo,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
-
+from modules.auth_utils import get_current_player_id
 from modules import player_manager, game_data, file_ids
 from modules.game_data import skills as skills_data
 from modules.game_data.skins import SKIN_CATALOG
@@ -191,18 +191,18 @@ async def _force_fix_inventory(user_id, player_data):
 async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # MUDANÇA AQUI: Usa a função ponte
+    user_id = get_current_player_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
     # --- CORREÇÃO LOCAL E IMEDIATA ---
-    # Roda a correção passando o objeto que acabamos de carregar.
     try:
         await _force_fix_inventory(user_id, player_data)
     except Exception as e:
         logger.error(f"Erro ao corrigir inventario localmente: {e}")
-    # ---------------------------------
 
     gold = player_manager.get_gold(player_data)
     gems = player_manager.get_gems(player_data)
@@ -249,10 +249,10 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
         await inventory_menu_callback(update, context)
         return
 
-    user_id = query.from_user.id
-    player_data = await player_manager.get_player_data(user_id)
+    # MUDANÇA AQUI: Usa a função ponte
+    user_id = get_current_player_id(update, context)
     
-    # Roda a correção (Fix que já existia)
+    player_data = await player_manager.get_player_data(user_id)
     try: await _force_fix_inventory(user_id, player_data)
     except: pass
     
@@ -265,17 +265,14 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
         
         if _determine_tab(k, v) == cat_key:
             if isinstance(v, dict): 
-                # Item Único (Equipamento)
                 name = _display_name_for_instance(k, v)
-                base_id_debug = v.get("base_id", "item") # Pega o ID base para exibir
+                base_id_debug = v.get("base_id", "item")
                 items_in_cat.append({"name": name, "id": k, "qty": 1, "type": "unique", "base_id": base_id_debug})
             else:
-                # Item Stack (Poção, Tomo, etc)
                 info = _info_for(k)
                 name = info.get("display_name") or k.replace("_", " ").title()
                 emoji = info.get("emoji", "")
                 full_name = f"{emoji} {name}".strip()
-                # No stack, a chave 'k' É o base_id
                 items_in_cat.append({"name": full_name, "id": k, "qty": v, "type": "stack", "base_id": k})
 
     total_items = len(items_in_cat)
@@ -296,16 +293,12 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
         text += "<i>Nenhum item nesta categoria.</i>"
     else:
         for item in current_items:
-            # --- AQUI ESTA A MAGIA DO ID ---
-            # Exibe: "Nome do Item 🆔 id_do_item"
-            display = f"{item['name']} 🆔 {item.get('base_id', '')}"
-            
+            display = f"{item['name']}" # Removi o debug ID visual para ficar limpo
             if item['qty'] > 1: display += f" (x{item['qty']})"
             
             is_locked = False
             req_class_label = ""
             
-            # Lógica de Bloqueio (Mantida igual)
             item_info = _info_for(item['id'] if item['type'] == 'stack' else item['base_id'])
             effects = item_info.get("on_use") or item_info.get("effects") or {}
             eff_type = effects.get("effect")
@@ -351,13 +344,17 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
     item_buttons.append(nav_row)
     
     await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(item_buttons))
+    
 # -----------------------------------------------------------
 # 3. USO DE ITENS
 # -----------------------------------------------------------
 
 async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # MUDANÇA AQUI: Usa a função ponte
+    user_id = get_current_player_id(update, context)
+    
     try: item_id = query.data.split(":", 1)[1]
     except: return
 

@@ -1,5 +1,4 @@
 # modules/recovery_manager.py
-# (VERSÃO CORRIGIDA: Loop síncrono para iter_player_ids)
 
 import logging
 from datetime import datetime, timezone

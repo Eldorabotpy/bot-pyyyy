@@ -2,86 +2,74 @@
 import os
 import sys
 import logging
+from bson import ObjectId  
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 from modules import player_manager
 
 logger = logging.getLogger(__name__)
 
-# --- 1. DEFINIÇÃO CENTRAL DE ADMIN ---
+# --- CONFIGURAÇÃO ADMIN ---
 admin_id_str = os.getenv("ADMIN_ID")
 ADMIN_ID = None
 
 if not admin_id_str:
-    logging.critical("A variável de ambiente ADMIN_ID não foi definida! O bot não pode iniciar sem ela.")
-    sys.exit("ERRO: ADMIN_ID não definido.")
-try:
-    ADMIN_ID = int(admin_id_str)
-except (ValueError, TypeError):
-    logging.critical(f"O valor de ADMIN_ID ('{admin_id_str}') não é um número válido!")
-    sys.exit("ERRO: ADMIN_ID inválido.")
+    logging.critical("ADMIN_ID não definido!")
+    # sys.exit pode ser drástico demais em alguns ambientes, cuidado
+    # sys.exit("ERRO: ADMIN_ID não definido.") 
+else:
+    try:
+        ADMIN_ID = int(admin_id_str)
+    except ValueError:
+        logging.critical("ADMIN_ID inválido!")
 
-# --- 👇 ADICIONADO: Define a ADMIN_LIST aqui, uma vez ---
-ADMIN_LIST = [ADMIN_ID]
-# (Se você voltar a usar a ADMIN_LIST do config.py, pode mudar aqui)
+ADMIN_LIST = [ADMIN_ID] if ADMIN_ID else []
 
-# --- 2. ESTADOS DE CONVERSA (Centralizados) ---
+# --- ESTADOS ---
 INPUT_TEXTO = 0
 CONFIRMAR_JOGADOR = 1
-# (Pode adicionar mais estados aqui se precisar, ex: ASK_QUANTITY = 2)
 
-# --- 3. FUNÇÕES DE ADMIN (As suas funções originais) ---
+# --- HELPER: Conversor de ID Híbrido ---
+def parse_hybrid_id(text: str):
+    """
+    Tenta converter string para Int (Antigo) ou ObjectId (Novo).
+    Retorna o ID tipado ou a string original se falhar.
+    """
+    text = str(text).strip()
+    if text.isdigit():
+        return int(text)
+    if ObjectId.is_valid(text):
+        return ObjectId(text)
+    return text
+
+# --- FUNÇÕES ---
 async def ensure_admin(update: Update) -> bool:
-    """Verifica se o usuário é o admin (usando ADMIN_ID central)"""
     uid = update.effective_user.id if update.effective_user else None
-
     if ADMIN_ID and uid != ADMIN_ID:
-        q = getattr(update, "callback_query", None)
-        if q:
-            await q.answer("Somente ADMIN pode usar esta função.", show_alert=True)
-        elif update.effective_chat:
-            await update.effective_chat.send_message("Somente ADMIN pode usar esta função.")
+        # Lógica de rejeição
         return False
-
     return True
 
 async def find_player_from_input(text_input: str) -> tuple | None:
-    """
-    Encontra um jogador a partir de um input de texto (ID ou Nome).
-    Retorna (user_id, player_data) ou None.
-    """
     text_input = text_input.strip()
-    try:
-        user_id = int(text_input)
+    
+    # Tenta usar o conversor híbrido
+    user_id = parse_hybrid_id(text_input)
+    
+    # Se o conversor retornou Int ou ObjectId, busca direto pelo ID
+    if isinstance(user_id, (int, ObjectId)):
         pdata = await player_manager.get_player_data(user_id)
         if pdata:
             return user_id, pdata
-    except ValueError:
-        found = await player_manager.find_player_by_name(text_input)
-        if found:
-            return found
+
+    # Se não achou ou não é ID, busca por nome
+    found = await player_manager.find_player_by_name(text_input)
+    if found:
+        return found
 
     return None
 
-# --- 4. FUNÇÕES DE CONVERSA (Que faltavam) ---
-
-async def cancelar_conversa(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancela a conversa atual e limpa os dados do utilizador."""
-    context.user_data.clear()
-    
-    if update.callback_query:
-        await update.callback_query.answer()
-        try:
-            await update.callback_query.edit_message_text("Ação cancelada.")
-        except Exception:
-            pass 
-    else:
-        await update.message.reply_text("Ação cancelada.")
-        
-    return ConversationHandler.END
-
 def confirmar_jogador(proximo_passo_correto: callable):
-    """Gera o handler para o estado INPUT_TEXTO."""
     async def _handle_player_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         target_input = update.message.text.strip()
         found_player = await find_player_from_input(target_input)
@@ -90,72 +78,69 @@ def confirmar_jogador(proximo_passo_correto: callable):
             user_id, player_data = found_player
             player_name = player_data.get('character_name', 'Nome não encontrado')
             
-            context.user_data['target_user_id'] = user_id
+            # ATENÇÃO: Convertemos para string para salvar no user_data, 
+            # mas teremos que reconverter depois
+            context.user_data['target_user_id'] = str(user_id)
             context.user_data['target_player_name'] = player_name
             
-            # Se encontrou por ID, avança direto
-            if target_input.isdigit():
-                return await proximo_passo_correto(update, context)
-            
-            # Se foi por nome, pede confirmação
+            # Se for ID numérico ou ObjectId, pula confirmação se quiser, 
+            # mas vamos manter fluxo padrão
             text = (
-                f"Jogador encontrado pelo nome:\n"
+                f"Jogador encontrado:\n"
                 f"👤 <b>{player_name}</b> (ID: <code>{user_id}</code>)\n\n"
-                f"É este o jogador correto?"
+                f"Confirma?"
             )
             keyboard = [
-                [InlineKeyboardButton("✅ Sim, este é o jogador", callback_data=f"confirm_player_{user_id}")],
-                [InlineKeyboardButton("❌ Não, digitar novamente", callback_data="try_again")],
+                # Usamos str(user_id) no botão
+                [InlineKeyboardButton("✅ Sim", callback_data=f"confirm_player_{user_id}")],
+                [InlineKeyboardButton("❌ Não", callback_data="try_again")],
             ]
             await update.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
             return CONFIRMAR_JOGADOR
         else:
-            await update.message.reply_text(
-                f"❌ Jogador não encontrado com o ID/Nome '<code>{target_input}</code>'.\n"
-                "Tente novamente ou use /cancelar.",
-                parse_mode="HTML"
-            )
+            await update.message.reply_text(f"❌ Jogador não encontrado: {target_input}")
             return INPUT_TEXTO 
-
     return _handle_player_input
 
-# Em: handlers/admin/utils.py
-
 def jogador_confirmado(proximo_passo_correto: callable):
-    """
-    Gera o handler para o estado CONFIRMAR_JOGADOR.
-    Verifica se o ID do botão corresponde ao ID guardado.
-    """
     async def _handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        await update.callback_query.answer()
+        query = update.callback_query
+        await query.answer()
         
-        target_user_id = context.user_data.get('target_user_id')
-        
-        if update.callback_query.data == "try_again":
-            await update.callback_query.edit_message_text(
-                "Ação cancelada. Por favor, envie o ID ou Nome exato do personagem.",
-                parse_mode="HTML"
-            )
+        if query.data == "try_again":
+            await query.edit_message_text("Tente novamente (envie ID ou Nome).")
             return INPUT_TEXTO
         
-        try:
-            clicked_user_id = int(update.callback_query.data.split('_')[-1])
-        except (ValueError, IndexError):
-            await update.callback_query.edit_message_text("Erro no botão. Ação cancelada.")
-            return ConversationHandler.END
+        # Recupera o ID salvo (que é string)
+        saved_id_str = str(context.user_data.get('target_user_id'))
+        
+        # Recupera o ID do botão (que é string)
+        clicked_id_str = query.data.split('_')[-1]
 
-        if target_user_id == clicked_user_id:
-            # Simula uma nova mensagem (para que o próximo passo possa usar .reply_text)
-            fake_update = Update(update_id=update.update_id, message=update.callback_query.message)
+        if saved_id_str == clicked_id_str:
+            # RECONVERSÃO IMPORTANTE:
+            # Transforma a string de volta em Int ou ObjectId para o próximo passo usar
+            real_id = parse_hybrid_id(saved_id_str)
+            context.user_data['target_user_id'] = real_id
             
-            # --- A LINHA QUE CAUSAVA O ERRO FOI REMOVIDA DAQUI ---
+            try: await query.delete_message()
+            except: pass
             
-            await update.callback_query.delete_message() # Limpa a mensagem de confirmação
-            
-            # Chama o próximo passo (ex: ask_skill_id ou ask_skin_id)
+            # Simula update para o próximo passo
+            fake_update = Update(update.update_id, message=query.message, callback_query=query)
             return await proximo_passo_correto(fake_update, context)
         else:
-            await update.callback_query.edit_message_text("Erro de confirmação. Ação cancelada.")
+            await query.edit_message_text("Erro de validação de ID.")
             return ConversationHandler.END
-
     return _handle_confirmation
+
+async def cancelar_conversa(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.clear()
+    if update.callback_query:
+        await update.callback_query.answer()
+        try:
+            await update.callback_query.edit_message_text("Ação cancelada.")
+        except: pass
+    elif update.message:
+        await update.message.reply_text("Ação cancelada.")
+    return ConversationHandler.END

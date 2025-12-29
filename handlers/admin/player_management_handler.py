@@ -18,6 +18,7 @@ from modules import player_manager
 from modules.player.core import players_collection 
 from handlers.admin.utils import (
     ADMIN_LIST,
+    parse_hybrid_id,
     ensure_admin, 
     find_player_from_input,
     cancelar_conversa,
@@ -187,17 +188,24 @@ async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception:
         pass
 
-    try:
-        target_user_id = int(query.data.split(':')[-1])
-    except (ValueError, IndexError):
+    # --- INÍCIO DA CORREÇÃO ---
+    # Pegamos o ID cru (string) do callback
+    raw_id = query.data.split(':')[-1]
+    
+    # Usamos o parser híbrido para converter corretamente (Int ou ObjectId)
+    target_user_id = parse_hybrid_id(raw_id)
+
+    if not target_user_id:
         await query.edit_message_text("Erro: ID do jogador inválido.")
         return await show_main_management_menu(update, context) 
+    # --- FIM DA CORREÇÃO ---
     
     context.user_data['target_user_id'] = target_user_id
     
     pdata = await player_manager.get_player_data(target_user_id)
     if not pdata:
-        await query.edit_message_text(f"Erro: Jogador <code>{target_user_id}</code> não encontrado.")
+        # Usa f-string com str(target_user_id) para evitar erro caso seja ObjectId na renderização
+        await query.edit_message_text(f"Erro: Jogador <code>{str(target_user_id)}</code> não encontrado.")
         return MAIN_MENU
 
     try:
@@ -217,7 +225,7 @@ async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     text = [
         f"👤 <b>Detalhes de {name}</b>",
-        f"<b>ID:</b> <code>{target_user_id}</code>",
+        f"<b>ID:</b> <code>{str(target_user_id)}</code>", # Convertido para string para segurança visual
         f"<b>Nível:</b> {level}",
         f"<b>Conta Criada:</b> {created_at_str}",
         f"<b>Última Interação:</b> {last_seen_str}",
@@ -225,6 +233,7 @@ async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ]
     
     keyboard = [
+        # O f-string lida bem com ObjectId automaticamente, convertendo pra string no callback_data
         [InlineKeyboardButton("🗑️ APAGAR ESTE JOGADOR", callback_data=f"admin_pmanage_delconf:{target_user_id}")],
         [InlineKeyboardButton("⬅️ Voltar para a Lista", callback_data="admin_pmanage_list:1")],
         [InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="admin_pmanage_main")],
@@ -246,7 +255,8 @@ async def confirm_delete_player(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
 
-    target_user_id = int(query.data.split(':')[-1])
+    raw_id = query.data.split(':')[-1]
+    target_user_id = parse_hybrid_id(raw_id)
     context.user_data['target_user_id'] = target_user_id 
     
     pdata = await player_manager.get_player_data(target_user_id)
@@ -271,7 +281,8 @@ async def execute_delete_player(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer("Processando exclusão...")
 
-    target_user_id = int(query.data.split(':')[-1])
+    raw_id = query.data.split(':')[-1]
+    target_user_id = parse_hybrid_id(raw_id)
     
     try:
         deleted_ok = player_manager.delete_player(target_user_id)

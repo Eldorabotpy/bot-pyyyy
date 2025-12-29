@@ -22,6 +22,7 @@ from handlers.combat.skill_handler import (
 
 # Importa PvP
 from pvp.pvp_handler import pvp_handlers
+from pvp.tournament_admin import get_tournament_admin_handlers
 
 def register_combat_handlers(application: Application):
     """Regista todos os handlers relacionados a combate."""
@@ -46,3 +47,6 @@ def register_combat_handlers(application: Application):
     # 5. PvP
     for handler in pvp_handlers():
         application.add_handler(handler)
+
+    for handler in get_tournament_admin_handlers():
+        application.add_handler(handler)    

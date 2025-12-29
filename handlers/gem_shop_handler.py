@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from modules import player_manager, game_data
 # Importa o dicionário completo de itens de evolução
 from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
-
+from modules.auth_utils import get_current_player_id
 # Importa planos e helper de texto
 try:
     from modules.game_data.premium import PREMIUM_PLANS_FOR_SALE, get_benefits_text
@@ -200,7 +200,7 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try: await q.answer()
         except: pass
         chat_id = update.effective_chat.id
-        user_id = q.from_user.id
+        user_id = get_current_player_id(update, context)
     else:
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
@@ -388,7 +388,7 @@ async def gem_change_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    buyer_id = q.from_user.id
+    buyer_id = get_current_player_id(update, context)
     st = _state(context, buyer_id)
     base_id = st.get("base_id")
     qty = max(1, int(st.get("qty", 1)))

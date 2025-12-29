@@ -5,14 +5,14 @@ from __future__ import annotations
 import logging
 import datetime
 import asyncio
+import certifi
 from zoneinfo import ZoneInfo
 from typing import Dict, Optional, Any
 from telegram.ext import ContextTypes
 from modules import game_data
 # --- MONGODB IMPORTS ---
 from pymongo import MongoClient
-import certifi
-
+from bson import ObjectId
 from modules import player_manager
 from modules.player_manager import (
     save_player_data, get_perk_value, 
@@ -45,15 +45,30 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 players_col = None
-
+users_col = None
 try:
     client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
     db = client["eldora_db"]
     players_col = db["players"]
-    logger.info("✅ [JOBS] Conexão MongoDB OK.")
+    users_col = db["users"] # Conecta na coleção nova também
+    logger.info("✅ [JOBS] Conexão MongoDB Híbrida OK.")
 except Exception as e:
     logger.critical(f"❌ [JOBS] FALHA CRÍTICA NA CONEXÃO MONGODB: {e}")
     players_col = None
+    users_col = None
+
+def get_col_and_id(user_id):
+    """
+    Retorna a coleção correta e o formato do ID para query.
+    - Int -> players_col, int
+    - Str -> users_col, ObjectId
+    """
+    if isinstance(user_id, int):
+        return players_col, user_id
+    elif isinstance(user_id, str):
+        if users_col is not None and ObjectId.is_valid(user_id):
+            return users_col, ObjectId(user_id)
+    return None, None
 
 # ==============================================================================
 # CONSTANTES E UTILITÁRIOS
@@ -80,17 +95,18 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
     today = _today_str()
     count = 0
     
-    msg_reset = "⚔️ <b>ARENA DE ELDORA</b>\n suas 10 batalhas diárias foram restauradas! Boa sorte."
+    msg_reset = "⚔️ <b>ARENA DE ELDORA</b>\nSuas 10 batalhas diárias foram restauradas! Boa sorte."
 
     async for user_id, pdata in player_manager.iter_players():
         try:
-            # Se já resetou hoje, pula
             if pdata.get("last_pvp_entry_reset") == today: continue
             
-            if players_col is not None:
-                # Atualiza no Banco
-                players_col.update_one(
-                    {"_id": user_id},
+            # Roteamento Híbrido
+            col, query_id = get_col_and_id(user_id)
+            
+            if col is not None:
+                col.update_one(
+                    {"_id": query_id},
                     {
                         "$set": {
                             "pvp_entries_left": 10,
@@ -99,14 +115,13 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
                     }
                 )
                 
-                # --- LIMPEZA DE CACHE (CRÍTICO) ---
                 try:
                     if hasattr(player_manager, "clear_player_cache"):
                         res = player_manager.clear_player_cache(user_id)
                         if asyncio.iscoroutine(res): await res
                 except: pass
                 
-                # Notifica (opcional para não spammar, mas bom para engajamento)
+                # Notificação (Comente se for spam)
                 try:
                     await context.bot.send_message(chat_id=user_id, text=msg_reset, parse_mode='HTML')
                     await asyncio.sleep(0.05)
@@ -133,23 +148,24 @@ async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
             daily = pdata.get("daily_awards") or {}
             if daily.get("last_arena_ticket_date") == today: continue
             
-            if players_col is not None:
-                players_col.update_one(
-                    {"_id": user_id},
+            # Roteamento Híbrido
+            col, query_id = get_col_and_id(user_id)
+            
+            if col is not None:
+                col.update_one(
+                    {"_id": query_id},
                     {
                         "$inc": {"inventory.ticket_arena": 10},
                         "$set": {"daily_awards.last_arena_ticket_date": today}
                     }
                 )
                 
-                # --- LIMPEZA DE CACHE (CRÍTICO) ---
                 try:
                     if hasattr(player_manager, "clear_player_cache"):
                         res = player_manager.clear_player_cache(user_id)
                         if asyncio.iscoroutine(res): await res
                 except: pass
                 
-                # Notifica
                 try:
                     await context.bot.send_message(chat_id=user_id, text=msg_arena, parse_mode='HTML')
                     await asyncio.sleep(0.05)
@@ -159,16 +175,13 @@ async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
         except: pass
         
     logger.info(f"[JOB] Tickets de Arena entregues: {granted}")
-    return granted
 
 async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
     """
     Entrega 1 Ticket para todos os jogadores SEM limite diário.
-    Usado automaticamente quando o evento inicia.
     """
     logger.info("[JOB] Distribuindo tickets de evento (sem limite diário)...")
     
-    # --- MENSAGEM VISUAL MELHORADA (ESTILO DECRETO) ---
     msg_ticket = (
         "╭─────── [ 📜 <b>DECRETO REAL</b> ] ───────➤\n"
         "│\n"
@@ -186,34 +199,30 @@ async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
     count = 0
     async for user_id, pdata in player_manager.iter_players():
         try:
-            # 1. Entrega direta no MongoDB (Rápido)
-            if players_col is not None:
-                players_col.update_one(
-                    {"_id": user_id},
+            # Roteamento Híbrido
+            col, query_id = get_col_and_id(user_id)
+
+            if col is not None:
+                col.update_one(
+                    {"_id": query_id},
                     {"$inc": {"inventory.ticket_defesa_reino": 1}}
                 )
                 
-                # ========================================================
-                # 🛠️ CORREÇÃO TÉCNICA: LIMPEZA DE CACHE
-                # Essencial para o ticket aparecer imediatamente
-                # ========================================================
                 try:
                     if hasattr(player_manager, "clear_player_cache"):
                         res = player_manager.clear_player_cache(user_id)
                         if asyncio.iscoroutine(res): await res
-                except Exception: 
-                    pass
+                except Exception: pass
 
-            # 2. Fallback (Caso não use Mongo direto)
             else:
+                # Fallback Memória
                 if not pdata: continue
                 player_manager.add_item_to_inventory(pdata, "ticket_defesa_reino", 1)
                 await player_manager.save_player_data(user_id, pdata)
             
-            # 3. Envia a mensagem bonita
             try:
                 await context.bot.send_message(chat_id=user_id, text=msg_ticket, parse_mode='HTML')
-                await asyncio.sleep(0.05) # Evita bloqueio por spam
+                await asyncio.sleep(0.05)
             except Exception: pass
             
             count += 1
@@ -222,33 +231,23 @@ async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"[JOB] Tickets de evento entregues: {count}")
 
 async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Nasce o World Boss e notifica.
-    """
     if world_boss_manager is None:
         logger.error("⚠️ [JOB] CRÍTICO: world_boss_manager é None!")
         return
 
-    # Se já estiver ativo, não faz nada (agora o main.py limpa isso no reinício)
     if world_boss_manager.is_active:
          logger.info("👹 [JOB] Boss já está vivo. Ignorando spawn duplicado.")
          return
 
     logger.info("👹 [JOB] Iniciando sequência de spawn do World Boss...")
     
-    # Inicia e recebe o local
     result = world_boss_manager.start_event()
     
     if result.get("success"):
         location_key = result.get('location', 'desconhecido')
-        
-        # --- CORREÇÃO DO NOME DO LOCAL ---
-        # Busca o nome bonito no game_data, fallback para o ID formatado
         region_info = (game_data.REGIONS_DATA.get(location_key) or {})
         location_display = region_info.get("display_name", location_key.replace("_", " ").title())
-        # ---------------------------------
         
-        # 1. Notifica no Canal/Grupo (Aba de Avisos)
         if ANNOUNCEMENT_CHAT_ID:
             try:
                 msg_text = (
@@ -266,7 +265,6 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"❌ ERRO NOTIFICAR GRUPO (BOSS): {e}")
         
-        # 2. Broadcast (DM para os players)
         try:
             await broadcast_boss_announcement(context.application, location_key)
         except Exception as e:
@@ -276,13 +274,12 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
 
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     if not world_boss_manager: return
-
-    if not world_boss_manager.is_active:
-        return
+    if not world_boss_manager.is_active: return
 
     logger.info("👹 [JOB] O tempo acabou! Removendo o Boss...")
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
     await distribute_loot_and_announce(context, battle_results)
+
 
 # ==============================================================================
 # 🛡️ JOB: KINGDOM DEFENSE
@@ -290,7 +287,6 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
 # Em handlers/jobs.py
 
 async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
-    """Inicia o evento, entrega tickets e notifica."""
     if not event_manager: return
 
     job_data = context.job.data or {}
@@ -298,19 +294,14 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     location_name = "🏰 Portões do Reino" 
 
     try:
-        # 1. Inicia o Evento no Engine
         result = await event_manager.start_event()
         
-        # Se falhar (já ativo), para aqui e não entrega ticket nem avisa
         if result and "error" in result:
             logger.warning(f"[KD] Evento já ativo ou erro: {result['error']}")
             return
 
-        # 2. ENTREGAR TICKETS (Nova chamada)
-        # Isso garante que SEMPRE que o evento ativar, o ticket é entregue
         await distribute_event_ticket(context)
 
-        # 3. Notificação no Grupo (Aba de Avisos)
         group_msg = (
             "🔥 <b>INVASÃO EM ANDAMENTO!</b> 🔥\n\n"
             "‼️ <b>ATENÇÃO HERÓIS DE ELDORA!</b>\n"
@@ -332,7 +323,6 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"❌ ERRO NOTIFICAR GRUPO: {e}")
 
-        # 4. Agenda o FIM automático
         context.job_queue.run_once(
             end_kingdom_defense_event, 
             when=duration_minutes * 60,
@@ -344,20 +334,12 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Erro ao iniciar Kingdom Defense: {e}")
 
 async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
-    """Finaliza o evento e posta o resultado no grupo."""
     if not event_manager: return
-    
-    # Se já não estiver ativo, evita postar mensagem duplicada
-    if not event_manager.is_active:
-        return
+    if not event_manager.is_active: return
 
     try:
-        success_data = await event_manager.end_event() # Agora retorna dict ou msg
+        await event_manager.end_event() 
         
-        # O end_event no engine geralmente retorna um dict ou string. 
-        # Vamos assumir que se deu certo, precisamos avisar.
-        
-        # Mensagem de encerramento
         end_msg = (
             "🏁 <b>FIM DA INVASÃO!</b> 🏁\n\n"
             "As poeiras da batalha baixaram.\n"
@@ -386,7 +368,6 @@ async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
 # ==============================================================================
 
 async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE):
-    """Distribui 1 ticket de defesa para todos os jogadores."""
     job_data = context.job.data or {} if context.job else {}
     event_time_str = job_data.get("event_time", "agora")
     TICKET_ID = "ticket_defesa_reino"
@@ -397,25 +378,19 @@ async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TY
     try:
         async for user_id, pdata in player_manager.iter_players():
             try:
-                # Se usar MongoDB direto
-                if players_col is not None:
-                    players_col.update_one(
-                        {"_id": user_id},
+                col, query_id = get_col_and_id(user_id)
+                
+                if col is not None:
+                    col.update_one(
+                        {"_id": query_id},
                         {"$inc": {f"inventory.{TICKET_ID}": 1}}
                     )
                     delivered += 1
                 else:
-                    # Fallback JSON/Memória
                     if not pdata: continue
                     player_manager.add_item_to_inventory(pdata, TICKET_ID, 1)
                     await save_player_data(user_id, pdata)
                     delivered += 1
-                
-                # Notificação Opcional (comente se for muito spam)
-                # try:
-                #    await context.bot.send_message(chat_id=user_id, text=f"🎟️ Recebeu 1 Ticket para o evento!", parse_mode='HTML')
-                # except Exception: pass
-                
             except Exception: pass
     except Exception as e:
         logger.error(f"Erro distribuindo tickets: {e}")
@@ -425,43 +400,19 @@ async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TY
 async def daily_event_ticket_job(context: ContextTypes.DEFAULT_TYPE):
     return await distribute_kingdom_defense_ticket_job(context)
 
-async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
-    granted = 0
-    try:
-        async for user_id, pdata in player_manager.iter_players():
-            try:
-                if not pdata: continue
-                player_manager.add_item_to_inventory(pdata, DAILY_CRYSTAL_ITEM_ID, DAILY_CRYSTAL_BASE_QTY)
-                if "daily_awards" not in pdata: pdata["daily_awards"] = {}
-                pdata["daily_awards"]["last_crystal_date"] = _today_str()
-                await save_player_data(user_id, pdata)
-                granted += 1
-                try: await context.bot.send_message(chat_id=user_id, text=f"🎁 Admin enviou {DAILY_CRYSTAL_BASE_QTY}x Cristais!")
-                except Exception: pass
-            except Exception: pass
-    except Exception: pass
-    return granted
 
 # ==============================================================================
 # ⚔️ PVP E OUTROS JOBS
 # ==============================================================================
 async def job_pvp_monthly_reset(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Job agendado que roda todo dia, mas só executa o reset no dia 1º.
-    """
     try:
         tz = ZoneInfo(JOB_TIMEZONE)
     except Exception:
         tz = datetime.timezone.utc
     
     now = datetime.datetime.now(tz)
-    
-    # 1. Trava de Segurança: Só roda no dia 1 do mês
-    if now.day != 1: 
-        return
+    if now.day != 1: return
 
-    # 2. Chama a função MESTRA do pvp_scheduler
-    # Ela vai: Premiar Top 5 -> Zerar Pontos -> Limpar Cache -> Salvar Log
     await executar_reset_pvp(context.bot, force_run=False)
 
 async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
@@ -475,27 +426,30 @@ async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
     except: return
 
     all_players_ranked.sort(key=lambda p: p["points"], reverse=True)
+    
     if MONTHLY_RANKING_REWARDS:
         for i, player in enumerate(all_players_ranked):
             rank = i + 1
             reward_amount = MONTHLY_RANKING_REWARDS.get(rank)
             if reward_amount:
                 user_id = player["user_id"]
-                if players_col is not None:
-                     players_col.update_one({"_id": user_id}, {"$inc": {"gems": reward_amount}})
+                col, query_id = get_col_and_id(user_id)
+                
+                if col is not None:
+                     col.update_one({"_id": query_id}, {"$inc": {"gems": reward_amount}})
                      try: await context.bot.send_message(chat_id=user_id, text=f"🏆 Rank {rank}: Recebeu {reward_amount} gemas!")
                      except: pass
+                     
     if ANNOUNCEMENT_CHAT_ID:
         try: await context.bot.send_message(chat_id=ANNOUNCEMENT_CHAT_ID, message_thread_id=ANNOUNCEMENT_THREAD_ID, text="🏆 <b>Ranking PvP Finalizado!</b>", parse_mode="HTML")
         except: pass
 
 async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
-    if players_col is not None:
-        # Zera os pontos de todos
-        players_col.update_many({}, {"$set": {"pvp_points": 0}})
+    # Reseta nas duas coleções
+    if players_col: players_col.update_many({}, {"$set": {"pvp_points": 0}})
+    if users_col: users_col.update_many({}, {"$set": {"pvp_points": 0}})
     
     if ANNOUNCEMENT_CHAT_ID:
-        # Mensagem Épica de Nova Temporada
         msg_season = (
             "╭────── [ 🏆 <b>NOVA TEMPORADA</b> ] ──────➤\n"
             "│\n"
@@ -534,8 +488,9 @@ async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 is_premium = player_manager.has_premium_plan(pdata) 
                 
                 if is_premium or regenerate_non_premium:
-                    if players_col is not None:
-                        players_col.update_one({"_id": user_id}, {"$inc": {"energy": 1}})
+                    col, query_id = get_col_and_id(user_id)
+                    if col is not None:
+                        col.update_one({"_id": query_id}, {"$inc": {"energy": 1}})
                         try:
                             if hasattr(player_manager, "clear_player_cache"):
                                 res = player_manager.clear_player_cache(user_id)
@@ -554,9 +509,11 @@ async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int:
                 daily = pdata.get("daily_awards") or {}
                 if daily.get("last_crystal_date") == today: continue
                 
-                if players_col is not None:
-                    players_col.update_one(
-                        {"_id": user_id},
+                col, query_id = get_col_and_id(user_id)
+                
+                if col is not None:
+                    col.update_one(
+                        {"_id": query_id},
                         {
                             "$inc": {f"inventory.{DAILY_CRYSTAL_ITEM_ID}": 4},
                             "$set": {"daily_awards.last_crystal_date": today}
@@ -583,9 +540,6 @@ async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> in
     return 0
 
 async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Entrega 1 Ticket de Defesa do Reino diariamente e avisa com estilo RPG.
-    """
     today = _today_str() 
     granted = 0
     
@@ -601,31 +555,28 @@ async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
         try:
             daily = pdata.get("daily_awards") or {}
             
-            # Se já recebeu hoje, pula
             if daily.get("last_kingdom_ticket_date") == today: 
                 continue
             
-            if players_col is not None:
-                players_col.update_one(
-                    {"_id": user_id},
+            col, query_id = get_col_and_id(user_id)
+            
+            if col is not None:
+                col.update_one(
+                    {"_id": query_id},
                     {
                         "$inc": {"inventory.ticket_defesa_reino": 1},
                         "$set": {"daily_awards.last_kingdom_ticket_date": today}
                     }
                 )
                 
-                # --- [IMPORTANTE] LIMPEZA DE CACHE ADICIONADA AQUI ---
-                # Sem isso, o item não aparece na hora!
                 try:
                     if hasattr(player_manager, "clear_player_cache"):
                         res = player_manager.clear_player_cache(user_id)
                         if asyncio.iscoroutine(res): await res
                 except Exception: pass
-                # -----------------------------------------------------
 
                 granted += 1
                 
-                # --- NOTIFICAÇÃO AO JOGADOR ---
                 try:
                     await context.bot.send_message(
                         chat_id=user_id, 
@@ -639,3 +590,7 @@ async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
             pass
             
     return granted
+
+async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Wrapper para forçar a entrega de cristais diários via admin."""
+    return await daily_crystal_grant_job(context)

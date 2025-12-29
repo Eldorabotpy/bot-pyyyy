@@ -12,7 +12,7 @@ from telegram.ext import (
     filters,
     CommandHandler,
 )
-
+from handlers.admin.utils import parse_hybrid_id
 from modules import player_manager
 
 logger = logging.getLogger(__name__)
@@ -48,29 +48,27 @@ def _reset_prof_one(p: dict) -> None:
 async def _resolve_user_id(text: str) -> int | None:
     text = (text or "").strip()
     
-    # 1. Se for ID numérico, converte e retorna
-    if text.isdigit(): 
-        return int(text)
+    # --- CORREÇÃO HÍBRIDA ---
+    # Usa o parser para aceitar Int ou ObjectId
+    parsed_id = parse_hybrid_id(text)
+    if parsed_id:
+        return parsed_id
+    # ------------------------
     
-    # 2. Se for texto, tenta buscar pelo nome usando a função que vimos no seu arquivo
+    # 2. Se for texto, tenta buscar pelo nome
     try:
-        # Tenta buscar exato primeiro
         found = await player_manager.find_player_by_name(text)
         
-        # Se não achar, tenta buscar normalizado (minúsculas, sem acento) se existir
         if not found and hasattr(player_manager, 'find_player_by_name_norm'):
             found = await player_manager.find_player_by_name_norm(text)
             
         if found:
-            # A função retorna (id, data), queremos só o ID (índice 0)
             return found[0] 
             
     except Exception as e:
         logger.error(f"Erro ao buscar jogador '{text}': {e}")
         
     return None
-
-# --- Funções da Conversa ---
 
 # Ponto de Entrada: Mostra o menu principal de reset
 async def _entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

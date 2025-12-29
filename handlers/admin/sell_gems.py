@@ -9,7 +9,7 @@ from telegram.ext import (
     ContextTypes, CallbackQueryHandler, ConversationHandler, 
     MessageHandler, filters, CommandHandler
 )
-
+from bson import ObjectId
 from modules.player.core import players_collection, get_player_data, save_player_data
 from modules.player.inventory import add_gems
 from handlers.admin.utils import ensure_admin
@@ -22,14 +22,16 @@ def _blocking_search(term: str):
     if players_collection is None: return None
     try:
         term = str(term).strip()
-        # 1. ID
+        
+        # 1. ID Numérico (Legado)
         if term.isdigit():
             doc = players_collection.find_one({"_id": int(term)})
             if doc: return doc["_id"]
 
-        # 2. Nome Exato
-        doc = players_collection.find_one({"character_name": term})
-        if doc: return doc["_id"]
+        # 2. ID ObjectId (Novo) - ADICIONAR ISSO
+        if ObjectId.is_valid(term):
+            doc = players_collection.find_one({"_id": ObjectId(term)})
+            if doc: return doc["_id"]
 
         # 3. Regex (Haküro)
         safe = re.escape(term)

@@ -67,6 +67,16 @@ async def _smart_edit_message(query, text, reply_markup):
 # FORMATADORES
 # ============================================================================
 
+def _get_boss_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Retorna o ID correto do jogador:
+    1. Se estiver logado (sessão híbrida), retorna o ObjectId (str).
+    2. Se não, retorna o ID do Telegram (int).
+    """
+    if context.user_data and "logged_player_id" in context.user_data:
+        return context.user_data["logged_player_id"]
+    return update.effective_user.id
+
 def _format_log_line(text):
     return f"• {text}"
 
@@ -279,7 +289,7 @@ async def wb_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ FIX: Responde imediatamente para parar o carregamento
     await query.answer() 
     
-    user_id = query.from_user.id
+    user_id = _get_boss_user_id(update, context)
     pdata = await player_manager.get_player_data(user_id)
     
     status = await world_boss_manager.add_player_to_event(user_id, pdata)
@@ -292,7 +302,7 @@ async def wb_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def wb_target_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_boss_user_id(update, context)
     
     if user_id not in world_boss_manager.active_fighters:
         await query.answer("𝑽𝒐𝒄𝒆̂ 𝒔𝒂𝒊𝒖 𝒅𝒂 𝒍𝒖𝒕𝒂.", show_alert=True)
@@ -317,7 +327,7 @@ async def wb_target_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_boss_user_id(update, context)
     
     pdata = await player_manager.get_player_data(user_id)
     stats = await player_manager.get_player_total_stats(pdata)
@@ -360,7 +370,7 @@ async def wb_fight_screen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
-    user_id = query.from_user.id
+    user_id = _get_boss_user_id(update, context)
     
     if data.startswith("wb_set_target:"):
         target = data.split(":")[1]
@@ -427,7 +437,7 @@ async def wb_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def wb_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_boss_user_id(update, context)
     pdata = await player_manager.get_player_data(user_id)
     equipped = pdata.get("equipped_skills", [])
     kb = []
@@ -454,7 +464,7 @@ async def wb_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def wb_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_boss_user_id(update, context)
     pdata = await player_manager.get_player_data(user_id)
     inventory = pdata.get("inventory", {})
     
@@ -477,7 +487,7 @@ async def wb_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def wb_use_potion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_boss_user_id(update, context)
     data = query.data
     
     try:

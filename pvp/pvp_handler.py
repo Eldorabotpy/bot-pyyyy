@@ -20,6 +20,10 @@ from .pvp_config import ARENA_MODIFIERS, MONTHLY_RANKING_REWARDS
 from . import pvp_battle
 from . import pvp_config
 from . import pvp_utils
+# ✅ IMPORTAÇÃO DO SISTEMA DE TORNEIO
+from . import tournament_system
+# import do terneio
+from . import tournament_system
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +54,28 @@ async def aplicar_resultado_pvp_seguro(user_id, pontos_delta, ouro_delta=0):
     except Exception as e:
         logger.error(f"Erro ao salvar PvP seguro para {user_id}: {e}")
         return False
+
+# =============================================================================
+# HANDLERS DO TORNEIO (NOVOS)
+# =============================================================================
+
+async def torneio_signup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Botão de inscrição no torneio."""
+    query = update.callback_query
+    success, msg = await tournament_system.registrar_jogador(query.from_user.id)
+    await query.answer(msg, show_alert=True)
+    
+    # Recarrega o menu para atualizar o botão para "Inscrito"
+    if success:
+        await pvp_menu_command(update, context)
+
+async def torneio_ready_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Botão de 'Estou Pronto' na hora da luta."""
+    query = update.callback_query
+    msg = await tournament_system.confirmar_prontidao(query.from_user.id, context)
+    await query.answer(msg, show_alert=True)
+    # Recarrega menu
+    await pvp_menu_command(update, context)
 
 # =============================================================================
 # HANDLERS
@@ -369,12 +395,42 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Escolha seu caminho, campeão:"
         )
 
+        # --- BOTÕES PADRÃO ---
         keyboard = [
             [InlineKeyboardButton("⚔️ Procurar Oponente (Ranqueado)", callback_data=PVP_PROCURAR_OPONENTE)],
             [InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
              InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO)],
             [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")],
         ]
+
+        # ====================================================
+        # 👇 INTEGRAÇÃO COM O TORNEIO (CÓDIGO NOVO) 👇
+        # ====================================================
+        try:
+            t_data = tournament_system.get_tournament_data()
+            status = t_data.get("status")
+            
+            # 1. Fase de Inscrição
+            if status == "registration":
+                # Verifica se já está inscrito
+                participantes = t_data.get("participants", [])
+                if user_id in participantes:
+                    # Botão informativo (sem ação)
+                    keyboard.insert(0, [InlineKeyboardButton("✅ Inscrito no Torneio", callback_data="noop")])
+                else:
+                    # Botão de ação
+                    keyboard.insert(0, [InlineKeyboardButton("✍️ Inscrever-se no Torneio", callback_data="torneio_signup")])
+            
+            # 2. Fase de Luta Ativa (Botão de Pronto)
+            elif status == "active":
+                match_state = tournament_system.CURRENT_MATCH_STATE
+                # Só mostra o botão se houver luta ativa E o usuário for um dos lutadores
+                if match_state["active"] and user_id in [match_state["p1"], match_state["p2"]]:
+                    keyboard.insert(0, [InlineKeyboardButton("🔥 ⚔️ ESTOU PRONTO! ⚔️ 🔥", callback_data="torneio_ready")])
+        except Exception as e:
+            logger.error(f"Erro ao integrar torneio no menu: {e}")
+        # ====================================================
+
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if update.callback_query:
@@ -393,6 +449,21 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e_geral:
         logger.error(f"Erro pvp_menu: {e_geral}")
 
+async def torneio_signup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    success, msg = await tournament_system.registrar_jogador(query.from_user.id)
+    await query.answer(msg, show_alert=True)
+    if success:
+        # Atualiza o menu para mostrar "Inscrito"
+        await pvp_menu_command(update, context)
+
+async def torneio_ready_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    msg = await tournament_system.confirmar_prontidao(query.from_user.id, context)
+    await query.answer(msg, show_alert=True)
+    # Atualiza o menu
+    await pvp_menu_command(update, context)
+
 async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Ação registrada.")
@@ -405,4 +476,7 @@ def pvp_handlers() -> list:
         CallbackQueryHandler(ranking_callback, pattern=f'^{PVP_RANKING}$'),
         CallbackQueryHandler(historico_callback, pattern=f'^{PVP_HISTORICO}$'),
         CallbackQueryHandler(pvp_battle_action_callback, pattern=r'^pvp_battle_attack$'),
+        # ✅ Handlers do Torneio (Novos)
+        CallbackQueryHandler(torneio_signup_callback, pattern=r'^torneio_signup$'),
+        CallbackQueryHandler(torneio_ready_callback, pattern=r'^torneio_ready$'),
     ]

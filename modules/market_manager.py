@@ -355,3 +355,65 @@ def render_listing_line(
     
     if include_id: suffix += f" (#{lid})"
     return f"{prefix}{core}{suffix}{reserved_suf}"
+
+async def cancel_listing(listing_id: int) -> bool:
+    """
+    Cancela um anúncio e DEVOLVE os itens restantes ao vendedor.
+    """
+    # 1. Import local para evitar ciclo
+    from modules.player import inventory as inv_module
+
+    # 2. Busca o anúncio
+    listing = get_listing(listing_id)
+    if not listing:
+        raise ListingNotFound("Anúncio não encontrado.")
+    
+    if not listing.get("active"):
+        raise ListingInactive("Este anúncio já foi finalizado ou cancelado.")
+
+    seller_id = int(listing["seller_id"])
+    quantity_left = int(listing.get("quantity", 0))
+
+    # Se não sobrou nada (bug visual?), apenas desativa e retorna
+    if quantity_left <= 0:
+        market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
+        return True
+
+    # 3. Carrega o vendedor
+    seller_data = await player_manager.get_player_data(seller_id)
+    if not seller_data:
+        raise MarketError("Vendedor não encontrado para devolução.")
+
+    item_payload = listing.get("item", {})
+    item_type = item_payload.get("type")
+    
+    # 4. Lógica de Devolução
+    items_refunded_count = 0
+
+    if item_type == "stack":
+        # Devolve pilhas de itens (ex: 5 lotes de 10 ferros = 50 ferros)
+        base_id = item_payload.get("base_id")
+        stack_size = int(item_payload.get("qty", 1))
+        total_to_give = quantity_left * stack_size
+        
+        inv_module.add_item_to_inventory(seller_data, base_id, total_to_give)
+        items_refunded_count = total_to_give
+
+    elif item_type == "unique":
+        # Devolve itens únicos (recria o item com os dados originais salvos no payload)
+        # O payload tem: {'type': 'unique', 'item': {...dados...}, 'uid': ...}
+        base_item_data = item_payload.get("item", {}).copy()
+        
+        # Como é um item único, se sobrar mais de 1 (raro, mas possível na lógica), devolve todos
+        for _ in range(quantity_left):
+            inv_module.add_unique_item(seller_data, base_item_data)
+        items_refunded_count = quantity_left
+
+    # 5. Salva o Jogador (Com os itens de volta)
+    await player_manager.save_player_data(seller_id, seller_data)
+
+    # 6. Desativa o Anúncio no Banco
+    market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
+    
+    log.info(f"♻️ [MARKET] Anúncio #{listing_id} cancelado. {items_refunded_count} itens devolvidos para {seller_id}.")
+    return listing

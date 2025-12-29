@@ -17,6 +17,13 @@ from modules.cooldowns import verificar_cooldown
 
 logger = logging.getLogger(__name__)
 
+
+# 🛠️ HELPER
+def _get_combat_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data and "logged_player_id" in context.user_data:
+        return context.user_data["logged_player_id"]
+    return update.callback_query.from_user.id
+
 async def _safe_answer(query):
     """Helper para responder callbacks sem gerar erro se já foi respondido."""
     if not query: return
@@ -30,7 +37,7 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
     """
     query = update.callback_query
     await _safe_answer(query)
-    user_id = query.from_user.id
+    user_id = _get_combat_user_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
 
@@ -87,7 +94,7 @@ async def combat_skill_menu_callback(update: Update, context: ContextTypes.DEFAU
 async def combat_skill_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try:
-        user_id = query.from_user.id
+        user_id = _get_combat_user_id(update, context)
         player_data = await player_manager.get_player_data(user_id)
         skill_id = query.data.split(':', 1)[1]
         
@@ -119,7 +126,7 @@ async def combat_use_skill_callback(update: Update, context: ContextTypes.DEFAUL
     Processa a tentativa de uso da skill.
     """
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_combat_user_id(update, context)
 
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return

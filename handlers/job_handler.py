@@ -1,9 +1,8 @@
 # handlers/job_handler.py
-# (VERSÃO REFATORADA: Compatível com JobQueue E Recovery System)
+# (VERSÃO REFATORADA FINAL: Lógica de Coleta com Auto-Correção de Itens)
 
 import random
 import logging
-import math
 from typing import Any
 from telegram.error import Forbidden
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -37,20 +36,18 @@ async def execute_collection_logic(
     context: ContextTypes.DEFAULT_TYPE,
     message_id_to_delete: int = None
 ):
-    # --- [INÍCIO DA CORREÇÃO] ADICIONE ISTO AQUI ---
-    # Mapa de correção forçada (ID Antigo -> ID Novo)
+    # --- AUTO-CORREÇÃO DE IDs (Compatibilidade Legado) ---
     FIX_IDS = {
-        "minerio_ferro": "minerio_de_ferro",  # Converte o antigo pro novo
-        "iron_ore": "minerio_de_ferro",       # Caso tenha sobrado algo em inglês
-        # Adicione outros se precisar
+        "minerio_ferro": "minerio_de_ferro",
+        "iron_ore": "minerio_de_ferro",
+        "pedra_ferro": "minerio_de_ferro",
+        "minerio_estanho": "minerio_de_estanho",
+        "tin_ore": "minerio_de_estanho",
+        "madeira_rara_bruta": "madeira_rara"
     }
     
-    # Se o ID que chegou for um dos antigos, trocamos pelo novo imediatamente
-    if resource_id in FIX_IDS: 
-        resource_id = FIX_IDS[resource_id]
-    
-    if item_id_yielded in FIX_IDS: 
-        item_id_yielded = FIX_IDS[item_id_yielded]
+    if resource_id in FIX_IDS: resource_id = FIX_IDS[resource_id]
+    if item_id_yielded in FIX_IDS: item_id_yielded = FIX_IDS[item_id_yielded]
         
     """
     Executa a matemática da coleta, entrega itens e notifica.
@@ -69,11 +66,9 @@ async def execute_collection_logic(
         try: await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
         except: pass
 
-    # 3. Validações de Dados
-    if not resource_id:
-        return # Dados inválidos, aborta silenciosamente para não spammar erro
+    if not resource_id: return 
 
-    # --- CÁLCULOS (Mantendo sua lógica original) ---
+    # --- CÁLCULOS ---
     prof = player_data.get('profession', {}) or {}
     prof_level = _int(prof.get('level', 1), 1)
     
@@ -97,11 +92,8 @@ async def execute_collection_logic(
 
     # --- ATUALIZA MISSÕES ---
     try:
-        # Tenta atualizar missões de coleta
         if mission_manager:
             await mission_manager.update_mission_progress(user_id, 'collect', final_item_id, quantidade_final)
-            # Mantendo suporte ao seu formato antigo 'GATHER' se necessário
-            # mission_manager.update_mission_progress(player_data, 'GATHER', details={'item_id': final_item_id, 'quantity': quantidade_final})
     except Exception: pass
 
     # --- XP DE PROFISSÃO ---
@@ -109,24 +101,16 @@ async def execute_collection_logic(
     level_up_text = ""
     required_profession = game_data.get_profession_for_resource(resource_id)
     
-    # Só ganha XP se tiver a profissão certa
     if prof.get('type') == required_profession:
-        # XP Base: 3 * Quantidade (sem critico na base, mas a sua lógica multiplicava a base)
-        # Sua lógica: xp_base = quantidade_base * 3. Se critico, xp * 2.
-        
-        # Vamos replicar exato:
         xp_base_unit = 3
-        base_calc = (1 + prof_level) * xp_base_unit # Base sem o critico de quantidade
+        base_calc = (1 + prof_level) * xp_base_unit
         
         premium = PremiumManager(player_data)
         xp_mult = _clamp_float(premium.get_perk_value('gather_xp_multiplier', 1.0), 1.0, 5.0, 1.0)
         
         xp_ganho = int(base_calc * xp_mult)
+        if is_crit: xp_ganho *= 2
         
-        if is_crit: 
-            xp_ganho *= 2 # Dobra XP no critico também
-        
-        # Aplica XP
         prof['xp'] = _int(prof.get('xp', 0)) + xp_ganho
         
         # Level Up Loop
@@ -135,7 +119,6 @@ async def execute_collection_logic(
             try: 
                 xp_need = int(game_data.get_xp_for_next_collection_level(cur_level))
             except: 
-                # Fallback de segurança se game_data falhar
                 xp_need = int(100 * (cur_level ** 1.5))
             
             if xp_need <= 0 or prof['xp'] < xp_need: 
@@ -156,7 +139,6 @@ async def execute_collection_logic(
         rare_cfg = region_info.get("rare_resource")
         
         if isinstance(rare_cfg, dict) and rare_cfg.get("key"):
-            # Chance: 1% base + Sorte/2000
             chance = 0.01 + (luck_stat / 2000.0)
             if random.random() < chance:
                 rare_key = rare_cfg["key"]
@@ -183,7 +165,6 @@ async def execute_collection_logic(
         f"{level_up_text}"
     )
 
-    # Mídia
     media_key = item_info.get("media_key") or "coleta_sucesso"
     file_data = file_ids.get_file_data(media_key)
     
@@ -205,9 +186,8 @@ async def execute_collection_logic(
     except Exception as e:
         logger.warning(f"Erro ao enviar msg final coleta {user_id}: {e}")
 
-
 # ==============================================================================
-# 2. O WRAPPER DO TELEGRAM (Mantém compatibilidade com JobQueue)
+# 2. O WRAPPER DO TELEGRAM
 # ==============================================================================
 async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -218,14 +198,11 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
 
     job_data = job.data or {}
     
-    # Extrai dados do job
     user_id = job_data.get('user_id') or job.user_id
     chat_id = job_data.get('chat_id') or job.chat_id
     
-    # Busca message_id para apagar a msg de "Trabalhando..." se existir
     msg_id = job_data.get('message_id')
     if not msg_id:
-        # Tenta buscar do player_data se não vier no job (fallback)
         try:
             pdata = await player_manager.get_player_data(user_id)
             if pdata:

@@ -1,5 +1,5 @@
 # modules/auto_hunt_engine.py
-# (VERSÃO ROBUSTA: Preparada para Recovery System + Anti-Deadlock)
+# (VERSÃO ROBUSTA: Preparada para Recovery System + Anti-Deadlock + Fix Chat Not Found)
 
 import random
 import asyncio
@@ -7,7 +7,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from telegram.ext import ContextTypes
 from collections import Counter
-from telegram.error import Forbidden
+# ✅ ADICIONADO: BadRequest para tratar 'Chat not found'
+from telegram.error import Forbidden, BadRequest
 
 from telegram import (
     InlineKeyboardMarkup, InlineKeyboardButton, Update,
@@ -109,7 +110,9 @@ async def execute_hunt_completion(
         # Se não houver monstros, libera o jogador
         player_data['player_state'] = {'action': 'idle'}
         await player_manager.save_player_data(user_id, player_data)
-        await context.bot.send_message(chat_id, f"⚠️ Erro: Região '{region_key}' sem monstros.")
+        try:
+            await context.bot.send_message(chat_id, f"⚠️ Erro: Região '{region_key}' sem monstros.")
+        except: pass
         return
 
     # --- Simulação em Lote ---
@@ -152,7 +155,6 @@ async def execute_hunt_completion(
         logger.error(f"[AutoHunt] CRASH na simulação ({user_id}): {e}", exc_info=True)
         player_data['player_state'] = {'action': 'idle'}
         await player_manager.save_player_data(user_id, player_data)
-        await context.bot.send_message(chat_id, "⚠️ Erro crítico na simulação.")
         return 
 
     # --- Aplica Recompensas ---
@@ -177,13 +179,13 @@ async def execute_hunt_completion(
     except Exception as e:
         logger.error(f"[AutoHunt] Erro missões: {e}")
 
-    # --- Finalização ---
+    # --- Finalização (SALVA NO BANCO) ---
     _, _, level_up_msg = player_manager.check_and_apply_level_up(player_data)
     
     player_data['player_state'] = {'action': 'idle'}
     await player_manager.save_player_data(user_id, player_data)
 
-    # --- Mensagem Final ---
+    # --- Mensagem Final (ENVIO VISUAL) ---
     reg_name = region_data.get('display_name', region_key.title())
     
     summary_msg = [
@@ -234,15 +236,17 @@ async def execute_hunt_completion(
                 caption=final_caption, parse_mode="HTML", reply_markup=reply_markup
             )
 
-    except Forbidden:
-        logger.warning(f"[AutoHunt] Usuário {user_id} bloqueou o bot. Recompensa entregue, mas notificação falhou.")
-        # Não faz nada, pois o jogador já recebeu os itens/XP no banco de dados.
+    except (Forbidden, BadRequest) as e:
+        # 🔴 BLINDAGEM: Se o usuário bloqueou ou chat sumiu, apenas loga e segue a vida
+        logger.warning(f"[AutoHunt] Falha de notificação para {user_id} (Bloqueio/Chat Inválido): {e}")
+        # O jogador já recebeu os itens/XP no save_player_data acima, então consideramos sucesso.
+        
     except Exception as e:
-        logger.error(f"[AutoHunt] Erro visual para {user_id}: {e}")
+        logger.error(f"[AutoHunt] Erro visual desconhecido para {user_id}: {e}")
         # Fallback se edição falhar (ex: mensagem muito antiga)
         try:
             await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
-        except Forbidden:
+        except (Forbidden, BadRequest):
             pass # Ignora bloqueio no fallback também
 
 # ==========================================
@@ -375,3 +379,4 @@ async def start_auto_hunt(
     except Exception as e:
         logger.error(f"[AutoHunt] ERRO DE INICIALIZAÇÃO ({user_id}): {e}", exc_info=True)
         await query.answer("Erro ao iniciar. Admin notificado.", show_alert=True)
+        
