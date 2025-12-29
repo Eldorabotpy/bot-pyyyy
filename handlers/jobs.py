@@ -612,3 +612,60 @@ async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
 async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
     """Wrapper para forçar a entrega de cristais diários via admin."""
     return await daily_crystal_grant_job(context)
+
+async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Job periódico: Verifica assinaturas vencidas, remove o status e notifica o usuário.
+    """
+    from modules.player.premium import PremiumManager
+    
+    count_downgraded = 0
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    # Itera sobre todos os jogadores
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            # Pula quem já é Free
+            current_tier = pdata.get("premium_tier")
+            if not current_tier or current_tier == "free":
+                continue
+
+            # Instancia o gerenciador
+            pm = PremiumManager(pdata)
+            
+            # Se NÃO for premium (porque a data venceu), mas o tier no banco ainda diz que é...
+            # (A função pm.is_premium() já faz a checagem matemática da data)
+            if not pm.is_premium():
+                # 1. Pega a data de expiração para ter certeza que não é permanente
+                exp_date = pm.expiration_date
+                
+                # Só remove se tiver uma data de validade definida (não remove permanentes)
+                if exp_date is not None and exp_date < now:
+                    
+                    # 2. Revoga o status (Limpa os campos no dicionário)
+                    pm.revoke()
+                    
+                    # 3. Salva no Banco de Dados
+                    await player_manager.save_player_data(user_id, pdata)
+                    
+                    # 4. Notifica o Jogador
+                    try:
+                        msg = (
+                            "⚠️ <b>ASSINATURA EXPIRADA</b>\n\n"
+                            f"O seu plano <b>{current_tier.title()}</b> chegou ao fim.\n"
+                            "Sua conta retornou para o status <b>Free</b>.\n\n"
+                            "💎 <i>Renove no menu Premium para recuperar seus benefícios!</i>"
+                        )
+                        await context.bot.send_message(chat_id=user_id, text=msg, parse_mode="HTML")
+                    except Exception:
+                        pass # Usuário bloqueou o bot ou erro de rede
+                        
+                    count_downgraded += 1
+                    
+        except Exception as e:
+            logger.error(f"Erro ao verificar validade premium para {user_id}: {e}")
+            continue
+
+    if count_downgraded > 0:
+        logger.info(f"[JOB PREMIUM] {count_downgraded} assinaturas vencidas foram removidas.")
+        

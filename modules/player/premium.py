@@ -113,10 +113,14 @@ class PremiumManager:
             logging.getLogger(__name__).exception("Falha ao aplicar bônus de energia em grant_days")
 
     def revoke(self) -> None:
-        """Revoga o premium (remove tier e expiração)."""
-        # Preferimos remover as chaves em vez de setar None para evitar ambiguidade
-        self.player_data.pop('premium_tier', None)
-        self.player_data.pop('premium_expires_at', None)
+        """
+        Remove o VIP e define o plano como 'free'.
+        """
+        # Define explicitamente como 'free' para carregar os perks padrão
+        self.player_data['premium_tier'] = 'free'
+        
+        # Remove a data de validade (pois 'free' é permanente/padrão)
+        self.player_data['premium_expires_at'] = None
 
     def get_perks(self) -> Dict[str, Any]:
         """

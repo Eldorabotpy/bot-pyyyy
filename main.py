@@ -53,7 +53,8 @@ from handlers.jobs import (
     start_kingdom_defense_event,
     start_world_boss_job,
     end_world_boss_job,
-    job_pvp_monthly_reset
+    job_pvp_monthly_reset,
+    check_premium_expiry_job
 )
 
 try:
@@ -126,7 +127,7 @@ async def post_init_tasks(application: Application):
 
     # (Jobs mantidos do seu código original)
     jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
-    
+    jq.run_repeating(check_premium_expiry_job, interval=3600, first=60, name="premium_checker")
     if EVENT_TIMES:
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
             try:
