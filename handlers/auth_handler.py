@@ -173,7 +173,18 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def btn_login_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("👤 Digite seu 𝐔𝐒𝐔𝐀𝐑𝐈𝐎:")
+    
+    # CORREÇÃO: Deleta a imagem
+    try:
+        await query.delete_message()
+    except Exception:
+        pass
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="👤 Digite seu 𝗨𝗦𝗨𝗔𝗥𝗜𝗢:",
+        parse_mode="Markdown"
+    )
     return TYPING_USER_LOGIN
 
 async def receive_user_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -209,11 +220,24 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # 3. FLUXO DE REGISTRO
 # ==============================================================================
 async def start_register_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = "🆕 𝐍𝐨𝐯𝐚 𝐂𝐨𝐧𝐭𝐚\n\nEscolha um 𝐍𝐎𝐌𝐄 𝐃𝐄 𝐔𝐒𝐔𝐀𝐑𝐈𝐎 (Login) único:"
+    text = "🆕 **Nova Conta**\n\nEscolha um 𝗡𝗢𝗠𝗘 𝗗𝗘 𝗨𝗦𝗨𝗔𝗥𝗜𝗢  único:"
+    
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="Markdown")
+        await update.callback_query.answer()
+        # CORREÇÃO: Deleta a imagem se veio de botão
+        try:
+            await update.callback_query.delete_message()
+        except Exception:
+            pass
+        
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text,
+            parse_mode="Markdown"
+        )
     else:
         await update.message.reply_text(text, parse_mode="Markdown")
+        
     return TYPING_USER_REG
 
 async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -267,8 +291,17 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text(
-        "🔄 **MIGRAÇÃO DE CONTA**\n\n1️⃣ Digite o **USUÁRIO** que você quer usar:"
+    
+    # CORREÇÃO: Deleta a imagem antes de mandar o texto
+    try:
+        await query.delete_message()
+    except Exception:
+        pass # Se não der pra deletar, ignora
+        
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="🔄 **MIGRAÇÃO DE CONTA**\n\n1️⃣ Digite o **USUÁRIO** que você quer usar:",
+        parse_mode="Markdown"
     )
     return TYPING_USER_MIGRATE
 
