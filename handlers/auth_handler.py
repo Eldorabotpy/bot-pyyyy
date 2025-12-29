@@ -358,15 +358,59 @@ async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔒 Você saiu da sua conta.")
 
 # --- NOVA FUNÇÃO DE LOGOUT PARA O BOTÃO ---
+# Em handlers/auth_handler.py
+
 async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Realiza o logout, limpa a sessão e ENCERRA qualquer conversa ativa.
+    """
     query = update.callback_query
-    await query.answer()
     
-    # Limpa a sessão
+    # 1. Feedback visual rápido
+    try: await query.answer("👋 Saindo...")
+    except: pass
+    
+    # 2. Tenta apagar a mensagem do menu anterior (opcional, mas limpa a tela)
+    try: await query.delete_message()
+    except: pass
+    
+    # 3. Limpa os dados da sessão
     context.user_data.clear()
     
-    # Chama o menu de login novamente para mostrar as opções
-    await start_auth(update, context)
+    # 4. Chama a tela de Login novamente
+    # Nota: Não usamos 'await start_auth' direto aqui porque queremos que o handler
+    # de autenticação capture o 'estado' limpo na próxima interação.
+    # Em vez disso, mandamos a mensagem inicial manualmente.
+    
+    # Vamos usar a mesma lógica do start_auth para mostrar a imagem correta
+    # (Copie aqui as suas variáveis de imagem que estão lá em cima no arquivo)
+    IMG_LOGIN = "AgACAgEAAxkBAAEEhz9pUum4yP5jywLvsM-XaIHeG2-rfwACJAxrG_tYmUZ14kXfrtMVigEAAwIAA3kAAzYE"
+    
+    kb = [
+        [InlineKeyboardButton("🔐 𝔼ℕ𝕋ℝ𝔸ℝ", callback_data='btn_login')],
+        [InlineKeyboardButton("📝 𝕀𝕟𝕚𝕔𝕚𝕒𝕣 ℕ𝕠𝕧𝕒 𝕁𝕠𝕣𝕟𝕒𝕕𝕒", callback_data='btn_register')]
+    ]
+    
+    try:
+        await context.bot.send_photo(
+            chat_id=update.effective_chat.id,
+            photo=IMG_LOGIN,
+            caption="🔒 <b>Você desconectou.</b>\n\nPara voltar a Eldora, entre novamente.",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="HTML"
+        )
+    except Exception:
+        # Fallback se der erro na foto
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🔒 <b>Você desconectou.</b>\n\nUse /start para entrar novamente.",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="HTML"
+        )
+
+    # 5. O PASSO MAIS IMPORTANTE:
+    # Retorna END para dizer ao ConversationHandler do Jogo que acabou!
+    return ConversationHandler.END
 
 # ==============================================================================
 # CONFIGURAÇÃO DO HANDLER
@@ -393,5 +437,10 @@ auth_handler = ConversationHandler(
         TYPING_USER_MIGRATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_migrate)],
         TYPING_PASS_MIGRATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_migrate)],
     },
-    fallbacks=[CommandHandler('cancel', cancel)]
+    fallbacks=[
+        CommandHandler('cancel', cancel),
+        CommandHandler('logout', logout_command),
+        # Adicione esta linha para o botão funcionar mesmo se o jogador estiver digitando senha:
+        CallbackQueryHandler(logout_callback, pattern='^logout_btn$')
+    ]
 )
