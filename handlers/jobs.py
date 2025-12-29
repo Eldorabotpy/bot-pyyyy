@@ -99,13 +99,22 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
 
     async for user_id, pdata in player_manager.iter_players():
         try:
-            if pdata.get("last_pvp_entry_reset") == today: continue
+            # Verifica se já recebeu HOJE
+            last_reset = pdata.get("last_pvp_entry_reset")
+            if last_reset == today: 
+                continue
             
-            # Roteamento Híbrido
+            # --- CORREÇÃO: Força conversão e roteamento seguro ---
             col, query_id = get_col_and_id(user_id)
             
+            # Se falhar o roteamento automático, tenta converter ID numérico para int
+            if col is None and str(user_id).isdigit():
+                query_id = int(user_id)
+                col = players_col
+
             if col is not None:
-                col.update_one(
+                # Atualiza no Banco
+                result = col.update_one(
                     {"_id": query_id},
                     {
                         "$set": {
@@ -115,20 +124,29 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
                     }
                 )
                 
-                try:
-                    if hasattr(player_manager, "clear_player_cache"):
-                        res = player_manager.clear_player_cache(user_id)
-                        if asyncio.iscoroutine(res): await res
-                except: pass
-                
-                # Notificação (Comente se for spam)
-                try:
-                    await context.bot.send_message(chat_id=user_id, text=msg_reset, parse_mode='HTML')
-                    await asyncio.sleep(0.05)
-                except: pass
-                
-                count += 1
-        except Exception: pass
+                # Se atualizou no banco, limpa cache e notifica
+                if result.modified_count > 0 or result.matched_count > 0:
+                    try:
+                        if hasattr(player_manager, "clear_player_cache"):
+                            res = player_manager.clear_player_cache(user_id)
+                            if asyncio.iscoroutine(res): await res
+                    except: pass
+                    
+                    # Notificação ao Jogador
+                    try:
+                        await context.bot.send_message(chat_id=user_id, text=msg_reset, parse_mode='HTML')
+                        await asyncio.sleep(0.05) # Anti-flood leve
+                    except Exception as e:
+                        # Ignora erro de chat não encontrado (bot bloqueado)
+                        pass
+                    
+                    count += 1
+            else:
+                logger.warning(f"[JOB PvP] Não foi possível determinar coleção para user_id: {user_id}")
+
+        except Exception as e:
+            logger.error(f"[JOB PvP] Erro ao resetar usuário {user_id}: {e}")
+            continue
         
     logger.info(f"[JOB] PvP Resetado para {count} jogadores.")
 
