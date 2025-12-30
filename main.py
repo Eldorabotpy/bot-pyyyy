@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO: Boas-vindas Ativas + Bloqueio de Spam em Grupo)
+# (VERSÃO: BARREIRA TOTAL - Bloqueia Texto e Botões em Grupos)
 
 from __future__ import annotations
 import asyncio
@@ -12,7 +12,16 @@ from zoneinfo import ZoneInfo
 
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram.ext import (
+    Application, 
+    MessageHandler, 
+    filters, 
+    ContextTypes, 
+    CommandHandler, 
+    CallbackQueryHandler,
+    TypeHandler,          # <--- O SEGREDO: Para interceptar tudo
+    ApplicationHandlerStop # <--- O FREIO: Para parar o processamento
+)
 from telegram.constants import ChatType
 
 # Configuração de Path
@@ -33,19 +42,16 @@ from config import (
     STARTUP_IMAGE_ID
 )
 
-# --- NOVOS IMPORTS (SISTEMA DE AUTH) ---
+# --- IMPORTS DOS HANDLERS ---
 from handlers.auth_handler import auth_handler, logout_command, logout_callback
 from handlers.start_handler import start_command_handler
+from handlers.admin.file_id_conv import file_id_conv_handler
 
-# --- IMPORTS DOS REGISTROS (LEGADO) ---
 from registries import register_all_handlers
 from registries.class_evolution import register_evolution_handlers
 from registries.market import register_market_handlers
 
-# --- IMPORTAÇÃO DO GERENCIADOR DE ARQUIVOS (ADMIN) ---
-from handlers.admin.file_id_conv import file_id_conv_handler
-
-# --- JOBS ---
+# --- IMPORTS DOS JOBS ---
 from handlers.jobs import (
     daily_crystal_grant_job,
     start_kingdom_defense_event,
@@ -55,7 +61,6 @@ from handlers.jobs import (
     check_premium_expiry_job
 )
 
-# Job de Entradas PvP
 try:
     from handlers.jobs import daily_pvp_entry_reset_job
 except ImportError:
@@ -74,7 +79,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# SERVIDOR WEB (KEEP ALIVE - RENDER)
+# SERVIDOR WEB (KEEP ALIVE)
 # ==============================================================================
 app = Flask('')
 
@@ -93,47 +98,40 @@ def start_keep_alive():
 # TAREFAS DE INICIALIZAÇÃO
 # ==============================================================================
 async def post_init_tasks(application: Application):
-    
-    # 1. Limpeza de Boss Fantasma
     if world_boss_manager and world_boss_manager.is_active:
-        logger.warning("Detectado World Boss ativo de sessão anterior. Encerrando...")
-        world_boss_manager.end_event(reason="Reinício do Sistema")
+        logger.warning("Boss ativo detectado. Reiniciando status...")
+        world_boss_manager.end_event(reason="Reinício")
     
-    # 2. Notificação Admin
     if ADMIN_ID:
         try: 
-            msg_text = "🤖 <b>Sistema Online!</b>\n<i>Filtro de grupos ativo.</i>"
+            msg_text = "🤖 <b>Sistema Online!</b>\n🛡️ <i>Barreira de Grupos: ATIVADA</i>"
             if STARTUP_IMAGE_ID:
                 await application.bot.send_photo(chat_id=ADMIN_ID, photo=STARTUP_IMAGE_ID, caption=msg_text, parse_mode="HTML")
             else:
                 await application.bot.send_message(chat_id=ADMIN_ID, text=msg_text, parse_mode="HTML")
-        except Exception as e:
-            logger.warning(f"Msg Admin falhou: {e}")
+        except Exception: pass
     
-    # 3. Recuperação de Ações
+    # Recuperações e Watchdogs
     try:
         from modules.player.actions import check_stale_actions_on_startup
         await check_stale_actions_on_startup(application)
     except ImportError: pass
     
-    # 4. Recuperação de Caças
     try:
         from modules.recovery_manager import recover_active_hunts
         asyncio.create_task(recover_active_hunts(application))
     except ImportError: pass
     
-    # 5. Agendamento de Jobs
+    # Agendamento de Jobs
     jq = application.job_queue 
     try:
         tz = ZoneInfo(JOB_TIMEZONE)
     except Exception:
         tz = timezone.utc
 
-    # Agendamentos
     jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
     jq.run_repeating(check_premium_expiry_job, interval=3600, first=60, name="premium_checker")
     
-    # Reset Diário PvP (12:25)
     if daily_pvp_entry_reset_job:
         jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_daily_entry_reset")
 
@@ -159,66 +157,51 @@ async def post_init_tasks(application: Application):
         jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_monthly_check")
     except ImportError: pass
 
-    logging.info("Jobs agendados.")
+    logging.info("Jobs e Sistemas iniciados.")
 
 # ==============================================================================
-# FUNÇÃO: BOAS-VINDAS (Ativa para Novos Jogadores)
+# 1. BOAS-VINDAS (Permitido em Grupos)
 # ==============================================================================
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Dá boas-vindas visuais e convida a jogar no privado.
-    """
-    if not update.message.new_chat_members:
-        return
+    if not update.message.new_chat_members: return
 
-    # Imagem de Boas-vindas (Padrão ou Configurada)
     IMG_BOAS_VINDAS = STARTUP_IMAGE_ID if STARTUP_IMAGE_ID else "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE"
 
     for member in update.message.new_chat_members:
-        # Ignora bots
-        if member.id == context.bot.id:
-            continue
-            
+        if member.id == context.bot.id: continue
+        
         bot_username = context.bot.username
-        # Link especial que já abre o comando de criar conta
         deep_link = f"https://t.me/{bot_username}?start=criar_conta"
         
-        keyboard = [
-            [InlineKeyboardButton("⚔️ CRIAR PERSONAGEM ⚔️", url=deep_link)]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        # Texto chamativo mencionando o usuário
+        keyboard = [[InlineKeyboardButton("⚔️ CRIAR PERSONAGEM ⚔️", url=deep_link)]]
         caption_text = (
             f"🔔 <b>UM NOVO AVENTUREIRO CHEGOU!</b>\n\n"
             f"Seja bem-vindo(a), {member.mention_html()}!\n"
             f"Os portões de <b>Eldora</b> se abrem para você.\n\n"
-            "👇 <b>Toque no botão abaixo para começar sua jornada:</b>"
+            "👇 <b>Comece sua jornada no botão abaixo:</b>"
         )
         
         try:
-            await update.message.reply_photo(
-                photo=IMG_BOAS_VINDAS,
-                caption=caption_text,
-                reply_markup=reply_markup,
-                parse_mode="HTML"
-            )
-        except Exception:
-            # Fallback seguro (caso a imagem falhe)
-            await update.message.reply_text(
-                f"Bem-vindo {member.mention_html()}! Clique aqui para jogar: @{bot_username}",
-                parse_mode="HTML"
-            )
+            await update.message.reply_photo(photo=IMG_BOAS_VINDAS, caption=caption_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        except:
+            await update.message.reply_text(f"Bem-vindo {member.mention_html()}! Jogue aqui: @{bot_username}", parse_mode="HTML")
 
 # ==============================================================================
-# FUNÇÃO: SILENCIADOR DE GRUPO (O Segredo)
+# 2. A BARREIRA (TypeHandler)
 # ==============================================================================
-async def group_spam_silencer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Esta função intercepta mensagens em GRUPO de NÃO-ADMINS e não faz nada.
-    Isso impede que o bot responda a /start ou texto solto no chat geral.
+    Este middleware roda em TODAS as atualizações (Texto, Botão, Áudio, Edição).
+    Se for Grupo E não for Admin -> BLOQUEIA TUDO.
     """
-    return
+    if update.effective_chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        # Permite apenas o Admin (Você) usar o bot no grupo para manutenção
+        if update.effective_user.id == ADMIN_ID:
+            return # Deixa passar
+        
+        # Se chegou aqui, é usuário comum no grupo.
+        # BLOQUEIA A EXECUÇÃO DE QUALQUER OUTRO HANDLER ABAIXO
+        raise ApplicationHandlerStop
 
 # ==============================================================================
 # EXECUÇÃO PRINCIPAL
@@ -226,28 +209,27 @@ async def group_spam_silencer(update: Update, context: ContextTypes.DEFAULT_TYPE
 if __name__ == '__main__':
     try:
         start_keep_alive()
-        logging.info("Servidor Web iniciado.")
-    except Exception as e:
-        logging.warning(f"Erro no servidor Web: {e}")
+        logging.info("Web Server OK.")
+    except Exception: pass
 
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init_tasks).build()
     
-    # --- REGISTRO DE HANDLERS (A ORDEM É CRÍTICA) ---
+    # --- ORDEM DE HANDLERS (CRÍTICA) ---
 
-    # 1. Boas-vindas (TEM QUE SER O PRIMEIRO)
-    # Isso garante que a entrada de membros seja processada antes de qualquer bloqueio.
+    # 1. Boas-vindas (Isso precisa rodar antes do bloqueio, pois é permitido em grupo)
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
 
-    # 2. SILENCIADOR DE GRUPOS (A Barreira)
-    # Bloqueia: Grupos + Não é Admin + Não é Entrada de Membro
-    # Resultado: O bot ignora comandos de usuários comuns no chat geral.
-    application.add_handler(MessageHandler(
-        filters.ChatType.GROUPS & ~filters.User(ADMIN_ID) & ~filters.StatusUpdate.NEW_CHAT_MEMBERS, 
-        group_spam_silencer
-    ))
+    # 2. BLOQUEIO TOTAL DE GRUPOS
+    # O TypeHandler pega QUALQUER coisa (Update). 
+    # Se for grupo e não for admin, ele dá "Stop" e nada abaixo roda.
+    # Isso mata cliques em botões, comandos /menu, forwarding, tudo.
+    application.add_handler(TypeHandler(Update, master_group_blocker))
 
-    # 3. Autenticação e Comandos
-    # Só chegam aqui: Mensagens Privadas OU Mensagens do Admin no Grupo.
+    # --------------------------------------------------------------------------
+    # DAQUI PARA BAIXO, SÓ CHEGAM MENSAGENS PRIVADAS (OU DO ADMIN)
+    # --------------------------------------------------------------------------
+
+    # 3. Autenticação
     application.add_handler(auth_handler)
     application.add_handler(CommandHandler("logout", logout_command))
     application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
@@ -255,7 +237,7 @@ if __name__ == '__main__':
     # 4. Menu Principal
     application.add_handler(start_command_handler)
 
-    # 5. Ferramentas Admin
+    # 5. Admin / Ferramentas
     application.add_handler(file_id_conv_handler)
     
     # 6. Sistemas de Jogo
@@ -269,6 +251,5 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler("debug_reset", cmd_force_pvp_reset))
     except ImportError: pass
 
-    logging.info("Handlers registrados. Bot Blindado contra Spam.")
-
+    logging.info("Handlers registrados. Bot 100% BLINDADO contra spam de grupo.")
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
