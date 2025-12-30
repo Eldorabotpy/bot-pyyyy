@@ -1,5 +1,5 @@
 # handlers/auth_handler.py
-# (VERSÃO BLINDADA: Impede travamento de grupos e tópicos)
+# (VERSÃO 4.0: Visual Imersivo + Senha Auto-Deletável)
 
 import logging
 import hashlib
@@ -44,6 +44,11 @@ TYPING_PASS_MIGRATE = 7
 # --- CONSTANTES ---
 USERS_COLLECTION = db["users"] 
 
+# --- IMAGENS (IDs do Telegram) ---
+IMG_LOGIN = "AgACAgEAAxkBAAEEhz9pUum4yP5jywLvsM-XaIHeG2-rfwACJAxrG_tYmUZ14kXfrtMVigEAAwIAA3kAAzYE"
+IMG_MIGRACAO = "AgACAgEAAxkBAAEEhzZpUulnSfDAylISvmAqV6y4Zn7fogACIwxrG_tYmUaQ3V-IybVsVwEAAwIAA3kAAzYE"
+IMG_NOVO = "AgACAgEAAxkBAAEEhzZpUulnSfDAylISvmAqV6y4Zn7fogACIwxrG_tYmUaQ3V-IybVsVwEAAwIAA3kAAzYE"
+
 # ==============================================================================
 # FUNÇÕES AUXILIARES
 # ==============================================================================
@@ -65,9 +70,6 @@ async def _check_private(update: Update) -> bool:
 # ==============================================================================
 # 1. MENU INICIAL E COMANDO /START
 # ==============================================================================
-# ==============================================================================
-# 1. MENU INICIAL E COMANDO /START (CORRIGIDO)
-# ==============================================================================
 async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Se for em grupo, ignora totalmente
     if update.effective_chat.type != ChatType.PRIVATE:
@@ -77,8 +79,8 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 1. DEEP LINK (CRIAR CONTA)
     if context.args and context.args[0] == 'criar_conta':
-        await update.message.reply_text("👋 Bem-vindo ao Registro!\nVamos criar sua conta.")
-        return await start_register_flow(update, context)
+        await start_register_flow(update, context)
+        return TYPING_USER_REG
 
     # 2. CHECK SE JÁ ESTÁ LOGADO
     session_id = get_session_id(context)
@@ -95,10 +97,10 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if start_command:
                 await start_command(update, context)
             else:
-                # Removemos markdown aqui também para garantir
-                await update.message.reply_text(
-                    f"✅ Você já está logado como {user_doc.get('username')}!\n"
-                    "Use /menu para jogar."
+                await update.message.reply_photo(
+                    photo=IMG_LOGIN,
+                    caption=f"✅ Você já está logado como <b>{user_doc.get('username')}</b>!\nUse /menu para jogar.",
+                    parse_mode="HTML"
                 )
             return ConversationHandler.END
 
@@ -106,37 +108,30 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     old_account = players_col.find_one({"_id": user.id})
     already_migrated = USERS_COLLECTION.find_one({"telegram_id_owner": user.id})
 
-    # --- DEFINIÇÃO DAS IMAGENS ---
-    IMG_LOGIN = "AgACAgEAAxkBAAEEhz9pUum4yP5jywLvsM-XaIHeG2-rfwACJAxrG_tYmUZ14kXfrtMVigEAAwIAA3kAAzYE"
-    IMG_MIGRACAO = "AgACAgEAAxkBAAEEhzZpUulnSfDAylISvmAqV6y4Zn7fogACIwxrG_tYmUaQ3V-IybVsVwEAAwIAA3kAAzYE"
-    IMG_NOVO = "AgACAgEAAxkBAAEEhzZpUulnSfDAylISvmAqV6y4Zn7fogACIwxrG_tYmUaQ3V-IybVsVwEAAwIAA3kAAzYE"
-
     current_img = None
     caption_text = ""
     keyboard = []
 
     if already_migrated:
         current_img = IMG_LOGIN
-        # REMOVIDO os ** para evitar erro com nomes tipo "Joao_Silva"
-        caption_text = f"🛡️ Bem-vindo de volta, {user.first_name}!\nDetectamos sua conta Eldora."
+        caption_text = f"🛡️ <b>Bem-vindo de volta, {user.first_name}!</b>\nDetectamos sua conta Eldora."
         keyboard.append([InlineKeyboardButton("🔐 𝔼ℕ𝕋ℝ𝔸ℝ", callback_data='btn_login')])
         keyboard.append([InlineKeyboardButton("📝 𝕀𝕟𝕚𝕔𝕚𝕒𝕣 ℕ𝕠𝕧𝕒 𝕁𝕠𝕣𝕟𝕒𝕕𝕒", callback_data='btn_register')])
     elif old_account:
         current_img = IMG_MIGRACAO
         nome_heroi = old_account.get('character_name', 'Aventureiro')
         caption_text = (
-            "📜 𝐎 𝐆𝐑𝐈𝐌𝐎́𝐑𝐈𝐎 𝐅𝐎𝐈 𝐀𝐓𝐔𝐀𝐋𝐈𝐙𝐀𝐃𝐎!\n\n"
-            f"Saudações, nobre {nome_heroi}!\n\n" # Sem markdown aqui
-            "𝘖𝘴 𝘮𝘢𝘨𝘰𝘴 𝘥𝘰 𝘳𝘦𝘪𝘯𝘰 𝘳𝘦𝘯𝘰𝘷𝘢𝘳𝘢𝘮 𝘰𝘴 𝘢𝘯𝘵𝘪𝘨𝘰𝘴 𝘳𝘦𝘨𝘪𝘴𝘵𝘳𝘰𝘴 𝘥𝘦 𝘌𝘭𝘥𝘰𝘳𝘢. "
-            "𝘗𝘢𝘳𝘢 𝘨𝘢𝘳𝘢𝘯𝘵𝘪𝘳 𝘲𝘶𝘦 𝘴𝘶𝘢𝘴 𝘭𝘦𝘯𝘥𝘢𝘴, 𝘰𝘶𝘳𝘰𝘴 𝘦 𝘤𝘰𝘯𝘲𝘶𝘪𝘴𝘵𝘢𝘴 𝘯𝘢̃𝘰 𝘴𝘦 𝘱𝘦𝘳𝘤𝘢𝘮 𝘯𝘢𝘴 𝘢𝘳𝘦𝘪𝘢𝘴 𝘥𝘰 𝘵𝘦𝘮𝘱𝘰, "
-            "𝘦́ 𝘯𝘦𝘤𝘦𝘴𝘴𝘢́𝘳𝘪𝘰 𝐯𝐢𝐧𝐜𝐮𝐥𝐚𝐫 𝐬𝐮𝐚 𝐚𝐥𝐦𝐚 𝘢 𝘶𝘮 𝘯𝘰𝘷𝘰 𝘙𝘦𝘨𝘪𝘴𝘵𝘳𝘰 𝘔𝘢́𝘨𝘪𝘤𝘰.\n\n"
-            "𝘕𝘢̃𝘰 𝘵𝘦𝘮𝘢! 𝘛𝘰𝘥𝘰 𝘰 𝘴𝘦𝘶 𝘱𝘰𝘥𝘦𝘳 𝘦 𝘪𝘯𝘷𝘦𝘯𝘵𝘢́𝘳𝘪𝘰 𝘴𝘦𝘳𝘢̃𝘰 𝘱𝘳𝘦𝘴𝘦𝘳𝘷𝘢𝘥𝘰𝘴 𝘥𝘶𝘳𝘢𝘯𝘵𝘦 𝘰 𝘳𝘪𝘵𝘶𝘢𝘭."
+            "📜 <b>O GRIMÓRIO FOI ATUALIZADO!</b>\n\n"
+            f"Saudações, nobre {nome_heroi}!\n\n"
+            "Os magos do reino renovaram os antigos registros de Eldora. "
+            "Para garantir que suas lendas não se percam, vincule sua alma a um novo Registro Mágico.\n\n"
+            "<i>Todo o seu poder e inventário serão preservados.</i>"
         )
         keyboard.append([InlineKeyboardButton("✨ RESGATAR MEU LEGADO", callback_data='btn_migrate')])
         keyboard.append([InlineKeyboardButton("🆕 Iniciar Nova Jornada", callback_data='btn_register')])
     else:
         current_img = IMG_NOVO
-        caption_text = "⚔️ 𝗕𝗲𝗺-𝘃𝗶𝗻𝗱𝗼 𝗮𝗼 𝗠𝘂𝗻𝗱𝗼 𝗱𝗲 𝗘𝗹𝗱𝗼𝗿𝗮!\n\n𝗣𝗮𝗿𝗮 𝗷𝗼𝗴𝗮𝗿, 𝗲𝗻𝘁𝗿𝗲 𝗼𝘂 𝗰𝗿𝗶𝗲 𝘂𝗺𝗮 𝗰𝗼𝗻𝘁𝗮."
+        caption_text = "⚔️ <b>Bem-vindo ao Mundo de Eldora!</b>\n\nPara jogar, entre ou crie uma conta."
         keyboard.append([InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')])
         keyboard.append([InlineKeyboardButton("🔐 Já tenho conta", callback_data='btn_login')])
 
@@ -147,58 +142,64 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try: await update.callback_query.delete_message()
         except Exception: pass
             
-    # BLOCO DE ENVIO SEGURO (SEM PARSE_MODE)
     try:
         await context.bot.send_photo(
             chat_id=update.effective_chat.id,
             photo=current_img,
             caption=caption_text,
-            reply_markup=reply_markup
-            # parse_mode REMOVIDO para evitar crash
+            reply_markup=reply_markup,
+            parse_mode="HTML"
         )
-    except Exception as e:
-        logger.error(f"Erro ao enviar foto no auth: {e}")
-        # Fallback seguro
+    except Exception:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=caption_text,
-            reply_markup=reply_markup
-            # parse_mode REMOVIDO para evitar crash
+            reply_markup=reply_markup,
+            parse_mode="HTML"
         )
 
     return CHOOSING_ACTION
 
 # ==============================================================================
-# 2. FLUXO DE LOGIN
+# 2. FLUXO DE LOGIN (VISUAL + SEGURO)
 # ==============================================================================
 async def btn_login_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _check_private(update): return ConversationHandler.END # <--- TRAVA DE GRUPO
+    if not await _check_private(update): return ConversationHandler.END
 
     query = update.callback_query
     await query.answer()
-    
     try: await query.delete_message()
     except Exception: pass
 
-    await context.bot.send_message(
+    await context.bot.send_photo(
         chat_id=update.effective_chat.id,
-        text="👤 Digite seu 𝗨𝗦𝗨𝗔𝗥𝗜𝗢:",
-        parse_mode="Markdown"
+        photo=IMG_LOGIN,
+        caption="👤 <b>LOGIN:</b> Digite seu <b>USUÁRIO</b>:",
+        parse_mode="HTML"
     )
     return TYPING_USER_LOGIN
 
 async def receive_user_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Se cair aqui num grupo por erro, cancela imediatamente
     if update.effective_chat.type != ChatType.PRIVATE: return ConversationHandler.END
     
     context.user_data['auth_temp_user'] = update.message.text.strip().lower()
-    await update.message.reply_text("🔑 Agora digite sua 𝐒𝐄𝐍𝐇𝐀:")
+    
+    await update.message.reply_photo(
+        photo=IMG_LOGIN,
+        caption="🔑 <b>LOGIN:</b> Agora digite sua <b>SENHA</b>:",
+        parse_mode="HTML"
+    )
     return TYPING_PASS_LOGIN
 
 async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != ChatType.PRIVATE: return ConversationHandler.END
 
     password = update.message.text.strip()
+    
+    # 🔒 APAGA A MENSAGEM COM A SENHA IMEDIATAMENTE
+    try: await update.message.delete()
+    except Exception: pass
+    
     username = context.user_data.get('auth_temp_user')
     password_hash = hash_password(password)
 
@@ -208,8 +209,10 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data['logged_player_id'] = str(user_doc['_id'])
         context.user_data['logged_username'] = username
         
-        await update.message.reply_text(
-            f"🔓 𝕃𝕠𝕘𝕚𝕟 𝕣𝕖𝕒𝕝𝕚𝕫𝕒𝕕𝕠!\nBem-vindo, {user_doc.get('character_name', username)}!",
+        await update.message.reply_photo(
+            photo=IMG_LOGIN,
+            caption=f"🔓 <b>Login realizado!</b>\nBem-vindo, {user_doc.get('character_name', username)}!",
+            parse_mode="HTML",
             reply_markup=ReplyKeyboardRemove()
         )
         
@@ -218,25 +221,37 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
         return ConversationHandler.END
     else:
-        await update.message.reply_text("❌ Usuário ou senha incorretos.\nUse /start para tentar novamente.")
+        await update.message.reply_photo(
+            photo=IMG_LOGIN,
+            caption="❌ <b>Usuário ou senha incorretos.</b>\nUse /start para tentar novamente.",
+            parse_mode="HTML"
+        )
         return ConversationHandler.END
 
 # ==============================================================================
-# 3. FLUXO DE REGISTRO
+# 3. FLUXO DE REGISTRO (VISUAL + SEGURO)
 # ==============================================================================
 async def start_register_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _check_private(update): return ConversationHandler.END # <--- TRAVA DE GRUPO
+    msg = update.message if update.message else update.callback_query.message
+    if not await _check_private(update): return ConversationHandler.END
 
-    text = "🆕 **Nova Conta**\n\nEscolha um 𝗡𝗢𝗠𝗘 𝗗𝗘 𝗨𝗦𝗨𝗔𝗥𝗜𝗢  único:"
-    
     if update.callback_query:
         await update.callback_query.answer()
         try: await update.callback_query.delete_message()
         except Exception: pass
         
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode="Markdown")
+        await context.bot.send_photo(
+            chat_id=msg.chat_id, 
+            photo=IMG_NOVO,
+            caption="🆕 <b>NOVA CONTA</b>\n\nEscolha um <b>NOME DE USUÁRIO</b> único:",
+            parse_mode="HTML"
+        )
     else:
-        await update.message.reply_text(text, parse_mode="Markdown")
+        await update.message.reply_photo(
+            photo=IMG_NOVO,
+            caption="🆕 <b>NOVA CONTA</b>\n\nEscolha um <b>NOME DE USUÁRIO</b> único:",
+            parse_mode="HTML"
+        )
         
     return TYPING_USER_REG
 
@@ -246,21 +261,39 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.text.strip().lower()
     
     if len(username) < 4:
-        await update.message.reply_text("⚠️ O usuário deve ter pelo menos 4 letras. Tente outro:")
+        await update.message.reply_photo(
+            photo=IMG_NOVO,
+            caption="⚠️ O usuário deve ter pelo menos 4 letras. Tente outro:",
+            parse_mode="HTML"
+        )
         return TYPING_USER_REG
 
     if USERS_COLLECTION.find_one({"username": username}):
-        await update.message.reply_text("⚠️ Este usuário já existe. Escolha outro:")
+        await update.message.reply_photo(
+            photo=IMG_NOVO,
+            caption="⚠️ Este usuário já existe. Escolha outro:",
+            parse_mode="HTML"
+        )
         return TYPING_USER_REG
         
     context.user_data['reg_temp_user'] = username
-    await update.message.reply_text(f"✅ Usuário '{username}' disponível!\n\nAgora escolha uma **SENHA**:")
+    
+    await update.message.reply_photo(
+        photo=IMG_NOVO,
+        caption=f"✅ Usuário <b>{username}</b> disponível!\n\nAgora escolha uma <b>SENHA</b>:",
+        parse_mode="HTML"
+    )
     return TYPING_PASS_REG
 
 async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != ChatType.PRIVATE: return ConversationHandler.END
 
     password = update.message.text.strip()
+    
+    # 🔒 APAGA A MENSAGEM COM A SENHA IMEDIATAMENTE
+    try: await update.message.delete()
+    except Exception: pass
+    
     username = context.user_data['reg_temp_user']
     now_iso = datetime.now().isoformat()
     
@@ -281,7 +314,11 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = USERS_COLLECTION.insert_one(new_player_doc)
     context.user_data['logged_player_id'] = str(result.inserted_id)
     
-    await update.message.reply_text("🎉 **Conta Criada!**\nAbrindo menu...")
+    await update.message.reply_photo(
+        photo=IMG_NOVO,
+        caption="🎉 <b>Conta Criada com Sucesso!</b>\nAbrindo menu principal...",
+        parse_mode="HTML"
+    )
     
     if start_command:
         await start_command(update, context)
@@ -289,21 +326,21 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # ==============================================================================
-# 4. FLUXO DE MIGRAÇÃO
+# 4. FLUXO DE MIGRAÇÃO (VISUAL + SEGURO)
 # ==============================================================================
 async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _check_private(update): return ConversationHandler.END # <--- TRAVA DE GRUPO
+    if not await _check_private(update): return ConversationHandler.END
 
     query = update.callback_query
     await query.answer()
-    
     try: await query.delete_message()
     except Exception: pass
         
-    await context.bot.send_message(
+    await context.bot.send_photo(
         chat_id=update.effective_chat.id,
-        text="🔄 **MIGRAÇÃO DE CONTA**\n\n1️⃣ Digite o **USUÁRIO** que você quer usar:",
-        parse_mode="Markdown"
+        photo=IMG_MIGRACAO,
+        caption="🔄 <b>MIGRAÇÃO</b>\n\n1️⃣ Digite o <b>USUÁRIO</b> que você quer usar na nova conta:",
+        parse_mode="HTML"
     )
     return TYPING_USER_MIGRATE
 
@@ -312,17 +349,31 @@ async def receive_user_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
 
     username = update.message.text.strip().lower()
     if USERS_COLLECTION.find_one({"username": username}):
-        await update.message.reply_text("⚠️ Usuário em uso. Tente outro:")
+        await update.message.reply_photo(
+            photo=IMG_MIGRACAO,
+            caption="⚠️ Usuário em uso. Tente outro:",
+            parse_mode="HTML"
+        )
         return TYPING_USER_MIGRATE
     
     context.user_data['mig_temp_user'] = username
-    await update.message.reply_text("2️⃣ Agora escolha uma **SENHA** segura:")
+    
+    await update.message.reply_photo(
+        photo=IMG_MIGRACAO,
+        caption="2️⃣ Agora escolha uma <b>SENHA</b> segura:",
+        parse_mode="HTML"
+    )
     return TYPING_PASS_MIGRATE
 
 async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != ChatType.PRIVATE: return ConversationHandler.END
 
     password = update.message.text.strip()
+    
+    # 🔒 APAGA A MENSAGEM COM A SENHA IMEDIATAMENTE
+    try: await update.message.delete()
+    except Exception: pass
+    
     username = context.user_data['mig_temp_user']
     telegram_id = update.effective_user.id
     
@@ -346,7 +397,11 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data['logged_player_id'] = str(result.inserted_id)
     context.user_data['logged_username'] = username
     
-    await update.message.reply_text("✅ **Migração Concluída!**\nAbrindo menu...")
+    await update.message.reply_photo(
+        photo=IMG_MIGRACAO,
+        caption="✅ <b>Migração Concluída!</b>\nTodos os seus itens foram salvos.",
+        parse_mode="HTML"
+    )
     
     if start_command:
         await start_command(update, context)
@@ -371,8 +426,6 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     context.user_data.clear()
     
-    # IMPORTANTE: Manda mensagem com botão, MAS o auth_handler agora bloqueia cliques em grupo
-    IMG_LOGIN = "AgACAgEAAxkBAAEEhz9pUum4yP5jywLvsM-XaIHeG2-rfwACJAxrG_tYmUZ14kXfrtMVigEAAwIAA3kAAzYE"
     kb = [
         [InlineKeyboardButton("🔐 𝔼ℕ𝕋ℝ𝔸ℝ", callback_data='btn_login')],
         [InlineKeyboardButton("📝 𝕀𝕟𝕚𝕔𝕚𝕒𝕣 ℕ𝕠𝕧𝕒 𝕁𝕠𝕣𝕟𝕒𝕕𝕒", callback_data='btn_register')]
@@ -380,12 +433,17 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if update.effective_chat.type == ChatType.PRIVATE:
         try:
-            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=IMG_LOGIN, caption="🔒 <b>Você desconectou.</b>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id, 
+                photo=IMG_LOGIN, 
+                caption="🔒 <b>Você desconectou.</b>", 
+                reply_markup=InlineKeyboardMarkup(kb), 
+                parse_mode="HTML"
+            )
         except:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="🔒 <b>Você desconectou.</b>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            pass
     else:
-        # Se logout foi no grupo, avisa simples e não manda botões de login para evitar misclick
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="🔒 <b>Logout realizado.</b>\nPara entrar novamente, vá no privado do bot: @EldoraRPG_Bot")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="🔒 <b>Logout realizado.</b>")
 
     return ConversationHandler.END
 
