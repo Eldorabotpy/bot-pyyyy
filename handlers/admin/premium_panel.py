@@ -1,6 +1,4 @@
 # handlers/admin/premium_panel.py
-# (FORMATO ORIGINAL MANTIDO - CORREÇÃO DE SINCRONIA USERS/PLAYERS APLICADA)
-
 from __future__ import annotations
 import os
 import logging
@@ -36,7 +34,7 @@ logger = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0")) 
 
 # ==============================================================================
-# FUNÇÃO AUXILIAR: SINCRONIA (Adicionada para corrigir o bug do site)
+# FUNÇÃO AUXILIAR: SINCRONIA
 # ==============================================================================
 def _sync_users_collection(user_id, tier: str, expires_at: Optional[str]):
     """Replica a alteração de Premium na coleção 'users'."""
@@ -87,8 +85,7 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     
-    if update.effective_user.id != ADMIN_ID:
-        await query.edit_message_text("⛔ Acesso restrito.")
+    if not await ensure_admin(update):
         return ConversationHandler.END
 
     await query.edit_message_text(
@@ -135,7 +132,7 @@ async def _show_player_options(update: Update, context: ContextTypes.DEFAULT_TYP
     
     kb = [
         [
-            InlineKeyboardButton("🥇 PREMIUM", callback_data="prem_tier:gold"),
+            InlineKeyboardButton("🥇 GOLD", callback_data="prem_tier:gold"),
             InlineKeyboardButton("💎 VIP", callback_data="prem_tier:vip"),
             InlineKeyboardButton("🏆 LENDA", callback_data="prem_tier:lenda")
         ],
@@ -143,10 +140,6 @@ async def _show_player_options(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("+7 Dias", callback_data="prem_add:7"),
             InlineKeyboardButton("+15 Dias", callback_data="prem_add:15"),
             InlineKeyboardButton("+30 Dias", callback_data="prem_add:30")
-        ],
-         [
-            InlineKeyboardButton("-1 Dia", callback_data="prem_add:-1"),
-            InlineKeyboardButton("-7 Dias", callback_data="prem_add:-7"),
         ],
         [InlineKeyboardButton("❌ REMOVER VIP (Virar Free)", callback_data="prem_clear")],
         [InlineKeyboardButton("🔍 Outro Jogador", callback_data="prem_change_user")],
@@ -159,7 +152,7 @@ async def _show_player_options(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
 
 # ---------------------------------------------------------
-# Ações (Agora com Sincronia de Users)
+# Ações
 # ---------------------------------------------------------
 async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -176,11 +169,13 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     from modules.player.premium import PremiumManager
     pm = PremiumManager(pdata)
     
-    # Se não tinha data, dá 30 dias ao definir tier
+    # Define o tier
+    # Se não tiver data de expiração, adiciona 30 dias por padrão
     if not pm.expiration_date:
-        pm.add_days(30)
-        
-    pm.set_tier(new_tier)
+        pm.grant_days(new_tier, 30, force=True)
+    else:
+        # Apenas muda o tier mantendo a data (ou define permanente se for o caso na lógica interna)
+        pm.set_tier(new_tier)
     
     # 1. Salva no Jogo
     await player_manager.save_player_data(target_id, pdata)
@@ -202,11 +197,13 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     from modules.player.premium import PremiumManager
     pm = PremiumManager(pdata)
     
-    # Se era free, vira Gold automaticamente
-    if pm.tier == 'free' or not pm.tier:
-        pm.set_tier('gold')
+    # Determina qual tier usar para a renovação
+    current_tier = pm.tier
+    if not current_tier or current_tier == 'free':
+        current_tier = 'gold' # Default se for free e tentar adicionar dias
         
-    pm.add_days(days)
+    # CORREÇÃO: Usa grant_days em vez de add_days
+    pm.grant_days(current_tier, days)
     
     # 1. Salva no Jogo
     await player_manager.save_player_data(target_id, pdata)
@@ -251,6 +248,7 @@ async def _action_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     except: pass
     context.user_data.clear()
     return ConversationHandler.END
+
 
 async def _cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Operação cancelada.")

@@ -1249,6 +1249,81 @@ async def admin_fix_tomos_command(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         logger.error(f"Erro no fix_tomos: {e}", exc_info=True)
         await msg.edit_text(f"❌ Erro crítico: {e}")
+
+async def fix_premium_dates_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando ADMIN: Remove VIP 'Permanente' (bugado) e sincroniza com o Site.
+    """
+    if not await ensure_admin(update): return
+
+    msg = await update.message.reply_text("⏳ <b>Zerando VIPs e Sincronizando Site...</b>", parse_mode="HTML")
+    
+    from modules.player_manager import iter_players, save_player_data
+    from modules.database import players_collection # Para acessar o banco direto
+    
+    # Tenta pegar a coleção de usuários do site para garantir a sincronia
+    try:
+        users_col = players_collection.database["users"]
+    except:
+        users_col = None
+
+    count_fixed = 0
+    total_checked = 0
+
+    try:
+        async for user_id, pdata in iter_players():
+            total_checked += 1
+            
+            tier = pdata.get("premium_tier", "free")
+            expires = pdata.get("premium_expires_at")
+
+            # Se tem VIP mas a data é NULA -> Remove
+            if tier != "free" and not expires:
+                
+                # 1. Atualiza o objeto na memória
+                pdata["premium_tier"] = "free"
+                pdata["premium_expires_at"] = None
+                
+                # 2. Salva no banco principal (Bot)
+                # O core.py já decide se vai para 'players' ou 'users' aqui
+                await save_player_data(user_id, pdata)
+                
+                # 3. Força Sincronia com a tabela do Site ('users')
+                if users_col:
+                    try:
+                        # Se for conta antiga (int), busca pelo telegram_id_owner
+                        if isinstance(user_id, int):
+                            users_col.update_one(
+                                {"telegram_id_owner": user_id},
+                                {"$set": {"premium_tier": "free", "premium_expires_at": None}}
+                            )
+                        # Se for conta nova (str/objectid), busca pelo _id
+                        else:
+                            from bson import ObjectId
+                            oid = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id
+                            users_col.update_one(
+                                {"_id": oid},
+                                {"$set": {"premium_tier": "free", "premium_expires_at": None}}
+                            )
+                    except Exception as e:
+                        print(f"Erro ao sincronizar site para {user_id}: {e}")
+
+                count_fixed += 1
+            
+            if total_checked % 100 == 0:
+                await asyncio.sleep(0.01)
+
+        await msg.edit_text(
+            f"✅ <b>LIMPEZA COMPLETA!</b>\n\n"
+            f"👥 Contas verificadas: {total_checked}\n"
+            f"🚫 VIPs Zerados: <b>{count_fixed}</b>\n"
+            f"🔄 Bot e Site sincronizados."
+        )
+
+    except Exception as e:
+        logger.error(f"Erro no fix_premium: {e}", exc_info=True)
+        await msg.edit_text(f"❌ Erro crítico: {e}")
+               
 async def admin_clean_market_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Comando ADMIN: Varre os mercados (Ouro e Gemas) e corrige nomes duplicados
@@ -1350,7 +1425,7 @@ admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_he
 # ... outros handlers ...
 clean_clan_handler = CommandHandler("limpar_cla", clean_clan_status_command, filters=filters.User(ADMIN_LIST))
 fix_ghost_clan_handler = CommandHandler("fix_cla_fantasma", fix_deleted_clan_command, filters=filters.User(ADMIN_LIST))
-
+fix_premium_handler = CommandHandler("fix_premium", fix_premium_dates_command, filters=filters.User(ADMIN_LIST))
 # Handler de Conversa para Limpeza de Cache (filtros aplicados nos entry points e message handlers)
 clear_cache_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(_cache_entry_point, pattern=r"^admin_clear_cache$")],

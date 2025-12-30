@@ -310,17 +310,28 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- MUDANÇA DE NOME: PREMIUM -> BÊNÇÃO ---
     premium_txt = ""
     raw_tier = player_data.get("premium_tier")
-    if raw_tier and raw_tier != "free":
+    
+    # Verifica se existe tier e se não é "free"
+    if raw_tier and str(raw_tier).lower() not in ("free", "none"):
         exp = player_data.get("premium_expires_at")
         date_str = "Permanente"
+        
+        # Tenta formatar a data se ela existir
         if exp:
             try:
-                dt = datetime.fromisoformat(exp)
+                # Suporta formato ISO com ou sem timezone
+                dt = datetime.fromisoformat(str(exp))
                 date_str = dt.strftime('%d/%m/%Y')
-            except: pass
-        # AQUI MUDAMOS O TEXTO
-        premium_txt = f"\n✨ <b>Bênção:</b> {raw_tier.capitalize()} <code>({date_str})</code>"
-
+                
+                # Opcional: Avisar se venceu
+                if dt.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+                     date_str = f"{date_str} (Vencido)"
+            except Exception: 
+                pass
+                
+        # Monta o texto
+        premium_txt = f"\n✨ <b>Bênção:</b> {raw_tier.upper()} <code>({date_str})</code>"
+        
     # Progressão (Nível e Profissão)
     lvl = int(player_data.get('level', 1))
     xp = int(player_data.get('xp', 0))

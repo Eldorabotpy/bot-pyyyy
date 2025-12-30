@@ -395,16 +395,33 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     buyer_id = get_current_player_id(update, context)
     from modules import market_manager
+    # Import para checar premium
+    from modules.player.premium import PremiumManager 
 
     try: lid = int(q.data.replace("market_buy_", ""))
     except: await q.answer("ID inválido.", show_alert=True); return
+
+    # --- TRAVA DE SEGURANÇA: APENAS VIP COMPRA ---
+    pdata = await player_manager.get_player_data(buyer_id)
+    if not pdata: return
+
+    pm = PremiumManager(pdata)
+    # Se NÃO for premium (é free) e tentar comprar: BLOQUEIA
+    if not pm.is_premium():
+        await q.answer(
+            "🔒 Apenas Aventureiros VIP podem COMPRAR no mercado!\n\n"
+            "Torne-se VIP para desbloquear compras ou venda seus itens para ganhar Ouro.",
+            show_alert=True
+        )
+        return
+    # ---------------------------------------------
 
     try:
         try: listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         except TypeError: listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         
-        buyer_data = await player_manager.get_player_data(buyer_id)
-        buyer_name = buyer_data.get("character_name", f"Player {buyer_id}")
+        # (O resto do código continua igual...)
+        buyer_name = pdata.get("character_name", f"Player {buyer_id}")
         seller_name = listing.get("seller_name", "Desconhecido")
         item_payload = listing.get("item", {})
         item_display = "Item Misterioso"
@@ -433,7 +450,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erro na compra: {e}")
         await q.answer(f"Erro: {str(e)}", show_alert=True)
-
+        
 async def market_sell_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

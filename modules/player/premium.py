@@ -36,14 +36,20 @@ class PremiumManager:
         return dt
 
     def is_premium(self) -> bool:
-        """Indica se jogador está em estado premium ativo (inclui permanente)."""
-        tier = self.player_data.get("premium_tier")
-        if not tier or tier == "free" or tier not in game_data.PREMIUM_TIERS:
+        """
+        Indica se jogador está em estado premium ativo.
+        AGORA EXIGE DATA VÁLIDA (Nada de permanente).
+        """
+        if self.tier in ('free', None):
             return False
 
-        # Se expiration_date for None -> tratamos como permanente
         exp_date = self.expiration_date
-        return exp_date is None or (exp_date > self._now)
+        
+        # Se não tem data (None), considera EXPIRADO (False)
+        if exp_date is None:
+            return False
+            
+        return exp_date > self._now
 
     def get_remaining_days(self) -> int:
         """Dias restantes; 0 = não premium, 999 = permanente."""

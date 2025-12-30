@@ -497,6 +497,22 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     buyer_id = q.from_user.id
     lid = int(q.data.replace("market_buy_", ""))
+
+    # --- NOVO BLOCO DE SEGURANÇA (VIP ONLY) ---
+    from modules.player.premium import PremiumManager
+    pdata = await player_manager.get_player_data(buyer_id)
+    
+    if pdata:
+        pm = PremiumManager(pdata)
+        if not pm.is_premium():
+            await q.answer(
+                "🔒 RESTRITO: Apenas VIPs podem comprar no mercado!\n"
+                "Você ainda pode vender seus itens para ganhar ouro.",
+                show_alert=True
+            )
+            return
+    # ------------------------------------------
+
     try:
         _, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         await q.answer(f"✅ Compra realizada! Custo: {cost}", show_alert=True)
