@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO CORRIGIDA PARA SISTEMA DE LOGIN/MIGRAÇÃO)
+# (VERSÃO: Boas-vindas Ativas + Bloqueio de Spam em Grupo)
 
 from __future__ import annotations
 import asyncio
@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram.constants import ChatType
 
 # Configuração de Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -41,9 +42,6 @@ from registries import register_all_handlers
 from registries.class_evolution import register_evolution_handlers
 from registries.market import register_market_handlers
 
-# [REMOVIDO] register_character_handlers causaria conflito com o auth_handler
-# from registries.character import register_character_handlers 
-
 # --- IMPORTAÇÃO DO GERENCIADOR DE ARQUIVOS (ADMIN) ---
 from handlers.admin.file_id_conv import file_id_conv_handler
 
@@ -56,6 +54,12 @@ from handlers.jobs import (
     job_pvp_monthly_reset,
     check_premium_expiry_job
 )
+
+# Job de Entradas PvP
+try:
+    from handlers.jobs import daily_pvp_entry_reset_job
+except ImportError:
+    daily_pvp_entry_reset_job = None
 
 try:
     from modules.world_boss.engine import world_boss_manager
@@ -98,7 +102,7 @@ async def post_init_tasks(application: Application):
     # 2. Notificação Admin
     if ADMIN_ID:
         try: 
-            msg_text = "🤖 <b>Sistema Online com Auth Híbrida!</b>"
+            msg_text = "🤖 <b>Sistema Online!</b>\n<i>Filtro de grupos ativo.</i>"
             if STARTUP_IMAGE_ID:
                 await application.bot.send_photo(chat_id=ADMIN_ID, photo=STARTUP_IMAGE_ID, caption=msg_text, parse_mode="HTML")
             else:
@@ -106,7 +110,7 @@ async def post_init_tasks(application: Application):
         except Exception as e:
             logger.warning(f"Msg Admin falhou: {e}")
     
-    # 3. Recuperação de Ações (Watchdog)
+    # 3. Recuperação de Ações
     try:
         from modules.player.actions import check_stale_actions_on_startup
         await check_stale_actions_on_startup(application)
@@ -125,9 +129,14 @@ async def post_init_tasks(application: Application):
     except Exception:
         tz = timezone.utc
 
-    # (Jobs mantidos do seu código original)
+    # Agendamentos
     jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
     jq.run_repeating(check_premium_expiry_job, interval=3600, first=60, name="premium_checker")
+    
+    # Reset Diário PvP (12:25)
+    if daily_pvp_entry_reset_job:
+        jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_daily_entry_reset")
+
     if EVENT_TIMES:
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
             try:
@@ -146,110 +155,120 @@ async def post_init_tasks(application: Application):
             except: pass
 
     try:
-        from handlers.jobs import daily_pvp_entry_reset_job
-        # Agenda para 12:25 (ou outro horário)
-        jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_daily_entry_reset")
+        from handlers.jobs import job_pvp_monthly_reset
+        jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_monthly_check")
     except ImportError: pass
 
     logging.info("Jobs agendados.")
 
 # ==============================================================================
-# FUNÇÕES DE GRUPO E BOAS-VINDAS
+# FUNÇÃO: BOAS-VINDAS (Ativa para Novos Jogadores)
 # ==============================================================================
-# No main.py, substitua a função welcome_new_member antiga por esta:
-
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Boas-vindas com IMAGEM, MARCAÇÃO e BOTÃO DE AÇÃO.
+    Dá boas-vindas visuais e convida a jogar no privado.
     """
     if not update.message.new_chat_members:
         return
 
-    # --- CONFIGURAÇÃO DA IMAGEM ---
-    
-    IMG_BOAS_VINDAS = STARTUP_IMAGE_ID if STARTUP_IMAGE_ID else "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE" 
+    # Imagem de Boas-vindas (Padrão ou Configurada)
+    IMG_BOAS_VINDAS = STARTUP_IMAGE_ID if STARTUP_IMAGE_ID else "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE"
 
     for member in update.message.new_chat_members:
-        # Ignora se for o próprio bot
+        # Ignora bots
         if member.id == context.bot.id:
             continue
             
-        # O PULO DO GATO: Deep Link para criar conta direto
         bot_username = context.bot.username
+        # Link especial que já abre o comando de criar conta
         deep_link = f"https://t.me/{bot_username}?start=criar_conta"
         
-        # Botão Chamativo
         keyboard = [
-            [InlineKeyboardButton("⚔️ CRIAR PERSONAGEM AGORA ⚔️", url=deep_link)]
+            [InlineKeyboardButton("⚔️ CRIAR PERSONAGEM ⚔️", url=deep_link)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Texto Épico com Marcação
-        # member.mention_html() é o que faz o nome ficar azul e clicável (Marca a pessoa)
+        # Texto chamativo mencionando o usuário
         caption_text = (
             f"🔔 <b>UM NOVO AVENTUREIRO CHEGOU!</b>\n\n"
             f"Seja bem-vindo(a), {member.mention_html()}!\n"
             f"Os portões de <b>Eldora</b> se abrem para você.\n\n"
-            "⛔ <i>Por segurança, sua jornada começa no privado.</i>\n"
-            "👇 <b>Toque no botão abaixo para criar sua conta:</b>"
+            "👇 <b>Toque no botão abaixo para começar sua jornada:</b>"
         )
         
         try:
-            # Envia a FOTO com a legenda
             await update.message.reply_photo(
                 photo=IMG_BOAS_VINDAS,
                 caption=caption_text,
                 reply_markup=reply_markup,
                 parse_mode="HTML"
             )
-        except Exception as e:
-            # Fallback: Se der erro na imagem (link quebrado), manda só texto para não falhar
-            logging.error(f"Erro ao enviar imagem de boas-vindas: {e}")
+        except Exception:
+            # Fallback seguro (caso a imagem falhe)
             await update.message.reply_text(
-                f"Olá {member.mention_html()}! Clique abaixo para jogar:",
-                reply_markup=reply_markup,
+                f"Bem-vindo {member.mention_html()}! Clique aqui para jogar: @{bot_username}",
                 parse_mode="HTML"
             )
+
+# ==============================================================================
+# FUNÇÃO: SILENCIADOR DE GRUPO (O Segredo)
+# ==============================================================================
+async def group_spam_silencer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Esta função intercepta mensagens em GRUPO de NÃO-ADMINS e não faz nada.
+    Isso impede que o bot responda a /start ou texto solto no chat geral.
+    """
+    return
 
 # ==============================================================================
 # EXECUÇÃO PRINCIPAL
 # ==============================================================================
 if __name__ == '__main__':
-    # Inicia o servidor Flask
     try:
         start_keep_alive()
         logging.info("Servidor Web iniciado.")
     except Exception as e:
         logging.warning(f"Erro no servidor Web: {e}")
 
-    # Constrói a aplicação
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init_tasks).build()
     
-    # --- REGISTRO DE HANDLERS (ORDEM CRÍTICA) ---
+    # --- REGISTRO DE HANDLERS (A ORDEM É CRÍTICA) ---
 
-    # 1. Detector de Entrada no Grupo (Prioridade Máxima para Boas-vindas)
+    # 1. Boas-vindas (TEM QUE SER O PRIMEIRO)
+    # Isso garante que a entrada de membros seja processada antes de qualquer bloqueio.
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
 
-    # 2. SISTEMA DE AUTENTICAÇÃO (O Porteiro)
-    # Deve vir antes de qualquer outro handler de comando para interceptar o /start
+    # 2. SILENCIADOR DE GRUPOS (A Barreira)
+    # Bloqueia: Grupos + Não é Admin + Não é Entrada de Membro
+    # Resultado: O bot ignora comandos de usuários comuns no chat geral.
+    application.add_handler(MessageHandler(
+        filters.ChatType.GROUPS & ~filters.User(ADMIN_ID) & ~filters.StatusUpdate.NEW_CHAT_MEMBERS, 
+        group_spam_silencer
+    ))
+
+    # 3. Autenticação e Comandos
+    # Só chegam aqui: Mensagens Privadas OU Mensagens do Admin no Grupo.
     application.add_handler(auth_handler)
     application.add_handler(CommandHandler("logout", logout_command))
     application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
 
-    # 3. Menu Principal (Novo Start Handler)
-    # Só é acionado se o auth_handler liberar (usuário já logado)
+    # 4. Menu Principal
     application.add_handler(start_command_handler)
 
-    # 4. Admin / Ferramentas
+    # 5. Ferramentas Admin
     application.add_handler(file_id_conv_handler)
     
-    # 5. Sistemas de Jogo (Mercado, Evolução, Registros Gerais)
-    # IMPORTANTE: register_character_handlers foi REMOVIDO para não conflitar com o auth
+    # 6. Sistemas de Jogo
     register_market_handlers(application)
     register_evolution_handlers(application)
     register_all_handlers(application)
 
-    logging.info("Handlers registrados. Iniciando Polling...")
+    # 7. Debug
+    try:
+        from handlers.jobs import cmd_force_pvp_reset
+        application.add_handler(CommandHandler("debug_reset", cmd_force_pvp_reset))
+    except ImportError: pass
 
-    # Loop principal
+    logging.info("Handlers registrados. Bot Blindado contra Spam.")
+
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
