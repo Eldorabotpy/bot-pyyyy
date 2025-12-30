@@ -21,6 +21,13 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# CONFIGURAÇÃO DE NOTIFICAÇÃO (ONDE AVISAR QUANDO ALGUÉM VIRA VIP)
+# ==============================================================================
+
+NOTIFICATION_GROUP_ID = -1002881364171
+NOTIFICATION_TOPIC_ID = 24475 
+
 # -------------------------------
 # Configuração de Listas
 # -------------------------------
@@ -50,8 +57,6 @@ ITEMS_PER_PAGE = 3
 # -------------------------------
 # Helpers Básicos
 # -------------------------------
-
-
 
 def _gems(pdata: dict) -> int:
     return max(0, int(pdata.get("gems", 0)))
@@ -92,8 +97,7 @@ def _get_button_label(base_id: str) -> str:
         name = info.get("display_name") or info.get("nome_exibicao") or base_id
         emoji = info.get("emoji", "📦")
         
-        # --- LIMPEZA DE TEXTO (Aqui está o segredo) ---
-        # Remove prefixos repetitivos para economizar espaço
+        # --- LIMPEZA DE TEXTO ---
         name = name.replace("Emblema: ", "")
         name = name.replace("Essência da ", "")
         name = name.replace("Essência do ", "")
@@ -110,7 +114,6 @@ def _get_button_label(base_id: str) -> str:
 def _state(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> dict:
     st = context.user_data.get("gemshop")
     if not st:
-        # Adicionei 'page' ao estado inicial
         st = {"tab": "premium", "base_id": None, "qty": 1, "page": 1}
         context.user_data["gemshop"] = st
     return st
@@ -125,7 +128,7 @@ def _build_shop_keyboard(context_state: dict, page_items: list = None) -> Inline
     qty = context_state.get("qty", 1)
     page = context_state.get("page", 1)
 
-    # CENÁRIO 1: ITEM SELECIONADO (Detalhes) - Mantém igual
+    # CENÁRIO 1: ITEM SELECIONADO (Detalhes)
     if selected_id:
         is_plan = selected_id in PREMIUM_PLANS_FOR_SALE
         actions = []
@@ -157,24 +160,18 @@ def _build_shop_keyboard(context_state: dict, page_items: list = None) -> Inline
     
     kb_rows = [tabs_row]
 
-    # 2. Botões de Ação Numéricos [ 1 🛒 ] [ 2 🛒 ] ...
-    # Só gera se houver itens na página
+    # 2. Botões de Ação Numéricos
     if page_items:
         btn_row = []
         for idx, base_id in enumerate(page_items, start=1):
-            # Cria botão: "1 🛒", "2 🛒"... mapeado para o ID do item
             btn_row.append(InlineKeyboardButton(f"{idx} 🛒", callback_data=f"gem_pick_{base_id}"))
-            
-            # Quebra linha a cada 5 botões (opcional, ou deixa em uma linha só se couber)
             if len(btn_row) >= 5:
                 kb_rows.append(btn_row)
                 btn_row = []
-        
         if btn_row: kb_rows.append(btn_row)
 
     # 3. Barra de Navegação
-    # Precisa calcular total de páginas novamente ou receber como arg (simplificando aqui)
-    total_pages = context_state.get("total_pages", 1) # Vamos injetar isso no state temporariamente ou recalcular
+    total_pages = context_state.get("total_pages", 1)
     
     nav_row = []
     if total_pages > 1:
@@ -220,23 +217,19 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤➤➤"
     ]
     
-    # Define a fonte de itens
     items_source = []
     if current_tab == "premium": items_source = TAB_PREMIUM
     elif current_tab == "evolution": items_source = TAB_EVOLUTION
     elif current_tab == "misc": items_source = TAB_MISC
 
-    # Cálculos de Paginação
     total_items = len(items_source)
-    # ITEMS_PER_PAGE deve estar definido no topo do arquivo (ex: 8)
     total_pages = math.ceil(total_items / ITEMS_PER_PAGE)
     if total_pages == 0: total_pages = 1
-    if page > total_pages: page = 1; st["page"] = 1 # Correção
+    if page > total_pages: page = 1; st["page"] = 1
     
-    # Passa total_pages para o builder saber se mostra setas
     st["total_pages"] = total_pages 
 
-    # MODO DETALHES (Item Selecionado) - Igual ao anterior
+    # MODO DETALHES
     if base_id:
         price = _price_for(base_id)
         if base_id in PREMIUM_PLANS_FOR_SALE:
@@ -262,15 +255,14 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lines.append("━━━━━━━━━━━━━━━━━━")
             lines.append(f"💵 <b>TOTAL: {total} 💎</b>")
             
-        page_items_for_kb = None # Não gera botões numéricos na tela de detalhes
+        page_items_for_kb = None 
 
-    # MODO VITRINE (Lista Numerada)
+    # MODO VITRINE
     else:
         start_idx = (page - 1) * ITEMS_PER_PAGE
         end_idx = start_idx + ITEMS_PER_PAGE
         page_items_for_kb = items_source[start_idx:end_idx]
 
-        # Cabeçalho da categoria
         cat_name = "ITENS DIVERSOS"
         if current_tab == "premium": cat_name = "PLANOS VIP"
         elif current_tab == "evolution": cat_name = "MATERIAIS DE EVOLUÇÃO"
@@ -280,36 +272,26 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         num_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
-        # Gera a lista de texto
         for idx, item_id in enumerate(page_items_for_kb):
-            # Ícone numérico
             icon_num = num_emojis[idx] if idx < len(num_emojis) else f"<b>{idx+1}.</b>"
-            
             price = _price_for(item_id)
             
             if current_tab == "premium":
-                # Layout Especial para VIP
                 plan = PREMIUM_PLANS_FOR_SALE.get(item_id, {})
                 p_name = plan.get("name", item_id).replace("Aventureiro ", "")
                 lines.append(f"{icon_num} 👑 <b>{p_name}</b>")
                 lines.append(f"   ╰┈➤ 💎 <b>{price}</b> │ ⏱ {plan.get('days')} Dias")
             else:
-                # Layout para Itens (Evo/Misc)
                 info = _get_item_info(item_id)
                 i_name = info.get("display_name", item_id).upper()
-                # Limpeza de nome para não ficar gigante
                 i_name = i_name.replace("EMBLEMA: ", "").replace("ESSÊNCIA DA ", "").replace("ESSÊNCIA DO ", "")
-                
                 emoji = info.get("emoji", "🔮")
-                
                 lines.append(f"{icon_num} {emoji} <b>{i_name}</b>")
                 lines.append(f"   ╰┈➤ 💎 <b>{price}</b>")
             
-            lines.append("") # Espaço entre itens
+            lines.append("")
 
     text_content = "\n".join(lines)
-    
-    # Passa os itens da página atual para o builder gerar os botões 1, 2, 3...
     kb = _build_shop_keyboard(st, page_items_for_kb)
 
     if q:
@@ -333,13 +315,12 @@ async def gem_switch_tab(update: Update, context: ContextTypes.DEFAULT_TYPE):
         st["tab"] = new_tab
         st["base_id"] = None 
         st["qty"] = 1
-        st["page"] = 1 # Reseta página ao trocar aba
+        st["page"] = 1
         
     context.user_data["gemshop"] = st
     await gem_shop_open(update, context)
 
 async def gem_change_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lida com Avançar/Voltar página"""
     q = update.callback_query
     await q.answer()
     user_id = q.from_user.id
@@ -360,7 +341,6 @@ async def gem_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = q.from_user.id
     base_id = q.data.replace("gem_pick_", "")
 
-    # Se clicar no mesmo item, volta pra lista (desmarca)
     st = _state(context, user_id)
     if st["base_id"] == base_id:
         st["base_id"] = None
@@ -434,7 +414,52 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buyer["premium_tier"] = new_tier
         buyer["premium_expires_at"] = new_exp.isoformat()
         
+        # Sincroniza com a coleção 'users' também (igual ao painel admin)
+        try:
+            from modules.database import db
+            users_col = db["users"]
+            
+            # Se for ID antigo (int), busca pelo telegram_id_owner
+            if isinstance(buyer_id, int):
+                query = {"telegram_id_owner": buyer_id}
+            else:
+                # Se for ID novo (ObjectId string)
+                from bson import ObjectId
+                oid = ObjectId(buyer_id) if ObjectId.is_valid(buyer_id) else buyer_id
+                query = {"_id": oid}
+                
+            users_col.update_one(query, {"$set": {"premium_tier": new_tier, "premium_expires_at": new_exp.isoformat()}})
+        except Exception as e:
+            logger.error(f"Erro sync vip loja: {e}")
+
         msg = f"✅ <b>Assinatura Confirmada!</b>\n\n👑 <b>{plan['name']}</b>\n📅 Válido até: {new_exp.strftime('%d/%m/%Y')}"
+
+        # =======================================================
+        # 👇 AQUI ESTÁ A CORREÇÃO: ENVIO DA NOTIFICAÇÃO NO GRUPO 👇
+        # =======================================================
+        try:
+            buyer_name = buyer.get("character_name", "Aventureiro")
+            plan_name = plan['name']
+            
+            notif_text = (
+                f"🎉 <b>UM NOVO MEMBRO DE ELITE SURGIU!</b> 🎉\n\n"
+                f"O aventureiro <b>{buyer_name}</b> acaba de adquirir o plano:\n"
+                f"🌟 <b>{plan_name}</b> 🌟\n\n"
+                f"<i>Agora ele possui bônus de XP, Drop e Vantagens Exclusivas!</i>\n\n"
+                f"💎 Quer se tornar VIP também? Digite /gemas ou vá ao Mercado!"
+            )
+            
+            # Envia para o grupo configurado no topo do arquivo
+            await context.bot.send_message(
+                chat_id=NOTIFICATION_GROUP_ID,
+                message_thread_id=NOTIFICATION_TOPIC_ID,
+                text=notif_text,
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Falha ao enviar notificação VIP no grupo: {e}")
+        # =======================================================
+
     else:
         player_manager.add_item_to_inventory(buyer, base_id, qty)
         msg = f"✅ <b>Compra Confirmada!</b>\n\n💎 Custo: {total_cost}"
