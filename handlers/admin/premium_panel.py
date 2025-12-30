@@ -1,4 +1,6 @@
 # handlers/admin/premium_panel.py
+# (VERSÃO BLINDADA: Corrige busca de ID Numérico vs Texto)
+
 from __future__ import annotations
 import os
 import logging
@@ -17,7 +19,8 @@ from telegram.ext import (
     filters,
 )
 from modules import player_manager, game_data
-from handlers.admin.utils import ensure_admin, parse_hybrid_id
+from handlers.admin.utils import ensure_admin 
+# Removemos parse_hybrid_id externo para usar o local mais seguro
 
 # --- TENTA IMPORTAR A COLEÇÃO DE USERS PARA SINCRONIA ---
 try:
@@ -32,6 +35,39 @@ logger = logging.getLogger(__name__)
 # ---- States da conversa ----
 (ASK_NAME,) = range(1)
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0")) 
+
+# ==============================================================================
+# FUNÇÃO LOCAL: PARSER INTELIGENTE DE ID
+# ==============================================================================
+async def _smart_identify_target(text: str) -> Optional[int | str]:
+    """
+    Identifica se o input é ID Numérico (Old), ObjectId (New), 
+    Username ou Nome, e retorna o ID correto pronto para uso.
+    """
+    text = text.strip()
+    
+    # 1. É um ID Numérico? (Conta Antiga)
+    if text.isdigit():
+        return int(text)  # <--- CRUCIAL: Retorna como INT
+        
+    # 2. É um ObjectId? (Conta Nova)
+    if ObjectId.is_valid(text):
+        return str(text)  # Retorna como STRING
+        
+    # 3. É um Username (@Usuario)?
+    if text.startswith("@"):
+        from modules.player.queries import find_by_username
+        pdata = await find_by_username(text)
+        if pdata:
+            return pdata.get("user_id") or pdata.get("_id")
+            
+    # 4. Busca por Nome do Personagem (Tenta os dois bancos)
+    from modules.player.queries import find_player_by_name_norm
+    found = await find_player_by_name_norm(text)
+    if found:
+        return found[0] # Retorna o ID encontrado (int ou str)
+        
+    return None
 
 # ==============================================================================
 # FUNÇÃO AUXILIAR: SINCRONIA
@@ -98,17 +134,23 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text.strip()
     
-    # Busca inteligente
-    target_id = parse_hybrid_id(text)
-    if not target_id:
-        from modules.player.queries import find_player_by_name_norm
-        found = await find_player_by_name_norm(text)
-        if found:
-            target_id = found[0]
+    # --- USA O NOVO PARSER BLINDADO ---
+    target_id = await _smart_identify_target(text)
+    # ----------------------------------
 
+    if not target_id:
+        await update.message.reply_text(f"❌ Jogador '{text}' não encontrado em nenhum banco de dados.")
+        return ASK_NAME
+    
     pdata = await player_manager.get_player_data(target_id)
     if not pdata:
-        await update.message.reply_text("❌ Jogador não encontrado. Tente novamente ou /cancelar.")
+        # Tenta forçar int se for string numérica (última tentativa)
+        if isinstance(target_id, str) and target_id.isdigit():
+             pdata = await player_manager.get_player_data(int(target_id))
+             if pdata: target_id = int(target_id)
+
+    if not pdata:
+        await update.message.reply_text(f"❌ ID identificado ({target_id}), mas os dados estão corrompidos ou vazios.")
         return ASK_NAME
     
     context.user_data["prem_target_id"] = target_id
@@ -141,6 +183,10 @@ async def _show_player_options(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("+15 Dias", callback_data="prem_add:15"),
             InlineKeyboardButton("+30 Dias", callback_data="prem_add:30")
         ],
+        [
+            InlineKeyboardButton("-1 Dia", callback_data="prem_add:-1"),
+            InlineKeyboardButton("-7 Dias", callback_data="prem_add:-7"),
+        ],
         [InlineKeyboardButton("❌ REMOVER VIP (Virar Free)", callback_data="prem_clear")],
         [InlineKeyboardButton("🔍 Outro Jogador", callback_data="prem_change_user")],
         [InlineKeyboardButton("🔙 Fechar", callback_data="prem_close")]
@@ -169,12 +215,11 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     from modules.player.premium import PremiumManager
     pm = PremiumManager(pdata)
     
-    # Define o tier
     # Se não tiver data de expiração, adiciona 30 dias por padrão
     if not pm.expiration_date:
         pm.grant_days(new_tier, 30, force=True)
     else:
-        # Apenas muda o tier mantendo a data (ou define permanente se for o caso na lógica interna)
+        # Apenas muda o tier mantendo a data
         pm.set_tier(new_tier)
     
     # 1. Salva no Jogo
@@ -248,7 +293,6 @@ async def _action_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     except: pass
     context.user_data.clear()
     return ConversationHandler.END
-
 
 async def _cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Operação cancelada.")

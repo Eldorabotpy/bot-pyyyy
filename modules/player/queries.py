@@ -1,4 +1,5 @@
 # Em modules/player/queries.py
+# (VERSÃO CORRIGIDA: Busca Híbrida em 'players' e 'users')
 
 from __future__ import annotations
 import re as _re
@@ -7,11 +8,18 @@ import logging
 from typing import AsyncIterator, Iterator, Tuple, Optional
 from .core import players_collection, get_player_data, save_player_data, clear_player_cache
 from modules.player.core import players_collection, _player_cache
+
 # ========================================
 # FUNÇÕES AUXILIARES DE NORMALIZAÇÃO
 # ========================================
 
 logger = logging.getLogger(__name__)
+
+def _get_users_collection():
+    """Helper para pegar a coleção de usuários novos."""
+    if players_collection is not None:
+        return players_collection.database["users"]
+    return None
 
 def _normalize_char_name(_s: str) -> str:
     if not isinstance(_s, str):
@@ -51,7 +59,7 @@ def _emoji_variants(s: str):
 async def create_new_player(user_id: int, character_name: str) -> dict:
     from .actions import utcnow  # Importação local para evitar ciclos
 
-    now_iso = utcnow().isoformat() # Pega a hora atual uma vez
+    now_iso = utcnow().isoformat()
 
     new_player_data = {
         "character_name": character_name,
@@ -67,7 +75,7 @@ async def create_new_player(user_id: int, character_name: str) -> dict:
         "stat_points": 0,
         "energy": 20,
         "max_energy": 20,
-        "energy_last_ts": now_iso, # Usa a nova variável 'now_iso'
+        "energy_last_ts": now_iso,
         "gold": 0,
         "gems": 0, 
         "premium_tier": None,
@@ -85,17 +93,14 @@ async def create_new_player(user_id: int, character_name: str) -> dict:
         "last_chat_id": None,
         "class_choice_offered": False,
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
-
-        # --- 👇 NOVOS CAMPOS ADICIONADOS 👇 ---
-        "created_at": now_iso, # Guarda a data de criação
-        "last_seen": now_iso,  # Guarda a última interação (agora)
-        # --- 👆 FIM DOS NOVOS CAMPOS 👆 ---
+        "created_at": now_iso,
+        "last_seen": now_iso,
     }
     await save_player_data(user_id, new_player_data)
     return new_player_data
 
 async def get_or_create_player(user_id: int, default_name: str = "Aventureiro") -> dict:
-    pdata = get_player_data(user_id)
+    pdata = await get_player_data(user_id) # Tem que ser await se get_player_data for async
     if pdata is None:
         pdata = await create_new_player(user_id, default_name)
     return pdata
@@ -103,31 +108,52 @@ async def get_or_create_player(user_id: int, default_name: str = "Aventureiro") 
 def delete_player(user_id: int) -> bool:
     """
     Remove completamente um jogador do banco de dados e do cache.
-    Retorna True se apagou, False se não encontrou.
+    Suporta ID numérico (antigo) e string/ObjectId (novo).
     """
-    user_id = int(user_id)
     deleted = False
+    str_id = str(user_id)
 
-    # 1. Remove do MongoDB
+    # 1. Tenta remover do MongoDB (Coleção Antiga)
     if players_collection is not None:
         try:
-            result = players_collection.delete_one({"_id": user_id})
-            if result.deleted_count > 0:
-                deleted = True
+            # Tenta como int
+            try:
+                iid = int(user_id)
+                res = players_collection.delete_one({"_id": iid})
+                if res.deleted_count > 0: deleted = True
+            except: pass
         except Exception as e:
-            print(f"Erro ao deletar do Mongo: {e}")
+            print(f"Erro ao deletar do Mongo (Players): {e}")
 
-    # 2. Remove do Cache (Memória)
-    # Acessa o dicionário global diretamente (pois queries.py tem acesso ao core)
-    if user_id in _player_cache:
-        del _player_cache[user_id]
-        deleted = True 
+    # 2. Tenta remover do MongoDB (Coleção Nova)
+    users_col = _get_users_collection()
+    if users_col is not None:
+        try:
+            from bson import ObjectId
+            # Tenta deletar pelo ObjectId
+            if ObjectId.is_valid(str_id):
+                res = users_col.delete_one({"_id": ObjectId(str_id)})
+                if res.deleted_count > 0: deleted = True
+        except Exception as e:
+            print(f"Erro ao deletar do Mongo (Users): {e}")
+
+    # 3. Remove do Cache (Memória)
+    # Tenta remover tanto a chave int quanto a str para garantir
+    keys_to_remove = [user_id, str_id]
+    try:
+        keys_to_remove.append(int(user_id))
+    except: pass
+
+    for k in keys_to_remove:
+        if k in _player_cache:
+            del _player_cache[k]
+            deleted = True 
 
     return deleted
 
 
 # ========================================
-# FUNÇÕES DE BUSCA (QUERIES)
+# FUNÇÕES DE BUSCA (QUERIES HÍBRIDAS)
 # ========================================
 
 async def find_player_by_name(name: str) -> Optional[Tuple[int, dict]]:
@@ -135,11 +161,22 @@ async def find_player_by_name(name: str) -> Optional[Tuple[int, dict]]:
     if not target_normalized or players_collection is None:
         return None
     
+    # 1. Busca na coleção ANTIGA (Players)
     doc = players_collection.find_one({"character_name_normalized": target_normalized})
     if doc:
         user_id = doc['_id']
         full_data = await get_player_data(user_id)
         return (user_id, full_data) if full_data else None
+
+    # 2. Busca na coleção NOVA (Users)
+    users_col = _get_users_collection()
+    if users_col:
+        doc = users_col.find_one({"character_name_normalized": target_normalized})
+        if doc:
+            user_id = str(doc['_id']) # Converte ObjectId para string
+            full_data = await get_player_data(user_id)
+            return (user_id, full_data) if full_data else None
+
     return None
 
 async def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
@@ -151,12 +188,23 @@ async def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
         return None
     
     normalized_variants = [_normalize_char_name(v) for v in qvars]
-    doc = players_collection.find_one({"character_name_normalized": {"$in": normalized_variants}})
     
+    # 1. Busca na coleção ANTIGA
+    doc = players_collection.find_one({"character_name_normalized": {"$in": normalized_variants}})
     if doc:
         user_id = doc['_id']
         full_data = await get_player_data(user_id)
         return (user_id, full_data) if full_data else None
+
+    # 2. Busca na coleção NOVA
+    users_col = _get_users_collection()
+    if users_col:
+        doc = users_col.find_one({"character_name_normalized": {"$in": normalized_variants}})
+        if doc:
+            user_id = str(doc['_id'])
+            full_data = await get_player_data(user_id)
+            return (user_id, full_data) if full_data else None
+
     return None
 
 async def find_players_by_name_partial(query: str) -> list:
@@ -164,13 +212,26 @@ async def find_players_by_name_partial(query: str) -> list:
     if not nq or not players_collection:
         return []
 
-    cursor = players_collection.find({"character_name_normalized": {"$regex": nq, "$options": "i"}})
     out = []
+    
+    # 1. Busca na coleção ANTIGA
+    cursor = players_collection.find({"character_name_normalized": {"$regex": nq, "$options": "i"}})
     for doc in cursor:
         uid = doc["_id"]
         full_data = await get_player_data(uid)
         if full_data:
             out.append((uid, full_data))
+            
+    # 2. Busca na coleção NOVA
+    users_col = _get_users_collection()
+    if users_col:
+        cursor = users_col.find({"character_name_normalized": {"$regex": nq, "$options": "i"}})
+        for doc in cursor:
+            uid = str(doc["_id"])
+            full_data = await get_player_data(uid)
+            if full_data:
+                out.append((uid, full_data))
+                
     return out
 
 async def find_by_username(username: str) -> Optional[dict]:
@@ -180,53 +241,71 @@ async def find_by_username(username: str) -> Optional[dict]:
     
     CAND_KEYS = ("username", "telegram_username", "tg_username")
     query = {"$or": [{k: u} for k in CAND_KEYS]}
-    doc = players_collection.find_one(query)
     
+    # 1. Busca na coleção ANTIGA
+    doc = players_collection.find_one(query)
     if doc:
         user_id = doc['_id']
         return await get_player_data(user_id)
+
+    # 2. Busca na coleção NOVA
+    users_col = _get_users_collection()
+    if users_col:
+        doc = users_col.find_one(query)
+        if doc:
+            user_id = str(doc['_id'])
+            return await get_player_data(user_id)
+            
     return None
 
 # ========================================
-# FUNÇÕES DE ITERAÇÃO
+# FUNÇÕES DE ITERAÇÃO (HÍBRIDAS)
 # ========================================
 
 def iter_player_ids() -> Iterator[int]:
+    """Itera APENAS IDs numéricos (legado). Para todos, use iter_players."""
     if players_collection is None:
         return
     for doc in players_collection.find({}, {"_id": 1}):
         yield doc["_id"]
 
-# Em modules/player/queries.py
-
-async def iter_players() -> AsyncIterator[Tuple[int, dict]]:
+async def iter_players() -> AsyncIterator[Tuple[int|str, dict]]:
+    """Itera sobre TODOS os jogadores (Antigos e Novos)."""
     if players_collection is None:
-        logger.warning("[ITER_DEBUG] players_collection é None, iter_players não pode executar.")
+        logger.warning("[ITER_DEBUG] players_collection é None.")
         return
     
-    logger.debug("[ITER_DEBUG] Iniciando iteração sobre player IDs...")
+    # 1. Itera Contas Antigas (Players)
     count = 0
-    # iter_player_ids é síncrono
-    for user_id in iter_player_ids():
+    try:
+        cursor = players_collection.find({}, {"_id": 1})
+        for doc in cursor:
+            user_id = doc["_id"]
+            try:
+                pdata = await get_player_data(user_id)
+                if pdata:
+                    yield user_id, pdata
+                    count += 1
+            except Exception as e:
+                logger.error(f"Erro iter_players (old) ID {user_id}: {e}")
+    except Exception as e:
+        logger.error(f"Erro iter_players cursor old: {e}")
+
+    # 2. Itera Contas Novas (Users)
+    users_col = _get_users_collection()
+    if users_col:
         try:
-             count += 1
-             logger.debug(f"[ITER_DEBUG] Processando ID #{count}: {user_id}")
-             player_data = await get_player_data(user_id) # Chama a função com logs
-             
-             # Loga o que get_player_data retornou ANTES do if
-             logger.debug(f"[ITER_DEBUG] get_player_data retornou para {user_id}: Tipo={type(player_data)}")
-             
-             if player_data is not None and isinstance(player_data, dict): # Verifica explicitamente se é dict
-                 logger.debug(f"[ITER_DEBUG] Yielding dados VÁLIDOS para {user_id}")
-                 yield user_id, player_data
-             else:
-                  # Loga se os dados foram filtrados (None ou tipo errado)
-                  logger.warning(f"[ITER_DEBUG] Dados inválidos ou None recebidos para {user_id}. FILTRANDO.")
-                  
+            cursor = users_col.find({}, {"_id": 1})
+            for doc in cursor:
+                user_id = str(doc["_id"]) # ObjectId -> Str
+                try:
+                    pdata = await get_player_data(user_id)
+                    if pdata:
+                        yield user_id, pdata
+                        count += 1
+                except Exception as e:
+                    logger.error(f"Erro iter_players (new) ID {user_id}: {e}")
         except Exception as e:
-             # Loga erros durante a iteração de um ID específico
-             logger.error(f"[ITER_DEBUG] Erro ao processar user_id {user_id} dentro de iter_players: {e}", exc_info=True)
-             # Continua para o próximo ID
-             continue 
+            logger.error(f"Erro iter_players cursor new: {e}")
              
-    logger.debug(f"[ITER_DEBUG] Fim da iteração. Total de IDs processados: {count}")
+    logger.debug(f"[ITER_DEBUG] Fim da iteração híbrida. Total: {count}")
