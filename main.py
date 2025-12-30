@@ -154,7 +154,7 @@ async def post_init_tasks(application: Application):
 
     try:
         from handlers.jobs import job_pvp_monthly_reset
-        jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_monthly_check")
+        jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=17, minute=15, tzinfo=tz), name="pvp_monthly_check")
     except ImportError: pass
 
     logging.info("Jobs e Sistemas iniciados.")
@@ -191,18 +191,22 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ==============================================================================
 async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Este middleware roda em TODAS as atualizações (Texto, Botão, Áudio, Edição).
-    Se for Grupo E não for Admin -> BLOQUEIA TUDO.
+    Este middleware roda em TODAS as atualizações.
+    Lógica:
+    1. Se for Chat PRIVADO -> Deixa passar (return None).
+    2. Se for GRUPO e for o ADMIN -> Deixa passar.
+    3. Se for GRUPO e NÃO for Admin -> PARE (raise ApplicationHandlerStop).
     """
+    if update.effective_chat.type == ChatType.PRIVATE:
+        return # ✅ PRIVADO SEMPRE PASSA
+
     if update.effective_chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
         # Permite apenas o Admin (Você) usar o bot no grupo para manutenção
-        if update.effective_user.id == ADMIN_ID:
-            return # Deixa passar
+        if update.effective_user and update.effective_user.id == ADMIN_ID:
+            return # ✅ ADMIN NO GRUPO PASSA
         
-        # Se chegou aqui, é usuário comum no grupo.
-        # BLOQUEIA A EXECUÇÃO DE QUALQUER OUTRO HANDLER ABAIXO
+        # ⛔ USUÁRIO COMUM NO GRUPO É BLOQUEADO
         raise ApplicationHandlerStop
-
 # ==============================================================================
 # EXECUÇÃO PRINCIPAL
 # ==============================================================================
@@ -217,13 +221,9 @@ if __name__ == '__main__':
     # --- ORDEM DE HANDLERS (CRÍTICA) ---
 
     # 1. Boas-vindas (Isso precisa rodar antes do bloqueio, pois é permitido em grupo)
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member), group=-1)
 
-    # 2. BLOQUEIO TOTAL DE GRUPOS
-    # O TypeHandler pega QUALQUER coisa (Update). 
-    # Se for grupo e não for admin, ele dá "Stop" e nada abaixo roda.
-    # Isso mata cliques em botões, comandos /menu, forwarding, tudo.
-    application.add_handler(TypeHandler(Update, master_group_blocker))
+    application.add_handler(TypeHandler(Update, master_group_blocker), group=-1)
 
     # --------------------------------------------------------------------------
     # DAQUI PARA BAIXO, SÓ CHEGAM MENSAGENS PRIVADAS (OU DO ADMIN)

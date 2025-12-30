@@ -71,42 +71,50 @@ async def _check_private(update: Update) -> bool:
 # 1. MENU INICIAL E COMANDO /START
 # ==============================================================================
 async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Se for em grupo, ignora totalmente
+    # 1. Se for grupo, ignora
     if update.effective_chat.type != ChatType.PRIVATE:
         return ConversationHandler.END
 
-    # ✅ CORREÇÃO 1: Importação Tardia (Lazy Import) para evitar Erro Circular
-    try:
-        from handlers.start_handler import start_command
-    except ImportError:
-        start_command = None
-        logger.error("Erro ao importar start_command dentro do auth!")
-
     user = update.effective_user
     
-    # 1. DEEP LINK (CRIAR CONTA)
+    # 2. Verifica se é comando de criar conta (Deep Link)
     if context.args and context.args[0] == 'criar_conta':
         await start_register_flow(update, context)
         return TYPING_USER_REG
 
-    # 2. CHECK SE JÁ ESTÁ LOGADO
+    # 3. Verifica se já está logado (Sessão Ativa)
     session_id = get_session_id(context)
     if session_id:
-        # ... (lógica de verificação do usuário mantém igual) ...
         try:
+            # Verifica se o usuário ainda existe no banco
             oid = ObjectId(session_id)
             user_doc = USERS_COLLECTION.find_one({"_id": oid})
         except Exception:
             user_doc = None
 
         if not user_doc:
+             # Sessão inválida, limpa e pede login
              context.user_data.clear()
         else:
-            # Se já está logado, chama o menu principal
-            if start_command:
-                await start_command(update, context)
-            else:
-                await update.message.reply_text("⚠️ Você já está logado, mas o Menu Principal não pode ser carregado.")
+            # ✅ CORREÇÃO AQUI: Em vez de tentar importar o start_command e travar,
+            # nós enviamos uma mensagem simples e direta. Isso quebra o ciclo de erro.
+            nome = user_doc.get('character_name', 'Aventureiro')
+            
+            # Tenta apagar a mensagem do /start para ficar limpo
+            try: await update.message.delete()
+            except: pass
+
+            # Envia o painel de "Já Logado"
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=IMG_LOGIN,
+                caption=(
+                    f"✅ <b>Você já está conectado, {nome}!</b>\n\n"
+                    "O sistema recuperou sua sessão.\n"
+                    "👉 <b>Clique aqui para jogar:</b> /menu"
+                ),
+                parse_mode="HTML"
+            )
             return ConversationHandler.END
 
     # 3. CHECK DE CONTA ANTIGA / MIGRAÇÃO

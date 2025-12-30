@@ -96,59 +96,59 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
 
 async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
     """
-    Reseta os tickets de arena para 5 diariamente (CORRIGIDO PARA O ITEM DE INVENTÁRIO).
+    Reseta os tickets de arena para 5 diariamente (CORREÇÃO: Define o ITEM no inventário).
     """
     today = _today_str()
     count = 0
     
     msg_reset = "⚔️ <b>ARENA DE ELDORA</b>\nSeus tickets diários foram renovados (5/5)! Boa sorte."
 
-    # Iteramos sobre todos os jogadores
+    # Itera sobre todos os jogadores
     async for user_id, pdata in player_manager.iter_players():
         try:
-            # Verifica se já rodou hoje
+            # Verifica data
             last_reset = pdata.get("last_pvp_entry_reset")
             if last_reset == today: 
                 continue
             
             col, query_id = get_col_and_id(user_id)
             
-            # Se não achou a coleção, tenta fallback numérico
+            # Fallback para ID numérico
             if col is None and str(user_id).isdigit():
                 query_id = int(user_id)
                 col = players_col
 
             if col is not None:
-                # ✅ CORREÇÃO PRINCIPAL:
-                # Usamos $set no 'inventory.ticket_arena' para garantir que ele tenha 5 tickets.
-                # (Se quiser acumular em vez de resetar, use $inc)
+                # ✅ AQUI ESTÁ A CORREÇÃO:
+                # Usamos $set no 'inventory.ticket_arena' para garantir que ele tenha exatamente 5 tickets.
+                # (Se o seu jogo for de acumular, mude $set para $inc)
                 result = col.update_one(
                     {"_id": query_id},
                     {
                         "$set": {
-                            "inventory.ticket_arena": 5, # Define o ITEM no inventário
+                            "inventory.ticket_arena": 5, # <--- Define o ITEM que o PvP procura
                             "last_pvp_entry_reset": today
                         }
                     }
                 )
                 
-                # Notifica o jogador se houve alteração
+                # Envia notificação se mudou algo
                 if result.modified_count > 0:
-                    # Limpa o cache para o bot ler o novo inventário imediatamente
+                    # Limpa cache
                     try:
                         if hasattr(player_manager, "clear_player_cache"):
                             await player_manager.clear_player_cache(user_id)
                     except: pass
                     
-                    # Tenta descobrir o ID do Telegram para enviar a mensagem
+                    # Tenta avisar o usuário
                     telegram_chat_id = pdata.get("telegram_id_owner")
-                    if not telegram_chat_id and (isinstance(user_id, int) or str(user_id).isdigit()):
+                    if not telegram_chat_id and str(user_id).isdigit():
                         telegram_chat_id = int(user_id)
                     
                     if telegram_chat_id:
                         try:
                             await context.bot.send_message(chat_id=telegram_chat_id, text=msg_reset, parse_mode='HTML')
-                            await asyncio.sleep(0.05) # Evita flood
+                            await asyncio.sleep(0.05) 
                         except: pass
                     
                     count += 1
