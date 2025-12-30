@@ -106,13 +106,12 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         await context.bot.answer_callback_query(query.id, f"Você não tem {item_name} suficiente! ({current_tickets} restantes)", show_alert=True)
         return
 
-    # 3. Busca Oponentes (LÓGICA CORRIGIDA PARA MONGODB)
+    # 3. Busca Oponentes (LÓGICA OTIMIZADA MONGODB)
     my_points = player_manager.get_pvp_points(player_data)
     opponents_found = []
     
     try:
         if players_collection is not None:
-            
             pipeline = [
                 {"$match": {"_id": {"$ne": user_id}}},
                 {"$match": {"level": {"$gte": 1}}},
@@ -191,22 +190,41 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
         sent_msg = None
         try:
-            opponent_class_key = (opponent_data.get("class_key") or opponent_data.get("class") or "default")
-            video_key = f"classe_{opponent_class_key.lower()}_media"
+            # Tenta pegar a Mídia da Classe do Oponente
+            raw_class = opponent_data.get("class_key") or opponent_data.get("class") or "guerreiro"
+            class_slug = raw_class.lower().strip()
+            video_key = f"classe_{class_slug}_media"
+            
             media_data = file_ids.get_file_data(video_key) 
 
+            # LÓGICA DE VÍDEO CORRIGIDA
             if media_data and media_data.get("id"):
-                method = context.bot.send_video if media_data.get("type") == "video" else context.bot.send_photo
-                sent_msg = await method(
+                file_id = media_data["id"]
+                # Verifica explicitamente se é vídeo
+                if media_data.get("type") == "video":
+                    sent_msg = await context.bot.send_video(
+                        chat_id=query.message.chat_id, 
+                        video=file_id, 
+                        caption=caption_batalha, 
+                        parse_mode=ParseMode.HTML
+                    )
+                else:
+                    # Se não for vídeo, manda foto
+                    sent_msg = await context.bot.send_photo(
+                        chat_id=query.message.chat_id, 
+                        photo=file_id, 
+                        caption=caption_batalha, 
+                        parse_mode=ParseMode.HTML
+                    )
+            else:
+                # Fallback se não tiver mídia da classe
+                sent_msg = await context.bot.send_message(
                     chat_id=query.message.chat_id, 
-                    video=media_data["id"] if media_data.get("type") == "video" else media_data["id"], 
-                    photo=media_data["id"], 
-                    caption=caption_batalha, 
+                    text=caption_batalha, 
                     parse_mode=ParseMode.HTML
                 )
-            else:
-                sent_msg = await context.bot.send_message(chat_id=query.message.chat_id, text=caption_batalha, parse_mode=ParseMode.HTML)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Erro visual ao enviar mídia: {e}")
             sent_msg = await context.bot.send_message(chat_id=query.message.chat_id, text="⚔️ Batalha Iniciada!")
 
         # --- SIMULAÇÃO DA BATALHA ---
@@ -239,38 +257,32 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             await aplicar_resultado_pvp_seguro(final_opponent_id, elo_ganho, 0)
             log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
 
-        # --- ANIMAÇÃO DO LOG (Loop) ---
+        # --- ANIMAÇÃO DO LOG (Loop Janela Deslizante) ---
         reply_markup_final = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]])
         
         if sent_msg:
             dest_chat_id = sent_msg.chat_id
             dest_msg_id = sent_msg.message_id
             is_media = bool(sent_msg.photo or sent_msg.video)
-            header = log_final[0] # Cabeçalho com stats (estático)
-            corpo_log = log_final[1:] # O resto é pancadaria
+            
+            header = log_final[0] # Cabeçalho
+            corpo_log = log_final[1:] # Ação
                 
-            # Tamanho do bloco: Mostra 4 linhas novas por vez (geralmente Atk P1 + Dano + Atk P2 + Dano)
             passo = 4 
-                
-            # Quantas linhas de histórico mantemos na tela? (8 linhas = ~2 turnos completos)
-            # Isso faz a tela ficar cheia e bonita.
             tamanho_janela = 10 
 
             for i in range(0, len(corpo_log), passo):
-                    
                 is_last_frame = (i + passo) >= len(corpo_log)
                 markup = reply_markup_final if is_last_frame else None
                     
                 # CÁLCULO DA JANELA
-                # Pegamos do índice atual (i) + passo, e olhamos para trás (tamanho_janela)
                 fim_slice = i + passo
                 inicio_slice = max(0, fim_slice - tamanho_janela)
-                    
+                
                 chunk_atual = corpo_log[inicio_slice : fim_slice]
                     
-                # Se for o frame final, garante que mostra o resultado da luta
                 if is_last_frame:
-                    # Pega as últimas 12 linhas para garantir que o resultado final apareça
+                    # No final, garante mostrar o resultado (últimas 12 linhas)
                     chunk_atual = corpo_log[max(0, len(corpo_log) - 12):]
                     texto_combate = "\n".join(chunk_atual)
                     texto_frame = f"{header}\n\n📜 <b>Histórico Recente:</b>\n{texto_combate}"
@@ -278,8 +290,8 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                     texto_combate = "\n".join(chunk_atual)
                     rodape = "\n\n⚔️ <i>A batalha continua...</i>"
                     texto_frame = f"{header}\n\n{texto_combate}{rodape}"
-                    
-                # Proteção de limite de caracteres (Caption = 1024)
+                
+                # Proteção de limite de caracteres
                 if len(texto_frame) > 1000: 
                     texto_frame = texto_frame[:990] + "..."
 
@@ -300,11 +312,9 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                             reply_markup=markup,
                             parse_mode=ParseMode.HTML
                         )
-                except Exception as e:
-                    # Se der erro de "Message not modified", apenas ignora
+                except Exception:
                     pass 
                     
-                # Pausa dramática
                 if not is_last_frame:
                     await asyncio.sleep(2.5)
         else:
@@ -312,7 +322,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             await context.bot.send_message(chat_id=query.message.chat_id, text="\n".join(log_final[-10:]), reply_markup=reply_markup_final)
 
     else: 
-        # 5. CASO NÃO ACHE NINGUÉM (NÃO CONSOME TICKET)
+        # 5. CASO NÃO ACHE NINGUÉM
         no_opp_msg = "🛡️ <b>Arena Vazia!</b>\nNão encontramos oponentes neste momento.\n<i>Seu ticket foi preservado.</i>"
         keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
