@@ -463,6 +463,12 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
         char_name = pdata.get("character_name", "Aventureiro")
     except Exception: return
     
+    # --- 1. PREPARAÇÃO: Mapear o que está equipado (SEGURANÇA) ---
+    # Cria uma lista com os IDs de todos os itens que estão no corpo do personagem
+    equipment = pdata.get("equipment", {})
+    equipped_ids = {uid for uid in equipment.values() if uid}
+    # -------------------------------------------------------------
+
     sellable = []
     WHITELIST_GOLD = [
         "couro_de_lobo", "couro_de_lobo_alfa", "couro_lobo", "couro_curtido",
@@ -470,7 +476,7 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
         "rolo_de_pano_simples", "veludo_runico", "rolo_seda_sombria",
         "barra_de_ferro", "barra_de_aco", "barra_de_prata", "barra_bronze",
         "fio_de_prata",
-        "presa_de_javali", 
+        "presa_de_javali", "asa_de_morcego", "membrana_de_couro_fino",
         
         "minerio_de_cobre", "minerio_de_ferro", "minerio_de_ouro",
         "minerio_de_estanho", "minerio_de_prata", "carvao", "cristal_bruto",
@@ -478,9 +484,7 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
         ]
     BLOCKED_KEYWORDS = [
         "essencia", "fragmento", "alma", "emblema", 
-        "lamina", 
-        "lâmina", 
-        "poeira", "aco", "aço", "totem", 
+        "lamina", "lâmina", "poeira", "aco", "aço", "totem", 
         "reliquia", "relíquia", "foco", 
         "coracao", "coração", "selo", "calice", "cálice", 
         "espirito", "espírito", 
@@ -492,10 +496,15 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
         "skin", "traje", "caixa", "chave", 
         "ticket", "sigilo", "cristal", "batuta", 
         "gemas", "gems", "ouro", "gold", "xp", "experiencia"
-        
         ]
     
     for item_id, data in inv.items():
+        # --- 2. FILTRO DE SEGURANÇA ---
+        # Se o ID do item estiver na lista de equipados, ele é invisível aqui.
+        if item_id in equipped_ids:
+            continue
+        # ------------------------------
+
         try:
             if isinstance(data, dict): 
                 base_id = data.get("base_id") or data.get("tpl") or item_id

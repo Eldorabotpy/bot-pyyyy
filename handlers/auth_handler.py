@@ -408,7 +408,7 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
 
-    # 5. O PASSO MAIS IMPORTANTE:
+    # 5. O PASSO MAIS IMPORTANTE: 
     # Retorna END para dizer ao ConversationHandler do Jogo que acabou!
     return ConversationHandler.END
 

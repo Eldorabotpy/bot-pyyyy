@@ -371,5 +371,11 @@ MATERIALS_DATA = {
         "stackable": True, 
         "media_key": "item_fio_de_prata"
     },
+    "membrana_de_couro_fino": {
+        "display_name": "Membrana de couro fino", "emoji": "🟤🦇",
+        "type": "material_refinado", "category": "coletavel", 
+        "stackable": True, 
+        "media_key": "item_membrana_de_couro_fino"
+    },
     
 }
