@@ -71,50 +71,41 @@ async def _check_private(update: Update) -> bool:
 # 1. MENU INICIAL E COMANDO /START
 # ==============================================================================
 async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Se for grupo, ignora
+    # Se for em grupo, ignora
     if update.effective_chat.type != ChatType.PRIVATE:
         return ConversationHandler.END
 
+    # ✅ CORREÇÃO: Importação Tardia (Lazy Import) para destravar o bot
+    try:
+        from handlers.start_handler import start_command
+    except ImportError:
+        start_command = None
+
     user = update.effective_user
     
-    # 2. Verifica se é comando de criar conta (Deep Link)
+    # 1. DEEP LINK (CRIAR CONTA)
     if context.args and context.args[0] == 'criar_conta':
         await start_register_flow(update, context)
         return TYPING_USER_REG
 
-    # 3. Verifica se já está logado (Sessão Ativa)
+    # 2. CHECK SE JÁ ESTÁ LOGADO
     session_id = get_session_id(context)
     if session_id:
+        # ... (lógica de verificação do usuário mantém igual) ...
         try:
-            # Verifica se o usuário ainda existe no banco
             oid = ObjectId(session_id)
             user_doc = USERS_COLLECTION.find_one({"_id": oid})
         except Exception:
             user_doc = None
 
         if not user_doc:
-             # Sessão inválida, limpa e pede login
              context.user_data.clear()
         else:
-            # ✅ CORREÇÃO AQUI: Em vez de tentar importar o start_command e travar,
-            # nós enviamos uma mensagem simples e direta. Isso quebra o ciclo de erro.
-            nome = user_doc.get('character_name', 'Aventureiro')
-            
-            # Tenta apagar a mensagem do /start para ficar limpo
-            try: await update.message.delete()
-            except: pass
-
-            # Envia o painel de "Já Logado"
-            await context.bot.send_photo(
-                chat_id=update.effective_chat.id,
-                photo=IMG_LOGIN,
-                caption=(
-                    f"✅ <b>Você já está conectado, {nome}!</b>\n\n"
-                    "O sistema recuperou sua sessão.\n"
-                    "👉 <b>Clique aqui para jogar:</b> /menu"
-                ),
-                parse_mode="HTML"
-            )
+            # Se já está logado, chama o menu principal
+            if start_command:
+                await start_command(update, context)
+            else:
+                await update.message.reply_text("⚠️ Você já está logado, mas o Menu Principal não pode ser carregado.")
             return ConversationHandler.END
 
     # 3. CHECK DE CONTA ANTIGA / MIGRAÇÃO
@@ -321,7 +312,13 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "max_hp": 50, "current_hp": 50,
         "energy": 20, "max_energy": 20, "energy_last_ts": now_iso,
         "inventory": {}, "equipment": {},
-        "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}
+        "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
+        
+        # --- CORREÇÃO AQUI: Força o plano FREE ---
+        "premium_tier": "free",      # Define explicitamente como Free
+        "premium_expires_at": None,  # Sem data de expiração
+        "gems": 0                    # Garante que começa com 0 gemas
+        # -----------------------------------------
     }
     
     result = USERS_COLLECTION.insert_one(new_player_doc)
@@ -398,13 +395,23 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     new_data = dict(old_data)
     if "_id" in new_data: del new_data["_id"]
         
+    # --- CORREÇÃO AQUI: Remove o VIP antigo ---
+    # Removemos qualquer traço de VIP da conta antiga para garantir que 
+    # a nova conta comece "limpa" nesse aspecto.
+    new_data.pop("premium_tier", None)
+    new_data.pop("premium_expires_at", None)
+    
+    # Define os novos padrões
     new_data.update({
         "username": username,
         "password": hash_password(password),
         "telegram_id_owner": telegram_id,
         "migrated_at": datetime.now().isoformat(),
-        "is_migrated": True
+        "is_migrated": True,
+        "premium_tier": "free",      # Força Free
+        "premium_expires_at": None   # Força sem validade
     })
+    # ------------------------------------------
     
     result = USERS_COLLECTION.insert_one(new_data)
     context.user_data['logged_player_id'] = str(result.inserted_id)
@@ -412,7 +419,7 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     
     await update.message.reply_photo(
         photo=IMG_MIGRACAO,
-        caption="✅ <b>Migração Concluída!</b>\nTodos os seus itens foram salvos.",
+        caption="✅ <b>Migração Concluída!</b>\nSeus itens foram salvos, mas o plano VIP (se houver) é vinculado à conta, não ao usuário.",
         parse_mode="HTML"
     )
     
