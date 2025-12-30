@@ -10,9 +10,12 @@ from telegram.ext import (
     filters,
     CommandHandler,
 )
-# Certifique-se de ter este utils ou ajuste para sua lógica de ID
 from handlers.admin.utils import parse_hybrid_id
 from modules import player_manager
+
+# --- IMPORTAÇÃO CRÍTICA PARA BUSCAR POR NOME ---
+# Isso permite achar o ID digitando "Aragorn" ou "GuerreiroX"
+from modules.player.queries import find_player_by_name_norm
 
 logger = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
@@ -26,10 +29,8 @@ MAIN_MENU, ASKING_PLAYER_RESPEC, ASKING_PLAYER_IDLE, CONFIRM_ALL, CONFIRM_IDLE =
 async def _reset_points_one(p: dict) -> int:
     """Reseta status e devolve pontos (Async)."""
     try:
-        # Usa await pois a função no player_manager é async
         refunded = await player_manager.reset_stats_and_refund_points(p)
         
-        # Recalcula totais para corrigir HP/MP
         totals = await player_manager.get_player_total_stats(p)
         max_hp = int(totals.get("max_hp", p.get("max_hp", 50)))
         p["current_hp"] = max(1, min(int(p.get("current_hp", max_hp)), max_hp))
@@ -44,12 +45,9 @@ async def _reset_points_one(p: dict) -> int:
 # ==============================================================================
 
 async def _entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Abre o menu de Reset."""
     query = update.callback_query
-    if query:
-        await query.answer()
+    if query: await query.answer()
     
-    # Verifica Admin
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
         if query: await query.edit_message_text("⛔ Acesso negado.")
@@ -70,113 +68,131 @@ async def _entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
     else:
         await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
-        
     return MAIN_MENU
 
 async def _ask_player_for_respec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Pede o ID/Nome do jogador para resetar."""
     query = update.callback_query
     await query.answer()
     
-    action = query.data  # ex: reset_action_points
+    action = query.data
     context.user_data['reset_action'] = action
     
     readable = "Status"
     if "class" in action: readable = "Classe"
     if "prof" in action: readable = "Profissão"
 
-    text = f"👤 **Resetar {readable}**\n\nDigite o **ID Numérico**, **@Username** ou **Nome** do jogador:"
+    text = f"👤 **Resetar {readable}**\n\nDigite o **ID Numérico**, **@Username** ou **Nome do Personagem**:"
     kb = [[InlineKeyboardButton("🔙 Cancelar", callback_data="reset_back_to_main")]]
     
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
     return ASKING_PLAYER_RESPEC
 
 async def _ask_player_for_idle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Pede o ID para limpar estado travado."""
     query = update.callback_query
     await query.answer()
     context.user_data['reset_action'] = "idle_fix"
     
-    text = "💤 **Limpar Estado (Anti-Bug)**\n\nDigite o **ID Numérico** ou **@Username** do jogador travado:"
+    text = "💤 **Limpar Estado (Anti-Bug)**\n\nDigite o **ID Numérico**, **@Username** ou **Nome do Personagem**:"
     kb = [[InlineKeyboardButton("🔙 Cancelar", callback_data="reset_back_to_main")]]
     
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
     return ASKING_PLAYER_IDLE
 
-# --- EXECUÇÃO DO RESET INDIVIDUAL ---
+# --- EXECUÇÃO DO RESET INDIVIDUAL (COM BUSCA POR NOME) ---
 async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text_input = update.message.text.strip()
     action = context.user_data.get('reset_action')
     
-    # Busca Jogador
+    # 1. Tenta identificar ID Numérico ou @Mention
     target_id = parse_hybrid_id(text_input)
+    
+    # 2. Se não achou ID direto, busca pelo NOME DO PERSONAGEM
     if not target_id:
-        # Tenta buscar por nome se o ID falhar
-        from modules.player.queries import find_player_by_name_norm
         found = await find_player_by_name_norm(text_input)
         if found:
+            # found retorna uma tupla (user_id, player_data)
             target_id = found[0]
+        else:
+            await update.message.reply_text(
+                f"❌ Personagem **'{text_input}'** não encontrado.\nTente o ID numérico ou verifique o nome exato.",
+                parse_mode="Markdown"
+            )
+            return ASKING_PLAYER_RESPEC
 
+    # 3. Carrega dados do alvo
     pdata = await player_manager.get_player_data(target_id)
     if not pdata:
-        await update.message.reply_text("❌ Jogador não encontrado. Tente o ID numérico.")
+        await update.message.reply_text("❌ Dados do jogador não encontrados (ID inválido?).")
         return ASKING_PLAYER_RESPEC
 
-    # Executa a ação
+    # 4. Executa a ação
     msg_result = ""
+    char_name = pdata.get('character_name', 'Desconhecido')
     
     if action == "reset_action_points":
         refunded = await _reset_points_one(pdata)
-        msg_result = f"✅ Status resetados! {refunded} pontos devolvidos."
+        msg_result = f"✅ Status de **{char_name}** resetados!\n💎 {refunded} pontos devolvidos."
         
     elif action == "reset_action_class":
-        # Remove classe e devolve pontos
         pdata["class"] = None
         pdata["class_key"] = None
         pdata["subclass"] = None
-        # Opcional: Resetar skills também
+        # Opcional: Resetar skills aqui se quiser
         await _reset_points_one(pdata)
-        msg_result = "✅ Classe removida e pontos resetados."
+        msg_result = f"✅ Classe de **{char_name}** removida (voltou a Novato)."
 
     elif action == "reset_action_prof":
         pdata["profession"] = {}
         pdata["profession_xp"] = 0
-        msg_result = "✅ Profissão zerada."
+        msg_result = f"✅ Profissão de **{char_name}** zerada."
 
     # Salva
     await player_manager.save_player_data(target_id, pdata)
     
     await update.message.reply_text(
-        f"{msg_result}\n👤 Jogador: {pdata.get('character_name')}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="reset_back_to_main")]])
+        msg_result,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="reset_back_to_main")]],),
+        parse_mode="Markdown"
     )
     return MAIN_MENU
 
-# --- EXECUÇÃO DO IDLE FIX ---
+# --- EXECUÇÃO DO IDLE FIX (COM BUSCA POR NOME) ---
 async def _receive_player_for_idle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text_input = update.message.text.strip()
+    
+    # 1. Tenta ID direto
     target_id = parse_hybrid_id(text_input)
     
+    # 2. Se falhar, tenta NOME
+    if not target_id:
+        found = await find_player_by_name_norm(text_input)
+        if found:
+            target_id = found[0]
+        else:
+            await update.message.reply_text("❌ Jogador/Personagem não encontrado.")
+            return ASKING_PLAYER_IDLE
+
     pdata = await player_manager.get_player_data(target_id)
     if not pdata:
-        await update.message.reply_text("❌ Jogador não encontrado.")
+        await update.message.reply_text("❌ Dados não encontrados.")
         return ASKING_PLAYER_IDLE
 
     pdata["player_state"] = {"action": "idle"}
     await player_manager.save_player_data(target_id, pdata)
     
     await update.message.reply_text(
-        f"✅ Estado forçado para **IDLE**.\n👤 {pdata.get('character_name')}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="reset_back_to_main")]])
+        f"✅ Estado de **{pdata.get('character_name')}** forçado para **IDLE**.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="reset_back_to_main")]],),
+        parse_mode="Markdown"
     )
     return MAIN_MENU
 
-# --- RESET GLOBAL (CUIDADO) ---
+# --- RESET GLOBAL ---
 async def _reset_all_points_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     
-    text = "⚠️ **PERIGO: RESET GLOBAL** ⚠️\n\nIsso irá resetar os status de **TODOS** os jogadores do banco de dados.\nTem certeza absoluta?"
+    text = "⚠️ **PERIGO: RESET GLOBAL** ⚠️\n\nIsso irá resetar os status de **TODOS** os jogadores.\nTem certeza absoluta?"
     kb = [
         [InlineKeyboardButton("✅ SIM, RESETAR TUDO", callback_data="reset_execute_points_all")],
         [InlineKeyboardButton("🔙 NÃO! Cancelar", callback_data="reset_back_to_main")]
@@ -187,7 +203,7 @@ async def _reset_all_points_confirm(update: Update, context: ContextTypes.DEFAUL
 async def _reset_all_points_execute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("⏳ Iniciando reset global... Isso pode demorar.")
+    await query.edit_message_text("⏳ Iniciando reset global... Aguarde.")
     
     count = 0
     async for uid, pdata in player_manager.iter_players():
@@ -203,7 +219,7 @@ async def _reset_all_points_execute(update: Update, context: ContextTypes.DEFAUL
     )
     return ConversationHandler.END
 
-# --- CANCELAR / FECHAR ---
+# --- CANCELAR ---
 async def _cancel_op(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     if query: 
@@ -214,7 +230,7 @@ async def _cancel_op(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 # ==============================================================================
-# CONFIGURAÇÃO DO CONVERSATION HANDLER
+# CONFIGURAÇÃO
 # ==============================================================================
 reset_panel_conversation_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(_entry_point, pattern=r'^admin_reset_panel$')],
@@ -237,7 +253,7 @@ reset_panel_conversation_handler = ConversationHandler(
             CallbackQueryHandler(_reset_all_points_execute, pattern=r'^reset_execute_points_all$'),
             CallbackQueryHandler(_entry_point, pattern=r'^reset_back_to_main$'),
         ],
-        CONFIRM_IDLE: [ # Estado reserva caso implemente confirmação de idle no futuro
+        CONFIRM_IDLE: [
             CallbackQueryHandler(_entry_point, pattern=r'^reset_back_to_main$'),
         ]
     },

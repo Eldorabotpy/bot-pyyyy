@@ -613,9 +613,12 @@ async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
     """Wrapper para forçar a entrega de cristais diários via admin."""
     return await daily_crystal_grant_job(context)
 
+# Em handlers/jobs.py
+
 async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Job periódico: Verifica assinaturas vencidas, remove o status e notifica o usuário.
+    Atualiza TANTO a coleção 'players' QUANTO a coleção 'users'.
     """
     from modules.player.premium import PremiumManager
     
@@ -633,22 +636,40 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
             # Instancia o gerenciador
             pm = PremiumManager(pdata)
             
-            # Se NÃO for premium (porque a data venceu), mas o tier no banco ainda diz que é...
-            # (A função pm.is_premium() já faz a checagem matemática da data)
+            # Se a data venceu...
             if not pm.is_premium():
-                # 1. Pega a data de expiração para ter certeza que não é permanente
                 exp_date = pm.expiration_date
                 
-                # Só remove se tiver uma data de validade definida (não remove permanentes)
+                # Só remove se tiver uma data de validade definida (ignora permanentes)
                 if exp_date is not None and exp_date < now:
                     
-                    # 2. Revoga o status (Limpa os campos no dicionário)
+                    # 1. Revoga na memória e salva na coleção PLAYERS
                     pm.revoke()
-                    
-                    # 3. Salva no Banco de Dados
                     await player_manager.save_player_data(user_id, pdata)
                     
-                    # 4. Notifica o Jogador
+                    # 2. --- CORREÇÃO: Sincroniza com a coleção USERS ---
+                    if users_col is not None:
+                        query_user = None
+                        
+                        # Descobre como achar esse usuário na tabela 'users'
+                        if isinstance(user_id, int):
+                            # Contas antigas (Telegram ID)
+                            query_user = {"telegram_id_owner": user_id}
+                        elif isinstance(user_id, ObjectId):
+                            # Contas novas (ObjectId)
+                            query_user = {"_id": user_id}
+                        elif isinstance(user_id, str) and ObjectId.is_valid(user_id):
+                            # Caso venha como string
+                            query_user = {"_id": ObjectId(user_id)}
+                            
+                        if query_user:
+                            users_col.update_one(
+                                query_user, 
+                                {"$set": {"premium_tier": "free", "premium_expires_at": None}}
+                            )
+                    # ---------------------------------------------------
+                    
+                    # 3. Notifica o Jogador
                     try:
                         msg = (
                             "⚠️ <b>ASSINATURA EXPIRADA</b>\n\n"
@@ -658,7 +679,7 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
                         )
                         await context.bot.send_message(chat_id=user_id, text=msg, parse_mode="HTML")
                     except Exception:
-                        pass # Usuário bloqueou o bot ou erro de rede
+                        pass
                         
                     count_downgraded += 1
                     
@@ -667,5 +688,5 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
             continue
 
     if count_downgraded > 0:
-        logger.info(f"[JOB PREMIUM] {count_downgraded} assinaturas vencidas foram removidas.")
+        logger.info(f"[JOB PREMIUM] {count_downgraded} assinaturas vencidas foram removidas de Players e Users.")
         
