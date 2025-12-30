@@ -28,19 +28,38 @@ def get_player_class_media(player_data: dict):
             return fd
     return None
 
+# Em pvp/pvp_utils.py
+
 def gerar_barra_hp(atual: int, maximo: int, tamanho: int = 10) -> str:
-    """Gera uma barra de vida visual (ex: 🟥🟥🟥⬜⬜)."""
+    """
+    Gera uma barra de vida que muda de cor baseada na % restante.
+    Ex: 🟩🟩🟩🟩🟩 (100%) -> 🟨🟨🟨⬜⬜ (50%) -> 🟥🟥⬜⬜⬜ (20%)
+    """
     if maximo <= 0: maximo = 1
     if atual < 0: atual = 0
+    if atual > maximo: atual = maximo
     
     porcentagem = atual / maximo
     cheios = int(porcentagem * tamanho)
+    # Garante pelo menos 1 quadrado se tiver > 0 de vida
+    if cheios == 0 and atual > 0:
+        cheios = 1
+    
     vazios = tamanho - cheios
     
-    # Barra vermelha para HP baixo, Verde/Azul para cheio (opcional, aqui usaremos padrão)
-    return "🟥" * cheios + "⬜" * vazios
-
-# --- FERRAMENTAS DE LÓGICA DE JOGO (PvP) ---
+    # Lógica de Cores (Paleta Satisfatória)
+    if porcentagem > 0.6:     # Acima de 60% = Verde
+        bloco = "🟩"
+    elif porcentagem > 0.25:  # Entre 25% e 60% = Amarelo/Laranja
+        bloco = "🟨"
+    else:                     # Abaixo de 25% = Vermelho (Perigo!)
+        bloco = "🟥"
+    
+    barra = (bloco * cheios) + ("⬜" * vazios)
+    
+    # Adiciona a % numérica para ficar mais RPG
+    pct_txt = int(porcentagem * 100)
+    return f"{barra} {pct_txt}%"
 
 def get_player_elo(player_points: int) -> str:
     """

@@ -146,8 +146,9 @@ async def post_init_tasks(application: Application):
             except: pass
 
     try:
-        from handlers.jobs import job_pvp_monthly_reset
-        jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=0, minute=0, tzinfo=tz), name="pvp_monthly_check")
+        from handlers.jobs import daily_pvp_entry_reset_job
+        # Agenda para 12:25 (ou outro horário)
+        jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_daily_entry_reset")
     except ImportError: pass
 
     logging.info("Jobs agendados.")

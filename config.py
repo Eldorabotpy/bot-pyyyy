@@ -28,7 +28,7 @@ JOB_TIMEZONE = os.getenv("JOB_TIMEZONE", "America/Sao_Paulo")
 # Horários de início e fim dos 4 eventos (Defesa do Reino)
 # Formato: (hora_inicio, min_inicio, hora_fim, min_fim)
 EVENT_TIMES = [
-    (9,  10,   9, 40),  # Evento das 09:00 (dura 30 min)
+    (9,  00,   9, 30),  # Evento das 09:00 (dura 30 min)
     (12, 0,  12, 30),  # Evento das 12:00 (dura 30 min)
     (18, 10,  18, 40),  # Evento das 18:00 (dura 30 min)
     (22, 0,  22, 30),  # Evento das 22:00 (dura 30 min)

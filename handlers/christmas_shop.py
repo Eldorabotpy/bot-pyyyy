@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 # O evento acaba dia 29 de Dezembro às 23:59 UTC
 NOW = datetime.now(timezone.utc)
-EVENT_END_DATE = datetime(NOW.year, 12, 29, 23, 59, 59, tzinfo=timezone.utc)
+EVENT_END_DATE = datetime(NOW.year + 1, 1, 1, 23, 59, 59, tzinfo=timezone.utc)
 
 # Itens que dropam dos monstros (Configure no items.py)
 ITEM_COMUM = "presente_perdido" # Troca por Sigilo

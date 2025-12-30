@@ -198,7 +198,9 @@ async def simular_batalha_completa(player1_id, player2_id, modifier_effect=None,
 
     # Loop da batalha
     for round_num in range(1, 21):
-        battle_log.append(f"\n--- <b>Turno {round_num}</b> ---")
+        # AQUI: Usamos um separador sutil em vez de "Turno X" que gasta muito espaço
+        battle_log.append(f"───────────────") 
+        battle_log.append(f"⏱️ <b>Turno {round_num}</b>")
 
         # --- Ataque do primeiro jogador ---
         try:
@@ -217,7 +219,7 @@ async def simular_batalha_completa(player1_id, player2_id, modifier_effect=None,
 
             battle_log.append(f"➡️ {html.escape(atacante_name)} ataca!")
             battle_log.extend(crit_log)
-            battle_log.append(f"💥 {html.escape(defensor_name)} recebe {dano} de dano.\n   {barra_hp} ({hp_atual_def}/{hp_max_def})")
+            battle_log.append(f"💥 {html.escape(defensor_name)} recebeu <b>-{dano} HP</b>!\n   {barra_hp}")
             
         except Exception as e_atk1:
             logger.error(f"Erro no ataque 1: {e_atk1}")

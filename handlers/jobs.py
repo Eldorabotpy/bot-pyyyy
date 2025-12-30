@@ -6,6 +6,8 @@ import logging
 import datetime
 import asyncio
 import certifi
+from telegram import Update
+from telegram.ext import CommandHandler
 from zoneinfo import ZoneInfo
 from typing import Dict, Optional, Any
 from telegram.ext import ContextTypes
@@ -91,7 +93,7 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
 # ==============================================================================
 
 async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
-    """Reseta as 10 entradas diárias da Arena PvP."""
+    """Reseta as 10 entradas diárias da Arena PvP (CORRIGIDO PARA MONGODB)."""
     today = _today_str()
     count = 0
     
@@ -99,21 +101,19 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
 
     async for user_id, pdata in player_manager.iter_players():
         try:
-            # Verifica se já recebeu HOJE
             last_reset = pdata.get("last_pvp_entry_reset")
             if last_reset == today: 
                 continue
             
-            # --- CORREÇÃO: Força conversão e roteamento seguro ---
             col, query_id = get_col_and_id(user_id)
             
-            # Se falhar o roteamento automático, tenta converter ID numérico para int
+            # Fallback: Se falhar e for numérico, assume que é player antigo
             if col is None and str(user_id).isdigit():
                 query_id = int(user_id)
                 col = players_col
 
             if col is not None:
-                # Atualiza no Banco
+                # 3. Atualiza no Banco de Dados
                 result = col.update_one(
                     {"_id": query_id},
                     {
@@ -124,21 +124,33 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
                     }
                 )
                 
-                # Se atualizou no banco, limpa cache e notifica
+                # 4. Notificação (AQUI ESTAVA O ERRO)
                 if result.modified_count > 0 or result.matched_count > 0:
                     try:
+                        # Limpa cache
                         if hasattr(player_manager, "clear_player_cache"):
                             res = player_manager.clear_player_cache(user_id)
                             if asyncio.iscoroutine(res): await res
                     except: pass
                     
-                    # Notificação ao Jogador
-                    try:
-                        await context.bot.send_message(chat_id=user_id, text=msg_reset, parse_mode='HTML')
-                        await asyncio.sleep(0.05) # Anti-flood leve
-                    except Exception as e:
-                        # Ignora erro de chat não encontrado (bot bloqueado)
-                        pass
+                    # CORREÇÃO CRÍTICA: Descobre o ID real do Telegram
+                    # Se for conta nova (ObjectId), o ID do Telegram está em 'telegram_id_owner'
+                    # Se for conta antiga, o próprio 'user_id' já é o ID do Telegram
+                    telegram_chat_id = pdata.get("telegram_id_owner")
+                    
+                    if not telegram_chat_id:
+                        # Se não tiver o campo owner, tenta usar o próprio ID se for numérico
+                        if isinstance(user_id, int) or str(user_id).isdigit():
+                            telegram_chat_id = int(user_id)
+                    
+                    # Só tenta enviar se achou um ID válido
+                    if telegram_chat_id:
+                        try:
+                            await context.bot.send_message(chat_id=telegram_chat_id, text=msg_reset, parse_mode='HTML')
+                            await asyncio.sleep(0.05) # Anti-flood leve
+                        except Exception as e:
+                            # Ignora erro se o bot foi bloqueado pelo usuário
+                            pass
                     
                     count += 1
             else:

@@ -65,8 +65,11 @@ async def _check_private(update: Update) -> bool:
 # ==============================================================================
 # 1. MENU INICIAL E COMANDO /START
 # ==============================================================================
+# ==============================================================================
+# 1. MENU INICIAL E COMANDO /START (CORRIGIDO)
+# ==============================================================================
 async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Se for em grupo, ignora totalmente (não responde nada para não poluir)
+    # Se for em grupo, ignora totalmente
     if update.effective_chat.type != ChatType.PRIVATE:
         return ConversationHandler.END
 
@@ -92,8 +95,9 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if start_command:
                 await start_command(update, context)
             else:
+                # Removemos markdown aqui também para garantir
                 await update.message.reply_text(
-                    f"✅ Você já está logado como **{user_doc.get('username')}**!\n"
+                    f"✅ Você já está logado como {user_doc.get('username')}!\n"
                     "Use /menu para jogar."
                 )
             return ConversationHandler.END
@@ -113,7 +117,8 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if already_migrated:
         current_img = IMG_LOGIN
-        caption_text = f"🛡️ **Bem-vindo de volta, {user.first_name}!**\nDetectamos sua conta Eldora."
+        # REMOVIDO os ** para evitar erro com nomes tipo "Joao_Silva"
+        caption_text = f"🛡️ Bem-vindo de volta, {user.first_name}!\nDetectamos sua conta Eldora."
         keyboard.append([InlineKeyboardButton("🔐 𝔼ℕ𝕋ℝ𝔸ℝ", callback_data='btn_login')])
         keyboard.append([InlineKeyboardButton("📝 𝕀𝕟𝕚𝕔𝕚𝕒𝕣 ℕ𝕠𝕧𝕒 𝕁𝕠𝕣𝕟𝕒𝕕𝕒", callback_data='btn_register')])
     elif old_account:
@@ -121,17 +126,11 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         nome_heroi = old_account.get('character_name', 'Aventureiro')
         caption_text = (
             "📜 𝐎 𝐆𝐑𝐈𝐌𝐎́𝐑𝐈𝐎 𝐅𝐎𝐈 𝐀𝐓𝐔𝐀𝐋𝐈𝐙𝐀𝐃𝐎!\n\n"
-
-            f"Saudações, nobre {nome_heroi}!\n\n"
-
+            f"Saudações, nobre {nome_heroi}!\n\n" # Sem markdown aqui
             "𝘖𝘴 𝘮𝘢𝘨𝘰𝘴 𝘥𝘰 𝘳𝘦𝘪𝘯𝘰 𝘳𝘦𝘯𝘰𝘷𝘢𝘳𝘢𝘮 𝘰𝘴 𝘢𝘯𝘵𝘪𝘨𝘰𝘴 𝘳𝘦𝘨𝘪𝘴𝘵𝘳𝘰𝘴 𝘥𝘦 𝘌𝘭𝘥𝘰𝘳𝘢. "
-
             "𝘗𝘢𝘳𝘢 𝘨𝘢𝘳𝘢𝘯𝘵𝘪𝘳 𝘲𝘶𝘦 𝘴𝘶𝘢𝘴 𝘭𝘦𝘯𝘥𝘢𝘴, 𝘰𝘶𝘳𝘰𝘴 𝘦 𝘤𝘰𝘯𝘲𝘶𝘪𝘴𝘵𝘢𝘴 𝘯𝘢̃𝘰 𝘴𝘦 𝘱𝘦𝘳𝘤𝘢𝘮 𝘯𝘢𝘴 𝘢𝘳𝘦𝘪𝘢𝘴 𝘥𝘰 𝘵𝘦𝘮𝘱𝘰, "
-
             "𝘦́ 𝘯𝘦𝘤𝘦𝘴𝘴𝘢́𝘳𝘪𝘰 𝐯𝐢𝐧𝐜𝐮𝐥𝐚𝐫 𝐬𝐮𝐚 𝐚𝐥𝐦𝐚 𝘢 𝘶𝘮 𝘯𝘰𝘷𝘰 𝘙𝘦𝘨𝘪𝘴𝘵𝘳𝘰 𝘔𝘢́𝘨𝘪𝘤𝘰.\n\n"
-
             "𝘕𝘢̃𝘰 𝘵𝘦𝘮𝘢! 𝘛𝘰𝘥𝘰 𝘰 𝘴𝘦𝘶 𝘱𝘰𝘥𝘦𝘳 𝘦 𝘪𝘯𝘷𝘦𝘯𝘵𝘢́𝘳𝘪𝘰 𝘴𝘦𝘳𝘢̃𝘰 𝘱𝘳𝘦𝘴𝘦𝘳𝘷𝘢𝘥𝘰𝘴 𝘥𝘶𝘳𝘢𝘯𝘵𝘦 𝘰 𝘳𝘪𝘵𝘶𝘢𝘭."
-
         )
         keyboard.append([InlineKeyboardButton("✨ RESGATAR MEU LEGADO", callback_data='btn_migrate')])
         keyboard.append([InlineKeyboardButton("🆕 Iniciar Nova Jornada", callback_data='btn_register')])
@@ -148,20 +147,23 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try: await update.callback_query.delete_message()
         except Exception: pass
             
+    # BLOCO DE ENVIO SEGURO (SEM PARSE_MODE)
     try:
         await context.bot.send_photo(
             chat_id=update.effective_chat.id,
             photo=current_img,
             caption=caption_text,
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
+            reply_markup=reply_markup
+            # parse_mode REMOVIDO para evitar crash
         )
-    except Exception:
+    except Exception as e:
+        logger.error(f"Erro ao enviar foto no auth: {e}")
+        # Fallback seguro
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=caption_text,
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
+            reply_markup=reply_markup
+            # parse_mode REMOVIDO para evitar crash
         )
 
     return CHOOSING_ACTION
