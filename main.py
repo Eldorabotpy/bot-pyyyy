@@ -133,7 +133,7 @@ async def post_init_tasks(application: Application):
     jq.run_repeating(check_premium_expiry_job, interval=3600, first=60, name="premium_checker")
     
     if daily_pvp_entry_reset_job:
-        jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=12, minute=25, tzinfo=tz), name="pvp_daily_entry_reset")
+        jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=16, minute=27, tzinfo=tz), name="pvp_daily_entry_reset")
 
     if EVENT_TIMES:
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):

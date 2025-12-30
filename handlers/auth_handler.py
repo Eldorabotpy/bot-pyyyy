@@ -75,6 +75,13 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != ChatType.PRIVATE:
         return ConversationHandler.END
 
+    # ✅ CORREÇÃO 1: Importação Tardia (Lazy Import) para evitar Erro Circular
+    try:
+        from handlers.start_handler import start_command
+    except ImportError:
+        start_command = None
+        logger.error("Erro ao importar start_command dentro do auth!")
+
     user = update.effective_user
     
     # 1. DEEP LINK (CRIAR CONTA)
@@ -85,6 +92,7 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. CHECK SE JÁ ESTÁ LOGADO
     session_id = get_session_id(context)
     if session_id:
+        # ... (lógica de verificação do usuário mantém igual) ...
         try:
             oid = ObjectId(session_id)
             user_doc = USERS_COLLECTION.find_one({"_id": oid})
@@ -94,14 +102,11 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not user_doc:
              context.user_data.clear()
         else:
+            # Se já está logado, chama o menu principal
             if start_command:
                 await start_command(update, context)
             else:
-                await update.message.reply_photo(
-                    photo=IMG_LOGIN,
-                    caption=f"✅ Você já está logado como <b>{user_doc.get('username')}</b>!\nUse /menu para jogar.",
-                    parse_mode="HTML"
-                )
+                await update.message.reply_text("⚠️ Você já está logado, mas o Menu Principal não pode ser carregado.")
             return ConversationHandler.END
 
     # 3. CHECK DE CONTA ANTIGA / MIGRAÇÃO
@@ -459,13 +464,21 @@ auth_handler = ConversationHandler(
     ],
     states={
         CHOOSING_ACTION: [
+            # Adicione o comando start aqui também para caso ele clique e queira reiniciar
+            CommandHandler('start', start_auth, filters=filters.ChatType.PRIVATE),
             CallbackQueryHandler(btn_login_callback, pattern='^btn_login$'),
             CallbackQueryHandler(start_register_flow, pattern='^btn_register$'),
             CallbackQueryHandler(btn_migrate_callback, pattern='^btn_migrate$'),
         ],
-        TYPING_USER_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_login)],
-        TYPING_PASS_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_login)],
-        
+        TYPING_USER_LOGIN: [
+             CommandHandler('start', start_auth), # Permite reiniciar se digitar /start
+             MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_login)
+        ],
+        TYPING_PASS_LOGIN: [
+             CommandHandler('start', start_auth),
+             MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_login)
+        ],
+        # ... Repita para os outros estados (REG e MIGRATE) se desejar ...
         TYPING_USER_REG: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_reg)],
         TYPING_PASS_REG: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_reg)],
         
@@ -475,6 +488,9 @@ auth_handler = ConversationHandler(
     fallbacks=[
         CommandHandler('cancel', cancel),
         CommandHandler('logout', logout_command),
-        CallbackQueryHandler(logout_callback, pattern='^logout_btn$')
-    ]
+        CallbackQueryHandler(logout_callback, pattern='^logout_btn$'),
+        # Fallback de segurança para o start
+        CommandHandler('start', start_auth, filters=filters.ChatType.PRIVATE)
+    ],
+    allow_reentry=True # ✅ CORREÇÃO 2: Permite digitar /start a qualquer momento para reiniciar
 )
