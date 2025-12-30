@@ -497,7 +497,7 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
         
         "minerio_de_cobre", "minerio_de_ferro", "minerio_de_ouro",
         "minerio_de_estanho", "minerio_de_prata", "carvao", "cristal_bruto",
-        "pedra", "gema_bruta", "gema_polida",
+        "pedra", "gema_bruta", "gema_polida", "fragmento_gargula",
         ]
     BLOCKED_KEYWORDS = [
         "essencia", "fragmento", "alma", "emblema", 
