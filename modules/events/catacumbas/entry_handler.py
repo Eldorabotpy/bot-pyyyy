@@ -326,6 +326,6 @@ handlers = [
     CallbackQueryHandler(leave_lobby_cb, pattern="^cat_leave_lobby$"),
     CallbackQueryHandler(start_raid_run_cb, pattern="^cat_start_run$"),
     CallbackQueryHandler(ask_for_code_cb, pattern="^cat_join_input$"),
-    MessageHandler(filters.TEXT & ~filters.COMMAND, process_code_input),
+    MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, process_code_input),
     CommandHandler("debug_key", debug_give_key_cb)
 ]
