@@ -31,18 +31,17 @@ logger = logging.getLogger(__name__)
 
 # 🛠️ HELPER PARA ID HÍBRIDO (Adicionado)
 def _get_combat_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Retorna o ObjectId (Login) ou Int (Telegram) dependendo da sessão."""
-    # 1. Tenta pegar da sessão de login
+    """
+    Retorna o ID do jogador APENAS se estiver logado.
+    Bloqueia o fallback para o ID do Telegram para evitar puxar a conta errada.
+    """
+    # 1. Prioridade absoluta: Sessão de Login
     logged_id = context.user_data.get("logged_player_id")
     if logged_id:
-        return logged_id # Retorna string (ObjectId)
+        return str(logged_id) # Retorna string (ObjectId)
     
-    # 2. Fallback para ID nativo do Telegram
-    # Tenta pegar do query ou do message
-    if update.callback_query:
-        return update.callback_query.from_user.id
-    if update.effective_user:
-        return update.effective_user.id
+    # 2. SE NÃO TIVER LOGADO, RETORNA NONE (Não tenta adivinhar)
+    # Isso impede que ele pegue a conta antiga vinculada ao ID do Telegram
     return None
 
 # ================================================
@@ -103,6 +102,16 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     user_id = _get_combat_user_id(update, context)
     chat_id = query.message.chat_id if query else update.effective_chat.id
     
+    # --- BLOQUEIO DE SEGURANÇA ---
+    # Se user_id for None, significa que a sessão caiu ou não existe login.
+    # Não deixamos ele prosseguir para não carregar dados da conta errada.
+    if not user_id:
+        if query:
+            try: await query.answer("⚠️ Sessão inválida. Por favor, faça login novamente.", show_alert=True)
+            except: pass
+        return
+    # -----------------------------
+    
     # 1. Retornar ao Mapa
     if action == 'combat_return_to_map':
         if query: await _safe_answer(query)
@@ -133,10 +142,12 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     
     # 3. Recuperação/Criação do Cache de Batalha
     battle_cache = context.user_data.get('battle_cache')
+    
+    # --- CORREÇÃO: Converter tudo para String (Texto) antes de comparar ---
     cache_uid = str(battle_cache.get('player_id')) if battle_cache else None
     current_uid = str(user_id)
 
-    if not battle_cache or battle_cache.get('player_id') != user_id:
+    if not battle_cache or cache_uid != current_uid:
         player_data = await player_manager.get_player_data(user_id)
         state_action = player_data.get('player_state', {}).get('action')
             
@@ -165,7 +176,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 }
                 p_media = _get_class_media(player_data, purpose="combate")
                 new_cache = {
-                    'player_id': user_id, # ✅ Agora usa o ID Híbrido
+                    'player_id': user_id, # ✅ Agora usa o ID Híbrido (String)
                     'chat_id': chat_id,
                     'message_id': query.message.message_id if query and query.message else None,
                     'player_stats': p_stats,
@@ -562,5 +573,5 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
           [InlineKeyboardButton("🧪 Poções", callback_data='combat_potion_menu'), InlineKeyboardButton("🏃 Fugir", callback_data='combat_flee')]]
     
     await _edit_media_or_caption(context, battle_cache, caption_m, battle_cache['monster_media_id'], battle_cache['monster_media_type'], InlineKeyboardMarkup(kb))
-
+    
 combat_handler = CallbackQueryHandler(combat_callback, pattern=r'^(combat_attack|combat_flee|combat_attack_menu|combat_return_to_map)$')
