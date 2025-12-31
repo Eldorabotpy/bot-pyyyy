@@ -428,17 +428,23 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, r
         await q.answer()
         try: await q.delete_message()
         except Exception: pass
-        uid = get_current_player_id(update, context)
+        
+        # --- CORREÇÃO AQUI ---
+        # Antes: uid = q.from_user.id
+        uid = get_current_player_id(update, context) 
         cid = q.message.chat_id
     else:
-        uid, cid = update.effective_user.id, update.effective_chat.id
+        # --- CORREÇÃO AQUI ---
+        # Antes: uid = update.effective_user.id
+        uid = get_current_player_id(update, context)
+        cid = update.effective_chat.id
 
     await _auto_finalize_travel_if_due(context, uid)
     try: await player_manager.try_finalize_timed_action_for_user(uid)
     except: pass
     
     await send_region_menu(context, uid, cid, region_key=region_key, player_data=player_data)
-
+    
 # =============================================================================
 # Handlers de Ação: Viagem e Coleta
 # =============================================================================
