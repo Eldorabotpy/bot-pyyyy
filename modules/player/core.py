@@ -3,6 +3,8 @@
 
 import logging
 import asyncio
+from telegram import Update
+from telegram.ext import ContextTypes
 from typing import Optional, Dict, Any, Union
 from bson import ObjectId  # Necessário para o novo sistema
 
@@ -42,6 +44,19 @@ def to_object_id(user_id: Any) -> Optional[ObjectId]:
 # FUNÇÕES SÍNCRONAS (Low Level)
 # ====================================================================
 
+def get_current_char_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Retorna o ID do personagem logado na sessão.
+    Se não houver login, retorna o ID do Telegram (para compatibilidade antiga).
+    """
+    # 1. Tenta pegar o ID da sessão de login (Auth Handler)
+    logged_id = context.user_data.get("logged_player_id")
+    if logged_id:
+        return str(logged_id)
+        
+    # 2. Se não estiver logado, usa o ID do Telegram (Comportamento antigo)
+    return update.effective_user.id
+    
 def _load_player_from_db_sync(user_id: Union[int, str]) -> Optional[dict]:
     if players_collection is None: return None
     

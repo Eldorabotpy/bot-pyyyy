@@ -11,6 +11,8 @@ from modules.dungeons.registry import get_dungeon_for_region
 from modules.player.premium import PremiumManager
 from modules.world_boss.engine import world_boss_manager, BOSS_STATS
 from datetime import datetime, timezone, timedelta
+from modules.auth_utils import get_current_player_id
+
 logger = logging.getLogger(__name__)
 
 def _humanize_duration(seconds: int) -> str:
@@ -106,7 +108,7 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_id = query.from_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
 
     # <<< CORREÇÃO 4: Adiciona await (já estava correto) >>>
@@ -395,10 +397,10 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         try: await query.delete_message()
         except Exception: pass
-        user_id = query.from_user.id
+        user_id = get_current_player_id(update, context)
         chat_id = query.message.chat_id
     else:
-        user_id = update.effective_user.id
+        user_id = get_current_player_id(update, context)
         chat_id = update.effective_chat.id
 
     # <<< CORREÇÃO 17: Adiciona await >>>

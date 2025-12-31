@@ -15,7 +15,7 @@ from modules.player import actions as player_actions
 from modules.game_data import monsters as monsters_data
 from modules.game_data.worldmap import WORLD_MAP
 from modules.dungeons.registry import get_dungeon_for_region
-
+from modules.auth_utils import get_current_player_id
 # --- IMPORTS DE HANDLERS ESPECÍFICOS ---
 from modules.world_boss.engine import world_boss_manager
 from handlers.christmas_shop import is_event_active
@@ -102,7 +102,7 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    user_id = query.from_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
     player_data = await player_manager.get_player_data(user_id) or {} 
     current_location = player_data.get("current_location", "reino_eldora")
@@ -189,7 +189,7 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
     
     try: region_key = query.data.split(':')[1]
@@ -428,7 +428,8 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, r
         await q.answer()
         try: await q.delete_message()
         except Exception: pass
-        uid, cid = q.from_user.id, q.message.chat_id
+        uid = get_current_player_id(update, context)
+        cid = q.message.chat_id
     else:
         uid, cid = update.effective_user.id, update.effective_chat.id
 
@@ -445,7 +446,9 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, r
 async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    uid, cid = q.from_user.id, q.message.chat_id
+    # Pegamos o ID correto da sessão
+    uid = get_current_player_id(update, context)
+    cid = q.message.chat_id
     
     # Finaliza viagens anteriores pendentes se o tempo já passou
     await _auto_finalize_travel_if_due(context, uid)
@@ -541,7 +544,9 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from handlers.job_handler import finish_collection_job 
 
     await q.answer()
-    uid, cid = q.from_user.id, q.message.chat_id
+    # Pegamos o ID correto da sessão
+    uid = get_current_player_id(update, context)
+    cid = q.message.chat_id
     
     res_id = (q.data or "").replace("collect_", "", 1)
     
@@ -642,7 +647,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_restore_durability_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    uid = q.from_user.id
+    uid = get_current_player_id(update, context)
     # Garante leitura atualizada
     pdata = await player_manager.get_player_data(uid) or {}
     
@@ -691,7 +696,7 @@ async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE
     """
     q = update.callback_query
     await q.answer()
-    uid = q.from_user.id
+    uid = get_current_player_id(update, context)
     
     target = q.data.replace("rd_fix_", "", 1)
     
