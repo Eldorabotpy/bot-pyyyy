@@ -5,7 +5,8 @@ import logging
 import hashlib
 from datetime import datetime
 from bson import ObjectId
-
+# No topo do arquivo, junto com os outros imports
+from modules.player.core import clear_player_cache
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     CommandHandler,
@@ -210,7 +211,20 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_doc = USERS_COLLECTION.find_one({"username": username, "password": password_hash})
 
     if user_doc:
-        context.user_data['logged_player_id'] = str(user_doc['_id'])
+        # ✅ LIMPEZA DE CACHE (Novo)
+        # 1. Limpa a sessão do Telegram para remover estados antigos
+        context.user_data.clear()
+        
+        new_player_id = str(user_doc['_id'])
+        
+        # 2. Força o Core a esquecer dados antigos deste jogador (RAM)
+        await clear_player_cache(new_player_id)
+        
+        # 3. Força o Core a esquecer dados vinculados ao ID do Telegram
+        await clear_player_cache(update.effective_user.id)
+        # -------------------------------------------------------
+
+        context.user_data['logged_player_id'] = new_player_id
         context.user_data['logged_username'] = username
         
         await update.message.reply_photo(
@@ -231,6 +245,7 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode="HTML"
         )
         return ConversationHandler.END
+ 
 
 # ==============================================================================
 # 3. FLUXO DE REGISTRO (VISUAL + SEGURO)
@@ -322,6 +337,8 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     
     result = USERS_COLLECTION.insert_one(new_player_doc)
+    await clear_player_cache(update.effective_user.id)
+    
     context.user_data['logged_player_id'] = str(result.inserted_id)
     
     await update.message.reply_photo(
@@ -395,9 +412,7 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     new_data = dict(old_data)
     if "_id" in new_data: del new_data["_id"]
         
-    # --- CORREÇÃO AQUI: Remove o VIP antigo ---
-    # Removemos qualquer traço de VIP da conta antiga para garantir que 
-    # a nova conta comece "limpa" nesse aspecto.
+    # --- CORREÇÃO: Remove o VIP antigo ---
     new_data.pop("premium_tier", None)
     new_data.pop("premium_expires_at", None)
     
@@ -411,12 +426,27 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
         "premium_tier": "free",      # Força Free
         "premium_expires_at": None   # Força sem validade
     })
-    # ------------------------------------------
     
+    # Insere a nova conta no banco
     result = USERS_COLLECTION.insert_one(new_data)
+    
+    # =================================================================
+    # ✅ CORREÇÃO CRÍTICA DE CACHE
+    # =================================================================
+    
+    # 1. Apaga a memória da conta antiga (baseada no ID do Telegram)
+    # Se não fizer isso, o bot continua achando que você é a conta antiga sem login.
+    await clear_player_cache(telegram_id)
+    
+    # 2. Limpa a sessão atual (remove estados temporários)
+    context.user_data.clear()
+
+    # 3. Define a nova sessão (baseada no ID do MongoDB)
     context.user_data['logged_player_id'] = str(result.inserted_id)
     context.user_data['logged_username'] = username
     
+    # =================================================================
+
     await update.message.reply_photo(
         photo=IMG_MIGRACAO,
         caption="✅ <b>Migração Concluída!</b>\nSeus itens foram salvos, mas o plano VIP (se houver) é vinculado à conta, não ao usuário.",
@@ -433,8 +463,15 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 1. Limpa cache global antes de destruir a sessão
+    logged_id = context.user_data.get("logged_player_id")
+    if logged_id:
+        await clear_player_cache(logged_id)
+    await clear_player_cache(update.effective_user.id)
+
+    # 2. Destrói a sessão
     context.user_data.clear()
-    await update.message.reply_text("🔒 Você saiu da sua conta.")
+    await update.message.reply_text("🔒 Você saiu da sua conta e a memória foi limpa.")
 
 # --- LOGOUT VIA BOTÃO ---
 async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -443,6 +480,12 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: pass
     try: await query.delete_message()
     except: pass
+    
+    # ✅ LIMPEZA COMPLETA
+    logged_id = context.user_data.get("logged_player_id")
+    if logged_id:
+        await clear_player_cache(logged_id)
+    await clear_player_cache(update.effective_user.id)
     
     context.user_data.clear()
     
@@ -466,7 +509,6 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="🔒 <b>Logout realizado.</b>")
 
     return ConversationHandler.END
-
 # ==============================================================================
 # CONFIGURAÇÃO DO HANDLER
 # ==============================================================================
