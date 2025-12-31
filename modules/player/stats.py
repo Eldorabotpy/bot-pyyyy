@@ -1,9 +1,9 @@
 # modules/player/stats.py 
-# (VERSÃO FINAL: Mapeamento completo baseado em attributes.py)
+# (VERSÃO REFATORADA: SEM TIPAGEM ESTRITA DE INT PARA IDs)
 
 from __future__ import annotations
 import logging
-from typing import Dict, Optional, Tuple, Any, List
+from typing import Dict, Optional, Tuple, Any, List, Union
 from modules.game_data.skills import SKILL_DATA
 # REMOVIDO IMPORT GLOBAL DE PLAYER_MANAGER PARA EVITAR CICLO
 from modules import game_data, clan_manager
@@ -17,7 +17,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ========================================
-# CONSTANTES DE PROGRESSÃO DE CLASSE
+# CONSTANTES DE PROGRESSÃO (Mantidas igual ao original)
 # ========================================
 MAGIC_CLASSES = {
     "mago", "arquimago", "feiticeiro", "bruxo", "necromante", 
@@ -159,7 +159,8 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
 # --- FUNÇÃO MESTRA DE STATS (ATUALIZADA) ---
 # ========================================
 
-async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = None) -> dict:
+async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) -> dict:
+    # ally_user_ids: agora é list (pode conter int ou str)
     from modules import player_manager
     from modules.player.premium import PremiumManager 
 
@@ -190,26 +191,10 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
                 val = _ival((data or {}).get('value', 0), 0)
                 k = stat_key.lower().strip()
                 
-                # --- CORREÇÃO: MAPEAMENTO COMPLETO (Baseado em attributes.py) ---
-                
-                # HP / VIDA
-                if k in ("hp", "vida", "health", "max_hp", "vitalidade", "vit"): 
-                    stat_key = "max_hp"
-                
-                # DEFESA
-                elif k in ("defesa", "defense", "def", "resistencia", "resistance", "res", "armadura", "armor"): 
-                    stat_key = "defense"
-                
-                # INICIATIVA / AGILIDADE
-                elif k in ("iniciativa", "initiative", "ini", "agilidade", "agility", "agi", "velocidade", "speed", "spd", "run"): 
-                    stat_key = "initiative"
-                
-                # SORTE
-                elif k in ("sorte", "luck", "lucky", "luk"): 
-                    stat_key = "luck"
-
-                # ATTACK (Físico/Geral)
-                # Inclui: Força (Guerreiro), Fúria (Berserker), Precisão (Caçador), Letalidade (Assassino), Foco (Monge), Bushido (Samurai)
+                if k in ("hp", "vida", "health", "max_hp", "vitalidade", "vit"): stat_key = "max_hp"
+                elif k in ("defesa", "defense", "def", "resistencia", "resistance", "res", "armadura", "armor"): stat_key = "defense"
+                elif k in ("iniciativa", "initiative", "ini", "agilidade", "agility", "agi", "velocidade", "speed", "spd", "run"): stat_key = "initiative"
+                elif k in ("sorte", "luck", "lucky", "luk"): stat_key = "luck"
                 elif k in ("ataque", "attack", "atk", "dmg", "damage", "fisico", "dano_fisico", 
                            "forca", "strength", "str", 
                            "furia", "fury", 
@@ -218,27 +203,17 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
                            "foco", "focus", 
                            "bushido"): 
                     stat_key = "attack"
-                
-                # MAGIC ATTACK
-                # Inclui: Inteligência (Mago), Carisma (Bardo)
                 elif k in ("inteligencia", "intelligence", "int", "magia", "magic", "poder_magico", "dano_magico", "magic_attack", "matk", 
                            "carisma", "charisma"): 
                     stat_key = "magic_attack"
-                    
-                # CRIT (Se houver separado)
                 elif k in ("crit", "critico", "mira"): 
                     stat_key = "crit_chance_flat"
 
-                # --- SOMA NO TOTAL ---
-                if stat_key == 'max_hp': 
-                    total['max_hp'] = total.get('max_hp', 0) + val
-                elif stat_key == 'magic_attack': 
-                    total['magic_attack'] = total.get('magic_attack', 0) + val
-                elif stat_key in ('attack', 'defense', 'initiative', 'luck'): 
-                    total[stat_key] = total.get(stat_key, 0) + val
+                if stat_key == 'max_hp': total['max_hp'] = total.get('max_hp', 0) + val
+                elif stat_key == 'magic_attack': total['magic_attack'] = total.get('magic_attack', 0) + val
+                elif stat_key in ('attack', 'defense', 'initiative', 'luck'): total[stat_key] = total.get(stat_key, 0) + val
                 else:
-                    if stat_key not in _BASELINE_KEYS: 
-                        total[stat_key] = total.get(stat_key, 0) + val
+                    if stat_key not in _BASELINE_KEYS: total[stat_key] = total.get(stat_key, 0) + val
 
     # 3. Clã Buffs
     clan_id = player_data.get("clan_id")
@@ -277,8 +252,10 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
     try:
         _apply_passive_skill_bonuses(player_data, total)
         if ally_user_ids:
+            # Compara como String para garantir compatibilidade
+            my_id_str = str(player_data.get("user_id") or "")
             for ally_id in ally_user_ids:
-                if ally_id == player_data.get("user_id"): continue
+                if str(ally_id) == my_id_str: continue
                 ally_data = await player_manager.get_player_data(ally_id)
                 if ally_data: _apply_party_aura_bonuses(ally_data, total)
     except: pass
@@ -325,7 +302,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: List[int] = N
     
     return total
 
-async def get_player_dodge_chance(player_data: dict, ally_user_ids: List[int] = None) -> float:
+async def get_player_dodge_chance(player_data: dict, ally_user_ids: list = None) -> float:
     total_stats = await get_player_total_stats(player_data, ally_user_ids)
     initiative = total_stats.get('initiative', 0)
     dodge_chance = (initiative * 0.4) / 100.0
@@ -333,7 +310,7 @@ async def get_player_dodge_chance(player_data: dict, ally_user_ids: List[int] = 
     if total_stats.get("cannot_be_dodged", False): return 0.0 
     return min(dodge_chance, 0.75) 
 
-async def get_player_double_attack_chance(player_data: dict, ally_user_ids: List[int] = None) -> float:
+async def get_player_double_attack_chance(player_data: dict, ally_user_ids: list = None) -> float:
     total_stats = await get_player_total_stats(player_data, ally_user_ids)
     initiative = total_stats.get('initiative', 0)
     double_attack_chance = (initiative * 0.25) / 100.0
@@ -398,7 +375,8 @@ def needs_class_choice(player_data: dict) -> bool:
     already_offered = bool(player_data.get("class_choice_offered"))
     return (lvl >= 5) and (not already_has_class) and (not already_offered)
 
-async def mark_class_choice_offered(user_id: int):
+async def mark_class_choice_offered(user_id):
+    # user_id: int ou str (ObjectId)
     from .core import get_player_data, save_player_data
     pdata = await get_player_data(user_id)
     if not pdata: return
@@ -585,24 +563,12 @@ async def apply_class_change_and_recalculate(player_data: dict, new_class_key: s
     player_data["class_choice_offered"] = True
     return player_data
 
-# --- ADICIONE ISTO NO FINAL DO ARQUIVO stats.py ---
-
 def add_xp(player_data: dict, amount: int):
-    """
-    Adiciona XP ao dicionário do jogador de forma segura.
-    Não salva no banco, apenas atualiza a memória.
-    """
-    if not player_data:
-        return
-        
+    if not player_data: return
     current_xp = player_data.get("xp", 0)
-    
-    # Garante que seja inteiro
     try:
         amount = int(amount)
         current_xp = int(current_xp)
     except:
         amount = 0
-        
     player_data["xp"] = current_xp + amount
-    

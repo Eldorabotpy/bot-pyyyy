@@ -1,15 +1,14 @@
 # modules/player/actions.py
-# (VERSÃO CORRIGIDA: Imports movidos para evitar travamento da Caçada Automática)
+# (VERSÃO REFATORADA: SUPORTE A STRING ID + WATCHDOG NA COLEÇÃO 'USERS')
 
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import time
-from typing import Optional, Tuple
-import random
+from typing import Optional, Tuple, Union
 import logging
 import asyncio
 
-# Imports internos do pacote (Estes são seguros)
+# Imports internos do pacote
 from . import core
 from .premium import PremiumManager
 from .core import get_player_data, save_player_data, players_collection
@@ -17,12 +16,7 @@ from .inventory import add_item_to_inventory
 from modules import game_data
 from .stats import get_player_total_stats
 from telegram.ext import Application
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from modules.game_data.skills import SKILL_DATA
-# -------------------------------------------------------------------------
-# ⚠️ REMOVIDO IMPORTS GLOBAIS DE HANDLERS AQUI PARA EVITAR CICLO
-# Eles foram movidos para dentro da função check_stale_actions_on_startup
-# -------------------------------------------------------------------------
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +77,6 @@ def spend_energy(player_data: dict, amount: int = 1) -> bool:
     if cur < amount:
         return False
         
-    # Se a energia estava cheia, reseta o relógio para AGORA
-    # Isso evita regeneração instantânea se o player ficou ocioso muito tempo
     if cur >= max_e:
         player_data['energy_last_ts'] = utcnow().isoformat()
 
@@ -92,13 +84,8 @@ def spend_energy(player_data: dict, amount: int = 1) -> bool:
     return True
 
 def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
-    """
-    Aplica os efeitos de um item no jogador.
-    Retorna uma lista de mensagens de feedback.
-    """
     messages = []
     
-    # 1. Efeito: Aprender Skill (TOMOS)
     if "learn_skill" in effects:
         skill_id = effects["learn_skill"]
         skill_info = SKILL_DATA.get(skill_id)
@@ -106,27 +93,20 @@ def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
         if not skill_info:
             messages.append("⚠️ A habilidade deste tomo parece não existir mais.")
         else:
-            # Verifica se já tem a skill
             current_skills = player_data.get("skills", {})
-            # Garante que é um dicionário (correção de bugs antigos)
             if not isinstance(current_skills, dict):
                 current_skills = {} 
                 player_data["skills"] = current_skills
 
             if skill_id in current_skills:
                 messages.append(f"⚠️ Você já conhece a técnica {skill_info['display_name']}!")
-                # Nota: Idealmente você retornaria False para não consumir o item, 
-                # mas aqui vamos apenas avisar.
             else:
-                # --- A MÁGICA ACONTECE AQUI ---
-                # Salva a skill no formato correto (Dicionário com raridade)
                 player_data["skills"][skill_id] = {
                     "rarity": "comum",
                     "progress": 0
                 }
                 messages.append(f"✨ <b>Nova Habilidade Aprendida:</b> {skill_info['display_name']}!")
 
-    # 2. Efeito: Skins
     if "grant_skin" in effects:
         skin_id = effects["grant_skin"]
         unlocked = player_data.get("unlocked_skins", [])
@@ -137,12 +117,12 @@ def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
         else:
             messages.append("⚠️ Você já possui esta aparência.")
 
-    # 3. Efeitos de Poção (Cura, XP, Energia...)
     if "heal" in effects:
         amount = effects["heal"]
-        stats = get_player_total_stats(player_data) # Certifique-se de importar isso
+        # Nota: Ideal chamar get_player_total_stats async fora daqui se possível, 
+        # mas mantendo estrutura atual para compatibilidade
+        max_hp = _ival(player_data.get("max_hp", 100)) 
         old_hp = player_data.get("current_hp", 0)
-        max_hp = stats["max_hp"]
         new_hp = min(max_hp, old_hp + amount)
         player_data["current_hp"] = new_hp
         recovered = new_hp - old_hp
@@ -158,7 +138,6 @@ def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
 
     if "add_xp" in effects:
         amount = effects["add_xp"]
-        # Aqui você chamaria sua função de dar XP
         player_data["xp"] = player_data.get("xp", 0) + amount
         messages.append(f"🧠 Ganhou {amount} XP.")
 
@@ -176,7 +155,6 @@ def sanitize_and_cap_energy(player_data: dict):
     current_val = _ival(current_raw, max_e) if current_raw is not None else max_e
     player_data["energy"] = max(0, min(current_val, max_e))
     
-    # Se timestamp inválido ou antigo demais, reseta
     if not player_data.get('energy_last_ts'):
         anchor = _parse_iso(player_data.get('last_energy_ts')) or utcnow()
         player_data['energy_last_ts'] = anchor.isoformat()
@@ -195,14 +173,12 @@ def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
     now = utcnow()
     last_ts = _parse_iso(last_raw)
 
-    # Proteção contra relógio no futuro
     if last_ts is None or last_ts > now:
         player_data['energy_last_ts'] = now.isoformat()
         return True 
 
     regen_s = _get_regen_seconds(player_data)
     
-    # Se cheio, mantém relógio atualizado
     if cur >= max_e:
         player_data['energy_last_ts'] = now.isoformat()
         return last_raw != player_data['energy_last_ts']
@@ -217,7 +193,6 @@ def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
             player_data['energy'] = new_energy
             changed = True
         
-        # Avança relógio preservando resto
         if new_energy >= max_e:
             player_data['energy_last_ts'] = now.isoformat()
         else:
@@ -248,9 +223,12 @@ def _gather_xp_mult(player_data: dict) -> float:
     except: return 1.0
 
 # -------------------------
-# Ações temporizadas & Estado
+# Ações temporizadas & Estado (AGORA SUPORTA STRING ID)
 # -------------------------
-async def set_last_chat_id(user_id: int, chat_id: int):
+async def set_last_chat_id(user_id, chat_id: int):
+    """
+    user_id: Pode ser int ou str (ObjectId)
+    """
     pdata = await get_player_data(user_id)
     if not pdata: return
     pdata["last_chat_id"] = int(chat_id)
@@ -269,7 +247,10 @@ def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | N
         pdata["last_chat_id"] = int(chat_id)
     return pdata
 
-async def try_finalize_timed_action_for_user(user_id: int) -> tuple[bool, str | None]:
+async def try_finalize_timed_action_for_user(user_id) -> tuple[bool, str | None]:
+    """
+    user_id: Pode ser int ou str (ObjectId)
+    """
     player_data = await get_player_data(user_id)
     if not player_data: return False, None
     state = player_data.get("player_state") or {}
@@ -350,12 +331,16 @@ def add_buff(player_data: dict, buff_info: dict):
 async def check_stale_actions_on_startup(application: Application):
     """
     Verifica ações presas. 
-    IMPORTS MOVIDOS PARA CÁ PARA EVITAR CICLO COM auto_hunt_engine.
+    LÓGICA ATUALIZADA: Varre a coleção 'users' (contas novas).
     """
+    # Se players_collection for None, DB não conectou
     if players_collection is None: return
     
+    # --- ACESSO À COLEÇÃO NOVA (USERS) ---
+    users_collection = players_collection.database["users"]
+    
     # -----------------------------------------------------
-    # ✅ IMPORTS LOCAIS (O SEGREDO PARA NÃO TRAVAR)
+    # IMPORTS LOCAIS
     # -----------------------------------------------------
     from modules.auto_hunt_engine import finish_auto_hunt_job
     from handlers.menu.region import finish_travel_job
@@ -364,16 +349,29 @@ async def check_stale_actions_on_startup(application: Application):
     from handlers.refining_handler import finish_refine_job, finish_dismantle_job
     # -----------------------------------------------------
 
-    logger.info("[Watchdog] Verificando ações presas...")
+    logger.info("[Watchdog] Verificando ações presas (Coleção USERS)...")
     now = utcnow()
     actions_to_check = ("auto_hunting", "travel", "collecting", "crafting", "working", "refining", "dismantling")
+    
+    # Query: Procura documentos onde 'player_state.action' é um dos listados
     query = {"player_state.action": {"$in": list(actions_to_check)}}
 
     try:
-        cursor = players_collection.find(query)
+        # Varre a coleção NOVA
+        cursor = users_collection.find(query)
+        count = 0
+        
         for pdata in cursor:
-            user_id = pdata.get("_id")
-            chat_id = pdata.get("last_chat_id", user_id)
+            # Em 'users', o _id é ObjectId. Precisamos converter para string.
+            user_id = str(pdata.get("_id"))
+            
+            chat_id = pdata.get("last_chat_id")
+            # Fallback seguro para chat_id (admin ou algo assim se falhar)
+            if not chat_id: 
+                # Se não tiver chat_id salvo, não conseguimos notificar, mas tentamos processar
+                logger.warning(f"[Watchdog] User {user_id} sem last_chat_id. Pulando notificação.")
+                continue
+
             state = pdata.get("player_state", {})
             action = state.get("action")
             details = state.get("details") or {}
@@ -389,13 +387,15 @@ async def check_stale_actions_on_startup(application: Application):
             
             if not end_time: continue
 
+            count += 1
             try:
                 delay = 1 if now >= end_time else (end_time - now).total_seconds()
                 prefix = f"watchdog_{action}_{user_id}"
 
                 if action == "auto_hunting":
                     job_data = {
-                        "user_id": user_id, "chat_id": chat_id,
+                        "user_id": user_id, # String ID
+                        "chat_id": chat_id,
                         "message_id": state.get("message_id"),
                         "hunt_count": details.get('hunt_count'),
                         "region_key": details.get('region_key')
@@ -403,14 +403,15 @@ async def check_stale_actions_on_startup(application: Application):
                     application.job_queue.run_once(finish_auto_hunt_job, when=delay, data=job_data, name=f"{prefix}_ah")
 
                 elif action == "travel":
+                    # Passa user_id como argumento (já é string)
                     application.job_queue.run_once(finish_travel_job, when=delay, user_id=user_id, chat_id=chat_id, data={"dest": details.get("destination")}, name=f"{prefix}_tr")
 
                 elif action == "collecting":
                     job_data = {
                         'resource_id': details.get("resource_id"),
                         'item_id_yielded': details.get("item_id_yielded"), 
-                        'quantity': details.get("quantity", 1), # Garante quantidade
-                        'message_id': details.get("collect_message_id") # Garante message_id
+                        'quantity': details.get("quantity", 1), 
+                        'message_id': details.get("collect_message_id")
                     }
                     application.job_queue.run_once(finish_collection_job, when=delay, user_id=user_id, chat_id=chat_id, data=job_data, name=f"{prefix}_col")
 
@@ -424,10 +425,13 @@ async def check_stale_actions_on_startup(application: Application):
                     application.job_queue.run_once(finish_dismantle_job, when=delay, user_id=user_id, chat_id=chat_id, data={}, name=f"{prefix}_dis")
 
             except Exception as e:
-                logger.error(f"[Watchdog] Erro user {user_id}: {e}")
+                logger.error(f"[Watchdog] Erro processando user {user_id}: {e}")
                 try:
                     pdata["player_state"] = {"action": "idle"}
                     await save_player_data(user_id, pdata)
                 except: pass
+        
+        logger.info(f"[Watchdog] Processamento concluído. {count} ações agendadas/restauradas.")
+            
     except Exception as e:
-        logger.error(f"[Watchdog] Erro Geral: {e}")
+        logger.error(f"[Watchdog] Erro Geral na Query Users: {e}")

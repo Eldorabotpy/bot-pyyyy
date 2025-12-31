@@ -1,6 +1,6 @@
 {
   "is_active": false,
-  "location": "campos_linho",
+  "location": "mina_ferro",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",
@@ -17,163 +17,163 @@
       "loot_table": [
         [
           "samurai_sombra_demoniaca",
-          4.0
+          2.0
         ],
         [
           "samurai_corte_iaijutsu",
-          4.0
+          2.0
         ],
         [
           "samurai_passive_perfect_parry",
-          4.0
+          2.0
         ],
         [
           "assassino_ataque_furtivo",
-          4.0
+          2.0
         ],
         [
           "assassino_active_guillotine_strike",
-          4.0
+          2.0
         ],
         [
           "assassino_passive_potent_toxins",
-          4.0
+          2.0
         ],
         [
           "bardo_melodia_restauradora",
-          4.0
+          2.0
         ],
         [
           "bardo_passive_perfect_pitch",
-          4.0
+          2.0
         ],
         [
           "bardo_passive_symphony_of_power",
-          4.0
+          2.0
         ],
         [
           "mago_bola_de_fogo",
-          4.0
+          2.0
         ],
         [
           "mago_active_arcane_ward",
-          4.0
+          2.0
         ],
         [
           "mago_active_meteor_swarm",
-          4.0
+          2.0
         ],
         [
           "monge_rajada_de_punhos",
-          4.0
+          2.0
         ],
         [
           "monge_active_thunder_palm",
-          4.0
+          2.0
         ],
         [
           "monge_active_transcendence",
-          4.0
+          2.0
         ],
         [
           "cacador_flecha_precisa",
-          4.0
+          2.0
         ],
         [
           "cacador_active_ricochet_arrow",
-          4.0
+          2.0
         ],
         [
           "cacador_passive_apex_predator",
-          4.0
+          2.0
         ],
         [
           "berserker_golpe_selvagem",
-          4.0
+          2.0
         ],
         [
           "berserker_golpe_divino_da_ira",
-          4.0
+          2.0
         ],
         [
           "berserker_ultimo_recurso",
-          4.0
+          2.0
         ],
         [
           "guerreiro_corte_perfurante",
-          4.0
+          2.0
         ],
         [
           "guerreiro_colossal_defense",
-          4.0
+          2.0
         ],
         [
           "guerreiro_bencao_sagrada",
-          4.0
+          2.0
         ],
         [
           "samurai_armadura_shogun",
-          3.0
+          2.0
         ],
         [
           "samurai_armadura_demoniaca",
-          3.0
+          2.0
         ],
         [
           "bardo_requiem_sombrio",
-          3.0
+          2.0
         ],
         [
           "bardo_traje_maestro",
-          3.0
+          2.0
         ],
         [
           "monge_aspecto_asura",
-          3.0
+          2.0
         ],
         [
           "monge_quimono_dragao",
-          3.0
+          2.0
         ],
         [
           "berserker_infernal",
-          3.0
+          2.0
         ],
         [
           "berserker_pele_urso",
-          3.0
+          2.0
         ],
         [
           "cacador_cacador_dragoes",
-          3.0
+          2.0
         ],
         [
           "cacador_patrulheiro_elfico",
-          3.0
+          2.0
         ],
         [
           "assassino_manto_espectral",
-          3.0
+          2.0
         ],
         [
           "mago_arquimago_caos",
-          3.0
+          2.0
         ],
         [
           "mago_traje_arcano",
-          3.0
+          2.0
         ],
         [
           "guerreiro_placas_douradas",
-          3.0
+          2.0
         ],
         [
           "guerreiro_armadura_negra",
-          3.0
+          2.0
         ],
         [
           "guerreiro_armadura_jade",
-          3.0
+          2.0
         ],
         [
           "pocao_cura_leve",

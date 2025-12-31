@@ -1,5 +1,5 @@
 # handlers/auth_handler.py
-# (VERSÃO 4.0: Visual Imersivo + Senha Auto-Deletável)
+# (VERSÃO 4.1: Com suporte ao botão de Reconexão)
 
 import logging
 import hashlib
@@ -18,6 +18,7 @@ from telegram.ext import (
 )
 from telegram.constants import ChatType
 from modules.auth_utils import get_current_player_id
+
 # Tenta importar as coleções
 try:
     from modules.database import players_col, db
@@ -46,9 +47,9 @@ TYPING_PASS_MIGRATE = 7
 USERS_COLLECTION = db["users"] 
 
 # --- IMAGENS (IDs do Telegram) ---
-IMG_LOGIN = "AgACAgEAAxkBAAEEhz9pUum4yP5jywLvsM-XaIHeG2-rfwACJAxrG_tYmUZ14kXfrtMVigEAAwIAA3kAAzYE"
-IMG_MIGRACAO = "AgACAgEAAxkBAAEEhzZpUulnSfDAylISvmAqV6y4Zn7fogACIwxrG_tYmUaQ3V-IybVsVwEAAwIAA3kAAzYE"
-IMG_NOVO = "AgACAgEAAxkBAAEEhzZpUulnSfDAylISvmAqV6y4Zn7fogACIwxrG_tYmUaQ3V-IybVsVwEAAwIAA3kAAzYE"
+IMG_LOGIN = "https://i.ibb.co/Fb8VkHjw/photo-2025-12-30-21-56-50.jpg"
+IMG_MIGRACAO = "https://i.ibb.co/m5NxQwGw/photo-2025-12-30-21-56-46.jpg"
+IMG_NOVO = "https://i.ibb.co/7JyxJfpn/photo-2025-12-30-21-56-42.jpg" 
 
 # ==============================================================================
 # FUNÇÕES AUXILIARES
@@ -76,7 +77,7 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != ChatType.PRIVATE:
         return ConversationHandler.END
 
-    # ✅ CORREÇÃO: Importação Tardia (Lazy Import) para destravar o bot
+    # Lazy Import para evitar ciclo
     try:
         from handlers.start_handler import start_command
     except ImportError:
@@ -92,7 +93,6 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. CHECK SE JÁ ESTÁ LOGADO
     session_id = get_session_id(context)
     if session_id:
-        # ... (lógica de verificação do usuário mantém igual) ...
         try:
             oid = ObjectId(session_id)
             user_doc = USERS_COLLECTION.find_one({"_id": oid})
@@ -106,7 +106,7 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if start_command:
                 await start_command(update, context)
             else:
-                await update.message.reply_text("⚠️ Você já está logado, mas o Menu Principal não pode ser carregado.")
+                await update.message.reply_text("⚠️ Você já está logado.")
             return ConversationHandler.END
 
     # 3. CHECK DE CONTA ANTIGA / MIGRAÇÃO
@@ -144,6 +144,7 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if update.callback_query:
         await update.callback_query.answer()
+        # Tenta deletar a mensagem anterior (ex: a msg de "Sessão Expirada") para limpar a tela
         try: await update.callback_query.delete_message()
         except Exception: pass
             
@@ -166,7 +167,7 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CHOOSING_ACTION
 
 # ==============================================================================
-# 2. FLUXO DE LOGIN (VISUAL + SEGURO)
+# 2. FLUXO DE LOGIN
 # ==============================================================================
 async def btn_login_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_private(update): return ConversationHandler.END
@@ -200,8 +201,6 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if update.effective_chat.type != ChatType.PRIVATE: return ConversationHandler.END
 
     password = update.message.text.strip()
-    
-    # 🔒 APAGA A MENSAGEM COM A SENHA IMEDIATAMENTE
     try: await update.message.delete()
     except Exception: pass
     
@@ -211,18 +210,12 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_doc = USERS_COLLECTION.find_one({"username": username, "password": password_hash})
 
     if user_doc:
-        # ✅ LIMPEZA DE CACHE (Novo)
-        # 1. Limpa a sessão do Telegram para remover estados antigos
+        # Limpeza completa de sessão anterior
         context.user_data.clear()
         
         new_player_id = str(user_doc['_id'])
-        
-        # 2. Força o Core a esquecer dados antigos deste jogador (RAM)
         await clear_player_cache(new_player_id)
-        
-        # 3. Força o Core a esquecer dados vinculados ao ID do Telegram
         await clear_player_cache(update.effective_user.id)
-        # -------------------------------------------------------
 
         context.user_data['logged_player_id'] = new_player_id
         context.user_data['logged_username'] = username
@@ -248,7 +241,7 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
  
 
 # ==============================================================================
-# 3. FLUXO DE REGISTRO (VISUAL + SEGURO)
+# 3. FLUXO DE REGISTRO
 # ==============================================================================
 async def start_register_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message if update.message else update.callback_query.message
@@ -308,8 +301,6 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != ChatType.PRIVATE: return ConversationHandler.END
 
     password = update.message.text.strip()
-    
-    # 🔒 APAGA A MENSAGEM COM A SENHA IMEDIATAMENTE
     try: await update.message.delete()
     except Exception: pass
     
@@ -328,17 +319,14 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "energy": 20, "max_energy": 20, "energy_last_ts": now_iso,
         "inventory": {}, "equipment": {},
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
-        
-        # --- CORREÇÃO AQUI: Força o plano FREE ---
-        "premium_tier": "free",      # Define explicitamente como Free
-        "premium_expires_at": None,  # Sem data de expiração
-        "gems": 0                    # Garante que começa com 0 gemas
-        # -----------------------------------------
+        "premium_tier": "free",
+        "premium_expires_at": None,
+        "gems": 0
     }
     
     result = USERS_COLLECTION.insert_one(new_player_doc)
     await clear_player_cache(update.effective_user.id)
-    
+
     context.user_data['logged_player_id'] = str(result.inserted_id)
     
     await update.message.reply_photo(
@@ -353,7 +341,7 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # ==============================================================================
-# 4. FLUXO DE MIGRAÇÃO (VISUAL + SEGURO)
+# 4. FLUXO DE MIGRAÇÃO
 # ==============================================================================
 async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_private(update): return ConversationHandler.END
@@ -396,8 +384,6 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     if update.effective_chat.type != ChatType.PRIVATE: return ConversationHandler.END
 
     password = update.message.text.strip()
-    
-    # 🔒 APAGA A MENSAGEM COM A SENHA IMEDIATAMENTE
     try: await update.message.delete()
     except Exception: pass
     
@@ -411,45 +397,30 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
         
     new_data = dict(old_data)
     if "_id" in new_data: del new_data["_id"]
-        
-    # --- CORREÇÃO: Remove o VIP antigo ---
     new_data.pop("premium_tier", None)
     new_data.pop("premium_expires_at", None)
     
-    # Define os novos padrões
     new_data.update({
         "username": username,
         "password": hash_password(password),
         "telegram_id_owner": telegram_id,
         "migrated_at": datetime.now().isoformat(),
         "is_migrated": True,
-        "premium_tier": "free",      # Força Free
-        "premium_expires_at": None   # Força sem validade
+        "premium_tier": "free",
+        "premium_expires_at": None
     })
     
-    # Insere a nova conta no banco
     result = USERS_COLLECTION.insert_one(new_data)
     
-    # =================================================================
-    # ✅ CORREÇÃO CRÍTICA DE CACHE
-    # =================================================================
-    
-    # 1. Apaga a memória da conta antiga (baseada no ID do Telegram)
-    # Se não fizer isso, o bot continua achando que você é a conta antiga sem login.
     await clear_player_cache(telegram_id)
-    
-    # 2. Limpa a sessão atual (remove estados temporários)
     context.user_data.clear()
 
-    # 3. Define a nova sessão (baseada no ID do MongoDB)
     context.user_data['logged_player_id'] = str(result.inserted_id)
     context.user_data['logged_username'] = username
     
-    # =================================================================
-
     await update.message.reply_photo(
         photo=IMG_MIGRACAO,
-        caption="✅ <b>Migração Concluída!</b>\nSeus itens foram salvos, mas o plano VIP (se houver) é vinculado à conta, não ao usuário.",
+        caption="✅ <b>Migração Concluída!</b>",
         parse_mode="HTML"
     )
     
@@ -463,17 +434,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Limpa cache global antes de destruir a sessão
     logged_id = context.user_data.get("logged_player_id")
     if logged_id:
         await clear_player_cache(logged_id)
     await clear_player_cache(update.effective_user.id)
-
-    # 2. Destrói a sessão
     context.user_data.clear()
-    await update.message.reply_text("🔒 Você saiu da sua conta e a memória foi limpa.")
+    await update.message.reply_text("🔒 Você saiu da sua conta.")
 
-# --- LOGOUT VIA BOTÃO ---
 async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try: await query.answer("👋 Saindo...")
@@ -481,7 +448,6 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: await query.delete_message()
     except: pass
     
-    # ✅ LIMPEZA COMPLETA
     logged_id = context.user_data.get("logged_player_id")
     if logged_id:
         await clear_player_cache(logged_id)
@@ -505,10 +471,8 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except:
             pass
-    else:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="🔒 <b>Logout realizado.</b>")
-
     return ConversationHandler.END
+
 # ==============================================================================
 # CONFIGURAÇÃO DO HANDLER
 # ==============================================================================
@@ -518,27 +482,28 @@ auth_handler = ConversationHandler(
         CallbackQueryHandler(btn_login_callback, pattern='^btn_login$'),
         CallbackQueryHandler(start_register_flow, pattern='^btn_register$'),
         CallbackQueryHandler(btn_migrate_callback, pattern='^btn_migrate$'),
+        
+        # ✅ ADICIONADO AQUI: O ponto de entrada para o botão de Reconectar
+        CallbackQueryHandler(start_auth, pattern='^start_login_flow$'),
     ],
     states={
         CHOOSING_ACTION: [
-            # Adicione o comando start aqui também para caso ele clique e queira reiniciar
             CommandHandler('start', start_auth, filters=filters.ChatType.PRIVATE),
             CallbackQueryHandler(btn_login_callback, pattern='^btn_login$'),
             CallbackQueryHandler(start_register_flow, pattern='^btn_register$'),
             CallbackQueryHandler(btn_migrate_callback, pattern='^btn_migrate$'),
+            CallbackQueryHandler(start_auth, pattern='^start_login_flow$'),
         ],
         TYPING_USER_LOGIN: [
-             CommandHandler('start', start_auth), # Permite reiniciar se digitar /start
+             CommandHandler('start', start_auth), 
              MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_login)
         ],
         TYPING_PASS_LOGIN: [
              CommandHandler('start', start_auth),
              MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_login)
         ],
-        # ... Repita para os outros estados (REG e MIGRATE) se desejar ...
         TYPING_USER_REG: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_reg)],
         TYPING_PASS_REG: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_reg)],
-        
         TYPING_USER_MIGRATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_migrate)],
         TYPING_PASS_MIGRATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_migrate)],
     },
@@ -546,8 +511,7 @@ auth_handler = ConversationHandler(
         CommandHandler('cancel', cancel),
         CommandHandler('logout', logout_command),
         CallbackQueryHandler(logout_callback, pattern='^logout_btn$'),
-        # Fallback de segurança para o start
         CommandHandler('start', start_auth, filters=filters.ChatType.PRIVATE)
     ],
-    allow_reentry=True # ✅ CORREÇÃO 2: Permite digitar /start a qualquer momento para reiniciar
+    allow_reentry=True
 )

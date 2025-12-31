@@ -1,0 +1,642 @@
+==================================================
+🔍 RELATÓRIO DE ESTRUTURA E MIGRAÇÃO
+==================================================
+
+📂 ESTRUTURA DE ARQUIVOS:
+[./]
+    .env
+    .gitignore
+    audit_daily_cristal.py
+    config.py
+    debug_check_cristal.py
+    debug_payment.py
+    fix_duplicate_vips.py
+    fix_mongo_tomos.py
+    fix_skins.py
+    inspect_mongo.py
+    limpar_cache.py
+    limpar_webhook.py
+    listar_arquivos.py
+    main.py
+    mapeamento.py
+    migrar_jogadores.py
+    relatorio_migracao.txt
+    repair_daily_cristal_today.py
+    requirements.txt
+    run_daily_cristal_now.py
+    world_boss_state.json
+    [assets/]
+        file_ids.json.bak
+    [data/]
+        gem_market_listings.json
+        market_listings.json
+        [clans/]
+    [dungeons/]
+        dungeons_xyz.json
+    [game_logic/]
+        __init__.py
+    [handlers/]
+        admin_handler.py
+        adventurer_market_handler.py
+        auth_handler.py
+        autohunt_handler.py
+        character_handler.py
+        chat_handler.py
+        christmas_shop.py
+        class_evolution_handler.py
+        class_gate.py
+        class_selection_handler.py
+        converter_handler.py
+        crafting_handler.py
+        enhance_handler.py
+        equipment_handler.py
+        evolution_handler.py
+        forge_handler.py
+        gem_market_handler.py
+        gem_shop_handler.py
+        guild_handler.py
+        guild_menu_handler.py
+        hunt_handler.py
+        inventory_handler.py
+        jobs.py
+        job_handler.py
+        kingdom_shop_handler.py
+        market_browse.py
+        market_sell.py
+        menu_handler.py
+        npc_handler.py
+        potion_handler.py
+        profession_handler.py
+        profile_handler.py
+        refining_handler.py
+        region_handler.py
+        runes_handler.py
+        skin_handler.py
+        start_handler.py
+        status_handler.py
+        utils.py
+        utils_timed.py
+        work_handler.py
+        __init__.py
+        [admin/]
+            admin_commands.py
+            admin_tools.py
+            debug_skill.py
+            file_id_conv.py
+            force_daily.py
+            generate_equip.py
+            grant_item.py
+            grant_skill.py
+            grant_skin.py
+            player_edit_panel.py
+            player_management_handler.py
+            premium_panel.py
+            pvp_panel_handler.py
+            reset_panel.py
+            sell_gems.py
+            utils.py
+            __init__.py
+        [combat/]
+            main_handler.py
+            potion_handler.py
+            skill_handler.py
+        [events/]
+            party_actions.py
+            party_conversation.py
+            party_handler.py
+            __init__.py
+        [guild/]
+            bank.py
+            creation_search.py
+            dashboard.py
+            management.py
+            missions.py
+            upgrades.py
+            war.py
+            __init__.py
+        [menu/]
+            events.py
+            forge.py
+            kingdom.py
+            region.py
+            __init__.py
+        [world_boss/]
+            handler.py
+            __init__.py
+    [kingdom_defense/]
+        data.py
+        engine.py
+        handler.py
+        kd_leaderboard.json
+        leaderboard.py
+        __init__.py
+    [modules/]
+        auth_utils.py
+        auto_hunt_engine.py
+        balance.py
+        chat_responses.py
+        clan_manager.py
+        clan_war_engine.py
+        class_evolution_service.py
+        cooldowns.py
+        crafting_engine.py
+        crafting_registry.py
+        database.py
+        dismantle_engine.py
+        display_utils.py
+        dungeon_definitions.py
+        dungeon_loot.py
+        dungeon_manager.py
+        evolution_battle.py
+        file_ids.py
+        gem_market_manager.py
+        guild_system.py
+        items_api.py
+        item_factory.py
+        market_manager.py
+        market_utils.py
+        mission_manager.py
+        party_manager.py
+        player_manager.py
+        profession_engine.py
+        rarities.py
+        recovery_manager.py
+        refining_engine.py
+        stats_engine.py
+        __init__.py
+        [combat/]
+            combat_engine.py
+            criticals.py
+            durability.py
+            party_engine.py
+            rewards.py
+        [dungeons/]
+            combat_hook.py
+            config.py
+            regions.py
+            registry.py
+            runtime.py
+            runtime_api.py
+            _init_.py
+        [events/]
+            event_menu.py
+            __init__.py
+            [catacumbas/]
+                combat_handler.py
+                config.py
+                entry_handler.py
+                raid_manager.py
+                __init__.py
+        [game_data/]
+            attributes.py
+            clans.py
+            classes.py
+            class_evolution.py
+            constants.py
+            encounters.py
+            equipment.py
+            guild_missions.py
+            items.py
+            items_consumables.py
+            items_equipments.py
+            items_evolution.py
+            items_materials.py
+            items_runes.py
+            market.py
+            missions.py
+            monsters.py
+            monsters_data.py
+            npc_trades.py
+            premium.py
+            professions.py
+            rarity.py
+            refining.py
+            regions.py
+            runes_data.py
+            skills.py
+            skins.py
+            utils.py
+            worldmap.py
+            xp.py
+            __init__.py
+        [player/]
+            actions.py
+            core.py
+            inventory.py
+            premium.py
+            queries.py
+            stats.py
+        [recipes/]
+            assassino_t1.py
+            assassino_t2.py
+            bardo_t1.py
+            bardo_t2.py
+            berserker_t1.py
+            berserker_t2.py
+            cacador_t1.py
+            cacador_t2.py
+            guerreiro_t1.py
+            guerreiro_t2.py
+            mago_t1.py
+            mago_t2.py
+            monge_t1.py
+            monge_t2.py
+            samurai_t1.py
+            samurai_t2.py
+            __init__.py
+        [world_boss/]
+            engine.py
+    [parties/]
+        party_123.json
+    [pvp/]
+        pvp_battle.py
+        pvp_config.py
+        pvp_handler.py
+        pvp_scheduler.py
+        pvp_utils.py
+        tournament_admin.py
+        tournament_system.py
+        __init__.py
+    [registries/]
+        admin.py
+        character.py
+        class_evolution.py
+        combat.py
+        crafting.py
+        events.py
+        guild.py
+        market.py
+        regions.py
+        __init__.py
+    [tools/]
+        hard_respec_all.py
+        normalize_file_ids.py
+
+==================================================
+
+🚨 ANÁLISE DE CÓDIGO (Arquivos que precisam de atenção):
+
+Arquivo: .\main.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\handlers\admin_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id, query.from_user.id, message.from_user.id, players_collection.find
+----------------------------------------
+
+Arquivo: .\handlers\adventurer_market_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id, query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\auth_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id, players_col.find
+----------------------------------------
+
+Arquivo: .\handlers\autohunt_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\character_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\christmas_shop.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\class_evolution_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\class_gate.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\class_selection_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id, query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\converter_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\forge_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\gem_shop_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\hunt_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\job_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\market_sell.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\menu_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\npc_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\potion_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\profession_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\profile_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\refining_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\region_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\runes_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\skin_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\utils.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\work_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\admin\force_daily.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\handlers\admin\grant_skill.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\handlers\admin\grant_skin.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\handlers\admin\player_management_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: players_collection.find
+----------------------------------------
+
+Arquivo: .\handlers\admin\pvp_panel_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: players_collection.find
+----------------------------------------
+
+Arquivo: .\handlers\admin\sell_gems.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: players_collection.find
+----------------------------------------
+
+Arquivo: .\handlers\admin\utils.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\handlers\combat\potion_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\combat\skill_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\events\party_actions.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\events\party_conversation.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id, query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\guild\bank.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\guild\creation_search.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\handlers\guild\management.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\guild\missions.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\menu\events.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id
+----------------------------------------
+
+Arquivo: .\handlers\menu\region.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\handlers\world_boss\handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id, query.from_user.id
+----------------------------------------
+
+Arquivo: .\kingdom_defense\engine.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\kingdom_defense\handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\kingdom_defense\leaderboard.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\auth_utils.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\modules\auto_hunt_engine.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\modules\clan_manager.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\class_evolution_service.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\crafting_engine.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\evolution_battle.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: query.from_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\modules\item_factory.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\mission_manager.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\party_manager.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\player_manager.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\profession_engine.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\dungeons\runtime.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id, user_id: int
+----------------------------------------
+
+Arquivo: .\modules\dungeons\runtime_api.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\events\catacumbas\combat_handler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\events\catacumbas\entry_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: update.effective_user.id
+----------------------------------------
+
+Arquivo: .\modules\events\catacumbas\raid_manager.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\game_data\xp.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\player\actions.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: players_collection.find, user_id: int
+----------------------------------------
+
+Arquivo: .\modules\player\core.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: update.effective_user.id, players_collection.find
+----------------------------------------
+
+Arquivo: .\modules\player\inventory.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\player\queries.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: players_collection.find, user_id: int
+----------------------------------------
+
+Arquivo: .\modules\player\stats.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\modules\world_boss\engine.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: user_id: int
+----------------------------------------
+
+Arquivo: .\pvp\pvp_handler.py
+Status: ⚠️ MISTO (Verificar)
+Encontrado: query.from_user.id, players_collection.find
+----------------------------------------
+
+Arquivo: .\pvp\pvp_scheduler.py
+Status: ❌ CRÍTICO (Alterar Urgente)
+Encontrado: players_collection.find
+----------------------------------------

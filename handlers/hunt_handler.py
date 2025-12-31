@@ -1,11 +1,12 @@
 # handlers/hunt_handler.py
+# (VERSÃO REFATORADA: CAÇADA VINCULADA À SESSÃO DE LOGIN)
 
 import random
 import re
 import unicodedata
 import logging
 import asyncio
-from typing import Optional
+from typing import Optional, Union
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, CallbackQuery
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
@@ -17,10 +18,23 @@ from modules.player.premium import PremiumManager
 from modules import auto_hunt_engine
 from handlers.profile_handler import _get_class_media
 
-# Importa a DB de skills para garantir acesso (se necessário no futuro)
+# Importa a DB de skills para garantir acesso
 from modules.game_data.monsters import MONSTER_SKILLS_DB
-
+from modules.auth_utils import requires_login
 logger = logging.getLogger(__name__)
+
+# =========================
+# HELPER DE SEGURANÇA (ID)
+# =========================
+def _get_hunt_user_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
+    """
+    Retorna o ID do jogador (ObjectId String) da sessão.
+    NÃO faz fallback para ID do Telegram.
+    """
+    logged_id = context.user_data.get("logged_player_id")
+    if logged_id:
+        return str(logged_id)
+    return None
 
 # =========================
 # Elites
@@ -66,13 +80,11 @@ def _coerce_monster_entry(entry) -> dict | None:
     return None
 
 def _pick_monster_template(region_key: str, player_level: int) -> dict:
-    # Tenta pegar da lista principal
     lst = _get_monsters_from_region_dict(region_key)
     if lst:
         pool = [e for e in lst if isinstance(e, dict)]
         if pool: return dict(random.choice(pool))
 
-    # Tenta pegar da definição da região
     mons = _get_monsters_from_region_field(region_key)
     if mons:
         pool = []
@@ -81,11 +93,10 @@ def _pick_monster_template(region_key: str, player_level: int) -> dict:
             if m: pool.append(m)
         if pool: return dict(random.choice(pool))
 
-    # Fallback Genérico
     base_hp = 20 + player_level * 5
     return {
         "id": f"generic_{region_key}", "name": "Criatura Sombria",
-        "hp": base_hp, "max_hp": base_hp, # Garante max_hp
+        "hp": base_hp, "max_hp": base_hp,
         "attack": 3 + player_level // 2, "defense": 2,
         "initiative": 4, "luck": 3,
         "xp_reward": 8 + player_level, "gold_drop": 4 + player_level,
@@ -102,7 +113,6 @@ def _apply_elite_scaling(mon: dict) -> dict:
     m["name"] = f"{name} (🅴🅻I🆃🅴) 👑"
     m["_elite"] = True
     
-    # Aplica multiplicadores de Elite
     keys_mult = [("max_hp", "hp"), ("attack", "attack"), ("defense", "defense"), 
                  ("xp_reward", "xp"), ("gold_drop", "gold")]
     
@@ -110,11 +120,10 @@ def _apply_elite_scaling(mon: dict) -> dict:
         base = int(m.get(k_mon, 0))
         m[k_mon] = int(base * ELITE_MULTS[k_mult])
     
-    m["hp"] = m["max_hp"] # Cura total
+    m["hp"] = m["max_hp"] 
     m["initiative"] = int(m.get("initiative", 0)) + ELITE_MULTS["initiative_add"]
     m["luck"] = int(m.get("luck", 0)) + ELITE_MULTS["luck_add"]
     
-    # Loot extra
     loot = []
     for it in (m.get("loot_table") or []):
         it2 = dict(it)
@@ -123,23 +132,17 @@ def _apply_elite_scaling(mon: dict) -> dict:
     m["loot_table"] = loot
     return m
 
-# --- NOVA FUNÇÃO: ESCALA HÍBRIDA (CORRIGIDA) ---
 def _scale_monster_stats(mon: dict, player_level: int) -> dict:
-    """Escala o monstro e garante que max_hp esteja setado."""
-    
-    # 1. Normalização Inicial de HP
     if "max_hp" not in mon and "hp" in mon:
         mon["max_hp"] = mon["hp"]
     elif "max_hp" not in mon:
         mon["max_hp"] = 10 
 
-    # 2. Definição do Nível
     min_lvl = mon.get("min_level", 1)
     max_lvl = mon.get("max_level", player_level + 2)
     target_lvl = max(min_lvl, min(player_level + random.randint(-1, 1), max_lvl))
     mon["level"] = target_lvl
 
-    # 3. Atualiza Nome 
     raw_name = mon.get("name", "Inimigo").replace("Lv.", "").strip()
     raw_name = re.sub(r"^\d+\s+", "", raw_name) 
     mon["name"] = f"Lv.{target_lvl} {raw_name}"
@@ -148,23 +151,15 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
         mon["hp"] = mon["max_hp"]
         return mon
 
-    # ==========================================================
-    # 📉 AJUSTE DE BALANCEAMENTO (NERF AGRESSIVO)
-    # ==========================================================
-    
-    GROWTH_HP = 3        # Valor fixo por nível (Mantido baixo)
-    GROWTH_ATK = 0.6     # Reduzi um pouco mais (era 0.7)
-    GROWTH_DEF = 0.1     # Defesa quase nula por nível (era 0.2)
+    GROWTH_HP = 3        
+    GROWTH_ATK = 0.6     
+    GROWTH_DEF = 0.1     
     
     GROWTH_XP = 3       
     GROWTH_GOLD = 1.0   
     
-    # --- AQUI ESTAVA O ERRO ---
-    # Antes estava 0.12 (12% por nível -> Lv 35 = +420% status)
-    # Agora mudamos para 0.01 (1% por nível -> Lv 35 = +35% status)
     scaling_bonus = 1 + (target_lvl * 0.05) 
 
-    # 5. Aplica Fórmula
     base_hp = int(mon.get("max_hp", 10))
     base_atk = int(mon.get("attack", 2))
     base_def = int(mon.get("defense", 0))
@@ -176,7 +171,6 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     mon["attack"] = int((base_atk * scaling_bonus) + (target_lvl * GROWTH_ATK))
     mon["defense"] = int((base_def * scaling_bonus) + (target_lvl * GROWTH_DEF))
     
-    # XP e Ouro ajustados
     mon["xp_reward"] = int((base_xp * scaling_bonus) + (target_lvl * GROWTH_XP))
     mon["gold_drop"] = int((base_gold * scaling_bonus) + (target_lvl * GROWTH_GOLD))
     
@@ -185,13 +179,11 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
 def _build_combat_details_from_template(mon: dict, player_level: int = 1) -> dict:
     m = mon.copy()
     
-    # Normaliza chaves legadas antes de escalar
     if "monster_max_hp" in m: m["max_hp"] = m.pop("monster_max_hp")
     if "monster_attack" in m: m["attack"] = m.pop("monster_attack")
     if "monster_defense" in m: m["defense"] = m.pop("monster_defense")
     if "monster_name" in m: m["name"] = m.pop("monster_name")
 
-    # Aplica a Escala (que agora garante max_hp e nome)
     m = _scale_monster_stats(m, player_level)
     
     return {
@@ -199,7 +191,7 @@ def _build_combat_details_from_template(mon: dict, player_level: int = 1) -> dic
         "name": m.get("name"),
         "level": m.get("level", 1),
         "hp": int(m.get("hp", 1)),
-        "max_hp": int(m.get("max_hp", 1)), # Agora deve vir correto da escala
+        "max_hp": int(m.get("max_hp", 1)), 
         "attack": int(m.get("attack", 1)),
         "defense": int(m.get("defense", 0)),
         "initiative": int(m.get("initiative", 0)),
@@ -214,8 +206,7 @@ def _build_combat_details_from_template(mon: dict, player_level: int = 1) -> dic
 
 def _get_monster_media(mon_tpl: dict, region_key: str, is_elite: bool):
     cands = []
-    # Tenta usar o ID ou nome limpo para achar a mídia
-    raw_name = mon_tpl.get("name", "").replace("Lv.", "").strip().split(" ")[-1] # Pega ultima palavra se tiver Lv.
+    raw_name = mon_tpl.get("name", "").replace("Lv.", "").strip().split(" ")[-1] 
     raw_id = mon_tpl.get("id", "")
     
     for k in ("file_id_name", "file_id_key", "media_key"):
@@ -232,17 +223,10 @@ def _get_monster_media(mon_tpl: dict, region_key: str, is_elite: bool):
     return None
 
 async def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
-    # 1. Define 1 como custo base padrão
     base = 1 
-    
-    # 2. Tenta ler a configuração global (se houver)
     base = int(getattr(game_data, "HUNT_ENERGY_COST", base))
-    
-    # 3. Verifica se a região específica tem um custo diferente
     reg_info = _get_region_info(region_key)
     base = int(reg_info.get("hunt_energy_cost", base))
-    
-    # 4. Aplica os bônus/reduções de Premium (Lenda/VIP podem ter custo reduzido)
     premium = PremiumManager(player_data)
     return int(premium.get_perk_value("hunt_energy_cost", base))
 
@@ -250,7 +234,7 @@ async def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
 # HANDLERS
 # =========================
 async def start_hunt(
-    user_id: int, 
+    user_id: Union[str, int],  # ✅ Suporta String e Int
     chat_id: int, 
     context: ContextTypes.DEFAULT_TYPE, 
     is_auto_mode: bool, 
@@ -259,9 +243,10 @@ async def start_hunt(
 ):
     from handlers.combat.main_handler import combat_callback
 
+    # ✅ CORREÇÃO: Usa o user_id passado (que deve ser String da sessão)
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        if query: await query.answer("Erro: Dados não encontrados.", show_alert=True)
+        if query: await query.answer("Erro: Sessão inválida. Relogue.", show_alert=True)
         return
 
     # Custo e Missão
@@ -285,29 +270,25 @@ async def start_hunt(
     # 1. Escolhe e Escala Monstro
     tpl = _pick_monster_template(region_key, player_lvl)
     
-    # Elite Check
     total_stats = await player_manager.get_player_total_stats(pdata)
     is_elite = _roll_is_elite(int(total_stats.get("luck", 5)))
     if is_elite: tpl = _apply_elite_scaling(tpl)
 
-    # Constrói stats finais
     monster_stats = _build_combat_details_from_template(tpl, player_level=player_lvl)
     monster_media = _get_monster_media(tpl, region_key, is_elite)
     player_media = _get_class_media(pdata, purpose="combate")
 
-    # Sincronia HP/MP
     max_hp = total_stats.get('max_hp', 50)
     max_mp = total_stats.get('max_mana', 10)
     cur_hp = min(pdata.get('current_hp', max_hp), max_hp)
     cur_mp = min(pdata.get('current_mp', max_mp), max_mp)
 
-    # 2. CACHE DA BATALHA (Aqui adicionamos o Nível do Player ao Nome)
+    # 2. CACHE DA BATALHA
     char_name = pdata.get('character_name', 'Herói')
     
     battle_cache = {
-        'player_id': user_id,
+        'player_id': user_id, # ✅ Salva String ou Int (o que vier)
         'chat_id': chat_id,
-        # CORREÇÃO: Injeta o nível no nome para aparecer na interface
         'player_name': f"Lv.{player_lvl} {char_name}", 
         'player_stats': total_stats,
         'player_hp': cur_hp,
@@ -346,7 +327,6 @@ async def start_hunt(
         try: await query.delete_message()
         except: pass
 
-    # Envio da Mídia
     sent_msg = None
     mid = battle_cache['monster_media_id']
     mtype = battle_cache['monster_media_type']
@@ -367,24 +347,41 @@ async def start_hunt(
         context.user_data['battle_cache'] = battle_cache
 
     if is_auto_mode:
-        # Fake trigger para auto hunt
-        fake_u = type("User", (), {"id": user_id})()
+        # ✅ CORREÇÃO: Fake trigger com ID String compatível
+        fake_u = type("User", (), {"id": user_id})() # ID agora é string se user_id for string
         fake_q = CallbackQuery(id=f"auto_{user_id}", from_user=fake_u, chat_instance="auto", data="combat_attack")
         fake_up = Update(update_id=0, callback_query=fake_q)
         await asyncio.sleep(2)
         await combat_callback(fake_up, context, action='combat_attack')
 
+@requires_login
 async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try: await query.answer()
     except: pass
     
-    region_key = (query.data or "").replace("hunt_", "", 1)
-    await start_hunt(query.from_user.id, query.message.chat.id, context, False, region_key, query)
+    # ✅ CORREÇÃO: Busca o ID da sessão
+    user_id = _get_hunt_user_id(context)
+    if not user_id:
+        await query.answer("⚠️ Sessão expirada. Faça login novamente.", show_alert=True)
+        return
 
+    region_key = (query.data or "").replace("hunt_", "", 1)
+    
+    # ✅ CORREÇÃO: Passa user_id da sessão, NÃO query.from_user.id
+    await start_hunt(user_id, query.message.chat.id, context, False, region_key, query)
+
+@requires_login
 async def start_auto_hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    
+    # ✅ CORREÇÃO: Verificação de sessão
+    user_id = _get_hunt_user_id(context)
+    if not user_id:
+        await query.answer("⚠️ Sessão expirada.", show_alert=True)
+        return
+
     try:
         parts = query.data.split('_')
         hunt_count = int(parts[2])
