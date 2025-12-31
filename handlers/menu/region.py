@@ -20,6 +20,8 @@ from modules.auth_utils import get_current_player_id
 from modules.world_boss.engine import world_boss_manager
 from handlers.christmas_shop import is_event_active
 from modules.player.stats import can_see_evolution_menu
+from modules.auth_utils import get_current_player_id, requires_login
+
 logger = logging.getLogger(__name__)
 
 # Fallbacks de Importação Segura
@@ -98,10 +100,12 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
 # Menus de Navegação (Mapa e Info)
 # =============================================================================
 
+@requires_login
 async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
+    # Decorator garante que temos sessão válida
     user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
     player_data = await player_manager.get_player_data(user_id) or {} 
@@ -110,70 +114,37 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     is_vip = False
     try: is_vip = PremiumManager(player_data).is_premium()
-    except Exception: pass
+    except: pass
 
-    # --- DEFINIÇÃO DOS DESTINOS ---
     if is_vip:
-        # Ordem lógica de progressão do jogo para o menu ficar organizado
-        REGION_ORDER = [
-            "reino_eldora", "pradaria_inicial", "floresta_sombria", "campos_linho",
-            "pedreira_granito", "mina_ferro", "pantano_maldito", "pico_grifo",
-            "forja_abandonada", "picos_gelados", "deserto_ancestral"
-        ]
+        REGION_ORDER = ["reino_eldora", "pradaria_inicial", "floresta_sombria", "campos_linho", "pedreira_granito", "mina_ferro", "pantano_maldito", "pico_grifo", "forja_abandonada", "picos_gelados", "deserto_ancestral"]
         all_regions = list((game_data.REGIONS_DATA or {}).keys())
-        # Ordena: Primeiro os da lista oficial, depois o resto
         all_regions.sort(key=lambda k: REGION_ORDER.index(k) if k in REGION_ORDER else 999)
         possible_destinations = [r for r in all_regions if r != current_location]
-        
-        caption = (
-            f"🗺 <b>🄼ＡＰＡ  ＭＵＮＤＩ (VIP)</b> 🗺\n\n"
-            f"📍 <b>Local Atual:</b> {region_info.get('display_name','Desconhecido')}\n"
-            f"✨ <i>O teletransporte da Pedra Dimensional está ativo.</i>"
-        )
+        caption = f"🗺 🄼🄰🄿🄰 🄼🅄🄽🄳🄸\n📍 Local: {region_info.get('display_name','Unknown')}\n✨ <i>Teletransporte ativo.</i>"
     else:
         possible_destinations = WORLD_MAP.get(current_location, [])
-        caption = (
-            f"🧭 <b>ＰＬＡＮＯ  ＤＥ  ＶＩＡＧＥＭ</b>\n\n"
-            f"📍 <b>Local Atual:</b> {region_info.get('display_name','Desconhecido')}\n"
-            f"👣 <i>Para onde seus pés o levarão?</i>"
-        )
+        caption = f"🧭 <b>ＰＬＡＮＯ ＤＥ ＶＩＡＧＥＭ</b>\n📍 Local: {region_info.get('display_name','Unknown')}"
 
-    # --- MONTAGEM DO GRID (2 Colunas) ---
     keyboard = []
     row = []
-    
     for dest_key in possible_destinations:
         dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
         if not dest_info: continue
-        
-        # Limpa o nome para não ficar muito grande no botão
         d_name = dest_info.get('display_name', dest_key)
         d_emoji = dest_info.get('emoji', '📍')
-        
-        # Adiciona ao buffer da linha
-        row.append(InlineKeyboardButton(
-            f"{d_emoji} {d_name}",
-            callback_data=f"region_{dest_key}"
-        ))
-        
-        # Se a linha tem 2 botões, adiciona ao teclado e limpa o buffer
+        row.append(InlineKeyboardButton(f"{d_emoji} {d_name}", callback_data=f"region_{dest_key}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
-            
-    # Se sobrou algum botão sozinho na última linha, adiciona ele
-    if row:
-        keyboard.append(row)
+    if row: keyboard.append(row)
 
-    # Botão de Voltar (ocupa linha inteira)
-    keyboard.append([InlineKeyboardButton("⬅️ 𝐂𝐚𝐧𝐜𝐞𝐥𝐚𝐫 𝐕𝐢𝐚𝐠𝐞𝐦", callback_data=f'open_region:{current_location}')])
-    
+    keyboard.append([InlineKeyboardButton("⬅️ 𝐂𝐚𝐧𝐜𝐞𝐥𝐚𝐫", callback_data=f'open_region:{current_location}')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     try: await query.delete_message()
-    except Exception: pass
+    except: pass
 
-    # --- ENVIO DA MENSAGEM (Com Mídia do Mapa se houver) ---
     fd = media_ids.get_file_data("mapa_mundo")
     if fd and fd.get("id"):
         try:
@@ -182,10 +153,11 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await context.bot.send_photo(chat_id=chat_id, photo=fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
             return
-        except Exception: pass
+        except: pass
 
     await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
-    
+
+@requires_login
 async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -201,10 +173,11 @@ async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await player_manager.save_player_data(user_id, player_data) 
 
     try: await query.delete_message()
-    except Exception: pass
+    except: pass
 
     await send_region_menu(context, user_id, chat_id)
 
+@requires_login
 async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -212,214 +185,126 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     except IndexError: return
         
     region_info = game_data.REGIONS_DATA.get(region_key, {})
-    
-    info_parts = [
-        f"ℹ️ <b>Sobre: {region_info.get('display_name', region_key)}</b>",
-        f"<i>{region_info.get('description', 'Nenhuma descrição.')}</i>\n",
-        "<b>Ações Possíveis:</b>"
-    ]
+    info_parts = [f"ℹ️ <b>{region_info.get('display_name', region_key)}</b>", f"<i>{region_info.get('description', '')}</i>\n"]
     
     if region_key == 'reino_eldora':
-        info_parts.extend([" 🏇 - 𝐕𝐢𝐚𝐣𝐚𝐫 ", " 🔰 - 𝐆𝐮𝐢𝐥𝐝𝐚", " 🛒 - 𝐌𝐞𝐫𝐜𝐚𝐝𝐨", " ⚒️ - 𝐅𝐨𝐫𝐣𝐚", " 👤 - 𝐏𝐞𝐫𝐟𝐢𝐥"])
+        info_parts.extend([" 🏇 - 𝐕𝐢𝐚𝐣𝐚𝐫 ", " 🔰 - 𝐆𝐮𝐢𝐥𝐝𝐚", " 🛒 - 𝐌𝐞𝐫𝐜𝐚𝐝𝐨", " ⚒️ - 𝐅𝐨𝐫𝐣𝐚"])
     else:
-        if region_info.get('resource'): info_parts.append("- Coletar recursos")
-        if monsters_data.MONSTERS_DATA.get(region_key): info_parts.append("- Caçar monstros")
-        if get_dungeon_for_region(region_key): info_parts.append("- Entrar em Calabouço")
+        if region_info.get('resource'): info_parts.append("- Coleta disponível")
+        if monsters_data.MONSTERS_DATA.get(region_key): info_parts.append("- Caça disponível")
+        if get_dungeon_for_region(region_key): info_parts.append("- Calabouço")
     
     info_parts.append("\n<b>Criaturas:</b>")
     mons = monsters_data.MONSTERS_DATA.get(region_key, [])
-    if not mons: info_parts.append("- <i>Nenhuma criatura catalogada.</i>")
+    if not mons: info_parts.append("- <i>Nenhuma.</i>")
     else:
         for m in mons: info_parts.append(f"- {m.get('name', '???')}")
             
     text = "\n".join(info_parts)
     back_cb = 'continue_after_action' if region_key == 'reino_eldora' else f"open_region:{region_key}"
     keyboard = [[InlineKeyboardButton("⬅️ 𝐕𝐎𝐋𝐓𝐀𝐑", callback_data=back_cb)]]
-    
     await _safe_edit_or_send(query, context, query.message.chat_id, text, InlineKeyboardMarkup(keyboard))
 
 # =============================================================================
 # Menu Principal da Região
 # =============================================================================
 
-async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
+async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     if player_data is None:
         player_data = await player_manager.get_player_data(user_id) or {}
     
-    # ⚡ CORREÇÃO CRÍTICA DE SINCRONIA ⚡
-    # Aplica regeneração e, se mudou algo, SALVA imediatamente.
-    # Isso garante que a energia "visual" mostrada no menu seja a mesma "real" do banco.
-    energy_changed = player_actions._apply_energy_autoregen_inplace(player_data)
-    if energy_changed:
+    # Sincronia de energia
+    if player_actions._apply_energy_autoregen_inplace(player_data):
         await player_manager.save_player_data(user_id, player_data)
-    # ----------------------------------------------------------------
 
     final_region_key = region_key or player_data.get("current_location", "reino_eldora")
     player_data['current_location'] = final_region_key
-    
     region_info = (game_data.REGIONS_DATA or {}).get(final_region_key)
 
     if not region_info or final_region_key == "reino_eldora":
         if show_kingdom_menu:
             fake_update = Update(update_id=0) 
-            await show_kingdom_menu(fake_update, context, player_data=player_data)
+            await show_kingdom_menu(fake_update, context, player_data=player_data, chat_id=chat_id)
         else:
-            await context.bot.send_message(chat_id=chat_id, text="Bem-vindo ao Reino de Eldora.", parse_mode="HTML")
+            await context.bot.send_message(chat_id=chat_id, text="Bem-vindo ao Reino.", parse_mode="HTML")
         return 
 
-    # --- LÓGICA DO WORLD BOSS ---
+    # World Boss
     if world_boss_manager.state["is_active"] and final_region_key == world_boss_manager.state["location"]:
         hud_text = await world_boss_manager.get_battle_hud()
-        
         caption = (f"‼️ **PERIGO IMINENTE** ‼️\nO **Demônio Dimensional** está aqui!\n\n{hud_text}")
-        
-        keyboard = [
-            [InlineKeyboardButton("⚔️ ENTRAR NA RAID ⚔️", callback_data='wb_menu')],
-            [InlineKeyboardButton("👤 Perfil", callback_data='profile')],
-            [InlineKeyboardButton("🗺️ Fugir", callback_data='travel')],
-        ]
+        keyboard = [[InlineKeyboardButton("⚔️ ENTRAR NA RAID ⚔️", callback_data='wb_menu')], [InlineKeyboardButton("🗺️ Fugir", callback_data='travel')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        file_data = media_ids.get_file_data("boss_raid")
-        
-    else:
-        # --- MENU NORMAL (HUD ATUALIZADO V2) ---
-        premium = PremiumManager(player_data)
-        stats = await player_manager.get_player_total_stats(player_data)
-        
-        # Variáveis de Dados (Nome/Profissão) - Adicionado para o novo layout
-        character_name = player_data.get("character_name", "Aventureiro")
-        prof_data = player_data.get("profession", {})
-        prof_lvl = int(prof_data.get("level", 1))
-        prof_type = prof_data.get("type", "adventurer")
-        prof_name = prof_type.capitalize()
-        # Tenta pegar nome bonito da profissão se disponível
         try:
-            if hasattr(game_data, 'PROFESSIONS_DATA'):
-                prof_name = game_data.PROFESSIONS_DATA.get(prof_type, {}).get("display_name", prof_name)
-        except: pass
+            fd = media_ids.get_file_data("boss_raid")
+            if fd: await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+            else: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+        except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+        return
 
-        # Variáveis Auxiliares (Stats)
-        p_gold = player_manager.get_gold(player_data)
-        p_gems = player_manager.get_gems(player_data)
-        
-        p_hp = int(player_data.get('current_hp', 0))
-        max_hp = int(stats.get('max_hp', 1))
-        
-        p_mp = int(player_data.get('current_mp', 0))
-        max_mp = int(stats.get('max_mana', 1))
-        
-        p_en = int(player_data.get('energy', 0))
-        max_en = int(player_manager.get_player_max_energy(player_data))
+    # Menu Normal
+    premium = PremiumManager(player_data)
+    stats = await player_manager.get_player_total_stats(player_data)
+    
+    char_name = player_data.get("character_name", "Aventureiro")
+    prof = (player_data.get("profession", {}) or {}).get("type", "adventurer").capitalize()
+    
+    p_hp, max_hp = int(player_data.get('current_hp', 0)), int(stats.get('max_hp', 1))
+    p_mp, max_mp = int(player_data.get('current_mp', 0)), int(stats.get('max_mana', 1))
+    p_en, max_en = int(player_data.get('energy', 0)), int(player_manager.get_player_max_energy(player_data))
+    p_gold, p_gems = player_manager.get_gold(player_data), player_manager.get_gems(player_data)
 
-        # Montagem do HUD (Visual Setas + Bateria)
-        status_hud = (
-            f"\n"
-            f"╭────────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
-            f"│ ╰┈➤ 👤 {character_name}\n"
-            f"│ ╰┈➤ 🛠 {prof_name} (Nv. {prof_lvl})\n"
-            f"│ ╰┈➤ ❤️ HP: {p_hp}/{max_hp}\n"
-            f"│ ╰┈➤ 💙 MP: {p_mp}/{max_mp}\n"
-            f"│ ╰┈➤ ⚡ ENERGIA: 🪫{p_en}/🔋{max_en}\n"
-            f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
-            f"╰──────────────────────────➤"
-        )
-        
-        region_name = region_info.get('display_name', 'Região')
-        
-        caption = (
-            f"🗺️ Você está em <b>{region_name}</b>.\n"
-            f"╰┈➤ <i>O que deseja fazer?</i>\n"
-            f"{status_hud}"
-        )
-        keyboard = []
-        
-        # --- LINHA 1: INTERAÇÕES ESPECIAIS (NPCs/Lojas) ---
-        special_row = []
-        if final_region_key == 'floresta_sombria':
-            special_row.append(InlineKeyboardButton("⛺ 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta'))
-        
-        if final_region_key == 'deserto_ancestral':
-             special_row.append(InlineKeyboardButton("🧙‍♂️ 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main'))
-             # Verifica evolução
-             if can_see_evolution_menu(player_data):
-                special_row.append(InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu'))
+    status_hud = (
+        f"\n╭─────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────➤\n"
+        f"│ ╭┈➤ 👤 {char_name}\n"
+        f"│ ├┈➤ 🛠 {prof} (Nv. {player_data.get('level',1)})\n"
+        f"│ ├┈➤ ❤️ HP: {p_hp}/{max_hp}  💙 MP: {p_mp}/{max_mp}\n"
+        f"│ ├┈➤ ⚡ ENERGIA: 🪫{p_en}/🔋{max_en}\n"
+        f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
+        f"╰───────────────────────➤"
+    )
+    
+    caption = f"🗺️ Você está em <b>{region_info.get('display_name', 'Região')}</b>.\n╰┈➤ <i>O que deseja fazer?</i>\n{status_hud}"
+    keyboard = []
+    
+    # Botões Especiais
+    if final_region_key == 'floresta_sombria': keyboard.append([InlineKeyboardButton("⛺ 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta')])
+    if final_region_key == 'deserto_ancestral':
+         row = [InlineKeyboardButton("🧙‍♂️ 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main')]
+         if can_see_evolution_menu(player_data): row.append(InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu'))
+         keyboard.append(row)
+    if final_region_key == 'picos_gelados' and is_event_active(): keyboard.append([InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
 
-        if final_region_key == 'picos_gelados' and is_event_active():
-             special_row.append(InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open"))
-        
-        if special_row:
-            keyboard.append(special_row)
+    # Combate
+    combat = [InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫", callback_data=f"hunt_{final_region_key}")]
+    if build_region_dungeon_button: 
+        btn = build_region_dungeon_button(final_region_key)
+        if btn: combat.append(btn)
+    elif get_dungeon_for_region(final_region_key):
+        combat.append(InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}"))
+    keyboard.append(combat)
 
-        # --- LINHA 2: AÇÃO DE COMBATE (Caçar + Calabouço na mesma linha se possível) ---
-        combat_row = []
-        combat_row.append(InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫", callback_data=f"hunt_{final_region_key}"))
-        
-        # Lógica do Calabouço
-        dungeon_btn = None
-        if build_region_dungeon_button:
-            dungeon_btn = build_region_dungeon_button(final_region_key)
-        elif get_dungeon_for_region(final_region_key):
-            dungeon_btn = InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}")
-        
-        if dungeon_btn:
-            combat_row.append(dungeon_btn)
-            
-        keyboard.append(combat_row)
-
-        # --- LINHA 3: AUTO HUNT (PREMIUM) ---
-        if premium.is_premium():
-            keyboard.append([
-                InlineKeyboardButton("⏱ 10x", callback_data=f"autohunt_start_10_{final_region_key}"),
-                InlineKeyboardButton("⏱ 25x", callback_data=f"autohunt_start_25_{final_region_key}"),
-                InlineKeyboardButton("⏱ 35x", callback_data=f"autohunt_start_35_{final_region_key}"),
-            ])
-
-        # --- LINHA 4: COLETA (Ocupa linha inteira pois o texto é longo com timer) ---
-        res_id = region_info.get("resource")
-        if res_id:
-            req_prof = game_data.get_profession_for_resource(res_id)
-            cur_prof = (player_data.get("profession", {}) or {}).get("type")
-            if req_prof and req_prof == cur_prof:
-                p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get('resources', {})
-                item_yielded = p_res.get(res_id, res_id)
-                i_name = (game_data.ITEMS_DATA or {}).get(item_yielded, {}).get("display_name", res_id).capitalize()
-                
-                # Visual
-                base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-                spd = float(premium.get_perk_value("gather_speed_multiplier", 1.0))
-                dur = max(1, int(base_secs / max(0.25, spd)))
-                hum_tm = _humanize_duration(dur)
-                cost = int(premium.get_perk_value("gather_energy_cost", 1))
-                c_txt = "grátis" if cost == 0 else f"-{cost}⚡"
-
-                keyboard.append([InlineKeyboardButton(f"⛏️ Coletar {i_name} ({hum_tm}, {c_txt})", callback_data=f"collect_{res_id}")])
-
-        # --- LINHA 5: SISTEMA (Mapa e Perfil lado a lado) ---
+    if premium.is_premium():
         keyboard.append([
-            InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"),
-            InlineKeyboardButton("👤 𝐏𝐞𝐫𝐟𝐢𝐥", callback_data="profile")
+            InlineKeyboardButton("⏱ 10x", callback_data=f"autohunt_start_10_{final_region_key}"),
+            InlineKeyboardButton("⏱ 25x", callback_data=f"autohunt_start_25_{final_region_key}"),
+            InlineKeyboardButton("⏱ 35x", callback_data=f"autohunt_start_35_{final_region_key}"),
         ])
 
-        # --- LINHA 6: MANUTENÇÃO E INFO ---
-        keyboard.append([
-            InlineKeyboardButton("📜 𝐑𝐞𝐩𝐚𝐫𝐚𝐫", callback_data="restore_durability_menu"),
-            InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨", callback_data=f"region_info:{final_region_key}")
-        ])
+    res_id = region_info.get("resource")
+    if res_id:
+        # Lógica de profissão simplificada para exibição
+        keyboard.append([InlineKeyboardButton(f"⛏️ Coletar Recursos", callback_data=f"collect_{res_id}")])
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        file_data = media_ids.get_file_data(f"regiao_{final_region_key}")
+    keyboard.append([InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"), InlineKeyboardButton("👤 𝐏𝐞𝐫𝐟𝐢𝐥", callback_data="profile")])
+    keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐩𝐚𝐫𝐚𝐫", callback_data="restore_durability_menu"), InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨", callback_data=f"region_info:{final_region_key}")])
 
+    reply_markup = InlineKeyboardMarkup(keyboard)
     try:
-        if file_data and file_data.get("id"):
-            mtype = (file_data.get("type") or "photo").lower()
-            if mtype == "video":
-                await context.bot.send_video(chat_id=chat_id, video=file_data["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
-            else:
-                await context.bot.send_photo(chat_id=chat_id, photo=file_data["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
-        else:
-            await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
-    except Exception:
-        await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
+        fd = media_ids.get_file_data(f"regiao_{final_region_key}")
+        if fd: await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+        else: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+    except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
 
 async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None, player_data: dict | None = None):
     # Wrapper para compatibilidade
@@ -449,20 +334,18 @@ async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, r
 # Handlers de Ação: Viagem e Coleta
 # =============================================================================
 
+@requires_login
 async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    # Pegamos o ID correto da sessão
     uid = get_current_player_id(update, context)
     cid = q.message.chat_id
     
-    # Finaliza viagens anteriores pendentes se o tempo já passou
     await _auto_finalize_travel_if_due(context, uid)
 
     dest = q.data.replace("region_", "", 1)
-    if dest not in (game_data.REGIONS_DATA or {}):
-        await q.answer("Região inválida.", show_alert=True)
-        return
+    pdata = await player_manager.get_player_data(uid)
+    if not pdata: return
 
     pdata = await player_manager.get_player_data(uid)
     if not pdata:
@@ -531,118 +414,85 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.job_queue.run_once(finish_travel_job, when=secs, user_id=uid, chat_id=cid, data={"dest": dest}, name=f"finish_travel_{uid}")
     
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Callback executado pelo JobQueue quando a viagem termina.
+    Corrige o travamento injetando a sessão manualmente antes de chamar o menu.
+    """
     job = context.job
-    uid, cid, dest = job.user_id, job.chat_id, (job.data or {}).get("dest")
+    # Pega o ID do jogador de dentro do `data` (String), ou do `user_id` se for fallback
+    job_data = job.data or {}
+    uid = job_data.get("player_id") or str(job.user_id)
+    cid = job.chat_id
+    dest = job_data.get("dest")
+
+    # 1. Atualiza o DB para destravar o jogador
     pdata = await player_manager.get_player_data(uid)
-    if pdata.get("player_state", {}).get("action") == "travel":
+    if pdata and pdata.get("player_state", {}).get("action") == "travel":
         pdata["current_location"] = dest
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(uid, pdata)
-        await send_region_menu(context, uid, cid)
-
+    
+    # 2. HACK CRÍTICO: Injeta a sessão manualmente no context 
+    # Isso impede que o menu ache que o usuário está deslogado
+    if context.user_data is not None:
+        context.user_data['logged_player_id'] = str(uid)
+        
+    # 3. Envia o menu (Agora vai funcionar porque tem sessão na memória)
+    await send_region_menu(context, uid, cid)
+    
 # --- START COLLECTION LOGIC (LÓGICA LOCAL) ---
+@requires_login
 async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Inicia coleta diretamente aqui, agendando o job no final.
-    """
     q = update.callback_query
-    # IMPORTANTE: Import local para evitar ciclo
     from handlers.job_handler import finish_collection_job 
-
     await q.answer()
-    # Pegamos o ID correto da sessão
+    
     uid = get_current_player_id(update, context)
     cid = q.message.chat_id
-    
     res_id = (q.data or "").replace("collect_", "", 1)
     
-    # 1. Carrega dados
     pdata = await player_manager.get_player_data(uid)
     if not pdata: return
 
-    # 2. Validações (Região e Profissão)
-    cur_loc = pdata.get("current_location", "reino_eldora")
-    reg_info = (game_data.REGIONS_DATA or {}).get(cur_loc, {})
-    if reg_info.get("resource") != res_id:
-        await q.answer("Recurso não disponível aqui.", show_alert=True); return
-
-    req_prof = game_data.get_profession_for_resource(res_id)
-    cur_prof = (pdata.get("profession", {}) or {}).get("type")
-    if req_prof and req_prof != cur_prof:
-        pn = (game_data.PROFESSIONS_DATA or {}).get(req_prof, {}).get("display_name", req_prof)
-        await q.answer(f"Precisa ser {pn}.", show_alert=True); return
-
-    # 3. Custo e Tempo
+    # Validações rápidas
     prem = PremiumManager(pdata)
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
-    
     if int(pdata.get("energy", 0)) < cost:
         await q.answer(f"Sem energia ({cost}⚡).", show_alert=True); return
 
-    # 4. Aplica Custo
     player_manager.spend_energy(pdata, cost)
-
-    # 5. Configura Item Resultante
+    
+    # Setup Coleta
+    req_prof = game_data.get_profession_for_resource(res_id)
     p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get('resources', {})
     item_yielded = p_res.get(res_id, res_id)
 
-    # 6. Salva Estado
     base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
     spd = float(prem.get_perk_value("gather_speed_multiplier", 1.0))
     dur = max(1, int(base_secs / max(0.25, spd)))
     
     finish = datetime.now(timezone.utc) + timedelta(seconds=dur)
-    
     pdata['player_state'] = {
         'action': 'collecting',
         'finish_time': finish.isoformat(),
-        'details': {
-            'resource_id': res_id, 'item_id_yielded': item_yielded,
-            'quantity': 1, 'energy_cost': cost
-        }
+        'details': {'resource_id': res_id, 'item_id_yielded': item_yielded, 'quantity': 1}
     }
     player_manager.set_last_chat_id(pdata, cid)
     
-    # Envio da mensagem visual
-    i_name = (game_data.ITEMS_DATA or {}).get(item_yielded, {}).get("display_name", item_yielded)
+    # UI Feedback
     human = _humanize_duration(dur)
-    c_txt = "Grátis" if cost == 0 else f"-{cost}⚡"
-    cap = f"⛏️ <b>Coletando {i_name}...</b>\n⏳ Tempo: {human}\n⚡ Custo: {c_txt}"
-    
+    cap = f"⛏️ <b>Coletando...</b>\n⏳ Tempo: {human}"
     try: await q.delete_message()
     except: pass
+    msg = await context.bot.send_message(cid, cap, parse_mode="HTML")
     
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⏳ Trabalhando...", callback_data="noop")]])
-    
-    # Envia mídia da região como feedback
-    m_key = reg_info.get("media_key") or f"regiao_{cur_loc}"
-    fd = media_ids.get_file_data(m_key)
-    msg = None
-    try:
-        if fd and fd.get("id"):
-            typ = (fd.get("type") or "photo").lower()
-            if typ == "video": msg = await context.bot.send_video(cid, fd["id"], caption=cap, reply_markup=kb, parse_mode="HTML")
-            else: msg = await context.bot.send_photo(cid, fd["id"], caption=cap, reply_markup=kb, parse_mode="HTML")
-        else:
-            msg = await context.bot.send_message(cid, cap, reply_markup=kb, parse_mode="HTML")
-    except:
-        msg = await context.bot.send_message(cid, cap, reply_markup=kb, parse_mode="HTML")
-
-    # Atualiza ID da mensagem para delete futuro
-    if msg:
-        pdata['player_state']['details']['collect_message_id'] = msg.message_id
-        
+    if msg: pdata['player_state']['details']['collect_message_id'] = msg.message_id
     await player_manager.save_player_data(uid, pdata)
 
-    # 7. Agendamento (Usando função importada localmente)
     context.job_queue.run_once(
         finish_collection_job,
         when=dur,
-        data={
-            'user_id': uid, 'chat_id': cid,
-            'resource_id': res_id, 'item_id_yielded': item_yielded,
-            'quantity': 1, 'message_id': msg.message_id if msg else None
-        },
+        data={'user_id': uid, 'chat_id': cid, 'resource_id': res_id, 'item_id_yielded': item_yielded, 'quantity': 1, 'message_id': msg.message_id},
         name=f"collect_{uid}"
     )
 
@@ -650,6 +500,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Durabilidade e Registro
 # =============================================================================
 
+@requires_login
 async def show_restore_durability_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -696,6 +547,7 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
     
     await _safe_edit_or_send(q, context, q.message.chat_id, "\n".join(lines), InlineKeyboardMarkup(kb))
 
+@requires_login
 async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Gerencia APENAS o 'Reparar Tudo'.

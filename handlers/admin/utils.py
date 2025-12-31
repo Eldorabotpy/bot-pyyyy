@@ -12,16 +12,11 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURAÇÃO ADMIN ---
 admin_id_str = os.getenv("ADMIN_ID")
 ADMIN_ID = None
+ADMIN_LIST = []
 
-if not admin_id_str:
-    logging.critical("ADMIN_ID não definido!")
-    # sys.exit pode ser drástico demais em alguns ambientes, cuidado
-    # sys.exit("ERRO: ADMIN_ID não definido.") 
-else:
-    try:
-        ADMIN_ID = int(admin_id_str)
-    except ValueError:
-        logging.critical("ADMIN_ID inválido!")
+if admin_id_str and admin_id_str.isdigit():
+    ADMIN_ID = int(admin_id_str)
+    ADMIN_LIST.append(ADMIN_ID)
 
 ADMIN_LIST = [ADMIN_ID] if ADMIN_ID else []
 
@@ -30,17 +25,21 @@ INPUT_TEXTO = 0
 CONFIRMAR_JOGADOR = 1
 
 # --- HELPER: Conversor de ID Híbrido ---
-def parse_hybrid_id(text: str):
+def parse_hybrid_id(text: str | int):
     """
     Tenta converter string para Int (Antigo) ou ObjectId (Novo).
-    Retorna o ID tipado ou a string original se falhar.
+    Retorna o ID tipado ou None se falhar.
     """
-    text = str(text).strip()
-    if text.isdigit():
-        return int(text)
-    if ObjectId.is_valid(text):
-        return ObjectId(text)
-    return text
+    if not text: return None
+    
+    text_str = str(text).strip()
+    
+    if text_str.isdigit():
+        return int(text_str)
+        
+    if ObjectId.is_valid(text_str):
+        return ObjectId(text_str)
+    return text_str
 
 # --- FUNÇÕES ---
 async def ensure_admin(update: Update) -> bool:

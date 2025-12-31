@@ -1,5 +1,5 @@
 # handlers/job_handler.py
-# (VERSÃO REFATORADA FINAL: Lógica de Coleta com Auto-Correção de Itens)
+# (VERSÃO BLINDADA: Com Injeção de Sessão para Auth Híbrida)
 
 import random
 import logging
@@ -25,10 +25,10 @@ def _clamp_float(v: Any, lo: float, hi: float, default: float) -> float:
     return max(lo, min(hi, f))
 
 # ==============================================================================
-# 1. A LÓGICA PURA (Pode ser chamada pelo Job ou pelo Recovery)
+# 1. A LÓGICA PURA (Mantida intacta)
 # ==============================================================================
 async def execute_collection_logic(
-    user_id: int,
+    user_id: str, # Alterado type hint para str, pois agora garantimos string
     chat_id: int,
     resource_id: str,
     item_id_yielded: str,
@@ -51,8 +51,8 @@ async def execute_collection_logic(
         
     """
     Executa a matemática da coleta, entrega itens e notifica.
-    Independente de contexto de Job.
     """
+    # Busca usando o ID (String ou Int, o manager lida, mas preferimos String vinda do Job)
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
@@ -78,7 +78,7 @@ async def execute_collection_logic(
     # Quantidade: Base + Nível Profissão
     quantidade_final = quantity_base + prof_level 
     
-    # Crítico (Base 3% + Bônus Nível + Bônus Sorte)
+    # Crítico
     is_crit = False
     chance_critica = 3.0 + (prof_level * 0.1) + (luck_stat * 0.05)
     
@@ -187,19 +187,37 @@ async def execute_collection_logic(
         logger.warning(f"Erro ao enviar msg final coleta {user_id}: {e}")
 
 # ==============================================================================
-# 2. O WRAPPER DO TELEGRAM
+# 2. O WRAPPER DO TELEGRAM (CORRIGIDO)
 # ==============================================================================
 async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     """
-    Job chamado pelo scheduler. Extrai dados e chama a lógica.
+    Job chamado pelo scheduler.
+    INCLUI HACK DE SESSÃO para Auth Híbrida.
     """
     job = context.job
     if not job: return
 
     job_data = job.data or {}
     
-    user_id = job_data.get('user_id') or job.user_id
+    # --- RECUPERAÇÃO SEGURA DO ID ---
+    # Prioridade: ID no job_data > ID no objeto job
+    raw_uid = job_data.get('user_id') or job.user_id
+    
+    # CONVERSÃO CRÍTICA: Garante que o ID da sessão seja String (ObjectId)
+    # Se o ID for int (conta antiga migrada ou erro), str() o torna string
+    user_id = str(raw_uid)
+    
     chat_id = job_data.get('chat_id') or job.chat_id
+    
+    # ==========================================================================
+    # 🔐 HACK DE INJEÇÃO DE SESSÃO (AUTH HÍBRIDA)
+    # ==========================================================================
+    # Como jobs rodam em thread isolada sem update, o user_data vem vazio.
+    # Injetamos manualmente para que funções subsequentes (menus, checks)
+    # não achem que o usuário está deslogado.
+    if context.user_data is not None:
+        context.user_data['logged_player_id'] = user_id
+    # ==========================================================================
     
     msg_id = job_data.get('message_id')
     if not msg_id:

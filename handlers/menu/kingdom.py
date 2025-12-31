@@ -1,33 +1,32 @@
 # handlers/menu/kingdom.py
-# (VERSÃO CORRIGIDA: Compatível com novo sistema de Login)
+# (VERSÃO BLINDADA 4.2: Com proteção contra reinício)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data, file_ids
 from kingdom_defense import leaderboard 
-from modules.auth_utils import get_current_player_id # <--- Importante
+# ✅ Importamos o decorator de segurança
+from modules.auth_utils import get_current_player_id, requires_login 
 
 logger = logging.getLogger(__name__)
 
-# Alteração 1: Aceita chat_id e message_id como argumentos opcionais
+# Aplicamos o decorator aqui. Se o bot reiniciar, ele barra a entrada
+# e mostra o botão "Reconectar" ANTES de tentar ler qualquer dado.
+@requires_login
 async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, player_data: dict | None = None, chat_id: int | None = None, message_id: int | None = None):
     """Mostra o menu principal do Reino de Eldora."""
     try:
         query = None
         user = None
         
-        # Verifica se 'update' existe antes de tentar acessá-lo
         if update:
             if update.callback_query:
                 query = update.callback_query
             user = update.effective_user
 
-        # =================================================================
-        # 🛡️ BLINDAGEM NÍVEL 2 (FIX ERRO NoneType)
-        # =================================================================
-        
-        # 1. Se o chat_id não veio nos argumentos, tenta descobrir pelo Update do Telegram
+        # Como o @requires_login garante a sessão, podemos confiar mais no contexto,
+        # mas mantemos a blindagem para segurança extra.
         if not chat_id and update:
             if update.effective_chat:
                 chat_id = update.effective_chat.id
@@ -36,53 +35,39 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             elif user:
                 chat_id = user.id
         
-        # 2. (NOVO) Se ainda não achou, tenta pegar de dentro do player_data
         if not chat_id and player_data:
-            # Tenta pegar o chat ID salvo ou o ID do dono (Telegram ID)
             chat_id = player_data.get("last_chat_id") or player_data.get("telegram_id_owner")
-            # Se for conta antiga, o próprio _id/user_id é o chat_id
-            if not chat_id:
-                uid = player_data.get("user_id")
-                if isinstance(uid, int):
-                    chat_id = uid
 
-        # Se ainda assim falhar, aborta
         if not chat_id:
+            # Esse erro deve ser raríssimo agora com o @requires_login
             logger.error("ERRO CRÍTICO: Não foi possível identificar o Chat ID no menu Kingdom.")
             return
-        # =================================================================
 
         if query and query.data == "show_kingdom_menu":
             try: await query.answer() 
             except: pass
 
-        # Carrega dados do jogador se não vierem nos argumentos
         if player_data is None:
             if update:
-                # MUDANÇA CRÍTICA AQUI: Usa a função ponte para pegar o ID correto (Sessão ou Telegram)
+                # Usa o ID da sessão garantido pelo decorator
                 user_id = get_current_player_id(update, context)
                 player_data = await player_manager.get_player_data(user_id)
             else:
-                # Se não tem update e nem player_data, não tem como saber quem é.
-                logger.error("show_kingdom_menu chamado sem update e sem player_data.")
                 return
         
         if not player_data:
-            # Tenta avisar usando o chat_id recuperado
             await context.bot.send_message(chat_id=chat_id, text="Personagem não encontrado. Use /start.")
             return
 
         # Atualiza localização
         player_data['current_location'] = 'reino_eldora'
-        # Salva o user_id se ele veio do player_data
         user_id_save = player_data.get("user_id")
         if user_id_save:
             await player_manager.save_player_data(user_id_save, player_data) 
 
-        # --- PREPARAÇÃO DOS DADOS PARA EXIBIÇÃO ---
+        # --- DADOS PARA EXIBIÇÃO ---
         character_name = player_data.get("character_name", "Aventureiro(a)")
         
-        # Stats (Híbrido)
         try:
             res = player_manager.get_player_total_stats(player_data)
             total_stats = await res if hasattr(res, '__await__') else res
@@ -117,11 +102,9 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             p_gold = player_data.get("gold", 0)
             p_gems = player_data.get("gems", 0)
 
-        # Leaderboard
         try: leaderboard_text = leaderboard.get_top_score_text()
         except: leaderboard_text = ""
         
-        # --- NOVO VISUAL ESTILO HUD ---
         status_hud = (
             f"\n"
             f"╭──────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ────➤\n"
@@ -132,7 +115,6 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             f"│ ├┈➤ ⚡ ENRGIA: 🪫{p_energy}/🔋{max_energy}\n"
             f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
             f"╰────────────────────────➤"
-            
         )
 
         caption = (
@@ -149,34 +131,29 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 f"   ╰┈➤ {leaderboard_text.strip()}"
                 f"\n"
             )
-        # --- TECLADO ---
+            
         keyboard = [
-            # LINHA 1: Ações Principais (Viajar e Perfil)
             [
                 InlineKeyboardButton("🗺 𝐕𝐢𝐚𝐣𝐚𝐫", callback_data='travel'),
                 InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data='profile')
             ],
-            # LINHA 2: Economia (Mercado e Forja)
             [
                 InlineKeyboardButton("🏪 𝐌𝐞𝐫𝐜𝐚𝐝𝐨", callback_data='market'),
                 InlineKeyboardButton("⚒️ 𝐅𝐨𝐫𝐣𝐚", callback_data='forge:main'),
             ],
-            # LINHA 3: Social e Avançado (Guilda e Refino)
             [
                 InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚", callback_data='adventurer_guild_main'),
                 InlineKeyboardButton("🧪 𝐑𝐞𝐟𝐢𝐧𝐨", callback_data='refining_main'),
             ],
-            # LINHA 4: Combate e Eventos (Destaque para ação)
             [
                 InlineKeyboardButton("⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐏𝐯𝐏", callback_data='pvp_arena'), 
                 InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬", callback_data='evt_hub_principal')
             ],
-            # LINHA 5: Rodapé (Info)
             [InlineKeyboardButton("ℹ️ 𝐒𝐨𝐛𝐫𝐞 𝐨 𝐑𝐞𝐢𝐧𝐨", callback_data='region_info:reino_eldora')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # --- LÓGICA DE MÍDIA ---
+        # Mídia
         media_id = None
         media_type = "photo"
         try:
@@ -186,7 +163,6 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 media_type = (fd.get("type") or "photo").lower()
         except: pass
 
-        # Tenta editar se for callback E se a mensagem original existir
         if query and query.message:
             try:
                 if media_id:
@@ -199,7 +175,6 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 try: await query.delete_message()
                 except: pass
 
-        # Fallback: Envio de Nova Mensagem
         if media_id:
             try:
                 if media_type == "video":
@@ -218,5 +193,4 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
              try: await context.bot.send_message(chat_id=chat_id, text="⚠️ Erro ao carregar o reino.")
              except: pass
 
-# Handler
 kingdom_menu_handler = CallbackQueryHandler(show_kingdom_menu, pattern=r'^show_kingdom_menu$')

@@ -11,7 +11,7 @@ from modules import player_manager
 from .menu.kingdom import show_kingdom_menu
 from .menu.region import show_travel_menu, show_region_menu
 from .menu.events import show_events_menu
-
+from modules.auth_utils import requires_login
 
 # ---- IMPORT FORGE OPCIONAL / COM FALLBACK ----
 try:
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # -------------------------
 # Anti-flood (simples)
 # -------------------------
-_LAST_CLICK: Dict[int, float] = {}
+_LAST_CLICK: Dict[str, float] = {}
 _MIN_DELTA = 0.4  # segundos
 
 def _allow_click(user_id: int) -> bool:
@@ -40,23 +40,13 @@ def _allow_click(user_id: int) -> bool:
 # Helpers de segurança
 # -------------------------
 async def _safe_answer(update: Update) -> None:
-    """Responde ao callback sem estourar exceção se já foi respondido."""
-    query = update.callback_query
-    if not query:
-        return
-    try:
-        await query.answer()
-    except BadRequest:
-        pass
-    except Exception:
-        logger.debug("Falha silenciosa em query.answer()", exc_info=True)
+    if update.callback_query:
+        try: await update.callback_query.answer()
+        except: pass
 
 async def _error_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE, msg: str) -> None:
-    q = update.callback_query
-    try:
-        await q.edit_message_text(msg)
-    except Exception:
-        await context.bot.send_message(chat_id=q.message.chat.id, text=msg)
+    try: await update.callback_query.edit_message_text(msg)
+    except: await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
 
 # -------------------------
 # Aliases (compat antiga)
@@ -75,23 +65,13 @@ ALIASES = {
 # -------------------------
 # Router (nome -> função)
 # -------------------------
-async def _go_kingdom(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_kingdom_menu(update, context)
-
-async def _go_travel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_travel_menu(update, context)
-
-async def _go_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_events_menu(update, context)
-
-
-async def _go_forge(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    if show_forge_menu:
-        await show_forge_menu(update, context)  # type: ignore
-    else:
-        await q.edit_message_text("⚒️ Forja ainda não está disponível.")
-
+async def _go_kingdom(update, context): await show_kingdom_menu(update, context)
+async def _go_travel(update, context): await show_travel_menu(update, context)
+async def _go_events(update, context): await show_events_menu(update, context)
+async def _go_forge(update, context):
+    if show_forge_menu: await show_forge_menu(update, context)
+    else: await update.callback_query.edit_message_text("⚒️ Forja indisponível.")
+    
 ROUTES: Dict[str, Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]]] = {
     "show_kingdom_menu": _go_kingdom,
     "navigate_reino_eldora": _go_kingdom,   # compat
@@ -100,33 +80,27 @@ ROUTES: Dict[str, Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]]
     "forge": _go_forge,
 }
 
+@requires_login
 async def continue_after_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # PEGA O ID DA SESSÃO (Garantido pelo decorator)
+    user_id = context.user_data["logged_player_id"]
     
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        await query.edit_message_text("Jogador não encontrado. Use /start.")
+        await query.edit_message_text("Jogador não encontrado.")
         return
 
-    # 1. Pega a localização atual salva nos dados do jogador
     location_key = player_data.get('current_location', 'reino_eldora')
+    try: await query.delete_message()
+    except: pass
     
-    try:
-        await query.delete_message()
-    except Exception:
-        pass # Ignora se não conseguir apagar a mensagem anterior
-    
-    # 2. Chama a função de menu para a localização CORRETA
     if location_key == 'reino_eldora':
         await show_kingdom_menu(update, context)
     else:
-        # AQUI ESTÁ A CORREÇÃO: passamos a location_key para a função
         await show_region_menu(update, context, region_key=location_key)
-
-# --- EXPORT DOS HANDLERS ---
-# Em vez de um handler gigante, exportamos handlers específicos e limpos.
 
 # Handler inteligente para voltar à aventura
 continue_after_action_handler = CallbackQueryHandler(
@@ -146,70 +120,53 @@ travel_handler = CallbackQueryHandler(
 # -------------------------
 # Handler principal
 # -------------------------
+@requires_login
 async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    print("\n>>> RASTREAMENTO: Entrou em navigation_callback")
     await _safe_answer(update)
     query = update.callback_query
-    if not query:
-        return
+    if not query: return
 
-    user_id = query.from_user.id
-    if not _allow_click(user_id):
-        # silêncio em flood curto
-        return
+    # ✅ CORREÇÃO: ID Seguro
+    user_id = context.user_data["logged_player_id"]
+    
+    if not _allow_click(user_id): return
 
-    # --- estado do jogador ---
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        await _error_fallback(update, context, "Não encontrei seus dados. Use /start para começar.")
+        await _error_fallback(update, context, "Dados não encontrados.")
         return
 
-    # Evita quebrar ações com tempo
     player_state = player_data.get("player_state", {"action": "idle"})
     data = (query.data or "").strip()
-    if not data:
-        await _error_fallback(update, context, "Botão inválido.")
-        return
-
-    # normaliza alias
     button = ALIASES.get(data, data)
 
     if player_state.get("action") not in ("idle", None) and button != "continue_after_action":
-        await query.answer("Você está em uma ação no momento. Conclua antes de navegar.", show_alert=True)
+        await query.answer("Conclua sua ação atual primeiro.", show_alert=True)
         return
 
     try:
-        # Mude isto:
         current_location = player_data.get("current_location", "reino_eldora")
-        if current_location == "reino_eldora":
-            await show_kingdom_menu(update, context)
-        else:
-            await show_region_menu(update, context) # <--- BUG
-
-# Para isto (passando a key):
-        current_location = player_data.get("current_location", "reino_eldora")
-        if current_location == "reino_eldora":
-            await show_kingdom_menu(update, context)
-        else:
-            await show_region_menu(update, context, region_key=current_location) # <--- CORRIGIDO
-
-        # despacho por tabela
+        
+        # Despacho por tabela
         handler = ROUTES.get(button)
         if handler:
             await handler(update, context)
             return
 
-        # Fallback: desconhecido -> volta ao menu do local atual
-        logger.info("Botão de navegação desconhecido: %s", button)
-        current_location = player_data.get("current_location", "reino_eldora")
+        # Fallback: volta ao menu do local atual
+        logger.info("Botão desconhecido: %s -> Recarregando menu.", button)
         if current_location == "reino_eldora":
             await show_kingdom_menu(update, context)
         else:
-            await show_region_menu(update, context)
+            await show_region_menu(update, context, region_key=current_location)
 
     except Exception:
-        logger.exception("Erro ao processar botão de navegação: %s", button)
-        await _error_fallback(update, context, "❌ Ocorreu um erro ao processar o menu. Tente novamente.")
+        logger.exception("Erro navegação: %s", button)
+        await _error_fallback(update, context, "❌ Erro ao processar.")
+
+continue_after_action_handler = CallbackQueryHandler(continue_after_action_callback, pattern=r'^continue_after_action$')
+kingdom_menu_handler = CallbackQueryHandler(show_kingdom_menu, pattern=r'^show_kingdom_menu$')
+travel_handler = CallbackQueryHandler(show_travel_menu, pattern=r'^travel$')
 
 navigation_handler = CallbackQueryHandler(
     navigation_callback,

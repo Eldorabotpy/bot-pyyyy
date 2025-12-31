@@ -5,13 +5,15 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any, Optional, Type
+from typing import Any, Optional, Type, Union # Adicionado Union
+from bson import ObjectId # Adicionado ObjectId
 
 logger = logging.getLogger(__name__)
 
 # --- 1. Funções do Core ---
 from .player.core import (
-    get_player_data, 
-    save_player_data, 
+    get_player_data as _get_player_data_core, 
+    save_player_data as _save_player_data_core, 
     clear_player_cache, 
     clear_all_player_cache,
 )
@@ -65,7 +67,6 @@ from .player.inventory import (
 # --- 5. Funções de Ações, Energia e Estado ---
 from .player.actions import (
     get_player_max_energy, 
-    # spend_energy, <--- REMOVIDO DAQUI (Redefinido abaixo)
     add_energy, 
     set_last_chat_id,
     ensure_timed_state, 
@@ -84,6 +85,31 @@ from .player.actions import (
 
 # Importamos a função original com outro nome para usar dentro do nosso Wrapper
 from .player.actions import spend_energy as _spend_energy_internal
+
+def _ensure_id_format(user_id: Union[int, str, ObjectId]) -> Union[int, ObjectId]:
+    """
+    Converte o ID para o formato correto do banco:
+    - Se for int: Mantém int (Conta Legada)
+    - Se for str de 24 chars: Converte para ObjectId (Conta Nova)
+    - Se for str numérico: Converte para int (Conta Legada vinda como str)
+    - Se for ObjectId: Mantém
+    """
+    if isinstance(user_id, ObjectId):
+        return user_id
+        
+    if isinstance(user_id, int):
+        return user_id
+        
+    if isinstance(user_id, str):
+        # Tenta converter para int primeiro (caso seja ID do telegram em string)
+        if user_id.isdigit():
+            return int(user_id)
+        # Se for um ObjectId válido em string
+        if ObjectId.is_valid(user_id):
+            return ObjectId(user_id)
+            
+    # Se falhar, retorna como está (provavelmente vai dar erro no find, mas evita crash aqui)
+    return user_id
 
 # =================================================================
 # --- 5.1 WRAPPER GLOBAL DE ENERGIA ---
@@ -140,6 +166,7 @@ def get_perk_value_float(pdata: Optional[dict], perk_name: str, default: float =
 # --- 7. HELPER: FULL RESTORE ---
 # =================================================================
 async def full_restore(user_id: int):
+    # Usa o wrapper seguro
     pdata = await get_player_data(user_id)
     if pdata:
         stats = await get_player_total_stats(pdata)
@@ -209,7 +236,7 @@ def get_rune_bonuses(player_data: dict) -> dict:
 # Use estas funções ao dar recompensas para garantir que o save ocorra
 # imediatamente no banco de dados, prevenindo perdas se o Render reiniciar.
 
-async def safe_add_gold(user_id: int, amount: int) -> int:
+async def safe_add_gold(user_id: Union[int, str], amount: int) -> int:
     """Adiciona ouro e salva imediatamente."""
     pdata = await get_player_data(user_id)
     if not pdata: return 0
@@ -222,7 +249,17 @@ async def safe_add_gold(user_id: int, amount: int) -> int:
     
     return int(pdata.get("gold", 0))
 
-async def safe_spend_gold(user_id: int, amount: int) -> bool:
+async def get_player_data(user_id: Union[int, str]):
+    """Wrapper seguro para buscar dados de qualquer tipo de conta."""
+    real_id = _ensure_id_format(user_id)
+    return await _get_player_data_core(real_id)
+
+async def save_player_data(user_id: Union[int, str], data: dict):
+    """Wrapper seguro para salvar dados de qualquer tipo de conta."""
+    real_id = _ensure_id_format(user_id)
+    return await _save_player_data_core(real_id, data)
+
+async def safe_spend_gold(user_id: Union[int, str], amount: int) -> bool:
     """Gasta ouro e salva imediatamente se houver sucesso."""
     pdata = await get_player_data(user_id)
     if not pdata: return False
@@ -232,7 +269,7 @@ async def safe_spend_gold(user_id: int, amount: int) -> bool:
         return True
     return False
 
-async def safe_add_xp(user_id: int, xp_amount: int) -> tuple[int, str]:
+async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, str]:
     """Adiciona XP, checa Level Up e salva imediatamente."""
     pdata = await get_player_data(user_id)
     if not pdata: return 0, ""
@@ -248,57 +285,25 @@ async def safe_add_xp(user_id: int, xp_amount: int) -> tuple[int, str]:
     
     return levels_gained, msg
 
-def corrigir_itens_duplicados(player_data: dict) -> bool:
-    """
-    Detecta itens com IDs antigos, transfere a quantidade para o ID novo e remove o antigo.
-    Retorna True se houve mudança.
-    """
-    inventory = player_data.get("inventory", {})
-    if not inventory: return False
-
-    # Mapa: O que deve sair -> Para onde deve ir
-    migracoes = {
-        "minerio_ferro": "minerio_de_ferro",
-        "iron_ore": "minerio_de_ferro",
-        "pedra_ferro": "minerio_de_ferro"
-    }
-
-    houve_mudanca = False
-
-    for id_velho, id_novo in migracoes.items():
-        if id_velho in inventory:
-            # 1. Pega a quantidade do item velho
-            dados_velho = inventory[id_velho]
-            qtd_velha = 0
-            
-            if isinstance(dados_velho, dict):
-                qtd_velha = int(dados_velho.get("quantity", 0))
-            else:
-                qtd_velha = int(dados_velho) # Caso esteja salvo apenas como int
-            
-            # 2. Se tiver quantidade para migrar
-            if qtd_velha > 0:
-                # Garante que o item novo existe
-                if id_novo not in inventory:
-                    inventory[id_novo] = {"quantity": 0}
-                
-                # Soma no novo
-                inventory[id_novo]["quantity"] = int(inventory[id_novo].get("quantity", 0)) + qtd_velha
-                
-                # Deleta o velho
-                del inventory[id_velho]
-                houve_mudanca = True
-                print(f"♻️ Migrado: {qtd_velha}x {id_velho} -> {id_novo}")
-            else:
-                # Se for 0 ou lixo, só deleta
-                del inventory[id_velho]
-                houve_mudanca = True
-
-    return houve_mudanca
+async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, str]:
+    """Adiciona XP, checa Level Up e salva imediatamente."""
+    pdata = await get_player_data(user_id)
+    if not pdata: return 0, ""
+    
+    current_xp = int(pdata.get("xp", 0))
+    pdata["xp"] = current_xp + int(xp_amount)
+    
+    # Verifica level up
+    levels_gained, points_gained, msg = check_and_apply_level_up(pdata)
+    
+    # Salva tudo
+    await save_player_data(user_id, pdata)
+    
+    return levels_gained, msg
 
 # --- ADICIONE NO FINAL DE player_manager.py ---
 
-async def corrigir_inventario_automatico(user_id: int):
+async def corrigir_inventario_automatico(user_id: Union[int, str]):
     """
     Detecta itens com IDs antigos/errados e funde com os oficiais.
     Executa a correção e salva se necessário.
@@ -310,7 +315,6 @@ async def corrigir_inventario_automatico(user_id: int):
     mudou = False
 
     # MAPA: "ID_ERRADO" -> "ID_OFICIAL_DO_REFINO"
-    # Adicionei todas as variações comuns aqui
     migracoes = {
         # Ferro
         "minerio_ferro": "minerio_de_ferro",
@@ -370,9 +374,7 @@ async def corrigir_inventario_automatico(user_id: int):
         return True
     return False
 
-# --- ADICIONE NO FINAL DE player_manager.py ---
-
-async def corrigir_bug_tomos_duplicados(user_id: int):
+async def corrigir_bug_tomos_duplicados(user_id: Union[int, str]):
     """
     Varre o inventário do jogador. Se achar 'tomo_tomo_',
     converte para 'tomo_' e mantém a quantidade.

@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import random
 from typing import Any, Dict, Tuple, List
-
+from typing import Any, Dict, Tuple, List, Union
 # Módulos do projeto (Removemos game_data daqui de cima para evitar o ciclo)
 from modules import player_manager
 # Importamos apenas o essencial aqui
@@ -139,28 +139,46 @@ async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
         "emoji": rec.get("emoji", ""),
     }
 
-async def start_craft(user_id: int, recipe_id: str):
+async def start_craft(user_id: str, recipe_id: str):
+    """
+    Inicia o processo de crafting.
+    user_id: DEVE ser a String do ObjectId (sessão).
+    """
+    # 1. Busca os dados usando o ID String
     pdata = await player_manager.get_player_data(user_id)
+    
     rec = get_recipe(recipe_id)
     if not pdata or not rec:
         return "Receita de forja inválida."
+    
     rec = dict(rec)
+    
+    # 2. Validação de Profissão
     prof = _as_dict(pdata.get("profession"))
     if prof.get("type") != rec.get("profession") or int(prof.get("level", 1)) < int(rec.get("level_req", 1)):
         return "Nível ou tipo de profissão insuficiente para esta receita."
+    
+    # 3. Validação de Materiais
     inputs = _as_dict(rec.get("inputs"))
     if not _has_materials(pdata, inputs):
         return "Materiais insuficientes."
+    
+    # 4. Consumo e Cálculo de Tempo
     duration = await _seconds_with_perks(pdata, int(rec.get("time_seconds", 60)))
     _consume_materials(pdata, inputs)
 
     finish = datetime.now(timezone.utc) + timedelta(seconds=duration)
+    
+    # 5. Atualiza Estado do Jogador
     pdata["player_state"] = {
         "action": "crafting",
         "finish_time": finish.isoformat(),
         "details": {"recipe_id": recipe_id}
     }
+    
+    # Salva usando o user_id (String)
     await player_manager.save_player_data(user_id, pdata)
+    
     return {"duration_seconds": duration, "finish_time": finish.isoformat()}
 
 # =========================
@@ -485,34 +503,47 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
 # Finish / XP
 # =========================
 
-async def finish_craft(user_id: int):
-    # Usa Lazy Import para xp curve se precisar no futuro, mas aqui usa player_manager
-    # Importante: game_data é usado aqui para curva de XP
-    gd = _get_game_data()
+async def finish_craft(user_id: str):
+    """
+    Finaliza o crafting.
+    user_id: DEVE ser a String do ObjectId (sessão).
+    """
+    # Usa Lazy Import se necessário para evitar ciclo, ou import direto se já estiver no topo
+    try:
+        from modules import game_data
+        gd = game_data
+    except ImportError:
+        gd = None
 
     pdata = await player_manager.get_player_data(user_id)
     pstate = _as_dict(pdata.get("player_state")) if pdata else {}
+    
     if not pdata or pstate.get("action") != "crafting":
         return "Nenhuma forja em andamento."
 
     rid = _as_dict(pstate.get("details")).get("recipe_id")
     rec = get_recipe(rid)
+    
     if not rec:
+        # Se a receita sumiu, destrava o jogador
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(user_id, pdata)
         return "Receita não encontrada ao concluir."
 
     rec = dict(rec)
 
+    # Criação do Item
+    # (Certifique-se que _create_dynamic_unique_item está definida no arquivo)
     novo_item_criado = _create_dynamic_unique_item(pdata, rec)
     player_manager.add_unique_item(pdata, novo_item_criado)
 
+    # XP de Profissão
     prof = _as_dict(pdata.get("profession"))
     if prof.get("type") == rec.get("profession"):
         prof["xp"] = int(prof.get("xp", 0)) + int(rec.get("xp_gain", 1))
         cur = int(prof.get("level", 1))
         
-        # Lógica de XP segura
+        # Lógica de Level Up
         if gd:
             while True:
                 try: need = int(gd.get_xp_for_next_collection_level(cur))
@@ -522,6 +553,7 @@ async def finish_craft(user_id: int):
         
         pdata["profession"] = prof
 
+    # Finaliza e Salva
     pdata["player_state"] = {"action": "idle"}
     await player_manager.save_player_data(user_id, pdata)
 

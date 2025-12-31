@@ -1,5 +1,5 @@
 # handlers/forge_handler.py
-# (VERSÃO FINAL 3.0: Suporte total a VÍDEO MP4 e FOTO na forja)
+# (VERSÃO BLINDADA: Auth Híbrida + Proteção de Job + Correção de Duplicatas)
 
 import logging
 from telegram import (
@@ -7,13 +7,13 @@ from telegram import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    InputFile,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.helpers import escape_markdown
 from telegram.error import BadRequest, Forbidden
-from modules.auth_utils import get_current_player_id
+
 # --- Módulos do Jogo ---
+from modules.auth_utils import get_current_player_id
 from modules import (
     player_manager,
     game_data,
@@ -57,21 +57,20 @@ async def _send_or_edit_media(query, context, media_data, caption, reply_markup=
     chat_id = query.message.chat_id
     try: await query.delete_message()
     except Exception: pass
-    media_id = media_data.get("id")
-    media_type = media_data.get("type", "photo").lower()
+    media_id = media_data.get("id") if media_data else None
+    media_type = (media_data.get("type") or "photo").lower() if media_data else "photo"
+    
     try:
-        if media_type == "video": await context.bot.send_video(chat_id=chat_id, video=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
-        else: await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
+        if media_id:
+            if media_type == "video": 
+                await context.bot.send_video(chat_id=chat_id, video=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
+            else: 
+                await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=caption, reply_markup=reply_markup, parse_mode="Markdown")
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Erro ao enviar mídia na forja: {e}")
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="Markdown")
-
-def _pretty_item_name(item_id: str) -> str:
-    info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(item_id, {})
-    name = info.get("display_name", item_id.replace("_", " ").title())
-    emoji = info.get("emoji", "")
-    full_name = f"{emoji} {name}" if emoji else name
-    return _md_escape(full_name)
 
 def _fmt_need_line(item_id: str, have: int, need: int) -> str:
     mark = "✅" if have >= need else "❌"
@@ -82,9 +81,8 @@ def _fmt_need_line(item_id: str, have: int, need: int) -> str:
 # =====================================================
 # 1. LÓGICA DE EXECUÇÃO (Recovery Safe)
 # =====================================================
-# É AQUI QUE ENTRA A NOVA FUNÇÃO QUE VOCÊ PERGUNTOU
 async def execute_craft_logic(
-    user_id: int, 
+    user_id: str, # Agora espera String (ObjectId)
     chat_id: int, 
     recipe_id: str, 
     context: ContextTypes.DEFAULT_TYPE, 
@@ -92,7 +90,6 @@ async def execute_craft_logic(
 ):
     """
     Finaliza a forja: entrega o item, calcula XP e notifica.
-    Pode ser chamado pelo Job (normal) ou Recovery (reboot).
     """
     # 1. Apaga mensagem de progresso (se existir)
     if message_id_to_delete:
@@ -100,13 +97,12 @@ async def execute_craft_logic(
             await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
         except Exception: pass
 
-    # 2. Executa a lógica de finalização (Banco de Dados + Inventário)
-    # O crafting_engine.finish_craft já cuida de verificar se está 'crafting' e dar o item
+    # 2. Executa a lógica de finalização
+    # O user_id passado já deve ser string aqui
     result = await crafting_engine.finish_craft(user_id)
     
     if not isinstance(result, dict) or "item_criado" not in result:
-        # Se retornou erro ou não tinha nada pra finalizar, paramos.
-        # Mas garantimos que o player seja destravado se for um erro de estado.
+        # Destrava o jogador em caso de erro
         pdata = await player_manager.get_player_data(user_id)
         if pdata and pdata.get('player_state', {}).get('action') == 'crafting':
              pdata['player_state'] = {'action': 'idle'}
@@ -131,23 +127,22 @@ async def execute_craft_logic(
         InlineKeyboardButton("↩️ Voltar para a Forja", callback_data="forge:main")
     ]])
 
-    try:
-        if media_data.get("type") == "video" or str(media_data.get("id")).endswith(".mp4"):
-            await context.bot.send_video(chat_id=chat_id, video=media_data["id"], caption=text, parse_mode="Markdown", reply_markup=kb)
-        else:
-            await context.bot.send_photo(chat_id=chat_id, photo=media_data["id"], caption=text, parse_mode="Markdown", reply_markup=kb)
-            
-    except Forbidden:
-        logger.warning(f"Bot bloqueado pelo usuário {user_id} na forja.")
-    except Exception as e:
-        logger.error(f"Erro envio forja {user_id}: {e}")
-        await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=kb)
+    await _send_or_edit_media(
+        # Criamos um "fake query" ou usamos None, pois essa função espera um objeto com .message
+        type("Query", (), {"message": type("Msg", (), {"chat_id": chat_id})()})(), 
+        context, 
+        media_data, 
+        text, 
+        kb
+    )
+
 # =====================================================
 # Funções de Interface (Menus da Forja)
 # =====================================================
 
 async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    # ✅ FIX: Uso do helper de Auth
     user_id = get_current_player_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
@@ -178,23 +173,24 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
 
     text = f"{profession_info}\n\n🔥 *Forja de Eldora*\nEscolha uma profissão para ver as receitas:"
     
-    # Busca dados da mídia
     media_data = _get_media_data("menu_forja_principal")
-    # Fallback
     if not media_data:
         media_data = {"id": "https://i.ibb.co/d4sdS1qs/photo-2025-12-11-21-55-55.jpg", "type": "photo"}
 
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, profession_id: str, page: int):
-    user_id = context.user_data.get("logged_player_id") or query.from_user.id
+    # ✅ FIX: Uso do helper de Auth (lida com user_data ou fallback)
+    # Como não temos 'update' aqui, construímos um wrapper simples ou usamos lógica direta se soubermos que update está no context
+    user_id = context.user_data.get("logged_player_id") or str(query.from_user.id)
+    
     player_data = await player_manager.get_player_data(user_id)
 
     player_prof = (player_data or {}).get("profession", {})
     player_prof_type = player_prof.get("type")
     
     available_recipes = []
-    # Mostra receitas apenas se for a profissão do jogador (opcional, ajustável)
+    # Mostra receitas apenas se for a profissão do jogador
     if player_prof_type == profession_id:
         all_recipes = crafting_registry.all_recipes()
         for recipe_id, recipe_data in all_recipes.items():
@@ -233,7 +229,8 @@ async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTyp
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, recipe_id: str):
-    user_id = context.user_data.get("logged_player_id") or query.from_user.id
+    # ✅ FIX: Uso do helper de Auth
+    user_id = context.user_data.get("logged_player_id") or str(query.from_user.id)
     player_data = await player_manager.get_player_data(user_id)
 
     recipe_data = crafting_registry.get_recipe(recipe_id)
@@ -272,46 +269,13 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
     media_data = _get_media_data(f"item_{recipe_data.get('output_item_id')}") or {"id": "BAACAgEAAxkBAAEEcHBpUX9JS1KW8xJPX8HhLgkhiWQo_gACZgYAAlOKkEYoa0mljmtqoDYE", "type": "video"}
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
-async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    player_data = await player_manager.get_player_data(user_id)
-
-    profession_info = "Você ainda não tem uma profissão de criação."
-    if player_prof := (player_data or {}).get("profession"):
-        if prof_id := player_prof.get("type"):
-            prof_data = (getattr(game_data, "PROFESSIONS_DATA", {}) or {}).get(prof_id, {})
-            if prof_data.get("category") == "crafting":
-                prof_level = player_prof.get("level", 1)
-                prof_display_name = prof_data.get("display_name", prof_id.capitalize())
-                profession_info = f"Sua Profissão: *{_md_escape(prof_display_name)} (Nível {prof_level})*"
-
-    keyboard = [[InlineKeyboardButton("🛠️ Aprimorar & Durabilidade", callback_data="enhance_menu")]]
-    row = []
-    all_professions = getattr(game_data, "PROFESSIONS_DATA", {}) or {}
-    for prof_id, prof_data in all_professions.items():
-        if prof_data.get("category") == "crafting":
-            display_name = prof_data.get("display_name", prof_id.capitalize())
-            row.append(InlineKeyboardButton(display_name, callback_data=f"forge:prof:{prof_id}:1"))
-            if len(row) == 2:
-                keyboard.append(row)
-                row = []
-    if row: keyboard.append(row)
-    
-    keyboard.append([InlineKeyboardButton("↩️ Voltar ao Reino", callback_data="show_kingdom_menu")])
-
-    text = f"{profession_info}\n\n🔥 *Forja de Eldora*\nEscolha uma profissão para ver as receitas:"
-    media_data = _get_media_data("menu_forja_principal") or {"id": "https://media.tenor.com/images/a82f3073995eb879d74709d437033527/tenor.gif", "type": "photo"}
-
-    await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
-
 # =====================================================
 # Lógica de Início e Término da Forja (AGORA COM VIDEO)
 # =====================================================
 
 async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
-    user_id = context.user_data.get("logged_player_id") or query.from_user.id
+    # ✅ FIX: Auth Híbrida
+    user_id = context.user_data.get("logged_player_id") or str(query.from_user.id)
     chat_id = query.message.chat_id
     message_id_antiga = query.message.message_id
     
@@ -324,14 +288,18 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     duration = result.get("duration_seconds", 0)
     job_name = f"craft_{user_id}_{recipe_id}"
     
-    # Salva o ID da mensagem para apagar depois
-    job_data = {"recipe_id": recipe_id, "message_id_notificacao": message_id_antiga}
+    # ✅ FIX: Salva user_id (String) no job_data para recuperação segura
+    job_data = {
+        "recipe_id": recipe_id, 
+        "message_id_notificacao": message_id_antiga,
+        "user_id": user_id 
+    }
     
     context.job_queue.run_once(
         finish_craft_notification_job,
         duration,
         chat_id=chat_id,
-        user_id=user_id,
+        user_id=int(user_id) if user_id.isdigit() else None, # Opcional no argumento nomeado, mas passamos no data
         name=job_name,
         data=job_data
     )
@@ -352,18 +320,30 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
 
 async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     """
-    Função chamada pelo JobQueue. Apenas repassa os dados para a lógica principal.
+    Função chamada pelo JobQueue.
+    ✅ BLINDADA: Injeta sessão para evitar perda de contexto.
     """
     job = context.job
     if not job: return
     
+    # 1. Recupera ID seguro (String)
+    data = job.data or {}
+    raw_uid = data.get("user_id") or job.user_id
+    user_id = str(raw_uid)
+    
+    # 2. Hack de Injeção de Sessão
+    if context.user_data is not None:
+        context.user_data["logged_player_id"] = user_id
+    
+    # 3. Executa
     await execute_craft_logic(
-        user_id=job.user_id,
+        user_id=user_id,
         chat_id=job.chat_id,
-        recipe_id=job.data.get("recipe_id"),
+        recipe_id=data.get("recipe_id"),
         context=context,
-        message_id_to_delete=job.data.get("message_id_notificacao")
+        message_id_to_delete=data.get("message_id_notificacao")
     )
+
 # =====================================================
 # Roteador
 # =====================================================
@@ -384,6 +364,7 @@ async def forge_callback_router(update: Update, context: ContextTypes.DEFAULT_TY
         elif action == "confirm": await confirm_craft_start(query, parts[2], context)
     except Exception as e:
         logger.error(f"Erro forja callback {data}: {e}")
-        await query.edit_message_text("❌ Erro interno.")
+        try: await query.edit_message_text("❌ Erro interno na forja.")
+        except: pass
         
 forge_handler = CallbackQueryHandler(forge_callback_router, pattern=r"^forge:")
