@@ -5,7 +5,7 @@ import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
-
+from modules.auth_utils import get_current_player_id
 from modules import player_manager
 from modules import file_ids
 
@@ -169,7 +169,7 @@ async def open_christmas_shop(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if query: await query.answer()
     
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
 
     if not is_event_active():

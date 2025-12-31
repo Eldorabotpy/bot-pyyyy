@@ -16,7 +16,7 @@ from telegram.ext import (
     filters
 )
 from telegram.constants import ChatType
-
+from modules.auth_utils import get_current_player_id
 # Tenta importar as coleções
 try:
     from modules.database import players_col, db

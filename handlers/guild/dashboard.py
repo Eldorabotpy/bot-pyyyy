@@ -9,6 +9,7 @@ from telegram.error import BadRequest
 from modules import player_manager, clan_manager
 from modules import file_ids 
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS
+from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     try: await query.answer()
     except: pass
     
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
     clan_id = player_data.get("clan_id")

@@ -15,6 +15,7 @@ from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
 from modules.player import stats as player_stats
 from modules.game_data.class_evolution import can_player_use_skill
+from modules.auth_utils import get_current_player_id
 
 # Import para correção de energia
 from modules.player import actions as player_actions
@@ -263,7 +264,7 @@ async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ====================================================================
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
     
     if query: await query.answer()

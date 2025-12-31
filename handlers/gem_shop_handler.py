@@ -200,7 +200,7 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = get_current_player_id(update, context)
     else:
         chat_id = update.effective_chat.id
-        user_id = update.effective_user.id
+        user_id = get_current_player_id(update, context)
 
     st = _state(context, user_id)
     current_tab = st.get("tab", "premium")

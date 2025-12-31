@@ -7,6 +7,7 @@ from telegram.ext import (
     MessageHandler, filters, CommandHandler
 )
 from modules import player_manager, clan_manager
+from modules.auth_utils import get_current_player_id
 
 ASKING_DEPOSIT_AMOUNT = 0
 ASKING_WITHDRAW_AMOUNT = 1
@@ -78,7 +79,7 @@ async def start_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASKING_DEPOSIT_AMOUNT
 
 async def receive_deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     text = update.message.text.strip()
     
     await _clean_chat(update, context) # Limpa pergunta e resposta

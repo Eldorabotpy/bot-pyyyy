@@ -13,6 +13,7 @@ from modules import player_manager, clan_manager
 from modules.database import db
 from modules import file_ids
 from handlers.guild.dashboard import _render_clan_screen
+from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,7 @@ async def start_invite_conversation(update: Update, context: ContextTypes.DEFAUL
     return ASKING_INVITEE
 
 async def receive_invitee_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     target_name = update.message.text.strip()
     
     await _clean_chat(update, context) # Limpa a resposta do user e a pergunta do bot
@@ -209,7 +210,7 @@ async def start_transfer_leadership(update: Update, context: ContextTypes.DEFAUL
     return ASKING_TRANSFER_TARGET
 
 async def receive_transfer_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     target_name = update.message.text.strip()
     await _clean_chat(update, context)
     

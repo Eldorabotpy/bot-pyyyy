@@ -4,7 +4,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 from . import tournament_system
-
+from modules.auth_utils import get_current_player_id
 # Configure seus IDs de admin aqui (ou importe do seu config.py)
 ADMIN_IDS = [
     7262799478, # Seu ID
@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 async def check_admin(update: Update) -> bool:
     """Verificação de segurança simples."""
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, 
+                                    )
     if user_id not in ADMIN_IDS:
         # Opcional: Avisar que não tem permissão ou apenas ignorar
         # await update.message.reply_text("⛔ Apenas o Rei pode convocar torneios.")

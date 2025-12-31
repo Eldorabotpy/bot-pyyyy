@@ -38,6 +38,7 @@ except ImportError:
 # Importa Entry (Entrada/Lobby) E Combat (Luta) das Catacumbas
 from modules.events.catacumbas import entry_handler as cat_entry
 from modules.events.catacumbas import combat_handler as cat_combat
+from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ async def update_last_seen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user:
         return 
         
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     try:
         # Otimização: Não precisamos carregar o dado todo se for só pra salvar timestamp, 
         # mas mantendo sua lógica original para segurança:

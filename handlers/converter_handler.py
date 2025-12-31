@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data, file_ids
 from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
-
+from modules.auth_utils import get_current_player_id
 # Tenta importar as listas de itens permitidos para venda
 try:
     from handlers.gem_market_handler import SKILL_BOOK_ITEMS, SKIN_BOX_ITEMS

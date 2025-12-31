@@ -15,6 +15,7 @@ from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER, Difficulty
 from .regions import REGIONAL_DUNGEONS, MobDef
 from modules.dungeons.runtime_api import set_pending_battle
 from handlers.profile_handler import _get_class_media 
+from modules.auth_utils import get_current_player_id 
 
 try:
     from modules import file_id_manager as media_ids
@@ -199,7 +200,7 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
     }
 
 async def _start_first_fight(update, context, region_key, difficulty_key):
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
     try: dungeon = _load_region_dungeon(region_key)
     except: return

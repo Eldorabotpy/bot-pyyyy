@@ -21,7 +21,7 @@ from modules.player import actions as player_actions
 # ✅ IMPORTAÇÃO CENTRALIZADA
 from modules.game_data.skills import get_skill_data_with_rarity
 from modules.cooldowns import verificar_cooldown
-
+from modules.auth_utils import get_current_player_id
 logger = logging.getLogger(__name__)
 
 BOSS_MEDIA = "boss_raid" 
@@ -169,7 +169,7 @@ def _format_battle_screen(user_id, player_data, total_stats):
 # ============================================================================
 
 async def iniciar_worldboss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     if user_id != ADMIN_ID: return 
     result = world_boss_manager.start_event()
     if result.get("success"):
@@ -179,7 +179,7 @@ async def iniciar_worldboss_command(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(f"⚠️ Erro: {result.get('error')}")
 
 async def encerrar_worldboss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     if user_id != ADMIN_ID: return
     if not world_boss_manager.is_active:
         await update.message.reply_text("⚠️ 𝗡𝗮̃𝗼 𝗵𝗮́ 𝗲𝘃𝗲𝗻𝘁𝗼 𝗮𝘁𝗶𝘃𝗼.")

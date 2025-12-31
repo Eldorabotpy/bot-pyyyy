@@ -2,9 +2,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from modules.market_manager import list_active, render_listing_line
 from modules import player_manager
-
+from modules.auth_utils import get_current_player_id
 async def open_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     
     # 1. Pega dados do jogador (Async - Correto)
     pdata = await player_manager.get_player_data(user_id) or {}

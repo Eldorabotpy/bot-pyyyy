@@ -24,6 +24,7 @@ from . import pvp_utils
 from . import tournament_system
 # import do terneio
 from . import tournament_system
+from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
@@ -439,7 +440,7 @@ async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer("Função 'Histórico' ainda em construção!", show_alert=True)
 
 async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
 
     try: await pvp_utils.verificar_reset_temporada(context.bot)

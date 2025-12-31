@@ -12,7 +12,7 @@ from modules.game_data import skills as skills_data
 from telegram.constants import ParseMode
 import html
 from telegram.error import BadRequest
-
+from modules.auth_utils import get_current_player_id
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -319,7 +319,7 @@ async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Tela principal da Ficha de Personagem."""
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
 
     # <<< CORREÇÃO 1: Adiciona await >>>

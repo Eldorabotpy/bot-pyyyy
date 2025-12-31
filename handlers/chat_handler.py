@@ -5,6 +5,8 @@ from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from modules.chat_responses import CHAT_RESPONSES
 from modules import player_manager
+from modules.auth_utils import get_current_player_id
+
 
 async def chat_interaction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -42,7 +44,7 @@ async def chat_interaction_callback(update: Update, context: ContextTypes.DEFAUL
 
 async def debug_inv_cmd(update, context):
     """Comando secreto para ver IDs do inventário."""
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     pdata = await player_manager.get_player_data(user_id)
     
     inv = pdata.get("inventory", {})

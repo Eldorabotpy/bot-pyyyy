@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 from handlers.admin.utils import parse_hybrid_id
 from modules import player_manager
-
+from modules.auth_utils import get_current_player_id
 # --- IMPORTAÇÃO CRÍTICA PARA BUSCAR POR NOME ---
 # Isso permite achar o ID digitando "Aragorn" ou "GuerreiroX"
 from modules.player.queries import find_player_by_name_norm
@@ -48,7 +48,7 @@ async def _entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     query = update.callback_query
     if query: await query.answer()
     
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     if user_id != ADMIN_ID:
         if query: await query.edit_message_text("⛔ Acesso negado.")
         else: await update.message.reply_text("⛔ Acesso negado.")

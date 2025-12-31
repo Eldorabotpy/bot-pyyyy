@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, clan_manager
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS
+from modules.auth_utils import get_current_player_id
 
 # --- HELPER VISUAL PARA FORMATAR BUFFS ---
 def _format_buffs(buffs):
@@ -47,7 +48,7 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
     # IMPORTAÇÃO TARDIA (Essencial para usar a função do Dashboard sem travar)
     from handlers.guild.dashboard import _render_clan_screen
 
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
@@ -137,7 +138,7 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
 async def confirm_clan_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa o pagamento e a evolução."""
     query = update.callback_query
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")

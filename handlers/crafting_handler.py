@@ -9,7 +9,7 @@ from telegram import (
     InlineKeyboardMarkup,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
-
+from modules.auth_utils import get_current_player_id
 # --- Importação da Função de Destino ---
 # Importamos diretamente a função que deve ser chamada quando o jogador entra na forja.
 # Esta função é responsável por mostrar as profissões (Ferreiro, Artesão, etc.).

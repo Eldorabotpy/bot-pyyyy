@@ -8,6 +8,7 @@ import json
 import sys
 import asyncio # Importado para o loop de reset
 from typing import Optional
+from modules.auth_utils import get_current_player_id
 from handlers.jobs import distribute_kingdom_defense_ticket_job
 from handlers.admin.grant_item import grant_item_conv_handler 
 #from handlers.admin.sell_gems import sell_gems_conv_handler 
@@ -434,7 +435,7 @@ async def _handle_force_ticket(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Você não tem permissão.", show_alert=True)
         return
     
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     item_id = 'ticket_defesa_reino'
 
     try:
@@ -771,7 +772,7 @@ async def inspect_item_command(update: Update, context: ContextTypes.DEFAULT_TYP
 # --- Comando FixMe ---
 async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Corrige o estado de um jogador afetado por bugs de level up anteriores."""
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     if user_id not in ADMIN_LIST:
         await update.message.reply_text("Você não tem permissão para usar este comando.")
         return
@@ -801,7 +802,7 @@ async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- Comando MyData ---
 async def my_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Envia os dados do jogador como um ficheiro JSON para diagnóstico."""
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     if user_id not in ADMIN_LIST: return
 
     player_data = await get_player_data(user_id)

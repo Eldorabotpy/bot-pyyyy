@@ -5,6 +5,7 @@ from modules import player_manager
 from modules.dungeons.runtime_api import set_pending_battle
 from handlers.utils import format_combat_message
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ContextTypes # Importa Update e ContextTypes
+from modules.auth_utils import get_current_player_id
 
 # (Certifica-te de que 'logging' está importado no topo do ficheiro, se ainda não estiver)
 import logging
@@ -16,7 +17,7 @@ async def start_pve_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, m
     Dispara o combate interativo usando o seu combat_handler.
     (Versão corrigida com async/await E botão de Skills)
     """
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
 
     # --- Bloco síncrono (Correto) ---

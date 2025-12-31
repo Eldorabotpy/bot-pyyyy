@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 from telegram.ext import ContextTypes
 from collections import Counter
 from telegram.error import Forbidden
-
+from modules.auth_utils import get_current_player_id
 from telegram import (
     InlineKeyboardMarkup, InlineKeyboardButton, Update,
     InputMediaPhoto, InputMediaVideo

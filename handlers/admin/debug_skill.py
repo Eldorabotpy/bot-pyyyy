@@ -5,14 +5,14 @@ from modules import player_manager
 from modules.game_data.skills import SKILL_DATA
 from modules.game_data import items
 from config import ADMIN_ID # Ou sua lista de admins
-
+from modules.auth_utils import get_current_player_id
 async def cmd_give_test_skill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Comando para testar o drop de skills.
     Uso: /test_skill <id_da_skill>
     Exemplo: /test_skill guerreiro_corte_perfurante
     """
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     
     # Validação simples de Admin
     # (Adicione sua verificação real aqui se tiver uma lista)

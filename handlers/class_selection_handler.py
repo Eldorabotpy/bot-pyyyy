@@ -8,7 +8,7 @@ from handlers.menu_handler import show_kingdom_menu
 from modules.balance import ui_display_modifiers
 from modules.player import stats as player_stats  # <--- Importante: Importa o módulo stats completo
 from modules.player.stats import CLASS_PROGRESSIONS, CLASS_POINT_GAINS
-
+from modules.auth_utils import get_current_player_id
 CLASS_MANA_INFO = {
     "guerreiro": "Sorte",
     "berserker": "Sorte",
@@ -137,7 +137,7 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query:
         await query.answer()
 
-    user_id = update.effective_user.id if update.effective_user else None
+    user_id = get_current_player_id(update, context) if update.effective_user else None
     
     player_data = await player_manager.get_player_data(user_id) if user_id else None
 

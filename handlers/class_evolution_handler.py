@@ -6,7 +6,7 @@ from typing import Dict, Tuple, Optional, List, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
-
+from modules.auth_utils import get_current_player_id
 from modules import player_manager
 import modules.combat.combat_engine as combat_manager
 from modules import class_evolution_service as evo_service

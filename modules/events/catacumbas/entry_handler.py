@@ -5,6 +5,8 @@ import html
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, CommandHandler
 from modules import player_manager
+from modules.auth_utils import get_current_player_id
+
 
 try:
     from modules import file_id_manager as media_ids
@@ -203,7 +205,7 @@ async def create_room_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def refresh_lobby_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Membros podem atualizar manualmente para ver se entrou gente."""
     query = update.callback_query
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     
     lobby = raid_manager.get_player_lobby(user_id)
     if not lobby:
@@ -225,7 +227,7 @@ async def refresh_lobby_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def leave_lobby_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     
     lobby = raid_manager.get_player_lobby(user_id)
     code = lobby['code'] if lobby else None
@@ -312,7 +314,7 @@ async def process_code_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # 🔧 DEBUG
 # ==============================================================================
 async def debug_give_key_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     pdata = await player_manager.get_player_data(user_id)
     inv = pdata.setdefault("inventory", {})
     inv[config.REQUIRED_KEY_ITEM] = inv.get(config.REQUIRED_KEY_ITEM, 0) + 10

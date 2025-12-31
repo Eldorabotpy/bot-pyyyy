@@ -3,7 +3,7 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from modules import player_manager
-
+from modules.auth_utils import get_current_player_id
 # Callback de abertura: ajuste para o que seu class_selection_handler espera.
 CLASS_OPEN_CALLBACK = "class_open"
 

@@ -13,6 +13,7 @@ from handlers.menu.kingdom import show_kingdom_menu
 from modules.game_data.skills import SKILL_DATA
 from telegram.error import BadRequest
 from modules.game_data.class_evolution import can_player_use_skill
+from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
@@ -469,7 +470,7 @@ async def back_to_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     now = time.time()
     last_attack_time = context.user_data.get('kd_last_attack_time', 0)
     if now - last_attack_time < 2.0: await query.answer("Aguarde!", cache_time=1); return
@@ -609,7 +610,7 @@ async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
     if player_data.get('inventory', {}).get('ticket_defesa_reino', 0) <= 0:
@@ -634,7 +635,7 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
 
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     if not event_manager.is_active:
         await query.edit_message_text("Evento encerrado.", reply_markup=_get_game_over_keyboard()); return
 

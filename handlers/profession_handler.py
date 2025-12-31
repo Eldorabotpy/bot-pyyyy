@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data, file_ids, crafting_registry
 from modules.game_data.refining import REFINING_RECIPES
-
+from modules.auth_utils import get_current_player_id
 logger = logging.getLogger(__name__)
 
 RECIPES_PER_PAGE = 6
@@ -175,7 +175,7 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
 async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query: await query.answer()
-    user_id = update.effective_user.id
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
     
     player_data = await player_manager.get_player_data(user_id)
