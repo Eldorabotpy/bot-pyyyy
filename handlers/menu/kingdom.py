@@ -124,14 +124,14 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         # --- NOVO VISUAL ESTILO HUD ---
         status_hud = (
             f"\n"
-            f"╭────────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
-            f"│ ╰┈➤ 👤 {character_name}\n"
-            f"│ ╰┈➤ 🛠 {prof_name} (Nv. {prof_lvl})\n"
-            f"│ ╰┈➤ ❤️ HP: {p_hp}/{p_max_hp}\n"
-            f"│ ╰┈➤ 💙 MP: {p_mp}/{p_max_mp}\n"
-            f"│ ╰┈➤ ⚡ ENRGIA: 🪫{p_energy}/🔋{max_energy}\n"
+            f"╭──────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ────➤\n"
+            f"│ ╭┈➤ 👤 {character_name}\n"
+            f"│ ├┈➤ 🛠 {prof_name} (Nv. {prof_lvl})\n"
+            f"│ ├┈➤ ❤️ HP: {p_hp}/{p_max_hp}\n"
+            f"│ ├┈➤ 💙 MP: {p_mp}/{p_max_mp}\n"
+            f"│ ├┈➤ ⚡ ENRGIA: 🪫{p_energy}/🔋{max_energy}\n"
             f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
-            f"╰──────────────────────────➤"
+            f"╰────────────────────────➤"
             
         )
 
