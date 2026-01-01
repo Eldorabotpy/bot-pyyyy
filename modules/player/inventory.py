@@ -1,13 +1,18 @@
-# Em modules/player/inventory.py
-# (VERSÃO REFATORADA: SUPORTE A STRING ID EM EQUIP_UNIQUE_ITEM)
+# modules/player/inventory.py
+# (VERSÃO BLINDADA: Suporte a Auth Híbrida)
 
 import uuid
-from typing import Tuple, Optional, List
+import logging
+from typing import Tuple, Optional, List, Union, Dict, Any
+from bson import ObjectId
+
 from modules import game_data
 from . import stats 
 from modules.game_data.class_evolution import get_class_ancestry
 from modules.game_data.skins import SKIN_CATALOG
 from modules.player import stats as player_stats_helper
+
+logger = logging.getLogger(__name__)
 
 # ========================================
 # CONSTANTES
@@ -34,20 +39,23 @@ def add_gold(player_data: dict, amount: int) -> dict:
 
 def spend_gold(player_data: dict, amount: int) -> bool:
     amount = int(amount)
-    if amount <= 0: return True
+    if amount < 0: return False
     cur = get_gold(player_data)
-    if cur < amount: return False
-    set_gold(player_data, cur - amount)
-    return True
+    if cur >= amount:
+        set_gold(player_data, cur - amount)
+        return True
+    return False
 
 def get_gems(player_data: dict) -> int:
-    try: return int(player_data.get("gems", player_data.get(GEMS_KEY_PT, 0)))
-    except Exception: return 0
+    # Tenta chaves comuns para gemas
+    val = player_data.get("gems") or player_data.get("gemas") or 0
+    return int(val)
 
 def set_gems(player_data: dict, value: int) -> dict:
     val = max(0, int(value))
+    # Salva nas duas chaves para garantir compatibilidade
     player_data["gems"] = val
-    if GEMS_KEY_PT in player_data: player_data[GEMS_KEY_PT] = val
+    player_data["gemas"] = val
     return player_data
 
 def add_gems(player_data: dict, amount: int) -> dict:
@@ -55,189 +63,140 @@ def add_gems(player_data: dict, amount: int) -> dict:
     return set_gems(player_data, cur + int(amount))
 
 def spend_gems(player_data: dict, amount: int) -> bool:
-    amt = int(amount)
-    if amt <= 0: return True
+    amount = int(amount)
+    if amount < 0: return False
     cur = get_gems(player_data)
-    if cur < amt: return False
-    set_gems(player_data, cur - amt)
-    return True
-
-async def _sanitize_and_migrate_gold(player_data: dict) -> bool:
-    inv = player_data.get("inventory", {}) or {}
-    changed = False 
-    
-    raw_gold = inv.get(GOLD_KEY)
-    
-    try: player_data["gold"] = int(player_data.get("gold", 0))
-    except Exception: player_data["gold"] = 0
-        
-    if isinstance(raw_gold, (int, float)):
-        add_gold(player_data, int(raw_gold)) 
-        inv.pop(GOLD_KEY, None)
-        changed = True
-
-    for gk in GEM_KEYS:
-        raw_gems = inv.get(gk)
-        if isinstance(raw_gems, (int, float)):
-            set_gems(player_data, get_gems(player_data) + int(raw_gems)) 
-            inv.pop(gk, None)
-            changed = True 
-
-    player_data["inventory"] = inv
-    return changed
-
-# ========================================
-# INVENTÁRIO E ITENS
-# ========================================
-
-def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1):
-    qty = int(quantity)
-    if qty == 0: return player_data
-    
-    if item_id == GOLD_KEY:
-        if qty > 0: add_gold(player_data, qty)
-        else: spend_gold(player_data, -qty)
-        return player_data
-
-    if item_id in GEM_KEYS:
-        if qty > 0: add_gems(player_data, qty)
-        else: spend_gems(player_data, -qty)
-        return player_data
-
-    is_skin_box = item_id.startswith("caixa_")
-    skin_id_to_check = item_id.replace("caixa_", "") if is_skin_box else item_id
-
-    if skin_id_to_check in SKIN_CATALOG:
-        if is_skin_box:
-            pass 
-        else:
-            skin_info = SKIN_CATALOG[skin_id_to_check]
-            skin_class_req = skin_info.get('class')
-            
-            try: player_base_class = player_stats_helper._get_class_key_normalized(player_data)
-            except Exception: player_base_class = (player_data.get("class") or "").lower()
-
-            if skin_class_req == player_base_class:
-                unlocked_list = player_data.setdefault("unlocked_skins", [])
-                if skin_id_to_check not in unlocked_list:
-                    unlocked_list.append(skin_id_to_check)
-                    player_data["unlocked_skins"] = unlocked_list
-            return player_data
-
-    inventory = player_data.setdefault('inventory', {})
-    current = int(inventory.get(item_id, 0))
-    new_val = current + qty
-    if new_val <= 0:
-        if item_id in inventory: del inventory[item_id]
-    else:
-        inventory[item_id] = new_val
-    return player_data
-
-def add_unique_item(player_data: dict, item_instance: dict) -> str:
-    inventory = player_data.setdefault('inventory', {})
-    unique_id = str(uuid.uuid4())
-    inventory[unique_id] = item_instance
-    return unique_id
-
-def remove_item_from_inventory(player_data: dict, item_id: str, quantity: int = 1) -> bool:
-    if item_id == GOLD_KEY: return spend_gold(player_data, int(quantity))
-    if item_id in GEM_KEYS: return spend_gems(player_data, int(quantity))
-    inventory = player_data.get('inventory', {})
-    if item_id not in inventory: return False
-    if isinstance(inventory[item_id], dict):
-        del inventory[item_id]
-        return True
-    qty = int(quantity)
-    have = int(inventory[item_id])
-    if have >= qty > 0:
-        new_val = have - qty
-        if new_val <= 0: del inventory[item_id]
-        else: inventory[item_id] = new_val
+    if cur >= amount:
+        set_gems(player_data, cur - amount)
         return True
     return False
 
+# ========================================
+# GERENCIAMENTO DE ITENS
+# ========================================
+
+def get_inventory(player_data: dict) -> dict:
+    if "inventory" not in player_data:
+        player_data["inventory"] = {}
+    return player_data["inventory"]
+
 def has_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
-    inv = player_data.get("inventory", {})
-    return inv.get(item_id, 0) >= int(quantity)
+    inv = get_inventory(player_data)
+    entry = inv.get(item_id)
+    if not entry: return False
+
+    if isinstance(entry, dict):
+        # Item unique ou com metadata
+        q = int(entry.get("quantity", 1))
+        return q >= quantity
+    else:
+        # Item simples (int)
+        return int(entry) >= quantity
+
+def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) -> dict:
+    """
+    Adiciona item stackable (comum) ao inventário.
+    """
+    inv = get_inventory(player_data)
+    current = inv.get(item_id, 0)
+    
+    if isinstance(current, dict):
+        # Se já existe como dict, soma na quantity
+        new_q = int(current.get("quantity", 0)) + quantity
+        current["quantity"] = new_q
+        inv[item_id] = current
+    else:
+        # Se é int ou não existe
+        inv[item_id] = int(current) + quantity
+        
+    player_data["inventory"] = inv
+    return player_data
+
+def remove_item_from_inventory(player_data: dict, item_id: str, quantity: int = 1) -> bool:
+    inv = get_inventory(player_data)
+    current = inv.get(item_id)
+    if not current: return False
+
+    if isinstance(current, dict):
+        q = int(current.get("quantity", 1))
+        if q < quantity: return False
+        q -= quantity
+        if q <= 0:
+            del inv[item_id]
+        else:
+            current["quantity"] = q
+            inv[item_id] = current
+        return True
+    else:
+        val = int(current)
+        if val < quantity: return False
+        val -= quantity
+        if val <= 0:
+            del inv[item_id]
+        else:
+            inv[item_id] = val
+        return True
 
 def consume_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
-    if not has_item(player_data, item_id, quantity): return False
     return remove_item_from_inventory(player_data, item_id, quantity)
 
 # ========================================
-# EQUIPAMENTOS
+# ITENS ÚNICOS (EQUIPAMENTOS)
 # ========================================
 
-def is_unique_item_entry(value) -> bool:
-    return isinstance(value, dict) and ("base_id" in value or "tpl" in value or "id" in value)
+def add_unique_item(player_data: dict, item_data: dict) -> str:
+    """
+    Adiciona um item único (dicionário completo) ao inventário.
+    Gera um UUID se não tiver.
+    Retorna o ID único gerado.
+    """
+    inv = get_inventory(player_data)
+    
+    # Garante que tem um ID único
+    unique_id = item_data.get("unique_id")
+    if not unique_id:
+        unique_id = str(uuid.uuid4())
+        item_data["unique_id"] = unique_id
+    
+    # Se já existe, substitui (overwrite) ou gera novo ID? 
+    # Por segurança, se colidir, gera novo.
+    if unique_id in inv:
+        unique_id = str(uuid.uuid4())
+        item_data["unique_id"] = unique_id
 
-def get_equipped_map(player_data: dict) -> dict:
-    inv = player_data.get("inventory", {}) or {}
-    eq  = player_data.get("equipment", {}) or {}
-    out = {}
-    for slot, uid in (eq or {}).items():
-        if not uid:
-            out[slot] = (None, None); continue
-        inst = inv.get(uid)
-        if is_unique_item_entry(inst): out[slot] = (uid, inst)
-        else: out[slot] = (None, None)
-    return out
+    # Garante quantidade 1 para uniques
+    item_data["quantity"] = 1
+    
+    inv[unique_id] = item_data
+    return unique_id
+
+def is_unique_item_entry(entry: Any) -> bool:
+    return isinstance(entry, dict) and "base_id" in entry
+
+def get_unique_item(player_data: dict, unique_id: str) -> Optional[dict]:
+    inv = get_inventory(player_data)
+    entry = inv.get(unique_id)
+    if is_unique_item_entry(entry):
+        return entry
+    return None
+
+# ========================================
+# EQUIPAR / DESEQUIPAR
+# ========================================
 
 def can_equip_slot(slot: str) -> bool:
-    return (slot or "").lower() in {"arma","elmo","armadura","calca","luvas","botas","colar","anel","brinco"}
+    valid_slots = {
+        "weapon", "helmet", "armor", "legs", "boots", 
+        "accessory", "ring", "amulet", "shield", "artifact"
+    }
+    return slot in valid_slots
 
-def _class_req_from_base(base_id: Optional[str]):
+def _get_item_slot_from_base(base_id: str) -> Optional[str]:
+    # Tenta pegar do game_data se disponível
     if not base_id: return None
-    try:
-        info = game_data.get_item_info(base_id) or {}
-        if info.get("class_req"): return info["class_req"]
-    except Exception: pass 
-    base = getattr(game_data, "ITEMS_DATA", {}).get(base_id) or {}
-    return base.get("class_req")
-
-def is_item_allowed_for_player_class(player_data: dict, item: dict) -> Tuple[bool, Optional[str]]:
-    player_class_key = player_stats_helper._get_class_key_normalized(player_data)
-    req = item.get("class_req") or _class_req_from_base(item.get("base_id"))
-    
-    if not req: return True, None 
-
-    if isinstance(req, str): req_list_lower = [req.strip().lower()]
-    elif isinstance(req, (list, tuple)): req_list_lower = [str(x).strip().lower() for x in req]
-    else: req_list_lower = [] 
-    
-    if not req_list_lower: return True, None
-    if not player_class_key: return False, "Classe do jogador não definida."
-
-    try: ancestry = get_class_ancestry(player_class_key)
-    except Exception: ancestry = [player_class_key]
-    
-    for class_node in ancestry:
-        if class_node in req_list_lower: return True, None 
-
-    disp = item.get("display_name") or item.get("base_id") or "item"
-    classes_str = ", ".join([r.title() for r in req_list_lower])
-    
-    return False, f"⚠️ {disp} é exclusivo para: {classes_str}."
-
-def _get_item_slot_from_base(base_id: Optional[str]) -> Optional[str]:
-    if not base_id: return None
-    entry = {}
-    try: entry = game_data.get_item_info(base_id) or {}
-    except Exception: pass
-
-    if not entry:
-        entry = getattr(game_data, "ITEMS_DATA", {}).get(base_id) or {}
-
-    slot = entry.get("slot")
-    if slot and isinstance(slot, str):
-        slot_lower = slot.strip().lower()
-        if can_equip_slot(slot_lower): return slot_lower
-    
-    slot_type = entry.get("type")
-    if slot_type and isinstance(slot_type, str):
-        slot_type_lower = slot_type.strip().lower()
-        if can_equip_slot(slot_type_lower): return slot_type_lower
-            
+    item_info = (game_data.ITEMS_DATA or {}).get(base_id)
+    if item_info:
+        return item_info.get("slot")
     return None
 
 def _get_unique_item_from_inventory(player_data: dict, unique_id: str) -> Optional[dict]:
@@ -245,33 +204,71 @@ def _get_unique_item_from_inventory(player_data: dict, unique_id: str) -> Option
     val = inv.get(unique_id)
     return val if is_unique_item_entry(val) else None
 
-async def equip_unique_item_for_user(user_id, unique_id: str, expected_slot: Optional[str] = None) -> Tuple[bool, str]:
-    # user_id: REMOVIDA TIPAGEM :int
-    from .core import get_player_data, save_player_data 
+async def equip_unique_item_for_user(user_id: Union[int, str], unique_id: str, expected_slot: Optional[str] = None) -> Tuple[bool, str]:
+    """
+    Equipa um item no jogador.
+    Suporta user_id Híbrido (Int ou Str).
+    """
+    # IMPORTANTE: Usamos o player_manager para garantir a busca segura (blindada)
+    # Evitamos importar do .core diretamente pois ele pode não tratar string corretamente ainda
+    from modules import player_manager 
     
-    pdata = await get_player_data(user_id)
+    pdata = await player_manager.get_player_data(user_id)
     if not pdata: return False, "Jogador não encontrado."
 
     item = _get_unique_item_from_inventory(pdata, unique_id)
     if not item: return False, "Item não encontrado no inventário."
 
     base_id = item.get("base_id")
-    slot_from_item = _get_item_slot_from_base(base_id) or item.get("slot")
+    # Prioridade: Slot salvo no item > Slot do banco de dados > None
+    slot_from_item = item.get("slot") or _get_item_slot_from_base(base_id)
     
     if not slot_from_item: return False, "Item sem slot reconhecido."
 
     slot_from_item = str(slot_from_item).strip().lower()
     if not can_equip_slot(slot_from_item): return False, f"Slot inválido: {slot_from_item}"
 
+    # Validação extra de slot esperado (ex: clicar no slot de Capacete e tentar equipar Bota)
     if expected_slot and expected_slot.strip().lower() != slot_from_item:
-        return False, f"Este item é do slot '{slot_from_item}', não '{expected_slot.strip().lower()}'."
+        return False, f"Este item é do slot '{slot_from_item}', não '{expected_slot}'."
 
-    ok, err = is_item_allowed_for_player_class(pdata, item)
-    if not ok: return False, err or "Sua classe não pode equipar este item."
+    # Verifica requisitos de classe/nível (Opcional, mas recomendado)
+    req_class = item.get("required_class")
+    if req_class:
+        p_class = pdata.get("class", "aventueiro")
+        # Lógica simples de verificação (pode expandir se tiver subclasses)
+        if req_class != "any" and req_class != p_class:
+             return False, f"Classe requerida: {req_class}"
 
-    eq = pdata.setdefault("equipment", {})
-    eq[slot_from_item] = unique_id
+    # Lógica de Troca (Swap)
+    equipment = pdata.get("equipment", {})
+    old_equipped_id = equipment.get(slot_from_item)
 
-    await save_player_data(user_id, pdata)
-    name = item.get("display_name") or base_id or "Item"
-    return True, f"Equipado {name} em {slot_from_item}."
+    # Se já tem algo equipado, "desequipa" logicamente (o item volta pro pool disponível)
+    # Como nosso inventário é único (tudo fica no inventory), não precisamos mover nada,
+    # apenas atualizar o ponteiro do slot.
+    
+    equipment[slot_from_item] = unique_id
+    pdata["equipment"] = equipment
+    
+    # Atualiza stats totais
+    await player_manager.save_player_data(user_id, pdata)
+    
+    return True, f"Item equipado em {slot_from_item}."
+
+async def unequip_item_for_user(user_id: Union[int, str], slot: str) -> Tuple[bool, str]:
+    from modules import player_manager
+    
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return False, "Jogador não encontrado."
+    
+    equipment = pdata.get("equipment", {})
+    if not equipment.get(slot):
+        return False, "Nada equipado neste slot."
+        
+    # Remove a referência
+    del equipment[slot]
+    pdata["equipment"] = equipment
+    
+    await player_manager.save_player_data(user_id, pdata)
+    return True, "Item desequipado."

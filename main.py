@@ -130,7 +130,8 @@ async def post_init_tasks(application: Application):
         tz = timezone.utc
 
     jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
-    jq.run_repeating(check_premium_expiry_job, interval=3600, first=60, name="premium_checker")
+    # Executa a cada 600 segundos (10 minutos)
+    jq.run_repeating(check_premium_expiry_job, interval=600, first=60, name="premium_checker")
     
     if daily_pvp_entry_reset_job:
         jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=16, minute=27, tzinfo=tz), name="pvp_daily_entry_reset")

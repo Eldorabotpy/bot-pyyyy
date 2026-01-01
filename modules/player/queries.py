@@ -1,13 +1,14 @@
-# Em modules/player/queries.py
-# (VERSÃO CORRIGIDA: Busca Híbrida em 'players' e 'users')
+# modules/player/queries.py
+# (VERSÃO BLINDADA: Busca Híbrida + Iterador Inteligente Anti-Duplicidade)
 
 from __future__ import annotations
 import re as _re
 import unicodedata
 import logging
-from typing import AsyncIterator, Iterator, Tuple, Optional
+from typing import AsyncIterator, Iterator, Tuple, Optional, Union, List
 from .core import players_collection, get_player_data, save_player_data, clear_player_cache
 from modules.player.core import players_collection, _player_cache
+from bson import ObjectId
 
 # ========================================
 # FUNÇÕES AUXILIARES DE NORMALIZAÇÃO
@@ -56,8 +57,8 @@ def _emoji_variants(s: str):
 # CICLO DE VIDA DO JOGADOR
 # ========================================
 
-async def create_new_player(user_id: int, character_name: str) -> dict:
-    from .actions import utcnow  # Importação local para evitar ciclos
+async def create_new_player(user_id: Union[int, str], character_name: str) -> dict:
+    from .actions import utcnow 
 
     now_iso = utcnow().isoformat()
 
@@ -96,16 +97,17 @@ async def create_new_player(user_id: int, character_name: str) -> dict:
         "created_at": now_iso,
         "last_seen": now_iso,
     }
+    # O core.save_player_data já decide se salva em 'players' ou 'users' baseado no tipo do ID
     await save_player_data(user_id, new_player_data)
     return new_player_data
 
-async def get_or_create_player(user_id: int, default_name: str = "Aventureiro") -> dict:
-    pdata = await get_player_data(user_id) # Tem que ser await se get_player_data for async
+async def get_or_create_player(user_id: Union[int, str], default_name: str = "Aventureiro") -> dict:
+    pdata = await get_player_data(user_id)
     if pdata is None:
         pdata = await create_new_player(user_id, default_name)
     return pdata
 
-def delete_player(user_id: int) -> bool:
+def delete_player(user_id: Union[int, str]) -> bool:
     """
     Remove completamente um jogador do banco de dados e do cache.
     Suporta ID numérico (antigo) e string/ObjectId (novo).
@@ -116,21 +118,16 @@ def delete_player(user_id: int) -> bool:
     # 1. Tenta remover do MongoDB (Coleção Antiga)
     if players_collection is not None:
         try:
-            # Tenta como int
-            try:
-                iid = int(user_id)
+            if str_id.isdigit():
+                iid = int(str_id)
                 res = players_collection.delete_one({"_id": iid})
                 if res.deleted_count > 0: deleted = True
-            except: pass
-        except Exception as e:
-            print(f"Erro ao deletar do Mongo (Players): {e}")
+        except: pass
 
     # 2. Tenta remover do MongoDB (Coleção Nova)
     users_col = _get_users_collection()
     if users_col is not None:
         try:
-            from bson import ObjectId
-            # Tenta deletar pelo ObjectId
             if ObjectId.is_valid(str_id):
                 res = users_col.delete_one({"_id": ObjectId(str_id)})
                 if res.deleted_count > 0: deleted = True
@@ -138,11 +135,8 @@ def delete_player(user_id: int) -> bool:
             print(f"Erro ao deletar do Mongo (Users): {e}")
 
     # 3. Remove do Cache (Memória)
-    # Tenta remover tanto a chave int quanto a str para garantir
-    keys_to_remove = [user_id, str_id]
-    try:
-        keys_to_remove.append(int(user_id))
-    except: pass
+    keys_to_remove = [str_id]
+    if str_id.isdigit(): keys_to_remove.append(int(str_id))
 
     for k in keys_to_remove:
         if k in _player_cache:
@@ -151,12 +145,11 @@ def delete_player(user_id: int) -> bool:
 
     return deleted
 
-
 # ========================================
 # FUNÇÕES DE BUSCA (QUERIES HÍBRIDAS)
 # ========================================
 
-async def find_player_by_name(name: str) -> Optional[Tuple[int, dict]]:
+async def find_player_by_name(name: str) -> Optional[Tuple[Union[int, str], dict]]:
     target_normalized = _normalize_char_name(name)
     if not target_normalized or players_collection is None:
         return None
@@ -166,26 +159,26 @@ async def find_player_by_name(name: str) -> Optional[Tuple[int, dict]]:
     if doc:
         user_id = doc['_id']
         full_data = await get_player_data(user_id)
-        return (user_id, full_data) if full_data else None
+        # Se full_data retornar um ID diferente (redirecionado), usamos o novo
+        real_id = full_data.get("user_id") or user_id
+        return (real_id, full_data) if full_data else None
 
     # 2. Busca na coleção NOVA (Users)
     users_col = _get_users_collection()
     if users_col:
         doc = users_col.find_one({"character_name_normalized": target_normalized})
         if doc:
-            user_id = str(doc['_id']) # Converte ObjectId para string
+            user_id = str(doc['_id'])
             full_data = await get_player_data(user_id)
             return (user_id, full_data) if full_data else None
 
     return None
 
-async def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
-    if players_collection is None:
-        return None
+async def find_player_by_name_norm(name: str) -> Optional[Tuple[Union[int, str], dict]]:
+    if players_collection is None: return None
 
     qvars = list(_emoji_variants(name))
-    if not qvars:
-        return None
+    if not qvars: return None
     
     normalized_variants = [_normalize_char_name(v) for v in qvars]
     
@@ -194,7 +187,8 @@ async def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
     if doc:
         user_id = doc['_id']
         full_data = await get_player_data(user_id)
-        return (user_id, full_data) if full_data else None
+        real_id = full_data.get("user_id") or user_id
+        return (real_id, full_data) if full_data else None
 
     # 2. Busca na coleção NOVA
     users_col = _get_users_collection()
@@ -209,8 +203,7 @@ async def find_player_by_name_norm(name: str) -> Optional[Tuple[int, dict]]:
 
 async def find_players_by_name_partial(query: str) -> list:
     nq = _normalize_char_name(query)
-    if not nq or not players_collection:
-        return []
+    if not nq or not players_collection: return []
 
     out = []
     
@@ -220,6 +213,8 @@ async def find_players_by_name_partial(query: str) -> list:
         uid = doc["_id"]
         full_data = await get_player_data(uid)
         if full_data:
+            # Verifica se já migrou (não adiciona se for o caso, pois vai aparecer na busca da nova)
+            if str(full_data.get("user_id")) != str(uid): continue 
             out.append((uid, full_data))
             
     # 2. Busca na coleção NOVA
@@ -236,8 +231,7 @@ async def find_players_by_name_partial(query: str) -> list:
 
 async def find_by_username(username: str) -> Optional[dict]:
     u = (username or "").lstrip("@").strip().lower()
-    if not u or not players_collection:
-        return None
+    if not u or not players_collection: return None
     
     CAND_KEYS = ("username", "telegram_username", "tg_username")
     query = {"$or": [{k: u} for k in CAND_KEYS]}
@@ -246,7 +240,9 @@ async def find_by_username(username: str) -> Optional[dict]:
     doc = players_collection.find_one(query)
     if doc:
         user_id = doc['_id']
-        return await get_player_data(user_id)
+        data = await get_player_data(user_id)
+        if data and str(data.get("user_id")) == str(user_id):
+             return data
 
     # 2. Busca na coleção NOVA
     users_col = _get_users_collection()
@@ -259,18 +255,30 @@ async def find_by_username(username: str) -> Optional[dict]:
     return None
 
 # ========================================
-# FUNÇÕES DE ITERAÇÃO (HÍBRIDAS)
+# FUNÇÕES DE ITERAÇÃO (HÍBRIDAS E SEGURAS)
 # ========================================
 
-def iter_player_ids() -> Iterator[int]:
-    """Itera APENAS IDs numéricos (legado). Para todos, use iter_players."""
-    if players_collection is None:
-        return
-    for doc in players_collection.find({}, {"_id": 1}):
-        yield doc["_id"]
+def iter_player_ids() -> Iterator[Union[int, str]]:
+    """
+    Itera IDs de AMBAS as coleções (Legacy e New).
+    Útil para correções em massa (como fix_tomos).
+    """
+    # 1. Legacy
+    if players_collection:
+        for doc in players_collection.find({}, {"_id": 1}):
+            yield doc["_id"]
 
-async def iter_players() -> AsyncIterator[Tuple[int|str, dict]]:
-    """Itera sobre TODOS os jogadores (Antigos e Novos)."""
+    # 2. New
+    users_col = _get_users_collection()
+    if users_col:
+        for doc in users_col.find({}, {"_id": 1}):
+            yield str(doc["_id"])
+
+async def iter_players() -> AsyncIterator[Tuple[Union[int, str], dict]]:
+    """
+    Itera sobre TODOS os jogadores (Antigos e Novos).
+    ⚡ INTELIGENTE: Evita processar a mesma pessoa duas vezes se ela já migrou.
+    """
     if players_collection is None:
         logger.warning("[ITER_DEBUG] players_collection é None.")
         return
@@ -284,6 +292,14 @@ async def iter_players() -> AsyncIterator[Tuple[int|str, dict]]:
             try:
                 pdata = await get_player_data(user_id)
                 if pdata:
+                    # [FILTRO ANTI-DUPLICIDADE]
+                    # Se get_player_data redirecionou para um ID novo (String/ObjectId),
+                    # significa que este usuário já migrou.
+                    # PULA ele aqui, pois ele será pego no loop 2 (Users).
+                    real_id = pdata.get("user_id") or pdata.get("_id")
+                    if str(real_id) != str(user_id) and not isinstance(real_id, int):
+                        continue
+
                     yield user_id, pdata
                     count += 1
             except Exception as e:
@@ -308,4 +324,4 @@ async def iter_players() -> AsyncIterator[Tuple[int|str, dict]]:
         except Exception as e:
             logger.error(f"Erro iter_players cursor new: {e}")
              
-    logger.debug(f"[ITER_DEBUG] Fim da iteração híbrida. Total: {count}")
+    # logger.debug(f"[ITER_DEBUG] Fim da iteração híbrida. Processados: {count}")

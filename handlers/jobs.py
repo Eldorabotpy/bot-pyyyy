@@ -621,12 +621,10 @@ async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
     """Wrapper para forçar a entrega de cristais diários via admin."""
     return await daily_crystal_grant_job(context)
 
-# Em handlers/jobs.py
-
 async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Job periódico: Verifica assinaturas vencidas, remove o status e notifica o usuário.
-    Atualiza TANTO a coleção 'players' QUANTO a coleção 'users'.
+    Inclui delay de segurança para não tomar FloodWait.
     """
     from modules.player.premium import PremiumManager
     
@@ -636,7 +634,7 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
     # Itera sobre todos os jogadores
     async for user_id, pdata in player_manager.iter_players():
         try:
-            # Pula quem já é Free
+            # Pula quem já é Free ou não tem dados de premium
             current_tier = pdata.get("premium_tier")
             if not current_tier or current_tier == "free":
                 continue
@@ -655,19 +653,15 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
                     pm.revoke()
                     await player_manager.save_player_data(user_id, pdata)
                     
-                    # 2. --- CORREÇÃO: Sincroniza com a coleção USERS ---
+                    # 2. Sincroniza com a coleção USERS (Login)
                     if users_col is not None:
                         query_user = None
                         
-                        # Descobre como achar esse usuário na tabela 'users'
                         if isinstance(user_id, int):
-                            # Contas antigas (Telegram ID)
                             query_user = {"telegram_id_owner": user_id}
                         elif isinstance(user_id, ObjectId):
-                            # Contas novas (ObjectId)
                             query_user = {"_id": user_id}
                         elif isinstance(user_id, str) and ObjectId.is_valid(user_id):
-                            # Caso venha como string
                             query_user = {"_id": ObjectId(user_id)}
                             
                         if query_user:
@@ -675,19 +669,31 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
                                 query_user, 
                                 {"$set": {"premium_tier": "free", "premium_expires_at": None}}
                             )
-                    # ---------------------------------------------------
                     
-                    # 3. Notifica o Jogador
+                    # 3. Notifica o Jogador (Com Delay de Segurança)
                     try:
-                        msg = (
-                            "⚠️ <b>ASSINATURA EXPIRADA</b>\n\n"
-                            f"O seu plano <b>{current_tier.title()}</b> chegou ao fim.\n"
-                            "Sua conta retornou para o status <b>Free</b>.\n\n"
-                            "💎 <i>Renove no menu Premium para recuperar seus benefícios!</i>"
-                        )
-                        await context.bot.send_message(chat_id=user_id, text=msg, parse_mode="HTML")
+                        # Define qual ID usar para enviar a mensagem
+                        target_chat_id = None
+                        if isinstance(user_id, int):
+                            target_chat_id = user_id
+                        else:
+                            # Se for ObjectId, tenta pegar o ID numérico salvo
+                            target_chat_id = pdata.get("last_chat_id") or pdata.get("telegram_id_owner")
+                        
+                        if target_chat_id:
+                            msg = (
+                                "⚠️ <b>ASSINATURA EXPIRADA</b>\n\n"
+                                f"O seu plano <b>{current_tier.title()}</b> chegou ao fim.\n"
+                                "Sua conta retornou para o status <b>Free</b>.\n\n"
+                                "💎 <i>Renove no menu Premium para recuperar seus benefícios!</i>"
+                            )
+                            await context.bot.send_message(chat_id=target_chat_id, text=msg, parse_mode="HTML")
+                            
+                            # ✅ ADICIONADO: Delay para evitar spam/block do Telegram
+                            await asyncio.sleep(0.05) 
+                            
                     except Exception:
-                        pass
+                        pass # Ignora se o bot estiver bloqueado pelo usuário
                         
                     count_downgraded += 1
                     
@@ -696,5 +702,24 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
             continue
 
     if count_downgraded > 0:
-        logger.info(f"[JOB PREMIUM] {count_downgraded} assinaturas vencidas foram removidas de Players e Users.")
+        logger.info(f"[JOB PREMIUM] {count_downgraded} assinaturas vencidas foram removidas e notificadas.")
+                
+async def cmd_force_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando ADMIN para forçar o reset diário de tickets PvP e mensal de Season."""
+    from config import ADMIN_ID
+    if update.effective_user.id != ADMIN_ID:
+        return
         
+    await update.message.reply_text("🔄 <b>DEBUG:</b> Iniciando rotinas de PvP...", parse_mode="HTML")
+    
+    # 1. Reseta Tickets Diários
+    await daily_pvp_entry_reset_job(context)
+    
+    # 2. Verifica/Reseta Season (Forçado)
+    # Nota: Se quiser forçar o reset da season mesmo não sendo dia 1, 
+    # você precisaria alterar a função job_pvp_monthly_reset para aceitar um flag 'force'.
+    # Por enquanto, chamamos o job padrão:
+    await job_pvp_monthly_reset(context)
+    
+    await update.message.reply_text("✅ <b>DEBUG:</b> Rotinas PvP chamadas.", parse_mode="HTML")
+            
