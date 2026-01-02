@@ -1,4 +1,5 @@
 # handlers/menu/region.py
+# (VERSÃO FINAL: AUTH UNIFICADA + FIX VIAGEM VIP)
 
 import time
 import logging
@@ -15,12 +16,12 @@ from modules.player import actions as player_actions
 from modules.game_data import monsters as monsters_data
 from modules.game_data.worldmap import WORLD_MAP
 from modules.dungeons.registry import get_dungeon_for_region
-from modules.auth_utils import get_current_player_id
+from modules.auth_utils import get_current_player_id, requires_login
+
 # --- IMPORTS DE HANDLERS ESPECÍFICOS ---
 from modules.world_boss.engine import world_boss_manager
 from handlers.christmas_shop import is_event_active
 from modules.player.stats import can_see_evolution_menu
-from modules.auth_utils import get_current_player_id, requires_login
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
         mult = 1.0 
     return max(0, int(round(base * mult)))
 
-async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id) -> bool:
     """Finaliza viagem silenciosamente se o tempo já passou."""
     player = await player_manager.get_player_data(user_id) or {}
     state = player.get("player_state") or {}
@@ -105,19 +106,36 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    # Decorator garante que temos sessão válida
+    # 🔒 SEGURANÇA: ID via Auth Central
     user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
+    
     player_data = await player_manager.get_player_data(user_id) or {} 
     current_location = player_data.get("current_location", "reino_eldora")
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
     
+    # --- LÓGICA VIP CORRIGIDA ---
     is_vip = False
-    try: is_vip = PremiumManager(player_data).is_premium()
+    try:
+        pm = PremiumManager(player_data)
+        if pm.is_premium():
+            is_vip = True
+        else:
+            # Fallback para dados legados (Tier existe mas data é None)
+            tier = pm.tier
+            if tier and tier != 'free' and pm.expiration_date is None:
+                # É VIP Permanente Legado? Considera True por enquanto
+                is_vip = True
     except: pass
 
     if is_vip:
-        REGION_ORDER = ["reino_eldora", "pradaria_inicial", "floresta_sombria", "campos_linho", "pedreira_granito", "mina_ferro", "pantano_maldito", "pico_grifo", "forja_abandonada", "picos_gelados", "deserto_ancestral"]
+        # Ordem personalizada do mapa múndi
+        REGION_ORDER = [
+            "reino_eldora", "pradaria_inicial", "floresta_sombria", 
+            "campos_linho", "pedreira_granito", "mina_ferro", 
+            "pantano_maldito", "pico_grifo", "forja_abandonada", 
+            "picos_gelados", "deserto_ancestral"
+        ]
         all_regions = list((game_data.REGIONS_DATA or {}).keys())
         all_regions.sort(key=lambda k: REGION_ORDER.index(k) if k in REGION_ORDER else 999)
         possible_destinations = [r for r in all_regions if r != current_location]
@@ -291,23 +309,17 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
             InlineKeyboardButton("⏱ 35x", callback_data=f"autohunt_start_35_{final_region_key}"),
         ])
 
-    # ==========================================================================
-    # 🛡️ TRAVA VISUAL DE COLETA (BLINDAGEM)
-    # ==========================================================================
+    # Coleta
     res_id = region_info.get("resource")
     if res_id:
         req_prof = game_data.get_profession_for_resource(res_id)
-        
-        # Compatibilidade: verifica se o dado de profissão está em 'key' (novo) ou 'type' (legado)
         p_prof_data = player_data.get("profession", {})
         my_prof = p_prof_data.get("key") or p_prof_data.get("type")
 
-        # Regra: Só adiciona o botão se não houver requisito, OU se o jogador tiver a profissão exata
         if not req_prof or (my_prof and my_prof == req_prof):
             item_info = (game_data.ITEMS_DATA or {}).get(res_id, {})
             item_name = item_info.get("display_name", res_id.replace("_", " ").title())
             keyboard.append([InlineKeyboardButton(f"⛏️ Coletar {item_name}", callback_data=f"collect_{res_id}")])
-    # ==========================================================================
 
     keyboard.append([InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"), InlineKeyboardButton("👤 𝐏𝐞𝐫𝐟𝐢𝐥", callback_data="profile")])
     keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐩𝐚𝐫𝐚𝐫", callback_data="restore_durability_menu"), InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨", callback_data=f"region_info:{final_region_key}")])
@@ -320,22 +332,20 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
     except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
 
 async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None, player_data: dict | None = None):
-    # Wrapper para compatibilidade
+    # Lógica limpa para recuperar o ID
     q = getattr(update, "callback_query", None)
+    
+    uid = get_current_player_id(update, context)
+    
     if q:
         await q.answer()
         try: await q.delete_message()
         except Exception: pass
-        
-        # --- CORREÇÃO AQUI ---
-        # Antes: uid = q.from_user.id
-        uid = get_current_player_id(update, context) 
         cid = q.message.chat_id
     else:
-        # --- CORREÇÃO AQUI ---
-        # Antes: uid = update.effective_user.id
-        uid = get_current_player_id(update, context)
         cid = update.effective_chat.id
+
+    if not uid: return
 
     await _auto_finalize_travel_if_due(context, uid)
     try: await player_manager.try_finalize_timed_action_for_user(uid)
@@ -360,42 +370,40 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pdata = await player_manager.get_player_data(uid)
     if not pdata: return
 
-    pdata = await player_manager.get_player_data(uid)
-    if not pdata:
-        return
-
     cur = pdata.get("current_location", "reino_eldora")
     
-    # Verifica VIP e Vizinhança
-    vip = False
+    # --- VERIFICAÇÃO VIP CONSISTENTE ---
+    is_vip = False
     try:
-        vip = PremiumManager(pdata).is_premium()
+        pm = PremiumManager(pdata)
+        if pm.is_premium():
+            is_vip = True
+        else:
+            tier = pm.tier
+            if tier and tier != 'free' and pm.expiration_date is None:
+                is_vip = True
     except Exception:
         pass
 
     is_neighbor = dest in WORLD_MAP.get(cur, []) or cur == dest
-    if not vip and not is_neighbor:
+    if not is_vip and not is_neighbor:
         await q.answer("Muito longe para viajar a pé.", show_alert=True)
         return
 
     # Calcula custo de viagem
     cost = int(((game_data.REGIONS_DATA or {}).get(dest, {}) or {}).get("travel_cost", 0))
     
-    # Verifica se tem energia suficiente
-    # Nota: get_player_data já deve ter atualizado o regen, mas verificamos o valor atual
     current_energy = int(pdata.get("energy", 0))
     if cost > 0 and current_energy < cost:
         await q.answer(f"Energia insuficiente. Precisa de {cost}⚡.", show_alert=True)
         return
 
-    # --- CORREÇÃO: Consome energia de forma segura ---
     if cost > 0:
         player_manager.spend_energy(pdata, cost)
-    # ------------------------------------------------
 
     secs = _get_travel_time_seconds(pdata, dest)
 
-    # Viagem Instantânea (0 segundos)
+    # Viagem Instantânea
     if secs <= 0:
         pdata["current_location"] = dest
         pdata["player_state"] = {"action": "idle"}
@@ -424,36 +432,29 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = f"🧭 Viajando para <b>{dest_name}</b>… (~{human})"
     
     await context.bot.send_message(chat_id=cid, text=txt, parse_mode="HTML")
-    context.job_queue.run_once(finish_travel_job, when=secs, user_id=uid, chat_id=cid, data={"dest": dest}, name=f"finish_travel_{uid}")
+    context.job_queue.run_once(finish_travel_job, when=secs, data={"player_id": str(uid), "dest": dest}, chat_id=cid, name=f"finish_travel_{uid}")
     
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Callback executado pelo JobQueue quando a viagem termina.
-    Corrige o travamento injetando a sessão manualmente antes de chamar o menu.
-    """
     job = context.job
-    # Pega o ID do jogador de dentro do `data` (String), ou do `user_id` se for fallback
+    # Garante que pegamos o ID corretamente (seja int antigo ou string novo)
     job_data = job.data or {}
     uid = job_data.get("player_id") or str(job.user_id)
     cid = job.chat_id
     dest = job_data.get("dest")
 
-    # 1. Atualiza o DB para destravar o jogador
     pdata = await player_manager.get_player_data(uid)
     if pdata and pdata.get("player_state", {}).get("action") == "travel":
         pdata["current_location"] = dest
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(uid, pdata)
     
-    # 2. HACK CRÍTICO: Injeta a sessão manualmente no context 
-    # Isso impede que o menu ache que o usuário está deslogado
+    # Injeta sessão manual se necessário (Hack de JobQueue)
     if context.user_data is not None:
         context.user_data['logged_player_id'] = str(uid)
         
-    # 3. Envia o menu (Agora vai funcionar porque tem sessão na memória)
     await send_region_menu(context, uid, cid)
     
-# --- START COLLECTION LOGIC (LÓGICA LOCAL) ---
+# --- START COLLECTION LOGIC ---
 @requires_login
 async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -467,7 +468,6 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pdata = await player_manager.get_player_data(uid)
     if not pdata: return
 
-    # Validações rápidas
     prem = PremiumManager(pdata)
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
     if int(pdata.get("energy", 0)) < cost:
@@ -475,7 +475,6 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     player_manager.spend_energy(pdata, cost)
     
-    # Setup Coleta
     req_prof = game_data.get_profession_for_resource(res_id)
     p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get('resources', {})
     item_yielded = p_res.get(res_id, res_id)
@@ -492,7 +491,6 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     player_manager.set_last_chat_id(pdata, cid)
     
-    # UI Feedback
     human = _humanize_duration(dur)
     cap = f"⛏️ <b>Coletando...</b>\n⏳ Tempo: {human}"
     try: await q.delete_message()
@@ -518,25 +516,19 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
     q = update.callback_query
     await q.answer()
     uid = get_current_player_id(update, context)
-    # Garante leitura atualizada
     pdata = await player_manager.get_player_data(uid) or {}
     
     lines = ["<b>📜 Restaurar Durabilidade</b>\n"]
     lines.append("<i>Restaura TODOS os itens equipados consumindo apenas 1 Pergaminho.</i>\n")
 
     inv, equip = pdata.get("inventory", {}), pdata.get("equipment", {})
-    
-    # Helper para ler durabilidade
     def _d(raw): 
         try: return int(raw[0]), int(raw[1])
         except: return 20, 20
 
     items_broken_count = 0
-    
-    # 1. Apenas LISTA os itens (sem criar botões individuais)
     for slot, uid_item in equip.items():
         if not uid_item: continue
-        
         inst = inv.get(uid_item)
         if isinstance(inst, dict):
             cur, mx = _d(inst.get("durability"))
@@ -546,14 +538,11 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
                 lines.append(f"• {nm} <b>({cur}/{mx})</b>")
     
     kb = []
-    
-    # 2. Se houver itens quebrados, mostra o ÚNICO botão de ação
     if items_broken_count > 0:
         kb.append([InlineKeyboardButton(f"✨ REPARAR TUDO (Gasta 1x 📜)", callback_data="rd_fix_all")])
     else:
         lines.append("✅ <i>Todos os equipamentos estão perfeitos.</i>")
     
-    # Botão Voltar
     loc = pdata.get("current_location", "reino_eldora")
     back = 'continue_after_action' if loc == 'reino_eldora' else f"open_region:{loc}"
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data=back)])
@@ -562,38 +551,27 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
 
 @requires_login
 async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Gerencia APENAS o 'Reparar Tudo'.
-    """
     q = update.callback_query
     await q.answer()
     uid = get_current_player_id(update, context)
     
     target = q.data.replace("rd_fix_", "", 1)
-    
-    # Se por acaso clicar num botão antigo individual, ignoramos ou tratamos como erro
     if target != "all":
         await q.answer("Opção antiga inválida. Use 'Reparar Tudo'.", show_alert=True)
         await show_restore_durability_menu(update, context)
         return
 
     pdata = await player_manager.get_player_data(uid)
-    
-    # Importação da função do motor
     from modules.profession_engine import restore_all_equipped_durability
-    
-    # Executa reparo em massa
     res = await restore_all_equipped_durability(pdata)
     
     if isinstance(res, dict) and res.get("error"):
         await q.answer(res["error"], show_alert=True)
     else:
         count = res.get("count", 0)
-        # Salva o jogador após a modificação
         await player_manager.save_player_data(uid, pdata)
         await q.answer(f"✨ Sucesso! {count} itens reparados!", show_alert=True)
     
-    # Recarrega o menu
     await show_restore_durability_menu(update, context)
 
 # REGISTRO DOS HANDLERS
@@ -602,5 +580,5 @@ travel_handler = CallbackQueryHandler(show_travel_menu, pattern=r"^travel$")
 collect_handler = CallbackQueryHandler(collect_callback, pattern=r"^collect_[A-Za-z0-9_]+$")
 open_region_handler = CallbackQueryHandler(open_region_callback, pattern=r"^open_region:")
 restore_durability_menu_handler = CallbackQueryHandler(show_restore_durability_menu, pattern=r"^restore_durability_menu$")
-restore_durability_fix_handler = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_all$") # Pattern restrito ao 'all' agora
+restore_durability_fix_handler = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_all$")
 region_info_handler = CallbackQueryHandler(region_info_callback, pattern=r"^region_info:.*$")

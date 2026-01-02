@@ -1,22 +1,6 @@
-RELATÓRIO DE MIGRAÇÃO - 91.7% CONCLUÍDO
+RELATÓRIO DE MIGRAÇÃO - 93.5% CONCLUÍDO
 ==================================================
 
-Arquivo: .\handlers\guild\management.py
-Prioridade: 6 | Status: ⚠️ MISTO
-Encontrado: query.from_user.id
-----------------------------------------
-Arquivo: .\handlers\guild\missions.py
-Prioridade: 6 | Status: ❌ CRÍTICO
-Encontrado: query.from_user.id
-----------------------------------------
-Arquivo: .\handlers\menu\events.py
-Prioridade: 6 | Status: ❌ CRÍTICO
-Encontrado: query.from_user.id
-----------------------------------------
-Arquivo: .\handlers\menu\region.py
-Prioridade: 6 | Status: ⚠️ MISTO
-Encontrado: update.effective_user.id, user_id: int
-----------------------------------------
 Arquivo: .\handlers\world_boss\handler.py
 Prioridade: 6 | Status: ⚠️ MISTO
 Encontrado: update.effective_user.id, query.from_user.id

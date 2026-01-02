@@ -1,5 +1,5 @@
 # handlers/guild/missions.py
-# (VERSÃO FINAL: Corrigido erro de 'edit_message_text' em mensagens com foto)
+# (VERSÃO ZERO LEGADO: MISSÕES DE CLÃ + AUTH SEGURA + STRING IDs)
 
 import logging
 import random
@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, clan_manager
 from modules.database import db
+from modules.auth_utils import get_current_player_id
 
 # Tenta importar o catálogo novo. Se falhar, usa um fallback vazio.
 try:
@@ -22,9 +23,16 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # 🔒 SEGURANÇA: Identificação via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        if query: await query.answer("Sessão inválida.", show_alert=True)
+        return
+
+    # IMPORTAÇÃO TARDIA PARA EVITAR CICLO
     from handlers.guild.dashboard import _render_clan_screen
     
-    user_id = query.from_user.id
     player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
     
@@ -36,8 +44,10 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     if not clan: return
 
     mission = clan.get("active_mission")
+    # Comparação segura de IDs (String)
     is_leader = (str(clan.get("leader_id")) == str(user_id))
 
+    # Filtra missões antigas do tipo COLLECT se necessário, ou adapta
     if mission and str(mission.get('type')).upper() == 'COLLECT':
         mission = None
 
@@ -101,7 +111,10 @@ async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFA
     query = update.callback_query
     from handlers.guild.dashboard import _render_clan_screen
 
-    user_id = query.from_user.id
+    # 🔒 Auth
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     pdata = await player_manager.get_player_data(user_id)
     clan_id = pdata.get("clan_id")
     clan = await clan_manager.get_clan(clan_id)
@@ -126,14 +139,19 @@ async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFA
 
 
 # ==============================================================================
-# 3. LÓGICA DE INICIAR A MISSÃO (CORRIGIDO)
+# 3. LÓGICA DE INICIAR A MISSÃO
 # ==============================================================================
 async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Gera a missão a partir do CATÁLOGO externo e exibe com MÍDIA."""
     query = update.callback_query
-    # IMPORTAÇÃO TARDIA CRÍTICA
     from handlers.guild.dashboard import _render_clan_screen
     
+    # 🔒 Auth
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida.")
+        return
+
     await query.answer()
     
     try:
@@ -141,10 +159,9 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
     except:
         selected_difficulty = "easy"
         
-    user_id = query.from_user.id
     pdata = await player_manager.get_player_data(user_id)
     clan_id = pdata.get("clan_id")
-    clan = await clan_manager.get_clan(clan_id) # Precisamos do objeto clan para renderizar
+    clan = await clan_manager.get_clan(clan_id)
     
     # --- FILTRAGEM DO CATÁLOGO ---
     available_keys = [
@@ -197,7 +214,6 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
         )
         kb = [[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]]
         
-        # USA O RENDERIZADOR QUE SUPORTA MÍDIA
         await _render_clan_screen(update, context, clan, text, kb)
         
     except Exception as e:
@@ -212,7 +228,10 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     from handlers.guild.dashboard import _render_clan_screen
 
-    user_id = query.from_user.id
+    # 🔒 Auth
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     pdata = await player_manager.get_player_data(user_id)
     clan_id = pdata.get("clan_id")
     clan = await clan_manager.get_clan(clan_id)
@@ -264,7 +283,10 @@ async def cancel_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     from handlers.guild.dashboard import _render_clan_screen
 
-    user_id = query.from_user.id
+    # 🔒 Auth
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     pdata = await player_manager.get_player_data(user_id)
     clan_id = pdata.get("clan_id")
     clan = await clan_manager.get_clan(clan_id)
@@ -278,7 +300,6 @@ async def cancel_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         {"$unset": {"active_mission": ""}}
     )
     
-    # Atualiza o objeto local para remover a missão visualmente
     if "active_mission" in clan:
         del clan["active_mission"]
 
