@@ -1,5 +1,5 @@
 # handlers/admin/premium_panel.py
-# (VERSÃO CORRIGIDA: Math de Datas Seguro + Proteção UTC)
+# (VERSÃO CORRIGIDA: INICIA COM 0 DIAS PARA CONTROLE TOTAL MANUAL)
 
 from __future__ import annotations
 import os
@@ -39,12 +39,12 @@ logger = logging.getLogger(__name__)
 (ASK_NAME,) = range(1)
 
 # ==============================================================================
-# HELPER DE KEYBOARD
+# HELPER DE KEYBOARD (AQUI ESTAVA O PROBLEMA DO 30 FIXO)
 # ==============================================================================
 def _get_premium_keyboard():
+    # MUDANÇA: callback_data termina com :0 em vez de :30
     return [
         [
-            # Mudei de :30 para :0 para não adicionar dias automaticamente
             InlineKeyboardButton("👑 Setar: PREMIUM", callback_data="prem_tier:premium:0"),
             InlineKeyboardButton("🌟 Setar: VIP", callback_data="prem_tier:vip:0"),
             InlineKeyboardButton("🔱 Setar: LENDA", callback_data="prem_tier:lenda:0")
@@ -52,7 +52,8 @@ def _get_premium_keyboard():
         [
             InlineKeyboardButton("📅 +1 Dia", callback_data="prem_add:1"),
             InlineKeyboardButton("📅 +7 Dias", callback_data="prem_add:7"),
-            InlineKeyboardButton("📅 +15 Dias", callback_data="prem_add:15")
+            InlineKeyboardButton("📅 +15 Dias", callback_data="prem_add:15"),
+            InlineKeyboardButton("📅 +30 Dias", callback_data="prem_add:30") # Adicionei opção de 30 aqui
         ],
         [
             InlineKeyboardButton("📅 -1 Dia", callback_data="prem_add:-1"),
@@ -97,25 +98,33 @@ def _get_user_info_text(pdata: dict, uid) -> str:
     
     # Verifica se já expirou visualmente
     status_extra = ""
+    is_expired = False
+    
     if expires:
         try:
             dt = datetime.fromisoformat(expires)
             if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
             if dt < datetime.now(timezone.utc):
-                status_extra = " (EXPIRADO)"
+                status_extra = " (EXPIRADO/ZERADO)"
+                is_expired = True
         except: pass
+    elif tier != "free":
+        status_extra = " (Permanente?)"
 
     tier_info = PREMIUM_TIERS.get(tier, {})
     tier_name = tier_info.get("display_name", tier.upper())
     
+    # Instrução visual
+    instruction = "✅ Adicione dias abaixo para ativar." if is_expired and tier != "free" else "Escolha uma ação:"
+
     txt = (
         f"👤 <b>Usuário:</b> {name}\n"
         f"🆔 <b>ID:</b> <code>{uid}</code>\n"
         f"------------------------------\n"
-        f"💎 <b>Plano Atual:</b> {tier_name}{status_extra}\n"
-        f"📅 <b>Expira em:</b> {_format_date(expires)}\n"
+        f"💎 <b>Plano Definido:</b> {tier_name}{status_extra}\n"
+        f"📅 <b>Vencimento:</b> {_format_date(expires)}\n"
         f"------------------------------\n"
-        f"Escolha uma ação:"
+        f"👇 <b>{instruction}</b>"
     )
     return txt
 
@@ -219,20 +228,21 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     parts = query.data.split(":")
     new_tier = parts[1]
-    days = int(parts[2]) # Agora virá como 0
+    days = int(parts[2]) # Agora isto virá como 0
     
-    # Lógica Nova:
+    # Define a data base como AGORA
+    new_expire = datetime.now(timezone.utc)
+    
+    # Se por acaso mandarmos dias no futuro, soma
     if days > 0:
-        
-        new_expire = datetime.now(timezone.utc) + timedelta(days=days)
-        msg_extra = f"por {days} dias"
+        new_expire += timedelta(days=days)
+        msg = f"✅ Definido {new_tier.upper()} (+{days}d)!"
     else:
-        new_expire = datetime.now(timezone.utc)
-        msg_extra = "(Aguardando definição de dias)"
+        # Se for 0, só define o tier e zera o tempo
+        msg = f"✅ Tier {new_tier.upper()} definido! Adicione os dias agora."
     
     await _save_premium_changes(uid, pdata, new_tier, new_expire)
-    
-    await query.answer(f"✅ Definido {new_tier.upper()}! Adicione os dias agora.", show_alert=True)
+    await query.answer(msg, show_alert=True)
     await _refresh_menu(update, context)
     return ASK_NAME
 
@@ -251,21 +261,32 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     current_tier = pdata.get("premium_tier", "free")
     current_exp_str = pdata.get("premium_expires_at")
     
-    if current_tier == "free" or not current_exp_str:
-        await query.answer("⚠️ Usuário Free. Defina um plano primeiro!", show_alert=True)
+    if current_tier == "free":
+        await query.answer("⚠️ O usuário é FREE. Escolha um plano VIP primeiro!", show_alert=True)
         return ASK_NAME
         
     try:
         # 1. Parsing Seguro com UTC
-        current_dt = datetime.fromisoformat(current_exp_str)
-        if current_dt.tzinfo is None:
-            current_dt = current_dt.replace(tzinfo=timezone.utc)
-            
         now = datetime.now(timezone.utc)
         
-        if days_to_add > 0 and current_dt < now:
-            base_date = now
+        if not current_exp_str:
+            # Se não tem data (era permanente ou bug), assume agora
+            current_dt = now
         else:
+            current_dt = datetime.fromisoformat(current_exp_str)
+            if current_dt.tzinfo is None:
+                current_dt = current_dt.replace(tzinfo=timezone.utc)
+            
+        # 2. Lógica Inteligente de Adição
+        # Se o plano JÁ venceu, começamos a contar de AGORA.
+        # Se o plano AINDA vale, somamos ao final dele.
+        if days_to_add > 0:
+            if current_dt < now:
+                base_date = now
+            else:
+                base_date = current_dt
+        else:
+            # Se for remover dias (valor negativo), usamos a data atual do plano
             base_date = current_dt
             
         new_expire = base_date + timedelta(days=days_to_add)
@@ -273,11 +294,11 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await _save_premium_changes(uid, pdata, current_tier, new_expire)
         
         op = "+" if days_to_add > 0 else ""
-        await query.answer(f"✅ Data atualizada: {op}{days_to_add} dias.")
+        await query.answer(f"✅ Atualizado: {op}{days_to_add} dias.")
         
     except Exception as e:
         logger.error(f"Erro math data premium: {e}")
-        await query.answer("❌ Erro ao calcular data (formato inválido).")
+        await query.answer("❌ Erro ao calcular data.")
         
     await _refresh_menu(update, context)
     return ASK_NAME
@@ -289,7 +310,7 @@ async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     pdata = await player_manager.get_player_data(uid)
     
     await _save_premium_changes(uid, pdata, "free", None)
-    await query.answer("🗑️ Premium removido (Setado para Free).")
+    await query.answer("🗑️ Premium removido (Setado para Free).", show_alert=True)
     await _refresh_menu(update, context)
     return ASK_NAME
 
