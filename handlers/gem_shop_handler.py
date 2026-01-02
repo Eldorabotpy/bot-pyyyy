@@ -1,7 +1,9 @@
 # handlers/gem_shop_handler.py
+# (VERSÃO FINAL: 100% BLINDADA COM AUTH CENTRALIZADA)
+
 import logging
 import math
-from typing import Dict, List
+from typing import Dict, List, Union
 from datetime import datetime, timezone, timedelta
 
 from telegram.error import BadRequest
@@ -111,7 +113,8 @@ def _get_button_label(base_id: str) -> str:
             
         return f"{emoji} {name} ({price})"
 
-def _state(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> dict:
+def _state(context: ContextTypes.DEFAULT_TYPE, user_id: Union[str, int]) -> dict:
+    # A chave do user_data deve ser independente do tipo de ID (str ou int)
     st = context.user_data.get("gemshop")
     if not st:
         st = {"tab": "premium", "base_id": None, "qty": 1, "page": 1}
@@ -193,14 +196,18 @@ def _build_shop_keyboard(context_state: dict, page_items: list = None) -> Inline
 # -------------------------------
 async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
+    
+    # 🔒 BLINDAGEM: ID Seguro
+    user_id = get_current_player_id(update, context)
+    chat_id = update.effective_chat.id
+    
     if q:
         try: await q.answer()
         except: pass
-        chat_id = update.effective_chat.id
-        user_id = get_current_player_id(update, context)
-    else:
-        chat_id = update.effective_chat.id
-        user_id = get_current_player_id(update, context)
+
+    if not user_id:
+        if q: await q.answer("Sessão inválida.", show_alert=True)
+        return
 
     st = _state(context, user_id)
     current_tab = st.get("tab", "premium")
@@ -307,7 +314,11 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def gem_switch_tab(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    
+    # 🔒 BLINDAGEM
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+    
     new_tab = q.data.replace("gem_tab_", "")
     st = _state(context, user_id)
     
@@ -323,7 +334,11 @@ async def gem_switch_tab(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def gem_change_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    
+    # 🔒 BLINDAGEM
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+    
     st = _state(context, user_id)
     
     current_page = st.get("page", 1)
@@ -338,7 +353,11 @@ async def gem_change_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def gem_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    
+    # 🔒 BLINDAGEM
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     base_id = q.data.replace("gem_pick_", "")
 
     st = _state(context, user_id)
@@ -354,7 +373,11 @@ async def gem_pick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def gem_change_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    
+    # 🔒 BLINDAGEM
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     st = _state(context, user_id)
     if not st["base_id"]: return
     
@@ -368,7 +391,13 @@ async def gem_change_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
+    
+    # 🔒 BLINDAGEM: ID Seguro (Auth Central)
     buyer_id = get_current_player_id(update, context)
+    if not buyer_id:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
     st = _state(context, buyer_id)
     base_id = st.get("base_id")
     qty = max(1, int(st.get("qty", 1)))
@@ -435,7 +464,7 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"✅ <b>Assinatura Confirmada!</b>\n\n👑 <b>{plan['name']}</b>\n📅 Válido até: {new_exp.strftime('%d/%m/%Y')}"
 
         # =======================================================
-        # 👇 AQUI ESTÁ A CORREÇÃO: ENVIO DA NOTIFICAÇÃO NO GRUPO 👇
+        # NOTIFICAÇÃO DE GRUPO
         # =======================================================
         try:
             buyer_name = buyer.get("character_name", "Aventureiro")
@@ -449,7 +478,6 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💎 Quer se tornar VIP também? Digite /gemas ou vá ao Mercado!"
             )
             
-            # Envia para o grupo configurado no topo do arquivo
             await context.bot.send_message(
                 chat_id=NOTIFICATION_GROUP_ID,
                 message_thread_id=NOTIFICATION_TOPIC_ID,
@@ -469,7 +497,6 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     st["qty"] = 1
     context.user_data["gemshop"] = st
 
-    # Feedback visual final
     reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar à Loja", callback_data="gem_shop")]])
     try: await q.edit_message_caption(caption=msg, reply_markup=reply_markup, parse_mode="HTML")
     except BadRequest: await q.edit_message_text(text=msg, reply_markup=reply_markup, parse_mode="HTML")

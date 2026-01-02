@@ -1,5 +1,5 @@
 # handlers/inventory_handler.py
-# (VERSÃO FINAL BLINDADA: Corrige inventário duplicado NA HORA DE ABRIR)
+# (VERSÃO BLINDADA: Auth Híbrida + Correção de Duplicatas + Navegação Rápida)
 
 import math
 import logging
@@ -118,54 +118,37 @@ async def _force_fix_inventory(user_id, player_data):
     
     # Mapeamento ID VELHO (Errado) -> ID NOVO (Certo/Oficial do refino)
     correcoes = {
-        # Ferros
         "ferro": "minerio_de_ferro",
         "minerio_ferro": "minerio_de_ferro",
         "iron_ore": "minerio_de_ferro",
         "pedra_ferro": "minerio_de_ferro",
         "minerio_bruto": "minerio_de_ferro",
         "minerio_de_ferro_bruto": "minerio_de_ferro",
-        
-        # Estanhos
         "minerio_estanho": "minerio_de_estanho",
         "tin_ore": "minerio_de_estanho",
-        
-        # Prata
         "minerio_prata": "minerio_de_prata",
         "silver_ore": "minerio_de_prata",
-
-        # Madeiras
         "madeira_rara_bruta": "madeira_rara",
         "wood_rare": "madeira_rara",
-        
-        # Carvão (caso tenha duplicado)
         "carvao_mineral": "carvao",
         "coal": "carvao"
     }
 
     for velho, novo in correcoes.items():
         if velho in inventory:
-            # 1. Se o ID 'velho' for IGUAL ao 'novo' (por engano na lista), pula
-            if velho == novo: 
-                continue
-
-            # 2. Descobre quantidade do item velho
+            if velho == novo: continue
+            
             dado_velho = inventory[velho]
             qtd_velha = 0
             
-            # Suporta se o item velho for um dicionário ou um número direto
             if isinstance(dado_velho, dict):
-                qtd_velha = int(dado_velho.get("quantity", 1)) # Default 1 se for dict sem qtd
+                qtd_velha = int(dado_velho.get("quantity", 1))
             else:
                 qtd_velha = int(dado_velho)
             
             if qtd_velha > 0:
-                # 3. Garante que o item novo existe no inventário
-                if novo not in inventory:
-                    inventory[novo] = 0
+                if novo not in inventory: inventory[novo] = 0
                 
-                # 4. Soma a quantidade no item novo
-                # Verifica se o destino é dict ou int e soma corretamente
                 if isinstance(inventory[novo], dict):
                     inventory[novo]["quantity"] = int(inventory[novo].get("quantity", 0)) + qtd_velha
                 else:
@@ -174,14 +157,11 @@ async def _force_fix_inventory(user_id, player_data):
                 logger.info(f"🔧 FIX INVENTÁRIO: {user_id} | {qtd_velha}x {velho} -> {novo}")
                 mudou = True
             
-            # 5. Remove o item velho (o impostor)
             del inventory[velho]
             mudou = True
             
     if mudou:
-        # Salva no banco para persistir a correção
         await player_manager.save_player_data(user_id, player_data)
-        
     return mudou
 
 # -----------------------------------------------------------
@@ -192,17 +172,14 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     await query.answer()
     
-    # MUDANÇA AQUI: Usa a função ponte
+    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    # --- CORREÇÃO LOCAL E IMEDIATA ---
-    try:
-        await _force_fix_inventory(user_id, player_data)
-    except Exception as e:
-        logger.error(f"Erro ao corrigir inventario localmente: {e}")
+    try: await _force_fix_inventory(user_id, player_data)
+    except Exception as e: logger.error(f"Erro ao corrigir inventario localmente: {e}")
 
     gold = player_manager.get_gold(player_data)
     gems = player_manager.get_gems(player_data)
@@ -218,8 +195,7 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     for key, data in CATEGORIES.items():
         row.append(InlineKeyboardButton(data["label"], callback_data=f"inv_open_{key}_1"))
         if len(row) == 2:
-            buttons.append(row)
-            row = []
+            buttons.append(row); row = []
     if row: buttons.append(row)
     
     buttons.append([
@@ -232,16 +208,14 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(buttons))
 
 # -----------------------------------------------------------
-# 2. LISTA DE ITENS (ATUALIZADA COM DEBUG DE ID)
+# 2. LISTA DE ITENS
 # -----------------------------------------------------------
 
 async def inventory_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, manual_data=None):
     query = update.callback_query
-    if not manual_data:
-        await query.answer()
+    if not manual_data: await query.answer()
     
     target_data = manual_data if manual_data else query.data
-
     try:
         _, _, cat_key, page_str = target_data.split("_")
         page = int(page_str)
@@ -249,7 +223,7 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
         await inventory_menu_callback(update, context)
         return
 
-    # MUDANÇA AQUI: Usa a função ponte
+    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
     
     player_data = await player_manager.get_player_data(user_id)
@@ -293,7 +267,7 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
         text += "<i>Nenhum item nesta categoria.</i>"
     else:
         for item in current_items:
-            display = f"{item['name']}" # Removi o debug ID visual para ficar limpo
+            display = f"{item['name']}"
             if item['qty'] > 1: display += f" (x{item['qty']})"
             
             is_locked = False
@@ -352,7 +326,7 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
 async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
-    # MUDANÇA AQUI: Usa a função ponte
+    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
     
     try: item_id = query.data.split(":", 1)[1]
@@ -397,10 +371,8 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 player_manager.add_item_to_inventory(player_data, item_id, 1)
                 raise ValueError(f"Skill ID {skill_id} inválida.")
 
-            if "skills" not in player_data or not isinstance(player_data["skills"], dict):
-                player_data["skills"] = {}
-            if "equipped_skills" not in player_data:
-                player_data["equipped_skills"] = []
+            if "skills" not in player_data: player_data["skills"] = {}
+            if "equipped_skills" not in player_data: player_data["equipped_skills"] = []
 
             if skill_id in player_data["skills"]:
                 await query.answer("Você já conhece esta habilidade!", show_alert=True)

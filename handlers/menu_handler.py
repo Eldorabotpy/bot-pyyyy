@@ -1,7 +1,9 @@
 # handlers/menu_handler.py
+# (VERSÃO BLINDADA: AUTH HÍBRIDA + ANTI-FLOOD CORRIGIDO)
+
 import logging
 from time import monotonic
-from typing import Callable, Awaitable, Optional, Dict
+from typing import Callable, Awaitable, Optional, Dict, Union
 
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -25,10 +27,12 @@ logger = logging.getLogger(__name__)
 # -------------------------
 # Anti-flood (simples)
 # -------------------------
-_LAST_CLICK: Dict[str, float] = {}
+# Aceita ID numérico (Telegram) ou String (ObjectId)
+_LAST_CLICK: Dict[Union[str, int], float] = {}
 _MIN_DELTA = 0.4  # segundos
 
-def _allow_click(user_id: int) -> bool:
+def _allow_click(user_id: Union[str, int]) -> bool:
+    """Verifica se o usuário pode clicar novamente (rate limit)."""
     t = monotonic()
     last = _LAST_CLICK.get(user_id, 0.0)
     if t - last < _MIN_DELTA:
@@ -46,7 +50,9 @@ async def _safe_answer(update: Update) -> None:
 
 async def _error_fallback(update: Update, context: ContextTypes.DEFAULT_TYPE, msg: str) -> None:
     try: await update.callback_query.edit_message_text(msg)
-    except: await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
+    except: 
+        # Chat ID é sempre numérico (canal de comunicação), isso está correto
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
 
 # -------------------------
 # Aliases (compat antiga)
@@ -85,7 +91,7 @@ async def continue_after_action_callback(update: Update, context: ContextTypes.D
     query = update.callback_query
     await query.answer()
     
-    # PEGA O ID DA SESSÃO (Garantido pelo decorator)
+    # PEGA O ID DA SESSÃO (Garantido pelo decorator, pode ser str ou int)
     user_id = context.user_data["logged_player_id"]
     
     player_data = await player_manager.get_player_data(user_id)
@@ -102,23 +108,8 @@ async def continue_after_action_callback(update: Update, context: ContextTypes.D
     else:
         await show_region_menu(update, context, region_key=location_key)
 
-# Handler inteligente para voltar à aventura
-continue_after_action_handler = CallbackQueryHandler(
-    continue_after_action_callback, pattern=r'^continue_after_action$'
-)
-
-# Handler para o menu principal do reino (se chamado por um botão)
-kingdom_menu_handler = CallbackQueryHandler(
-    show_kingdom_menu, pattern=r'^show_kingdom_menu$'
-)
-
-# Handler dedicado para o botão "Viajar"
-travel_handler = CallbackQueryHandler(
-    show_travel_menu, pattern=r'^travel$'
-)
-
 # -------------------------
-# Handler principal
+# Handler principal de Navegação
 # -------------------------
 @requires_login
 async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -126,7 +117,7 @@ async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if not query: return
 
-    # ✅ CORREÇÃO: ID Seguro
+    # ✅ ID Seguro da Sessão (Str/Int)
     user_id = context.user_data["logged_player_id"]
     
     if not _allow_click(user_id): return
@@ -140,6 +131,7 @@ async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     data = (query.data or "").strip()
     button = ALIASES.get(data, data)
 
+    # Bloqueio de ação (exceto se for para continuar/voltar)
     if player_state.get("action") not in ("idle", None) and button != "continue_after_action":
         await query.answer("Conclua sua ação atual primeiro.", show_alert=True)
         return
@@ -147,7 +139,7 @@ async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         current_location = player_data.get("current_location", "reino_eldora")
         
-        # Despacho por tabela
+        # Despacho por tabela de rotas
         handler = ROUTES.get(button)
         if handler:
             await handler(update, context)
@@ -164,6 +156,9 @@ async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.exception("Erro navegação: %s", button)
         await _error_fallback(update, context, "❌ Erro ao processar.")
 
+# -------------------------
+# Definição dos Handlers
+# -------------------------
 continue_after_action_handler = CallbackQueryHandler(continue_after_action_callback, pattern=r'^continue_after_action$')
 kingdom_menu_handler = CallbackQueryHandler(show_kingdom_menu, pattern=r'^show_kingdom_menu$')
 travel_handler = CallbackQueryHandler(show_travel_menu, pattern=r'^travel$')

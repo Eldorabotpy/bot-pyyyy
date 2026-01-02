@@ -1,12 +1,15 @@
 # modules/events/catacumbas/combat_handler.py
+# (VERSÃO BLINDADA: Auth Híbrida + Correção de IDs)
 
 import random
 import logging
+from typing import Union
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager
 from modules.combat import criticals, combat_engine
 from handlers.profile_handler import _get_class_media
+from modules.auth_utils import get_current_player_id
 
 # Importamos o formatador visual novo
 from handlers import utils 
@@ -33,7 +36,6 @@ def _get_enemy_media(session: dict) -> str:
     if not target: return config.MEDIA_KEYS.get("lobby_screen")
 
     if target.get("current_hp", 0) <= 0:
-         # Se morreu e não tem mais ninguém, mostra lobby ou vitória (gerenciado depois)
          pass 
          
     if target.get("is_boss"):
@@ -48,11 +50,12 @@ def _get_enemy_media(session: dict) -> str:
 # 🖥️ INTERFACE PRINCIPAL (REFRESH)
 # ==============================================================================
 
-async def refresh_battle_interface(update: Update, context: ContextTypes.DEFAULT_TYPE, session: dict, user_id: int, turn_state: str = "player_turn"):
+async def refresh_battle_interface(update: Update, context: ContextTypes.DEFAULT_TYPE, session: dict, user_id: Union[int, str], turn_state: str = "player_turn"):
     """
     Renderiza a tela de combate usando o novo visual detalhado.
     """
     # 1. Carrega dados do usuário atual (para validar morte)
+    # player_manager já foi blindado para aceitar Union[int, str]
     current_pdata = await player_manager.get_player_data(user_id)
     
     if current_pdata.get("current_hp", 0) <= 0:
@@ -109,10 +112,15 @@ async def refresh_battle_interface(update: Update, context: ContextTypes.DEFAULT
 
 async def combat_action_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user = update.effective_user
+    
+    # --- AUTH HÍBRIDA ---
+    # Usamos user_id seguro para lógica e user.first_name para visual
+    user_id = get_current_player_id(update, context)
+    user_name = update.effective_user.first_name
     action = query.data
     
-    code = raid_manager.PLAYER_LOCATION.get(user.id)
+    # Busca sessão usando o ID seguro
+    code = raid_manager.PLAYER_LOCATION.get(user_id)
     session = raid_manager.ACTIVE_RAIDS.get(code)
     
     if not session:
@@ -125,23 +133,22 @@ async def combat_action_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("Inimigos ainda vivos!", show_alert=True)
             return
         if raid_manager.advance_to_next_floor(session):
-            await refresh_battle_interface(update, context, session, user.id)
+            await refresh_battle_interface(update, context, session, user_id)
         else:
             await _handle_victory(update, context, session)
         return
 
     # --- Verifica Alvo Vivo ---
-    # Lógica simplificada: Pega o Boss ou o primeiro mob vivo
     target = session.get("boss")
     # (Se você implementar lista de enemies, adapte aqui para selecionar qual atacar)
     
     if session.get("floor_cleared") or (target and target["current_hp"] <= 0):
         await query.answer("Inimigo já derrotado.")
-        await refresh_battle_interface(update, context, session, user.id)
+        await refresh_battle_interface(update, context, session, user_id)
         return
 
     # --- Prepara Dados para Combate ---
-    pdata = await player_manager.get_player_data(user.id)
+    pdata = await player_manager.get_player_data(user_id)
     stats = await player_manager.get_player_total_stats(pdata)
     
     # Define stats do inimigo para o motor de combate
@@ -159,19 +166,19 @@ async def combat_action_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         dmg = res["total_damage"]
         target["current_hp"] -= dmg
-        session["turn_log"].append(f"⚔️ {user.first_name} causou {dmg} dano!")
+        session["turn_log"].append(f"⚔️ {user_name} causou {dmg} dano!")
         
     elif action == "cat_act_heal_small":
         heal = 250
         pdata["current_hp"] = min(stats["max_hp"], pdata.get("current_hp", 0) + heal)
-        session["turn_log"].append(f"🧪 {user.first_name} curou {heal}.")
+        session["turn_log"].append(f"🧪 {user_name} curou {heal}.")
 
     # 2. Verifica Morte do Inimigo
     if target["current_hp"] <= 0:
         target["current_hp"] = 0
         session["floor_cleared"] = True # Marca andar como limpo
         session["turn_log"].append(f"💀 **{target['name']} MORREU!**")
-        await refresh_battle_interface(update, context, session, user.id)
+        await refresh_battle_interface(update, context, session, user_id)
         return
 
     # 3. Turno do Inimigo (Contra-ataque)
@@ -183,21 +190,21 @@ async def combat_action_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_crit: msg += " (CRIT!)"
         session["turn_log"].append(msg)
     else:
-        session["turn_log"].append(f"💨 {user.first_name} esquivou!")
+        session["turn_log"].append(f"💨 {user_name} esquivou!")
     
-    await player_manager.save_player_data(user.id, pdata)
-    await refresh_battle_interface(update, context, session, user.id, turn_state="monster_attacked")
+    await player_manager.save_player_data(user_id, pdata)
+    await refresh_battle_interface(update, context, session, user_id, turn_state="monster_attacked")
 
 # ==============================================================================
 # 🔄 LOOP DE ATUALIZAÇÃO
 # ==============================================================================
 
 async def refresh_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    code = raid_manager.PLAYER_LOCATION.get(user.id)
+    user_id = get_current_player_id(update, context)
+    code = raid_manager.PLAYER_LOCATION.get(user_id)
     session = raid_manager.ACTIVE_RAIDS.get(code)
     if session:
-        await refresh_battle_interface(update, context, session, user.id)
+        await refresh_battle_interface(update, context, session, user_id)
     else:
         if update.callback_query:
             await update.callback_query.answer("Raid não encontrada.")

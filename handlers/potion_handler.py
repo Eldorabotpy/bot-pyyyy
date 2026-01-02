@@ -1,22 +1,32 @@
-# handlers/potion_handler.py (NOVO ARQUIVO)
+# handlers/potion_handler.py
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 logger = logging.getLogger(__name__)
 
 # Esta função será chamada para mostrar o menu de poções
-# Esta função será chamada para mostrar o menu de poções
 async def show_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        if query: await query.answer("Sessão inválida. Use /start.", show_alert=True)
+        return
 
     # <<< CORREÇÃO 1: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        if query: await query.answer("Dados do jogador não encontrados.", show_alert=True)
+        return
+
     inventory = player_data.get("inventory", {})
 
     caption = "🧪 **Poções & Consumíveis**\n\nSelecione um item para usar."
@@ -25,6 +35,11 @@ async def show_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Procura no inventário por itens do tipo "potion" (Síncrono)
     found_potions = False
     for item_id, quantity in inventory.items():
+        # Verifica se é um dicionário (item único) ou int (stack)
+        if isinstance(quantity, dict):
+             # Lógica para itens únicos (se houver poções únicas)
+             continue
+        
         item_info = game_data.ITEMS_DATA.get(item_id, {})
         if item_info.get("type") == "potion":
             found_potions = True
@@ -41,9 +56,8 @@ async def show_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption += "\n\nVocê não possui nenhuma poção no seu inventário."
 
     # Adiciona um botão para voltar (sugiro voltar ao perfil)
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")]) # Assume 'profile'
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")])
 
-    # Await já estava correto aqui
     # Tenta editar caption, se falhar (ex: msg de texto), tenta editar texto
     try:
         await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -56,7 +70,12 @@ async def show_potion_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Esta função será chamada quando o jogador clicar para usar uma poção
 async def use_potion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida. Use /start.", show_alert=True)
+        return
 
     try:
         item_id_to_use = query.data.split(':')[1]
@@ -66,6 +85,10 @@ async def use_potion_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # <<< CORREÇÃO 2: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await query.answer("Perfil não encontrado.", show_alert=True)
+        return
+
     item_info = game_data.ITEMS_DATA.get(item_id_to_use, {}) # Síncrono
     effects = item_info.get("effects", {}) # Síncrono
 

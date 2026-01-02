@@ -1,5 +1,5 @@
 # handlers/converter_handler.py
-# (VERSÃO FINAL LIMPA E CORRIGIDA)
+# (VERSÃO FINAL: SEGURA - IDS BLINDADOS)
 
 import logging
 import math
@@ -59,6 +59,12 @@ async def converter_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     
+    # 🔒 BLINDAGEM: Verifica sessão, embora não precise de dados neste menu
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await _safe_edit_or_send(query, context, query.message.chat_id, "Sessão inválida. Use /start.", None)
+        return
+    
     text = (
         "🔄 <b>Conversor de Recompensas</b>\n\n"
         "Converta Skills ou Skins aprendidas de volta em <b>Itens</b> (Tomos/Caixas) para vender ou trocar.\n\n"
@@ -76,7 +82,13 @@ async def converter_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def converter_list_items(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 BLINDAGEM: ID seguro
+    user_id = get_current_player_id(update, context)
+    
+    if not user_id:
+        await _safe_edit_or_send(query, context, query.message.chat_id, "Sessão inválida.", None)
+        return
     
     try:
         parts = query.data.split(":")
@@ -141,6 +153,11 @@ async def converter_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
+    # 🔒 BLINDAGEM: Verifica sessão
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+    
     try:
         parts = query.data.split(":")
         item_type = parts[2]
@@ -169,7 +186,13 @@ async def converter_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def converter_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # 🔒 BLINDAGEM: ID Seguro
+    user_id = get_current_player_id(update, context)
+    
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
     
     try:
         parts = query.data.split(":")

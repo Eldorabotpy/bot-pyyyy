@@ -1,232 +1,216 @@
-# handlers/events/party_actions.py (FINAL)
+# handlers/events/party_actions.py
+# (VERSÃO BLINDADA: AUTH UNIFICADA + SUPORTE A STRING ID)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-from modules import player_manager, party_manager, dungeon_definitions
-from .dungeon_actions import show_dungeon_info
+from telegram.ext import ContextTypes, CallbackQueryHandler
+
+# --- IMPORTAÇÃO DA SEGURANÇA ---
+from modules.auth_utils import get_current_player_id 
+
+# --- Módulos do Jogo ---
+from modules import player_manager
+try:
+    # Tenta importar o gerenciador de grupo e definições
+    from modules.events import party_manager
+    from modules.dungeons import dungeon_definitions
+except ImportError:
+    party_manager = None
+    dungeon_definitions = None
 
 logger = logging.getLogger(__name__)
 
+async def party_actions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Gerencia todas as ações de grupo (Criar, Entrar, Sair, Iniciar, Convites).
+    """
+    query = update.callback_query
+    
+    # 🔒 SEGURANÇA: Identificação via Auth Central
+    user_id = get_current_player_id(update, context)
+    
+    if not user_id:
+        await query.answer("❌ Sessão inválida ou expirada. Use /start para logar.", show_alert=True)
+        return
 
-async def _update_lobby_for_all_members(context: ContextTypes.DEFAULT_TYPE, party_id: str):
-    """Atualiza a tela de lobby para todos no grupo (edita se possível; se não, envia nova e atualiza mapeamento)."""
-    party_data = party_manager.get_party_data(party_id)
+    # Recupera dados para validação (Nome, Nível, etc)
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await query.answer("❌ Perfil não encontrado.", show_alert=True)
+        return
+
+    data = query.data
+    # Padrão esperado: party:ACTION:ARG1:ARG2...
+    parts = data.split(":")
+    if len(parts) < 2:
+        return 
+        
+    action = parts[1]
+
+    # Verifica se o gerenciador de party está carregado
+    if not party_manager:
+        await query.answer("⚠️ Sistema de grupos indisponível no momento.", show_alert=True)
+        return
+
+    try:
+        # --- AÇÃO: CRIAR GRUPO ---
+        if action == "create":
+            # Ex: party:create:dungeon_id
+            dungeon_id = parts[2] if len(parts) > 2 else "generic"
+            
+            result = await party_manager.create_party(user_id, player_data, dungeon_id)
+            if result["success"]:
+                await query.answer("✅ Grupo criado!", show_alert=False)
+                await _refresh_party_menu(query, result["party_id"])
+            else:
+                await query.answer(f"❌ {result.get('message', 'Erro ao criar grupo.')}", show_alert=True)
+
+        # --- AÇÃO: ENTRAR (JOIN) OU ACEITAR (ACCEPT) ---
+        elif action in ("join", "accept"):
+            party_id = parts[2]
+            
+            # Tenta entrar no grupo
+            result = await party_manager.join_party(user_id, player_data, party_id)
+            
+            if result["success"]:
+                await query.answer("✅ Você entrou no grupo!", show_alert=False)
+                # Se foi aceitar convite, apaga a msg do convite ou atualiza
+                if action == "accept":
+                    try: await query.delete_message()
+                    except: pass
+                else:
+                    await _refresh_party_menu(query, party_id)
+            else:
+                msg_erro = result.get('message', 'Não foi possível entrar.')
+                if action == "accept":
+                    try: await query.edit_message_text(f"❌ {msg_erro}")
+                    except: pass
+                else:
+                    await query.answer(f"❌ {msg_erro}", show_alert=True)
+
+        # --- AÇÃO: RECUSAR CONVITE (DECLINE) ---
+        elif action == "decline":
+            # party:decline:party_id
+            try:
+                await query.edit_message_text("❌ Convite recusado.")
+            except:
+                pass
+
+        # --- AÇÃO: SAIR (LEAVE) ---
+        elif action == "leave":
+            party_id = parts[2]
+            result = await party_manager.leave_party(user_id, party_id)
+            
+            if result["success"]:
+                await query.answer("Você saiu do grupo.", show_alert=False)
+                # Tenta fechar o menu para quem saiu
+                try: await query.delete_message()
+                except: pass
+            else:
+                await query.answer(f"❌ {result.get('message', 'Erro ao sair.')}", show_alert=True)
+
+        # --- AÇÃO: INICIAR (START - Apenas Líder) ---
+        elif action == "start":
+            party_id = parts[2]
+            # Verifica se é líder
+            is_leader = await party_manager.is_party_leader(party_id, user_id)
+            
+            if not is_leader:
+                await query.answer("⚠️ Apenas o líder pode iniciar a aventura!", show_alert=True)
+                return
+
+            result = await party_manager.start_party_event(party_id)
+            if result["success"]:
+                await query.answer("🚀 Aventura iniciada!", show_alert=True)
+            else:
+                await query.answer(f"❌ {result.get('message', 'Não foi possível iniciar.')}", show_alert=True)
+
+        # --- AÇÃO: ATUALIZAR (REFRESH) ---
+        elif action == "refresh":
+            party_id = parts[2]
+            await query.answer("Atualizado.")
+            await _refresh_party_menu(query, party_id)
+
+        # --- AÇÃO: EXPULSAR (KICK - Apenas Líder) ---
+        elif action == "kick":
+            party_id = parts[2]
+            target_id = parts[3] 
+            
+            # Verifica permissão
+            is_leader = await party_manager.is_party_leader(party_id, user_id)
+            if not is_leader:
+                await query.answer("⚠️ Apenas o líder pode expulsar membros.", show_alert=True)
+                return
+                
+            # Comparação segura de Strings (ObjectIds)
+            if str(target_id) == str(user_id):
+                await query.answer("Você não pode se expulsar. Use 'Sair'.", show_alert=True)
+                return
+
+            result = await party_manager.kick_member(party_id, target_id)
+            if result["success"]:
+                await query.answer("🥾 Membro removido.", show_alert=True)
+                await _refresh_party_menu(query, party_id)
+            else:
+                await query.answer("Erro ao remover membro.", show_alert=True)
+
+    except Exception as e:
+        logger.error(f"Erro no handler de party ({action}): {e}", exc_info=True)
+        await query.answer("❌ Erro interno no sistema de grupos.", show_alert=True)
+
+async def _refresh_party_menu(query, party_id):
+    """
+    Atualiza a mensagem visual do grupo com os membros atuais.
+    """
+    party_data = await party_manager.get_party_info(party_id)
     if not party_data:
+        try: await query.edit_message_text("⚠️ Este grupo foi desfeito ou expirou.")
+        except: pass
         return
 
+    # Renderização da Lista de Membros
+    members = party_data.get("members", [])
+    
+    # Determina max slots
+    max_slots = 4
     dungeon_id = party_data.get("dungeon_id")
-    dungeon_info = dungeon_definitions.DUNGEONS.get(dungeon_id)
-    if not dungeon_info:
-        logger.error(f"[LOBBY] dungeon_id '{dungeon_id}' não existe para party '{party_id}'")
-        return
-
-    members = party_data.get("members", {}) or {}
-    member_names = list(members.values())
-    members_list = "".join([f"👤 {name}\n" for name in member_names])
-    spots = max(0, int(dungeon_info.get("max_players", 1)) - len(member_names))
-    if spots:
-        members_list += "".join(["❓ (Vaga Aberta)\n" for _ in range(spots)])
-
+    if dungeon_definitions:
+        dgn_def = dungeon_definitions.DUNGEONS.get(dungeon_id, {})
+        max_slots = int(dgn_def.get("max_players", 4))
+    
+    dungeon_name = party_data.get("dungeon_name", "Aventura")
+    
     text = (
-        f"<b>Sala de Espera: {dungeon_info.get('display_name', dungeon_id)}</b>\n\n"
-        f"Líder: {party_data.get('leader_name')}\n"
-        "--------------------\n"
-        f"<b>Grupo ({len(member_names)}/{dungeon_info.get('max_players', 1)}):</b>\n{members_list}"
+        f"🏰 <b>GRUPO: {dungeon_name}</b>\n"
+        f"👥 Membros: {len(members)}/{max_slots}\n"
+        "─────────────────\n"
     )
 
-    is_full = len(member_names) >= int(dungeon_info.get("max_players", 1))
-    party_data.setdefault("player_lobby_messages", {})
+    kb = []
+    # Itera membros para mostrar na lista
+    for member in members:
+        role_icon = "👑" if member.get("is_leader") else "🛡️"
+        name = member.get("name", "Jogador")
+        lvl = member.get("level", 1)
+        cls = member.get("class_name", "Aventureiro")
+        text += f"{role_icon} <b>{name}</b> (Nv.{lvl} {cls})\n"
 
-    for member_id_str in list(members.keys()):
-        is_leader = (member_id_str == party_data.get("leader_id"))
-        keyboard = []
-        if is_leader:
-            if not is_full:
-                keyboard.append([InlineKeyboardButton("➡️ Convidar", callback_data=f"party_invite_{party_id}")])
-            # Botão de entrar chama o handler de dungeon_enter (fica em outro módulo)
-            keyboard.append([InlineKeyboardButton("🚪 Entrar na Masmorra", callback_data=f"dungeon_enter_{dungeon_id}")])
-            keyboard.append([InlineKeyboardButton("❌ Desfazer Grupo", callback_data=f"party_disband_{party_id}")])
-        else:
-            keyboard.append([InlineKeyboardButton("🏃 Deixar Grupo", callback_data=f"party_leave_{party_id}")])
+    text += "─────────────────\n"
+    text += "<i>Aguardando início...</i>"
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        msg_id = party_data["player_lobby_messages"].get(member_id_str)
+    # Botões de Controle
+    kb.append([InlineKeyboardButton("🚀 INICIAR AVENTURA", callback_data=f"party:start:{party_id}")])
+    kb.append([InlineKeyboardButton("🔄 Atualizar", callback_data=f"party:refresh:{party_id}"),
+               InlineKeyboardButton("🚪 Sair", callback_data=f"party:leave:{party_id}")])
 
-        try:
-            if msg_id:
-                await context.bot.edit_message_text(
-                    chat_id=member_id_str, message_id=msg_id,
-                    text=text, reply_markup=reply_markup, parse_mode="HTML"
-                )
-            else:
-                sent = await context.bot.send_message(
-                    chat_id=member_id_str, text=text, reply_markup=reply_markup, parse_mode="HTML"
-                )
-                party_data["player_lobby_messages"][member_id_str] = sent.message_id
-        except Exception as e:
-            # Fallback: manda uma nova e atualiza o mapeamento
-            logger.warning(f"[LOBBY] edit falhou p/ {member_id_str}: {e}")
-            try:
-                sent = await context.bot.send_message(
-                    chat_id=member_id_str, text=text, reply_markup=reply_markup, parse_mode="HTML"
-                )
-                party_data["player_lobby_messages"][member_id_str] = sent.message_id
-            except Exception as e2:
-                logger.error(f"[LOBBY] send falhou p/ {member_id_str}: {e2}")
-
-    # salva caso tenhamos atualizado player_lobby_messages
-    party_manager.save_party_data(party_id, party_data)
-
-
-async def show_party_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE, params: list):
-    """Mostra a tela de 'Sala de Espera' do grupo."""
-    if not params:
-        return
-    party_id = params[0]
-    await _update_lobby_for_all_members(context, party_id)
-
-
-async def party_create_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, params: list):
-    """Cria um grupo e entra na sala de espera."""
-    query = update.callback_query
-    user_id_str = str(query.from_user.id)
-    pdata = player_manager.get_player_data(int(user_id_str)) or {}
-
-    if pdata.get("party_id"):
-        await query.answer("Você já está em um grupo!", show_alert=True)
-        return
-
-    dungeon_id = "_".join(params)  # catacumba_reino etc.
-    party_data = party_manager.create_party(user_id_str, pdata.get("character_name", "Líder"))
-    party_data["dungeon_id"] = dungeon_id
-    party_data["player_lobby_messages"] = {}
+    markup = InlineKeyboardMarkup(kb)
 
     try:
-        msg = await query.edit_message_text("Criando grupo...")
-        party_data["player_lobby_messages"][user_id_str] = msg.message_id
-    except Exception:
-        # fallback se não conseguir editar
-        sent = await context.bot.send_message(chat_id=user_id_str, text="Criando grupo...")
-        party_data["player_lobby_messages"][user_id_str] = sent.message_id
-
-    party_manager.save_party_data(user_id_str, party_data)
-    await _update_lobby_for_all_members(context, user_id_str)
-
-
-async def party_disband_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, params: list):
-    """Desfaz um grupo."""
-    query = update.callback_query
-    user_id_str = str(query.from_user.id)
-    if not params:
-        await query.answer("Ação inválida.", show_alert=True); return
-    party_id = params[0]
-
-    p = party_manager.get_party_data(party_id)
-    if not p or user_id_str != p.get("leader_id"):
-        await query.answer("Apenas o líder pode desfazer o grupo.", show_alert=True)
-        return
-
-    dungeon_id = p.get("dungeon_id")
-
-    # avisa geral
-    for member_id_str in list((p.get("members") or {}).keys()):
-        try:
-            await context.bot.send_message(chat_id=member_id_str, text="O grupo foi desfeito pelo líder.")
-        except Exception:
-            pass
-
-    party_manager.disband_party(party_id)
-
-    # Volta para a tela de info da dungeon, sem mexer no query.data
-    await show_dungeon_info(update, context, dungeon_id.split("_"))
-
-
-async def party_leave_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, params: list):
-    """Permite que um membro saia de um grupo."""
-    query = update.callback_query
-    user_id_str = str(query.from_user.id)
-    pdata = player_manager.get_player_data(int(user_id_str)) or {}
-    party_id = pdata.get("party_id")
-
-    if not party_id:
-        try:
-            await query.edit_message_text("Você não está em um grupo.")
-        except Exception:
-            await context.bot.send_message(chat_id=user_id_str, text="Você não está em um grupo.")
-        return
-
-    p = party_manager.get_party_data(party_id) or {}
-    if user_id_str == p.get("leader_id"):
-        await query.answer("O líder não pode deixar o grupo, apenas desfazê-lo.", show_alert=True)
-        return
-
-    party_manager.remove_member(party_id, int(user_id_str))
-    try:
-        await query.edit_message_text("Você saiu do grupo.")
-    except Exception:
-        await context.bot.send_message(chat_id=user_id_str, text="Você saiu do grupo.")
-
-    try:
-        await context.bot.send_message(
-            chat_id=p.get("leader_id"),
-            text=f"🏃 {(pdata.get('character_name') or 'Membro')} saiu do grupo.",
-        )
+        await query.edit_message_text(text=text, reply_markup=markup, parse_mode="HTML")
     except Exception:
         pass
 
-    await _update_lobby_for_all_members(context, party_id)
-
-
-async def invite_response_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, params: list):
-    """Aceitar/Recusar convite."""
-    query = update.callback_query
-    user_id_str = str(query.from_user.id)
-    action = (query.data or "").split("_")[1] if query.data else ""   # accept | decline
-    if not params:
-        await query.answer("Convite inválido.", show_alert=True); return
-    party_id = params[0]
-
-    p = party_manager.get_party_data(party_id)
-    if not p:
-        await query.edit_message_text("Este grupo não existe mais.")
-        return
-
-    if action == "decline":
-        await query.edit_message_text("Você recusou o convite.")
-        try:
-            player = player_manager.get_player_data(int(user_id_str)) or {}
-            await context.bot.send_message(
-                chat_id=p.get("leader_id"),
-                text=f"❌ {player.get('character_name','Jogador')} recusou seu convite."
-            )
-        except Exception:
-            pass
-        return
-
-    # aceitar
-    player_data = player_manager.get_player_data(int(user_id_str)) or {}
-    if player_data.get("party_id"):
-        await query.edit_message_text("Você já está em um grupo!")
-        return
-
-    dgn = dungeon_definitions.DUNGEONS.get(p.get("dungeon_id"), {})
-    if len((p.get("members") or {})) >= int(dgn.get("max_players", 1)):
-        await query.edit_message_text("O grupo ficou cheio antes que você pudesse entrar!")
-        return
-
-    ok = party_manager.add_member(party_id, int(user_id_str), player_data.get("character_name", "Membro"))
-    if not ok:
-        await query.edit_message_text("Não foi possível entrar no grupo.")
-        return
-
-    sent = await query.edit_message_text(
-        f"Você entrou no grupo de <b>{p.get('leader_name')}</b>!", parse_mode="HTML"
-    )
-
-    # Atualiza o mapeamento de mensagem do lobby
-    reloaded = party_manager.get_party_data(party_id) or {}
-    reloaded.setdefault("player_lobby_messages", {})[user_id_str] = sent.message_id
-    party_manager.save_party_data(party_id, reloaded)
-
-    await _update_lobby_for_all_members(context, party_id)
+# ==============================================================================
+# REGISTRO DO HANDLER
+# ==============================================================================
+party_actions_handler = CallbackQueryHandler(party_actions_callback, pattern=r"^party:.*")

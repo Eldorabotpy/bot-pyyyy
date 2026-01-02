@@ -1,5 +1,5 @@
 # modules/player/stats.py 
-# (VERSÃO REFATORADA: SEM TIPAGEM ESTRITA DE INT PARA IDs)
+# (VERSÃO BLINDADA: Suporte Total a Auth Híbrida + Proteção de IDs)
 
 from __future__ import annotations
 import logging
@@ -156,11 +156,11 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
     total_stats['max_mana'] = mana_base + (mana_attribute_value * mana_por_ponto)
 
 # ========================================
-# --- FUNÇÃO MESTRA DE STATS (ATUALIZADA) ---
+# --- FUNÇÃO MESTRA DE STATS ---
 # ========================================
 
 async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) -> dict:
-    # ally_user_ids: agora é list (pode conter int ou str)
+    # ally_user_ids: Lista de Union[int, str]
     from modules import player_manager
     from modules.player.premium import PremiumManager 
 
@@ -248,14 +248,18 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
     except Exception as e:
         logger.error(f"Erro ao calcular stats Premium: {e}")
 
-    # 5. Passivas e Auras
+    # 5. Passivas e Auras (CRÍTICO: Conversão segura de ID)
     try:
         _apply_passive_skill_bonuses(player_data, total)
         if ally_user_ids:
-            # Compara como String para garantir compatibilidade
+            # Garante que my_id_str seja uma string para comparação segura
             my_id_str = str(player_data.get("user_id") or "")
+            
             for ally_id in ally_user_ids:
+                # Converte ally_id para str antes de comparar
                 if str(ally_id) == my_id_str: continue
+                
+                # player_manager.get_player_data agora aceita int ou str
                 ally_data = await player_manager.get_player_data(ally_id)
                 if ally_data: _apply_party_aura_bonuses(ally_data, total)
     except: pass
@@ -375,8 +379,8 @@ def needs_class_choice(player_data: dict) -> bool:
     already_offered = bool(player_data.get("class_choice_offered"))
     return (lvl >= 5) and (not already_has_class) and (not already_offered)
 
-async def mark_class_choice_offered(user_id):
-    # user_id: int ou str (ObjectId)
+async def mark_class_choice_offered(user_id: Union[int, str]):
+    # CRÍTICO: user_id agora é explicitamente Union[int, str]
     from .core import get_player_data, save_player_data
     pdata = await get_player_data(user_id)
     if not pdata: return

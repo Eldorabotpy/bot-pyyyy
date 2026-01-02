@@ -1,5 +1,5 @@
 # handlers/skin_handler.py
-# (VERSÃO FINAL E LIMPA)
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,17 +8,28 @@ from telegram.error import BadRequest
 from modules.player import stats as player_stats
 from modules import player_manager, game_data
 from modules.game_data.skins import SKIN_CATALOG
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 logger = logging.getLogger(__name__)
 
 async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida. Use /start.", show_alert=True)
+        return
     
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
-        await query.edit_message_caption(caption="Erro ao carregar dados. Tente /start.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]]))
+        try:
+            await query.edit_message_caption(
+                caption="Erro ao carregar dados. Tente /start.", 
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]])
+            )
+        except: pass
         return
         
     try:
@@ -79,7 +90,12 @@ async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def equip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
     
     try:
         skin_id_to_equip = query.data.split(':')[1]
@@ -109,7 +125,12 @@ async def equip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def unequip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
     
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:

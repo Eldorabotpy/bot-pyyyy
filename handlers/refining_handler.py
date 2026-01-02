@@ -1,4 +1,5 @@
-#------bot/handlers/refining_handler.py
+# handlers/refining_handler.py
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
 
 import logging 
 import math
@@ -14,6 +15,7 @@ from modules.game_data import attributes
 from modules import game_data, player_manager, file_ids
 from modules.refining_engine import preview_refine, start_refine, finish_refine, start_batch_refine, get_max_refine_quantity
 from modules import crafting_registry, dismantle_engine, display_utils
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 ITEMS_PER_PAGE = 5
 
@@ -56,7 +58,7 @@ def _get_profession_header(pdata: dict) -> str:
 # 1. CORE LOGIC - REFINO
 # =====================================================
 async def execute_refine_logic(
-    user_id: int, 
+    user_id: str, 
     chat_id: int, 
     context: ContextTypes.DEFAULT_TYPE, 
     message_id_to_delete: int = None
@@ -113,7 +115,7 @@ async def execute_refine_logic(
 # 2. CORE LOGIC - DESMONTE (SINGLE)
 # =====================================================
 async def execute_dismantle_logic(
-    user_id: int,
+    user_id: str,
     chat_id: int,
     context: ContextTypes.DEFAULT_TYPE,
     job_details: dict,
@@ -154,7 +156,7 @@ async def execute_dismantle_logic(
 # 3. CORE LOGIC - DESMONTE EM MASSA (BULK)
 # =====================================================
 async def execute_bulk_dismantle_logic(
-    user_id: int,
+    user_id: str,
     chat_id: int,
     context: ContextTypes.DEFAULT_TYPE,
     job_details: dict,
@@ -204,8 +206,12 @@ async def execute_bulk_dismantle_logic(
 async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     if not job: return
+    
+    # Recupera user_id seguro do job.data (String)
+    user_id = str(job.data.get("user_id") or job.user_id)
+    
     await execute_refine_logic(
-        user_id=job.user_id,
+        user_id=user_id,
         chat_id=job.chat_id,
         context=context,
         message_id_to_delete=job.data.get("message_id_to_delete")
@@ -214,8 +220,11 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
 async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     if not job: return
+    
+    user_id = str(job.data.get("user_id") or job.user_id)
+    
     await execute_dismantle_logic(
-        user_id=job.user_id,
+        user_id=user_id,
         chat_id=job.chat_id,
         context=context,
         job_details=job.data,
@@ -225,8 +234,11 @@ async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
 async def finish_bulk_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     if not job: return
+    
+    user_id = str(job.data.get("user_id") or job.user_id)
+    
     await execute_bulk_dismantle_logic(
-        user_id=job.user_id,
+        user_id=user_id,
         chat_id=job.chat_id,
         context=context,
         job_details=job.data,
@@ -364,7 +376,12 @@ async def _safe_edit_or_send_with_media(query, context, caption, reply_markup=No
 async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    uid = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid:
+        await q.answer("Sessão inválida. Use /start.", show_alert=True)
+        return
     
     # --- ADICIONE ISTO AQUI NO INÍCIO ---
     # Isso garante que os itens se juntem ANTES de ler o inventário
@@ -466,7 +483,12 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     try: await q.delete_message()
     except: pass
     
-    uid = q.from_user.id
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
     rid = q.data.replace("ref_confirm_", "", 1)
     
     pdata = await player_manager.get_player_data(uid)
@@ -482,8 +504,6 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     t = _fmt_minutes_or_seconds(secs)
     title = (getattr(game_data, "REFINING_RECIPES", {}).get(rid, {}) or {}).get("display_name", rid)
     
-    # ... dentro de ref_confirm_callback ...
-
     # Visual de Progresso Épico
     bar = "▒▒▒▒▒▒▒▒▒▒" # Barra vazia
     
@@ -497,13 +517,11 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         f"<i>Você pode fechar esta janela, o bot avisará quando terminar.</i>"
     )
     
-  
-    
     sent = await _safe_send_with_media(context, q.message.chat_id, txt)
     mid = sent.message_id if sent else None
     
     context.job_queue.run_once(finish_refine_job, secs, user_id=uid, chat_id=q.message.chat_id,
-                               data={"rid": rid, "message_id_to_delete": mid}, name=f"refining:{uid}")
+                               data={"rid": rid, "message_id_to_delete": mid, "user_id": uid}, name=f"refining:{uid}")
     
 async def ref_batch_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o menu para escolher a quantidade do lote com visual melhorado."""
@@ -513,7 +531,12 @@ async def ref_batch_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     except: pass
     
     rid = q.data.replace("ref_batch_menu_", "")
-    uid = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid:
+        return
+
     pdata = await player_manager.get_player_data(uid)
     rec = game_data.REFINING_RECIPES.get(rid)
     
@@ -571,7 +594,12 @@ async def ref_batch_confirm_callback(update: Update, context: ContextTypes.DEFAU
         await context.bot.send_message(q.message.chat_id, "❌ Erro interno: Receita inválida.")
         return
 
-    uid = q.from_user.id
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
     pdata = await player_manager.get_player_data(uid)
     
     if pdata.get("player_state", {}).get("action") not in (None, "idle"):
@@ -608,8 +636,8 @@ async def ref_batch_confirm_callback(update: Update, context: ContextTypes.DEFAU
         seconds, 
         user_id=uid, 
         chat_id=q.message.chat_id,
-        # Passa o ID para ser deletado quando acabar
-        data={"rid": rid, "message_id_to_delete": mid}, 
+        # Passa o ID para ser deletado quando acabar e user_id no data
+        data={"rid": rid, "message_id_to_delete": mid, "user_id": uid}, 
         name=f"refining:{uid}"
     )
 
@@ -621,7 +649,11 @@ async def ref_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     except: pass
 
     rid = q.data.replace("ref_sel_", "", 1)
-    uid = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid: return
+
     pdata = await player_manager.get_player_data(uid)
     
     prev = preview_refine(rid, pdata)
@@ -686,7 +718,11 @@ async def ref_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    uid = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid: return
+
     pdata = await player_manager.get_player_data(uid)
     
     page = 0
@@ -738,7 +774,12 @@ async def show_dismantle_list_callback(update: Update, context: ContextTypes.DEF
 async def show_dismantle_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    try: uid, iuid = q.from_user.id, q.data.split(':')[1]
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid: return
+
+    try: iuid = q.data.split(':')[1]
     except: return
     
     pdata = await player_manager.get_player_data(uid)
@@ -787,7 +828,13 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
     try: await q.delete_message()
     except: pass
     
-    uid, iuid = q.from_user.id, q.data.split(':')[1]
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
+    iuid = q.data.split(':')[1]
     pdata = await player_manager.get_player_data(uid)
     
     res = await dismantle_engine.start_dismantle(pdata, iuid)
@@ -806,7 +853,8 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
         "item_name": res.get("item_name"),
         "base_id": res.get("base_id"),
         "rarity": pdata.get("player_state", {}).get("details", {}).get("rarity"), 
-        "message_id_to_delete": mid
+        "message_id_to_delete": mid,
+        "user_id": uid
     }
     
     if "details" in pdata["player_state"]:
@@ -822,7 +870,11 @@ async def confirm_bulk_dismantle_callback(update: Update, context: ContextTypes.
     try: await q.delete_message()
     except: pass
     
-    uid = q.from_user.id
+    # 🔒 SEGURANÇA: ID via Auth Central
+    uid = get_current_player_id(update, context)
+    if not uid:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
     
     parts = q.data.split(':') 
     base_id = parts[1]
@@ -862,13 +914,16 @@ async def confirm_bulk_dismantle_callback(update: Update, context: ContextTypes.
     
     mid = sent.message_id if sent else None
     
-    if "details" in pdata["player_state"]:
-        pdata["player_state"]["details"]["message_id_to_delete"] = mid
+    # Adiciona user_id ao details para persistência no job
+    details = pdata.get("player_state", {}).get("details", {})
+    details["message_id_to_delete"] = mid
+    details["user_id"] = uid
+    pdata["player_state"]["details"] = details
         
     await player_manager.save_player_data(uid, pdata)
 
     context.job_queue.run_once(finish_bulk_dismantle_job, dur, user_id=uid, chat_id=q.message.chat_id,
-                               data=pdata["player_state"]["details"], name=f"dismantle_bulk_{uid}")
+                               data=details, name=f"dismantle_bulk_{uid}")
 
 async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()

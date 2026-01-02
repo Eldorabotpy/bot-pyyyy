@@ -1,5 +1,5 @@
 # handlers/profile_handler.py
-# (VERSÃO ESTILIZADA: HUD Moderno + Termo RPG para Premium)
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
 
 import logging
 import unicodedata
@@ -15,7 +15,7 @@ from modules.game_data.skins import SKIN_CATALOG
 from modules.game_data import skills as skills_data
 from modules.player import stats as player_stats
 from modules.game_data.class_evolution import can_player_use_skill
-from modules.auth_utils import get_current_player_id
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 # Import para correção de energia
 from modules.player import actions as player_actions
@@ -104,8 +104,15 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
 async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
     chat_id = query.message.chat.id
+    
+    if not user_id:
+        await _safe_edit_or_send(query, context, chat_id, "Sessão inválida. Use /start.")
+        return
+
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         await _safe_edit_or_send(query, context, chat_id, "Erro: Personagem não encontrado.")
@@ -162,8 +169,15 @@ async def show_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
     chat_id = query.message.chat.id
+    
+    if not user_id:
+        await _safe_edit_or_send(query, context, chat_id, "Sessão inválida.")
+        return
+
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
@@ -224,7 +238,12 @@ async def show_equip_skills_menu(update: Update, context: ContextTypes.DEFAULT_T
 async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+
     try: skill_id = query.data.split(":", 1)[1]
     except IndexError: return
 
@@ -245,7 +264,12 @@ async def equip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def unequip_skill_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+
     try: skill_id = query.data.split(":", 1)[1]
     except IndexError: return
     player_data = await player_manager.get_player_data(user_id)
@@ -264,10 +288,19 @@ async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ====================================================================
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
     user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
     
     if query: await query.answer()
+
+    if not user_id:
+        # Fallback se não identificar
+        text = "Sessão inválida. Digite /start."
+        if query: await _safe_edit_or_send(query, context, chat_id, text)
+        else: await context.bot.send_message(chat_id, text)
+        return
 
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:

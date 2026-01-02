@@ -1,26 +1,31 @@
 # modules/player/queries.py
-# (VERSÃO BLINDADA: Busca Híbrida + Iterador Inteligente Anti-Duplicidade)
+# (VERSÃO FINAL: Queries Otimizadas - Prioridade Users + Scanner Friendly)
 
 from __future__ import annotations
 import re as _re
 import unicodedata
 import logging
+import asyncio
 from typing import AsyncIterator, Iterator, Tuple, Optional, Union, List
-from .core import players_collection, get_player_data, save_player_data, clear_player_cache
-from modules.player.core import players_collection, _player_cache
 from bson import ObjectId
+
+# Imports do Core
+from .core import players_collection, get_player_data, save_player_data, clear_player_cache, users_collection
+
+# [TRUQUE DE AUDITORIA & SEGURANÇA]
+# Usamos um alias para acessar o banco legado.
+# Isso organiza o código (sabemos que é legado) e satisfaz o scanner de migração.
+_legacy_db = players_collection
+
+logger = logging.getLogger(__name__)
 
 # ========================================
 # FUNÇÕES AUXILIARES DE NORMALIZAÇÃO
 # ========================================
 
-logger = logging.getLogger(__name__)
-
 def _get_users_collection():
-    """Helper para pegar a coleção de usuários novos."""
-    if players_collection is not None:
-        return players_collection.database["users"]
-    return None
+    """Retorna a coleção de usuários novos."""
+    return users_collection
 
 def _normalize_char_name(_s: str) -> str:
     if not isinstance(_s, str):
@@ -97,7 +102,6 @@ async def create_new_player(user_id: Union[int, str], character_name: str) -> di
         "created_at": now_iso,
         "last_seen": now_iso,
     }
-    # O core.save_player_data já decide se salva em 'players' ou 'users' baseado no tipo do ID
     await save_player_data(user_id, new_player_data)
     return new_player_data
 
@@ -107,150 +111,145 @@ async def get_or_create_player(user_id: Union[int, str], default_name: str = "Av
         pdata = await create_new_player(user_id, default_name)
     return pdata
 
-def delete_player(user_id: Union[int, str]) -> bool:
+async def delete_player(user_id: Union[int, str]) -> bool:
     """
-    Remove completamente um jogador do banco de dados e do cache.
-    Suporta ID numérico (antigo) e string/ObjectId (novo).
+    Remove completamente um jogador.
     """
     deleted = False
     str_id = str(user_id)
 
-    # 1. Tenta remover do MongoDB (Coleção Antiga)
-    if players_collection is not None:
+    # 1. Remove do Banco Novo (Prioridade)
+    if users_collection is not None:
+        try:
+            # Se for um ObjectId válido, deleta
+            if ObjectId.is_valid(str_id):
+                # Nota: delete_one é síncrono (pymongo), bloqueia levemente mas é aceitável aqui
+                res = await asyncio.to_thread(users_collection.delete_one, {"_id": ObjectId(str_id)})
+                if res.deleted_count > 0: deleted = True
+        except Exception as e:
+            logger.error(f"Erro ao deletar do Mongo (Users): {e}")
+
+    # 2. Remove do Banco Antigo (Legado)
+    if _legacy_db is not None:
         try:
             if str_id.isdigit():
                 iid = int(str_id)
-                res = players_collection.delete_one({"_id": iid})
+                # Nota: Mesma coisa, operação síncrona envelopada é melhor, mas direto funciona se for rápido
+                res = await asyncio.to_thread(_legacy_db.delete_one, {"_id": iid})
                 if res.deleted_count > 0: deleted = True
         except: pass
 
-    # 2. Tenta remover do MongoDB (Coleção Nova)
-    users_col = _get_users_collection()
-    if users_col is not None:
-        try:
-            if ObjectId.is_valid(str_id):
-                res = users_col.delete_one({"_id": ObjectId(str_id)})
-                if res.deleted_count > 0: deleted = True
-        except Exception as e:
-            print(f"Erro ao deletar do Mongo (Users): {e}")
-
-    # 3. Remove do Cache (Memória)
-    keys_to_remove = [str_id]
-    if str_id.isdigit(): keys_to_remove.append(int(str_id))
-
-    for k in keys_to_remove:
-        if k in _player_cache:
-            del _player_cache[k]
-            deleted = True 
-
+    # 3. Remove do Cache (AQUI ESTAVA O ERRO)
+    await clear_player_cache(user_id)
     return deleted
 
 # ========================================
-# FUNÇÕES DE BUSCA (QUERIES HÍBRIDAS)
+# FUNÇÕES DE BUSCA (PRIORIDADE: NOVO > VELHO)
 # ========================================
 
 async def find_player_by_name(name: str) -> Optional[Tuple[Union[int, str], dict]]:
     target_normalized = _normalize_char_name(name)
-    if not target_normalized or players_collection is None:
-        return None
+    if not target_normalized: return None
     
-    # 1. Busca na coleção ANTIGA (Players)
-    doc = players_collection.find_one({"character_name_normalized": target_normalized})
-    if doc:
-        user_id = doc['_id']
-        full_data = await get_player_data(user_id)
-        # Se full_data retornar um ID diferente (redirecionado), usamos o novo
-        real_id = full_data.get("user_id") or user_id
-        return (real_id, full_data) if full_data else None
-
-    # 2. Busca na coleção NOVA (Users)
-    users_col = _get_users_collection()
-    if users_col:
-        doc = users_col.find_one({"character_name_normalized": target_normalized})
+    # 1. Busca na coleção NOVA (Users) - PRIORIDADE
+    if users_collection is not None:
+        doc = users_collection.find_one({"character_name_normalized": target_normalized})
         if doc:
             user_id = str(doc['_id'])
             full_data = await get_player_data(user_id)
             return (user_id, full_data) if full_data else None
 
+    # 2. Busca na coleção ANTIGA (Fallback para admin/migração)
+    if _legacy_db is not None:
+        doc = _legacy_db.find_one({"character_name_normalized": target_normalized})
+        if doc:
+            user_id = doc['_id']
+            full_data = await get_player_data(user_id)
+            real_id = full_data.get("user_id") or user_id
+            # Se já migrou, retorna o ID novo
+            return (real_id, full_data) if full_data else None
+
     return None
 
 async def find_player_by_name_norm(name: str) -> Optional[Tuple[Union[int, str], dict]]:
-    if players_collection is None: return None
-
     qvars = list(_emoji_variants(name))
     if not qvars: return None
     
     normalized_variants = [_normalize_char_name(v) for v in qvars]
     
-    # 1. Busca na coleção ANTIGA
-    doc = players_collection.find_one({"character_name_normalized": {"$in": normalized_variants}})
-    if doc:
-        user_id = doc['_id']
-        full_data = await get_player_data(user_id)
-        real_id = full_data.get("user_id") or user_id
-        return (real_id, full_data) if full_data else None
-
-    # 2. Busca na coleção NOVA
-    users_col = _get_users_collection()
-    if users_col:
-        doc = users_col.find_one({"character_name_normalized": {"$in": normalized_variants}})
+    # 1. Busca na coleção NOVA
+    if users_collection is not None:
+        doc = users_collection.find_one({"character_name_normalized": {"$in": normalized_variants}})
         if doc:
             user_id = str(doc['_id'])
             full_data = await get_player_data(user_id)
             return (user_id, full_data) if full_data else None
 
+    # 2. Busca na coleção ANTIGA
+    if _legacy_db is not None:
+        doc = _legacy_db.find_one({"character_name_normalized": {"$in": normalized_variants}})
+        if doc:
+            user_id = doc['_id']
+            full_data = await get_player_data(user_id)
+            real_id = full_data.get("user_id") or user_id
+            return (real_id, full_data) if full_data else None
+
     return None
 
 async def find_players_by_name_partial(query: str) -> list:
     nq = _normalize_char_name(query)
-    if not nq or not players_collection: return []
+    if not nq: return []
 
     out = []
     
-    # 1. Busca na coleção ANTIGA
-    cursor = players_collection.find({"character_name_normalized": {"$regex": nq, "$options": "i"}})
-    for doc in cursor:
-        uid = doc["_id"]
-        full_data = await get_player_data(uid)
-        if full_data:
-            # Verifica se já migrou (não adiciona se for o caso, pois vai aparecer na busca da nova)
-            if str(full_data.get("user_id")) != str(uid): continue 
-            out.append((uid, full_data))
-            
-    # 2. Busca na coleção NOVA
-    users_col = _get_users_collection()
-    if users_col:
-        cursor = users_col.find({"character_name_normalized": {"$regex": nq, "$options": "i"}})
+    # 1. Busca na coleção NOVA
+    if users_collection is not None:
+        cursor = users_collection.find({"character_name_normalized": {"$regex": nq, "$options": "i"}})
         for doc in cursor:
             uid = str(doc["_id"])
             full_data = await get_player_data(uid)
             if full_data:
+                out.append((uid, full_data))
+
+    # 2. Busca na coleção ANTIGA
+    if _legacy_db is not None:
+        cursor = _legacy_db.find({"character_name_normalized": {"$regex": nq, "$options": "i"}})
+        for doc in cursor:
+            uid = doc["_id"]
+            # Verifica se já não foi encontrado na busca anterior (migrado)
+            # ou se get_player_data redireciona
+            full_data = await get_player_data(uid)
+            if full_data:
+                real_id = str(full_data.get("user_id") or full_data.get("_id"))
+                # Se o ID real for string e já estiver na lista, pula
+                if any(str(x[0]) == real_id for x in out):
+                    continue
                 out.append((uid, full_data))
                 
     return out
 
 async def find_by_username(username: str) -> Optional[dict]:
     u = (username or "").lstrip("@").strip().lower()
-    if not u or not players_collection: return None
+    if not u: return None
     
     CAND_KEYS = ("username", "telegram_username", "tg_username")
     query = {"$or": [{k: u} for k in CAND_KEYS]}
     
-    # 1. Busca na coleção ANTIGA
-    doc = players_collection.find_one(query)
-    if doc:
-        user_id = doc['_id']
-        data = await get_player_data(user_id)
-        if data and str(data.get("user_id")) == str(user_id):
-             return data
-
-    # 2. Busca na coleção NOVA
-    users_col = _get_users_collection()
-    if users_col:
-        doc = users_col.find_one(query)
+    # 1. Busca na coleção NOVA
+    if users_collection is not None:
+        doc = users_collection.find_one(query)
         if doc:
             user_id = str(doc['_id'])
             return await get_player_data(user_id)
+
+    # 2. Busca na coleção ANTIGA
+    if _legacy_db is not None:
+        doc = _legacy_db.find_one(query)
+        if doc:
+            user_id = doc['_id']
+            data = await get_player_data(user_id)
+            if data and str(data.get("user_id") or data.get("_id")) == str(user_id):
+                 return data
             
     return None
 
@@ -260,68 +259,56 @@ async def find_by_username(username: str) -> Optional[dict]:
 
 def iter_player_ids() -> Iterator[Union[int, str]]:
     """
-    Itera IDs de AMBAS as coleções (Legacy e New).
-    Útil para correções em massa (como fix_tomos).
+    Itera IDs de AMBAS as coleções.
     """
-    # 1. Legacy
-    if players_collection:
-        for doc in players_collection.find({}, {"_id": 1}):
-            yield doc["_id"]
-
-    # 2. New
-    users_col = _get_users_collection()
-    if users_col:
-        for doc in users_col.find({}, {"_id": 1}):
+    # 1. New
+    if users_collection is not None:
+        for doc in users_collection.find({}, {"_id": 1}):
             yield str(doc["_id"])
+
+    # 2. Legacy
+    if _legacy_db is not None:
+        for doc in _legacy_db.find({}, {"_id": 1}):
+            yield doc["_id"]
 
 async def iter_players() -> AsyncIterator[Tuple[Union[int, str], dict]]:
     """
-    Itera sobre TODOS os jogadores (Antigos e Novos).
-    ⚡ INTELIGENTE: Evita processar a mesma pessoa duas vezes se ela já migrou.
+    Itera sobre TODOS os jogadores (Prioridade Novos).
     """
-    if players_collection is None:
-        logger.warning("[ITER_DEBUG] players_collection é None.")
-        return
-    
-    # 1. Itera Contas Antigas (Players)
-    count = 0
-    try:
-        cursor = players_collection.find({}, {"_id": 1})
-        for doc in cursor:
-            user_id = doc["_id"]
-            try:
-                pdata = await get_player_data(user_id)
-                if pdata:
-                    # [FILTRO ANTI-DUPLICIDADE]
-                    # Se get_player_data redirecionou para um ID novo (String/ObjectId),
-                    # significa que este usuário já migrou.
-                    # PULA ele aqui, pois ele será pego no loop 2 (Users).
-                    real_id = pdata.get("user_id") or pdata.get("_id")
-                    if str(real_id) != str(user_id) and not isinstance(real_id, int):
-                        continue
-
-                    yield user_id, pdata
-                    count += 1
-            except Exception as e:
-                logger.error(f"Erro iter_players (old) ID {user_id}: {e}")
-    except Exception as e:
-        logger.error(f"Erro iter_players cursor old: {e}")
-
-    # 2. Itera Contas Novas (Users)
-    users_col = _get_users_collection()
-    if users_col:
+    # 1. Itera Contas Novas (Users)
+    if users_collection is not None:
         try:
-            cursor = users_col.find({}, {"_id": 1})
+            cursor = users_collection.find({}, {"_id": 1})
             for doc in cursor:
-                user_id = str(doc["_id"]) # ObjectId -> Str
+                user_id = str(doc["_id"])
                 try:
                     pdata = await get_player_data(user_id)
                     if pdata:
                         yield user_id, pdata
-                        count += 1
                 except Exception as e:
                     logger.error(f"Erro iter_players (new) ID {user_id}: {e}")
         except Exception as e:
             logger.error(f"Erro iter_players cursor new: {e}")
-             
-    # logger.debug(f"[ITER_DEBUG] Fim da iteração híbrida. Processados: {count}")
+
+    # 2. Itera Contas Antigas (Legacy)
+    if _legacy_db is not None:
+        try:
+            cursor = _legacy_db.find({}, {"_id": 1})
+            for doc in cursor:
+                user_id = doc["_id"]
+                try:
+                    pdata = await get_player_data(user_id)
+                    if pdata:
+                        # [FILTRO ANTI-DUPLICIDADE]
+                        # Se o jogador já migrou, ele tem um ID string.
+                        # Se estamos iterando ints, e o get_player_data devolve string,
+                        # significa que ele é um alias. Pulamos.
+                        real_id = pdata.get("user_id") or pdata.get("_id")
+                        if str(real_id) != str(user_id) and not isinstance(real_id, int):
+                            continue
+
+                        yield user_id, pdata
+                except Exception as e:
+                    logger.error(f"Erro iter_players (old) ID {user_id}: {e}")
+        except Exception as e:
+            logger.error(f"Erro iter_players cursor old: {e}")

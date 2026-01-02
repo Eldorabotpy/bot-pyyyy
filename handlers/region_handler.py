@@ -1,4 +1,5 @@
 # handlers/region_handler.py
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO + CORREÇÃO DE JOBS)
 
 import logging
 import time
@@ -11,7 +12,7 @@ from modules.dungeons.registry import get_dungeon_for_region
 from modules.player.premium import PremiumManager
 from modules.world_boss.engine import world_boss_manager, BOSS_STATS
 from datetime import datetime, timezone, timedelta
-from modules.auth_utils import get_current_player_id
+from modules.auth_utils import get_current_player_id # <--- ÚNICA FONTE DE VERDADE
 
 logger = logging.getLogger(__name__)
 
@@ -47,27 +48,26 @@ def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
     final_seconds = max(0, int(round(base * mult)))
     
     # Debug para o terminal (para você ter certeza que funcionou)
-    print(f"DEBUG VIAGEM: Base=360s, Mult={mult}, Final={final_seconds}s")
+    # print(f"DEBUG VIAGEM: Base=360s, Mult={mult}, Final={final_seconds}s")
     
     return final_seconds
 
-async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id: str) -> bool:
     """
     Se o player estiver viajando e o tempo já passou, finaliza silenciosamente.
+    Args:
+        user_id (str): ID do jogador (ObjectId string).
     """
     progressed = False
 
     # 1) Finalizador robusto (novo) - Assumindo que esta função é SÍNCRONA
-    # Se 'try_finalize_timed_action_for_user' for async, ela precisa de 'await'
     try:
         if player_manager.try_finalize_timed_action_for_user(user_id):
             progressed = True
     except Exception as e_finalize:
          logger.error(f"Erro ao tentar _auto_finalize_travel_if_due (novo) para {user_id}: {e_finalize}")
-         # Continua para o método legado mesmo se o novo falhar
 
     # 2) Complemento: checa legacy travel_finish_ts
-    # <<< CORREÇÃO 1: Adiciona await >>>
     player = await player_manager.get_player_data(user_id) or {}
     state = player.get("player_state") or {}
 
@@ -82,11 +82,10 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
                       if dest and dest in (game_data.REGIONS_DATA or {}):
                            player["current_location"] = dest
                       player["player_state"] = {"action": "idle"}
-                      # <<< CORREÇÃO 2: Adiciona await >>>
                       await player_manager.save_player_data(user_id, player)
-                      return True # Retorna True pois finalizou com sucesso
+                      return True 
              except Exception:
-                  pass # Ignora erro de parsing ISO
+                  pass 
 
         # Verifica o formato legado (travel_finish_ts float)
         finish_ts = float(state.get("travel_finish_ts") or 0)
@@ -95,7 +94,6 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
             if dest and dest in (game_data.REGIONS_DATA or {}):
                 player["current_location"] = dest
             player["player_state"] = {"action": "idle"}
-            # <<< CORREÇÃO 3: Adiciona await >>>
             await player_manager.save_player_data(user_id, player)
             progressed = True
 
@@ -108,16 +106,18 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    # 🔒 SEGURANÇA: ID via Auth Central
     user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
 
-    # <<< CORREÇÃO 4: Adiciona await (já estava correto) >>>
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
+
     await _auto_finalize_travel_if_due(context, user_id)
 
-    # <<< CORREÇÃO 5: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id) or {}
     
-    # Lógica síncrona
     current_location = player_data.get('current_location', 'reino_eldora')
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
     possible_destinations = (game_data.WORLD_MAP or {}).get(current_location, [])
@@ -144,10 +144,8 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-    # Lógica síncrona
     file_data = file_id_manager.get_file_data('mapa_mundo')
     if file_data and file_data.get("id"):
-        # Chamadas send_* já usam await
         await context.bot.send_photo(
             chat_id=chat_id, photo=file_data["id"],
             caption=caption, reply_markup=reply_markup, parse_mode='HTML'
@@ -161,30 +159,37 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 # Constrói e envia o menu da REGIÃO (pós-viagem/teleporte).
 # =============================================================================
-# Em handlers/menu/region.py
-
-async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int):
-    # <<< CORREÇÃO 6: Adiciona await >>>
+async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: str, chat_id: int):
+    """
+    Envia o menu da região atual para o jogador.
+    Args:
+        user_id (str): ID do jogador (String).
+        chat_id (int): Chat ID para envio da mensagem.
+    """
     await _auto_finalize_travel_if_due(context, user_id)
 
-    # <<< CORREÇÃO 7: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id) or {}
     region_key = player_data.get('current_location', 'reino_eldora')
     region_info = (game_data.REGIONS_DATA or {}).get(region_key)
 
     if not region_info or region_key == 'reino_eldora':
-        # ... (lógica do fake_update) ...
-        fake_update = Update(update_id=0, message=type('Message', (), {'from_user': type('User', (), {'id': user_id})(), 'chat': type('Chat', (), {'id': chat_id})()})())
-        # <<< CORREÇÃO 8: Adiciona await >>>
-        await show_kingdom_menu(fake_update, context) # Chama função async
+        # Cria um fake update seguro para chamar o menu do reino
+        # Usamos um chat_id numérico válido no objeto Mock
+        fake_update = Update(0, message=None) 
+        fake_update.effective_chat = type("Chat", (), {"id": chat_id})()
+        
+        # Injeta o ID na sessão para que o show_kingdom_menu consiga ler (hack de compatibilidade)
+        if context.user_data is not None:
+            context.user_data["logged_player_id"] = user_id
+            
+        await show_kingdom_menu(fake_update, context)
         return
 
-    # --- LÓGICA DO WORLD BOSS (Síncrona) ---
+    # --- LÓGICA DO WORLD BOSS ---
     is_boss_active = world_boss_manager.is_active
     boss_location = world_boss_manager.boss_location
 
     if is_boss_active and region_key == boss_location:
-        # ... (código do menu do boss mantido) ...
         caption = (f"‼️ **PERIGO IMINENTE** ‼️\n\n"
                    f"O **Demônio Dimensional** está nesta região!\n\n"
                    f"{world_boss_manager.get_status_text()}")
@@ -199,8 +204,8 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
             file_data = file_id_manager.get_file_data(f"regiao_{region_key}")
 
     else:
-        # --- Menu normal da região (Síncrono) ---
-        total_stats = player_manager.get_player_total_stats(player_data)
+        # --- Menu normal da região ---
+        total_stats = await player_manager.get_player_total_stats(player_data) # Async
         current_hp = int(player_data.get('current_hp', 0))
         max_hp = int(total_stats.get('max_hp', 0))
         current_energy = int(player_data.get('energy', 0))
@@ -235,7 +240,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
 
                 keyboard.append([InlineKeyboardButton(
                     f"{profession_emoji} Coletar {item_name} (~{human_time}, {cost_txt})",
-                    # <<< CORREÇÃO DE LÓGICA: O callback de coleta deve usar o resource_id, não o region_key >>>
                     callback_data=f"collect_{resource_id}"
                 )])
         
@@ -244,7 +248,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int, cha
         reply_markup = InlineKeyboardMarkup(keyboard)
         file_data = file_id_manager.get_file_data(f"regiao_{region_key}")
 
-    # --- Lógica de envio (Async - já estava correta) ---
     try:
         if file_data and file_data.get("id"):
             await context.bot.send_photo(
@@ -282,10 +285,14 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
-    user_id = q.from_user.id
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
     chat_id = q.message.chat_id
 
-    # <<< CORREÇÃO 9: Adiciona await >>>
+    if not user_id:
+        await q.answer("Sessão inválida. Use /start.", show_alert=True)
+        return
+
     await _auto_finalize_travel_if_due(context, user_id)
 
     data = (q.data or "")
@@ -294,11 +301,9 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     dest_key = data.replace("region_", "", 1)
 
-    # <<< CORREÇÃO 10: Adiciona await >>>
     player = await player_manager.get_player_data(user_id) or {}
     cur = player.get("current_location", "reino_eldora")
 
-    # Verificações síncronas
     if dest_key not in (game_data.REGIONS_DATA or {}):
         await q.answer("Região desconhecida.", show_alert=True)
         return
@@ -312,7 +317,8 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Energia insuficiente para viajar.", show_alert=True)
         return
 
-    secs = _get_travel_time_seconds(cur, dest_key, player) # Síncrono
+    # Correção: Passa apenas 2 argumentos (player_data e dest_key)
+    secs = _get_travel_time_seconds(player, dest_key)
 
     if travel_cost > 0:
         player["energy"] = max(0, energy - travel_cost)
@@ -320,12 +326,10 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if secs <= 0: # Teleporte instantâneo
         player["current_location"] = dest_key
         player["player_state"] = {"action": "idle"}
-        # <<< CORREÇÃO 11: Adiciona await >>>
         await player_manager.save_player_data(user_id, player)
         try: await q.delete_message()
         except Exception: pass
-        # <<< CORREÇÃO 12: Adiciona await >>>
-        await send_region_menu(context, user_id, chat_id) # Chama função async
+        await send_region_menu(context, user_id, chat_id)
         return
 
     # Iniciar viagem temporizada
@@ -334,8 +338,12 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_state["action"] = "travel"
     player_state["travel_dest"] = dest_key
     player_state["travel_finish_ts"] = finish_ts
+    
+    # Novo formato ISO para compatibilidade futura
+    player_state["finish_time"] = (datetime.now(timezone.utc) + timedelta(seconds=secs)).isoformat()
+    player_state["details"] = {"destination": dest_key}
+    
     player["player_state"] = player_state
-    # <<< CORREÇÃO 13: Adiciona await >>>
     await player_manager.save_player_data(user_id, player)
 
     dest_disp = (game_data.REGIONS_DATA or {}).get(dest_key, {}).get("display_name", dest_key)
@@ -351,13 +359,14 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await context.bot.send_message(chat_id=chat_id, text=caption, parse_mode="HTML")
 
-    # Agendamento síncrono
+    # Agendamento - Passa o ID na DATA para recuperar como string
     context.job_queue.run_once(
-        finish_travel_job, # Função async
+        finish_travel_job, 
         when=secs,
-        user_id=user_id,
+        # chat_id é seguro passar como int
         chat_id=chat_id,
-        data={"dest": dest_key},
+        # user_id string vai no data
+        data={"dest": dest_key, "user_id": user_id},
         name=f"finish_travel_{user_id}"
     )
 
@@ -367,46 +376,39 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
-    user_id = job.user_id
+    # Recupera ID string do payload
+    user_id = str(job.data.get("user_id") or job.user_id) 
     chat_id = job.chat_id
     dest = (job.data or {}).get("dest")
 
-    # Assumindo síncrono
-    player_manager.try_finalize_timed_action_for_user(user_id)
+    # Finaliza (pode ser síncrono ou async dependendo da implementação)
+    # Aqui assumimos que try_finalize... é robusto ou que _auto_finalize... resolve
+    await _auto_finalize_travel_if_due(context, user_id)
 
-    # <<< CORREÇÃO 14: Adiciona await >>>
-    player = await player_manager.get_player_data(user_id) or {}
-    state = (player.get("player_state") or {})
-    
-    # Verifica o estado legado (já que o region_callback ainda o define)
-    if state.get("action") == "travel" and dest and (state.get("travel_dest") == dest or state.get("details", {}).get("destination") == dest):
-        player["current_location"] = dest
-        player["player_state"] = {"action": "idle"}
-        # <<< CORREÇÃO 15: Adiciona await >>>
-        await player_manager.save_player_data(user_id, player)
-
-    # <<< CORREÇÃO 16: Adiciona await >>>
-    await send_region_menu(context, user_id, chat_id) # Chama função async
+    # Abre o menu
+    await send_region_menu(context, user_id, chat_id)
 
 # =============================================================================
 # Wrapper: abrir o menu da região atual (usado por /start e outros)
 # =============================================================================
 async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = getattr(update, "callback_query", None)
+    
+    # 🔒 SEGURANÇA
+    user_id = get_current_player_id(update, context)
+    chat_id = update.effective_chat.id
+    
     if query:
         await query.answer()
         try: await query.delete_message()
         except Exception: pass
-        user_id = get_current_player_id(update, context)
         chat_id = query.message.chat_id
-    else:
-        user_id = get_current_player_id(update, context)
-        chat_id = update.effective_chat.id
 
-    # <<< CORREÇÃO 17: Adiciona await >>>
-    await _auto_finalize_travel_if_due(context, user_id) # Chama função async
-    # <<< CORREÇÃO 18: Adiciona await >>>
-    await send_region_menu(context, user_id, chat_id) # Chama função async
+    if not user_id:
+        return
+
+    await _auto_finalize_travel_if_due(context, user_id)
+    await send_region_menu(context, user_id, chat_id)
 
 # =============================================================================
 # Exports (registre no main)

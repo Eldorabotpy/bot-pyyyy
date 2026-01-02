@@ -1,5 +1,5 @@
 # handlers/hunt_handler.py
-# (VERSÃO REFATORADA: CAÇADA VINCULADA À SESSÃO DE LOGIN)
+# (VERSÃO BLINDADA: AUTH HÍBRIDA + PROTEÇÃO DE FAKE UPDATE)
 
 import random
 import re
@@ -7,7 +7,7 @@ import unicodedata
 import logging
 import asyncio
 from typing import Optional, Union
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, CallbackQuery
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, CallbackQuery, User
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
 
@@ -17,24 +17,12 @@ from handlers.utils import format_combat_message_from_cache
 from modules.player.premium import PremiumManager
 from modules import auto_hunt_engine
 from handlers.profile_handler import _get_class_media
-
-# Importa a DB de skills para garantir acesso
 from modules.game_data.monsters import MONSTER_SKILLS_DB
-from modules.auth_utils import requires_login
-logger = logging.getLogger(__name__)
 
-# =========================
-# HELPER DE SEGURANÇA (ID)
-# =========================
-def _get_hunt_user_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
-    """
-    Retorna o ID do jogador (ObjectId String) da sessão.
-    NÃO faz fallback para ID do Telegram.
-    """
-    logged_id = context.user_data.get("logged_player_id")
-    if logged_id:
-        return str(logged_id)
-    return None
+# ✅ IMPORTAÇÃO PADRÃO DE AUTH (Removemos a função duplicada _get_hunt_user_id)
+from modules.auth_utils import requires_login, get_current_player_id
+
+logger = logging.getLogger(__name__)
 
 # =========================
 # Elites
@@ -154,7 +142,6 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     GROWTH_HP = 3        
     GROWTH_ATK = 0.6     
     GROWTH_DEF = 0.1     
-    
     GROWTH_XP = 3       
     GROWTH_GOLD = 1.0   
     
@@ -234,7 +221,7 @@ async def _hunt_energy_cost(player_data: dict, region_key: str) -> int:
 # HANDLERS
 # =========================
 async def start_hunt(
-    user_id: Union[str, int],  # ✅ Suporta String e Int
+    user_id: Union[str, int], 
     chat_id: int, 
     context: ContextTypes.DEFAULT_TYPE, 
     is_auto_mode: bool, 
@@ -243,7 +230,6 @@ async def start_hunt(
 ):
     from handlers.combat.main_handler import combat_callback
 
-    # ✅ CORREÇÃO: Usa o user_id passado (que deve ser String da sessão)
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         if query: await query.answer("Erro: Sessão inválida. Relogue.", show_alert=True)
@@ -267,10 +253,9 @@ async def start_hunt(
     # --- SETUP DA BATALHA ---
     player_lvl = int(pdata.get("level", 1))
     
-    # 1. Escolhe e Escala Monstro
     tpl = _pick_monster_template(region_key, player_lvl)
-    
     total_stats = await player_manager.get_player_total_stats(pdata)
+    
     is_elite = _roll_is_elite(int(total_stats.get("luck", 5)))
     if is_elite: tpl = _apply_elite_scaling(tpl)
 
@@ -283,11 +268,10 @@ async def start_hunt(
     cur_hp = min(pdata.get('current_hp', max_hp), max_hp)
     cur_mp = min(pdata.get('current_mp', max_mp), max_mp)
 
-    # 2. CACHE DA BATALHA
     char_name = pdata.get('character_name', 'Herói')
     
     battle_cache = {
-        'player_id': user_id, # ✅ Salva String ou Int (o que vier)
+        'player_id': user_id, 
         'chat_id': chat_id,
         'player_name': f"Lv.{player_lvl} {char_name}", 
         'player_stats': total_stats,
@@ -347,10 +331,26 @@ async def start_hunt(
         context.user_data['battle_cache'] = battle_cache
 
     if is_auto_mode:
-        # ✅ CORREÇÃO: Fake trigger com ID String compatível
-        fake_u = type("User", (), {"id": user_id})() # ID agora é string se user_id for string
-        fake_q = CallbackQuery(id=f"auto_{user_id}", from_user=fake_u, chat_instance="auto", data="combat_attack")
+        # ✅ CORREÇÃO DE SEGURANÇA: FAKE USER BLINDADO
+        # Cria um objeto User 'fake' apenas para satisfazer a tipagem básica
+        # O ID deve ser um int válido para o Telegram (usamos 0 ou o ID do bot), 
+        # mas o sistema interno vai ignorar isso e usar 'logged_player_id'.
+        
+        # Se user_id for string, usamos 0. Se for int, usamos ele mesmo.
+        safe_tg_id = user_id if isinstance(user_id, int) else 0
+        
+        fake_u = User(id=safe_tg_id, first_name="Auto", is_bot=False)
+        fake_q = CallbackQuery(
+            id=f"auto_{user_id}", 
+            from_user=fake_u, 
+            chat_instance="auto", 
+            data="combat_attack"
+        )
         fake_up = Update(update_id=0, callback_query=fake_q)
+        
+        # Garante que o contexto tenha o ID logado para o handler de combate ler
+        context.user_data['logged_player_id'] = user_id
+        
         await asyncio.sleep(2)
         await combat_callback(fake_up, context, action='combat_attack')
 
@@ -360,15 +360,15 @@ async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: await query.answer()
     except: pass
     
-    # ✅ CORREÇÃO: Busca o ID da sessão
-    user_id = _get_hunt_user_id(context)
+    # ✅ CORREÇÃO: Usa helper padrão de Auth
+    user_id = get_current_player_id(update, context)
     if not user_id:
         await query.answer("⚠️ Sessão expirada. Faça login novamente.", show_alert=True)
         return
 
     region_key = (query.data or "").replace("hunt_", "", 1)
     
-    # ✅ CORREÇÃO: Passa user_id da sessão, NÃO query.from_user.id
+    # Passa o ID correto (pode ser str)
     await start_hunt(user_id, query.message.chat.id, context, False, region_key, query)
 
 @requires_login
@@ -376,8 +376,7 @@ async def start_auto_hunt_callback(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
     
-    # ✅ CORREÇÃO: Verificação de sessão
-    user_id = _get_hunt_user_id(context)
+    user_id = get_current_player_id(update, context)
     if not user_id:
         await query.answer("⚠️ Sessão expirada.", show_alert=True)
         return

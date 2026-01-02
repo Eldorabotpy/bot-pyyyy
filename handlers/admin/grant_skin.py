@@ -1,4 +1,6 @@
 # handlers/admin/grant_skin.py
+# (VERSÃO FINAL: Compatível com IDs Híbridos/String)
+
 import logging
 import math
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -11,12 +13,15 @@ from telegram.ext import (
     filters,
 )
 
-# --- Imports Corrigidas ---
 from modules import player_manager
-from modules.game_data.skins import SKIN_CATALOG # Importa o catálogo de skins
+from modules.game_data.skins import SKIN_CATALOG 
+
+# [IMPORT NOVO] Necessário para identificar o admin corretamente
+from modules.auth_utils import get_current_player_id
+
 from handlers.admin.utils import (
     ADMIN_LIST,
-    ensure_admin, # Precisamos disto para o entry_point
+    ensure_admin, 
     confirmar_jogador,
     jogador_confirmado,
     cancelar_conversa,
@@ -27,11 +32,11 @@ from handlers.admin.utils import (
 logger = logging.getLogger(__name__)
 
 # --- Constantes do Catálogo ---
-SKINS_PER_PAGE = 8 # Quantas skins mostrar por página
+SKINS_PER_PAGE = 8 
 
 # --- Novos Estados da Conversa ---
 (SHOW_CATALOG, CONFIRMAR_GRANT) = range(2, 4) 
-ASK_PLAYER = INPUT_TEXTO # Renomeia para clareza
+ASK_PLAYER = INPUT_TEXTO 
 
 # --- PASSO 1: Ponto de Entrada (Pede o Jogador) ---
 async def grant_skin_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -45,14 +50,13 @@ async def grant_skin_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "Use /cancelar para sair.",
         parse_mode="HTML"
     )
-    return ASK_PLAYER # Estado 0
+    return ASK_PLAYER 
 
-# --- PASSO 2: Mostrar o Catálogo (Substitui o ask_skin_id) ---
+# --- PASSO 2: Mostrar o Catálogo ---
 async def show_skin_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1) -> int:
     """
     Jogador foi confirmado. Mostra o catálogo de skins paginado.
     """
-    # Ordena todas as skins (do SKIN_CATALOG) por nome
     try:
         sorted_skins = sorted(
             SKIN_CATALOG.items(), 
@@ -105,7 +109,7 @@ async def show_skin_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
-    return SHOW_CATALOG # Estado 2
+    return SHOW_CATALOG 
 
 # --- PASSO 2.5: Mudar de Página ---
 async def skin_catalog_pager(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -115,7 +119,7 @@ async def skin_catalog_pager(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await show_skin_catalog(update, context, page=page)
     return SHOW_CATALOG
 
-# --- PASSO 3: Selecionar a Skin (Substitui o confirm_skin) ---
+# --- PASSO 3: Selecionar a Skin ---
 async def select_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Admin clicou numa skin. Valida e pede confirmação."""
     await update.callback_query.answer()
@@ -144,7 +148,7 @@ async def select_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.callback_query.edit_message_text(
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    return CONFIRMAR_GRANT # Estado 3
+    return CONFIRMAR_GRANT 
 
 # --- PASSO 4: Confirmação Final ---
 async def grant_skin_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -185,7 +189,12 @@ async def grant_skin_confirmed(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="HTML"
         )
         
-        if user_id != update.effective_user.id:
+        # [CORREÇÃO] Comparação segura de IDs (Admin vs Alvo)
+        # Usamos get_current_player_id para garantir compatibilidade com o sistema novo
+        admin_id = get_current_player_id(update, context)
+        
+        # Comparação como String para evitar erro Int vs ObjectId
+        if str(user_id) != str(admin_id):
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
@@ -208,21 +217,21 @@ async def back_to_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await show_skin_catalog(update, context, page=1)
     return SHOW_CATALOG
 
-# --- Handler da Conversa (Atualizado) ---
+# --- Handler da Conversa ---
 grant_skin_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(grant_skin_entry, pattern=r"^admin_grant_skin$")],
     states={
-        ASK_PLAYER: [ # Estado 0 (INPUT_TEXTO)
+        ASK_PLAYER: [ 
             MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), confirmar_jogador(show_skin_catalog))
         ],
-        CONFIRMAR_JOGADOR: [ # Estado 1
+        CONFIRMAR_JOGADOR: [ 
              CallbackQueryHandler(jogador_confirmado(show_skin_catalog), pattern=r"^confirm_player_")
         ],
-        SHOW_CATALOG: [ # Estado 2
+        SHOW_CATALOG: [ 
             CallbackQueryHandler(select_skin_callback, pattern=r"^admin_gskin_select:"),
             CallbackQueryHandler(skin_catalog_pager, pattern=r"^admin_gskin_page:"),
         ],
-        CONFIRMAR_GRANT: [ # Estado 3
+        CONFIRMAR_GRANT: [ 
             CallbackQueryHandler(grant_skin_confirmed, pattern=r"^confirm_grant_skin$"),
             CallbackQueryHandler(back_to_catalog, pattern=r"^back_to_skin_catalog$"),
         ],

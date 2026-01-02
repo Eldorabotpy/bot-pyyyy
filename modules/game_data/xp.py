@@ -1,6 +1,8 @@
-# modules/game_data/xp.py (VERSÃO ULTRA-HARDCORE TIERED)
+# modules/game_data/xp.py
+# (VERSÃO BLINDADA: Suporte a Auth Híbrida + Fórmula Hardcore)
+
 from __future__ import annotations
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 from modules import player_manager
 
@@ -123,7 +125,7 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
     }
 
 # ================================
-# API Pública
+# API Pública (BLINDADA PARA AUTH HÍBRIDA)
 # ================================
 def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]:
     if not isinstance(player_data, dict):
@@ -163,7 +165,14 @@ def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]:
     player_data["xp"] += amount
     return _apply_level_ups_inplace(player_data)
 
-async def add_combat_xp(user_id: int, amount: int) -> Dict[str, int]:
+async def add_combat_xp(user_id: str, amount: int) -> Dict[str, int]:
+    """
+    Adiciona XP de combate e salva no banco.
+    Suporta user_id como STRING (ObjectId).
+    """
+    # Garante string para o player_manager
+    user_id = str(user_id)
+    
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         return {

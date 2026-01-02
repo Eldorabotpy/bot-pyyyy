@@ -1,12 +1,11 @@
 # modules/player_manager.py
-# (VERSÃO FINAL COMPLETA: Energia + Runas Corrigidas + Save Seguro Anti-Render)
+# (VERSÃO FINAL BLINDADA: Suporte Híbrido Total Int/Str)
 
 from __future__ import annotations
 import asyncio
 import logging
-from typing import Any, Optional, Type
-from typing import Any, Optional, Type, Union # Adicionado Union
-from bson import ObjectId # Adicionado ObjectId
+from typing import Any, Optional, Type, Union
+from bson import ObjectId
 
 logger = logging.getLogger(__name__)
 
@@ -118,15 +117,20 @@ def spend_energy(player_data: dict, amount: int) -> bool:
     """
     Consome energia do jogador e atualiza missões automaticamente (Fire and Forget).
     """
+    # Executa a lógica interna de gasto (matemática)
     success = _spend_energy_internal(player_data, amount)
 
     if success and amount > 0:
         try:
-            user_id = player_data.get("user_id") or player_data.get("_id")
+            # ✅ CORREÇÃO: Força conversão para STR para evitar erro no Mission Manager
+            raw_id = player_data.get("user_id") or player_data.get("_id")
+            user_id = str(raw_id) 
+            
             if user_id:
                 async def _bg_mission_update():
                     try:
                         from modules import mission_manager
+                        # Atualiza missão de "gastar X energia" e "gastar energia total"
                         await mission_manager.update_mission_progress(user_id, "spend_energy", "any", amount)
                         await mission_manager.update_mission_progress(user_id, "energy", "any", amount)
                     except Exception as e:
@@ -165,7 +169,8 @@ def get_perk_value_float(pdata: Optional[dict], perk_name: str, default: float =
 # =================================================================
 # --- 7. HELPER: FULL RESTORE ---
 # =================================================================
-async def full_restore(user_id: int):
+async def full_restore(user_id: Union[int, str]):
+    # ✅ CORREÇÃO: Aceita int ou str (ObjectId)
     # Usa o wrapper seguro
     pdata = await get_player_data(user_id)
     if pdata:
@@ -189,7 +194,7 @@ async def find_player_by_character_name(name: str):
     return None
 
 # =================================================================
-# --- 8. SISTEMA DE RUNAS (CORRIGIDO) ---
+# --- 8. SISTEMA DE RUNAS ---
 # =================================================================
 try:
     from modules.game_data import runes_data
@@ -233,20 +238,14 @@ def get_rune_bonuses(player_data: dict) -> dict:
 # =================================================================
 # --- 9. TRANSAÇÕES SEGURAS (ANTI-LAG & ANTI-PERDA DE DADOS) ---
 # =================================================================
-# Use estas funções ao dar recompensas para garantir que o save ocorra
-# imediatamente no banco de dados, prevenindo perdas se o Render reiniciar.
 
 async def safe_add_gold(user_id: Union[int, str], amount: int) -> int:
     """Adiciona ouro e salva imediatamente."""
     pdata = await get_player_data(user_id)
     if not pdata: return 0
     
-    # Usa a função importada de inventory (que já modifica o dict)
     add_gold(pdata, amount)
-    
-    # Salva no banco (asyncio.to_thread está no core.py, então não trava)
     await save_player_data(user_id, pdata)
-    
     return int(pdata.get("gold", 0))
 
 async def get_player_data(user_id: Union[int, str]):
@@ -285,28 +284,11 @@ async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, st
     
     return levels_gained, msg
 
-async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, str]:
-    """Adiciona XP, checa Level Up e salva imediatamente."""
-    pdata = await get_player_data(user_id)
-    if not pdata: return 0, ""
-    
-    current_xp = int(pdata.get("xp", 0))
-    pdata["xp"] = current_xp + int(xp_amount)
-    
-    # Verifica level up
-    levels_gained, points_gained, msg = check_and_apply_level_up(pdata)
-    
-    # Salva tudo
-    await save_player_data(user_id, pdata)
-    
-    return levels_gained, msg
-
-# --- ADICIONE NO FINAL DE player_manager.py ---
+# --- FERRAMENTAS DE CORREÇÃO ---
 
 async def corrigir_inventario_automatico(user_id: Union[int, str]):
     """
     Detecta itens com IDs antigos/errados e funde com os oficiais.
-    Executa a correção e salva se necessário.
     """
     pdata = await get_player_data(user_id)
     if not pdata: return
@@ -314,34 +296,23 @@ async def corrigir_inventario_automatico(user_id: Union[int, str]):
     inventory = pdata.get("inventory", {})
     mudou = False
 
-    # MAPA: "ID_ERRADO" -> "ID_OFICIAL_DO_REFINO"
     migracoes = {
-        # Ferro
         "minerio_ferro": "minerio_de_ferro",
         "iron_ore": "minerio_de_ferro",
         "pedra_ferro": "minerio_de_ferro",
         "minerio_bruto": "minerio_de_ferro",
-        
-        # Estanho
         "minerio_estanho": "minerio_de_estanho",
         "tin_ore": "minerio_de_estanho",
-        
-        # Prata
         "minerio_prata": "minerio_de_prata",
         "silver_ore": "minerio_de_prata",
-
-        # Madeira
         "madeira_rara_bruta": "madeira_rara",
         "wood_rare": "madeira_rara",
-        
-        # Carvão
         "carvao_mineral": "carvao",
         "coal": "carvao"
     }
 
     for id_velho, id_novo in migracoes.items():
         if id_velho in inventory:
-            # Pega a quantidade do item velho com segurança
             item_data = inventory[id_velho]
             qtd_velha = 0
             
@@ -351,12 +322,9 @@ async def corrigir_inventario_automatico(user_id: Union[int, str]):
                 qtd_velha = int(item_data)
 
             if qtd_velha > 0:
-                # 1. Garante que o item novo existe
                 if id_novo not in inventory:
-                    # Se não existe, cria. Mantém o padrão (int se for stack simples)
                     inventory[id_novo] = 0
                 
-                # 2. Soma a quantidade no item novo
                 if isinstance(inventory[id_novo], dict):
                     inventory[id_novo]["quantity"] = int(inventory[id_novo].get("quantity", 0)) + qtd_velha
                 else:
@@ -365,7 +333,6 @@ async def corrigir_inventario_automatico(user_id: Union[int, str]):
                 print(f"🔧 FIX: {user_id} | {qtd_velha}x {id_velho} -> {id_novo}")
                 mudou = True
             
-            # 3. Deleta o item velho
             del inventory[id_velho]
             mudou = True
 
@@ -376,8 +343,7 @@ async def corrigir_inventario_automatico(user_id: Union[int, str]):
 
 async def corrigir_bug_tomos_duplicados(user_id: Union[int, str]):
     """
-    Varre o inventário do jogador. Se achar 'tomo_tomo_',
-    converte para 'tomo_' e mantém a quantidade.
+    Corrige IDs duplicados como 'tomo_tomo_'.
     """
     pdata = await get_player_data(user_id)
     if not pdata: return False
@@ -385,14 +351,10 @@ async def corrigir_bug_tomos_duplicados(user_id: Union[int, str]):
     inventory = pdata.get("inventory", {})
     mudou = False
     
-    # Precisamos listar as chaves antes de iterar para poder deletar durante o loop
     lista_itens = list(inventory.keys())
 
     for item_id in lista_itens:
-        # Detecta o padrão errado
         if item_id.startswith("tomo_tomo_"):
-            
-            # 1. Pega a quantidade do item bugado
             dados_item = inventory[item_id]
             qtd = 0
             if isinstance(dados_item, dict):
@@ -401,15 +363,10 @@ async def corrigir_bug_tomos_duplicados(user_id: Union[int, str]):
                 qtd = int(dados_item)
 
             if qtd > 0:
-                # 2. Cria o ID correto (remove o primeiro 'tomo_')
                 id_correto = item_id.replace("tomo_tomo_", "tomo_", 1)
-                
-                # 3. Adiciona ao item correto (se já tiver, soma)
                 add_item_to_inventory(pdata, id_correto, qtd)
-                
                 print(f"🔧 FIX TOMO: Jogador {user_id} | {qtd}x {item_id} -> {id_correto}")
             
-            # 4. Deleta o item bugado
             del inventory[item_id]
             mudou = True
 

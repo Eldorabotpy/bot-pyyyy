@@ -1,12 +1,12 @@
 # handlers/class_evolution_handler.py
-# (VERSÃO CORRIGIDA - Botão Voltar leva para a Região Atual)
+# (VERSÃO FINAL: SISTEMA DE ID PADRONIZADO E BLINDADO)
 
 import logging
 from typing import Dict, Tuple, Optional, List, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
-from modules.auth_utils import get_current_player_id
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 from modules import player_manager
 import modules.combat.combat_engine as combat_manager
 from modules import class_evolution_service as evo_service
@@ -65,7 +65,9 @@ def _get_player_class_name(pdata: dict) -> str:
 async def open_evolution_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
     
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return
@@ -200,7 +202,9 @@ async def show_node_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: node_id = query.data.split(":", 1)[1]
     except: return
 
-    user_id = query.from_user.id
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
     pdata = await player_manager.get_player_data(user_id)
     status_info = evo_service.get_player_evolution_status(pdata)
 
@@ -222,7 +226,10 @@ async def complete_node(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: node_id = query.data.split(":", 1)[1]
     except: return
     
-    success, msg = await evo_service.attempt_ascension_node(query.from_user.id, node_id)
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
+    success, msg = await evo_service.attempt_ascension_node(user_id, node_id)
     await query.answer(msg, show_alert=True)
     await open_evolution_menu(update, context)
 
@@ -238,7 +245,10 @@ async def start_trial_confirmation(update: Update, context: ContextTypes.DEFAULT
 
 async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
     try: 
         target = query.data.split(":", 1)[1] # Ex: "ladrao_de_sombras"
     except: 
@@ -318,7 +328,11 @@ async def start_trial_execute(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def show_skill_ascension_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    pdata = await player_manager.get_player_data(query.from_user.id)
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
+    pdata = await player_manager.get_player_data(user_id)
     skills = pdata.get("skills", {})
     
     text = "💎 <b>Aprimorar Skills</b> 💎\nSelecione uma skill para evoluir sua raridade.\n"
@@ -354,7 +368,10 @@ async def show_skill_ascension_info(update: Update, context: ContextTypes.DEFAUL
     try: sid = query.data.split(":", 1)[1]
     except: return
     
-    pdata = await player_manager.get_player_data(query.from_user.id)
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
+    pdata = await player_manager.get_player_data(user_id)
     sdata = pdata["skills"].get(sid)
     info = SKILL_DATA.get(sid)
     
@@ -380,7 +397,9 @@ async def confirm_skill_ascension(update: Update, context: ContextTypes.DEFAULT_
     try: sid = query.data.split(":", 1)[1]
     except: return
     
-    user_id = query.from_user.id
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
     pdata = await player_manager.get_player_data(user_id)
     sdata = pdata["skills"].get(sid)
     

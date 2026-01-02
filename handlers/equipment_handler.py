@@ -1,12 +1,13 @@
 # handlers/equipment_handler.py
-# (VERSÃO ESTILIZADA: HUD Moderno + Setas Elegantes)
+# (VERSÃO BLINDADA: Compatível com Auth Híbrida)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data
-from modules import display_utils  # usa formatar_item_para_exibicao
+from modules import display_utils
 from modules.player.stats import get_player_total_stats
+from modules.auth_utils import get_current_player_id # ✅ IMPORT CRÍTICO
 
 # Preferimos as constantes globais dos slots
 try:
@@ -33,22 +34,17 @@ SLOT_LABELS = {
     "brinco": "𝐁𝐫𝐢𝐧𝐜𝐨",
 }
 
-
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
     try:
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
+    except Exception: pass
     try:
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except Exception:
-        pass
+    except Exception: pass
     try:
         await query.delete_message()
-    except Exception:
-        pass
+    except Exception: pass
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-
 
 # =============================================================
 # --- HELPERS DE SLOT E RENDERIZAÇÃO ---
@@ -98,7 +94,9 @@ def _list_equippable_items_for_slot(player_data: dict, slot: str) -> list[tuple[
 async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = q.from_user.id
+    
+    # ✅ ID DA SESSÃO
+    user_id = get_current_player_id(update, context)
     chat_id = q.message.chat.id 
 
     pdata = await player_manager.get_player_data(user_id)
@@ -106,7 +104,7 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
         return
 
-    # --- 1. BLOCO DE STATUS (Estilo HUD Moderno) ---
+    # --- 1. BLOCO DE STATUS ---
     total_stats = await get_player_total_stats(pdata)
     
     hp_total = int(total_stats.get('max_hp', 0))
@@ -115,7 +113,6 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ini_total = int(total_stats.get('initiative', 0))
     luck_total = int(total_stats.get('luck', 0))
 
-    # Usamos <code> para dar destaque visual (fundo cinza) nos números
     stats_block = (
         f"📊 <b>RESUMO DE ATRIBUTOS</b>\n"
         f"├─ 🧡 <b>HP....</b> <code>{hp_total}</code>\n"
@@ -125,7 +122,7 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"└─ 🍀 <b>LUK...</b> <code>{luck_total}</code>"
     )
 
-    # --- 2. LISTA DE EQUIPAMENTOS (Estilo Setas Elegantes) ---
+    # --- 2. LISTA DE EQUIPAMENTOS ---
     inv = pdata.get("inventory", {}) or {}
     eq = pdata.get("equipment", {}) or {}
 
@@ -133,25 +130,22 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for slot in SLOTS_ORDER:
         uid = eq.get(slot)
-        slot_label = SLOT_LABELS.get(slot, slot.title()).upper() # Nome em MAIÚSCULO para destaque
+        slot_label = SLOT_LABELS.get(slot, slot.title()).upper() 
         slot_emoji = SLOT_EMOJIS.get(slot, '❓')
         
-        # Cabeçalho do Slot
         header = f"<b>[ {slot_emoji} {slot_label} ]</b> ──────────────"
 
         if uid and isinstance(inv.get(uid), dict):
             item_line = _render_item_line_full(inv[uid])
-            # Seta elegante apontando para o item
             block = f"{header}\n ╰┈➤ {item_line}"
         else:
-            # Vazio estilizado
             block = f"{header}\n ╰┈➤ <code>— Vazio —</code>"
             
         equip_lines.append(block)
 
     text = stats_block + "\n".join(equip_lines)
 
-    # --- 3. TECLADO (Mantido funcional) ---
+    # --- 3. TECLADO ---
     keyboard: list[list[InlineKeyboardButton]] = []
     
     # Botões de Desequipar (❌)
@@ -185,7 +179,9 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     q = update.callback_query
     await q.answer()
     slot = q.data.replace("equip_slot_", "")
-    user_id = q.from_user.id
+    
+    # ✅ ID DA SESSÃO
+    user_id = get_current_player_id(update, context)
     chat_id = q.message.chat.id
 
     pdata = await player_manager.get_player_data(user_id)
@@ -218,7 +214,9 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     q = update.callback_query
     await q.answer()
     uid = q.data.replace("equip_pick_", "")
-    user_id = q.from_user.id
+    
+    # ✅ ID DA SESSÃO
+    user_id = get_current_player_id(update, context)
     chat_id = q.message.chat.id
 
     pdata = await player_manager.get_player_data(user_id)
@@ -228,6 +226,7 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if st not in (None, "idle"):
         await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True); return
 
+    # O manager já deve estar preparado para aceitar ID str. Se não, avise.
     success, message = await player_manager.equip_unique_item_for_user(user_id, uid)
     if not success:
         await q.answer(message, show_alert=True); return
@@ -239,7 +238,9 @@ async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_T
     q = update.callback_query
     await q.answer()
     slot = q.data.replace("equip_unequip_", "")
-    user_id = q.from_user.id
+    
+    # ✅ ID DA SESSÃO
+    user_id = get_current_player_id(update, context)
     
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return

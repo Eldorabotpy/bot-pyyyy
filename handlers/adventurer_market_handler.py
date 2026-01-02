@@ -1,5 +1,5 @@
 # handlers/adventurer_market_handler.py
-# (VERSÃO FINAL CORRIGIDA: Corrige bug que impedia itens de aparecerem)
+# (VERSÃO FINAL LIMPA: Auth Híbrida Padronizada - Sem código legado)
 
 import logging
 import asyncio
@@ -42,21 +42,6 @@ logger = logging.getLogger(__name__)
 # --- CONFIGURAÇÃO DE LOGS DO MERCADO ---
 MARKET_LOG_GROUP_ID = -1002881364171
 MARKET_LOG_TOPIC_ID = 24475
-
-# 🛠️ HELPER: ID HÍBRIDO (Adicionado)
-def _get_market_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Retorna o ObjectId (Login) ou Int (Telegram) dependendo da sessão."""
-    # 1. Tenta pegar da sessão de login
-    logged_id = context.user_data.get("logged_player_id")
-    if logged_id:
-        return logged_id # Retorna string (ObjectId)
-    
-    # 2. Fallback para ID nativo do Telegram
-    if update.callback_query:
-        return update.callback_query.from_user.id
-    if update.effective_user:
-        return update.effective_user.id
-    return None
 
 async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, text: str):
     """Envia notificação RPG para o canal de logs."""
@@ -481,7 +466,6 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     except Exception: return
     
     # --- 1. PREPARAÇÃO: Mapear o que está equipado (SEGURANÇA) ---
-    # Cria uma lista com os IDs de todos os itens que estão no corpo do personagem
     equipment = pdata.get("equipment", {})
     equipped_ids = {uid for uid in equipment.values() if uid}
     # -------------------------------------------------------------
@@ -517,7 +501,6 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
     
     for item_id, data in inv.items():
         # --- 2. FILTRO DE SEGURANÇA ---
-        # Se o ID do item estiver na lista de equipados, ele é invisível aqui.
         if item_id in equipped_ids:
             continue
         # ------------------------------
@@ -838,8 +821,6 @@ async def market_finalize_listing(update: Update, context: ContextTypes.DEFAULT_
         if q: await _safe_edit(q, err_msg, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
         else: await update.effective_message.reply_text(err_msg, parse_mode="HTML")
 
-# Em handlers/adventurer_market_handler.py
-
 async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Verifica se estamos esperando um ID (Safety check)
     if not context.user_data.get("market_awaiting_id"): 
@@ -853,15 +834,15 @@ async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         # Lógica de busca (Forward, ID Numérico ou Nome)
         if update.message.forward_from:
-            target_id = update.message.forward_from.id
+            # Em modo Sistema Único, forward pode não funcionar se não tivermos mapeamento
+            # Mas tentamos buscar pelo ID do Telegram na coleção 'users' (caso tenha sido importado assim)
+            target_id = str(update.message.forward_from.id)
             target_name = update.message.forward_from.first_name
         elif text.isdigit():
-            target_id = int(text)
-            try:
-                pdata = await player_manager.get_player_data(target_id)
-                if pdata: target_name = pdata.get("character_name", "Jogador")
-            except: pass
+            # ID Numérico (Telegram Legacy ou novo numérico)
+            target_id = text
         else:
+            # Busca por nome/username
             pdata = None
             if text.startswith("@"):
                 from modules.player import queries
@@ -872,24 +853,28 @@ async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TY
                 if not res: 
                     res = await queries.find_player_by_name_norm(text)
                 if res: 
-                    target_id, pdata = res
+                    # res[0] é o ID, res[1] são os dados
+                    target_id = str(res[0])
+                    pdata = res[1]
 
             if pdata:
-                target_id = pdata.get("user_id") or pdata.get("_id")
+                target_id = str(pdata.get("user_id") or pdata.get("_id"))
                 target_name = pdata.get("character_name", text)
 
-        # --- TRATAMENTO DE ERRO COM BOTÃO ---
+        # --- VALIDAÇÃO FINAL DO ALVO ---
         if not target_id:
-            # Cria um botão de cancelar para o usuário não ficar preso
-            kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("❌ Cancelar e Voltar", callback_data="market_cancel_new")]
-            ])
-            await update.message.reply_text(
-                "❌ <b>Jogador não encontrado.</b>\nVerifique o nome exato ou use o ID numérico.\n\nTente novamente ou cancele:",
-                reply_markup=kb,
-                parse_mode="HTML"
-            )
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]])
+            await update.message.reply_text("❌ <b>Jogador não encontrado.</b>\nTente o nome exato ou ID.", reply_markup=kb, parse_mode="HTML")
             return
+
+        # Verifica se o alvo existe mesmo
+        target_pdata = await player_manager.get_player_data(target_id)
+        if not target_pdata:
+             kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]])
+             await update.message.reply_text("❌ <b>Jogador inválido.</b>\nID não existe no banco.", reply_markup=kb, parse_mode="HTML")
+             return
+             
+        target_name = target_pdata.get("character_name", target_name)
 
         if str(target_id) == str(user_id):
             await update.message.reply_text("❌ Você não pode vender para si mesmo.")
@@ -901,7 +886,7 @@ async def market_catch_input_id(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         logger.error(f"Erro input ID: {e}")
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancelar", callback_data="market_cancel_new")]])
-        await update.message.reply_text("❌ Erro ao buscar jogador. Tente novamente ou cancele.", reply_markup=kb)
+        await update.message.reply_text("❌ Erro ao buscar. Tente novamente.", reply_markup=kb)
 
 async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer("Cancelado.")
@@ -931,8 +916,6 @@ async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def market_cancel_listing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    
-    # 1. Feedback tátil imediato
     try: await q.answer()
     except: pass
 
@@ -940,62 +923,38 @@ async def market_cancel_listing(update: Update, context: ContextTypes.DEFAULT_TY
     from modules import market_manager
 
     try:
-        # 2. Pega o ID
         lid_str = q.data.replace("market_cancel_", "")
-        if not lid_str.isdigit():
-            raise ValueError("ID não numérico")
+        if not lid_str.isdigit(): raise ValueError("ID não numérico")
         lid = int(lid_str)
 
-        # 3. Executa o cancelamento e RECEBE os dados do anúncio de volta
         canceled_listing = await market_manager.cancel_listing(lid)
 
-        # 4. Se deu certo, prepara o LOG RPG
         if canceled_listing:
-            # --- Montagem dos dados para o texto ---
-            seller_name = canceled_listing.get("seller_name", "Mercador Desconhecido")
+            seller_name = canceled_listing.get("seller_name", "Mercador")
             item_payload = canceled_listing.get("item", {})
             qty_returned = canceled_listing.get("quantity", 0)
             
-            # Descobre o nome bonito do item
-            item_display_name = "Item Misterioso"
-            
+            item_display_name = "Item"
             if item_payload.get("type") == "stack":
                 base_id = item_payload.get("base_id")
-                qty_per_stack = item_payload.get("qty", 1) # Tamanho do lote
-                total_items = qty_returned * qty_per_stack
-                
                 info = _get_item_info(base_id)
-                base_name = info.get("display_name") or base_id.replace("_", " ").title()
-                item_display_name = f"{base_name} (Total: {total_items})"
-                
+                item_display_name = f"{info.get('display_name') or base_id}"
             elif item_payload.get("type") == "unique":
                 inst = item_payload.get("item", {})
-                base_id = inst.get("base_id")
-                info = _get_item_info(base_id)
-                base_name = inst.get("display_name") or info.get("display_name") or base_id
-                rarity = str(inst.get("rarity", "comum")).upper()
-                item_display_name = f"{base_name} [{rarity}]"
+                item_display_name = inst.get("display_name") or "Equipamento"
 
-            # --- O TEXTO RPG ---
             rpg_log_text = (
                 f"🚫 <b>OFERTA RETIRADA!</b>\n\n"
                 f"🗣️ <b>Mercador:</b> {seller_name}\n"
                 f"📦 <b>Recolheu:</b> {item_display_name}\n"
-                f"🔙 <b>Estoque Devolvido:</b> {qty_returned} lote(s)\n\n"
-                f"🔒 <i>O item retornou à segurança do inventário.</i>"
+                f"🔙 <b>Estoque Devolvido:</b> {qty_returned} lote(s)"
             )
-
-            # 5. Envia para o Grupo de Logs
             context.application.create_task(_send_market_log(context, rpg_log_text))
-
-            # 6. Feedback para o usuário
-            try: await q.answer("✅ Anúncio removido e itens recuperados!", show_alert=True)
+            try: await q.answer("✅ Anúncio removido!", show_alert=True)
             except: pass
-            
-            # Atualiza o menu
             await market_my(update, context)
         else:
-            await q.answer("❌ Não foi possível cancelar (já vendido?)", show_alert=True)
+            await q.answer("❌ Não foi possível cancelar.", show_alert=True)
             await market_my(update, context)
 
     except Exception as e:

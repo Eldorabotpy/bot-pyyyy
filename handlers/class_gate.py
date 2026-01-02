@@ -1,23 +1,32 @@
 # handlers/class_gate.py
+# (VERSÃO FINAL: COMPATÍVEL COM SISTEMA DE ID STRING)
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from modules import player_manager
-from modules.auth_utils import get_current_player_id
+
 # Callback de abertura: ajuste para o que seu class_selection_handler espera.
 CLASS_OPEN_CALLBACK = "class_open"
 
-async def maybe_offer_class_choice(user_id: int, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def maybe_offer_class_choice(user_id: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Se o jogador precisar escolher classe, envia uma mensagem com o botão para abrir o menu de classes.
     Garante que só envia uma vez (marca flag no save).
+    
+    Args:
+        user_id (str): O ID interno do jogador (ObjectId string).
+        chat_id (int): O ID do chat para enviar a mensagem.
+        context (ContextTypes.DEFAULT_TYPE): Contexto do bot.
     """
-    # <<< CORREÇÃO 1: Adiciona await >>>
+    # Garante que user_id seja string para o banco de dados
+    user_id = str(user_id)
+    
+    # Busca dados do jogador (Async)
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         return # Se não encontrar dados, sai silenciosamente
 
-    # Assumindo que needs_class_choice é síncrono (apenas verifica o dicionário pdata)
+    # Verifica se precisa escolher classe (Síncrono na lógica, mas depende dos dados carregados)
     if not player_manager.needs_class_choice(pdata):
         return
 
@@ -29,10 +38,13 @@ async def maybe_offer_class_choice(user_id: int, chat_id: int, context: ContextT
         "🎉 <b>Nível 5 alcançado!</b>\n"
         "Você desbloqueou a <b>escolha de classe</b>. Toque no botão abaixo para escolher."
     )
-    # <<< CORREÇÃO 2: Adiciona await (já estava correto) >>>
-    await context.bot.send_message(chat_id=chat_id, text=txt, reply_markup=kb, parse_mode="HTML")
+    
+    # Envia a notificação
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=txt, reply_markup=kb, parse_mode="HTML")
+    except Exception as e:
+        # Evita crash se o bot não conseguir enviar msg (ex: bloqueado)
+        return
 
-    # Marca que já oferecemos
-    # <<< CORREÇÃO 3: Adiciona await >>>
-    # (Assumindo que mark_class_choice_offered é async porque salva os dados)
+    # Marca que já oferecemos para não spamar (Async)
     await player_manager.mark_class_choice_offered(user_id)

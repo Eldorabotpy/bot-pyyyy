@@ -9,9 +9,9 @@ from telegram import (
     InlineKeyboardMarkup,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
+from modules.auth_utils import requires_login  # ✅ PROTEÇÃO DE ROTA
 
 # --- Importação da Função de Destino ---
-# Importamos diretamente a função que deve ser chamada quando o jogador entra na forja.
 try:
     from .forge_handler import show_forge_professions_menu
     CRAFT_IMPL = show_forge_professions_menu
@@ -21,8 +21,6 @@ except ImportError:
     )
     CRAFT_IMPL = None
 
-# --- Módulos do Jogo ---
-# Mantemos imports para garantir que o registro de crafting seja carregado
 from modules import crafting_registry
 
 logger = logging.getLogger(__name__)
@@ -35,31 +33,27 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
     try:
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
         return
-    except Exception:
-        pass
+    except Exception: pass
     try:
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
         return
-    except Exception:
-        pass
+    except Exception: pass
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
-
+# ✅ PROTEÇÃO ADICIONADA: Garante sessão antes de entrar na lógica da forja
+@requires_login
 async def craft_open_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Callback principal do botão 'Forjar item'.
     Redireciona para o menu de profissões.
     """
     query = update.callback_query
-    # logger.info(f"Roteador de Forja ativado pelo callback: '{query.data}'")
-    try:
-        await query.answer()
-    except:
-        pass
+    try: await query.answer()
+    except: pass
 
     if CRAFT_IMPL:
         try:
-            # Chama o menu de profissões (que já tem @requires_login e trata a sessão)
+            # Chama o menu de profissões
             await CRAFT_IMPL(update, context)
             return 
         except Exception as e:

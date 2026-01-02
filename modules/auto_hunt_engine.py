@@ -1,13 +1,13 @@
 # modules/auto_hunt_engine.py
-# (VERSÃO ROBUSTA: Preparada para Recovery System + Anti-Deadlock + Fix Chat Not Found)
+# (VERSÃO: HÍBRIDA STR/INT + MATEMÁTICA SINCRONIZADA + BLINDAGEM)
 
 import random
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 from telegram.ext import ContextTypes
 from collections import Counter
-# ✅ ADICIONADO: BadRequest para tratar 'Chat not found'
 from telegram.error import Forbidden, BadRequest
 
 from telegram import (
@@ -20,10 +20,72 @@ from modules import player_manager, game_data, file_ids as file_id_manager
 from modules import mission_manager 
 from modules.combat import criticals, rewards 
 from modules.player.premium import PremiumManager 
+# Importa auth utils para pegar ID correto
+from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
 SECONDS_PER_HUNT = 30 
+
+# ==============================================================================
+# 🛠️ FUNÇÃO DE ESCALA (PRESERVADA DA SUA VERSÃO "CORRETA")
+# ==============================================================================
+def _scale_monster_stats(mon: dict, player_level: int) -> dict:
+    """
+    Escala o monstro igualzinho à caçada manual.
+    """
+    # Copia para não alterar o original
+    m = mon.copy()
+
+    # 1. Normalização Inicial de HP
+    if "max_hp" not in m and "hp" in m:
+        m["max_hp"] = m["hp"]
+    elif "max_hp" not in m:
+        m["max_hp"] = 10 
+
+    # 2. Definição do Nível (Mesma lógica do Manual)
+    min_lvl = m.get("min_level", 1)
+    max_lvl = m.get("max_level", player_level + 2)
+    target_lvl = max(min_lvl, min(player_level + random.randint(-1, 1), max_lvl))
+    m["level"] = target_lvl
+
+    # 3. Atualiza Nome 
+    raw_name = m.get("name", "Inimigo").replace("Lv.", "").strip()
+    raw_name = re.sub(r"^\d+\s+", "", raw_name) 
+    m["name"] = f"Lv.{target_lvl} {raw_name}"
+
+    # Se for Nível 1, retorna base
+    if target_lvl <= 1:
+        m["hp"] = m["max_hp"]
+        return m
+
+    # ==========================================================
+    # 📉 MATEMÁTICA DE CRESCIMENTO (IGUAL AO MANUAL)
+    # ==========================================================
+    GROWTH_HP = 12       
+    GROWTH_ATK = 2.0     
+    GROWTH_DEF = 1.0     
+    GROWTH_XP = 3        # <--- NERF APLICADO AQUI TAMBÉM
+    GROWTH_GOLD = 1.5    
+    
+    scaling_bonus = 1 + (target_lvl * 0.02) 
+
+    # 5. Aplica Fórmula
+    base_hp = int(m.get("max_hp", 10))
+    base_atk = int(m.get("attack", 2))
+    base_def = int(m.get("defense", 0))
+    base_xp = int(m.get("xp_reward", 5))
+    base_gold = int(m.get("gold_drop", 1))
+
+    m["max_hp"] = int((base_hp * scaling_bonus) + (target_lvl * GROWTH_HP))
+    m["hp"] = m["max_hp"]
+    m["attack"] = int((base_atk * scaling_bonus) + (target_lvl * GROWTH_ATK))
+    m["defense"] = int((base_def * scaling_bonus) + (target_lvl * GROWTH_DEF))
+    
+    m["xp_reward"] = int((base_xp * scaling_bonus) + (target_lvl * GROWTH_XP))
+    m["gold_drop"] = int((base_gold * scaling_bonus) + (target_lvl * GROWTH_GOLD))
+    
+    return m
 
 # ==========================================
 # 1. SIMULADOR DE BATALHA (Core Lógico)
@@ -54,6 +116,7 @@ async def _simulate_single_battle(
         # 2. Verifica Vitória
         if monster_hp <= 0:
             combat_details_for_reward = monster_data.copy()
+            # Garante que usamos o XP escalado
             combat_details_for_reward['monster_xp_reward'] = monster_data.get('xp_reward', 0)
             combat_details_for_reward['monster_gold_drop'] = monster_data.get('gold_drop', 0)
             
@@ -82,7 +145,7 @@ async def _simulate_single_battle(
 # 2. EXECUTOR DE CONCLUSÃO (Universal)
 # ==========================================
 async def execute_hunt_completion(
-    user_id: int, 
+    user_id: str,  # ✅ AGORA ACEITA STR/INT
     chat_id: int, 
     hunt_count: int, 
     region_key: str, 
@@ -91,7 +154,6 @@ async def execute_hunt_completion(
 ):
     """
     Executa a lógica final da caça: simulações, prêmios e mensagem.
-    Pode ser chamado pelo Job (normal) ou pelo Recovery Manager (boot).
     """
     logger.info(f"[AutoHunt] Executando conclusão para User {user_id} | Count {hunt_count}")
 
@@ -100,6 +162,8 @@ async def execute_hunt_completion(
         return
 
     player_stats = await player_manager.get_player_total_stats(player_data)
+    player_level = int(player_data.get("level", 1)) # Necessário para a escala
+
     region_data = game_data.REGIONS_DATA.get(region_key, {})
     
     monster_list_data = game_data.MONSTERS_DATA.get(region_key)
@@ -107,7 +171,6 @@ async def execute_hunt_completion(
         monster_list_data = region_data.get('monsters', []) 
 
     if not monster_list_data:
-        # Se não houver monstros, libera o jogador
         player_data['player_state'] = {'action': 'idle'}
         await player_manager.save_player_data(user_id, player_data)
         try:
@@ -133,8 +196,11 @@ async def execute_hunt_completion(
                 if not monster_template: continue 
             elif not isinstance(monster_template, dict):
                 continue
+            
+            # >>> ESCALA O MONSTRO ANTES DA LUTA <<<
+            monster_scaled = _scale_monster_stats(monster_template, player_level)
 
-            battle_result = await _simulate_single_battle(player_data, player_stats, monster_template)
+            battle_result = await _simulate_single_battle(player_data, player_stats, monster_scaled)
             
             if battle_result["result"] == "win":
                 wins += 1
@@ -149,7 +215,7 @@ async def execute_hunt_completion(
             else:
                 losses += 1
                 logger.info(f"[AutoHunt] {user_id} perdeu na batalha {i+1}. Parando.")
-                break # Para na primeira derrota
+                break 
                 
     except Exception as e:
         logger.error(f"[AutoHunt] CRASH na simulação ({user_id}): {e}", exc_info=True)
@@ -179,13 +245,13 @@ async def execute_hunt_completion(
     except Exception as e:
         logger.error(f"[AutoHunt] Erro missões: {e}")
 
-    # --- Finalização (SALVA NO BANCO) ---
+    # --- Finalização ---
     _, _, level_up_msg = player_manager.check_and_apply_level_up(player_data)
     
     player_data['player_state'] = {'action': 'idle'}
     await player_manager.save_player_data(user_id, player_data)
 
-    # --- Mensagem Final (ENVIO VISUAL) ---
+    # --- Mensagem Final ---
     reg_name = region_data.get('display_name', region_key.title())
     
     summary_msg = [
@@ -213,12 +279,10 @@ async def execute_hunt_completion(
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     try:
-        # Se não temos message_id (chamada via Recovery), mandamos nova mensagem
         if not message_id:
             await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
             return
 
-        # Tenta editar a mensagem existente (chamada via Job)
         media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
         file_data = file_id_manager.get_file_data(media_key)
         
@@ -237,28 +301,25 @@ async def execute_hunt_completion(
             )
 
     except (Forbidden, BadRequest) as e:
-        # 🔴 BLINDAGEM: Se o usuário bloqueou ou chat sumiu, apenas loga e segue a vida
-        logger.warning(f"[AutoHunt] Falha de notificação para {user_id} (Bloqueio/Chat Inválido): {e}")
-        # O jogador já recebeu os itens/XP no save_player_data acima, então consideramos sucesso.
+        logger.warning(f"[AutoHunt] Falha de notificação para {user_id}: {e}")
         
     except Exception as e:
         logger.error(f"[AutoHunt] Erro visual desconhecido para {user_id}: {e}")
-        # Fallback se edição falhar (ex: mensagem muito antiga)
         try:
             await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
         except (Forbidden, BadRequest):
-            pass # Ignora bloqueio no fallback também
+            pass 
 
 # ==========================================
 # 3. O JOB WRAPPER (Ponte para o Scheduler)
 # ==========================================
 async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Função chamada pelo JobQueue. Apenas extrai dados e chama o executor.
-    """
     job_data = context.job.data
+    # Extrai o user_id, garantindo que pode ser str ou int
+    raw_user_id = job_data.get('user_id')
+    
     await execute_hunt_completion(
-        user_id=job_data.get('user_id'),
+        user_id=raw_user_id,
         chat_id=job_data.get('chat_id'),
         hunt_count=job_data.get('hunt_count', 0),
         region_key=job_data.get('region_key'),
@@ -267,7 +328,7 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ==========================================
-# 4. INICIADOR (Com Anti-Deadlock e Cálculo Local)
+# 4. INICIADOR (BLINDAGEM APLICADA AQUI)
 # ==========================================
 async def start_auto_hunt(
     update: Update, 
@@ -276,7 +337,11 @@ async def start_auto_hunt(
     region_key: str
 ) -> None:
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # ✅ CORREÇÃO CRÍTICA: USAR AUTH_UTILS PARA PEGAR ID (STR ou INT)
+    user_id = get_current_player_id(update, context)
+    
+    # Chat ID continua sendo do Telegram (para envio de mensagem)
     chat_id = query.message.chat.id
     
     try:
@@ -287,7 +352,7 @@ async def start_auto_hunt(
             await query.answer("⭐️ 𝗙𝘂𝗻𝗰𝗶𝗼𝗻𝗮𝗹𝗶𝗱𝗮𝗱𝗲 𝗲𝘅𝗰𝗹𝘂𝘀𝗶𝘃𝗮 𝗽𝗮𝗿𝗮 𝗣𝗿𝗲𝗺𝗶𝘂𝗺.", show_alert=True)
             return
 
-        # 2. Anti-Deadlock (Cura Estado Travado)
+        # 2. Anti-Deadlock
         current_state = player_data.get('player_state', {}).get('action', 'idle')
         finish_time_str = player_data.get('player_state', {}).get('finish_time')
         
@@ -295,17 +360,16 @@ async def start_auto_hunt(
         if current_state == 'auto_hunting' and finish_time_str:
             try:
                 ft = datetime.fromisoformat(finish_time_str)
-                # Se passou 1 min do tempo previsto e ainda tá 'auto_hunting', tá travado.
                 if datetime.now(timezone.utc) > ft + timedelta(minutes=1):
                     is_stuck = True
             except:
-                is_stuck = True # Data inválida = travado
+                is_stuck = True 
 
         if current_state != 'idle' and not is_stuck:
             await query.answer(f"𝗩𝗼𝗰𝗲̂ 𝗲𝘀𝘁𝗮́ 𝗼𝗰𝘂𝗽𝗮𝗱𝗼: {current_state}", show_alert=True)
             return
         
-        # 3. Cálculo de Energia (LOCAL - Sem Import Circular)
+        # 3. Cálculo de Energia
         base_cost = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
         region_info = (getattr(game_data, "REGIONS_DATA", {}) or {}).get(region_key, {}) or {}
         base_cost = int(region_info.get("hunt_energy_cost", base_cost))
@@ -335,7 +399,6 @@ async def start_auto_hunt(
                 'region_key': region_key
             }
         }
-        # IMPORTANTE: Salvar o chat_id para o Recovery System usar depois
         player_manager.set_last_chat_id(player_data, chat_id)
         
         await player_manager.save_player_data(user_id, player_data)
@@ -363,7 +426,7 @@ async def start_auto_hunt(
 
         # 6. Agenda Job
         job_data = {
-            "user_id": user_id,
+            "user_id": user_id, # ✅ PASSA O ID CORRETO (STR ou INT)
             "chat_id": chat_id,
             "message_id": sent_message.message_id if sent_message else None,
             "hunt_count": hunt_count,
@@ -379,4 +442,3 @@ async def start_auto_hunt(
     except Exception as e:
         logger.error(f"[AutoHunt] ERRO DE INICIALIZAÇÃO ({user_id}): {e}", exc_info=True)
         await query.answer("Erro ao iniciar. Admin notificado.", show_alert=True)
-        

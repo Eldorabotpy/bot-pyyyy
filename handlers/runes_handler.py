@@ -1,10 +1,13 @@
 # handlers/runes_handler.py
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
+
 import random
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager
 from modules.game_data import runes_data, items_runes
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +47,7 @@ async def _send_media_menu(query, context, text, keyboard, media_key=None):
         except Exception: pass
 
         if media_type == "video":
-            # handlers/runes_handler.py (Linha ~49)
-            await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+            await context.bot.send_video(chat_id=chat_id, video=media_id, caption=text, reply_markup=reply_markup, parse_mode="HTML")
         else:
             await context.bot.send_photo(chat_id=chat_id, photo=media_id, caption=text, reply_markup=reply_markup, parse_mode="HTML")
     else:
@@ -57,10 +59,10 @@ async def _send_media_menu(query, context, text, keyboard, media_key=None):
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
 
 # ==============================================================================
-# 2. LÓGICA DE BACKEND (CORRIGIDA)
+# 2. LÓGICA DE BACKEND (CORRIGIDA - USER_ID STRING)
 # ==============================================================================
 
-async def _deduct_currency(user_id: int, pdata: dict, currency_type: str, amount: int) -> bool:
+async def _deduct_currency(user_id: str, pdata: dict, currency_type: str, amount: int) -> bool:
     current = pdata.get("gold", 0) if currency_type == "gold" else pdata.get("gems", 0)
     if current >= amount:
         if currency_type == "gold": pdata["gold"] = current - amount
@@ -69,10 +71,12 @@ async def _deduct_currency(user_id: int, pdata: dict, currency_type: str, amount
         return True
     return False
 
-async def logic_craft_rune_from_fragments(user_id: int) -> str:
+async def logic_craft_rune_from_fragments(user_id: str) -> str:
     """Lógica de Gacha: 7 Fragmentos -> 1 Runa (CORRIGIDO)."""
     try:
         pdata = await player_manager.get_player_data(user_id)
+        if not pdata: return "❌ Erro ao carregar dados."
+
         inv = pdata.get("inventory", {})
         frag_id = "fragmento_runa_ancestral"
         
@@ -83,7 +87,7 @@ async def logic_craft_rune_from_fragments(user_id: int) -> str:
         if qtd < 7: 
             return f"❌ Você precisa de 7 Fragmentos. Você só tem {qtd}."
 
-        # 1. Consome (Isso funcionava)
+        # 1. Consome
         if not await player_manager.remove_item_from_inventory(pdata, frag_id, 7):
             return "❌ Erro ao consumir fragmentos."
         
@@ -95,28 +99,23 @@ async def logic_craft_rune_from_fragments(user_id: int) -> str:
         
         possiveis = runes_data.get_runes_by_tier(tier)
         
-        # Fallback se não achar runas desse tier (evita crash)
+        # Fallback
         if not possiveis:
             tier = 1
             possiveis = runes_data.get_runes_by_tier(1)
             
         rune_won = random.choice(possiveis) if possiveis else "runa_vampiro_menor"
             
-        # 3. Adiciona Item (CORREÇÃO: Adicionado await por segurança e try/except interno)
-        # Se add_item for síncrono no seu código, o await não atrapalha muito, 
-        # mas se for async (como costuma ser em DBs), ele é obrigatório.
+        # 3. Adiciona Item
         try:
             res = player_manager.add_item_to_inventory(pdata, rune_won, 1)
-            if hasattr(res, "__await__"): # Verifica se é awaitable
-                await res
+            if hasattr(res, "__await__"): await res
         except Exception as e:
             logger.error(f"Erro ao adicionar runa {rune_won}: {e}")
-            # Devolve fragmentos em caso de erro fatal
-            pdata["gold"] += 0 # Dummy op
             
         await player_manager.save_player_data(user_id, pdata)
         
-        # 4. Retorno Seguro (Evita KeyError)
+        # 4. Retorno
         r_info = runes_data.get_rune_info(rune_won)
         emoji = r_info.get('emoji', '🔮')
         name = r_info.get('name', rune_won)
@@ -127,8 +126,9 @@ async def logic_craft_rune_from_fragments(user_id: int) -> str:
         logger.error(f"Erro fatal no craft de runas: {e}")
         return "❌ Ocorreu um erro mágico inesperado. Tente novamente."
 
-async def logic_socket_rune(user_id: int, slot_name: str, slot_index: int, rune_id: str) -> str:
+async def logic_socket_rune(user_id: str, slot_name: str, slot_index: int, rune_id: str) -> str:
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return "❌ Erro dados."
     equipments = get_safe_equipments(pdata)
     target_item = equipments.get(slot_name)
     
@@ -149,8 +149,9 @@ async def logic_socket_rune(user_id: int, slot_name: str, slot_index: int, rune_
     await player_manager.save_player_data(user_id, pdata)
     return "✅ Runa incrustada com sucesso!"
 
-async def logic_remove_rune(user_id: int, slot_name: str, slot_index: int) -> str:
+async def logic_remove_rune(user_id: str, slot_name: str, slot_index: int) -> str:
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return "❌ Erro dados."
     equipments = get_safe_equipments(pdata)
     target_item = equipments.get(slot_name)
     if not target_item: return "❌ Erro."
@@ -165,15 +166,16 @@ async def logic_remove_rune(user_id: int, slot_name: str, slot_index: int) -> st
 
     target_item["sockets"][slot_index] = None
     
-    # Adiciona de volta (com await check)
+    # Adiciona de volta
     res = player_manager.add_item_to_inventory(pdata, rune_id, 1)
     if hasattr(res, "__await__"): await res
         
     await player_manager.save_player_data(user_id, pdata)
     return "✅ Runa removida!"
 
-async def logic_reroll_rune(user_id: int, slot_name: str, slot_index: int) -> str:
+async def logic_reroll_rune(user_id: str, slot_name: str, slot_index: int) -> str:
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return "❌ Erro dados."
     equipments = get_safe_equipments(pdata)
     target_item = equipments.get(slot_name)
     
@@ -205,9 +207,16 @@ async def logic_reroll_rune(user_id: int, slot_name: str, slot_index: int) -> st
 async def npc_rune_master_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
     
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return
+
     equipments = get_safe_equipments(pdata)
     
     valid_items = []
@@ -256,8 +265,14 @@ async def npc_rune_master_main(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def npc_crafting_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata: return
+
     inv = pdata.get("inventory", {})
     frag_id = "fragmento_runa_ancestral"
     
@@ -284,8 +299,12 @@ async def npc_crafting_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def npc_manage_item_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # 🔒 SEGURANÇA
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     slot_name = query.data.split(":")[2]
-    user_id = query.from_user.id
     pdata = await player_manager.get_player_data(user_id)
     equipments = get_safe_equipments(pdata)
     item = equipments.get(slot_name)
@@ -314,9 +333,13 @@ async def npc_manage_item_slots(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def npc_select_rune_inv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # 🔒 SEGURANÇA
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     parts = query.data.split(":")
     slot_name, slot_idx = parts[2], parts[3]
-    user_id = query.from_user.id
     pdata = await player_manager.get_player_data(user_id)
     inv = pdata.get("inventory", {})
     
@@ -342,6 +365,7 @@ async def npc_select_rune_inv(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def npc_slot_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    # Apenas visual, não precisa de user_id
     parts = query.data.split(":")
     slot_name, slot_idx = parts[2], parts[3]
     kb = [
@@ -358,37 +382,48 @@ async def npc_slot_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def action_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # 🔒 SEGURANÇA: ID via Auth Central (usado para todas as lógicas de ação)
+    user_id = get_current_player_id(update, context)
+    
     data = query.data
     parts = data.split(":")
     action = parts[1]
     
-    if action == "main": await npc_rune_master_main(update, context)
-    elif action == "craft_menu": await npc_crafting_menu(update, context)
-    elif action == "select_item": await npc_manage_item_slots(update, context)
-    elif action == "open_inv": await npc_select_rune_inv(update, context)
-    elif action == "options": await npc_slot_options(update, context)
-    elif action == "ignore": await query.answer("Falta recursos!", show_alert=True)
-    
-    elif action == "do_craft":
-        msg = await logic_craft_rune_from_fragments(query.from_user.id)
-        # Feedback e atualização
+    # Verificação de Sessão para Ações Críticas
+    if action in ["main", "craft_menu", "select_item", "open_inv", "options", "ignore"]:
+        # Menus de navegação (já tratam user_id internamente)
+        if action == "main": await npc_rune_master_main(update, context)
+        elif action == "craft_menu": await npc_crafting_menu(update, context)
+        elif action == "select_item": await npc_manage_item_slots(update, context)
+        elif action == "open_inv": await npc_select_rune_inv(update, context)
+        elif action == "options": await npc_slot_options(update, context)
+        elif action == "ignore": await query.answer("Falta recursos!", show_alert=True)
+        return
+
+    # Ações Lógicas (Exigem user_id válido aqui)
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
+
+    if action == "do_craft":
+        msg = await logic_craft_rune_from_fragments(user_id)
         await query.answer("Processando...", show_alert=False)
         await npc_crafting_menu(update, context)
-        # Manda a resposta em mensagem separada
         await context.bot.send_message(query.message.chat_id, msg, parse_mode="Markdown")
 
     elif action == "do_socket":
-        msg = await logic_socket_rune(query.from_user.id, parts[2], int(parts[3]), parts[4])
+        msg = await logic_socket_rune(user_id, parts[2], int(parts[3]), parts[4])
         await query.answer(msg, show_alert=True)
         await npc_manage_item_slots(update, context)
         
     elif action == "do_remove":
-        msg = await logic_remove_rune(query.from_user.id, parts[2], int(parts[3]))
+        msg = await logic_remove_rune(user_id, parts[2], int(parts[3]))
         await query.answer(msg, show_alert=True)
         await npc_manage_item_slots(update, context)
         
     elif action == "do_reroll":
-        msg = await logic_reroll_rune(query.from_user.id, parts[2], int(parts[3]))
+        msg = await logic_reroll_rune(user_id, parts[2], int(parts[3]))
         await query.answer("Feito!", show_alert=False)
         await npc_manage_item_slots(update, context)
         await context.bot.send_message(query.message.chat_id, msg, parse_mode="Markdown")

@@ -1,14 +1,12 @@
 # handlers/admin_handler.py
-# (VERSÃO FINAL UNIFICADA: Comandos Corrigidos + Conversations Restauradas)
+# (VERSÃO FINAL PURA: Apenas Sistema Novo - Sem código legado)
 
 from __future__ import annotations
-import os
 import io
 import logging 
 import json
-import sys
 import asyncio 
-from typing import Optional
+from typing import Optional, Union
 
 # --- Imports do Telegram ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -20,13 +18,12 @@ from telegram.ext import (
     filters,
     ConversationHandler
 )
-from telegram.error import BadRequest
 from telegram.constants import ParseMode
 
 # --- Imports de Banco de Dados e Utils ---
 from bson import ObjectId
 from modules.auth_utils import get_current_player_id
-from handlers.admin.utils import parse_hybrid_id, ensure_admin, ADMIN_LIST
+from handlers.admin.utils import ensure_admin, ADMIN_LIST
 from modules.player.queries import _normalize_char_name
 
 # --- Imports de Funcionalidades Administrativas ---
@@ -41,9 +38,6 @@ from handlers.admin.grant_skin import grant_skin_conv_handler
 from handlers.admin.player_management_handler import player_management_conv_handler
 from handlers.admin.debug_skill import debug_skill_handler
 
-# (Opcional: Se você tiver o arquivo, descomente. Se não, mantenha comentado para evitar erro)
-# from handlers.admin.sell_gems import sell_gems_conv_handler 
-
 # --- Imports do Core do Jogo ---
 from modules.player_manager import (
     delete_player, 
@@ -57,17 +51,19 @@ from modules.player_manager import (
     compute_spent_status_points,
     reset_stats_and_refund_points,
     iter_players,
-    iter_player_ids,
-    corrigir_bug_tomos_duplicados # Certifique-se que isso existe no player_manager
+    corrigir_bug_tomos_duplicados 
 )
 
 from modules import game_data
 from handlers.jobs import reset_pvp_season, force_grant_daily_crystals 
 from kingdom_defense.engine import event_manager
-from modules.player.core import _player_cache, players_collection
+
+# Acesso ao DB apenas para ferramentas de Debug do SISTEMA NOVO
+# Removemos players_collection para atender ao requisito de sistema único
+from modules.player.core import _player_cache, users_collection
 
 logger = logging.getLogger(__name__) 
-HTML = "HTML" 
+HTML = ParseMode.HTML
 
 # --- CONSTANTES DE ESTADO (CONVERSATIONS) ---
 (SELECT_CACHE_ACTION, ASK_USER_FOR_CACHE_CLEAR) = range(2)
@@ -77,8 +73,13 @@ ASK_GHOST_CLAN_ID = 6
 (ASK_OLD_ID_CHANGE, ASK_NEW_ID_CHANGE, CONFIRM_ID_CHANGE) = range(7, 10)
 
 # =========================================================
-# HELPERS VISUAIS
+# HELPERS
 # =========================================================
+
+def parse_target_id(text: str) -> str:
+    """Força o ID a ser string."""
+    if not text: return ""
+    return str(text).strip()
 
 async def _safe_answer(update: Update):
     if q := update.callback_query:
@@ -94,6 +95,7 @@ async def _safe_edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE, te
         await context.bot.send_message(chat_id, text, parse_mode=HTML, reply_markup=reply_markup)
 
 async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Envia o menu principal do admin."""
     try:
         await context.bot.send_message(
             chat_id=chat_id,
@@ -110,41 +112,37 @@ async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> 
 
 def _admin_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎁 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕀𝕥𝕖𝕟𝕤 (Stackable) 𓂀", callback_data="admin_grant_item")],
-        [InlineKeyboardButton("💎 𓂀 𝕍𝕖𝕟𝕕𝕖𝕣 𝔾𝕖𝕞𝕒𝕤 𓂀", callback_data="admin_sell_gems")],
-        [InlineKeyboardButton("🛠️ 𓂀 𝔾𝕖𝕣𝕒𝕣 𝔼𝕢𝕦𝕚𝕡𝕒𝕞𝕖𝕟𝕥𝕠 𓂀", callback_data="admin_generate_equip")],
-        [InlineKeyboardButton("📚 𓂀 𝔼𝕟𝕤𝕚𝕟𝕒𝕣 ℍ𝕒𝕓𝕚𝕝𝕚𝕕𝕒𝕕𝕖 (Skill) 𓂀", callback_data="admin_grant_skill")],
-        [InlineKeyboardButton("🎨 𓂀 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝔸𝕡𝕒𝕣𝕖̂𝕟𝕔𝕚𝕒 (Skin) 𓂀", callback_data="admin_grant_skin")],
-        [InlineKeyboardButton("👥 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤 𓂀", callback_data="admin_pmanage_main")],
-        [InlineKeyboardButton("👤 𓂀 𝔼𝕕𝕚𝕥𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣 𓂀", callback_data="admin_edit_player")], 
-        [InlineKeyboardButton("🆔 𓂀 𝐓𝐑𝐎𝐂𝐀𝐑 𝐈𝐃 (𝐌𝐢𝐠𝐫𝐚𝐫) 𓂀", callback_data="admin_change_id_start")],
+        [InlineKeyboardButton("🎁 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕀𝕥𝕖𝕟𝕤", callback_data="admin_grant_item")],
+        [InlineKeyboardButton("🛠️ 𝔾𝕖𝕣𝕒𝕣 𝔼𝕢𝕦𝕚𝕡𝕒𝕞𝕖𝕟𝕥𝕠", callback_data="admin_generate_equip")],
+        [InlineKeyboardButton("📚 𝔼𝕟𝕤𝕚𝕟𝕒𝕣 𝕊𝕜𝕚𝕝𝕝", callback_data="admin_grant_skill")],
+        [InlineKeyboardButton("🎨 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕊𝕜𝕚𝕟", callback_data="admin_grant_skin")],
+        [InlineKeyboardButton("👥 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤", callback_data="admin_pmanage_main")],
+        [InlineKeyboardButton("🚀 𝐌𝐈𝐆𝐑𝐀𝐑/CLONAR 𝐈𝐃", callback_data="admin_change_id_start")],
         [InlineKeyboardButton("🏚️ Limpar Clã Fantasma", callback_data="admin_fix_clan_start")],
-        [InlineKeyboardButton("💀 𝐃𝐄𝐋𝐄𝐓𝐀𝐑 𝐂𝐎𝐍𝐓𝐀 (Perigo)", callback_data="admin_delete_start")],
-        [InlineKeyboardButton("🔁 𓂀 𝔽𝕠𝕣ç𝕒𝕣 𝕕𝕚á𝕣𝕚𝕠𝕤 (ℂ𝕣𝕚𝕤𝕥𝕒𝕚𝕤) 𓂀", callback_data="admin_force_daily")],
-        [InlineKeyboardButton("👑 𓂀 ℙ𝕣𝕖𝕞𝕚𝕦𝕞 𓂀", callback_data="admin_premium")],
-        [InlineKeyboardButton("⚔️ Painel PvP", callback_data="admin_pvp_menu")],
-        [InlineKeyboardButton("🎉 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔼𝕧𝕖𝕟𝕥𝕠𝕤 𓂀 🎉", callback_data="admin_event_menu")],
-        [InlineKeyboardButton("🔬 𓂀 Painel de Teste de Evento 𓂀 🔬", callback_data="admin_test_menu")],
-        [InlineKeyboardButton("📁 𓂀 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔽𝕚𝕝𝕖 𝕀𝔻𝕤 𓂀", callback_data="admin_file_ids")],
-        [InlineKeyboardButton("🧹 𓂀 ℝ𝕖𝕤𝕖𝕥/ℝ𝕖𝕤𝕡𝕖𝕔 𓂀", callback_data="admin_reset_menu")],
-        [InlineKeyboardButton("🧽 𓂀 𝕃𝕚𝕞𝕡𝕒𝕣 ℂ𝕒𝕔𝕙𝕖 𓂀", callback_data="admin_clear_cache")],
-        [InlineKeyboardButton("🔄 𝐑𝐞𝐬𝐞𝐭𝐚𝐫 𝐄𝐬𝐭𝐚𝐝𝐨 (/𝐫𝐞𝐬𝐞𝐭_𝐬𝐭𝐚𝐭𝐞)", callback_data="admin_reset_state_hint")], 
-        [InlineKeyboardButton("ℹ️ 𝐀𝐣𝐮𝐝𝐚 𝐝𝐨𝐬 𝐂𝐨𝐦𝐚𝐧𝐝𝐨𝐬", callback_data="admin_help")]
+        [InlineKeyboardButton("💀 𝐃𝐄𝐋𝐄𝐓𝐀𝐑 𝐂𝐎𝐍𝐓𝐀", callback_data="admin_delete_start")],
+        [InlineKeyboardButton("🔁 𝔽𝕠𝕣ç𝕒𝕣 𝔻𝕚á𝕣𝕚𝕠𝕤", callback_data="admin_force_daily")],
+        [InlineKeyboardButton("👑 ℙ𝕣𝕖𝕞𝕚𝕦𝕞", callback_data="admin_premium")],
+        [InlineKeyboardButton("🎉 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔼𝕧𝕖𝕟𝕥𝕠𝕤", callback_data="admin_event_menu")],
+        [InlineKeyboardButton("🔬 𝕋𝕖𝕤𝕥𝕖𝕤 𝕕𝕖 𝔼𝕧𝕖𝕟𝕥𝕠", callback_data="admin_test_menu")],
+        [InlineKeyboardButton("📁 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔽𝕚𝕝𝕖 𝕀𝔻𝕤", callback_data="admin_file_ids")],
+        [InlineKeyboardButton("🧹 ℝ𝕖𝕤𝕖𝕥/ℝ𝕖𝕤𝕡𝕖𝕔", callback_data="admin_reset_menu")],
+        [InlineKeyboardButton("🧽 𝕃𝕚𝕞𝕡𝕒𝕣 ℂ𝕒𝕔𝕙𝕖", callback_data="admin_clear_cache")],
+        [InlineKeyboardButton("ℹ️ 𝐀𝐣𝐮𝐝𝐚", callback_data="admin_help")]
     ])
 
 def _admin_event_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎟️ Entregar Ticket de Defesa", callback_data="admin_event_force_ticket")],
-        [InlineKeyboardButton("📨 FORÇAR JOB DE TICKETS (TODOS)", callback_data="admin_force_ticket_job")],
-        [InlineKeyboardButton("▶️ Forçar Início do Evento", callback_data="admin_event_force_start")],
-        [InlineKeyboardButton("⏹️ Forçar Fim do Evento", callback_data="admin_event_force_end")],
-        [InlineKeyboardButton("⬅️ Voltar ao Painel Principal", callback_data="admin_main")],
+        [InlineKeyboardButton("🎟️ Entregar Ticket", callback_data="admin_event_force_ticket")],
+        [InlineKeyboardButton("📨 FORÇAR JOB TICKETS", callback_data="admin_force_ticket_job")],
+        [InlineKeyboardButton("▶️ Iniciar Evento", callback_data="admin_event_force_start")],
+        [InlineKeyboardButton("⏹️ Finalizar Evento", callback_data="admin_event_force_end")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")],
     ])
 
 def _admin_test_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 Iniciar em Wave Específica", callback_data="test_start_at_wave")],
-        [InlineKeyboardButton("⬅️ Voltar ao Painel Principal", callback_data="admin_main")],
+        [InlineKeyboardButton("🚀 Iniciar Wave X", callback_data="test_start_at_wave")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")],
     ])
 
 # =========================================================
@@ -152,10 +150,9 @@ def _admin_test_menu_kb() -> InlineKeyboardMarkup:
 # =========================================================
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Exibe o painel principal do admin."""
     if not await ensure_admin(update): return 
     await update.message.reply_text(
-        "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:",
+        "🎛️ <b>Painel do Admin (Sistema Novo)</b>\nEscolha uma opção:",
         reply_markup=_admin_menu_kb(),
         parse_mode=HTML,
     )
@@ -167,21 +164,20 @@ async def _handle_admin_main(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    thread_id = getattr(update.effective_message, 'message_thread_id', None)
-    topic_text = f"🆔 <b>Topic ID:</b> <code>{thread_id}</code>" if thread_id else "🆔 <b>Topic ID:</b> <i>Geral (None)</i>"
+    # Usa a função compatível com string/int
+    game_id = get_current_player_id(update, context)
     text = (
-        f"<b>🕵️ INSPETOR DE IDs</b>\n"
+        f"<b>🕵️ INFO DO JOGADOR</b>\n"
         f"--------------------------\n"
-        f"👤 <b>Seu User ID:</b> <code>{update.effective_user.id}</code>\n"
-        f"🏠 <b>Group ID:</b> <code>{chat_id}</code>\n"
-        f"{topic_text}"
+        f"🎮 <b>ID do Jogo:</b> <code>{game_id}</code>\n"
+        f"🏠 <b>Chat ID:</b> <code>{chat_id}</code>"
     )
     await update.message.reply_text(text, parse_mode=HTML)
 
 async def _handle_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
     await _safe_answer(update)
-    help_text = "ℹ️ <b>Ajuda Admin</b>\nUse os botões para navegar ou os comandos:\n/fixme - Corrigir seu char\n/mydata - Baixar dados\n/find_player <nome> - Achar ID"
+    help_text = "ℹ️ <b>Ajuda</b>\n/fixme - Reseta seus status\n/mydata - Baixa seu JSON\n/find_player <nome> - Busca ID por nome\n/delete_player <id> - Deleta conta"
     await _safe_edit_text(update, context, help_text, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
 
 # =========================================================
@@ -191,7 +187,7 @@ async def _handle_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def _handle_admin_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
     await _safe_answer(update)
-    await _safe_edit_text(update, context, "🎉 <b>Painel de Gerenciamento de Eventos</b>", _admin_event_menu_kb())
+    await _safe_edit_text(update, context, "🎉 <b>Gerenciamento de Eventos</b>", _admin_event_menu_kb())
 
 async def _handle_force_start_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
@@ -222,16 +218,16 @@ async def _handle_force_ticket(update: Update, context: ContextTypes.DEFAULT_TYP
 async def _handle_force_ticket_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
     query = update.callback_query
-    await query.answer("Rodando job global...")
+    await query.answer("Executando job...")
     context.job = type('Job', (object,), {'data': {"event_time": "FORCE"}, 'name': 'admin_force'})
     await distribute_kingdom_defense_ticket_job(context)
-    await query.message.reply_text("Job de tickets executado.")
+    await query.message.reply_text("Tickets distribuídos.")
 
 async def _handle_admin_force_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
     await _safe_answer(update)
     await force_grant_daily_crystals(context)
-    await _safe_edit_text(update, context, "✅ Cristais diários entregues a todos.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
+    await _safe_edit_text(update, context, "✅ Cristais diários entregues.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
 
 async def force_daily_crystals_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
@@ -244,13 +240,12 @@ async def _reset_pvp_now_command(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text("PvP resetado.")
 
 # =========================================================
-# COMANDOS DE JOGADOR (DEBUG/FIX) - CORRIGIDOS
+# COMANDOS DE JOGADOR (DEBUG/FIX)
 # =========================================================
 
 async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Corrige o estado do PRÓPRIO admin."""
     if not await ensure_admin(update): return
-    user_id = get_current_player_id(update, context) # Pega o ID da Sessão
+    user_id = get_current_player_id(update, context)
     
     player_data = await get_player_data(user_id)
     if not player_data:
@@ -263,19 +258,17 @@ async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
         spent = compute_spent_status_points(player_data) 
         player_data['stat_points'] = max(0, allowed - spent)
         await save_player_data(user_id, player_data)
-        await update.message.reply_text("✅ Personagem corrigido!")
+        await update.message.reply_text("✅ Status corrigidos!")
     except Exception as e:
         await update.message.reply_text(f"Erro: {e}")
 
 async def my_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Envia JSON do jogador logado."""
     if not await ensure_admin(update): return
-    user_id = get_current_player_id(update, context) # Pega o ID da Sessão
+    user_id = get_current_player_id(update, context)
 
     player_data = await get_player_data(user_id)
     if not player_data: return
 
-    # Trata ObjectId para JSON
     pdata_copy = player_data.copy()
     if '_id' in pdata_copy: pdata_copy['_id'] = str(pdata_copy['_id'])
 
@@ -294,15 +287,24 @@ async def inspect_item_command(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(f"INFO {item_id}: {info}")
 
 async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Verifica APENAS o sistema novo (cache e DB users)."""
     if not await ensure_admin(update): return 
-    try:
-        raw_id = context.args[0]
-        uid = parse_hybrid_id(raw_id)
+    try: uid = parse_target_id(context.args[0])
     except: return
     
-    in_cache = uid in _player_cache
-    in_db = players_collection.find_one({"_id": uid}) is not None
-    await update.message.reply_text(f"Debug {uid}:\nCache: {in_cache}\nDB: {in_db}")
+    in_cache = str(uid) in _player_cache
+    in_new = False
+    
+    if users_collection is not None:
+        try:
+            search_id = ObjectId(uid) if ObjectId.is_valid(uid) else uid
+            in_new = await asyncio.to_thread(users_collection.find_one, {"_id": search_id}) is not None
+        except: pass
+
+    await update.message.reply_text(
+        f"🔍 <b>Debug Info (Sistema Novo)</b>\n🆔 ID: <code>{uid}</code>\n💾 Cache: {'✅' if in_cache else '❌'}\n☁️ DB Users: {'✅' if in_new else '❌'}",
+        parse_mode=HTML
+    )
 
 async def find_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return 
@@ -310,7 +312,7 @@ async def find_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     name = " ".join(context.args)
     found = await find_player_by_name(name)
     if found:
-        await update.message.reply_text(f"Encontrado: {found[1].get('character_name')} ID: {found[0]}")
+        await update.message.reply_text(f"Encontrado: {found[1].get('character_name')}\nID: <code>{found[0]}</code>", parse_mode=HTML)
     else:
         await update.message.reply_text("Não encontrado.")
 
@@ -322,6 +324,7 @@ async def hard_respec_all_command(update: Update, context: ContextTypes.DEFAULT_
     if not await ensure_admin(update): return
     msg = await update.message.reply_text("⏳ Iniciando Reset Total...")
     count = 0
+    # iter_players assume que só existe um DB válido agora
     async for uid, _ in iter_players():
         pdata = await get_player_data(uid)
         if pdata:
@@ -336,12 +339,9 @@ async def admin_fix_tomos_command(update: Update, context: ContextTypes.DEFAULT_
     if not await ensure_admin(update): return
     msg = await update.message.reply_text("⏳ Corrigindo Tomos...")
     fixed = 0
-    
-    # Coleta IDs primeiro para evitar erro de cursor
     ids = []
     async for uid, _ in iter_players():
         ids.append(uid)
-        
     for pid in ids:
         if await corrigir_bug_tomos_duplicados(pid):
             fixed += 1
@@ -355,12 +355,12 @@ async def admin_clean_market_names(update: Update, context: ContextTypes.DEFAULT
 async def clean_clan_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
     if not context.args: return
-    uid = parse_hybrid_id(context.args[0])
+    uid = parse_target_id(context.args[0])
     pdata = await get_player_data(uid)
     if pdata:
         pdata['clan_id'] = None
         await save_player_data(uid, pdata)
-        clear_player_cache(uid)
+        await clear_player_cache(uid)
         await update.message.reply_text("Clã limpo.")
 
 async def fix_deleted_clan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -377,22 +377,22 @@ async def fix_deleted_clan_command(update: Update, context: ContextTypes.DEFAULT
 async def fix_premium_dates_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
     await update.message.reply_text("Corrigindo VIPs...")
-    # Lógica simplificada para placeholder, usar a completa se necessário
     pass 
 
 async def _delete_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
-    uid = parse_hybrid_id(context.args[0])
-    if delete_player(uid):
+    uid = parse_target_id(context.args[0])
+    # CORREÇÃO CRÍTICA: await na função async
+    if await delete_player(uid):
         await update.message.reply_text("Deletado.")
     else:
         await update.message.reply_text("Não encontrado.")
 
 # =========================================================
-# CONVERSATIONS HANDLERS (DEFINIÇÕES)
+# CONVERSATIONS
 # =========================================================
 
-# --- 1. Cache ---
+# --- Cache ---
 async def _cache_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): return ConversationHandler.END
     await _safe_edit_text(update, context, "Opções de Cache:", InlineKeyboardMarkup([
@@ -403,15 +403,13 @@ async def _cache_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return SELECT_CACHE_ACTION
 
 async def _cache_ask_for_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await _safe_edit_text(update, context, "Envie o ID/Nome:")
+    await _safe_edit_text(update, context, "Envie o ID:")
     return ASK_USER_FOR_CACHE_CLEAR
 
 async def _cache_clear_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    txt = update.message.text
-    uid = parse_hybrid_id(txt)
-    # Lógica simplificada de busca
-    if uid: clear_player_cache(uid)
-    await update.message.reply_text("Cache limpo se existia.")
+    uid = parse_target_id(update.message.text)
+    if uid: await clear_player_cache(uid)
+    await update.message.reply_text("Cache limpo.")
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
 
@@ -450,7 +448,7 @@ clear_cache_conv_handler = ConversationHandler(
     per_message=False
 )
 
-# --- 2. Test Event ---
+# --- Test Event ---
 async def _handle_admin_test_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): return ConversationHandler.END
     await _safe_edit_text(update, context, "Painel de Teste", _admin_test_menu_kb())
@@ -481,24 +479,23 @@ test_event_conv_handler = ConversationHandler(
     per_message=False
 )
 
-# --- 3. Delete Player ---
+# --- Delete Player ---
 async def _delete_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): return ConversationHandler.END
     await _safe_edit_text(update, context, "Envie ID para DELETAR:")
     return ASK_DELETE_ID
 
 async def _delete_resolve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    uid = parse_hybrid_id(update.message.text)
-    if not uid: 
-        await update.message.reply_text("ID Inválido.")
-        return ConversationHandler.END
+    uid = parse_target_id(update.message.text)
+    if not uid: return ConversationHandler.END
     context.user_data['del_id'] = uid
     await update.message.reply_text(f"Confirmar deletar {uid}?", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SIM", callback_data="confirm_delete_yes")]]))
     return CONFIRM_DELETE_ACTION
 
 async def _delete_perform_btn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     uid = context.user_data.get('del_id')
-    delete_player(uid)
+    # CORREÇÃO CRÍTICA: await na função async
+    await delete_player(uid)
     await _safe_edit_text(update, context, "Deletado.")
     return ConversationHandler.END
 
@@ -515,10 +512,10 @@ delete_player_conv_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancelar", _delete_cancel), CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
 )
 
-# --- 4. Fix Clan ---
+# --- Fix Clan ---
 async def _fix_clan_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): return ConversationHandler.END
-    await _safe_edit_text(update, context, "Digite o ID do Clã para limpar:")
+    await _safe_edit_text(update, context, "Digite o ID do Clã:")
     return ASK_GHOST_CLAN_ID
 
 async def _fix_clan_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -538,37 +535,52 @@ fix_clan_conv_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancelar", _delete_cancel), CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
 )
 
-# --- 5. Change ID ---
+# --- Change ID (Clone/Migration WITHIN New System) ---
 async def _change_id_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): return ConversationHandler.END
-    await _safe_edit_text(update, context, "Digite ID VELHO:")
+    await _safe_edit_text(update, context, "Digite ID ORIGEM (User ID):")
     return ASK_OLD_ID_CHANGE
 
 async def _change_id_ask_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['old_id'] = parse_hybrid_id(update.message.text)
-    await update.message.reply_text("Digite ID NOVO:")
+    context.user_data['old_id'] = parse_target_id(update.message.text)
+    await update.message.reply_text("Digite ID DESTINO (Novo User ID):")
     return ASK_NEW_ID_CHANGE
 
 async def _change_id_confirm_step(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['new_id'] = parse_hybrid_id(update.message.text)
-    await update.message.reply_text("Confirmar troca?", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SIM", callback_data="do_change_id_yes")]]))
+    context.user_data['new_id'] = parse_target_id(update.message.text)
+    await update.message.reply_text("Confirmar clonagem/migração?", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SIM", callback_data="do_change_id_yes")]]))
     return CONFIRM_ID_CHANGE
 
 async def _change_id_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     old = context.user_data['old_id']
     new = context.user_data['new_id']
     
-    pdata = await get_player_data(old)
+    # Busca apenas no sistema novo
+    pdata = None
+    if users_collection is not None:
+        try:
+            oid = ObjectId(old) if ObjectId.is_valid(old) else old
+            pdata = await asyncio.to_thread(users_collection.find_one, {"_id": oid})
+        except: pass
+
     if pdata:
-        pdata['_id'] = new
-        # Insere novo
-        if isinstance(new, int): players_collection.insert_one(pdata)
-        else: players_collection.database['users'].insert_one(pdata)
-        # Deleta velho
-        delete_player(old)
-        await _safe_edit_text(update, context, "ID Trocado.")
+        try:
+            if users_collection is not None:
+                final_oid = ObjectId(new) if ObjectId.is_valid(new) else new
+                pdata['_id'] = final_oid
+                
+                # Salva como novo
+                await asyncio.to_thread(users_collection.replace_one, {"_id": final_oid}, pdata, upsert=True)
+                
+                # Deleta o antigo
+                old_oid = ObjectId(old) if ObjectId.is_valid(old) else old
+                await asyncio.to_thread(users_collection.delete_one, {"_id": old_oid})
+
+            await _safe_edit_text(update, context, "✅ ID Trocado (Sistema Novo).")
+        except Exception as e:
+            await _safe_edit_text(update, context, f"❌ Erro ao gravar: {e}")
     else:
-        await _safe_edit_text(update, context, "Erro: Jogador original não achado.")
+        await _safe_edit_text(update, context, "Erro: Conta original não encontrada no sistema novo.")
     return ConversationHandler.END
 
 change_id_conv_handler = ConversationHandler(
@@ -582,10 +594,9 @@ change_id_conv_handler = ConversationHandler(
 )
 
 # =========================================================
-# REGISTRO DOS HANDLERS (LISTA FINAL)
+# REGISTRO FINAL
 # =========================================================
 
-# Handlers de Comando (Filtrados)
 admin_command_handler = CommandHandler("admin", admin_command, filters=filters.User(ADMIN_LIST))
 delete_player_handler = CommandHandler("delete_player", _delete_player_command, filters=filters.User(ADMIN_LIST))
 inspect_item_handler = CommandHandler("inspect_item", inspect_item_command, filters=filters.User(ADMIN_LIST))
@@ -594,7 +605,7 @@ my_data_handler = CommandHandler("mydata", my_data_command, filters=filters.User
 reset_pvp_now_handler = CommandHandler("resetpvpnow", _reset_pvp_now_command, filters=filters.User(ADMIN_LIST))
 find_player_handler = CommandHandler("find_player", find_player_command, filters=filters.User(ADMIN_LIST))
 debug_player_handler = CommandHandler("debug_player", debug_player_data, filters=filters.User(ADMIN_LIST))
-get_id_command_handler = CommandHandler("get_id", get_id_command) # Sem filtro
+get_id_command_handler = CommandHandler("get_id", get_id_command)
 fixme_handler = CommandHandler("fixme", fix_my_character, filters=filters.User(ADMIN_LIST))
 hard_respec_all_handler = CommandHandler("hard_respec_all", hard_respec_all_command, filters=filters.User(ADMIN_LIST))
 fix_tomos_handler = CommandHandler("fix_tomos", admin_fix_tomos_command, filters=filters.User(ADMIN_LIST))
@@ -603,7 +614,6 @@ clean_clan_handler = CommandHandler("limpar_cla", clean_clan_status_command, fil
 fix_ghost_clan_handler = CommandHandler("fix_cla_fantasma", fix_deleted_clan_command, filters=filters.User(ADMIN_LIST))
 fix_premium_handler = CommandHandler("fix_premium", fix_premium_dates_command, filters=filters.User(ADMIN_LIST))
 
-# Handlers de Callback (Navegação Simples)
 admin_main_handler = CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
 admin_force_daily_callback_handler = CallbackQueryHandler(_handle_admin_force_daily, pattern="^admin_force_daily$")
 admin_event_menu_handler = CallbackQueryHandler(_handle_admin_event_menu, pattern="^admin_event_menu$")
@@ -613,45 +623,16 @@ admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern=
 admin_force_ticket_job_handler = CallbackQueryHandler(_handle_force_ticket_job, pattern="^admin_force_ticket_job$")
 admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_help$")
 
-# Lista Final para Exportação
 all_admin_handlers = [
-    admin_command_handler,
-    delete_player_handler,
-    inspect_item_handler,
-    force_daily_handler,
-    find_player_handler,
-    debug_player_handler,
-    get_id_command_handler,
-    fixme_handler,
-    admin_main_handler,
-    admin_force_daily_callback_handler,
-    admin_event_menu_handler,
-    admin_force_start_handler,
-    admin_force_end_handler,
-    admin_force_ticket_handler,
-    admin_force_ticket_job_handler,
-    clear_cache_conv_handler, # ✅ Restaurado
-    test_event_conv_handler,  # ✅ Restaurado
-    grant_item_conv_handler, 
-    # sell_gems_conv_handler, # Mantido comentado
-    my_data_handler,
-    reset_pvp_now_handler,
-    generate_equip_conv_handler,
-    file_id_conv_handler,
-    premium_panel_handler,
-    reset_panel_conversation_handler,
-    grant_skill_conv_handler,
-    grant_skin_conv_handler,
-    player_management_conv_handler, 
-    admin_help_handler,
-    delete_player_conv_handler, # ✅ Restaurado
-    hard_respec_all_handler, 
-    clean_clan_handler, 
-    change_id_conv_handler,     # ✅ Restaurado
-    fix_ghost_clan_handler,
-    fix_clan_conv_handler,      # ✅ Restaurado
-    debug_skill_handler,
-    fix_tomos_handler,
-    clean_market_handler,
-    fix_premium_handler
+    admin_command_handler, delete_player_handler, inspect_item_handler, force_daily_handler,
+    find_player_handler, debug_player_handler, get_id_command_handler, fixme_handler,
+    admin_main_handler, admin_force_daily_callback_handler, admin_event_menu_handler,
+    admin_force_start_handler, admin_force_end_handler, admin_force_ticket_handler,
+    admin_force_ticket_job_handler, clear_cache_conv_handler, test_event_conv_handler,
+    grant_item_conv_handler, my_data_handler, reset_pvp_now_handler, generate_equip_conv_handler,
+    file_id_conv_handler, premium_panel_handler, reset_panel_conversation_handler,
+    grant_skill_conv_handler, grant_skin_conv_handler, player_management_conv_handler,
+    admin_help_handler, delete_player_conv_handler, hard_respec_all_handler, clean_clan_handler,
+    change_id_conv_handler, fix_ghost_clan_handler, fix_clan_conv_handler, debug_skill_handler,
+    fix_tomos_handler, clean_market_handler, fix_premium_handler
 ]

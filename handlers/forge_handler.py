@@ -1,5 +1,5 @@
 # handlers/forge_handler.py
-# (VERSÃO BLINDADA: Auth Híbrida + Proteção de Job + Correção de Duplicatas)
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
 
 import logging
 from telegram import (
@@ -13,7 +13,7 @@ from telegram.helpers import escape_markdown
 from telegram.error import BadRequest, Forbidden
 
 # --- Módulos do Jogo ---
-from modules.auth_utils import get_current_player_id
+from modules.auth_utils import get_current_player_id # <--- ÚNICA FONTE DE VERDADE
 from modules import (
     player_manager,
     game_data,
@@ -98,7 +98,6 @@ async def execute_craft_logic(
         except Exception: pass
 
     # 2. Executa a lógica de finalização
-    # O user_id passado já deve ser string aqui
     result = await crafting_engine.finish_craft(user_id)
     
     if not isinstance(result, dict) or "item_criado" not in result:
@@ -128,7 +127,7 @@ async def execute_craft_logic(
     ]])
 
     await _send_or_edit_media(
-        # Criamos um "fake query" ou usamos None, pois essa função espera um objeto com .message
+        # Fake query wrapper
         type("Query", (), {"message": type("Msg", (), {"chat_id": chat_id})()})(), 
         context, 
         media_data, 
@@ -142,8 +141,12 @@ async def execute_craft_logic(
 
 async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    # ✅ FIX: Uso do helper de Auth
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
     user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
     
     player_data = await player_manager.get_player_data(user_id)
 
@@ -179,18 +182,20 @@ async def show_forge_professions_menu(update: Update, context: ContextTypes.DEFA
 
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
-async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, profession_id: str, page: int):
-    # ✅ FIX: Uso do helper de Auth (lida com user_data ou fallback)
-    # Como não temos 'update' aqui, construímos um wrapper simples ou usamos lógica direta se soubermos que update está no context
-    user_id = context.user_data.get("logged_player_id") or str(query.from_user.id)
+async def show_profession_recipes_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, profession_id: str, page: int):
+    # Nota: Recebemos update inteiro agora, para usar get_current_player_id
+    query = update.callback_query
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
     
     player_data = await player_manager.get_player_data(user_id)
-
     player_prof = (player_data or {}).get("profession", {})
     player_prof_type = player_prof.get("type")
     
     available_recipes = []
-    # Mostra receitas apenas se for a profissão do jogador
     if player_prof_type == profession_id:
         all_recipes = crafting_registry.all_recipes()
         for recipe_id, recipe_data in all_recipes.items():
@@ -228,9 +233,14 @@ async def show_profession_recipes_menu(query: CallbackQuery, context: ContextTyp
     media_data = _get_media_data(f"profissao_{profession_id}_menu") or {"id": "https://media.tenor.com/images/a82f3073995eb879d74709d437033527/tenor.gif", "type": "photo"}
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
-async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, recipe_id: str):
-    # ✅ FIX: Uso do helper de Auth
-    user_id = context.user_data.get("logged_player_id") or str(query.from_user.id)
+async def show_recipe_preview(update: Update, context: ContextTypes.DEFAULT_TYPE, recipe_id: str):
+    query = update.callback_query
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+        
     player_data = await player_manager.get_player_data(user_id)
 
     recipe_data = crafting_registry.get_recipe(recipe_id)
@@ -270,12 +280,18 @@ async def show_recipe_preview(query: CallbackQuery, context: ContextTypes.DEFAUL
     await _send_or_edit_media(query, context, media_data, text, InlineKeyboardMarkup(keyboard))
 
 # =====================================================
-# Lógica de Início e Término da Forja (AGORA COM VIDEO)
+# Lógica de Início e Término da Forja
 # =====================================================
 
-async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
-    # ✅ FIX: Auth Híbrida
-    user_id = context.user_data.get("logged_player_id") or str(query.from_user.id)
+async def confirm_craft_start(update: Update, recipe_id: str, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
+
     chat_id = query.message.chat_id
     message_id_antiga = query.message.message_id
     
@@ -288,18 +304,17 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
     duration = result.get("duration_seconds", 0)
     job_name = f"craft_{user_id}_{recipe_id}"
     
-    # ✅ FIX: Salva user_id (String) no job_data para recuperação segura
     job_data = {
         "recipe_id": recipe_id, 
         "message_id_notificacao": message_id_antiga,
-        "user_id": user_id 
+        "user_id": user_id # String ID
     }
     
     context.job_queue.run_once(
         finish_craft_notification_job,
         duration,
         chat_id=chat_id,
-        user_id=int(user_id) if user_id.isdigit() else None, # Opcional no argumento nomeado, mas passamos no data
+        user_id=int(user_id) if user_id.isdigit() else None, 
         name=job_name,
         data=job_data
     )
@@ -321,7 +336,6 @@ async def confirm_craft_start(query: CallbackQuery, recipe_id: str, context: Con
 async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Função chamada pelo JobQueue.
-    ✅ BLINDADA: Injeta sessão para evitar perda de contexto.
     """
     job = context.job
     if not job: return
@@ -330,10 +344,6 @@ async def finish_craft_notification_job(context: ContextTypes.DEFAULT_TYPE):
     data = job.data or {}
     raw_uid = data.get("user_id") or job.user_id
     user_id = str(raw_uid)
-    
-    # 2. Hack de Injeção de Sessão
-    if context.user_data is not None:
-        context.user_data["logged_player_id"] = user_id
     
     # 3. Executa
     await execute_craft_logic(
@@ -358,12 +368,13 @@ async def forge_callback_router(update: Update, context: ContextTypes.DEFAULT_TY
     
     try:
         action = parts[1]
+        # Passa 'update' para todas as funções agora, para suportar o Auth Helper
         if action == "main": await show_forge_professions_menu(update, context)
-        elif action == "prof": await show_profession_recipes_menu(query, context, parts[2], int(parts[3]))
-        elif action == "recipe": await show_recipe_preview(query, context, parts[2])
-        elif action == "confirm": await confirm_craft_start(query, parts[2], context)
+        elif action == "prof": await show_profession_recipes_menu(update, context, parts[2], int(parts[3]))
+        elif action == "recipe": await show_recipe_preview(update, context, parts[2])
+        elif action == "confirm": await confirm_craft_start(update, parts[2], context)
     except Exception as e:
-        logger.error(f"Erro forja callback {data}: {e}")
+        logger.error(f"Erro forja callback {data}: {e}", exc_info=True)
         try: await query.edit_message_text("❌ Erro interno na forja.")
         except: pass
         

@@ -1,10 +1,10 @@
 # registries/character.py
-# (VERSÃO CORRIGIDA: REMOVIDO SISTEMA ANTIGO DE NOME)
+# (VERSÃO CORRIGIDA: ATUALIZADO PARA O NOVO SISTEMA DE PROFISSÕES)
 
 import logging
 from telegram.ext import Application, BaseHandler 
 
-# 1. Do fluxo de início (Agora só importamos o Menu, pois o Auth cuida do resto)
+# 1. Do fluxo de início
 from handlers.start_handler import start_command_handler
 
 # 2. Do Status e Perfil
@@ -57,13 +57,12 @@ from handlers.class_evolution_handler import (
     start_trial_execute_handler,
 )
 
-# 6. Profissões
+# 6. Profissões (ATUALIZADO)
 from handlers.profession_handler import (
     job_menu_handler,
     job_pick_handler,
-    job_view_handler,
-    job_confirm_handler,
-    job_guide_handler,
+    job_list_handler,  # Substituiu job_view_handler
+    job_do_handler,    # Substituiu job_confirm_handler
 )
 
 # 7. Menu do Reino
@@ -137,11 +136,10 @@ def register_character_handlers(application: Application):
         start_trial_confirmation_handler,
         start_trial_execute_handler,
         
-        # Profissões
+        # Profissões (ATUALIZADO)
         job_menu_handler,
-        job_view_handler,     
-        job_confirm_handler,  
-        job_guide_handler,    
+        job_list_handler,     
+        job_do_handler,  
         
         # --- SISTEMA DE GUILDA ---
         adventurer_guild_handler,

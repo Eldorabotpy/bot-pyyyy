@@ -291,10 +291,23 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
             InlineKeyboardButton("⏱ 35x", callback_data=f"autohunt_start_35_{final_region_key}"),
         ])
 
+    # ==========================================================================
+    # 🛡️ TRAVA VISUAL DE COLETA (BLINDAGEM)
+    # ==========================================================================
     res_id = region_info.get("resource")
     if res_id:
-        # Lógica de profissão simplificada para exibição
-        keyboard.append([InlineKeyboardButton(f"⛏️ Coletar Recursos", callback_data=f"collect_{res_id}")])
+        req_prof = game_data.get_profession_for_resource(res_id)
+        
+        # Compatibilidade: verifica se o dado de profissão está em 'key' (novo) ou 'type' (legado)
+        p_prof_data = player_data.get("profession", {})
+        my_prof = p_prof_data.get("key") or p_prof_data.get("type")
+
+        # Regra: Só adiciona o botão se não houver requisito, OU se o jogador tiver a profissão exata
+        if not req_prof or (my_prof and my_prof == req_prof):
+            item_info = (game_data.ITEMS_DATA or {}).get(res_id, {})
+            item_name = item_info.get("display_name", res_id.replace("_", " ").title())
+            keyboard.append([InlineKeyboardButton(f"⛏️ Coletar {item_name}", callback_data=f"collect_{res_id}")])
+    # ==========================================================================
 
     keyboard.append([InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"), InlineKeyboardButton("👤 𝐏𝐞𝐫𝐟𝐢𝐥", callback_data="profile")])
     keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐩𝐚𝐫𝐚𝐫", callback_data="restore_durability_menu"), InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨", callback_data=f"region_info:{final_region_key}")])
@@ -474,7 +487,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finish = datetime.now(timezone.utc) + timedelta(seconds=dur)
     pdata['player_state'] = {
         'action': 'collecting',
-        'finish_time': finish.isoformat(),
+        'finish_time': finish.isoformat(), 
         'details': {'resource_id': res_id, 'item_id_yielded': item_yielded, 'quantity': 1}
     }
     player_manager.set_last_chat_id(pdata, cid)

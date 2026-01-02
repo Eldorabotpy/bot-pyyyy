@@ -1,12 +1,13 @@
 # handlers/work_handler.py
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
+
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from datetime import timedelta
 from modules import player_manager, game_data
 from modules.profession_engine import WORK_RECIPES, preview_work, start_work, finish_work
-
-
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +18,22 @@ def _humanize(seconds: int) -> str:
     return f"{int(seconds)} s"
 
 async def show_work_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query; await query.answer()
-    user_id = query.from_user.id
+    query = update.callback_query
+    await query.answer()
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
+    if not user_id:
+        await query.answer("Sessão inválida. Use /start.", show_alert=True)
+        return
 
     # <<< CORREÇÃO 1: Adiciona await >>>
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
          # Adiciona um fallback se os dados do jogador não forem encontrados
-         await query.edit_message_text("Erro ao carregar dados. Tente /start.")
+         try: await query.edit_message_text("Erro ao carregar dados. Tente /start.")
+         except: pass
          return
 
     # Lógica síncrona
@@ -55,9 +64,16 @@ async def show_work_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=query.message.chat_id, text=text, reply_markup=rm, parse_mode='HTML')
 
 async def start_work_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query; await query.answer()
-    user_id = query.from_user.id
+    query = update.callback_query
+    await query.answer()
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
+    
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
 
     rid = query.data.replace("work_start_", "")
 
@@ -84,8 +100,21 @@ async def start_work_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await player_manager.save_player_data(user_id, pdata)
 
     duration = int(res["duration_seconds"])
-    # agenda o término
-    context.job_queue.run_once(_finish_work_job, when=duration, user_id=user_id, chat_id=chat_id, data={"recipe_id": rid})
+    
+    # Agendamento do Job com ID Seguro
+    job_data = {
+        "recipe_id": rid,
+        "user_id": user_id  # String ID
+    }
+    
+    context.job_queue.run_once(
+        _finish_work_job, 
+        when=duration, 
+        chat_id=chat_id,
+        user_id=int(user_id) if str(user_id).isdigit() else None, # Opcional para legado
+        data=job_data,
+        name=f"work_{user_id}"
+    )
 
     try:
         await query.edit_message_text(text=f"🛠️ Trabalho iniciado! Conclusão em ~{_humanize(duration)}.", parse_mode='HTML')
@@ -94,14 +123,21 @@ async def start_work_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def _finish_work_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
-    user_id, chat_id = job.user_id, job.chat_id
-    recipe_id = (job.data or {}).get("recipe_id") # Pega recipe_id
+    if not job: return
+    
+    # Recupera ID seguro (String)
+    data = job.data or {}
+    raw_uid = data.get("user_id") or job.user_id
+    user_id = str(raw_uid)
+    chat_id = job.chat_id
+    recipe_id = data.get("recipe_id")
 
     # <<< CORREÇÃO 5: Adiciona await e carrega pdata >>>
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
          logger.error(f"_finish_work_job: pdata não encontrado para {user_id}")
-         await context.bot.send_message(chat_id=chat_id, text="Erro ao finalizar trabalho: jogador não encontrado.")
+         try: await context.bot.send_message(chat_id=chat_id, text="Erro ao finalizar trabalho: jogador não encontrado.")
+         except: pass
          return
 
     # <<< CORREÇÃO 6: Adiciona await e passa pdata >>>

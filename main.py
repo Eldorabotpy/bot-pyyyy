@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO: BARREIRA TOTAL - Bloqueia Texto e Botões em Grupos)
+# (VERSÃO: BARREIRA TOTAL - Híbrido Str/Int Compliance)
 
 from __future__ import annotations
 import asyncio
@@ -19,8 +19,8 @@ from telegram.ext import (
     ContextTypes, 
     CommandHandler, 
     CallbackQueryHandler,
-    TypeHandler,          # <--- O SEGREDO: Para interceptar tudo
-    ApplicationHandlerStop # <--- O FREIO: Para parar o processamento
+    TypeHandler,          
+    ApplicationHandlerStop 
 )
 from telegram.constants import ChatType
 
@@ -102,14 +102,19 @@ async def post_init_tasks(application: Application):
         logger.warning("Boss ativo detectado. Reiniciando status...")
         world_boss_manager.end_event(reason="Reinício")
     
+    # Validação segura do ID do Admin para envio de mensagem
     if ADMIN_ID:
         try: 
             msg_text = "🤖 <b>Sistema Online!</b>\n🛡️ <i>Barreira de Grupos: ATIVADA</i>"
+            # O send_message do Telegram aceita int ou str numérico no chat_id
+            target_chat_id = int(ADMIN_ID) if str(ADMIN_ID).isdigit() else ADMIN_ID
+            
             if STARTUP_IMAGE_ID:
-                await application.bot.send_photo(chat_id=ADMIN_ID, photo=STARTUP_IMAGE_ID, caption=msg_text, parse_mode="HTML")
+                await application.bot.send_photo(chat_id=target_chat_id, photo=STARTUP_IMAGE_ID, caption=msg_text, parse_mode="HTML")
             else:
-                await application.bot.send_message(chat_id=ADMIN_ID, text=msg_text, parse_mode="HTML")
-        except Exception: pass
+                await application.bot.send_message(chat_id=target_chat_id, text=msg_text, parse_mode="HTML")
+        except Exception as e: 
+            logger.error(f"Falha ao enviar msg de startup: {e}")
     
     # Recuperações e Watchdogs
     try:
@@ -169,7 +174,8 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
     IMG_BOAS_VINDAS = STARTUP_IMAGE_ID if STARTUP_IMAGE_ID else "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE"
 
     for member in update.message.new_chat_members:
-        if member.id == context.bot.id: continue
+        # Verifica ID do bot (trata como string para segurança)
+        if str(member.id) == str(context.bot.id): continue
         
         bot_username = context.bot.username
         deep_link = f"https://t.me/{bot_username}?start=criar_conta"
@@ -203,11 +209,17 @@ async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if update.effective_chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
         # Permite apenas o Admin (Você) usar o bot no grupo para manutenção
-        if update.effective_user and update.effective_user.id == ADMIN_ID:
-            return # ✅ ADMIN NO GRUPO PASSA
+        # Validação RÍGIDA de String para evitar erro de tipo entre int/str
+        if update.effective_user:
+            tg_user_id_str = str(update.effective_user.id)
+            admin_id_str = str(ADMIN_ID)
+            
+            if tg_user_id_str == admin_id_str:
+                return # ✅ ADMIN NO GRUPO PASSA
         
         # ⛔ USUÁRIO COMUM NO GRUPO É BLOQUEADO
         raise ApplicationHandlerStop
+
 # ==============================================================================
 # EXECUÇÃO PRINCIPAL
 # ==============================================================================

@@ -1,4 +1,5 @@
-# Arquivo: handlers/jobs.py (VERSÃO FINAL: NOTIFICAÇÃO DE LOCAL E ABA DE AVISOS)
+# handlers/jobs.py
+# (VERSÃO FINAL: NOTIFICAÇÃO DE LOCAL E ABA DE AVISOS + AUTH SEGURA)
 
 from __future__ import annotations
 
@@ -12,6 +13,8 @@ from zoneinfo import ZoneInfo
 from typing import Dict, Optional, Any
 from telegram.ext import ContextTypes
 from modules import game_data
+# --- AUTH IMPORT ---
+from modules.auth_utils import get_current_player_id # <--- ÚNICA FONTE DE VERDADE
 # --- MONGODB IMPORTS ---
 from pymongo import MongoClient
 from bson import ObjectId
@@ -63,13 +66,24 @@ def get_col_and_id(user_id):
     """
     Retorna a coleção correta e o formato do ID para query.
     - Int -> players_col, int
-    - Str -> users_col, ObjectId
+    - ObjectId -> users_col, ObjectId (CORREÇÃO CRÍTICA)
+    - Str (ObjectId válido) -> users_col, ObjectId
     """
+    # 1. Se já for ObjectId (o padrão do pymongo iterando)
+    if isinstance(user_id, ObjectId):
+        return users_col, user_id
+
+    # 2. Legado (Int)
     if isinstance(user_id, int):
         return players_col, user_id
+    
+    # 3. String (Pode ser ObjectId ou Int em string)
     elif isinstance(user_id, str):
         if users_col is not None and ObjectId.is_valid(user_id):
             return users_col, ObjectId(user_id)
+        if user_id.isdigit():
+            return players_col, int(user_id)
+            
     return None, None
 
 # ==============================================================================
@@ -91,8 +105,6 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
 # ==============================================================================
 # ⚔️ JOBS DE ARENA PVP (CORRIGIDOS)
 # ==============================================================================
-
-# Em handlers/jobs.py
 
 async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -121,7 +133,6 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
             if col is not None:
                 # ✅ AQUI ESTÁ A CORREÇÃO:
                 # Usamos $set no 'inventory.ticket_arena' para garantir que ele tenha exatamente 5 tickets.
-                # (Se o seu jogo for de acumular, mude $set para $inc)
                 result = col.update_one(
                     {"_id": query_id},
                     {
@@ -310,7 +321,6 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
 # ==============================================================================
 # 🛡️ JOB: KINGDOM DEFENSE
 # ==============================================================================
-# Em handlers/jobs.py
 
 async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     if not event_manager: return
@@ -707,7 +717,22 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
 async def cmd_force_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando ADMIN para forçar o reset diário de tickets PvP e mensal de Season."""
     from config import ADMIN_ID
-    if update.effective_user.id != ADMIN_ID:
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+    
+    # Validação de Admin (compatível com sistema híbrido)
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        return
+
+    owner_id = pdata.get("telegram_id_owner")
+    if owner_id is None and str(user_id).isdigit():
+        owner_id = int(user_id)
+    
+    if owner_id != ADMIN_ID:
         return
         
     await update.message.reply_text("🔄 <b>DEBUG:</b> Iniciando rotinas de PvP...", parse_mode="HTML")
@@ -716,10 +741,6 @@ async def cmd_force_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE
     await daily_pvp_entry_reset_job(context)
     
     # 2. Verifica/Reseta Season (Forçado)
-    # Nota: Se quiser forçar o reset da season mesmo não sendo dia 1, 
-    # você precisaria alterar a função job_pvp_monthly_reset para aceitar um flag 'force'.
-    # Por enquanto, chamamos o job padrão:
     await job_pvp_monthly_reset(context)
     
     await update.message.reply_text("✅ <b>DEBUG:</b> Rotinas PvP chamadas.", parse_mode="HTML")
-            

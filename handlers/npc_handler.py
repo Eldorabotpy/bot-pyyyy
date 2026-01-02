@@ -1,4 +1,5 @@
-# handlers/npc_handler.py (VERSÃO FINAL E COMPLETA)
+# handlers/npc_handler.py
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,6 +9,7 @@ from modules import player_manager, game_data
 from modules import file_ids as file_id_manager
 # Importa a variável das receitas de troca
 from modules.game_data.npc_trades import NPC_TRADES
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +19,14 @@ async def npc_trade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
+
+    if not user_id:
+        await context.bot.send_message(chat_id=chat_id, text="Sessão inválida. Use /start para logar.")
+        return
 
     try:
         npc_id = query.data.split(':')[1]
@@ -26,7 +34,6 @@ async def npc_trade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await context.bot.send_message(chat_id=chat_id, text="Erro: NPC não encontrado.")
         return
 
-    # <<< CORREÇÃO 1: Adiciona await >>>
     player_data = await player_manager.get_player_data(user_id)
     # Verifica se player_data foi carregado
     if not player_data:
@@ -38,15 +45,17 @@ async def npc_trade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     npc_info = NPC_TRADES.get(npc_id, {})
     npc_trades = npc_info.get('trades', {})
 
+    current_location = player_data.get('current_location', 'reino_eldora')
+
     if not npc_trades:
-        await context.bot.send_message(chat_id=chat_id, text="Este NPC não tem nada para trocar no momento.")
+        text_empty = "Este NPC não tem nada para trocar no momento."
         # Adiciona botão de voltar mesmo se não houver trocas
-        keyboard_empty = [[InlineKeyboardButton("⬅️ Voltar à Região", callback_data=f"open_region:{player_data.get('current_location')}")]]
+        keyboard_empty = [[InlineKeyboardButton("⬅️ Voltar à Região", callback_data=f"open_region:{current_location}")]]
         # Tenta editar a mensagem anterior se possível
         try:
-             await query.edit_message_text("Este NPC não tem nada para trocar no momento.", reply_markup=InlineKeyboardMarkup(keyboard_empty))
+             await query.edit_message_text(text_empty, reply_markup=InlineKeyboardMarkup(keyboard_empty))
         except Exception:
-             await context.bot.send_message(chat_id=chat_id, text="Este NPC não tem nada para trocar no momento.", reply_markup=InlineKeyboardMarkup(keyboard_empty))
+             await context.bot.send_message(chat_id=chat_id, text=text_empty, reply_markup=InlineKeyboardMarkup(keyboard_empty))
         return
 
     intro_message = npc_info.get('intro_message', "'Vê os meus produtos.'")
@@ -76,7 +85,7 @@ async def npc_trade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         keyboard.append([InlineKeyboardButton(f"Trocar por {output_name}", callback_data=f"npc_confirm:{npc_id}:{item_id_output}")])
 
     caption = "\n".join(caption_parts)
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar à Região", callback_data=f"open_region:{player_data.get('current_location')}")])
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar à Região", callback_data=f"open_region:{current_location}")])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Lógica de envio de mídia (síncrono + async)
@@ -109,8 +118,13 @@ async def npc_trade_confirm_callback(update: Update, context: ContextTypes.DEFAU
         await query.answer("Erro no callback da troca.", show_alert=True)
         return
 
-    user_id = query.from_user.id
-    # <<< CORREÇÃO 2: Adiciona await >>>
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
+    if not user_id:
+        await query.answer("Sessão inválida.", show_alert=True)
+        return
+
     player_data = await player_manager.get_player_data(user_id)
     # Verifica se player_data foi carregado
     if not player_data:
@@ -142,13 +156,11 @@ async def npc_trade_confirm_callback(update: Update, context: ContextTypes.DEFAU
     player_manager.spend_gold(player_data, gold_cost)
     player_manager.add_item_to_inventory(player_data, item_id_output, 1)
 
-    # <<< CORREÇÃO 3: Adiciona await >>>
     await player_manager.save_player_data(user_id, player_data)
 
     output_name = game_data.ITEMS_DATA.get(item_id_output, {}).get('display_name', item_id_output)
     await query.answer(f"✅ Troca bem-sucedida! Você obteve 1x {output_name}.", show_alert=True)
 
-    # <<< CORREÇÃO 4: Adiciona await >>>
     await npc_trade_callback(update, context) # Chama a função async que redesenha o menu
 
 # --- REGISTO DOS HANDLERS ---

@@ -1,5 +1,5 @@
 # handlers/guild/bank.py
-# (VERSÃO FINAL: BANCO COM LIMPEZA DE CHAT)
+# (VERSÃO ZERO LEGADO: BANCO DE CLÃ + AUTH SEGURA)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -14,6 +14,7 @@ ASKING_WITHDRAW_AMOUNT = 1
 
 # --- Helper de Limpeza ---
 async def _clean_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Remove mensagens de interação do bot para manter o chat limpo."""
     try: await update.message.delete()
     except: pass
     last_id = context.user_data.get('last_bot_msg_id')
@@ -24,21 +25,40 @@ async def _clean_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_clan_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # 🔒 SEGURANÇA: Apenas sessão validada (String ID)
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("❌ Sessão inválida. Use /start.", show_alert=True)
+        return
+
     await query.answer()
-    user_id = query.from_user.id
     
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        await query.edit_message_text("Perfil não encontrado.")
+        return
+
     clan_id = pdata.get("clan_id")
-    if not clan_id: return
+    if not clan_id: 
+        await query.edit_message_text("Você não possui um clã.")
+        return
 
     clan = await clan_manager.get_clan(clan_id)
+    if not clan:
+        await query.edit_message_text("Clã não encontrado.")
+        return
+
     saldo = clan.get("bank", 0)
     
+    # Renderiza Log
     logs = clan.get("bank_log", [])[-5:]
     log_text = ""
     for l in reversed(logs):
         emoji = "📥" if l.get('action') == 'depositou' else "📤"
-        log_text += f"{emoji} {l.get('player_name')}: {l.get('amount')} 🪙\n"
+        p_name = l.get('player_name', 'Desconhecido')
+        val = l.get('amount', 0)
+        log_text += f"{emoji} {p_name}: {val:,} 🪙\n"
 
     text = (
         f"🏦 <b>COFRE DO CLÃ</b>\n"
@@ -50,7 +70,7 @@ async def show_clan_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard = [
         [
             InlineKeyboardButton("📥 Depositar", callback_data="clan_deposit_start"),
-            InlineKeyboardButton("📤 Sacar (Líder)", callback_data="clan_withdraw_start")
+            # InlineKeyboardButton("📤 Sacar (Líder)", callback_data="clan_withdraw_start") # Futuro
         ],
         [InlineKeyboardButton("🔙 Voltar ao Clã", callback_data="clan_menu")]
     ]
@@ -60,13 +80,18 @@ async def show_clan_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     except:
         await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
-# --- DEPÓSITO ---
+# --- FLUXO DE DEPÓSITO ---
 
 async def start_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    
+    # 🔒 SEGURANÇA PREVENTIVA
+    if not get_current_player_id(update, context):
+        await query.answer("Sessão expirada.")
+        return ConversationHandler.END
+
     await query.answer()
     
-    # Tenta editar para a pergunta, se falhar (era foto), manda novo
     msg_text = "📥 <b>Depósito</b>\nDigite o valor que deseja doar:"
     try:
         msg = await query.edit_message_text(msg_text, parse_mode="HTML")
@@ -79,47 +104,63 @@ async def start_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASKING_DEPOSIT_AMOUNT
 
 async def receive_deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 🔒 SEGURANÇA: Identificação via Auth Central
     user_id = get_current_player_id(update, context)
+    if not user_id:
+        return ConversationHandler.END
+
     text = update.message.text.strip()
-    
-    await _clean_chat(update, context) # Limpa pergunta e resposta
+    await _clean_chat(update, context) 
 
     if not text.isdigit():
-        msg = await update.message.reply_text("❌ Digite apenas números.")
+        msg = await update.message.reply_text("❌ Digite apenas números inteiros.")
         context.user_data['last_bot_msg_id'] = msg.message_id
         return ASKING_DEPOSIT_AMOUNT
         
     amount = int(text)
-    if amount <= 0: return ConversationHandler.END
+    if amount <= 0: 
+        return ConversationHandler.END
     
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        return ConversationHandler.END
+
+    # Verifica saldo e remove
     if not player_manager.spend_gold(pdata, amount):
-        msg = await update.message.reply_text("❌ Ouro insuficiente.")
+        msg = await update.message.reply_text("❌ Ouro insuficiente no seu inventário.")
         context.user_data['last_bot_msg_id'] = msg.message_id
         return ConversationHandler.END
         
-    # Deposita
+    # Efetua Depósito
     clan_id = pdata.get("clan_id")
-    await clan_manager.bank_deposit(clan_id, user_id, amount)
+    if clan_id:
+        await clan_manager.bank_deposit(clan_id, user_id, amount)
+    
+    # Persiste alteração do jogador (ouro removido)
     await player_manager.save_player_data(user_id, pdata)
     
-    # Manda mensagem de sucesso com botão de voltar
+    # Feedback
     kb = [[InlineKeyboardButton("🔙 Voltar ao Banco", callback_data="clan_bank_menu")]]
     await context.bot.send_message(
         chat_id=update.effective_chat.id, 
-        text=f"✅ Depósito de {amount:,} Ouro realizado!", 
-        reply_markup=InlineKeyboardMarkup(kb)
+        text=f"✅ <b>Sucesso!</b> Você depositou {amount:,} Ouro no cofre do clã.", 
+        reply_markup=InlineKeyboardMarkup(kb),
+        parse_mode="HTML"
     )
     return ConversationHandler.END
 
 async def cancel_op(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _clean_chat(update, context)
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Cancelado.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="clan_bank_menu")]]))
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, 
+        text="❌ Operação cancelada.", 
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="clan_bank_menu")]])
+    )
     return ConversationHandler.END
 
-# --- HANDLERS ---
+# --- REGISTRO DOS HANDLERS ---
 clan_bank_menu_handler = CallbackQueryHandler(show_clan_bank_menu, pattern=r'^clan_bank_menu$')
-clan_bank_log_handler = CallbackQueryHandler(lambda u,c: u.callback_query.answer("Histórico Completo"), pattern=r'^clan_bank_log$')
+clan_bank_log_handler = CallbackQueryHandler(lambda u,c: u.callback_query.answer("Use o menu acima."), pattern=r'^clan_bank_log$')
 
 clan_deposit_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(start_deposit, pattern=r'^clan_deposit_start$')],
@@ -127,8 +168,7 @@ clan_deposit_conv_handler = ConversationHandler(
     fallbacks=[CommandHandler('cancelar', cancel_op)]
 )
 
-# (Adicione o saque aqui seguindo a mesma lógica de _clean_chat se quiser)
 clan_withdraw_conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(lambda u,c: u.callback_query.answer("Saque"), pattern=r'^clan_withdraw_start$')],
+    entry_points=[CallbackQueryHandler(lambda u,c: u.callback_query.answer("Em breve!"), pattern=r'^clan_withdraw_start$')],
     states={}, fallbacks=[]
 )

@@ -24,13 +24,60 @@ from . import pvp_utils
 from . import tournament_system
 # import do terneio
 from . import tournament_system
-from modules.auth_utils import get_current_player_id
+from modules.auth_utils import get_current_player_id, requires_login
 
 logger = logging.getLogger(__name__)
+
+users_collection = None
+if players_collection is not None:
+    try: users_collection = players_collection.database["users"]
+    except: pass
 
 PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
 PVP_HISTORICO = "pvp_historico"
+
+async def find_opponents_hybrid(player_elo: int, my_id: str, limit_per_col=5) -> list:
+    """
+    Busca oponentes em AMBAS as coleções (players e users) e retorna misturado.
+    """
+    candidates = []
+    
+    # Faixa de Elo aceitável (+/- 500 pontos)
+    min_elo = max(0, player_elo - 500)
+    max_elo = player_elo + 500
+    
+    query = {
+        "pvp_points": {"$gte": min_elo, "$lte": max_elo}
+    }
+
+    # 1. Busca no Legado (Players)
+    if players_collection is not None:
+        try:
+            pipeline = [{"$match": query}, {"$sample": {"size": limit_per_col}}]
+            candidates.extend(list(players_collection.aggregate(pipeline)))
+        except Exception as e:
+            logger.error(f"Erro matchmaking legacy: {e}")
+
+    # 2. Busca no Novo (Users)
+    if users_collection is not None:
+        try:
+            pipeline = [{"$match": query}, {"$sample": {"size": limit_per_col}}]
+            candidates.extend(list(users_collection.aggregate(pipeline)))
+        except Exception as e:
+            logger.error(f"Erro matchmaking new: {e}")
+
+    # 3. Filtra a si mesmo
+    final_list = []
+    str_my_id = str(my_id)
+    
+    for c in candidates:
+        c_id = c.get("_id")
+        if str(c_id) == str_my_id: continue
+        c["_id"] = c_id 
+        final_list.append(c)
+
+    return final_list
 
 # =============================================================================
 # FUNÇÃO AUXILIAR SEGURA
@@ -82,257 +129,101 @@ async def torneio_ready_callback(update: Update, context: ContextTypes.DEFAULT_T
 # HANDLERS
 # =============================================================================
 
+@requires_login
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    if not query.message:
-        return
-
-    # Variável para usar em caso de erro visual no início
-    original_message_is_media = bool(query.message.photo or query.message.video or query.message.animation)
-        
-    await query.answer("🔍 Buscando oponente na rede...")
-    user_id = query.from_user.id
+    await query.answer("🔍 Buscando oponente digno...")
     
-    # 1. Carrega dados do Jogador
-    player_data = await player_manager.get_player_data(user_id)
-    if not player_data:
-        await query.answer("Erro ao carregar dados.", show_alert=True)
-        return
-
-    # 2. Verifica se tem Ticket (MAS NÃO GASTA AINDA)
-    item_id_entrada = "ticket_arena" 
-    if not player_manager.has_item(player_data, item_id_entrada, quantity=1):
-        current_tickets = player_data.get('inventory', {}).get(item_id_entrada, 0)
-        item_name = game_data.ITEMS_DATA.get(item_id_entrada, {}).get('display_name', item_id_entrada)
-        await context.bot.answer_callback_query(query.id, f"Você não tem {item_name} suficiente! ({current_tickets} restantes)", show_alert=True)
-        return
-
-    # 3. Busca Oponentes (LÓGICA OTIMIZADA MONGODB)
-    my_points = player_manager.get_pvp_points(player_data)
-    opponents_found = []
+    user_id = get_current_player_id(update, context)
+    pdata = await player_manager.get_player_data(user_id)
     
-    try:
-        if players_collection is not None:
-            pipeline = [
-                {"$match": {"_id": {"$ne": user_id}}},
-                {"$match": {"level": {"$gte": 1}}},
-                {"$sample": {"size": 30}}
-            ]
-            
-            cursor = players_collection.aggregate(pipeline)
-            potential_opponents = list(cursor)
-            
-            # Listas de prioridade
-            match_perfeito = []   # +/- 300 pontos
-            match_aceitavel = []  # +/- 1000 pontos
-            match_qualquer = []   # Resto
-            
-            for opp in potential_opponents:
-                try:
-                    opp_points = opp.get("pvp_points", 0)
-                    diff = abs(my_points - opp_points)
-                    opp_id = opp["_id"]
-                    
-                    if diff <= 300:
-                        match_perfeito.append(opp_id)
-                    elif diff <= 1000:
-                        match_aceitavel.append(opp_id)
-                    else:
-                        match_qualquer.append(opp_id)
-                except Exception: continue
-            
-            # Escolhe a melhor lista disponível
-            if match_perfeito:
-                opponents_found = match_perfeito
-            elif match_aceitavel:
-                opponents_found = match_aceitavel
-            else:
-                opponents_found = match_qualquer
-                
-        else:
-            # --- FALLBACK (Caso DB falhe, usa o iterador antigo) ---
-            async for opponent_id, opp_data in player_manager.iter_players():
-                if opponent_id == user_id: continue
-                opponents_found.append(opponent_id)
-
-    except Exception as e_search:
-        logger.error(f"Erro na busca PvP: {e_search}")
-        await query.answer("Erro técnico na busca.", show_alert=True)
+    # Verifica Tickets
+    tickets = player_manager.get_pvp_entries(pdata)
+    if tickets <= 0:
+        await query.edit_message_text(
+            "🚫 <b>Sem Tickets de Arena!</b>\n\n"
+            "Você usou todas as suas 5 lutas diárias.\n"
+            "Volte amanhã ou use um item de recarga.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]])
+        , parse_mode="HTML")
         return
 
-    # 4. Decisão Final e Combate
-    if opponents_found:
-        final_opponent_id = random.choice(opponents_found)
+    # Matchmaking
+    my_points = pdata.get("pvp_points", 0)
+    opponents = await find_opponents_hybrid(my_points, user_id)
+    
+    if not opponents:
+        # Se não achou ninguém perto, pega qualquer um aleatório
+        opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=10) # range maior implícito na lógica se quiser, ou só retry
         
-        # AGORA SIM: Consome o Ticket
-        if not player_manager.remove_item_from_inventory(player_data, item_id_entrada, quantity=1):
-            await query.answer("Erro ao consumir ticket.", show_alert=True)
+        if not opponents:
+            await query.edit_message_text("😔 A Arena está vazia no momento. Tente mais tarde.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]))
             return
+
+    enemy_doc = random.choice(opponents)
+    enemy_id = enemy_doc["_id"]
+    
+    # Carrega dados completos do inimigo via player_manager (garante cálculo de stats)
+    # Note que enemy_id pode ser int ou ObjectId, o manager lida com isso.
+    enemy_data = await player_manager.get_player_data(enemy_id)
+    
+    if not enemy_data:
+        await query.edit_message_text("Erro ao carregar oponente. Tente novamente.")
+        return
+
+    # Consome Ticket
+    player_manager.use_pvp_entry(pdata)
+    await player_manager.save_player_data(user_id, pdata)
+
+    # Executa Batalha
+    winner_id, log = pvp_battle.simular_batalha_pvp(pdata, enemy_data)
+    
+    # Processa Resultado
+    is_win = (str(winner_id) == str(user_id))
+    
+    # Cálculos de recompensa...
+    elo_delta = 25 if is_win else -15
+    gold_reward = 100 if is_win else 10
+    
+    # Aplica no Jogador
+    pdata = await player_manager.get_player_data(user_id) # Recarrega pra garantir
+    new_points = max(0, pdata.get("pvp_points", 0) + elo_delta)
+    pdata["pvp_points"] = new_points
+    
+    if is_win: 
+        pdata["pvp_wins"] = pdata.get("pvp_wins", 0) + 1
+        player_manager.add_gold(pdata, gold_reward)
+    else:
+        pdata["pvp_losses"] = pdata.get("pvp_losses", 0) + 1
+        player_manager.add_gold(pdata, gold_reward)
         
-        # Salva o inventário atualizado
-        await player_manager.save_player_data(user_id, player_data)
+    await player_manager.save_player_data(user_id, pdata)
+    
+    # Aplica no Inimigo (Passivo)
+    # Inimigos só perdem/ganham pontos, não gold/wins passivas (decisão de design comum)
+    enemy_points = max(0, enemy_data.get("pvp_points", 0) - (15 if is_win else -25))
+    enemy_data["pvp_points"] = enemy_points
+    await player_manager.save_player_data(enemy_id, enemy_data)
 
-        # Prepara dados do oponente
-        opponent_data = await player_manager.get_player_data(final_opponent_id)
-        if not opponent_data:
-            await query.answer("Oponente inválido.", show_alert=True)
-            return
-            
-        # Configura Modificadores do Dia
-        today_weekday = datetime.datetime.now().weekday()
-        modifier = ARENA_MODIFIERS.get(today_weekday)
-        current_effect = modifier.get("effect") if modifier else None
-
-        caption_batalha = "⚔️ <b>Oponente encontrado!</b> Simulando batalha..."
-
-        # --- Limpeza e Envio da Mídia (Visual) ---
-        try: await query.delete_message()
-        except Exception: pass
-
-        sent_msg = None
-        try:
-            # Tenta pegar a Mídia da Classe do Oponente
-            raw_class = opponent_data.get("class_key") or opponent_data.get("class") or "guerreiro"
-            class_slug = raw_class.lower().strip()
-            video_key = f"classe_{class_slug}_media"
-            
-            media_data = file_ids.get_file_data(video_key) 
-
-            # LÓGICA DE VÍDEO CORRIGIDA
-            if media_data and media_data.get("id"):
-                file_id = media_data["id"]
-                # Verifica explicitamente se é vídeo
-                if media_data.get("type") == "video":
-                    sent_msg = await context.bot.send_video(
-                        chat_id=query.message.chat_id, 
-                        video=file_id, 
-                        caption=caption_batalha, 
-                        parse_mode=ParseMode.HTML
-                    )
-                else:
-                    # Se não for vídeo, manda foto
-                    sent_msg = await context.bot.send_photo(
-                        chat_id=query.message.chat_id, 
-                        photo=file_id, 
-                        caption=caption_batalha, 
-                        parse_mode=ParseMode.HTML
-                    )
-            else:
-                # Fallback se não tiver mídia da classe
-                sent_msg = await context.bot.send_message(
-                    chat_id=query.message.chat_id, 
-                    text=caption_batalha, 
-                    parse_mode=ParseMode.HTML
-                )
-        except Exception as e:
-            logger.error(f"Erro visual ao enviar mídia: {e}")
-            sent_msg = await context.bot.send_message(chat_id=query.message.chat_id, text="⚔️ Batalha Iniciada!")
-
-        # --- SIMULAÇÃO DA BATALHA ---
-        vencedor_id, log_completo = await pvp_battle.simular_batalha_completa(user_id, final_opponent_id, modifier_effect=current_effect)
-        
-        # Definição de Ganhos/Perdas
-        elo_ganho_base = 25; elo_perdido_base = 15; log_final = list(log_completo)
-        OURO_BASE_RECOMPENSA = 50
-        OURO_FINAL_RECOMPENSA = OURO_BASE_RECOMPENSA
-        
-        if current_effect == "prestige_day": 
-            elo_ganho = int(elo_ganho_base * 1.5); elo_perdido = int(elo_perdido_base * 1.5)
-            log_final.append("\n🏆 <b>Dia do Prestígio!</b> Pontos de Elo aumentados!")
-        else: 
-            elo_ganho = elo_ganho_base; elo_perdido = elo_perdido_base
-        
-        if current_effect == "greed_day": 
-            OURO_FINAL_RECOMPENSA *= 2
-            log_final.append("💰 <b>Dia da Ganância!</b> Ouro dobrado!")
-        
-        # --- SALVA RESULTADOS (Seguro) ---
-        if vencedor_id == user_id:
-            await aplicar_resultado_pvp_seguro(user_id, elo_ganho, OURO_FINAL_RECOMPENSA)
-            await aplicar_resultado_pvp_seguro(final_opponent_id, -elo_perdido, 0)
-            log_final.append(f"\n🏆 Você ganhou <b>+{elo_ganho}</b> pontos de Elo!")
-            log_final.append(f"💰 Você recebeu <b>{OURO_FINAL_RECOMPENSA}</b> de ouro!")
-
-        elif vencedor_id == final_opponent_id:
-            await aplicar_resultado_pvp_seguro(user_id, -elo_perdido, 0)
-            await aplicar_resultado_pvp_seguro(final_opponent_id, elo_ganho, 0)
-            log_final.append(f"\n❌ Você perdeu <b>-{elo_perdido}</b> pontos de Elo.")
-
-        # --- ANIMAÇÃO DO LOG (Loop Janela Deslizante) ---
-        reply_markup_final = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]])
-        
-        if sent_msg:
-            dest_chat_id = sent_msg.chat_id
-            dest_msg_id = sent_msg.message_id
-            is_media = bool(sent_msg.photo or sent_msg.video)
-            
-            header = log_final[0] # Cabeçalho
-            corpo_log = log_final[1:] # Ação
-                
-            passo = 4 
-            tamanho_janela = 10 
-
-            for i in range(0, len(corpo_log), passo):
-                is_last_frame = (i + passo) >= len(corpo_log)
-                markup = reply_markup_final if is_last_frame else None
-                    
-                # CÁLCULO DA JANELA
-                fim_slice = i + passo
-                inicio_slice = max(0, fim_slice - tamanho_janela)
-                
-                chunk_atual = corpo_log[inicio_slice : fim_slice]
-                    
-                if is_last_frame:
-                    # No final, garante mostrar o resultado (últimas 12 linhas)
-                    chunk_atual = corpo_log[max(0, len(corpo_log) - 12):]
-                    texto_combate = "\n".join(chunk_atual)
-                    texto_frame = f"{header}\n\n📜 <b>Histórico Recente:</b>\n{texto_combate}"
-                else:
-                    texto_combate = "\n".join(chunk_atual)
-                    rodape = "\n\n⚔️ <i>A batalha continua...</i>"
-                    texto_frame = f"{header}\n\n{texto_combate}{rodape}"
-                
-                # Proteção de limite de caracteres
-                if len(texto_frame) > 1000: 
-                    texto_frame = texto_frame[:990] + "..."
-
-                try:
-                    if is_media:
-                        await context.bot.edit_message_caption(
-                            chat_id=dest_chat_id,
-                            message_id=dest_msg_id,
-                            caption=texto_frame,
-                            reply_markup=markup,
-                            parse_mode=ParseMode.HTML
-                        )
-                    else:
-                        await context.bot.edit_message_text(
-                            chat_id=dest_chat_id,
-                            message_id=dest_msg_id,
-                            text=texto_frame,
-                            reply_markup=markup,
-                            parse_mode=ParseMode.HTML
-                        )
-                except Exception:
-                    pass 
-                    
-                if not is_last_frame:
-                    await asyncio.sleep(2.5)
-        else:
-            # Fallback se a mensagem sumiu
-            await context.bot.send_message(chat_id=query.message.chat_id, text="\n".join(log_final[-10:]), reply_markup=reply_markup_final)
-
-    else: 
-        # 5. CASO NÃO ACHE NINGUÉM
-        no_opp_msg = "🛡️ <b>Arena Vazia!</b>\nNão encontramos oponentes neste momento.\n<i>Seu ticket foi preservado.</i>"
-        keyboard = [[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        try:
-            if original_message_is_media: await query.edit_message_caption(caption=no_opp_msg, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-            else: await query.edit_message_text(text=no_opp_msg, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-        except Exception: pass
+    # Renderiza Log
+    result_text = "🏆 <b>VITÓRIA!</b>" if is_win else "💀 <b>DERROTA...</b>"
+    full_log = "\n".join(log[-10:]) # Últimas 10 linhas para não floodar
+    
+    msg = (
+        f"{result_text}\n\n"
+        f"🆚 <b>Oponente:</b> {enemy_data.get('character_name')}\n"
+        f"📜 <b>Resumo da Luta:</b>\n{full_log}\n\n"
+        f"💰 <b>Ouro:</b> +{gold_reward}\n"
+        f"📈 <b>Pontos:</b> {elo_delta:+d} (Total: {new_points})"
+    )
+    
+    kb = [[InlineKeyboardButton("⚔️ Lutar Novamente", callback_data=PVP_PROCURAR_OPONENTE)],
+          [InlineKeyboardButton("⬅️ Menu Arena", callback_data="pvp_arena")]]
+          
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 
+@requires_login
 async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
@@ -435,92 +326,69 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: 
             pass
 
+@requires_login
 async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Função 'Histórico' ainda em construção!", show_alert=True)
 
+@requires_login
 async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = get_current_player_id(update, context)
-    chat_id = update.effective_chat.id
+    pdata = await player_manager.get_player_data(user_id)
+    
+    if not pdata: return
 
-    try: await pvp_utils.verificar_reset_temporada(context.bot)
-    except: pass
+    # Dados do Jogador
+    points = pdata.get("pvp_points", 0)
+    wins = pdata.get("pvp_wins", 0)
+    losses = pdata.get("pvp_losses", 0)
+    elo_name = pvp_utils.get_player_elo(points)
+    
+    # Efeito do Dia
+    weekday = datetime.datetime.now().weekday()
+    day_effect = ARENA_MODIFIERS.get(weekday, {})
+    day_desc = day_effect.get("description", "Sem efeitos hoje.")
+    day_title = day_effect.get("name", "Dia Comum")
 
-    try:
-        player_data = await player_manager.get_player_data(user_id)
-        if not player_data:
-            await context.bot.send_message(chat_id, "Você precisa criar um personagem primeiro com /start.")
-            return
-        
-        item_id_entrada = "ticket_arena"
-        current_tickets = player_data.get('inventory', {}).get(item_id_entrada, 0)
-        
-        today_weekday = datetime.datetime.now().weekday()
-        modifier = ARENA_MODIFIERS.get(today_weekday)
-        modifier_text = ""
-        if modifier:
-            modifier_text = (f"\n🔥 <b>Modificador de Hoje: {modifier['name']}</b>\n<i>{modifier['description']}</i>\n")
-        
-        caption = (
-            "⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 ⚔️\n"
-            f"🎟️ <b>Tickets Disponíveis: {current_tickets}x</b>\n"
-            f"{modifier_text}\n"
-            "Escolha seu caminho, campeão:"
-        )
+    # Mídia
+    media = file_ids.get_file_data("menu_arena_pvp")
+    
+    txt = (
+        f"⚔️ <b>ARENA DE ELDORA</b> ⚔️\n\n"
+        f"👤 <b>Guerreiro:</b> {pdata.get('character_name')}\n"
+        f"🏆 <b>Elo:</b> {elo_name} ({points} pts)\n"
+        f"📊 <b>Histórico:</b> {wins}V / {losses}D\n\n"
+        f"📅 <b>Evento de Hoje:</b> {day_title}\n"
+        f"<i>{day_desc}</i>"
+    )
 
-        # --- BOTÕES PADRÃO ---
-        keyboard = [
-            [InlineKeyboardButton("⚔️ Procurar Oponente (Ranqueado)", callback_data=PVP_PROCURAR_OPONENTE)],
-            [InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
-             InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO)],
-            [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")],
-        ]
+    kb = [
+        [InlineKeyboardButton("⚔️ PROCURAR OPONENTE", callback_data=PVP_PROCURAR_OPONENTE)],
+        [InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING), 
+         InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO)],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")]
+    ]
 
-        # ====================================================
-        # 👇 INTEGRAÇÃO COM O TORNEIO (CÓDIGO NOVO) 👇
-        # ====================================================
-        try:
-            t_data = tournament_system.get_tournament_data()
-            status = t_data.get("status")
-            
-            # 1. Fase de Inscrição
-            if status == "registration":
-                # Verifica se já está inscrito
-                participantes = t_data.get("participants", [])
-                if user_id in participantes:
-                    # Botão informativo (sem ação)
-                    keyboard.insert(0, [InlineKeyboardButton("✅ Inscrito no Torneio", callback_data="noop")])
-                else:
-                    # Botão de ação
-                    keyboard.insert(0, [InlineKeyboardButton("✍️ Inscrever-se no Torneio", callback_data="torneio_signup")])
-            
-            # 2. Fase de Luta Ativa (Botão de Pronto)
-            elif status == "active":
-                match_state = tournament_system.CURRENT_MATCH_STATE
-                # Só mostra o botão se houver luta ativa E o usuário for um dos lutadores
-                if match_state["active"] and user_id in [match_state["p1"], match_state["p2"]]:
-                    keyboard.insert(0, [InlineKeyboardButton("🔥 ⚔️ ESTOU PRONTO! ⚔️ 🔥", callback_data="torneio_ready")])
-        except Exception as e:
-            logger.error(f"Erro ao integrar torneio no menu: {e}")
-        # ====================================================
+    # Torneio Ativo?
+    if tournament_system.CURRENT_MATCH_STATE["active"]:
+        kb.insert(0, [InlineKeyboardButton("🏆 TORNEIO (Em andamento)", callback_data="torneio_menu")])
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        if update.callback_query:
-            try: await update.callback_query.delete_message()
-            except: pass
-
-        media_data = file_ids.get_file_data("pvp_arena_media")
-        if media_data and media_data.get("id"):
+    if update.callback_query:
+        await update.callback_query.answer()
+        # Lógica de envio de mídia segura (igual ao seu padrão)
+        if media:
             try:
-                await context.bot.send_photo(chat_id=chat_id, photo=media_data["id"], caption=caption, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-                return
-            except Exception: pass
-
-        await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-
-    except Exception as e_geral:
-        logger.error(f"Erro pvp_menu: {e_geral}")
+                if media["type"] == "video":
+                    await update.callback_query.edit_message_caption(caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                else:
+                    await update.callback_query.edit_message_text(text=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            except:
+                # Fallback se não der pra editar
+                await context.bot.send_message(update.effective_chat.id, txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        else:
+            await update.callback_query.edit_message_text(text=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    else:
+        await update.message.reply_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 async def torneio_signup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

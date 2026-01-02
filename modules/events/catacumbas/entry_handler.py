@@ -1,4 +1,5 @@
 # modules/events/catacumbas/entry_handler.py
+# (VERSÃO BLINDADA: Auth Híbrida + Correção de IDs)
 
 import logging
 import html
@@ -6,7 +7,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceRe
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, CommandHandler
 from modules import player_manager
 from modules.auth_utils import get_current_player_id
-
 
 try:
     from modules import file_id_manager as media_ids
@@ -81,7 +81,8 @@ def _format_lobby_status(lobby: dict) -> str:
     )
     
     for pid, name in players.items():
-        role = "👑 Líder" if pid == leader_id else "🛡️ Membro"
+        # Compara como string para garantir segurança (int vs str/ObjectId)
+        role = "👑 Líder" if str(pid) == str(leader_id) else "🛡️ Membro"
         safe_name = escape_markdown(name)
         txt += f" - {role}: {safe_name}\n"
 
@@ -156,10 +157,15 @@ async def menu_catacumba_main(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if query: await query.answer()
     
-    existing_lobby = raid_manager.get_player_lobby(update.effective_user.id)
+    # 🔐 AUTH HÍBRIDA
+    user_id = get_current_player_id(update, context)
+    
+    existing_lobby = raid_manager.get_player_lobby(user_id)
     if existing_lobby:
         text = _format_lobby_status(existing_lobby)
-        kb = _lobby_keyboard(is_leader=(existing_lobby['leader_id'] == update.effective_user.id))
+        # Comparação segura
+        is_leader = (str(existing_lobby['leader_id']) == str(user_id))
+        kb = _lobby_keyboard(is_leader=is_leader)
         
         msg = await send_event_interface(update, context, text, kb, config.MEDIA_KEYS["lobby_screen"])
         if msg:
@@ -176,9 +182,11 @@ async def menu_catacumba_main(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def create_room_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = update.effective_user
+    # 🔐 AUTH HÍBRIDA
+    user_id = get_current_player_id(update, context)
     
     # Checagem de Chave
-    pdata = await player_manager.get_player_data(user.id)
+    pdata = await player_manager.get_player_data(user_id)
     inv = pdata.get("inventory", {})
     
     # Verifica chave (comente se estiver testando sem chave)
@@ -186,11 +194,12 @@ async def create_room_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Sem chaves! Use /debug_key para testar.", show_alert=True)
         return
 
-    code = raid_manager.create_lobby(user.id, user.first_name)
+    # Passamos o user_id seguro para o manager
+    code = raid_manager.create_lobby(user_id, user.first_name)
     if code:
         # Consome chave
         inv[config.REQUIRED_KEY_ITEM] = inv.get(config.REQUIRED_KEY_ITEM, 1) - 1
-        await player_manager.save_player_data(user.id, pdata)
+        await player_manager.save_player_data(user_id, pdata)
         
         lobby = raid_manager.LOBBIES[code]
         text = _format_lobby_status(lobby)
@@ -214,7 +223,9 @@ async def refresh_lobby_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     text = _format_lobby_status(lobby)
-    kb = _lobby_keyboard(is_leader=(lobby['leader_id'] == user_id))
+    # Comparação segura
+    is_leader = (str(lobby['leader_id']) == str(user_id))
+    kb = _lobby_keyboard(is_leader=is_leader)
     
     try:
         await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
@@ -244,9 +255,10 @@ async def leave_lobby_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start_raid_run_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from . import combat_handler 
     query = update.callback_query
-    user = update.effective_user
+    # 🔐 AUTH HÍBRIDA
+    user_id = get_current_player_id(update, context)
     
-    session = raid_manager.start_raid_from_lobby(user.id)
+    session = raid_manager.start_raid_from_lobby(user_id)
     if not session:
         await query.answer(f"Erro: Mínimo {config.MIN_PLAYERS} jogadores ou você não é líder.", show_alert=True)
         return
@@ -254,12 +266,17 @@ async def start_raid_run_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer("🚀 INICIANDO!")
     
     # 1. Atualiza tela do Líder
-    await combat_handler.refresh_battle_interface(update, context, session, user.id)
+    await combat_handler.refresh_battle_interface(update, context, session, user_id)
     
     # 2. Notifica todos os outros
     for pid in session["players"]:
-        if pid != user.id:
+        if str(pid) != str(user_id):
             try:
+                # O pid aqui é do jogo, que pode ser o chat_id do telegram
+                # Se for conta login (str), não dá pra mandar mensagem direta via bot.send_message
+                # a não ser que tenhamos o chat_id salvo.
+                # Assumindo que pid de sessão ativa é roteável ou temos chat_id no player_data.
+                # Se não der, o try/except segura.
                 await context.bot.send_message(
                     pid, 
                     "⚔️ **O LÍDER ENTROU NA CATACUMBA!**\nAperte abaixo para entrar no combate.",
@@ -280,18 +297,22 @@ async def ask_for_code_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_code_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().upper()
     user = update.effective_user
+    # 🔐 AUTH HÍBRIDA
+    user_id = get_current_player_id(update, context)
     
     if len(text) != 5: return 
 
-    # Tenta entrar na sala
-    res = raid_manager.join_lobby_by_code(user.id, user.first_name, text)
+    # Tenta entrar na sala usando o user_id seguro
+    res = raid_manager.join_lobby_by_code(user_id, user.first_name, text)
     
     try: await update.message.delete() # Limpa o código digitado
     except: pass
     
+    # Chat ID para respostas de erro
+    chat_id = update.effective_chat.id
+
     if res == "success":
         # 1. Tenta atualizar a tela do Líder IMEDIATAMENTE
-        # Passamos o nome do user para notificação de fallback
         await _update_leader_interface(context, text, new_player_name=user.first_name)
         
         # 2. Mostra a sala para quem acabou de entrar
@@ -302,13 +323,13 @@ async def process_code_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await send_event_interface(update, context, formatted_text, kb, config.MEDIA_KEYS["lobby_screen"])
         
     elif res == "not_found":
-        await context.bot.send_message(user.id, "🚫 Sala não encontrada.")
+        await context.bot.send_message(chat_id, "🚫 Sala não encontrada.")
     elif res == "full":
-        await context.bot.send_message(user.id, "🚫 Sala cheia!")
+        await context.bot.send_message(chat_id, "🚫 Sala cheia!")
     elif res == "started":
-        await context.bot.send_message(user.id, "🚫 A Raid já começou.")
+        await context.bot.send_message(chat_id, "🚫 A Raid já começou.")
     elif res == "already_in":
-        await context.bot.send_message(user.id, "⚠️ Você já está nesta sala.")
+        await context.bot.send_message(chat_id, "⚠️ Você já está nesta sala.")
 
 # ==============================================================================
 # 🔧 DEBUG

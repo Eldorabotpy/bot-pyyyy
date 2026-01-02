@@ -1,4 +1,5 @@
 # handlers/admin/grant_skill.py
+# (VERSÃO FINAL: Compatível com IDs Híbridos/String)
 
 import logging
 import math
@@ -14,6 +15,10 @@ from telegram.ext import (
 
 from modules import player_manager
 from modules.game_data.skills import SKILL_DATA 
+
+# [IMPORT NOVO] Necessário para identificar o admin corretamente no sistema novo
+from modules.auth_utils import get_current_player_id
+
 from handlers.admin.utils import (
     ADMIN_LIST,
     confirmar_jogador,
@@ -181,7 +186,12 @@ async def grant_skill_confirmed(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode="HTML"
         )
         
-        if user_id != update.effective_user.id:
+        # [CORREÇÃO] Comparação segura de IDs (Admin vs Alvo)
+        # Usamos get_current_player_id para garantir compatibilidade com o sistema novo
+        admin_id = get_current_player_id(update, context)
+        
+        # Comparamos como string para evitar erro Int vs ObjectId
+        if str(user_id) != str(admin_id):
             try:
                 await context.bot.send_message(
                     chat_id=user_id,

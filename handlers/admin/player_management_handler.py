@@ -1,4 +1,6 @@
 # handlers/admin/player_management_handler.py
+# (VERSÃO BLINDADA: Sistema Novo 'users' + Correção Async Delete)
+
 import logging
 import math
 import asyncio
@@ -15,7 +17,8 @@ from telegram.ext import (
 )
 
 from modules import player_manager
-from modules.player.core import players_collection 
+# [CORREÇÃO] Importamos a coleção NOVA (users) em vez da legada (players)
+from modules.player.core import users_collection 
 from handlers.admin.utils import (
     ADMIN_LIST,
     parse_hybrid_id,
@@ -48,21 +51,26 @@ async def show_main_management_menu(update: Update, context: ContextTypes.DEFAUL
     if query:
         await query.answer()
 
+    if users_collection is None:
+        await update.effective_message.reply_text("❌ Erro: Banco de dados 'users' não conectado.")
+        return ConversationHandler.END
+
     try:
-        total_players = players_collection.count_documents({})
+        # [MIGRAÇÃO] Consultas direcionadas à collection 'users'
+        total_players = await asyncio.to_thread(users_collection.count_documents, {})
         
         inactive_date_limit = datetime.now(timezone.utc) - timedelta(days=INACTIVE_DAYS)
-        inactive_count = players_collection.count_documents(
+        inactive_count = await asyncio.to_thread(users_collection.count_documents, 
             {"last_seen": {"$lt": inactive_date_limit.isoformat()}}
         )
         
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        active_today_count = players_collection.count_documents(
+        active_today_count = await asyncio.to_thread(users_collection.count_documents, 
             {"last_seen": {"$gte": today_start.isoformat()}}
         )
         
         text = [
-            "👥 <b>Gestão de Jogadores</b>\n",
+            "👥 <b>Gestão de Jogadores (Sistema Novo)</b>\n",
             f"<b>Total de Contas:</b> {total_players}",
             f"<b>Ativos Hoje:</b> {active_today_count}",
             f"<b>Inativos (+{INACTIVE_DAYS} dias):</b> {inactive_count}",
@@ -103,6 +111,10 @@ async def list_inactive_players(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
 
+    if users_collection is None:
+        await query.edit_message_text("Erro de DB.")
+        return ConversationHandler.END
+
     inactive_date_limit = datetime.now(timezone.utc) - timedelta(days=INACTIVE_DAYS)
     
     try:
@@ -113,15 +125,16 @@ async def list_inactive_players(update: Update, context: ContextTypes.DEFAULT_TY
             ]
         }
         
-        total_inactive = players_collection.count_documents(db_query)
+        # [MIGRAÇÃO] Uso de users_collection e asyncio.to_thread para não bloquear
+        total_inactive = await asyncio.to_thread(users_collection.count_documents, db_query)
         total_pages = math.ceil(total_inactive / PLAYERS_PER_PAGE)
+        if total_pages == 0: total_pages = 1
         page = max(1, min(page, total_pages)) 
         
         start_index = (page - 1) * PLAYERS_PER_PAGE
         
-        cursor = players_collection.find(db_query).sort("last_seen", 1).skip(start_index).limit(PLAYERS_PER_PAGE)
-        
-        inactive_list = list(cursor)
+        cursor = users_collection.find(db_query).sort("last_seen", 1).skip(start_index).limit(PLAYERS_PER_PAGE)
+        inactive_list = await asyncio.to_thread(list, cursor)
         
         text = [f"👥 <b>Jogadores Inativos (+{INACTIVE_DAYS} dias)</b> - Página {page}/{total_pages}\n"]
         keyboard = []
@@ -130,7 +143,7 @@ async def list_inactive_players(update: Update, context: ContextTypes.DEFAULT_TY
             text.append("<i>Nenhum jogador inativo encontrado.</i>")
         
         for pdata in inactive_list:
-            user_id = pdata["_id"]
+            user_id = str(pdata["_id"]) # Força string (ObjectId -> str)
             name = pdata.get("character_name", f"ID {user_id}")
             
             last_seen_iso = pdata.get("last_seen", "Nunca")
@@ -182,29 +195,20 @@ async def list_inactive_pager(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Mostra os detalhes de um jogador específico e opções de moderação."""
     query = update.callback_query
-    # Tenta responder ao callback para parar o reloginho de carregamento
-    try:
-        await query.answer()
-    except Exception:
-        pass
+    try: await query.answer()
+    except Exception: pass
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Pegamos o ID cru (string) do callback
     raw_id = query.data.split(':')[-1]
-    
-    # Usamos o parser híbrido para converter corretamente (Int ou ObjectId)
     target_user_id = parse_hybrid_id(raw_id)
 
     if not target_user_id:
         await query.edit_message_text("Erro: ID do jogador inválido.")
         return await show_main_management_menu(update, context) 
-    # --- FIM DA CORREÇÃO ---
     
     context.user_data['target_user_id'] = target_user_id
     
     pdata = await player_manager.get_player_data(target_user_id)
     if not pdata:
-        # Usa f-string com str(target_user_id) para evitar erro caso seja ObjectId na renderização
         await query.edit_message_text(f"Erro: Jogador <code>{str(target_user_id)}</code> não encontrado.")
         return MAIN_MENU
 
@@ -225,7 +229,7 @@ async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     text = [
         f"👤 <b>Detalhes de {name}</b>",
-        f"<b>ID:</b> <code>{str(target_user_id)}</code>", # Convertido para string para segurança visual
+        f"<b>ID:</b> <code>{str(target_user_id)}</code>",
         f"<b>Nível:</b> {level}",
         f"<b>Conta Criada:</b> {created_at_str}",
         f"<b>Última Interação:</b> {last_seen_str}",
@@ -233,7 +237,6 @@ async def show_player_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ]
     
     keyboard = [
-        # O f-string lida bem com ObjectId automaticamente, convertendo pra string no callback_data
         [InlineKeyboardButton("🗑️ APAGAR ESTE JOGADOR", callback_data=f"admin_pmanage_delconf:{target_user_id}")],
         [InlineKeyboardButton("⬅️ Voltar para a Lista", callback_data="admin_pmanage_list:1")],
         [InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="admin_pmanage_main")],
@@ -285,7 +288,8 @@ async def execute_delete_player(update: Update, context: ContextTypes.DEFAULT_TY
     target_user_id = parse_hybrid_id(raw_id)
     
     try:
-        deleted_ok = player_manager.delete_player(target_user_id)
+        # [CORREÇÃO CRÍTICA] Adicionado await na chamada assíncrona
+        deleted_ok = await player_manager.delete_player(target_user_id)
         
         if deleted_ok:
             await query.edit_message_text(f"✅ Jogador <code>{target_user_id}</code> foi apagado com sucesso.")
@@ -316,10 +320,7 @@ async def ask_find_player_input(update: Update, context: ContextTypes.DEFAULT_TY
     return ASK_PLAYER_TO_FIND 
 
 async def show_player_detail_from_find(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Função intermediária. O 'confirmar_jogador' (do utils) já encontrou 
-    o jogador. Agora, vamos forjar um callback para o menu de detalhes.
-    """
+    """Função intermediária para mostrar detalhes após busca."""
     target_user_id = context.user_data.get('target_user_id')
     if not target_user_id:
         await update.message.reply_text("Erro ao encontrar o jogador. Tente novamente.")
@@ -327,14 +328,13 @@ async def show_player_detail_from_find(update: Update, context: ContextTypes.DEF
 
     fake_query_data = f"admin_pmanage_detail:{target_user_id}"
     
-    # Cria um objeto CallbackQuery simulado para reutilizar a função show_player_detail
     fake_query = CallbackQuery(
         id="fake_query_id", 
         from_user=update.effective_user, 
         chat_instance="fake_instance", 
         data=fake_query_data, 
         message=update.effective_message,
-        _bot=context.bot # Necessário para .answer() funcionar no PTB v20+
+        _bot=context.bot 
     )
     
     fake_update = Update(update_id=update.update_id, callback_query=fake_query)

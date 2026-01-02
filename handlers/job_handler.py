@@ -1,5 +1,5 @@
 # handlers/job_handler.py
-# (VERSÃO BLINDADA: Com Injeção de Sessão para Auth Híbrida)
+# (VERSÃO BLINDADA: Trava Rígida de Profissão na Coleta + Auth Híbrida)
 
 import random
 import logging
@@ -25,10 +25,10 @@ def _clamp_float(v: Any, lo: float, hi: float, default: float) -> float:
     return max(lo, min(hi, f))
 
 # ==============================================================================
-# 1. A LÓGICA PURA (Mantida intacta)
+# 1. A LÓGICA PURA (BLINDADA)
 # ==============================================================================
 async def execute_collection_logic(
-    user_id: str, # Alterado type hint para str, pois agora garantimos string
+    user_id: str, 
     chat_id: int,
     resource_id: str,
     item_id_yielded: str,
@@ -52,7 +52,6 @@ async def execute_collection_logic(
     """
     Executa a matemática da coleta, entrega itens e notifica.
     """
-    # Busca usando o ID (String ou Int, o manager lida, mas preferimos String vinda do Job)
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
@@ -60,7 +59,7 @@ async def execute_collection_logic(
     state = player_data.get('player_state') or {}
     if state.get('action') == 'collecting':
         player_data['player_state'] = {'action': 'idle'}
-
+    
     # 2. Tenta deletar mensagem antiga de "Coletando..."
     if message_id_to_delete:
         try: await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
@@ -68,8 +67,38 @@ async def execute_collection_logic(
 
     if not resource_id: return 
 
-    # --- CÁLCULOS ---
+    # ==========================================================================
+    # 🛑 TRAVA DE PROFISSÃO (NOVA LÓGICA)
+    # ==========================================================================
     prof = player_data.get('profession', {}) or {}
+    # Aceita 'key' (novo padrão) ou 'type' (legado), priorizando 'key'
+    user_prof_key = prof.get('key') or prof.get('type')
+    
+    required_profession = game_data.get_profession_for_resource(resource_id)
+    
+    # Se o recurso exige profissão e o jogador não tem a correta
+    if required_profession and user_prof_key != required_profession:
+        # Recupera nome bonito da profissão necessária
+        prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {})
+        prof_name_display = prof_info.get('display_name', required_profession.capitalize())
+        
+        msg_erro = (
+            f"❌ <b>Falha na Coleta!</b>\n\n"
+            f"Você tentou coletar este recurso, mas não tem o conhecimento necessário.\n"
+            f"⚠️ Requisito: Ser um <b>{prof_name_display}</b>."
+        )
+        
+        current_loc = player_data.get('current_location', 'reino_eldora')
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]])
+        
+        await context.bot.send_message(chat_id, msg_erro, reply_markup=kb, parse_mode='HTML')
+        
+        # Salva o estado idle e sai
+        await player_manager.save_player_data(user_id, player_data)
+        return
+    # ==========================================================================
+
+    # --- CÁLCULOS ---
     prof_level = _int(prof.get('level', 1), 1)
     
     total_stats = await player_manager.get_player_total_stats(player_data)
@@ -97,39 +126,38 @@ async def execute_collection_logic(
     except Exception: pass
 
     # --- XP DE PROFISSÃO ---
+    # (Como já passamos pela trava, sabemos que a profissão é a correta, então ganha XP sempre)
     xp_ganho = 0
     level_up_text = ""
-    required_profession = game_data.get_profession_for_resource(resource_id)
     
-    if prof.get('type') == required_profession:
-        xp_base_unit = 3
-        base_calc = (1 + prof_level) * xp_base_unit
+    xp_base_unit = 3
+    base_calc = (1 + prof_level) * xp_base_unit
+    
+    premium = PremiumManager(player_data)
+    xp_mult = _clamp_float(premium.get_perk_value('gather_xp_multiplier', 1.0), 1.0, 5.0, 1.0)
+    
+    xp_ganho = int(base_calc * xp_mult)
+    if is_crit: xp_ganho *= 2
+    
+    prof['xp'] = _int(prof.get('xp', 0)) + xp_ganho
+    
+    # Level Up Loop
+    cur_level = prof_level
+    while True:
+        try: 
+            xp_need = int(game_data.get_xp_for_next_collection_level(cur_level))
+        except: 
+            xp_need = int(100 * (cur_level ** 1.5))
         
-        premium = PremiumManager(player_data)
-        xp_mult = _clamp_float(premium.get_perk_value('gather_xp_multiplier', 1.0), 1.0, 5.0, 1.0)
-        
-        xp_ganho = int(base_calc * xp_mult)
-        if is_crit: xp_ganho *= 2
-        
-        prof['xp'] = _int(prof.get('xp', 0)) + xp_ganho
-        
-        # Level Up Loop
-        cur_level = prof_level
-        while True:
-            try: 
-                xp_need = int(game_data.get_xp_for_next_collection_level(cur_level))
-            except: 
-                xp_need = int(100 * (cur_level ** 1.5))
+        if xp_need <= 0 or prof['xp'] < xp_need: 
+            break
             
-            if xp_need <= 0 or prof['xp'] < xp_need: 
-                break
-                
-            prof['xp'] -= xp_need
-            cur_level += 1
-            prof['level'] = cur_level
-            level_up_text += f"\n🆙 Profissão subiu para nível {cur_level}!"
-            
-        player_data['profession'] = prof
+        prof['xp'] -= xp_need
+        cur_level += 1
+        prof['level'] = cur_level
+        level_up_text += f"\n🆙 Profissão subiu para nível {cur_level}!"
+        
+    player_data['profession'] = prof
 
     # --- ITEM RARO (Sorte) ---
     rare_msg = ""
@@ -187,7 +215,7 @@ async def execute_collection_logic(
         logger.warning(f"Erro ao enviar msg final coleta {user_id}: {e}")
 
 # ==============================================================================
-# 2. O WRAPPER DO TELEGRAM (CORRIGIDO)
+# 2. O WRAPPER DO TELEGRAM (MANTIDO E PROTEGIDO)
 # ==============================================================================
 async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     """
@@ -200,24 +228,14 @@ async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
     job_data = job.data or {}
     
     # --- RECUPERAÇÃO SEGURA DO ID ---
-    # Prioridade: ID no job_data > ID no objeto job
     raw_uid = job_data.get('user_id') or job.user_id
-    
-    # CONVERSÃO CRÍTICA: Garante que o ID da sessão seja String (ObjectId)
-    # Se o ID for int (conta antiga migrada ou erro), str() o torna string
-    user_id = str(raw_uid)
+    user_id = str(raw_uid) # Garante String para Auth
     
     chat_id = job_data.get('chat_id') or job.chat_id
     
-    # ==========================================================================
-    # 🔐 HACK DE INJEÇÃO DE SESSÃO (AUTH HÍBRIDA)
-    # ==========================================================================
-    # Como jobs rodam em thread isolada sem update, o user_data vem vazio.
-    # Injetamos manualmente para que funções subsequentes (menus, checks)
-    # não achem que o usuário está deslogado.
+    # Injeção de Sessão
     if context.user_data is not None:
         context.user_data['logged_player_id'] = user_id
-    # ==========================================================================
     
     msg_id = job_data.get('message_id')
     if not msg_id:

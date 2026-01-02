@@ -1,31 +1,39 @@
 # handlers/admin/pvp_panel_handler.py
-# (VERSÃO BLINDADA: Com limpeza de cache em todas as opções de reset)
+# (VERSÃO BLINDADA: Importações Corrigidas + Sistema Novo 'users')
 
 import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 # --- Importação do Banco de Dados ---
-from modules.player.core import players_collection
+# [MIGRAÇÃO] Substituímos players_collection por users_collection
+from modules.player.core import users_collection, clear_all_player_cache
 
-# --- IMPORTANTE: Importamos o player_manager para limpar o CACHE ---
-from modules import player_manager 
-
-# --- Importa a lógica mestre de reset (que criamos no pvp_scheduler) ---
-from pvp.pvp_scheduler import executar_reset_pvp
-
-# --- Importar Jobs Antigos (Mantemos compatibilidade) ---
+# --- Importa a lógica mestre de reset ---
+# Se este arquivo não existir, o import falhará, mas assumimos que o módulo pvp existe.
 try:
-    from handlers.daily_jobs import daily_pvp_entry_reset_job, daily_arena_ticket_job
+    from pvp.pvp_scheduler import executar_reset_pvp
 except ImportError:
-    from handlers.jobs import daily_pvp_entry_reset_job
-    try:
-        from handlers.jobs import daily_arena_ticket_job
-    except ImportError:
-         # Fallback silencioso se não existir
-         async def daily_arena_ticket_job(context, force_run=False): pass
+    # Fallback caso o scheduler ainda não esteja migrado
+    async def executar_reset_pvp(bot, force_run=False):
+        logging.warning("Scheduler de PvP não encontrado.")
 
+# --- Importar Jobs (CORREÇÃO DE IMPORTAÇÃO) ---
+# Centralizamos tudo em handlers.jobs para evitar erro 'handlers.daily_jobs not found'
 from handlers.jobs import distribute_pvp_rewards
+
+# Tenta importar jobs específicos. Se não existirem, cria mocks para não crashar o Admin.
+try:
+    from handlers.jobs import daily_pvp_entry_reset_job
+except ImportError:
+    async def daily_pvp_entry_reset_job(context, force_run=False): pass
+
+try:
+    from handlers.jobs import daily_arena_ticket_job
+except ImportError:
+    async def daily_arena_ticket_job(context, force_run=False): pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +43,7 @@ async def admin_pvp_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     text = (
-        "⚔️ <b>Painel de Controle de PvP</b> ⚔️\n\n"
+        "⚔️ <b>Painel de Controle de PvP (Sistema Novo)</b> ⚔️\n\n"
         "Selecione uma ação manual para executar imediatamente.\n\n"
         "⚠️ <b>Atenção:</b> As ações de RESET (3 e 4) limpam o cache global."
     )
@@ -102,7 +110,7 @@ async def admin_trigger_pvp_reset(update: Update, context: ContextTypes.DEFAULT_
         await query.edit_message_text(
             "✅ <b>Temporada Encerrada com Sucesso!</b>\n\n"
             "1. Prêmios entregues aos Top 5.\n"
-            "2. Pontos de todos zerados.\n"
+            "2. Pontos de todos zerados (DB Users).\n"
             "3. Cache do servidor limpo.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_pvp_menu")]]),
             parse_mode="HTML"
@@ -114,14 +122,15 @@ async def admin_trigger_pvp_reset(update: Update, context: ContextTypes.DEFAULT_
 async def admin_trigger_pvp_zero_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Opção 4: HARD RESET COM VARREDURA (Corrige bugs de Texto vs Número).
+    Agora opera sobre a coleção 'users'.
     """
     query = update.callback_query
     
     if "confirm" not in query.data:
         await query.edit_message_text(
-            "⚠️ <b>HARD RESET: MODO VARREDURA</b> ⚠️\n\n"
+            "⚠️ <b>HARD RESET: MODO VARREDURA (USERS)</b> ⚠️\n\n"
             "O reset anterior falhou em achar todos?\n"
-            "Este modo vai verificar <b>JOGADOR POR JOGADOR</b>.\n\n"
+            "Este modo vai verificar <b>JOGADOR POR JOGADOR</b> no banco novo.\n\n"
             "Isso corrige erros onde pontos estão salvos como Texto ('100') em vez de Número (100).\n\n"
             "Confirmar?",
             reply_markup=InlineKeyboardMarkup([
@@ -132,50 +141,49 @@ async def admin_trigger_pvp_zero_points(update: Update, context: ContextTypes.DE
         )
         return
 
-    await query.answer("Iniciando varredura...")
+    await query.answer("Iniciando varredura em background...")
     
     try:
-        if players_collection is None: raise Exception("Sem banco de dados.")
+        if users_collection is None: raise Exception("Sem banco de dados (Users).")
         
-        count_db = 0
-        count_manual = 0
-        
-        # --- PASSO 1: O Update Rápido (Pega os Números) ---
-        result = players_collection.update_many(
-            {"pvp_points": {"$gt": 0}}, 
-            {"$set": {"pvp_points": 0}}
-        )
-        count_db = result.modified_count
-        
-        # --- PASSO 2: A Varredura Manual (Pega os Textos/Erros) ---
-        # Iteramos sobre TODOS os jogadores para garantir
-        # (Nota: Se tiver 10k+ jogadores, isso pode demorar alguns segundos, mas para <1000 é instantâneo)
-        
-        # Importante: precisamos iterar sobre a coleção direto, não só o cache
-        cursor = players_collection.find({}, {"pvp_points": 1}) # Traz só ID e Pontos para ser leve
-        
-        for doc in cursor:
-            user_id = doc.get("_id")
-            raw_points = doc.get("pvp_points", 0)
+        # Operação pesada: rodar em thread separada
+        async def _run_sweep():
+            count_db = 0
+            count_manual = 0
             
-            needs_fix = False
+            # --- PASSO 1: O Update Rápido (Pega os Números) ---
+            # Usa asyncio.to_thread para não travar o bot enquanto o Mongo trabalha
+            result = await asyncio.to_thread(users_collection.update_many,
+                {"pvp_points": {"$gt": 0}}, 
+                {"$set": {"pvp_points": 0}}
+            )
+            count_db = result.modified_count
             
-            # Tenta converter para inteiro para ver se é > 0
-            try:
-                val = int(raw_points)
-                if val != 0: needs_fix = True
-            except:
-                # Se der erro de conversão (ex: texto sujo), provavelmente precisa zerar
-                needs_fix = True
+            # --- PASSO 2: A Varredura Manual (Pega os Textos/Erros) ---
+            # Busca IDs e Pontos em uma thread para não bloquear
+            cursor = await asyncio.to_thread(lambda: list(users_collection.find({}, {"pvp_points": 1})))
             
-            if needs_fix:
-                players_collection.update_one({"_id": user_id}, {"$set": {"pvp_points": 0}})
-                count_manual += 1
+            for doc in cursor:
+                user_id = doc.get("_id")
+                raw_points = doc.get("pvp_points", 0)
+                
+                needs_fix = False
+                try:
+                    val = int(raw_points)
+                    if val != 0: needs_fix = True
+                except:
+                    needs_fix = True
+                
+                if needs_fix:
+                    await asyncio.to_thread(users_collection.update_one, {"_id": user_id}, {"$set": {"pvp_points": 0}})
+                    count_manual += 1
 
-        # --- PASSO 3: Limpar Memória ---
-        if hasattr(player_manager, "PLAYER_CACHE"):
-            player_manager.PLAYER_CACHE.clear()
-        
+            # --- PASSO 3: Limpar Cache (Nova Função) ---
+            clear_all_player_cache()
+            
+            return count_db, count_manual
+
+        count_db, count_manual = await _run_sweep()
         total_zerados = count_db + count_manual
         
         await query.edit_message_text(

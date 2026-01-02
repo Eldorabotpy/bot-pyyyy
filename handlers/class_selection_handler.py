@@ -1,4 +1,5 @@
 # handlers/class_selection_handler.py
+# (VERSÃO FINAL: SISTEMA DE ID PADRONIZADO E BLINDADO)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -6,9 +7,10 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data, file_id_manager
 from handlers.menu_handler import show_kingdom_menu
 from modules.balance import ui_display_modifiers
-from modules.player import stats as player_stats  # <--- Importante: Importa o módulo stats completo
+from modules.player import stats as player_stats
 from modules.player.stats import CLASS_PROGRESSIONS, CLASS_POINT_GAINS
 from modules.auth_utils import get_current_player_id
+
 CLASS_MANA_INFO = {
     "guerreiro": "Sorte",
     "berserker": "Sorte",
@@ -36,11 +38,7 @@ def _try_import_classes_module():
 
 def _normalize_class_entry(class_key: str, cfg: dict) -> dict:
     """
-    Normaliza para:
-    {
-      "key": str, "display_name": str, "emoji": str,
-      "description": str, "stat_modifiers": dict, "file_id_name": Optional[str]
-    }
+    Normaliza para formato padrão de exibição.
     """
     cfg = cfg or {}
     disp = (
@@ -80,7 +78,7 @@ def _normalize_class_entry(class_key: str, cfg: dict) -> dict:
 
 def _load_classes_dict() -> dict:
     """Tenta obter o dicionário bruto de classes de várias fontes."""
-    # 1) direto de modules.game_data (reexportado no __init__.py)
+    # 1) direto de modules.game_data
     for attr in ("CLASSES_DATA", "CLASSES"):
         data = getattr(game_data, attr, None)
         if isinstance(data, dict) and data:
@@ -97,7 +95,7 @@ def _load_classes_dict() -> dict:
     return {}
 
 def _load_classes_list() -> list[dict]:
-    """Lê as classes e normaliza; se nada, cai em fallback (2 classes)."""
+    """Lê as classes e normaliza; se nada, cai em fallback."""
     raw = _load_classes_dict()
     if isinstance(raw, dict) and raw:
         out = []
@@ -137,9 +135,19 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query:
         await query.answer()
 
-    user_id = get_current_player_id(update, context) if update.effective_user else None
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
     
-    player_data = await player_manager.get_player_data(user_id) if user_id else None
+    if not user_id:
+        msg = "Sessão inválida. Digite /start."
+        if query:
+            try: await query.edit_message_text(text=msg)
+            except: await context.bot.send_message(update.effective_chat.id, msg)
+        else:
+            await context.bot.send_message(update.effective_chat.id, msg)
+        return
+    
+    player_data = await player_manager.get_player_data(user_id)
 
     if player_data and player_data.get("class"):
         text = f"Você já escolheu sua classe: <b>{player_data.get('class')}</b>."
@@ -193,20 +201,25 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE, class_key: str):
     query = update.callback_query
-    user_id = query.from_user.id if query else (update.effective_user.id if update.effective_user else None)
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
 
-    player_data = await player_manager.get_player_data(user_id) if user_id else None
+    if not user_id:
+        if query: await query.answer("Sessão inválida.", show_alert=True)
+        return
+
+    player_data = await player_manager.get_player_data(user_id)
 
     if player_data and player_data.get("class"):
         await query.answer("Você já escolheu sua classe.", show_alert=True)
         return
 
-    # Corrigido para Nv 5
     if not _eligible_for_class(player_data or {}):
         await query.answer("Você ainda não pode escolher classe (nível 5 necessário).", show_alert=True)
         return
 
-    classes = _load_classes_list() # Síncrono
+    classes = _load_classes_list()
     entry = next((e for e in classes if e["key"] == class_key), None)
     if not entry:
         await query.edit_message_text(
@@ -221,7 +234,7 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
     
     mana_stat_name = CLASS_MANA_INFO.get(class_key, "Sorte")
     
-    # 2. Ganhos Automáticos
+    # Ganhos Automáticos
     auto = prog.get("PER_LVL", {})
     auto_hp = auto.get("max_hp", 0)
     auto_atk = auto.get("attack", 0)
@@ -273,7 +286,7 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
     except Exception:
         pass
 
-    chat_id = update.effective_chat.id # Pega chat_id aqui
+    chat_id = update.effective_chat.id
     if file_data and file_data.get("id"):
         file_id, file_type = file_data["id"], (file_data.get("type") or "").lower()
         if file_type == 'video':
@@ -297,11 +310,17 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
 # =========================
 async def confirm_class_choice(update: Update, context: ContextTypes.DEFAULT_TYPE, class_key: str):
     query = update.callback_query
-    user_id = query.from_user.id if query else (update.effective_user.id if update.effective_user else None)
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
 
-    player_data = await player_manager.get_player_data(user_id) if user_id else None
+    if not user_id:
+        if query: await query.answer("Sessão inválida.", show_alert=True)
+        return
 
-    classes = _load_classes_list() # Síncrono
+    player_data = await player_manager.get_player_data(user_id)
+
+    classes = _load_classes_list()
     entry = next((e for e in classes if e["key"] == class_key), None)
     if not entry or not player_data:
         if query:

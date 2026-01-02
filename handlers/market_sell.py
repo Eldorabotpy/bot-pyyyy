@@ -1,10 +1,13 @@
-# handlers/adventurer_market_handler.py
+# handlers/market_sell.py
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
+
 import logging
 from typing import List, Dict, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 # --- SEUS MÓDULOS ---
+from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 from modules import player_manager, game_data, file_ids, market_manager
 from modules.market_manager import render_listing_line as _mm_render_listing_line
 from modules import market_utils
@@ -220,7 +223,12 @@ async def market_sell_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def market_sell_list_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("Sessão inválida. Use /start.", show_alert=True)
+        return
 
     try: _, category, page_str = query.data.split(':')
     except: category, page_str = "mat", "1"
@@ -340,8 +348,12 @@ async def market_sell_list_category(update: Update, context: ContextTypes.DEFAUL
 async def market_pick_stack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
     base_id = q.data.replace("market_pick_stack_", "")
-    user_id = q.from_user.id
     
     pdata = await player_manager.get_player_data(user_id)
     inv = pdata.get("inventory", {})
@@ -420,7 +432,13 @@ async def market_qty_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def market_finalize(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    user_id = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
     pending = context.user_data.get("market_pending")
     if not pending: await q.answer("Sessão expirada.", show_alert=True); return
 
@@ -455,12 +473,10 @@ async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try: await q.answer("Operação Cancelada.")
         except: pass
 
-    # --- CORREÇÃO CRÍTICA: Limpa TODOS os estados de espera ---
-    # Se não limparmos isso, o bot continua achando que o próximo texto é um ID ou Preço
     keys_to_remove = [
         "market_pending", 
         "market_price",
-        "market_awaiting_id",           # <--- O culpado principal
+        "market_awaiting_id",           
         "market_awaiting_qty_input",
         "market_awaiting_size_input",
         "market_awaiting_price_input"
@@ -469,7 +485,6 @@ async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for key in keys_to_remove:
         context.user_data.pop(key, None)
 
-    # Garante que volta para o menu inicial do mercado
     await market_adventurer(update, context)
 
 # ==============================
@@ -477,7 +492,10 @@ async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==============================
 async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
-    user_id = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    
     listings = market_manager.list_active()
     
     if not listings:
@@ -488,14 +506,24 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rows = []
     for l in listings[:15]: 
         lines.append("• " + _mm_render_listing_line(l, show_price_per_unit=True))
-        if int(l.get("seller_id", 0)) != user_id:
+        
+        # Comparação Segura de Strings para evitar incompatibilidade int vs ObjectId
+        seller_id = l.get("seller_id", 0)
+        if str(seller_id) != str(user_id):
             rows.append([InlineKeyboardButton(f"Comprar #{l['id']}", callback_data=f"market_buy_{l['id']}")])
+            
     rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")])
     await _safe_edit(q, "\n".join(lines), InlineKeyboardMarkup(rows))
 
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    buyer_id = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    buyer_id = get_current_player_id(update, context)
+    if not buyer_id:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
     lid = int(q.data.replace("market_buy_", ""))
 
     # --- NOVO BLOCO DE SEGURANÇA (VIP ONLY) ---
@@ -522,7 +550,13 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
-    user_id = q.from_user.id
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
     listings = market_manager.list_by_seller(user_id)
     if not listings:
         await _safe_edit(q, "Sem vendas ativas.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))

@@ -1,15 +1,15 @@
 # handlers/utils.py
+# (VERSÃO FINAL: COMPATÍVEL COM ORCHESTRATOR E IDS HÍBRIDOS)
+
 import logging
 import html
-from telegram import Update
+from typing import Optional, Union
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.error import BadRequest
-from typing import Optional
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from modules import player_manager, game_data
-from telegram import Update
-
 
 logger = logging.getLogger(__name__)
+
 # =============================================================================
 # MELHORIA: A função 'render_item_stats_short' foi movida para cá
 # para resolver uma importação circular com 'item_factory.py'.
@@ -59,7 +59,9 @@ async def safe_update_message(update: Update, context, new_text: str, new_reply_
 
     # --- Cenário 1: A chamada veio de um BOTÃO (query existe) ---
     if query:
-        await query.answer()
+        try: 
+            await query.answer()
+        except: pass
         
         # Lógica para tentar editar. Se não der, apaga e reenvia.
         # Esta é a lógica mais robusta para quando a mensagem muda de tipo (texto -> foto).
@@ -169,20 +171,9 @@ def obter_titulo_e_icones_por_regiao(regiao_id: str) -> tuple[str, str]:
     return (f"{emoji} {nome}", f"⚔️ 𝑽𝑺 {emoji}")
 
 # ---------- Helpers de exibição (inteiros) ----------
-def _i(v) -> int:
-    """Converte qualquer valor para inteiro (com round) de forma segura."""
-    try:
-        return int(round(float(v)))
-    except (ValueError, TypeError):
-        try:
-            return int(v)
-        except (ValueError, TypeError):
-            return 0
-
 def _fmt_player_stats_as_ints(total_stats: dict) -> tuple[int, int, int, int, int]:
     """
     Converte o dict retornado por get_player_total_stats em inteiros para exibição.
-    (Mantido)
     """
     p_max_hp = _i(total_stats.get('max_hp', 0))
     p_atk    = _i(total_stats.get('attack', 0))
@@ -358,7 +349,6 @@ async def format_combat_message_from_cache(battle_cache: dict) -> str:
 async def format_dungeon_combat_message(dungeon_instance: dict, all_players_data: dict) -> str:
     """
     Formata a mensagem de combate para dungeons (multi-participantes).
-    (VERSÃO CORRIGIDA E LIMPA)
     """
     cs = dungeon_instance.get('combat_state', {})
 
@@ -421,10 +411,10 @@ async def format_dungeon_combat_message(dungeon_instance: dict, all_players_data
 # 💀 FORMATADOR ESPECÍFICO PARA CATACUMBAS (ESTILO DETALHADO)
 # =============================================================================
 
-async def format_catacomb_interface(session: dict, current_user_id: int, all_players_data: dict) -> str:
+async def format_catacomb_interface(session: dict, current_user_id: str, all_players_data: dict) -> str:
     """
-    Gera a interface visual da Raid usando os blocos detalhados solicitados.
-    Suporta múltiplos jogadores e múltiplos mobs (se existirem na sessão).
+    Gera a interface visual da Raid. 
+    NOTA: current_user_id agora é STRING para compatibilidade.
     """
     
     # 1. CABEÇALHO
@@ -454,8 +444,8 @@ async def format_catacomb_interface(session: dict, current_user_id: int, all_pla
         p_ini = _i(stats.get("initiative", 0))
         p_srt = _i(stats.get("luck", 0))
         
-        # Marcador visual se for o usuário atual
-        if pid == current_user_id:
+        # Marcador visual se for o usuário atual (Compatibilidade int/str)
+        if str(pid) == str(current_user_id):
             p_name = f"👉 {p_name}"
         if p_current_hp <= 0:
             p_name = f"💀 {p_name}"
@@ -471,28 +461,23 @@ async def format_catacomb_interface(session: dict, current_user_id: int, all_pla
         heroes_blocks.append(player_block)
 
     # 3. BLOCO DOS MONSTROS (MOBS)
-    # Tenta pegar lista 'enemies' (se você implementou 6 mobs), senão pega o 'boss' único e põe numa lista
     enemies_list = session.get("enemies", [])
     if not enemies_list and session.get("boss"):
         enemies_list = [session.get("boss")]
 
     mobs_blocks = []
     for idx, mob in enumerate(enemies_list):
-        # Se o mob já morreu (HP 0), podemos pular ou mostrar como morto
-        # Aqui vou mostrar mesmo morto para manter o layout fixo dos 6 mobs se desejar
         
         m_hp = _i(mob.get("current_hp", 0))
         if m_hp <= 0 and len(enemies_list) > 1: 
-            continue # Se tem vários, esconde os mortos para economizar espaço
+            continue # Se tem vários, esconde os mortos
 
         m_max = _i(mob.get("max_hp", 100))
         m_name = html.escape(mob.get("name", f"Inimigo {idx+1}"))
         
-        # Se for Boss/Mob único, tentamos pegar stats detalhados se existirem no dict
-        # Se não existirem (mob simples), usamos 0 ou valor padrão
         m_atk = _i(mob.get("attack", 0))
         m_def = _i(mob.get("defense", 0))
-        m_ini = _i(mob.get("initiative", mob.get("speed", 0))) # Tenta initiative ou speed
+        m_ini = _i(mob.get("initiative", mob.get("speed", 0)))
         m_srt = _i(mob.get("luck", 0))
         
         # Ícone de Chefe
@@ -516,10 +501,7 @@ async def format_catacomb_interface(session: dict, current_user_id: int, all_pla
     log_block = "\n".join(log_lines) if log_lines else "O combate começou!"
 
     # 5. MONTAGEM FINAL
-    # Junta todos os heróis separados por linha vazia
     heroes_section = "\n───────────────\n".join(heroes_blocks)
-    
-    # Junta todos os mobs separados por linha vazia
     mobs_section = "\n───────────────\n".join(mobs_blocks)
 
     final_msg = (
@@ -579,7 +561,6 @@ def render_inventory_row(uid: str, inst: dict, player_class: str) -> str:
 async def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perdedor_data: Optional[dict]) -> tuple[str, InlineKeyboardMarkup]:
     """
     Formata o resultado de uma batalha PvP no estilo visual do bot.
-    (VERSÃO CORRIGIDA COM MANA e ASYNC)
     """
     log_texto = "\n".join([html.escape(str(x)) for x in resultado.get('log', [])]) 
 
@@ -594,7 +575,6 @@ async def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perd
         v_max_hp, v_atk, v_def, v_vel, v_srt = _fmt_player_stats_as_ints(vstats)
         p_max_hp, p_atk, p_def, p_vel, p_srt = _fmt_player_stats_as_ints(pstats)
 
-
         v_max_mp = _i(vstats.get('max_mana', 10))
         p_max_mp = _i(pstats.get('max_mana', 10))
         
@@ -604,7 +584,6 @@ async def format_pvp_result(resultado: dict, vencedor_data: Optional[dict], perd
         v_mp = _i((vencedor_data or {}).get('current_mp', v_max_mp))
         p_mp = _i((perdedor_data or {}).get('current_mp', p_max_mp))
    
-
         header = "╔════════════ ◆◈◆ ════════════╗\n"
         divider = "══════════════════════════════\n"
         footer = "╚════════════ ◆◈◆ ════════════╝"
@@ -647,8 +626,4 @@ def format_buffs_text(buffs_dict: dict) -> str:
         text += f"   - Bónus de XP: +{buffs_dict['xp_bonus_percent']}%\n"
     if buffs_dict.get("gold_bonus_percent"):
         text += f"   - Bónus de Ouro: +{buffs_dict['gold_bonus_percent']}%\n"
-    # Adicione aqui a formatação para outros buffs que você tiver
     return text if text else "   - Nenhum\n"
-
-
-
