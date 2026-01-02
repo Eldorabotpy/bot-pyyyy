@@ -248,10 +248,51 @@ async def safe_add_gold(user_id: Union[int, str], amount: int) -> int:
     await save_player_data(user_id, pdata)
     return int(pdata.get("gold", 0))
 
+# Em modules/player_manager.py
+
+# Em modules/player_manager.py
+
 async def get_player_data(user_id: Union[int, str]):
-    """Wrapper seguro para buscar dados de qualquer tipo de conta."""
+    """
+    Wrapper seguro.
+    O FAXINEIRO AGORA RESPEITA VIP PERMANENTE (Sem Data).
+    Só remove se tiver data E ela estiver vencida.
+    """
     real_id = _ensure_id_format(user_id)
-    return await _get_player_data_core(real_id)
+    pdata = await _get_player_data_core(real_id)
+
+    if pdata:
+        tier = pdata.get("premium_tier", "free")
+        
+        # Só verifica se não for Free e não for Admin
+        if tier != "free" and tier != "admin":
+            try:
+                from .player.premium import PremiumManager
+                pm = PremiumManager(pdata)
+                
+                # --- NOVA LÓGICA DO FAXINEIRO ---
+                deve_remover = False
+                
+                # Só remove se TIVER data de validade E ela já passou.
+                # Se a data for None (vazio), consideramos PERMANENTE e não removemos.
+                if pm.expiration_date: 
+                    from datetime import datetime, timezone
+                    agora = datetime.now(timezone.utc)
+                    
+                    if pm.expiration_date < agora:
+                        deve_remover = True
+                
+                if deve_remover:
+                    print(f"📉 VIP VENCIDO de {user_id}. Data: {pm.expiration_date}. Removendo.")
+                    pdata["premium_tier"] = "free"
+                    pdata["premium_until"] = None
+                    pdata["premium_expires_at"] = None
+                    await _save_player_data_core(real_id, pdata)
+                    
+            except Exception as e:
+                logger.error(f"Erro no faxineiro VIP: {e}")
+
+    return pdata
 
 async def save_player_data(user_id: Union[int, str], data: dict):
     """Wrapper seguro para salvar dados de qualquer tipo de conta."""

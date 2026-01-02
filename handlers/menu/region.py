@@ -70,12 +70,30 @@ def _humanize_duration(seconds: int) -> str:
     return f"{seconds} s"
 
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
+    """
+    Calcula o tempo de viagem.
+    Se o multiplicador for 0.0 (VIP), retorna 0 imediatamente.
+    """
+    # Tempo Base: 6 Minutos (360s)
     base = 360 
+    
     try:
-        premium = PremiumManager(player_data)
-        mult = float(premium.get_perk_value("travel_time_multiplier", 1.0))
-    except Exception:
-        mult = 1.0 
+        # Instancia o gerenciador
+        pm = PremiumManager(player_data)
+        
+        # Obtém o multiplicador configurado no premium.py
+        # Free = 1.0 | Premium/VIP/Lenda = 0.0
+        mult = float(pm.get_perk_value("travel_time_multiplier", 1.0))
+        
+        # Se o multiplicador for 0 (ou muito próximo de 0), a viagem é instantânea
+        if mult <= 0.01:
+            return 0
+            
+    except Exception as e:
+        # Se houver erro (ex: premium expirado ou falha de leitura), usa tempo normal
+        print(f"⚠️ Erro ao calcular tempo de viagem: {e}")
+        mult = 1.0
+
     return max(0, int(round(base * mult)))
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id) -> bool:

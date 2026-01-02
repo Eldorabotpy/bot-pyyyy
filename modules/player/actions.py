@@ -61,10 +61,25 @@ def spend_mana(player_data: dict, amount: int) -> bool:
 # -------------------------
 # Energia (LÓGICA TEMPO REAL)
 # -------------------------
+# Em modules/player/actions.py
+
 def get_player_max_energy(player_data: dict) -> int:
-    base_max = _ival(player_data.get('max_energy', 20))
-    premium = PremiumManager(player_data)
-    bonus = _ival(premium.get_perk_value('max_energy_bonus', 0))
+    """
+    Calcula energia máxima baseada EXCLUSIVAMENTE no Plano.
+    Base (20) + Bônus do Plano.
+    """
+    # 1. Base fixa do jogo
+    base_max = 20
+    
+    # 2. Pega o bônus do plano (0, 5, 10 ou 15)
+    # Se o plano não estiver ativo/válido, retorna 0.
+    bonus = 0
+    try:
+        premium = PremiumManager(player_data)
+        bonus = _ival(premium.get_perk_value('max_energy_bonus', 0))
+    except Exception:
+        bonus = 0
+        
     return base_max + bonus
 
 def spend_energy(player_data: dict, amount: int = 1) -> bool:

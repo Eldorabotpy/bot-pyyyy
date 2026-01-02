@@ -1,66 +1,69 @@
 # modules/game_data/xp.py
-# (VERSÃO BLINDADA: Suporte a Auth Híbrida + Fórmula Hardcore)
+# (VERSÃO FINAL: Lógica Completa + Suporte a Premium/VIP)
 
 from __future__ import annotations
 from typing import Dict, Optional, Tuple, Union
+import logging
 
 from modules import player_manager
+
+# ✅ Tenta importar PremiumManager (dentro de try/except para evitar erro de import circular)
+try:
+    from modules.player.premium import PremiumManager
+except ImportError:
+    PremiumManager = None
+
+logger = logging.getLogger(__name__)
 
 # ================================
 # Configuração de Progressão
 # ================================
 MAX_LEVEL: int = 100
+POINTS_PER_LEVEL: int = 1
 
 def _xp_formula(level: int) -> int:
     """
     XP necessário para passar do 'level' atual para o próximo.
-    Usa sistema de TIERS para dificultar drasticamente o mid/end game.
     """
     if level >= MAX_LEVEL:
         return 0
     
-    # 1. Cálculo Base (Curva Quadrática Forte)
-    # Aumentamos a base quadrática de 25 para 40
+    # Cálculo Base (Curva Quadrática)
     base = 200
     lin  = 100 * (level - 1)
     quad = 40 * (level - 1) * (level - 1)
     
     raw_xp = int(base + lin + quad)
 
-    # 2. Multiplicadores de Dificuldade por Faixa de Nível (O "Muro")
+    # Multiplicadores de Dificuldade (O "Muro")
     multiplier = 1.0
-
     if level < 20:
-        multiplier = 1.0      # Início: Normal
+        multiplier = 1.0
     elif 20 <= level < 50:
-        multiplier = 1.5      # Mid Game: +50% XP necessário
+        multiplier = 1.5
     elif 50 <= level < 80:
-        multiplier = 2.5      # Late Game: +150% XP necessário
+        multiplier = 2.5
     elif level >= 80:
-        multiplier = 4.0      # End Game: +300% XP necessário (Brutal)
+        multiplier = 4.0
 
     return int(raw_xp * multiplier)
 
 def get_xp_for_next_combat_level(level: int) -> int:
-    """Compat: usado pela UI para exibir o alvo do próximo nível."""
+    """Retorna o XP necessário para o próximo nível."""
     try:
         level = int(level)
     except Exception:
         level = 1
-    # garante nível mínimo 1
     level = max(1, level)
     return max(0, _xp_formula(level))
 
-# Quantos pontos de atributo (point_pool) cada nível concede
-POINTS_PER_LEVEL: int = 1
-
 # ================================
-# Núcleo de Level Up
+# Núcleo de Level Up (Lógica Interna)
 # ================================
 def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
     """
     Verifica e aplica level ups em player_data (in-place).
-    Retorna resumo (old_level, new_level, levels_gained, points_awarded, current_xp, next_level_xp).
+    Retorna resumo do que aconteceu.
     """
     if not isinstance(player_data, dict):
         player_data = {"level": 1, "xp": 0}
@@ -87,13 +90,12 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
         player_data["level"] = new_level
         player_data["xp"]    = xp_curr
 
+        # Garante estrutura de pontos
         if "point_pool" not in player_data:
             try: player_data["point_pool"] = int(player_data.get("stat_points", 0) or 0)
             except: player_data["point_pool"] = 0
 
-        if "invested" not in player_data or not isinstance(player_data["invested"], dict):
-            player_data["invested"] = {"hp": 0, "attack": 0, "defense": 0, "initiative": 0, "luck": 0}
-
+        # Pontos legados
         try: legacy = int(player_data.get("stat_points", 0) or 0)
         except: legacy = 0
         
@@ -101,8 +103,19 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
             player_data["point_pool"] = int(player_data.get("point_pool", 0)) + legacy
             player_data["stat_points"] = 0
 
+        # Entrega recompensas
         reward_points = levels_gained * POINTS_PER_LEVEL
         player_data["point_pool"] = int(player_data.get("point_pool", 0)) + reward_points
+
+        # Restaura HP/MP/Energia ao upar (Bônus clássico de RPG)
+        try:
+            from modules.player.actions import get_player_max_energy
+            stats = player_manager.get_player_total_stats(player_data)
+            # Como get_player_total_stats é async, aqui dentro de func sincrona 
+            # não conseguimos chamar fácil, então ignoramos o HP/MP full heal 
+            # ou fazemos só o básico seguro:
+            player_data["energy"] = get_player_max_energy(player_data)
+        except: pass
 
         return {
             "old_level": level_before,
@@ -113,6 +126,7 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
             "next_level_xp": get_xp_for_next_combat_level(new_level),
         }
 
+    # Se não upou
     curr_level = int(player_data.get("level", 1) or 1)
     player_data["xp"] = xp_curr
     return {
@@ -124,10 +138,11 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
         "next_level_xp": get_xp_for_next_combat_level(curr_level),
     }
 
-# ================================
-# API Pública (BLINDADA PARA AUTH HÍBRIDA)
-# ================================
 def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]:
+    """
+    Função síncrona que adiciona o valor ao dicionário e calcula levels.
+    NÃO SALVA NO BANCO (quem chama deve salvar).
+    """
     if not isinstance(player_data, dict):
         player_data = {"level": 1, "xp": 0}
 
@@ -137,38 +152,34 @@ def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]:
     if amount <= 0:
         lvl = int(player_data.get("level", 1) or 1)
         return {
-            "old_level": lvl,
-            "new_level": lvl,
-            "levels_gained": 0,
-            "points_awarded": 0,
-            "current_xp": int(player_data.get("xp", 0) or 0),
+            "old_level": lvl, "new_level": lvl, "levels_gained": 0,
+            "points_awarded": 0, "current_xp": int(player_data.get("xp", 0) or 0),
             "next_level_xp": get_xp_for_next_combat_level(lvl),
         }
 
-    try: player_data["level"] = int(player_data.get("level", 1) or 1)
-    except: player_data["level"] = 1
-    try: player_data["xp"] = int(player_data.get("xp", 0) or 0)
-    except: player_data["xp"] = 0
+    # Inicializa campos se não existirem
+    if "level" not in player_data: player_data["level"] = 1
+    if "xp" not in player_data: player_data["xp"] = 0
 
     if int(player_data["level"]) >= MAX_LEVEL:
         player_data["xp"] = 0
         lvl = int(player_data["level"])
         return {
-            "old_level": lvl,
-            "new_level": lvl,
-            "levels_gained": 0,
-            "points_awarded": 0,
-            "current_xp": 0,
-            "next_level_xp": 0,
+            "old_level": lvl, "new_level": lvl, "levels_gained": 0,
+            "points_awarded": 0, "current_xp": 0, "next_level_xp": 0,
         }
 
-    player_data["xp"] += amount
+    player_data["xp"] = int(player_data["xp"]) + amount
     return _apply_level_ups_inplace(player_data)
+
+# ================================
+# API Pública (Async + Premium Check)
+# ================================
 
 async def add_combat_xp(user_id: str, amount: int) -> Dict[str, int]:
     """
     Adiciona XP de combate e salva no banco.
-    Suporta user_id como STRING (ObjectId).
+    APLICA MULTIPLICADOR PREMIUM AUTOMATICAMENTE.
     """
     # Garante string para o player_manager
     user_id = str(user_id)
@@ -176,14 +187,24 @@ async def add_combat_xp(user_id: str, amount: int) -> Dict[str, int]:
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         return {
-            "old_level": 1,
-            "new_level": 1,
-            "levels_gained": 0,
-            "points_awarded": 0,
-            "current_xp": 0,
-            "next_level_xp": get_xp_for_next_combat_level(1),
+            "old_level": 1, "new_level": 1, "levels_gained": 0,
+            "points_awarded": 0, "current_xp": 0, "next_level_xp": 100,
         }
     
-    result = add_combat_xp_inplace(pdata, amount) 
+    # ✅ Lógica de Multiplicador VIP
+    final_amount = amount
+    try:
+        if PremiumManager:
+            pm = PremiumManager(pdata)
+            mult = float(pm.get_perk_value("xp_multiplier", 1.0))
+            
+            if mult > 1.0:
+                final_amount = int(amount * mult)
+    except Exception as e:
+        logger.error(f"Erro ao aplicar XP Premium para {user_id}: {e}")
+
+    # Usa a função inplace definida acima
+    result = add_combat_xp_inplace(pdata, final_amount) 
+    
     await player_manager.save_player_data(user_id, pdata)
     return result
