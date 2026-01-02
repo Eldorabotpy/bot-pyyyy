@@ -44,9 +44,10 @@ logger = logging.getLogger(__name__)
 def _get_premium_keyboard():
     return [
         [
-            InlineKeyboardButton("👑 Setar: PREMIUM (30d)", callback_data="prem_tier:premium:30"),
-            InlineKeyboardButton("🌟 Setar: VIP (30d)", callback_data="prem_tier:vip:30"),
-            InlineKeyboardButton("🔱 Setar: LENDA (30d)", callback_data="prem_tier:lenda:30")
+            # Mudei de :30 para :0 para não adicionar dias automaticamente
+            InlineKeyboardButton("👑 Setar: PREMIUM", callback_data="prem_tier:premium:0"),
+            InlineKeyboardButton("🌟 Setar: VIP", callback_data="prem_tier:vip:0"),
+            InlineKeyboardButton("🔱 Setar: LENDA", callback_data="prem_tier:lenda:0")
         ],
         [
             InlineKeyboardButton("📅 +1 Dia", callback_data="prem_add:1"),
@@ -218,12 +219,20 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     parts = query.data.split(":")
     new_tier = parts[1]
-    days = int(parts[2])
+    days = int(parts[2]) # Agora virá como 0
     
-    new_expire = datetime.now(timezone.utc) + timedelta(days=days)
+    # Lógica Nova:
+    if days > 0:
+        
+        new_expire = datetime.now(timezone.utc) + timedelta(days=days)
+        msg_extra = f"por {days} dias"
+    else:
+        new_expire = datetime.now(timezone.utc)
+        msg_extra = "(Aguardando definição de dias)"
     
     await _save_premium_changes(uid, pdata, new_tier, new_expire)
-    await query.answer(f"✅ Definido {new_tier.upper()} por {days} dias!", show_alert=False)
+    
+    await query.answer(f"✅ Definido {new_tier.upper()}! Adicione os dias agora.", show_alert=True)
     await _refresh_menu(update, context)
     return ASK_NAME
 
@@ -254,20 +263,12 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             
         now = datetime.now(timezone.utc)
         
-        # 2. Lógica de Adição/Remoção
-        # Se estiver adicionando dias e o plano já venceu, começa de AGORA.
-        # Se estiver removendo ou o plano está ativo, usa a data atual do plano.
         if days_to_add > 0 and current_dt < now:
             base_date = now
         else:
             base_date = current_dt
             
         new_expire = base_date + timedelta(days=days_to_add)
-        
-        # 3. Proteção contra datas passadas (Remoção excessiva)
-        # Se a nova data for no passado, o plano expira tecnicamente.
-        # Não mudamos o Tier para "free" automaticamente aqui para permitir "reverter" se foi erro,
-        # mas o jogo vai considerar expirado.
         
         await _save_premium_changes(uid, pdata, current_tier, new_expire)
         
