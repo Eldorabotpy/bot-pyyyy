@@ -12,7 +12,7 @@ from telegram import (
     InlineKeyboardMarkup, InlineKeyboardButton, Update,
     InputMediaPhoto, InputMediaVideo
 )
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import Forbidden
 
 # --- Imports do Core & Utils ---
@@ -593,119 +593,111 @@ async def start_auto_hunt(
     hunt_count: int, 
     region_key: str
 ) -> None:
-    """
-    Inicia o motor de caçada automática.
-    Limpa o menu anterior, cobra energia 1:1 e envia mídia de feedback.
-    """
     query = update.callback_query
     
-    # 1. Recuperação Segura da Sessão (Auth Híbrida)
-    raw_uid = get_current_player_id(update, context)
-    if not raw_uid:
-        await query.answer("❌ Sessão expirada. Faça login novamente (/start).", show_alert=True)
+    # 1. Recuperação e Validações
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await query.answer("❌ Sessão expirada.", show_alert=True)
         return
 
-    user_id = str(raw_uid)
     chat_id = query.message.chat.id
+    player_data = await player_manager.get_player_data(user_id)
     
+    # Valida Premium/Vip
+    if not PremiumManager(player_data).is_premium():
+        await query.answer("⭐️ Recurso exclusivo Premium!", show_alert=True)
+        return
+
+    # Valida Energia
+    total_cost = hunt_count  # Custo 1:1
+    if player_data.get('energy', 0) < total_cost:
+        await query.answer(f"⚡ Energia insuficiente. Precisa de {total_cost}.", show_alert=True)
+        return
+
+    # Consome Energia
+    if not player_manager.spend_energy(player_data, total_cost):
+        await query.answer("❌ Erro ao processar energia.", show_alert=True)
+        return
+
+    # --- INÍCIO DA CORREÇÃO VISUAL ---
+
+    # 2. Apagar o Menu Anterior (Prioridade)
+    # Fazemos isso ANTES de enviar a nova mensagem para evitar "pulo" na tela
     try:
-        # Recupera dados do jogador
-        player_data = await player_manager.get_player_data(user_id)
-        if not player_data:
-            await query.answer("❌ Perfil não encontrado.", show_alert=True)
-            return
-
-        # 2. Verificação de Plano Premium
-        if not PremiumManager(player_data).is_premium():
-            await query.answer("⭐️ Recurso exclusivo para Aventureiros Premium!", show_alert=True)
-            return
-
-        # Anti-Deadlock
-        current_state = player_data.get('player_state', {}).get('action', 'idle')
-        if current_state != 'idle':
-            await query.answer(f"⚠️ Você já está ocupado com: {current_state}", show_alert=True)
-            return
-        
-        # 3. Cálculo de Custo de Energia (Regra Absoluta: 1 por 1)
-        total_cost = hunt_count 
-        
-        if player_data.get('energy', 0) < total_cost:
-            await query.answer(f"⚡ Energia insuficiente. Necessário: {total_cost}.", show_alert=True)
-            return
-
-        # 4. Consumo Real
-        if not player_manager.spend_energy(player_data, total_cost):
-            await query.answer("❌ Erro ao consumir energia.", show_alert=True)
-            return
-
-        # Configuração do Job
-        duration_seconds = SECONDS_PER_HUNT * hunt_count 
-        finish_dt = (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds))
-        
-        player_data['player_state'] = {
-            'action': 'auto_hunting',
-            'finish_time': finish_dt.isoformat(),
-            'details': {'hunt_count': hunt_count, 'region_key': region_key}
-        }
-        await player_manager.save_player_data(user_id, player_data)
-
-        # 5. Limpeza Imersiva: Apaga o menu anterior
-        menu_message_id = query.message.message_id
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=menu_message_id)
-        except Exception as e:
-            logger.warning(f"[AutoHunt] Falha ao apagar menu: {e}")
-
-        # 6. Feedback Visual: Nova Mensagem com Mídia Dinâmica
-        region_info = game_data.REGIONS_DATA.get(region_key, {})
-        region_name = region_info.get('display_name', region_key)
-        duration_min = duration_seconds / 60.0
-        
-        msg = (
-            f"⏱ <b>𝐂𝐚𝐜̧𝐚𝐝𝐚 𝐑𝐚́𝐩𝐢𝐝𝐚 𝐈𝐧𝐢𝐜𝐢𝐚𝐝𝐚!</b>\n"
-            f"⚔️ Simulando <b>{hunt_count} combates</b> em <b>{region_name}</b>...\n\n"
-            f"⚡ Custo: <b>{total_cost} energia</b>\n"
-            f"⏳ Tempo Estimado: <b>{duration_min:.1f} minutos</b>.\n\n"
-            f"<i>O relatório final será enviado automaticamente.</i>"
-        )
-
-        # Busca mídia de início
-        media_data = file_id_manager.get_file_data("autohunt_start_media")
-        sent_message = None
-
-        try:
-            if media_data and media_data.get("id"):
-                m_id = media_data["id"]
-                m_type = (media_data.get("type") or "photo").lower()
-                
-                if m_type == "video":
-                    sent_message = await context.bot.send_video(chat_id=chat_id, video=m_id, caption=msg, parse_mode="HTML")
-                else:
-                    sent_message = await context.bot.send_photo(chat_id=chat_id, photo=m_id, caption=msg, parse_mode="HTML")
-            else:
-                sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
-        except Exception as e:
-            logger.error(f"[AutoHunt] Erro ao enviar mídia: {e}")
-            sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
-
-        # 7. Agendamento do Job
-        job_data = {
-            "user_id": user_id,
-            "chat_id": chat_id,
-            "message_id": sent_message.message_id if sent_message else None,
-            "hunt_count": hunt_count,
-            "region_key": region_key
-        }
-        
-        context.job_queue.run_once(
-            finish_auto_hunt_job, 
-            when=duration_seconds, 
-            data=job_data, 
-            name=f"autohunt_{user_id}"
-        )
-
+        await query.message.delete()
     except Exception as e:
-        logger.error(f"[AutoHunt] Erro crítico ao iniciar: {e}", exc_info=True)
-        try:
-            await context.bot.send_message(chat_id, "❌ Erro ao iniciar a caçada automática.")
-        except: pass
+        logger.warning(f"[AutoHunt] Não foi possível apagar o menu: {e}")
+
+    # 3. Preparar Estado e Dados
+    duration_seconds = SECONDS_PER_HUNT * hunt_count 
+    finish_dt = (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds))
+    
+    player_data['player_state'] = {
+        'action': 'auto_hunting',
+        'finish_time': finish_dt.isoformat(),
+        'details': {'hunt_count': hunt_count, 'region_key': region_key}
+    }
+    await player_manager.save_player_data(user_id, player_data)
+
+    # 4. Preparar Mensagem e Mídia
+    region_info = game_data.REGIONS_DATA.get(region_key, {})
+    region_name = region_info.get('display_name', region_key)
+    duration_min = duration_seconds / 60.0
+    
+    msg = (
+        f"⏱ <b>𝐂𝐚𝐜̧𝐚𝐝𝐚 𝐑𝐚́𝐩𝐢𝐝𝐚 𝐈𝐧𝐢𝐜𝐢𝐚𝐝𝐚!</b>\n"
+        f"⚔️ Simulando <b>{hunt_count} combates</b> em <b>{region_name}</b>...\n\n"
+        f"⚡ Custo: <b>{total_cost} energia</b>\n"
+        f"⏳ Tempo: <b>{duration_min:.1f} minutos</b>.\n\n"
+        f"<i>O relatório chegará automaticamente.</i>"
+    )
+
+    # Busca a mídia no banco (Certifique-se que 'autohunt_start_media' existe!)
+    media_key = "autohunt_start_media"
+    media_data = file_id_manager.get_file_data(media_key)
+    sent_message = None
+
+    try:
+        if media_data and media_data.get("id"):
+            file_id = media_data["id"]
+            file_type = (media_data.get("type") or "photo").lower()
+            
+            if file_type == "video":
+                sent_message = await context.bot.send_video(
+                    chat_id=chat_id, video=file_id, caption=msg, parse_mode="HTML"
+                )
+            else:
+                sent_message = await context.bot.send_photo(
+                    chat_id=chat_id, photo=file_id, caption=msg, parse_mode="HTML"
+                )
+        else:
+            # Fallback se não tiver mídia cadastrada
+            logger.warning(f"[AutoHunt] Mídia '{media_key}' não encontrada. Enviando texto.")
+            sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
+            
+    except Exception as e:
+        logger.error(f"[AutoHunt] Erro ao enviar mídia: {e}")
+        # Se falhar o envio da foto/video, tenta mandar texto para não travar o jogo
+        sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
+
+    # 5. Agendar o Job
+    job_data = {
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "message_id": sent_message.message_id if sent_message else None,
+        "hunt_count": hunt_count,
+        "region_key": region_key
+    }
+    
+    context.job_queue.run_once(
+        finish_auto_hunt_job, 
+        when=duration_seconds, 
+        data=job_data, 
+        name=f"autohunt_{user_id}"
+    )
+
+autohunt_start_handler = CallbackQueryHandler(
+    lambda u, c: start_auto_hunt(u, c, 10, u.callback_query.data.split(":")[1]), 
+    pattern=r"^autohunt_start:"
+)

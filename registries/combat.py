@@ -2,9 +2,17 @@
 
 from telegram.ext import Application
 
-# Importa handlers de caça
-# Se der erro aqui, verifique o arquivo handlers/hunt_handler.py
-from handlers.hunt_handler import hunt_handler, autohunt_start_handler
+# 1. Importa handler de caça manual (Mantém o original)
+from handlers.hunt_handler import hunt_handler
+
+# 2. CORREÇÃO: Importa o Auto Hunt do arquivo NOVO/CORRIGIDO
+# Isso garante que ele use a versão que apaga o menu e envia a mídia
+try:
+    from handlers.autohunt_handler import autohunt_start_handler
+except ImportError:
+    # Fallback caso você não tenha definido a variável no arquivo novo ainda
+    from handlers.hunt_handler import autohunt_start_handler
+    print("⚠️ AVISO: Usando autohunt antigo. Verifique handlers/autohunt_handler.py")
 
 # Importa handlers de combate direto
 from handlers.combat.main_handler import combat_handler
@@ -26,10 +34,12 @@ from pvp.tournament_admin import get_tournament_admin_handlers
 
 def register_combat_handlers(application: Application):
     """Regista todos os handlers relacionados a combate."""
-
+    
     # 1. Caça e Auto Hunt
     application.add_handler(hunt_handler)
-    application.add_handler(autohunt_start_handler)
+    
+    if autohunt_start_handler:
+        application.add_handler(autohunt_start_handler)
     
     # 2. Combate PvE (Ataque, Fuga)
     application.add_handler(combat_handler)
@@ -49,4 +59,4 @@ def register_combat_handlers(application: Application):
         application.add_handler(handler)
 
     for handler in get_tournament_admin_handlers():
-        application.add_handler(handler)    
+        application.add_handler(handler)
