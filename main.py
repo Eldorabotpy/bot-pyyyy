@@ -9,7 +9,7 @@ import logging
 from threading import Thread
 from datetime import time as dt_time, timezone
 from zoneinfo import ZoneInfo
-
+from registries.startup import run_system_startup_tasks
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -98,73 +98,15 @@ def start_keep_alive():
 # TAREFAS DE INICIALIZAÇÃO
 # ==============================================================================
 async def post_init_tasks(application: Application):
+    # 1. Tratamento de Boss (Mantenha aqui por segurança, ou mova para o startup se preferir)
     if world_boss_manager and world_boss_manager.is_active:
         logger.warning("Boss ativo detectado. Reiniciando status...")
         world_boss_manager.end_event(reason="Reinício")
     
-    # Validação segura do ID do Admin para envio de mensagem
-    if ADMIN_ID:
-        try: 
-            msg_text = "🤖 <b>Sistema Online!</b>\n🛡️ <i>Barreira de Grupos: ATIVADA</i>"
-            # O send_message do Telegram aceita int ou str numérico no chat_id
-            target_chat_id = int(ADMIN_ID) if str(ADMIN_ID).isdigit() else ADMIN_ID
-            
-            if STARTUP_IMAGE_ID:
-                await application.bot.send_photo(chat_id=target_chat_id, photo=STARTUP_IMAGE_ID, caption=msg_text, parse_mode="HTML")
-            else:
-                await application.bot.send_message(chat_id=target_chat_id, text=msg_text, parse_mode="HTML")
-        except Exception as e: 
-            logger.error(f"Falha ao enviar msg de startup: {e}")
-    
-    # Recuperações e Watchdogs
-    try:
-        from modules.player.actions import check_stale_actions_on_startup
-        await check_stale_actions_on_startup(application)
-    except ImportError: pass
-    
-    try:
-        from modules.recovery_manager import recover_active_hunts
-        asyncio.create_task(recover_active_hunts(application))
-    except ImportError: pass
-    
-    # Agendamento de Jobs
-    jq = application.job_queue 
-    try:
-        tz = ZoneInfo(JOB_TIMEZONE)
-    except Exception:
-        tz = timezone.utc
-
-    jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
-    # Executa a cada 600 segundos (10 minutos)
-    jq.run_repeating(check_premium_expiry_job, interval=600, first=60, name="premium_checker")
-    
-    if daily_pvp_entry_reset_job:
-        jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=16, minute=27, tzinfo=tz), name="pvp_daily_entry_reset")
-
-    if EVENT_TIMES:
-        for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
-            try:
-                start_min = sh * 60 + sm
-                end_min = eh * 60 + em
-                duration = end_min - start_min
-                if duration < 0: duration += 1440 
-                jq.run_daily(start_kingdom_defense_event, time=dt_time(hour=sh, minute=sm, tzinfo=tz), name=f"kingdom_defense_{i}", data={"event_duration_minutes": duration})
-            except: pass
-
-    if WORLD_BOSS_TIMES:
-        for i, (sh, sm, eh, em) in enumerate(WORLD_BOSS_TIMES):
-            try:
-                jq.run_daily(start_world_boss_job, time=dt_time(hour=sh, minute=sm, tzinfo=tz), name=f"start_boss_{i}")
-                jq.run_daily(end_world_boss_job, time=dt_time(hour=eh, minute=em, tzinfo=tz), name=f"end_boss_{i}")
-            except: pass
-
-    try:
-        from handlers.jobs import job_pvp_monthly_reset
-        jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=17, minute=15, tzinfo=tz), name="pvp_monthly_check")
-    except ImportError: pass
-
-    logging.info("Jobs e Sistemas iniciados.")
-
+    # 2. AQUI ESTÁ A FUNÇÃO QUE VOCÊ PEDIU:
+    # Ela substitui todo aquele bloco de mensagens de admin, watchdogs e agendamento de jobs.
+    # Tudo isso agora roda dentro de registries/startup.py
+    await run_system_startup_tasks(application)
 # ==============================================================================
 # 1. BOAS-VINDAS (Permitido em Grupos)
 # ==============================================================================

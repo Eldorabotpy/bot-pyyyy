@@ -1,32 +1,37 @@
 # modules/player/core.py
-# (VERSÃO BLINDADA: Suporte Híbrido Players/Users + Cache Seguro)
+# (VERSÃO BLINDADA: Conexão Direta Obrigatória - Resolve "Conta não encontrada")
 
 import logging
 import asyncio
+import certifi
 from typing import Optional, Dict, Any, Union
 from bson import ObjectId
+from pymongo import MongoClient
 
 # Configuração de Logs
 logger = logging.getLogger(__name__)
 
-# --- 1. CONFIGURAÇÃO DAS COLEÇÕES ---
+# ==============================================================================
+# 1. CONEXÃO MONGODB CENTRALIZADA E BLINDADA
+# ==============================================================================
+MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 players_collection = None
 users_collection = None
 
 try:
-    # Tenta importar do módulo central de database
-    from modules.database import players_col as pc
-    players_collection = pc
-    # Se conseguiu players, tenta pegar users do mesmo database
-    if players_collection is not None:
-        db = players_collection.database
-        users_collection = db["users"]
-        logger.info("✅ [CORE] Conectado a Players (Legado) e Users (Novo).")
-except ImportError:
-    logger.error("❌ [CORE] Erro ao importar players_collection. O banco pode estar inacessível.")
+    # Tenta conectar DIRETAMENTE (Ignora o modules.database se ele estiver falhando)
+    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
+    db = client["eldora_db"]
+    
+    players_collection = db["players"] # Legado
+    users_collection = db["users"]     # Novo Sistema
+    
+    logger.info("✅ [CORE] Conexão MongoDB Direta: SUCESSO.")
+except Exception as e:
+    logger.critical(f"❌ [CORE] FALHA CRÍTICA AO CONECTAR MONGODB: {e}")
+    # Se falhar aqui, o jogo inteiro para, mas pelo menos sabemos o porquê.
 
 # --- 2. SISTEMA DE CACHE ---
-# Cache em memória para evitar chamadas excessivas ao Mongo
 _player_cache: Dict[str, Dict[str, Any]] = {}
 _player_cache_lock: asyncio.Lock = asyncio.Lock()
 
@@ -51,7 +56,6 @@ async def get_player_data(user_id: Union[int, str, ObjectId]) -> Optional[Dict[s
     # 1. Tenta buscar no Cache primeiro
     async with _player_cache_lock:
         if cache_key in _player_cache:
-            # Retorna uma cópia para evitar modificação direta no cache por referência
             return dict(_player_cache[cache_key])
 
     # 2. Se não está no cache, busca no Banco
@@ -68,8 +72,13 @@ async def get_player_data(user_id: Union[int, str, ObjectId]) -> Optional[Dict[s
             oid = None
             if isinstance(user_id, ObjectId):
                 oid = user_id
-            elif isinstance(user_id, str) and ObjectId.is_valid(user_id):
-                oid = ObjectId(user_id)
+            elif isinstance(user_id, str):
+                if ObjectId.is_valid(user_id):
+                    oid = ObjectId(user_id)
+                elif user_id.isdigit():
+                    # Fallback: String numérica tratada como int legado
+                    if players_collection is not None:
+                         doc = await asyncio.to_thread(players_collection.find_one, {"_id": int(user_id)})
             
             if oid and users_collection is not None:
                 doc = await asyncio.to_thread(users_collection.find_one, {"_id": oid})
@@ -80,6 +89,11 @@ async def get_player_data(user_id: Union[int, str, ObjectId]) -> Optional[Dict[s
 
     # 3. Se encontrou, salva no cache e retorna
     if doc:
+        # Garante que o _id no documento seja compatível para salvamento futuro
+        if "_id" in doc and isinstance(doc["_id"], ObjectId):
+             # Mantém ObjectId, o save_player_data lidará com isso
+             pass
+
         async with _player_cache_lock:
             _player_cache[cache_key] = dict(doc)
         return dict(doc)
@@ -94,7 +108,7 @@ async def save_player_data(user_id: Union[int, str, ObjectId], data: Dict[str, A
     
     cache_key = _get_cache_key(user_id)
     
-    # 1. Atualiza Cache Imediatamente (para a UI ficar rápida)
+    # 1. Atualiza Cache Imediatamente
     async with _player_cache_lock:
         _player_cache[cache_key] = dict(data)
 
@@ -115,9 +129,15 @@ async def save_player_data(user_id: Union[int, str, ObjectId], data: Dict[str, A
             oid = None
             if isinstance(user_id, ObjectId):
                 oid = user_id
-            elif isinstance(user_id, str) and ObjectId.is_valid(user_id):
-                oid = ObjectId(user_id)
-            
+            elif isinstance(user_id, str): 
+                if ObjectId.is_valid(user_id):
+                    oid = ObjectId(user_id)
+                elif user_id.isdigit():
+                    # Fallback: Salvando int legado que veio como string
+                    if players_collection is not None:
+                        await asyncio.to_thread(players_collection.replace_one, {"_id": int(user_id)}, data, upsert=True)
+                    return
+
             if oid and users_collection is not None:
                 # Garante que o campo _id no documento seja o ObjectId correto
                 data["_id"] = oid 
@@ -137,15 +157,13 @@ async def save_player_data(user_id: Union[int, str, ObjectId], data: Dict[str, A
 # ==============================================================================
 
 async def clear_player_cache(user_id: Union[int, str, ObjectId]):
-    """Remove um jogador específico do cache (útil após logout ou update manual)."""
+    """Remove um jogador específico do cache."""
     cache_key = _get_cache_key(user_id)
     async with _player_cache_lock:
         if cache_key in _player_cache:
             del _player_cache[cache_key]
 
 def clear_all_player_cache():
-    """Limpa todo o cache (útil para manutenção)."""
-    # Não precisa ser async se usarmos ensure_future, mas para segurança de thread:
-    # (Como limpar tudo é raro e drástico, podemos fazer um clear direto no dict se o lock permitir)
+    """Limpa todo o cache."""
     _player_cache.clear()
     logger.info("🧹 Cache de jogadores limpo.")

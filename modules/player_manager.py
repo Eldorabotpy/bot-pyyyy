@@ -253,44 +253,38 @@ async def safe_add_gold(user_id: Union[int, str], amount: int) -> int:
 # Em modules/player_manager.py
 
 async def get_player_data(user_id: Union[int, str]):
-    """
-    Wrapper seguro.
-    O FAXINEIRO AGORA RESPEITA VIP PERMANENTE (Sem Data).
-    Só remove se tiver data E ela estiver vencida.
-    """
     real_id = _ensure_id_format(user_id)
     pdata = await _get_player_data_core(real_id)
 
     if pdata:
-        tier = pdata.get("premium_tier", "free")
+        tier = str(pdata.get("premium_tier", "free")).lower()
         
-        # Só verifica se não for Free e não for Admin
-        if tier != "free" and tier != "admin":
+        # Só tenta validar se não for Free e não for Admin
+        if tier not in ["free", "admin"]:
             try:
-                from .player.premium import PremiumManager
-                pm = PremiumManager(pdata)
+                expires_at_raw = pdata.get("premium_expires_at") or pdata.get("premium_until")
                 
-                # --- NOVA LÓGICA DO FAXINEIRO ---
-                deve_remover = False
-                
-                # Só remove se TIVER data de validade E ela já passou.
-                # Se a data for None (vazio), consideramos PERMANENTE e não removemos.
-                if pm.expiration_date: 
+                # SE TIVER DATA, valida. Se não tiver (None), assume PERMANENTE.
+                if expires_at_raw:
                     from datetime import datetime, timezone
                     agora = datetime.now(timezone.utc)
-                    
-                    if pm.expiration_date < agora:
-                        deve_remover = True
-                
-                if deve_remover:
-                    print(f"📉 VIP VENCIDO de {user_id}. Data: {pm.expiration_date}. Removendo.")
-                    pdata["premium_tier"] = "free"
-                    pdata["premium_until"] = None
-                    pdata["premium_expires_at"] = None
-                    await _save_player_data_core(real_id, pdata)
-                    
-            except Exception as e:
-                logger.error(f"Erro no faxineiro VIP: {e}")
+                    try:
+                        expire_dt = datetime.fromisoformat(str(expires_at_raw))
+                        if expire_dt.tzinfo is None:
+                            expire_dt = expire_dt.replace(tzinfo=timezone.utc)
+                            
+                        # Só remove se a data for válida E estiver no passado
+                        if expire_dt < agora:
+                            # LOG AQUI para saber que foi removido
+                            print(f"📉 VIP VENCIDO: {user_id}. Expirou: {expire_dt}")
+                            pdata["premium_tier"] = "free"
+                            pdata["premium_until"] = None
+                            pdata["premium_expires_at"] = None
+                            await _save_player_data_core(real_id, pdata)
+                    except ValueError:
+                        pass # Data inválida? Mantém o VIP por segurança.
+            except Exception:
+                pass 
 
     return pdata
 

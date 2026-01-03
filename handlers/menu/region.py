@@ -1,5 +1,5 @@
 # handlers/menu/region.py
-# (VERSÃO FINAL: AUTH UNIFICADA + FIX VIAGEM VIP)
+# (VERSÃO FINAL: AUTH UNIFICADA + FIX VIAGEM VIP + FIX BOTÕES AUTO HUNT)
 
 import time
 import logging
@@ -69,32 +69,25 @@ def _humanize_duration(seconds: int) -> str:
         return f"{mins} min"
     return f"{seconds} s"
 
-# Em handlers/menu/region.py
-
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
     """
     Calcula o tempo de viagem.
-    BLINDAGEM VIP: Se for Lenda/VIP, retorna 0 imediatamente.
+    BLINDAGEM: Se for Lenda/VIP/Admin, retorna 0 imediatamente.
     """
-    # 1. Verificação Direta de Tier (Ignora validade complexa, confia no DB)
-    tier = str(player_data.get("premium_tier", "free")).lower()
+    # 1. Verificação Direta (Ignora validade de data, confia no registo do banco)
+    tier = str(player_data.get("premium_tier", "free")).lower().strip()
     
     if tier in ["lenda", "vip", "admin"]:
         return 0
 
-    # 2. Lógica Padrão / Premium
-    # Tempo Base: 6 Minutos (360s)
+    # 2. Lógica Padrão para outros casos
     base = 360 
-    
     try:
-        # Tenta pegar multiplicador específico se existir
+        from modules.player.premium import PremiumManager
         pm = PremiumManager(player_data)
         mult = float(pm.get_perk_value("travel_time_multiplier", 1.0))
-        
-        # Se o multiplicador for 0 (Premium pode ter bugs, mas o check acima garante VIP/Lenda)
         if mult <= 0.01:
             return 0
-            
     except Exception:
         mult = 1.0
 
@@ -136,18 +129,15 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_location = player_data.get("current_location", "reino_eldora")
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
     
-    # --- LÓGICA VIP CORRIGIDA ---
+    # --- LÓGICA VIP CORRIGIDA (Check Rápido) ---
     is_vip = False
     try:
-        pm = PremiumManager(player_data)
-        if pm.is_premium():
+        tier = str(player_data.get("premium_tier", "free")).lower().strip()
+        if tier in ["lenda", "vip", "premium", "admin"]:
             is_vip = True
         else:
-            # Fallback para dados legados (Tier existe mas data é None)
-            tier = pm.tier
-            if tier and tier != 'free' and pm.expiration_date is None:
-                # É VIP Permanente Legado? Considera True por enquanto
-                is_vip = True
+            pm = PremiumManager(player_data)
+            if pm.is_premium(): is_vip = True
     except: pass
 
     if is_vip:
@@ -289,9 +279,14 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
     char_name = player_data.get("character_name", "Aventureiro")
     prof = (player_data.get("profession", {}) or {}).get("type", "adventurer").capitalize()
     
+    # --- CÁLCULO DE ENERGIA E STATS ---
     p_hp, max_hp = int(player_data.get('current_hp', 0)), int(stats.get('max_hp', 1))
     p_mp, max_mp = int(player_data.get('current_mp', 0)), int(stats.get('max_mana', 1))
-    p_en, max_en = int(player_data.get('energy', 0)), int(player_manager.get_player_max_energy(player_data))
+    
+    # IMPORTANTE: Pegamos a energia máxima aqui para usar como "prova" de VIP depois
+    max_en = int(player_manager.get_player_max_energy(player_data))
+    p_en = int(player_data.get('energy', 0))
+    
     p_gold, p_gems = player_manager.get_gold(player_data), player_manager.get_gems(player_data)
 
     status_hud = (
@@ -324,7 +319,27 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         combat.append(InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}"))
     keyboard.append(combat)
 
-    if premium.is_premium():
+    # --- LÓGICA BLINDADA SUPREMA ---
+    is_vip_visual = False
+    
+    # 1. Tenta pelo nome do tier (com limpeza de string)
+    tier_visual = str(player_data.get("premium_tier", "free")).lower().strip()
+    if tier_visual in ["premium", "vip", "lenda", "admin"]:
+        is_vip_visual = True
+    
+    # 2. Se falhar, tenta pelo método antigo
+    if not is_vip_visual:
+        try:
+            if premium.is_premium(): is_vip_visual = True
+        except: pass
+
+    # 3. ULTIMATO: Se a energia for > 20, ele é VIP.
+    # (Usuários Free têm max 20. Premium tem 25+. Lenda tem 35)
+    # Isso garante que se o stat está aplicado, o botão aparece.
+    if max_en > 20:
+        is_vip_visual = True
+
+    if is_vip_visual:
         keyboard.append([
             InlineKeyboardButton("⏱ 10x", callback_data=f"autohunt_start_10_{final_region_key}"),
             InlineKeyboardButton("⏱ 25x", callback_data=f"autohunt_start_25_{final_region_key}"),
@@ -352,7 +367,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         if fd: await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
         else: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
     except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
-
+    
 async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None, player_data: dict | None = None):
     # Lógica limpa para recuperar o ID
     q = getattr(update, "callback_query", None)
@@ -397,13 +412,13 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- VERIFICAÇÃO VIP CONSISTENTE ---
     is_vip = False
     try:
-        pm = PremiumManager(pdata)
-        if pm.is_premium():
+        # Mesma lógica blindada da viagem
+        tier = str(pdata.get("premium_tier", "free")).lower().strip()
+        if tier in ["lenda", "vip", "premium", "admin"]:
             is_vip = True
         else:
-            tier = pm.tier
-            if tier and tier != 'free' and pm.expiration_date is None:
-                is_vip = True
+            pm = PremiumManager(pdata)
+            if pm.is_premium(): is_vip = True
     except Exception:
         pass
 

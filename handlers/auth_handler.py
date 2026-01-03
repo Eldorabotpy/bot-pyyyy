@@ -1,11 +1,13 @@
 # handlers/auth_handler.py
-# (VERSÃO FINAL: Auth Híbrida - Otimizada para passar na Auditoria)
+# (VERSÃO FINAL: Auth Híbrida - Com Conexão Direta ao MongoDB)
 
 import logging
 import hashlib
 import asyncio 
+import certifi # Importante para conexão segura
 from datetime import datetime
 from bson import ObjectId
+from pymongo import MongoClient # Cliente do Banco
 
 # --- Imports do Telegram ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
@@ -21,9 +23,8 @@ from telegram.constants import ChatType
 
 # --- Imports do Core ---
 from modules.auth_utils import get_current_player_id
-# [MODIFICAÇÃO] Importamos get_player_data para acessar legado de forma abstrata
-# Removemos players_collection para não disparar alertas de auditoria
-from modules.player.core import clear_player_cache, users_collection, get_player_data, save_player_data
+# [MODIFICAÇÃO] Removemos users_collection da importação para definir localmente e evitar erro NoneType
+from modules.player.core import clear_player_cache, get_player_data, save_player_data
 
 # Tenta importar o menu
 try:
@@ -33,7 +34,24 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# --- ESTADOS DA CONVERSA ---
+# ==============================================================================
+# CONEXÃO MONGODB (BLINDAGEM CONTRA ERRO NONETYPE)
+# ==============================================================================
+MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
+try:
+    # Conexão direta para garantir que o Login funcione
+    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
+    db = client["eldora_db"]
+    users_collection = db["users"] # Coleção oficial de Login
+    logger.info("✅ [AUTH] Conexão MongoDB estabelecida com sucesso.")
+except Exception as e:
+    logger.critical(f"❌ [AUTH] FALHA AO CONECTAR MONGODB: {e}")
+    users_collection = None # Vai gerar erro se falhar, mas logamos o motivo
+
+# ==============================================================================
+# ESTADOS DA CONVERSA
+# ==============================================================================
 CHOOSING_ACTION = 1
 TYPING_USER_LOGIN = 2
 TYPING_PASS_LOGIN = 3
@@ -73,7 +91,9 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if session_id and isinstance(session_id, str) and ObjectId.is_valid(session_id):
         # Verifica se a sessão é válida no banco (async)
-        user_exists = await asyncio.to_thread(users_collection.find_one, {"_id": ObjectId(session_id)})
+        # Usa a coleção local garantida
+        user_exists = await asyncio.to_thread(users_collection.find_one, {"_id": ObjectId(session_id)}) if users_collection is not None else None
+        
         if user_exists:
             if start_command: await start_command(update, context)
             else: await update.message.reply_text("✅ Você já está logado!")
@@ -82,7 +102,6 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
 
     # 2. VERIFICAÇÃO DE LEGADO (Para oferecer migração)
-    # Usamos o ID do Telegram (Int) para consultar o banco legado via get_player_data
     u = update.effective_user
     tg_id = u.id 
     
@@ -92,11 +111,11 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     legacy_data = await get_player_data(tg_id)
     
     if legacy_data:
-        # Se achou dados antigos, verifica se já não migrou para o sistema novo
-        # (Procura um usuário novo que tenha esse telegram_id_owner)
-        already_migrated = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": tg_id})
-        if not already_migrated:
-            has_legacy = True
+        # Se achou dados antigos, verifica se já não migrou
+        if users_collection is not None:
+            already_migrated = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": tg_id})
+            if not already_migrated:
+                has_legacy = True
 
     # 3. MENU DINÂMICO
     keyboard = []
@@ -159,6 +178,10 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     username = context.user_data.get('auth_temp_user')
     password_hash = hash_password(password)
     
+    if users_collection is None:
+        await update.message.reply_text("❌ Erro de conexão com o Banco de Dados. Contate o Admin.")
+        return ConversationHandler.END
+
     # Busca async para não travar
     user_doc = await asyncio.to_thread(users_collection.find_one, {"username": username, "password": password_hash})
 
@@ -194,6 +217,10 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.text.strip().lower()
     if len(username) < 4: await update.message.reply_text("⚠️ Muito curto. Tente outro:"); return TYPING_USER_REG
     
+    if users_collection is None:
+        await update.message.reply_text("❌ Erro Crítico: DB desconectado.")
+        return ConversationHandler.END
+
     # Verificação Async
     exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
     if exists: 
@@ -256,6 +283,10 @@ async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def receive_user_migrate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.text.strip().lower()
     
+    if users_collection is None:
+        await update.message.reply_text("❌ DB Error.")
+        return ConversationHandler.END
+
     exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
     if exists:
         await update.message.reply_text("⚠️ Usuário já existe. Tente outro:")
@@ -275,7 +306,7 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     u = update.effective_user
     tg_id = u.id
     
-    # 1. Recupera dados antigos (usando abstração do Core, sem tocar no DB legado aqui)
+    # 1. Recupera dados antigos (usando abstração do Core)
     old_data = await get_player_data(tg_id)
         
     if not old_data:
@@ -294,6 +325,10 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
         "is_migrated": True
     })
     
+    if users_collection is None:
+        await update.message.reply_text("❌ DB Error.")
+        return ConversationHandler.END
+
     # 3. Insere no Novo Sistema (Async)
     result = await asyncio.to_thread(users_collection.insert_one, new_data)
     

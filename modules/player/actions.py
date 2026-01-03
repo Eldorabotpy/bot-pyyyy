@@ -43,16 +43,12 @@ def _ival(x, default=0):
 # -------------------------
 # Energia (LÓGICA BLINDADA PARA LENDA/VIP)
 # -------------------------
-# Em modules/player/actions.py
-
 def get_player_max_energy(player_data: dict) -> int:
     """
-    Calcula energia máxima: Base (20) + Bônus do Plano.
-    LÓGICA BLINDADA: Se o tier diz 'lenda', recebe o bônus, independente da data.
+    Calcula energia máxima.
+    BLINDAGEM: Se o tier diz 'lenda', recebe o bônus, independente da data.
     """
     base_max = 20
-    
-    # Normaliza o tier para string minúscula
     tier = str(player_data.get("premium_tier", "free")).lower()
     
     bonus = 0
@@ -63,11 +59,9 @@ def get_player_max_energy(player_data: dict) -> int:
     elif tier == "premium":
         bonus = 5
     elif tier == "admin":
-        bonus = 50 # Admin bônus
+        bonus = 50
         
     return base_max + bonus
-
-
 
 def spend_energy(player_data: dict, amount: int = 1) -> bool:
     amount = max(0, int(amount))
