@@ -336,15 +336,13 @@ async def start_auto_hunt(
         base_cost = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
         cost_per_hunt = int(region_info.get("hunt_energy_cost", base_cost))
         
-        #premium = PremiumManager(player_data)
-        #final_cost = int(premium.get_perk_value("hunt_energy_cost", cost_per_hunt))
-        total_cost = hunt_count
+        total_cost = hunt_count 
         
         if player_data.get('energy', 0) < total_cost:
             await query.answer(f"⚡ Energia insuficiente. Necessário: {total_cost}.", show_alert=True)
             return
 
-        # 4. Consumo e Persistência de Estado
+        # 4. Consumo Real
         if not player_manager.spend_energy(player_data, total_cost):
             await query.answer("❌ Erro ao consumir energia.", show_alert=True)
             return
@@ -371,10 +369,11 @@ async def start_auto_hunt(
         region_name = region_info.get('display_name', region_key)
         duration_min = duration_seconds / 60.0
         
+        # Aqui forçamos a exibição do total_cost que acabamos de calcular
         msg = (
             f"⏱ <b>𝐂𝐚𝐜̧𝐚𝐝𝐚 𝐑𝐚́𝐩𝐢𝐝𝐚 𝐈𝐧𝐢𝐜𝐢𝐚𝐝𝐚!</b>\n"
             f"⚔️ Simulando <b>{hunt_count} combates</b> em <b>{region_name}</b>...\n\n"
-            f"⚡ Custo: {total_cost} energia\n"
+            f"⚡ Custo: <b>{total_cost} energia</b>\n"
             f"⏳ Tempo Estimado: <b>{duration_min:.1f} minutos</b>.\n\n"
             f"<i>O relatório final será enviado automaticamente.</i>"
         )

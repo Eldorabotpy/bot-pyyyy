@@ -302,7 +302,7 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         # 2. Verifica Energia
         # Se for Lenda/Admin, custo é ZERO (Força bruta para garantir a promessa do plano)
         cost_per_hunt = 1
-        if tier in ["lenda", "admin"]:
+        if tier in ["admin"]:
             cost_per_hunt = 0
         else:
              # Pega do premium manager ou do jogo
