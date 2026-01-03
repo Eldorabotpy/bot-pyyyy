@@ -1,69 +1,49 @@
 # modules/auth_utils.py
-# (VERSÃO ATUALIZADA: Com Middleware de verificação de Sessão)
 
 import logging
 from functools import wraps
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from modules.player.core import users_collection #
 
 logger = logging.getLogger(__name__)
 
-def get_current_player_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def get_current_player_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str | None:
     """
-    Retorna o ID correto do jogador (Sessão de Login ou ID do Telegram).
+    Retorna o User ID (Mongo _id). 
+    O Telegram ID serve APENAS para resgatar a sessão se a RAM falhar.
     """
-    # 1. Tenta pegar da sessão (Login Novo)
-    if context.user_data:
-        session_id = context.user_data.get("logged_player_id")
-        if session_id:
-            return str(session_id)
+    # 1. Prioridade Máxima: Sessão na RAM
+    if context.user_data and 'logged_player_id' in context.user_data:
+        return str(context.user_data['logged_player_id'])
 
-    # 2. Fallback: Retorna None (TOLERÂNCIA ZERO ativada)
-    # Se não tiver sessão, não retornamos o ID do Telegram para evitar bugs de contas misturadas.
+    # 2. Resgate: Se a RAM sumiu, busca o User ID vinculado ao Telegram ID
+    if update.effective_user and users_collection is not None:
+        tg_id = update.effective_user.id
+        try:
+            # Busca o documento para recuperar o _id real
+            user = users_collection.find_one({"telegram_id_owner": tg_id}, {"_id": 1})
+            if user:
+                user_id_mongo = str(user["_id"])
+                # Restaura na RAM para os próximos cliques
+                context.user_data['logged_player_id'] = user_id_mongo
+                return user_id_mongo
+        except Exception as e:
+            logger.error(f"Erro no resgate de sessão: {e}")
+
     return None
 
 def requires_login(func):
-    """
-    Decorator: Coloque @requires_login em cima de qualquer função de botão (callback).
-    Se o bot tiver reiniciado e perdido a sessão, ele avisa o usuário e pede login.
-    """
+    """Protege funções garantindo que o User ID seja recuperado."""
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        # Verifica se tem o ID na sessão
         user_id = get_current_player_id(update, context)
-        
         if not user_id:
-            # --- SESSÃO PERDIDA / BOT REINICIADO ---
-            
-            # 1. Responde o "loading" do botão para parar de girar
             if update.callback_query:
-                try:
-                    await update.callback_query.answer("⚠️ Sessão expirada.", show_alert=True)
-                except: pass
-
-            # 2. Mensagem amigável explicativa
-            msg_text = (
-                "⚠️ <b>Sessão Expirada</b>\n\n"
-                "O Reino de Eldora passou por uma manutenção mágica (o bot foi atualizado/reiniciado) "
-                "e sua conexão foi encerrada por segurança.\n\n"
-                "👇 <b>Clique abaixo para reconectar:</b>"
-            )
-            
-            kb = [[InlineKeyboardButton("🔐 Reconectar / Login", callback_data="start_login_flow")]]
-            
-            # Envia a mensagem (ou edita se possível, mas enviar nova é melhor para chamar atenção)
-            if update.effective_chat:
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=msg_text,
-                    reply_markup=InlineKeyboardMarkup(kb),
-                    parse_mode="HTML"
-                )
-            
-            # Interrompe a execução da função original (não tenta caçar/abrir inventário)
-            return 
-            
-        # Se tiver logado, executa a função normal
+                await update.callback_query.answer("⚠️ Conta não identificada. Use /start.", show_alert=True)
+                return
+            if update.message:
+                await update.message.reply_text("⛔ Digite /start para acessar sua conta.")
+                return
         return await func(update, context, *args, **kwargs)
-    
     return wrapper

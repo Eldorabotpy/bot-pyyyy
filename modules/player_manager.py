@@ -58,7 +58,8 @@ from .player.inventory import (
     add_item_to_inventory, 
     add_unique_item, 
     remove_item_from_inventory,
-    equip_unique_item_for_user, 
+    equip_unique_item_for_user,
+    unequip_item_for_user, 
     has_item, 
     consume_item,
 )

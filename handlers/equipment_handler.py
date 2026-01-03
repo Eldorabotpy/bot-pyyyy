@@ -239,26 +239,18 @@ async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_T
     await q.answer()
     slot = q.data.replace("equip_unequip_", "")
     
-    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
     
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata: return
+    # ✅ USA A FUNÇÃO CENTRALIZADA (unequip_item_for_user)
+    # Note: Importamos de player_manager que agora deve expor unequip_item_for_user
+    success, message = await player_manager.unequip_item_for_user(user_id, slot)
+    
+    if success:
+        await q.answer("Removido e status atualizados!")
+        await equipment_menu(update, context) # Recarrega o HUD com stats novos
+    else:
+        await q.answer(message, show_alert=True)
 
-    st = (pdata.get("player_state") or {}).get("action")
-    if st not in (None, "idle"):
-        await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True); return
-
-    eq = pdata.get("equipment", {}) or {}
-    if not eq.get(slot):
-        await q.answer("𝑵𝒂𝒅𝒂 𝒆𝒒𝒖𝒊𝒑𝒂𝒅𝒐 𝒏𝒆𝒔𝒔𝒆 𝒔𝒍𝒐𝒕.", show_alert=False); return
-
-    eq[slot] = None
-    pdata["equipment"] = eq
-    await player_manager.save_player_data(user_id, pdata)
-
-    await q.answer("𝑹𝒆𝒎𝒐𝒗𝒊𝒅𝒐.", show_alert=False)
-    await equipment_menu(update, context)
     
 
 # ---------- Exporta handlers ----------
