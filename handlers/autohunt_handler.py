@@ -336,9 +336,9 @@ async def start_auto_hunt(
         base_cost = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
         cost_per_hunt = int(region_info.get("hunt_energy_cost", base_cost))
         
-        premium = PremiumManager(player_data)
-        final_cost = int(premium.get_perk_value("hunt_energy_cost", cost_per_hunt))
-        total_cost = max(0, final_cost) * hunt_count
+        #premium = PremiumManager(player_data)
+        #final_cost = int(premium.get_perk_value("hunt_energy_cost", cost_per_hunt))
+        total_cost = hunt_count
         
         if player_data.get('energy', 0) < total_cost:
             await query.answer(f"⚡ Energia insuficiente. Necessário: {total_cost}.", show_alert=True)

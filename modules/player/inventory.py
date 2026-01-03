@@ -144,12 +144,9 @@ async def equip_unique_item_for_user(user_id: Union[int, str], unique_id: str, s
     equipment[slot_key] = unique_id
     pdata["equipment"] = equipment
     
-    # --- O PULO DO GATO: Recalcular status agora ---
-    # Isso garante que pdata['attack'], pdata['max_hp'] etc fiquem atualizados no banco
     totals = await get_player_total_stats(pdata)
     for stat in ['attack', 'defense', 'initiative', 'luck', 'max_hp']:
-        if stat in totals:
-            pdata[stat] = totals[stat]
+        pdata[stat] = totals.get(stat, 1)
     
     # Garante que o HP atual não ultrapasse o novo máximo
     pdata['current_hp'] = min(pdata.get('current_hp', 1), pdata['max_hp'])

@@ -161,9 +161,8 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
 
 async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) -> dict:
     """
-    Calcula os status totais do herói de forma balanceada.
-    Ordem: Base/Nível (com mult. de classe) -> Pontos Aditivos -> Itens Aditivos -> 
-           Bônus Globais (VIP/Clã) -> Unificação de Dano.
+    Calcula os status totais do herói de forma balanceada e corrigida.
+    Ordem: Base/Nível -> Pontos Investidos -> Itens -> Bônus % -> Unificação.
     """
     from modules import player_manager
     from modules.player.premium import PremiumManager 
@@ -172,8 +171,8 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
     ckey = _get_class_key_normalized(player_data)
     real_class_key = (player_data.get("class_key") or player_data.get("class") or "").lower()
 
-    # 1. CÁLCULO NATURAL (Crescimento de Nível * Modificador de Classe)
-    # Aqui o multiplicador de classe atua apenas sobre a base e o ganho por nível.
+    # 1. CÁLCULO NATURAL (Base da Classe + Crescimento por Nível)
+    # Esta é a base limpa, sem itens ou pontos investidos.
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
     total: Dict[str, Any] = {} 
     for k in _BASELINE_KEYS:
@@ -181,24 +180,25 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
     
     total['magic_attack'] = 0
 
-    # 2. PONTOS INVESTIDOS (Aditivo)
-    # Adicionamos os pontos investidos manualmente sem multiplicá-los pela classe.
-    base_stats = player_data.get("base_stats", {})
-    if isinstance(base_stats, dict):
-        for k, val in base_stats.items():
-            target_key = k
-            # Normalização de nomes para as chaves internas
-            if k in ("vida", "hp", "vitalidade", "health", "vit"): target_key = "max_hp"
-            elif k in ("ataque", "attack", "forca", "strength", "str"): target_key = "attack"
-            elif k in ("defesa", "defense", "def", "res"): target_key = "defense"
-            elif k in ("agilidade", "initiative", "ini", "agi"): target_key = "initiative"
-            elif k in ("sorte", "luck", "luk"): target_key = "luck"
-            
-            if target_key in total:
-                total[target_key] += _ival(val, 0)
+    # 2. PONTOS INVESTIDOS (Lido apenas de 'base_stats')
+    # IMPORTANTE: Ignora os valores na raiz do player_data para evitar duplicidade.
+    invested_points = player_data.get("base_stats", {})
+    if not isinstance(invested_points, dict):
+        invested_points = {}
+
+    # Mapeamento para garantir que pegamos as chaves corretas do dicionário de pontos
+    for k, val in invested_points.items():
+        target_key = k
+        if k in ("vida", "hp", "vitalidade", "health", "vit"): target_key = "max_hp"
+        elif k in ("ataque", "attack", "forca", "strength", "str"): target_key = "attack"
+        elif k in ("defesa", "defense", "def", "res"): target_key = "defense"
+        elif k in ("agilidade", "initiative", "ini", "agi"): target_key = "initiative"
+        elif k in ("sorte", "luck", "luk"): target_key = "luck"
+        
+        if target_key in total:
+            total[target_key] += _ival(val, 0)
 
     # 3. EQUIPAMENTOS (Aditivo)
-    # Processa cada item equipado e mapeia os bônus dos encantamentos.
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
     
@@ -213,32 +213,22 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                 val = _ival((data or {}).get('value', 0), 0)
                 k = raw_stat.lower().strip()
                 
-                # Mapeamento extensivo de chaves de itens
                 stat_key = None
-                if k in ("hp", "vida", "health", "max_hp", "vitalidade", "vit"): 
-                    stat_key = "max_hp"
-                elif k in ("defesa", "defense", "def", "resistencia", "res", "armadura", "armor"): 
-                    stat_key = "defense"
-                elif k in ("iniciativa", "initiative", "ini", "agilidade", "agi", "velocidade", "speed"): 
-                    stat_key = "initiative"
-                elif k in ("sorte", "luck", "lucky", "luk"): 
-                    stat_key = "luck"
-                elif k in ("ataque", "attack", "atk", "dmg", "damage", "fisico", "forca", "str", "furia", "precisao", "letalidade", "foco", "bushido"): 
-                    stat_key = "attack"
-                elif k in ("inteligencia", "intelligence", "int", "magia", "magic", "matk", "carisma"): 
-                    stat_key = "magic_attack"
-                elif k in ("crit", "critico", "mira"): 
-                    stat_key = "crit_chance_flat"
+                if k in ("hp", "vida", "health", "max_hp", "vitalidade", "vit"): stat_key = "max_hp"
+                elif k in ("defesa", "defense", "def", "resistencia", "res", "armadura", "armor"): stat_key = "defense"
+                elif k in ("iniciativa", "initiative", "ini", "agilidade", "agi", "velocidade", "speed"): stat_key = "initiative"
+                elif k in ("sorte", "luck", "lucky", "luk"): stat_key = "luck"
+                elif k in ("ataque", "attack", "atk", "dmg", "damage", "fisico", "forca", "str", "furia", "precisao", "letalidade", "foco", "bushido"): stat_key = "attack"
+                elif k in ("inteligencia", "intelligence", "int", "magia", "magic", "matk", "carisma"): stat_key = "magic_attack"
+                elif k in ("crit", "critico", "mira"): stat_key = "crit_chance_flat"
 
                 if stat_key:
                     if stat_key in total:
                         total[stat_key] += val
                     else:
-                        # Para stats como crit_chance_flat que não estão no _BASELINE_KEYS
                         total[stat_key] = total.get(stat_key, 0) + val
 
-    # 4. BÔNUS DE CLÃ E PREMIUM (%)
-    # Aplicamos as porcentagens sobre o valor consolidado (Natural + Pontos + Itens).
+    # 4. BÔNUS DE CLÃ E PREMIUM (%) - Aplicado sobre o montante acumulado até aqui
     clan_id = player_data.get("clan_id")
     if clan_id:
         try:
@@ -274,28 +264,26 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                 ally_data = await player_manager.get_player_data(ally_id)
                 if ally_data: _apply_party_aura_bonuses(ally_data, total)
         
-        # Bônus de Runas
         rune_bonuses = player_manager.get_rune_bonuses(player_data)
         for stat, value in rune_bonuses.items():
             k_rune = "max_hp" if stat == "hp" else stat
             total[k_rune] = total.get(k_rune, 0) + int(value)
     except: pass
 
-    # 6. UNIFICAÇÃO DE DANO (Balanceado)
-    # Soma ataque mágico se a classe for da árvore de Magos
+    # 6. UNIFICAÇÃO E CONVERSÃO DE ATRIBUTOS
+    # Magos: Unificam Ataque Mágico ao Ataque Geral
     is_magic = real_class_key in MAGIC_CLASSES or any(c in MAGIC_CLASSES for c in get_class_ancestry(real_class_key))
     if is_magic:
         total['attack'] += total.get('magic_attack', 0)
         total['magic_attack'] = total['attack']
 
-    # Conversão de Agilidade (Assassinos/Caçadores)
+    # Assassinos/Caçadores: Ganham ataque baseado em Agilidade (12%)
     is_agility = real_class_key in AGILITY_CLASSES or any(c in AGILITY_CLASSES for c in get_class_ancestry(real_class_key))
     if is_agility:
-        # 12% da iniciativa vira bônus de ataque (reduzido de 25% para balanceamento)
         ini_bonus = int(total.get('initiative', 0) * 0.12)
         total['attack'] += ini_bonus
 
-    # 7. MANA E SANITIZAÇÃO
+    # 7. MANA E SANITIZAÇÃO FINAL
     _calculate_mana(player_data, total, ckey_fallback=ckey)
     for k in _BASELINE_KEYS:
         total[k] = max(1, _ival(total.get(k), 0))
