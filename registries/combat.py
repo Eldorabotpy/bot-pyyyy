@@ -32,29 +32,38 @@ from handlers.combat.skill_handler import (
 from pvp.pvp_handler import pvp_handlers
 from pvp.tournament_admin import get_tournament_admin_handlers
 
+# registries/combat.py
+
 def register_combat_handlers(application: Application):
     """Regista todos os handlers relacionados a combate."""
     
-    # 1. Caça e Auto Hunt
-    application.add_handler(hunt_handler)
-    
+    # -------------------------------------------------------------
+    # 1. AUTO HUNT (PRIORIDADE MÁXIMA)
+    # -------------------------------------------------------------
+    # Colocamos ele PRIMEIRO para garantir que ele capture o clique antes do hunt_handler
     if autohunt_start_handler:
         application.add_handler(autohunt_start_handler)
+        print("✅ Auto Hunt Handler registrado com prioridade.")
+
+    # -------------------------------------------------------------
+    # 2. Caça Manual (Menu Geral)
+    # -------------------------------------------------------------
+    application.add_handler(hunt_handler)
     
-    # 2. Combate PvE (Ataque, Fuga)
+    # 3. Combate PvE (Ataque, Fuga)
     application.add_handler(combat_handler)
     
-    # 3. Poções em Combate
+    # 4. Poções em Combate
     application.add_handler(combat_potion_menu_handler)
     application.add_handler(combat_use_potion_handler)
 
-    # 4. Skills em Combate
+    # 5. Skills em Combate
     application.add_handler(combat_skill_menu_handler)
     application.add_handler(combat_use_skill_handler)
     application.add_handler(combat_skill_on_cooldown_handler)
     application.add_handler(combat_skill_info_handler)
 
-    # 5. PvP
+    # 6. PvP
     for handler in pvp_handlers():
         application.add_handler(handler)
 
