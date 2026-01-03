@@ -301,9 +301,7 @@ async def start_auto_hunt(
 ) -> None:
     query = update.callback_query
     
-    # ---------------------------------------------------------
-    # 🔒 SEGURANÇA NIVEL 1: RECUPERAÇÃO DE SESSÃO
-    # ---------------------------------------------------------
+    # 1. Recuperação Segura da Sessão
     raw_uid = get_current_player_id(update, context)
     if not raw_uid:
         await query.answer("❌ Sessão expirada. Faça login novamente (/start).", show_alert=True)
@@ -318,58 +316,53 @@ async def start_auto_hunt(
             await query.answer("❌ Perfil não encontrado.", show_alert=True)
             return
 
-        # ---------------------------------------------------------
-        # 🔒 SEGURANÇA NIVEL 2: VERIFICAÇÃO DE PLANO PAGO
-        # ---------------------------------------------------------
+        # 2. Verificação de Plano Premium
         if not PremiumManager(player_data).is_premium():
             await query.answer("⭐️ Recurso exclusivo para Aventureiros Premium!", show_alert=True)
             return
 
-        # Anti-Deadlock
+        # Anti-Deadlock: Verifica se o jogador já está em uma ação
         current_state = player_data.get('player_state', {}).get('action', 'idle')
         if current_state != 'idle':
             await query.answer(f"⚠️ Você já está ocupado com: {current_state}", show_alert=True)
             return
         
-        # 3. Cálculo de Custo de Energia
-        region_info = game_data.REGIONS_DATA.get(region_key, {})
-        base_cost = int(getattr(game_data, "HUNT_ENERGY_COST", 1))
-        cost_per_hunt = int(region_info.get("hunt_energy_cost", base_cost))
-        
+        # 3. Cálculo de Custo de Energia (Regra Absoluta: 1 por 1)
+        # O total_cost é definido puramente pelo número de caçadas
         total_cost = hunt_count 
         
         if player_data.get('energy', 0) < total_cost:
             await query.answer(f"⚡ Energia insuficiente. Necessário: {total_cost}.", show_alert=True)
             return
 
-        # 4. Consumo Real
+        # 4. Consumo Real e Persistência de Estado
         if not player_manager.spend_energy(player_data, total_cost):
             await query.answer("❌ Erro ao consumir energia.", show_alert=True)
             return
 
+        # Configura o tempo de conclusão
         duration_seconds = SECONDS_PER_HUNT * hunt_count 
+        finish_dt = (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds))
+        
         player_data['player_state'] = {
             'action': 'auto_hunting',
-            'finish_time': (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)).isoformat(),
+            'finish_time': finish_dt.isoformat(),
             'details': {'hunt_count': hunt_count, 'region_key': region_key}
         }
         await player_manager.save_player_data(user_id, player_data)
 
-        # ---------------------------------------------------------
-        # 🧹 LÓGICA DE LIMPEZA: APAGA O MENU ANTERIOR
-        # ---------------------------------------------------------
+        # 5. Limpeza Imersiva: Apaga o menu de seleção anterior
+        menu_message_id = query.message.message_id
         try:
-            await query.delete_message()
+            await context.bot.delete_message(chat_id=chat_id, message_id=menu_message_id)
         except Exception as e:
             logger.warning(f"[AutoHunt] Falha ao apagar menu: {e}")
 
-        # ---------------------------------------------------------
-        # 🖼️ FEEDBACK VISUAL: NOVA MENSAGEM COM MÍDIA
-        # ---------------------------------------------------------
+        # 6. Feedback Visual: Nova Mensagem com Mídia Dinâmica
+        region_info = game_data.REGIONS_DATA.get(region_key, {})
         region_name = region_info.get('display_name', region_key)
         duration_min = duration_seconds / 60.0
         
-        # Aqui forçamos a exibição do total_cost que acabamos de calcular
         msg = (
             f"⏱ <b>𝐂𝐚𝐜̧𝐚𝐝𝐚 𝐑𝐚́𝐩𝐢𝐝𝐚 𝐈𝐧𝐢𝐜𝐢𝐚𝐝𝐚!</b>\n"
             f"⚔️ Simulando <b>{hunt_count} combates</b> em <b>{region_name}</b>...\n\n"
@@ -378,7 +371,7 @@ async def start_auto_hunt(
             f"<i>O relatório final será enviado automaticamente.</i>"
         )
 
-        # Busca mídia de início ("autohunt_start_media")
+        # Busca mídia de início ("autohunt_start_media") no file_id_manager
         media_data = file_id_manager.get_file_data("autohunt_start_media")
         sent_message = None
 
@@ -387,6 +380,7 @@ async def start_auto_hunt(
                 m_id = media_data["id"]
                 m_type = (media_data.get("type") or "photo").lower()
                 
+                # Envia nova mídia (vídeo ou foto)
                 if m_type == "video":
                     sent_message = await context.bot.send_video(chat_id, video=m_id, caption=msg, parse_mode="HTML")
                 else:
@@ -396,9 +390,7 @@ async def start_auto_hunt(
         except Exception:
             sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
 
-        # ---------------------------------------------------------
-        # ⏳ AGENDAMENTO DO JOB (MENSAGEM ATUALIZADA)
-        # ---------------------------------------------------------
+        # 7. Agendamento do Job de Finalização
         job_data = {
             "user_id": user_id,
             "chat_id": chat_id,
@@ -415,5 +407,5 @@ async def start_auto_hunt(
         )
 
     except Exception as e:
-        logger.error(f"[AutoHunt] Erro crítico: {e}", exc_info=True)
+        logger.error(f"[AutoHunt] Erro crítico ao iniciar: {e}", exc_info=True)
         await context.bot.send_message(chat_id, "❌ Erro ao iniciar a caçada.")

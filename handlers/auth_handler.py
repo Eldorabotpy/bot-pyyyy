@@ -356,17 +356,24 @@ async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    try: await q.answer("Saindo...")
+    try: await q.answer("Encerrando sessão...")
     except: pass
     
+    # 1. Limpa o Cache do MongoDB
     uid = get_current_player_id(update, context)
-    if uid: await clear_player_cache(uid)
-    context.user_data.clear()
+    if uid: 
+        await clear_player_cache(uid)
     
-    if update.effective_chat.type == ChatType.PRIVATE:
-        kb = [[InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')]]
-        try: await q.edit_message_caption(caption="🔒 <b>Desconectado.</b>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
-        except: await context.bot.send_message(update.effective_chat.id, "🔒 Desconectado.")
+    # 2. Limpa ABSOLUTAMENTE TUDO da sessão atual do Telegram
+    context.user_data.clear()
+    if context.chat_data: context.chat_data.clear()
+    
+    # 3. Informa o usuário e remove o teclado antigo
+    await q.edit_message_caption(
+        caption="🔒 <b>Sessão encerrada com sucesso!</b>\n\nUse /start para entrar em outra conta.", 
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔐 Entrar em Outra Conta", callback_data='btn_login')]]),
+        parse_mode="HTML"
+    )
     return ConversationHandler.END
 
 auth_handler = ConversationHandler(
