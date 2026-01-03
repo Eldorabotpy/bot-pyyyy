@@ -69,29 +69,33 @@ def _humanize_duration(seconds: int) -> str:
         return f"{mins} min"
     return f"{seconds} s"
 
+# Em handlers/menu/region.py
+
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
     """
     Calcula o tempo de viagem.
-    Se o multiplicador for 0.0 (VIP), retorna 0 imediatamente.
+    BLINDAGEM VIP: Se for Lenda/VIP, retorna 0 imediatamente.
     """
+    # 1. Verificação Direta de Tier (Ignora validade complexa, confia no DB)
+    tier = str(player_data.get("premium_tier", "free")).lower()
+    
+    if tier in ["lenda", "vip", "admin"]:
+        return 0
+
+    # 2. Lógica Padrão / Premium
     # Tempo Base: 6 Minutos (360s)
     base = 360 
     
     try:
-        # Instancia o gerenciador
+        # Tenta pegar multiplicador específico se existir
         pm = PremiumManager(player_data)
-        
-        # Obtém o multiplicador configurado no premium.py
-        # Free = 1.0 | Premium/VIP/Lenda = 0.0
         mult = float(pm.get_perk_value("travel_time_multiplier", 1.0))
         
-        # Se o multiplicador for 0 (ou muito próximo de 0), a viagem é instantânea
+        # Se o multiplicador for 0 (Premium pode ter bugs, mas o check acima garante VIP/Lenda)
         if mult <= 0.01:
             return 0
             
-    except Exception as e:
-        # Se houver erro (ex: premium expirado ou falha de leitura), usa tempo normal
-        print(f"⚠️ Erro ao calcular tempo de viagem: {e}")
+    except Exception:
         mult = 1.0
 
     return max(0, int(round(base * mult)))

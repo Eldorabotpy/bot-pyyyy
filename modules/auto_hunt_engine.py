@@ -337,18 +337,25 @@ async def start_auto_hunt(
     region_key: str
 ) -> None:
     query = update.callback_query
-    
-    # ✅ CORREÇÃO CRÍTICA: USAR AUTH_UTILS PARA PEGAR ID (STR ou INT)
     user_id = get_current_player_id(update, context)
-    
-    # Chat ID continua sendo do Telegram (para envio de mensagem)
     chat_id = query.message.chat.id
     
     try:
         player_data = await player_manager.get_player_data(user_id)
 
-        # 1. Checagem Premium
-        if not PremiumManager(player_data).is_premium():
+        # --- 1. CHECAGEM BLINDADA DE PREMIUM ---
+        # Não confia apenas no is_premium() se houver erro de data.
+        # Verifica a string crua do banco.
+        tier = str(player_data.get("premium_tier", "free")).lower()
+        is_vip_brute = tier in ["premium", "vip", "lenda", "admin"]
+        
+        # Tenta validar pelo manager também (caso seja um free com trial temporário)
+        try:
+            if not is_vip_brute and PremiumManager(player_data).is_premium():
+                is_vip_brute = True
+        except: pass
+
+        if not is_vip_brute:
             await query.answer("⭐️ 𝗙𝘂𝗻𝗰𝗶𝗼𝗻𝗮𝗹𝗶𝗱𝗮𝗱𝗲 𝗲𝘅𝗰𝗹𝘂𝘀𝗶𝘃𝗮 𝗽𝗮𝗿𝗮 𝗣𝗿𝗲𝗺𝗶𝘂𝗺.", show_alert=True)
             return
 

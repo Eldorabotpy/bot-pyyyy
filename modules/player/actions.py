@@ -1,21 +1,23 @@
 # modules/player/actions.py
-# (VERSÃO REFATORADA: SUPORTE A STRING ID + WATCHDOG NA COLEÇÃO 'USERS')
+# (VERSÃO FINAL COMPLETA: Correção Lenda + Correção de Imports)
 
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import time
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 import logging
 import asyncio
 
-# Imports internos do pacote
+from telegram.ext import Application
+
+# --- IMPORTS CORRIGIDOS ---
 from . import core
 from .premium import PremiumManager
+# Importamos explicitamente para evitar o erro "não definido"
 from .core import get_player_data, save_player_data, players_collection
 from .inventory import add_item_to_inventory
 from modules import game_data
 from .stats import get_player_total_stats
-from telegram.ext import Application
 from modules.game_data.skills import SKILL_DATA
 
 logger = logging.getLogger(__name__)
@@ -39,48 +41,33 @@ def _ival(x, default=0):
     except Exception: return int(default)
 
 # -------------------------
-# Mana
-# -------------------------
-async def get_player_max_mana(player_data: dict, total_stats: dict | None = None) -> int:
-    if total_stats is None:
-        total_stats = await get_player_total_stats(player_data)
-    return _ival(total_stats.get('max_mana'), 50)
-
-async def add_mana(player_data: dict, amount: int, total_stats: dict | None = None):
-    max_m = await get_player_max_mana(player_data, total_stats)
-    cur = _ival(player_data.get('current_mp', 0))
-    player_data['current_mp'] = max(0, min(cur + int(amount), max_m))
-
-def spend_mana(player_data: dict, amount: int) -> bool:
-    amount = max(0, int(amount))
-    cur = _ival(player_data.get('current_mp', 0))
-    if cur < amount: return False
-    player_data['current_mp'] = cur - amount
-    return True
-
-# -------------------------
-# Energia (LÓGICA TEMPO REAL)
+# Energia (LÓGICA BLINDADA PARA LENDA/VIP)
 # -------------------------
 # Em modules/player/actions.py
 
 def get_player_max_energy(player_data: dict) -> int:
     """
-    Calcula energia máxima baseada EXCLUSIVAMENTE no Plano.
-    Base (20) + Bônus do Plano.
+    Calcula energia máxima: Base (20) + Bônus do Plano.
+    LÓGICA BLINDADA: Se o tier diz 'lenda', recebe o bônus, independente da data.
     """
-    # 1. Base fixa do jogo
     base_max = 20
     
-    # 2. Pega o bônus do plano (0, 5, 10 ou 15)
-    # Se o plano não estiver ativo/válido, retorna 0.
+    # Normaliza o tier para string minúscula
+    tier = str(player_data.get("premium_tier", "free")).lower()
+    
     bonus = 0
-    try:
-        premium = PremiumManager(player_data)
-        bonus = _ival(premium.get_perk_value('max_energy_bonus', 0))
-    except Exception:
-        bonus = 0
+    if tier == "lenda":
+        bonus = 15
+    elif tier == "vip":
+        bonus = 10
+    elif tier == "premium":
+        bonus = 5
+    elif tier == "admin":
+        bonus = 50 # Admin bônus
         
     return base_max + bonus
+
+
 
 def spend_energy(player_data: dict, amount: int = 1) -> bool:
     amount = max(0, int(amount))
@@ -89,74 +76,13 @@ def spend_energy(player_data: dict, amount: int = 1) -> bool:
     max_e = get_player_max_energy(player_data)
     cur = _ival(player_data.get('energy', 0))
     
-    if cur < amount:
-        return False
+    if cur < amount: return False
         
     if cur >= max_e:
         player_data['energy_last_ts'] = utcnow().isoformat()
 
     player_data['energy'] = cur - amount
     return True
-
-def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
-    messages = []
-    
-    if "learn_skill" in effects:
-        skill_id = effects["learn_skill"]
-        skill_info = SKILL_DATA.get(skill_id)
-        
-        if not skill_info:
-            messages.append("⚠️ A habilidade deste tomo parece não existir mais.")
-        else:
-            current_skills = player_data.get("skills", {})
-            if not isinstance(current_skills, dict):
-                current_skills = {} 
-                player_data["skills"] = current_skills
-
-            if skill_id in current_skills:
-                messages.append(f"⚠️ Você já conhece a técnica {skill_info['display_name']}!")
-            else:
-                player_data["skills"][skill_id] = {
-                    "rarity": "comum",
-                    "progress": 0
-                }
-                messages.append(f"✨ <b>Nova Habilidade Aprendida:</b> {skill_info['display_name']}!")
-
-    if "grant_skin" in effects:
-        skin_id = effects["grant_skin"]
-        unlocked = player_data.get("unlocked_skins", [])
-        if skin_id not in unlocked:
-            unlocked.append(skin_id)
-            player_data["unlocked_skins"] = unlocked
-            messages.append(f"👘 Nova aparência desbloqueada!")
-        else:
-            messages.append("⚠️ Você já possui esta aparência.")
-
-    if "heal" in effects:
-        amount = effects["heal"]
-        # Nota: Ideal chamar get_player_total_stats async fora daqui se possível, 
-        # mas mantendo estrutura atual para compatibilidade
-        max_hp = _ival(player_data.get("max_hp", 100)) 
-        old_hp = player_data.get("current_hp", 0)
-        new_hp = min(max_hp, old_hp + amount)
-        player_data["current_hp"] = new_hp
-        recovered = new_hp - old_hp
-        if recovered > 0:
-            messages.append(f"❤️ Recuperou {recovered} HP.")
-        else:
-            messages.append("❤️ HP já está cheio.")
-
-    if "add_energy" in effects:
-        amount = effects["add_energy"]
-        player_data["energy"] = player_data.get("energy", 0) + amount
-        messages.append(f"⚡ Recuperou {amount} Energia.")
-
-    if "add_xp" in effects:
-        amount = effects["add_xp"]
-        player_data["xp"] = player_data.get("xp", 0) + amount
-        messages.append(f"🧠 Ganhou {amount} XP.")
-
-    return messages
 
 def add_energy(player_data: dict, amount: int = 1) -> dict:
     max_e = get_player_max_energy(player_data)
@@ -175,9 +101,21 @@ def sanitize_and_cap_energy(player_data: dict):
         player_data['energy_last_ts'] = anchor.isoformat()
     player_data.pop('last_energy_ts', None)
 
+# -------------------------
+# Regeneração (VELOCIDADE VIP)
+# -------------------------
 def _get_regen_seconds(player_data: dict) -> int:
-    premium = PremiumManager(player_data)
-    return max(1, int(premium.get_perk_value('energy_regen_seconds', 420)))
+    """
+    Retorna o tempo de regeneração baseado APENAS no nome do tier.
+    """
+    tier = str(player_data.get("premium_tier", "free")).lower()
+    
+    if tier == "lenda": return 120    # 2 min
+    if tier == "vip": return 180      # 3 min
+    if tier == "premium": return 300  # 5 min
+    if tier == "admin": return 10     # Admin
+    
+    return 420 # 7 min (Padrão)
 
 def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
     changed = False
@@ -218,7 +156,75 @@ def _apply_energy_autoregen_inplace(player_data: dict) -> bool:
     return changed
 
 # -------------------------
-# Funções de COLETA
+# Mana e Stats
+# -------------------------
+async def get_player_max_mana(player_data: dict, total_stats: dict | None = None) -> int:
+    if total_stats is None:
+        total_stats = await get_player_total_stats(player_data)
+    return _ival(total_stats.get('max_mana'), 50)
+
+async def add_mana(player_data: dict, amount: int, total_stats: dict | None = None):
+    max_m = await get_player_max_mana(player_data, total_stats)
+    cur = _ival(player_data.get('current_mp', 0))
+    player_data['current_mp'] = max(0, min(cur + int(amount), max_m))
+
+def spend_mana(player_data: dict, amount: int) -> bool:
+    amount = max(0, int(amount))
+    cur = _ival(player_data.get('current_mp', 0))
+    if cur < amount: return False
+    player_data['current_mp'] = cur - amount
+    return True
+
+# -------------------------
+# Efeitos de Itens
+# -------------------------
+def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
+    messages = []
+    
+    if "learn_skill" in effects:
+        skill_id = effects["learn_skill"]
+        skill_info = SKILL_DATA.get(skill_id)
+        if not skill_info:
+            messages.append("⚠️ Habilidade desconhecida.")
+        else:
+            current_skills = player_data.setdefault("skills", {})
+            if skill_id in current_skills:
+                messages.append(f"⚠️ Já conhece {skill_info['display_name']}!")
+            else:
+                current_skills[skill_id] = {"rarity": "comum", "progress": 0}
+                messages.append(f"✨ Aprendeu: {skill_info['display_name']}!")
+
+    if "grant_skin" in effects:
+        skin_id = effects["grant_skin"]
+        unlocked = player_data.setdefault("unlocked_skins", [])
+        if skin_id not in unlocked:
+            unlocked.append(skin_id)
+            messages.append(f"👘 Skin desbloqueada!")
+
+    if "heal" in effects:
+        amount = effects["heal"]
+        # Valor simples para evitar loop async
+        max_hp = _ival(player_data.get("max_hp", 100)) 
+        old_hp = player_data.get("current_hp", 0)
+        new_hp = min(max_hp, old_hp + amount)
+        player_data["current_hp"] = new_hp
+        messages.append(f"❤️ Recuperou {new_hp - old_hp} HP.")
+
+    if "add_energy" in effects:
+        amount = effects["add_energy"]
+        # Usa função segura
+        add_energy(player_data, amount)
+        messages.append(f"⚡ Recuperou {amount} Energia.")
+
+    if "add_xp" in effects:
+        amount = effects["add_xp"]
+        player_data["xp"] = _ival(player_data.get("xp", 0)) + amount
+        messages.append(f"🧠 Ganhou {amount} XP.")
+
+    return messages
+
+# -------------------------
+# Coleta (Utilitários)
 # -------------------------
 def _collect_duration_seconds(player_data: dict) -> int:
     base_minutes = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1))
@@ -238,16 +244,13 @@ def _gather_xp_mult(player_data: dict) -> float:
     except: return 1.0
 
 # -------------------------
-# Ações temporizadas & Estado (AGORA SUPORTA STRING ID)
+# Ações Temporizadas e PvP
 # -------------------------
 async def set_last_chat_id(user_id, chat_id: int):
-    """
-    user_id: Pode ser int ou str (ObjectId)
-    """
     pdata = await get_player_data(user_id)
-    if not pdata: return
-    pdata["last_chat_id"] = int(chat_id)
-    await core.save_player_data(user_id, pdata)
+    if pdata:
+        pdata["last_chat_id"] = int(chat_id)
+        await save_player_data(user_id, pdata)
 
 def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | None, chat_id: int | None):
     start = utcnow().replace(microsecond=0)
@@ -263,54 +266,35 @@ def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | N
     return pdata
 
 async def try_finalize_timed_action_for_user(user_id) -> tuple[bool, str | None]:
-    """
-    user_id: Pode ser int ou str (ObjectId)
-    """
     player_data = await get_player_data(user_id)
     if not player_data: return False, None
     state = player_data.get("player_state") or {}
     action = state.get("action")
     
-    if action not in ("exploring", "travel", "crafting", "working", "auto_hunting", "collecting", "refining", "dismantling"):
-        return False, None
+    if not state.get("finish_time"): return False, None
 
     try:
-        finish_iso = state.get("finish_time")
-        if not finish_iso:
-            player_data["player_state"] = {"action": "idle"}
-            await save_player_data(user_id, player_data)
-            return True, f"Ação '{action}' limpa (sem tempo)."
+        if utcnow() < _parse_iso(state["finish_time"]): return False, None
 
-        if utcnow() < _parse_iso(finish_iso): return False, None
-
-        reward_summary = f"Sua ação '{action}' foi interrompida (reinício)."
+        reward_summary = f"Ação '{action}' finalizada."
         if action == "travel":
             dest = (state.get("details") or {}).get("destination")
             if dest: player_data["current_location"] = dest
-            reward_summary = f"Você chegou a {dest}."
         
         player_data["player_state"] = {"action": "idle"}
         await save_player_data(user_id, player_data)
         return True, reward_summary
 
     except Exception as e:
-        logger.error(f"Erro em try_finalize_timed_action: {e}")
-        try:
-            player_data["player_state"] = {"action": "idle"}
-            await save_player_data(user_id, player_data)
-        except: pass
-        return True, "Ação finalizada por erro."
+        logger.error(f"Erro finalizar ação: {e}")
+        return False, None
 
-# -------------------------
-# PvP & Outros
-# -------------------------
-DEFAULT_PVP_ENTRIES = 10
 def get_pvp_entries(player_data: dict) -> int:
     today = utcnow().date().isoformat()
     if player_data.get("last_pvp_entry_reset") != today:
-        player_data["pvp_entries_left"] = DEFAULT_PVP_ENTRIES
+        player_data["pvp_entries_left"] = 10
         player_data["last_pvp_entry_reset"] = today
-    return player_data.get("pvp_entries_left", DEFAULT_PVP_ENTRIES)
+    return player_data.get("pvp_entries_left", 10)
 
 def use_pvp_entry(player_data: dict) -> bool:
     current = get_pvp_entries(player_data)
@@ -331,8 +315,8 @@ def add_pvp_points(player_data: dict, amount: int):
     return val
 
 async def heal_player(player_data: dict, amount: int):
-    stats = await get_player_total_stats(player_data)
-    max_hp = stats.get('max_hp', 1)
+    # Simplificado para evitar loop
+    max_hp = _ival(player_data.get('max_hp', 100))
     player_data['current_hp'] = min(max_hp, _ival(player_data.get('current_hp', 0)) + int(amount))
 
 def add_buff(player_data: dict, buff_info: dict):
@@ -343,73 +327,53 @@ def add_buff(player_data: dict, buff_info: dict):
         "turns_left": buff_info.get("duration_turns")
     })
 
+# -------------------------
+# WATCHDOG (Recuperação de Ações)
+# -------------------------
 async def check_stale_actions_on_startup(application: Application):
     """
     Verifica ações presas. 
-    LÓGICA ATUALIZADA: Varre a coleção 'users' (contas novas).
     """
-    # Se players_collection for None, DB não conectou
     if players_collection is None: return
     
-    # --- ACESSO À COLEÇÃO NOVA (USERS) ---
+    # --- ACESSO À COLEÇÃO ---
     users_collection = players_collection.database["users"]
     
-    # -----------------------------------------------------
-    # IMPORTS LOCAIS
-    # -----------------------------------------------------
+    # Imports Locais para evitar ciclo no topo
     from modules.auto_hunt_engine import finish_auto_hunt_job
     from handlers.menu.region import finish_travel_job
     from handlers.job_handler import finish_collection_job
-    from handlers.forge_handler import finish_craft_notification_job
-    from handlers.refining_handler import finish_refine_job, finish_dismantle_job
-    # -----------------------------------------------------
-
-    logger.info("[Watchdog] Verificando ações presas (Coleção USERS)...")
-    now = utcnow()
-    actions_to_check = ("auto_hunting", "travel", "collecting", "crafting", "working", "refining", "dismantling")
+    # Adicione outros se necessário
     
-    # Query: Procura documentos onde 'player_state.action' é um dos listados
-    query = {"player_state.action": {"$in": list(actions_to_check)}}
+    logger.info("[Watchdog] Verificando ações presas...")
+    now = utcnow()
+    actions_to_check = ("auto_hunting", "travel", "collecting")
+    query = {"player_state.action": {"$in": actions_to_check}}
 
     try:
-        # Varre a coleção NOVA
         cursor = users_collection.find(query)
         count = 0
-        
         for pdata in cursor:
-            # Em 'users', o _id é ObjectId. Precisamos converter para string.
             user_id = str(pdata.get("_id"))
-            
             chat_id = pdata.get("last_chat_id")
-            # Fallback seguro para chat_id (admin ou algo assim se falhar)
-            if not chat_id: 
-                # Se não tiver chat_id salvo, não conseguimos notificar, mas tentamos processar
-                logger.warning(f"[Watchdog] User {user_id} sem last_chat_id. Pulando notificação.")
-                continue
+            if not chat_id: continue
 
             state = pdata.get("player_state", {})
             action = state.get("action")
             details = state.get("details") or {}
-            
             finish_iso = state.get("finish_time")
             end_time = _parse_iso(finish_iso) if finish_iso else None
 
-            # Limpa auto-hunt bugado sem tempo
-            if action == "auto_hunting" and not end_time:
-                pdata["player_state"] = {"action": "idle"}
-                await save_player_data(user_id, pdata)
-                continue
-            
-            if not end_time: continue
+            if not end_time: continue # Se não tem tempo, ignora
 
             count += 1
-            try:
-                delay = 1 if now >= end_time else (end_time - now).total_seconds()
-                prefix = f"watchdog_{action}_{user_id}"
+            delay = 1 if now >= end_time else (end_time - now).total_seconds()
+            prefix = f"watchdog_{action}_{user_id}"
 
+            try:
                 if action == "auto_hunting":
                     job_data = {
-                        "user_id": user_id, # String ID
+                        "user_id": user_id,
                         "chat_id": chat_id,
                         "message_id": state.get("message_id"),
                         "hunt_count": details.get('hunt_count'),
@@ -418,35 +382,22 @@ async def check_stale_actions_on_startup(application: Application):
                     application.job_queue.run_once(finish_auto_hunt_job, when=delay, data=job_data, name=f"{prefix}_ah")
 
                 elif action == "travel":
-                    # Passa user_id como argumento (já é string)
-                    application.job_queue.run_once(finish_travel_job, when=delay, user_id=user_id, chat_id=chat_id, data={"dest": details.get("destination")}, name=f"{prefix}_tr")
+                    application.job_queue.run_once(finish_travel_job, when=delay, chat_id=chat_id, data={"dest": details.get("destination"), "user_id": user_id}, name=f"{prefix}_tr")
 
                 elif action == "collecting":
                     job_data = {
+                        'user_id': user_id, 'chat_id': chat_id,
                         'resource_id': details.get("resource_id"),
                         'item_id_yielded': details.get("item_id_yielded"), 
                         'quantity': details.get("quantity", 1), 
                         'message_id': details.get("collect_message_id")
                     }
-                    application.job_queue.run_once(finish_collection_job, when=delay, user_id=user_id, chat_id=chat_id, data=job_data, name=f"{prefix}_col")
-
-                elif action == "crafting":
-                    application.job_queue.run_once(finish_craft_notification_job, when=delay, user_id=user_id, chat_id=chat_id, data={"recipe_id": details.get("recipe_id")}, name=f"{prefix}_cr")
-
-                elif action == "refining":
-                    application.job_queue.run_once(finish_refine_job, when=delay, user_id=user_id, chat_id=chat_id, data={"recipe_id": details.get("recipe_id")}, name=f"{prefix}_ref")
-
-                elif action == "dismantling":
-                    application.job_queue.run_once(finish_dismantle_job, when=delay, user_id=user_id, chat_id=chat_id, data={}, name=f"{prefix}_dis")
+                    application.job_queue.run_once(finish_collection_job, when=delay, data=job_data, name=f"{prefix}_col")
 
             except Exception as e:
-                logger.error(f"[Watchdog] Erro processando user {user_id}: {e}")
-                try:
-                    pdata["player_state"] = {"action": "idle"}
-                    await save_player_data(user_id, pdata)
-                except: pass
+                logger.error(f"[Watchdog] Erro user {user_id}: {e}")
         
-        logger.info(f"[Watchdog] Processamento concluído. {count} ações agendadas/restauradas.")
+        logger.info(f"[Watchdog] {count} ações restauradas.")
             
     except Exception as e:
-        logger.error(f"[Watchdog] Erro Geral na Query Users: {e}")
+        logger.error(f"[Watchdog] Erro Geral: {e}")
