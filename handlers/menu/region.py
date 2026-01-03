@@ -239,6 +239,8 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 # Menu Principal da Região
 # =============================================================================
 
+# Em handlers/menu/region.py
+
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     if player_data is None:
         player_data = await player_manager.get_player_data(user_id) or {}
@@ -272,27 +274,34 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
         return
 
-    # Menu Normal
+    # --- CÁLCULOS DO HUD ---
     premium = PremiumManager(player_data)
     stats = await player_manager.get_player_total_stats(player_data)
     
     char_name = player_data.get("character_name", "Aventureiro")
-    prof = (player_data.get("profession", {}) or {}).get("type", "adventurer").capitalize()
+    char_lvl = player_data.get("level", 1)  # Nível do Personagem
     
-    # --- CÁLCULO DE ENERGIA E STATS ---
+    # Dados da Profissão
+    prof_data = player_data.get("profession", {}) or {}
+    prof_name = prof_data.get("type", "adventurer").capitalize()
+    prof_lvl = int(prof_data.get("level", 1)) # Nível da Profissão
+    
     p_hp, max_hp = int(player_data.get('current_hp', 0)), int(stats.get('max_hp', 1))
     p_mp, max_mp = int(player_data.get('current_mp', 0)), int(stats.get('max_mana', 1))
     
-    # IMPORTANTE: Pegamos a energia máxima aqui para usar como "prova" de VIP depois
+    # Energia Máxima (Usa função segura)
     max_en = int(player_manager.get_player_max_energy(player_data))
     p_en = int(player_data.get('energy', 0))
     
     p_gold, p_gems = player_manager.get_gold(player_data), player_manager.get_gems(player_data)
 
+    # --- HUD CORRIGIDO ---
+    # Agora o Nível do Personagem fica ao lado do Nome.
+    # E o Nível da Profissão fica ao lado da Profissão.
     status_hud = (
-        f"\n╭─────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────➤\n"
-        f"│ ╭┈➤ 👤 {char_name}\n"
-        f"│ ├┈➤ 🛠 {prof} (Nv. {player_data.get('level',1)})\n"
+        f"\n╭─────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ───────➤\n"
+        f"│ ╭┈➤ 👤 {char_name} (Nv. {char_lvl})\n"
+        f"│ ├┈➤ 🛠 {prof_name} [Prof. {prof_lvl}]\n"
         f"│ ├┈➤ ❤️ HP: {p_hp}/{max_hp}  💙 MP: {p_mp}/{max_mp}\n"
         f"│ ├┈➤ ⚡ ENERGIA: 🪫{p_en}/🔋{max_en}\n"
         f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
@@ -319,7 +328,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         combat.append(InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}"))
     keyboard.append(combat)
 
-    # --- LÓGICA BLINDADA SUPREMA ---
+    # --- LÓGICA BLINDADA SUPREMA (BOTÕES VIP) ---
     is_vip_visual = False
     
     # 1. Tenta pelo nome do tier (com limpeza de string)
@@ -334,8 +343,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         except: pass
 
     # 3. ULTIMATO: Se a energia for > 20, ele é VIP.
-    # (Usuários Free têm max 20. Premium tem 25+. Lenda tem 35)
-    # Isso garante que se o stat está aplicado, o botão aparece.
     if max_en > 20:
         is_vip_visual = True
 
@@ -367,7 +374,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         if fd: await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
         else: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
     except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
-    
+
 async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None, player_data: dict | None = None):
     # Lógica limpa para recuperar o ID
     q = getattr(update, "callback_query", None)
