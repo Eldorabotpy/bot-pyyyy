@@ -3,7 +3,8 @@ HUNT_ENERGY_COST = 1
 COLLECTION_TIME_MINUTES = 1
 
 # Probabilidades
-ELITE_CHANCE = 0.12  # 12% de chance base de aparecer Elite
+ELITE_CHANCE = 0.20  # 12% de chance base de aparecer Elite
+
 PREMIUM_TIERS = {
     "free": {
         "display_name": "Aventureiro Comum",
@@ -17,7 +18,7 @@ PREMIUM_TIERS = {
             "travel_time_multiplier": 1.0,
             "gather_speed_multiplier": 1.0,
             "gather_energy_cost": 1,
-            "hunt_energy_cost": 1,        # ✅ Adicionado para garantir o custo
+            "hunt_energy_cost": 1,
         }
     },
     "premium": {
@@ -29,10 +30,10 @@ PREMIUM_TIERS = {
             "refine_speed_multiplier": 1.25,
             "max_energy_bonus": 5,
             "energy_regen_seconds": 300,  # 5 Minutos
-            "travel_time_multiplier": 0.0,
+            "travel_time_multiplier": 0.0, # Viagem Instantânea
             "gather_speed_multiplier": 1.5,
             "gather_energy_cost": 1,
-            "hunt_energy_cost": 1,        # ✅ Custa 1
+            "hunt_energy_cost": 1,
         }
     },
     "vip": {
@@ -44,10 +45,10 @@ PREMIUM_TIERS = {
             "refine_speed_multiplier": 1.5,
             "max_energy_bonus": 10,
             "energy_regen_seconds": 180,  # 3 Minutos
-            "travel_time_multiplier": 0.0,
+            "travel_time_multiplier": 0.0, # Viagem Instantânea
             "gather_speed_multiplier": 2.0,
-            "gather_energy_cost": 0,      # Coleta Grátis
-            "hunt_energy_cost": 1,        # Caça custa 1
+            "gather_energy_cost": 1,      # Coleta Grátis
+            "hunt_energy_cost": 1,
         }
     },
     "lenda": {
@@ -59,76 +60,32 @@ PREMIUM_TIERS = {
             "refine_speed_multiplier": 2.0,
             "max_energy_bonus": 15,
             "energy_regen_seconds": 120,  # 2 Minutos
-            "travel_time_multiplier": 0.0,
+            "travel_time_multiplier": 0.0, # Viagem Instantânea
             "gather_speed_multiplier": 2.5,
             "gather_energy_cost": 0,      # Coleta Grátis
-            "hunt_energy_cost": 1,        # ✅ CAÇA GRÁTIS (Exclusivo Lenda)
+            "hunt_energy_cost": 1,        # Custa 1 (Regra Global)
         }
     }
 }
+
 # =================================================================
-# PLANOS E PREÇOS (AJUSTADOS PARA A ECONOMIA DO JOGO)
+# PLANOS E PREÇOS
 # =================================================================
 PREMIUM_PLANS_FOR_SALE = {
-    # --- PREMIUM (~R$ 20,00) ---
-    "premium_30d": {
-        "name": "Premium (30 Dias)", 
-        "price": 120, # Exatamente o pacote Básico
-        "tier": "premium", 
-        "days": 30
-    },
-    "premium_15d": {
-        "name": "Premium (15 Dias)", 
-        "price": 70, 
-        "tier": "premium", 
-        "days": 15
-    },
-    "premium_7d":  {
-        "name": "Premium (7 Dias)",  
-        "price": 35, 
-        "tier": "premium", 
-        "days": 7
-    },
+    # --- PREMIUM ---
+    "premium_30d": {"name": "Premium (30 Dias)", "price": 120, "tier": "premium", "days": 30},
+    "premium_15d": {"name": "Premium (15 Dias)", "price": 70,  "tier": "premium", "days": 15},
+    "premium_7d":  {"name": "Premium (7 Dias)",  "price": 35,  "tier": "premium", "days": 7},
     
-    # --- VIP (~R$ 40,00) ---
-    "vip_30d": {
-        "name": "VIP (30 Dias)",     
-        "price": 300, # Aprox R$ 40~42
-        "tier": "vip", 
-        "days": 30
-    },
-    "vip_15d": {
-        "name": "VIP (15 Dias)",     
-        "price": 160, 
-        "tier": "vip", 
-        "days": 15
-    },
-    "vip_7d": {
-        "name": "VIP (7 Dias)",      
-        "price": 80,  
-        "tier": "vip", 
-        "days": 7
-    },
+    # --- VIP ---
+    "vip_30d": {"name": "VIP (30 Dias)",     "price": 300, "tier": "vip", "days": 30},
+    "vip_15d": {"name": "VIP (15 Dias)",     "price": 160, "tier": "vip", "days": 15},
+    "vip_7d":  {"name": "VIP (7 Dias)",      "price": 80,  "tier": "vip", "days": 7},
 
-    # --- LENDA (~R$ 65,00) ---
-    "lenda_30d": {
-        "name": "Lenda (30 Dias)",   
-        "price": 500, # Aprox R$ 65,00
-        "tier": "lenda", 
-        "days": 30
-    },
-    "lenda_15d": {
-        "name": "Lenda (15 Dias)",   
-        "price": 270, 
-        "tier": "lenda", 
-        "days": 15
-    },
-    "lenda_7d": {
-        "name": "Lenda (7 Dias)",    
-        "price": 140, 
-        "tier": "lenda", 
-        "days": 7
-    },
+    # --- LENDA ---
+    "lenda_30d": {"name": "Lenda (30 Dias)",   "price": 500, "tier": "lenda", "days": 30},
+    "lenda_15d": {"name": "Lenda (15 Dias)",   "price": 270, "tier": "lenda", "days": 15},
+    "lenda_7d":  {"name": "Lenda (7 Dias)",    "price": 140, "tier": "lenda", "days": 7},
 }
 
 def get_benefits_text(tier_key: str) -> str:
@@ -142,13 +99,20 @@ def get_benefits_text(tier_key: str) -> str:
     if data.get("auto_hunt"):
         lines.append("🤖 <b>Auto Caça:</b> Liberado")
     
+    # Viagem (Novo)
+    travel_mult = data.get("travel_time_multiplier", 1.0)
+    if travel_mult == 0.0:
+        lines.append("🚀 <b>Viagem:</b> Instantânea")
+    
     # Coleta
     gather_speed = data.get("gather_speed_multiplier", 1.0)
     gather_cost = data.get("gather_energy_cost", 1)
+    
     if gather_speed > 1.0:
         lines.append(f"⚡️ <b>Coleta:</b> {gather_speed}x mais rápida")
+    
     if gather_cost == 0:
-        lines.append("💥 <b>Coleta:</b> Energia ZERO")
+        lines.append("🌿 <b>Coleta:</b> Energia ZERO") # Ícone diferenciado
 
     # Multiplicadores
     xp = int((data.get("xp_multiplier", 1.0) - 1) * 100)
@@ -161,9 +125,15 @@ def get_benefits_text(tier_key: str) -> str:
     
     # Energia
     bonus_e = data.get("max_energy_bonus", 0)
+    regen_s = data.get("energy_regen_seconds", 420)
     
     if bonus_e > 0: 
         base = 20
         lines.append(f"💚 <b>Energia Máx:</b> +{bonus_e} ({base}→{base+bonus_e})")
+    
+    # Exibir Regen de forma amigável
+    if regen_s < 420:
+        regen_min = regen_s // 60
+        lines.append(f"⏳ <b>Regen:</b> 1 a cada {regen_min} min")
 
     return "\n".join(lines)

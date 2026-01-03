@@ -1,5 +1,5 @@
 # handlers/autohunt_handler.py
-# (VERSÃO FINAL: Corrigido Parser de Botões 10x/25x/35x + Limpeza de Menu + Mídia)
+# (VERSÃO CORRIGIDA: Libera Plano Lenda/Admin Manualmente)
 
 import random
 import logging
@@ -28,9 +28,7 @@ SECONDS_PER_HUNT = 30
 # 🛠️ 1. FUNÇÕES AUXILIARES DE ESCALA
 # ==============================================================================
 def _scale_monster_stats(mon: dict, player_level: int) -> dict:
-    """Escala os atributos do monstro dinamicamente baseada no nível do jogador."""
     m = mon.copy()
-
     if "max_hp" not in m and "hp" in m: m["max_hp"] = m["hp"]
     elif "max_hp" not in m: m["max_hp"] = 10 
 
@@ -47,12 +45,9 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
         m["hp"] = m["max_hp"]
         return m
 
-    GROWTH_HP = 12       
-    GROWTH_ATK = 2.0     
-    GROWTH_DEF = 1.0     
-    GROWTH_XP = 3
-    GROWTH_GOLD = 1.5    
-    
+    # Coeficientes
+    GROWTH_HP, GROWTH_ATK, GROWTH_DEF = 12, 2.0, 1.0
+    GROWTH_XP, GROWTH_GOLD = 3, 1.5    
     scaling_bonus = 1 + (target_lvl * 0.02) 
 
     base_hp = int(m.get("max_hp", 10))
@@ -65,7 +60,6 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     m["hp"] = m["max_hp"]
     m["attack"] = int((base_atk * scaling_bonus) + (target_lvl * GROWTH_ATK))
     m["defense"] = int((base_def * scaling_bonus) + (target_lvl * GROWTH_DEF))
-    
     m["xp_reward"] = int((base_xp * scaling_bonus) + (target_lvl * GROWTH_XP))
     m["gold_drop"] = int((base_gold * scaling_bonus) + (target_lvl * GROWTH_GOLD))
     
@@ -102,36 +96,22 @@ async def _simulate_single_battle(player_data: dict, player_stats: dict, monster
             items_rolled = list(Counter(item_ids_list).items())
             
             return {
-                "result": "win", 
-                "xp": xp, 
-                "gold": gold, 
-                "items": items_rolled,
+                "result": "win", "xp": xp, "gold": gold, "items": items_rolled,
                 "monster_id": monster_data.get("id")
             }
             
         # 2. Monstro Ataca
         dmg_to_player, _, _ = criticals.roll_damage(monster_stats_sim, player_stats, {})
         player_hp -= max(1, dmg_to_player)
-        
-        if player_hp <= 0:
-            return {"result": "loss", "reason": "HP do jogador esgotado"}
+        if player_hp <= 0: return {"result": "loss", "reason": "HP do jogador esgotado"}
 
     return {"result": "loss", "reason": "Exaustão (Tempo Esgotado)"}
 
 # ==============================================================================
 # 🏁 3. EXECUTOR DE CONCLUSÃO (JOB)
 # ==============================================================================
-async def execute_hunt_completion(
-    user_id: str, 
-    chat_id: int, 
-    hunt_count: int, 
-    region_key: str, 
-    context: ContextTypes.DEFAULT_TYPE, 
-    message_id: int = None
-):
+async def execute_hunt_completion(user_id: str, chat_id: int, hunt_count: int, region_key: str, context: ContextTypes.DEFAULT_TYPE, message_id: int = None):
     """Finaliza a simulação, limpa a mídia de início e envia o resultado."""
-    logger.info(f"[AutoHunt] Processando conclusão para ID: {user_id}")
-
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
@@ -180,7 +160,7 @@ async def execute_hunt_completion(
         await player_manager.save_player_data(user_id, player_data)
         return 
 
-    # --- Aplicação de Recompensas ---
+    # --- Recompensas ---
     player_manager.add_gold(player_data, total_gold)
     player_data['xp'] = player_data.get('xp', 0) + total_xp
     
@@ -201,11 +181,10 @@ async def execute_hunt_completion(
 
     _, _, level_up_msg = player_manager.check_and_apply_level_up(player_data)
     
-    # LIBERA O JOGADOR
     player_data['player_state'] = {'action': 'idle'}
     await player_manager.save_player_data(user_id, player_data)
 
-    # --- Geração do Relatório ---
+    # --- Relatório ---
     summary_msg = [
         "🏁 <b>𝐂𝐚𝐜̧𝐚𝐝𝐚 𝐑𝐚́𝐩𝐢𝐝𝐚 𝐂𝐨𝐧𝐜𝐥𝐮𝐢́𝐝𝐚!</b> 🏁",
         f"📊 Resultado: <b>{wins} vitórias</b> | <b>{losses} derrotas</b>",
@@ -220,12 +199,11 @@ async def execute_hunt_completion(
     final_caption = "\n".join(summary_msg)
     reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"open_region:{region_key}")]])
 
-    # 1. Apaga a mensagem de "Iniciado" (O vídeo/foto de espera)
+    # Limpeza e Mídia
     if message_id:
         try: await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
         except Exception: pass 
 
-    # 2. Busca mídia de resultado
     media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
     file_data = file_id_manager.get_file_data(media_key)
     
@@ -243,9 +221,6 @@ async def execute_hunt_completion(
         logger.error(f"[AutoHunt] Erro no envio final: {e}")
         await context.bot.send_message(chat_id, final_caption, parse_mode="HTML", reply_markup=reply_markup)
 
-# ==============================================================================
-# 🧩 4. JOB WRAPPER
-# ==============================================================================
 async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
     job_data = context.job.data
     raw_uid = job_data.get('user_id')
@@ -262,17 +237,11 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ==============================================================================
-# 🚀 5. INICIADOR (START)
+# 🚀 5. INICIADOR (START) - CORRIGIDO PARA ACEITAR LENDA/VIP
 # ==============================================================================
-async def start_auto_hunt(
-    update: Update, 
-    context: ContextTypes.DEFAULT_TYPE, 
-    hunt_count: int, 
-    region_key: str
-) -> None:
+async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hunt_count: int, region_key: str) -> None:
     query = update.callback_query
     
-    # 1. Recuperação e Validações
     user_id = get_current_player_id(update, context)
     if not user_id:
         await query.answer("❌ Sessão expirada.", show_alert=True)
@@ -281,32 +250,39 @@ async def start_auto_hunt(
     chat_id = query.message.chat.id
     player_data = await player_manager.get_player_data(user_id)
     
-    # Valida Premium/Vip
-    if not PremiumManager(player_data).is_premium():
+    # --- VALIDAÇÃO VIP CORRIGIDA ---
+    # Verifica tanto o sistema Premium quanto o nome bruto do plano (Lenda/Admin/VIP)
+    is_vip = False
+    
+    # 1. Tentativa Padrão
+    try:
+        if PremiumManager(player_data).is_premium():
+            is_vip = True
+    except: pass
+    
+    # 2. Tentativa Manual (String Bruta) - Garante que Lenda/Admin passe
+    tier_name = str(player_data.get("premium_tier", "")).lower()
+    if any(x in tier_name for x in ["lenda", "vip", "premium", "admin"]):
+        is_vip = True
+
+    if not is_vip:
         await query.answer("⭐️ Recurso exclusivo Premium!", show_alert=True)
         return
+    # ---------------------------------
 
-    # Valida Energia
     total_cost = hunt_count
     if player_data.get('energy', 0) < total_cost:
         await query.answer(f"⚡ Energia insuficiente. Precisa de {total_cost}.", show_alert=True)
         return
 
-    # Consome Energia
     if not player_manager.spend_energy(player_data, total_cost):
         await query.answer("❌ Erro ao processar energia.", show_alert=True)
         return
 
-    # --- INÍCIO DA CORREÇÃO VISUAL ---
+    # Visual: Apagar menu anterior
+    try: await query.message.delete()
+    except Exception as e: logger.warning(f"[AutoHunt] Não foi possível apagar o menu: {e}")
 
-    # 2. Apagar o Menu Anterior (Prioridade)
-    # Fazemos isso ANTES de enviar a nova mensagem para evitar "pulo" e duplicação
-    try:
-        await query.message.delete()
-    except Exception as e:
-        logger.warning(f"[AutoHunt] Não foi possível apagar o menu: {e}")
-
-    # 3. Preparar Estado e Dados
     duration_seconds = SECONDS_PER_HUNT * hunt_count 
     finish_dt = (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds))
     
@@ -317,7 +293,6 @@ async def start_auto_hunt(
     }
     await player_manager.save_player_data(user_id, player_data)
 
-    # 4. Preparar Mensagem e Mídia
     region_info = game_data.REGIONS_DATA.get(region_key, {})
     region_name = region_info.get('display_name', region_key)
     duration_min = duration_seconds / 60.0
@@ -330,7 +305,6 @@ async def start_auto_hunt(
         f"<i>O relatório chegará automaticamente.</i>"
     )
 
-    # Busca a mídia no banco (Certifique-se que 'autohunt_start_media' existe!)
     media_key = "autohunt_start_media"
     media_data = file_id_manager.get_file_data(media_key)
     sent_message = None
@@ -339,67 +313,42 @@ async def start_auto_hunt(
         if media_data and media_data.get("id"):
             file_id = media_data["id"]
             file_type = (media_data.get("type") or "photo").lower()
-            
             if file_type == "video":
-                sent_message = await context.bot.send_video(
-                    chat_id=chat_id, video=file_id, caption=msg, parse_mode="HTML"
-                )
+                sent_message = await context.bot.send_video(chat_id=chat_id, video=file_id, caption=msg, parse_mode="HTML")
             else:
-                sent_message = await context.bot.send_photo(
-                    chat_id=chat_id, photo=file_id, caption=msg, parse_mode="HTML"
-                )
+                sent_message = await context.bot.send_photo(chat_id=chat_id, photo=file_id, caption=msg, parse_mode="HTML")
         else:
-            # Fallback se não tiver mídia cadastrada
-            logger.warning(f"[AutoHunt] Mídia '{media_key}' não encontrada. Enviando texto.")
             sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
-            
     except Exception as e:
         logger.error(f"[AutoHunt] Erro ao enviar mídia: {e}")
-        # Se falhar o envio da foto/video, tenta mandar texto para não travar o jogo
         sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
 
-    # 5. Agendar o Job
     job_data = {
-        "user_id": user_id,
-        "chat_id": chat_id,
+        "user_id": user_id, "chat_id": chat_id,
         "message_id": sent_message.message_id if sent_message else None,
-        "hunt_count": hunt_count,
-        "region_key": region_key
+        "hunt_count": hunt_count, "region_key": region_key
     }
     
-    context.job_queue.run_once(
-        finish_auto_hunt_job, 
-        when=duration_seconds, 
-        data=job_data, 
-        name=f"autohunt_{user_id}"
-    )
+    context.job_queue.run_once(finish_auto_hunt_job, when=duration_seconds, data=job_data, name=f"autohunt_{user_id}")
 
 # ==============================================================================
 # 🧩 6. HANDLER DE BOTÃO (PARSER INTELIGENTE)
 # ==============================================================================
 async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Lê botões no formato: autohunt_start_10_floresta_sombria
-    Extrai a quantidade (10/25/35) e a região corretamente.
-    """
+    """Lê botões no formato: autohunt_start_10_floresta_sombria"""
     query = update.callback_query
-    data = query.data  # Ex: autohunt_start_35_pantano_maldito
+    data = query.data
     
     try:
-        # 1. Remove o prefixo padrão
         content = data.replace("autohunt_start_", "")
-        
-        # 2. Separa apenas no PRIMEIRO underscore 
         parts = content.split("_", 1)
         
         if len(parts) < 2:
             await query.answer("❌ Erro nos dados do botão.", show_alert=True)
             return
 
-        hunt_count = int(parts[0])  # Pega o 10, 25 ou 35
-        region_key = parts[1]       # Pega o resto da string como região
-
-        # 3. Chama a função principal
+        hunt_count = int(parts[0])
+        region_key = parts[1]
         await start_auto_hunt(update, context, hunt_count, region_key)
         
     except ValueError:
@@ -408,6 +357,4 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
         logger.error(f"Erro no parser do autohunt: {e}")
         await query.answer("❌ Erro interno.", show_alert=True)
 
-# Registra o handler procurando por qualquer coisa que comece com "autohunt_start_"
-# O regex garante que pegue todos os botões (10, 25, 35)
 autohunt_start_handler = CallbackQueryHandler(_autohunt_button_parser, pattern=r"^autohunt_start_")
