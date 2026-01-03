@@ -390,9 +390,9 @@ async def start_auto_hunt(
                 
                 # Envia nova mídia: Suporta nativamente Vídeo ou Foto
                 if m_type == "video":
-                    sent_message = await context.bot.send_video(chat_id, video=m_id, caption=msg, parse_mode="HTML")
+                    sent_message = await context.bot.send_video(chat_id=chat_id, video=m_id, caption=msg, parse_mode="HTML")
                 else:
-                    sent_message = await context.bot.send_photo(chat_id, photo=m_id, caption=msg, parse_mode="HTML")
+                    sent_message = await context.bot.send_photo(chat_id=chat_id, photo=m_id, caption=msg, parse_mode="HTML")
             else:
                 sent_message = await context.bot.send_message(chat_id, msg, parse_mode="HTML")
         except Exception as e:
@@ -417,7 +417,6 @@ async def start_auto_hunt(
 
     except Exception as e:
         logger.error(f"[AutoHunt] Erro crítico ao iniciar: {e}", exc_info=True)
-        # Em caso de erro catastrófico, tenta avisar o usuário
         try:
             await context.bot.send_message(chat_id, "❌ Erro ao iniciar a caçada automática.")
         except:

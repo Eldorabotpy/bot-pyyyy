@@ -10,6 +10,8 @@ from threading import Thread
 from datetime import time as dt_time, timezone
 from zoneinfo import ZoneInfo
 from registries.startup import run_system_startup_tasks
+from handlers.admin.media_handler import set_media_command
+
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -194,7 +196,7 @@ if __name__ == '__main__':
 
     # 5. Admin / Ferramentas
     application.add_handler(file_id_conv_handler)
-    
+    application.add_handler(CommandHandler("setmedia", set_media_command))
     # 6. Sistemas de Jogo
     register_market_handlers(application)
     register_evolution_handlers(application)
