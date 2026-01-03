@@ -77,8 +77,8 @@ def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
     # 1. Verificação Direta (Ignora validade de data, confia no registo do banco)
     tier = str(player_data.get("premium_tier", "free")).lower().strip()
     
-    if tier in ["lenda", "vip", "admin"]:
-        return 0
+    if tier in ["lenda", "vip", "admin", "premium"]:
+       return 0
 
     # 2. Lógica Padrão para outros casos
     base = 360 
@@ -285,7 +285,9 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
     prof_data = player_data.get("profession", {}) or {}
     prof_name = prof_data.get("type", "adventurer").capitalize()
     prof_lvl = int(prof_data.get("level", 1)) # Nível da Profissão
-    
+    tier_key = str(player_data.get("premium_tier", "free")).lower()
+    tier_info = getattr(game_data, "PREMIUM_TIERS", {}).get(tier_key, {})
+    tier_display = tier_info.get("display_name", "Aventureiro")
     p_hp, max_hp = int(player_data.get('current_hp', 0)), int(stats.get('max_hp', 1))
     p_mp, max_mp = int(player_data.get('current_mp', 0)), int(stats.get('max_mana', 1))
     
@@ -299,8 +301,9 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
     # Agora o Nível do Personagem fica ao lado do Nome.
     # E o Nível da Profissão fica ao lado da Profissão.
     status_hud = (
-        f"\n╭─────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ───────➤\n"
+        f"\n╭─────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
         f"│ ╭┈➤ 👤 {char_name} (Nv. {char_lvl})\n"
+        f"│ ├┈➤ 🎖️ 𝐏𝐥𝐚𝐧𝐨: <b>{tier_display}</b>\n"
         f"│ ├┈➤ 🛠 {prof_name} [Prof. {prof_lvl}]\n"
         f"│ ├┈➤ ❤️ HP: {p_hp}/{max_hp}  💙 MP: {p_mp}/{max_mp}\n"
         f"│ ├┈➤ ⚡ ENERGIA: 🪫{p_en}/🔋{max_en}\n"
