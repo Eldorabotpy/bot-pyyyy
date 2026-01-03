@@ -1,90 +1,102 @@
 # handlers/menu/events.py
-# (VERSÃO ZERO LEGADO: HUB DE EVENTOS + AUTH SEGURA)
+# (VERSÃO BLINDADA: Lê do regions.py e usa Auth de Sessão)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from modules import player_manager
-from modules.dungeon_definitions import DUNGEONS
-from modules.auth_utils import get_current_player_id
+
+# Importa o CORE para pegar dados seguros (User ou Player)
+from modules.player.core import get_player_data
+# Importa as definições NOVAS (Onde está o Pico do Grifo)
+from modules.dungeons.regions import REGIONAL_DUNGEONS
 
 async def show_events_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Mostra o menu de eventos (HUB).
-    Lista tanto a Defesa do Reino quanto as Dungeons (Catacumbas).
+    Exibe a lista de Calabouços/Eventos lendo diretamente do regions.py.
+    Verifica se o jogador (User ou Player) tem a chave necessária.
     """
     query = update.callback_query
+    if query:
+        await query.answer()
+
+    # 1. SEGURANÇA: Pega o ID da Sessão
+    # Isso é CRUCIAL: Contas novas têm ID de sessão (ObjectId), contas velhas têm ID numérico.
+    # O context.user_data["logged_player_id"] garante que pegamos o certo.
+    user_id = context.user_data.get("logged_player_id")
     
-    # 🔒 SEGURANÇA: Identificação via Auth Central
-    user_id = get_current_player_id(update, context)
     if not user_id:
-        if query: await query.answer("Sessão inválida. Use /start.", show_alert=True)
+        if query:
+            await query.edit_message_text("⚠️ Sessão expirada. Digite /start novamente.")
         return
 
-    await query.answer()
-
-    # Recupera dados usando String ID
-    player_data = await player_manager.get_player_data(user_id)
-    if not player_data:
-        await query.edit_message_text("Erro ao carregar perfil.")
-        return
+    # 2. Carrega dados BLINDADOS
+    # O core.get_player_data sabe procurar tanto em 'users' quanto em 'players'
+    player_data = await get_player_data(user_id)
     
-    # Normaliza a localização
-    player_location = player_data.get("current_location", "reino_eldora")
+    if not player_data:
+        msg = "❌ Perfil não encontrado."
+        if query: await query.edit_message_text(msg)
+        else: await context.bot.send_message(update.effective_chat.id, msg)
+        return
 
-    text = "💀 <b>HUB DE EVENTOS ESPECIAIS</b> 💀\n\nEscolha seu desafio:"
+    # Pega o inventário para checar as chaves
+    inventory = player_data.get("inventory", {})
+
+    # 3. Monta o teclado dinamicamente lendo o regions.py
     keyboard = []
     
-    # ==================================================================
-    # 1. BOTÃO DA DEFESA DO REINO
-    # ==================================================================
-    # Verifica se o jogador está no reino
-    if player_location == 'reino_eldora':
-        keyboard.append([
-            InlineKeyboardButton("🛡️ Defesa do Reino (Ondas)", callback_data="defesa_reino_main")
-        ])
+    text = (
+        "⚔️ <b>Masmorras e Eventos</b> ⚔️\n\n"
+        "Selecione um local para explorar.\n"
+        "<i>É necessário possuir o item de acesso.</i>\n"
+    )
 
-    # ==================================================================
-    # 2. BOTÕES DAS DUNGEONS (CATACUMBAS, ETC)
-    # ==================================================================
-    event_found = False
+    # Loop inteligente: Varre todas as regiões configuradas no regions.py
+    # Assim que você adicionar algo novo no regions.py, aparece aqui automaticamente.
+    found_any = False
     
-    # DUNGEONS é um dict fixo, não precisa de await
-    for dungeon_id, dungeon_info in DUNGEONS.items():
-        # Verifica se a dungeon pertence ao local atual do jogador
-        if dungeon_info.get("entry_location") == player_location:
-            event_found = True
-            display_name = dungeon_info.get('display_name', 'Masmorra')
-            keyboard.append([
-                InlineKeyboardButton(f"💀 {display_name}", callback_data=f"dungeon_info_{dungeon_id}")
-            ])
+    for region_key, data in REGIONAL_DUNGEONS.items():
+        found_any = True
+        label = data.get("label", region_key.replace("_", " ").title())
+        emoji = data.get("emoji", "🏰")
+        key_item = data.get("key_item", "cristal_de_abertura")
+        
+        # --- VERIFICAÇÃO DE CHAVE ---
+        # Compatível com sistema novo (dict) e velho (int)
+        key_qty = 0
+        inv_item = inventory.get(key_item)
+        
+        if isinstance(inv_item, dict): 
+            key_qty = 1 # É um item único (nova estrutura)
+        else:
+            try: key_qty = int(inv_item or 0) # É quantidade simples (estrutura antiga)
+            except: key_qty = 0
 
-    # ==================================================================
-    # 3. NAVEGAÇÃO
-    # ==================================================================
-    
-    if not keyboard:
-        text += "\n\n🚫 <i>Nenhum evento disponível nesta localização.</i>"
+        # Define visual do botão
+        status_icon = "✅" if key_qty > 0 else "🔒"
+        
+        # Se não tiver a chave, mostra que está trancado mas deixa o botão (ou remove se preferir)
+        # Aqui deixei visível para o jogador saber que o evento existe
+        btn_text = f"{emoji} {label} ({status_icon})"
+        
+        # O callback 'dungeon_open' é capturado pelo modules/dungeons/engine.py ou runtime.py
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"dungeon_open:{region_key}")])
 
-    # Define para onde o botão "Voltar" leva
-    back_callback = "back_to_kingdom" if player_location == 'reino_eldora' else "continue_after_action"
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data=back_callback)])
+    if not found_any:
+        text += "\n🚫 <i>Nenhum evento ativo no momento.</i>"
+
+    # Botão de Voltar padrão (gerenciado pelo menu_handler)
+    keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="continue_after_action")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # Lógica de renderização (Tenta manter imagem se existir, senão manda texto)
-    try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode='HTML')
-    except Exception:
-        # Fallback se a mensagem anterior não tinha caption (era texto puro)
+    
+    # 4. Envia ou Edita a mensagem
+    if query and query.message:
+        # Tenta editar a mensagem existente para evitar spam
         try:
-            await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode='HTML')
+            await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
         except:
-            # Último recurso: apaga e envia novo
-            try: await query.delete_message()
-            except: pass
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
+            # Se falhar (ex: era uma foto e agora é texto), apaga e manda novo
+            await query.delete_message()
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_markup=reply_markup, parse_mode="HTML")
