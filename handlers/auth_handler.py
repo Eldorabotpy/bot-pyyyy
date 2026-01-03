@@ -1,16 +1,15 @@
 # handlers/auth_handler.py
-# (VERSÃO FINAL: Auth Híbrida - Com Conexão Direta ao MongoDB)
+# (VERSÃO FINAL: Auth Híbrida + AUTO-LOGIN PERSISTENTE)
 
 import logging
 import hashlib
 import asyncio 
-import certifi # Importante para conexão segura
+import certifi 
 from datetime import datetime
 from bson import ObjectId
-from pymongo import MongoClient # Cliente do Banco
+from pymongo import MongoClient 
 
-# --- Imports do Telegram ---
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     CommandHandler,
     MessageHandler,
@@ -21,12 +20,18 @@ from telegram.ext import (
 )
 from telegram.constants import ChatType
 
-# --- Imports do Core ---
 from modules.auth_utils import get_current_player_id
-# [MODIFICAÇÃO] Removemos users_collection da importação para definir localmente e evitar erro NoneType
 from modules.player.core import clear_player_cache, get_player_data, save_player_data
 
-# Tenta importar o menu
+# --- IMPORT DO NOVO SISTEMA DE SESSÕES ---
+try:
+    from modules.sessions import save_persistent_session, get_persistent_session, clear_persistent_session
+except ImportError:
+    # Fallback caso o arquivo não exista (evita crash, mas sem persistência)
+    async def save_persistent_session(*a): pass
+    async def get_persistent_session(*a): return None
+    async def clear_persistent_session(*a): pass
+
 try:
     from handlers.start_handler import start_command
 except ImportError:
@@ -35,19 +40,18 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# CONEXÃO MONGODB (BLINDAGEM CONTRA ERRO NONETYPE)
+# CONEXÃO MONGODB
 # ==============================================================================
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 
 try:
-    # Conexão direta para garantir que o Login funcione
     client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
     db = client["eldora_db"]
-    users_collection = db["users"] # Coleção oficial de Login
+    users_collection = db["users"] 
     logger.info("✅ [AUTH] Conexão MongoDB estabelecida com sucesso.")
 except Exception as e:
     logger.critical(f"❌ [AUTH] FALHA AO CONECTAR MONGODB: {e}")
-    users_collection = None # Vai gerar erro se falhar, mas logamos o motivo
+    users_collection = None
 
 # ==============================================================================
 # ESTADOS DA CONVERSA
@@ -80,44 +84,56 @@ async def _check_private(update: Update) -> bool:
     return True
 
 # ==============================================================================
-# 1. MENU INICIAL E COMANDO /START
+# 1. MENU INICIAL E COMANDO /START (COM AUTO-LOGIN)
 # ==============================================================================
 async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != ChatType.PRIVATE:
         return ConversationHandler.END
 
-    # 1. CHECK SE JÁ ESTÁ LOGADO (Sistema Novo)
+    # 1. TENTA RECUPERAR SESSÃO (AUTO-LOGIN)
+    # Primeiro verifica RAM
     session_id = get_current_player_id(update, context)
     
+    # Se não tiver na RAM, verifica no BANCO (Persistência)
+    if not session_id:
+        tg_id = update.effective_user.id
+        saved_id = await get_persistent_session(tg_id)
+        if saved_id:
+            # Achou no banco! Restaura na memória RAM
+            context.user_data['logged_player_id'] = saved_id
+            session_id = saved_id
+            logger.info(f"🔄 Auto-Login realizado para {tg_id}")
+
+    # 2. CHECK SE A SESSÃO É VÁLIDA
     if session_id and isinstance(session_id, str) and ObjectId.is_valid(session_id):
-        # Verifica se a sessão é válida no banco (async)
-        # Usa a coleção local garantida
+        # Verifica se o usuário ainda existe no banco
         user_exists = await asyncio.to_thread(users_collection.find_one, {"_id": ObjectId(session_id)}) if users_collection is not None else None
         
         if user_exists:
+            # JÁ ESTÁ LOGADO -> Vai direto para o jogo
             if start_command: await start_command(update, context)
             else: await update.message.reply_text("✅ Você já está logado!")
             return ConversationHandler.END
+        else:
+            # Sessão inválida (usuário deletado?), limpa tudo
+            context.user_data.clear()
+            await clear_persistent_session(update.effective_user.id)
     else:
         context.user_data.clear()
 
-    # 2. VERIFICAÇÃO DE LEGADO (Para oferecer migração)
+    # 3. VERIFICAÇÃO DE LEGADO (Para oferecer migração)
     u = update.effective_user
     tg_id = u.id 
-    
     has_legacy = False
     
-    # Busca dados usando a abstração do Core (suporta Int = Legado)
     legacy_data = await get_player_data(tg_id)
-    
     if legacy_data:
-        # Se achou dados antigos, verifica se já não migrou
         if users_collection is not None:
             already_migrated = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": tg_id})
             if not already_migrated:
                 has_legacy = True
 
-    # 3. MENU DINÂMICO
+    # 4. MENU DINÂMICO
     keyboard = []
     
     if has_legacy:
@@ -182,7 +198,6 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ Erro de conexão com o Banco de Dados. Contate o Admin.")
         return ConversationHandler.END
 
-    # Busca async para não travar
     user_doc = await asyncio.to_thread(users_collection.find_one, {"username": username, "password": password_hash})
 
     if user_doc:
@@ -192,6 +207,9 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         context.user_data['logged_player_id'] = new_player_id
         context.user_data['logged_username'] = username
+        
+        # ✅ SALVA A SESSÃO NO BANCO (PERSISTÊNCIA)
+        await save_persistent_session(update.effective_user.id, new_player_id)
         
         await update.message.reply_photo(photo=IMG_LOGIN, caption=f"🔓 <b>Bem-vindo de volta, {user_doc.get('character_name', username)}!</b>", parse_mode="HTML")
         if start_command: await start_command(update, context)
@@ -221,7 +239,6 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Erro Crítico: DB desconectado.")
         return ConversationHandler.END
 
-    # Verificação Async
     exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
     if exists: 
         await update.message.reply_text("⚠️ Usuário em uso. Tente outro:")
@@ -256,16 +273,20 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "premium_tier": "free", "gems": 0
     }
     
-    # Inserção Async
     result = await asyncio.to_thread(users_collection.insert_one, new_player_doc)
     
-    context.user_data['logged_player_id'] = str(result.inserted_id)
+    new_player_id = str(result.inserted_id)
+    context.user_data['logged_player_id'] = new_player_id
+    
+    # ✅ SALVA A SESSÃO
+    await save_persistent_session(owner_id, new_player_id)
+
     await update.message.reply_photo(photo=IMG_NOVO, caption="🎉 <b>Conta Criada!</b>\nVocê está logado.", parse_mode="HTML")
     if start_command: await start_command(update, context)
     return ConversationHandler.END
 
 # ==============================================================================
-# 4. FLUXO DE MIGRAÇÃO (SEM ACESSO DIRETO AO LEGADO)
+# 4. FLUXO DE MIGRAÇÃO
 # ==============================================================================
 async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_private(update): return ConversationHandler.END
@@ -302,18 +323,14 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     except: pass
     
     username = context.user_data['mig_temp_user']
-    
     u = update.effective_user
     tg_id = u.id
     
-    # 1. Recupera dados antigos (usando abstração do Core)
     old_data = await get_player_data(tg_id)
-        
     if not old_data:
         await update.message.reply_text("❌ Erro: Conta antiga não encontrada. Digite /start.")
         return ConversationHandler.END
         
-    # 2. Prepara novo documento
     new_data = dict(old_data)
     if "_id" in new_data: del new_data["_id"]
     
@@ -329,13 +346,15 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("❌ DB Error.")
         return ConversationHandler.END
 
-    # 3. Insere no Novo Sistema (Async)
     result = await asyncio.to_thread(users_collection.insert_one, new_data)
     
-    # 4. Limpa e Loga
+    new_player_id = str(result.inserted_id)
     await clear_player_cache(tg_id)
     context.user_data.clear()
-    context.user_data['logged_player_id'] = str(result.inserted_id)
+    context.user_data['logged_player_id'] = new_player_id
+
+    # ✅ SALVA A SESSÃO
+    await save_persistent_session(tg_id, new_player_id)
     
     await update.message.reply_photo(photo=IMG_MIGRA, caption="✅ <b>Sucesso!</b> Conta migrada.", parse_mode="HTML")
     if start_command: await start_command(update, context)
@@ -351,6 +370,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = get_current_player_id(update, context)
     if uid: await clear_player_cache(uid)
+    
+    # ✅ LIMPA SESSÃO PERSISTENTE
+    await clear_persistent_session(update.effective_user.id)
+    
     context.user_data.clear()
     await update.message.reply_text("🔒 Saiu.")
 
@@ -359,16 +382,16 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: await q.answer("Encerrando sessão...")
     except: pass
     
-    # 1. Limpa o Cache do MongoDB
     uid = get_current_player_id(update, context)
     if uid: 
         await clear_player_cache(uid)
     
-    # 2. Limpa ABSOLUTAMENTE TUDO da sessão atual do Telegram
+    # ✅ LIMPA SESSÃO PERSISTENTE
+    await clear_persistent_session(update.effective_user.id)
+    
     context.user_data.clear()
     if context.chat_data: context.chat_data.clear()
     
-    # 3. Informa o usuário e remove o teclado antigo
     await q.edit_message_caption(
         caption="🔒 <b>Sessão encerrada com sucesso!</b>\n\nUse /start para entrar em outra conta.", 
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔐 Entrar em Outra Conta", callback_data='btn_login')]]),

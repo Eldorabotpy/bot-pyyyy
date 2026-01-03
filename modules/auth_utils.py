@@ -1,34 +1,55 @@
 # modules/auth_utils.py
-
-import logging
 from functools import wraps
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
-from modules.player.core import users_collection #
-
-logger = logging.getLogger(__name__)
+from modules.sessions import get_persistent_session # <--- Importe o novo módulo
 
 def get_current_player_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str | None:
     """
-    Retorna o User ID (Mongo _id) baseado estritamente na sessão ativa.
-    O resgate automático por Telegram ID foi removido para permitir a troca de contas (Logout).
+    Retorna o ID do jogador logado.
+    1. Verifica memória RAM (context.user_data).
+    2. Se não achar, verifica Banco de Dados (Sessão Persistente).
     """
-    if context.user_data and 'logged_player_id' in context.user_data:
-        return str(context.user_data['logged_player_id'])
-    
+    # 1. Tenta pegar da memória (Rápido)
+    user_id = context.user_data.get("logged_player_id")
+    if user_id:
+        return user_id
+
+    # 2. Se não está na memória, tenta recuperar do banco (Auto-Login)
+    tg_id = update.effective_user.id
+    # Nota: Como get_persistent_session é async, não podemos chamar direto aqui se esta função for sincrona.
+    # Mas geralmente usamos isso dentro de handlers async.
+    # Se você precisar chamar isso de forma sincrona, a lógica muda um pouco,
+    # mas o ideal é que a verificação ocorra no decorator @requires_login.
     return None
 
 def requires_login(func):
-    """Protege funções garantindo que o User ID seja recuperado."""
+    """
+    Decorator que garante que o usuário está logado.
+    Faz o 'Auto-Login' se o bot tiver reiniciado.
+    """
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        user_id = get_current_player_id(update, context)
-        if not user_id:
-            if update.callback_query:
-                await update.callback_query.answer("⚠️ Conta não identificada. Use /start.", show_alert=True)
+        # 1. Verifica memória
+        if not context.user_data.get("logged_player_id"):
+            
+            # 2. Memória vazia? Tenta AUTO-LOGIN pelo banco
+            tg_id = update.effective_user.id
+            saved_player_id = await get_persistent_session(tg_id)
+            
+            if saved_player_id:
+                # ACHOU! Restaura a sessão na memória
+                context.user_data["logged_player_id"] = saved_player_id
+                # Opcional: Avisar no log
+                print(f"🔄 Auto-login realizado para Telegram ID {tg_id}")
+            else:
+                # Não achou nada, pede login
+                if update.callback_query:
+                    await update.callback_query.answer("⚠️ Você precisa fazer login novamente.", show_alert=True)
+                    # Aqui você pode redirecionar para o menu de login se quiser
+                else:
+                    await update.message.reply_text("⚠️ <b>Sessão expirada.</b>\nPor favor, faça login novamente com /login ou /start.", parse_mode="HTML")
                 return
-            if update.message:
-                await update.message.reply_text("⛔ Digite /start para acessar sua conta.")
-                return
+
         return await func(update, context, *args, **kwargs)
     return wrapper
