@@ -1,5 +1,5 @@
 # modules/dungeons/runtime.py
-# (VERSÃO FINAL BLINDADA: Conecta direto no Core e Stats Novos)
+# (VERSÃO FINAL: Conecta direto no Core/Users - Resolve o bug de 0 chaves)
 
 from __future__ import annotations
 import logging 
@@ -9,7 +9,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 from telegram.error import BadRequest, Forbidden
 
-# --- IMPORTS DO SISTEMA NOVO (Substituindo player_manager) ---
+# --- [CORREÇÃO] IMPORTS DIRETOS DO SISTEMA NOVO (Sem player_manager) ---
 from modules.player.core import get_player_data, save_player_data
 from modules.player.inventory import add_item_to_inventory, add_gold
 from modules.player.stats import get_player_total_stats, check_and_apply_level_up

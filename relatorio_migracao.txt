@@ -1,6 +1,10 @@
-RELATÓRIO DE MIGRAÇÃO - 93.5% CONCLUÍDO
+RELATÓRIO DE MIGRAÇÃO - 92.7% CONCLUÍDO
 ==================================================
 
+Arquivo: .\handlers\admin\media_handler.py
+Prioridade: 5 | Status: ❌ CRÍTICO
+Encontrado: update.effective_user.id
+----------------------------------------
 Arquivo: .\handlers\world_boss\handler.py
 Prioridade: 6 | Status: ⚠️ MISTO
 Encontrado: update.effective_user.id, query.from_user.id
@@ -45,9 +49,13 @@ Arquivo: .\modules\party_manager.py
 Prioridade: 99 | Status: ❌ CRÍTICO
 Encontrado: user_id: int
 ----------------------------------------
+Arquivo: .\modules\sessions.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: user_id: int
+----------------------------------------
 Arquivo: .\modules\dungeons\runtime.py
 Prioridade: 99 | Status: ⚠️ MISTO
-Encontrado: update.effective_user.id, user_id: int
+Encontrado: user_id: int
 ----------------------------------------
 Arquivo: .\modules\dungeons\runtime_api.py
 Prioridade: 99 | Status: ❌ CRÍTICO
