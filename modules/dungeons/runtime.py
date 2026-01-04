@@ -1,5 +1,5 @@
 # modules/dungeons/runtime.py
-# (VERSÃO CORRIGIDA: Reconhece Itens do Inventário Novo e Antigo)
+# (VERSÃO FINAL BLINDADA: Conecta direto no Core e Stats Novos)
 
 from __future__ import annotations
 import logging 
@@ -8,14 +8,21 @@ from typing import List, Dict, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 from telegram.error import BadRequest, Forbidden
+
+# --- IMPORTS DO SISTEMA NOVO (Substituindo player_manager) ---
+from modules.player.core import get_player_data, save_player_data
+from modules.player.inventory import add_item_to_inventory, add_gold
+from modules.player.stats import get_player_total_stats, check_and_apply_level_up
+from modules.auth_utils import get_current_player_id
+from modules import game_data
 from modules.combat import durability
-from modules import player_manager, game_data
+
 from handlers.utils import format_combat_message
+from handlers.profile_handler import _get_class_media 
+
 from .config import DIFFICULTIES, DEFAULT_DIFFICULTY_ORDER, Difficulty
 from .regions import REGIONAL_DUNGEONS, MobDef
 from modules.dungeons.runtime_api import set_pending_battle
-from handlers.profile_handler import _get_class_media 
-from modules.auth_utils import get_current_player_id 
 
 try:
     from modules import file_id_manager as media_ids
@@ -29,54 +36,52 @@ def _inv(p: dict) -> dict:
     return inv if isinstance(inv, dict) else {}
 
 # ============================================================
-# 🛠️ CORREÇÃO PRINCIPAL AQUI (CONSUMO DE CHAVES)
+# 🛠️ HELPER: CONTAGEM INTELIGENTE DE CHAVES
 # ============================================================
-def _consume_keys(pdata: dict, key_item: str, key_cost: int) -> bool:
-    """
-    Remove itens chave do inventário, suportando:
-    1. Quantidade Int (Sistema Antigo/Simples)
-    2. Objeto Dict (Sistema Novo/Único)
-    """
+def _get_key_quantity(pdata: dict, key_item: str) -> int:
+    """Retorna a quantidade de chaves, compatível com int e dict."""
     inv = _inv(pdata)
     item_data = inv.get(key_item)
-
-    # Cenário 1: Não tem o item
+    
     if not item_data:
-        return False
-
-    # Cenário 2: Item é um Dicionário (Sistema Novo)
-    if isinstance(item_data, dict):
-        # Se for item de quantidade (ex: poções), verifica 'quantity'
-        qty = item_data.get("quantity", 1)
-        if qty < key_cost:
-            return False
-            
-        # Consome
-        new_qty = qty - key_cost
-        if new_qty <= 0:
-            del inv[key_item] # Acabou
-        else:
-            item_data["quantity"] = new_qty # Atualiza qtd
-            inv[key_item] = item_data
-            
-        pdata["inventory"] = inv
-        return True
-
-    # Cenário 3: Item é um Inteiro/String (Sistema Antigo)
-    try:
-        current_keys = int(item_data)
-        if current_keys < key_cost:
-            return False
+        return 0
         
-        inv[key_item] = current_keys - key_cost
-        # Opcional: remover se for 0, mas manter int é mais seguro p/ legado
+    # Se for Dicionário (Sistema Novo: {"quantity": 5, ...})
+    if isinstance(item_data, dict):
+        return int(item_data.get("quantity", 1))
+    
+    # Se for Inteiro (Sistema Antigo: 5)
+    try:
+        return int(item_data)
+    except:
+        return 0
+
+def _consume_keys(pdata: dict, key_item: str, key_cost: int) -> bool:
+    """Consome a chave do inventário."""
+    inv = _inv(pdata)
+    current_qty = _get_key_quantity(pdata, key_item)
+    
+    if current_qty < key_cost:
+        return False
+        
+    # Realiza a subtração
+    item_data = inv.get(key_item)
+    
+    if isinstance(item_data, dict):
+        new_qty = current_qty - key_cost
+        if new_qty <= 0:
+            inv.pop(key_item, None)
+        else:
+            item_data["quantity"] = new_qty
+            inv[key_item] = item_data
+    else:
+        # Lógica Int
+        inv[key_item] = current_qty - key_cost
         if inv[key_item] <= 0:
             inv.pop(key_item, None)
             
-        pdata["inventory"] = inv
-        return True
-    except:
-        return False
+    pdata["inventory"] = inv
+    return True
 
 def _load_region_dungeon(region_key: str) -> dict:
     d = REGIONAL_DUNGEONS.get(region_key)
@@ -96,7 +101,8 @@ def _key_item_for(dungeon_cfg: dict) -> str: return str(dungeon_cfg.get("key_ite
 # 🛠️ CACHE BRIDGE
 # ============================================================
 async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int, pdata: dict, combat_details: dict, message_id: int = None, chat_id: int = None):
-    p_stats = await player_manager.get_player_total_stats(pdata)
+    # Usa a função importada diretamente de stats.py
+    p_stats = await get_player_total_stats(pdata)
     
     monster_stats = {
         'name': combat_details.get('monster_name', 'Inimigo'),
@@ -139,20 +145,18 @@ async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int,
     context.user_data['battle_cache'] = cache
     set_pending_battle(user_id, combat_details.get('dungeon_ctx'))
 
-def build_region_dungeon_button(region_key: str) -> InlineKeyboardButton:
-    return InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨 🏰", callback_data=f"dungeon_open:{region_key}")
-
 async def _send_battle_media(context, chat_id, caption, file_id_name, reply_markup=None) -> int | None:
     fd = None
     if media_ids and hasattr(media_ids, "get_file_data") and file_id_name:
         try: fd = media_ids.get_file_data(file_id_name)
         except: pass
-    sent_msg = None
     try:
         if fd and fd.get("id"):
             mtype = (fd.get("type") or "photo").lower()
-            if mtype == "video": sent_msg = await context.bot.send_video(chat_id=chat_id, video=fd["id"], caption=caption, parse_mode="HTML", reply_markup=reply_markup)
-            else: sent_msg = await context.bot.send_photo(chat_id=chat_id, photo=fd["id"], caption=caption, parse_mode="HTML", reply_markup=reply_markup)
+            if mtype == "video": 
+                sent_msg = await context.bot.send_video(chat_id=chat_id, video=fd["id"], caption=caption, parse_mode="HTML", reply_markup=reply_markup)
+            else: 
+                sent_msg = await context.bot.send_photo(chat_id=chat_id, photo=fd["id"], caption=caption, parse_mode="HTML", reply_markup=reply_markup)
             return sent_msg.message_id
     except: pass
     try:
@@ -160,42 +164,53 @@ async def _send_battle_media(context, chat_id, caption, file_id_name, reply_mark
         return sent_msg.message_id
     except: return None
 
+# ============================================================
+# 🖥️ MENU DO CALABOUÇO (AGORA LÊ AS CHAVES CORRETAMENTE)
+# ============================================================
 async def _open_menu(update, context, region_key):
     q = update.callback_query
     if q: 
         try: await q.answer()
         except: pass
-    try: dungeon = _load_region_dungeon(region_key)
+        
+    try: 
+        dungeon = _load_region_dungeon(region_key)
     except: 
         await context.bot.send_message(update.effective_chat.id, "Erro no calabouço.")
         return
+        
     key_item = _key_item_for(dungeon)
     
-    # --- BUSCA BLINDADA DE INVENTÁRIO NO MENU ---
+    # 1. Pega ID da Sessão (Seguro)
     user_id = get_current_player_id(update, context)
-    pdata = await player_manager.get_player_data(user_id) or {}
-    inv = _inv(pdata)
-    item_val = inv.get(key_item)
     
-    # Normaliza quantidade para exibição
-    have = 0
-    if isinstance(item_val, dict): have = item_val.get("quantity", 1)
-    else:
-        try: have = int(item_val or 0)
-        except: have = 0
+    # 2. Busca dados direto do Core (Blindado contra sistema antigo)
+    pdata = await get_player_data(user_id) or {}
+    
+    # 3. Usa o helper inteligente para ler a quantidade
+    have = _get_key_quantity(pdata, key_item)
 
     caption = f"<b>{dungeon.get('label','Calabouço')}</b>\nRegião: <code>{region_key}</code>\n\n🎒 Chaves: <b>{have}</b>\n\nEscolha:"
+    
     kb = []
     d_prog = (pdata.get("dungeon_progress", {}) or {}).get(region_key, {})
     high = d_prog.get("highest_completed")
     h_idx = -1
-    if high in DEFAULT_DIFFICULTY_ORDER: h_idx = DEFAULT_DIFFICULTY_ORDER.index(high)
+    
+    if high in DEFAULT_DIFFICULTY_ORDER: 
+        h_idx = DEFAULT_DIFFICULTY_ORDER.index(high)
+        
     for i, diff_key in enumerate(DEFAULT_DIFFICULTY_ORDER):
         meta = DIFFICULTIES.get(diff_key)
         if not meta: continue
-        if i <= h_idx + 1: kb.append([InlineKeyboardButton(f"{meta.emoji} {meta.label}", callback_data=f"dungeon_pick:{diff_key}:{region_key}")])
-        else: kb.append([InlineKeyboardButton(f"🔒 {meta.label}", callback_data="dungeon_locked")])
+        
+        if i <= h_idx + 1: 
+            kb.append([InlineKeyboardButton(f"{meta.emoji} {meta.label}", callback_data=f"dungeon_pick:{diff_key}:{region_key}")])
+        else: 
+            kb.append([InlineKeyboardButton(f"🔒 {meta.label}", callback_data="dungeon_locked")])
+            
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="combat_return_to_map")])
+    
     await _send_battle_media(context, update.effective_chat.id, caption, dungeon.get("menu_media_key"), InlineKeyboardMarkup(kb))
 
 # ============================================================
@@ -251,14 +266,18 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
 async def _start_first_fight(update, context, region_key, difficulty_key):
     user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
+    
     try: dungeon = _load_region_dungeon(region_key)
     except: return
+    
     diff_cfg = DIFFICULTIES.get(difficulty_key)
     key_item = _key_item_for(dungeon)
     key_cost = _key_cost_for(diff_cfg)
-    pdata = await player_manager.get_player_data(user_id) or {}
     
-    # VERIFICAÇÃO DE CHAVES
+    # Busca Direta
+    pdata = await get_player_data(user_id) or {}
+    
+    # Verifica Chave
     if not _consume_keys(pdata, key_item, key_cost):
         await context.bot.send_message(chat_id, f"🔒 <b>Acesso Negado</b>\nVocê precisa de {key_cost}x <b>{key_item.replace('_', ' ').title()}</b>.", parse_mode="HTML")
         return
@@ -273,11 +292,13 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
     state["action"] = "in_combat"
     state["details"] = combat
     pdata["player_state"] = state
-    await player_manager.save_player_data(user_id, pdata)
+    
+    # Salva Direto
+    await save_player_data(user_id, pdata)
     
     caption = await format_combat_message(pdata)
-    kb = [[InlineKeyboardButton("⚔️ 𝘼𝙩𝙖𝙘𝙖𝙧", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡𝙨", callback_data="combat_skill_menu")],
-          [InlineKeyboardButton("🧪 𝗣𝗼𝗰̧𝗼̃𝗲𝘀", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝙁𝙪𝙜𝙞𝙧", callback_data="combat_flee")]]
+    kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡𝙨", callback_data="combat_skill_menu")],
+          [InlineKeyboardButton("🧪 𝙋𝙤𝙘̧𝗼̃𝗲𝘀", callback_data="combat_potion_menu"), InlineKeyboardButton("🏃 𝐅𝐮𝐠𝐢𝙧", callback_data="combat_flee")]]
     msg_id = await _send_battle_media(context, chat_id, caption, combat.get("file_id_name"), InlineKeyboardMarkup(kb))
     await _update_battle_cache(context, user_id, pdata, combat, message_id=msg_id, chat_id=chat_id)
 
@@ -299,9 +320,10 @@ async def resume_dungeon_after_battle(context, user_id, dungeon_ctx, victory):
 
 async def fail_dungeon_run(update, context, user_id, chat_id, reason):
     await _delete_previous_battle_msg(context, user_id)
-    pdata = await player_manager.get_player_data(user_id)
+    # Busca Direta
+    pdata = await get_player_data(user_id)
     if pdata:
-        stats = await player_manager.get_player_total_stats(pdata) 
+        stats = await get_player_total_stats(pdata) 
         pdata['current_hp'] = stats.get('max_hp', 50)
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
@@ -310,7 +332,7 @@ async def fail_dungeon_run(update, context, user_id, chat_id, reason):
         if cache.get('region_key'):
              pdata["location"] = cache.get('region_key')
 
-        await player_manager.save_player_data(user_id, pdata)
+        await save_player_data(user_id, pdata)
     
     await _send_battle_media(context, chat_id, f"💀 𝗙𝗶𝗺 𝗱𝗮 𝗟𝗶𝗻𝗵𝗮\n{reason}.", "media_dungeon_defeat", 
                              InlineKeyboardMarkup([[InlineKeyboardButton("⚰️ 𝙎𝙖𝙞𝙧", callback_data="combat_return_to_map")]]))
@@ -321,7 +343,8 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         if current_hp is None: current_hp = cache.get('player_hp')
         if current_mp is None: current_mp = cache.get('player_mp')
     
-    pdata = await player_manager.get_player_data(user_id) or {}
+    # Busca Direta
+    pdata = await get_player_data(user_id) or {}
     run = pdata.get("player_state") or {}
     
     if current_hp is not None: pdata['current_hp'] = int(current_hp)
@@ -332,18 +355,18 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     
     levelup_text = ""
     try:
-        if hasattr(player_manager, 'check_and_apply_level_up'):
-            lvls, pts, msg = player_manager.check_and_apply_level_up(pdata)
-            if lvls > 0:
-                stats = await player_manager.get_player_total_stats(pdata)
-                pdata['current_hp'] = stats.get('max_hp', 100)
-                pdata['current_mp'] = stats.get('max_mana', 50)
-                levelup_text = f"\n\n🆙 <b>LEVEL UP!</b>\n{msg}"
+        # Usa função importada de stats.py
+        lvls, pts, msg = check_and_apply_level_up(pdata)
+        if lvls > 0:
+            stats = await get_player_total_stats(pdata)
+            pdata['current_hp'] = stats.get('max_hp', 100)
+            pdata['current_mp'] = stats.get('max_mana', 50)
+            levelup_text = f"\n\n🆙 <b>LEVEL UP!</b>\n{msg}"
     except Exception as e:
         print(f"Erro no level up: {e}")
 
-    if gold > 0: player_manager.add_gold(pdata, gold)
-    for i, q, _ in items: player_manager.add_item_to_inventory(pdata, i, q)
+    if gold > 0: add_gold(pdata, gold)
+    for i, q, _ in items: add_item_to_inventory(pdata, i, q)
 
     reg_key = str(combat_details.get("region_key"))
     diff_key = str(combat_details.get("difficulty"))
@@ -365,11 +388,11 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         pdata.setdefault("dungeon_progress", {}).setdefault(reg_key, {})
         pdata["dungeon_progress"][reg_key]["highest_completed"] = diff_key
         bonus = _final_gold_for(dungeon, diff_cfg)
-        if bonus > 0: player_manager.add_gold(pdata, bonus)
+        if bonus > 0: add_gold(pdata, bonus)
         
         durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
         
-        stats = await player_manager.get_player_total_stats(pdata)
+        stats = await get_player_total_stats(pdata)
         pdata['current_hp'] = stats.get('max_hp', 50)
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
@@ -378,7 +401,7 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         if "cooldowns" in pdata:
             pdata.pop("cooldowns", None)
         
-        await player_manager.save_player_data(user_id, pdata)
+        await save_player_data(user_id, pdata)
         
         summ = f"🏆 <b>CALABOUÇO CONCLUÍDO!</b>\n\n✨ <b>XP Ganho:</b> {xp}\n💰 <b>Bônus Ouro:</b> {bonus}"
         summ += levelup_text
@@ -407,7 +430,7 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     run["details"] = combat
     pdata["player_state"] = run
     
-    await player_manager.save_player_data(user_id, pdata)
+    await save_player_data(user_id, pdata)
 
     caption = await format_combat_message(pdata)
     kb = [[InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"), InlineKeyboardButton("✨ 𝙎𝙠𝙞𝙡𝙡𝙨", callback_data="combat_skill_menu")],
