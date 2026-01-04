@@ -1,11 +1,13 @@
 import os
 import time
 
-# Configuração
-IGNORE_DIRS = {'.venv', '.git', '__pycache__', '.idea', '.vscode'}
+# ==============================================================================
+# CONFIGURAÇÃO
+# ==============================================================================
+IGNORE_DIRS = {'.venv', '.git', '__pycache__', '.idea', '.vscode', 'env', 'venv'}
 OUTPUT_FILE = "relatorio_migracao.txt"
 
-# Padrões de Risco
+# Padrões de Risco (Código Antigo)
 OLD_PATTERNS = [
     "update.effective_user.id",
     "query.from_user.id",
@@ -16,21 +18,20 @@ OLD_PATTERNS = [
     "user_id : int"
 ]
 
+# Padrão de Sucesso (Código Novo)
 NEW_PATTERN = "get_current_player_id"
 
 # --- LISTA BRANCA (Exceções Permitidas) ---
 # Arquivos que PODEM usar certos comandos proibidos por necessidade técnica
 WHITELIST = {
-    # O Auth Handler precisa ler o ID do Telegram para saber quem está tentando logar
+    # Windows paths
     "handlers\\auth_handler.py": ["update.effective_user.id"],
-    "handlers/auth_handler.py": ["update.effective_user.id"],
-    
-    # O Auth Utils é quem cria a segurança, ele precisa ler o ID cru
     "modules\\auth_utils.py": ["update.effective_user.id"],
-    "modules/auth_utils.py": ["update.effective_user.id"],
-    
-    # O Core do banco precisa acessar as coleções antigas para compatibilidade se necessário
     "modules\\player\\core.py": ["players_collection.find", "players_col.find"],
+    
+    # Linux/Mac paths
+    "handlers/auth_handler.py": ["update.effective_user.id"],
+    "modules/auth_utils.py": ["update.effective_user.id"],
     "modules/player/core.py": ["players_collection.find", "players_col.find"],
 }
 
@@ -45,6 +46,10 @@ PRIORITY_ORDER = [
     "handlers",                 
 ]
 
+# ==============================================================================
+# FUNÇÕES AUXILIARES
+# ==============================================================================
+
 def get_priority_score(path):
     """Define a urgência do arquivo baseado na pasta onde ele está."""
     path = path.replace("\\", "/") 
@@ -53,14 +58,45 @@ def get_priority_score(path):
             return i 
     return 99 
 
+def generate_project_tree(start_path="."):
+    """Gera uma string visual da estrutura de diretórios e arquivos .py."""
+    tree_output = ["\n" + "="*50, "📂 ESTRUTURA DO PROJETO (Arquivos .py)", "="*50 + "\n"]
+    
+    for root, dirs, files in os.walk(start_path):
+        # Filtra diretórios ignorados in-place para o os.walk não entrar neles
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
+        
+        # Calcula indentação baseada na profundidade
+        level = root.replace(start_path, '').count(os.sep)
+        indent = '│   ' * (level)
+        
+        # Nome da pasta atual
+        folder_name = os.path.basename(root)
+        if folder_name == ".":
+            folder_name = "RAIZ (Projeto)"
+            
+        tree_output.append(f"{indent}📁 {folder_name}/")
+        
+        # Lista arquivos
+        sub_indent = '│   ' * (level + 1)
+        for f in files:
+            if f.endswith(".py"):
+                tree_output.append(f"{sub_indent}📄 {f}")
+                
+    return "\n".join(tree_output)
+
+# ==============================================================================
+# FUNÇÃO PRINCIPAL
+# ==============================================================================
+
 def generate_report():
-    print("🕵️  Auditoria Inteligente v3.0 (Com Exceções)...\n")
+    print("🕵️  Auditoria Inteligente v3.0 (Com Mapeamento de Estrutura)...\n")
     time.sleep(0.5)
 
     total_files = 0
     files_with_issues = []
     
-    # Varredura
+    # --- 1. VARREDURA DE ARQUIVOS ---
     for root, dirs, files in os.walk("."):
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
         
@@ -77,11 +113,9 @@ def generate_report():
                         has_fix = NEW_PATTERN in content
                         
                         for pattern in OLD_PATTERNS:
-                            # --- VERIFICAÇÃO DE EXCEÇÃO ---
-                            # Se o arquivo está na whitelist e o padrão é permitido nele, ignora
-                            normalized_path = path
+                            # --- LÓGICA DE WHITELIST ---
+                            # Normaliza para verificar exceções
                             is_whitelisted = False
-                            
                             for w_path, w_patterns in WHITELIST.items():
                                 if path.endswith(w_path):
                                     if pattern in w_patterns:
@@ -90,7 +124,7 @@ def generate_report():
                             
                             if is_whitelisted:
                                 continue
-                            # ------------------------------
+                            # ---------------------------
 
                             if pattern in content:
                                 found_issues.append(pattern)
@@ -104,12 +138,14 @@ def generate_report():
                                 "priority": get_priority_score(path)
                             })
                             
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Erro ao ler {path}: {e}")
 
     # Ordena por prioridade
     files_with_issues.sort(key=lambda x: x['priority'])
 
+    # --- 2. GERAÇÃO DO RELATÓRIO ---
+    
     # Estatísticas
     total_issues = len(files_with_issues)
     clean_files = total_files - total_issues
@@ -124,32 +160,48 @@ def generate_report():
 
     if not files_with_issues:
         print("✅ PARABÉNS! O sistema está 100% migrado e seguro.")
-        return
+    else:
+        print("🚀 PRÓXIMO PASSO (PRIORIDADE MÁXIMA):")
+        next_target = files_with_issues[0]
+        print(f"👉 Arquivo Alvo: {next_target['path']}")
+        print(f"   Status: {next_target['status']}")
+        print(f"   Problemas: {', '.join(next_target['issues'])}")
+        
+        print("\n💡 DICA:")
+        if "admin" in next_target['path']:
+            print("   Painéis de admin costumam ter código misto.")
+            print("   Verifique se as funções de edição de player usam 'get_current_player_id'.")
+        elif "handler" in next_target['path']:
+            print("   Este handler está acessando o update do Telegram diretamente.")
+            print("   Use 'uid = get_current_player_id(update, context)' no início das funções.")
 
-    print("🚀 PRÓXIMO PASSO (PRIORIDADE MÁXIMA):")
-    
-    next_target = files_with_issues[0]
-    print(f"👉 Arquivo Alvo: {next_target['path']}")
-    print(f"   Status: {next_target['status']}")
-    print(f"   Problemas: {', '.join(next_target['issues'])}")
-    
-    print("\n💡 DICA:")
-    if "admin" in next_target['path']:
-        print("   Painéis de admin costumam ter código misto.")
-        print("   Verifique se as funções de edição de player usam 'get_current_player_id'.")
-    elif "handler" in next_target['path']:
-        print("   Este handler está acessando o update do Telegram diretamente.")
-        print("   Use 'uid = get_current_player_id(update, context)' no início das funções.")
-
-    # Salva relatório
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
-        out.write(f"RELATÓRIO DE MIGRAÇÃO - {progress:.1f}% CONCLUÍDO\n")
-        out.write("="*50 + "\n\n")
-        for item in files_with_issues:
-            out.write(f"Arquivo: {item['path']}\n")
-            out.write(f"Prioridade: {item['priority']} | Status: {item['status']}\n")
-            out.write(f"Encontrado: {', '.join(item['issues'])}\n")
-            out.write("-" * 40 + "\n")
+    # --- 3. SALVAMENTO EM ARQUIVO (AUDITORIA + ESTRUTURA) ---
+    try:
+        project_tree = generate_project_tree(".")
+        
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
+            # Cabeçalho
+            out.write(f"RELATÓRIO DE MIGRAÇÃO - {progress:.1f}% CONCLUÍDO\n")
+            out.write(f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            out.write("="*50 + "\n\n")
+            
+            # Lista de Problemas
+            if not files_with_issues:
+                out.write("Nenhum problema encontrado. Migração completa!\n")
+            else:
+                for item in files_with_issues:
+                    out.write(f"Arquivo: {item['path']}\n")
+                    out.write(f"Prioridade: {item['priority']} | Status: {item['status']}\n")
+                    out.write(f"Encontrado: {', '.join(item['issues'])}\n")
+                    out.write("-" * 40 + "\n")
+            
+            # Adiciona a Árvore do Projeto no final do arquivo
+            out.write(project_tree)
+            
+        print(f"\n📄 Relatório completo salvo em: {OUTPUT_FILE}")
+        
+    except Exception as e:
+        print(f"Erro ao salvar arquivo de relatório: {e}")
 
 if __name__ == "__main__":
     generate_report()

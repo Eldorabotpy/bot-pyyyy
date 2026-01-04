@@ -1,5 +1,5 @@
 # modules/player_manager.py
-# (VERSÃO FINAL BLINDADA: Suporte Híbrido Total Int/Str)
+# (VERSÃO FINAL BLINDADA: Suporte Híbrido Total Int/Str + Adapter)
 
 from __future__ import annotations
 import asyncio
@@ -9,7 +9,11 @@ from bson import ObjectId
 
 logger = logging.getLogger(__name__)
 
-# --- 1. Funções do Core ---
+# ==============================================================================
+# 1. IMPORTAÇÕES DO SISTEMA NOVO (CORE & MODULS)
+# ==============================================================================
+
+# Core & Banco
 from .player.core import (
     get_player_data as _get_player_data_core, 
     save_player_data as _save_player_data_core, 
@@ -17,7 +21,7 @@ from .player.core import (
     clear_all_player_cache,
 )
 
-# --- 2. Funções de Busca e Ciclo de Vida do Jogador ---
+# Queries & Busca
 from .player.queries import (
     create_new_player, 
     get_or_create_player, 
@@ -28,7 +32,7 @@ from .player.queries import (
     iter_player_ids
 )
 
-# --- 3. Funções de Stats, Classes e Level Up ---
+# Stats & Nível
 from .player.stats import (
     get_player_total_stats, 
     get_player_dodge_chance, 
@@ -45,7 +49,7 @@ from .player.stats import (
     compute_spent_status_points,
 )
 
-# --- 4. Funções de Inventário, Ouro, Gemas e Equipamentos ---
+# Inventário & Economia
 from .player.inventory import (
     get_gold, 
     set_gold, 
@@ -64,7 +68,7 @@ from .player.inventory import (
     consume_item,
 )
 
-# --- 5. Funções de Ações, Energia e Estado ---
+# Ações & Energia
 from .player.actions import (
     get_player_max_energy, 
     add_energy, 
@@ -82,97 +86,110 @@ from .player.actions import (
     get_pvp_points,
     add_pvp_points,
 )
-
-# Importamos a função original com outro nome para usar dentro do nosso Wrapper
+# Alias interno para evitar recursão
 from .player.actions import spend_energy as _spend_energy_internal
 
-def _ensure_id_format(user_id: Union[int, str, ObjectId]) -> Union[int, ObjectId]:
-    """
-    Converte o ID para o formato correto do banco:
-    - Se for int: Mantém int (Conta Legada)
-    - Se for str de 24 chars: Converte para ObjectId (Conta Nova)
-    - Se for str numérico: Converte para int (Conta Legada vinda como str)
-    - Se for ObjectId: Mantém
-    """
-    if isinstance(user_id, ObjectId):
-        return user_id
-        
-    if isinstance(user_id, int):
-        return user_id
-        
-    if isinstance(user_id, str):
-        # Tenta converter para int primeiro (caso seja ID do telegram em string)
-        if user_id.isdigit():
-            return int(user_id)
-        # Se for um ObjectId válido em string
-        if ObjectId.is_valid(user_id):
-            return ObjectId(user_id)
-            
-    # Se falhar, retorna como está (provavelmente vai dar erro no find, mas evita crash aqui)
-    return user_id
-
-# =================================================================
-# --- 5.1 WRAPPER GLOBAL DE ENERGIA ---
-# =================================================================
-def spend_energy(player_data: dict, amount: int) -> bool:
-    """
-    Consome energia do jogador e atualiza missões automaticamente (Fire and Forget).
-    """
-    # Executa a lógica interna de gasto (matemática)
-    success = _spend_energy_internal(player_data, amount)
-
-    if success and amount > 0:
-        try:
-            # ✅ CORREÇÃO: Força conversão para STR para evitar erro no Mission Manager
-            raw_id = player_data.get("user_id") or player_data.get("_id")
-            user_id = str(raw_id) 
-            
-            if user_id:
-                async def _bg_mission_update():
-                    try:
-                        from modules import mission_manager
-                        # Atualiza missão de "gastar X energia" e "gastar energia total"
-                        await mission_manager.update_mission_progress(user_id, "spend_energy", "any", amount)
-                        await mission_manager.update_mission_progress(user_id, "energy", "any", amount)
-                    except Exception as e:
-                        logger.error(f"Erro silencioso missão energia: {e}")
-
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(_bg_mission_update())
-                except RuntimeError:
-                    pass
-        except Exception as e:
-            logger.error(f"Erro no hook de spend_energy: {e}")
-
-    return success
-
-# =================================================================
-# --- 6. Funções do Sistema Premium ---
-# =================================================================
+# Premium
 from .player.premium import PremiumManager
 
-def has_premium_plan(pdata: Optional[dict]) -> bool:
+# ==============================================================================
+# 2. HELPER DE COMPATIBILIDADE DE ID
+# ==============================================================================
+def _ensure_id_format(user_id: Union[int, str, ObjectId]) -> Union[int, ObjectId]:
+    """
+    Garante o formato correto do ID para o banco:
+    - Int -> Int (Conta Legada)
+    - Str(ObjectId) -> ObjectId (Conta Nova)
+    """
+    if isinstance(user_id, ObjectId): return user_id
+    if isinstance(user_id, int): return user_id
+    if isinstance(user_id, str):
+        if user_id.isdigit(): return int(user_id)
+        if ObjectId.is_valid(user_id): return ObjectId(user_id)
+    return user_id
+
+# ==============================================================================
+# 3. WRAPPERS (ADAPTADORES)
+# ==============================================================================
+
+async def get_player_data(user_id: Union[int, str]):
+    """Busca dados e verifica validade do VIP automaticamente."""
+    real_id = _ensure_id_format(user_id)
+    pdata = await _get_player_data_core(real_id)
+
+    # Lógica de expiração VIP (Auto-Revoke)
+    if pdata:
+        tier = str(pdata.get("premium_tier", "free")).lower()
+        if tier not in ["free", "admin"]:
+            try:
+                expires_at = pdata.get("premium_expires_at")
+                if expires_at:
+                    from datetime import datetime, timezone
+                    now = datetime.now(timezone.utc)
+                    dt = datetime.fromisoformat(expires_at)
+                    if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+                    
+                    if dt < now:
+                        logger.info(f"📉 VIP Vencido: {user_id}")
+                        pdata["premium_tier"] = "free"
+                        pdata["premium_expires_at"] = None
+                        await _save_player_data_core(real_id, pdata)
+            except Exception: pass
+            
+    return pdata
+
+async def save_player_data(user_id: Union[int, str], data: dict):
+    """Salva dados usando o ID correto."""
+    real_id = _ensure_id_format(user_id)
+    return await _save_player_data_core(real_id, data)
+
+def spend_energy(player_data: dict, amount: int) -> bool:
+    """Wrapper para gastar energia e atualizar missões."""
+    success = _spend_energy_internal(player_data, amount)
+    if success and amount > 0:
+        # Fire-and-forget atualização de missão
+        try:
+            user_id = str(player_data.get("user_id") or player_data.get("_id"))
+            async def _bg_mission():
+                try:
+                    from modules import mission_manager
+                    await mission_manager.update_mission_progress(user_id, "spend_energy", "any", amount)
+                except: pass
+            
+            try: asyncio.get_running_loop().create_task(_bg_mission())
+            except: pass
+        except: pass
+    return success
+
+# --- Wrappers de Transação Segura ---
+
+async def safe_add_gold(user_id: Union[int, str], amount: int) -> int:
+    pdata = await get_player_data(user_id)
+    if not pdata: return 0
+    add_gold(pdata, amount)
+    await save_player_data(user_id, pdata)
+    return int(pdata.get("gold", 0))
+
+async def safe_spend_gold(user_id: Union[int, str], amount: int) -> bool:
+    pdata = await get_player_data(user_id)
     if not pdata: return False
-    try: return PremiumManager(pdata).is_premium()
-    except Exception: return False
+    if spend_gold(pdata, amount):
+        await save_player_data(user_id, pdata)
+        return True
+    return False
 
-def get_perk_value(pdata: Optional[dict], perk_name: str, default: Any = 1, cast: Type = None) -> Any:
-    if not pdata: return default
-    try: return PremiumManager(pdata).get_perk_value(perk_name, default, cast=cast)
-    except Exception: return default
+async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, str]:
+    pdata = await get_player_data(user_id)
+    if not pdata: return 0, ""
+    
+    current = int(pdata.get("xp", 0))
+    pdata["xp"] = current + int(xp_amount)
+    
+    lvls, pts, msg = check_and_apply_level_up(pdata)
+    await save_player_data(user_id, pdata)
+    return lvls, msg
 
-def get_perk_value_float(pdata: Optional[dict], perk_name: str, default: float = 1.0) -> float:
-    val = get_perk_value(pdata, perk_name, default, cast=float)
-    try: return float(val)
-    except Exception: return float(default)
-
-# =================================================================
-# --- 7. HELPER: FULL RESTORE ---
-# =================================================================
 async def full_restore(user_id: Union[int, str]):
-    # ✅ CORREÇÃO: Aceita int ou str (ObjectId)
-    # Usa o wrapper seguro
     pdata = await get_player_data(user_id)
     if pdata:
         stats = await get_player_total_stats(pdata)
@@ -184,228 +201,74 @@ async def full_restore(user_id: Union[int, str]):
     return False
 
 async def find_player_by_character_name(name: str):
-    result = await find_player_by_name(name)
-    if not result: return None
-    if isinstance(result, tuple) and len(result) >= 2:
-        user_id = result[0]
-        player_data = result[1]
-        if isinstance(player_data, dict):
-            player_data['user_id'] = user_id
-            return player_data
+    res = await find_player_by_name(name)
+    if res:
+        uid, data = res
+        data['user_id'] = uid
+        return data
     return None
 
-# =================================================================
-# --- 8. SISTEMA DE RUNAS ---
-# =================================================================
+# --- Wrappers Premium ---
+
+def has_premium_plan(pdata: Optional[dict]) -> bool:
+    if not pdata: return False
+    try: return PremiumManager(pdata).is_premium()
+    except: return False
+
+def get_perk_value(pdata: Optional[dict], perk_name: str, default: Any = 1, cast: Type = None) -> Any:
+    if not pdata: return default
+    try: return PremiumManager(pdata).get_perk_value(perk_name, default, cast=cast)
+    except: return default
+
+# --- Runas ---
 try:
     from modules.game_data import runes_data
 except ImportError:
     runes_data = None
 
 def get_rune_bonuses(player_data: dict) -> dict:
-    """
-    Varre equipamentos, busca os itens no inventário e soma bônus das runas.
-    """
     bonuses = {}
     if not runes_data: return bonuses
-
-    # Pega o mapa {slot: uid}
-    equipped_map = player_data.get("equipment") or player_data.get("equipments") or {}
-    # Pega o inventário real
-    inventory = player_data.get("inventory") or {}
+    equipped = player_data.get("equipment", {})
+    inv = player_data.get("inventory", {})
     
-    for slot, uid in equipped_map.items():
+    for uid in equipped.values():
         if not uid: continue
-        
-        # BUSCA O ITEM NO INVENTÁRIO
-        item = inventory.get(uid)
-        if not item or not isinstance(item, dict): continue
-        
-        sockets = item.get("sockets", [])
-        for rune_id in sockets:
-            if not rune_id: continue
-            
-            info = runes_data.get_rune_info(rune_id)
-            stat_key = info.get("stat_key")
-            value = info.get("value", 0)
-            
-            if stat_key and value:
-                current = bonuses.get(stat_key, 0)
-                try: bonuses[stat_key] = current + value
-                except Exception: pass
-                
+        item = inv.get(uid)
+        if isinstance(item, dict):
+            for rid in item.get("sockets", []):
+                if not rid: continue
+                info = runes_data.get_rune_info(rid)
+                if info and "stat_key" in info:
+                    k = info["stat_key"]
+                    bonuses[k] = bonuses.get(k, 0) + info.get("value", 0)
     return bonuses
 
-# =================================================================
-# --- 9. TRANSAÇÕES SEGURAS (ANTI-LAG & ANTI-PERDA DE DADOS) ---
-# =================================================================
-
-async def safe_add_gold(user_id: Union[int, str], amount: int) -> int:
-    """Adiciona ouro e salva imediatamente."""
-    pdata = await get_player_data(user_id)
-    if not pdata: return 0
-    
-    add_gold(pdata, amount)
-    await save_player_data(user_id, pdata)
-    return int(pdata.get("gold", 0))
-
-# Em modules/player_manager.py
-
-# Em modules/player_manager.py
-
-async def get_player_data(user_id: Union[int, str]):
-    real_id = _ensure_id_format(user_id)
-    pdata = await _get_player_data_core(real_id)
-
-    if pdata:
-        tier = str(pdata.get("premium_tier", "free")).lower()
-        
-        # Só tenta validar se não for Free e não for Admin
-        if tier not in ["free", "admin"]:
-            try:
-                expires_at_raw = pdata.get("premium_expires_at") or pdata.get("premium_until")
-                
-                # SE TIVER DATA, valida. Se não tiver (None), assume PERMANENTE.
-                if expires_at_raw:
-                    from datetime import datetime, timezone
-                    agora = datetime.now(timezone.utc)
-                    try:
-                        expire_dt = datetime.fromisoformat(str(expires_at_raw))
-                        if expire_dt.tzinfo is None:
-                            expire_dt = expire_dt.replace(tzinfo=timezone.utc)
-                            
-                        # Só remove se a data for válida E estiver no passado
-                        if expire_dt < agora:
-                            # LOG AQUI para saber que foi removido
-                            print(f"📉 VIP VENCIDO: {user_id}. Expirou: {expire_dt}")
-                            pdata["premium_tier"] = "free"
-                            pdata["premium_until"] = None
-                            pdata["premium_expires_at"] = None
-                            await _save_player_data_core(real_id, pdata)
-                    except ValueError:
-                        pass # Data inválida? Mantém o VIP por segurança.
-            except Exception:
-                pass 
-
-    return pdata
-
-async def save_player_data(user_id: Union[int, str], data: dict):
-    """Wrapper seguro para salvar dados de qualquer tipo de conta."""
-    real_id = _ensure_id_format(user_id)
-    return await _save_player_data_core(real_id, data)
-
-async def safe_spend_gold(user_id: Union[int, str], amount: int) -> bool:
-    """Gasta ouro e salva imediatamente se houver sucesso."""
-    pdata = await get_player_data(user_id)
-    if not pdata: return False
-    
-    if spend_gold(pdata, amount):
-        await save_player_data(user_id, pdata)
-        return True
-    return False
-
-async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, str]:
-    """Adiciona XP, checa Level Up e salva imediatamente."""
-    pdata = await get_player_data(user_id)
-    if not pdata: return 0, ""
-    
-    current_xp = int(pdata.get("xp", 0))
-    pdata["xp"] = current_xp + int(xp_amount)
-    
-    # Verifica level up
-    levels_gained, points_gained, msg = check_and_apply_level_up(pdata)
-    
-    # Salva tudo
-    await save_player_data(user_id, pdata)
-    
-    return levels_gained, msg
-
-# --- FERRAMENTAS DE CORREÇÃO ---
-
-async def corrigir_inventario_automatico(user_id: Union[int, str]):
-    """
-    Detecta itens com IDs antigos/errados e funde com os oficiais.
-    """
-    pdata = await get_player_data(user_id)
-    if not pdata: return
-    
-    inventory = pdata.get("inventory", {})
-    mudou = False
-
-    migracoes = {
-        "minerio_ferro": "minerio_de_ferro",
-        "iron_ore": "minerio_de_ferro",
-        "pedra_ferro": "minerio_de_ferro",
-        "minerio_bruto": "minerio_de_ferro",
-        "minerio_estanho": "minerio_de_estanho",
-        "tin_ore": "minerio_de_estanho",
-        "minerio_prata": "minerio_de_prata",
-        "silver_ore": "minerio_de_prata",
-        "madeira_rara_bruta": "madeira_rara",
-        "wood_rare": "madeira_rara",
-        "carvao_mineral": "carvao",
-        "coal": "carvao"
-    }
-
-    for id_velho, id_novo in migracoes.items():
-        if id_velho in inventory:
-            item_data = inventory[id_velho]
-            qtd_velha = 0
-            
-            if isinstance(item_data, dict):
-                qtd_velha = int(item_data.get("quantity", 1))
-            else:
-                qtd_velha = int(item_data)
-
-            if qtd_velha > 0:
-                if id_novo not in inventory:
-                    inventory[id_novo] = 0
-                
-                if isinstance(inventory[id_novo], dict):
-                    inventory[id_novo]["quantity"] = int(inventory[id_novo].get("quantity", 0)) + qtd_velha
-                else:
-                    inventory[id_novo] = int(inventory[id_novo]) + qtd_velha
-
-                print(f"🔧 FIX: {user_id} | {qtd_velha}x {id_velho} -> {id_novo}")
-                mudou = True
-            
-            del inventory[id_velho]
-            mudou = True
-
-    if mudou:
-        await save_player_data(user_id, pdata)
-        return True
-    return False
+# ==============================================================================
+# 4. FERRAMENTAS DE CORREÇÃO (LEGADO)
+# ==============================================================================
 
 async def corrigir_bug_tomos_duplicados(user_id: Union[int, str]):
-    """
-    Corrige IDs duplicados como 'tomo_tomo_'.
-    """
+    """Corrige IDs de tomos duplicados no inventário."""
     pdata = await get_player_data(user_id)
     if not pdata: return False
     
-    inventory = pdata.get("inventory", {})
+    inv = pdata.get("inventory", {})
     mudou = False
     
-    lista_itens = list(inventory.keys())
-
-    for item_id in lista_itens:
-        if item_id.startswith("tomo_tomo_"):
-            dados_item = inventory[item_id]
-            qtd = 0
-            if isinstance(dados_item, dict):
-                qtd = int(dados_item.get("quantity", 1))
-            else:
-                qtd = int(dados_item)
-
-            if qtd > 0:
-                id_correto = item_id.replace("tomo_tomo_", "tomo_", 1)
-                add_item_to_inventory(pdata, id_correto, qtd)
-                print(f"🔧 FIX TOMO: Jogador {user_id} | {qtd}x {item_id} -> {id_correto}")
+    for iid in list(inv.keys()):
+        if iid.startswith("tomo_tomo_"):
+            dados = inv[iid]
+            qtd = int(dados.get("quantity", 1)) if isinstance(dados, dict) else int(dados)
             
-            del inventory[item_id]
+            if qtd > 0:
+                novo_id = iid.replace("tomo_tomo_", "tomo_", 1)
+                add_item_to_inventory(pdata, novo_id, qtd)
+                print(f"🔧 FIX TOMO: {user_id} | {iid} -> {novo_id}")
+            
+            del inv[iid]
             mudou = True
-
+            
     if mudou:
         await save_player_data(user_id, pdata)
         return True
