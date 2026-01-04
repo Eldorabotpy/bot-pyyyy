@@ -1,5 +1,5 @@
 # modules/dungeons/runtime.py
-# (VERSÃO CORRIGIDA: Corrige o bug de voltar para o Reino ao clicar em Continuar)
+# (VERSÃO CORRIGIDA: Reconhece Itens do Inventário Novo e Antigo)
 
 from __future__ import annotations
 import logging 
@@ -24,19 +24,59 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-
 def _inv(p: dict) -> dict:
     inv = p.get("inventory") or p.get("inventario") or {}
     return inv if isinstance(inv, dict) else {}
 
+# ============================================================
+# 🛠️ CORREÇÃO PRINCIPAL AQUI (CONSUMO DE CHAVES)
+# ============================================================
 def _consume_keys(pdata: dict, key_item: str, key_cost: int) -> bool:
+    """
+    Remove itens chave do inventário, suportando:
+    1. Quantidade Int (Sistema Antigo/Simples)
+    2. Objeto Dict (Sistema Novo/Único)
+    """
     inv = _inv(pdata)
-    try: current_keys = int(inv.get(key_item, 0))
-    except: current_keys = 0
-    if current_keys < key_cost: return False 
-    inv[key_item] = current_keys - key_cost
-    pdata["inventory"] = inv
-    return True
+    item_data = inv.get(key_item)
+
+    # Cenário 1: Não tem o item
+    if not item_data:
+        return False
+
+    # Cenário 2: Item é um Dicionário (Sistema Novo)
+    if isinstance(item_data, dict):
+        # Se for item de quantidade (ex: poções), verifica 'quantity'
+        qty = item_data.get("quantity", 1)
+        if qty < key_cost:
+            return False
+            
+        # Consome
+        new_qty = qty - key_cost
+        if new_qty <= 0:
+            del inv[key_item] # Acabou
+        else:
+            item_data["quantity"] = new_qty # Atualiza qtd
+            inv[key_item] = item_data
+            
+        pdata["inventory"] = inv
+        return True
+
+    # Cenário 3: Item é um Inteiro/String (Sistema Antigo)
+    try:
+        current_keys = int(item_data)
+        if current_keys < key_cost:
+            return False
+        
+        inv[key_item] = current_keys - key_cost
+        # Opcional: remover se for 0, mas manter int é mais seguro p/ legado
+        if inv[key_item] <= 0:
+            inv.pop(key_item, None)
+            
+        pdata["inventory"] = inv
+        return True
+    except:
+        return False
 
 def _load_region_dungeon(region_key: str) -> dict:
     d = REGIONAL_DUNGEONS.get(region_key)
@@ -93,7 +133,6 @@ async def _update_battle_cache(context: ContextTypes.DEFAULT_TYPE, user_id: int,
         'monster_media_id': combat_details.get('file_id_name'), 
         'monster_media_type': 'photo', 
         'dungeon_ctx': combat_details.get('dungeon_ctx'),
-        # Tenta pegar do player data se não vier no details, para garantir sincronia inicial
         'skill_cooldowns': combat_details.get('skill_cooldowns', pdata.get('cooldowns', {})) 
     }
     
@@ -131,8 +170,20 @@ async def _open_menu(update, context, region_key):
         await context.bot.send_message(update.effective_chat.id, "Erro no calabouço.")
         return
     key_item = _key_item_for(dungeon)
-    pdata = await player_manager.get_player_data(update.effective_user.id) or {}
-    have = int((_inv(pdata)).get(key_item, 0))
+    
+    # --- BUSCA BLINDADA DE INVENTÁRIO NO MENU ---
+    user_id = get_current_player_id(update, context)
+    pdata = await player_manager.get_player_data(user_id) or {}
+    inv = _inv(pdata)
+    item_val = inv.get(key_item)
+    
+    # Normaliza quantidade para exibição
+    have = 0
+    if isinstance(item_val, dict): have = item_val.get("quantity", 1)
+    else:
+        try: have = int(item_val or 0)
+        except: have = 0
+
     caption = f"<b>{dungeon.get('label','Calabouço')}</b>\nRegião: <code>{region_key}</code>\n\n🎒 Chaves: <b>{have}</b>\n\nEscolha:"
     kb = []
     d_prog = (pdata.get("dungeon_progress", {}) or {}).get(region_key, {})
@@ -171,7 +222,6 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
     else:
         intro_text = f"𝗩𝗼𝗰𝗲̂ 𝗮𝘃𝗮𝗻𝗰̧𝗮! 𝗨𝗺 {mob_name} \n𝗮𝗽𝗮𝗿𝗲𝗰𝗲 𝗱𝗮𝘀 𝘀𝗼𝗺𝗯𝗿𝗮𝘀!"
 
-    # Processa cooldowns: só repassa skills que têm turnos > 0
     processed_cooldowns = {}
     if active_cooldowns:
         for skill_id, turns in active_cooldowns.items():
@@ -195,7 +245,6 @@ def _build_combat_details(floor_mob: MobDef, difficulty_cfg: Difficulty, region_
         "file_id_name":  floor_mob.media_key, 
         "is_boss":       bool(base_stats.get("is_boss", False)),
         "region_key":    region_key, "difficulty": difficulty_cfg.key, "dungeon_stage": stage,
-        
         "skill_cooldowns": processed_cooldowns 
     }
 
@@ -208,15 +257,16 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
     key_item = _key_item_for(dungeon)
     key_cost = _key_cost_for(diff_cfg)
     pdata = await player_manager.get_player_data(user_id) or {}
+    
+    # VERIFICAÇÃO DE CHAVES
     if not _consume_keys(pdata, key_item, key_cost):
-        await context.bot.send_message(chat_id, f"𝗙𝗮𝗹𝘁𝗮 {key_cost}x {key_item}.")
+        await context.bot.send_message(chat_id, f"🔒 <b>Acesso Negado</b>\nVocê precisa de {key_cost}x <b>{key_item.replace('_', ' ').title()}</b>.", parse_mode="HTML")
         return
+        
     floors = list(dungeon.get("floors") or [])
     if not floors: return
 
     state = _new_run_state(region_key, difficulty_key)
-    
-    # Pega cooldowns atuais do jogador para iniciar a dungeon
     current_cooldowns = pdata.get("cooldowns", {})
     combat = _build_combat_details(floors[0], diff_cfg, region_key, 0, active_cooldowns=current_cooldowns)
     
@@ -235,7 +285,6 @@ async def _start_first_fight(update, context, region_key, difficulty_key):
 # Avanço Pós-Combate
 # ============================================================
 async def resume_dungeon_after_battle(context, user_id, dungeon_ctx, victory):
-    # Pega dados do cache apenas para HP/MP, cooldowns pegaremos do DB
     cache = context.user_data.get('battle_cache') or {}
     final_hp = cache.get('player_hp')
     final_mp = cache.get('player_mp')
@@ -245,7 +294,6 @@ async def resume_dungeon_after_battle(context, user_id, dungeon_ctx, victory):
         dungeon_ctx, {}, 
         current_hp=final_hp, 
         current_mp=final_mp,
-        # Passamos None nos cooldowns para forçar o advance a ler do DB
         current_cds=None
     )
 
@@ -258,7 +306,6 @@ async def fail_dungeon_run(update, context, user_id, chat_id, reason):
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
         
-        # Recupera a chave da região do cache se possível para manter o player lá
         cache = context.user_data.get('battle_cache') or {}
         if cache.get('region_key'):
              pdata["location"] = cache.get('region_key')
@@ -309,9 +356,7 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
     cur_stg = int(combat_details.get("dungeon_stage", 0))
     next_stg = cur_stg + 1
     
-    # Aplica desgaste
     dummy_log = []
-    
     active_cds = pdata.get("cooldowns", {})
 
     # --- VITÓRIA FINAL ---
@@ -322,15 +367,12 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         bonus = _final_gold_for(dungeon, diff_cfg)
         if bonus > 0: player_manager.add_gold(pdata, bonus)
         
-        # ✅ APLICAMOS DURABILIDADE APÓS O ÚLTIMO COMBATE
         durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
         
         stats = await player_manager.get_player_total_stats(pdata)
         pdata['current_hp'] = stats.get('max_hp', 50)
         pdata['current_mp'] = stats.get('max_mana', 10)
         pdata["player_state"] = {"action": "idle"}
-        
-        # 🟢 [CORREÇÃO CRÍTICA] Força a localização para a região da masmorra
         pdata["location"] = reg_key 
         
         if "cooldowns" in pdata:
@@ -341,7 +383,6 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
         summ = f"🏆 <b>CALABOUÇO CONCLUÍDO!</b>\n\n✨ <b>XP Ganho:</b> {xp}\n💰 <b>Bônus Ouro:</b> {bonus}"
         summ += levelup_text
         
-        # --- CORREÇÃO DE LOOT DA DUNGEON ---
         if items:
             loot_lines = []
             for i, q, _ in items:
@@ -350,17 +391,14 @@ async def advance_after_victory(update, context, user_id, chat_id, combat_detail
                 emoji = info.get("emoji", "")
                 loot_lines.append(f"• {q}x {emoji} {name}")
             summ += "\n\n🎒 <b>Loot Final:</b>\n" + "\n".join(loot_lines)
-        # -----------------------------------
 
         await _send_battle_media(context, chat_id, summ, "media_dungeon_victory", 
                                  InlineKeyboardMarkup([[InlineKeyboardButton("🎉 Continuar", callback_data="combat_return_to_map")]]))
         return
 
-    # --- PRÓXIMO MONSTRO ---
     try: next_mob = floors[next_stg]
     except: return
 
-    # ✅ APLICAMOS DURABILIDADE ANTES DE COMEÇAR O PRÓXIMO COMBATE
     durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
 
     combat = _build_combat_details(next_mob, diff_cfg, reg_key, next_stg, active_cooldowns=active_cds)
