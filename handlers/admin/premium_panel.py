@@ -1,5 +1,5 @@
 # handlers/admin/premium_panel.py
-# (VERSÃO CORRIGIDA: FIX ERRO MATH DATA + INÍCIO ZERADO)
+# (VERSÃO FINAL: Importações Corrigidas para Core/Queries)
 
 from __future__ import annotations
 import logging
@@ -19,18 +19,17 @@ from telegram.ext import (
 )
 from telegram.error import BadRequest
 
-# Imports do Projeto
-from modules import player_manager
+# --- IMPORTS CORRIGIDOS (Aponta para o sistema novo) ---
+from modules.player.core import get_player_data, save_player_data, clear_player_cache
+from modules.player.queries import find_player_by_name
 from modules.game_data.premium import PREMIUM_TIERS
 from handlers.admin.utils import ensure_admin, parse_hybrid_id
 
 # Tenta importar conexão direta para atualizar a coleção 'users' (Auth)
 try:
-    from modules.player.core import players_collection
-    db = players_collection.database
-    users_col = db["users"]
+    from modules.player.core import users_collection
 except Exception:
-    users_col = None
+    users_collection = None
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +37,9 @@ logger = logging.getLogger(__name__)
 (ASK_NAME,) = range(1)
 
 # ==============================================================================
-# HELPER DE DATA INTELIGENTE (CORREÇÃO DO CRASH)
+# HELPER DE DATA
 # ==============================================================================
 def _parse_smart_date(value) -> datetime:
-    """Converte string ISO ou datetime do Mongo para datetime com timezone."""
     if not value:
         return datetime.now(timezone.utc)
     
@@ -49,22 +47,18 @@ def _parse_smart_date(value) -> datetime:
     if isinstance(value, datetime):
         dt = value
     elif isinstance(value, str):
-        try:
-            dt = datetime.fromisoformat(value)
-        except:
-            return datetime.now(timezone.utc)
+        try: dt = datetime.fromisoformat(value)
+        except: return datetime.now(timezone.utc)
     
-    # Garante UTC
     if dt and dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
         
     return dt
 
 # ==============================================================================
-# HELPER DE KEYBOARD
+# KEYBOARD
 # ==============================================================================
 def _get_premium_keyboard():
-    # Callback envia :0 para garantir que começa zerado
     return [
         [
             InlineKeyboardButton("👑 Setar: PREMIUM", callback_data="prem_tier:premium:0"),
@@ -95,12 +89,16 @@ def _get_premium_keyboard():
 async def _smart_find_player(text: str) -> tuple[Optional[Union[int, str, ObjectId]], Optional[dict]]:
     text = text.strip()
     uid_candidate = parse_hybrid_id(text)
+    
+    # 1. Tenta por ID
     if uid_candidate:
-        pdata = await player_manager.get_player_data(uid_candidate)
+        pdata = await get_player_data(uid_candidate)
         if pdata: return uid_candidate, pdata
 
-    found = await player_manager.find_player_by_name(text)
+    # 2. Tenta por Nome (Usando QUERIES novo)
+    found = await find_player_by_name(text)
     if found: return found[0], found[1]
+    
     return None, None
 
 def _format_date(val) -> str:
@@ -143,27 +141,26 @@ def _get_user_info_text(pdata: dict, uid) -> str:
     return txt
 
 # ==============================================================================
-# FUNÇÃO CRÍTICA DE SALVAMENTO
+# SALVAMENTO
 # ==============================================================================
 async def _save_premium_changes(uid, pdata, tier, expires_dt):
-    # Garante UTC
     if expires_dt and expires_dt.tzinfo is None:
         expires_dt = expires_dt.replace(tzinfo=timezone.utc)
 
-    # Para o JSON (cache/legado), usamos string ISO
+    # JSON String para cache/banco
     expires_str = expires_dt.isoformat() if expires_dt else None
     
     pdata['premium_tier'] = tier
     pdata['premium_expires_at'] = expires_str
     
-    await player_manager.save_player_data(uid, pdata)
+    # Salva usando CORE (híbrido)
+    await save_player_data(uid, pdata)
     
-    try:
-        await player_manager.clear_player_cache(uid)
+    try: await clear_player_cache(uid)
     except: pass
 
-    # Sincroniza com Auth (Mongo Users) enviando OBJETO datetime (evita erro de tipo)
-    if users_col is not None:
+    # Sincroniza com Auth (Mongo Users) diretamente
+    if users_collection is not None:
         try:
             query = None
             if isinstance(uid, str) and ObjectId.is_valid(uid):
@@ -174,15 +171,19 @@ async def _save_premium_changes(uid, pdata, tier, expires_dt):
                 query = {"telegram_id_owner": uid}
                 
             if query:
-                users_col.update_one(query, {"$set": {
+                await asyncio_wrap(users_collection.update_one, query, {"$set": {
                     "premium_tier": tier,
                     "premium_expires_at": expires_dt 
                 }})
         except Exception as e:
             logger.error(f"Erro sync premium: {e}")
 
+import asyncio
+async def asyncio_wrap(func, *args, **kwargs):
+    return await asyncio.to_thread(func, *args, **kwargs)
+
 # ==============================================================================
-# AÇÕES
+# AÇÕES DO MENU
 # ==============================================================================
 
 async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -215,7 +216,7 @@ async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def _refresh_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = context.user_data.get('prem_target_id')
     if not uid: return
-    pdata = await player_manager.get_player_data(uid)
+    pdata = await get_player_data(uid)
     try:
         await update.callback_query.edit_message_text(
             _get_user_info_text(pdata, uid),
@@ -227,26 +228,23 @@ async def _refresh_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    
     uid = context.user_data.get('prem_target_id')
-    pdata = await player_manager.get_player_data(uid)
+    pdata = await get_player_data(uid)
     if not pdata: return ASK_NAME
     
     parts = query.data.split(":")
     new_tier = parts[1]
-    
-    # Define a data base como AGORA (Zerado)
     new_expire = datetime.now(timezone.utc)
     
     await _save_premium_changes(uid, pdata, new_tier, new_expire)
-    await query.answer(f"✅ Tier {new_tier.upper()} definido! Agora adicione os dias.", show_alert=True)
+    await query.answer(f"✅ Tier {new_tier.upper()} definido! Adicione dias.", show_alert=True)
     await _refresh_menu(update, context)
     return ASK_NAME
 
 async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     uid = context.user_data.get('prem_target_id')
-    pdata = await player_manager.get_player_data(uid)
+    pdata = await get_player_data(uid)
     if not pdata: 
         await query.answer()
         return ASK_NAME
@@ -259,36 +257,26 @@ async def _action_add_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     expires_val = pdata.get("premium_expires_at")
     
     if current_tier == "free":
-        await query.answer("⚠️ Usuário FREE. Escolha um plano primeiro!", show_alert=True)
+        await query.answer("⚠️ Defina um plano antes de adicionar dias!", show_alert=True)
         return ASK_NAME
         
     try:
-        # Usa o parser seguro que aceita string ou datetime
         current_dt = _parse_smart_date(expires_val)
         now = datetime.now(timezone.utc)
         
-        # Se estiver vencido e adicionando tempo -> Começa de AGORA
-        # Se estiver vencido e removendo tempo -> Usa a data velha (para evitar bugs, mas não surte efeito)
-        # Se estiver ativo -> Soma/Subtrai do final
-        
         if days_to_add > 0:
-            if current_dt < now:
-                base_date = now
-            else:
-                base_date = current_dt
+            base_date = now if current_dt < now else current_dt
         else:
             base_date = current_dt
             
         new_expire = base_date + timedelta(days=days_to_add)
-        
         await _save_premium_changes(uid, pdata, current_tier, new_expire)
         
         op = "+" if days_to_add > 0 else ""
         await query.answer(f"✅ Atualizado: {op}{days_to_add} dias.")
-        
     except Exception as e:
-        logger.error(f"Erro math data premium: {e}")
-        await query.answer("❌ Erro ao calcular data (Formato inválido).", show_alert=True)
+        logger.error(f"Erro math premium: {e}")
+        await query.answer("❌ Erro de data.", show_alert=True)
         
     await _refresh_menu(update, context)
     return ASK_NAME
@@ -297,10 +285,10 @@ async def _action_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     query = update.callback_query
     await query.answer()
     uid = context.user_data.get('prem_target_id')
-    pdata = await player_manager.get_player_data(uid)
+    pdata = await get_player_data(uid)
     
     await _save_premium_changes(uid, pdata, "free", None)
-    await query.answer("🗑️ Premium removido.", show_alert=True)
+    await query.answer("🗑️ Removido.", show_alert=True)
     await _refresh_menu(update, context)
     return ASK_NAME
 
@@ -325,7 +313,7 @@ async def _action_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     return ConversationHandler.END
 
 async def _cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Operação cancelada.")
+    await update.message.reply_text("Cancelado.")
     context.user_data.clear()
     return ConversationHandler.END
 
