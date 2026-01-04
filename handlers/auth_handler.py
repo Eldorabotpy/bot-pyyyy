@@ -378,25 +378,47 @@ async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔒 Saiu.")
 
 async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Realiza o logout, limpa a tela e envia o menu de Login limpo novamente.
+    """
     q = update.callback_query
+    # 1. Feedback visual imediato (para o reloginho do botão parar)
     try: await q.answer("Encerrando sessão...")
     except: pass
     
+    # 2. Limpeza de Dados (Segurança)
     uid = get_current_player_id(update, context)
     if uid: 
         await clear_player_cache(uid)
     
-    # ✅ LIMPA SESSÃO PERSISTENTE
+    # Remove a sessão do banco (Impede auto-login imediato)
     await clear_persistent_session(update.effective_user.id)
     
+    # Limpa a memória RAM do bot para este usuário
     context.user_data.clear()
     if context.chat_data: context.chat_data.clear()
     
-    await q.edit_message_caption(
-        caption="🔒 <b>Sessão encerrada com sucesso!</b>\n\nUse /start para entrar em outra conta.", 
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔐 Entrar em Outra Conta", callback_data='btn_login')]]),
+    # 3. Limpeza Visual (Apaga o menu do jogo anterior)
+    try:
+        await q.delete_message()
+    except:
+        pass # Se não der para apagar, ignora
+
+    # 4. Envia o Menu de Login "Fresco"
+    # (Reusa as constantes que já existem no arquivo: IMG_NOVO e botões de entrada)
+    keyboard = [
+        [InlineKeyboardButton("🔐 ENTRAR (Login)", callback_data='btn_login')],
+        [InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')]
+    ]
+    
+    await context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=IMG_NOVO, 
+        caption="🔒 <b>Você desconectou com sucesso!</b>\n\nPara voltar a jogar, entre novamente:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="HTML"
     )
+    
     return ConversationHandler.END
 
 auth_handler = ConversationHandler(
