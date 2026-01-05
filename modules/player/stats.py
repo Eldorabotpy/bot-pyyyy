@@ -57,7 +57,10 @@ CLASS_POINT_GAINS = {
     "_default":  {"max_hp": 3, "attack": 1, "defense": 1, "initiative": 1, "luck": 1},
 }
 
-_BASELINE_KEYS = ("max_hp", "attack", "defense", "initiative", "luck")
+PROFILE_KEYS = ("max_hp", "attack", "defense", "initiative", "luck")
+
+# Mantém o _BASELINE_KEYS como uma "cópia" para o resto do código dentro do stats.py funcionar
+_BASELINE_KEYS = PROFILE_KEYS
 
 def _ival(x: Any, default: int = 0) -> int:
     try: return int(round(float(x)))
