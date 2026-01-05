@@ -253,28 +253,28 @@ CLASSES_DATA = {
      #   'tier': 1
     #},
     # EVOLUÇÕES TIER 2 
-    'clerigo': {
-        'display_name': 'Clérigo', 'emoji': '✝️',
-        'description': 'Canaliza poder divino para curas potentes e purificação.',
-        'stat_modifiers': {'hp': 3.4, 'max_mana': 2.2, 'attack': 0.8, 'defense': 1.7, 'initiative': 1.1, 'luck': 1.8},
-        'file_id_name': 'classe_curandeiro_media',
-        'tier': 2
-    },
-    'druida': {
-        'display_name': 'Druida', 'emoji': '🌳',
-        'description': 'Usa o poder da natureza para curar aliados e prender inimigos.',
-        'stat_modifiers': {'hp': 3.3, 'max_mana': 2.1, 'attack': 1.0, 'defense': 1.6, 'initiative': 1.3, 'luck': 1.6},
-        'file_id_name': 'classe_curandeiro_media',
-        'tier': 2
-    },
+    #'clerigo': {
+     #   'display_name': 'Clérigo', 'emoji': '✝️',
+      #  'description': 'Canaliza poder divino para curas potentes e purificação.',
+       # 'stat_modifiers': {'hp': 3.4, 'max_mana': 2.2, 'attack': 0.8, 'defense': 1.7, 'initiative': 1.1, 'luck': 1.8},
+        #'file_id_name': 'classe_curandeiro_media',
+        #'tier': 2
+    #},
+    #'druida': {
+    #    'display_name': 'Druida', 'emoji': '🌳',
+    #    'description': 'Usa o poder da natureza para curar aliados e prender inimigos.',
+    #    'stat_modifiers': {'hp': 3.3, 'max_mana': 2.1, 'attack': 1.0, 'defense': 1.6, 'initiative': 1.3, 'luck': 1.6},
+    #    'file_id_name': 'classe_curandeiro_media',
+    #    'tier': 2
+    #},
     # EVOLUÇÕES TIER 3 
-    'sacerdote': {
-        'display_name': 'Sacerdote', 'emoji': '⛪',
-        'description': 'Um mestre da cura em área (HoT) e escudos sagrados.',
-        'stat_modifiers': {'hp': 3.6, 'max_mana': 2.5, 'attack': 0.8, 'defense': 2.0, 'initiative': 1.2, 'luck': 2.0},
-        'file_id_name': 'classe_curandeiro_media',
-        'tier': 3
-    },
+    #'sacerdote': {
+    #    'display_name': 'Sacerdote', 'emoji': '⛪',
+    #    'description': 'Um mestre da cura em área (HoT) e escudos sagrados.',
+    #    'stat_modifiers': {'hp': 3.6, 'max_mana': 2.5, 'attack': 0.8, 'defense': 2.0, 'initiative': 1.2, 'luck': 2.0},
+    #    'file_id_name': 'classe_curandeiro_media',
+    #    'tier': 3
+    #},
 
 }
 

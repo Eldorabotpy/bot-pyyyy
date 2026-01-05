@@ -37,8 +37,8 @@ from handlers.admin.grant_skill import grant_skill_conv_handler
 from handlers.admin.grant_skin import grant_skin_conv_handler
 from handlers.admin.player_management_handler import player_management_conv_handler
 from handlers.admin.debug_skill import debug_skill_handler
-
-# --- NOVOS IMPORTS DO CORE DO JOGO (Substitui player_manager) ---
+from handlers.admin.player_edit_panel import admin_edit_player_handler
+from handlers.admin.sell_gems import sell_gems_conv_handler
 from modules.player.core import (
     get_player_data, 
     save_player_data, 
@@ -82,13 +82,12 @@ async def _safe_answer(update: Update):
         try: await q.answer()
         except: pass
 
-async def _safe_edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_markup=None):
-    if q := update.callback_query:
-        try: await q.edit_message_text(text, parse_mode=HTML, reply_markup=reply_markup)
+async def _safe_edit_text(update, context, text, reply_markup=None):
+    if update.callback_query:
+        try: await update.callback_query.edit_message_text(text, parse_mode=HTML, reply_markup=reply_markup)
         except: pass
     else:
-        chat_id = update.effective_chat.id
-        await context.bot.send_message(chat_id, text, parse_mode=HTML, reply_markup=reply_markup)
+        await context.bot.send_message(update.effective_chat.id, text, parse_mode=HTML, reply_markup=reply_markup)
 
 async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
@@ -111,11 +110,14 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🛠️ 𝔾𝕖𝕣𝕒𝕣 𝔼𝕢𝕦𝕚𝕡𝕒𝕞𝕖𝕟𝕥𝕠", callback_data="admin_generate_equip")],
         [InlineKeyboardButton("📚 𝔼𝕟𝕤𝕚𝕟𝕒𝕣 𝕊𝕜𝕚𝕝𝕝", callback_data="admin_grant_skill")],
         [InlineKeyboardButton("🎨 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕊𝕜𝕚𝕟", callback_data="admin_grant_skin")],
+        [InlineKeyboardButton("✏️ 𝐄𝐝𝐢𝐭𝐚𝐫 𝐉𝐨𝐠𝐚𝐝𝐨𝐫", callback_data="admin_edit_player")],
         [InlineKeyboardButton("👥 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤", callback_data="admin_pmanage_main")],
         [InlineKeyboardButton("🚀 𝐌𝐈𝐆𝐑𝐀𝐑/CLONAR 𝐈𝐃", callback_data="admin_change_id_start")],
         [InlineKeyboardButton("🏚️ Limpar Clã Fantasma", callback_data="admin_fix_clan_start")],
         [InlineKeyboardButton("💀 𝐃𝐄𝐋𝐄𝐓𝐀𝐑 𝐂𝐎𝐍𝐓𝐀", callback_data="admin_delete_start")],
         [InlineKeyboardButton("🔁 𝔽𝕠𝕣ç𝕒𝕣 𝔻𝕚á𝕣𝕚𝕠𝕤", callback_data="admin_force_daily")],
+        [InlineKeyboardButton("💎 𝐕𝐞𝐧𝐝𝐞𝐫 𝐆𝐞𝐦𝐚𝐬", callback_data="admin_sell_gems"),
+        InlineKeyboardButton("🔥 Remover Gemas", callback_data="admin_remove_gems")],
         [InlineKeyboardButton("👑 ℙ𝕣𝕖𝕞𝕚𝕦𝕞", callback_data="admin_premium")],
         [InlineKeyboardButton("🎉 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔼𝕧𝕖𝕟𝕥𝕠𝕤", callback_data="admin_event_menu")],
         [InlineKeyboardButton("🔬 𝕋𝕖𝕤𝕥𝕖𝕤 𝕕𝕖 𝔼𝕧𝕖𝕟𝕥𝕠", callback_data="admin_test_menu")],
@@ -147,15 +149,20 @@ def _admin_test_menu_kb() -> InlineKeyboardMarkup:
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return 
     await update.message.reply_text(
-        "🎛️ <b>Painel do Admin (Sistema Novo)</b>\nEscolha uma opção:",
+        "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:",
         reply_markup=_admin_menu_kb(),
         parse_mode=HTML,
     )
 
 async def _handle_admin_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): return
-    await _safe_answer(update)
-    await _safe_edit_text(update, context, "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:", _admin_menu_kb())
+    if update.callback_query: await update.callback_query.answer()
+    
+    text = "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:"
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=_admin_menu_kb(), parse_mode=HTML)
+    else:
+        await update.message.reply_text(text, reply_markup=_admin_menu_kb(), parse_mode=HTML)
 
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -641,15 +648,43 @@ admin_force_ticket_job_handler = CallbackQueryHandler(_handle_force_ticket_job, 
 admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_help$")
 
 all_admin_handlers = [
-    admin_command_handler, delete_player_handler, inspect_item_handler, force_daily_handler,
-    find_player_handler, debug_player_handler, get_id_command_handler, fixme_handler,
-    admin_main_handler, admin_force_daily_callback_handler, admin_event_menu_handler,
-    admin_force_start_handler, admin_force_end_handler, admin_force_ticket_handler,
-    admin_force_ticket_job_handler, clear_cache_conv_handler, test_event_conv_handler,
-    grant_item_conv_handler, my_data_handler, reset_pvp_now_handler, generate_equip_conv_handler,
-    file_id_conv_handler, premium_panel_handler, reset_panel_conversation_handler,
-    grant_skill_conv_handler, grant_skin_conv_handler, player_management_conv_handler,
-    admin_help_handler, delete_player_conv_handler, hard_respec_all_handler, clean_clan_handler,
-    change_id_conv_handler, fix_ghost_clan_handler, fix_clan_conv_handler, debug_skill_handler,
-    clean_market_handler, fix_premium_handler
+    admin_command_handler, 
+    delete_player_handler, 
+    inspect_item_handler, 
+    force_daily_handler,
+    find_player_handler, 
+    debug_player_handler, 
+    get_id_command_handler, 
+    fixme_handler,
+    admin_main_handler, 
+    admin_edit_player_handler,
+    sell_gems_conv_handler,
+    admin_force_daily_callback_handler, 
+    admin_event_menu_handler,
+    admin_force_start_handler, 
+    admin_force_end_handler, 
+    admin_force_ticket_handler,
+    admin_force_ticket_job_handler, 
+    clear_cache_conv_handler, 
+    test_event_conv_handler,
+    grant_item_conv_handler, 
+    my_data_handler, 
+    reset_pvp_now_handler, 
+    generate_equip_conv_handler,
+    file_id_conv_handler, 
+    premium_panel_handler, 
+    reset_panel_conversation_handler,
+    grant_skill_conv_handler, 
+    grant_skin_conv_handler, 
+    player_management_conv_handler,
+    admin_help_handler, 
+    delete_player_conv_handler, 
+    hard_respec_all_handler, 
+    clean_clan_handler,
+    change_id_conv_handler, 
+    fix_ghost_clan_handler, 
+    fix_clan_conv_handler, 
+    debug_skill_handler,
+    clean_market_handler, 
+    fix_premium_handler
 ]

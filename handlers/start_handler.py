@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes, CommandHandler
 from handlers.menu.kingdom import show_kingdom_menu
 from handlers.menu.region import show_region_menu
 from modules import player_manager
-from modules.auth_utils import requires_login # ✅ Importado
+from modules.auth_utils import requires_login 
 
 try:
     from bson import ObjectId
