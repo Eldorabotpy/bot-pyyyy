@@ -11,10 +11,15 @@ from config import ADMIN_ID, STARTUP_IMAGE_ID, JOB_TIMEZONE, EVENT_TIMES, WORLD_
 # Jobs e Watchdogs Imports
 from handlers.jobs import (
     daily_crystal_grant_job,
+    daily_arena_ticket_job,      # Adicionado
+    daily_kingdom_ticket_job,    # Adicionado
+    daily_pvp_entry_reset_job,   # Adicionado/Garantido
+    regenerate_energy_job,       # Adicionado (CRÍTICO para energia)
     start_kingdom_defense_event,
     start_world_boss_job,
     end_world_boss_job,
-    check_premium_expiry_job
+    check_premium_expiry_job,
+    job_pvp_monthly_reset
 )
 
 logger = logging.getLogger(__name__)
@@ -45,7 +50,7 @@ async def run_system_startup_tasks(application: Application):
     # 2. MENSAGEM DE BOAS-VINDAS AO ADMIN
     if ADMIN_ID:
         try: 
-            msg_text = "🤖 <b>Sistema Online!</b>\n🛡️ <i>Barreira de Grupos: ATIVADA</i>\n🐶 <i>Watchdog: ATIVO</i>"
+            msg_text = "🤖 <b>Sistema Online!</b>\n🛡️ <i>Barreira de Grupos: ATIVADA</i>\n🐶 <i>Watchdog: ATIVO</i>\n📅 <i>Scheduler: SINCRONIZADO</i>"
             target_chat_id = int(ADMIN_ID) if str(ADMIN_ID).isdigit() else ADMIN_ID
             
             if STARTUP_IMAGE_ID:
@@ -62,30 +67,56 @@ def setup_scheduler(application: Application):
     """Configura todos os Jobs repetitivos"""
     jq = application.job_queue 
     try:
+        # Garante fuso horário BR
         tz = ZoneInfo(JOB_TIMEZONE)
     except Exception:
         from datetime import timezone
         tz = timezone.utc
+        logger.warning("⚠️ Timezone inválida no config. Usando UTC.")
+
+    logger.info(f"📅 Configurando Jobs no fuso: {tz}")
+
+    # ==========================================================================
+    # 1. WATCHDOGS CONTÍNUOS (Rodam a cada X segundos)
+    # ==========================================================================
+    
+    # Premium Checker (Rigoroso: 60s)
+    # Verifica a cada minuto se o plano venceu para cortar imediatamente
+    jq.run_repeating(check_premium_expiry_job, interval=60, first=10, name="premium_watchdog")
+
+    # Regeneração de Energia (60s)
+    # Verifica a cada minuto quem precisa ganhar +1 de energia
+    jq.run_repeating(regenerate_energy_job, interval=60, first=5, name="energy_regen")
+
+    # ==========================================================================
+    # 2. JOBS DIÁRIOS (Sincronizados com Meia-Noite)
+    # ==========================================================================
+    midnight = dt_time(hour=0, minute=0, tzinfo=tz)
 
     # Cristais Diários
-    jq.run_daily(daily_crystal_grant_job, time=dt_time(hour=0, minute=0, tzinfo=tz), name="daily_crystal")
+    jq.run_daily(daily_crystal_grant_job, time=midnight, name="daily_crystal")
     
-    # Checker de Premium (A cada 10 min)
-    jq.run_repeating(check_premium_expiry_job, interval=600, first=60, name="premium_checker")
+    # Tickets de Arena (Item)
+    jq.run_daily(daily_arena_ticket_job, time=midnight, name="daily_arena_ticket")
     
-    # Reset PvP (Tenta importar se existir)
-    try:
-        from handlers.jobs import daily_pvp_entry_reset_job
-        if daily_pvp_entry_reset_job:
-            jq.run_daily(daily_pvp_entry_reset_job, time=dt_time(hour=16, minute=27, tzinfo=tz), name="pvp_daily_entry_reset")
-    except ImportError: pass
+    # Tickets de Defesa do Reino
+    jq.run_daily(daily_kingdom_ticket_job, time=midnight, name="daily_kingdom_ticket")
+    
+    # Reset de Entradas PvP (Define 5/5)
+    jq.run_daily(daily_pvp_entry_reset_job, time=midnight, name="daily_pvp_entry_reset")
 
-    try:
-        from handlers.jobs import job_pvp_monthly_reset
-        jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=17, minute=15, tzinfo=tz), name="pvp_monthly_check")
-    except ImportError: pass
+    # ==========================================================================
+    # 3. JOBS MENSAIS / ESPECÍFICOS
+    # ==========================================================================
+    
+    # Reset Mensal PvP (Roda todo dia, mas a função checa se é dia 1)
+    jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=0, minute=5, tzinfo=tz), name="pvp_monthly_check")
 
-    # Eventos Dinâmicos (Defesa do Reino)
+    # ==========================================================================
+    # 4. EVENTOS AGENDADOS (Config)
+    # ==========================================================================
+    
+    # Defesa do Reino (Kingdom Defense)
     if EVENT_TIMES:
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
             try:
@@ -93,7 +124,13 @@ def setup_scheduler(application: Application):
                 end_min = eh * 60 + em
                 duration = end_min - start_min
                 if duration < 0: duration += 1440 
-                jq.run_daily(start_kingdom_defense_event, time=dt_time(hour=sh, minute=sm, tzinfo=tz), name=f"kingdom_defense_{i}", data={"event_duration_minutes": duration})
+                
+                jq.run_daily(
+                    start_kingdom_defense_event, 
+                    time=dt_time(hour=sh, minute=sm, tzinfo=tz), 
+                    name=f"kingdom_defense_{i}", 
+                    data={"event_duration_minutes": duration}
+                )
             except: pass
 
     # World Boss
@@ -104,4 +141,4 @@ def setup_scheduler(application: Application):
                 jq.run_daily(end_world_boss_job, time=dt_time(hour=eh, minute=em, tzinfo=tz), name=f"end_boss_{i}")
             except: pass
             
-    logger.info("📅 Scheduler configurado.")
+    logger.info(f"✅ [SCHEDULER] Todos os jobs agendados em {JOB_TIMEZONE}.")

@@ -10,6 +10,12 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_ID_STR = os.getenv("ADMIN_ID")
 
+MONGO_CONNECTION_STRING = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URL = MONGO_CONNECTION_STRING
+
+os.environ["MONGO_CONNECTION_STRING"] = MONGO_CONNECTION_STRING
+os.environ["MONGO_URL"] = MONGO_CONNECTION_STRING
+
 # Validação para garantir que o bot não inicie sem as variáveis essenciais
 if not TELEGRAM_TOKEN:
     raise ValueError("Erro: A variável de ambiente TELEGRAM_TOKEN não foi definida!")

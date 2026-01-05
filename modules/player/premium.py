@@ -1,187 +1,150 @@
 # modules/player/premium.py
-from __future__ import annotations
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Type
-from modules import game_data
+# (VERSÃO COMPLETA: Config + Classe Manager)
 
+from datetime import datetime, timezone
+import logging
+
+logger = logging.getLogger(__name__)
+
+# =================================================================
+# CONFIGURAÇÕES (PREMIUM TIERS)
+# =================================================================
+HUNT_ENERGY_COST = 1
+COLLECTION_TIME_MINUTES = 1
+ELITE_CHANCE = 0.20
+
+PREMIUM_TIERS = {
+    "free": {
+        "display_name": "Aventureiro Comum",
+        "perks": {
+            "auto_hunt": False,
+            "xp_multiplier": 1.0,
+            "gold_multiplier": 1.0,
+            "refine_speed_multiplier": 1.0,
+            "max_energy_bonus": 0,
+            "energy_regen_seconds": 420,  # 7 Minutos
+            "travel_time_multiplier": 1.0,
+            "gather_speed_multiplier": 1.0,
+            "gather_energy_cost": 1,
+            "hunt_energy_cost": 1,
+        }
+    },
+    "premium": {
+        "display_name": "Aventureiro Premium",
+        "perks": {
+            "auto_hunt": True,
+            "xp_multiplier": 1.25,
+            "gold_multiplier": 1.25,
+            "refine_speed_multiplier": 1.25,
+            "max_energy_bonus": 5,
+            "energy_regen_seconds": 300,  # 5 Minutos
+            "travel_time_multiplier": 0.0,
+            "gather_speed_multiplier": 1.5,
+            "gather_energy_cost": 1,
+            "hunt_energy_cost": 1,
+        }
+    },
+    "vip": {
+        "display_name": "Aventureiro VIP",
+        "perks": {
+            "auto_hunt": True,
+            "xp_multiplier": 1.5,
+            "gold_multiplier": 1.5,
+            "refine_speed_multiplier": 1.5,
+            "max_energy_bonus": 10,
+            "energy_regen_seconds": 180,  # 3 Minutos
+            "travel_time_multiplier": 0.0,
+            "gather_speed_multiplier": 2.0,
+            "gather_energy_cost": 1,
+            "hunt_energy_cost": 1,
+        }
+    },
+    "lenda": {
+        "display_name": "Aventureiro Lenda",
+        "perks": {
+            "auto_hunt": True,
+            "xp_multiplier": 1.75,
+            "gold_multiplier": 1.5,
+            "refine_speed_multiplier": 2.0,
+            "max_energy_bonus": 15,
+            "energy_regen_seconds": 120,  # 2 Minutos
+            "travel_time_multiplier": 0.0,
+            "gather_speed_multiplier": 2.5,
+            "gather_energy_cost": 0,
+            "hunt_energy_cost": 1,
+        }
+    }
+}
+
+PREMIUM_PLANS_FOR_SALE = {
+    "premium_30d": {"name": "Premium (30 Dias)", "price": 120, "tier": "premium", "days": 30},
+    "premium_15d": {"name": "Premium (15 Dias)", "price": 70,  "tier": "premium", "days": 15},
+    "premium_7d":  {"name": "Premium (7 Dias)",  "price": 35,  "tier": "premium", "days": 7},
+    "vip_30d":     {"name": "VIP (30 Dias)",     "price": 300, "tier": "vip", "days": 30},
+    "vip_15d":     {"name": "VIP (15 Dias)",     "price": 160, "tier": "vip", "days": 15},
+    "vip_7d":      {"name": "VIP (7 Dias)",      "price": 80,  "tier": "vip", "days": 7},
+    "lenda_30d":   {"name": "Lenda (30 Dias)",   "price": 500, "tier": "lenda", "days": 30},
+    "lenda_15d":   {"name": "Lenda (15 Dias)",   "price": 270, "tier": "lenda", "days": 15},
+    "lenda_7d":    {"name": "Lenda (7 Dias)",    "price": 140, "tier": "lenda", "days": 7},
+}
+
+def get_benefits_text(tier_key: str) -> str:
+    data = PREMIUM_TIERS.get(tier_key, {}).get("perks", {})
+    if not data: return "Sem benefícios."
+    lines = []
+    if data.get("auto_hunt"): lines.append("🤖 <b>Auto Caça:</b> Liberado")
+    travel_mult = data.get("travel_time_multiplier", 1.0)
+    if travel_mult == 0.0: lines.append("🚀 <b>Viagem:</b> Instantânea")
+    gather_speed = data.get("gather_speed_multiplier", 1.0)
+    gather_cost = data.get("gather_energy_cost", 1)
+    if gather_speed > 1.0: lines.append(f"⚡️ <b>Coleta:</b> {gather_speed}x mais rápida")
+    if gather_cost == 0: lines.append("🌿 <b>Coleta:</b> Energia ZERO")
+    xp = int((data.get("xp_multiplier", 1.0) - 1) * 100)
+    if xp > 0: lines.append(f"📈 <b>XP:</b> +{xp}%")
+    bonus_e = data.get("max_energy_bonus", 0)
+    if bonus_e > 0: lines.append(f"💚 <b>Energia Máx:</b> +{bonus_e}")
+    return "\n".join(lines)
+
+# =================================================================
+# CLASSE DE GERENCIAMENTO (CRÍTICO PARA JOBS.PY)
+# =================================================================
 class PremiumManager:
-    """
-    Gerencia status premium e vantagens para um jogador.
-    - self.player_data é mutado in-place (quem chama deve salvar se necessário).
-    - Trata 'premium_expires_at' == None como *permanente*.
-    """
-
-    def __init__(self, player_data: Dict[str, Any]):
-        # Import local para evitar circularidade; esperamos que actions.utcnow exista.
-        from .actions import utcnow  # deve retornar datetime (idealmente timezone-aware)
-
-        self.player_data = player_data or {}
-        self._now = utcnow()
+    def __init__(self, player_data: dict):
+        self.player_data = player_data
+        self.tier_key = player_data.get("premium_tier", "free")
+        self.tier_data = PREMIUM_TIERS.get(self.tier_key, PREMIUM_TIERS["free"])
+        self.perks = self.tier_data.get("perks", {})
 
     @property
-    def tier(self) -> Optional[str]:
-        """Retorna o tier (ex: 'gold') ou None."""
-        tier = self.player_data.get("premium_tier")
-        return tier if tier else None
-
-    @property
-    def expiration_date(self) -> Optional[datetime]:
-        """Retorna datetime de expiração, ou None se permanente / não definido."""
-        from .actions import _parse_iso  # função utilitária para parse ISO -> datetime
-
-        iso_date = self.player_data.get("premium_expires_at")
-        if not iso_date:
-            return None
-        dt = _parse_iso(iso_date)
-        return dt
+    def expiration_date(self):
+        """Retorna objeto datetime (UTC) ou None."""
+        exp_str = self.player_data.get("premium_expires_at")
+        if not exp_str: return None
+        try:
+            dt = datetime.fromisoformat(exp_str)
+            if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except: return None
 
     def is_premium(self) -> bool:
-        """
-        Indica se jogador está em estado premium ativo.
-        AGORA EXIGE DATA VÁLIDA (Nada de permanente).
-        """
-        if self.tier in ('free', None):
+        """Verifica se é Premium e se a data ainda é válida."""
+        if self.tier_key == "free": return False
+        
+        # Se não tem data, mas tem tier definido => Estado Inválido (downgrade seguro)
+        if not self.player_data.get("premium_expires_at"):
             return False
 
-        exp_date = self.expiration_date
+        exp = self.expiration_date
+        now = datetime.now(timezone.utc)
         
-        # Se não tem data (None), considera EXPIRADO (False)
-        if exp_date is None:
-            return False
-            
-        return exp_date > self._now
+        if exp and now < exp:
+            return True
+        return False
 
-    def get_remaining_days(self) -> int:
-        """Dias restantes; 0 = não premium, 999 = permanente."""
-        if not self.is_premium():
-            return 0
+    def get_perk_value(self, perk_key: str, default=0):
+        return self.perks.get(perk_key, default)
 
-        exp_date = self.expiration_date
-        if exp_date is None:
-            return 999
-        remaining = exp_date - self._now
-        # Se já passou, retorna 0
-        return max(0, remaining.days + 1)
-
-    def grant_days(self, tier: str, days: int, *, force: bool = False) -> None:
-        """
-        Concede ou atualiza premium por 'days' dias.
-        """
-        from .actions import get_player_max_energy
-
-        tier = str(tier).lower()
-        days = max(0, int(days))
-
-        if tier == "free" or tier not in game_data.PREMIUM_TIERS or days <= 0:
-            return
-
-        self.player_data['premium_tier'] = tier
-
-        # 1. Determinar a data base para adicionar os dias
-        current_expiry = self.expiration_date 
-        
-        # Garante que base_date seja timezone-aware (UTC) para comparação segura
-        base_date = self._now.replace(tzinfo=timezone.utc) if self._now.tzinfo is None else self._now
-
-        if current_expiry is None:
-            # Se for permanente (None), só muda se forçado
-            if self.player_data.get('premium_expires_at') is None:
-                if not force:
-                    return # Já é permanente, não faz nada
-                else:
-                    # Força sobrescrever permanente -> começa de agora
-                    start_date = base_date
-            else:
-                # Expiry é None mas não é permanente (ex: nunca teve premium)
-                start_date = base_date
-        else:
-            # Se já tem data, garante UTC
-            current_expiry = current_expiry.replace(tzinfo=timezone.utc) if current_expiry.tzinfo is None else current_expiry
-            
-            # Se a data atual ainda é válida (futuro), soma a partir dela
-            if current_expiry > base_date:
-                start_date = current_expiry
-            else:
-                # Se já venceu, começa de agora
-                start_date = base_date
-
-        # 2. Calcular nova data
-        new_expiry = start_date + timedelta(days=days)
-        self.player_data['premium_expires_at'] = new_expiry.isoformat()
-
-        # Bônus: recarrega energia
-        try:
-            max_energy = get_player_max_energy(self.player_data)
-            self.player_data["energy"] = max_energy
-            self.player_data['energy_last_ts'] = base_date.isoformat()
-        except Exception:
-            import logging
-            logging.getLogger(__name__).exception("Falha ao aplicar bônus de energia em grant_days")
-
-    def revoke(self) -> None:
-        """
-        Remove o VIP e define o plano como 'free'.
-        """
-        # Define explicitamente como 'free' para carregar os perks padrão
-        self.player_data['premium_tier'] = 'free'
-        
-        # Remove a data de validade (pois 'free' é permanente/padrão)
-        self.player_data['premium_expires_at'] = None
-
-    def get_perks(self) -> Dict[str, Any]:
-        """
-        Retorna merge de perks entre 'free' e o tier atual (tier tem prioridade).
-        """
-        base_perks = (game_data.PREMIUM_TIERS.get("free") or {}).get("perks", {}) or {}
-
-        if not self.is_premium():
-            return dict(base_perks)
-
-        tier_name = self.tier
-        tier_info = game_data.PREMIUM_TIERS.get(tier_name, {}) if tier_name else {}
-        tier_perks = tier_info.get("perks", {}) or {}
-
-        merged_perks = {**base_perks, **tier_perks}
-        return merged_perks
-
-    def get_perk_value(self, perk_name: str, default: Any = 1, cast: Type = None) -> Any:
-        """
-        Retorna o valor do perk; se cast fornecido (ex: float, int), tenta converter com fallback.
-        Ex.: get_perk_value('xp_multiplier', 1.0, cast=float)
-        """
-        value = self.get_perks().get(perk_name, default)
-        if cast:
-            try:
-                return cast(value)
-            except Exception:
-                try:
-                    return cast(default)
-                except Exception:
-                    return default
-        return value
-
-    def set_tier(self, tier: str, *, permanent: bool = False) -> None:
-        """
-        Define/alterar o tier sem alterar a data de expiração por padrão.
-        Se permanent=True, torna o premium permanente (premium_expires_at = None).
-        """
-        from .actions import get_player_max_energy
-
-        tier = str(tier).lower()
-        if tier == "free" or tier not in game_data.PREMIUM_TIERS:
-            self.revoke()
-            return
-
-        self.player_data['premium_tier'] = tier
-
-        if permanent:
-            self.player_data['premium_expires_at'] = None
-
-        # Recarrega energia como bônus
-        try:
-            max_energy = get_player_max_energy(self.player_data)
-            self.player_data["energy"] = max_energy
-            self.player_data['energy_last_ts'] = self._now.isoformat()
-        except Exception:
-            import logging
-            logging.getLogger(__name__).exception("Falha ao aplicar bônus de energia em set_tier")
+    def revoke(self):
+        """Remove o status premium do dicionário local."""
+        self.player_data["premium_tier"] = "free"
+        self.player_data["premium_expires_at"] = None

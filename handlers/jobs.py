@@ -1,332 +1,749 @@
 # handlers/jobs.py
-# (VERSÃO FINAL BLINDADA: Expiração Estrita via 'users' + Jobs Otimizados)
+# (VERSÃO FINAL: NOTIFICAÇÃO DE LOCAL E ABA DE AVISOS + AUTH SEGURA)
 
 from __future__ import annotations
 
 import logging
-import asyncio
 import datetime
-from datetime import datetime, timezone
+import asyncio
+import certifi
+from telegram import Update
+from telegram.ext import CommandHandler
 from zoneinfo import ZoneInfo
 from typing import Dict, Optional, Any
+from telegram.ext import ContextTypes
+from modules import game_data
+from modules.player.premium import PremiumManager
+# --- AUTH IMPORT ---
+from modules.auth_utils import get_current_player_id # <--- ÚNICA FONTE DE VERDADE
+# --- MONGODB IMPORTS ---
+from pymongo import MongoClient
+from bson import ObjectId
+from modules import player_manager
+from modules.player_manager import (
+    save_player_data, get_perk_value, 
+    add_item_to_inventory, iter_player_ids
+)
 
-from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
-
-# --- IMPORTS DE DADOS E CORE ---
-from modules import player_manager, game_data
-from modules.auth_utils import get_current_player_id
-# Importamos a coleção 'users' diretamente para garantir a fonte de verdade
-from modules.player.core import users_collection, save_player_data, players_collection
-
-# --- CONFIGURAÇÃO ---
-from config import ADMIN_ID, JOB_TIMEZONE, ANNOUNCEMENT_CHAT_ID, ANNOUNCEMENT_THREAD_ID
+# --- CONFIG & MANAGERS ---
+# Importa IDs do Grupo e da Aba de Avisos
+from config import EVENT_TIMES, JOB_TIMEZONE, ANNOUNCEMENT_CHAT_ID, ANNOUNCEMENT_THREAD_ID
 from pvp.pvp_scheduler import executar_reset_pvp
-
-# --- ENGINE IMPORTS ---
-try:
-    from modules.world_boss.engine import (
-        world_boss_manager, 
-        broadcast_boss_announcement, 
-        distribute_boss_rewards
-    )
-except ImportError:
-    world_boss_manager = None
+# --- IMPORTAÇÃO DOS ENGINES (SEM TRY/EXCEPT PARA MOSTRAR ERROS REAIS) ---
+# Se der erro aqui, queremos que o bot avise no console, e não que esconda!
+from modules.world_boss.engine import (
+    world_boss_manager, 
+    broadcast_boss_announcement, 
+    distribute_loot_and_announce
+)
 
 try:
     from kingdom_defense.engine import event_manager
 except ImportError:
     event_manager = None
 
+from pvp.pvp_config import MONTHLY_RANKING_REWARDS
+
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# UTILITÁRIOS
+# CONFIGURAÇÃO DO MONGODB
 # ==============================================================================
+MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+players_col = None
+users_col = None
+try:
+    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
+    db = client["eldora_db"]
+    players_col = db["players"]
+    users_col = db["users"] # Conecta na coleção nova também
+    logger.info("✅ [JOBS] Conexão MongoDB Híbrida OK.")
+except Exception as e:
+    logger.critical(f"❌ [JOBS] FALHA CRÍTICA NA CONEXÃO MONGODB: {e}")
+    players_col = None
+    users_col = None
 
 def get_col_and_id(user_id):
-    """Retorna a coleção e ID corretos (Híbrido) para jobs genéricos."""
-    from bson import ObjectId
-    # 1. Se já for ObjectId
+    """
+    Retorna a coleção correta e o formato do ID para query.
+    - Int -> players_col, int
+    - ObjectId -> users_col, ObjectId (CORREÇÃO CRÍTICA)
+    - Str (ObjectId válido) -> users_col, ObjectId
+    """
+    # 1. Se já for ObjectId (o padrão do pymongo iterando)
     if isinstance(user_id, ObjectId):
-        return users_collection, user_id
+        return users_col, user_id
+
     # 2. Legado (Int)
     if isinstance(user_id, int):
-        return players_collection, user_id
-    # 3. String
+        return players_col, user_id
+    
+    # 3. String (Pode ser ObjectId ou Int em string)
     elif isinstance(user_id, str):
-        if users_collection is not None and ObjectId.is_valid(user_id):
-            return users_collection, ObjectId(user_id)
+        if users_col is not None and ObjectId.is_valid(user_id):
+            return users_col, ObjectId(user_id)
         if user_id.isdigit():
-            return players_collection, int(user_id)
+            return players_col, int(user_id)
+            
     return None, None
 
-def _today_str() -> str:
+# ==============================================================================
+# CONSTANTES E UTILITÁRIOS
+# ==============================================================================
+DAILY_CRYSTAL_ITEM_ID = "cristal_de_abertura"
+DAILY_CRYSTAL_BASE_QTY = 4
+DAILY_NOTIFY_USERS = True
+_non_premium_tick: Dict[str, int] = {"count": 0}
+
+def _today_str(tzname: str = JOB_TIMEZONE) -> str:
     try:
-        tz = ZoneInfo(JOB_TIMEZONE)
-        now = datetime.now(tz)
+        tz = ZoneInfo(tzname)
+        now = datetime.datetime.now(tz)
     except Exception:
-        now = datetime.now()
+        now = datetime.datetime.now()
     return now.date().isoformat()
 
 # ==============================================================================
-# 1. ROTINA DE PREMIUM (ESTRITA - USERS ONLY)
-# ==============================================================================
-async def check_premium_expiration_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Verifica APENAS a coleção 'users'.
-    Lógica: Se (Agora > Expira), define tier='free' e remove a data.
-    """
-    if users_collection is None:
-        logger.error("❌ [JOB PREMIUM] users_collection não está conectado! Abortando.")
-        return
-
-    # Garante UTC para comparação
-    now_utc = datetime.now(timezone.utc)
-    count_downgraded = 0
-
-    # Busca APENAS usuários que tenham uma data de expiração (ignora null/free)
-    # Isso torna a query muito leve.
-    query_filter = {"premium_expires_at": {"$ne": None}}
-    
-    try:
-        # Pega todos os candidatos a expiração
-        cursor = users_collection.find(query_filter)
-        
-        # Converte para lista para evitar timeout de cursor em async
-        # (Assumindo que não há milhões de premiums simultâneos, isso é seguro)
-        expired_candidates = list(cursor)
-
-        for doc in expired_candidates:
-            user_id = doc.get("_id")
-            expires_str = doc.get("premium_expires_at")
-            
-            if not expires_str: 
-                continue
-
-            try:
-                # 1. Parse da data (Formato ISO)
-                expires_dt = datetime.fromisoformat(str(expires_str))
-                
-                # Garante Timezone Aware (UTC) para não dar erro de comparação
-                if expires_dt.tzinfo is None:
-                    expires_dt = expires_dt.replace(tzinfo=timezone.utc)
-                
-                # 2. VERIFICAÇÃO FINAL: VENCEU?
-                if now_utc > expires_dt:
-                    # >>> SIM, VENCEU. EXECUTAR DOWNGRADE <<<
-                    
-                    old_tier = doc.get("premium_tier", "Desconhecido")
-                    
-                    # Atualização Atômica no Mongo (Mais seguro que save_player_data aqui)
-                    users_collection.update_one(
-                        {"_id": user_id},
-                        {
-                            "$set": {
-                                "premium_tier": "free",       # Volta para Comum
-                                "premium_expires_at": None    # Limpa a data (vira permanente free)
-                            }
-                        }
-                    )
-                    
-                    count_downgraded += 1
-                    
-                    # 3. Notifica o usuário (Fire and forget)
-                    chat_id = doc.get("telegram_id_owner") or doc.get("last_chat_id")
-                    if chat_id:
-                        try:
-                            msg = (
-                                "⚠️ <b>ASSINATURA EXPIRADA</b>\n\n"
-                                f"O seu plano <b>{str(old_tier).capitalize()}</b> chegou ao fim.\n"
-                                "Sua conta retornou para <b>Aventureiro Comum</b>.\n\n"
-                                "💎 <i>Renove na /loja_premium para recuperar as vantagens!</i>"
-                            )
-                            await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
-                            await asyncio.sleep(0.05) # Delay anti-flood
-                        except Exception:
-                            pass # Bloqueado ou chat inválido
-
-            except ValueError:
-                # Se a data estiver corrompida (ex: string mal formatada), reseta por segurança
-                logger.warning(f"[JOB] Data corrompida para {user_id}: {expires_str}. Resetando para Free.")
-                users_collection.update_one(
-                    {"_id": user_id},
-                    {"$set": {"premium_tier": "free", "premium_expires_at": None}}
-                )
-
-    except Exception as e:
-        logger.error(f"Erro fatal no loop de expiração premium: {e}")
-
-    if count_downgraded > 0:
-        logger.info(f"📉 [JOB PREMIUM] {count_downgraded} usuários voltaram para Aventureiro Comum.")
-
-# ==============================================================================
-# 2. RESET DE TICKETS (OTIMIZADO - UPDATE EM MASSA)
+# ⚔️ JOBS DE ARENA PVP (CORRIGIDOS)
 # ==============================================================================
 
 async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
     """
-    Reseta os tickets de Arena PvP para 5 diariamente.
-    Usa update_many para ser instantâneo.
+    Reseta os tickets de arena para 5 diariamente (CORREÇÃO: Define o ITEM no inventário).
     """
     today = _today_str()
-    logger.info("[JOB] Resetando Tickets de Arena (Mass Update)...")
+    count = 0
     
-    try:
-        # Atualiza Coleção Nova (Users)
-        if users_collection is not None:
-            res_users = users_collection.update_many(
-                {}, # Todos
-                {
-                    "$set": {
-                        "inventory.ticket_arena": 5,
-                        "last_pvp_entry_reset": today
-                    }
-                }
-            )
-            logger.info(f"✅ [Arena] {res_users.modified_count} usuários (Novo) resetados.")
+    msg_reset = "⚔️ <b>ARENA DE ELDORA</b>\nSeus tickets diários foram renovados (5/5)! Boa sorte."
 
-        # Atualiza Coleção Antiga (Players - Legado)
-        if players_collection is not None:
-            res_old = players_collection.update_many(
-                {}, 
-                {
-                    "$set": {
-                        "inventory.ticket_arena": 5,
-                        "last_pvp_entry_reset": today
-                    }
-                }
-            )
-            logger.info(f"✅ [Arena] {res_old.modified_count} usuários (Legado) resetados.")
-            
-    except Exception as e:
-        logger.error(f"Erro no reset de Arena: {e}")
-
-async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Entrega/Reseta o Ticket de Defesa do Reino (1 por dia/evento).
-    """
-    logger.info("[JOB] Distribuindo Tickets Kingdom Defense (Mass Update)...")
-    
-    try:
-        # Define inventory.ticket_defesa_reino = 1 para TODOS
-        if users_collection is not None:
-            users_collection.update_many(
-                {}, 
-                {"$set": {"inventory.ticket_defesa_reino": 1}}
-            )
-            
-        if players_collection is not None:
-            players_collection.update_many(
-                {}, 
-                {"$set": {"inventory.ticket_defesa_reino": 1}}
-            )
-            
-        logger.info("✅ [KD] Tickets de Defesa resetados para 1.")
-        
-    except Exception as e:
-        logger.error(f"Erro na distribuição KD: {e}")
-
-# ==============================================================================
-# 3. WORLD BOSS & EVENTOS
-# ==============================================================================
-
-async def check_world_boss_spawn(context: ContextTypes.DEFAULT_TYPE):
-    if not world_boss_manager: return
-    try:
-        # Garante UTC para hora consistente no servidor
-        now = datetime.now(timezone.utc)
-        # Ajuste manual para Horário de Brasília (-3) se o servidor for UTC puro
-        # Se seu servidor já está em BRT, remova o delta.
-        now_br = now - asyncio.timedelta(hours=3)
-
-        # Se o boss morreu e o evento ainda consta ativo no manager
-        if world_boss_manager.state["is_active"] and world_boss_manager.state["current_hp"] <= 0:
-            await distribute_boss_rewards(context)
-            return
-
-        # Horários de Spawn: 12h e 20h
-        SPAWN_HOURS = [12, 20] 
-        if now_br.hour in SPAWN_HOURS and now_br.minute == 0:
-            if not world_boss_manager.state["is_active"]:
-                await world_boss_manager.spawn_boss()
-                await broadcast_boss_announcement(context, "spawn")
-                
-    except Exception as e:
-        logger.error(f"Erro no Job World Boss: {e}")
-
-# ==============================================================================
-# 4. FERRAMENTAS ADMIN (MANUAIS)
-# ==============================================================================
-
-async def cmd_force_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando ADMIN para forçar rotinas de PvP."""
-    user_id = get_current_player_id(update, context)
-    
-    # Verifica ID Admin simples
-    if str(user_id) != str(ADMIN_ID) and str(update.effective_user.id) != str(ADMIN_ID):
-        return
-        
-    await update.message.reply_text("🔄 <b>DEBUG:</b> Rodando rotinas de PvP...", parse_mode="HTML")
-    
-    # Executa lógica de scheduler
-    await executar_reset_pvp(context)
-    # Executa o reset de tickets
-    await daily_pvp_entry_reset_job(context)
-    
-    await update.message.reply_text("✅ Rotinas PvP finalizadas.", parse_mode="HTML")
-
-async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
-    """Job agendado para rodar as rotinas de PvP."""
-    await executar_reset_pvp(context)
-
-async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE):
-    """Pode ser usado para dar cristais manualmente se necessário."""
-    pass
-
-# ==============================================================================
-# 5. REGENERAÇÃO DE ENERGIA (HÍBRIDA)
-# ==============================================================================
-# Variável global para controlar ticks (não mexer)
-_non_premium_tick: Dict[str, int] = {"count": 0}
-
-async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Roda a cada X minutos. 
-    Premium regenera todo tick. Free regenera a cada 2 ticks.
-    """
-    _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
-    regenerate_non_premium = (_non_premium_tick["count"] == 0)
-    
-    # Aqui precisamos iterar um por um para checar o limite máximo de cada um
-    # Não dá pra fazer mass update fácil pois cada um tem um max_energy diferente
+    # Itera sobre todos os jogadores
     async for user_id, pdata in player_manager.iter_players():
         try:
-            if not isinstance(pdata, dict): continue
+            # Verifica data
+            last_reset = pdata.get("last_pvp_entry_reset")
+            if last_reset == today: 
+                continue
             
-            # Pega limites
-            max_e = int(player_manager.get_player_max_energy(pdata)) 
-            cur_e = int(pdata.get("energy", 0))
+            col, query_id = get_col_and_id(user_id)
             
-            # Se já está cheio, ignora
-            if cur_e >= max_e: continue 
+            # Fallback para ID numérico
+            if col is None and str(user_id).isdigit():
+                query_id = int(user_id)
+                col = players_col
 
-            # Verifica Tier
-            tier = pdata.get("premium_tier", "free")
-            is_premium = tier in ["vip", "premium", "lenda", "admin"]
-            
-            # Lógica de Tick
-            if is_premium or regenerate_non_premium:
-                col, query_id = get_col_and_id(user_id)
-                if col is not None:
-                    # Incrementa 1 energia
-                    col.update_one({"_id": query_id}, {"$inc": {"energy": 1}})
-                    
-                    # Limpa cache para refletir no menu
+            if col is not None:
+                # ✅ AQUI ESTÁ A CORREÇÃO:
+                # Usamos $set no 'inventory.ticket_arena' para garantir que ele tenha exatamente 5 tickets.
+                result = col.update_one(
+                    {"_id": query_id},
+                    {
+                        "$set": {
+                            "inventory.ticket_arena": 5, # <--- Define o ITEM que o PvP procura
+                            "last_pvp_entry_reset": today
+                        }
+                    }
+                )
+                
+                # Envia notificação se mudou algo
+                if result.modified_count > 0:
+                    # Limpa cache
                     try:
                         if hasattr(player_manager, "clear_player_cache"):
                             await player_manager.clear_player_cache(user_id)
                     except: pass
                     
+                    # Tenta avisar o usuário
+                    telegram_chat_id = pdata.get("telegram_id_owner")
+                    if not telegram_chat_id and str(user_id).isdigit():
+                        telegram_chat_id = int(user_id)
+                    
+                    if telegram_chat_id:
+                        try:
+                            await context.bot.send_message(chat_id=telegram_chat_id, text=msg_reset, parse_mode='HTML')
+                            await asyncio.sleep(0.05) 
+                        except: pass
+                    
+                    count += 1
+        except Exception as e:
+            logger.error(f"[JOB PvP] Erro ao resetar usuário {user_id}: {e}")
+            continue
+        
+    logger.info(f"[JOB] Tickets de Arena (Item) resetados para {count} jogadores.")
+    
+async def daily_arena_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Entrega 10 Tickets de Arena diariamente."""
+    today = _today_str()
+    granted = 0
+    
+    msg_arena = (
+        "🎫 <b>SUPRIMENTO DE BATALHA</b>\n"
+        "Você recebeu <b>10x 🎟️ Ticket de Arena</b>.\n"
+        "<i>Use-os para desafiar oponentes além do limite diário!</i>"
+    )
+
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            daily = pdata.get("daily_awards") or {}
+            if daily.get("last_arena_ticket_date") == today: continue
+            
+            # Roteamento Híbrido
+            col, query_id = get_col_and_id(user_id)
+            
+            if col is not None:
+                col.update_one(
+                    {"_id": query_id},
+                    {
+                        "$inc": {"inventory.ticket_arena": 10},
+                        "$set": {"daily_awards.last_arena_ticket_date": today}
+                    }
+                )
+                
+                try:
+                    if hasattr(player_manager, "clear_player_cache"):
+                        res = player_manager.clear_player_cache(user_id)
+                        if asyncio.iscoroutine(res): await res
+                except: pass
+                
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=msg_arena, parse_mode='HTML')
+                    await asyncio.sleep(0.05)
+                except: pass
+                
+                granted += 1
+        except: pass
+        
+    logger.info(f"[JOB] Tickets de Arena entregues: {granted}")
+
+async def distribute_event_ticket(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Entrega 1 Ticket para todos os jogadores SEM limite diário.
+    """
+    logger.info("[JOB] Distribuindo tickets de evento (sem limite diário)...")
+    
+    msg_ticket = (
+        "╭─────── [ 📜 <b>DECRETO REAL</b> ] ───────➤\n"
+        "│\n"
+        "│ ⚔️ <b>AS TROMBETAS SOARAM!</b>\n"
+        "│ <i>As forças das trevas marcham contra</i>\n"
+        "│ <i>os Portões de Eldora!</i>\n"
+        "│\n"
+        "│ 📦 <b>SUPRIMENTO DE GUERRA:</b>\n"
+        "│ ╰┈➤ 🎟️ <b>1x Ticket de Defesa</b>\n"
+        "│\n"
+        "╰──────────────────────────────➤\n"
+        "🔥 <i>Vá ao menu 'Eventos' e lute!</i>"
+    )
+
+    count = 0
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            # Roteamento Híbrido
+            col, query_id = get_col_and_id(user_id)
+
+            if col is not None:
+                col.update_one(
+                    {"_id": query_id},
+                    {"$inc": {"inventory.ticket_defesa_reino": 1}}
+                )
+                
+                try:
+                    if hasattr(player_manager, "clear_player_cache"):
+                        res = player_manager.clear_player_cache(user_id)
+                        if asyncio.iscoroutine(res): await res
+                except Exception: pass
+
+            else:
+                # Fallback Memória
+                if not pdata: continue
+                player_manager.add_item_to_inventory(pdata, "ticket_defesa_reino", 1)
+                await player_manager.save_player_data(user_id, pdata)
+            
+            try:
+                await context.bot.send_message(chat_id=user_id, text=msg_ticket, parse_mode='HTML')
+                await asyncio.sleep(0.05)
+            except Exception: pass
+            
+            count += 1
+        except Exception: pass
+        
+    logger.info(f"[JOB] Tickets de evento entregues: {count}")
+
+async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
+    if world_boss_manager is None:
+        logger.error("⚠️ [JOB] CRÍTICO: world_boss_manager é None!")
+        return
+
+    if world_boss_manager.is_active:
+         logger.info("👹 [JOB] Boss já está vivo. Ignorando spawn duplicado.")
+         return
+
+    logger.info("👹 [JOB] Iniciando sequência de spawn do World Boss...")
+    
+    result = world_boss_manager.start_event()
+    
+    if result.get("success"):
+        location_key = result.get('location', 'desconhecido')
+        region_info = (game_data.REGIONS_DATA.get(location_key) or {})
+        location_display = region_info.get("display_name", location_key.replace("_", " ").title())
+        
+        if ANNOUNCEMENT_CHAT_ID:
+            try:
+                msg_text = (
+                    f"👹 𝕎𝕆ℝ𝕃𝔻 𝔹𝕆𝕊𝕊 𝕊𝕌ℝ𝔾𝕀𝕌!\n\n"
+                    f"📍 𝕃𝕠𝕔𝕒𝕝: {location_display}\n\n"
+                    f"O monstro despertou! Corram para derrotá-lo!"
+                )
+                
+                await context.bot.send_message(
+                    chat_id=ANNOUNCEMENT_CHAT_ID, 
+                    message_thread_id=ANNOUNCEMENT_THREAD_ID, 
+                    text=msg_text, 
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error(f"❌ ERRO NOTIFICAR GRUPO (BOSS): {e}")
+        
+        try:
+            await broadcast_boss_announcement(context.application, location_key)
+        except Exception as e:
+            logger.error(f"Erro no broadcast do boss: {e}")
+    else:
+        logger.error(f"Falha ao iniciar Boss: {result.get('error')}")
+
+async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
+    if not world_boss_manager: return
+    if not world_boss_manager.is_active: return
+
+    logger.info("👹 [JOB] O tempo acabou! Removendo o Boss...")
+    battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
+    await distribute_loot_and_announce(context, battle_results)
+
+
+# ==============================================================================
+# 🛡️ JOB: KINGDOM DEFENSE
+# ==============================================================================
+
+async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
+    if not event_manager: return
+
+    job_data = context.job.data or {}
+    duration_minutes = job_data.get("event_duration_minutes", 30)
+    location_name = "🏰 Portões do Reino" 
+
+    try:
+        result = await event_manager.start_event()
+        
+        if result and "error" in result:
+            logger.warning(f"[KD] Evento já ativo ou erro: {result['error']}")
+            return
+
+        await distribute_event_ticket(context)
+
+        group_msg = (
+            "🔥 <b>INVASÃO EM ANDAMENTO!</b> 🔥\n\n"
+            "‼️ <b>ATENÇÃO HERÓIS DE ELDORA!</b>\n"
+            f"Monstros estão atacando os <b>{location_name}</b>!\n\n"
+            f"⏳ <b>Tempo Restante:</b> {duration_minutes} minutos\n"
+            "🎟️ <i>Todos os guerreiros receberam 1 Ticket de entrada!</i>\n"
+            "👉 <b>CORRAM PARA O MENU 'DEFESA DO REINO'!</b>"
+        )
+
+        if ANNOUNCEMENT_CHAT_ID:
+            try:
+                thread_id = ANNOUNCEMENT_THREAD_ID if ANNOUNCEMENT_THREAD_ID else None
+                await context.bot.send_message(
+                    chat_id=ANNOUNCEMENT_CHAT_ID, 
+                    message_thread_id=thread_id,
+                    text=group_msg, 
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error(f"❌ ERRO NOTIFICAR GRUPO: {e}")
+
+        context.job_queue.run_once(
+            end_kingdom_defense_event, 
+            when=duration_minutes * 60,
+            name="auto_end_kingdom_defense"
+        )
+        logger.info(f"🛡️ Defesa Iniciada com sucesso.")
+
+    except Exception as e:
+        logger.error(f"Erro ao iniciar Kingdom Defense: {e}")
+
+async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
+    if not event_manager: return
+    if not event_manager.is_active: return
+
+    try:
+        await event_manager.end_event() 
+        
+        end_msg = (
+            "🏁 <b>FIM DA INVASÃO!</b> 🏁\n\n"
+            "As poeiras da batalha baixaram.\n"
+            "Obrigado a todos os defensores!\n\n"
+            "🏆 <i>Verifique o Ranking no menu do evento para ver os maiores danos!</i>"
+        )
+
+        if ANNOUNCEMENT_CHAT_ID:
+            try:
+                thread_id = ANNOUNCEMENT_THREAD_ID if ANNOUNCEMENT_THREAD_ID else None
+                
+                await context.bot.send_message(
+                    chat_id=ANNOUNCEMENT_CHAT_ID, 
+                    message_thread_id=thread_id,
+                    text=end_msg, 
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                 logger.error(f"❌ ERRO NOTIFICAR GRUPO (KD END): {e}")
+                 
+    except Exception as e:
+        logger.error(f"Erro ao finalizar Kingdom Defense: {e}")
+
+# ==============================================================================
+# 🔧 FUNÇÕES ADMINISTRATIVAS (Tickets e Recompensas)
+# ==============================================================================
+
+async def distribute_kingdom_defense_ticket_job(context: ContextTypes.DEFAULT_TYPE):
+    job_data = context.job.data or {} if context.job else {}
+    event_time_str = job_data.get("event_time", "agora")
+    TICKET_ID = "ticket_defesa_reino"
+    delivered = 0
+    
+    logger.info(f"[JOB] Distribuindo tickets para evento das {event_time_str}...")
+
+    try:
+        async for user_id, pdata in player_manager.iter_players():
+            try:
+                col, query_id = get_col_and_id(user_id)
+                
+                if col is not None:
+                    col.update_one(
+                        {"_id": query_id},
+                        {"$inc": {f"inventory.{TICKET_ID}": 1}}
+                    )
+                    delivered += 1
+                else:
+                    if not pdata: continue
+                    player_manager.add_item_to_inventory(pdata, TICKET_ID, 1)
+                    await save_player_data(user_id, pdata)
+                    delivered += 1
+            except Exception: pass
+    except Exception as e:
+        logger.error(f"Erro distribuindo tickets: {e}")
+        
+    logger.info(f"[JOB] Tickets distribuídos: {delivered}")
+
+async def daily_event_ticket_job(context: ContextTypes.DEFAULT_TYPE):
+    return await distribute_kingdom_defense_ticket_job(context)
+
+
+# ==============================================================================
+# ⚔️ PVP E OUTROS JOBS
+# ==============================================================================
+async def job_pvp_monthly_reset(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        tz = ZoneInfo(JOB_TIMEZONE)
+    except Exception:
+        tz = datetime.timezone.utc
+    
+    now = datetime.datetime.now(tz)
+    if now.day != 1: return
+
+    await executar_reset_pvp(context.bot, force_run=False)
+
+async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
+    all_players_ranked = []
+    try:
+        async for user_id, p_data in player_manager.iter_players():
+            try:
+                pts = player_manager.get_pvp_points(p_data)
+                if pts > 0: all_players_ranked.append({"user_id": user_id, "points": pts})
+            except: pass
+    except: return
+
+    all_players_ranked.sort(key=lambda p: p["points"], reverse=True)
+    
+    if MONTHLY_RANKING_REWARDS:
+        for i, player in enumerate(all_players_ranked):
+            rank = i + 1
+            reward_amount = MONTHLY_RANKING_REWARDS.get(rank)
+            if reward_amount:
+                user_id = player["user_id"]
+                col, query_id = get_col_and_id(user_id)
+                
+                if col is not None:
+                     col.update_one({"_id": query_id}, {"$inc": {"gems": reward_amount}})
+                     try: await context.bot.send_message(chat_id=user_id, text=f"🏆 Rank {rank}: Recebeu {reward_amount} gemas!")
+                     except: pass
+                     
+    if ANNOUNCEMENT_CHAT_ID:
+        try: await context.bot.send_message(chat_id=ANNOUNCEMENT_CHAT_ID, message_thread_id=ANNOUNCEMENT_THREAD_ID, text="🏆 <b>Ranking PvP Finalizado!</b>", parse_mode="HTML")
+        except: pass
+
+async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
+    # Reseta nas duas coleções
+    if players_col: players_col.update_many({}, {"$set": {"pvp_points": 0}})
+    if users_col: users_col.update_many({}, {"$set": {"pvp_points": 0}})
+    
+    if ANNOUNCEMENT_CHAT_ID:
+        msg_season = (
+            "╭────── [ 🏆 <b>NOVA TEMPORADA</b> ] ──────➤\n"
+            "│\n"
+            "│ ⚔️ <b>A ARENA FOI REINICIADA!</b>\n"
+            "│ <i>Os deuses da guerra limparam o sangue</i>\n"
+            "│ <i>da areia. A glória aguarda novos heróis!</i>\n"
+            "│\n"
+            "│ 🔄 <b>Status:</b> Pontos Resetados\n"
+            "│ 💎 <b>Prêmios:</b> Entregues aos Top Rankings\n"
+            "│\n"
+            "╰──────────────────────────────➤\n"
+            "🔥 <i>Vá à Arena e conquiste seu lugar na história!</i>"
+        )
+        
+        try: 
+            await context.bot.send_message(
+                chat_id=ANNOUNCEMENT_CHAT_ID, 
+                message_thread_id=ANNOUNCEMENT_THREAD_ID, 
+                text=msg_season, 
+                parse_mode="HTML"
+            )
+        except: pass
+
+async def regenerate_energy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    _non_premium_tick["count"] = (_non_premium_tick["count"] + 1) % 2
+    regenerate_non_premium = (_non_premium_tick["count"] == 0)
+    
+    try:
+        async for user_id, pdata in player_manager.iter_players():
+            try:
+                if not isinstance(pdata, dict): continue
+                max_e = int(player_manager.get_player_max_energy(pdata)) 
+                cur_e = int(pdata.get("energy", 0))
+                if cur_e >= max_e: continue 
+
+                is_premium = player_manager.has_premium_plan(pdata) 
+                
+                if is_premium or regenerate_non_premium:
+                    col, query_id = get_col_and_id(user_id)
+                    if col is not None:
+                        col.update_one({"_id": query_id}, {"$inc": {"energy": 1}})
+                        try:
+                            if hasattr(player_manager, "clear_player_cache"):
+                                res = player_manager.clear_player_cache(user_id)
+                                if asyncio.iscoroutine(res): await res
+                        except: pass
+            except: pass
+    except Exception as e:
+        logger.error(f"Erro regenerate_energy_job: {e}")
+
+async def daily_crystal_grant_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    today = _today_str()
+    granted = 0
+    try:
+        async for user_id, pdata in player_manager.iter_players():
+            try:
+                daily = pdata.get("daily_awards") or {}
+                if daily.get("last_crystal_date") == today: continue
+                
+                col, query_id = get_col_and_id(user_id)
+                
+                if col is not None:
+                    col.update_one(
+                        {"_id": query_id},
+                        {
+                            "$inc": {f"inventory.{DAILY_CRYSTAL_ITEM_ID}": 4},
+                            "$set": {"daily_awards.last_crystal_date": today}
+                        }
+                    )
+                    try:
+                        if hasattr(player_manager, "clear_player_cache"):
+                            res = player_manager.clear_player_cache(user_id)
+                            if asyncio.iscoroutine(res): await res
+                    except: pass
+                
+                if DAILY_NOTIFY_USERS:
+                    msg = f"🎁 Você recebeu 4× Cristal de Abertura."
+                    try: await context.bot.send_message(chat_id=user_id, text=msg)
+                    except: pass
+                granted += 1
+            except: pass
+    except Exception: pass
+    return granted
+
+
+
+async def afternoon_event_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    return 0
+
+async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
+    today = _today_str() 
+    granted = 0
+    
+    msg_ticket = (
+        "📜 <b>CONVOCAÇÃO REAL</b> 📜\n\n"
+        "Guerreiro, o Reino precisa de sua força!\n"
+        "Os batedores relatam movimentos nas sombras...\n\n"
+        "🎁 <b>Você recebeu:</b> 1x 🎟️ <b>Ticket de Defesa do Reino</b>\n"
+        "<i>Esteja pronto quando a trombeta de guerra soar!</i>"
+    )
+
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            daily = pdata.get("daily_awards") or {}
+            
+            if daily.get("last_kingdom_ticket_date") == today: 
+                continue
+            
+            col, query_id = get_col_and_id(user_id)
+            
+            if col is not None:
+                col.update_one(
+                    {"_id": query_id},
+                    {
+                        "$inc": {"inventory.ticket_defesa_reino": 1},
+                        "$set": {"daily_awards.last_kingdom_ticket_date": today}
+                    }
+                )
+                
+                try:
+                    if hasattr(player_manager, "clear_player_cache"):
+                        res = player_manager.clear_player_cache(user_id)
+                        if asyncio.iscoroutine(res): await res
+                except Exception: pass
+
+                granted += 1
+                
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id, 
+                        text=msg_ticket, 
+                        parse_mode='HTML'
+                    )
+                    await asyncio.sleep(0.05) 
+                except Exception:
+                    pass
         except Exception: 
-            pass # Ignora erros individuais no loop de energia para não travar
+            pass
+            
+    return granted
+
+async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Wrapper para forçar a entrega de cristais diários via admin."""
+    return await daily_crystal_grant_job(context)
+
+async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Job periódico: Verifica assinaturas vencidas.
+    Compara datas em UTC. Se venceu, reverte para FREE imediatamente.
+    """
+    count_downgraded = 0
+    now = datetime.datetime.now(datetime.timezone.utc) # Referência Global
+
+    # Itera sobre todos os jogadores
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            # Pula quem já é Free
+            current_tier = pdata.get("premium_tier")
+            if not current_tier or current_tier == "free":
+                continue
+
+            # Usa o Manager para verificar validade
+            pm = PremiumManager(pdata)
+            
+            # Se is_premium() retornar False, significa que expirou ou a data é inválida
+            if not pm.is_premium():
+                # Confirmação dupla: Se tinha data e ela passou de agora
+                exp_date = pm.expiration_date
+                
+                # Se não tem data (None) mas tem Tier -> Estado Ilegal -> Remove
+                # Se tem data e passou -> Remove
+                should_remove = False
+                if exp_date is None:
+                    should_remove = True
+                elif exp_date < now:
+                    should_remove = True
+                
+                if should_remove:
+                    logger.info(f"[PREMIUM] Expirou para user {user_id}. Resetando...")
+                    
+                    # 1. Revoga na memória e Salva na Collection Principal
+                    pm.revoke()
+                    
+                    # Importante: get_col_and_id lida com int/str/ObjectId
+                    col, query_id = get_col_and_id(user_id)
+                    
+                    # 2. Update Atômico no Banco (Garante Sync)
+                    if col is not None:
+                        col.update_one(
+                            {"_id": query_id}, 
+                            {"$set": {"premium_tier": "free", "premium_expires_at": None}}
+                        )
+                    
+                    # 3. Se for sistema híbrido, tenta syncar users também
+                    if users_col and col != users_col:
+                        # Tenta achar pelo owner se for legado
+                        try:
+                            users_col.update_one(
+                                {"telegram_id_owner": int(str(user_id))},
+                                {"$set": {"premium_tier": "free", "premium_expires_at": None}}
+                            )
+                        except: pass
+
+                    # 4. Notifica o Jogador
+                    try:
+                        target_chat_id = pdata.get("last_chat_id") or pdata.get("telegram_id_owner")
+                        # Se for ID numérico legado, usa ele mesmo
+                        if isinstance(user_id, int): target_chat_id = user_id
+                        
+                        if target_chat_id:
+                            msg = (
+                                "⚠️ <b>ASSINATURA EXPIRADA</b>\n\n"
+                                f"O seu plano <b>{str(current_tier).title()}</b> chegou ao fim.\n"
+                                "Sua conta retornou para o status <b>Aventureiro Comum</b>.\n\n"
+                                "💎 <i>Renove no menu Premium para recuperar seus benefícios!</i>"
+                            )
+                            await context.bot.send_message(chat_id=target_chat_id, text=msg, parse_mode="HTML")
+                            await asyncio.sleep(0.05) 
+                    except Exception:
+                        pass 
+                        
+                    count_downgraded += 1
+                    
+        except Exception as e:
+            logger.error(f"Erro check_premium_expiry_job user {user_id}: {e}")
+            continue
+
+    if count_downgraded > 0:
+        logger.info(f"[JOB PREMIUM] {count_downgraded} assinaturas vencidas processadas.")
+                       
+async def cmd_force_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando ADMIN para forçar o reset diário de tickets PvP e mensal de Season."""
+    from config import ADMIN_ID
+    
+    # 🔒 SEGURANÇA: ID via Auth Central
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+    
+    # Validação de Admin (compatível com sistema híbrido)
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        return
+
+    owner_id = pdata.get("telegram_id_owner")
+    if owner_id is None and str(user_id).isdigit():
+        owner_id = int(user_id)
+    
+    if owner_id != ADMIN_ID:
+        return
+        
+    await update.message.reply_text("🔄 <b>DEBUG:</b> Iniciando rotinas de PvP...", parse_mode="HTML")
+    
+    # 1. Reseta Tickets Diários
+    await daily_pvp_entry_reset_job(context)
+    
+    # 2. Verifica/Reseta Season (Forçado)
+    await job_pvp_monthly_reset(context)
+    
+    await update.message.reply_text("✅ <b>DEBUG:</b> Rotinas PvP chamadas.", parse_mode="HTML")

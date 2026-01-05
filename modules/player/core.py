@@ -1,5 +1,5 @@
 # modules/player/core.py
-# (VERSÃO BLINDADA: Conexão Direta Obrigatória - Resolve "Conta não encontrada")
+# (VERSÃO CORRIGIDA: Reintroduz 'players_collection' para compatibilidade)
 
 import logging
 import asyncio
@@ -14,22 +14,30 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 # 1. CONEXÃO MONGODB CENTRALIZADA E BLINDADA
 # ==============================================================================
-MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-players_collection = None
+try:
+    from config import MONGO_CONNECTION_STRING
+except ImportError:
+    MONGO_CONNECTION_STRING = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+logger = logging.getLogger(__name__)
+
+client = None
+db = None
+players_collection = None # <--- CRÍTICO: Actions.py busca isso
 users_collection = None
+legacy_collection = None
 
 try:
-    # Tenta conectar DIRETAMENTE (Ignora o modules.database se ele estiver falhando)
-    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
+    client = MongoClient(MONGO_CONNECTION_STRING, tlsCAFile=certifi.where())
     db = client["eldora_db"]
     
-    players_collection = db["players"] # Legado
-    users_collection = db["users"]     # Novo Sistema
+    # Definições obrigatórias para compatibilidade
+    users_collection = db["users"]     # Novo
+    players_collection = db["players"] # Legado (Necessário para actions.py)
+    legacy_collection = players_collection # Alias
     
-    logger.info("✅ [CORE] Conexão MongoDB Direta: SUCESSO.")
+    logger.info("✅ [CORE] MongoDB Conectado.")
 except Exception as e:
-    logger.critical(f"❌ [CORE] FALHA CRÍTICA AO CONECTAR MONGODB: {e}")
-    # Se falhar aqui, o jogo inteiro para, mas pelo menos sabemos o porquê.
+    logger.critical(f"❌ [CORE] Erro MongoDB: {e}")
 
 # --- 2. SISTEMA DE CACHE ---
 _player_cache: Dict[str, Dict[str, Any]] = {}
@@ -44,124 +52,79 @@ def _get_cache_key(user_id: Union[int, str, ObjectId]) -> str:
 # ==============================================================================
 
 async def get_player_data(user_id: Union[int, str, ObjectId]) -> Optional[Dict[str, Any]]:
-    """
-    Busca dados do jogador.
-    - Se for Int: Busca na coleção 'players' (Legado).
-    - Se for ObjectId/Str(24): Busca na coleção 'users' (Novo).
-    """
     if not user_id: return None
+    key = _get_cache_key(user_id)
     
-    cache_key = _get_cache_key(user_id)
-    
-    # 1. Tenta buscar no Cache primeiro
+    # Cache
     async with _player_cache_lock:
-        if cache_key in _player_cache:
-            return dict(_player_cache[cache_key])
+        if key in _player_cache: return dict(_player_cache[key])
 
-    # 2. Se não está no cache, busca no Banco
     doc = None
     try:
-        # --- ROTEAMENTO HÍBRIDO ---
+        # Roteamento Inteligente
         if isinstance(user_id, int):
-            # CASO 1: ID Numérico -> Coleção Legada 'players'
             if players_collection is not None:
                 doc = await asyncio.to_thread(players_collection.find_one, {"_id": user_id})
-        
         else:
-            # CASO 2: ID Novo (ObjectId ou String) -> Coleção Nova 'users'
+            # ObjectId ou String numérica
             oid = None
-            if isinstance(user_id, ObjectId):
-                oid = user_id
+            if isinstance(user_id, ObjectId): oid = user_id
             elif isinstance(user_id, str):
-                if ObjectId.is_valid(user_id):
-                    oid = ObjectId(user_id)
-                elif user_id.isdigit():
-                    # Fallback: String numérica tratada como int legado
-                    if players_collection is not None:
-                         doc = await asyncio.to_thread(players_collection.find_one, {"_id": int(user_id)})
+                if ObjectId.is_valid(user_id): oid = ObjectId(user_id)
+                elif user_id.isdigit() and players_collection is not None:
+                     # Fallback para legado se vier string numérica
+                     doc = await asyncio.to_thread(players_collection.find_one, {"_id": int(user_id)})
             
             if oid and users_collection is not None:
                 doc = await asyncio.to_thread(users_collection.find_one, {"_id": oid})
                 
     except Exception as e:
-        logger.error(f"Erro ao buscar player_data para {user_id} ({type(user_id)}): {e}")
-        return None
+        logger.error(f"Erro get_player_data {user_id}: {e}")
 
-    # 3. Se encontrou, salva no cache e retorna
     if doc:
-        # Garante que o _id no documento seja compatível para salvamento futuro
-        if "_id" in doc and isinstance(doc["_id"], ObjectId):
-             # Mantém ObjectId, o save_player_data lidará com isso
-             pass
-
-        async with _player_cache_lock:
-            _player_cache[cache_key] = dict(doc)
+        async with _player_cache_lock: _player_cache[key] = dict(doc)
         return dict(doc)
-        
     return None
 
 async def save_player_data(user_id: Union[int, str, ObjectId], data: Dict[str, Any]) -> None:
-    """
-    Salva dados do jogador na coleção correta baseada no tipo do ID.
-    """
     if not user_id or not data: return
+    key = _get_cache_key(user_id)
     
-    cache_key = _get_cache_key(user_id)
-    
-    # 1. Atualiza Cache Imediatamente
-    async with _player_cache_lock:
-        _player_cache[cache_key] = dict(data)
+    # Atualiza Cache
+    async with _player_cache_lock: _player_cache[key] = dict(data)
 
-    # 2. Persiste no Banco (Async)
     try:
-        # --- ROTEAMENTO HÍBRIDO ---
         if isinstance(user_id, int):
-            # CASO 1: Salva no Legado (players)
             if players_collection is not None:
-                await asyncio.to_thread(
-                    players_collection.replace_one, 
-                    {"_id": user_id}, 
-                    data, 
-                    upsert=True
-                )
+                await asyncio.to_thread(players_collection.replace_one, {"_id": user_id}, data, upsert=True)
         else:
-            # CASO 2: Salva no Novo (users)
             oid = None
-            if isinstance(user_id, ObjectId):
-                oid = user_id
-            elif isinstance(user_id, str): 
-                if ObjectId.is_valid(user_id):
-                    oid = ObjectId(user_id)
-                elif user_id.isdigit():
-                    # Fallback: Salvando int legado que veio como string
-                    if players_collection is not None:
-                        await asyncio.to_thread(players_collection.replace_one, {"_id": int(user_id)}, data, upsert=True)
+            if isinstance(user_id, ObjectId): oid = user_id
+            elif isinstance(user_id, str):
+                if ObjectId.is_valid(user_id): oid = ObjectId(user_id)
+                elif user_id.isdigit() and players_collection is not None:
+                    await asyncio.to_thread(players_collection.replace_one, {"_id": int(user_id)}, data, upsert=True)
                     return
 
             if oid and users_collection is not None:
-                # Garante que o campo _id no documento seja o ObjectId correto
-                data["_id"] = oid 
-                
-                await asyncio.to_thread(
-                    users_collection.replace_one, 
-                    {"_id": oid}, 
-                    data, 
-                    upsert=True
-                )
+                data["_id"] = oid
+                await asyncio.to_thread(users_collection.replace_one, {"_id": oid}, data, upsert=True)
                 
     except Exception as e:
-        logger.error(f"Erro crítico ao salvar player {user_id}: {e}")
+        logger.error(f"Erro save_player_data {user_id}: {e}")
+
+async def get_legacy_data_by_telegram_id(tid: int):
+    if players_collection is None: return None
+    return await asyncio.to_thread(players_collection.find_one, {"_id": tid})
 
 # ==============================================================================
 # GERENCIAMENTO DE CACHE
 # ==============================================================================
 
 async def clear_player_cache(user_id: Union[int, str, ObjectId]):
-    """Remove um jogador específico do cache."""
-    cache_key = _get_cache_key(user_id)
+    key = _get_cache_key(user_id)
     async with _player_cache_lock:
-        if cache_key in _player_cache:
-            del _player_cache[cache_key]
+        if key in _player_cache: del _player_cache[key]
 
 def clear_all_player_cache():
     """Limpa todo o cache."""
