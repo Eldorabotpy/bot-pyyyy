@@ -1,5 +1,5 @@
 # handlers/admin_handler.py
-# (VERSÃO FINAL BLINDADA: Tratamento de erros de importação e callback corrigido)
+# (VERSÃO FINAL: Corrigido "fix_premium_dates_command not defined")
 
 from __future__ import annotations
 import io
@@ -26,8 +26,17 @@ from bson import ObjectId
 from modules.auth_utils import get_current_player_id
 from handlers.admin.utils import ensure_admin, ADMIN_LIST, parse_hybrid_id
 
-# --- Imports de Funcionalidades Administrativas Básicas ---
+# --- Imports de Funcionalidades Administrativas ---
 from handlers.jobs import distribute_kingdom_defense_ticket_job
+from handlers.admin.grant_item import grant_item_conv_handler 
+from handlers.admin.generate_equip import generate_equip_conv_handler 
+from handlers.admin.file_id_conv import file_id_conv_handler 
+from handlers.admin.premium_panel import premium_panel_handler 
+from handlers.admin.reset_panel import reset_panel_conversation_handler 
+from handlers.admin.grant_skill import grant_skill_conv_handler
+from handlers.admin.grant_skin import grant_skin_conv_handler
+from handlers.admin.player_management_handler import player_management_conv_handler
+from handlers.admin.debug_skill import debug_skill_handler
 from modules.player.core import (
     get_player_data, 
     save_player_data, 
@@ -54,68 +63,6 @@ from kingdom_defense.engine import event_manager
 
 logger = logging.getLogger(__name__) 
 HTML = ParseMode.HTML
-
-# --- IMPORTAÇÃO SEGURA DE PAINÉIS (Evita que o bot morra se um arquivo tiver erro) ---
-try:
-    from handlers.admin.sell_gems import sell_gems_conv_handler 
-except ImportError:
-    logger.error("Admin: Falha ao importar sell_gems")
-    sell_gems_conv_handler = None
-
-try:
-    from handlers.admin.grant_item import grant_item_conv_handler 
-except ImportError:
-    logger.error("Admin: Falha ao importar grant_item")
-    grant_item_conv_handler = None
-
-try:
-    from handlers.admin.generate_equip import generate_equip_conv_handler 
-except ImportError:
-    logger.error("Admin: Falha ao importar generate_equip")
-    generate_equip_conv_handler = None
-
-try:
-    from handlers.admin.file_id_conv import file_id_conv_handler 
-except ImportError:
-    logger.error("Admin: Falha ao importar file_id_conv")
-    file_id_conv_handler = None
-
-try:
-    from handlers.admin.premium_panel import premium_panel_handler 
-except ImportError:
-    logger.error("Admin: Falha ao importar premium_panel")
-    premium_panel_handler = None
-
-try:
-    from handlers.admin.reset_panel import reset_panel_conversation_handler 
-except ImportError: 
-    logger.error("Admin: Falha ao importar reset_panel")
-    reset_panel_conversation_handler = None
-
-try:
-    from handlers.admin.grant_skill import grant_skill_conv_handler
-except ImportError:
-    logger.error("Admin: Falha ao importar grant_skill")
-    grant_skill_conv_handler = None
-
-try:
-    from handlers.admin.grant_skin import grant_skin_conv_handler
-except ImportError:
-    logger.error("Admin: Falha ao importar grant_skin")
-    grant_skin_conv_handler = None
-
-try:
-    from handlers.admin.player_management_handler import player_management_conv_handler
-except ImportError:
-    logger.error("Admin: Falha ao importar player_management")
-    player_management_conv_handler = None
-
-try:
-    from handlers.admin.debug_skill import debug_skill_handler
-except ImportError:
-    logger.error("Admin: Falha ao importar debug_skill")
-    debug_skill_handler = None
-
 
 # --- CONSTANTES DE ESTADO ---
 (SELECT_CACHE_ACTION, ASK_USER_FOR_CACHE_CLEAR) = range(2)
@@ -156,7 +103,6 @@ async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> 
 # =========================================================
 
 def _admin_menu_kb() -> InlineKeyboardMarkup:
-    # CORREÇÃO: "admin_reset_panel" em vez de "admin_reset_menu" para bater com reset_panel.py
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎁 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕀𝕥𝕖𝕟𝕤", callback_data="admin_grant_item")],
         [InlineKeyboardButton("🛠️ 𝔾𝕖𝕣𝕒𝕣 𝔼𝕢𝕦𝕚𝕡𝕒𝕞𝕖𝕟𝕥𝕠", callback_data="admin_generate_equip")],
@@ -174,7 +120,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎉 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔼𝕧𝕖𝕟𝕥𝕠𝕤", callback_data="admin_event_menu")],
         [InlineKeyboardButton("🔬 𝕋𝕖𝕤𝕥𝕖𝕤 𝕕𝕖 𝔼𝕧𝕖𝕟𝕥𝕠", callback_data="admin_test_menu")],
         [InlineKeyboardButton("📁 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔽𝕚𝕝𝕖 𝕀𝔻𝕤", callback_data="admin_file_ids")],
-        [InlineKeyboardButton("🧹 ℝ𝕖𝕤𝕖𝕥/ℝ𝕖𝕤𝕡𝕖𝕔", callback_data="admin_reset_panel")], 
+        [InlineKeyboardButton("🧹 ℝ𝕖𝕤𝕖𝕥/ℝ𝕖𝕤𝕡𝕖𝕔", callback_data="admin_reset_menu")],
         [InlineKeyboardButton("🧽 𝕃𝕚𝕞𝕡𝕒𝕣 ℂ𝕒𝕔𝕙𝕖", callback_data="admin_clear_cache")],
         [InlineKeyboardButton("ℹ️ 𝐀𝐣𝐮𝐝𝐚", callback_data="admin_help")]
     ])
@@ -403,7 +349,7 @@ async def fix_deleted_clan_command(update: Update, context: ContextTypes.DEFAULT
             count += 1
     await update.message.reply_text(f"Clã fantasma removido de {count} jogadores.")
 
-# === FUNÇÃO FIX PREMIUM ===
+# === 🛠️ AQUI ESTÁ A CORREÇÃO: DEFINIÇÃO DA FUNÇÃO QUE FALTAVA ===
 async def fix_premium_dates_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Varre todos os jogadores e corrige o formato da data de expiração do VIP.
@@ -445,7 +391,9 @@ async def fix_premium_dates_command(update: Update, context: ContextTypes.DEFAUL
                 # Tenta recuperar ou remove se inválido
                 new_date_str = None 
                 if tier != "free":
-                    pass # Mantém o que der
+                    # Se tem tier mas data ruim, define para agora (expira) ou remove
+                    # Aqui optamos por remover a data para não bugar
+                    pass
         
         if needs_fix:
             pdata["premium_expires_at"] = new_date_str
@@ -697,7 +645,6 @@ admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern=
 admin_force_ticket_job_handler = CallbackQueryHandler(_handle_force_ticket_job, pattern="^admin_force_ticket_job$")
 admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_help$")
 
-# LISTA BASE DE HANDLERS
 all_admin_handlers = [
     admin_command_handler, 
     delete_player_handler, 
@@ -708,6 +655,7 @@ all_admin_handlers = [
     get_id_command_handler, 
     fixme_handler,
     admin_main_handler, 
+
     admin_force_daily_callback_handler, 
     admin_event_menu_handler,
     admin_force_start_handler, 
@@ -716,8 +664,16 @@ all_admin_handlers = [
     admin_force_ticket_job_handler, 
     clear_cache_conv_handler, 
     test_event_conv_handler,
+    grant_item_conv_handler, 
     my_data_handler, 
     reset_pvp_now_handler, 
+    generate_equip_conv_handler,
+    file_id_conv_handler, 
+    premium_panel_handler, 
+    reset_panel_conversation_handler,
+    grant_skill_conv_handler, 
+    grant_skin_conv_handler, 
+    player_management_conv_handler,
     admin_help_handler, 
     delete_player_conv_handler, 
     hard_respec_all_handler, 
@@ -725,18 +681,7 @@ all_admin_handlers = [
     change_id_conv_handler, 
     fix_ghost_clan_handler, 
     fix_clan_conv_handler, 
+    debug_skill_handler,
     clean_market_handler, 
     fix_premium_handler
 ]
-
-# ADICIONA HANDLERS CONDICIONAIS (Só se a importação funcionou)
-if sell_gems_conv_handler: all_admin_handlers.append(sell_gems_conv_handler)
-if grant_item_conv_handler: all_admin_handlers.append(grant_item_conv_handler)
-if generate_equip_conv_handler: all_admin_handlers.append(generate_equip_conv_handler)
-if file_id_conv_handler: all_admin_handlers.append(file_id_conv_handler)
-if premium_panel_handler: all_admin_handlers.append(premium_panel_handler)
-if reset_panel_conversation_handler: all_admin_handlers.append(reset_panel_conversation_handler)
-if grant_skill_conv_handler: all_admin_handlers.append(grant_skill_conv_handler)
-if grant_skin_conv_handler: all_admin_handlers.append(grant_skin_conv_handler)
-if player_management_conv_handler: all_admin_handlers.append(player_management_conv_handler)
-if debug_skill_handler: all_admin_handlers.append(debug_skill_handler)

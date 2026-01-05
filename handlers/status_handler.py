@@ -15,6 +15,7 @@ from modules.player.stats import (
     _get_class_key_normalized,
     get_player_total_stats,
     _compute_class_baseline_for_level,
+    PROFILE_KEYS,
     # Se PROFILE_KEYS não estiver exportado no stats.py, usamos a lista local abaixo
 )
 
@@ -183,14 +184,16 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("Sem pontos disponíveis!", show_alert=True)
         return
 
-    # 2. Identifica o atributo
+    # 2. Identifica o atributo vindo do botão (ex: 'max_hp', 'attack')
     profile_stat = query.data.replace('upgrade_', '')
     if profile_stat not in PROFILE_KEYS:
         await query.answer("Atributo inválido.", show_alert=True)
         return
 
+    # 3. Mapeia para a chave interna (Canônica)
+    # Mantemos 'max_hp' como 'max_hp' para ficar igual ao stats.py
     stat_mapping = {
-        'max_hp': 'hp',
+        'max_hp': 'max_hp',
         'attack': 'attack',
         'defense': 'defense',
         'initiative': 'initiative',
@@ -199,33 +202,36 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     internal_key = stat_mapping.get(profile_stat, profile_stat)
 
     # 4. Garante que o bloco base_stats existe e incrementa APENAS nele
+    # 'base_stats' agora guarda o NÚMERO DE CLIQUES (Investimento)
     if "base_stats" not in player_data or not isinstance(player_data["base_stats"], dict):
-        player_data["base_stats"] = {k: 0 for k in stat_mapping.values()}
+        # Inicializa zerado se não existir
+        player_data["base_stats"] = {}
     
-    # Incrementa o contador de "cliques" do jogador
-    player_data["base_stats"][internal_key] = player_data["base_stats"].get(internal_key, 0) + 1
+
+    current_clicks = player_data["base_stats"].get(internal_key, 0)
+    player_data["base_stats"][internal_key] = current_clicks + 1
+    
+
     player_data["stat_points"] = pool - 1
 
-    # 5. RECALCULO TOTAL (A "Ponte" para o stats.py)
-    # Aqui usamos a função mestra para reconstruir o status Base + Pontos + Itens
     new_totals = await get_player_total_stats(player_data)
     
-    # Sincroniza os valores da raiz (cache de exibição) com os valores reais
+    
     for stat in PROFILE_KEYS:
-        player_data[stat] = new_totals.get(stat, 1)
+        player_data[stat] = new_totals.get(stat, 0)
 
-    # Ajuste de HP Atual se o jogador upou vida
-    if profile_stat == 'max_hp':
+    if internal_key == 'max_hp':
         ckey = _get_class_key_normalized(player_data)
         gains = _get_point_gains_for_class(ckey)
-        hp_increment = gains.get('max_hp', 1)
-        player_data["current_hp"] = player_data.get("current_hp", 0) + hp_increment
+        hp_increment = gains.get('max_hp', 1) 
+        player_data["current_hp"] = int(player_data.get("current_hp", 0)) + hp_increment
 
-    # 6. Persistência e Feedback
     await player_manager.save_player_data(user_id, player_data)
-    await query.answer(f"Subiu {profile_stat.replace('max_', '').title()}!")
+    stat_display_name = profile_stat.replace('max_', '').title()
+    if profile_stat == 'max_hp': stat_display_name = "HP"
+    
+    await query.answer(f"Subiu {stat_display_name}!")
 
-    # Atualiza a interface
     status_text, reply_markup = await _get_status_content(player_data)
     try:
         await query.edit_message_caption(caption=status_text, reply_markup=reply_markup, parse_mode='HTML')
@@ -233,7 +239,7 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             await query.edit_message_text(text=status_text, reply_markup=reply_markup, parse_mode='HTML')
         except:
-            pass
+            pass # Ignora erro se a mensagem não mudou ou foi deletada
         
 async def close_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

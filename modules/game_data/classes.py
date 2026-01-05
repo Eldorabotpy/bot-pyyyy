@@ -194,25 +194,34 @@ CLASSES_DATA = {
         'tier': 1
     },
     # EVOLUÇÕES TIER 2 #
-    'sombra': {'display_name': 'Sombra', 'emoji': '💨', 
+    'ladrao_de_sombras': { 
+        'display_name': 'Ladrão de Sombras', 
+        'emoji': '💨', 
         'description': 'Mestre da furtividade e de ataques surpresa devastadores.', 
-        'stat_modifiers': {'hp': 2.9, 'max_mana': 1.3, 'attack': 1.4, 'defense': 0.7, 'initiative': 2.2, 'luck': 1.7},
+        # Aumentei um pouco os status para sentires a evolução
+        'stat_modifiers': {'hp': 3.2, 'max_mana': 1.3, 'attack': 1.6, 'defense': 1.0, 'initiative': 2.2, 'luck': 1.7},
         'file_id_name': 'classe_assassino_media',
         'tier': 2
     },
-    'venefico': {'display_name': 'Venéfico', 'emoji': '☠️', 
-        'description': 'Especialista em venenos e toxinas que causam dano ao longo do tempo.', 
-        'stat_modifiers': {'hp': 3.0, 'max_mana': 1.4, 'attack': 1.5, 'defense': 0.9, 'initiative': 1.6, 'luck': 1.6},
-        'file_id_name': 'classe_assassino_media',
-        'tier': 2
-    },
-    # EVOLUÇÕES TIER 3 #
-    'mestre_das_laminas': {
-        'display_name': 'Mestre das Lâminas', 'emoji': '⚔️', 
-        'description': 'Um vulto letal cuja velocidade com as lâminas é inigualável.', 
-        'stat_modifiers': {'hp': 3.0, 'max_mana': 1.5, 'attack': 1.7, 'defense': 0.8, 'initiative': 2.5, 'luck': 1.9},
+
+    # --- TIER 3 (Adicionado/Verificado para bater com a evolução) ---
+    'ninja': { 
+        'display_name': 'Ninja', 
+        'emoji': '🥷', 
+        'description': 'Velocidade extrema e uso de venenos táticos.', 
+        'stat_modifiers': {'hp': 3.3, 'max_mana': 1.4, 'attack': 1.7, 'defense': 1.1, 'initiative': 2.4, 'luck': 1.8},
         'file_id_name': 'classe_assassino_media',
         'tier': 3
+    },
+
+    # --- TIER 4 (Verificado) ---
+    'mestre_das_laminas': {
+        'display_name': 'Mestre das Lâminas', 
+        'emoji': '⚔️', 
+        'description': 'Um vulto letal cuja velocidade com as lâminas é inigualável.', 
+        'stat_modifiers': {'hp': 3.4, 'max_mana': 1.5, 'attack': 1.9, 'defense': 1.2, 'initiative': 2.6, 'luck': 1.9},
+        'file_id_name': 'classe_assassino_media',
+        'tier': 4
     },
     
     #------------------------------------------------------------------------------------------------------------

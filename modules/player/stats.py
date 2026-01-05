@@ -161,21 +161,22 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
 
 async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) -> dict:
     """
-    Calcula os status totais aplicando corretamente a ASCENSÃO DE CLASSE.
-    Agora um Cavaleiro será matematicamente mais forte que um Guerreiro.
+    Calcula os status totais usando ARQUITETURA DE CAMADAS:
+    1. Base da Classe (Nível)
+    2. Pontos Investidos (Espelho) + Bônus de Classe
+    3. Multiplicador de Ascensão (Evolução)
+    4. Equipamentos (Flat)
+    5. Buffs
     """
     from modules import player_manager
     from modules.player.premium import PremiumManager 
 
     lvl = _ival(player_data.get("level"), 1)
     
-    # 1. IDENTIFICAÇÃO DA CLASSE (Base vs Real)
-    # ckey -> Classe Base (ex: guerreiro) usada para a curva de nivelamento padrão
-    # real_class_key -> Classe Real (ex: cavaleiro) usada para o Bônus de Ascensão
+    # --- CAMADA 1: BASE DA CLASSE (Imutável) ---
     ckey = _get_class_key_normalized(player_data)
     real_class_key = (player_data.get("class_key") or player_data.get("class") or "").lower()
-
-    # --- CÁLCULO BASE (Tier 1) ---
+    
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
     total: Dict[str, Any] = {} 
     for k in _BASELINE_KEYS:
@@ -183,13 +184,17 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
     
     total['magic_attack'] = 0
 
-    # --- PONTOS INVESTIDOS ---
-    invested_points = player_data.get("base_stats", {})
-    if not isinstance(invested_points, dict): invested_points = {}
+    # --- CAMADA 2: PONTOS INVESTIDOS (O "Espelho" do Jogador) ---
+    # 'base_stats' agora representa "Contagem de Pontos Gastos" e não valor absoluto
+    invested_counts = player_data.get("base_stats", {})
+    if not isinstance(invested_counts, dict): invested_counts = {}
 
-    for k, val in invested_points.items():
+    # Quanto a classe ganha por ponto investido?
+    gains = _get_point_gains_for_class(ckey)
+
+    for k, clicks in invested_counts.items():
+        # Normalização de chaves legadas
         target_key = k
-        # (Seus mapeamentos de chaves legadas continuam aqui...)
         if k in ("vida", "hp", "vitalidade", "health", "vit"): target_key = "max_hp"
         elif k in ("ataque", "attack", "forca", "strength", "str"): target_key = "attack"
         elif k in ("defesa", "defense", "def", "res"): target_key = "defense"
@@ -197,35 +202,29 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
         elif k in ("sorte", "luck", "luk"): target_key = "luck"
         
         if target_key in total:
-            total[target_key] += _ival(val, 0)
+            # Multiplica CLIQUES pelo GANHO DA CLASSE
+            # Ex: 1 clique em HP para Guerreiro = +4 HP
+            gain_per_click = gains.get(target_key, 1)
+            total[target_key] += (_ival(clicks, 0) * gain_per_click)
 
-    # ==============================================================================
-    # 🔥 NOVO: APLICAÇÃO DO BÔNUS DE ASCENSÃO (Tier Multiplier)
-    # ==============================================================================
+    # --- CAMADA 3: BÔNUS DE ASCENSÃO (Tier Multiplier) ---
     if real_class_key and real_class_key != ckey:
-        # Pega os modificadores da classe ATUAL (ex: Cavaleiro)
         current_mods = get_stat_modifiers(real_class_key)
-        # Pega os modificadores da classe BASE (ex: Guerreiro)
         base_mods = get_stat_modifiers(ckey)
 
         if current_mods and base_mods:
-            # Aplica a diferença proporcional em cada status
-            # Ex: Se Guerreiro tem Atk 1.4 e Cavaleiro tem 1.5 -> Bônus de 7% (1.5/1.4)
+            # Aplica a diferença proporcional
             for stat_k in ['max_hp', 'attack', 'defense', 'initiative', 'luck']:
-                # Mapeia chaves do stats.py para as chaves do classes.py
                 mod_k = "hp" if stat_k == "max_hp" else stat_k
-                
                 mod_curr = float(current_mods.get(mod_k, 1.0))
                 mod_base = float(base_mods.get(mod_k, 1.0))
 
                 if mod_base > 0 and mod_curr != mod_base:
                     ratio = mod_curr / mod_base
-                    # Aplica o ratio sobre o valor base + pontos
+                    # A evolução multiplica o poder BASE do corpo do personagem
                     total[stat_k] = int(total[stat_k] * ratio)
 
-    # ==============================================================================
-
-    # 3. EQUIPAMENTOS (Aditivo - Mantido igual)
+    # --- CAMADA 4: EQUIPAMENTOS (Aditivo Flat) ---
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
     
@@ -240,7 +239,6 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                 val = _ival((data or {}).get('value', 0), 0)
                 k = raw_stat.lower().strip()
                 
-                # (Seu mapeamento de itens continua aqui...)
                 stat_key = None
                 if k in ("hp", "vida", "health", "max_hp"): stat_key = "max_hp"
                 elif k in ("defesa", "defense", "def", "armadura"): stat_key = "defense"
@@ -253,7 +251,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                     if stat_key in total: total[stat_key] += val
                     else: total[stat_key] = total.get(stat_key, 0) + val
 
-    # 4. BÔNUS DE CLÃ E PREMIUM (Mantido igual)
+    # --- CAMADA 5: BÔNUS DE CLÃ, PREMIUM E BUFFS ---
     clan_id = player_data.get("clan_id")
     if clan_id:
         try:
@@ -278,7 +276,6 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
             if vip_luck > 0: total['luck'] += vip_luck
     except: pass
 
-    # 5. PASSIVAS, AURAS E RUNAS (Mantido igual)
     try:
         _apply_passive_skill_bonuses(player_data, total)
         if ally_user_ids:
@@ -294,7 +291,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
             total[k_rune] = total.get(k_rune, 0) + int(value)
     except: pass
 
-    # 6. UNIFICAÇÃO E CONVERSÃO (Mantido igual)
+    # --- AJUSTES FINAIS E MANA ---
     is_magic = real_class_key in MAGIC_CLASSES or any(c in MAGIC_CLASSES for c in get_class_ancestry(real_class_key))
     if is_magic:
         total['attack'] += total.get('magic_attack', 0)
@@ -305,7 +302,6 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
         ini_bonus = int(total.get('initiative', 0) * 0.12)
         total['attack'] += ini_bonus
 
-    # 7. MANA E SANITIZAÇÃO
     _calculate_mana(player_data, total, ckey_fallback=ckey)
     for k in _BASELINE_KEYS:
         total[k] = max(1, _ival(total.get(k), 0))
@@ -335,6 +331,10 @@ def allowed_points_for_level(pdata: dict) -> int:
     return per_lvl * max(0, lvl - 1)
 
 def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
+    """
+    Nova lógica de Level Up: Simples, Segura e Acumulativa.
+    Apenas soma pontos ao saldo, sem recalcular tudo.
+    """
     levels_gained, points_gained = 0, 0
     current_xp = int(player_data.get('xp', 0))
     ckey = _get_class_key_normalized(player_data)
@@ -343,32 +343,32 @@ def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
         current_level = int(player_data.get('level', 1))
         xp_needed = int(game_data.get_xp_for_next_combat_level(current_level))
         if xp_needed <= 0 or current_xp < xp_needed: break
+        
         current_xp -= xp_needed
-
+        
+        # 1. Aplica ganhos automáticos de status da classe (Base Layer)
         old_baseline = _compute_class_baseline_for_level(ckey, current_level)
         new_baseline = _compute_class_baseline_for_level(ckey, current_level + 1)
-
+        
         for k in _BASELINE_KEYS:
-            stat_increase = new_baseline.get(k, 0) - old_baseline.get(k, 0)
-            if stat_increase > 0:
-                current_val = int(player_data.get(k, old_baseline.get(k, 0)))
-                player_data[k] = current_val + stat_increase
-                if k == "max_hp":
-                    current_hp = int(player_data.get("current_hp", current_val))
-                    player_data["current_hp"] = current_hp + stat_increase
+            increase = new_baseline.get(k, 0) - old_baseline.get(k, 0)
+            if increase > 0 and k == "max_hp":
+                # Cura o HP proporcionalmente ao aumento
+                cur = int(player_data.get("current_hp", 0))
+                player_data["current_hp"] = cur + increase
 
-        old_allowed = allowed_points_for_level(player_data)
+        # 2. Sobe o Nível
         player_data['level'] = current_level + 1
-        new_allowed = allowed_points_for_level(player_data)
-        delta_points = max(0, new_allowed - old_allowed)
+        
+        # 3. Ganha Ponto (Lógica de espelho simples: Upar dá 1 ponto, ponto final)
         levels_gained += 1
-        points_gained += delta_points
+        points_gained += 1 # Valor padrão, pode vir de config se mudar no futuro
 
     if levels_gained > 0:
         player_data['xp'] = current_xp
-        allowed = allowed_points_for_level(player_data)
-        spent = compute_spent_status_points(player_data)
-        player_data['stat_points'] = max(0, allowed - spent)
+        # SOMA ao saldo existente (segurança contra bugs de equipamento)
+        current_balance = int(player_data.get('stat_points', 0))
+        player_data['stat_points'] = current_balance + points_gained
 
     level_up_message = ""
     if levels_gained > 0:
