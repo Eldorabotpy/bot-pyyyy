@@ -37,8 +37,6 @@ from handlers.admin.grant_skill import grant_skill_conv_handler
 from handlers.admin.grant_skin import grant_skin_conv_handler
 from handlers.admin.player_management_handler import player_management_conv_handler
 from handlers.admin.debug_skill import debug_skill_handler
-from handlers.admin.player_edit_panel import admin_edit_player_handler
-from handlers.admin.sell_gems import sell_gems_conv_handler
 from modules.player.core import (
     get_player_data, 
     save_player_data, 
@@ -657,8 +655,6 @@ all_admin_handlers = [
     get_id_command_handler, 
     fixme_handler,
     admin_main_handler, 
-    admin_edit_player_handler,
-    sell_gems_conv_handler,
     admin_force_daily_callback_handler, 
     admin_event_menu_handler,
     admin_force_start_handler, 

@@ -1,18 +1,22 @@
 # handlers/menu/kingdom.py
-# (VERSÃO BLINDADA 4.2: Com proteção contra reinício)
+# (VERSÃO CORRIGIDA: Fix do Crash 'NoneType' no botão Admin)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import player_manager, game_data, file_ids
 from kingdom_defense import leaderboard 
-# ✅ Importamos o decorator de segurança
+# Import do Decorator de Segurança
 from modules.auth_utils import get_current_player_id, requires_login 
+
+# Tenta importar as configurações de Premium
+try:
+    from modules.game_data.premium import PREMIUM_TIERS
+except ImportError:
+    PREMIUM_TIERS = {}
 
 logger = logging.getLogger(__name__)
 
-# Aplicamos o decorator aqui. Se o bot reiniciar, ele barra a entrada
-# e mostra o botão "Reconectar" ANTES de tentar ler qualquer dado.
 @requires_login
 async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, player_data: dict | None = None, chat_id: int | None = None, message_id: int | None = None):
     """Mostra o menu principal do Reino de Eldora."""
@@ -25,8 +29,7 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 query = update.callback_query
             user = update.effective_user
 
-        # Como o @requires_login garante a sessão, podemos confiar mais no contexto,
-        # mas mantemos a blindagem para segurança extra.
+        # Lógica de Chat ID robusta
         if not chat_id and update:
             if update.effective_chat:
                 chat_id = update.effective_chat.id
@@ -39,7 +42,6 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             chat_id = player_data.get("last_chat_id") or player_data.get("telegram_id_owner")
 
         if not chat_id:
-            # Esse erro deve ser raríssimo agora com o @requires_login
             logger.error("ERRO CRÍTICO: Não foi possível identificar o Chat ID no menu Kingdom.")
             return
 
@@ -49,7 +51,6 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         if player_data is None:
             if update:
-                # Usa o ID da sessão garantido pelo decorator
                 user_id = get_current_player_id(update, context)
                 player_data = await player_manager.get_player_data(user_id)
             else:
@@ -61,7 +62,12 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         # Atualiza localização
         player_data['current_location'] = 'reino_eldora'
+        
+        # Garante que user_id esteja disponível para salvamento
         user_id_save = player_data.get("user_id")
+        if not user_id_save and user:
+            user_id_save = user.id
+            
         if user_id_save:
             await player_manager.save_player_data(user_id_save, player_data) 
 
@@ -105,10 +111,26 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         try: leaderboard_text = leaderboard.get_top_score_text()
         except: leaderboard_text = ""
         
+        # --- LÓGICA DO PLANO ---
+        tier_key = player_data.get("premium_tier", "free")
+        tier_info = PREMIUM_TIERS.get(tier_key, {})
+        plan_display = tier_info.get("display_name", tier_key.capitalize())
+        
+        # Ícones e Nomes Especiais
+        if tier_key == "lenda": plan_icon = "👑"
+        elif tier_key == "vip": plan_icon = "💎"
+        elif tier_key == "premium": plan_icon = "🌟"
+        elif tier_key == "admin": plan_icon = "🛠️"
+        else: 
+            plan_icon = "🎗️"
+            if tier_key == "free": plan_display = "Aventureiro"
+
+        # --- HUD DO PERFIL ---
         status_hud = (
             f"\n"
             f"╭──────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ────➤\n"
             f"│ ╭┈➤ 👤 {character_name}\n"
+            f"│ ├┈➤ {plan_icon} <b>{plan_display}</b>\n" 
             f"│ ├┈➤ 🛠 {prof_name} (Nv. {prof_lvl})\n"
             f"│ ├┈➤ ❤️ HP: {p_hp}/{p_max_hp}\n"
             f"│ ├┈➤ 💙 MP: {p_mp}/{p_max_mp}\n"
@@ -151,6 +173,19 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             ],
             [InlineKeyboardButton("ℹ️ 𝐒𝐨𝐛𝐫𝐞 𝐨 𝐑𝐞𝐢𝐧𝐨", callback_data='region_info:reino_eldora')],
         ]
+        
+        # --- BOTÃO ADMIN (CORREÇÃO DO CRASH) ---
+        # Verifica ID de várias fontes para evitar AttributeError se 'user' for None
+        current_uid_str = None
+        if user:
+            current_uid_str = str(user.id)
+        elif player_data.get("user_id"):
+            current_uid_str = str(player_data.get("user_id"))
+
+        if current_uid_str and current_uid_str in ["5961634863"]:
+             keyboard.append([InlineKeyboardButton("🛠️ Painel Admin", callback_data='admin_main')])
+        # ----------------------------------------
+
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         # Mídia

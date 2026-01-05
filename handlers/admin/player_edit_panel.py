@@ -1,6 +1,7 @@
 # handlers/admin/player_edit_panel.py
+# (VERSÃO CORRIGIDA: Exporta a função create_admin_edit_player_handler)
+
 import logging
-import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes, 
@@ -11,9 +12,9 @@ from telegram.ext import (
     filters
 )
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
 
-# Imports do Core
+# --- Imports do Core e Utils ---
+# Importação centralizada de Utils para evitar erros de ADMIN_LIST
 from handlers.admin.utils import parse_hybrid_id, ADMIN_LIST
 from modules.player.core import get_player_data, save_player_data
 from modules.player.queries import find_player_by_name
@@ -42,7 +43,6 @@ def _get_player_info_text(pdata: dict) -> str:
         user_id = pdata.get('user_id', '???')
         
         class_key = pdata.get('class_key') or pdata.get('class', 'Nenhuma')
-        # Tenta pegar display name do game_data, fallback para o próprio key
         class_info = (game_data.CLASSES_DATA.get(str(class_key).lower()) or {})
         class_display = class_info.get('display_name', str(class_key).capitalize())
 
@@ -77,7 +77,6 @@ async def _send_or_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE,
         try:
             await update.callback_query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
         except Exception:
-            # Se falhar (ex: msg muito antiga), envia nova
             if update.effective_chat:
                 await context.bot.send_message(update.effective_chat.id, text, reply_markup=kb, parse_mode=ParseMode.HTML)
     elif update.message:
@@ -90,8 +89,7 @@ async def admin_edit_player_start(update: Update, context: ContextTypes.DEFAULT_
     
     if update.callback_query:
         await update.callback_query.answer()
-        await _send_or_edit_menu(update, context, text) # Reutiliza lógica de envio se possível, mas aqui queremos pedir texto
-        # Na verdade, como pedimos texto, melhor editar para apenas texto sem botões (ou botão cancelar)
+        # Edita para texto simples aguardando input
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("Cancelar", callback_data="edit_cancel")]])
         try:
             await update.callback_query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
@@ -126,8 +124,9 @@ async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     context.user_data['edit_target_id'] = target_id
     
-    # Se pdata veio sem user_id preenchido corretamente no objeto (comum em buscas raw), garante
-    pdata['user_id'] = target_id
+    # Se pdata veio sem user_id preenchido corretamente
+    if 'user_id' not in pdata:
+        pdata['user_id'] = target_id
     
     info_text = _get_player_info_text(pdata)
     await _send_or_edit_menu(update, context, info_text)
@@ -160,6 +159,7 @@ async def admin_choose_action(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Monta lista de classes Tier 1
         kb = []
         for cid, cdata in game_data.CLASSES_DATA.items():
+            # Filtra apenas Tier 1 para não poluir, ou mostra todas
             if cdata.get('tier', 1) == 1:
                 emoji = cdata.get('emoji', '🔹')
                 name = cdata.get('display_name', cid.capitalize())
@@ -203,7 +203,6 @@ async def admin_set_class(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         c_info = game_data.CLASSES_DATA.get(new_class_key, {})
         pdata['class'] = c_info.get('display_name', new_class_key.capitalize())
         pdata['class_key'] = new_class_key
-        # Opcional: Resetar subclass se mudar a base? Por enquanto mantemos simples.
         await save_player_data(target_id, pdata)
         await query.answer("Classe atualizada!")
     
@@ -237,7 +236,7 @@ async def admin_set_char_level(update: Update, context: ContextTypes.DEFAULT_TYP
             pdata['xp'] = 0
             await save_player_data(target_id, pdata)
             await update.message.reply_text(f"✅ Nível definido para {val}.")
-            # Retorna ao menu enviando nova mensagem pois estamos em MessageHandler
+            
             info_text = _get_player_info_text(pdata)
             await _send_or_edit_menu(update, context, info_text)
             return STATE_SHOW_MENU
@@ -276,33 +275,37 @@ async def _send_error(update, msg):
     if update.callback_query: await update.callback_query.answer(msg, show_alert=True)
     elif update.message: await update.message.reply_text(msg)
 
-# --- EXPORTAÇÃO DO HANDLER ---
+# ==============================================================================
+# FÁBRICA DE HANDLER (O que o admin.py está tentando importar)
+# ==============================================================================
 
-admin_edit_player_handler = ConversationHandler(
-    entry_points=[
-        CommandHandler("editplayer", admin_edit_player_start, filters=filters.User(ADMIN_LIST)),
-        CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$")
-    ],
-    states={
-        STATE_GET_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_get_user_id)],
-        STATE_SHOW_MENU: [
-            CallbackQueryHandler(admin_choose_action, pattern=r"^edit_(char_class|prof_type|prof_lvl|char_lvl|cancel)$"),
-            CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$") # Caso precise recarregar
+def create_admin_edit_player_handler():
+    """Retorna uma nova instância do ConversationHandler de Edição."""
+    return ConversationHandler(
+        entry_points=[
+            CommandHandler("editplayer", admin_edit_player_start, filters=filters.User(ADMIN_LIST)),
+            CallbackQueryHandler(admin_edit_player_start, pattern=r"^admin_edit_player$")
         ],
-        STATE_AWAIT_CLASS: [
-            CallbackQueryHandler(admin_set_class, pattern=r"^set_class:"),
-            CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$")
+        states={
+            STATE_GET_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_get_user_id)],
+            STATE_SHOW_MENU: [
+                CallbackQueryHandler(admin_choose_action, pattern=r"^edit_(char_class|prof_type|prof_lvl|char_lvl|cancel)$"),
+                CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$") 
+            ],
+            STATE_AWAIT_CLASS: [
+                CallbackQueryHandler(admin_set_class, pattern=r"^set_class:"),
+                CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$")
+            ],
+            STATE_AWAIT_PROFESSION: [
+                CallbackQueryHandler(admin_set_profession_type, pattern=r"^set_prof:"),
+                CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$")
+            ],
+            STATE_AWAIT_CHAR_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_char_level)],
+            STATE_AWAIT_PROF_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_prof_level)],
+        },
+        fallbacks=[
+            CommandHandler("cancel", admin_edit_cancel),
+            CallbackQueryHandler(admin_edit_cancel, pattern=r"^edit_cancel$")
         ],
-        STATE_AWAIT_PROFESSION: [
-            CallbackQueryHandler(admin_set_profession_type, pattern=r"^set_prof:"),
-            CallbackQueryHandler(admin_show_menu_dispatch, pattern=r"^edit_back_menu$")
-        ],
-        STATE_AWAIT_CHAR_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_char_level)],
-        STATE_AWAIT_PROF_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_prof_level)],
-    },
-    fallbacks=[
-        CommandHandler("cancel", admin_edit_cancel),
-        CallbackQueryHandler(admin_edit_cancel, pattern=r"^edit_cancel$")
-    ],
-    per_chat=True
-)
+        per_chat=True
+    )

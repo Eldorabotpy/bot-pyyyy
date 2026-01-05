@@ -386,13 +386,23 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: lid = int(q.data.replace("market_buy_", ""))
     except: await q.answer("ID inválido.", show_alert=True); return
 
-    # --- TRAVA DE SEGURANÇA: APENAS VIP COMPRA ---
+    # --- TRAVA DE SEGURANÇA: APENAS VIP/LENDA/PREMIUM COMPRAM ---
     pdata = await player_manager.get_player_data(buyer_id)
     if not pdata: return
 
     pm = PremiumManager(pdata)
-    # Se NÃO for premium (é free) e tentar comprar: BLOQUEIA
-    if not pm.is_premium():
+    
+    # 💡 CORREÇÃO: Verifica se o tier NÃO é free. 
+    # Isso aceita "premium", "vip", "lenda", "admin", etc.
+    # O PremiumManager.tier gerencia a expiração automaticamente.
+    current_tier = getattr(pm, "tier", "free")
+    
+    # Lista explícita de tiers que podem comprar
+    ALLOWED_TIERS = ["premium", "vip", "lenda", "admin"]
+    
+    is_vip = (current_tier in ALLOWED_TIERS)
+
+    if not is_vip:
         await q.answer(
             "🔒 Apenas Aventureiros VIP podem COMPRAR no mercado!\n\n"
             "Torne-se VIP para desbloquear compras ou venda seus itens para ganhar Ouro.",

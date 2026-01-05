@@ -1,5 +1,5 @@
 # handlers/menu/region.py
-# (VERSÃO FINAL: AUTH UNIFICADA + FIX VIAGEM VIP + FIX BOTÕES AUTO HUNT)
+# (VERSÃO FINAL CORRIGIDA: Exibição de Plano + Botão Auto Hunt Bloqueado)
 
 import time
 import logging
@@ -41,6 +41,12 @@ try:
 except Exception:
     build_region_dungeon_button = None
 
+# Tenta importar PREMIUM_TIERS diretamente
+try:
+    from modules.game_data.premium import PREMIUM_TIERS
+except ImportError:
+    PREMIUM_TIERS = {}
+
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -70,20 +76,15 @@ def _humanize_duration(seconds: int) -> str:
     return f"{seconds} s"
 
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
-    """
-    Calcula o tempo de viagem.
-    BLINDAGEM: Se for Lenda/VIP/Admin, retorna 0 imediatamente.
-    """
-    # 1. Verificação Direta (Ignora validade de data, confia no registo do banco)
+    """Calcula o tempo de viagem (VIP = 0)."""
+    # 1. Verificação Direta
     tier = str(player_data.get("premium_tier", "free")).lower().strip()
-    
     if tier in ["lenda", "vip", "admin", "premium"]:
        return 0
 
-    # 2. Lógica Padrão para outros casos
+    # 2. Lógica Padrão
     base = 360 
     try:
-        from modules.player.premium import PremiumManager
         pm = PremiumManager(player_data)
         mult = float(pm.get_perk_value("travel_time_multiplier", 1.0))
         if mult <= 0.01:
@@ -121,7 +122,6 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    # 🔒 SEGURANÇA: ID via Auth Central
     user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
     
@@ -129,15 +129,12 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_location = player_data.get("current_location", "reino_eldora")
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
     
-    # --- LÓGICA VIP CORRIGIDA (Check Rápido) ---
+    # --- CHECK VIP ---
     is_vip = False
     try:
         tier = str(player_data.get("premium_tier", "free")).lower().strip()
         if tier in ["lenda", "vip", "premium", "admin"]:
             is_vip = True
-        else:
-            pm = PremiumManager(player_data)
-            if pm.is_premium(): is_vip = True
     except: pass
 
     if is_vip:
@@ -239,8 +236,6 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 # Menu Principal da Região
 # =============================================================================
 
-# Em handlers/menu/region.py
-
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     if player_data is None:
         player_data = await player_manager.get_player_data(user_id) or {}
@@ -275,31 +270,27 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         return
 
     # --- CÁLCULOS DO HUD ---
-    premium = PremiumManager(player_data)
     stats = await player_manager.get_player_total_stats(player_data)
     
     char_name = player_data.get("character_name", "Aventureiro")
-    char_lvl = player_data.get("level", 1)  # Nível do Personagem
+    char_lvl = player_data.get("level", 1)
     
-    # Dados da Profissão
     prof_data = player_data.get("profession", {}) or {}
     prof_name = prof_data.get("type", "adventurer").capitalize()
-    prof_lvl = int(prof_data.get("level", 1)) # Nível da Profissão
+    prof_lvl = int(prof_data.get("level", 1))
+    
+    # ⚠️ CORREÇÃO: Usa o dicionário local PREMIUM_TIERS, não o do game_data (que pode ser vazio)
     tier_key = str(player_data.get("premium_tier", "free")).lower()
-    tier_info = getattr(game_data, "PREMIUM_TIERS", {}).get(tier_key, {})
-    tier_display = tier_info.get("display_name", "Aventureiro")
+    tier_info = PREMIUM_TIERS.get(tier_key, {}) 
+    tier_display = tier_info.get("display_name", tier_key.capitalize())
+    if tier_key == "free": tier_display = "Comum"
+    
     p_hp, max_hp = int(player_data.get('current_hp', 0)), int(stats.get('max_hp', 1))
     p_mp, max_mp = int(player_data.get('current_mp', 0)), int(stats.get('max_mana', 1))
-    
-    # Energia Máxima (Usa função segura)
     max_en = int(player_manager.get_player_max_energy(player_data))
     p_en = int(player_data.get('energy', 0))
-    
     p_gold, p_gems = player_manager.get_gold(player_data), player_manager.get_gems(player_data)
 
-    # --- HUD CORRIGIDO ---
-    # Agora o Nível do Personagem fica ao lado do Nome.
-    # E o Nível da Profissão fica ao lado da Profissão.
     status_hud = (
         f"\n╭─────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
         f"│ ╭┈➤ 👤 {char_name} (Nv. {char_lvl})\n"
@@ -314,7 +305,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
     caption = f"🗺️ Você está em <b>{region_info.get('display_name', 'Região')}</b>.\n╰┈➤ <i>O que deseja fazer?</i>\n{status_hud}"
     keyboard = []
     
-    # Botões Especiais
+    # Botões Especiais (NPCs, Eventos)
     if final_region_key == 'floresta_sombria': keyboard.append([InlineKeyboardButton("⛺ 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta')])
     if final_region_key == 'deserto_ancestral':
          row = [InlineKeyboardButton("🧙‍♂️ 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main')]
@@ -322,8 +313,18 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
          keyboard.append(row)
     if final_region_key == 'picos_gelados' and is_event_active(): keyboard.append([InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
 
-    # Combate
+    # --- LÓGICA BLINDADA SUPREMA (CHECK VIP) ---
+    is_vip_visual = False
+    if tier_key in ["premium", "vip", "lenda", "admin"]: is_vip_visual = True
+    elif max_en > 20: is_vip_visual = True # Fallback
+
+    # --- LINHA DE COMBATE ---
     combat = [InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫", callback_data=f"hunt_{final_region_key}")]
+    
+    # ⚠️ CORREÇÃO: Adiciona botão Auto Hunt Bloqueado se for Free
+    if not is_vip_visual:
+        combat.append(InlineKeyboardButton("🤖 Auto (🔒)", callback_data="premium_info"))
+        
     if build_region_dungeon_button: 
         btn = build_region_dungeon_button(final_region_key)
         if btn: combat.append(btn)
@@ -331,24 +332,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         combat.append(InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}"))
     keyboard.append(combat)
 
-    # --- LÓGICA BLINDADA SUPREMA (BOTÕES VIP) ---
-    is_vip_visual = False
-    
-    # 1. Tenta pelo nome do tier (com limpeza de string)
-    tier_visual = str(player_data.get("premium_tier", "free")).lower().strip()
-    if tier_visual in ["premium", "vip", "lenda", "admin"]:
-        is_vip_visual = True
-    
-    # 2. Se falhar, tenta pelo método antigo
-    if not is_vip_visual:
-        try:
-            if premium.is_premium(): is_vip_visual = True
-        except: pass
-
-    # 3. ULTIMATO: Se a energia for > 20, ele é VIP.
-    if max_en > 20:
-        is_vip_visual = True
-
+    # --- LINHA VIP: Auto Hunt Rápido ---
     if is_vip_visual:
         keyboard.append([
             InlineKeyboardButton("⏱ 10x", callback_data=f"autohunt_start_10_{final_region_key}"),
@@ -362,7 +346,6 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         req_prof = game_data.get_profession_for_resource(res_id)
         p_prof_data = player_data.get("profession", {})
         my_prof = p_prof_data.get("key") or p_prof_data.get("type")
-
         if not req_prof or (my_prof and my_prof == req_prof):
             item_info = (game_data.ITEMS_DATA or {}).get(res_id, {})
             item_name = item_info.get("display_name", res_id.replace("_", " ").title())
@@ -379,9 +362,7 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
     except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
 
 async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None, player_data: dict | None = None):
-    # Lógica limpa para recuperar o ID
     q = getattr(update, "callback_query", None)
-    
     uid = get_current_player_id(update, context)
     
     if q:
@@ -422,7 +403,6 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- VERIFICAÇÃO VIP CONSISTENTE ---
     is_vip = False
     try:
-        # Mesma lógica blindada da viagem
         tier = str(pdata.get("premium_tier", "free")).lower().strip()
         if tier in ["lenda", "vip", "premium", "admin"]:
             is_vip = True
@@ -439,7 +419,6 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Calcula custo de viagem
     cost = int(((game_data.REGIONS_DATA or {}).get(dest, {}) or {}).get("travel_cost", 0))
-    
     current_energy = int(pdata.get("energy", 0))
     if cost > 0 and current_energy < cost:
         await q.answer(f"Energia insuficiente. Precisa de {cost}⚡.", show_alert=True)
@@ -450,19 +429,15 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     secs = _get_travel_time_seconds(pdata, dest)
 
-    # Viagem Instantânea
     if secs <= 0:
         pdata["current_location"] = dest
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(uid, pdata)
-        
         try: await q.delete_message()
         except: pass
-        
         await send_region_menu(context, uid, cid)
         return
 
-    # Viagem com Tempo
     finish = datetime.now(timezone.utc) + timedelta(seconds=secs)
     pdata["player_state"] = {
         "action": "travel", 
@@ -483,7 +458,6 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
-    # Garante que pegamos o ID corretamente (seja int antigo ou string novo)
     job_data = job.data or {}
     uid = job_data.get("player_id") or str(job.user_id)
     cid = job.chat_id
@@ -495,13 +469,11 @@ async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(uid, pdata)
     
-    # Injeta sessão manual se necessário (Hack de JobQueue)
     if context.user_data is not None:
         context.user_data['logged_player_id'] = str(uid)
         
     await send_region_menu(context, uid, cid)
     
-# --- START COLLECTION LOGIC ---
 @requires_login
 async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
