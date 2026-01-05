@@ -1,3 +1,6 @@
+# handlers/admin/reset_panel.py
+# (VERSÃO CORRIGIDA: Reset Matemático Seguro + Iteração Global)
+
 from __future__ import annotations
 import os
 import logging
@@ -11,10 +14,13 @@ from telegram.ext import (
     CommandHandler,
 )
 from handlers.admin.utils import parse_hybrid_id
-from modules import player_manager
+
+# Imports do Core e Queries
 from modules.player.core import get_player_data, save_player_data
-from modules.player.queries import find_player_by_name
-from modules.auth_utils import get_current_player_id
+from modules.player.queries import find_player_by_name, iter_players
+
+# IMPORTE DIRETO DA MATEMÁTICA (Mais seguro que passar pelo manager)
+from modules.player.stats import reset_stats_and_refund_points
 
 logger = logging.getLogger(__name__)
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
@@ -22,26 +28,30 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 # --- Estados ---
 MAIN_MENU, ASKING_PLAYER_RESPEC, ASKING_PLAYER_IDLE, CONFIRM_ALL, CONFIRM_IDLE = range(5)
 
-# --- Lógica Reset ---
+# ==============================================================================
+# LÓGICA DE RESET
+# ==============================================================================
 async def _reset_points_one(p: dict) -> int:
+    """
+    Executa o reset matemático em um dicionário de jogador.
+    Retorna a quantidade de pontos devolvidos.
+    """
     try:
-        # Chama a função do stats.py que faz o cálculo limpo
-        refunded = await player_manager.reset_stats_and_refund_points(p)
+        # A função de stats geralmente é SÍNCRONA (apenas matemática).
+        # Chamar sem await evita erro de "object int is not awaitable".
+        refunded = reset_stats_and_refund_points(p)
         return refunded
     except Exception as e:
         logger.error(f"Erro reset points one: {e}")
         return 0
 
-# --- Entry Points ---
+# ==============================================================================
+# ENTRY POINTS
+# ==============================================================================
 async def _entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     if query: await query.answer()
     
-    # Validação simples de admin
-    if get_current_player_id(update, context) != ADMIN_ID:
-        # Se preferir usar ensure_admin do utils, pode importar e usar
-        pass 
-
     text = "🔧 **PAINEL DE RESET & DEBUG**\n\nSelecione o tipo de operação:"
     kb = [
         [InlineKeyboardButton("🔄 Resetar Status (Pontos)", callback_data="reset_action_points")],
@@ -82,14 +92,17 @@ async def _ask_player_for_idle_reset(update: Update, context: ContextTypes.DEFAU
     return ASKING_PLAYER_IDLE
 
 # --- Busca e Execução ---
-async def _process_target_input(update: Update) -> tuple[int | None, dict | None]:
+async def _process_target_input(update: Update) -> tuple[int | str | None, dict | None]:
     text_input = update.message.text.strip()
+    
+    # 1. Tenta ID Híbrido (Int ou ObjectId)
     target_id = parse_hybrid_id(text_input)
     pdata = None
 
     if target_id:
         pdata = await get_player_data(target_id)
     
+    # 2. Se falhar, tenta por Nome
     if not pdata:
         found = await find_player_by_name(text_input)
         if found:
@@ -110,20 +123,23 @@ async def _receive_player_for_respec(update: Update, context: ContextTypes.DEFAU
 
     if action == "reset_action_points":
         pts = await _reset_points_one(pdata)
-        msg = f"✅ Status de **{name}** resetados. {pts} pontos devolvidos."
+        msg = f"✅ Status de **{name}** resetados.\nFoi recalculado para o Nível {pdata.get('level')}.\n💰 **{pts}** pontos devolvidos."
         
     elif action == "reset_action_class":
         pdata['class'] = None
         pdata['class_key'] = None
-        await _reset_points_one(pdata) # Reseta pontos ao tirar classe
-        msg = f"✅ Classe de **{name}** removida."
+        # Ao tirar classe, reseta pontos também para evitar status base fantasma
+        pts = await _reset_points_one(pdata) 
+        msg = f"✅ Classe de **{name}** removida.\nPontos resetados ({pts} devolvidos)."
         
     elif action == "reset_action_prof":
         pdata['profession'] = {}
         msg = f"✅ Profissão de **{name}** zerada."
 
+    # Salva as alterações
     await save_player_data(target_id, pdata)
-    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Voltar", callback_data="admin_reset_panel")]]))
+    
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Voltar", callback_data="admin_reset_panel")]]), parse_mode="Markdown")
     return MAIN_MENU
 
 async def _receive_player_for_idle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -134,26 +150,29 @@ async def _receive_player_for_idle_reset(update: Update, context: ContextTypes.D
         
     pdata['player_state'] = {'action': 'idle'}
     await save_player_data(target_id, pdata)
-    await update.message.reply_text(f"✅ **{pdata.get('character_name')}** agora está IDLE.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Voltar", callback_data="admin_reset_panel")]]), parse_mode="Markdown")
+    
+    await update.message.reply_text(f"✅ **{pdata.get('character_name')}** agora está IDLE (Livre).", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Voltar", callback_data="admin_reset_panel")]]), parse_mode="Markdown")
     return MAIN_MENU
 
 async def _reset_all_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     kb = [[InlineKeyboardButton("CONFIRMAR RESET GLOBAL", callback_data="do_reset_all")], [InlineKeyboardButton("Cancelar", callback_data="admin_reset_panel")]]
-    await query.edit_message_text("⚠️ **RESET GLOBAL**\nResetar status de TODOS os jogadores?\nIsso não pode ser desfeito.", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+    await query.edit_message_text("⚠️ **RESET GLOBAL**\nIsso vai recalcular os pontos de TODOS os jogadores baseados no nível atual.\n\nTem certeza?", reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
     return CONFIRM_ALL
 
 async def _do_reset_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
-    await query.edit_message_text("⏳ Processando... (Isso pode demorar)")
-    c = 0
-    from modules.player.queries import iter_players
+    await query.edit_message_text("⏳ Processando Reset Global... (Isso pode demorar)")
+    
+    count = 0
+    # Usa o iterador otimizado do queries.py
     async for uid, pdata in iter_players():
         await _reset_points_one(pdata)
         await save_player_data(uid, pdata)
-        c += 1
-    await context.bot.send_message(update.effective_chat.id, f"✅ Reset Global finalizado. {c} jogadores processados.")
+        count += 1
+        
+    await context.bot.send_message(update.effective_chat.id, f"✅ Reset Global finalizado.\n{count} jogadores tiveram seus pontos recalculados.")
     return ConversationHandler.END
 
 async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
