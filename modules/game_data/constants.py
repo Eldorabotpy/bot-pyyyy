@@ -1,5 +1,5 @@
 # modules/game_data/constants.py
-TRAVEL_TIME_MINUTES = 15
+TRAVEL_TIME_MINUTES = 6
 COLLECTION_TIME_MINUTES = 10
 
 PREMIUM_TIERS = {

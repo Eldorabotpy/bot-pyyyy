@@ -11,11 +11,11 @@ from telegram import (
     CallbackQuery,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
+from modules.auth_utils import get_current_player_id
 from modules.game_data import attributes
 from modules import game_data, player_manager, file_ids
 from modules.refining_engine import preview_refine, start_refine, finish_refine, start_batch_refine, get_max_refine_quantity
 from modules import crafting_registry, dismantle_engine, display_utils
-from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
 
 ITEMS_PER_PAGE = 5
 
@@ -204,18 +204,73 @@ async def execute_bulk_dismantle_logic(
 # 4. JOB WRAPPERS
 # =====================================================
 async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Executado quando o tempo de refino acaba.
+    RECUPERA O ID DO USUÁRIO DO BANCO 'USERS' VIA JOB.DATA.
+    """
     job = context.job
     if not job: return
+
+    # --- CORREÇÃO CRÍTICA DE ID ---
+    # O job.user_id nativo do Telegram é um INT. 
+    # O nosso sistema novo usa STRING (ObjectId).
+    # Portanto, devemos pegar o ID que salvamos explicitamente no 'data'.
+    user_id = job.data.get("user_id")
+    chat_id = job.chat_id
+    mid = job.data.get("message_id_to_delete")
+
+    # Validação de Segurança
+    if not user_id:
+        logger.error(f"❌ [Refino] Job {job.name} executado sem 'user_id' no data!")
+        return
+
+    # 1. Tenta apagar a mensagem de progresso (barra de carregamento)
+    if mid:
+        try: 
+            await context.bot.delete_message(chat_id, mid)
+        except Exception: 
+            pass # Ignora se a mensagem já foi apagada ou não existe mais
+
+    # 2. Busca os dados do jogador no banco novo (usando o ID String)
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata: 
+        return
+
+    # 3. Executa a finalização lógica (Engine)
+    # Isso calcula recompensas, entrega itens e dá XP
+    res = await finish_refine(pdata)
     
-    # Recupera user_id seguro do job.data (String)
-    user_id = str(job.data.get("user_id") or job.user_id)
+    # Tratamento de erro da engine
+    if isinstance(res, str):
+        await context.bot.send_message(chat_id, f"❗ Ocorreu um erro no refino: {res}")
+        return
+    if not res: 
+        return
+
+    # 4. Monta a Mensagem de Sucesso
+    outs = res.get("outputs") or {}
+    xp = res.get("xp_gained", 0)
     
-    await execute_refine_logic(
-        user_id=user_id,
-        chat_id=job.chat_id,
-        context=context,
-        message_id_to_delete=job.data.get("message_id_to_delete")
-    )
+    lines = [
+        "✅ <b>PROCESSO CONCLUÍDO!</b>",
+        "──────────────────────",
+        "🎒 <b>VOCÊ RECEBEU:</b>"
+    ]
+    
+    # Lista os itens recebidos
+    for item_id, qty in outs.items():
+        # Usa o helper _fmt_item_line que deve existir no arquivo
+        lines.append(f" ╰┈➤ {_fmt_item_line(item_id, qty)}")
+    
+    # Mostra XP se houver
+    if xp > 0:
+        lines.append(f" ╰┈➤ ✨ <b>XP Profissão:</b> <code>+{xp}</code>")
+        
+    # Adiciona botão para voltar
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar ao Refino", callback_data="ref_main")]])
+    
+    # Envia a mensagem final
+    await context.bot.send_message(chat_id, "\n".join(lines), parse_mode="HTML", reply_markup=kb)
 
 async def finish_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
@@ -235,7 +290,8 @@ async def finish_bulk_dismantle_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     if not job: return
     
-    user_id = str(job.data.get("user_id") or job.user_id)
+    user_id = job.data.get("user_id") 
+    if not user_id: return
     
     await execute_bulk_dismantle_logic(
         user_id=user_id,
@@ -355,19 +411,21 @@ async def _safe_send_with_media(context, chat_id, caption, reply_markup=None, me
     return await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
 
 async def _safe_edit_or_send_with_media(query, context, caption, reply_markup=None, media_key="refino_universal"):
-    """
-    MODIFICADO: Sempre APAGA a mensagem anterior e ENVIA uma nova.
-    Isso evita o efeito de 'edição' e deixa o chat mais limpo no estilo log.
-    """
-    try: 
-        # Tenta apagar a mensagem onde o clique ocorreu
-        await query.message.delete()
-    except Exception: 
-        pass # Se não der (ex: muito antiga ou já apagada), vida que segue
+    try: await query.message.delete()
+    except: pass
     
-    # Envia a nova mensagem do zero
-    return await _safe_send_with_media(context, query.message.chat_id, caption, reply_markup, media_key=media_key)
-
+    # Busca file_id
+    fd = file_ids.get_file_data(media_key)
+    chat_id = query.message.chat_id
+    
+    if fd and fd.get("id"):
+        try:
+            if fd.get("type") == "video":
+                return await context.bot.send_video(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+            else:
+                return await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+        except: pass
+    return await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
 
 # =========================
 # HANDLERS CALLBACKS
@@ -377,37 +435,35 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     q = update.callback_query
     await q.answer()
     
-    # 🔒 SEGURANÇA: ID via Auth Central
+    # 🔒 SEGURANÇA TOTAL: Obtém o ID da sessão do banco de dados (String/ObjectId)
+    # Se o user não tiver logado, isso retorna None e barra o acesso.
     uid = get_current_player_id(update, context)
     if not uid:
-        await q.answer("Sessão inválida. Use /start.", show_alert=True)
+        await q.answer("⚠️ Sessão expirada. Digite /login ou /start.", show_alert=True)
         return
     
-    # --- ADICIONE ISTO AQUI NO INÍCIO ---
-    # Isso garante que os itens se juntem ANTES de ler o inventário
-    try:
-        await player_manager.corrigir_inventario_automatico(uid)
-    except Exception as e:
-        logger.error(f"Erro ao corrigir inventário no refino: {e}")
-    # ------------------------------------
-
-    page = 1
-    if "_PAGE_" in q.data: page = int(q.data.split('_PAGE_')[-1])
+    # Correção preventiva de inventário
+    await player_manager.corrigir_inventario_automatico(uid)
 
     pdata = await player_manager.get_player_data(uid)
-    
-    # Prepara as receitas
+    if not pdata:
+        await q.answer("Erro ao carregar perfil.", show_alert=True)
+        return
+
+    # Lógica de Paginação e Exibição (Mantida igual, mas usando dados seguros)
+    page = 1
+    if "_PAGE_" in q.data: 
+        try: page = int(q.data.split('_PAGE_')[-1])
+        except: page = 1
+
     recipes = []
     refining_recipes = getattr(game_data, "REFINING_RECIPES", {}) or {}
     
-    # Filtra e prepara dados
     for rid, rec in refining_recipes.items():
         prev = preview_refine(rid, pdata)
         if prev:
-            # Formata tempo bonito (ex: 05:00m)
             sec = int(prev.get("duration_seconds", 0))
             t_fmt = f"{sec//60:02d}:{sec%60:02d}m"
-            
             recipes.append({
                 "id": rid, 
                 "name": rec.get("display_name"),
@@ -416,96 +472,93 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
                 "req_lvl": rec.get("level_req", 1)
             })
 
-    # Paginação
-    total_p = max(1, math.ceil(len(recipes) / ITEMS_PER_PAGE)) # Usei ITEMS_PER_PAGE (5) para caber melhor o visual
+    total_p = max(1, math.ceil(len(recipes) / ITEMS_PER_PAGE))
     page = max(1, min(page, total_p))
     current = recipes[(page-1)*ITEMS_PER_PAGE : page*ITEMS_PER_PAGE]
 
-    # --- MONTAGEM DO TEXTO VISUAL ---
-    lines = [_get_profession_header(pdata)]
-    
-    if not current:
-        lines.append("\n<i>Nenhuma receita disponível no momento.</i>")
-    
-    for r in current:
-        can_craft = r["prev"].get("can_refine")
-        
-        # Lógica de Ícones
-        if can_craft:
-            status_icon = "🟢" # Verde se pode fazer
-            status_txt = "Pronto para forjar"
-        else:
-            # Tenta descobrir pq não pode (resumido)
-            if not r["prev"].get("meets_prof", True): # Assumindo que preview retorne isso, se não, simplifique
-                 status_icon = "🔒"
-                 status_txt = f"Req. Nvl {r['req_lvl']}"
-            else:
-                 status_icon = "🔴"
-                 status_txt = "Falta Material"
+    prof = pdata.get("profession", {})
+    p_type = str(prof.get("type", "Aprendiz")).upper()
+    lvl = int(prof.get("level", 1))
 
-        # O NOME DO ITEM EM NEGRITO (Destaque)
-        lines.append(f"\n{status_icon} <b>{r['name']}</b>")
+    lines = [
+        f"⚒️ <b>OFICINA DE REFINO</b>",
+        f"👷 <b>Profissão:</b> {p_type} <code>[Lv. {lvl}]</code>",
+        f"──────────────────────"
+    ]
+    
+    kb = []
+    # Botão de Desmonte no Topo
+    kb.append([InlineKeyboardButton("♻️ MODO DE DESMONTAGEM ♻️", callback_data="ref_dismantle_list")])
+
+    for r in current:
+        can = r["prev"].get("can_refine")
+        icon = "🟢" if can else "🔴"
+        status_txt = "Pronto" if can else "Falta Material/Nível"
         
-        lines.append(f"   ├─ ⏳ <code>{r['time']}</code>")
-        lines.append(f"   └─ ⚒️ <i>{status_txt}</i>")
+        lines.append(f"\n{icon} <b>{r['name']}</b>")
+        lines.append(f"   └─ ⏳ {r['time']} | {status_txt}")
+        
+        kb.append([InlineKeyboardButton(f"🔨 FORJAR: {r['name']}", callback_data=f"ref_sel_{r['id']}")])
 
     lines.append(f"\n📄 <b>Página {page}/{total_p}</b>")
-    
-    # --- BOTÕES (LAYOUT LIMPO) ---
-    kb = []
-    
-    # Botão de Ação Principal (Desmonte) destacado no topo
-    kb.append([InlineKeyboardButton("♻️ MODO DE DESMONTAGEM ♻️", callback_data="ref_dismantle_list")])
-    
-    # Lista de Botões de Receitas
-    for r in current:
-        # Nome mais limpo no botão
-        btn_txt = f"🔨 REFINAR: {r['name'].split(' ')[-1]}" # Pega só a última palavra ou usa o nome todo se preferir
-        # Eu prefiro o nome completo, mas se ficar grande, corte:
-        btn_txt = r['name']
-        kb.append([InlineKeyboardButton(btn_txt, callback_data=f"ref_sel_{r['id']}")])
 
-    # Navegação
     nav = []
-    if page > 1: nav.append(InlineKeyboardButton("◀️ Anterior", callback_data=f"ref_main_PAGE_{page-1}"))
-    nav.append(InlineKeyboardButton("💫 Atualizar", callback_data="noop_ref_page"))
-    if page < total_p: nav.append(InlineKeyboardButton("Próxima ▶️", callback_data=f"ref_main_PAGE_{page+1}"))
+    if page > 1: nav.append(InlineKeyboardButton("◀️", callback_data=f"ref_main_PAGE_{page-1}"))
+    nav.append(InlineKeyboardButton("🔄", callback_data="noop_ref_page"))
+    if page < total_p: nav.append(InlineKeyboardButton("▶️", callback_data=f"ref_main_PAGE_{page+1}"))
     if nav: kb.append(nav)
     
-    kb.append([InlineKeyboardButton("🔙 Fechar Menu", callback_data="continue_after_action")])
+    kb.append([InlineKeyboardButton("🔙 Fechar", callback_data="continue_after_action")])
 
-    # Envia usando seu helper seguro
     await _safe_edit_or_send_with_media(q, context, "\n".join(lines), InlineKeyboardMarkup(kb))
-
+    
 async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    # Apaga o menu de seleção
+    
+    # 1. Apaga o menu de seleção anterior
     try: await q.delete_message()
     except: pass
     
-    # 🔒 SEGURANÇA: ID via Auth Central
+    # 2. 🔒 SEGURANÇA: Obtém o ID da sessão (String/ObjectId)
+    # Se não tiver sessão ativa, barra o acesso.
     uid = get_current_player_id(update, context)
     if not uid:
-        await q.answer("Sessão inválida.", show_alert=True)
+        await q.answer("Sessão inválida. Digite /start.", show_alert=True)
         return
 
+    # 3. Identifica a receita
     rid = q.data.replace("ref_confirm_", "", 1)
     
+    # 4. Carrega dados do jogador
     pdata = await player_manager.get_player_data(uid)
+    
+    # 5. Verifica se já está ocupado
     if pdata.get("player_state", {}).get("action") not in (None, "idle"):
-        await context.bot.send_message(q.message.chat_id, "⚠️ <b>Ocupado!</b> Você já está fazendo outra coisa.")
+        await context.bot.send_message(
+            q.message.chat_id, 
+            "⚠️ <b>Ocupado!</b> Você já está fazendo outra coisa.", 
+            parse_mode="HTML"
+        )
         return
 
+    # 6. Inicia o refino na Engine
     res = await start_refine(pdata, rid)
+    
+    # Se retornar string, é mensagem de erro
     if isinstance(res, str):
-        await context.bot.send_message(q.message.chat_id, f"❌ {res}"); return
+        await context.bot.send_message(q.message.chat_id, f"❌ {res}", parse_mode="HTML")
+        return
 
+    # 7. Prepara o visual de progresso
     secs = int(res.get("duration_seconds", 60))
     t = _fmt_minutes_or_seconds(secs)
-    title = (getattr(game_data, "REFINING_RECIPES", {}).get(rid, {}) or {}).get("display_name", rid)
     
-    # Visual de Progresso Épico
-    bar = "▒▒▒▒▒▒▒▒▒▒" # Barra vazia
+    # Busca nome bonito do item
+    recipe_info = (getattr(game_data, "REFINING_RECIPES", {}) or {}).get(rid, {})
+    title = recipe_info.get("display_name", rid)
+    
+    # Barra de progresso inicial (vazia)
+    bar = "▒▒▒▒▒▒▒▒▒▒"
     
     txt = (
         f"🔨 <b>FORJA INICIADA:</b>\n"
@@ -517,12 +570,25 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         f"<i>Você pode fechar esta janela, o bot avisará quando terminar.</i>"
     )
     
+    # 8. Envia a mensagem com mídia (se houver)
     sent = await _safe_send_with_media(context, q.message.chat_id, txt)
     mid = sent.message_id if sent else None
     
-    context.job_queue.run_once(finish_refine_job, secs, user_id=uid, chat_id=q.message.chat_id,
-                               data={"rid": rid, "message_id_to_delete": mid, "user_id": uid}, name=f"refining:{uid}")
-    
+    # 9. Agenda o Job de finalização
+    # IMPORTANTE: Não passamos 'user_id=uid' como argumento direto pois ele é String.
+    # Passamos apenas dentro de 'data' para evitar conflito de tipo na lib.
+    context.job_queue.run_once(
+        finish_refine_job, 
+        secs, 
+        chat_id=q.message.chat_id,
+        data={
+            "rid": rid, 
+            "message_id_to_delete": mid, 
+            "user_id": uid  # <--- O ID seguro vai aqui dentro
+        }, 
+        name=f"refining:{uid}"
+    )
+
 async def ref_batch_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o menu para escolher a quantidade do lote com visual melhorado."""
     q = update.callback_query
@@ -577,24 +643,18 @@ async def ref_batch_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     await _safe_send_with_media(context, q.message.chat_id, txt, InlineKeyboardMarkup(kb), media_key=mkey)
 
 async def ref_batch_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Executa o refino com a quantidade escolhida (COM CORREÇÃO DE ERRO E DELETE)."""
     q = update.callback_query
-    
-    # 1. Apaga a mensagem do menu de lote
     try: await q.delete_message()
     except Exception: pass
     
     payload = q.data.replace("ref_batch_go_", "")
-    
     try:
-        # Usa rsplit para dividir apenas no último underline, preservando nomes como "couro_curtido"
         rid, qty_str = payload.rsplit("_", 1)
         qty = int(qty_str)
     except ValueError:
         await context.bot.send_message(q.message.chat_id, "❌ Erro interno: Receita inválida.")
         return
 
-    # 🔒 SEGURANÇA: ID via Auth Central
     uid = get_current_player_id(update, context)
     if not uid:
         await q.answer("Sessão inválida.", show_alert=True)
@@ -614,7 +674,6 @@ async def ref_batch_confirm_callback(update: Update, context: ContextTypes.DEFAU
 
     seconds = int(res["duration_seconds"])
     xp = res["xp_reward"]
-    
     rec = game_data.REFINING_RECIPES.get(rid, {})
     name = rec.get("display_name") or rid.replace("_", " ").title()
     
@@ -627,17 +686,19 @@ async def ref_batch_confirm_callback(update: Update, context: ContextTypes.DEFAU
         f" ╰┈➤ ⏲️ <i>Produção em massa iniciada...</i>"
     )
     
-    # Envia a mensagem de progresso nova
     sent = await _safe_send_with_media(context, q.message.chat_id, txt)
     mid = sent.message_id if sent else None
     
+    # CORREÇÃO: 'user_id': uid no data
     context.job_queue.run_once(
         finish_refine_job, 
         seconds, 
-        user_id=uid, 
         chat_id=q.message.chat_id,
-        # Passa o ID para ser deletado quando acabar e user_id no data
-        data={"rid": rid, "message_id_to_delete": mid, "user_id": uid}, 
+        data={
+            "rid": rid, 
+            "message_id_to_delete": mid, 
+            "user_id": uid # <--- CRÍTICO
+        }, 
         name=f"refining:{uid}"
     )
 
@@ -824,11 +885,9 @@ async def show_dismantle_preview_callback(update: Update, context: ContextTypes.
 
 async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    # Deleta o preview
     try: await q.delete_message()
     except: pass
     
-    # 🔒 SEGURANÇA: ID via Auth Central
     uid = get_current_player_id(update, context)
     if not uid:
         await q.answer("Sessão inválida.", show_alert=True)
@@ -843,34 +902,33 @@ async def confirm_dismantle_callback(update: Update, context: ContextTypes.DEFAU
         return
         
     dur = res.get("duration_seconds", 60)
-    # Envia nova mensagem de progresso
     sent = await _safe_send_with_media(context, q.message.chat_id, f"♻️ Desmontando... (~{_fmt_minutes_or_seconds(dur)})")
     
     mid = sent.message_id if sent else None
     
+    # Prepara dados do Job com ID seguro
     job_data = {
         "unique_item_id": iuid, 
         "item_name": res.get("item_name"),
         "base_id": res.get("base_id"),
         "rarity": pdata.get("player_state", {}).get("details", {}).get("rarity"), 
         "message_id_to_delete": mid,
-        "user_id": uid
+        "user_id": uid # <--- CRÍTICO
     }
     
-    if "details" in pdata["player_state"]:
+    # Atualiza o state também, por garantia, mas o Job usa o job_data acima
+    if "details" in pdata.get("player_state", {}):
         pdata["player_state"]["details"]["message_id_to_delete"] = mid
     await player_manager.save_player_data(uid, pdata)
 
-    context.job_queue.run_once(finish_dismantle_job, dur, user_id=uid, chat_id=q.message.chat_id,
+    context.job_queue.run_once(finish_dismantle_job, dur, chat_id=q.message.chat_id,
                                data=job_data, name=f"dismantle_{uid}")
-
+    
 async def confirm_bulk_dismantle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    # Deleta preview
     try: await q.delete_message()
     except: pass
     
-    # 🔒 SEGURANÇA: ID via Auth Central
     uid = get_current_player_id(update, context)
     if not uid:
         await q.answer("Sessão inválida.", show_alert=True)
@@ -899,7 +957,6 @@ async def confirm_bulk_dismantle_callback(update: Update, context: ContextTypes.
         return
 
     res = await dismantle_engine.start_batch_dismantle(pdata, base_id, rarity_filter, count_available)
-    
     if isinstance(res, str):
         await context.bot.send_message(q.message.chat_id, res)
         return
@@ -909,22 +966,23 @@ async def confirm_bulk_dismantle_callback(update: Update, context: ContextTypes.
     dur = res.get("duration_seconds", 60)
     
     txt = f"♻️ Desmontando {qty}x <b>{name} [{rarity_filter.title()}]</b>... (~{_fmt_minutes_or_seconds(dur)})"
-    # Envia nova
     sent = await _safe_send_with_media(context, q.message.chat_id, txt)
     
     mid = sent.message_id if sent else None
     
-    # Adiciona user_id ao details para persistência no job
+    # Recupera detalhes do state que a engine salvou e adiciona os dados de controle do job
     details = pdata.get("player_state", {}).get("details", {})
     details["message_id_to_delete"] = mid
-    details["user_id"] = uid
-    pdata["player_state"]["details"] = details
+    details["user_id"] = uid # <--- CRÍTICO
         
+    # Salva novamente só para garantir que o message_id fique no banco se o bot reiniciar
+    # (Opcional, mas boa prática)
+    pdata["player_state"]["details"] = details
     await player_manager.save_player_data(uid, pdata)
 
-    context.job_queue.run_once(finish_bulk_dismantle_job, dur, user_id=uid, chat_id=q.message.chat_id,
+    context.job_queue.run_once(finish_bulk_dismantle_job, dur, chat_id=q.message.chat_id,
                                data=details, name=f"dismantle_bulk_{uid}")
-
+    
 async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
 

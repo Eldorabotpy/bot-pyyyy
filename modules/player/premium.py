@@ -1,5 +1,5 @@
 # modules/player/premium.py
-# (VERSÃO COMPLETA: Config + Classe Manager)
+# (VERSÃO FINAL: Agnóstica ao Banco de Dados - Compatível com Users Collection)
 
 from datetime import datetime, timezone
 import logging
@@ -89,26 +89,37 @@ PREMIUM_PLANS_FOR_SALE = {
 }
 
 def get_benefits_text(tier_key: str) -> str:
+    """Gera o texto visual dos benefícios para menus."""
     data = PREMIUM_TIERS.get(tier_key, {}).get("perks", {})
     if not data: return "Sem benefícios."
+    
     lines = []
     if data.get("auto_hunt"): lines.append("🤖 <b>Auto Caça:</b> Liberado")
+    
     travel_mult = data.get("travel_time_multiplier", 1.0)
     if travel_mult == 0.0: lines.append("🚀 <b>Viagem:</b> Instantânea")
+    
     gather_speed = data.get("gather_speed_multiplier", 1.0)
     gather_cost = data.get("gather_energy_cost", 1)
     if gather_speed > 1.0: lines.append(f"⚡️ <b>Coleta:</b> {gather_speed}x mais rápida")
     if gather_cost == 0: lines.append("🌿 <b>Coleta:</b> Energia ZERO")
+    
     xp = int((data.get("xp_multiplier", 1.0) - 1) * 100)
     if xp > 0: lines.append(f"📈 <b>XP:</b> +{xp}%")
+    
     bonus_e = data.get("max_energy_bonus", 0)
     if bonus_e > 0: lines.append(f"💚 <b>Energia Máx:</b> +{bonus_e}")
+    
     return "\n".join(lines)
 
 # =================================================================
-# CLASSE DE GERENCIAMENTO (CRÍTICO PARA JOBS.PY)
+# CLASSE DE GERENCIAMENTO
 # =================================================================
 class PremiumManager:
+    """
+    Gerencia a lógica de Premium sobre o dicionário de dados do jogador.
+    NOTA: Esta classe NÃO salva no banco. Quem chama deve salvar pdata.
+    """
     def __init__(self, player_data: dict):
         self.player_data = player_data
         self.tier_key = player_data.get("premium_tier", "free")
@@ -127,10 +138,14 @@ class PremiumManager:
         except: return None
 
     def is_premium(self) -> bool:
-        """Verifica se é Premium e se a data ainda é válida."""
+        """
+        Verifica se é Premium e se a data ainda é válida.
+        Se expirou, NÃO revoga automaticamente aqui (isso deve ser feito em jobs ou login).
+        Apenas retorna False.
+        """
         if self.tier_key == "free": return False
         
-        # Se não tem data, mas tem tier definido => Estado Inválido (downgrade seguro)
+        # Se tem tier mas não tem data, considera inválido/expirado
         if not self.player_data.get("premium_expires_at"):
             return False
 
@@ -139,12 +154,17 @@ class PremiumManager:
         
         if exp and now < exp:
             return True
+            
         return False
 
     def get_perk_value(self, perk_key: str, default=0):
+        """Retorna o valor de um benefício específico."""
         return self.perks.get(perk_key, default)
 
     def revoke(self):
-        """Remove o status premium do dicionário local."""
+        """
+        Rebaixa o jogador para 'free' (Aventureiro Comum) no dicionário local.
+        IMPORTANTE: O caller deve salvar o player_data no banco após chamar isso.
+        """
         self.player_data["premium_tier"] = "free"
         self.player_data["premium_expires_at"] = None

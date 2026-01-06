@@ -1,5 +1,5 @@
 # modules/player/actions.py
-# (VERSÃO FINAL COMPLETA: Correção Lenda + Correção de Imports)
+# (VERSÃO FINAL: COMPATÍVEL COM OBJECTID E NOVA AUTH)
 
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone
@@ -13,8 +13,7 @@ from telegram.ext import Application
 # --- IMPORTS CORRIGIDOS ---
 from . import core
 from .premium import PremiumManager
-# Importamos explicitamente para evitar o erro "não definido"
-from .core import get_player_data, save_player_data, players_collection
+from .core import get_player_data, save_player_data, users_collection # <--- Importando users_collection
 from .inventory import add_item_to_inventory
 from modules import game_data
 from .stats import get_player_total_stats
@@ -99,9 +98,6 @@ def sanitize_and_cap_energy(player_data: dict):
 # Regeneração (VELOCIDADE VIP)
 # -------------------------
 def _get_regen_seconds(player_data: dict) -> int:
-    """
-    Retorna o tempo de regeneração baseado APENAS no nome do tier.
-    """
     tier = str(player_data.get("premium_tier", "free")).lower()
     
     if tier == "lenda": return 120    # 2 min
@@ -197,7 +193,6 @@ def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
 
     if "heal" in effects:
         amount = effects["heal"]
-        # Valor simples para evitar loop async
         max_hp = _ival(player_data.get("max_hp", 100)) 
         old_hp = player_data.get("current_hp", 0)
         new_hp = min(max_hp, old_hp + amount)
@@ -206,7 +201,6 @@ def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
 
     if "add_energy" in effects:
         amount = effects["add_energy"]
-        # Usa função segura
         add_energy(player_data, amount)
         messages.append(f"⚡ Recuperou {amount} Energia.")
 
@@ -240,7 +234,11 @@ def _gather_xp_mult(player_data: dict) -> float:
 # -------------------------
 # Ações Temporizadas e PvP
 # -------------------------
-async def set_last_chat_id(user_id, chat_id: int):
+async def set_last_chat_id(user_id: str, chat_id: int):
+    """
+    Atualiza o último chat ID do usuário.
+    user_id DEVE ser string (ObjectId).
+    """
     pdata = await get_player_data(user_id)
     if pdata:
         pdata["last_chat_id"] = int(chat_id)
@@ -259,7 +257,11 @@ def ensure_timed_state(pdata: dict, action: str, seconds: int, details: dict | N
         pdata["last_chat_id"] = int(chat_id)
     return pdata
 
-async def try_finalize_timed_action_for_user(user_id) -> tuple[bool, str | None]:
+async def try_finalize_timed_action_for_user(user_id: str) -> tuple[bool, str | None]:
+    """
+    Finaliza uma ação se o tempo já passou. 
+    Usado quando o usuário interage e a ação já deveria ter acabado.
+    """
     player_data = await get_player_data(user_id)
     if not player_data: return False, None
     state = player_data.get("player_state") or {}
@@ -309,7 +311,6 @@ def add_pvp_points(player_data: dict, amount: int):
     return val
 
 async def heal_player(player_data: dict, amount: int):
-    # Simplificado para evitar loop
     max_hp = _ival(player_data.get('max_hp', 100))
     player_data['current_hp'] = min(max_hp, _ival(player_data.get('current_hp', 0)) + int(amount))
 
@@ -326,30 +327,48 @@ def add_buff(player_data: dict, buff_info: dict):
 # -------------------------
 async def check_stale_actions_on_startup(application: Application):
     """
-    Verifica ações presas. 
+    Verifica ações presas no banco 'users'.
+    Recupera Jobs perdidos após reinicialização.
     """
-    if players_collection is None: return
-    
-    # --- ACESSO À COLEÇÃO ---
-    users_collection = players_collection.database["users"]
+    if users_collection is None:
+        logger.warning("[Watchdog] Coleção 'users' não disponível.")
+        return
     
     # Imports Locais para evitar ciclo no topo
-    from modules.auto_hunt_engine import finish_auto_hunt_job
-    from handlers.menu.region import finish_travel_job
-    from handlers.job_handler import finish_collection_job
-    # Adicione outros se necessário
+    # Certifique-se que esses módulos existem e exportam essas funções
+    try:
+        from modules.auto_hunt_engine import finish_auto_hunt_job
+        from handlers.menu.region import finish_travel_job
+        from handlers.job_handler import finish_collection_job
+        from handlers.refining_handler import finish_refine_job, finish_dismantle_job, finish_bulk_dismantle_job
+    except ImportError as e:
+        logger.error(f"[Watchdog] Falha ao importar jobs handlers: {e}")
+        return
     
-    logger.info("[Watchdog] Verificando ações presas...")
+    logger.info("[Watchdog] Iniciando verificação de ações pendentes (Users Collection)...")
     now = utcnow()
-    actions_to_check = ("auto_hunting", "travel", "collecting")
+    
+    # Lista de ações monitoradas
+    actions_to_check = (
+        "auto_hunting", "travel", "collecting", 
+        "refining", "dismantling", "dismantling_batch" # Novos jobs de refino
+    )
     query = {"player_state.action": {"$in": actions_to_check}}
 
     try:
+        # Usa to_thread se a coleção for sync (Pymongo padrão), 
+        # mas aqui assumimos que estamos em um contexto async ou usando o cursor diretamente se for motor.
+        # Como pymongo é sync, vamos iterar o cursor diretamente pois o loop de inicialização permite.
         cursor = users_collection.find(query)
-        count = 0
+        
+        restored_count = 0
         for pdata in cursor:
+            # 🔒 Extração Segura de ID
             user_id = str(pdata.get("_id"))
             chat_id = pdata.get("last_chat_id")
+            
+            # Se não tiver chat_id, não tem como notificar, mas talvez devêssemos limpar o estado?
+            # Por enquanto, pulamos.
             if not chat_id: continue
 
             state = pdata.get("player_state", {})
@@ -358,40 +377,66 @@ async def check_stale_actions_on_startup(application: Application):
             finish_iso = state.get("finish_time")
             end_time = _parse_iso(finish_iso) if finish_iso else None
 
-            if not end_time: continue # Se não tem tempo, ignora
+            if not end_time: continue 
 
-            count += 1
+            restored_count += 1
+            # Se já passou, executa em 1s. Se não, agenda para o tempo restante.
             delay = 1 if now >= end_time else (end_time - now).total_seconds()
-            prefix = f"watchdog_{action}_{user_id}"
+            prefix = f"wd_{action}_{user_id}"
 
             try:
+                # --- AUTO HUNT ---
                 if action == "auto_hunting":
                     job_data = {
-                        "user_id": user_id,
+                        "user_id": user_id, # String ID
                         "chat_id": chat_id,
-                        "message_id": state.get("message_id"),
+                        "message_id": state.get("message_id"), # Legado?
                         "hunt_count": details.get('hunt_count'),
                         "region_key": details.get('region_key')
                     }
                     application.job_queue.run_once(finish_auto_hunt_job, when=delay, data=job_data, name=f"{prefix}_ah")
 
+                # --- TRAVEL ---
                 elif action == "travel":
-                    application.job_queue.run_once(finish_travel_job, when=delay, chat_id=chat_id, data={"dest": details.get("destination"), "user_id": user_id}, name=f"{prefix}_tr")
+                    # Passa dados corretos para o job de viagem
+                    job_data = {
+                        "user_id": user_id, 
+                        "dest": details.get("destination")
+                    }
+                    application.job_queue.run_once(finish_travel_job, when=delay, chat_id=chat_id, data=job_data, name=f"{prefix}_tr")
 
+                # --- COLLECTING ---
                 elif action == "collecting":
                     job_data = {
-                        'user_id': user_id, 'chat_id': chat_id,
+                        'user_id': user_id, 
+                        'chat_id': chat_id,
                         'resource_id': details.get("resource_id"),
                         'item_id_yielded': details.get("item_id_yielded"), 
                         'quantity': details.get("quantity", 1), 
                         'message_id': details.get("collect_message_id")
                     }
                     application.job_queue.run_once(finish_collection_job, when=delay, data=job_data, name=f"{prefix}_col")
+                
+                # --- REFINING ---
+                elif action == "refining":
+                     job_data = {
+                        "user_id": user_id,
+                        "rid": details.get("recipe_id"),
+                        "message_id_to_delete": details.get("message_id_to_delete")
+                     }
+                     application.job_queue.run_once(finish_refine_job, when=delay, chat_id=chat_id, data=job_data, name=f"{prefix}_ref")
+
+                # --- DISMANTLING (SINGLE) ---
+                elif action == "dismantling": # ou o nome que você usou no engine
+                     # Recria o job_data necessário
+                     job_data = details.copy()
+                     job_data["user_id"] = user_id
+                     application.job_queue.run_once(finish_dismantle_job, when=delay, chat_id=chat_id, data=job_data, name=f"{prefix}_dis")
 
             except Exception as e:
-                logger.error(f"[Watchdog] Erro user {user_id}: {e}")
+                logger.error(f"[Watchdog] Erro ao restaurar user {user_id}: {e}")
         
-        logger.info(f"[Watchdog] {count} ações restauradas.")
+        logger.info(f"[Watchdog] {restored_count} ações restauradas com sucesso.")
             
     except Exception as e:
-        logger.error(f"[Watchdog] Erro Geral: {e}")
+        logger.error(f"[Watchdog] Erro Crítico: {e}")

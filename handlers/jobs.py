@@ -23,7 +23,7 @@ from modules.player_manager import (
     save_player_data, get_perk_value, 
     add_item_to_inventory, iter_player_ids
 )
-
+from telegram.error import BadRequest, Forbidden
 # --- CONFIG & MANAGERS ---
 from config import EVENT_TIMES, JOB_TIMEZONE, ANNOUNCEMENT_CHAT_ID, ANNOUNCEMENT_THREAD_ID
 from pvp.pvp_scheduler import executar_reset_pvp
@@ -58,6 +58,20 @@ except Exception as e:
     logger.critical(f"❌ [JOBS] FALHA CRÍTICA NA CONEXÃO MONGODB: {e}")
     players_col = None
     users_col = None
+
+async def safe_send_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int | str, text: str):
+    """
+    Envia mensagem de forma segura. 
+    Se o usuário não existir (Chat not found) ou bloqueou (Forbidden), apenas ignora.
+    """
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML')
+        await asyncio.sleep(0.05) # Delay para evitar flood
+    except (BadRequest, Forbidden):
+        # Usuário deletado ou bloqueou o bot. Ignora silenciosamente.
+        pass
+    except Exception as e:
+        logger.warning(f"Erro ao notificar {chat_id}: {e}")
 
 def get_col_and_id(user_id):
     """
@@ -569,19 +583,22 @@ async def force_grant_daily_crystals(context: ContextTypes.DEFAULT_TYPE) -> int:
 async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
     """
     Verifica assinaturas vencidas.
-    BLINDADO contra erros de 'Chat not found' e falhas de conexão.
+    BLINDADO: Usa safe_send_message para não travar com usuários deletados.
     """
     count_downgraded = 0
     now = datetime.datetime.now(datetime.timezone.utc)
 
+    # Itera sobre todos os jogadores
     async for user_id, pdata in player_manager.iter_players():
         try:
+            # Pula quem já é Free ou sem tier
             current_tier = pdata.get("premium_tier")
-            if not current_tier or current_tier == "free": 
+            if not current_tier or current_tier == "free":
                 continue
 
             pm = PremiumManager(pdata)
-            # Se não for premium (expirou data ou status inválido)
+            
+            # Se is_premium() for False, expirou ou data é inválida
             if not pm.is_premium():
                 exp_date = pm.expiration_date
                 should_remove = (exp_date is None) or (exp_date < now)
@@ -589,10 +606,8 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
                 if should_remove:
                     logger.info(f"[PREMIUM] Expirou para user {user_id}. Resetando...")
                     
-                    # 1. Revoga na memória
+                    # 1. Revoga e Salva
                     pm.revoke()
-                    
-                    # 2. Atualiza no Banco (Usando a função blindada acima)
                     col, query_id = get_col_and_id(user_id)
                     
                     if col is not None:
@@ -601,7 +616,7 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
                             {"$set": {"premium_tier": "free", "premium_expires_at": None}}
                         )
                     
-                    # 3. Sincronia Híbrida (se necessário)
+                    # Sincronia Híbrida (Users Collection)
                     if users_col is not None and col != users_col:
                         try:
                             users_col.update_one(
@@ -610,19 +625,17 @@ async def check_premium_expiry_job(context: ContextTypes.DEFAULT_TYPE):
                             )
                         except: pass
 
-                    # 4. Notifica o Jogador (Com proteção anti-erro)
-                    try:
-                        target_chat_id = pdata.get("last_chat_id") or pdata.get("telegram_id_owner") or user_id
+                    # 2. Notifica o Jogador (USANDO A FUNÇÃO SEGURA)
+                    target_chat_id = pdata.get("last_chat_id") or pdata.get("telegram_id_owner") or user_id
+                    
+                    if target_chat_id:
                         msg = (
                             "⚠️ <b>ASSINATURA EXPIRADA</b>\n\n"
                             f"O seu plano <b>{str(current_tier).title()}</b> chegou ao fim.\n"
                             "Sua conta retornou para o status <b>Aventureiro Comum</b>."
                         )
-                        await context.bot.send_message(chat_id=target_chat_id, text=msg, parse_mode="HTML")
-                        await asyncio.sleep(0.05)
-                    except Exception:
-                        # Se o usuário bloqueou ou não existe, apenas ignora
-                        pass 
+                        # Aqui usamos a função blindada criada acima
+                        await safe_send_message(context, target_chat_id, msg)
                         
                     count_downgraded += 1
                     
@@ -643,3 +656,4 @@ async def cmd_force_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE
     await daily_pvp_entry_reset_job(context)
     await job_pvp_monthly_reset(context)
     await update.message.reply_text("✅ DEBUG: Concluído.")
+    
