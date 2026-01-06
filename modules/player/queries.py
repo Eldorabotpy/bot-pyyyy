@@ -265,14 +265,16 @@ def iter_player_ids() -> Iterator[Union[int, str]]:
     if _legacy_db:
         for d in _legacy_db.find({}, {"_id": 1}): yield d["_id"]
 
-async def iter_players() -> AsyncIterator[Tuple[Union[int, str], dict]]:
-    if users_collection:
-        try:
-            for d in users_collection.find({}, {"_id": 1}):
-                uid = str(d["_id"])
-                p = await get_player_data(uid)
-                if p: yield uid, p
-        except: pass
+async def iter_players():
+    from .core import users_collection 
+
+    if users_collection is not None:
+        async for doc in users_collection.find({}):
+            user_id = doc.get("user_id")
+            if user_id:
+                yield user_id, doc
+    else:
+        pass
 
     if _legacy_db:
         try:
@@ -284,3 +286,4 @@ async def iter_players() -> AsyncIterator[Tuple[Union[int, str], dict]]:
                     if str(real) != str(uid) and not isinstance(real, int): continue
                     yield uid, p
         except: pass
+        

@@ -17,7 +17,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ========================================
-# CONSTANTES DE PROGRESSÃO (Mantidas igual ao original)
+# CONSTANTES DE PROGRESSÃO
 # ========================================
 MAGIC_CLASSES = {
     "mago", "arquimago", "feiticeiro", "bruxo", "necromante", 
@@ -31,19 +31,23 @@ AGILITY_CLASSES = {
     "monge"
 }
 
+# Define o crescimento base (Grátis por Nível)
 CLASS_PROGRESSIONS = {
     "guerreiro": { "BASE": {"max_hp": 52, "attack": 5, "defense": 4, "initiative": 4, "luck": 3}, "PER_LVL": {"max_hp": 8, "attack": 1, "defense": 2, "initiative": 0, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
     "berserker": { "BASE": {"max_hp": 55, "attack": 6, "defense": 3, "initiative": 5, "luck": 3}, "PER_LVL": {"max_hp": 9, "attack": 2, "defense": 0, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
-    "cacador": { "BASE": {"max_hp": 48, "attack": 6, "defense": 3, "initiative": 6, "luck": 4}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 0, "initiative": 2, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
-    "monge": { "BASE": {"max_hp": 50, "attack": 5, "defense": 4, "initiative": 6, "luck": 3}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 2, "initiative": 2, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
-    "mago": { "BASE": {"max_hp": 45, "attack": 7, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "magic_attack" },
-    "bardo": { "BASE": {"max_hp": 47, "attack": 5, "defense": 3, "initiative": 5, "luck": 6}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 2}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
+    "cacador":   { "BASE": {"max_hp": 48, "attack": 6, "defense": 3, "initiative": 6, "luck": 4}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 0, "initiative": 2, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
+    "monge":     { "BASE": {"max_hp": 50, "attack": 5, "defense": 4, "initiative": 6, "luck": 3}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 2, "initiative": 2, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
+    "mago":      { "BASE": {"max_hp": 45, "attack": 7, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "magic_attack" },
+    "bardo":     { "BASE": {"max_hp": 47, "attack": 5, "defense": 3, "initiative": 5, "luck": 6}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 2}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
     "assassino": { "BASE": {"max_hp": 47, "attack": 6, "defense": 2, "initiative": 7, "luck": 5}, "PER_LVL": {"max_hp": 5, "attack": 2, "defense": 0, "initiative": 3, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "initiative" },
-    "samurai": { "BASE": {"max_hp": 50, "attack": 6, "defense": 4, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 7, "attack": 2, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "defense" },
-    "curandeiro": { "BASE": {"max_hp": 48, "attack": 5, "defense": 4, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 2, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
-    "_default": { "BASE": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
+    "samurai":   { "BASE": {"max_hp": 50, "attack": 6, "defense": 4, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 7, "attack": 2, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "defense" },
+    "curandeiro":{ "BASE": {"max_hp": 48, "attack": 5, "defense": 4, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 2, "initiative": 1, "luck": 1}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
+    
+    # Aventureiro Comum (Sem Classe)
+    "_default":  { "BASE": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5}, "PER_LVL": {"max_hp": 7, "attack": 1, "defense": 1, "initiative": 1, "luck": 0}, "FREE_POINTS_PER_LVL": 1, "mana_stat": "luck" },
 }
 
+# Define quanto ganha por PONTO GASTO (Investimento)
 CLASS_POINT_GAINS = {
     "guerreiro": {"max_hp": 4, "defense": 2}, 
     "berserker": {"max_hp": 3, "attack": 2},  
@@ -54,26 +58,38 @@ CLASS_POINT_GAINS = {
     "assassino": {"attack": 2, "initiative": 2, "luck": 2}, 
     "samurai":   {"attack": 2, "defense": 2},
     "curandeiro":{"max_hp": 4, "defense": 2}, 
+    
+    # Aventureiro Comum ganha 1 por 1 em quase tudo, exceto HP que é um pouco melhor
     "_default":  {"max_hp": 3, "attack": 1, "defense": 1, "initiative": 1, "luck": 1},
 }
 
 PROFILE_KEYS = ("max_hp", "attack", "defense", "initiative", "luck")
-
-# Mantém o _BASELINE_KEYS como uma "cópia" para o resto do código dentro do stats.py funcionar
 _BASELINE_KEYS = PROFILE_KEYS
 
 def _ival(x: Any, default: int = 0) -> int:
     try: return int(round(float(x)))
     except: return int(default) if default else 0
 
-def _get_class_key_normalized(pdata: dict) -> Optional[str]:
+def _get_class_key_normalized(pdata: dict) -> str:
+    """Retorna a chave da classe ou '_default' se não tiver."""
     current_class = pdata.get("class_key") or pdata.get("class") or pdata.get("classe")
+    
+    # Se não tem classe, é default
     if not current_class: return "_default"
+    
+    # Normaliza
+    current_class = current_class.lower().strip()
+    
+    # Se a classe existe na progressão, retorna ela
+    if current_class in CLASS_PROGRESSIONS: return current_class
+    
+    # Tenta ver se é uma evolução (pega a ancestralidade)
     try:
         ancestry = get_class_ancestry(current_class)
-        if ancestry: return ancestry[-1]
+        if ancestry and ancestry[-1] in CLASS_PROGRESSIONS:
+            return ancestry[-1]
     except: pass
-    if current_class.lower() in CLASS_PROGRESSIONS: return current_class.lower()
+
     return "_default"
 
 def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
@@ -164,22 +180,20 @@ def _calculate_mana(pdata: dict, total_stats: dict, ckey_fallback: str | None):
 
 async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) -> dict:
     """
-    Calcula os status totais usando ARQUITETURA DE CAMADAS:
-    1. Base da Classe (Nível)
-    2. Pontos Investidos (Espelho) + Bônus de Classe
-    3. Multiplicador de Ascensão (Evolução)
-    4. Equipamentos (Flat)
-    5. Buffs
+    Calcula os status totais com separação rígida:
+    1. Base da Classe (Nível) - Automático
+    2. Investido (Pontos) - Multiplicadores de Classe
+    3. Ascensão (Evolução)
+    4. Equipamentos e Buffs
     """
     from modules import player_manager
     from modules.player.premium import PremiumManager 
 
     lvl = _ival(player_data.get("level"), 1)
-    
-    # --- CAMADA 1: BASE DA CLASSE (Imutável) ---
     ckey = _get_class_key_normalized(player_data)
     real_class_key = (player_data.get("class_key") or player_data.get("class") or "").lower()
     
+    # --- CAMADA 1: BASE DA CLASSE (Imutável por Nível) ---
     class_baseline = _compute_class_baseline_for_level(ckey, lvl)
     total: Dict[str, Any] = {} 
     for k in _BASELINE_KEYS:
@@ -187,16 +201,26 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
     
     total['magic_attack'] = 0
 
-    # --- CAMADA 2: PONTOS INVESTIDOS (O "Espelho" do Jogador) ---
-    # 'base_stats' agora representa "Contagem de Pontos Gastos" e não valor absoluto
-    invested_counts = player_data.get("base_stats", {})
-    if not isinstance(invested_counts, dict): invested_counts = {}
+    # --- CAMADA 2: PONTOS INVESTIDOS (Cliques do Jogador) ---
+    # Usamos o dicionário "invested" se existir (contagem de cliques).
+    # Se não existir, tentamos calcular baseados no base_stats legado, mas "invested" é preferível.
+    invested_clicks = player_data.get("invested", {})
+    if not isinstance(invested_clicks, dict): 
+        # Tenta recuperar de base_stats legado se 'invested' estiver vazio
+        # (Isso é um fallback de migração)
+        invested_clicks = {}
+        legacy_base = player_data.get("base_stats", {})
+        if legacy_base:
+            # Assume que base_stats são cliques se forem baixos, ou recalcula. 
+            # Para segurança, não usamos base_stats diretamente para somar, 
+            # a função compute_spent_status_points deve corrigir isso no save.
+            pass
 
-    # Quanto a classe ganha por ponto investido?
+    # Ganhos por ponto (Multiplicadores)
     gains = _get_point_gains_for_class(ckey)
 
-    for k, clicks in invested_counts.items():
-        # Normalização de chaves legadas
+    for k, clicks in invested_clicks.items():
+        # Normalização de chaves
         target_key = k
         if k in ("vida", "hp", "vitalidade", "health", "vit"): target_key = "max_hp"
         elif k in ("ataque", "attack", "forca", "strength", "str"): target_key = "attack"
@@ -205,26 +229,24 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
         elif k in ("sorte", "luck", "luk"): target_key = "luck"
         
         if target_key in total:
-            # Multiplica CLIQUES pelo GANHO DA CLASSE
-            # Ex: 1 clique em HP para Guerreiro = +4 HP
             gain_per_click = gains.get(target_key, 1)
             total[target_key] += (_ival(clicks, 0) * gain_per_click)
 
     # --- CAMADA 3: BÔNUS DE ASCENSÃO (Tier Multiplier) ---
-    if real_class_key and real_class_key != ckey:
+    # Se a classe real for uma evolução da classe base (ex: Paladino > Guerreiro)
+    if real_class_key and real_class_key != ckey and real_class_key != "_default":
         current_mods = get_stat_modifiers(real_class_key)
         base_mods = get_stat_modifiers(ckey)
 
         if current_mods and base_mods:
-            # Aplica a diferença proporcional
             for stat_k in ['max_hp', 'attack', 'defense', 'initiative', 'luck']:
                 mod_k = "hp" if stat_k == "max_hp" else stat_k
                 mod_curr = float(current_mods.get(mod_k, 1.0))
                 mod_base = float(base_mods.get(mod_k, 1.0))
 
-                if mod_base > 0 and mod_curr != mod_base:
+                if mod_base > 0:
                     ratio = mod_curr / mod_base
-                    # A evolução multiplica o poder BASE do corpo do personagem
+                    # Multiplica o total acumulado até aqui (Base + Pontos)
                     total[stat_k] = int(total[stat_k] * ratio)
 
     # --- CAMADA 4: EQUIPAMENTOS (Aditivo Flat) ---
@@ -254,7 +276,9 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                     if stat_key in total: total[stat_key] += val
                     else: total[stat_key] = total.get(stat_key, 0) + val
 
-    # --- CAMADA 5: BÔNUS DE CLÃ, PREMIUM E BUFFS ---
+    # --- CAMADA 5: BÔNUS EXTERNOS (Clã, VIP, Skills, Runas) ---
+    
+    # 5.1 Clã
     clan_id = player_data.get("clan_id")
     if clan_id:
         try:
@@ -267,6 +291,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                 total['max_hp'] += int(clan_buffs.get("flat_hp_bonus", 0))
         except: pass
 
+    # 5.2 VIP
     try:
         premium = PremiumManager(player_data)
         if premium.is_premium():
@@ -279,6 +304,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
             if vip_luck > 0: total['luck'] += vip_luck
     except: pass
 
+    # 5.3 Skills e Auras
     try:
         _apply_passive_skill_bonuses(player_data, total)
         if ally_user_ids:
@@ -318,25 +344,26 @@ async def get_player_dodge_chance(player_data: dict, ally_user_ids: list = None)
     dodge_chance = (initiative * 0.4) / 100.0
     dodge_chance += total_stats.get('dodge_chance_flat', 0)
     if total_stats.get("cannot_be_dodged", False): return 0.0 
-    return min(dodge_chance, 0.75) 
+    return min(dodge_chance, 0.75)
 
 async def get_player_double_attack_chance(player_data: dict, ally_user_ids: list = None) -> float:
     total_stats = await get_player_total_stats(player_data, ally_user_ids)
     initiative = total_stats.get('initiative', 0)
     double_attack_chance = (initiative * 0.25) / 100.0
-    return min(double_attack_chance, 0.50) 
+    return min(double_attack_chance, 0.50)
 
 def allowed_points_for_level(pdata: dict) -> int:
+    # Aventureiros ganham 1 ponto por nível, classes podem variar se configurado
     lvl = _ival(pdata.get("level"), 1)
-    ckey = _get_class_key_normalized(pdata)
-    prog = CLASS_PROGRESSIONS.get(ckey or "") or CLASS_PROGRESSIONS["_default"]
-    per_lvl = _ival(prog.get("FREE_POINTS_PER_LVL"), 0)
-    return per_lvl * max(0, lvl - 1)
+    return max(0, lvl - 1)
 
 def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
     """
-    Nova lógica de Level Up: Simples, Segura e Acumulativa.
-    Apenas soma pontos ao saldo, sem recalcular tudo.
+    Level Up simplificado:
+    1. Verifica XP.
+    2. Sobe Level.
+    3. Dá Pontos.
+    4. Cura o HP proporcionalmente ao aumento de BASE (sem recalcular tudo).
     """
     levels_gained, points_gained = 0, 0
     current_xp = int(player_data.get('xp', 0))
@@ -349,27 +376,20 @@ def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
         
         current_xp -= xp_needed
         
-        # 1. Aplica ganhos automáticos de status da classe (Base Layer)
+        # Cálculo de HP ganho pela subida de nível (Base da Classe)
         old_baseline = _compute_class_baseline_for_level(ckey, current_level)
         new_baseline = _compute_class_baseline_for_level(ckey, current_level + 1)
-        
-        for k in _BASELINE_KEYS:
-            increase = new_baseline.get(k, 0) - old_baseline.get(k, 0)
-            if increase > 0 and k == "max_hp":
-                # Cura o HP proporcionalmente ao aumento
-                cur = int(player_data.get("current_hp", 0))
-                player_data["current_hp"] = cur + increase
+        hp_increase = max(0, new_baseline.get("max_hp", 0) - old_baseline.get("max_hp", 0))
 
-        # 2. Sobe o Nível
+        # Atualiza dados
         player_data['level'] = current_level + 1
+        player_data["current_hp"] = int(player_data.get("current_hp", 1) + hp_increase)
         
-        # 3. Ganha Ponto (Lógica de espelho simples: Upar dá 1 ponto, ponto final)
         levels_gained += 1
-        points_gained += 1 # Valor padrão, pode vir de config se mudar no futuro
+        points_gained += 1 # Padrão: 1 ponto por nível
 
     if levels_gained > 0:
         player_data['xp'] = current_xp
-        # SOMA ao saldo existente (segurança contra bugs de equipamento)
         current_balance = int(player_data.get('stat_points', 0))
         player_data['stat_points'] = current_balance + points_gained
 
@@ -390,28 +410,30 @@ def needs_class_choice(player_data: dict) -> bool:
     return (lvl >= 5) and (not already_has_class) and (not already_offered)
 
 async def mark_class_choice_offered(user_id: Union[int, str]):
-    # CRÍTICO: user_id agora é explicitamente Union[int, str]
     from .core import get_player_data, save_player_data
     pdata = await get_player_data(user_id)
     if not pdata: return
     pdata["class_choice_offered"] = True
     await save_player_data(user_id, pdata)
 
-def _get_point_gains_for_class(ckey: Optional[str]) -> dict:
+def _get_point_gains_for_class(ckey: str) -> dict:
+    """Retorna os multiplicadores de pontos. Se a classe não existir, retorna default."""
     norm_key = (ckey or "").lower()
     gains = CLASS_POINT_GAINS.get(norm_key)
-    if gains is None:
+    
+    # Se não achou e não é default, tenta achar ancestral
+    if gains is None and norm_key != "_default":
         try:
             ancestry = get_class_ancestry(norm_key)
             if ancestry:
                 base_class = ancestry[-1]
                 gains = CLASS_POINT_GAINS.get(base_class.lower())
         except: pass
-    if gains is None: gains = CLASS_POINT_GAINS.get(norm_key, CLASS_POINT_GAINS["_default"])
-    full: Dict[str, int] = {}
-    for k in _BASELINE_KEYS:
-        full[k] = max(1, _ival(gains.get(k), CLASS_POINT_GAINS["_default"].get(k, 1)))
-    return full
+    
+    # Fallback final
+    if gains is None: gains = CLASS_POINT_GAINS["_default"]
+    
+    return gains
 
 def compute_spent_status_points(pdata: dict) -> int:
     lvl = _ival(pdata.get("level"), 1)
@@ -487,16 +509,20 @@ def _ensure_base_stats_block_inplace(pdata: dict) -> bool:
         if out != b: pdata["base_stats"] = out; changed = True
     return changed
 
-def _compute_class_baseline_for_level(class_key: Optional[str], level: int) -> dict:
+def _compute_class_baseline_for_level(class_key: str, level: int) -> dict:
+    """Calcula os stats BASE (Grátis) para o nível X da classe Y."""
     lvl = max(1, int(level or 1))
     prog = CLASS_PROGRESSIONS.get((class_key or "").lower()) or CLASS_PROGRESSIONS["_default"]
+    
     base = dict(prog["BASE"])
     per = dict(prog["PER_LVL"])
+    
     if lvl <= 1: return base
+    
     levels_up = lvl - 1
     out: Dict[str, int] = {}
     for k in _BASELINE_KEYS:
-        out[k] = _ival(base.get(k)) + _ival(per.get(k)) * levels_up
+        out[k] = _ival(base.get(k)) + (_ival(per.get(k)) * levels_up)
     return out
 
 def _current_invested_delta_over_baseline(pdata: dict, baseline: dict) -> dict:
@@ -583,6 +609,6 @@ def add_xp(player_data: dict, amount: int):
     try:
         amount = int(amount)
         current_xp = int(current_xp)
-    except:
-        amount = 0
+    except: amount = 0
     player_data["xp"] = current_xp + amount
+    

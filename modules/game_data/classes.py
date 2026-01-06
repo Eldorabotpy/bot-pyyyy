@@ -186,13 +186,7 @@ CLASSES_DATA = {
     },
 
     #-----------------------------------------------------------------------------------------------------------
-    'assassino': {
-        'display_name': 'Assassino', 'emoji': '🔪',
-        'description': 'Furtividade, velocidade e críticos.',
-        'stat_modifiers': {'hp': 3.0, 'max_mana': 1.2, 'attack': 1.3, 'defense': 0.8, 'initiative': 1.8, 'luck': 1.5},
-        'file_id_name': 'classe_assassino_media',
-        'tier': 1
-    },
+    
     # EVOLUÇÕES TIER 2 #
     'ladrao_de_sombras': { 
         'display_name': 'Ladrão de Sombras', 

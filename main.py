@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO: BARREIRA TOTAL - Híbrido Str/Int Compliance)
+# (VERSÃO: BARREIRA TOTAL - Híbrido Str/Int Compliance + FIX CONEXÃO LENTA)
 
 from __future__ import annotations
 import asyncio
@@ -14,6 +14,8 @@ from handlers.admin.media_handler import set_media_command
 
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+# ADICIONADO: Importação necessária para corrigir o erro de Timeout
+from telegram.request import HTTPXRequest 
 from telegram.ext import (
     Application, 
     MessageHandler, 
@@ -100,15 +102,14 @@ def start_keep_alive():
 # TAREFAS DE INICIALIZAÇÃO
 # ==============================================================================
 async def post_init_tasks(application: Application):
-    # 1. Tratamento de Boss (Mantenha aqui por segurança, ou mova para o startup se preferir)
+    # 1. Tratamento de Boss
     if world_boss_manager and world_boss_manager.is_active:
         logger.warning("Boss ativo detectado. Reiniciando status...")
         world_boss_manager.end_event(reason="Reinício")
     
-    # 2. AQUI ESTÁ A FUNÇÃO QUE VOCÊ PEDIU:
-    # Ela substitui todo aquele bloco de mensagens de admin, watchdogs e agendamento de jobs.
-    # Tudo isso agora roda dentro de registries/startup.py
+    # 2. Inicialização do Sistema (Mensagens Admin, Agendamentos, Watchdogs)
     await run_system_startup_tasks(application)
+
 # ==============================================================================
 # 1. BOAS-VINDAS (Permitido em Grupos)
 # ==============================================================================
@@ -118,7 +119,6 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
     IMG_BOAS_VINDAS = STARTUP_IMAGE_ID if STARTUP_IMAGE_ID else "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE"
 
     for member in update.message.new_chat_members:
-        # Verifica ID do bot (trata como string para segurança)
         if str(member.id) == str(context.bot.id): continue
         
         bot_username = context.bot.username
@@ -141,27 +141,17 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # 2. A BARREIRA (TypeHandler)
 # ==============================================================================
 async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Este middleware roda em TODAS as atualizações.
-    Lógica:
-    1. Se for Chat PRIVADO -> Deixa passar (return None).
-    2. Se for GRUPO e for o ADMIN -> Deixa passar.
-    3. Se for GRUPO e NÃO for Admin -> PARE (raise ApplicationHandlerStop).
-    """
     if update.effective_chat.type == ChatType.PRIVATE:
-        return # ✅ PRIVADO SEMPRE PASSA
+        return 
 
     if update.effective_chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        # Permite apenas o Admin (Você) usar o bot no grupo para manutenção
-        # Validação RÍGIDA de String para evitar erro de tipo entre int/str
         if update.effective_user:
             tg_user_id_str = str(update.effective_user.id)
             admin_id_str = str(ADMIN_ID)
             
             if tg_user_id_str == admin_id_str:
-                return # ✅ ADMIN NO GRUPO PASSA
+                return 
         
-        # ⛔ USUÁRIO COMUM NO GRUPO É BLOQUEADO
         raise ApplicationHandlerStop
 
 # ==============================================================================
@@ -173,13 +163,29 @@ if __name__ == '__main__':
         logging.info("Web Server OK.")
     except Exception: pass
 
-    application = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init_tasks).build()
+    # --- CORREÇÃO DE TIMEOUT ---
+    # Define timeouts longos (60s) para evitar quedas em conexões instáveis
+    request_config = HTTPXRequest(
+        connection_pool_size=8,
+        connect_timeout=60.0,
+        read_timeout=60.0,
+        write_timeout=60.0
+    )
+
+    application = (
+        Application.builder()
+        .token(TELEGRAM_TOKEN)
+        .request(request_config) # INJETA A CONFIGURAÇÃO DE TIMEOUT AQUI
+        .post_init(post_init_tasks)
+        .build()
+    )
     
     # --- ORDEM DE HANDLERS (CRÍTICA) ---
 
-    # 1. Boas-vindas (Isso precisa rodar antes do bloqueio, pois é permitido em grupo)
+    # 1. Boas-vindas
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member), group=-1)
 
+    # 2. Bloqueio de Grupo
     application.add_handler(TypeHandler(Update, master_group_blocker), group=-1)
 
     # --------------------------------------------------------------------------
@@ -197,6 +203,7 @@ if __name__ == '__main__':
     # 5. Admin / Ferramentas
     application.add_handler(file_id_conv_handler)
     application.add_handler(CommandHandler("setmedia", set_media_command))
+    
     # 6. Sistemas de Jogo
     register_market_handlers(application)
     register_evolution_handlers(application)
@@ -209,4 +216,7 @@ if __name__ == '__main__':
     except ImportError: pass
 
     logging.info("Handlers registrados. Bot 100% BLINDADO contra spam de grupo.")
+    
+    # Inicia o bot
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    
