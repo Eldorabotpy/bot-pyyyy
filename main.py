@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO: BARREIRA TOTAL - Híbrido Str/Int Compliance + FIX CONEXÃO LENTA)
+# (VERSÃO CORRIGIDA: Chama register_admin_handlers corretamente)
 
 from __future__ import annotations
 import asyncio
@@ -14,7 +14,7 @@ from handlers.admin.media_handler import set_media_command
 
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-# ADICIONADO: Importação necessária para corrigir o erro de Timeout
+# Importação necessária para corrigir o erro de Timeout
 from telegram.request import HTTPXRequest 
 from telegram.ext import (
     Application, 
@@ -51,9 +51,12 @@ from handlers.auth_handler import auth_handler, logout_command, logout_callback
 from handlers.start_handler import start_command_handler
 from handlers.admin.file_id_conv import file_id_conv_handler
 
+# --- IMPORTS DOS REGISTRIES (AQUI ESTÁ A CORREÇÃO) ---
 from registries import register_all_handlers
 from registries.class_evolution import register_evolution_handlers
 from registries.market import register_market_handlers
+# Importa o registro mestre de admins que você criou
+from registries.admin import register_admin_handlers 
 
 # --- IMPORTS DOS JOBS ---
 from handlers.jobs import (
@@ -183,10 +186,7 @@ if __name__ == '__main__':
     # ORDEM DE HANDLERS (CRÍTICA PARA FUNCIONAMENTO)
     # ==========================================================================
 
-    # --------------------------------------------------------------------------
     # 1. BARREIRA GLOBAL (Group -1)
-    # Executam primeiro para filtrar grupos ou dar boas-vindas
-    # --------------------------------------------------------------------------
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member), group=-1)
     application.add_handler(TypeHandler(Update, master_group_blocker), group=-1)
 
@@ -195,17 +195,19 @@ if __name__ == '__main__':
     # Devem vir ANTES do Auth para capturar inputs de menus abertos
     # --------------------------------------------------------------------------
     
-    # Ferramentas Admin (Conversão de ID, Mídia)
+    # Ferramentas Admin Básicas
     application.add_handler(file_id_conv_handler)
     application.add_handler(CommandHandler("setmedia", set_media_command))
+    
+    # >>> AQUI ESTÁ A CORREÇÃO PRINCIPAL <<<
+    # Chama o seu arquivo registries/admin.py que gerencia premium, gemas e edit player
+    register_admin_handlers(application)
     
     # Sistemas de Jogo (Mercado, Evolução)
     register_market_handlers(application)
     register_evolution_handlers(application)
     
-    # Registro Geral (Inclui o ADMIN/PREMIUM e outros sistemas)
-    # IMPORTANTE: Isso contém o handler do Premium. Ao ficar aqui em cima,
-    # ele captura o texto "Bastos ADM" antes do sistema de login.
+    # Registro Geral (Outros sistemas do jogo)
     register_all_handlers(application)
 
     # --------------------------------------------------------------------------
@@ -229,7 +231,7 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler("debug_reset", cmd_force_pvp_reset))
     except ImportError: pass
 
-    logging.info("Handlers registrados e organizados por prioridade.")
+    logging.info("Handlers registrados. Admin Registry ativado.")
     
     # Inicia o bot
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)

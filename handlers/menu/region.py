@@ -41,11 +41,8 @@ try:
 except Exception:
     build_region_dungeon_button = None
 
-# Tenta importar PREMIUM_TIERS diretamente
-try:
-    from modules.game_data.premium import PREMIUM_TIERS
-except ImportError:
-    PREMIUM_TIERS = {}
+# Importa DIRETAMENTE do seu arquivo premium.py
+from modules.game_data.premium import PREMIUM_TIERS
 
 # =============================================================================
 # Helpers

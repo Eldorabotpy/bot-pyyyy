@@ -9,11 +9,8 @@ from kingdom_defense import leaderboard
 # Import do Decorator de Segurança
 from modules.auth_utils import get_current_player_id, requires_login 
 
-# Tenta importar as configurações de Premium
-try:
-    from modules.game_data.premium import PREMIUM_TIERS
-except ImportError:
-    PREMIUM_TIERS = {}
+# Importa DIRETAMENTE do seu arquivo premium.py
+from modules.game_data.premium import PREMIUM_TIERS
 
 logger = logging.getLogger(__name__)
 
