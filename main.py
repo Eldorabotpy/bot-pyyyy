@@ -164,7 +164,6 @@ if __name__ == '__main__':
     except Exception: pass
 
     # --- CORREÇÃO DE TIMEOUT ---
-    # Define timeouts longos (60s) para evitar quedas em conexões instáveis
     request_config = HTTPXRequest(
         connection_pool_size=8,
         connect_timeout=60.0,
@@ -175,48 +174,62 @@ if __name__ == '__main__':
     application = (
         Application.builder()
         .token(TELEGRAM_TOKEN)
-        .request(request_config) # INJETA A CONFIGURAÇÃO DE TIMEOUT AQUI
+        .request(request_config)
         .post_init(post_init_tasks)
         .build()
     )
     
-    # --- ORDEM DE HANDLERS (CRÍTICA) ---
+    # ==========================================================================
+    # ORDEM DE HANDLERS (CRÍTICA PARA FUNCIONAMENTO)
+    # ==========================================================================
 
-    # 1. Boas-vindas
+    # --------------------------------------------------------------------------
+    # 1. BARREIRA GLOBAL (Group -1)
+    # Executam primeiro para filtrar grupos ou dar boas-vindas
+    # --------------------------------------------------------------------------
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member), group=-1)
-
-    # 2. Bloqueio de Grupo
     application.add_handler(TypeHandler(Update, master_group_blocker), group=-1)
 
     # --------------------------------------------------------------------------
-    # DAQUI PARA BAIXO, SÓ CHEGAM MENSAGENS PRIVADAS (OU DO ADMIN)
+    # 2. SISTEMAS PRIORITÁRIOS & CONVERSATIONS (Group 0 - Topo)
+    # Devem vir ANTES do Auth para capturar inputs de menus abertos
     # --------------------------------------------------------------------------
-
-    # 3. Autenticação
-    application.add_handler(auth_handler)
-    application.add_handler(CommandHandler("logout", logout_command))
-    application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
-
-    # 4. Menu Principal
-    application.add_handler(start_command_handler)
-
-    # 5. Admin / Ferramentas
+    
+    # Ferramentas Admin (Conversão de ID, Mídia)
     application.add_handler(file_id_conv_handler)
     application.add_handler(CommandHandler("setmedia", set_media_command))
     
-    # 6. Sistemas de Jogo
+    # Sistemas de Jogo (Mercado, Evolução)
     register_market_handlers(application)
     register_evolution_handlers(application)
+    
+    # Registro Geral (Inclui o ADMIN/PREMIUM e outros sistemas)
+    # IMPORTANTE: Isso contém o handler do Premium. Ao ficar aqui em cima,
+    # ele captura o texto "Bastos ADM" antes do sistema de login.
     register_all_handlers(application)
 
-    # 7. Debug
+    # --------------------------------------------------------------------------
+    # 3. AUTENTICAÇÃO E MENU PRINCIPAL (Group 0 - Fundo)
+    # Só capturam o que não foi pego pelos sistemas acima
+    # --------------------------------------------------------------------------
+    
+    # Autenticação (Login)
+    application.add_handler(auth_handler)
+    
+    # Logout e Start
+    application.add_handler(CommandHandler("logout", logout_command))
+    application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
+    application.add_handler(start_command_handler)
+
+    # --------------------------------------------------------------------------
+    # 4. DEBUG (Opcional)
+    # --------------------------------------------------------------------------
     try:
         from handlers.jobs import cmd_force_pvp_reset
         application.add_handler(CommandHandler("debug_reset", cmd_force_pvp_reset))
     except ImportError: pass
 
-    logging.info("Handlers registrados. Bot 100% BLINDADO contra spam de grupo.")
+    logging.info("Handlers registrados e organizados por prioridade.")
     
     # Inicia o bot
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-    
