@@ -210,18 +210,33 @@ async def _do_reset_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await query.edit_message_text("⏳ Processando Reset Global... (Isso não bloqueia o bot)")
     
     count = 0
-    # Iteração assíncrona
-    async for uid, pdata in iter_players():
-        await _reset_points_one(pdata)
-        await save_player_data(uid, pdata)
-        count += 1
-        # Pausa a cada 50 jogadores para não travar o bot
-        if count % 50 == 0:
-            await asyncio.sleep(0.01)
-        
+    erros = 0
+    try:
+        # Iteração assíncrona (agora corrigida no queries.py)
+        async for uid, pdata in iter_players():
+            try:
+                await _reset_points_one(pdata)
+                await save_player_data(uid, pdata)
+                count += 1
+            except Exception as e_inner:
+                logger.error(f"Erro ao resetar user {uid}: {e_inner}")
+                erros += 1
+                
+            # Pausa a cada 50 jogadores para garantir estabilidade
+            if count % 50 == 0:
+                await asyncio.sleep(0.01)
+                
+        final_msg = f"✅ Reset Global finalizado.\n👥 Jogadores: {count}"
+        if erros > 0:
+            final_msg += f"\n⚠️ Falhas: {erros}"
+            
+    except Exception as e:
+        logger.error(f"CRITICAL ERROR IN RESET ALL: {e}")
+        final_msg = f"❌ Erro Crítico no Reset: {str(e)}"
+
     await context.bot.send_message(
         update.effective_chat.id, 
-        f"✅ Reset Global finalizado.\n{count} jogadores recalculados.",
+        final_msg,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Voltar ao Admin", callback_data="admin_main")]])
     )
     return ConversationHandler.END
