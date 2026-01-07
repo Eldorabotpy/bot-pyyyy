@@ -982,7 +982,7 @@ async def confirm_bulk_dismantle_callback(update: Update, context: ContextTypes.
 
     context.job_queue.run_once(finish_bulk_dismantle_job, dur, chat_id=q.message.chat_id,
                                data=details, name=f"dismantle_bulk_{uid}")
-    
+                               
 async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
 

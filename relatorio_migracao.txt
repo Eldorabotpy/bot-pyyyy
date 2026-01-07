@@ -1,5 +1,5 @@
-RELATÓRIO DE MIGRAÇÃO - 92.7% CONCLUÍDO
-Gerado em: 2026-01-04 16:36:42
+RELATÓRIO DE MIGRAÇÃO - 92.8% CONCLUÍDO
+Gerado em: 2026-01-07 15:33:24
 ==================================================
 
 Arquivo: .\handlers\admin\media_handler.py
@@ -334,5 +334,8 @@ Encontrado: query.from_user.id, players_collection.find
 │   │   📄 startup.py
 │   │   📄 __init__.py
 │   📁 tools/
+│   │   📄 debug_market_item.py
+│   │   📄 find_legacy_usage.py
 │   │   📄 hard_respec_all.py
+│   │   📄 migrate_market.py
 │   │   📄 normalize_file_ids.py
