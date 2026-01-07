@@ -1,4 +1,5 @@
 # handlers/status_handler.py
+# (VERSÃO CORRIGIDA: Salva pontos em 'invested' para o stats.py ler corretamente)
 
 import logging
 import re
@@ -16,16 +17,12 @@ from modules.player.stats import (
     get_player_total_stats,
     _compute_class_baseline_for_level,
     PROFILE_KEYS,
-    # Se PROFILE_KEYS não estiver exportado no stats.py, usamos a lista local abaixo
 )
 
 logger = logging.getLogger(__name__)
 
-# Lista de atributos exibidos no perfil
-PROFILE_KEYS = ['max_hp', 'attack', 'defense', 'initiative', 'luck']
-
 # ==============================================================================
-# FUNÇÕES AUXILIARES DE MÍDIA (Mantidas originais)
+# FUNÇÕES AUXILIARES DE MÍDIA
 # ==============================================================================
 def _slugify(text: str) -> str:
     if not text: return ""
@@ -69,9 +66,9 @@ def _get_class_media(player_data: dict, purpose: str = "status"):
 async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMarkup]:
     """
     Gera o texto e o teclado do menu de status.
-    Usa get_player_total_stats para mostrar os valores REAIS (Base + Equip + Buffs).
+    Usa get_player_total_stats para mostrar os valores REAIS.
     """
-    # Calcula status totais (incluindo equipamentos e passivas)
+    # Calcula status totais (incluindo equipamentos, passivas e pontos investidos)
     total_stats = await get_player_total_stats(player_data)
     
     char_name = player_data.get('character_name', 'Aventureiro(a)')
@@ -93,7 +90,7 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
     keyboard_rows = []
     if available_points > 0:
         ckey = _get_class_key_normalized(player_data)
-        # Pega quanto cada ponto vale para essa classe (ex: Mago ganha +2 Atk, Guerreiro +1 Atk)
+        # Pega quanto cada ponto vale para essa classe
         gains = _get_point_gains_for_class(ckey)
 
         # Linha 1: HP e Ataque
@@ -114,8 +111,6 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
         if 'luck' in PROFILE_KEYS:
             keyboard_rows.append([InlineKeyboardButton(f"➕ 🍀 𝐒𝐎𝐑𝐓𝐄 (+{gains.get('luck', 1)})", callback_data='upgrade_luck')])
 
-    # Botões fixos de navegação
-    #keyboard_rows.append([InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data="open_evolution_menu")])
     keyboard_rows.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data='profile')]) 
 
     return status_text, InlineKeyboardMarkup(keyboard_rows)
@@ -125,7 +120,6 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
 # ==============================================================================
 
 async def show_status_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # MUDANÇA AQUI: Usa a função ponte
     user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id 
     player_data = await player_manager.get_player_data(user_id) 
@@ -184,14 +178,13 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("Sem pontos disponíveis!", show_alert=True)
         return
 
-    # 2. Identifica o atributo vindo do botão (ex: 'max_hp', 'attack')
+    # 2. Identifica o atributo vindo do botão
     profile_stat = query.data.replace('upgrade_', '')
     if profile_stat not in PROFILE_KEYS:
         await query.answer("Atributo inválido.", show_alert=True)
         return
 
     # 3. Mapeia para a chave interna (Canônica)
-    # Mantemos 'max_hp' como 'max_hp' para ficar igual ao stats.py
     stat_mapping = {
         'max_hp': 'max_hp',
         'attack': 'attack',
@@ -201,25 +194,25 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     }
     internal_key = stat_mapping.get(profile_stat, profile_stat)
 
-    # 4. Garante que o bloco base_stats existe e incrementa APENAS nele
-    # 'base_stats' agora guarda o NÚMERO DE CLIQUES (Investimento)
-    if "base_stats" not in player_data or not isinstance(player_data["base_stats"], dict):
-        # Inicializa zerado se não existir
-        player_data["base_stats"] = {}
-    
+    # 4. CORREÇÃO CRÍTICA AQUI
+    # Salva em "invested" (que é onde o stats.py lê os pontos extras)
+    if "invested" not in player_data or not isinstance(player_data["invested"], dict):
+        player_data["invested"] = {}
 
-    current_clicks = player_data["base_stats"].get(internal_key, 0)
-    player_data["base_stats"][internal_key] = current_clicks + 1
-    
+    current_clicks = player_data["invested"].get(internal_key, 0)
+    player_data["invested"][internal_key] = current_clicks + 1
 
+    # Desconta o ponto
     player_data["stat_points"] = pool - 1
 
+    # Recalcula para atualizar HP atual se necessário
     new_totals = await get_player_total_stats(player_data)
     
-    
+    # Atualiza valores visuais no dict local (para o menu mostrar certo imediatamente)
     for stat in PROFILE_KEYS:
         player_data[stat] = new_totals.get(stat, 0)
 
+    # Se aumentou Max HP, cura o valor ganho para não ficar com barra vazia
     if internal_key == 'max_hp':
         ckey = _get_class_key_normalized(player_data)
         gains = _get_point_gains_for_class(ckey)
@@ -227,11 +220,13 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         player_data["current_hp"] = int(player_data.get("current_hp", 0)) + hp_increment
 
     await player_manager.save_player_data(user_id, player_data)
+    
+    # Feedback visual no botão
     stat_display_name = profile_stat.replace('max_', '').title()
     if profile_stat == 'max_hp': stat_display_name = "HP"
-    
     await query.answer(f"Subiu {stat_display_name}!")
 
+    # Atualiza o menu
     status_text, reply_markup = await _get_status_content(player_data)
     try:
         await query.edit_message_caption(caption=status_text, reply_markup=reply_markup, parse_mode='HTML')
@@ -239,7 +234,7 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             await query.edit_message_text(text=status_text, reply_markup=reply_markup, parse_mode='HTML')
         except:
-            pass # Ignora erro se a mensagem não mudou ou foi deletada
+            pass 
         
 async def close_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
