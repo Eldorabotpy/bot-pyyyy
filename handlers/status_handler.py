@@ -1,5 +1,5 @@
 # handlers/status_handler.py
-# (VERSÃO CORRIGIDA: Salva pontos em 'invested' para o stats.py ler corretamente)
+# (VERSÃO CORRIGIDA: Salva em 'invested' para compatibilidade com stats.py)
 
 import logging
 import re
@@ -68,7 +68,7 @@ async def _get_status_content(player_data: dict) -> tuple[str, InlineKeyboardMar
     Gera o texto e o teclado do menu de status.
     Usa get_player_total_stats para mostrar os valores REAIS.
     """
-    # Calcula status totais (incluindo equipamentos, passivas e pontos investidos)
+    # Calcula status totais (Base + Investido + Equipamentos + Buffs)
     total_stats = await get_player_total_stats(player_data)
     
     char_name = player_data.get('character_name', 'Aventureiro(a)')
@@ -194,8 +194,7 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     }
     internal_key = stat_mapping.get(profile_stat, profile_stat)
 
-    # 4. CORREÇÃO CRÍTICA AQUI
-    # Salva em "invested" (que é onde o stats.py lê os pontos extras)
+    # 4. CORREÇÃO: Salva em "invested" (que é onde o stats.py lê os pontos extras)
     if "invested" not in player_data or not isinstance(player_data["invested"], dict):
         player_data["invested"] = {}
 
@@ -205,10 +204,10 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # Desconta o ponto
     player_data["stat_points"] = pool - 1
 
-    # Recalcula para atualizar HP atual se necessário
+    # Recalcula para atualizar HP atual se necessário e mostrar valores corretos no menu
     new_totals = await get_player_total_stats(player_data)
     
-    # Atualiza valores visuais no dict local (para o menu mostrar certo imediatamente)
+    # (Opcional) Atualiza valores visuais no dict local para feedback imediato no menu
     for stat in PROFILE_KEYS:
         player_data[stat] = new_totals.get(stat, 0)
 
@@ -221,7 +220,6 @@ async def upgrade_stat_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     await player_manager.save_player_data(user_id, player_data)
     
-    # Feedback visual no botão
     stat_display_name = profile_stat.replace('max_', '').title()
     if profile_stat == 'max_hp': stat_display_name = "HP"
     await query.answer(f"Subiu {stat_display_name}!")
