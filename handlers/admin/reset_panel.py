@@ -206,38 +206,85 @@ async def _reset_all_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return CONFIRM_ALL
 
 async def _do_reset_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # 1. Pega a mensagem onde você clicou (no seu chat privado)
     query = update.callback_query
-    await query.edit_message_text("⏳ Processando Reset Global... (Isso não bloqueia o bot)")
+    
+    # Texto inicial
+    base_text = "⏳ **INICIANDO RESET GLOBAL**...\n(Apenas você está vendo isso)\n\n"
+    try:
+        await query.edit_message_text(base_text, parse_mode="Markdown")
+    except: pass # Ignora se não der pra editar na hora
     
     count = 0
     erros = 0
+    last_log = [] # Lista para criar o efeito de "console" rolando
+    
     try:
-        # Iteração assíncrona (agora corrigida no queries.py)
+        # Loop seguro no banco de dados
         async for uid, pdata in iter_players():
             try:
-                await _reset_points_one(pdata)
+                # --- AÇÃO DE RESET ---
+                # Reseta e pega quantos pontos foram devolvidos
+                pts_refunded = await _reset_points_one(pdata)
+                
+                # Salva o jogador atualizado
                 await save_player_data(uid, pdata)
+                
+                # --- LOG VISUAL ---
+                char_name = pdata.get('character_name', 'Desconhecido')
+                user_level = pdata.get('level', 1)
+                
+                # Adiciona linha ao feed: "✅ Nome (Nv.X) -> +Y pts"
+                log_entry = f"✅ **{char_name}** (Nv.{user_level}) ➔ +{pts_refunded} pts"
+                last_log.append(log_entry)
+                
+                # Mantém apenas as últimas 8 linhas para a mensagem não ficar gigante
+                if len(last_log) > 8:
+                    last_log.pop(0)
+                
                 count += 1
+                
+                # --- ATUALIZA A TELA A CADA 5 JOGADORES ---
+                # Isso cria a animação de progresso sem travar o Telegram
+                if count % 5 == 0:
+                    log_str = "\n".join(last_log)
+                    display_text = (
+                        f"🔧 **PAINEL DE RESET - ADMIN**\n"
+                        f"🔄 Processando: `{count}` jogadores...\n\n"
+                        f"📜 **Feed em Tempo Real:**\n"
+                        f"{log_str}\n\n"
+                        f"⏳ *Aguarde...*"
+                    )
+                    try:
+                        # Edita a mensagem existente (Só você vê)
+                        await query.edit_message_text(display_text, parse_mode="Markdown")
+                    except Exception: 
+                        pass # Evita erro se a mensagem não mudou
+                    
+                    # Pausa técnica para o servidor respirar
+                    await asyncio.sleep(0.5)
+
             except Exception as e_inner:
                 logger.error(f"Erro ao resetar user {uid}: {e_inner}")
                 erros += 1
-                
-            # Pausa a cada 50 jogadores para garantir estabilidade
-            if count % 50 == 0:
-                await asyncio.sleep(0.01)
-                
-        final_msg = f"✅ Reset Global finalizado.\n👥 Jogadores: {count}"
-        if erros > 0:
-            final_msg += f"\n⚠️ Falhas: {erros}"
+        
+        # --- MENSAGEM FINAL ---
+        final_msg = (
+            f"🏁 **RESET GLOBAL CONCLUÍDO!**\n\n"
+            f"✅ Sucessos: `{count}`\n"
+            f"❌ Falhas: `{erros}`\n\n"
+            f"Todos os jogadores tiveram seus atributos base recalculados e os pontos devolvidos para redistribuição."
+        )
             
     except Exception as e:
         logger.error(f"CRITICAL ERROR IN RESET ALL: {e}")
-        final_msg = f"❌ Erro Crítico no Reset: {str(e)}"
+        final_msg = f"❌ **ERRO CRÍTICO:**\n`{str(e)}`"
 
+    # Atualiza a mensagem uma última vez com o relatório final
     await context.bot.send_message(
         update.effective_chat.id, 
         final_msg,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Voltar ao Admin", callback_data="admin_main")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar ao Admin", callback_data="admin_main")]])
     )
     return ConversationHandler.END
 

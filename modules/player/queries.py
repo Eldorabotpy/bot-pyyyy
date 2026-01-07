@@ -1,11 +1,11 @@
 # modules/player/queries.py
-# (VERSÃO CORRIGIDA: Iteração compatível com PyMongo Síncrono)
+# (VERSÃO BLINDADA: Compatível com PyMongo Síncrono e Asyncio)
 
 from __future__ import annotations
 import re as _re
 import logging
 import asyncio
-from typing import Iterator, Tuple, Optional, Union
+from typing import Iterator, Tuple, Optional, Union, Dict, Any
 from bson import ObjectId
 
 # Imports do Core
@@ -28,13 +28,13 @@ async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
     norm_text = _normalize_char_name(raw_text)
     user_text = raw_text.lstrip("@").lower()
 
-    # 1. TENTATIVA: NOME DO PERSONAGEM
+    # 1. TENTATIVA: NOME DO PERSONAGEM (Exato/Normalizado)
     if norm_text:
         doc = await asyncio.to_thread(users_collection.find_one, {"character_name_normalized": norm_text})
         if doc:
             return (str(doc['_id']), await get_player_data(str(doc['_id'])))
 
-    # 2. TENTATIVA: USERNAME DO TELEGRAM
+    # 2. TENTATIVA: USERNAME DO TELEGRAM (Exato)
     query_user = {
         "$or": [
             {"username": {"$regex": f"^{_re.escape(user_text)}$", "$options": "i"}},
@@ -63,6 +63,10 @@ async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
 
     return None
 
+async def find_player_by_name_norm(name: str) -> Optional[Tuple[str, dict]]:
+    """Alias para compatibilidade com partes antigas do sistema."""
+    return await find_player_by_name(name)
+
 async def find_players_by_name_partial(query: str) -> list:
     if users_collection is None: return []
     nq = _normalize_char_name(query)
@@ -70,9 +74,14 @@ async def find_players_by_name_partial(query: str) -> list:
     
     q = {"character_name": {"$regex": _re.escape(query), "$options": "i"}}
     out = []
-    # Cursor síncrono limitado
-    cursor = users_collection.find(q).limit(10)
-    for doc in cursor:
+    
+    # Cursor síncrono rodando em thread separada para não bloquear
+    def _run_query():
+        return list(users_collection.find(q).limit(10))
+    
+    docs = await asyncio.to_thread(_run_query)
+    
+    for doc in docs:
         uid = str(doc["_id"])
         p = await get_player_data(uid)
         if p: out.append((uid, p))
@@ -104,18 +113,39 @@ async def delete_player(user_id: str) -> bool:
     await clear_player_cache(user_id)
     return True
 
+async def find_by_username(username: str) -> Optional[dict]:
+    if users_collection is None: return None
+    u = (username or "").lstrip("@").strip().lower()
+    if not u: return None
+    q = {"$or": [{"username": u}, {"telegram_username": u}, {"tg_username": u}]}
+    doc = await asyncio.to_thread(users_collection.find_one, q)
+    if doc: return await get_player_data(str(doc['_id']))
+    return None
+
+def iter_player_ids() -> Iterator[str]:
+    """Iterador síncrono apenas de IDs."""
+    if users_collection is not None:
+        for d in users_collection.find({}, {"_id": 1}): yield str(d["_id"])
+
 async def iter_players():
     """
-    Itera sobre todos os jogadores de forma segura para PyMongo.
+    Itera sobre todos os jogadores de forma segura para PyMongo + Asyncio.
+    IMPORTANTE: Não usar 'async for' direto no cursor do pymongo.
     """
     if users_collection is not None:
-        # Pymongo retorna um cursor SÍNCRONO.
-        # Não podemos usar 'async for' direto nele.
-        # Iteramos normalmente e damos yield.
+        # Pega o cursor síncrono
         cursor = users_collection.find({})
         
-        # Iteração síncrona
+        # Itera sincronamente, mas cede o controle ao event loop a cada passo
         for doc in cursor:
             yield str(doc["_id"]), doc
-            # Yield para o Event Loop do Asyncio respirar e não travar o bot
+            # Isso impede que o bot trave enquanto processa milhares de jogadores
             await asyncio.sleep(0)
+
+async def check_migration_status(telegram_id: int) -> Tuple[bool, bool, Optional[dict]]:
+    already_migrated = False
+    if users_collection is not None:
+        doc = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": telegram_id})
+        already_migrated = (doc is not None)
+    legacy = await get_legacy_data_by_telegram_id(telegram_id)
+    return (legacy is not None), already_migrated, legacy
