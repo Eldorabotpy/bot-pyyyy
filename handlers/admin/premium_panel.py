@@ -1,12 +1,8 @@
-# handlers/admin/premium_panel.py
-# (VERSÃO CORRIGIDA: Tratamento de erro na busca de jogador e logs)
-
 from __future__ import annotations
 import logging
 import html
 from datetime import datetime, timezone, timedelta 
 from zoneinfo import ZoneInfo
-from typing import Optional
 from bson import ObjectId
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -20,21 +16,17 @@ from telegram.ext import (
 )
 
 from modules.player.core import get_player_data, save_player_data, clear_player_cache, users_collection
-from modules.player.queries import find_player_by_name
+# Agora usa a função inteligente que criamos no queries.py
+from modules.player.queries import find_player_by_name 
 from modules.game_data.premium import PREMIUM_TIERS
 from handlers.admin.utils import ensure_admin, parse_hybrid_id
 
-# Configuração fixa de Timezone
 JOB_TIMEZONE = "America/Sao_Paulo"
-
 logger = logging.getLogger(__name__)
 (ASK_NAME,) = range(1)
 
-# ==============================================================================
-# HELPER DE DATA (UTC -> BRT)
-# ==============================================================================
+# ... (Funções de Data _parse_smart_date e _format_date_br mantidas iguais) ...
 def _parse_smart_date(value) -> datetime:
-    """Lê do banco e garante UTC."""
     if not value: return datetime.now(timezone.utc)
     try:
         dt = datetime.fromisoformat(str(value))
@@ -43,32 +35,18 @@ def _parse_smart_date(value) -> datetime:
     except: return datetime.now(timezone.utc)
 
 def _format_date_br(iso_str: str, tier: str) -> str:
-    """Mostra a data no horário BRT (São Paulo)."""
-    if tier == "free" or not iso_str:
-        return "---"
+    if tier == "free" or not iso_str: return "---"
     try:
         dt_utc = _parse_smart_date(iso_str)
-        # Converte UTC -> America/Sao_Paulo
         dt_br = dt_utc.astimezone(ZoneInfo(JOB_TIMEZONE))
         return dt_br.strftime("%d/%m/%Y %H:%M")
     except: return "Data Inválida"
 
-# ==============================================================================
-# SYNC BANCO
-# ==============================================================================
 async def _save_and_refresh(user_id, pdata):
-    # Salva no sistema novo (users) se possível
     await save_player_data(user_id, pdata)
-    
-    # Update forçado direto no Mongo para garantir sincronia imediata
-    if users_collection is not None:
+    if users_collection:
         try:
-            q = None
-            if isinstance(user_id, ObjectId): q = {"_id": user_id}
-            elif isinstance(user_id, str) and ObjectId.is_valid(user_id): q = {"_id": ObjectId(user_id)}
-            # Fallback legado
-            elif isinstance(user_id, int): q = {"telegram_id_owner": user_id}
-            
+            q = {"_id": ObjectId(user_id)} if ObjectId.is_valid(user_id) else None
             if q:
                 users_collection.update_one(q, {"$set": {
                     "premium_tier": pdata.get("premium_tier"),
@@ -77,23 +55,20 @@ async def _save_and_refresh(user_id, pdata):
         except: pass
     await clear_player_cache(user_id)
 
-# ==============================================================================
-# PAINEL
-# ==============================================================================
+# --- PAINEL ---
+
 async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    
-    # Se já tem um alvo selecionado na memória, abre direto
     if context.user_data.get('prem_target_id'):
         target_id = context.user_data['prem_target_id']
         pdata = await get_player_data(target_id)
         if pdata:
             await _show_player_panel(update, context, pdata)
             return ASK_NAME
-            
+    
     await query.edit_message_text(
-        "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o <b>Nome</b> ou <b>ID</b>:",
+        "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o <b>Nome do Personagem</b> ou <b>@Usuario</b>:",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]])
     )
@@ -101,53 +76,43 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     txt = update.message.text.strip()
-    
-    # Feedback visual (opcional, ajuda a saber que o bot leu)
-    status_msg = await update.message.reply_text("🔍 Procurando...", quote=True)
+    # Feedback visual
+    loading_msg = await update.message.reply_text("🔍 Buscando jogador...", quote=True)
     
     try:
+        # Tenta achar ID direto primeiro (caso cole um ID)
         target_id = parse_hybrid_id(txt)
         pdata = None
         
-        # 1. Tenta buscar por ID direto
-        if target_id: 
+        if target_id:
             pdata = await get_player_data(target_id)
-        
-        # 2. Se não achou ou não é ID, busca por nome
+            
+        # Se não é ID, usa a busca inteligente por NOME
         if not pdata:
-            # Proteção contra erros no find_player_by_name
-            try:
-                found = await find_player_by_name(txt)
-                if found:
-                    # Garante que o retorno é desempacotável
-                    if isinstance(found, (list, tuple)) and len(found) >= 2:
-                        target_id, pdata = found[0], found[1]
-            except Exception as e_query:
-                logger.error(f"Erro ao buscar jogador por nome '{txt}': {e_query}")
+            found = await find_player_by_name(txt)
+            if found:
+                target_id, pdata = found
         
-        # 3. Resultado
         if not pdata:
-            await status_msg.edit_text("❌ Jogador não encontrado.\nTente novamente ou envie o ID.")
+            await loading_msg.edit_text(f"❌ Jogador '<b>{html.escape(txt)}</b>' não encontrado.\nTente o nome exato ou @usuario.", parse_mode="HTML")
             return ASK_NAME
             
         context.user_data['prem_target_id'] = target_id
-        
-        # Apaga a mensagem de "Procurando..." e mostra o painel
-        await status_msg.delete()
+        await loading_msg.delete()
         await _show_player_panel(update, context, pdata)
         
     except Exception as e:
-        logger.exception("Erro fatal no gerenciador premium:")
-        await status_msg.edit_text(f"❌ Erro interno ao processar: {e}")
-        
+        logger.error(f"Erro no Painel Premium: {e}")
+        await loading_msg.edit_text(f"❌ Erro ao buscar: {e}")
+
     return ASK_NAME
 
 async def _show_player_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, pdata: dict):
+    # (Mantido igual ao seu arquivo original, apenas garantindo o display correto)
     name = pdata.get("character_name", "Sem Nome")
     uid = pdata.get("user_id") or pdata.get("_id")
     tier = pdata.get("premium_tier", "free")
     expires = pdata.get("premium_expires_at")
-    
     tier_name = PREMIUM_TIERS.get(tier, {}).get("display_name", tier.capitalize())
     
     msg = (
@@ -182,17 +147,12 @@ async def _show_player_panel(update: Update, context: ContextTypes.DEFAULT_TYPE,
         [InlineKeyboardButton("🔙 Sair", callback_data="prem_close")]
     ]
     
-    markup = InlineKeyboardMarkup(kb)
-    
-    # Se foi chamado via callback (botão) edita, se foi via texto (input nome) envia nova
     if update.callback_query:
-        await update.callback_query.edit_message_text(msg, reply_markup=markup, parse_mode="HTML")
+        await update.callback_query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     else:
-        await update.message.reply_text(msg, reply_markup=markup, parse_mode="HTML")
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
-# ==============================================================================
-# AÇÕES
-# ==============================================================================
+# --- AÇÕES (Mantidas do original, só repassando para garantir integridade) ---
 async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -202,11 +162,9 @@ async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     pdata = await get_player_data(target_id)
     if pdata:
         pdata['premium_tier'] = new_tier
-        # Se não tem data, define +30 dias a partir de AGORA (UTC)
         if not pdata.get("premium_expires_at"):
             now = datetime.now(timezone.utc)
             pdata['premium_expires_at'] = (now + timedelta(days=30)).isoformat()
-        
         await _save_and_refresh(target_id, pdata)
         await _show_player_panel(update, context, pdata)
     return ASK_NAME
@@ -221,20 +179,14 @@ async def _action_mod_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if pdata:
         current_str = pdata.get("premium_expires_at")
         now_utc = datetime.now(timezone.utc)
-        
-        # Se já tem data, usa ela. Se não, usa Agora.
         if current_str:
             base_date = _parse_smart_date(current_str)
-            # Se a data antiga já passou (estava vencido), reinicia do Agora
-            if base_date < now_utc:
-                base_date = now_utc
-        else:
-            base_date = now_utc
+            if base_date < now_utc: base_date = now_utc
+        else: base_date = now_utc
 
         new_date = base_date + timedelta(days=days_delta)
         pdata['premium_expires_at'] = new_date.isoformat()
         
-        # Se adicionou dias em conta Free, vira Premium básico
         if pdata.get("premium_tier", "free") == "free" and days_delta > 0:
              pdata['premium_tier'] = "premium"
              
@@ -261,7 +213,7 @@ async def _action_change_user(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     context.user_data.pop('prem_target_id', None)
     await query.edit_message_text(
-        "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o novo <b>Nome</b> ou <b>ID</b>:",
+        "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o novo <b>Nome</b> ou <b>@Usuario</b>:",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]])
     )
