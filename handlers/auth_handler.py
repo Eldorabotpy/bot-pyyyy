@@ -1,5 +1,5 @@
 # handlers/auth_handler.py
-# (VERSÃO FINAL OFICIAL: Auth Híbrida + Auto-Login Integrado)
+# (VERSÃO BLINDADA: Proteção contra falha de banco no /start)
 
 import logging
 import hashlib
@@ -23,7 +23,7 @@ from telegram.constants import ChatType
 # --- MÓDULOS INTERNOS ---
 from modules.auth_utils import get_current_player_id
 from modules.player.core import clear_player_cache, get_player_data
-# Importa o gerenciador de sessões diretamente (sem try/except, pois o arquivo existe)
+# Importa o gerenciador de sessões
 from modules.sessions import save_persistent_session, get_persistent_session, clear_persistent_session
 
 # Tenta importar start_command opcionalmente
@@ -35,9 +35,10 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# CONEXÃO MONGODB (Mantendo local para garantir funcionamento deste módulo)
+# CONEXÃO MONGODB (Local para garantir funcionamento)
 # ==============================================================================
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+users_collection = None
 
 try:
     client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
@@ -45,7 +46,7 @@ try:
     users_collection = db["users"] 
     logger.info("✅ [AUTH] Conexão MongoDB estabelecida.")
 except Exception as e:
-    logger.critical(f"❌ [AUTH] FALHA CONEXÃO: {e}")
+    logger.error(f"❌ [AUTH] FALHA CONEXÃO: {e}")
     users_collection = None
 
 # ==============================================================================
@@ -86,26 +87,24 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     # --- LÓGICA DE AUTO-LOGIN ---
-    # 1. Verifica memória RAM
     session_id = get_current_player_id(update, context)
     tg_id = update.effective_user.id
 
-    # 2. Se não tem na RAM, busca no Banco (Persistência)
     if not session_id:
         saved_id = await get_persistent_session(tg_id)
         if saved_id:
-            # Verifica se esse ID ainda é válido no banco de usuários
-            user_exists = await asyncio.to_thread(users_collection.find_one, {"_id": ObjectId(saved_id)})
-            if user_exists:
-                # Restaura sessão
-                context.user_data['logged_player_id'] = saved_id
-                session_id = saved_id
-                logger.info(f"🔄 Auto-Login: {tg_id} -> {saved_id}")
-            else:
-                # Sessão inválida (conta deletada?), limpa
-                await clear_persistent_session(tg_id)
+            # Proteção: Só busca se a coleção existir
+            if users_collection:
+                try:
+                    user_exists = await asyncio.to_thread(users_collection.find_one, {"_id": ObjectId(saved_id)})
+                    if user_exists:
+                        context.user_data['logged_player_id'] = saved_id
+                        session_id = saved_id
+                        logger.info(f"🔄 Auto-Login: {tg_id} -> {saved_id}")
+                    else:
+                        await clear_persistent_session(tg_id)
+                except: pass
 
-    # 3. Se temos uma sessão válida, pula o login
     if session_id:
         if start_command: 
             await start_command(update, context)
@@ -116,15 +115,20 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- MODO DESLOGADO: MOSTRA MENU ---
     context.user_data.clear()
     
-    # Verifica se tem conta legada para sugerir migração
     has_legacy = False
-    legacy_data = await get_player_data(tg_id) # Busca no players (antigo) via ponte
-    
-    if legacy_data:
-        # Se tem conta antiga, verifica se JÁ migrou (se tem telegram_id_owner no users)
-        already_migrated = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": tg_id})
-        if not already_migrated:
-            has_legacy = True
+    try:
+        legacy_data = await get_player_data(tg_id)
+        if legacy_data:
+            already_migrated = False
+            # --- PROTEÇÃO CRÍTICA QUE FALTAVA ---
+            if users_collection:
+                doc = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": tg_id})
+                if doc: already_migrated = True
+            
+            if not already_migrated:
+                has_legacy = True
+    except Exception as e:
+        logger.error(f"Erro ao verificar legado: {e}")
 
     keyboard = []
     if has_legacy:
@@ -175,23 +179,23 @@ async def receive_user_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     password = update.message.text.strip()
-    try: await update.message.delete() # Apaga a senha do chat por segurança
+    try: await update.message.delete()
     except: pass
     
     username = context.user_data.get('auth_temp_user')
     password_hash = hash_password(password)
     
+    if not users_collection:
+        await update.message.reply_text("❌ Erro de conexão com banco de dados.")
+        return ConversationHandler.END
+
     user_doc = await asyncio.to_thread(users_collection.find_one, {"username": username, "password": password_hash})
 
     if user_doc:
         new_player_id = str(user_doc['_id'])
-        
-        # Limpa cache antigo e define sessão na RAM
         await clear_player_cache(new_player_id)
         context.user_data.clear()
         context.user_data['logged_player_id'] = new_player_id
-        
-        # ✅ SALVA PERSISTÊNCIA (AUTO-LOGIN)
         await save_persistent_session(update.effective_user.id, new_player_id)
         
         await update.message.reply_photo(photo=IMG_LOGIN, caption=f"🔓 <b>Bem-vindo, {user_doc.get('character_name', username)}!</b>\n<i>Sessão salva.</i>", parse_mode="HTML")
@@ -218,6 +222,10 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Muito curto. Tente outro:")
         return TYPING_USER_REG
     
+    if not users_collection:
+         await update.message.reply_text("❌ Erro no banco de dados. Tente mais tarde.")
+         return ConversationHandler.END
+
     exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
     if exists: 
         await update.message.reply_text("⚠️ Em uso. Tente outro:")
@@ -239,7 +247,7 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_player_doc = {
         "username": username,
         "password": hash_password(password),
-        "telegram_id_owner": owner_id, # Vincula ao Telegram para recuperação
+        "telegram_id_owner": owner_id, 
         "created_at": now_iso,
         "last_seen": now_iso,
         "character_name": username.capitalize(),
@@ -250,16 +258,13 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "premium_tier": "free", "gems": 0
     }
     
-    result = await asyncio.to_thread(users_collection.insert_one, new_player_doc)
-    new_player_id = str(result.inserted_id)
-    
-    context.user_data['logged_player_id'] = new_player_id
-    
-    # ✅ SALVA PERSISTÊNCIA
-    await save_persistent_session(owner_id, new_player_id)
-
-    await update.message.reply_photo(photo=IMG_NOVO, caption="🎉 <b>Conta Criada!</b>\nVocê já está logado.", parse_mode="HTML")
-    if start_command: await start_command(update, context)
+    if users_collection:
+        result = await asyncio.to_thread(users_collection.insert_one, new_player_doc)
+        new_player_id = str(result.inserted_id)
+        context.user_data['logged_player_id'] = new_player_id
+        await save_persistent_session(owner_id, new_player_id)
+        await update.message.reply_photo(photo=IMG_NOVO, caption="🎉 <b>Conta Criada!</b>\nVocê já está logado.", parse_mode="HTML")
+        if start_command: await start_command(update, context)
     return ConversationHandler.END
 
 # ==============================================================================
@@ -275,10 +280,11 @@ async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def receive_user_migrate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.text.strip().lower()
-    exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
-    if exists:
-        await update.message.reply_text("⚠️ Em uso. Tente outro:")
-        return TYPING_USER_MIGRATE
+    if users_collection:
+        exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
+        if exists:
+            await update.message.reply_text("⚠️ Em uso. Tente outro:")
+            return TYPING_USER_MIGRATE
         
     context.user_data['mig_temp_user'] = username
     await update.message.reply_text("2️⃣ Escolha uma <b>SENHA</b>:", parse_mode="HTML")
@@ -291,39 +297,29 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     
     username = context.user_data['mig_temp_user']
     tg_id = update.effective_user.id
-    
-    # Busca dados antigos usando a ponte do player_manager
     old_data = await get_player_data(tg_id)
     
     if not old_data:
-        # Fallback raro: se não achou dados, cria do zero
         new_data = {
             "username": username, "password": hash_password(password),
             "telegram_id_owner": tg_id, "migrated_at": datetime.now().isoformat(),
             "character_name": username.capitalize(), "level": 1, "gold": 100
         }
     else:
-        # Clona dados antigos
         new_data = dict(old_data)
-        if "_id" in new_data: del new_data["_id"] # Remove ID numérico antigo
-        
+        if "_id" in new_data: del new_data["_id"]
         new_data.update({
-            "username": username,
-            "password": hash_password(password),
-            "telegram_id_owner": tg_id, # Vínculo vital para o Mercado funcionar
-            "migrated_at": datetime.now().isoformat(),
-            "is_migrated": True
+            "username": username, "password": hash_password(password),
+            "telegram_id_owner": tg_id, "migrated_at": datetime.now().isoformat(), "is_migrated": True
         })
     
-    result = await asyncio.to_thread(users_collection.insert_one, new_data)
-    new_player_id = str(result.inserted_id)
-    
-    await clear_player_cache(tg_id)
-    context.user_data.clear()
-    context.user_data['logged_player_id'] = new_player_id
-
-    # ✅ SALVA PERSISTÊNCIA
-    await save_persistent_session(tg_id, new_player_id)
+    if users_collection:
+        result = await asyncio.to_thread(users_collection.insert_one, new_data)
+        new_player_id = str(result.inserted_id)
+        await clear_player_cache(tg_id)
+        context.user_data.clear()
+        context.user_data['logged_player_id'] = new_player_id
+        await save_persistent_session(tg_id, new_player_id)
     
     await update.message.reply_photo(photo=IMG_MIGRA, caption="✅ <b>Migração Concluída!</b>\nSeus itens e nível foram salvos.", parse_mode="HTML")
     if start_command: await start_command(update, context)
@@ -337,38 +333,24 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ✅ LOGOUT REAL: Limpa RAM e Banco
     uid = get_current_player_id(update, context)
     if uid: await clear_player_cache(uid)
-    
     await clear_persistent_session(update.effective_user.id)
     context.user_data.clear()
-    
     await update.message.reply_text("🔒 <b>Você saiu.</b>\nSeu auto-login foi removido.", parse_mode="HTML")
 
 async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     try: await q.answer("Saindo...")
     except: pass
-    
-    # Limpa tudo
     await clear_persistent_session(update.effective_user.id)
     context.user_data.clear()
     if context.chat_data: context.chat_data.clear()
-    
     try: await q.delete_message()
     except: pass
 
-    # Mostra tela de login novamente
-    keyboard = [
-        [InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')],
-        [InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')]
-    ]
-    await context.bot.send_photo(
-        chat_id=update.effective_chat.id, photo=IMG_NOVO,
-        caption="🔒 <b>Desconectado.</b>\nEntre novamente para jogar:",
-        reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML"
-    )
+    keyboard = [[InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')], [InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')]]
+    await context.bot.send_photo(chat_id=update.effective_chat.id, photo=IMG_NOVO, caption="🔒 <b>Desconectado.</b>\nEntre novamente para jogar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     return ConversationHandler.END
 
 auth_handler = ConversationHandler(
