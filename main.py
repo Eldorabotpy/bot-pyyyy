@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO CORRIGIDA: Chama register_admin_handlers corretamente)
+# (VERSÃO FINAL ESTRUTURADA: Prioridade de Login corrigida)
 
 from __future__ import annotations
 import asyncio
@@ -7,14 +7,9 @@ import os
 import sys
 import logging
 from threading import Thread
-from datetime import time as dt_time, timezone
-from zoneinfo import ZoneInfo
-from registries.startup import run_system_startup_tasks
-from handlers.admin.media_handler import set_media_command
 
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-# Importação necessária para corrigir o erro de Timeout
 from telegram.request import HTTPXRequest 
 from telegram.ext import (
     Application, 
@@ -28,7 +23,7 @@ from telegram.ext import (
 )
 from telegram.constants import ChatType
 
-# Configuração de Path
+# Configuração de Path (Garante que módulos sejam encontrados)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dotenv import load_dotenv
@@ -40,38 +35,22 @@ from flask import Flask
 from config import (
     ADMIN_ID, 
     TELEGRAM_TOKEN, 
-    EVENT_TIMES, 
-    JOB_TIMEZONE, 
-    WORLD_BOSS_TIMES, 
     STARTUP_IMAGE_ID
 )
 
-# --- IMPORTS DOS HANDLERS ---
+# --- IMPORTS DOS HANDLERS ESPECÍFICOS ---
+# Autenticação (Login/Registro)
 from handlers.auth_handler import auth_handler, logout_command, logout_callback
+# Comando Start e Ferramentas Admin Básicas
 from handlers.start_handler import start_command_handler
 from handlers.admin.file_id_conv import file_id_conv_handler
+from handlers.admin.media_handler import set_media_command
 
-# --- IMPORTS DOS REGISTRIES (AQUI ESTÁ A CORREÇÃO) ---
+# --- IMPORTS DOS REGISTROS (A Mágica acontece aqui) ---
+# Importamos a função MESTRA que carrega todos os sistemas do jogo
 from registries import register_all_handlers
-from registries.class_evolution import register_evolution_handlers
-from registries.market import register_market_handlers
-# Importa o registro mestre de admins que você criou
-from registries.admin import register_admin_handlers 
-
-# --- IMPORTS DOS JOBS ---
-from handlers.jobs import (
-    daily_crystal_grant_job,
-    start_kingdom_defense_event,
-    start_world_boss_job,
-    end_world_boss_job,
-    job_pvp_monthly_reset,
-    check_premium_expiry_job
-)
-
-try:
-    from handlers.jobs import daily_pvp_entry_reset_job
-except ImportError:
-    daily_pvp_entry_reset_job = None
+# Importamos as tarefas de inicialização (Jobs, Watchdogs)
+from registries.startup import run_system_startup_tasks
 
 try:
     from modules.world_boss.engine import world_boss_manager
@@ -102,19 +81,22 @@ def start_keep_alive():
     t.start()
 
 # ==============================================================================
-# TAREFAS DE INICIALIZAÇÃO
+# TAREFAS DE INICIALIZAÇÃO (POST-INIT)
 # ==============================================================================
 async def post_init_tasks(application: Application):
-    # 1. Tratamento de Boss
-    if world_boss_manager and world_boss_manager.is_active:
-        logger.warning("Boss ativo detectado. Reiniciando status...")
-        world_boss_manager.end_event(reason="Reinício")
+    """Executado assim que o bot conecta no Telegram"""
     
-    # 2. Inicialização do Sistema (Mensagens Admin, Agendamentos, Watchdogs)
+    # 1. Tratamento de Boss (Evita boss travado em restart)
+    if world_boss_manager and world_boss_manager.is_active:
+        logger.warning("Boss ativo detectado no reinício. Resetando status...")
+        world_boss_manager.end_event(reason="Reinício do Sistema")
+    
+    # 2. Chama o gerenciador de Startup (Jobs, Watchdogs, Msgs)
+    # Isso vem do arquivo registries/startup.py que você enviou
     await run_system_startup_tasks(application)
 
 # ==============================================================================
-# 1. BOAS-VINDAS (Permitido em Grupos)
+# 1. BOAS-VINDAS EM GRUPOS (Middleware)
 # ==============================================================================
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.new_chat_members: return
@@ -141,13 +123,15 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text(f"Bem-vindo {member.mention_html()}! Jogue aqui: @{bot_username}", parse_mode="HTML")
 
 # ==============================================================================
-# 2. A BARREIRA (TypeHandler)
+# 2. A BARREIRA DE GRUPOS (Bloqueia comandos em grupos para não-admins)
 # ==============================================================================
 async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == ChatType.PRIVATE:
         return 
 
+    # Se for grupo/supergrupo
     if update.effective_chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+        # Permite apenas Admin Global usar comandos no grupo (para manutenção)
         if update.effective_user:
             tg_user_id_str = str(update.effective_user.id)
             admin_id_str = str(ADMIN_ID)
@@ -155,18 +139,20 @@ async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYP
             if tg_user_id_str == admin_id_str:
                 return 
         
+        # Bloqueia o processamento para qualquer outro handler abaixo
         raise ApplicationHandlerStop
 
 # ==============================================================================
 # EXECUÇÃO PRINCIPAL
 # ==============================================================================
 if __name__ == '__main__':
+    # Inicia Web Server
     try:
         start_keep_alive()
         logging.info("Web Server OK.")
     except Exception: pass
 
-    # --- CORREÇÃO DE TIMEOUT ---
+    # Configuração HTTPX (Evita Timeouts de Rede)
     request_config = HTTPXRequest(
         connection_pool_size=8,
         connect_timeout=60.0,
@@ -174,6 +160,7 @@ if __name__ == '__main__':
         write_timeout=60.0
     )
 
+    # Constrói a Aplicação
     application = (
         Application.builder()
         .token(TELEGRAM_TOKEN)
@@ -183,55 +170,46 @@ if __name__ == '__main__':
     )
     
     # ==========================================================================
-    # ORDEM DE HANDLERS (CRÍTICA PARA FUNCIONAMENTO)
+    # 🚨 ORDEM DE HANDLERS (NÃO ALTERE A ORDEM) 🚨
     # ==========================================================================
 
-    # 1. BARREIRA GLOBAL (Group -1)
+    # GRUPO -1: MIDDLEWARES E BLOQUEIOS (Rodam antes de tudo)
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member), group=-1)
     application.add_handler(TypeHandler(Update, master_group_blocker), group=-1)
 
     # --------------------------------------------------------------------------
-    # 2. SISTEMAS PRIORITÁRIOS & CONVERSATIONS (Group 0 - Topo)
-    # Devem vir ANTES do Auth para capturar inputs de menus abertos
+    # GRUPO 0: FLUXO PRINCIPAL
     # --------------------------------------------------------------------------
     
-    # Ferramentas Admin Básicas
+    # 1️⃣ LOGIN E AUTH (Prioridade Máxima)
+    # Se o usuário estiver no meio do login, este handler captura o texto (senha)
+    # ANTES que os sistemas do jogo tentem processar.
+    application.add_handler(auth_handler)
+
+    # 2️⃣ FERRAMENTAS BÁSICAS E ADMIN
     application.add_handler(file_id_conv_handler)
     application.add_handler(CommandHandler("setmedia", set_media_command))
     
-    # >>> AQUI ESTÁ A CORREÇÃO PRINCIPAL <<<
-    # Chama o seu arquivo registries/admin.py que gerencia premium, gemas e edit player
-    register_admin_handlers(application)
-    
-    # Sistemas de Jogo (Mercado, Evolução)
-    register_market_handlers(application)
-    register_evolution_handlers(application)
-    
-    # Registro Geral (Outros sistemas do jogo)
+    # 3️⃣ SISTEMAS DO JOGO (Registries)
+    # Carrega: Admin, Character, Combat, Crafting, Market, Regions, Guild, Events
+    # Tudo definido no seu arquivo registries/__init__.py
     register_all_handlers(application)
 
-    # --------------------------------------------------------------------------
-    # 3. AUTENTICAÇÃO E MENU PRINCIPAL (Group 0 - Fundo)
-    # Só capturam o que não foi pego pelos sistemas acima
-    # --------------------------------------------------------------------------
-    
-    # Autenticação (Login)
-    application.add_handler(auth_handler)
-    
-    # Logout e Start
+    # 4️⃣ FALLBACKS (Comandos Gerais)
+    # Logout e Start ficam por último para não interferir em conversas ativas
     application.add_handler(CommandHandler("logout", logout_command))
     application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
     application.add_handler(start_command_handler)
 
     # --------------------------------------------------------------------------
-    # 4. DEBUG (Opcional)
-    # --------------------------------------------------------------------------
+    # DEBUG (Opcional)
     try:
         from handlers.jobs import cmd_force_pvp_reset
         application.add_handler(CommandHandler("debug_reset", cmd_force_pvp_reset))
     except ImportError: pass
 
-    logging.info("Handlers registrados. Admin Registry ativado.")
+    logging.info("✅ Todos os Handlers Registrados na Ordem Correta.")
+    logging.info("🚀 Iniciando Polling...")
     
     # Inicia o bot
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)

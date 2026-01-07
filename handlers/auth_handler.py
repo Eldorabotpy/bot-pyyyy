@@ -1,5 +1,5 @@
 # handlers/auth_handler.py
-# (VERSÃO BLINDADA: Proteção contra falha de banco no /start)
+# (VERSÃO BLINDADA: Correção do erro 'Collection truth value')
 
 import logging
 import hashlib
@@ -26,7 +26,6 @@ from modules.player.core import clear_player_cache, get_player_data
 # Importa o gerenciador de sessões
 from modules.sessions import save_persistent_session, get_persistent_session, clear_persistent_session
 
-# Tenta importar start_command opcionalmente
 try:
     from handlers.start_handler import start_command
 except ImportError:
@@ -93,8 +92,8 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not session_id:
         saved_id = await get_persistent_session(tg_id)
         if saved_id:
-            # Proteção: Só busca se a coleção existir
-            if users_collection:
+            # CORREÇÃO CRÍTICA: is not None
+            if users_collection is not None:
                 try:
                     user_exists = await asyncio.to_thread(users_collection.find_one, {"_id": ObjectId(saved_id)})
                     if user_exists:
@@ -120,8 +119,8 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         legacy_data = await get_player_data(tg_id)
         if legacy_data:
             already_migrated = False
-            # --- PROTEÇÃO CRÍTICA QUE FALTAVA ---
-            if users_collection:
+            # CORREÇÃO CRÍTICA: is not None
+            if users_collection is not None:
                 doc = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": tg_id})
                 if doc: already_migrated = True
             
@@ -173,6 +172,7 @@ async def btn_login_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return TYPING_USER_LOGIN
 
 async def receive_user_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Recebe o usuário e pede a senha
     context.user_data['auth_temp_user'] = update.message.text.strip().lower()
     await update.message.reply_text("🔑 Digite sua <b>SENHA</b>:", parse_mode="HTML")
     return TYPING_PASS_LOGIN
@@ -185,7 +185,8 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     username = context.user_data.get('auth_temp_user')
     password_hash = hash_password(password)
     
-    if not users_collection:
+    # CORREÇÃO CRÍTICA: is None
+    if users_collection is None:
         await update.message.reply_text("❌ Erro de conexão com banco de dados.")
         return ConversationHandler.END
 
@@ -222,7 +223,8 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Muito curto. Tente outro:")
         return TYPING_USER_REG
     
-    if not users_collection:
+    # CORREÇÃO CRÍTICA: is None
+    if users_collection is None:
          await update.message.reply_text("❌ Erro no banco de dados. Tente mais tarde.")
          return ConversationHandler.END
 
@@ -258,7 +260,8 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "premium_tier": "free", "gems": 0
     }
     
-    if users_collection:
+    # CORREÇÃO CRÍTICA: is not None
+    if users_collection is not None:
         result = await asyncio.to_thread(users_collection.insert_one, new_player_doc)
         new_player_id = str(result.inserted_id)
         context.user_data['logged_player_id'] = new_player_id
@@ -280,7 +283,8 @@ async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def receive_user_migrate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.text.strip().lower()
-    if users_collection:
+    # CORREÇÃO CRÍTICA: is not None
+    if users_collection is not None:
         exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
         if exists:
             await update.message.reply_text("⚠️ Em uso. Tente outro:")
@@ -313,7 +317,8 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
             "telegram_id_owner": tg_id, "migrated_at": datetime.now().isoformat(), "is_migrated": True
         })
     
-    if users_collection:
+    # CORREÇÃO CRÍTICA: is not None
+    if users_collection is not None:
         result = await asyncio.to_thread(users_collection.insert_one, new_data)
         new_player_id = str(result.inserted_id)
         await clear_player_cache(tg_id)
