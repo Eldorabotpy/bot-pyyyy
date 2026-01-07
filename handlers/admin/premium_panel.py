@@ -1,3 +1,6 @@
+# handlers/admin/premium_panel.py
+# (VERSÃO FINAL: Integração com a busca corrigida)
+
 from __future__ import annotations
 import logging
 import html
@@ -16,7 +19,6 @@ from telegram.ext import (
 )
 
 from modules.player.core import get_player_data, save_player_data, clear_player_cache, users_collection
-# Agora usa a função inteligente que criamos no queries.py
 from modules.player.queries import find_player_by_name 
 from modules.game_data.premium import PREMIUM_TIERS
 from handlers.admin.utils import ensure_admin, parse_hybrid_id
@@ -25,7 +27,6 @@ JOB_TIMEZONE = "America/Sao_Paulo"
 logger = logging.getLogger(__name__)
 (ASK_NAME,) = range(1)
 
-# ... (Funções de Data _parse_smart_date e _format_date_br mantidas iguais) ...
 def _parse_smart_date(value) -> datetime:
     if not value: return datetime.now(timezone.utc)
     try:
@@ -44,7 +45,8 @@ def _format_date_br(iso_str: str, tier: str) -> str:
 
 async def _save_and_refresh(user_id, pdata):
     await save_player_data(user_id, pdata)
-    if users_collection:
+    # --- CORREÇÃO DO ERRO AQUI TAMBÉM ---
+    if users_collection is not None:
         try:
             q = {"_id": ObjectId(user_id)} if ObjectId.is_valid(user_id) else None
             if q:
@@ -55,7 +57,7 @@ async def _save_and_refresh(user_id, pdata):
         except: pass
     await clear_player_cache(user_id)
 
-# --- PAINEL ---
+# --- FLUXO DO PAINEL ---
 
 async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -68,7 +70,7 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             return ASK_NAME
     
     await query.edit_message_text(
-        "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o <b>Nome do Personagem</b> ou <b>@Usuario</b>:",
+        "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o <b>Nome</b> ou <b>@Usuario</b>:",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]])
     )
@@ -76,39 +78,37 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     txt = update.message.text.strip()
-    # Feedback visual
-    loading_msg = await update.message.reply_text("🔍 Buscando jogador...", quote=True)
+    loading = await update.message.reply_text("🔍 ...", quote=True)
     
     try:
-        # Tenta achar ID direto primeiro (caso cole um ID)
+        # 1. Tenta ID direto
         target_id = parse_hybrid_id(txt)
         pdata = None
         
         if target_id:
             pdata = await get_player_data(target_id)
             
-        # Se não é ID, usa a busca inteligente por NOME
+        # 2. Tenta por NOME ou USERNAME (Função corrigida no queries.py)
         if not pdata:
             found = await find_player_by_name(txt)
             if found:
                 target_id, pdata = found
         
         if not pdata:
-            await loading_msg.edit_text(f"❌ Jogador '<b>{html.escape(txt)}</b>' não encontrado.\nTente o nome exato ou @usuario.", parse_mode="HTML")
+            await loading.edit_text(f"❌ Não encontrado: <b>{html.escape(txt)}</b>\nVerifique se o nome/user está exato.", parse_mode="HTML")
             return ASK_NAME
             
         context.user_data['prem_target_id'] = target_id
-        await loading_msg.delete()
+        await loading.delete()
         await _show_player_panel(update, context, pdata)
         
     except Exception as e:
-        logger.error(f"Erro no Painel Premium: {e}")
-        await loading_msg.edit_text(f"❌ Erro ao buscar: {e}")
+        logger.error(f"Erro painel premium: {e}")
+        await loading.edit_text(f"⚠️ Erro técnico: {str(e)}")
 
     return ASK_NAME
 
 async def _show_player_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, pdata: dict):
-    # (Mantido igual ao seu arquivo original, apenas garantindo o display correto)
     name = pdata.get("character_name", "Sem Nome")
     uid = pdata.get("user_id") or pdata.get("_id")
     tier = pdata.get("premium_tier", "free")
@@ -147,12 +147,13 @@ async def _show_player_panel(update: Update, context: ContextTypes.DEFAULT_TYPE,
         [InlineKeyboardButton("🔙 Sair", callback_data="prem_close")]
     ]
     
+    markup = InlineKeyboardMarkup(kb)
     if update.callback_query:
-        await update.callback_query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        await update.callback_query.edit_message_text(msg, reply_markup=markup, parse_mode="HTML")
     else:
-        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        await update.message.reply_text(msg, reply_markup=markup, parse_mode="HTML")
 
-# --- AÇÕES (Mantidas do original, só repassando para garantir integridade) ---
+# --- AÇÕES DO MENU ---
 async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
