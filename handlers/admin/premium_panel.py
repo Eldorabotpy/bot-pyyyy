@@ -1,5 +1,5 @@
 # handlers/admin/premium_panel.py
-# (VERSÃO CORRIGIDA: UTC Storage -> BRT Display)
+# (VERSÃO CORRIGIDA: Tratamento de erro na busca de jogador e logs)
 
 from __future__ import annotations
 import logging
@@ -83,12 +83,15 @@ async def _save_and_refresh(user_id, pdata):
 async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    
+    # Se já tem um alvo selecionado na memória, abre direto
     if context.user_data.get('prem_target_id'):
         target_id = context.user_data['prem_target_id']
         pdata = await get_player_data(target_id)
         if pdata:
             await _show_player_panel(update, context, pdata)
             return ASK_NAME
+            
     await query.edit_message_text(
         "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o <b>Nome</b> ou <b>ID</b>:",
         parse_mode="HTML",
@@ -98,17 +101,45 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     txt = update.message.text.strip()
-    target_id = parse_hybrid_id(txt)
-    pdata = None
-    if target_id: pdata = await get_player_data(target_id)
-    if not pdata:
-        found = await find_player_by_name(txt)
-        if found: target_id, pdata = found
-    if not pdata:
-        await update.message.reply_text("❌ Jogador não encontrado.")
-        return ASK_NAME
-    context.user_data['prem_target_id'] = target_id
-    await _show_player_panel(update, context, pdata)
+    
+    # Feedback visual (opcional, ajuda a saber que o bot leu)
+    status_msg = await update.message.reply_text("🔍 Procurando...", quote=True)
+    
+    try:
+        target_id = parse_hybrid_id(txt)
+        pdata = None
+        
+        # 1. Tenta buscar por ID direto
+        if target_id: 
+            pdata = await get_player_data(target_id)
+        
+        # 2. Se não achou ou não é ID, busca por nome
+        if not pdata:
+            # Proteção contra erros no find_player_by_name
+            try:
+                found = await find_player_by_name(txt)
+                if found:
+                    # Garante que o retorno é desempacotável
+                    if isinstance(found, (list, tuple)) and len(found) >= 2:
+                        target_id, pdata = found[0], found[1]
+            except Exception as e_query:
+                logger.error(f"Erro ao buscar jogador por nome '{txt}': {e_query}")
+        
+        # 3. Resultado
+        if not pdata:
+            await status_msg.edit_text("❌ Jogador não encontrado.\nTente novamente ou envie o ID.")
+            return ASK_NAME
+            
+        context.user_data['prem_target_id'] = target_id
+        
+        # Apaga a mensagem de "Procurando..." e mostra o painel
+        await status_msg.delete()
+        await _show_player_panel(update, context, pdata)
+        
+    except Exception as e:
+        logger.exception("Erro fatal no gerenciador premium:")
+        await status_msg.edit_text(f"❌ Erro interno ao processar: {e}")
+        
     return ASK_NAME
 
 async def _show_player_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, pdata: dict):
@@ -152,6 +183,8 @@ async def _show_player_panel(update: Update, context: ContextTypes.DEFAULT_TYPE,
     ]
     
     markup = InlineKeyboardMarkup(kb)
+    
+    # Se foi chamado via callback (botão) edita, se foi via texto (input nome) envia nova
     if update.callback_query:
         await update.callback_query.edit_message_text(msg, reply_markup=markup, parse_mode="HTML")
     else:
@@ -204,8 +237,6 @@ async def _action_mod_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # Se adicionou dias em conta Free, vira Premium básico
         if pdata.get("premium_tier", "free") == "free" and days_delta > 0:
              pdata['premium_tier'] = "premium"
-        
-        # Se removeu dias e ficou no passado, o Job vai limpar depois, mas já fica negativo aqui
              
         await _save_and_refresh(target_id, pdata)
         await query.answer(f"Tempo ajustado ({days_delta}d).")
