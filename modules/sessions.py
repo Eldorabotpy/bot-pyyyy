@@ -1,49 +1,73 @@
 # modules/sessions.py
-# (NOVO ARQUIVO: Gerencia Login Automático Persistente)
+# (VERSÃO CORRIGIDA: Conexão Independente e Segura)
 
-from modules.player.core import db
 import logging
-from datetime import datetime
+import certifi
+import asyncio
+from datetime import datetime, timezone
+from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
-# Coleção dedicada para sessões ativas
-# Estrutura: { "_id": TelegramID (int), "player_id": "ObjectId_String", "last_login": Date }
-sessions_collection = db["active_sessions"]
+# Configuração MongoDB Independente (Mais seguro para evitar erros de importação)
+MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+sessions_collection = None
+
+try:
+    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
+    db = client["eldora_db"]
+    sessions_collection = db["active_sessions"] # Usando a coleção correta
+    sessions_collection.create_index("telegram_id", unique=True)
+    logger.info("✅ [SESSIONS] Conexão MongoDB estabelecida.")
+except Exception as e:
+    logger.error(f"❌ [SESSIONS] Erro ao conectar: {e}")
+
+# --- Helper Async ---
+async def asyncio_wrap(func, *args, **kwargs):
+    """Executa chamadas síncronas do PyMongo em thread separada."""
+    return await asyncio.to_thread(func, *args, **kwargs)
+
+# ==============================================================================
+# FUNÇÕES DE PERSISTÊNCIA
+# ==============================================================================
 
 async def save_persistent_session(telegram_user_id: int, player_id: str):
-    """Salva o login no banco para resistir a reinicializações."""
+    """Salva o login no banco."""
+    if sessions_collection is None: return
+
     try:
-        await asyncio_wrap(sessions_collection.replace_one, 
+        await asyncio_wrap(
+            sessions_collection.replace_one,
             {"_id": telegram_user_id},
             {
                 "_id": telegram_user_id,
+                "telegram_id": telegram_user_id, # Redundância útil
                 "player_id": str(player_id),
-                "last_login": datetime.utcnow()
+                "last_login": datetime.now(timezone.utc)
             },
             upsert=True
         )
     except Exception as e:
-        logger.error(f"Erro ao salvar sessão persistente: {e}")
+        logger.error(f"Erro ao salvar sessão: {e}")
 
 async def get_persistent_session(telegram_user_id: int) -> str | None:
-    """Verifica se existe um login salvo no banco."""
+    """Recupera o ID do jogador logado."""
+    if sessions_collection is None: return None
+
     try:
         doc = await asyncio_wrap(sessions_collection.find_one, {"_id": telegram_user_id})
         if doc:
             return doc.get("player_id")
     except Exception as e:
-        logger.error(f"Erro ao recuperar sessão persistente: {e}")
+        logger.error(f"Erro ao buscar sessão: {e}")
+    
     return None
 
 async def clear_persistent_session(telegram_user_id: int):
-    """Remove o login do banco (Logout Real)."""
+    """Remove a sessão (Logout)."""
+    if sessions_collection is None: return
+
     try:
         await asyncio_wrap(sessions_collection.delete_one, {"_id": telegram_user_id})
     except Exception as e:
         logger.error(f"Erro ao limpar sessão: {e}")
-
-# Helper simples para rodar pymongo em async
-import asyncio
-async def asyncio_wrap(func, *args, **kwargs):
-    return await asyncio.to_thread(func, *args, **kwargs)
