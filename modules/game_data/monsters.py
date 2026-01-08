@@ -60,30 +60,30 @@ MONSTERS_DATA = {
          "media_key": "trial_wrath_god_media"}, # T6
 
         # ==================== GUARDÕES DO CAÇADOR ====================
-        {"id": "phantom_of_the_watchtower", "name": "Fantasma da Atalaia", 
-         "hp": 550, "attack": 70, "defense": 25, "initiative": 65, "luck": 40, 
+        {"id": "phantom_of_the_watchtower", "name": "Vulto da Torre", 
+         "hp": 850, "attack": 60, "defense": 20, "initiative": 50, "luck": 25, 
          "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_phantom_watchtower_media"}, # T2
-        
+         "media_key": "trial_hunter_t2_media", "is_boss": True}, # T2 (Franco-Atirador)
+
         {"id": "sky_piercer_hawk", "name": "Falcão Perfurador", 
-         "hp": 1800, "attack": 150, "defense": 50, "initiative": 100, "luck": 55, 
+         "hp": 2600, "attack": 135, "defense": 40, "initiative": 80, "luck": 45, 
          "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_sky_piercer_hawk_media"}, # T3
-        
-        {"id": "spectral_marksman", "name": "Atirador Espectral", 
-         "hp": 2800, "attack": 250, "defense": 80, "initiative": 130, "luck": 70, 
+         "media_key": "trial_hunter_t3_media", "is_boss": True}, # T3 (Olho de Águia)
+
+        {"id": "spectral_ranger", "name": "Patrulheiro Espectral", 
+         "hp": 3800, "attack": 230, "defense": 60, "initiative": 130, "luck": 70, 
          "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_spectral_marksman_media"}, # T4
-        
-        {"id": "horizon_walker", "name": "Caminhante do Horizonte", 
-         "hp": 4000, "attack": 350, "defense": 110, "initiative": 160, "luck": 85, 
+         "media_key": "trial_hunter_t4_media", "is_boss": True}, # T4 (Atirador Espectral)
+
+        {"id": "guardian_of_the_horizon", "name": "Guardião do Horizonte", 
+         "hp": 8200, "attack": 480, "defense": 100, "initiative": 220, "luck": 120, 
          "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_horizon_walker_media"}, # T5
-        
-        {"id": "legend_of_the_bow", "name": "Lenda do Arco", 
-         "hp": 6000, "attack": 550, "defense": 150, "initiative": 200, "luck": 100, 
+         "media_key": "trial_hunter_t5_media", "is_boss": True}, # T5 (O Horizonte)
+
+        {"id": "avatar_of_the_hunt", "name": "Avatar da Caça", 
+         "hp": 24000, "attack": 1300, "defense": 250, "initiative": 450, "luck": 300, 
          "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_legend_bow_media"}, # T6
+         "media_key": "trial_hunter_t6_media", "is_boss": True}, # T6 (Lenda do Arco)
         
         # ==================== GUARDÕES DO MONGE ====================
         {"id": "avatar_of_the_four_elements", "name": "Avatar dos Quatro Elementos", 
@@ -191,24 +191,29 @@ MONSTERS_DATA = {
 
         # ==================== GUARDÕES DO SAMURAI ====================
         {"id": "phantom_of_the_dojo", "name": "Fantasma do Dojo", 
-         "hp": 720, "attack": 75, "defense": 45, "initiative": 50, "luck": 20, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_phantom_dojo_media"}, # T2
-        
-        {"id": "master_swordsman_phantom", "name": "Fantasma Mestre Espadachim", 
-         "hp": 1900, "attack": 130, "defense": 100, "initiative": 80, "luck": 30, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_master_swordsman_media"}, # T3
-        
-        {"id": "heavy_armored_general", "name": "General de Armadura Pesada", 
-         "hp": 3200, "attack": 180, "defense": 200, "initiative": 110, "luck": 45, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_heavy_armored_general_media"}, # T4
-        
-        {"id": "spirit_of_honor", "name": "Espírito da Honra", 
-         "hp": 4800, "attack": 250, "defense": 280, "initiative": 140, "luck": 60, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_spirit_honor_media"}, # T5
-        
-        {"id": "divine_blade_incarnate", "name": "Encarnação da Lâmina Divina", 
-         "hp": 7200, "attack": 380, "defense": 380, "initiative": 180, "luck": 80, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_divine_blade_media"}, # T6
+         "hp": 950, "attack": 55, "defense": 35, "initiative": 35, "luck": 15, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_samurai_t2_media", "is_boss": True}, # T2 (Ronin)
+
+        {"id": "master_swordsman_phantom", "name": "Mestre Espadachim", 
+         "hp": 3000, "attack": 130, "defense": 80, "initiative": 60, "luck": 30, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_samurai_t3_media", "is_boss": True}, # T3 (Kenshi)
+
+        {"id": "undead_shogun", "name": "Shogun Imortal", 
+         "hp": 4800, "attack": 210, "defense": 150, "initiative": 80, "luck": 40, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_samurai_t4_media", "is_boss": True}, # T4 (Shogun)
+
+        {"id": "spirit_of_bushido", "name": "Espírito do Bushido", 
+         "hp": 9500, "attack": 420, "defense": 250, "initiative": 150, "luck": 80, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_samurai_t5_media", "is_boss": True}, # T5 (Mestre de Bushido)
+
+        {"id": "aspect_of_steel", "name": "Aspecto de Aço", 
+         "hp": 28000, "attack": 1100, "defense": 600, "initiative": 300, "luck": 150, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_samurai_t6_media", "is_boss": True}, # T6 (Aspecto da Lâmina)
 
         # ==================== GUARDÕES DO CURANDEIRO (NOVO) ====================
         {"id": "plague_carrier_specter", "name": "Espectro Portador da Peste", 
