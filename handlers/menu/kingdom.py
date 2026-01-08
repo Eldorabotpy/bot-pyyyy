@@ -1,5 +1,5 @@
 # handlers/menu/kingdom.py
-# (VERSÃO CORRIGIDA: Fix do Crash 'NoneType' no botão Admin)
+# (VERSÃO ATUALIZADA: Botão de Informação agora abre o GUIA INTERATIVO)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
@@ -168,11 +168,11 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 InlineKeyboardButton("⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐏𝐯𝐏", callback_data='pvp_arena'), 
                 InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬", callback_data='evt_hub_principal')
             ],
-            [InlineKeyboardButton("ℹ️ 𝐒𝐨𝐛𝐫𝐞 𝐨 𝐑𝐞𝐢𝐧𝐨", callback_data='region_info:reino_eldora')],
+            # --- BOTÃO DO GUIA NOVO ---
+            [InlineKeyboardButton("📘 𝐆𝐮𝐢𝐚 𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data='guide_main')],
         ]
         
-        # --- BOTÃO ADMIN (CORREÇÃO DO CRASH) ---
-        # Verifica ID de várias fontes para evitar AttributeError se 'user' for None
+        # --- BOTÃO ADMIN ---
         current_uid_str = None
         if user:
             current_uid_str = str(user.id)
@@ -195,13 +195,19 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 media_type = (fd.get("type") or "photo").lower()
         except: pass
 
+        # Edição inteligente (se for vídeo/foto)
         if query and query.message:
             try:
-                if media_id:
-                    media = InputMediaVideo(media_id, caption=caption, parse_mode='HTML') if media_type == "video" else InputMediaPhoto(media_id, caption=caption, parse_mode='HTML')
-                    await query.edit_message_media(media=media, reply_markup=reply_markup)
+                # Se já tiver mídia, apenas edita caption e botões
+                if query.message.caption: 
+                    if media_id: # Garante que a mídia é a do Reino
+                         await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode='HTML')
+                    else:
+                         await query.edit_message_text(text=caption, reply_markup=reply_markup, parse_mode='HTML')
                 else:
-                    await query.edit_message_text(text=caption, reply_markup=reply_markup, parse_mode='HTML')
+                    # Se era texto puro e agora tem mídia (ou vice versa), deleta e reenvia
+                    await query.delete_message()
+                    raise Exception("Reload needed")
                 return
             except Exception:
                 try: await query.delete_message()

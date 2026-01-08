@@ -51,7 +51,7 @@ from handlers.admin.media_handler import set_media_command
 from registries import register_all_handlers
 # Importamos as tarefas de inicialização (Jobs, Watchdogs)
 from registries.startup import run_system_startup_tasks
-
+from handlers.guide_handler import guide_handlers
 try:
     from modules.world_boss.engine import world_boss_manager
 except ImportError:
@@ -200,7 +200,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("logout", logout_command))
     application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
     application.add_handler(start_command_handler)
-
+    application.add_handlers(guide_handlers)
     # --------------------------------------------------------------------------
     # DEBUG (Opcional)
     try:

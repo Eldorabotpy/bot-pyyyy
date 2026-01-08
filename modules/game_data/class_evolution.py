@@ -582,7 +582,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             "tier_num": 3, 
             "from": "elementalista", 
             "to": "arquimago", 
-            "display_name": "Arquuimago", 
+            "display_name": "Arquimago", 
             "min_level": 40,
             "desc": "Um canal de poder arcano puro, mestre de todos os elementos.",
             
@@ -877,7 +877,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             "tier_num": 4, 
             "from": "ninja",  
             "to":"mestre_das_laminas",
-            "display_name": "Mestre das Laminas",  
+            "display_name": "Mestre das Lâminas",  
             "min_level": 60,
             "desc": "Transforma o Assassino em um duelista mortal com foco em ataques críticos.",
         
@@ -928,7 +928,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             "tier_num": 6, 
             "from": "ceifador", 
             "to": "aspecto_da_noite", 
-            "display_name": "Aspecto de Noite", 
+            "display_name": "Aspecto da Noite", 
             "min_level": 100,
             "desc": "Tornou-se um com o manto da noite, capaz de eliminar qualquer criatura em um instante.",
         
@@ -1091,7 +1091,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             "tier_num": 2, 
             "from": "curandeiro", 
             "to": "clerigo", 
-            "display_name": "clerigo", 
+            "display_name": "Clérigo", 
             "min_level": 25,
             "desc": "Foco em magias de cura de alvo único e purificação.",
             
@@ -1171,7 +1171,7 @@ EVOLUTIONS: Dict[str, List[Dict[str, Any]]] = {
             "tier_num": 5, 
             "from": "hierofante", 
             "to": "oraculo_celestial", 
-            "display_name": "Oraculo Celestial", 
+            "display_name": "Oráculo Celestial", 
             "min_level": 80,
             "desc": "Pode prever e anular ataques. Sua fé se manifesta como escudo de luz.",
             
