@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO FINAL ESTRUTURADA: Prioridade de Login corrigida)
+# (VERSÃO FINAL CORRIGIDA: Com Registro de Evolução)
 
 from __future__ import annotations
 import asyncio
@@ -52,6 +52,10 @@ from registries import register_all_handlers
 # Importamos as tarefas de inicialização (Jobs, Watchdogs)
 from registries.startup import run_system_startup_tasks
 from handlers.guide_handler import guide_handlers
+
+# 👇 [NOVO] IMPORTA O REGISTRO DE EVOLUÇÃO AQUI 👇
+from registries.class_evolution import register_evolution_handlers
+
 try:
     from modules.world_boss.engine import world_boss_manager
 except ImportError:
@@ -92,7 +96,6 @@ async def post_init_tasks(application: Application):
         world_boss_manager.end_event(reason="Reinício do Sistema")
     
     # 2. Chama o gerenciador de Startup (Jobs, Watchdogs, Msgs)
-    # Isso vem do arquivo registries/startup.py que você enviou
     await run_system_startup_tasks(application)
 
 # ==============================================================================
@@ -182,8 +185,6 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     
     # 1️⃣ LOGIN E AUTH (Prioridade Máxima)
-    # Se o usuário estiver no meio do login, este handler captura o texto (senha)
-    # ANTES que os sistemas do jogo tentem processar.
     application.add_handler(auth_handler)
 
     # 2️⃣ FERRAMENTAS BÁSICAS E ADMIN
@@ -192,11 +193,13 @@ if __name__ == '__main__':
     
     # 3️⃣ SISTEMAS DO JOGO (Registries)
     # Carrega: Admin, Character, Combat, Crafting, Market, Regions, Guild, Events
-    # Tudo definido no seu arquivo registries/__init__.py
     register_all_handlers(application)
 
+    # 👇 [NOVO] ATIVA O SISTEMA DE EVOLUÇÃO AQUI 👇
+    # Isso carrega o arquivo registries/class_evolution.py que contém o botão de duelo
+    register_evolution_handlers(application)
+
     # 4️⃣ FALLBACKS (Comandos Gerais)
-    # Logout e Start ficam por último para não interferir em conversas ativas
     application.add_handler(CommandHandler("logout", logout_command))
     application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
     application.add_handler(start_command_handler)
