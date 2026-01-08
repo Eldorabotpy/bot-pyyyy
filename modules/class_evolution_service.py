@@ -263,3 +263,105 @@ async def finalize_evolution(user_id: int, target_class: str) -> Tuple[bool, str
         msg_final += f"\nVocê aprendeu {skills_adicionadas} nova{s} habilidade{s}!"
         
     return True, msg_final
+
+# ================================================
+# SISTEMA DE UPGRADE DE HABILIDADES (SKILLS)
+# ================================================
+
+def _get_skill_upgrade_cost(current_level: int, rarity: str, skill_id: str) -> Dict[str, Any]:
+    """
+    Calcula o custo: Ouro + Cópia da Skill (Item 'tomo_ID').
+    """
+    # 1. Custo de Ouro
+    base_gold = 150
+    rarity_mult = {
+        "comum": 1,
+        "incomum": 2,
+        "rara": 5,
+        "epica": 10,
+        "lendaria": 20
+    }
+    mult = rarity_mult.get(rarity.lower(), 1)
+    
+    # Fórmula do Ouro: Base * Nível * Raridade
+    gold_cost = int(base_gold * (current_level if current_level > 0 else 1) * mult)
+    
+    # 2. Custo de Itens (A "cópia" da skill)
+    # No seu items.py, os itens são gerados como "tomo_{skill_id}"
+    skill_book_item_id = f"tomo_{skill_id}"
+    
+    # Quantidade de tomos necessários.
+    # Pode ser fixo em 1, ou aumentar a cada 3 níveis (ex: lvl 1-3 gasta 1, lvl 4-6 gasta 2...)
+    # Por enquanto, vou deixar 1 tomo por nível para facilitar.
+    books_needed = 1 
+    
+    items_cost = {
+        skill_book_item_id: books_needed
+    }
+    
+    return {"gold": gold_cost, "items": items_cost}
+
+
+async def process_skill_upgrade(user_id: int, skill_id: str) -> Tuple[bool, str, dict]:
+    """
+    Processa a compra de um nível de habilidade consumindo Ouro + Tomo da Skill.
+    """
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        return False, "Jogador não encontrado.", {}
+
+    if "skills" not in pdata or not isinstance(pdata["skills"], dict):
+        return False, "Você ainda não possui habilidades aprendidas.", {}
+
+    skill_entry = pdata["skills"].get(skill_id)
+    if not skill_entry:
+        return False, "Habilidade não encontrada.", {}
+
+    current_level = skill_entry.get("level", 1)
+    rarity = skill_entry.get("rarity", "comum")
+    max_level = 10 
+
+    if current_level >= max_level:
+        return False, "Esta habilidade já está no nível máximo!", {}
+
+    # 1. Calcular Custo (Passamos o skill_id para achar o tomo correto)
+    costs = _get_skill_upgrade_cost(current_level, rarity, skill_id)
+    req_gold = costs["gold"]
+    req_items = costs["items"] 
+
+    # 2. Verificar Ouro
+    if pdata.get("gold", 0) < req_gold:
+        return False, f"Ouro insuficiente. Custa {req_gold} 🪙.", {}
+    
+    # 3. Verificar se tem o Tomo
+    # A função _inventory_has verifica se o item existe no inventário do jogador
+    if not _inventory_has(pdata, req_items):
+        # Pega o ID do item que faltou para mostrar o nome bonitinho se possível
+        missing_id = list(req_items.keys())[0]
+        
+        # Tenta pegar o nome legível do items.py (se importado) ou formata o ID
+        try:
+            from modules.game_data.items import get_display_name
+            item_name = get_display_name(missing_id)
+        except ImportError:
+            item_name = missing_id.replace("_", " ").title()
+
+        return False, f"Para evoluir, você precisa de: 1x {item_name} 📘", {}
+
+    # 4. Consumir Recursos
+    _consume_gold(pdata, req_gold)
+    _consume_items(pdata, req_items)
+
+    # 5. Aplicar Upgrade
+    new_level = current_level + 1
+    pdata["skills"][skill_id]["level"] = new_level
+    
+    await player_manager.save_player_data(user_id, pdata)
+
+    success_msg = (
+        f"✨ **Habilidade Evoluída!**\n"
+        f"Nível {current_level} ➝ **{new_level}**\n"
+        f"Gastos: {req_gold} 🪙 e 1x Tomo."
+    )
+    
+    return True, success_msg, pdata["skills"][skill_id]

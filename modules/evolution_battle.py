@@ -1,9 +1,7 @@
 # modules/evolution_battle.py
-# (VERSÃO BLINDADA: Usa "Deletar e Enviar" para garantir que a tela mude)
-
 from __future__ import annotations
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from modules import player_manager
@@ -11,21 +9,31 @@ from modules.game_data.monsters import MONSTERS_DATA
 from modules.game_data import class_evolution as evo_data
 from modules import file_ids as file_id_manager
 from handlers.utils import format_combat_message
+# --- IMPORTAÇÃO NECESSÁRIA PARA O FIX DE ID ---
+from modules.auth_utils import get_current_player_id 
 
 logger = logging.getLogger(__name__)
 
-async def start_evolution_presentation(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, target_class: str):
+async def start_evolution_presentation(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: str, target_class: str):
     """
     FASE 1: Tela de Apresentação (VS).
+    Recebe user_id como STRING (ObjectId), vindo do handler.
     """
     # Garante o chat_id correto
-    chat_id = update.effective_chat.id if update.effective_chat else user_id
+    chat_id = update.effective_chat.id
     
+    # user_id já deve vir como string do handler, então isso funcionará no core novo
     pdata = await player_manager.get_player_data(user_id)
     
+    if not pdata:
+        await context.bot.send_message(chat_id, "⚠️ Erro: Jogador não encontrado no banco de dados novo.")
+        return
+
     # 1. Busca Evolução e Monstro
     evo_opt = evo_data.find_evolution_by_target(target_class)
-    if not evo_opt: return
+    if not evo_opt: 
+        await context.bot.send_message(chat_id, "⚠️ Erro: Evolução não encontrada.")
+        return
 
     monster_id = evo_opt.get('trial_monster_id')
     monster_data = None
@@ -41,7 +49,6 @@ async def start_evolution_presentation(update: Update, context: ContextTypes.DEF
         monster_data = MONSTERS_DATA.get(monster_id)
 
     if not monster_data:
-        # Fallback de erro visual
         await context.bot.send_message(chat_id, f"⚠️ Erro: Guardião '{monster_id}' não configurado.")
         return
 
@@ -80,12 +87,10 @@ async def start_evolution_presentation(update: Update, context: ContextTypes.DEF
     media_key = monster_data.get("media_key")
     file_info = file_id_manager.get_file_data(media_key)
     
-    # Tenta apagar mensagem anterior para limpar a tela
     if update.callback_query:
         try: await update.callback_query.message.delete()
         except: pass
 
-    # Envia nova mensagem limpa
     try:
         if file_info:
             if file_info.get("type") == "video":
@@ -93,7 +98,6 @@ async def start_evolution_presentation(update: Update, context: ContextTypes.DEF
             else:
                 await context.bot.send_photo(chat_id, photo=file_info["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
         else:
-            # Se não tiver imagem, envia texto
             await context.bot.send_message(chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
     except Exception as e:
         logger.error(f"Erro ao enviar VS screen: {e}")
@@ -105,15 +109,23 @@ async def start_evo_combat_callback(update: Update, context: ContextTypes.DEFAUL
     FASE 2: Início do Combate (O Botão foi clicado)
     """
     query = update.callback_query
-    await query.answer("⚔️ A arena se fecha...") # Feedback imediato
+    await query.answer("⚔️ A arena se fecha...")
 
-    user_id = query.from_user.id
     chat_id = query.message.chat_id
 
+    # --- CORREÇÃO DE ID AQUI ---
+    # Não usar query.from_user.id direto, pois é INT e o core novo requer STRING (ObjectId)
+    user_id = get_current_player_id(update, context)
+    # ---------------------------
+
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        # Se falhar o ID, tenta fallback ou avisa erro
+        await context.bot.send_message(chat_id, "⚠️ Erro crítico: Sessão de usuário não encontrada.")
+        return
+
     state = pdata.get('player_state', {})
     
-    # Validação de Sessão
     if state.get('action') != 'evolution_lobby':
         await context.bot.send_message(chat_id, "⚠️ Sessão expirada. Volte ao menu.")
         return
@@ -121,7 +133,6 @@ async def start_evo_combat_callback(update: Update, context: ContextTypes.DEFAUL
     details = state.get('details', {})
     monster_data = details.get('monster_data_snapshot', {})
     
-    # 1. Configura o Combate nos dados do Jogador
     combat_details = {
         "monster_name":       monster_data.get("name"),
         "monster_hp":         int(monster_data.get("hp")),
@@ -135,7 +146,6 @@ async def start_evo_combat_callback(update: Update, context: ContextTypes.DEFAUL
         "loot_table":         [],
         "id":                 monster_data.get("id"),
         "file_id_name":       monster_data.get("media_key"),
-        # Flags Críticas
         "is_evolution_trial": True, 
         "target_class_reward": details.get('target_class'),
         "battle_log": [f"⚔️ O duelo contra {monster_data.get('name')} começou!"]
@@ -147,7 +157,6 @@ async def start_evo_combat_callback(update: Update, context: ContextTypes.DEFAUL
     }
     await player_manager.save_player_data(user_id, pdata)
 
-    # 2. Prepara a Interface de Combate
     caption = await format_combat_message(pdata)
     
     kb = [
@@ -156,14 +165,11 @@ async def start_evo_combat_callback(update: Update, context: ContextTypes.DEFAUL
     ]
     reply_markup = InlineKeyboardMarkup(kb)
     
-    # 3. TROCA A TELA (Deletar VS -> Enviar Combate)
-    # Isso evita erros de edição se a mídia falhar
     try:
         await query.message.delete()
     except:
-        pass # Mensagem já pode ter sumido
+        pass 
 
-    # Pega a mídia do monstro (se existir)
     media_key = combat_details.get("file_id_name")
     file_info = file_id_manager.get_file_data(media_key)
     
@@ -174,10 +180,8 @@ async def start_evo_combat_callback(update: Update, context: ContextTypes.DEFAUL
             else:
                 await context.bot.send_photo(chat_id, photo=file_info["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
         else:
-            # Fallback seguro sem imagem
             await context.bot.send_message(chat_id, text=f"👹 <b>{combat_details['monster_name']}</b>\n\n{caption}", reply_markup=reply_markup, parse_mode="HTML")
             
     except Exception as e:
         logger.error(f"Erro crítico ao iniciar combat UI: {e}")
-        # Última tentativa em caso de erro de mídia
         await context.bot.send_message(chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")

@@ -49,6 +49,7 @@ WORLD_MAP = {
 }
 # Pontos de poder “alvo” por região (para calibrar a dificuldade)
 REGION_TARGET_POWER = {
+    "pradaria_inicial": 20,
     "floresta_sombria": 80,     # Tier 1
     "pedreira_granito": 130,    # Tier 2
     "campos_linho": 180,        # Tier 3  ← Campos de Linho
@@ -56,18 +57,22 @@ REGION_TARGET_POWER = {
     "mina_ferro": 260,
     "forja_abandonada": 300,
     "pantano_maldito": 330,
-    
+    "deserto_ancestral": 400,
+    "picos_gelados": 480,
 }
 
 # Regiões com “scaling” dinâmico ativado
 REGION_SCALING_ENABLED = {
+    "pradaria_inicial": True,
     "floresta_sombria": True,
     "pedreira_granito": True,
     "campos_linho": True,
     "pico_grifo": True,
     "mina_ferro": True,
-    "forja_abandonada":True,
-    "pantano_maldito":True,
+    "forja_abandonada": True,
+    "pantano_maldito": True,
+    "deserto_ancestral": True,
+    "picos_gelados": True,
     }
 
 
