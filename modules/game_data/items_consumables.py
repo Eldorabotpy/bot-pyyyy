@@ -86,6 +86,7 @@ CONSUMABLES_DATA = {
     },
     "pergaminho_durabilidade": {
         "display_name": "Pergaminho de Durabilidade", "emoji": "📜", 
+        "description": "Restaura a durabilidade de todos os seus equipamentos.",
         "type": "consumivel", "category": "consumivel", 
         "stackable": True, "value": 150
     },

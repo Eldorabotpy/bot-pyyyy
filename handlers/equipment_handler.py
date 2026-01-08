@@ -1,13 +1,14 @@
 # handlers/equipment_handler.py
-# (VERSÃO BLINDADA: Compatível com Auth Híbrida)
+# (VERSÃO BLINDADA: SISTEMA NOVO PURO - SEM SUPORTE LEGADO)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data
 from modules import display_utils
+from modules.player import inventory  # Modulo de lógica de inventário
 from modules.player.stats import get_player_total_stats
-from modules.auth_utils import get_current_player_id # ✅ IMPORT CRÍTICO
+from modules.auth_utils import get_current_player_id # AUTH NOVO
 
 # Preferimos as constantes globais dos slots
 try:
@@ -35,6 +36,7 @@ SLOT_LABELS = {
 }
 
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
+    """Tenta editar a mensagem atual, se falhar, envia uma nova."""
     try:
         await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
     except Exception: pass
@@ -79,11 +81,13 @@ def _render_item_line_full(inst: dict) -> str:
 def _list_equippable_items_for_slot(player_data: dict, slot: str) -> list[tuple[str, str]]:
     inv = player_data.get("inventory", {}) or {}
     out: list[tuple[str, str]] = []
+    
     for uid, val in inv.items():
         if not isinstance(val, dict): continue
         if _item_slot_from_base(val.get("base_id")) != slot: continue
         pretty = _render_item_line_full(val)
         out.append((uid, pretty))
+    
     out.sort(key=lambda t: t[1])
     return out
 
@@ -95,13 +99,16 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     
-    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
     chat_id = q.message.chat.id 
 
+    if not user_id:
+        await _safe_edit_or_send(q, context, chat_id, "❌ 𝑺𝒆𝒔𝒔𝒂̃𝒐 𝒊𝒏𝒗𝒂́𝒍𝒊𝒅𝒂. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
+        return
+
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
+        await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔.")
         return
 
     # --- 1. BLOCO DE STATUS ---
@@ -115,11 +122,11 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     stats_block = (
         f"📊 <b>RESUMO DE ATRIBUTOS</b>\n"
-        f"├─ 🧡 <b>HP....</b> <code>{hp_total}</code>\n"
-        f"├─ ⚔️ <b>ATK...</b> <code>{atk_total}</code>\n"
-        f"├─ 🛡 <b>DEF...</b> <code>{def_total}</code>\n"
-        f"├─ 🏃 <b>INI...</b> <code>{ini_total}</code>\n"
-        f"└─ 🍀 <b>LUK...</b> <code>{luck_total}</code>"
+        f"├┈➤ 🧡 <b>HP....</b> <code>{hp_total}</code>\n"
+        f"├┈➤ ⚔️ <b>ATK...</b> <code>{atk_total}</code>\n"
+        f"├┈➤ 🛡 <b>DEF...</b> <code>{def_total}</code>\n"
+        f"├┈➤ 🏃 <b>INI...</b> <code>{ini_total}</code>\n"
+        f"╰┈➤ 🍀 <b>LUK...</b> <code>{luck_total}</code>"
     )
 
     # --- 2. LISTA DE EQUIPAMENTOS ---
@@ -166,7 +173,7 @@ async def equipment_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(row); row = []
     if row: keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("📦 𝐀𝐛𝐫𝐢𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data="inventory_CAT_especial_PAGE_1")]) 
+    keyboard.append([InlineKeyboardButton("📦 𝐀𝐛𝐫𝐢𝐫 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data="inventory_menu")]) 
     keyboard.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="profile")]) 
 
     await _safe_edit_or_send(q, context, chat_id, text, InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -180,13 +187,13 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.answer()
     slot = q.data.replace("equip_slot_", "")
     
-    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
     chat_id = q.message.chat.id
+    if not user_id: return
 
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔. 𝑼𝒔𝒆 /𝒔𝒕𝒂𝒓𝒕.")
+        await _safe_edit_or_send(q, context, chat_id, "❌ 𝑵𝒂̃𝒐 𝒆𝒏𝒄𝒐𝒏𝒕𝒓𝒆𝒊 𝒔𝒆𝒖𝒔 𝒅𝒂𝒅𝒐𝒔.")
         return
 
     st = (pdata.get("player_state") or {}).get("action")
@@ -205,6 +212,7 @@ async def equip_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     kb: list[list[InlineKeyboardButton]] = []
     for uid, pretty in items:
         txt = pretty if len(pretty) <= 60 else (pretty[:57] + "…")
+        # Callback simples
         kb.append([InlineKeyboardButton(txt, callback_data=f"equip_pick_{uid}")])
 
     kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="equipment_menu")])
@@ -215,10 +223,9 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.answer()
     uid = q.data.replace("equip_pick_", "")
     
-    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
-    chat_id = q.message.chat.id
-
+    if not user_id: return
+    
     pdata = await player_manager.get_player_data(user_id)
     if not pdata: return
 
@@ -226,8 +233,8 @@ async def equip_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if st not in (None, "idle"):
         await q.answer("𝑽𝒐𝒄𝒆̂ 𝒆𝒔𝒕𝒂́ 𝒐𝒄𝒖𝒑𝒂𝒅𝒐 𝒄𝒐𝒎 𝒐𝒖𝒕𝒓𝒂 𝒂𝒄̧𝒂̃𝒐 𝒂𝒈𝒐𝒓𝒂.", show_alert=True); return
 
-    # O manager já deve estar preparado para aceitar ID str. Se não, avise.
-    success, message = await player_manager.equip_unique_item_for_user(user_id, uid)
+    # Chama a função segura do módulo de inventário
+    success, message = await inventory.equip_unique_item_for_user(user_id, uid)
     if not success:
         await q.answer(message, show_alert=True); return
 
@@ -240,18 +247,16 @@ async def equip_unequip_callback(update: Update, context: ContextTypes.DEFAULT_T
     slot = q.data.replace("equip_unequip_", "")
     
     user_id = get_current_player_id(update, context)
+    if not user_id: return
     
-    # ✅ USA A FUNÇÃO CENTRALIZADA (unequip_item_for_user)
-    # Note: Importamos de player_manager que agora deve expor unequip_item_for_user
-    success, message = await player_manager.unequip_item_for_user(user_id, slot)
+    # Chama a função segura do módulo de inventário
+    success, message = await inventory.unequip_item_for_user(user_id, slot)
     
     if success:
         await q.answer("Removido e status atualizados!")
-        await equipment_menu(update, context) # Recarrega o HUD com stats novos
+        await equipment_menu(update, context) 
     else:
         await q.answer(message, show_alert=True)
-
-    
 
 # ---------- Exporta handlers ----------
 equipment_menu_handler   = CallbackQueryHandler(equipment_menu, pattern=r'^equipment_menu$')

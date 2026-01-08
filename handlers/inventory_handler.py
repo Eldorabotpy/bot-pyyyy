@@ -1,5 +1,5 @@
 # handlers/inventory_handler.py
-# (VERSÃO BLINDADA: Auth Híbrida + Correção de Duplicatas + Navegação Rápida)
+# (VERSÃO FINAL: COMPATÍVEL COM VIEW DE DETALHES + LAYOUT SOLICITADO)
 
 import math
 import logging
@@ -11,6 +11,8 @@ from telegram import (
     InputMediaVideo,
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
+
+# AUTH: Apenas o novo sistema
 from modules.auth_utils import get_current_player_id
 from modules import player_manager, game_data, file_ids
 from modules.game_data import skills as skills_data
@@ -21,7 +23,7 @@ from modules.player import actions as player_actions
 
 logger = logging.getLogger(__name__)
 
-# Configurações
+# Configurações Visuais
 ITEMS_PER_PAGE = 5
 
 # --- DEFINIÇÃO DAS CATEGORIAS ---
@@ -55,7 +57,7 @@ def _display_name_for_instance(uid: str, inst: dict) -> str:
     emoji = info.get("emoji", "")
     return f"{emoji} {name}".strip()
 
-def _determine_tab(item_key: str, item_value: dict|int) -> str:
+def _determine_tab(item_key: str, item_value) -> str:
     if isinstance(item_value, dict): return "equipamento"
     info = _info_for(item_key)
     tipo = (info.get("type") or "").lower()
@@ -104,57 +106,32 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
         
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
 
-# ==========================================================
-# FUNÇÃO DE CORREÇÃO FORÇADA (LOCAL)
-# ==========================================================
-async def _force_fix_inventory(user_id, player_data):
-    """
-    Corrige IDs antigos fundindo no novo e atualiza o player_data EM MEMÓRIA.
-    Retorna True se houve mudança (para salvar).
-    """
+async def _force_fix_inventory_items(user_id, player_data):
     inventory = player_data.get("inventory", {})
     if not inventory: return False
     mudou = False
     
-    # Mapeamento ID VELHO (Errado) -> ID NOVO (Certo/Oficial do refino)
     correcoes = {
-        "ferro": "minerio_de_ferro",
-        "minerio_ferro": "minerio_de_ferro",
-        "iron_ore": "minerio_de_ferro",
-        "pedra_ferro": "minerio_de_ferro",
-        "minerio_bruto": "minerio_de_ferro",
-        "minerio_de_ferro_bruto": "minerio_de_ferro",
-        "minerio_estanho": "minerio_de_estanho",
-        "tin_ore": "minerio_de_estanho",
-        "minerio_prata": "minerio_de_prata",
-        "silver_ore": "minerio_de_prata",
-        "madeira_rara_bruta": "madeira_rara",
-        "wood_rare": "madeira_rara",
-        "carvao_mineral": "carvao",
-        "coal": "carvao"
+        "ferro": "minerio_de_ferro", "minerio_ferro": "minerio_de_ferro", "iron_ore": "minerio_de_ferro",
+        "pedra_ferro": "minerio_de_ferro", "minerio_bruto": "minerio_de_ferro", "minerio_de_ferro_bruto": "minerio_de_ferro",
+        "minerio_estanho": "minerio_de_estanho", "tin_ore": "minerio_de_estanho",
+        "minerio_prata": "minerio_de_prata", "silver_ore": "minerio_de_prata",
+        "madeira_rara_bruta": "madeira_rara", "wood_rare": "madeira_rara",
+        "carvao_mineral": "carvao", "coal": "carvao"
     }
 
     for velho, novo in correcoes.items():
         if velho in inventory:
             if velho == novo: continue
-            
             dado_velho = inventory[velho]
-            qtd_velha = 0
-            
-            if isinstance(dado_velho, dict):
-                qtd_velha = int(dado_velho.get("quantity", 1))
-            else:
-                qtd_velha = int(dado_velho)
+            qtd_velha = int(dado_velho.get("quantity", 1)) if isinstance(dado_velho, dict) else int(dado_velho)
             
             if qtd_velha > 0:
                 if novo not in inventory: inventory[novo] = 0
-                
                 if isinstance(inventory[novo], dict):
                     inventory[novo]["quantity"] = int(inventory[novo].get("quantity", 0)) + qtd_velha
                 else:
                     inventory[novo] = int(inventory[novo]) + qtd_velha
-                    
-                logger.info(f"🔧 FIX INVENTÁRIO: {user_id} | {qtd_velha}x {velho} -> {novo}")
                 mudou = True
             
             del inventory[velho]
@@ -170,16 +147,18 @@ async def _force_fix_inventory(user_id, player_data):
 
 async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    if query: await query.answer()
     
-    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
+    if not user_id:
+        if query: await query.answer("Sessão inválida. Use /start", show_alert=True)
+        return
     
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    try: await _force_fix_inventory(user_id, player_data)
-    except Exception as e: logger.error(f"Erro ao corrigir inventario localmente: {e}")
+    try: await _force_fix_inventory_items(user_id, player_data)
+    except Exception as e: logger.error(f"Erro fix inventory: {e}")
 
     gold = player_manager.get_gold(player_data)
     gems = player_manager.get_gems(player_data)
@@ -202,13 +181,16 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
         InlineKeyboardButton("🔥 Minhas Skills", callback_data="skills_menu_open"),
         InlineKeyboardButton("🎭 Minhas Skins", callback_data="skin_menu")
     ])
-    
     buttons.append([InlineKeyboardButton("🔙 Voltar ao Perfil", callback_data="profile")])
     
-    await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(buttons))
+    chat_id = update.effective_chat.id
+    if query:
+        await _safe_edit_or_send(query, context, chat_id, text, InlineKeyboardMarkup(buttons))
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="HTML")
 
 # -----------------------------------------------------------
-# 2. LISTA DE ITENS
+# 2. LISTA DE ITENS (CATÁLOGO)
 # -----------------------------------------------------------
 
 async def inventory_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, manual_data=None):
@@ -223,26 +205,27 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
         await inventory_menu_callback(update, context)
         return
 
-    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
+    if not user_id: return
     
     player_data = await player_manager.get_player_data(user_id)
-    try: await _force_fix_inventory(user_id, player_data)
-    except: pass
+    if not player_data: return
     
     inventory = player_data.get("inventory", {})
-    player_class_key = player_stats._get_class_key_normalized(player_data)
-
+    
     items_in_cat = []
     for k, v in inventory.items():
         if k in ("ouro", "gold", "gems"): continue
         
+        # Filtro de categoria
         if _determine_tab(k, v) == cat_key:
             if isinstance(v, dict): 
+                # Item Único (Equipamento/Custom)
                 name = _display_name_for_instance(k, v)
                 base_id_debug = v.get("base_id", "item")
                 items_in_cat.append({"name": name, "id": k, "qty": 1, "type": "unique", "base_id": base_id_debug})
             else:
+                # Item Stack (Consumível/Material)
                 info = _info_for(k)
                 name = info.get("display_name") or k.replace("_", " ").title()
                 emoji = info.get("emoji", "")
@@ -270,43 +253,9 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
             display = f"{item['name']}"
             if item['qty'] > 1: display += f" (x{item['qty']})"
             
-            is_locked = False
-            req_class_label = ""
-            
-            item_info = _info_for(item['id'] if item['type'] == 'stack' else item['base_id'])
-            effects = item_info.get("on_use") or item_info.get("effects") or {}
-            eff_type = effects.get("effect")
-            
-            class_req = item_info.get("class_req")
-            if class_req and not can_player_use_skill(player_class_key, class_req):
-                is_locked = True
-                req_class_label = class_req[0].capitalize()
-
-            if not is_locked:
-                sid = effects.get("skill_id") or effects.get("learn_skill")
-                if sid:
-                    skill = skills_data.SKILL_DATA.get(sid, {})
-                    allowed = skill.get("allowed_classes", [])
-                    if allowed and not can_player_use_skill(player_class_key, allowed):
-                        is_locked = True
-                        req_class_label = allowed[0].capitalize()
-            
-            if not is_locked and eff_type == "grant_skin":
-                sid = effects.get("skin_id")
-                if sid:
-                    skin = SKIN_CATALOG.get(sid, {})
-                    cls = skin.get("class")
-                    if cls and player_class_key != cls:
-                        is_locked = True
-                        req_class_label = cls.capitalize()
-
-            if is_locked:
-                display_locked = f"🔒 {display} ({req_class_label})"
-                cb_data = f"noop_inventory:{req_class_label}"
-                item_buttons.append([InlineKeyboardButton(display_locked, callback_data=cb_data)])
-            else:
-                cb_data = f"inv_use_item:{item['id']}"
-                item_buttons.append([InlineKeyboardButton(display, callback_data=cb_data)])
+            # AGORA O CLICK VAI PARA A VIEW (DETALHES), NÃO PARA O USO DIRETO
+            cb_data = f"inv_view:{item['id']}"
+            item_buttons.append([InlineKeyboardButton(display, callback_data=cb_data)])
 
     nav_row = []
     if page > 1:
@@ -318,48 +267,143 @@ async def inventory_category_callback(update: Update, context: ContextTypes.DEFA
     item_buttons.append(nav_row)
     
     await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(item_buttons))
-    
+
 # -----------------------------------------------------------
-# 3. USO DE ITENS
+# 3. DETALHES DO ITEM (NOVO MENU SOLICITADO)
+# -----------------------------------------------------------
+
+async def inventory_view_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_id = get_current_player_id(update, context)
+    if not user_id: return
+
+    try: item_id = query.data.split(":", 1)[1]
+    except: return
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data: return
+
+    item_val = player_data.get("inventory", {}).get(item_id)
+    if not item_val:
+        await query.answer("Item não encontrado ou removido.", show_alert=True)
+        await inventory_menu_callback(update, context)
+        return
+
+    # Determina Base ID e Tipo
+    is_unique = isinstance(item_val, dict)
+    base_id = item_val.get("base_id") if is_unique else item_id
+    qty = 1 if is_unique else item_val
+    
+    # Carrega Info
+    info = _info_for(base_id)
+    name = info.get("display_name") or base_id.replace("_", " ").title()
+    emoji = info.get("emoji", "")
+    full_name = f"{emoji} {name}".strip()
+    desc = info.get("description", "Sem descrição.")
+    tipo = (info.get("type") or "Item").replace("_", " ").title()
+    cat_key = _determine_tab(base_id, item_val)
+    cat_label = CATEGORIES.get(cat_key, {}).get("label", "Outros")
+    
+    # Validações de Uso
+    player_class_key = player_stats._get_class_key_normalized(player_data)
+    can_use = True
+    lock_reason = ""
+
+    # Verifica se é equipamento (Redireciona para menu de equip)
+    is_equip = is_unique or info.get("type") == "equipamento"
+    
+    if not is_equip:
+        # Verifica efeitos para saber se é "usável"
+        effects = info.get("on_use") or info.get("effects") or {}
+        if not effects:
+            can_use = False # Apenas material, não tem botão usar
+        
+        # Verifica Classe
+        class_req = info.get("class_req")
+        if class_req and not can_player_use_skill(player_class_key, class_req):
+            can_use = False
+            lock_reason = f"(Req: {class_req[0].title()})"
+
+    # --- MONTAGEM DO TEXTO (LAYOUT SOLICITADO) ---
+    text = (
+        f"📊 <b>{full_name}</b>\n"
+        f"├┈➤ {desc}\n"
+        f"├┈➤ <b>Categoria:</b> {cat_label}\n"
+        f"├┈➤ <b>Tipo:</b> {tipo}\n"
+        f"╰┈➤ <b>Quantidade:</b> {qty}"
+    )
+    if lock_reason:
+        text += f"\n\n🔒 <b>Bloqueado:</b> {lock_reason}"
+
+    # --- MONTAGEM DOS BOTÕES ---
+    buttons = []
+    
+    # Botão de Ação
+    if is_equip:
+        # Se for equip, botão manda para menu de equipamentos
+        buttons.append([InlineKeyboardButton("⚙️ Gerenciar Equipamento", callback_data="equipment_menu")])
+    elif can_use:
+        # Se for consumível e puder usar
+        buttons.append([InlineKeyboardButton("✅ Usar Item", callback_data=f"inv_use_item:{item_id}")])
+    
+    # Botão Voltar (Calcula a aba correta para não perder o lugar)
+    back_data = f"inv_open_{cat_key}_1"
+    buttons.append([InlineKeyboardButton("🔙 Voltar ao Menu Anterior", callback_data=back_data)])
+
+    # Usa a função segura com a media_key do item (se tiver imagem específica) ou padrão
+    media_k = info.get("media_key", "img_inventario")
+    await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(buttons), media_key=media_k)
+
+
+# -----------------------------------------------------------
+# 4. USO DE ITENS (LÓGICA)
 # -----------------------------------------------------------
 
 async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
-    # ✅ ID DA SESSÃO
     user_id = get_current_player_id(update, context)
-    
+    if not user_id: return
+
     try: item_id = query.data.split(":", 1)[1]
     except: return
 
-    await query.answer("Verificando...")
+    # Feedback imediato no botão para parecer responsivo
+    # await query.answer("Usando...") 
+
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
     item_val = player_data.get("inventory", {}).get(item_id)
+    if not item_val:
+        await query.answer("Você não tem mais este item.", show_alert=True)
+        # Tenta voltar para a lista
+        await inventory_menu_callback(update, context)
+        return
+
+    # Info Básica
     is_unique = isinstance(item_val, dict)
     base_id = item_val.get("base_id") if is_unique else item_id
     item_info = _info_for(base_id)
     item_name = item_info.get("display_name", base_id)
 
-    if is_unique or item_info.get("type") == "equipamento":
-        await query.answer("⚔️ Use o menu 'Equipamentos' para gerenciar.", show_alert=True)
-        return
-
+    # Extrai Efeitos
     on_use_data = item_info.get("on_use", {}) or {}
     effects_data = item_info.get("effects", {}) or {}
     effect_data_to_use = {**on_use_data, **effects_data}
 
     if not effect_data_to_use:
-        await query.answer(f"O item '{item_name}' não tem uso direto.", show_alert=True)
+        await query.answer(f"O item '{item_name}' não pode ser usado.", show_alert=True)
         return
 
+    # Consome 1 unidade
     if not player_manager.remove_item_from_inventory(player_data, item_id, 1):
-        await query.answer("Item não encontrado.", show_alert=True)
-        query.data = f"inv_open_{_determine_tab(base_id, 1)}_1"
-        await inventory_category_callback(update, context)
+        await query.answer("Erro ao consumir item.", show_alert=True)
         return
 
+    # Aplica Efeitos
     feedback_msg = f"Você usou {item_name}!"
     effect = effect_data_to_use.get("effect")
     skill_id = effect_data_to_use.get("skill_id") or effect_data_to_use.get("learn_skill")
@@ -384,7 +428,7 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 player_data["equipped_skills"].append(skill_id)
 
             skill_name_display = skills_data.SKILL_DATA[skill_id].get("display_name", skill_id)
-            feedback_msg = f"📚 Você aprendeu a habilidade: <b>{skill_name_display}</b>!\nEla foi equipada automaticamente."
+            feedback_msg = f"📚 Você aprendeu: {skill_name_display}!"
             
         elif effect == "grant_skin" and skin_id:
             skins = player_data.setdefault("unlocked_skins", [])
@@ -418,14 +462,15 @@ async def use_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erro usando item {item_id}: {e}")
         player_manager.add_item_to_inventory(player_data, item_id, 1) 
-        feedback_msg = "Erro interno ao usar item. Ele foi devolvido."
+        feedback_msg = "Erro ao usar item. Devolvido."
 
     await player_manager.save_player_data(user_id, player_data)
     await query.answer(feedback_msg, show_alert=True)
 
-    tab = _determine_tab(base_id, 1)
-    target_data_str = f"inv_open_{tab}_1"
-    await inventory_category_callback(update, context, manual_data=target_data_str)
+    # Após usar, REABRE A VIEW DO ITEM (para mostrar a qtd atualizada)
+    # Se a quantidade for 0, o inventory_view_callback vai tratar e jogar pro menu
+    query.data = f"inv_view:{item_id}" 
+    await inventory_view_callback(update, context)
 
 async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -433,11 +478,24 @@ async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data_parts = query.data.split(":", 1)
         msg = data_parts[1] if len(data_parts) > 1 else "Ação inválida"
         if "Página" in msg: await query.answer() 
-        else: await query.answer(f"🚫 Este item é exclusivo para: {msg}!", show_alert=True)
+        else: await query.answer(f"🚫 {msg}", show_alert=True)
     except Exception:
         await query.answer()
 
+# -----------------------------------------------------------
+# DEFINIÇÃO DOS HANDLERS (EXPORTS CRÍTICOS)
+# -----------------------------------------------------------
+
 inventory_menu_handler = CallbackQueryHandler(inventory_menu_callback, pattern=r'^inventory_menu$')
 inventory_cat_handler = CallbackQueryHandler(inventory_category_callback, pattern=r'^inv_open_')
-use_item_handler = CallbackQueryHandler(use_item_callback, pattern=r'^inv_use_item:')
+
+# Novo Handler para a View de Detalhes
+inventory_view_handler = CallbackQueryHandler(inventory_view_callback, pattern=r'^inv_view:')
+
+# Handler de Uso (Ação)
+inventory_use_handler = CallbackQueryHandler(use_item_callback, pattern=r'^inv_use_item:')
+
 noop_inventory_handler = CallbackQueryHandler(noop_inventory, pattern=r'^noop_inventory')
+
+# ALIASES para compatibilidade com registries/character.py
+inventory_list_handler = inventory_cat_handler

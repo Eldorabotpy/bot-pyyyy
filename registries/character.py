@@ -1,5 +1,5 @@
 # registries/character.py
-# (VERSÃO CORRIGIDA: ATUALIZADO PARA O NOVO SISTEMA DE PROFISSÕES)
+# (VERSÃO CORRIGIDA: Compatível com Inventário Visual Rico e Novos Handlers)
 
 import logging
 from telegram.ext import Application, BaseHandler 
@@ -24,13 +24,15 @@ from handlers.profile_handler import (
     noop_handler,
 )
 
-# 3. Inventário e Conversor
+# 3. Inventário (ATUALIZADO)
 from handlers.inventory_handler import (
     inventory_menu_handler,
-    inventory_cat_handler,
-    use_item_handler,
-    noop_inventory_handler
+    inventory_list_handler,  # Substitui inventory_cat_handler
+    inventory_view_handler,  # Novo: Visualizar detalhes
+    inventory_use_handler    # Renomeado: De use_item_handler para inventory_use_handler
 )
+
+# 4. Conversor e Skins
 from handlers.converter_handler import (
     converter_main_handler,
     converter_list_handler,
@@ -39,7 +41,7 @@ from handlers.converter_handler import (
 )
 from handlers.skin_handler import all_skin_handlers
 
-# 4. Equipamentos
+# 5. Equipamentos
 from handlers.equipment_handler import (
     equipment_menu_handler,
     equip_slot_handler,
@@ -47,7 +49,7 @@ from handlers.equipment_handler import (
     equip_unequip_handler,
 )
 
-# 5. Classes e Evolução
+# 6. Classes e Evolução
 from handlers.class_selection_handler import class_selection_handler
 from handlers.class_evolution_handler import (
     status_evolution_open_handler,
@@ -57,20 +59,20 @@ from handlers.class_evolution_handler import (
     start_trial_execute_handler,
 )
 
-# 6. Profissões (ATUALIZADO)
+# 7. Profissões
 from handlers.profession_handler import (
     job_menu_handler,
     job_pick_handler,
-    job_list_handler,  # Substituiu job_view_handler
-    job_do_handler,    # Substituiu job_confirm_handler
+    job_list_handler,
+    job_do_handler,
 )
 
-# 7. Menu do Reino
+# 8. Menu do Reino
 from telegram.ext import CallbackQueryHandler
 from handlers.menu.kingdom import show_kingdom_menu
 kingdom_menu_handler = CallbackQueryHandler(show_kingdom_menu, pattern=r'^continue_after_action$')
 
-# 8. GUILDA E CLÃ
+# 9. GUILDA E CLÃ
 from handlers.guild_menu_handler import (
     adventurer_guild_handler, 
     clan_board_handler,
@@ -82,7 +84,7 @@ from handlers.guild_handler import all_guild_handlers
 logger = logging.getLogger(__name__)
 
 def register_character_handlers(application: Application):
-    """Regista todos os handlers relacionados ao personagem (exceto login)."""
+    """Registra todos os handlers relacionados ao personagem (exceto login)."""
 
     # Lista inicial de handlers
     raw_handlers = [
@@ -103,11 +105,11 @@ def register_character_handlers(application: Application):
         character_command_handler,
         kingdom_menu_handler,
         
-        # Inventário Novo
+        # Inventário Novo (ATUALIZADO)
         inventory_menu_handler,
-        inventory_cat_handler,
-        use_item_handler,
-        noop_inventory_handler,
+        inventory_list_handler,
+        inventory_view_handler,
+        inventory_use_handler,
         
         # Conversor
         converter_main_handler,
@@ -136,7 +138,7 @@ def register_character_handlers(application: Application):
         start_trial_confirmation_handler,
         start_trial_execute_handler,
         
-        # Profissões (ATUALIZADO)
+        # Profissões
         job_menu_handler,
         job_list_handler,     
         job_do_handler,  
@@ -165,5 +167,4 @@ def register_character_handlers(application: Application):
         else:
             logger.warning(f"⚠️ Ignorando handler inválido no registro: {type(h)}")
 
-    # Registra apenas os handlers válidos e limpos
     application.add_handlers(clean_handlers)
