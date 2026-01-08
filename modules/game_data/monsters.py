@@ -164,25 +164,30 @@ MONSTERS_DATA = {
          "media_key": "trial_primordial_symphony_media"}, # T6
 
         # ==================== GUARDÕES DO ASSASSINO ====================
-        {"id": "doppelganger_of_the_throne", "name": "Doppelgänger do Trono", 
-         "hp": 600, "attack": 70, "defense": 35, "initiative": 80, "luck": 35, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_doppelganger_throne_media"}, # T2
-        
-        {"id": "quick_phantom", "name": "Fantasma Rápido", 
-         "hp": 1700, "attack": 160, "defense": 60, "initiative": 140, "luck": 50, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_quick_phantom_media"}, # T3
-        
-        {"id": "dual_wielding_ronin", "name": "Ronin de Duas Lâminas", 
-         "hp": 2800, "attack": 280, "defense": 90, "initiative": 180, "luck": 65, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_dual_wielding_ronin_media"}, # T4
-        
+        {"id": "doppelganger_of_the_throne", "name": "Sombra do Trono", 
+         "hp": 900, "attack": 65, "defense": 15, "initiative": 60, "luck": 20, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_shadow_media", "is_boss": True}, # T2 (Ladrão)
+
+        {"id": "quick_phantom", "name": "Fantasma Veloz", 
+         "hp": 2800, "attack": 140, "defense": 30, "initiative": 90, "luck": 40, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_ninja_media", "is_boss": True}, # T3 (Ninja)
+
+        {"id": "dual_wielding_ronin", "name": "Ronin das Lâminas Duplas", 
+         "hp": 4000, "attack": 220, "defense": 50, "initiative": 120, "luck": 50, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_blademaster_media", "is_boss": True}, # T4 (Mestre Lâminas)
+
         {"id": "shadow_of_fate", "name": "Sombra do Destino", 
-         "hp": 4000, "attack": 380, "defense": 120, "initiative": 220, "luck": 80, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_shadow_fate_media"}, # T5
-        
+         "hp": 8000, "attack": 450, "defense": 100, "initiative": 200, "luck": 80, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_reaper_media", "is_boss": True}, # T5 (Ceifador)
+
         {"id": "avatar_of_the_void", "name": "Avatar do Vazio", 
-         "hp": 6000, "attack": 550, "defense": 160, "initiative": 250, "luck": 95, "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
-         "media_key": "trial_avatar_void_media"}, # T6
+         "hp": 25000, "attack": 1200, "defense": 300, "initiative": 400, "luck": 200, 
+         "xp_reward": 0, "gold_drop": 0, "loot_table": [], 
+         "media_key": "trial_aspect_night_media", "is_boss": True}, # T6 (Aspecto)
 
         # ==================== GUARDÕES DO SAMURAI ====================
         {"id": "phantom_of_the_dojo", "name": "Fantasma do Dojo", 
