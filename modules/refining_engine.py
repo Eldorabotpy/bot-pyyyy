@@ -1,16 +1,16 @@
 # modules/refining_engine.py
-# (VERSÃO CORRIGIDA: SEM CICLO DE IMPORTAÇÃO)
+# (VERSÃO FINAL: Com Bônus Premium + Correção de Lote + Sem Ciclo de Import)
 
 from datetime import datetime, timedelta, timezone
 import logging
 from modules import game_data
-# ❌ REMOVIDO DAQUI: from modules import player_manager (Quebra o ciclo)
+# Importamos refining apenas para tipagem ou acesso direto se necessário
 from modules.game_data import refining 
 
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# 🛠️ HELPER: Extrair ID Seguro
+# 🛠️ HELPERS
 # ==============================================================================
 def get_uid_str(player_data: dict) -> str:
     if "_id" in player_data:
@@ -18,6 +18,38 @@ def get_uid_str(player_data: dict) -> str:
     if "user_id" in player_data:
         return str(player_data["user_id"])
     return "unknown"
+
+def _calculate_single_duration(recipe: dict, player_data: dict) -> int:
+    """
+    Calcula o tempo de UM item aplicando:
+    1. Redução por Nível da Profissão (Max 50%)
+    2. Multiplicador de Velocidade Premium (refine_speed_multiplier)
+    """
+    # 1. Tempo Base
+    base_time = recipe.get("time_seconds", 60)
+
+    # 2. Bônus de Nível (Reduz 1% por nível, cap em 50%)
+    prof = player_data.get("profession", {})
+    my_lvl = int(prof.get("level", 1))
+    reduction = min(0.5, (my_lvl * 0.01)) 
+    time_after_level = base_time * (1.0 - reduction)
+
+    # 3. Bônus Premium (Velocidade)
+    # Importação Tardia para evitar Circular Import
+    from modules.player.premium import PremiumManager
+    
+    premium = PremiumManager(player_data)
+    # Pega o multiplicador do premium.py (Ex: 1.5, 2.0)
+    speed_mult = float(premium.get_perk_value("refine_speed_multiplier", 1.0))
+    
+    # Segurança contra divisão por zero
+    if speed_mult < 0.1: speed_mult = 1.0
+
+    # Fórmula: Tempo = Tempo / Velocidade
+    # Se a velocidade é 2.0x, o tempo cai pela metade.
+    final_time = int(time_after_level / speed_mult)
+    
+    return max(1, final_time)
 
 # ==============================================================================
 # 1. PREVIEW
@@ -49,9 +81,8 @@ def preview_refine(recipe_id: str, player_data: dict) -> dict | None:
     prof_ok = (not allowed) or (my_prof in allowed)
     lvl_ok = my_lvl >= rec.get("level_req", 1)
     
-    base_time = rec.get("time_seconds", 60)
-    reduction = min(0.5, (my_lvl * 0.01)) 
-    final_time = int(base_time * (1.0 - reduction))
+    # ✅ USA A NOVA LÓGICA DE TEMPO
+    final_time = _calculate_single_duration(rec, player_data)
 
     return {
         "can_refine": (can_craft and prof_ok and lvl_ok),
@@ -80,9 +111,10 @@ def get_max_refine_quantity(player_data: dict, recipe: dict) -> int:
 # 2. START (Iniciar o processo)
 # ==============================================================================
 async def start_refine(player_data: dict, recipe_id: str) -> dict | str:
-    # ✅ IMPORTAÇÃO TARDIA (Quebra o ciclo)
+    # ✅ IMPORTAÇÃO TARDIA
     from modules import player_manager
 
+    # Usa o preview que já calcula o tempo correto com Premium
     prev = preview_refine(recipe_id, player_data)
     if not prev: return "Receita inválida."
     if not prev["can_refine"]: return "Materiais ou nível insuficientes."
@@ -131,8 +163,10 @@ async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int) -
         total_need = req * quantity
         player_manager.consume_item(player_data, item, total_need)
 
-    base_time = rec.get("time_seconds", 60)
-    total_time = base_time * quantity
+    # ✅ CORREÇÃO: Calcula o tempo unitário COM bônus e multiplica pela quantidade
+    unit_time = _calculate_single_duration(rec, player_data)
+    total_time = unit_time * quantity
+    
     base_xp = rec.get("xp_gain", 0)
     total_xp = int((base_xp * quantity) * 0.5) 
 
