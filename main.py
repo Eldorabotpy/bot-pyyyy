@@ -216,3 +216,4 @@ if __name__ == '__main__':
     
     # Inicia o bot
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    
