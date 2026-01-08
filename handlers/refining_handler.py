@@ -443,7 +443,7 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
     
     # Correção preventiva de inventário
-    await player_manager.corrigir_inventario_automatico(uid)
+    #await player_manager.corrigir_inventario_automatico(uid)
 
     pdata = await player_manager.get_player_data(uid)
     if not pdata:
@@ -989,7 +989,8 @@ async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 # REGISTROS
 # =========================
-refining_main_handler = CallbackQueryHandler(refining_main_callback, pattern=r"^(refining_main|ref_main|ref_main_PAGE_\d+)$")
+# Regex mais explícito e separado para garantir captura
+refining_main_handler = CallbackQueryHandler(refining_main_callback, pattern="^refining_main$|^ref_main$|^ref_main_PAGE_")
 noop_handler = CallbackQueryHandler(noop_callback, pattern=r"^noop_ref_page$")
 ref_select_handler  = CallbackQueryHandler(ref_select_callback,  pattern=r"^ref_sel_[A-Za-z0-9_]+$")
 ref_confirm_handler = CallbackQueryHandler(ref_confirm_callback,  pattern=r"^ref_confirm_[A-Za-z0-9_]+$")

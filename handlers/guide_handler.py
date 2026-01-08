@@ -158,15 +158,24 @@ TEXT_CLASSES_INFO = """
 
 Veja o destino de cada classe:
 
-⚔️ <b>GUERREIRO</b> ➔ Cavaleiro ➔ Templário ➔ Guardião Divino ➔ Avatar da Égide ➔ <b>Lenda Divina</b>
-🪓 <b>BERSERKER</b> ➔ Bárbaro ➔ Selvagem ➔ Ira Primordial ➔ Avatar da Calamidade ➔ <b>Deus da Ira</b>
-🏹 <b>CAÇADOR</b> ➔ Franco Atirador ➔ Olho de Águia ➔ Atirador Espectral ➔ O Horizonte ➔ <b>Lenda do Arco</b>
-🔪 <b>ASSASSINO</b> ➔ Ladrão de Sombras ➔ Ninja ➔ Mestre das Lâminas ➔ Ceifador ➔ <b>Aspecto da Noite</b>
-🧙 <b>MAGO</b> ➔ Elementalista ➔ Arquimago ➔ Mago de Batalha ➔ Arcanista Supremo ➔ <b>Aspecto Arcano</b>
-🧘 <b>MONGE</b> ➔ Punho Elemental ➔ Ascendente ➔ Punho Divino ➔ Dragão Interior ➔ <b>Lenda do Punho</b>
-🥷 <b>SAMURAI</b> ➔ Ronin ➔ Kenshi ➔ Shogunato ➔ Mestre de Bushido ➔ <b>Aspecto da Lâmina</b>
-🎶 <b>BARDO</b> ➔ Menestrel ➔ Trovador ➔ Mestre de Concerto ➔ Harmonista ➔ <b>Aspecto Musical</b>
-🩹 <b>CURANDEIRO</b> ➔ Clérigo ➔ Sacerdote ➔ Hierofante ➔ Oráculo Celestial ➔ <b>Lenda da Cura</b>
+⚔️ <b>GUERREIRO</b> ➔ 
+Cavaleiro ➔ Templário ➔ Guardião Divino ➔ Avatar da Égide ➔ <b>Lenda Divina</b>
+🪓 <b>BERSERKER</b> ➔ 
+Bárbaro ➔ Selvagem ➔ Ira Primordial ➔ Avatar da Calamidade ➔ <b>Deus da Ira</b>
+🏹 <b>CAÇADOR</b> ➔ 
+Franco Atirador ➔ Olho de Águia ➔ Atirador Espectral ➔ O Horizonte ➔ <b>Lenda do Arco</b>
+🔪 <b>ASSASSINO</b> ➔ 
+Ladrão de Sombras ➔ Ninja ➔ Mestre das Lâminas ➔ Ceifador ➔ <b>Aspecto da Noite</b>
+🧙 <b>MAGO</b> ➔ 
+Elementalista ➔ Arquimago ➔ Mago de Batalha ➔ Arcanista Supremo ➔ <b>Aspecto Arcano</b>
+🧘 <b>MONGE</b> ➔ 
+Punho Elemental ➔ Ascendente ➔ Punho Divino ➔ Dragão Interior ➔ <b>Lenda do Punho</b>
+🥷 <b>SAMURAI</b> ➔ 
+Ronin ➔ Kenshi ➔ Shogunato ➔ Mestre de Bushido ➔ <b>Aspecto da Lâmina</b>
+🎶 <b>BARDO</b> ➔ 
+Menestrel ➔ Trovador ➔ Mestre de Concerto ➔ Harmonista ➔ <b>Aspecto Musical</b>
+🩹 <b>CURANDEIRO</b> ➔ 
+Clérigo ➔ Sacerdote ➔ Hierofante ➔ Oráculo Celestial ➔ <b>Lenda da Cura</b>
 """
 
 # ==============================================================================
