@@ -442,3 +442,4 @@ start_trial_execute_handler = CallbackQueryHandler(start_trial_execute, pattern=
 skill_ascension_menu_handler = CallbackQueryHandler(show_skill_ascension_menu, pattern=r'^evo_skill_ascend_menu$')
 skill_ascension_info_handler = CallbackQueryHandler(show_skill_ascension_info, pattern=r'^evo_skill_ascend_info:')
 skill_ascension_confirm_handler = CallbackQueryHandler(confirm_skill_ascension, pattern=r'^evo_skill_ascend_confirm:')
+evo_battle_start_handler = CallbackQueryHandler(evolution_battle.start_evo_combat_callback, pattern=r'^start_evo_combat$')

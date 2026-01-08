@@ -1,9 +1,8 @@
 # registries/class_evolution.py
+# (VERSÃO CORRIGIDA: Registra o botão de combate final)
 
 from telegram.ext import Application, CallbackQueryHandler
 from handlers import class_evolution_handler as evo_h
-# 👇 Importe o novo módulo
-from modules import evolution_battle 
 
 def register_evolution_handlers(app: Application):
     """Registra todos os handlers para o menu de evolução de classe."""
@@ -14,7 +13,7 @@ def register_evolution_handlers(app: Application):
         pattern=r'^open_evolution_menu$'
     ))
     
-    # 2. Handlers da Árvore
+    # 2. Handlers da Árvore (Nós/Tarefas)
     app.add_handler(CallbackQueryHandler(
         evo_h.show_node_info, 
         pattern=r'^evo_node_info:'
@@ -24,7 +23,7 @@ def register_evolution_handlers(app: Application):
         pattern=r'^evo_complete_node:'
     ))
     
-    # 3. Handlers do Teste (Confirmação e Apresentação)
+    # 3. Handlers do Teste (Confirmação e Apresentação VS)
     app.add_handler(CallbackQueryHandler(
         evo_h.start_trial_confirmation, 
         pattern=r'^evo_start_trial_confirm:'
@@ -48,8 +47,7 @@ def register_evolution_handlers(app: Application):
         pattern=r'^evo_skill_ascend_confirm:'
     ))
 
-    # 👇 5. HANDLER DO COMBATE (O PASSO QUE FALTAVA) 👇
-    app.add_handler(CallbackQueryHandler(
-        evolution_battle.start_evo_combat_callback,
-        pattern=r'^start_evo_combat$'
-    ))
+    # 5. BATALHA DE EVOLUÇÃO (A PEÇA QUE FALTAVA!)
+    # Registra o handler que criamos no final do class_evolution_handler.py
+    app.add_handler(evo_h.evo_battle_start_handler)
+    
