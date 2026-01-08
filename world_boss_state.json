@@ -1,6 +1,6 @@
 {
-  "is_active": false,
-  "location": "floresta_sombria",
+  "is_active": true,
+  "location": "pradaria_inicial",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",

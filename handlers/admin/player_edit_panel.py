@@ -1,5 +1,5 @@
 # handlers/admin/player_edit_panel.py
-# (VERSÃO CORRIGIDA: Exporta a função create_admin_edit_player_handler)
+# (VERSÃO CORRIGIDA E BLINDADA: Suporte Híbrido ObjectId + Telegram ID)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -14,7 +14,6 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 
 # --- Imports do Core e Utils ---
-# Importação centralizada de Utils para evitar erros de ADMIN_LIST
 from handlers.admin.utils import parse_hybrid_id, ADMIN_LIST
 from modules.player.core import get_player_data, save_player_data
 from modules.player.queries import find_player_by_name
@@ -34,13 +33,16 @@ logger = logging.getLogger(__name__)
 
 # --- Helpers ---
 def _get_player_info_text(pdata: dict) -> str:
-    """Monta o texto de status atual do jogador."""
+    """Monta o texto de status atual do jogador (Blindado para ObjectId)."""
     try:
         char_level = int(pdata.get('level', 1))
         prof_type = (pdata.get('profession', {}) or {}).get('type', 'Nenhuma')
         prof_level = int((pdata.get('profession', {}) or {}).get('level', 1))
         char_name = pdata.get('character_name', 'Sem Nome')
-        user_id = pdata.get('user_id', '???')
+        
+        # [MODIFICAÇÃO] Exibe ambos os IDs para conferência
+        user_id_tg = pdata.get('user_id', '???')
+        db_id = str(pdata.get('_id', '???'))
         
         class_key = pdata.get('class_key') or pdata.get('class', 'Nenhuma')
         class_info = (game_data.CLASSES_DATA.get(str(class_key).lower()) or {})
@@ -50,7 +52,8 @@ def _get_player_info_text(pdata: dict) -> str:
 
         return (
             f"👤 <b>Editando Jogador:</b> {char_name}\n"
-            f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
+            f"🆔 <b>Tg ID:</b> <code>{user_id_tg}</code>\n"
+            f"🗃️ <b>Obj ID:</b> <code>{db_id}</code>\n"
             "----------------------------------\n"
             f"👑 <b>Classe:</b> {class_display}\n"
             f"🎖️ <b>Nível de Personagem:</b> {char_level}\n"
@@ -89,7 +92,6 @@ async def admin_edit_player_start(update: Update, context: ContextTypes.DEFAULT_
     
     if update.callback_query:
         await update.callback_query.answer()
-        # Edita para texto simples aguardando input
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("Cancelar", callback_data="edit_cancel")]])
         try:
             await update.callback_query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
@@ -105,7 +107,7 @@ async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     pdata = None
     target_id = None
 
-    # 1. Tenta por ID (Híbrido)
+    # 1. Tenta por ID (Híbrido - ObjectId ou Int)
     parsed_id = parse_hybrid_id(user_input)
     if parsed_id:
         pdata = await get_player_data(parsed_id)
@@ -124,9 +126,10 @@ async def admin_get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     context.user_data['edit_target_id'] = target_id
     
-    # Se pdata veio sem user_id preenchido corretamente
-    if 'user_id' not in pdata:
-        pdata['user_id'] = target_id
+    # [CORREÇÃO BLINDADA] Só preenche user_id se for numérico (ID Telegram)
+    # Evita salvar ObjectId no campo user_id, que quebraria envio de mensagens
+    if 'user_id' not in pdata and str(target_id).isdigit():
+        pdata['user_id'] = int(target_id)
     
     info_text = _get_player_info_text(pdata)
     await _send_or_edit_menu(update, context, info_text)
@@ -156,10 +159,8 @@ async def admin_choose_action(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ConversationHandler.END
 
     if action == "edit_char_class":
-        # Monta lista de classes Tier 1
         kb = []
         for cid, cdata in game_data.CLASSES_DATA.items():
-            # Filtra apenas Tier 1 para não poluir, ou mostra todas
             if cdata.get('tier', 1) == 1:
                 emoji = cdata.get('emoji', '🔹')
                 name = cdata.get('display_name', cid.capitalize())
@@ -219,7 +220,7 @@ async def admin_set_profession_type(update: Update, context: ContextTypes.DEFAUL
     if pdata:
         pdata.setdefault('profession', {})
         pdata['profession']['type'] = new_prof
-        pdata['profession']['level'] = 1 # Reseta nivel ao mudar prof
+        pdata['profession']['level'] = 1 
         pdata['profession']['xp'] = 0
         await save_player_data(target_id, pdata)
         await query.answer("Profissão definida!")
@@ -276,7 +277,7 @@ async def _send_error(update, msg):
     elif update.message: await update.message.reply_text(msg)
 
 # ==============================================================================
-# FÁBRICA DE HANDLER (O que o admin.py está tentando importar)
+# FÁBRICA DE HANDLER (Export)
 # ==============================================================================
 
 def create_admin_edit_player_handler():
