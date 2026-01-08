@@ -273,3 +273,16 @@ async def corrigir_bug_tomos_duplicados(user_id: Union[int, str]):
         await save_player_data(user_id, pdata)
         return True
     return False
+
+# ==============================================================================
+# ADICIONE ISTO NO FINAL DO ARQUIVO player_manager.py
+# ==============================================================================
+
+async def corrigir_inventario_automatico(user_id: Union[int, str]):
+    """
+    Função de compatibilidade chamada pelo refining_handler.
+    Redireciona para as correções específicas existentes.
+    """
+    # Chama a correção de tomos que já existe no arquivo
+    await corrigir_bug_tomos_duplicados(user_id)
+    return True
