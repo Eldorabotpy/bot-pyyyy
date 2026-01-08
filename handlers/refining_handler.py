@@ -516,78 +516,87 @@ async def ref_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     q = update.callback_query
     
     # 1. Apaga o menu de seleção anterior
+    # (É ISSO QUE FAZ O MENU SUMIR. Se der erro depois daqui, fica tela branca)
     try: await q.delete_message()
     except: pass
     
-    # 2. 🔒 SEGURANÇA: Obtém o ID da sessão (String/ObjectId)
-    # Se não tiver sessão ativa, barra o acesso.
-    uid = get_current_player_id(update, context)
-    if not uid:
-        await q.answer("Sessão inválida. Digite /start.", show_alert=True)
-        return
+    try:
+        # 🔒 SEGURANÇA: Obtém o ID da sessão
+        uid = get_current_player_id(update, context)
+        if not uid:
+            await context.bot.send_message(q.message.chat_id, "⚠️ Sessão inválida. Digite /start.")
+            return
 
-    # 3. Identifica a receita
-    rid = q.data.replace("ref_confirm_", "", 1)
+        # 3. Identifica a receita
+        rid = q.data.replace("ref_confirm_", "", 1)
+        
+        # 4. Carrega dados do jogador
+        pdata = await player_manager.get_player_data(uid)
+        
+        # 5. Verifica se já está ocupado
+        if pdata.get("player_state", {}).get("action") not in (None, "idle"):
+            await context.bot.send_message(
+                q.message.chat_id, 
+                "⚠️ <b>Ocupado!</b> Você já está fazendo outra coisa.", 
+                parse_mode="HTML"
+            )
+            return
+
+        # 6. Inicia o refino na Engine (AQUI DEVE ESTAR O ERRO)
+        res = await start_refine(pdata, rid)
+        
+        # Se retornar string, é mensagem de erro validada (ex: falta item)
+        if isinstance(res, str):
+            await context.bot.send_message(q.message.chat_id, f"❌ {res}", parse_mode="HTML")
+            return
+
+        # 7. Prepara o visual de progresso
+        secs = int(res.get("duration_seconds", 60))
+        t = _fmt_minutes_or_seconds(secs)
+        
+        # Busca nome bonito do item
+        recipe_info = (getattr(game_data, "REFINING_RECIPES", {}) or {}).get(rid, {})
+        title = recipe_info.get("display_name", rid)
+        
+        # Barra de progresso inicial
+        bar = "▒▒▒▒▒▒▒▒▒▒"
+        
+        txt = (
+            f"🔨 <b>FORJA INICIADA:</b>\n"
+            f"<b>{title.upper()}</b>\n"
+            f"──────────────────────\n"
+            f" ╰┈➤⏳ <b>Tempo Estimado:</b> <code>{t}</code>\n"
+            f" ╰┈➤🔋 <b>Estado:</b> <code>Aquecendo fornalha...</code>\n\n"
+            f" ╰┈➤[{bar}] 0%\n"
+            f"<i>Você pode fechar esta janela, o bot avisará quando terminar.</i>"
+        )
+        
+        # 8. Envia a mensagem com mídia
+        sent = await _safe_send_with_media(context, q.message.chat_id, txt)
+        mid = sent.message_id if sent else None
+        
+        # 9. Agenda o Job de finalização
+        context.job_queue.run_once(
+            finish_refine_job, 
+            secs, 
+            chat_id=q.message.chat_id,
+            data={
+                "rid": rid, 
+                "message_id_to_delete": mid, 
+                "user_id": uid 
+            }, 
+            name=f"refining:{uid}"
+        )
     
-    # 4. Carrega dados do jogador
-    pdata = await player_manager.get_player_data(uid)
-    
-    # 5. Verifica se já está ocupado
-    if pdata.get("player_state", {}).get("action") not in (None, "idle"):
+    except Exception as e:
+        # 🚨 AQUI ESTÁ A PROTEÇÃO: Se der erro, o bot avisa em vez de morrer
+        import traceback
+        traceback.print_exc() # Mostra no terminal
         await context.bot.send_message(
             q.message.chat_id, 
-            "⚠️ <b>Ocupado!</b> Você já está fazendo outra coisa.", 
+            f"❌ <b>ERRO CRÍTICO NO REFINO:</b>\n<code>{str(e)}</code>\n\nAvise o admin.", 
             parse_mode="HTML"
         )
-        return
-
-    # 6. Inicia o refino na Engine
-    res = await start_refine(pdata, rid)
-    
-    # Se retornar string, é mensagem de erro
-    if isinstance(res, str):
-        await context.bot.send_message(q.message.chat_id, f"❌ {res}", parse_mode="HTML")
-        return
-
-    # 7. Prepara o visual de progresso
-    secs = int(res.get("duration_seconds", 60))
-    t = _fmt_minutes_or_seconds(secs)
-    
-    # Busca nome bonito do item
-    recipe_info = (getattr(game_data, "REFINING_RECIPES", {}) or {}).get(rid, {})
-    title = recipe_info.get("display_name", rid)
-    
-    # Barra de progresso inicial (vazia)
-    bar = "▒▒▒▒▒▒▒▒▒▒"
-    
-    txt = (
-        f"🔨 <b>FORJA INICIADA:</b>\n"
-        f"<b>{title.upper()}</b>\n"
-        f"──────────────────────\n"
-        f" ╰┈➤⏳ <b>Tempo Estimado:</b> <code>{t}</code>\n"
-        f" ╰┈➤🔋 <b>Estado:</b> <code>Aquecendo fornalha...</code>\n\n"
-        f" ╰┈➤[{bar}] 0%\n"
-        f"<i>Você pode fechar esta janela, o bot avisará quando terminar.</i>"
-    )
-    
-    # 8. Envia a mensagem com mídia (se houver)
-    sent = await _safe_send_with_media(context, q.message.chat_id, txt)
-    mid = sent.message_id if sent else None
-    
-    # 9. Agenda o Job de finalização
-    # IMPORTANTE: Não passamos 'user_id=uid' como argumento direto pois ele é String.
-    # Passamos apenas dentro de 'data' para evitar conflito de tipo na lib.
-    context.job_queue.run_once(
-        finish_refine_job, 
-        secs, 
-        chat_id=q.message.chat_id,
-        data={
-            "rid": rid, 
-            "message_id_to_delete": mid, 
-            "user_id": uid  # <--- O ID seguro vai aqui dentro
-        }, 
-        name=f"refining:{uid}"
-    )
 
 async def ref_batch_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra o menu para escolher a quantidade do lote com visual melhorado."""
