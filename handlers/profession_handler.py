@@ -1,5 +1,5 @@
 # handlers/profession_handler.py
-# (VERSÃO: LEITURA DIRETA DO ARQUIVO PROFESSIONS.PY + TRAVA ÚNICA)
+# (VERSÃO CORRIGIDA: Salva 'type' em vez de 'key' para corrigir o bug de exibição)
 
 import math
 import logging
@@ -14,7 +14,6 @@ from modules.auth_utils import get_current_player_id
 try:
     from modules.game_data.professions import PROFESSIONS_DATA
 except ImportError:
-    # Fallback de segurança apenas para não crashar se o arquivo estiver vazio
     PROFESSIONS_DATA = {}
 
 logger = logging.getLogger(__name__)
@@ -44,9 +43,9 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    # Verifica se já tem profissão
+    # Verifica se já tem profissão (Compatibilidade type/key)
     prof_data = player_data.get("profession", {})
-    current_prof_key = prof_data.get("key")
+    current_prof_key = prof_data.get("type") or prof_data.get("key")
 
     # --- CENÁRIO A: JOGADOR JÁ TEM PROFISSÃO ---
     if current_prof_key and current_prof_key in PROFESSIONS_DATA:
@@ -79,14 +78,8 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     kb = []
-    # Lista dinamicamente o que está no seu arquivo professions.py
-    # Filtramos apenas as de 'crafting' se quiser restringir, ou mostramos todas.
-    # Assumindo que o jogador escolhe qualquer uma da lista:
     row = []
     for key, info in PROFESSIONS_DATA.items():
-        # Opcional: Filtrar apenas category='crafting' se coleta for skill passiva
-        # if info.get('category') != 'crafting': continue 
-        
         name = info.get('display_name', key.title())
         row.append(InlineKeyboardButton(f"{name}", callback_data=f"job_pick_{key}"))
         if len(row) == 2:
@@ -98,7 +91,7 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _safe_edit(query, text, InlineKeyboardMarkup(kb))
 
 # ==================================================================
-# 2. ESCOLHER PROFISSÃO
+# 2. ESCOLHER PROFISSÃO (AQUI ESTAVA O ERRO)
 # ==================================================================
 async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -107,7 +100,8 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
     player_data = await player_manager.get_player_data(user_id)
     
     # Trava de segurança
-    if player_data.get("profession", {}).get("key"):
+    prof_data = player_data.get("profession", {})
+    if prof_data.get("type") or prof_data.get("key"):
         await query.answer("Você já tem uma profissão!", show_alert=True)
         await job_menu_callback(update, context)
         return
@@ -117,9 +111,9 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
         await query.answer("Profissão inválida.", show_alert=True)
         return
 
-    # Salva a escolha
+    # [CORREÇÃO] Salva como 'type' para o profile_handler ler corretamente
     player_data["profession"] = {
-        "key": target_prof,
+        "type": target_prof, # <--- Antes estava "key"
         "level": 1,
         "xp": 0
     }
@@ -140,7 +134,8 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_data = await player_manager.get_player_data(user_id)
     
     prof_data = player_data.get("profession", {})
-    my_prof_key = prof_data.get("key")
+    # [CORREÇÃO] Lê 'type' preferencialmente
+    my_prof_key = prof_data.get("type") or prof_data.get("key")
     
     if not my_prof_key:
         await query.answer("Escolha uma profissão primeiro!", show_alert=True)
@@ -159,7 +154,6 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mode == "refine":
         # Lista receitas de refino
         for k, v in REFINING_RECIPES.items():
-            # (Opcional) Se quiser travar refino por profissão também, verifique aqui
             temp = v.copy(); temp['id'] = k
             recipes.append(temp)
             

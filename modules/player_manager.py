@@ -1,5 +1,5 @@
 # modules/player_manager.py
-# (VERSÃO FINAL BLINDADA: Suporte Híbrido Total Int/Str + Adapter)
+# (VERSÃO FINAL LIMPA: Sem lixo legado + Auto-Fix de Profissão)
 
 from __future__ import annotations
 import asyncio
@@ -92,6 +92,12 @@ from .player.actions import spend_energy as _spend_energy_internal
 # Premium
 from .player.premium import PremiumManager
 
+# Profissões (Para o Auto-Fix)
+try:
+    from modules.game_data.professions import PROFESSIONS_DATA
+except ImportError:
+    PROFESSIONS_DATA = {}
+
 # ==============================================================================
 # 2. HELPER DE COMPATIBILIDADE DE ID
 # ==============================================================================
@@ -109,16 +115,20 @@ def _ensure_id_format(user_id: Union[int, str, ObjectId]) -> Union[int, ObjectId
     return user_id
 
 # ==============================================================================
-# 3. WRAPPERS (ADAPTADORES)
+# 3. WRAPPERS (ADAPTADORES) COM AUTO-FIX
 # ==============================================================================
 
 async def get_player_data(user_id: Union[int, str]):
-    """Busca dados e verifica validade do VIP automaticamente."""
+    """
+    Busca dados e aplica correções automáticas (VIP e Profissão).
+    """
     real_id = _ensure_id_format(user_id)
     pdata = await _get_player_data_core(real_id)
 
-    # Lógica de expiração VIP (Auto-Revoke)
     if pdata:
+        changed = False
+
+        # --- 1. Auto-Fix: VIP Vencido ---
         tier = str(pdata.get("premium_tier", "free")).lower()
         if tier not in ["free", "admin"]:
             try:
@@ -133,8 +143,30 @@ async def get_player_data(user_id: Union[int, str]):
                         logger.info(f"📉 VIP Vencido: {user_id}")
                         pdata["premium_tier"] = "free"
                         pdata["premium_expires_at"] = None
-                        await _save_player_data_core(real_id, pdata)
+                        changed = True
             except Exception: pass
+        
+        # --- 2. Auto-Fix: Profissão Bugada ("key") ---
+        # Se não tiver profissão OU se o tipo for "key" (o bug que você relatou)
+        prof = pdata.get("profession")
+        if not prof or not isinstance(prof, dict) or prof.get("type") == "key":
+            # Define uma profissão padrão segura (ex: colhedor ou lenhador)
+            default_prof = "colhedor" 
+            # Verifica se 'colhedor' existe, senão pega a primeira disponível
+            if PROFESSIONS_DATA and default_prof not in PROFESSIONS_DATA:
+                default_prof = list(PROFESSIONS_DATA.keys())[0]
+
+            pdata["profession"] = {
+                "type": default_prof,
+                "level": 1,
+                "xp": 0
+            }
+            logger.info(f"🔧 Auto-Fix Profissão {user_id}: Corrigido para '{default_prof}'")
+            changed = True
+        
+        # Salva se houve correção
+        if changed:
+            await _save_player_data_core(real_id, pdata)
             
     return pdata
 
@@ -244,45 +276,3 @@ def get_rune_bonuses(player_data: dict) -> dict:
                     bonuses[k] = bonuses.get(k, 0) + info.get("value", 0)
     return bonuses
 
-# ==============================================================================
-# 4. FERRAMENTAS DE CORREÇÃO (LEGADO)
-# ==============================================================================
-
-async def corrigir_bug_tomos_duplicados(user_id: Union[int, str]):
-    """Corrige IDs de tomos duplicados no inventário."""
-    pdata = await get_player_data(user_id)
-    if not pdata: return False
-    
-    inv = pdata.get("inventory", {})
-    mudou = False
-    
-    for iid in list(inv.keys()):
-        if iid.startswith("tomo_tomo_"):
-            dados = inv[iid]
-            qtd = int(dados.get("quantity", 1)) if isinstance(dados, dict) else int(dados)
-            
-            if qtd > 0:
-                novo_id = iid.replace("tomo_tomo_", "tomo_", 1)
-                add_item_to_inventory(pdata, novo_id, qtd)
-                print(f"🔧 FIX TOMO: {user_id} | {iid} -> {novo_id}")
-            
-            del inv[iid]
-            mudou = True
-            
-    if mudou:
-        await save_player_data(user_id, pdata)
-        return True
-    return False
-
-# ==============================================================================
-# ADICIONE ISTO NO FINAL DO ARQUIVO player_manager.py
-# ==============================================================================
-
-async def corrigir_inventario_automatico(user_id: Union[int, str]):
-    """
-    Função de compatibilidade chamada pelo refining_handler.
-    Redireciona para as correções específicas existentes.
-    """
-    # Chama a correção de tomos que já existe no arquivo
-    await corrigir_bug_tomos_duplicados(user_id)
-    return True
