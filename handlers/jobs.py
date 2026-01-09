@@ -151,10 +151,7 @@ async def daily_pvp_entry_reset_job(context: ContextTypes.DEFAULT_TYPE):
                 )
                 
                 if result.modified_count > 0:
-                    try:
-                        if hasattr(player_manager, "clear_player_cache"):
-                            await player_manager.clear_player_cache(user_id)
-                    except: pass
+                    pass
                     
                     telegram_chat_id = pdata.get("telegram_id_owner")
                     if not telegram_chat_id and str(user_id).isdigit():
@@ -553,12 +550,6 @@ async def daily_kingdom_ticket_job(context: ContextTypes.DEFAULT_TYPE) -> int:
                         "$set": {"daily_awards.last_kingdom_ticket_date": today}
                     }
                 )
-                
-                try:
-                    if hasattr(player_manager, "clear_player_cache"):
-                        res = player_manager.clear_player_cache(user_id)
-                        if asyncio.iscoroutine(res): await res
-                except Exception: pass
 
                 granted += 1
                 

@@ -1,6 +1,4 @@
 # modules/auth_utils.py
-# (VERSÃO SANITIZADA: Rejeita sessões legadas)
-
 from functools import wraps
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -13,54 +11,66 @@ except ImportError:
 
 def get_current_player_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str | None:
     """
-    Retorna o ID do jogador logado.
-    AGORA: Só aceita strings/ObjectIds válidos. Rejeita INT (Legado).
+    Retorna o ID do jogador logado como STRING.
+    Aceita ObjectId do MongoDB e IDs numéricos antigos.
     """
     user_data = getattr(context, "user_data", None)
+    
+    # 1. Verifica na RAM (user_data)
     if user_data:
         pid = user_data.get("logged_player_id")
         
-        # Validação Estrita: Se for int ou string numérica simples, ignora (força re-login)
-        if isinstance(pid, int): return None
-        if isinstance(pid, str) and pid.isdigit(): return None
-        
-        if pid: return pid
+        if pid:
+            # Se for um objeto ObjectId, converte pra string e retorna
+            if isinstance(pid, ObjectId):
+                return str(pid)
+            
+            # Se for string
+            if isinstance(pid, str):
+                # Se for numérico (legado) ou hexadecimal (ObjectId), é válido
+                return pid
 
     return None
 
 def requires_login(func):
     """
-    Decorator de Auth. Se não tiver sessão válida (Novo Sistema), bloqueia.
+    Decorator blindado: Tenta recuperar a sessão do banco se a RAM falhar.
     """
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        # Permite injeção manual (casos de teste ou admin interno)
+        # Permite injeção manual para testes
         if "player_data" in kwargs and kwargs["player_data"]:
             return await func(update, context, *args, **kwargs)
 
         user_data = getattr(context, "user_data", None)
         
-        # 1. Verifica RAM
+        # 1. Se não achou na RAM, tenta recuperar do Banco (Persistência)
         if not user_data or not get_current_player_id(update, context):
             
-            # 2. Tenta Auto-Login Persistente
             if update.effective_user:
                 tg_id = update.effective_user.id
+                
+                # Busca no banco de sessões
                 saved_player_id = await get_persistent_session(tg_id)
                 
-                # Só restaura se for um ID válido do novo sistema (ObjectId string)
-                if saved_player_id and not saved_player_id.isdigit():
+                if saved_player_id:
+                    # RECONEXÃO SILENCIOSA
+                    # Salva na RAM como string para as próximas chamadas
                     if user_data is not None:
-                        context.user_data["logged_player_id"] = saved_player_id
+                        context.user_data["logged_player_id"] = str(saved_player_id)
                     return await func(update, context, *args, **kwargs)
 
-            # 3. Falhou? Avisa.
+            # 2. Se falhou tudo, avisa o usuário
             if update.effective_message:
-                msg = "⚠️ <b>Sessão expirada ou sistema atualizado.</b>\nPor favor, use /start para logar ou migrar sua conta."
+                msg = "⚠️ <b>Sessão expirada.</b>\nPor favor, digite /start para reconectar."
                 try:
                     if update.callback_query:
-                        await update.callback_query.answer("⚠️ Faça login novamente.", show_alert=True)
-                        # Opcional: enviar msg de texto se for botão crítico
+                        # Tenta responder o botão para não ficar girando
+                        try: await update.callback_query.answer("⚠️ Reconectando...", show_alert=False)
+                        except: pass
+                        
+                        # Opcional: Se quiser forçar o usuário a ver a msg, descomente abaixo:
+                        # await update.effective_message.reply_text(msg, parse_mode="HTML")
                     else:
                         await update.effective_message.reply_text(msg, parse_mode="HTML")
                 except: pass

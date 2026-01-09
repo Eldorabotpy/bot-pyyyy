@@ -248,9 +248,9 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         f"{lvl_msg}"
     )
     
-    # ✅ CORREÇÃO DO BOTÃO VOLTAR
-    # Usa 'open_region:' (com dois pontos) para abrir o menu SEM viajar
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"open_region:{region_key}")]])
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 Voltar para Região", callback_data=f"open_region:{region_key}")]
+    ])
     
     # ✅ MÍDIA FINAL (Restaurada)
     media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
