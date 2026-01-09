@@ -374,19 +374,71 @@ async def hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @requires_login
 async def start_auto_hunt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     
+    # 1. Recupera ID do usuário
     user_id = get_current_player_id(update, context)
     if not user_id:
         await query.answer("⚠️ Sessão expirada.", show_alert=True)
         return
 
+    # 2. Parse dos dados
     try:
         parts = query.data.split('_')
         hunt_count = int(parts[2])
         region_key = "_".join(parts[3:]) 
+    except IndexError:
+        await query.answer("❌ Dados inválidos.", show_alert=True)
+        return
+
+    # 3. Limpa o menu anterior
+    try:
+        await query.delete_message()
+    except Exception:
+        pass 
+
+    # 4. Feedback Visual (Suporta FOTO e VÍDEO)
+    try:
+        # Busca os dados do arquivo no seu gerenciador
+        file_data = file_id_manager.get_file_data(f"hunt_{region_key}")
+        
+        caption_text = f"🌲 <b>Viajando para {region_key.replace('_', ' ').title()}...</b>\n<i>Preparando equipamentos...</i>"
+
+        if file_data and file_data.get('id'):
+            media_id = file_data['id']
+            media_type = file_data.get('type', 'photo') # Padrão é photo se não tiver tipo definido
+
+            if media_type == 'video' or media_type == 'animation':
+                await context.bot.send_video(
+                    chat_id=query.message.chat_id,
+                    video=media_id,
+                    caption=caption_text,
+                    parse_mode="HTML"
+                )
+            else:
+                await context.bot.send_photo(
+                    chat_id=query.message.chat_id,
+                    photo=media_id,
+                    caption=caption_text,
+                    parse_mode="HTML"
+                )
+        else:
+            # Se não tiver imagem, manda só texto pra não ficar no vácuo
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=caption_text,
+                parse_mode="HTML"
+            )
+
+    except Exception as e:
+        logger.error(f"Erro visual ao iniciar hunt: {e}")
+        # Se der erro na imagem, manda texto simples
+        await context.bot.send_message(query.message.chat_id, "🌲 Iniciando viagem...")
+
+    # 5. Chama a Engine
+    try:
         await auto_hunt_engine.start_auto_hunt(update, context, hunt_count, region_key)
-    except Exception: pass
+    except Exception as e:
+        logger.error(f"Erro crítico no start_auto_hunt: {e}")
 
 autohunt_start_handler = CallbackQueryHandler(start_auto_hunt_callback, pattern=r'^autohunt_start_')        
 hunt_handler = CallbackQueryHandler(hunt_callback, pattern=r"^hunt_")
