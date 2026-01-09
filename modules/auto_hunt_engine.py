@@ -1,5 +1,5 @@
 # modules/auto_hunt_engine.py
-# (CORREÇÃO FINAL: Visual Restaurado + Botão Voltar Menu + XP Seguro)
+# (VERSÃO DEFINITIVA: Visual + Botão Voltar Corrigido + XP Seguro)
 
 import logging
 import random
@@ -15,7 +15,7 @@ from bson import ObjectId
 
 # Imports Core
 from modules import player_manager, game_data
-from modules import file_ids as file_id_manager # Necessário para o vídeo final
+from modules import file_ids as file_id_manager # Importante para o vídeo final
 from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def ensure_object_id(uid):
     return uid
 
 # ==============================================================================
-# ⚖️ BALANCEAMENTO (XP)
+# ⚖️ BALANCEAMENTO (XP CONTROLADO)
 # ==============================================================================
 def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     m = mon.copy()
@@ -52,12 +52,13 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     
     # --- XP Fixo e Baixo ---
     base_xp = int(m.get("xp_reward", 5))
-    if base_xp > 50: base_xp = 15 # Trava de segurança
+    if base_xp > 50: base_xp = 15 # Trava de segurança para valores errados no DB
 
     final_xp = base_xp + (target_lvl * 2)
     
+    # Penalidade de nível alto
     if player_level > min_lvl + 15:
-        final_xp = max(1, int(final_xp * 0.2)) # Penalidade de nível alto
+        final_xp = max(1, int(final_xp * 0.2)) 
 
     m["xp_reward"] = final_xp
     m["gold_drop"] = int(m.get("gold_drop", 1) * scaling_bonus)
@@ -100,7 +101,7 @@ def _roll_loot(monster_data):
     return drops
 
 # ==============================================================================
-# ▶️ START (Lógica Backend)
+# ▶️ START (BACKEND)
 # ==============================================================================
 async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hunt_count: int, region_key: str, message_id_override: int = None):
     raw_uid = get_current_player_id(update, context)
@@ -111,12 +112,12 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         player_data = await player_manager.get_player_data(db_user_id)
         if not player_data: return
 
-        # Consome Energia
+        # Energia
         total_cost = hunt_count 
         if player_data.get("energy", 0) >= total_cost:
             player_data["energy"] -= total_cost
         
-        # Configura Timer
+        # Timer
         duration_seconds = hunt_count * SECONDS_PER_HUNT
         finish_dt = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
         
@@ -133,7 +134,7 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         player_manager.set_last_chat_id(player_data, chat_id)
         await player_manager.save_player_data(db_user_id, player_data)
 
-        # Agenda Job
+        # Job Queue
         job_data = {
             "user_id": str(db_user_id), 
             "chat_id": chat_id, 
@@ -143,7 +144,6 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         }
         
         job_name = f"autohunt_{str(db_user_id)}"
-        
         for job in context.job_queue.get_jobs_by_name(job_name): 
             job.schedule_removal()
 
@@ -161,7 +161,7 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
         uid_str = job_data.get("user_id")
         if not uid_str: return
         
-        # Apaga msg de "Viajando"
+        # Apaga a mensagem de espera ("Viajando...")
         if job_data.get("message_id"):
             try: await context.bot.delete_message(chat_id=job_data["chat_id"], message_id=job_data["message_id"])
             except: pass
@@ -177,7 +177,7 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Erro job finish: {e}")
 
 # ==============================================================================
-# 📊 COMPLETION
+# 📊 COMPLETION & RELATÓRIO
 # ==============================================================================
 async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, context):
     db_id = ensure_object_id(user_id)
@@ -211,7 +211,7 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         else:
             losses += 1
 
-    # Salva
+    # Recompensas
     player_manager.add_gold(player_data, total_gold)
     
     items_text = ""
@@ -219,11 +219,14 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         items_text = "\n🎒 <b>Loot:</b>"
         for i_id, qty in total_items.items():
             player_manager.add_item_to_inventory(player_data, i_id, qty)
-            items_text += f"\n• {i_id.replace('_', ' ').title()} x{qty}"
+            # Nome bonito do item
+            i_name = (game_data.ITEMS_DATA or {}).get(i_id, {}).get("display_name", i_id.replace('_', ' ').title())
+            items_text += f"\n• {i_name} x{qty}"
 
-    # XP
+    # XP (Aplicação Direta para evitar bugs externos)
     player_data["exp"] = player_data.get("exp", 0) + total_xp
     
+    # Level Up Simples
     next_xp = player_level * 100 
     lvl_msg = ""
     if player_data["exp"] >= next_xp:
@@ -235,7 +238,7 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
     player_data['player_state'] = {'action': 'idle'}
     await player_manager.save_player_data(db_id, player_data)
 
-    # Relatório Texto
+    # Texto
     msg = (
         f"🏁 <b>Caçada Rápida Concluída!</b> 🏁\n"
         f"📊 Resultado: {wins} vitórias | {losses} derrotas\n"
@@ -245,12 +248,11 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         f"{lvl_msg}"
     )
     
-    # --- CORREÇÃO DO BOTÃO E MÍDIA ---
+    # ✅ CORREÇÃO DO BOTÃO VOLTAR
+    # Usa 'open_region:' (com dois pontos) para abrir o menu SEM viajar
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"open_region:{region_key}")]])
     
-    # 1. Botão: Usa open_region_ para abrir o menu, não hunt_ que abre luta
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"open_region_{region_key}")]])
-    
-    # 2. Mídia: Restaura o envio de Video/Foto
+    # ✅ MÍDIA FINAL (Restaurada)
     media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
     file_data = file_id_manager.get_file_data(media_key)
     
@@ -264,10 +266,8 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
             else:
                 await context.bot.send_photo(chat_id, photo=m_id, caption=msg, parse_mode="HTML", reply_markup=kb)
         else:
-            # Fallback se não tiver mídia
             await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)
             
     except Exception as e:
         logger.error(f"Erro visual final: {e}")
-        # Garante que envie ao menos o texto se a mídia falhar
         await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)
