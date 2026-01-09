@@ -1,5 +1,5 @@
 # modules/player/inventory.py
-# (VERSÃO FINAL: COMPATÍVEL COM OBJECTID E NOVA AUTH)
+# (VERSÃO FINAL: CORRIGIDA PARA add_unique_item INTELIGENTE)
 
 import logging
 import uuid
@@ -101,11 +101,48 @@ def has_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
 def consume_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
     return remove_item_from_inventory(player_data, item_id, quantity)
 
-def add_unique_item(player_data: dict, unique_id: str, item_data: dict):
-    """Adiciona um item complexo (dicionário) diretamente ao inventário."""
+# ✅ CORREÇÃO AQUI: Função inteligente que aceita 2 ou 3 argumentos
+def add_unique_item(player_data: dict, unique_id_or_item: Union[str, dict], item_data: dict = None) -> str:
+    """
+    Adiciona um item único ao inventário.
+    Compatível com chamadas:
+      1. add_unique_item(pdata, item_dict)          -> Novo padrão (extrai 'uuid' do dict)
+      2. add_unique_item(pdata, uid_str, item_dict) -> Padrão antigo/manual
+    Retorna o UID do item adicionado.
+    """
+    final_uid = None
+    final_item = None
+
+    # Caso 1: Chamada nova (2 argumentos: pdata, item_dict)
+    # O segundo argumento é o dicionário do item
+    if isinstance(unique_id_or_item, dict) and item_data is None:
+        final_item = unique_id_or_item
+        final_uid = final_item.get("uuid")
+        
+        # Se o item não tiver UID, geramos um agora
+        if not final_uid:
+            final_uid = str(uuid.uuid4())
+            final_item["uuid"] = final_uid 
+            
+    # Caso 2: Chamada antiga (3 argumentos: pdata, uid_str, item_dict)
+    elif isinstance(unique_id_or_item, str) and isinstance(item_data, dict):
+        final_uid = unique_id_or_item
+        final_item = item_data
+        # Garante que o UUID esteja dentro do item também
+        if "uuid" not in final_item:
+            final_item["uuid"] = final_uid
+        
+    else:
+        # Fallback de erro
+        logger.error(f"add_unique_item: Assinatura inválida. Args: {type(unique_id_or_item)}, {type(item_data)}")
+        return None
+
+    # Adiciona ao inventário
     inventory = player_data.get("inventory", {})
-    inventory[unique_id] = item_data
+    inventory[final_uid] = final_item
     player_data["inventory"] = inventory
+    
+    return final_uid
 
 # ==============================================================================
 # ⚔️ LÓGICA DE EQUIPAMENTOS (FIX: APENAS STR ID)
@@ -152,7 +189,6 @@ async def equip_unique_item_for_user(user_id: str, unique_id: str, slot_from_ite
     if not isinstance(equipment, dict): equipment = {}
     
     # Se já tiver algo equipado, o sistema de inventário apenas troca os ponteiros
-    # (O item antigo continua no inventário, o novo passa a ser referenciado no slot)
     equipment[slot_key] = unique_id
     pdata["equipment"] = equipment
     

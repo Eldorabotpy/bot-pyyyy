@@ -271,20 +271,25 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     
-    # ✅ ID DA SESSÃO
+    # ✅ ID DA SESSÃO (Essencial para o sistema novo)
     user_id = get_current_player_id(update, context)
     
     pdata = await player_manager.get_player_data(user_id)
     data = q.data
 
+    # === REPARAR TUDO ===
     if data == "enh_rest_all":
-        res = await restore_all_equipped_durability(pdata)
+        # CORREÇÃO: Passando user_id para garantir o salvamento no banco correto
+        res = await restore_all_equipped_durability(user_id, pdata)
         
         if res.get("error"):
             await q.answer(res["error"], show_alert=True)
             await show_enhance_menu(update, context) 
             return
 
+        # O engine já salva, mas por segurança mantemos aqui ou removemos se o engine duplicar. 
+        # No padrão novo, o engine costuma salvar. Se não, o handler salva.
+        # Vou manter para garantir.
         await player_manager.save_player_data(user_id, pdata)
         
         count = res.get("count", 0)
@@ -306,7 +311,9 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         use_joia = (flag == "joia")
-        res = await enhance_item(pdata, uid, use_joia=use_joia)
+        
+        # CORREÇÃO CRÍTICA: user_id como primeiro argumento
+        res = await enhance_item(user_id, pdata, uid, use_joia=use_joia)
         
         if isinstance(res, dict) and res.get("error"):
             await q.answer(res["error"], show_alert=True)
@@ -345,10 +352,12 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _edit_caption_or_text(q, text, kb, context=context)
         return
 
-    # === RESTAURAR DURABILIDADE ===
+    # === RESTAURAR DURABILIDADE (ÚNICO) ===
     if data.startswith("enh_rest_"):
         uid = data.replace("enh_rest_", "")
-        res = restore_durability(pdata, uid)
+        
+        # CORREÇÃO: Passando user_id
+        res = await restore_durability(user_id, pdata, uid)
         
         if isinstance(res, dict) and res.get("error"):
             await q.answer(res["error"], show_alert=True)
@@ -370,8 +379,7 @@ async def do_enhance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔧 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚 𝐦𝐞𝐥𝐡𝐨𝐫𝐚𝐫 𝐞𝐬𝐭𝐞 𝐢𝐭𝐞𝐦", callback_data=f"enh_sel_{uid}")],
             [InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫 𝐚𝐨𝐬 𝐞𝐪𝐮𝐢𝐩𝐚𝐝𝐨𝐬", callback_data="enhance_menu")],
         ])
-        await _edit_caption_or_text(q, text, kb, context=context)
-        
+        await _edit_caption_or_text(q, text, kb, context=context)        
 enhance_menu_handler   = CallbackQueryHandler(show_enhance_menu, pattern=r'^enhance_menu$')
 enhance_select_handler = CallbackQueryHandler(enhance_item_menu, pattern=r'^enh_sel_')
 enhance_action_handler = CallbackQueryHandler(do_enhance, pattern=r'^enh_(go|rest)_')

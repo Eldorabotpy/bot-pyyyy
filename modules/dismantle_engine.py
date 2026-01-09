@@ -62,8 +62,12 @@ async def start_dismantle(player_data: dict, unique_item_id: str) -> Dict[str, A
     """
     Inicia o desmonte de UM item específico (pelo UID).
     """
-    user_id = player_data.get("user_id")
-    if not user_id: return "Erro: Player ID não encontrado."
+    # ✅ CORREÇÃO: Pega o ID do Mongo (ObjectId) e converte para string
+    user_id = str(player_data.get("_id"))
+    
+    # Validação extra para garantir que não veio "None" ou vazio
+    if not user_id or user_id == "None": 
+        return "Erro: Player ID não encontrado nos dados."
 
     inventory = player_data.get("inventory", {})
     
@@ -79,10 +83,12 @@ async def start_dismantle(player_data: dict, unique_item_id: str) -> Dict[str, A
     name = item.get("display_name", "Item")
     rarity = item.get("rarity", "comum")
 
-    # 3. Remove do Inventário
+    # 3. Remove do Inventário (Removemos antes de iniciar para evitar duplicação)
     del inventory[unique_item_id]
+    player_data["inventory"] = inventory # Garante atualização da ref
 
     # 4. Define Estado
+    # TIME_PER_ITEM_SECONDS deve estar importado no topo do arquivo
     finish_time = datetime.now(timezone.utc) + timedelta(seconds=TIME_PER_ITEM_SECONDS)
     
     player_data["player_state"] = {
@@ -96,7 +102,7 @@ async def start_dismantle(player_data: dict, unique_item_id: str) -> Dict[str, A
         }
     }
 
-    # 5. Salva
+    # 5. Salva (Passando user_id string correto)
     await player_manager.save_player_data(user_id, player_data)
 
     return {

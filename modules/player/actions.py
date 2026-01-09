@@ -335,9 +335,10 @@ async def check_stale_actions_on_startup(application: Application):
         return
     
     # Imports Locais para evitar ciclo no topo
-    # Certifique-se que esses módulos existem e exportam essas funções
     try:
+        # ✅ CORREÇÃO: Importar do ENGINE, não do Handler
         from modules.auto_hunt_engine import finish_auto_hunt_job
+        
         from handlers.menu.region import finish_travel_job
         from handlers.job_handler import finish_collection_job
         from handlers.refining_handler import finish_refine_job, finish_dismantle_job, finish_bulk_dismantle_job
@@ -348,17 +349,16 @@ async def check_stale_actions_on_startup(application: Application):
     logger.info("[Watchdog] Iniciando verificação de ações pendentes (Users Collection)...")
     now = utcnow()
     
-    # Lista de ações monitoradas
+    # ✅ CORREÇÃO 1: Adicionado "refining_batch" na lista
     actions_to_check = (
         "auto_hunting", "travel", "collecting", 
-        "refining", "dismantling", "dismantling_batch" # Novos jobs de refino
+        "refining", "refining_batch", # <--- Faltava este
+        "dismantling", "dismantling_batch" 
     )
     query = {"player_state.action": {"$in": actions_to_check}}
 
     try:
-        # Usa to_thread se a coleção for sync (Pymongo padrão), 
-        # mas aqui assumimos que estamos em um contexto async ou usando o cursor diretamente se for motor.
-        # Como pymongo é sync, vamos iterar o cursor diretamente pois o loop de inicialização permite.
+        # Itera diretamente pois o loop de inicialização permite operações sync/bloqueantes moderadas
         cursor = users_collection.find(query)
         
         restored_count = 0
@@ -367,8 +367,6 @@ async def check_stale_actions_on_startup(application: Application):
             user_id = str(pdata.get("_id"))
             chat_id = pdata.get("last_chat_id")
             
-            # Se não tiver chat_id, não tem como notificar, mas talvez devêssemos limpar o estado?
-            # Por enquanto, pulamos.
             if not chat_id: continue
 
             state = pdata.get("player_state", {})
@@ -388,9 +386,9 @@ async def check_stale_actions_on_startup(application: Application):
                 # --- AUTO HUNT ---
                 if action == "auto_hunting":
                     job_data = {
-                        "user_id": user_id, # String ID
+                        "user_id": user_id, 
                         "chat_id": chat_id,
-                        "message_id": state.get("message_id"), # Legado?
+                        "message_id": state.get("message_id"), 
                         "hunt_count": details.get('hunt_count'),
                         "region_key": details.get('region_key')
                     }
@@ -398,7 +396,6 @@ async def check_stale_actions_on_startup(application: Application):
 
                 # --- TRAVEL ---
                 elif action == "travel":
-                    # Passa dados corretos para o job de viagem
                     job_data = {
                         "user_id": user_id, 
                         "dest": details.get("destination")
@@ -417,8 +414,9 @@ async def check_stale_actions_on_startup(application: Application):
                     }
                     application.job_queue.run_once(finish_collection_job, when=delay, data=job_data, name=f"{prefix}_col")
                 
-                # --- REFINING ---
-                elif action == "refining":
+                # --- REFINING (ÚNICO E LOTE) ---
+                # ✅ CORREÇÃO 2: Trata ambos os casos usando o mesmo handler
+                elif action in ("refining", "refining_batch"):
                      job_data = {
                         "user_id": user_id,
                         "rid": details.get("recipe_id"),
@@ -427,11 +425,16 @@ async def check_stale_actions_on_startup(application: Application):
                      application.job_queue.run_once(finish_refine_job, when=delay, chat_id=chat_id, data=job_data, name=f"{prefix}_ref")
 
                 # --- DISMANTLING (SINGLE) ---
-                elif action == "dismantling": # ou o nome que você usou no engine
-                     # Recria o job_data necessário
+                elif action == "dismantling": 
                      job_data = details.copy()
                      job_data["user_id"] = user_id
                      application.job_queue.run_once(finish_dismantle_job, when=delay, chat_id=chat_id, data=job_data, name=f"{prefix}_dis")
+
+                # --- DISMANTLING (BATCH) ---
+                elif action == "dismantling_batch":
+                     job_data = details.copy()
+                     job_data["user_id"] = user_id
+                     application.job_queue.run_once(finish_bulk_dismantle_job, when=delay, chat_id=chat_id, data=job_data, name=f"{prefix}_dis_batch")
 
             except Exception as e:
                 logger.error(f"[Watchdog] Erro ao restaurar user {user_id}: {e}")

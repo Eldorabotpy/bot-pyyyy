@@ -144,37 +144,43 @@ def render_item_line(instance: dict, player_class: str) -> str:
 # ----------------------------------------------------
 
 async def give_generated_item_to_player(
-    user_id: int,
+    user_id: str, # ✅ CORREÇÃO CRÍTICA: Mudado de int para str
     base_id: str,
     rarity: str,
     player_class: Optional[str] = None,
     player_level: Optional[int] = None,
     *,
     durab: int = 20,
-    save: bool = True, # 'save' agora é controlado por esta função
+    save: bool = True, 
 ) -> Tuple[str, str]:
     """
     Gera e entrega um item único para o jogador.
     Retorna (unique_id, linha_renderizada). (Versão async)
     """
-    # <<< CORREÇÃO 2: Adiciona await >>>
+    # Garante que seja string para o banco de dados
+    user_id = str(user_id) 
+
+    # Busca dados (Async)
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
-        raise RuntimeError("Jogador não encontrado.")
+        raise RuntimeError(f"Jogador {user_id} não encontrado.")
 
-    # Lógica síncrona
+    # Lógica síncrona de fallback
     pc = (player_class or pdata.get("class") or "guerreiro").lower()
     pl = int(player_level or pdata.get("level", 1))
 
-    # Gera e adiciona (Síncrono)
+    # Gera e adiciona (Síncrono na memória)
     inst = generate_item_instance(base_id, rarity, pc, pl, durab)
-    uid = player_manager.add_unique_item(pdata, inst) # Modifica pdata localmente
+    
+    # O add_unique_item apenas manipula o dicionário pdata
+    uid = player_manager.add_unique_item(pdata, inst) 
 
     if save:
-        # <<< CORREÇÃO 3: Adiciona await >>>
+        # Salva no banco (Async) usando o ID correto
         await player_manager.save_player_data(user_id, pdata)
 
-    line = render_item_line(inst, pc) # Síncrono
+    # Renderiza linha para exibição
+    line = render_item_line(inst, pc) 
     return uid, line
 
 # ----------------------------------------------------
