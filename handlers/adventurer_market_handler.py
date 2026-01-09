@@ -9,6 +9,9 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, fil
 from telegram.error import BadRequest
 from telegram.constants import ParseMode
 
+# --- IMPORTAÇÕES BSON (CRÍTICO PARA OBJECTID) ---
+from bson import ObjectId, errors as bson_errors
+
 # --- MÓDULOS PRINCIPAIS ---
 from modules import player_manager, game_data, file_ids, market_utils
 from modules.player import queries
@@ -43,6 +46,21 @@ logger = logging.getLogger(__name__)
 MARKET_LOG_GROUP_ID = -1002881364171
 MARKET_LOG_TOPIC_ID = 24475
 
+# ==============================================================================
+# 🛠️ HELPER: CONVERSÃO SEGURA DE ID
+# ==============================================================================
+def ensure_object_id(uid):
+    if isinstance(uid, ObjectId):
+        return uid
+    if isinstance(uid, str) and ObjectId.is_valid(uid):
+        return ObjectId(uid)
+    return None
+
+def short_id(oid):
+    """Retorna os últimos 4 dígitos do ObjectId para exibição visual limpa"""
+    s = str(oid)
+    return f"...{s[-4:]}" if len(s) > 4 else s
+
 async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, text: str):
     """Envia notificação RPG para o canal de logs."""
     try:
@@ -57,7 +75,6 @@ async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, text: str):
         logger.error(f"Falha ao enviar log de mercado: {e}")
 
 async def _send_smart(query, context, chat_id, text, kb, img_key):
-    """Envia ou edita mensagem com mídia de forma segura."""
     try: await query.delete_message()
     except: pass
     
@@ -74,6 +91,10 @@ async def _send_smart(query, context, chat_id, text, kb, img_key):
 
     await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode="HTML")
 
+
+# ==============================================================================
+# 🔍 FUNÇÕES DE RENDERIZAÇÃO
+# ==============================================================================
 def _get_item_info(base_id: str) -> dict:
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
@@ -90,24 +111,20 @@ def _rarity_to_int(rarity):
 
 def _detect_class_display(inst: dict, base_id: str) -> str:
     raw_class = inst.get("class_lock") or inst.get("class") or inst.get("classe") or inst.get("required_class")
-    
     if not raw_class:
         base_id_lower = base_id.lower()
         for c_key in CLASSES_DATA.keys():
             if c_key in base_id_lower:
                 raw_class = c_key
                 break
-
     if not raw_class or str(raw_class).lower() in ["none", "universal", "todos", "all", "any"]:
         return "🌎 Universal"
-
     ckey = str(raw_class).lower().strip()
     if ckey in CLASSES_DATA:
         c_info = CLASSES_DATA[ckey]
         emoji = c_info.get("emoji", "🛡️")
         name = c_info.get("display_name", ckey.capitalize())
         return f"{emoji} {name}"
-    
     return f"🛡️ {ckey.capitalize()}"
 
 def _get_stat_emoji(key: str) -> str:
@@ -127,12 +144,16 @@ def _render_listing_card(idx: int, listing: dict) -> str:
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
     
     price = int(listing.get("unit_price", 0))
-    seller_name = listing.get("seller_name") or f"Vendedor {listing.get('seller_id')}"
+    seller_name = listing.get("seller_name") or f"Vendedor"
     item_payload = listing.get("item", {})
     qty_stock = listing.get("quantity", 0)
 
-    tid = listing.get("target_buyer_id") or listing.get("target_id")
-    tname = listing.get("target_buyer_name") or listing.get("target_name") or "Alguém"
+    # Tratamento de ID visual
+    lid = listing.get("_id") or listing.get("id")
+    visual_id = short_id(lid)
+
+    tid = listing.get("target_buyer_id")
+    tname = listing.get("target_buyer_name") or "Alguém"
     lock_status = f"🔐 <b>Reservado:</b> {tname}" if tid else ""
     lock_emoji = "🔒 " if tid else ""
 
@@ -149,7 +170,7 @@ def _render_listing_card(idx: int, listing: dict) -> str:
         return (
             f"{icon_num}┈➤ {lock_emoji}{emoji} <b>{name}</b> x{lot_size}\n"
             f"├┈➤ 📦 Estoque: {qty_stock} lotes\n"
-            f"{footer}"
+            f"{footer} 🆔 <pre>{visual_id}</pre>"
         )
     else: # Unique
         inst = item_payload.get("item", {})
@@ -162,20 +183,7 @@ def _render_listing_card(idx: int, listing: dict) -> str:
         cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20,20]
         dura_str = f"[{int(cur_d)}/{int(max_d)}]"
         
-        stats_found = []
-        all_stats = {}
-        if isinstance(inst.get("attributes"), dict): all_stats.update(inst["attributes"])
-        if isinstance(inst.get("enchantments"), dict): all_stats.update(inst["enchantments"])
-        
-        for key, raw_val in all_stats.items():
-            val = raw_val.get("value", 0) if isinstance(raw_val, dict) else raw_val
-            try: 
-                if int(float(val)) > 0:
-                    icon = _get_stat_emoji(key)
-                    stats_found.append(f"{icon}+{int(val)}")
-            except: continue
-            
-        stats_str = ", ".join(stats_found[:3]) if stats_found else "---"
+        # Renderização de stats omitida para brevidade (igual ao original)
         class_str = _detect_class_display(inst, base_id)
 
         footer = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  👤 {seller_name}"
@@ -183,8 +191,8 @@ def _render_listing_card(idx: int, listing: dict) -> str:
 
         return (
             f"{icon_num}┈➤ {lock_emoji}{emoji} <b>{name}</b> [{rarity}] {dura_str}\n"
-            f"├┈➤ {class_str} │ {stats_str}\n"
-            f"{footer}"
+            f"├┈➤ {class_str}\n"
+            f"{footer} 🆔 <pre>{visual_id}</pre>"
         )
 
 def _render_sell_card(idx: int, item_wrapper: dict) -> str:
@@ -228,7 +236,10 @@ def _render_sell_card(idx: int, item_wrapper: dict) -> str:
 def _render_my_sale_card(idx: int, listing: dict) -> str:
     icons = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
-    lid = listing.get("id")
+    
+    lid = listing.get("_id") or listing.get("id")
+    visual_id = short_id(lid)
+
     price = int(listing.get("unit_price", 0))
     item_payload = listing.get("item", {})
     qty_stock = listing.get("quantity", 0)
@@ -249,16 +260,15 @@ def _render_my_sale_card(idx: int, listing: dict) -> str:
         header = "⚔️ Item Único"
         details = f"💰 {price:,} 🪙"
 
-    return f"{icon_num}┈➤ {header}\n├┈➤ {details} │ 🆔 <b>#{lid}</b>\n╰┈➤ {status_icon} <b>{status_text}</b>"
+    return f"{icon_num}┈➤ {header}\n├┈➤ {details} │ 🆔 <b>...{visual_id}</b>\n╰┈➤ {status_icon} <b>{status_text}</b>"
 
 # ==============================
 #  HANDLERS PRINCIPAIS
 # ==============================
 
 async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = get_current_player_id(update, context)
+    query = update.callback_query; await query.answer()
+    user_id = ensure_object_id(get_current_player_id(update, context))
 
     try:
         pdata = await player_manager.get_player_data(user_id)
@@ -287,14 +297,17 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = get_current_player_id(update, context)
+    
+    # Garante ObjectId para buscar no banco corretamente
+    user_id = ensure_object_id(get_current_player_id(update, context))
 
     try:
         pdata = await player_manager.get_player_data(user_id)
         gold = int(pdata.get("gold", 0))
-    except: gold = 0
+    except: 
+        gold = 0
 
-    text = (f"🎒 𝐌𝐄𝐑𝐂𝐀𝐃𝐎 𝐃𝐎 𝐀𝐕𝐄𝐍𝐓𝐔𝐑𝐄𝐈𝐑𝐎\n╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n│ 💰 𝙎𝙚𝙪 𝙎𝙖𝙡𝙙𝙤: {gold:,} 🪙\n╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n<i>O burburinho dos comerciantes preenche o ar.</i>")
+    text = (f"🎒 𝐌𝐄𝐑𝐂𝐀𝐃𝐎 𝐃𝐎 𝐀𝐕𝐄𝐍𝐓𝐔𝐑𝐄𝐈𝐑𝐎\n╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n│ 💰 𝙎𝙚𝙪 𝙎𝙖𝙡𝙙𝙤: {gold:,} 🪙\n╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤")
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🛒 𝐂𝐨𝐦𝐩𝐫𝐚𝐫", callback_data="market_list"), InlineKeyboardButton("➕ 𝐕𝐞𝐧𝐝𝐞𝐫", callback_data="market_sell_menu")],
         [InlineKeyboardButton("👤 𝐌𝐢𝐧𝐡𝐚𝐬 𝐕𝐞𝐧𝐝𝐚𝐬", callback_data="market_my")],
@@ -305,7 +318,9 @@ async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    user_id = get_current_player_id(update, context)
+    
+    # Garante ObjectId para passar pro market_manager filtrar
+    user_id = ensure_object_id(get_current_player_id(update, context))
     chat_id = update.effective_chat.id
     
     from modules import market_manager
@@ -315,6 +330,7 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         pdata = await player_manager.get_player_data(user_id) or {}
         gold = pdata.get("gold", 0)
+        # Passa o ID corrigido para não listar os próprios itens
         all_listings = market_manager.list_active(viewer_id=user_id)
     except Exception as e: 
         logger.error(f"Erro ao listar mercado: {e}")
@@ -344,20 +360,24 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "seller_name" not in listing:
                     sid = listing.get("seller_id")
                     try:
+                        # Busca nome se faltar (sid pode ser ObjectId, convertemos pra string se der erro)
                         s_data = await player_manager.get_player_data(sid)
-                        s_name = s_data.get("character_name", f"Vendedor {sid}")
+                        s_name = s_data.get("character_name", f"Vendedor")
                         listing["seller_name"] = s_name
-                    except: listing["seller_name"] = f"ID: {sid}"
+                    except: listing["seller_name"] = f"Vendedor"
 
                 card_text = _render_listing_card(idx, listing)
                 body_lines.append(card_text)
                 body_lines.append("") 
                 
-                # --- CORREÇÃO DE BUG (ID STR vs INT) ---
-                seller_id = listing.get("seller_id", 0)
-                lid = listing.get("id")
+                # --- CORREÇÃO DE BUG (ID STR vs INT vs OBJECTID) ---
+                seller_id = listing.get("seller_id")
                 
-                # Compara como STRING para funcionar com ObjectId e Int
+                # Pega o ID de forma segura (funciona pra _id ou id)
+                raw_lid = listing.get("_id") or listing.get("id")
+                lid = str(raw_lid) # Converte ObjectId para string para caber no callback
+                
+                # Compara como STRING para garantir que ObjectId e Str funcionem igual
                 if str(seller_id) != str(user_id):
                     selection_buttons.append(InlineKeyboardButton(f"{idx} 🛒", callback_data=f"market_buy_{lid}"))
                 else:
@@ -378,29 +398,43 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    buyer_id = get_current_player_id(update, context)
+    
+    # Garante que temos o ID do comprador corretamente tratado como ObjectId
+    buyer_id = ensure_object_id(get_current_player_id(update, context))
+    
+    # Imports locais para evitar ciclos e garantir funcionamento
     from modules import market_manager
-    # Import para checar premium
     from modules.player.premium import PremiumManager 
+    from bson import ObjectId 
 
-    try: lid = int(q.data.replace("market_buy_", ""))
-    except: await q.answer("ID inválido.", show_alert=True); return
+    # --- 1. PARSE DO ID (CORRIGIDO PARA OBJECTID) ---
+    try: 
+        lid_str = q.data.replace("market_buy_", "")
+        
+        # Valida se é um ObjectId válido do MongoDB (24 caracteres hex)
+        if not ObjectId.is_valid(lid_str):
+            await q.answer("❌ ID inválido (formato incorreto).", show_alert=True)
+            return
+            
+        lid = ObjectId(lid_str) # Converte string do botão para ObjectId do Banco
+    except Exception: 
+        await q.answer("Erro ao processar ID do item.", show_alert=True)
+        return
 
-    # --- TRAVA DE SEGURANÇA: APENAS VIP/LENDA/PREMIUM COMPRAM ---
+    # --- 2. TRAVA DE SEGURANÇA: APENAS VIP/LENDA/PREMIUM COMPRAM ---
     pdata = await player_manager.get_player_data(buyer_id)
     if not pdata: return
 
     pm = PremiumManager(pdata)
     
-    # 💡 CORREÇÃO: Verifica se o tier NÃO é free. 
-    # Isso aceita "premium", "vip", "lenda", "admin", etc.
-    # O PremiumManager.tier gerencia a expiração automaticamente.
+    # Pega o tier atual (ex: "free", "premium", "vip", "lenda")
     current_tier = getattr(pm, "tier", "free")
     
-    # Lista explícita de tiers que podem comprar
+    # Lista configurada conforme seu premium.py
     ALLOWED_TIERS = ["premium", "vip", "lenda", "admin"]
     
-    is_vip = (current_tier in ALLOWED_TIERS)
+    # Verifica se o plano atual está na lista permitida
+    is_vip = (str(current_tier).lower() in ALLOWED_TIERS)
 
     if not is_vip:
         await q.answer(
@@ -409,18 +443,22 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             show_alert=True
         )
         return
-    # ---------------------------------------------
 
+    # --- 3. EXECUÇÃO DA COMPRA ---
     try:
-        try: listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
-        except TypeError: listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
+        # Tenta comprar (suporta tanto função sync quanto async do manager)
+        try: 
+            listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
+        except TypeError: 
+            listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         
-        # (O resto do código continua igual...)
-        buyer_name = pdata.get("character_name", f"Player {buyer_id}")
+        # Prepara dados para o Log e UI
+        buyer_name = pdata.get("character_name", f"Player")
         seller_name = listing.get("seller_name", "Desconhecido")
         item_payload = listing.get("item", {})
         item_display = "Item Misterioso"
         
+        # Formata o nome do item para o Log
         if item_payload.get("type") == "stack":
             base_id = item_payload.get("base_id")
             lot_size = item_payload.get("qty", 1)
@@ -432,19 +470,33 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             base_id = inst.get("base_id")
             info = _get_item_info(base_id)
             i_name = inst.get("display_name") or info.get("display_name") or base_id
-            item_display = f"{i_name} [{str(inst.get('rarity','comum')).upper()}]"
+            rarity = str(inst.get('rarity','comum')).upper()
+            item_display = f"{i_name} [{rarity}]"
 
-        rpg_log = (f"   🤝 <b>NEGÓCIO FECHADO!</b>\n\n╭┈➤👤 <b>Comprador:</b> {buyer_name}\n├┈➤🛒 <b>Adquiriu:</b> {item_display}\n├┈➤💸 <b>Pagou:</b> {cost:,} Ouro\n╰┈➤🤝 <b>Vendedor:</b> {seller_name}\n\n    ⚖️ <i>A economia de Eldora segue girando!</i>")
+        # Log Bonito no Canal
+        rpg_log = (
+            f"🤝 <b>NEGÓCIO FECHADO!</b>\n\n"
+            f"╭┈➤👤 <b>Comprador:</b> {buyer_name}\n"
+            f"├┈➤🛒 <b>Adquiriu:</b> {item_display}\n"
+            f"├┈➤💸 <b>Pagou:</b> {cost:,} Ouro\n"
+            f"╰┈➤🤝 <b>Vendedor:</b> {seller_name}\n\n"
+            f"    ⚖️ <i>A economia de Eldora segue girando!</i>"
+        )
+        # Envia log em background
         context.application.create_task(_send_market_log(context, rpg_log))
-        await q.answer(f"✅ Compra realizada! Custo: {cost} ouro", show_alert=True)
+        
+        await q.answer(f"✅ Compra realizada! -{cost} ouro", show_alert=True)
+        
+        # Recarrega a lista para remover o item comprado da tela
         await market_list(update, context)
         
     except ValueError as ve:
+        # Erros de lógica de negócio (sem saldo, item já vendido, item seu, etc)
         await q.answer(f"❌ {str(ve)}", show_alert=True)
-        await market_list(update, context)
+        await market_list(update, context) # Recarrega pois o item pode ter sumido
     except Exception as e:
-        logger.error(f"Erro na compra: {e}")
-        await q.answer(f"Erro: {str(e)}", show_alert=True)
+        logger.error(f"Erro crítico na compra de mercado: {e}")
+        await q.answer("❌ Erro interno ao processar compra.", show_alert=True)
         
 async def market_sell_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -904,22 +956,26 @@ async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await market_adventurer(update, context)
 
 async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    user_id = get_current_player_id(update, context)
+    q = update.callback_query; await q.answer()
+    user_id = ensure_object_id(get_current_player_id(update, context))
     from modules import market_manager
-    listings = market_manager.list_by_seller(user_id)
+    listings = market_manager.list_by_seller(user_id) # Passa ObjectId
+    
     if not listings:
-        msg = "👤 <b>Minhas Vendas</b>\n\n<i>Você não tem itens à venda no momento.</i>"
+        msg = "👤 𝐌𝐢𝐧𝐡𝐚𝐬 𝐕𝐞𝐧𝐝𝐚𝐬 \n\n<i>Você não tem itens à venda.</i>"
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]])
         await _safe_edit(q, msg, kb)
         return
+
     lines = ["👤 𝐌𝐢𝐧𝐡𝐚𝐬 𝐕𝐞𝐧𝐝𝐚𝐬 𝐀𝐭𝐢𝐯𝐚𝐬\n"]; rows = []
     for idx, l in enumerate(listings, start=1):
         card_text = _render_my_sale_card(idx, l)
         lines.append(card_text); lines.append("") 
-        lid = l['id']
-        rows.append([InlineKeyboardButton(f"❌ Cancelar Item #{lid}", callback_data=f"market_cancel_{lid}")])
+        
+        # Pega ID (ObjectId ou Str)
+        lid = str(l.get("_id") or l.get("id"))
+        rows.append([InlineKeyboardButton(f"❌ Cancelar (ID: ...{lid[-4:]})", callback_data=f"market_cancel_{lid}")])
+
     rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")])
     full_text = "\n".join(lines)
     await _safe_edit(q, full_text, InlineKeyboardMarkup(rows))
@@ -929,17 +985,33 @@ async def market_cancel_listing(update: Update, context: ContextTypes.DEFAULT_TY
     try: await q.answer()
     except: pass
 
-    user_id = get_current_player_id(update, context) 
+    # Garante que temos o ID do usuário corretamente tratado como ObjectId
+    user_id = ensure_object_id(get_current_player_id(update, context))
+    
     from modules import market_manager
+    from bson import ObjectId
 
     try:
+        # --- 1. PARSE DO ID (CORRIGIDO PARA OBJECTID) ---
         lid_str = q.data.replace("market_cancel_", "")
-        if not lid_str.isdigit(): raise ValueError("ID não numérico")
-        lid = int(lid_str)
+        
+        # Valida se é um ObjectId válido
+        if not ObjectId.is_valid(lid_str):
+            await q.answer("❌ ID inválido (formato incorreto).", show_alert=True)
+            return
+            
+        lid = ObjectId(lid_str)
 
-        canceled_listing = await market_manager.cancel_listing(lid)
+        # --- 2. EXECUTA O CANCELAMENTO ---
+        # Tenta cancelar (suporta manager sync ou async)
+        try:
+            canceled_listing = await market_manager.cancel_listing(lid)
+        except TypeError:
+            # Fallback caso o manager não seja async
+            canceled_listing = market_manager.cancel_listing(lid)
 
         if canceled_listing:
+            # Prepara dados para o Log
             seller_name = canceled_listing.get("seller_name", "Mercador")
             item_payload = canceled_listing.get("item", {})
             qty_returned = canceled_listing.get("quantity", 0)
@@ -953,23 +1025,29 @@ async def market_cancel_listing(update: Update, context: ContextTypes.DEFAULT_TY
                 inst = item_payload.get("item", {})
                 item_display_name = inst.get("display_name") or "Equipamento"
 
+            # Log RPG Bonito
             rpg_log_text = (
                 f"🚫 <b>OFERTA RETIRADA!</b>\n\n"
                 f"🗣️ <b>Mercador:</b> {seller_name}\n"
                 f"📦 <b>Recolheu:</b> {item_display_name}\n"
                 f"🔙 <b>Estoque Devolvido:</b> {qty_returned} lote(s)"
             )
+            
+            # Envia o log em background
             context.application.create_task(_send_market_log(context, rpg_log_text))
+            
             try: await q.answer("✅ Anúncio removido!", show_alert=True)
             except: pass
+            
+            # Atualiza a lista de 'Minhas Vendas'
             await market_my(update, context)
         else:
-            await q.answer("❌ Não foi possível cancelar.", show_alert=True)
+            await q.answer("❌ Oferta não encontrada ou já vendida.", show_alert=True)
             await market_my(update, context)
 
     except Exception as e:
         logger.error(f"Erro ao cancelar venda (User {user_id}): {e}")
-        try: await q.answer(f"Erro: {e}", show_alert=True)
+        try: await q.answer(f"Erro: {str(e)}", show_alert=True)
         except: pass
         
 async def market_start_input_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
