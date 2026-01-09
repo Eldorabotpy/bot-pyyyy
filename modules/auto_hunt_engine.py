@@ -1,5 +1,5 @@
 # modules/auto_hunt_engine.py
-# (BACKEND: Lógica, Banco de Dados, Timer e Cálculo de XP Seguro)
+# (BACKEND: Lógica, Timer, XP Seguro e Botão Voltar Corrigido)
 
 import logging
 import random
@@ -31,7 +31,7 @@ def ensure_object_id(uid):
     return uid
 
 # ==============================================================================
-# ⚖️ BALANCEAMENTO DE MONSTROS (XP BAIXO E JUSTO)
+# ⚖️ BALANCEAMENTO (XP)
 # ==============================================================================
 def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     m = mon.copy()
@@ -39,7 +39,6 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     elif "max_hp" not in m: m["max_hp"] = 10 
 
     min_lvl = m.get("min_level", 1)
-    # Limita nível do monstro para não explodir stats
     target_lvl = max(min_lvl, min(player_level, min_lvl + 10)) 
     m["level"] = target_lvl
 
@@ -51,18 +50,14 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     m["hp"] = m["max_hp"]
     m["attack"] = int(m.get("attack", 2) * scaling_bonus)
     
-    # --- TRAVA DE XP ---
-    # Ignora valores absurdos do banco
+    # XP Fixo e Baixo
     base_xp = int(m.get("xp_reward", 5))
-    if base_xp > 50: base_xp = 15 # Força valor baixo se base estiver errada
+    if base_xp > 50: base_xp = 15 
 
-    # Cálculo linear simples: Base + (Nível * 2)
-    # Ex: Lobo (5) + (Lv 10 * 2) = 25 XP
     final_xp = base_xp + (target_lvl * 2)
     
-    # Penalidade se o player for muito forte (Farm de low level)
     if player_level > min_lvl + 15:
-        final_xp = max(1, int(final_xp * 0.2)) # Ganha só 20%
+        final_xp = max(1, int(final_xp * 0.2)) # Penalidade de nível alto
 
     m["xp_reward"] = final_xp
     m["gold_drop"] = int(m.get("gold_drop", 1) * scaling_bonus)
@@ -70,12 +65,11 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     return m
 
 # ==============================================================================
-# ⚔️ SIMULAÇÃO DE BATALHA
+# ⚔️ SIMULAÇÃO
 # ==============================================================================
 async def _simulate_single_battle(player_data, player_stats, monster_data):
     if not monster_data: return {"result": "loss"}
 
-    # Simulação simplificada para performance
     player_hp = player_stats.get('max_hp', 100)
     monster_hp = monster_data.get('max_hp', 10)
     player_atk = player_stats.get('attack', 10)
@@ -96,7 +90,7 @@ async def _simulate_single_battle(player_data, player_stats, monster_data):
         if player_hp <= 0: return {"result": "loss"}
         turns += 1
         
-    return {"result": "loss"} # Timeout
+    return {"result": "loss"} 
 
 def _roll_loot(monster_data):
     drops = []
@@ -109,9 +103,6 @@ def _roll_loot(monster_data):
 # ▶️ START (Lógica Backend)
 # ==============================================================================
 async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hunt_count: int, region_key: str, message_id_override: int = None):
-    """
-    Inicia a lógica. NÃO envia mensagem visual (o handler já enviou).
-    """
     raw_uid = get_current_player_id(update, context)
     db_user_id = ensure_object_id(raw_uid)
     chat_id = update.effective_chat.id
@@ -129,21 +120,20 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         duration_seconds = hunt_count * SECONDS_PER_HUNT
         finish_dt = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
         
-        # Salva Estado com o ID da mensagem para deletar depois
+        # Salva Estado
         player_data["player_state"] = {
             "action": "auto_hunting",
             "finish_time": finish_dt.isoformat(),
             "details": {
                 "hunt_count": hunt_count, 
                 "region_key": region_key, 
-                "message_id": message_id_override # Salva o ID que veio do handler
+                "message_id": message_id_override 
             }
         }
         player_manager.set_last_chat_id(player_data, chat_id)
         await player_manager.save_player_data(db_user_id, player_data)
 
-        # Agenda Job
-        # Convertemos ID para string para passar no job queue sem erro de Pickle
+        # Agenda Job (Passando ID como string)
         job_data = {
             "user_id": str(db_user_id), 
             "chat_id": chat_id, 
@@ -154,7 +144,6 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         
         job_name = f"autohunt_{str(db_user_id)}"
         
-        # Limpa jobs antigos
         for job in context.job_queue.get_jobs_by_name(job_name): 
             job.schedule_removal()
 
@@ -164,7 +153,7 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         logger.error(f"Erro start engine: {e}")
 
 # ==============================================================================
-# 🏁 FINISH JOB (Executado pelo Timer)
+# 🏁 FINISH JOB
 # ==============================================================================
 async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -172,12 +161,10 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
         uid_str = job_data.get("user_id")
         if not uid_str: return
         
-        # 1. Tenta apagar a mensagem de "Viajando"
         if job_data.get("message_id"):
             try: await context.bot.delete_message(chat_id=job_data["chat_id"], message_id=job_data["message_id"])
             except: pass
 
-        # 2. Executa conclusão
         await execute_hunt_completion(
             user_id=ensure_object_id(uid_str),
             chat_id=job_data["chat_id"],
@@ -189,7 +176,7 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Erro job finish: {e}")
 
 # ==============================================================================
-# 📊 COMPLETION & RELATÓRIO
+# 📊 COMPLETION
 # ==============================================================================
 async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, context):
     db_id = ensure_object_id(user_id)
@@ -208,7 +195,6 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
     losses = 0
     total_items = {}
 
-    # Roda as lutas
     for _ in range(hunt_count):
         tpl = random.choice(monster_list)
         if isinstance(tpl, str): tpl = game_data.MONSTERS_DATA.get(tpl, {"name": "Mob", "xp_reward": 5})
@@ -225,10 +211,9 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         else:
             losses += 1
 
-    # --- SALVA RECOMPENSAS (BYPASS XP MODULE) ---
+    # --- SALVA RECOMPENSAS ---
     player_manager.add_gold(player_data, total_gold)
     
-    # Itens
     items_text = ""
     if total_items:
         items_text = "\n🎒 <b>Loot:</b>"
@@ -236,11 +221,10 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
             player_manager.add_item_to_inventory(player_data, i_id, qty)
             items_text += f"\n• {i_id.replace('_', ' ').title()} x{qty}"
 
-    # XP DIRETO (Sem multiplicador externo)
+    # XP DIRETO
     player_data["exp"] = player_data.get("exp", 0) + total_xp
     
-    # Check Level Up Simples
-    next_xp = player_level * 100 # Exemplo simples
+    next_xp = player_level * 100 
     lvl_msg = ""
     if player_data["exp"] >= next_xp:
         player_data["level"] = player_level + 1
@@ -248,11 +232,10 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         player_data["current_hp"] = player_data.get("max_hp", 100)
         lvl_msg = f"\n🎉 <b>LEVEL UP!</b> {player_level} ➔ {player_level + 1}"
 
-    # Limpa estado
     player_data['player_state'] = {'action': 'idle'}
     await player_manager.save_player_data(db_id, player_data)
 
-    # Relatório Final
+    # Relatório
     msg = (
         f"🏁 <b>Caçada Rápida Concluída!</b> 🏁\n"
         f"📊 Resultado: {wins} vitórias | {losses} derrotas\n"
@@ -262,5 +245,8 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         f"{lvl_msg}"
     )
     
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"open_region_{region_key}")]])
+    # ✅ CORREÇÃO DO BOTÃO VOLTAR
+    # Usa 'hunt_' em vez de 'open_region_' pois sabemos que hunt_handler existe
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"hunt_{region_key}")]])
+    
     await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)

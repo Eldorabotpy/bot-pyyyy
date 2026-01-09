@@ -1,5 +1,5 @@
 # handlers/autohunt_handler.py
-# (FRONTEND: Visual, Mídia e Botões)
+# (FRONTEND: Apenas visual e botão de início)
 
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -10,7 +10,11 @@ from modules import auto_hunt_engine
 from modules import file_ids as file_id_manager
 from modules import player_manager
 from modules.auth_utils import get_current_player_id
-from modules.player.premium import PremiumManager 
+# Tenta importar PremiumManager com segurança
+try:
+    from modules.player.premium import PremiumManager 
+except ImportError:
+    PremiumManager = None
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +39,26 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
         await query.answer("❌ Erro nos dados do botão.", show_alert=True)
         return
 
-    # 3. Validações Prévias (Energia/VIP) antes de apagar o menu
-    # Isso evita apagar o menu se o cara não puder caçar
+    # 3. Validações Prévias (Energia/VIP)
     player_data = await player_manager.get_player_data(user_id)
-    if not PremiumManager(player_data).is_premium():
-        await query.answer("🔒 Exclusivo para Premium/VIP.", show_alert=True)
-        return
+    
+    # Verifica VIP se o PremiumManager existir
+    if PremiumManager:
+        pm = PremiumManager(player_data)
+        # Se não tiver método is_premium, assume True ou verifica tier manual
+        is_vip = False
+        if hasattr(pm, "is_premium"):
+            is_vip = pm.is_premium()
+        else:
+            # Fallback: verifica string do tier
+            tier = str(player_data.get("premium_tier", "free")).lower()
+            is_vip = tier in ["vip", "premium", "lenda", "admin"]
+            
+        if not is_vip:
+            await query.answer("🔒 Exclusivo para Premium/VIP.", show_alert=True)
+            return
 
-    # 4. LIMPEZA E VISUAL (Aqui garantimos o visual correto)
+    # 4. LIMPEZA E VISUAL
     try:
         await query.message.delete() # Apaga o menu antigo
     except Exception:
@@ -93,16 +109,14 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
 
     except Exception as e:
         logger.error(f"Erro visual autohunt: {e}")
-        # Se der erro na mídia, manda texto simples para não travar
         try:
             sent_msg = await context.bot.send_message(query.message.chat_id, f"🌲 Iniciando caçada em {region_name}...")
         except: pass
 
-    # 5. PASSA PARA A ENGINE (Com o ID da mensagem para deletar depois)
+    # 5. PASSA PARA A ENGINE
     msg_id = sent_msg.message_id if sent_msg else None
     
     # Chama a função Start da Engine (Backend)
-    # Note que passamos message_id_override=msg_id
     await auto_hunt_engine.start_auto_hunt(
         update, 
         context, 
