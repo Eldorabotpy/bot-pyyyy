@@ -1,5 +1,5 @@
 # modules/market_manager.py
-# (VERSÃO FINAL CORRIGIDA: Pagamento Retroativo para 'players')
+# (VERSÃO CORRIGIDA: Suporte Híbrido ObjectId + Int)
 
 from __future__ import annotations
 import logging
@@ -7,6 +7,8 @@ import os
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple, Union
 from pymongo import MongoClient
+from bson import ObjectId # Importante
+
 from modules import player_manager
 
 # --- CONFIGURAÇÃO DE LOGGING ---
@@ -25,7 +27,6 @@ try:
     db = client["eldora_db"] 
     market_col = db["market_listings"]
     counters_col = db["counters"]
-    # Garante índices
     market_col.create_index("id", unique=True)
     market_col.create_index("active")
 except Exception as e:
@@ -33,7 +34,6 @@ except Exception as e:
     market_col = None
     counters_col = None
 
-# Tenta importar utilitários de display e dados de jogo
 try:
     from modules import display_utils
     from modules import game_data
@@ -43,7 +43,6 @@ except ImportError:
     game_data = None
     EVOLUTION_ITEMS_DATA = {}
 
-# --- LISTA NEGRA MANUAL ---
 _BLOCKED_SPECIFIC_IDS = {
     "sigilo_protecao", "ticket_arena", "chave_da_catacumba", 
     "cristal_de_abertura", "gems", 
@@ -95,7 +94,6 @@ def create_listing(
 
     base_id = item_payload.get("base_id")
 
-    # Bloqueios de Itens
     if base_id and base_id in EVOLUTION_ITEMS_DATA:
         item_name = EVOLUTION_ITEMS_DATA[base_id].get("display_name", "Item de Evolução")
         raise InvalidListing(f"🚫 '{item_name}' deve ser vendido no Comércio de Relíquias (Gemas).")
@@ -105,7 +103,6 @@ def create_listing(
 
     lid = _get_next_sequence("market_id")
 
-    # Tratamento Híbrido de IDs
     def _safe_id(uid):
         if uid is None: return None
         if isinstance(uid, int): return uid
@@ -174,27 +171,53 @@ def list_by_seller(seller_id: Union[int, str]) -> List[dict]:
     if market_col is None: return []
     sid_val = int(seller_id) if str(seller_id).isdigit() else seller_id
     sid_str = str(seller_id)
+    # Busca tanto por ID antigo quanto novo
     return list(market_col.find({
         "active": True, 
         "$or": [{"seller_id": sid_val}, {"seller_id": sid_str}]
     }))
 
-def get_listing(listing_id: int) -> Optional[dict]:
+def get_listing(listing_id: Union[int, str, ObjectId]) -> Optional[dict]:
+    """
+    Busca flexível: Aceita ID numérico (legado) ou ObjectId (novo).
+    """
     if market_col is None: return None
-    return market_col.find_one({"id": int(listing_id)})
+    
+    # 1. Se for ObjectId puro
+    if isinstance(listing_id, ObjectId):
+        return market_col.find_one({"_id": listing_id})
+    
+    # 2. Se for String
+    if isinstance(listing_id, str):
+        # É ObjectId em string?
+        if ObjectId.is_valid(listing_id):
+            return market_col.find_one({"_id": ObjectId(listing_id)})
+        # É número em string?
+        if listing_id.isdigit():
+            return market_col.find_one({"id": int(listing_id)})
+            
+    # 3. Se for Inteiro
+    if isinstance(listing_id, int):
+        return market_col.find_one({"id": listing_id})
 
-def delete_listing(listing_id: int):
+    return None
+
+def delete_listing(listing_id: Union[int, str, ObjectId]):
+    """Desativa listagem de forma segura."""
     if market_col is not None:
-        market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
-        
+        listing = get_listing(listing_id)
+        if listing:
+            # Usa o _id recuperado para garantir update correto
+            market_col.update_one({"_id": listing["_id"]}, {"$set": {"active": False}})
+
 # ==============================================================================
-#  FUNÇÃO DE COMPRA (CORRIGIDA - FALLBACK PARA COLEÇÃO 'PLAYERS')
+#  FUNÇÃO DE COMPRA
 # ==============================================================================
 
 async def purchase_listing(
     *,
     buyer_id: Union[int, str], 
-    listing_id: int,
+    listing_id: Union[int, str, ObjectId], # Aceita qualquer tipo
     quantity: int = 1, 
     context=None
 ) -> Tuple[dict, int]:
@@ -235,10 +258,10 @@ async def purchase_listing(
     if buyer_gold < total_price:
         raise ValueError(f"Saldo insuficiente. Necessário: {total_price:,} 🪙")
 
-    # 1. Remove o Ouro (Memória)
+    # 1. Remove o Ouro
     buyer_data["gold"] = buyer_gold - total_price
 
-    # 2. Adiciona o Item (Memória)
+    # 2. Adiciona o Item
     item_type = item_payload.get("type")
     
     if item_type == "stack":
@@ -255,44 +278,32 @@ async def purchase_listing(
     # 3. SALVA O COMPRADOR
     await player_manager.save_player_data(buyer_id, buyer_data)
 
-    # --- B. ATUALIZAÇÃO DO ANÚNCIO ---
+    # --- B. ATUALIZAÇÃO DO ANÚNCIO (Usando _id) ---
     new_qty = available - quantity
     update_doc = {"quantity": new_qty}
     if new_qty <= 0: update_doc["active"] = False
     
+    # IMPORTANTE: Usa o _id do documento recuperado
     market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
     
-    # --- C. PAGAMENTO AO VENDEDOR (LÓGICA CRÍTICA) ---
+    # --- C. PAGAMENTO AO VENDEDOR ---
     try:
-        # Tenta carregar pelo gerenciador (Sistema Novo / Cache)
         seller_data = await player_manager.get_player_data(seller_id)
-        
         if seller_data:
-            # VENDEDOR MIGROU (Conta Nova) -> Salva no Users/Cache
             current_seller_gold = int(seller_data.get("gold", 0))
             seller_data["gold"] = current_seller_gold + total_price
             await player_manager.save_player_data(seller_id, seller_data)
-            log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu {total_price} (Via Sistema Novo).")
         else:
-            # VENDEDOR NÃO MIGROU (Conta Velha) -> Salva no 'players' (Legado)
-            # O get_player_data retornou None porque só olha 'users'
-            
-            # Se for ID numérico (padrão antigo)
+            # Fallback para Legacy
             if isinstance(seller_id, int) or (isinstance(seller_id, str) and seller_id.isdigit()):
-                db["players"].update_one(
-                    {"_id": int(seller_id)}, 
-                    {"$inc": {"gold": total_price}}
-                )
-                log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu {total_price} na coleção antiga 'players'.")
+                db["players"].update_one({"_id": int(seller_id)}, {"$inc": {"gold": total_price}})
             else:
-                # Caso raro: ID estranho, tenta 'users' por via das dúvidas
                 from bson import ObjectId
-                query = {"_id": ObjectId(seller_id)} if ObjectId.is_valid(seller_id) else {"_id": seller_id}
-                db["users"].update_one(query, {"$inc": {"gold": total_price}})
-                log.info(f"💰 [MARKET] Vendedor {seller_id} recebeu {total_price} (Recuperação direta Users).")
+                q_id = ObjectId(seller_id) if ObjectId.is_valid(seller_id) else seller_id
+                db["users"].update_one({"_id": q_id}, {"$inc": {"gold": total_price}})
             
     except Exception as e:
-        log.error(f"🔥 [MARKET] Erro crítico ao pagar vendedor {seller_id}: {e}")
+        log.error(f"🔥 [MARKET] Erro pagando vendedor {seller_id}: {e}")
 
     listing["quantity"] = new_qty
     listing["active"] = (new_qty > 0)
@@ -303,7 +314,7 @@ async def purchase_listing(
 #  FUNÇÃO DE CANCELAMENTO
 # =========================
 
-async def cancel_listing(listing_id: int) -> bool:
+async def cancel_listing(listing_id: Union[int, str, ObjectId]) -> bool:
     from modules.player import inventory as inv_module
 
     listing = get_listing(listing_id)
@@ -314,18 +325,15 @@ async def cancel_listing(listing_id: int) -> bool:
     quantity_left = int(listing.get("quantity", 0))
 
     if quantity_left <= 0:
-        market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
+        market_col.update_one({"_id": listing["_id"]}, {"$set": {"active": False}})
         return True
 
-    # Para cancelar, o usuário TEM que estar logado e migrado (pois ele clicou no botão)
-    # Então aqui usamos o sistema novo normalmente.
     seller_data = await player_manager.get_player_data(seller_id)
     if not seller_data:
-        raise MarketError("Erro: Sua conta não foi encontrada no sistema novo.")
+        raise MarketError("Erro: Conta vendedora não encontrada.")
 
     item_payload = listing.get("item", {})
     item_type = item_payload.get("type")
-    
     items_refunded_count = 0
 
     if item_type == "stack":
@@ -342,7 +350,9 @@ async def cancel_listing(listing_id: int) -> bool:
         items_refunded_count = quantity_left
 
     await player_manager.save_player_data(seller_id, seller_data)
-    market_col.update_one({"id": int(listing_id)}, {"$set": {"active": False}})
     
-    log.info(f"♻️ [MARKET] Anúncio #{listing_id} cancelado. {items_refunded_count} itens devolvidos.")
+    # IMPORTANTE: Usa _id para cancelar
+    market_col.update_one({"_id": listing["_id"]}, {"$set": {"active": False}})
+    
+    log.info(f"♻️ [MARKET] Anúncio {listing_id} cancelado. {items_refunded_count} itens devolvidos.")
     return listing

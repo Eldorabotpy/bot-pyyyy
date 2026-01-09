@@ -319,7 +319,6 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     
-    # Garante ObjectId para passar pro market_manager filtrar
     user_id = ensure_object_id(get_current_player_id(update, context))
     chat_id = update.effective_chat.id
     
@@ -330,7 +329,6 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         pdata = await player_manager.get_player_data(user_id) or {}
         gold = pdata.get("gold", 0)
-        # Passa o ID corrigido para não listar os próprios itens
         all_listings = market_manager.list_active(viewer_id=user_id)
     except Exception as e: 
         logger.error(f"Erro ao listar mercado: {e}")
@@ -360,7 +358,6 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "seller_name" not in listing:
                     sid = listing.get("seller_id")
                     try:
-                        # Busca nome se faltar (sid pode ser ObjectId, convertemos pra string se der erro)
                         s_data = await player_manager.get_player_data(sid)
                         s_name = s_data.get("character_name", f"Vendedor")
                         listing["seller_name"] = s_name
@@ -370,14 +367,14 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 body_lines.append(card_text)
                 body_lines.append("") 
                 
-                # --- CORREÇÃO DE BUG (ID STR vs INT vs OBJECTID) ---
                 seller_id = listing.get("seller_id")
                 
-                # Pega o ID de forma segura (funciona pra _id ou id)
+                # --- CORREÇÃO IMPORTANTE AQUI ---
+                # Prioriza o _id (ObjectId) e converte pra string
                 raw_lid = listing.get("_id") or listing.get("id")
-                lid = str(raw_lid) # Converte ObjectId para string para caber no callback
-                
-                # Compara como STRING para garantir que ObjectId e Str funcionem igual
+                lid = str(raw_lid) 
+                # --------------------------------
+
                 if str(seller_id) != str(user_id):
                     selection_buttons.append(InlineKeyboardButton(f"{idx} 🛒", callback_data=f"market_buy_{lid}"))
                 else:
@@ -425,16 +422,16 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pdata = await player_manager.get_player_data(buyer_id)
     if not pdata: return
 
-    pm = PremiumManager(pdata)
-    
-    # Pega o tier atual (ex: "free", "premium", "vip", "lenda")
-    current_tier = getattr(pm, "tier", "free")
+    # --- CORREÇÃO DE RECONHECIMENTO DE PLANO ---
+    # Lê o tier DIRETAMENTE do banco de dados para evitar erros na classe PremiumManager
+    raw_tier = pdata.get("premium_tier", "free")
+    current_tier = str(raw_tier).lower().strip()
     
     # Lista configurada conforme seu premium.py
     ALLOWED_TIERS = ["premium", "vip", "lenda", "admin"]
     
     # Verifica se o plano atual está na lista permitida
-    is_vip = (str(current_tier).lower() in ALLOWED_TIERS)
+    is_vip = (current_tier in ALLOWED_TIERS)
 
     if not is_vip:
         await q.answer(
@@ -443,6 +440,7 @@ async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
             show_alert=True
         )
         return
+    # ---------------------------------------------
 
     # --- 3. EXECUÇÃO DA COMPRA ---
     try:
