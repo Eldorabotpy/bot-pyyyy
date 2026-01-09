@@ -32,30 +32,62 @@ SECONDS_PER_HUNT = 30
 # ==============================================================================
 def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     """
-    Ajusta os atributos de combate do monstro baseando-se no nível do jogador.
-    (O XP NÃO é alterado aqui, apenas HP/Atk/Def para o combate ser justo).
+    Escala os atributos do monstro.
+    CORREÇÃO DE XP: Agora aplica uma curva muito mais suave e penalidade se o player for muito forte.
     """
     m = mon.copy()
+
+    # Define HP Base
     if "max_hp" not in m and "hp" in m: m["max_hp"] = m["hp"]
     elif "max_hp" not in m: m["max_hp"] = 10 
 
+    # --- Lógica de Nível ---
     min_lvl = m.get("min_level", 1)
-    max_lvl = m.get("max_level", player_level + 2)
+    max_lvl = m.get("max_level", player_level + 2) # O monstro pode subir um pouco
     
-    # Define o nível do monstro para o combate
-    real_lvl = max(min_lvl, min(player_level + random.randint(-1, 1), max_lvl))
-    if real_lvl < 1: real_lvl = 1
-    m["level"] = real_lvl
+    # O "Nível Real" do monstro não pode fugir muito da realidade da região
+    # Se a região é de nível 1-5, o monstro não deve virar nível 50 só pq o player é 50.
+    target_lvl = max(min_lvl, min(player_level, max_lvl + 5)) 
+    
+    m["level"] = target_lvl
 
-    # Escala apenas status de batalha (HP, ATK, DEF)
-    # Fórmula simples: +5% status por nível acima do base
-    level_diff = max(0, real_lvl - min_lvl)
-    multiplier = 1.0 + (level_diff * 0.05) 
+    # --- Formatação do Nome ---
+    raw_name = m.get("name", "Inimigo").replace("Lv.", "").strip()
+    m["name"] = f"Lv.{target_lvl} {raw_name}"
 
-    m["max_hp"] = int(m["max_hp"] * multiplier)
-    m["current_hp"] = m["max_hp"]
-    m["attack"] = int(m.get("attack", 5) * multiplier)
-    m["defense"] = int(m.get("defense", 2) * multiplier)
+    # --- Escalonamento de Status (Combate) ---
+    # HP/ATK/DEF crescem para o combate não ser chato, mas o XP é controlado abaixo.
+    scaling_bonus = 1 + (target_lvl * 0.05) # 5% por nível
+
+    base_hp = int(m.get("max_hp", 10))
+    base_atk = int(m.get("attack", 2))
+    base_def = int(m.get("defense", 0))
+
+    m["max_hp"] = int(base_hp * scaling_bonus)
+    m["hp"] = m["max_hp"]
+    m["attack"] = int(base_atk * scaling_bonus)
+    m["defense"] = int(base_def * scaling_bonus)
+    
+    # --- CORREÇÃO DO XP (A GRANDE MUDANÇA) ---
+    base_xp = int(m.get("xp_reward", 5))
+    base_gold = int(m.get("gold_drop", 1))
+
+    # Diferença de nível entre o Jogador e o Nível Base do Monstro
+    level_diff = max(0, player_level - min_lvl)
+
+    if level_diff > 10:
+        # PENALIDADE: Se o jogador é 10 níveis acima do mapa, ganha SÓ o XP base + 10%
+        # Isso evita farmar 2000 XP em mapa de nível 1.
+        final_xp = int(base_xp * 1.1)
+        final_gold = int(base_gold * 1.1)
+    else:
+        # NORMAL: Crescimento suave (2% por nível do monstro, não do jogador)
+        xp_multiplier = 1 + (target_lvl * 0.02) 
+        final_xp = int(base_xp * xp_multiplier)
+        final_gold = int(base_gold * xp_multiplier)
+
+    m["xp_reward"] = final_xp
+    m["gold_drop"] = final_gold
     
     return m
 
