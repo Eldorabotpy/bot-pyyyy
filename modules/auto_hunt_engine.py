@@ -1,5 +1,5 @@
 # modules/auto_hunt_engine.py
-# (BACKEND: Lógica, Timer, XP Seguro e Botão Voltar Corrigido)
+# (CORREÇÃO FINAL: Visual Restaurado + Botão Voltar Menu + XP Seguro)
 
 import logging
 import random
@@ -15,7 +15,7 @@ from bson import ObjectId
 
 # Imports Core
 from modules import player_manager, game_data
-from modules import mission_manager 
+from modules import file_ids as file_id_manager # Necessário para o vídeo final
 from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
@@ -50,9 +50,9 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     m["hp"] = m["max_hp"]
     m["attack"] = int(m.get("attack", 2) * scaling_bonus)
     
-    # XP Fixo e Baixo
+    # --- XP Fixo e Baixo ---
     base_xp = int(m.get("xp_reward", 5))
-    if base_xp > 50: base_xp = 15 
+    if base_xp > 50: base_xp = 15 # Trava de segurança
 
     final_xp = base_xp + (target_lvl * 2)
     
@@ -133,7 +133,7 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         player_manager.set_last_chat_id(player_data, chat_id)
         await player_manager.save_player_data(db_user_id, player_data)
 
-        # Agenda Job (Passando ID como string)
+        # Agenda Job
         job_data = {
             "user_id": str(db_user_id), 
             "chat_id": chat_id, 
@@ -161,6 +161,7 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
         uid_str = job_data.get("user_id")
         if not uid_str: return
         
+        # Apaga msg de "Viajando"
         if job_data.get("message_id"):
             try: await context.bot.delete_message(chat_id=job_data["chat_id"], message_id=job_data["message_id"])
             except: pass
@@ -186,7 +187,6 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
     player_stats = await player_manager.get_player_total_stats(player_data)
     player_level = int(player_data.get("level", 1))
 
-    # Busca monstros
     monster_list = game_data.MONSTERS_DATA.get(region_key) or [{"name": "Lobo", "xp_reward": 5, "gold_drop": 2, "id": "wolf"}]
     
     total_xp = 0
@@ -211,7 +211,7 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         else:
             losses += 1
 
-    # --- SALVA RECOMPENSAS ---
+    # Salva
     player_manager.add_gold(player_data, total_gold)
     
     items_text = ""
@@ -221,7 +221,7 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
             player_manager.add_item_to_inventory(player_data, i_id, qty)
             items_text += f"\n• {i_id.replace('_', ' ').title()} x{qty}"
 
-    # XP DIRETO
+    # XP
     player_data["exp"] = player_data.get("exp", 0) + total_xp
     
     next_xp = player_level * 100 
@@ -235,7 +235,7 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
     player_data['player_state'] = {'action': 'idle'}
     await player_manager.save_player_data(db_id, player_data)
 
-    # Relatório
+    # Relatório Texto
     msg = (
         f"🏁 <b>Caçada Rápida Concluída!</b> 🏁\n"
         f"📊 Resultado: {wins} vitórias | {losses} derrotas\n"
@@ -245,8 +245,29 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         f"{lvl_msg}"
     )
     
-    # ✅ CORREÇÃO DO BOTÃO VOLTAR
-    # Usa 'hunt_' em vez de 'open_region_' pois sabemos que hunt_handler existe
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"hunt_{region_key}")]])
+    # --- CORREÇÃO DO BOTÃO E MÍDIA ---
     
-    await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)
+    # 1. Botão: Usa open_region_ para abrir o menu, não hunt_ que abre luta
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data=f"open_region_{region_key}")]])
+    
+    # 2. Mídia: Restaura o envio de Video/Foto
+    media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
+    file_data = file_id_manager.get_file_data(media_key)
+    
+    try:
+        if file_data and file_data.get("id"):
+            m_id = file_data["id"]
+            m_type = (file_data.get("type") or "photo").lower()
+            
+            if m_type in ["video", "animation"]:
+                await context.bot.send_video(chat_id, video=m_id, caption=msg, parse_mode="HTML", reply_markup=kb)
+            else:
+                await context.bot.send_photo(chat_id, photo=m_id, caption=msg, parse_mode="HTML", reply_markup=kb)
+        else:
+            # Fallback se não tiver mídia
+            await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)
+            
+    except Exception as e:
+        logger.error(f"Erro visual final: {e}")
+        # Garante que envie ao menos o texto se a mídia falhar
+        await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)
