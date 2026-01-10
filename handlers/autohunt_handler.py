@@ -93,7 +93,8 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
         msg_erro = (
             f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
             f"│🚫 Seu plano ({user_tier.capitalize()})\n"
-            f"│  Permite máximo de {allowed_count}x.\n\n"
+            f"│  Permite máximo de {allowed_count}x.\n"
+            f"│\n"
             f"│Faça um upgrade para aumentar o limite!"
             f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n"
         )
@@ -106,7 +107,8 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
     if current_energy < total_cost:
         await query.answer(
             f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
-            f"│🚫 Você não tem energia suficiente!\n\n"
+            f"│🚫 Você não tem energia suficiente!\n"
+            f"│\n"
             f"│Necessário: {total_cost} ⚡\n"
             f"│Atual: {current_energy} ⚡"
             f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n",
@@ -127,7 +129,8 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
     caption_text = (
         f"╭────────────────────────➤\n"
         f"├─➤⏱ <b>Caçada Rápida Iniciada!</b>\n"
-        f"├─➤⚔️ Simulando <b>{requested_count} combates</b> em <b>{region_name}</b>...\n"
+        f"├─➤⚔️ Simulando <b>{requested_count} combates</b> em\n" 
+        f"├─➤ <b>{region_name}</b>...\n"
         f"│\n"
         f"├─➤⚡ Custo: {total_cost} energia\n"
         f"├─➤⏳ Tempo: {duration_min:.1f} minutos.\n"
