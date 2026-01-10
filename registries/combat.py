@@ -5,14 +5,15 @@ from telegram.ext import Application
 # 1. Importa handler de caça manual (Mantém o original)
 from handlers.hunt_handler import hunt_handler
 
-# 2. CORREÇÃO: Importa o Auto Hunt do arquivo NOVO/CORRIGIDO
-# Isso garante que ele use a versão que apaga o menu e envia a mídia
+# 2. AUTO HUNT (ATUALIZADO PARA INCLUIR O POPUP)
 try:
-    from handlers.autohunt_handler import autohunt_start_handler
+    # ✅ Importamos o start E o handler do popup (premium_info_handler)
+    from handlers.autohunt_handler import autohunt_start_handler, premium_info_handler
 except ImportError:
-    # Fallback caso você não tenha definido a variável no arquivo novo ainda
+    # Fallback caso dê erro na importação
     from handlers.hunt_handler import autohunt_start_handler
-    print("⚠️ AVISO: Usando autohunt antigo. Verifique handlers/autohunt_handler.py")
+    premium_info_handler = None
+    print("⚠️ AVISO: Usando autohunt antigo ou premium_info_handler não encontrado.")
 
 # Importa handlers de combate direto
 from handlers.combat.main_handler import combat_handler
@@ -40,10 +41,13 @@ def register_combat_handlers(application: Application):
     # -------------------------------------------------------------
     # 1. AUTO HUNT (PRIORIDADE MÁXIMA)
     # -------------------------------------------------------------
-    # Colocamos ele PRIMEIRO para garantir que ele capture o clique antes do hunt_handler
     if autohunt_start_handler:
         application.add_handler(autohunt_start_handler)
-        print("✅ Auto Hunt Handler registrado com prioridade.")
+        print("✅ Auto Hunt Handler registrado.")
+
+    # ✅ AQUI: Registra o Popup do Cadeado (Informações Premium)
+    if premium_info_handler:
+        application.add_handler(premium_info_handler)
 
     # -------------------------------------------------------------
     # 2. Caça Manual (Menu Geral)

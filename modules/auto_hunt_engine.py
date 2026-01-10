@@ -1,9 +1,10 @@
 # modules/auto_hunt_engine.py
-# (VERSÃO DEFINITIVA: XP Centralizado + Pontos Corretos)
+# (VERSÃO FINAL VISUAL: Estilo Box Solicitado + Lógica Blindada)
 
 import logging
 import random
 import asyncio
+import html  # Importante para evitar erros de formatação
 from datetime import datetime, timezone, timedelta
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -14,10 +15,11 @@ from bson import ObjectId
 
 # Imports Core
 from modules import player_manager, game_data
-from modules import file_ids as file_id_manager 
+from modules import file_ids as file_id_manager
 from modules.auth_utils import get_current_player_id
-# Importa o módulo XP para garantir Level Up correto com pontos
-from modules.game_data import xp as xp_module 
+
+# Importa o módulo XP
+from modules.game_data import xp as xp_module
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +37,8 @@ def ensure_object_id(uid):
 # ⚖️ BALANCEAMENTO
 # ==============================================================================
 def _scale_monster_stats(mon: dict, player_level: int) -> dict:
-    # ... (MANTÉM IGUAL AO SEU ARQUIVO ORIGINAL) ...
     m = mon.copy()
+    
     if "max_hp" not in m and "hp" in m: m["max_hp"] = m["hp"]
     elif "max_hp" not in m: m["max_hp"] = 10 
 
@@ -69,7 +71,6 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
 # ⚔️ SIMULAÇÃO
 # ==============================================================================
 async def _simulate_single_battle(player_data, player_stats, monster_data):
-    # ... (MANTÉM IGUAL AO SEU ARQUIVO ORIGINAL) ...
     if not monster_data: return {"result": "loss"}
 
     player_hp = player_stats.get('max_hp', 100)
@@ -88,8 +89,11 @@ async def _simulate_single_battle(player_data, player_stats, monster_data):
                 "items": _roll_loot(monster_data),
                 "monster_id": monster_data.get("id")
             }
+        
         player_hp -= monster_atk
-        if player_hp <= 0: return {"result": "loss"}
+        if player_hp <= 0: 
+            return {"result": "loss"}
+            
         turns += 1
         
     return {"result": "loss"} 
@@ -98,14 +102,17 @@ def _roll_loot(monster_data):
     drops = []
     for item in monster_data.get("loot_table", []):
         if random.uniform(0, 100) <= float(item.get("drop_chance", 0)):
-            drops.append((item.get("item_id") or item.get("base_id"), random.randint(item.get("min", 1), item.get("max", 1))))
+            item_id = item.get("item_id") or item.get("base_id")
+            qty = random.randint(item.get("min", 1), item.get("max", 1))
+            drops.append((item_id, qty))
     return drops
 
 # ==============================================================================
 # ▶️ START (BACKEND)
 # ==============================================================================
 async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hunt_count: int, region_key: str, message_id_override: int = None):
-    # ... (MANTÉM A ESTRUTURA, MAS GARANTE O DÉBITO DE ENERGIA) ...
+    logger.info(f"[AutoHunt] Iniciando request: {hunt_count}x em {region_key}")
+    
     raw_uid = get_current_player_id(update, context)
     db_user_id = ensure_object_id(raw_uid)
     chat_id = update.effective_chat.id
@@ -114,18 +121,21 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         player_data = await player_manager.get_player_data(db_user_id)
         if not player_data: return
 
-        # A validação e o aviso de popup já ocorreram no Handler.
-        # Aqui debitamos a energia de fato para garantir a transação.
+        # Débito de Energia
         total_cost = hunt_count 
-        if player_data.get("energy", 0) >= total_cost:
-            player_data["energy"] -= total_cost
+        current_energy = int(player_data.get("energy", 0))
+        
+        if current_energy >= total_cost:
+            player_data["energy"] = current_energy - total_cost
         else:
-            # Caso raro de race condition (gastou energia entre o clique e o engine)
+            logger.warning(f"[AutoHunt] Energia insuficiente no backend: {current_energy}/{total_cost}")
             return 
         
+        # Timer
         duration_seconds = hunt_count * SECONDS_PER_HUNT
         finish_dt = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
         
+        # Salva Estado
         player_data["player_state"] = {
             "action": "auto_hunting",
             "finish_time": finish_dt.isoformat(),
@@ -138,7 +148,7 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         player_manager.set_last_chat_id(player_data, chat_id)
         await player_manager.save_player_data(db_user_id, player_data)
 
-        # Job Queue
+        # Configura Job
         job_data = {
             "user_id": str(db_user_id), 
             "chat_id": chat_id, 
@@ -148,26 +158,33 @@ async def start_auto_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, hu
         }
         
         job_name = f"autohunt_{str(db_user_id)}"
+        
+        # Limpa anteriores
         for job in context.job_queue.get_jobs_by_name(job_name): 
             job.schedule_removal()
 
         context.job_queue.run_once(finish_auto_hunt_job, when=duration_seconds, data=job_data, name=job_name)
+        logger.info(f"[AutoHunt] Job agendado para {duration_seconds}s")
         
     except Exception as e:
-        logger.error(f"Erro start engine: {e}")
+        logger.error(f"[AutoHunt] Erro crítico no Start: {e}")
 
 # ==============================================================================
 # 🏁 FINISH JOB
 # ==============================================================================
 async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
-    # ... (MANTÉM IGUAL) ...
+    logger.info("[AutoHunt] Job de finalização disparado.")
     try:
         job_data = context.job.data
         uid_str = job_data.get("user_id")
-        if not uid_str: return
+        if not uid_str: 
+            logger.error("[AutoHunt] Job sem user_id!")
+            return
         
+        # Tenta apagar mensagem de loading
         if job_data.get("message_id"):
-            try: await context.bot.delete_message(chat_id=job_data["chat_id"], message_id=job_data["message_id"])
+            try: 
+                await context.bot.delete_message(chat_id=job_data["chat_id"], message_id=job_data["message_id"])
             except: pass
 
         await execute_hunt_completion(
@@ -178,18 +195,25 @@ async def finish_auto_hunt_job(context: ContextTypes.DEFAULT_TYPE):
             context=context
         )
     except Exception as e:
-        logger.error(f"Erro job finish: {e}")
+        logger.error(f"[AutoHunt] Erro fatal no Job Finish: {e}", exc_info=True)
 
 # ==============================================================================
-# 📊 COMPLETION & RELATÓRIO (MODIFICADO PARA XP CORRETO)
+# 📊 COMPLETION & RELATÓRIO
 # ==============================================================================
-async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, context):
+async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, context, message_id=None):
+    logger.info(f"[AutoHunt] Calculando resultados para {user_id}...")
+    
+    # Se recebeu message_id (pelo Recovery), tenta apagar caso ainda exista
+    if message_id:
+        try: await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except: pass
+
     db_id = ensure_object_id(user_id)
     player_data = await player_manager.get_player_data(db_id)
     if not player_data: return
 
     player_stats = await player_manager.get_player_total_stats(player_data)
-    player_level = int(player_data.get("level", 1))
+    old_level = int(player_data.get("level", 1))
 
     monster_list = game_data.MONSTERS_DATA.get(region_key) or [{"name": "Lobo", "xp_reward": 5, "gold_drop": 2, "id": "wolf"}]
     
@@ -202,9 +226,10 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
     # --- SIMULAÇÃO ---
     for _ in range(hunt_count):
         tpl = random.choice(monster_list)
-        if isinstance(tpl, str): tpl = game_data.MONSTERS_DATA.get(tpl, {"name": "Mob", "xp_reward": 5})
+        if isinstance(tpl, str): 
+            tpl = game_data.MONSTERS_DATA.get(tpl, {"name": "Mob", "xp_reward": 5})
         
-        monster = _scale_monster_stats(tpl, player_level)
+        monster = _scale_monster_stats(tpl, old_level)
         res = await _simulate_single_battle(player_data, player_stats, monster)
         
         if res["result"] == "win":
@@ -216,64 +241,62 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
         else:
             losses += 1
 
-    # --- APLICAÇÃO DE RECOMPENSAS ---
+    # --- RECOMPENSAS ---
     player_manager.add_gold(player_data, total_gold)
     
-    # Loot Items
     items_text = ""
     if total_items:
-        items_text = "\n🎒 <b>Loot:</b>"
+        items_text = "\n├─➤🎒 Loot:"
         for i_id, qty in total_items.items():
             player_manager.add_item_to_inventory(player_data, i_id, qty)
-            i_name = (game_data.ITEMS_DATA or {}).get(i_id, {}).get("display_name", i_id.replace('_', ' ').title())
-            items_text += f"\n• {i_name} x{qty}"
+            raw_name = (game_data.ITEMS_DATA or {}).get(i_id, {}).get("display_name", i_id.replace('_', ' ').title())
+            clean_name = html.escape(str(raw_name))
+            items_text += f"\n├─➤ • {clean_name} x{qty}"
 
-    # ✅ XP E LEVEL UP (CORREÇÃO AQUI)
-    # Usamos o módulo XP para processar level ups, pontos de status e multiplicadores premium
     xp_result = await xp_module.add_combat_xp(db_id, total_xp)
     
-    # Recarrega player_data para pegar o level atualizado caso tenha mudado no add_combat_xp
-    # (Embora add_combat_xp já salve, precisamos dos dados para o relatório se quisermos ser precisos,
-    # mas o xp_result já nos dá o que precisamos)
-    
     levels_gained = xp_result.get("levels_gained", 0)
-    new_level = xp_result.get("new_level", player_level)
+    new_level = xp_result.get("new_level", old_level)
     points_awarded = xp_result.get("points_awarded", 0)
     
     lvl_msg = ""
     if levels_gained > 0:
         lvl_msg = (
-            f"\n\n🎉 <b>LEVEL UP!</b> {player_level} ➔ {new_level}\n"
-            f"✨ Pontos ganhos: +{points_awarded}"
+            f"\n├────────────────────────────"
+            f"\n├─➤ 🎉 <b>LEVEL UP!</b> {old_level} ➔ {new_level}"
+            f"\n├─➤ ✨ Pontos de Atributo: +{points_awarded}"
         )
 
-    # Estado Idle
-    # Nota: Não salvamos player_data aqui com save_player_data porque add_combat_xp JÁ salvou.
-    # Apenas atualizamos o estado na memória para o próximo ciclo se necessário, 
-    # ou fazemos um update simples de estado.
-    update_state = {"player_state": {"action": "idle"}}
-    await player_manager.users_collection.update_one({"_id": db_id}, {"$set": update_state})
+    try:
+        await player_manager.users_collection.update_one(
+            {"_id": db_id}, 
+            {"$set": {"player_state": {"action": "idle"}}}
+        )
+    except Exception as e:
+        logger.error(f"[AutoHunt] Erro ao limpar estado: {e}")
 
-    # Texto
+    # --- MENSAGEM ---
     msg = (
-        f"🏁 <b>Caçada Rápida Concluída!</b> 🏁\n"
-        f"📊 Resultado: {wins} vitórias | {losses} derrotas\n"
-        f"────────────────\n"
-        f"💰 Ouro: +{total_gold} | ✨ XP: +{total_xp}"
+        f"╭────────────────────────────➤\n"
+        f"├─➤🏁 <b>Caçada Rápida Concluída!</b> 🏁\n"
+        f"├─➤📊 Resultado: {wins} vitórias | {losses} derrotas\n"
+        f"├────────────────────────────\n"
+        f"├─➤💰 Ouro: +{total_gold} | ✨ XP: +{total_xp}"
         f"{items_text}"
         f"{lvl_msg}"
+        f"\n╰───────────────────────────➤"
     )
     
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔙 Voltar para Região", callback_data=f"open_region:{region_key}")]
     ])
     
-    # Mídia Final
+    media_sent = False
     media_key = "autohunt_victory_media" if wins > 0 else "autohunt_defeat_media"
     file_data = file_id_manager.get_file_data(media_key)
-    
-    try:
-        if file_data and file_data.get("id"):
+
+    if file_data and file_data.get("id"):
+        try:
             m_id = file_data["id"]
             m_type = (file_data.get("type") or "photo").lower()
             
@@ -281,9 +304,16 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
                 await context.bot.send_video(chat_id, video=m_id, caption=msg, parse_mode="HTML", reply_markup=kb)
             else:
                 await context.bot.send_photo(chat_id, photo=m_id, caption=msg, parse_mode="HTML", reply_markup=kb)
-        else:
+            media_sent = True
+        except Exception as e:
+            logger.error(f"[AutoHunt] Falha mídia: {e}")
+            media_sent = False
+
+    if not media_sent:
+        try:
             await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            # Fallback final texto puro
+            clean_msg = msg.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", "")
+            await context.bot.send_message(chat_id, clean_msg, reply_markup=kb)
             
-    except Exception as e:
-        logger.error(f"Erro visual final: {e}")
-        await context.bot.send_message(chat_id, msg, parse_mode="HTML", reply_markup=kb)

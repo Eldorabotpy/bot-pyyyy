@@ -1,5 +1,5 @@
 # modules/game_data/xp.py
-# (VERSÃO CORRIGIDA: Suporte ObjectId + Trava de Segurança de Multiplicador)
+# (VERSÃO CORRIGIDA: Unificação de stat_points + Migração Automática)
 
 from __future__ import annotations
 from typing import Dict, Optional, Tuple, Union
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ================================
 MAX_LEVEL: int = 100
 POINTS_PER_LEVEL: int = 1
-MAX_MULTIPLIER_CAP: float = 3.0 # TRAVA DE SEGURANÇA: Ninguém ganha mais que 3x XP (nem Lenda)
+MAX_MULTIPLIER_CAP: float = 3.0 
 
 # ================================
 # Helpers
@@ -69,6 +69,15 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
     if not isinstance(player_data, dict):
         player_data = {"level": 1, "xp": 0}
 
+    # --- AUTO-FIX: Recupera pontos perdidos na 'point_pool' ---
+    # Se existirem pontos na chave antiga, move para a chave certa 'stat_points'
+    stuck_points = player_data.pop("point_pool", 0)
+    if stuck_points > 0:
+        current_stats = int(player_data.get("stat_points", 0))
+        player_data["stat_points"] = current_stats + int(stuck_points)
+        logger.info(f"🔧 Auto-Fix XP: {stuck_points} pontos movidos de 'point_pool' para 'stat_points'.")
+    # -----------------------------------------------------------
+
     level_before = int(player_data.get("level", 1) or 1)
     xp_curr      = int(player_data.get("xp", 0) or 0)
 
@@ -89,12 +98,12 @@ def _apply_level_ups_inplace(player_data: dict) -> Dict[str, int]:
         player_data["level"] = new_level
         player_data["xp"]    = xp_curr
 
-        # Adiciona Pontos de Status
+        # Adiciona Pontos de Status na chave CORRETA (stat_points)
         reward_points = levels_gained * POINTS_PER_LEVEL
         try:
-            player_data["point_pool"] = int(player_data.get("point_pool", 0)) + reward_points
+            player_data["stat_points"] = int(player_data.get("stat_points", 0)) + reward_points
         except:
-            player_data["point_pool"] = reward_points
+            player_data["stat_points"] = reward_points
 
         # Restaura Energia/HP (Bônus de Level Up)
         try:

@@ -28,6 +28,26 @@ TIER_LIMITS = {
     "admin": 100     # Admin (opcional)
 }
 
+# ==============================================================================
+# ℹ️ POPUP DE INFORMAÇÕES (Auto 🔒)
+# ==============================================================================
+async def premium_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    
+    # Texto do Popup (Máx 200 caracteres para garantir compatibilidade)
+    texto_popup = (
+        "🤖 SISTEMA AUTO-HUNT\n\n"
+        "Cace monstros automaticamente!\n\n"
+        "LIMITES POR VEZ:\n"
+        "🥈 Premium: 10x\n"
+        "🥇 VIP: 25x\n"
+        "🏆 Lenda: 35x\n\n"
+        "ℹ️ Adquira um plano na Loja!"
+    )
+    
+    # show_alert=True faz aparecer a "Janela Popup" com botão OK
+    await query.answer(texto_popup, show_alert=True)
+
 async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
@@ -69,26 +89,27 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
         await query.answer("🔒 Recurso exclusivo para Premium, VIP ou Lenda.", show_alert=True)
         return
 
-    # 2. Verifica se está tentando fazer mais do que o plano permite
     if requested_count > allowed_count and user_tier != "admin":
         msg_erro = (
-            f"🚫 Seu plano ({user_tier.capitalize()}) permite máximo de {allowed_count}x.\n\n"
-            "Faça um upgrade para aumentar o limite!"
+            f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
+            f"│🚫 Seu plano ({user_tier.capitalize()})\n"
+            f"│  Permite máximo de {allowed_count}x.\n\n"
+            f"│Faça um upgrade para aumentar o limite!"
+            f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n"
         )
         await query.answer(msg_erro, show_alert=True)
         return
 
-    # --- VALIDAÇÃO DE ENERGIA (POPUP) ---
-    # Custo: 1 energia por caçada
     total_cost = requested_count
     current_energy = int(player_data.get("energy", 0))
 
     if current_energy < total_cost:
-        # ✅ AQUI ESTÁ O POPUP COM O BOTÃO OK
         await query.answer(
-            f"🚫 Você não tem energia suficiente!\n\n"
-            f"Necessário: {total_cost} ⚡\n"
-            f"Atual: {current_energy} ⚡",
+            f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
+            f"│🚫 Você não tem energia suficiente!\n\n"
+            f"│Necessário: {total_cost} ⚡\n"
+            f"│Atual: {current_energy} ⚡"
+            f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n",
             show_alert=True
         )
         return
@@ -104,11 +125,15 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
     duration_min = (requested_count * 30) / 60 # 30s por mob
 
     caption_text = (
-        f"⏱ <b>Caçada Rápida Iniciada!</b>\n"
-        f"⚔️ Simulando <b>{requested_count} combates</b> em <b>{region_name}</b>...\n\n"
-        f"⚡ Custo: {total_cost} energia\n"
-        f"⏳ Tempo: {duration_min:.1f} minutos.\n\n"
-        f"<i>O relatório chegará automaticamente.</i>"
+        f"╭────────────────────────➤\n"
+        f"├─➤⏱ <b>Caçada Rápida Iniciada!</b>\n"
+        f"├─➤⚔️ Simulando <b>{requested_count} combates</b> em <b>{region_name}</b>...\n"
+        f"│\n"
+        f"├─➤⚡ Custo: {total_cost} energia\n"
+        f"├─➤⏳ Tempo: {duration_min:.1f} minutos.\n"
+        f"│\n"
+        f"├─➤<i>O relatório chegará automaticamente.</i>\n"
+        f"╰────────────────────────➤"
     )
 
     sent_msg = None
@@ -158,3 +183,5 @@ async def _autohunt_button_parser(update: Update, context: ContextTypes.DEFAULT_
     )
 
 autohunt_start_handler = CallbackQueryHandler(_autohunt_button_parser, pattern=r'^autohunt_start_')
+# Registra o clique no botão "Auto (🔒)"
+premium_info_handler = CallbackQueryHandler(premium_info_callback, pattern=r'^premium_info$')

@@ -1,6 +1,6 @@
 {
   "is_active": false,
-  "location": "campos_linho",
+  "location": "pradaria_inicial",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",
@@ -242,5 +242,5 @@
   "environment_hazard": false,
   "hazard_turns": 0,
   "damage_leaderboard": {},
-  "last_hitter_id": 7262799478
+  "last_hitter_id": null
 }
