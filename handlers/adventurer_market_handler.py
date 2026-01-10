@@ -2,43 +2,36 @@
 # (VERSÃO FINAL LIMPA: Auth Híbrida Padronizada - Sem código legado)
 
 import logging
-import asyncio
 from typing import List, Dict, Any, Optional
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
-from telegram.error import BadRequest
 from telegram.constants import ParseMode
 
 # --- IMPORTAÇÕES BSON (CRÍTICO PARA OBJECTID) ---
-from bson import ObjectId, errors as bson_errors
+from bson import ObjectId
 
 # --- MÓDULOS PRINCIPAIS ---
-from modules import player_manager, game_data, file_ids, market_utils
-from modules.player import queries
+from modules import player_manager, game_data, file_ids
 from modules.auth_utils import get_current_player_id
 
-# --- DADOS DE JOGO ---
+EVOLUTION_ITEMS_DATA = {}
+CONSUMABLES_DATA = {}
+STAT_EMOJI = {}
+CLASSES_DATA = {}
+market_manager = None
+
+# Tenta importar dados de jogo para visualização
 try:
     from modules import market_manager
 except ImportError:
     market_manager = None
 
 try:
-    from modules.game_data.items_consumables import CONSUMABLES_DATA
     from modules.game_data.attributes import STAT_EMOJI
     from modules.game_data.classes import CLASSES_DATA
 except ImportError:
-    EVOLUTION_ITEMS_DATA = {}
-    CONSUMABLES_DATA = {}
     STAT_EMOJI = {}
     CLASSES_DATA = {}
-
-try:
-    from modules import game_data
-    from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
-except ImportError:
-    game_data = None
-    EVOLUTION_ITEMS_DATA = {}
 
 logger = logging.getLogger(__name__)
 
@@ -50,53 +43,62 @@ MARKET_LOG_TOPIC_ID = 24475
 # 🛠️ HELPER: CONVERSÃO SEGURA DE ID
 # ==============================================================================
 def ensure_object_id(uid):
-    if isinstance(uid, ObjectId):
-        return uid
-    if isinstance(uid, str) and ObjectId.is_valid(uid):
-        return ObjectId(uid)
+    """Garante que o ID seja um ObjectId válido do MongoDB."""
+    if isinstance(uid, ObjectId): return uid
+    if isinstance(uid, str) and ObjectId.is_valid(uid): return ObjectId(uid)
     return None
 
 def short_id(oid):
-    """Retorna os últimos 4 dígitos do ObjectId para exibição visual limpa"""
+    """Retorna apenas os últimos 4 dígitos do ObjectId para visualização limpa."""
     s = str(oid)
-    return f"...{s[-4:]}" if len(s) > 4 else s
+    return f"🆔..{s[-4:]}" if len(s) > 4 else "🆔"
+
+def _get_item_info(base_id: str) -> dict:
+    return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
 async def _send_market_log(context: ContextTypes.DEFAULT_TYPE, text: str):
-    """Envia notificação RPG para o canal de logs."""
     try:
         await context.bot.send_message(
             chat_id=MARKET_LOG_GROUP_ID,
             message_thread_id=MARKET_LOG_TOPIC_ID,
             text=text,
-            parse_mode=ParseMode.HTML,
-            disable_notification=False
+            parse_mode=ParseMode.HTML
         )
     except Exception as e:
-        logger.error(f"Falha ao enviar log de mercado: {e}")
+        logger.error(f"Falha log mercado: {e}")
 
-async def _send_smart(query, context, chat_id, text, kb, img_key):
+async def _send_smart(query, context, chat_id, text, kb, img_key=None):
     try: await query.delete_message()
     except: pass
     
-    fd = file_ids.get_file_data(img_key) if file_ids else None
-    
-    if fd and fd.get("id"):
-        try:
-            if fd.get("type") == "video":
-                await context.bot.send_video(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await context.bot.send_photo(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
-            return
-        except: pass
+    # Tenta enviar imagem se disponível
+    if img_key and file_ids:
+        fd = file_ids.get_file_data(img_key)
+        if fd and fd.get("id"):
+            try:
+                if fd.get("type") == "video":
+                    await context.bot.send_video(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await context.bot.send_photo(chat_id, fd["id"], caption=text, reply_markup=kb, parse_mode="HTML")
+                return
+            except: pass
 
     await context.bot.send_message(chat_id, text, reply_markup=kb, parse_mode="HTML")
 
-
+SLOT_HEADERS = {
+    "arma": "𝐀𝐫𝐦𝐚", "weapon": "𝐀𝐫𝐦𝐚",
+    "elmo": "𝐄𝐥𝐦𝐨", "helmet": "𝐄𝐥𝐦𝐨", "head": "𝐄𝐥𝐦𝐨",
+    "armadura": "𝐀𝐫𝐦𝐚𝐝𝐮𝐫𝐚", "armor": "𝐀𝐫𝐦𝐚𝐝𝐮𝐫𝐚", "body": "𝐀𝐫𝐦𝐚𝐝𝐮𝐫𝐚",
+    "calca": "𝐂𝐚𝐥ç𝐚", "legs": "𝐂𝐚𝐥ç𝐚", "pants": "𝐂𝐚𝐥ç𝐚",
+    "luvas": "𝐋𝐮𝐯𝐚𝐬", "gloves": "𝐋𝐮𝐯𝐚𝐬", "hands": "𝐋𝐮𝐯𝐚𝐬",
+    "botas": "𝐁𝐨𝐭𝐚𝐬", "boots": "𝐁𝐨𝐭𝐚𝐬", "feet": "𝐁𝐨𝐭𝐚𝐬",
+    "colar": "𝐂𝐨𝐥𝐚𝐫", "necklace": "𝐂𝐨𝐥𝐚𝐫", "neck": "𝐂𝐨𝐥𝐚𝐫",
+    "anel": "𝐀𝐧𝐞𝐥", "ring": "𝐀𝐧𝐞𝐥",
+    "item": "𝐈𝐭𝐞𝐦", "material": "𝐌𝐚𝐭𝐞𝐫𝐢𝐚𝐥"
+}
 # ==============================================================================
 # 🔍 FUNÇÕES DE RENDERIZAÇÃO
 # ==============================================================================
-def _get_item_info(base_id: str) -> dict:
-    return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
 def _get_item_name_from_context(context):
     pending = context.user_data.get("market_pending", {})
@@ -128,15 +130,18 @@ def _detect_class_display(inst: dict, base_id: str) -> str:
     return f"🛡️ {ckey.capitalize()}"
 
 def _get_stat_emoji(key: str) -> str:
-    key_lower = key.lower()
-    if key_lower in STAT_EMOJI: return STAT_EMOJI[key_lower]
-    if "hp" in key_lower or "vida" in key_lower: return "❤️"
-    if "atk" in key_lower or "dmg" in key_lower: return "⚔️"
-    if "def" in key_lower: return "🛡️"
-    if "int" in key_lower: return "🧠"
-    if "str" in key_lower: return "💪"
-    if "agi" in key_lower: return "🏃"
-    if "luc" in key_lower or "sorte" in key_lower: return "🍀"
+    """Busca emoji no attributes.py ou usa fallback inteligente."""
+    k = key.lower()
+    if k in STAT_EMOJI: return STAT_EMOJI[k]
+    # Fallbacks comuns
+    if "hp" in k or "vida" in k: return "❤️‍🩹"
+    if "def" in k: return "🛡️"
+    if "atk" in k or "dmg" in k: return "⚔️"
+    if "crit" in k: return "💥"
+    if "agi" in k or "spd" in k: return "🏃"
+    if "int" in k: return "🧠"
+    if "str" in k or "for" in k: return "💪"
+    if "luck" in k or "sort" in k: return "🍀"
     return "✨"
 
 def _render_listing_card(idx: int, listing: dict) -> str:
@@ -144,124 +149,552 @@ def _render_listing_card(idx: int, listing: dict) -> str:
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
     
     price = int(listing.get("unit_price", 0))
-    seller_name = listing.get("seller_name") or f"Vendedor"
+    seller_name = listing.get("seller_name") or "Vendedor"
     item_payload = listing.get("item", {})
     qty_stock = listing.get("quantity", 0)
-
-    # Tratamento de ID visual
-    lid = listing.get("_id") or listing.get("id")
+    
+    lid = listing.get("_id")
     visual_id = short_id(lid)
 
     tid = listing.get("target_buyer_id")
     tname = listing.get("target_buyer_name") or "Alguém"
-    lock_status = f"🔐 <b>Reservado:</b> {tname}" if tid else ""
-    lock_emoji = "🔒 " if tid else ""
+    lock_str = f"🔒 Reservado: {tname}" if tid else ""
 
+    # --- STACK ---
     if item_payload.get("type") == "stack":
         base_id = item_payload.get("base_id")
         lot_size = item_payload.get("qty", 1)
         info = _get_item_info(base_id)
+        
         name = info.get("display_name") or base_id.replace("_", " ").title()
         emoji = info.get("emoji", "📦")
         
-        footer = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  👤 {seller_name}"
-        if lock_status: footer += f"\n╰┈➤ {lock_status}"
+        line1 = f"{icon_num}┈➤ {emoji} <b>{name}</b> x{lot_size}"
+        line2 = f"├┈➤ 📦 <b>Estoque:</b> {qty_stock} lotes"
+        line3 = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  👤 {seller_name} {visual_id}"
+        if lock_str: line3 += f"\n╰┈➤ {lock_str}"
+        return f"{line1}\n{line2}\n{line3}"
 
-        return (
-            f"{icon_num}┈➤ {lock_emoji}{emoji} <b>{name}</b> x{lot_size}\n"
-            f"├┈➤ 📦 Estoque: {qty_stock} lotes\n"
-            f"{footer} 🆔 <pre>{visual_id}</pre>"
-        )
-    else: # Unique
+    # --- UNIQUE (EQUIPAMENTO) ---
+    else:
         inst = item_payload.get("item", {})
         base_id = item_payload.get("base_id") or inst.get("base_id")
         info = _get_item_info(base_id)
+        
         name = inst.get("display_name") or info.get("display_name") or base_id
-        emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
-        rarity = str(inst.get("rarity", "comum")).upper()
+        rarity = str(inst.get("rarity", "comum")).title()
+        upgrade = inst.get("upgrade_level", 0)
         
-        cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20,20]
-        dura_str = f"[{int(cur_d)}/{int(max_d)}]"
+        name_display = f"{name}"
+        if upgrade > 0: name_display += f" [+{upgrade}]"
+        name_display += f"[{rarity}]"
         
-        # Renderização de stats omitida para brevidade (igual ao original)
-        class_str = _detect_class_display(inst, base_id)
+        cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20, 20]
+        dura_display = f"[{int(cur_d)}/{int(max_d)}]"
+        
+        slot_raw = str(info.get("slot", "item")).lower()
+        slot_header = SLOT_HEADERS.get(slot_raw, "𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨")
+        
+        slot_emoji = info.get("emoji") or "⚔️"
+        if slot_raw == "arma": slot_emoji = "⚔️"
+        elif slot_raw == "elmo": slot_emoji = "🪖"
+        elif slot_raw == "armadura": slot_emoji = "👕"
+        elif slot_raw == "calca": slot_emoji = "👖"
+        
+        stats_list = []
+        all_attrs = {}
+        if isinstance(inst.get("attributes"), dict): all_attrs.update(inst["attributes"])
+        if isinstance(inst.get("enchantments"), dict): all_attrs.update(inst["enchantments"])
+        
+        ignored_stats = ["description", "value", "price", "durability", "rarity", "name"]
+        
+        for k, v in all_attrs.items():
+            if k in ignored_stats: continue
+            val = v.get("value", 0) if isinstance(v, dict) else v
+            try: val = int(float(val))
+            except: val = 0
+            if val > 0:
+                emo = _get_stat_emoji(k)
+                stats_list.append(f"{emo} +{val}")
+        
+        stats_str = ", ".join(stats_list) if stats_list else "Sem atributos extras"
+        
+        # Runas
+        total_slots = inst.get("slots", 3)
+        equipped_runes = inst.get("runes", [])
+        runes_visual = ""
+        for i in range(total_slots):
+            if i < len(equipped_runes): runes_visual += "🔴" 
+            else: runes_visual += "⚪️"
+        runes_display = f"({runes_visual})" if total_slots > 0 else ""
 
-        footer = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  👤 {seller_name}"
-        if lock_status: footer += f"\n╰┈➤ {lock_status}"
+        # Classe
+        raw_class = inst.get("class_lock") or inst.get("required_class")
+        if not raw_class or str(raw_class).lower() in ["any", "todas", "universal", "none"]:
+            class_display = "🌎 Universal"
+        else:
+            c_key = str(raw_class).lower()
+            c_data = CLASSES_DATA.get(c_key, {})
+            c_emoji = c_data.get("emoji", "🛡️")
+            class_display = f"{c_emoji}" 
 
-        return (
-            f"{icon_num}┈➤ {lock_emoji}{emoji} <b>{name}</b> [{rarity}] {dura_str}\n"
-            f"├┈➤ {class_str}\n"
-            f"{footer} 🆔 <pre>{visual_id}</pre>"
-        )
+        header = f"{icon_num}{slot_emoji} <b>{slot_header}</b> ──────────────"
+        line_item = f"├┈➤ 『{dura_display} {info.get('emoji','')} <b>{name_display}</b>:"
+        line_stats = f"├┈➤  {stats_str} 』 {runes_display}"
+        line_class = f"├┈➤ <b>Classe</b> {class_display}"
+        line_price = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  👤 {seller_name} {visual_id}"
+        
+        if lock_str: line_price += f"\n╰┈➤ {lock_str}"
+
+        return f"{header}\n{line_item}\n{line_stats}\n{line_class}\n{line_price}"
+    
+# ==============================================================================
+# 🎨 RENDERIZAÇÃO DETALHADA PARA O MENU DE VENDA
+# ==============================================================================
 
 def _render_sell_card(idx: int, item_wrapper: dict) -> str:
     icons = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
     
+    # --- STACK (MATERIAIS) ---
     if item_wrapper["type"] == "stack":
         base_id = item_wrapper["base_id"]
         qty = item_wrapper["qty"]
         info = _get_item_info(base_id)
         name = info.get("display_name") or base_id.replace("_", " ").title()
         emoji = info.get("emoji", "📦")
-        return f"{icon_num}┈➤ {emoji} <b>{name}</b>\n╰┈➤ 📦 Lote de {qty} un."
-    else:
-        inst = item_wrapper["inst"]
-        base_id = item_wrapper["sort_name"]
-        info = _get_item_info(base_id)
-        name = inst.get("display_name") or info.get("display_name") or base_id
-        emoji = inst.get("emoji") or info.get("emoji") or "⚔️"
-        rarity = str(inst.get("rarity", "comum")).upper()
-        upg = inst.get("upgrade_level", 0)
-        plus_str = f" +{upg}" if upg > 0 else ""
-        cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20,20]
-        dura_str = f"[{int(cur_d)}/{int(max_d)}]"
-        stats_found = []
-        all_stats = {}
-        if isinstance(inst.get("attributes"), dict): all_stats.update(inst["attributes"])
-        if isinstance(inst.get("enchantments"), dict): all_stats.update(inst["enchantments"])
-        for key, raw_val in all_stats.items():
-            val = raw_val.get("value", 0) if isinstance(raw_val, dict) else raw_val
-            try: 
-                if int(float(val)) > 0:
-                    icon = _get_stat_emoji(key)
-                    stats_found.append(f"{icon}+{int(val)}")
-            except: continue
-        stats_str = ", ".join(stats_found[:4]) 
-        if not stats_str: stats_str = ""
-        class_str = _detect_class_display(inst, base_id)
-        return f"{icon_num}┈➤ {emoji} <b>{name}{plus_str}</b> [{rarity}]\n├┈➤ {dura_str} {stats_str}\n╰┈➤ {class_str}"
+        
+        # Layout simples para stack
+        return (
+            f"{icon_num}┈➤ {emoji} <b>{name}</b>\n"
+            f"╰┈➤ 📦 <b>Disponível:</b> {qty}"
+        )
+
+    # --- UNIQUE (EQUIPAMENTOS) ---
+    inst = item_wrapper["inst"]
+    base_id = item_wrapper["sort_name"]
+    info = _get_item_info(base_id)
+    
+    # 1. Identificação
+    name = inst.get("display_name") or info.get("display_name") or base_id
+    rarity = str(inst.get("rarity", "comum")).title()
+    upgrade = inst.get("upgrade_level", 0)
+    
+    name_display = f"{name}"
+    if upgrade > 0: name_display += f" [+{upgrade}]"
+    name_display += f"[{rarity}]"
+    
+    # 2. Durabilidade
+    cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20, 20]
+    dura_display = f"[{int(cur_d)}/{int(max_d)}]"
+    
+    # 3. Slot Header
+    slot_raw = str(info.get("slot", "item")).lower()
+    slot_header = SLOT_HEADERS.get(slot_raw, "𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨")
+    
+    slot_emoji = info.get("emoji") or "⚔️"
+    if slot_raw == "arma": slot_emoji = "⚔️"
+    elif slot_raw == "elmo": slot_emoji = "🪖"
+    elif slot_raw == "armadura": slot_emoji = "👕"
+    elif slot_raw == "calca": slot_emoji = "👖"
+    elif slot_raw == "luvas": slot_emoji = "🧤"
+    elif slot_raw == "botas": slot_emoji = "🥾"
+
+    # 4. Atributos
+    stats_list = []
+    all_attrs = {}
+    if isinstance(inst.get("attributes"), dict): all_attrs.update(inst["attributes"])
+    if isinstance(inst.get("enchantments"), dict): all_attrs.update(inst["enchantments"])
+    
+    ignored_stats = ["description", "value", "price", "durability", "rarity", "name", "uuid", "base_id", "slots"]
+    
+    for k, v in all_attrs.items():
+        if k in ignored_stats: continue
+        val = v.get("value", 0) if isinstance(v, dict) else v
+        try: val = int(float(val))
+        except: val = 0
+        if val > 0:
+            emo = _get_stat_emoji(k)
+            stats_list.append(f"{emo}+{val}") # Removi espaço para caber mais
+    
+    stats_str = ", ".join(stats_list) if stats_list else "Sem status extras"
+
+    # 5. Runas (CORRIGIDO: Só mostra se tiver slots > 0)
+    # Tenta pegar do item instanciado, depois da base, senão é 0
+    total_slots = int(inst.get("slots", 0)) 
+    if total_slots == 0:
+         total_slots = int(info.get("slots", 0))
+
+    runes_display = ""
+    if total_slots > 0:
+        equipped_runes = inst.get("runes", [])
+        runes_visual = ""
+        for i in range(total_slots):
+            if i < len(equipped_runes): runes_visual += "🔴" 
+            else: runes_visual += "⚪️"
+        runes_display = f" ({runes_visual})"
+
+    # 6. Classe (CORRIGIDO: Lógica robusta de detecção)
+    # Tenta: Trava do Item -> Requisito Base (Lista) -> Requisito Base (String)
+    raw_class = inst.get("class_lock") or info.get("class_req") or info.get("required_class")
+    
+    # Se for lista (ex: ['guerreiro', 'berserker']), pega o primeiro
+    if isinstance(raw_class, list) and len(raw_class) > 0:
+        raw_class = raw_class[0]
+    
+    class_display = "🌎 Universal"
+    c_emoji = "🌎"
+    
+    if raw_class and str(raw_class).lower() not in ["any", "todas", "universal", "none"]:
+        c_key = str(raw_class).lower()
+        # Se a chave da classe estiver no nome do arquivo (ex: classe_assassino), limpa
+        if "classe_" in c_key: c_key = c_key.replace("classe_", "")
+        
+        c_data = CLASSES_DATA.get(c_key, {})
+        if c_data:
+            c_emoji = c_data.get("emoji", "🛡️")
+            c_name = c_data.get("display_name", c_key.capitalize())
+            class_display = f"{c_emoji} {c_name}"
+        else:
+            # Fallback: Tenta achar no nome do ID se não achou nos metadados
+            found = False
+            for k, v in CLASSES_DATA.items():
+                if k in base_id.lower():
+                    class_display = f"{v['emoji']} {v['display_name']}"
+                    found = True
+                    break
+            if not found:
+                class_display = f"🛡️ {str(raw_class).capitalize()}"
+    
+    # 7. MONTAGEM FINAL
+    # Header
+    header = f"{icon_num} {slot_emoji} <b>{slot_header}</b> ──────────────"
+    
+    # Linha do Nome
+    line_item = f"├┈➤ 『{dura_display} {info.get('emoji','')} <b>{name_display}</b>:"
+    
+    # Linha de Status e Runas
+    # Se tiver runas, coloca na mesma linha ou linha separada dependendo do tamanho
+    line_stats = f"├┈➤  {stats_str} 』{runes_display}"
+    
+    # Linha de Classe
+    line_class = f"├┈➤ <b>Classe:</b> {class_display}"
+
+    return f"{header}\n{line_item}\n{line_stats}\n{line_class}"
+
+# ==============================================================================
+# 🛒 FUNÇÃO PRINCIPAL DA LISTA DE VENDA (BOTÕES COMPACTOS)
+# ==============================================================================
+
+async def market_sell_list_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query; await query.answer()
+    user_id = ensure_object_id(get_current_player_id(update, context))
+    
+    try: parts = query.data.split(':'); category = parts[1]; page = int(parts[2])
+    except: category, page = "equip", 1
+
+    try:
+        pdata = await player_manager.get_player_data(user_id) or {}
+        inv = pdata.get("inventory", {}) or {}
+        gold = pdata.get("gold", 0)
+        char_name = pdata.get("character_name", "Aventureiro")
+    except Exception: return
+    
+    # Filtros
+    equipment = pdata.get("equipment", {})
+    equipped_ids = {uid for uid in equipment.values() if uid}
+    sellable = []
+    
+    for item_id, data in inv.items():
+        if item_id in equipped_ids: continue 
+
+        try:
+            if isinstance(data, dict): 
+                base_id = data.get("base_id") or item_id; qty = 1; is_unique = True; inst_data = data
+            else: 
+                base_id = item_id; qty = int(data); is_unique = False; inst_data = {}
+
+            info = _get_item_info(base_id)
+            itype = str(info.get("type", "")).lower()
+            
+            if base_id in EVOLUTION_ITEMS_DATA: continue 
+            
+            is_equip = (is_unique or itype in ["equipamento", "arma", "armadura", "acessorio"])
+            should_show = False
+            
+            if category == "equip" and is_equip: should_show = True
+            elif category == "mat" and not is_equip and itype != "consumivel": should_show = True
+            elif category == "cons" and itype == "consumivel": should_show = True
+
+            if should_show and qty > 0:
+                rarity_rank = 0
+                if is_unique:
+                    r = str(inst_data.get("rarity", "comum")).lower()
+                    ranks = {"comum": 1, "incomum": 2, "bom": 3, "raro": 4, "epico": 5, "lendario": 6}
+                    rarity_rank = ranks.get(r, 0)
+                
+                sellable.append({
+                    "type": "unique" if is_unique else "stack",
+                    "uid": item_id,
+                    "base_id": base_id,
+                    "qty": qty,
+                    "inst": inst_data,
+                    "sort_name": base_id,
+                    "rarity_rank": rarity_rank
+                })
+        except Exception: continue
+
+    # Ordena: Maior Raridade Primeiro -> Nome
+    sellable.sort(key=lambda x: (-x.get("rarity_rank", 0), x["sort_name"]))
+    
+    # Paginação (5 itens)
+    ITEMS_PER_PAGE = 5
+    total = len(sellable)
+    total_pages = max(1, (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * ITEMS_PER_PAGE
+    items_page = sellable[start : start + ITEMS_PER_PAGE]
+
+    cat_names = {"equip": "⚔️ Equipamentos", "cons": "🧪 Consumíveis", "mat": "🧱 Materiais"}
+    cat_title = cat_names.get(category, "Itens")
+
+    # Header de Saldo
+    header = (
+        f"╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n"
+        f"│ 🛒 <b>VENDER:</b> {cat_title} ({page}/{total_pages})\n"
+        f"│ 👤 <b>{char_name}</b>\n"
+        f"│ 💰 <b>Saldo:</b> {gold:,} 🪙\n"
+        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n"
+    )
+    
+    body_lines = []
+    selection_buttons = []
+    icons_btn = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+
+    if not items_page: 
+        body_lines.append("<i>Nenhum item disponível para venda nesta categoria.</i>")
+    
+    for idx, item in enumerate(items_page, start=1):
+        # Renderiza texto rico
+        text_block = _render_sell_card(idx, item)
+        body_lines.append(text_block)
+        body_lines.append("")
+        
+        # Botão Compacto [ 1🏷️ ]
+        icon_num = icons_btn[idx] if idx < len(icons_btn) else f"{idx}"
+        
+        if item["type"] == "unique":
+            selection_buttons.append(InlineKeyboardButton(f"{icon_num}🏷️", callback_data=f"market_pick_unique_{item['uid']}"))
+        else:
+            selection_buttons.append(InlineKeyboardButton(f"{icon_num}🏷️", callback_data=f"market_pick_stack_{item['base_id']}"))
+
+    full_text = header + "\n".join(body_lines)
+    keyboard = []
+    
+    # Adiciona botões compactos em uma linha
+    if selection_buttons:
+        keyboard.append(selection_buttons)
+    
+    # Navegação
+    nav_row = []
+    if page > 1: nav_row.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"market_sell_cat:{category}:{page-1}"))
+    nav_row.append(InlineKeyboardButton("📂 Categorias", callback_data="market_sell_menu"))
+    if total > start + ITEMS_PER_PAGE: nav_row.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"market_sell_cat:{category}:{page+1}"))
+    if nav_row: keyboard.append(nav_row)
+    
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market_adventurer")])
+    
+    await _safe_edit(query, full_text, InlineKeyboardMarkup(keyboard))
+    
+
+# ==============================================================================
+# 👤 RENDERIZAÇÃO: MINHAS VENDAS (VISUAL RICO)
+# ==============================================================================
 
 def _render_my_sale_card(idx: int, listing: dict) -> str:
+    """
+    Renderiza o card de 'Minhas Vendas' com visual rico (Atributos, Slot, Status).
+    """
     icons = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
     icon_num = icons[idx] if idx < len(icons) else f"{idx}️⃣"
     
-    lid = listing.get("_id") or listing.get("id")
-    visual_id = short_id(lid)
-
+    # Dados da Listagem
     price = int(listing.get("unit_price", 0))
     item_payload = listing.get("item", {})
     qty_stock = listing.get("quantity", 0)
-    target_id = listing.get("target_buyer_id")
-    target_name = listing.get("target_buyer_name") or "Alguém"
-    status_icon = "🔐" if target_id else "📢"
-    status_text = f"Reservado: {target_name}" if target_id else "Público"
+    
+    # ID Visual
+    lid = listing.get("_id")
+    visual_id = short_id(lid)
 
+    # Status de Reserva
+    tid = listing.get("target_buyer_id")
+    tname = listing.get("target_buyer_name") or "Alguém"
+    status_str = f"🔐 <b>Reservado:</b> {tname}" if tid else "📢 <b>Público</b>"
+
+    # --- CASO 1: STACK (MATERIAIS) ---
     if item_payload.get("type") == "stack":
         base_id = item_payload.get("base_id")
         lot_size = item_payload.get("qty", 1)
         info = _get_item_info(base_id)
-        name = info.get("display_name") or base_id
+        
+        name = info.get("display_name") or base_id.replace("_", " ").title()
         emoji = info.get("emoji", "📦")
-        header = f"{emoji} <b>{name}</b> (Lote de {lot_size})"
-        details = f"💰 {price:,} 🪙 | Restam: {qty_stock} lotes"
+        
+        return (
+            f"{icon_num}┈➤ {emoji} <b>{name}</b> x{lot_size}\n"
+            f"├┈➤ 📦 <b>Estoque:</b> {qty_stock} lotes\n"
+            f"╰┈➤ 💸 <b>{price:,} 🪙</b>  {status_str}"
+        )
+
+    # --- CASO 2: EQUIPAMENTOS (UNIQUE) ---
     else:
-        header = "⚔️ Item Único"
-        details = f"💰 {price:,} 🪙"
+        inst = item_payload.get("item", {})
+        base_id = item_payload.get("base_id") or inst.get("base_id")
+        info = _get_item_info(base_id)
+        
+        # 1. Identificação
+        name = inst.get("display_name") or info.get("display_name") or base_id
+        rarity = str(inst.get("rarity", "comum")).title()
+        upgrade = inst.get("upgrade_level", 0)
+        
+        name_display = f"{name}"
+        if upgrade > 0: name_display += f" [+{upgrade}]"
+        name_display += f"[{rarity}]"
+        
+        # 2. Durabilidade
+        cur_d, max_d = inst.get("durability", [20, 20]) if isinstance(inst.get("durability"), list) else [20, 20]
+        dura_display = f"[{int(cur_d)}/{int(max_d)}]"
+        
+        # 3. Slot Header
+        slot_raw = str(info.get("slot", "item")).lower()
+        slot_header = SLOT_HEADERS.get(slot_raw, "𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨")
+        slot_emoji = info.get("emoji") or "⚔️"
+        if slot_raw == "arma": slot_emoji = "⚔️"
+        elif slot_raw == "elmo": slot_emoji = "🪖"
+        elif slot_raw == "armadura": slot_emoji = "👕"
+        
+        # 4. Atributos
+        stats_list = []
+        all_attrs = {}
+        if isinstance(inst.get("attributes"), dict): all_attrs.update(inst["attributes"])
+        if isinstance(inst.get("enchantments"), dict): all_attrs.update(inst["enchantments"])
+        
+        ignored_stats = ["description", "value", "price", "durability", "rarity", "name", "uuid"]
+        
+        for k, v in all_attrs.items():
+            if k in ignored_stats: continue
+            val = v.get("value", 0) if isinstance(v, dict) else v
+            try: val = int(float(val))
+            except: val = 0
+            if val > 0:
+                emo = _get_stat_emoji(k)
+                stats_list.append(f"{emo} +{val}")
+        
+        stats_str = ", ".join(stats_list) if stats_list else "Sem atributos extras"
+        
+        # 5. Runas
+        total_slots = inst.get("slots", 3)
+        equipped_runes = inst.get("runes", [])
+        runes_visual = ""
+        for i in range(total_slots):
+            if i < len(equipped_runes): runes_visual += "🔴" 
+            else: runes_visual += "⚪️"
+        runes_display = f"({runes_visual})" if total_slots > 0 else ""
+        
+        # 6. Classe
+        raw_class = inst.get("class_lock") or inst.get("required_class")
+        class_display = "🌎"
+        if raw_class and str(raw_class).lower() not in ["any", "todas", "universal", "none"]:
+            c_key = str(raw_class).lower()
+            c_data = CLASSES_DATA.get(c_key, {})
+            class_display = c_data.get("emoji", "🛡️")
 
-    return f"{icon_num}┈➤ {header}\n├┈➤ {details} │ 🆔 <b>...{visual_id}</b>\n╰┈➤ {status_icon} <b>{status_text}</b>"
+        # MONTAGEM FINAL DO CARD "MINHAS VENDAS"
+        header = f"{icon_num}{slot_emoji} <b>{slot_header}</b> ──────────────"
+        line_item = f"├┈➤ 『{dura_display} {info.get('emoji','')} <b>{name_display}</b>:"
+        line_stats = f"├┈➤  {stats_str} 』 {runes_display}"
+        line_class = f"├┈➤ <b>Classe:</b> {class_display}"
+        line_price = f"╰┈➤ 💸 <b>{price:,} 🪙</b>  {status_str} {visual_id}"
+        
+        return f"{header}\n{line_item}\n{line_stats}\n{line_class}\n{line_price}"
 
+# ==============================================================================
+# 👤 HANDLER: MINHAS VENDAS (COM PAGINAÇÃO E BOTÕES COMPACTOS)
+# ==============================================================================
+
+async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query; await q.answer()
+    
+    # 1. Garante ObjectId
+    user_id = ensure_object_id(get_current_player_id(update, context))
+    
+    # 2. Paginação (via split do callback)
+    try: page = int(q.data.split(":")[1]) if ":" in q.data else 1
+    except: page = 1
+
+    # 3. Busca Listings
+    # A função list_by_seller deve retornar a lista completa
+    all_listings = market_manager.list_by_seller(user_id)
+    
+    if not all_listings:
+        await _safe_edit(q, "👤 <b>Minhas Vendas</b>\n\nVocê não tem itens à venda no momento.", 
+                         InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]))
+        return
+
+    # --- Configuração Paginação ---
+    ITEMS_PER_PAGE = 5
+    total = len(all_listings)
+    total_pages = max(1, (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * ITEMS_PER_PAGE
+    listings_page = all_listings[start : start + ITEMS_PER_PAGE]
+
+    # --- Construção do Texto ---
+    header = (f"╭┈┈┈┈┈➤ 👤 <b>MINHAS VENDAS ({page}/{total_pages})</b> ┈┈┈┈┈╮\n"
+              f" │ 📊 <b>Total Ativo:</b> {total} anúncios\n"
+              f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n\n")
+    
+    body_lines = []
+    cancel_buttons_row = []
+    
+    # Ícones para botões
+    icons_btn = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+
+    for idx, listing in enumerate(listings_page, start=1):
+        # Renderiza Card Rico
+        card_text = _render_my_sale_card(idx, listing)
+        body_lines.append(card_text)
+        body_lines.append("") # Espaço
+
+        # Cria Botão de Cancelar Compacto (1️⃣❌)
+        lid = str(listing.get("_id"))
+        icon_num = icons_btn[idx] if idx < len(icons_btn) else f"{idx}"
+        
+        cancel_buttons_row.append(
+            InlineKeyboardButton(f"{icon_num}❌", callback_data=f"market_cancel_{lid}")
+        )
+
+    full_text = header + "\n".join(body_lines)
+    
+    # --- Montagem do Teclado ---
+    keyboard = []
+    
+    # Linha única de botões de cancelamento
+    if cancel_buttons_row:
+        keyboard.append(cancel_buttons_row)
+        
+    # Navegação
+    nav_row = []
+    if page > 1: nav_row.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"market_my:{page-1}"))
+    nav_row.append(InlineKeyboardButton("🔄 Atualizar", callback_data=f"market_my:{page}"))
+    if page < total_pages: nav_row.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"market_my:{page+1}"))
+    if nav_row: keyboard.append(nav_row)
+    
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Mercado", callback_data="market_adventurer")])
+
+    # Envia (suporta edição de mensagem ou envio novo se necessário)
+    await _safe_edit(q, full_text, InlineKeyboardMarkup(keyboard))
 # ==============================
 #  HANDLERS PRINCIPAIS
 # ==============================
@@ -288,8 +721,8 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎒 Mercado )", callback_data="market_adventurer"), InlineKeyboardButton("🏰 Loja do Reino", callback_data="market_kingdom")],
-        [InlineKeyboardButton("🏛️ Leilões ", callback_data="gem_market_main"), InlineKeyboardButton("💎 Loja Premium", callback_data="gem_shop")],
+        [InlineKeyboardButton("🎒 Mercado de Ouro", callback_data="market_adventurer"), InlineKeyboardButton("🏰 Loja do Reino", callback_data="market_kingdom")],
+        [InlineKeyboardButton("🏛️ Leilões (Gemas)", callback_data="gem_market_main"), InlineKeyboardButton("💎 Loja Premium", callback_data="gem_shop")],
         [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")]
     ])
     await _send_smart(query, context, update.effective_chat.id, text, kb, "market")
@@ -297,15 +730,12 @@ async def market_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def market_adventurer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    # Garante ObjectId para buscar no banco corretamente
     user_id = ensure_object_id(get_current_player_id(update, context))
 
     try:
         pdata = await player_manager.get_player_data(user_id)
         gold = int(pdata.get("gold", 0))
-    except: 
-        gold = 0
+    except: gold = 0
 
     text = (f"🎒 𝐌𝐄𝐑𝐂𝐀𝐃𝐎 𝐃𝐎 𝐀𝐕𝐄𝐍𝐓𝐔𝐑𝐄𝐈𝐑𝐎\n╭┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤\n│ 💰 𝙎𝙚𝙪 𝙎𝙖𝙡𝙙𝙤: {gold:,} 🪙\n╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤")
     kb = InlineKeyboardMarkup([
@@ -322,13 +752,13 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = ensure_object_id(get_current_player_id(update, context))
     chat_id = update.effective_chat.id
     
-    from modules import market_manager
     try: page = int(q.data.split(":")[1]) if ":" in q.data else 1
     except: page = 1
 
     try:
         pdata = await player_manager.get_player_data(user_id) or {}
         gold = pdata.get("gold", 0)
+        # Lista com suporte a visualizador
         all_listings = market_manager.list_active(viewer_id=user_id)
     except Exception as e: 
         logger.error(f"Erro ao listar mercado: {e}")
@@ -340,7 +770,8 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _send_smart(q, context, chat_id, text_vazio, kb_vazio, "mercado_aventureiro")
         return
 
-    ITEMS_PER_PAGE = 5
+    # --- CORREÇÃO: RETORNADO PARA 5 ITENS ---
+    ITEMS_PER_PAGE = 5 
     total = len(all_listings)
     total_pages = max(1, (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
     page = max(1, min(page, total_pages))
@@ -351,155 +782,120 @@ async def market_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     body_lines = []
     selection_buttons = []
 
-    if not listings_page: body_lines.append("<i>Página vazia.</i>")
-    else:
-        for idx, listing in enumerate(listings_page, start=1):
-            try:
-                if "seller_name" not in listing:
-                    sid = listing.get("seller_id")
-                    try:
-                        s_data = await player_manager.get_player_data(sid)
-                        s_name = s_data.get("character_name", f"Vendedor")
-                        listing["seller_name"] = s_name
-                    except: listing["seller_name"] = f"Vendedor"
+    # Ícones para os botões compactos
+    icons_btn = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
 
-                card_text = _render_listing_card(idx, listing)
-                body_lines.append(card_text)
-                body_lines.append("") 
-                
-                seller_id = listing.get("seller_id")
-                
-                # --- CORREÇÃO IMPORTANTE AQUI ---
-                # Prioriza o _id (ObjectId) e converte pra string
-                raw_lid = listing.get("_id") or listing.get("id")
-                lid = str(raw_lid) 
-                # --------------------------------
+    for idx, listing in enumerate(listings_page, start=1):
+        try:
+            if "seller_name" not in listing:
+                sid = listing.get("seller_id")
+                try:
+                    s_data = await player_manager.get_player_data(sid)
+                    listing["seller_name"] = s_data.get("character_name", "Desconhecido")
+                except: listing["seller_name"] = "Vendedor"
 
-                if str(seller_id) != str(user_id):
-                    selection_buttons.append(InlineKeyboardButton(f"{idx} 🛒", callback_data=f"market_buy_{lid}"))
-                else:
-                    selection_buttons.append(InlineKeyboardButton(f"{idx} 👤", callback_data="noop"))
-            except Exception as e:
-                logger.error(f"Erro ao renderizar item {idx}: {e}")
+            card_text = _render_listing_card(idx, listing)
+            body_lines.append(card_text)
+            body_lines.append("") 
+            
+            # --- LÓGICA DO BOTÃO DE COMPRA ---
+            # Garante que usamos a String do ObjectId para o callback
+            lid = str(listing.get("_id"))
+            seller_id = str(listing.get("seller_id"))
+            uid_str = str(user_id)
+
+            icon_num = icons_btn[idx] if idx < len(icons_btn) else f"{idx}"
+
+            if seller_id != uid_str:
+                # Botão Compacto: "1️⃣🛒"
+                selection_buttons.append(InlineKeyboardButton(f"{icon_num}🛒", callback_data=f"market_buy_{lid}"))
+            else:
+                # Botão Compacto Dono: "1️⃣👤"
+                selection_buttons.append(InlineKeyboardButton(f"{icon_num}👤", callback_data="noop"))
+                
+        except Exception as e:
+            logger.error(f"Erro render item {idx}: {e}")
 
     full_text = header + "\n".join(body_lines)
     keyboard = []
-    if selection_buttons: keyboard.append(selection_buttons)
+    
+    # --- LAYOUT COMPACTO: Todos em uma linha (se couber) ou chunk maior ---
+    if selection_buttons:
+        # Tenta colocar até 5 em uma linha (Telegram suporta até 8, mas 5 é ideal visualmente)
+        keyboard.append(selection_buttons)
+        
     nav_row = []
     if page > 1: nav_row.append(InlineKeyboardButton("⬅️ Ant.", callback_data=f"market_list:{page-1}"))
     nav_row.append(InlineKeyboardButton("🔄 Atualizar", callback_data=f"market_list:{page}"))
     if page < total_pages: nav_row.append(InlineKeyboardButton("Prox. ➡️", callback_data=f"market_list:{page+1}"))
     if nav_row: keyboard.append(nav_row)
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="market_adventurer")])
+    
     await _send_smart(q, context, chat_id, full_text, InlineKeyboardMarkup(keyboard), "mercado_aventureiro")
 
 async def market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    
-    # Garante que temos o ID do comprador corretamente tratado como ObjectId
     buyer_id = ensure_object_id(get_current_player_id(update, context))
     
-    # Imports locais para evitar ciclos e garantir funcionamento
-    from modules import market_manager
-    from modules.player.premium import PremiumManager 
-    from bson import ObjectId 
-
-    # --- 1. PARSE DO ID (CORRIGIDO PARA OBJECTID) ---
+    # 1. Parse do ObjectId
     try: 
         lid_str = q.data.replace("market_buy_", "")
-        
-        # Valida se é um ObjectId válido do MongoDB (24 caracteres hex)
         if not ObjectId.is_valid(lid_str):
-            await q.answer("❌ ID inválido (formato incorreto).", show_alert=True)
-            return
-            
-        lid = ObjectId(lid_str) # Converte string do botão para ObjectId do Banco
-    except Exception: 
-        await q.answer("Erro ao processar ID do item.", show_alert=True)
-        return
+            await q.answer("❌ ID inválido.", show_alert=True); return
+        lid = ObjectId(lid_str)
+    except: 
+        await q.answer("Erro ID.", show_alert=True); return
 
-    # --- 2. TRAVA DE SEGURANÇA: APENAS VIP/LENDA/PREMIUM COMPRAM ---
+    # 2. Check VIP/Tier
     pdata = await player_manager.get_player_data(buyer_id)
     if not pdata: return
-
-    # --- CORREÇÃO DE RECONHECIMENTO DE PLANO ---
-    # Lê o tier DIRETAMENTE do banco de dados para evitar erros na classe PremiumManager
+    
     raw_tier = pdata.get("premium_tier", "free")
-    current_tier = str(raw_tier).lower().strip()
-    
-    # Lista configurada conforme seu premium.py
-    ALLOWED_TIERS = ["premium", "vip", "lenda", "admin"]
-    
-    # Verifica se o plano atual está na lista permitida
-    is_vip = (current_tier in ALLOWED_TIERS)
-
-    if not is_vip:
-        await q.answer(
-            "🔒 Apenas Aventureiros VIP podem COMPRAR no mercado!\n\n"
-            "Torne-se VIP para desbloquear compras ou venda seus itens para ganhar Ouro.",
-            show_alert=True
-        )
+    ALLOWED = ["premium", "vip", "lenda", "admin"]
+    if str(raw_tier).lower() not in ALLOWED:
+        await q.answer("🔒 Apenas VIPs podem comprar no mercado!", show_alert=True)
         return
-    # ---------------------------------------------
 
-    # --- 3. EXECUÇÃO DA COMPRA ---
+    # 3. Executa Compra
     try:
-        # Tenta comprar (suporta tanto função sync quanto async do manager)
-        try: 
-            listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
-        except TypeError: 
-            listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
+        # Tenta async, fallback sync
+        try: listing, cost = await market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
+        except TypeError: listing, cost = market_manager.purchase_listing(buyer_id=buyer_id, listing_id=lid, quantity=1)
         
-        # Prepara dados para o Log e UI
-        buyer_name = pdata.get("character_name", f"Player")
-        seller_name = listing.get("seller_name", "Desconhecido")
+        # Log Visual
+        buyer_name = pdata.get("character_name", "Player")
+        seller_name = listing.get("seller_name", "Vendedor")
         item_payload = listing.get("item", {})
-        item_display = "Item Misterioso"
         
-        # Formata o nome do item para o Log
         if item_payload.get("type") == "stack":
-            base_id = item_payload.get("base_id")
-            lot_size = item_payload.get("qty", 1)
-            info = _get_item_info(base_id)
-            i_name = info.get("display_name") or base_id
-            item_display = f"{i_name} (Lote de {lot_size})"
+             i_name = f"Lote de {item_payload.get('base_id')}"
         else:
-            inst = item_payload.get("item", {})
-            base_id = inst.get("base_id")
-            info = _get_item_info(base_id)
-            i_name = inst.get("display_name") or info.get("display_name") or base_id
-            rarity = str(inst.get('rarity','comum')).upper()
-            item_display = f"{i_name} [{rarity}]"
+             inst = item_payload.get("item", {})
+             i_name = inst.get("display_name") or "Item Lendário"
 
-        # Log Bonito no Canal
         rpg_log = (
             f"🤝 <b>NEGÓCIO FECHADO!</b>\n\n"
             f"╭┈➤👤 <b>Comprador:</b> {buyer_name}\n"
-            f"├┈➤🛒 <b>Adquiriu:</b> {item_display}\n"
+            f"├┈➤🛒 <b>Adquiriu:</b> {i_name}\n"
             f"├┈➤💸 <b>Pagou:</b> {cost:,} Ouro\n"
-            f"╰┈➤🤝 <b>Vendedor:</b> {seller_name}\n\n"
-            f"    ⚖️ <i>A economia de Eldora segue girando!</i>"
+            f"╰┈➤🤝 <b>Vendedor:</b> {seller_name}\n"
         )
-        # Envia log em background
         context.application.create_task(_send_market_log(context, rpg_log))
         
-        await q.answer(f"✅ Compra realizada! -{cost} ouro", show_alert=True)
-        
-        # Recarrega a lista para remover o item comprado da tela
+        await q.answer(f"✅ Compra realizada!", show_alert=True)
         await market_list(update, context)
         
     except ValueError as ve:
-        # Erros de lógica de negócio (sem saldo, item já vendido, item seu, etc)
+        # Erro de negócio (saldo, estoque)
         await q.answer(f"❌ {str(ve)}", show_alert=True)
-        await market_list(update, context) # Recarrega pois o item pode ter sumido
+        await market_list(update, context)
     except Exception as e:
-        logger.error(f"Erro crítico na compra de mercado: {e}")
+        logger.error(f"Erro compra: {e}")
         await q.answer("❌ Erro interno ao processar compra.", show_alert=True)
-        
+
 async def market_sell_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    text = "➕ <b>Vender Item - Escolha a Categoria</b>\n\nSelecione o tipo de item para vender por Ouro:"
+    query = update.callback_query; await query.answer()
+    text = "➕ <b>Vender Item - Escolha a Categoria</b>"
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("⚔️ Equipamentos", callback_data="market_sell_cat:equip:1")],
         [InlineKeyboardButton("🧱 Materiais", callback_data="market_sell_cat:mat:1"), InlineKeyboardButton("🧪 Consumíveis", callback_data="market_sell_cat:cons:1")],
@@ -508,9 +904,9 @@ async def market_sell_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _safe_edit(query, text, kb)
 
 async def market_sell_list_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = get_current_player_id(update, context)
+    """Lista inventário para venda - Implementação simplificada mantendo lógica original de filtro"""
+    query = update.callback_query; await query.answer()
+    user_id = ensure_object_id(get_current_player_id(update, context))
 
     try: 
         parts = query.data.split(':')
@@ -956,27 +1352,30 @@ async def market_cancel_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def market_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query; await q.answer()
     user_id = ensure_object_id(get_current_player_id(update, context))
-    from modules import market_manager
-    listings = market_manager.list_by_seller(user_id) # Passa ObjectId
+    listings = market_manager.list_by_seller(user_id)
     
     if not listings:
-        msg = "👤 𝐌𝐢𝐧𝐡𝐚𝐬 𝐕𝐞𝐧𝐝𝐚𝐬 \n\n<i>Você não tem itens à venda.</i>"
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]])
-        await _safe_edit(q, msg, kb)
+        await _safe_edit(q, "👤 <b>Minhas Vendas</b>\n\nNenhum item anunciado.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")]]) )
         return
-
-    lines = ["👤 𝐌𝐢𝐧𝐡𝐚𝐬 𝐕𝐞𝐧𝐝𝐚𝐬 𝐀𝐭𝐢𝐯𝐚𝐬\n"]; rows = []
-    for idx, l in enumerate(listings, start=1):
-        card_text = _render_my_sale_card(idx, l)
-        lines.append(card_text); lines.append("") 
         
-        # Pega ID (ObjectId ou Str)
-        lid = str(l.get("_id") or l.get("id"))
-        rows.append([InlineKeyboardButton(f"❌ Cancelar (ID: ...{lid[-4:]})", callback_data=f"market_cancel_{lid}")])
-
+    lines = ["👤 <b>Gerenciar Vendas</b>\n"]
+    rows = []
+    
+    for l in listings:
+        lid = str(l.get("_id"))
+        item = l.get("item", {})
+        price = l.get("unit_price")
+        
+        if item.get("type") == "stack":
+            nome = f"{item.get('base_id')} (x{item.get('qty')})"
+        else:
+            nome = item.get("item", {}).get("display_name", "Item")
+            
+        lines.append(f"📦 <b>{nome}</b>\n💰 {price:,} Ouro | {short_id(lid)}")
+        rows.append([InlineKeyboardButton(f"❌ Cancelar (ID: ..{lid[-4:]})", callback_data=f"market_cancel_{lid}")])
+        
     rows.append([InlineKeyboardButton("⬅️ Voltar", callback_data="market_adventurer")])
-    full_text = "\n".join(lines)
-    await _safe_edit(q, full_text, InlineKeyboardMarkup(rows))
+    await _safe_edit(q, "\n\n".join(lines), InlineKeyboardMarkup(rows))
 
 async def market_cancel_listing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
