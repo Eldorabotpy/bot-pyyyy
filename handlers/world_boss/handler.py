@@ -163,16 +163,18 @@ def _format_battle_screen(user_id, player_data, total_stats):
 # ============================================================================
 
 async def iniciar_worldboss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ATENÇÃO: Verificação de Admin usa o ID do TELEGRAM (Inteiro), não o do personagem.
-    if update.effective_user.id != ADMIN_ID: return 
+    # ✅ CORREÇÃO: Use update.effective_user.id para comparar com ADMIN_ID (que é numérico)
+    if update.effective_user.id != ADMIN_ID: 
+        return 
     
     result = world_boss_manager.start_event()
     if result.get("success"):
+        # O broadcast agora vai funcionar porque corrigimos o loop acima
         await broadcast_boss_announcement(context.application, result["location"])
         await update.message.reply_text("✅ 𝑬𝒗𝒆𝒏𝒕𝒐 𝒊𝒏𝒊𝒄𝒊𝒂𝒅𝒐!")
     else:
         await update.message.reply_text(f"⚠️ Erro: {result.get('error')}")
-
+        
 async def encerrar_worldboss_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ATENÇÃO: Verificação de Admin usa o ID do TELEGRAM (Inteiro).
     if update.effective_user.id != ADMIN_ID: return

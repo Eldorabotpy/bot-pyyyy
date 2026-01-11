@@ -572,34 +572,81 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     except: pass
 
 async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):
-    # (Código mantido igual ao original, apenas garantindo que user_id no loop iter_players seja tratado)
     location_name = (game_data.REGIONS_DATA.get(location_key) or {}).get("display_name", location_key)
-    media_id = forced_media_id or file_ids.get_file_id("boss_raid")
-    anuncio = f"🚨 𝐀𝐋𝐄𝐑𝐓𝐀 𝐆𝐋𝐎𝐁𝐀𝐋 🚨\nᴜᴍ ᴅᴇᴍôɴɪᴏ ᴅɪᴍᴇɴsɪᴏɴᴀʟ sᴜʀɢɪᴜ ᴇᴍ {location_name}!"
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ 𝔸𝔹ℝ𝕀ℝ 𝕄𝔸ℙ𝔸", callback_data="travel")]])
+    
+    # Busca o ID da mídia (Seja vídeo ou foto)
+    media_id = forced_media_id
+    if not media_id:
+        try:
+            file_ids.refresh_cache()
+            media_id = file_ids.get_file_id("boss_raid")
+        except: pass
+
+    anuncio = f"🚨 𝐀𝐋𝐄𝐑𝐓𝐀 𝐆𝐋𝐎𝐁𝐀𝐋 🚨\nᴜᴍ ᴅᴇᴍôɴɪᴏ ᴅɪᴍᴇɴsɪᴏɴᴀʟ sᴜʀɢɪᴜ ᴇᴍ {location_name}!\n\nᴄʟɪǫᴜᴇ ᴀʙᴀɪxᴏ ᴘᴀʀᴀ ᴠɪᴀᴊᴀʀ!"
+    keyboard = [[InlineKeyboardButton("🗺️ 𝔸𝔹ℝ𝕀ℝ 𝕄𝔸ℙ𝔸 𝔻𝔼 𝕍𝕀𝔸𝔾𝔼𝕄 🗺️", callback_data="travel")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     count = 0
-    async for user_id, _ in player_manager.iter_players():
+    
+    # --- CORREÇÃO AQUI ---
+    # Usamos 'pdata' para achar o Chat ID real do Telegram
+    async for _oid, pdata in player_manager.iter_players():
         try:
-            # Tenta Video -> Foto -> Texto
+            # Tenta pegar o ID numérico do Telegram
+            target_chat_id = pdata.get("last_chat_id")
+            if not target_chat_id:
+                target_chat_id = pdata.get("telegram_id_owner")
+            
+            # Se não tiver ID numérico, pula (não dá pra mandar msg pra ObjectId)
+            if not target_chat_id:
+                continue
+                
+            chat_id_int = int(target_chat_id)
             sent = False
+            
+            # Se tivermos um ID de mídia, começamos a "Cascata Inteligente"
             if media_id:
+                # 1ª Tentativa: VÍDEO
                 try:
-                    await application.bot.send_video(chat_id=user_id, video=media_id, caption=anuncio, parse_mode='HTML', reply_markup=kb)
+                    await application.bot.send_video(
+                        chat_id=chat_id_int, 
+                        video=media_id, 
+                        caption=anuncio, 
+                        parse_mode='HTML', 
+                        reply_markup=reply_markup
+                    )
                     sent = True
-                except:
+                except Exception:
+                    # 2ª Tentativa: FOTO
                     try:
-                        await application.bot.send_photo(chat_id=user_id, photo=media_id, caption=anuncio, parse_mode='HTML', reply_markup=kb)
+                        await application.bot.send_photo(
+                            chat_id=chat_id_int, 
+                            photo=media_id, 
+                            caption=anuncio, 
+                            parse_mode='HTML', 
+                            reply_markup=reply_markup
+                        )
                         sent = True
-                    except: pass
+                    except Exception:
+                        pass
             
+            # 3ª Tentativa (Fallback): TEXTO PURO
             if not sent:
-                await application.bot.send_message(chat_id=user_id, text=anuncio, parse_mode='HTML', reply_markup=kb)
+                await application.bot.send_message(
+                    chat_id=chat_id_int, 
+                    text=anuncio, 
+                    parse_mode='HTML', 
+                    reply_markup=reply_markup
+                )
             
+            # Anti-Flood leve
             count += 1
             if count % 20 == 0: await asyncio.sleep(1)
-            else: await asyncio.sleep(0.05)
-        except: continue
+            else: await asyncio.sleep(0.05) 
+
+        except Exception as e:
+            # Se o usuário bloqueou o bot, ignora
+            continue
 
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
