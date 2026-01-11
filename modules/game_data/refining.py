@@ -203,6 +203,7 @@ REFINING_RECIPES = {
         "xp_gain": 3,
         "emoji": "⛏️",
     },
+
     
     # --- METALURGIA (Ferreiro / Fundidor / Joalheiro) ---
     #V
@@ -284,5 +285,47 @@ REFINING_RECIPES = {
         "inputs": {"tronco_antigo": 2, "oleo_mineral": 1},
         "outputs": {"tabua_ancestral": 1},
         "xp_gain": 50
+    },
+    "ref_tabua_carvalho": {
+        "display_name": "🪵 Tábua de Carvalho",
+        "profession": ["curtidor", "ferreiro", "armeiro"], # Profissões que usam madeira
+        "level_req": 5,
+        "time_seconds": 10 * 60,
+        "inputs": {"madeira_de_carvalho": 2}, # Você já tem esse item no items.py
+        "outputs": {"tabua_de_carvalho": 1},  # Novo item refinado
+        "xp_gain": 12
+    },
+    "ref_tabua_mogno": {
+        "display_name": "🪵🔴 Tábua de Mogno",
+        "profession": ["curtidor", "ferreiro", "armeiro"],
+        "level_req": 15,
+        "time_seconds": 25 * 60,
+        "inputs": {"madeira_mogno": 2, "oleo_mineral": 1},
+        "outputs": {"tabua_de_mogno": 1},
+        "xp_gain": 35
+    },
+
+    # --- METAIS (Adicionais) ---
+    # Você já tem Bronze, Ferro, Aço e Prata. Vamos adicionar Ouro se for usar.
+    "ref_barra_ouro": {
+        "display_name": "🟡 Fundição de Ouro",
+        "profession": ["fundidor", "joalheiro", "ferreiro"],
+        "level_req": 20,
+        "time_seconds": 30 * 60,
+        "inputs": {"minerio_de_ouro": 4, "carvao": 4},
+        "outputs": {"barra_de_ouro": 1},
+        "xp_gain": 60
+    },
+
+    # --- TECIDOS (Amarras) ---
+    # Você já tem Rolo de Pano e Seda. Vamos adicionar Corda Resistente.
+    "ref_corda_linho": {
+        "display_name": "🪢 Corda de Linho",
+        "profession": ["alfaiate", "curtidor"],
+        "level_req": 3,
+        "time_seconds": 5 * 60,
+        "inputs": {"linho": 4, "fibra_vegetal": 2},
+        "outputs": {"corda_de_linho": 1},
+        "xp_gain": 8
     },
 }

@@ -1,5 +1,5 @@
 # handlers/profession_handler.py
-# (VERSÃO CORRIGIDA: Caminho de importação ajustado para modules.game_data.items)
+# (VERSÃO FINAL: Importação correta de game_data.items + Fix de Lista de Receitas)
 
 import math
 import logging
@@ -10,18 +10,17 @@ from modules import player_manager, game_data, crafting_registry
 from modules.game_data.refining import REFINING_RECIPES
 from modules.auth_utils import get_current_player_id
 
-# ✅ IMPORTAÇÃO DA SUA FONTE DE DADOS REAL
+# ✅ 1. IMPORTAÇÃO CORRETA DAS PROFISSÕES
 try:
     from modules.game_data.professions import PROFESSIONS_DATA
 except ImportError:
     PROFESSIONS_DATA = {}
 
-# ✅ IMPORTAÇÃO DE ITENS PARA CORRIGIR NOMES (CAMINHO CORRIGIDO)
+# ✅ 2. IMPORTAÇÃO CORRETA DOS ITENS (Sem modules.items)
+# O arquivo correto é modules/game_data/items.py
 try:
-    # O arquivo está em modules/game_data/items.py 
     from modules.game_data.items import ITEMS_DATA
 except ImportError:
-    # Fallback silencioso para dicionário vazio se falhar, evitando quebra total
     ITEMS_DATA = {} 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +40,7 @@ async def _safe_edit(query, text, reply_markup):
         await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode='HTML')
 
 # ==================================================================
-# 1. MENU PRINCIPAL (INTELIGENTE: COLETA vs CRAFT)
+# 1. MENU PRINCIPAL
 # ==================================================================
 async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -51,7 +50,6 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    # Verifica se já tem profissão (Compatibilidade type/key)
     prof_data = player_data.get("profession", {})
     current_prof_key = prof_data.get("type") or prof_data.get("key")
 
@@ -74,17 +72,16 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # --- MENU PARA COLETORES (Gathering) ---
         if prof_cat == 'gathering':
             text += f"\n🌲 <i>Sua função é explorar o mundo e extrair recursos naturais.</i>\n\n"
-            text += "💡 <b>Como upar?</b>\nViaje para regiões que tenham recursos (ex: Floresta, Mina) e use a opção <b>⛏️ Coletar</b> no menu do local."
+            text += "💡 <b>Como upar?</b>\nViaje para regiões que tenham recursos e use a opção <b>⛏️ Coletar</b>."
             
-            # Mostra quais recursos esse coletor pega
             resources = prof_info.get('resources', {})
             if resources:
                 text += "\n\n<b>Seus Alvos:</b>\n"
-                for res_key, item_yield in resources.items():
+                for res_key, _ in resources.items():
                     r_name = ITEMS_DATA.get(res_key, {}).get('display_name', res_key)
                     text += f"• {r_name}\n"
 
-            kb.append([InlineKeyboardButton("🗺️ Abrir Mapa de Viagem", callback_data="travel")])
+            kb.append([InlineKeyboardButton("🗺️ Abrir Mapa", callback_data="travel")])
 
         # --- MENU PARA ARTESÃOS (Crafting) ---
         else:
@@ -97,7 +94,7 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _safe_edit(query, text, InlineKeyboardMarkup(kb))
         return
 
-    # --- CENÁRIO B: JOGADOR SEM PROFISSÃO (ESCOLHA) ---
+    # --- CENÁRIO B: JOGADOR SEM PROFISSÃO ---
     text = (
         "🔨 <b>GUILDA DOS ARTESÃOS</b>\n\n"
         "Você precisa se especializar em um ofício.\n"
@@ -109,7 +106,6 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     row = []
     for key, info in PROFESSIONS_DATA.items():
         name = info.get('display_name', key.title())
-        # Adiciona icone visual se for coleta ou craft
         cat_emoji = "🌲" if info.get('category') == 'gathering' else "⚒️"
         
         row.append(InlineKeyboardButton(f"{cat_emoji} {name}", callback_data=f"job_pick_{key}"))
@@ -130,7 +126,6 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
     user_id = get_current_player_id(update, context)
     player_data = await player_manager.get_player_data(user_id)
     
-    # Trava de segurança
     prof_data = player_data.get("profession", {})
     if prof_data.get("type") or prof_data.get("key"):
         await query.answer("Você já tem uma profissão!", show_alert=True)
@@ -154,7 +149,7 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
     await job_menu_callback(update, context)
 
 # ==================================================================
-# 3. LISTAR RECEITAS (CORREÇÃO DE NOMES "ITEM")
+# 3. LISTAR RECEITAS (CORRIGIDO: SUPORTE A LISTA DE REQUISITOS)
 # ==================================================================
 async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -189,9 +184,18 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif mode == "craft":
         all_recipes = crafting_registry.all_recipes()
         for k, v in all_recipes.items():
-            # Filtra pela profissão do jogador
+            # CORREÇÃO: Verifica se o requisito é uma lista OU string
             req = v.get("profession_req")
-            if req == my_prof_key:
+            
+            allowed = False
+            if isinstance(req, list):
+                if my_prof_key in req: allowed = True
+            elif req == my_prof_key:
+                allowed = True
+            elif req is None:
+                allowed = True # Receitas sem requisito
+
+            if allowed:
                 temp = v.copy(); temp['id'] = k
                 recipes.append(temp)
 
@@ -215,19 +219,14 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for rec in current_list:
             rid = rec['id']
             
-            # --- CORREÇÃO DO NOME DO ITEM ---
+            # --- BUSCA INTELIGENTE DE NOME ---
             final_item_id = None
-            
-            # 1. Tenta pegar ID direto (Crafting costuma ter result_base_id)
             if "result_id" in rec: final_item_id = rec["result_id"]
             elif "result_base_id" in rec: final_item_id = rec["result_base_id"]
-            
-            # 2. Se for Refino, o resultado está dentro do dicionário 'outputs'
             elif "outputs" in rec and isinstance(rec["outputs"], dict):
                 keys = list(rec["outputs"].keys())
                 if keys: final_item_id = keys[0]
 
-            # 3. Busca info no banco de itens
             name = rec.get("result_name") 
             if final_item_id:
                 item_db_info = ITEMS_DATA.get(final_item_id, {})

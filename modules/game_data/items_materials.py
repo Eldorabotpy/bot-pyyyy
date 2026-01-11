@@ -377,5 +377,135 @@ MATERIALS_DATA = {
         "stackable": True, 
         "media_key": "item_membrana_de_couro_fino"
     },
-    
+    "gema_de_polimento": {
+        "display_name": "Gema de Polimento", "emoji": "💎✨",
+        "type": "consumivel", "category": "especial",
+        "description": "Aplica um revestimento mágico. Adiciona +5 de Durabilidade Máxima a uma ferramenta.",
+        "stackable": True,
+        "value": 0, # Valor 0 (Premium/Gemas)
+        "premium": True,
+        "media_key": "item_gema_polimento"
+    },
+
+    # --- NOVOS RECURSOS DE LENHADOR (Madeiras Nobres) ---
+    "madeira_mogno": {
+        "display_name": "Mogno Real", "emoji": "🪵🔴",
+        "type": "material_bruto", "category": "coletavel",
+        "tier": 3, "profession": "lenhador",
+        "description": "Madeira nobre de cor avermelhada.",
+        "stackable": True, "value": 80,
+        "media_key": "item_madeira_mogno"
+    },
+    "madeira_elfica": {
+        "display_name": "Madeira Élfica", "emoji": "🪵🍃",
+        "type": "material_bruto", "category": "coletavel",
+        "tier": 4, "profession": "lenhador",
+        "description": "Leve como pluma, dura como aço.",
+        "stackable": True, "value": 350,
+        "media_key": "item_madeira_elfica"
+    },
+    "raiz_do_mundo": {
+        "display_name": "Fragmento de Yggdrasil", "emoji": "🪵🌌",
+        "type": "material_bruto", "category": "coletavel",
+        "tier": 5, "profession": "lenhador",
+        "description": "Um pedaço da árvore que sustenta os mundos.",
+        "stackable": True, "value": 1500,
+        "media_key": "item_raiz_do_mundo"
+    },
+
+    # --- NOVOS RECURSOS DE MINERADOR (Minérios Raros) ---
+    "cristal_mana": {
+        "display_name": "Cristal de Mana", "emoji": "💎⚡",
+        "type": "material_bruto", "category": "coletavel",
+        "tier": 4, "profession": "minerador",
+        "description": "Pedra pulsante de energia mágica.",
+        "stackable": True, "value": 400,
+        "media_key": "item_cristal_mana"
+    },
+    "obsidiana_ancestral": {
+        "display_name": "Obsidiana Ancestral", "emoji": "⚫🔥",
+        "type": "material_bruto", "category": "coletavel",
+        "tier": 5, "profession": "minerador",
+        "description": "Minério forjado no núcleo do planeta.",
+        "stackable": True, "value": 1800,
+        "media_key": "item_obsidiana_ancestral"
+    },
+
+    # --- NOVOS RECURSOS DE COLHEDOR (Plantas Exóticas) ---
+    "erva_cura": {
+        "display_name": "Erva Medicinal", "emoji": "🌿💚",
+        "type": "reagent", "category": "coletavel",
+        "tier": 2, "profession": "colhedor",
+        "description": "Folha básica para poções de vida.",
+        "stackable": True, "value": 15,
+        "media_key": "item_erva_cura"
+    },
+    "raiz_solar": {
+        "display_name": "Raiz Solar", "emoji": "🥕☀️",
+        "type": "reagent", "category": "coletavel",
+        "tier": 4, "profession": "colhedor",
+        "description": "Quente ao toque, brilha no escuro.",
+        "stackable": True, "value": 300,
+        "media_key": "item_raiz_solar"
+    },
+    "fruta_imortalidade": {
+        "display_name": "Pêssego Dourado", "emoji": "🍑✨",
+        "type": "reagent", "category": "coletavel",
+        "tier": 5, "profession": "colhedor",
+        "description": "Diz a lenda que concede vida eterna.",
+        "stackable": True, "value": 1200,
+        "media_key": "item_fruta_imortalidade"
+    },
+
+    # --- NOVOS RECURSOS DE ESFOLADOR (Peles de Monstros) ---
+    "escama_serpente": {
+        "display_name": "Escama de Serpente", "emoji": "🐍🟢",
+        "type": "material_monstro", "category": "cacada",
+        "tier": 3, "profession": "esfolador",
+        "description": "Material duro e flexível.",
+        "stackable": True, "value": 90,
+        "media_key": "item_escama_serpente"
+    },
+    "couro_dragao": {
+        "display_name": "Couro de Dragão", "emoji": "🐉🔴",
+        "type": "material_monstro", "category": "cacada",
+        "tier": 4, "profession": "esfolador",
+        "description": "Imune ao fogo comum.",
+        "stackable": True, "value": 450,
+        "media_key": "item_couro_dragao"
+    },
+    "essencia_vital": {
+        "display_name": "Essência Vital", "emoji": "❤️💎",
+        "type": "material_monstro", "category": "cacada",
+        "tier": 5, "profession": "esfolador",
+        "description": "A própria alma da criatura solidificada.",
+        "stackable": True, "value": 2000,
+        "media_key": "item_essencia_vital"
+    },
+
+    # --- NOVOS RECURSOS DE ALQUIMISTA (Fluidos e Energias) ---
+    "agua_pura": {
+        "display_name": "Água Pura", "emoji": "💧",
+        "type": "reagent", "category": "coletavel",
+        "tier": 1, "profession": "alquimista",
+        "description": "Água cristalina de nascente.",
+        "stackable": True, "value": 5,
+        "media_key": "item_agua_pura"
+    },
+    "gas_venenoso": {
+        "display_name": "Gás do Pântano", "emoji": "☁️🤢",
+        "type": "reagent", "category": "coletavel",
+        "tier": 3, "profession": "alquimista",
+        "description": "Tóxico, coletado com extrator.",
+        "stackable": True, "value": 85,
+        "media_key": "item_gas_venenoso"
+    },
+    "luz_estelar": {
+        "display_name": "Luz Estelar Líquida", "emoji": "🌟💧",
+        "type": "reagent", "category": "coletavel",
+        "tier": 5, "profession": "alquimista",
+        "description": "Um pedaço do céu em um frasco.",
+        "stackable": True, "value": 1600,
+        "media_key": "item_luz_estelar"
+    },    
 }
