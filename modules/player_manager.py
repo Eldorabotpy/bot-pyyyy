@@ -1,5 +1,5 @@
 # modules/player_manager.py
-# (VERSÃO FINAL LIMPA: Sem lixo legado + Auto-Fix de Profissão)
+# (VERSÃO CORRIGIDA: Exporta iter_player_ids corretamente)
 
 from __future__ import annotations
 import asyncio
@@ -10,7 +10,7 @@ from bson import ObjectId
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# 1. IMPORTAÇÕES DO SISTEMA NOVO (CORE & MODULS)
+# 1. IMPORTAÇÕES DO SISTEMA (CORE & QUERIES)
 # ==============================================================================
 
 # Core & Banco
@@ -21,7 +21,7 @@ from .player.core import (
     clear_all_player_cache,
 )
 
-# Queries & Busca
+# Queries & Busca (AQUI ESTÁ A CORREÇÃO: iter_player_ids)
 from .player.queries import (
     create_new_player, 
     get_or_create_player, 
@@ -29,7 +29,7 @@ from .player.queries import (
     find_player_by_name,
     find_player_by_name_norm, 
     iter_players,
-    iter_player_ids
+    iter_player_ids  # <--- Essencial para o handlers/jobs.py
 )
 
 # Stats & Nível
@@ -51,84 +51,50 @@ from .player.stats import (
 
 # Inventário & Economia
 from .player.inventory import (
-    get_gold, 
-    set_gold, 
-    add_gold, 
-    spend_gold, 
-    get_gems, 
-    set_gems, 
-    add_gems, 
-    spend_gems,
-    add_item_to_inventory, 
-    add_unique_item, 
+    get_gold, set_gold, add_gold, spend_gold, 
+    get_gems, set_gems, add_gems, spend_gems,
+    add_item_to_inventory, add_unique_item, 
     remove_item_from_inventory,
     equip_unique_item_for_user,
     unequip_item_for_user, 
-    has_item, 
-    consume_item,
+    has_item, consume_item,
 )
 
 # Ações & Energia
 from .player.actions import (
-    get_player_max_energy, 
-    add_energy, 
-    set_last_chat_id,
-    ensure_timed_state, 
-    try_finalize_timed_action_for_user, 
-    get_pvp_entries,
-    use_pvp_entry, 
-    add_pvp_entries,
-    heal_player, 
-    add_buff, 
-    get_player_max_mana,
-    add_mana,
-    spend_mana,
-    get_pvp_points,
-    add_pvp_points,
+    get_player_max_energy, add_energy, set_last_chat_id,
+    ensure_timed_state, try_finalize_timed_action_for_user, 
+    get_pvp_entries, use_pvp_entry, add_pvp_entries,
+    heal_player, add_buff, 
+    get_player_max_mana, add_mana, spend_mana,
+    get_pvp_points, add_pvp_points,
 )
-# Alias interno para evitar recursão
+# Alias interno para evitar circular imports
 from .player.actions import spend_energy as _spend_energy_internal
 
 # Premium
 from .player.premium import PremiumManager
 
-# Profissões (Para o Auto-Fix)
-try:
-    from modules.game_data.professions import PROFESSIONS_DATA
-except ImportError:
-    PROFESSIONS_DATA = {}
-
 # ==============================================================================
-# 2. HELPER DE COMPATIBILIDADE DE ID
+# 2. HELPER DE ID (STRICT OBJECTID)
 # ==============================================================================
-def _ensure_id_format(user_id: Union[int, str, ObjectId]) -> Union[int, ObjectId]:
-    """
-    Garante o formato correto do ID para o banco:
-    - Int -> Int (Conta Legada)
-    - Str(ObjectId) -> ObjectId (Conta Nova)
-    """
+def _ensure_id_format(user_id: Union[str, ObjectId]) -> ObjectId:
     if isinstance(user_id, ObjectId): return user_id
-    if isinstance(user_id, int): return user_id
-    if isinstance(user_id, str):
-        if user_id.isdigit(): return int(user_id)
-        if ObjectId.is_valid(user_id): return ObjectId(user_id)
-    return user_id
+    if isinstance(user_id, str) and ObjectId.is_valid(user_id): return ObjectId(user_id)
+    # logger.error(f"❌ [ID ERROR] ID Inválido: {user_id}")
+    return None
 
 # ==============================================================================
-# 3. WRAPPERS (ADAPTADORES) COM AUTO-FIX
+# 3. WRAPPERS E LÓGICA
 # ==============================================================================
 
-async def get_player_data(user_id: Union[int, str]):
-    """
-    Busca dados e aplica correções automáticas (VIP e Profissão).
-    """
+async def get_player_data(user_id: Union[str, ObjectId]):
     real_id = _ensure_id_format(user_id)
+    if not real_id: return None
     pdata = await _get_player_data_core(real_id)
 
+    # Auto-Fix VIP Expirado
     if pdata:
-        changed = False
-
-        # --- 1. Auto-Fix: VIP Vencido ---
         tier = str(pdata.get("premium_tier", "free")).lower()
         if tier not in ["free", "admin"]:
             try:
@@ -138,71 +104,45 @@ async def get_player_data(user_id: Union[int, str]):
                     now = datetime.now(timezone.utc)
                     dt = datetime.fromisoformat(expires_at)
                     if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
-                    
                     if dt < now:
-                        logger.info(f"📉 VIP Vencido: {user_id}")
                         pdata["premium_tier"] = "free"
                         pdata["premium_expires_at"] = None
-                        changed = True
+                        await _save_player_data_core(real_id, pdata)
             except Exception: pass
-        
-        # --- 2. Auto-Fix: Profissão Bugada ("key") ---
-        # Se não tiver profissão OU se o tipo for "key" (o bug que você relatou)
-        prof = pdata.get("profession")
-        if not prof or not isinstance(prof, dict) or prof.get("type") == "key":
-            # Define uma profissão padrão segura (ex: colhedor ou lenhador)
-            default_prof = "colhedor" 
-            # Verifica se 'colhedor' existe, senão pega a primeira disponível
-            if PROFESSIONS_DATA and default_prof not in PROFESSIONS_DATA:
-                default_prof = list(PROFESSIONS_DATA.keys())[0]
-
-            pdata["profession"] = {
-                "type": default_prof,
-                "level": 1,
-                "xp": 0
-            }
-            logger.info(f"🔧 Auto-Fix Profissão {user_id}: Corrigido para '{default_prof}'")
-            changed = True
-        
-        # Salva se houve correção
-        if changed:
-            await _save_player_data_core(real_id, pdata)
             
     return pdata
 
-async def save_player_data(user_id: Union[int, str], data: dict):
-    """Salva dados usando o ID correto."""
+async def save_player_data(user_id: Union[str, ObjectId], data: dict):
     real_id = _ensure_id_format(user_id)
+    if not real_id: return
     return await _save_player_data_core(real_id, data)
 
 def spend_energy(player_data: dict, amount: int) -> bool:
-    """Wrapper para gastar energia e atualizar missões."""
     success = _spend_energy_internal(player_data, amount)
     if success and amount > 0:
-        # Fire-and-forget atualização de missão
         try:
             user_id = str(player_data.get("user_id") or player_data.get("_id"))
+            # Tenta atualizar missão em background
             async def _bg_mission():
                 try:
                     from modules import mission_manager
                     await mission_manager.update_mission_progress(user_id, "spend_energy", "any", amount)
                 except: pass
-            
             try: asyncio.get_running_loop().create_task(_bg_mission())
             except: pass
         except: pass
     return success
 
-# --- Wrappers de Transação Segura ---
+# --- Wrappers de Transação ---
 
-async def safe_add_gold(user_id: Union[int, str], amount: int) -> int:
+async def safe_add_gold(user_id: Union[str, ObjectId], amount: int) -> int:
     pdata = await get_player_data(user_id)
     if not pdata: return 0
     add_gold(pdata, amount)
     await save_player_data(user_id, pdata)
     return int(pdata.get("gold", 0))
 
-async def safe_spend_gold(user_id: Union[int, str], amount: int) -> bool:
+async def safe_spend_gold(user_id: Union[str, ObjectId], amount: int) -> bool:
     pdata = await get_player_data(user_id)
     if not pdata: return False
     if spend_gold(pdata, amount):
@@ -210,7 +150,7 @@ async def safe_spend_gold(user_id: Union[int, str], amount: int) -> bool:
         return True
     return False
 
-async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, str]:
+async def safe_add_xp(user_id: Union[str, ObjectId], xp_amount: int) -> tuple[int, str]:
     pdata = await get_player_data(user_id)
     if not pdata: return 0, ""
     
@@ -221,7 +161,7 @@ async def safe_add_xp(user_id: Union[int, str], xp_amount: int) -> tuple[int, st
     await save_player_data(user_id, pdata)
     return lvls, msg
 
-async def full_restore(user_id: Union[int, str]):
+async def full_restore(user_id: Union[str, ObjectId]):
     pdata = await get_player_data(user_id)
     if pdata:
         stats = await get_player_total_stats(pdata)
@@ -232,15 +172,7 @@ async def full_restore(user_id: Union[int, str]):
         return True
     return False
 
-async def find_player_by_character_name(name: str):
-    res = await find_player_by_name(name)
-    if res:
-        uid, data = res
-        data['user_id'] = uid
-        return data
-    return None
-
-# --- Wrappers Premium ---
+# --- Helpers Diversos ---
 
 def has_premium_plan(pdata: Optional[dict]) -> bool:
     if not pdata: return False
@@ -252,7 +184,7 @@ def get_perk_value(pdata: Optional[dict], perk_name: str, default: Any = 1, cast
     try: return PremiumManager(pdata).get_perk_value(perk_name, default, cast=cast)
     except: return default
 
-# --- Runas ---
+# Runas (Fallback)
 try:
     from modules.game_data import runes_data
 except ImportError:
@@ -263,7 +195,6 @@ def get_rune_bonuses(player_data: dict) -> dict:
     if not runes_data: return bonuses
     equipped = player_data.get("equipment", {})
     inv = player_data.get("inventory", {})
-    
     for uid in equipped.values():
         if not uid: continue
         item = inv.get(uid)
@@ -275,4 +206,3 @@ def get_rune_bonuses(player_data: dict) -> dict:
                     k = info["stat_key"]
                     bonuses[k] = bonuses.get(k, 0) + info.get("value", 0)
     return bonuses
-

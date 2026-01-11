@@ -278,10 +278,10 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
     # --- MENSAGEM ---
     msg = (
         f"╭────────────────────────────➤\n"
-        f"├─➤🏁 <b>Caçada Rápida Concluída!</b> 🏁\n"
-        f"├─➤📊 Resultado: {wins} vitórias | {losses} derrotas\n"
+        f"├─➤ 🏁 <b>Caçada Rápida Concluída!</b> 🏁\n"
+        f"├─➤ 📊 Resultado: {wins} vitórias | {losses} derrotas\n"
         f"├────────────────────────────\n"
-        f"├─➤💰 Ouro: +{total_gold} | ✨ XP: +{total_xp}"
+        f"├─➤ 💰 Ouro: +{total_gold} | ✨ XP: +{total_xp}"
         f"{items_text}"
         f"{lvl_msg}"
         f"\n╰───────────────────────────➤"
@@ -316,4 +316,3 @@ async def execute_hunt_completion(user_id, chat_id, hunt_count, region_key, cont
             # Fallback final texto puro
             clean_msg = msg.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", "")
             await context.bot.send_message(chat_id, clean_msg, reply_markup=kb)
-            

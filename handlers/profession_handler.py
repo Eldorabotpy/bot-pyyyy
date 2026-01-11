@@ -1,5 +1,5 @@
 # handlers/profession_handler.py
-# (VERSÃO CORRIGIDA: Salva 'type' em vez de 'key' para corrigir o bug de exibição)
+# (VERSÃO CORRIGIDA: Caminho de importação ajustado para modules.game_data.items)
 
 import math
 import logging
@@ -15,6 +15,14 @@ try:
     from modules.game_data.professions import PROFESSIONS_DATA
 except ImportError:
     PROFESSIONS_DATA = {}
+
+# ✅ IMPORTAÇÃO DE ITENS PARA CORRIGIR NOMES (CAMINHO CORRIGIDO)
+try:
+    # O arquivo está em modules/game_data/items.py 
+    from modules.game_data.items import ITEMS_DATA
+except ImportError:
+    # Fallback silencioso para dicionário vazio se falhar, evitando quebra total
+    ITEMS_DATA = {} 
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +41,7 @@ async def _safe_edit(query, text, reply_markup):
         await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode='HTML')
 
 # ==================================================================
-# 1. MENU PRINCIPAL (LÓGICA DE BLOQUEIO)
+# 1. MENU PRINCIPAL (INTELIGENTE: COLETA vs CRAFT)
 # ==================================================================
 async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -49,22 +57,42 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- CENÁRIO A: JOGADOR JÁ TEM PROFISSÃO ---
     if current_prof_key and current_prof_key in PROFESSIONS_DATA:
-        prof_name = _get_prof_display_name(current_prof_key)
+        prof_info = PROFESSIONS_DATA[current_prof_key]
+        prof_name = prof_info.get('display_name', current_prof_key.capitalize())
+        prof_cat = prof_info.get('category', 'crafting') # gathering ou crafting
+        
         lvl = prof_data.get("level", 1)
         xp = prof_data.get("xp", 0)
         
         text = (
-            f"🛠 <b>PROFISSÃO: {prof_name.upper()}</b>\n\n"
+            f"🛠 <b>PROFISSÃO: {prof_name.upper()}</b>\n"
             f"Nível: {lvl} | XP: {xp}\n"
-            f"<i>Você é especialista nesta área.</i>"
         )
         
-        # Mostra apenas ações pertinentes
-        kb = [
-            [InlineKeyboardButton(f"⚒️ Refinar / Processar", callback_data=f"job_list_refine_1")],
-            [InlineKeyboardButton(f"📜 Criar Itens ({prof_name})", callback_data=f"job_list_craft_1")],
-            [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")]
-        ]
+        kb = []
+        
+        # --- MENU PARA COLETORES (Gathering) ---
+        if prof_cat == 'gathering':
+            text += f"\n🌲 <i>Sua função é explorar o mundo e extrair recursos naturais.</i>\n\n"
+            text += "💡 <b>Como upar?</b>\nViaje para regiões que tenham recursos (ex: Floresta, Mina) e use a opção <b>⛏️ Coletar</b> no menu do local."
+            
+            # Mostra quais recursos esse coletor pega
+            resources = prof_info.get('resources', {})
+            if resources:
+                text += "\n\n<b>Seus Alvos:</b>\n"
+                for res_key, item_yield in resources.items():
+                    r_name = ITEMS_DATA.get(res_key, {}).get('display_name', res_key)
+                    text += f"• {r_name}\n"
+
+            kb.append([InlineKeyboardButton("🗺️ Abrir Mapa de Viagem", callback_data="travel")])
+
+        # --- MENU PARA ARTESÃOS (Crafting) ---
+        else:
+            text += f"<i>Você transforma materiais brutos em equipamentos poderosos.</i>"
+            kb.append([InlineKeyboardButton(f"⚒️ Refinar / Processar", callback_data=f"job_list_refine_1")])
+            kb.append([InlineKeyboardButton(f"📜 Criar Itens ({prof_name})", callback_data=f"job_list_craft_1")])
+        
+        kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")])
         
         await _safe_edit(query, text, InlineKeyboardMarkup(kb))
         return
@@ -81,7 +109,10 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     row = []
     for key, info in PROFESSIONS_DATA.items():
         name = info.get('display_name', key.title())
-        row.append(InlineKeyboardButton(f"{name}", callback_data=f"job_pick_{key}"))
+        # Adiciona icone visual se for coleta ou craft
+        cat_emoji = "🌲" if info.get('category') == 'gathering' else "⚒️"
+        
+        row.append(InlineKeyboardButton(f"{cat_emoji} {name}", callback_data=f"job_pick_{key}"))
         if len(row) == 2:
             kb.append(row); row = []
     if row: kb.append(row)
@@ -91,7 +122,7 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _safe_edit(query, text, InlineKeyboardMarkup(kb))
 
 # ==================================================================
-# 2. ESCOLHER PROFISSÃO (AQUI ESTAVA O ERRO)
+# 2. ESCOLHER PROFISSÃO
 # ==================================================================
 async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -111,9 +142,8 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
         await query.answer("Profissão inválida.", show_alert=True)
         return
 
-    # [CORREÇÃO] Salva como 'type' para o profile_handler ler corretamente
     player_data["profession"] = {
-        "type": target_prof, # <--- Antes estava "key"
+        "type": target_prof, 
         "level": 1,
         "xp": 0
     }
@@ -124,7 +154,7 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
     await job_menu_callback(update, context)
 
 # ==================================================================
-# 3. LISTAR RECEITAS (Blindado pela Profissão Escolhida)
+# 3. LISTAR RECEITAS (CORREÇÃO DE NOMES "ITEM")
 # ==================================================================
 async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -134,7 +164,6 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_data = await player_manager.get_player_data(user_id)
     
     prof_data = player_data.get("profession", {})
-    # [CORREÇÃO] Lê 'type' preferencialmente
     my_prof_key = prof_data.get("type") or prof_data.get("key")
     
     if not my_prof_key:
@@ -160,7 +189,7 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif mode == "craft":
         all_recipes = crafting_registry.all_recipes()
         for k, v in all_recipes.items():
-            # 🔥 O FILTRO DE OURO: Só mostra se a receita exigir a MINHA profissão
+            # Filtra pela profissão do jogador
             req = v.get("profession_req")
             if req == my_prof_key:
                 temp = v.copy(); temp['id'] = k
@@ -185,14 +214,35 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         for rec in current_list:
             rid = rec['id']
-            name = rec.get("result_name", "Item")
+            
+            # --- CORREÇÃO DO NOME DO ITEM ---
+            final_item_id = None
+            
+            # 1. Tenta pegar ID direto (Crafting costuma ter result_base_id)
+            if "result_id" in rec: final_item_id = rec["result_id"]
+            elif "result_base_id" in rec: final_item_id = rec["result_base_id"]
+            
+            # 2. Se for Refino, o resultado está dentro do dicionário 'outputs'
+            elif "outputs" in rec and isinstance(rec["outputs"], dict):
+                keys = list(rec["outputs"].keys())
+                if keys: final_item_id = keys[0]
+
+            # 3. Busca info no banco de itens
+            name = rec.get("result_name") 
+            if final_item_id:
+                item_db_info = ITEMS_DATA.get(final_item_id, {})
+                if not name: name = item_db_info.get("display_name")
+                if not name: name = final_item_id.replace("_", " ").title()
+            
+            if not name: name = "Item Misterioso"
+
             lvl_req = rec.get("level_req", 1)
             
             # Botão de Criar
             kb.append([InlineKeyboardButton(f"🔨 {name} (Nv.{lvl_req})", callback_data=f"job_do_{mode}_{rid}")])
             
             # Texto de custo
-            mats = rec.get("materials", {})
+            mats = rec.get("materials") or rec.get("inputs") or {}
             mats_str = ", ".join([f"{qty}x {mid}" for mid, qty in mats.items()])
             text += f"🔹 <b>{name}</b>: {mats_str}\n"
 

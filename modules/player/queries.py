@@ -5,8 +5,9 @@ from __future__ import annotations
 import re as _re
 import logging
 import asyncio
-from typing import Iterator, Tuple, Optional, Union, Dict, Any
+from typing import Iterator, Tuple, Optional, Union, Dict, Any, List
 from bson import ObjectId
+from datetime import datetime, timezone
 
 # Imports do Core
 from .core import users_collection, get_player_data, save_player_data, clear_player_cache
@@ -14,13 +15,24 @@ from .core import get_legacy_data_by_telegram_id
 
 logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# HELPERS
+# ==============================================================================
 def _normalize_char_name(_s: str) -> str:
     if not isinstance(_s, str): return ""
     s = _re.sub(r"[\u200B-\u200D\uFEFF]", "", _s)
     s = _re.sub(r"\s+", " ", s).strip().lower()
     return s
 
+# ==============================================================================
+# BUSCAS (FINDERS)
+# ==============================================================================
+
 async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
+    """
+    Busca um jogador pelo nome do personagem (prioridade) ou username.
+    Retorna: (user_id_str, player_data_dict) ou None
+    """
     if users_collection is None or not name: 
         return None
     
@@ -29,12 +41,20 @@ async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
     user_text = raw_text.lstrip("@").lower()
 
     # 1. TENTATIVA: NOME DO PERSONAGEM (Exato/Normalizado)
+    # Busca por 'name_normalized' ou 'character_name_normalized' (compatibilidade)
     if norm_text:
-        doc = await asyncio.to_thread(users_collection.find_one, {"character_name_normalized": norm_text})
+        query_norm = {
+            "$or": [
+                {"name_normalized": norm_text},
+                {"character_name_normalized": norm_text}
+            ]
+        }
+        doc = await asyncio.to_thread(users_collection.find_one, query_norm)
         if doc:
             return (str(doc['_id']), await get_player_data(str(doc['_id'])))
 
     # 2. TENTATIVA: USERNAME DO TELEGRAM (Exato)
+    # Regex case-insensitive para username
     query_user = {
         "$or": [
             {"username": {"$regex": f"^{_re.escape(user_text)}$", "$options": "i"}},
@@ -46,14 +66,15 @@ async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
     if doc:
         return (str(doc['_id']), await get_player_data(str(doc['_id'])))
 
-    # 3. TENTATIVA: BUSCA PARCIAL
+    # 3. TENTATIVA: BUSCA PARCIAL (Agressiva)
     try:
         regex_pattern = _re.escape(raw_text)
         aggressive_query = {
             "$or": [
+                {"name": {"$regex": regex_pattern, "$options": "i"}},
                 {"character_name": {"$regex": regex_pattern, "$options": "i"}},
                 {"username": {"$regex": regex_pattern, "$options": "i"}},
-                {"character_name_normalized": {"$regex": _normalize_char_name(raw_text), "$options": "i"}}
+                {"name_normalized": {"$regex": norm_text, "$options": "i"}}
             ]
         }
         doc = await asyncio.to_thread(users_collection.find_one, aggressive_query)
@@ -63,19 +84,27 @@ async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
 
     return None
 
-async def find_player_by_name_norm(name: str) -> Optional[Tuple[str, dict]]:
+async def find_player_by_name_norm(name: str) -> Optional[dict]:
     """Alias para compatibilidade com partes antigas do sistema."""
-    return await find_player_by_name(name)
+    res = await find_player_by_name(name)
+    if res:
+        return res[1]
+    return None
 
-async def find_players_by_name_partial(query: str) -> list:
+async def find_players_by_name_partial(query: str) -> List[Tuple[str, dict]]:
+    """Retorna lista de jogadores que dão match parcial no nome."""
     if users_collection is None: return []
     nq = _normalize_char_name(query)
     if not nq: return []
     
-    q = {"character_name": {"$regex": _re.escape(query), "$options": "i"}}
+    q = {
+        "$or": [
+            {"name": {"$regex": _re.escape(query), "$options": "i"}},
+            {"character_name": {"$regex": _re.escape(query), "$options": "i"}}
+        ]
+    }
     out = []
     
-    # Cursor síncrono rodando em thread separada para não bloquear
     def _run_query():
         return list(users_collection.find(q).limit(10))
     
@@ -87,32 +116,6 @@ async def find_players_by_name_partial(query: str) -> list:
         if p: out.append((uid, p))
     return out
 
-async def create_new_player(user_id: Union[str, ObjectId], character_name: str) -> dict:
-    from datetime import datetime, timezone
-    now_iso = datetime.now(timezone.utc).isoformat()
-    oid = ObjectId(user_id) if isinstance(user_id, str) else user_id
-    new_player_data = {
-        "_id": oid,
-        "character_name": character_name,
-        "character_name_normalized": _normalize_char_name(character_name),
-        "level": 1, "xp": 0, "gold": 0, "gems": 0,
-        "premium_tier": "free", "premium_expires_at": None,
-        "created_at": now_iso
-    }
-    await save_player_data(oid, new_player_data)
-    return new_player_data
-
-async def get_or_create_player(user_id: str, default_name: str = "Aventureiro") -> dict:
-    pdata = await get_player_data(user_id)
-    if not pdata: pdata = await create_new_player(user_id, default_name)
-    return pdata
-
-async def delete_player(user_id: str) -> bool:
-    if users_collection is not None and ObjectId.is_valid(user_id):
-        await asyncio.to_thread(users_collection.delete_one, {"_id": ObjectId(user_id)})
-    await clear_player_cache(user_id)
-    return True
-
 async def find_by_username(username: str) -> Optional[dict]:
     if users_collection is None: return None
     u = (username or "").lstrip("@").strip().lower()
@@ -122,10 +125,73 @@ async def find_by_username(username: str) -> Optional[dict]:
     if doc: return await get_player_data(str(doc['_id']))
     return None
 
-def iter_player_ids() -> Iterator[str]:
-    """Iterador síncrono apenas de IDs."""
+# ==============================================================================
+# CRUD
+# ==============================================================================
+
+async def create_new_player(user_id: Union[str, ObjectId], character_name: str, username: str = None) -> dict:
+    oid = ObjectId(user_id) if isinstance(user_id, str) and ObjectId.is_valid(user_id) else user_id
+    
+    now_iso = datetime.now(timezone.utc).isoformat()
+    norm = _normalize_char_name(character_name)
+
+    new_player_data = {
+        "_id": oid,
+        "name": character_name,             # Padrão novo
+        "character_name": character_name,   # Compatibilidade
+        "name_normalized": norm,
+        "character_name_normalized": norm,
+        "username": username,
+        "level": 1, 
+        "xp": 0, 
+        "gold": 0, 
+        "gems": 0,
+        "premium_tier": "free", 
+        "premium_expires_at": None,
+        "created_at": now_iso,
+        "stats": {"hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
+        "inventory": {},
+        "equipment": {}
+    }
+    
+    # Salva usando a função do core para garantir cache
+    if isinstance(oid, ObjectId):
+        await save_player_data(str(oid), new_player_data)
+    else:
+        await save_player_data(oid, new_player_data)
+        
+    return new_player_data
+
+async def get_or_create_player(user_id: str, default_name: str = "Aventureiro") -> dict:
+    pdata = await get_player_data(user_id)
+    if not pdata: pdata = await create_new_player(user_id, default_name)
+    return pdata
+
+async def delete_player(user_id: str) -> bool:
     if users_collection is not None:
-        for d in users_collection.find({}, {"_id": 1}): yield str(d["_id"])
+        try:
+            oid = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id
+            await asyncio.to_thread(users_collection.delete_one, {"_id": oid})
+        except: 
+            pass # Se falhar conversão, tenta deletar como string se fosse o caso (raro)
+            
+    await clear_player_cache(user_id)
+    return True
+
+# ==============================================================================
+# ITERADORES (Correção do ImportError)
+# ==============================================================================
+
+def iter_player_ids() -> Iterator[str]:
+    """
+    Iterador síncrono apenas de IDs.
+    Usado por handlers/jobs.py e scripts de manutenção.
+    """
+    if users_collection is not None:
+        # Retorna apenas o campo _id para ser rápido e leve
+        cursor = users_collection.find({}, {"_id": 1})
+        for d in cursor:
+            yield str(d["_id"])
 
 async def iter_players():
     """
@@ -142,10 +208,25 @@ async def iter_players():
             # Isso impede que o bot trave enquanto processa milhares de jogadores
             await asyncio.sleep(0)
 
+# ==============================================================================
+# MIGRAÇÃO
+# ==============================================================================
+
 async def check_migration_status(telegram_id: int) -> Tuple[bool, bool, Optional[dict]]:
+    """
+    Verifica se o usuário tem dados no banco antigo e se já migrou para o novo.
+    Retorna: (has_legacy_data, already_migrated, legacy_data)
+    """
     already_migrated = False
+    
+    # 1. Verifica se já existe um usuário linkado a este Telegram ID na collection nova
     if users_collection is not None:
-        doc = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": telegram_id})
+        # Procura por telegram_id ou owner_id
+        q = {"$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}]}
+        doc = await asyncio.to_thread(users_collection.find_one, q)
         already_migrated = (doc is not None)
+    
+    # 2. Busca dados no banco legado (players_collection)
     legacy = await get_legacy_data_by_telegram_id(telegram_id)
+    
     return (legacy is not None), already_migrated, legacy

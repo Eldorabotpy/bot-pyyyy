@@ -1,5 +1,5 @@
 # modules/player/core.py
-# (VERSÃO FINAL SEGURA: Gameplay 100% Users Collection | Legado isolado para Migração)
+# (VERSÃO CORRIGIDA: Reintroduz suporte a Legado para Migração)
 
 import logging
 import asyncio
@@ -8,47 +8,45 @@ from typing import Optional, Dict, Any, Union
 from bson import ObjectId
 from pymongo import MongoClient
 
-# Configuração de Logs
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
 # 1. CONEXÃO MONGODB
 # ==============================================================================
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-players_collection = None # Legado (Apenas para leitura de migração)
-users_collection = None   # Novo Sistema (Gameplay Real)
+users_collection = None    # Novo (ObjectId)
+players_collection = None  # Antigo (Int ID) - Apenas para Migração
 
 try:
     client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
     db = client["eldora_db"]
     
-    players_collection = db["players"] 
-    users_collection = db["users"]     
+    users_collection = db["users"]
+    players_collection = db["players"] # Recuperado para consultas de migração
     
-    logger.info("✅ [CORE] Conexão MongoDB: SUCESSO.")
+    logger.info("✅ [CORE] Conexão MongoDB: SUCESSO (Users + Players Legacy).")
 except Exception as e:
-    logger.critical(f"❌ [CORE] FALHA CRÍTICA AO CONECTAR MONGODB: {e}")
+    logger.critical(f"❌ [CORE] FALHA CRÍTICA MONGODB: {e}")
 
 # --- 2. SISTEMA DE CACHE ---
 _player_cache: Dict[str, Dict[str, Any]] = {}
 _player_cache_lock: asyncio.Lock = asyncio.Lock()
 
 def _get_cache_key(user_id: Union[str, ObjectId]) -> str:
-    """Normaliza o ID para string para usar como chave de cache."""
     return str(user_id)
 
 # ==============================================================================
-# FUNÇÕES PRINCIPAIS (CRUD - APENAS SISTEMA NOVO)
+# CRUD (USERS - STRICT OBJECTID)
 # ==============================================================================
 
 async def get_player_data(user_id: Union[str, ObjectId]) -> Optional[Dict[str, Any]]:
     """
     Busca dados EXCLUSIVAMENTE na coleção 'users'.
-    Ignora IDs inteiros (legado).
+    Retorna None se user_id for int ou inválido.
     """
     if not user_id: return None
     
-    # Se receber int, retorna None imediatamente (Proteção contra legado)
+    # 🚫 Fim do Legado: Rejeita Inteiros para gameplay
     if isinstance(user_id, int):
         return None
 
@@ -86,10 +84,12 @@ async def get_player_data(user_id: Union[str, ObjectId]) -> Optional[Dict[str, A
 
 async def save_player_data(user_id: Union[str, ObjectId], data: Dict[str, Any]) -> None:
     """
-    Salva dados EXCLUSIVAMENTE na coleção 'users'.
+    Salva dados EXCLUSIVAMENTE via ObjectId na coleção 'users'.
     """
     if not user_id or not data: return
-    if isinstance(user_id, int): return # Proteção: não salva int
+    
+    # 🚫 Fim do Legado
+    if isinstance(user_id, int): return 
     
     cache_key = _get_cache_key(user_id)
     
@@ -107,7 +107,7 @@ async def save_player_data(user_id: Union[str, ObjectId], data: Dict[str, Any]) 
                 oid = ObjectId(user_id)
 
             if oid:
-                # Garante integridade do _id
+                # Garante integridade do _id no documento
                 data["_id"] = oid
                 await asyncio.to_thread(
                     users_collection.replace_one, 
@@ -119,24 +119,26 @@ async def save_player_data(user_id: Union[str, ObjectId], data: Dict[str, Any]) 
         logger.error(f"Erro ao salvar player {user_id}: {e}")
 
 # ==============================================================================
-# FUNÇÃO AUXILIAR DE MIGRAÇÃO (USO RESTRITO AO AUTH)
+# 3. LEGADO / MIGRAÇÃO (A FUNÇÃO QUE FALTAVA)
 # ==============================================================================
+
 async def get_legacy_data_by_telegram_id(telegram_id: int) -> Optional[Dict[str, Any]]:
     """
     Busca dados na coleção antiga 'players'.
-    ATENÇÃO: Usar SOMENTE no momento do Login/Migração.
-    O jogo não deve usar isso.
+    Usado APENAS pelo check_migration_status no queries.py.
     """
     if players_collection is None:
         return None
     try:
-        return await asyncio.to_thread(players_collection.find_one, {"_id": int(telegram_id)})
+        # A coleção antiga usava _id = Inteiro (Telegram ID)
+        doc = await asyncio.to_thread(players_collection.find_one, {"_id": int(telegram_id)})
+        return dict(doc) if doc else None
     except Exception as e:
         logger.error(f"Erro busca legado {telegram_id}: {e}")
         return None
 
 # ==============================================================================
-# GERENCIAMENTO DE CACHE
+# CACHE UTILS
 # ==============================================================================
 
 async def clear_player_cache(user_id: Union[str, ObjectId]):
