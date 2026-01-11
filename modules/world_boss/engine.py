@@ -449,7 +449,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     # --- TOP 3 ---
     ranking_data = []
     for uid_raw, dmg in leaderboard.items():
-        ranking_data.append((str(uid_raw), dmg)) # ✅ Tudo String
+        ranking_data.append((str(uid_raw), dmg))
 
     sorted_ranking = sorted(ranking_data, key=lambda item: item[1], reverse=True)
     
@@ -463,12 +463,12 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
 
     # --- LOOP DISTRIBUIÇÃO ---
     for user_id_raw, dmg_val in leaderboard.items():
-        uid = str(user_id_raw) # ✅ ID String ObjectId
+        uid = str(user_id_raw)
         dmg = dmg_val['damage'] if isinstance(dmg_val, dict) else dmg_val
         
         if dmg <= 0: continue
         
-        pdata = await player_manager.get_player_data(uid) # ✅ Agora acha o jogador e inventário!
+        pdata = await player_manager.get_player_data(uid)
         if not pdata: continue
         
         total_participants += 1
@@ -516,7 +516,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     skill_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
 
                 if rare_item_id:
-                    player_manager.add_item_to_inventory(pdata, rare_item_id, 1) # ✅ Inventário funciona agora
+                    player_manager.add_item_to_inventory(pdata, rare_item_id, 1)
                     player_mudou = True
 
                 if random.random() * 100 <= 50.0:
@@ -532,7 +532,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 if player_mudou:
                     await player_manager.save_player_data(uid, pdata)
                 
-                # 3. Enviar DM (Precisa achar o ChatID numérico)
+                # 3. Enviar DM
                 target_chat_id = pdata.get("last_chat_id") or pdata.get("telegram_id_owner")
                 if target_chat_id:
                     try:
@@ -545,22 +545,51 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
             except Exception as e:
                 logger.error(f"[WB_LOOT] Erro ao processar player {uid}: {e}")
 
-    # --- ANÚNCIO CANAL (Mantido) ---
+    # --- ANÚNCIO CANAL (VISUAL CORRIGIDO IGUAL À PRINT) ---
     separator = "━━━━━━━━━━━━━━━━━━"
     if not boss_defeated:
         title = "☁️ <b>AS SOMBRAS PERMANECEM...</b>"
         body = f"<i>Inimigo recuou.\n\n🛡️ <b>Top 3:</b>\n" + "\n".join(top_3_msg)
     else:
+        # Título Exato da Print
         title = "⚔️ <b>A LENDA FOI ESCRITA!</b>"
-        body = f"<i>Boss <b>{boss_data.get('name')}</b> derrotado!</i>\n\n🏆 <b>MVP:</b>\n" + "\n".join(top_3_msg)
-        if last_hit_msg: body += f"\n{last_hit_msg}"
-        body += f"\n\n{separator}\n🌍 <b>ESPÓLIOS</b>\n├ ⚔️ <b>Heróis:</b> {total_participants}\n├ 💰 <b>Ouro:</b> {total_gold_distributed:,}\n└ ✨ <b>XP:</b> {total_xp_distributed:,}\n"
         
+        # Corpo: Boss e Lore
+        body = f"<i>O Boss <b>{boss_data.get('name', 'Lorde das Sombras')}</b> foi derrotado!</i>\n"
+        body += f"<i>A glória deste dia será cantada nas tavernas!</i>\n\n"
+        
+        # MVP
+        body += f"🏆 <b>HALL DA GLÓRIA (MVP)</b>\n"
+        body += "\n".join(top_3_msg)
+        
+        # Last Hit
+        if last_hit_msg: body += f"\n{last_hit_msg}"
+        
+        # Espólios (Stats Globais)
+        body += f"\n\n{separator}\n🌍 <b>ESPÓLIOS DE GUERRA</b>\n"
+        body += f"├ ⚔️ <b>Heróis:</b> {total_participants}\n"
+        body += f"├ 💰 <b>Ouro:</b> {total_gold_distributed:,}\n"
+        body += f"└ ✨ <b>XP:</b> {total_xp_distributed:,}\n"
+        
+        # Recursos Globais Dropados (Resumo)
+        if loot_summary:
+            body += f"\n📦 <b>RECURSOS (Global)</b>\n"
+            # Mostra apenas os 4 primeiros para não poluir, ou todos se quiser
+            itens_mostrados = 0
+            for iname, iqtd in loot_summary.items():
+                if itens_mostrados >= 5: break
+                body += f"▪️ {iqtd}x {iname}\n"
+                itens_mostrados += 1
+        
+        # Artefatos Lendários (Skills/Skins)
         if skin_winners_msg or skill_winners_msg:
             body += f"\n🚨 <b>ARTEFATOS LENDÁRIOS</b>\n"
             for msg in skin_winners_msg + skill_winners_msg:
-                body += f"{msg.replace('• ', '🌟 ')}\n"
+                # Remove o bullet padrão para usar um emoji melhor se quiser
+                clean_msg = msg.replace("• ", "").strip()
+                body += f"{clean_msg}\n"
 
+    # ENVIO PARA O CANAL
     try:
         if ANNOUNCEMENT_CHAT_ID:
             await context.bot.send_message(
@@ -569,12 +598,12 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 text=f"{title}\n\n{body}",
                 parse_mode="HTML"
             )
-    except: pass
+    except Exception as e:
+        logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
 async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):
     location_name = (game_data.REGIONS_DATA.get(location_key) or {}).get("display_name", location_key)
     
-    # Busca o ID da mídia (Seja vídeo ou foto)
     media_id = forced_media_id
     if not media_id:
         try:
@@ -582,71 +611,57 @@ async def broadcast_boss_announcement(application, location_key: str, forced_med
             media_id = file_ids.get_file_id("boss_raid")
         except: pass
 
-    anuncio = f"🚨 𝐀𝐋𝐄𝐑𝐓𝐀 𝐆𝐋𝐎𝐁𝐀𝐋 🚨\nᴜᴍ ᴅᴇᴍôɴɪᴏ ᴅɪᴍᴇɴsɪᴏɴᴀʟ sᴜʀɢɪᴜ ᴇᴍ {location_name}!\n\nᴄʟɪǫᴜᴇ ᴀʙᴀɪxᴏ ᴘᴀʀᴀ ᴠɪᴀᴊᴀʀ!"
-    keyboard = [[InlineKeyboardButton("🗺️ 𝔸𝔹ℝ𝕀ℝ 𝕄𝔸ℙ𝔸 𝔻𝔼 𝕍𝕀𝔸𝔾𝔼𝕄 🗺️", callback_data="travel")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # --- TEXTO DA DM (Privado) ---
+    anuncio_dm = f"🚨 𝐀𝐋𝐄𝐑𝐓𝐀 𝐆𝐋𝐎𝐁𝐀𝐋 🚨\nᴜᴍ ᴅᴇᴍôɴɪᴏ ᴅɪᴍᴇɴsɪᴏɴᴀʟ sᴜʀɢɪᴜ ᴇᴍ {location_name}!\n\nᴄʟɪǫᴜᴇ ᴀʙᴀɪxᴏ ᴘᴀʀᴀ ᴠɪᴀᴊᴀʀ!"
+    kb_dm = InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ 𝔸𝔹ℝ𝕀ℝ 𝕄𝔸ℙ𝔸 𝔻𝔼 𝕍𝕀𝔸𝔾𝔼𝕄 🗺️", callback_data="travel")]])
 
-    count = 0
+    # --- TEXTO DO CANAL (Igual à Print 1) ---
+    anuncio_canal = f"👺 <b>WORLD BOSS SURGIU!</b>\n📍 <b>Local:</b> {location_name}\n\nO monstro despertou! Ataquem!"
     
-    # --- CORREÇÃO AQUI ---
-    # Usamos 'pdata' para achar o Chat ID real do Telegram
+    # 1. ENVIA PARA O CANAL/GRUPO OFICIAL (Correção Principal)
+    try:
+        if ANNOUNCEMENT_CHAT_ID:
+            if media_id:
+                # Tenta Video -> Foto
+                try:
+                    await application.bot.send_video(chat_id=ANNOUNCEMENT_CHAT_ID, video=media_id, caption=anuncio_canal, parse_mode='HTML', message_thread_id=ANNOUNCEMENT_THREAD_ID)
+                except:
+                    try:
+                        await application.bot.send_photo(chat_id=ANNOUNCEMENT_CHAT_ID, photo=media_id, caption=anuncio_canal, parse_mode='HTML', message_thread_id=ANNOUNCEMENT_THREAD_ID)
+                    except: pass
+            else:
+                await application.bot.send_message(chat_id=ANNOUNCEMENT_CHAT_ID, text=anuncio_canal, parse_mode='HTML', message_thread_id=ANNOUNCEMENT_THREAD_ID)
+    except Exception as e:
+        logger.error(f"Erro broadcast canal: {e}")
+
+    # 2. ENVIA PARA OS JOGADORES (DM)
+    count = 0
     async for _oid, pdata in player_manager.iter_players():
         try:
-            # Tenta pegar o ID numérico do Telegram
             target_chat_id = pdata.get("last_chat_id")
-            if not target_chat_id:
-                target_chat_id = pdata.get("telegram_id_owner")
-            
-            # Se não tiver ID numérico, pula (não dá pra mandar msg pra ObjectId)
-            if not target_chat_id:
-                continue
+            if not target_chat_id: target_chat_id = pdata.get("telegram_id_owner")
+            if not target_chat_id: continue
                 
             chat_id_int = int(target_chat_id)
             sent = False
             
-            # Se tivermos um ID de mídia, começamos a "Cascata Inteligente"
             if media_id:
-                # 1ª Tentativa: VÍDEO
                 try:
-                    await application.bot.send_video(
-                        chat_id=chat_id_int, 
-                        video=media_id, 
-                        caption=anuncio, 
-                        parse_mode='HTML', 
-                        reply_markup=reply_markup
-                    )
+                    await application.bot.send_video(chat_id=chat_id_int, video=media_id, caption=anuncio_dm, parse_mode='HTML', reply_markup=kb_dm)
                     sent = True
-                except Exception:
-                    # 2ª Tentativa: FOTO
+                except:
                     try:
-                        await application.bot.send_photo(
-                            chat_id=chat_id_int, 
-                            photo=media_id, 
-                            caption=anuncio, 
-                            parse_mode='HTML', 
-                            reply_markup=reply_markup
-                        )
+                        await application.bot.send_photo(chat_id=chat_id_int, photo=media_id, caption=anuncio_dm, parse_mode='HTML', reply_markup=kb_dm)
                         sent = True
-                    except Exception:
-                        pass
+                    except: pass
             
-            # 3ª Tentativa (Fallback): TEXTO PURO
             if not sent:
-                await application.bot.send_message(
-                    chat_id=chat_id_int, 
-                    text=anuncio, 
-                    parse_mode='HTML', 
-                    reply_markup=reply_markup
-                )
+                await application.bot.send_message(chat_id=chat_id_int, text=anuncio_dm, parse_mode='HTML', reply_markup=kb_dm)
             
-            # Anti-Flood leve
             count += 1
             if count % 20 == 0: await asyncio.sleep(1)
             else: await asyncio.sleep(0.05) 
-
-        except Exception as e:
-            # Se o usuário bloqueou o bot, ignora
-            continue
+        except: continue
 
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
@@ -662,3 +677,4 @@ async def iniciar_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
         await broadcast_boss_announcement(context.application, res["location"])
         hours = context.job.data.get("duration_hours", 1) if context.job.data else 1
         context.job_queue.run_once(end_world_boss_job, when=timedelta(hours=hours))
+        
