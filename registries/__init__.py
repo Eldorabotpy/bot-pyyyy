@@ -1,4 +1,5 @@
-# registries/__init__.py (VERSÃO FINAL QUE LIGA O BOTÃO)
+# registries/__init__.py
+# (VERSÃO CORRIGIDA: Importação de Eventos e Remoção de Duplicatas)
 
 import logging
 from telegram import Update
@@ -6,6 +7,7 @@ from telegram.ext import Application, TypeHandler, ContextTypes, CallbackQueryHa
 from modules import player_manager
 from datetime import datetime, timezone
 from handlers import runes_handler
+
 # --- IMPORTS DOS REGISTROS (SEUS MÓDULOS) ---
 from .admin import register_admin_handlers
 from .character import register_character_handlers
@@ -21,19 +23,21 @@ from handlers.world_boss.handler import all_world_boss_handlers
 from handlers.potion_handler import all_potion_handlers
 # from handlers.autohunt_handler import all_autohunt_handlers
 
-# [IMPORTANTE] Importa o registro da Defesa do Reino
-from kingdom_defense.handler import register_handlers as register_kingdom_defense_handlers
-
 # --- IMPORTS DE MENUS E NAVEGAÇÃO ---
 from handlers.menu import kingdom  # Para o botão "Voltar ao Reino"
 
-# [CORREÇÃO CRÍTICA]: Usamos o handler de menu que TEM o botão da defesa configurado corretamente
-# Se o seu arquivo estiver em 'handlers/menu/events.py', o import é este:
+# [CORREÇÃO]: Importação robusta do Menu de Eventos
+# Tenta importar do local novo (handlers/events), depois tenta os antigos
 try:
-    from handlers.menu import events as events_menu_handler
+    # 1. Tenta o local novo sugerido (handlers/events/event_menu.py)
+    from handlers.events import event_menu as events_menu_handler
 except ImportError:
-    # Fallback caso você ainda use o caminho antigo, mas recomendo fortemente usar o handlers.menu.events
-    from modules.events import event_menu as events_menu_handler
+    try:
+        # 2. Tenta o local antigo 1
+        from handlers.menu import events as events_menu_handler
+    except ImportError:
+        # 3. Tenta o local antigo 2 (modules)
+        from modules.events import event_menu as events_menu_handler
 
 # Importa Entry (Entrada/Lobby) E Combat (Luta) das Catacumbas
 from modules.events.catacumbas import entry_handler as cat_entry
@@ -74,14 +78,15 @@ def register_all_handlers(application: Application):
     register_guild_handlers(application)
     register_regions_handlers(application)
     
-    # 3. Registra eventos gerais
+    # 3. Registra eventos gerais (Inclui Defesa do Reino e World Boss)
     register_event_handlers(application)
     
     # --- NOVO REGISTRO DO MÍSTICO RÚNICO ---
     application.add_handler(CallbackQueryHandler(runes_handler.action_router, pattern="^rune_npc:"))
     application.add_handler(CallbackQueryHandler(runes_handler.runes_router, pattern="^rune_mgr:"))
     
-    register_kingdom_defense_handlers(application)
+    # [REMOVIDO]: register_kingdom_defense_handlers(application) 
+    # Motivo: Já está sendo chamado dentro de register_event_handlers acima.
     
     # 4. Registo de Listas de Handlers (Legado/Outros)
     application.add_handlers(all_world_boss_handlers)
@@ -93,11 +98,11 @@ def register_all_handlers(application: Application):
     # ============================================================
     
     # A. Menu Principal de Eventos (O Hub)
-    # Conecta o botão "💀 Eventos Especiais" ao menu que mostra as opções
-    # Tenta usar a função 'show_events_menu', se não existir, usa 'show_active_events'
+    # Conecta o botão "💀 Eventos" (callback: evt_hub_principal) ao menu correto
     if hasattr(events_menu_handler, 'show_events_menu'):
         application.add_handler(CallbackQueryHandler(events_menu_handler.show_events_menu, pattern="^evt_hub_principal$"))
     else:
+        # Se você usou o código que enviei anteriormente, a função é show_active_events
         application.add_handler(CallbackQueryHandler(events_menu_handler.show_active_events, pattern="^evt_hub_principal$"))
     
     # B. Botão Voltar para o Reino
