@@ -1,6 +1,3 @@
-# Arquivo: kingdom_defense/leaderboard.py
-# (VERSÃO ZERO-TOLERANCE: IDs STRINGS)
-
 import json
 from pathlib import Path
 import datetime
@@ -24,16 +21,16 @@ def _save_leaderboard(data: dict):
     except IOError as e:
         print(f"Erro crítico ao salvar leaderboard: {e}")
 
+# MUDANÇA: user_id agora é str (ObjectId)
 def update_top_score(user_id: str, character_name: str, damage: int):
     """
     Salva o MVP do evento atual.
-    Recebe user_id como STRING.
     """
     leaderboard = _load_leaderboard()
     
     # Cria o registro do novo vencedor
     new_record = {
-        "user_id": str(user_id), # Garante string no JSON
+        "user_id": str(user_id), # Garante string
         "character_name": character_name,
         "damage": damage,
         "set_on": datetime.date.today().isoformat()

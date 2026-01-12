@@ -1,6 +1,4 @@
 # Arquivo: kingdom_defense/engine.py
-# (VERSÃO ZERO-TOLERANCE: IDs STRINGS OBRIGATÓRIOS)
-
 import random
 import logging
 from typing import Optional, Dict, Any
@@ -17,16 +15,12 @@ from modules.combat import combat_engine
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# HELPER: Raridade de Skills
-# =============================================================================
+# ... (Funções _get_player_skill_data_by_rarity e _find_monster_template permanecem iguais) ...
 def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> dict | None:
-    """Busca os dados da skill e ajusta o CUSTO DE MANA baseado na classe."""
+    # (Mesmo código anterior)
     base_skill = SKILL_DATA.get(skill_id)
     if not base_skill: return None
-
     merged_data = base_skill.copy()
-    
     if "rarity_effects" in base_skill:
         player_skills = pdata.get("skills", {})
         rarity = "comum"
@@ -34,18 +28,14 @@ def _get_player_skill_data_by_rarity(pdata: dict, skill_id: str) -> dict | None:
             player_skill_instance = player_skills.get(skill_id)
             if player_skill_instance:
                 rarity = player_skill_instance.get("rarity", "comum")
-        
         rarity_data = base_skill["rarity_effects"].get(rarity, base_skill["rarity_effects"].get("comum", {}))
         merged_data.update(rarity_data)
-    
     player_class = (pdata.get("class_key") or pdata.get("class") or "").lower()
     high_mana_classes = ["mago", "feiticeiro", "elementalista", "arquimago"]
-    
     if player_class in high_mana_classes:
         original_cost = merged_data.get("mana_cost", 0)
         new_cost = int(original_cost * 2.0) 
         merged_data["mana_cost"] = new_cost
-
     return merged_data
 
 def _find_monster_template(mob_id: str) -> dict | None:
@@ -70,14 +60,11 @@ class KingdomDefenseManager:
         logger.info("Evento de Defesa do Reino iniciado na Onda 1.")
         return {"success": "Evento iniciado!"}
     
-    def store_player_message_id(self, user_id: str, message_id: int):
-        """Armazena o message_id da batalha para um jogador."""
-        # Garante string
-        uid = str(user_id)
-        if uid in self.player_states:
-            self.player_states[uid]['message_id'] = message_id
-        else:
-            logger.warning(f"Tentativa de armazenar message_id para {uid} sem estado de batalha.")
+    def store_player_message_id(self, player_id: str, message_id: int):
+        """Armazena o message_id da batalha usando player_id (ObjectId)."""
+        if player_id in self.player_states:
+            self.player_states[player_id]['message_id'] = message_id
+            logger.info(f"Armazenado message_id {message_id} para jogador {player_id}")
 
     async def end_event(self, context: ContextTypes.DEFAULT_TYPE | None = None):
         logger.info("Encerrando evento de Defesa do Reino...")
@@ -86,39 +73,41 @@ class KingdomDefenseManager:
         
         all_participants = list(self.active_fighters) + self.waiting_queue
         
-        for user_id in all_participants:
-            # user_id já é string aqui
-            state = self.player_states.get(user_id)
+        # user_id aqui é o PLAYER_ID (ObjectId string)
+        for player_id in all_participants:
+            state = self.player_states.get(player_id)
             if not state: continue
 
+            # Recupera o Telegram ID salvo no estado para notificar
+            tg_id = state.get('telegram_id')
+
             try:
-                player_data = await player_manager.get_player_data(user_id)
+                player_data = await player_manager.get_player_data(player_id)
                 if player_data:
                     player_data["player_state"] = {"action": "idle"}
-                    await player_manager.save_player_data(user_id, player_data)
+                    await player_manager.save_player_data(player_id, player_data)
                     
                     damage_dealt = state.get('damage_dealt', 0)
                     if damage_dealt > max_damage:
                         max_damage = damage_dealt
                         top_scorer = {
-                            "user_id": user_id,
+                            "user_id": player_id,
                             "character_name": player_data.get("character_name", "Herói"),
                             "damage": max_damage
                         }
                     
-                    if context:
+                    if context and tg_id:
                         try:
-                            # Tenta notificar (user_id é string, mas telegram aceita se for numérico valido)
-                            await context.bot.send_message(chat_id=user_id, text="⚔️ O evento de Defesa do Reino foi encerrado! ⚔️")
+                            await context.bot.send_message(chat_id=tg_id, text="⚔️ O evento de Defesa do Reino foi encerrado! ⚔️")
                         except Exception:
                             pass 
                         
             except Exception as e:
-                logger.error(f"Erro ao finalizar evento para {user_id}: {e}")
+                logger.error(f"Erro ao finalizar evento para {player_id}: {e}")
 
         if top_scorer:
             leaderboard.update_top_score(
-                user_id=str(top_scorer["user_id"]),
+                user_id=top_scorer["user_id"],
                 character_name=top_scorer["character_name"],
                 damage=top_scorer["damage"]
             )
@@ -132,9 +121,9 @@ class KingdomDefenseManager:
         self.boss_mode_active = False
         self.boss_global_hp = 0
         self.boss_max_hp = 0
-        self.active_fighters = set() # Set de strings
-        self.waiting_queue = []      # Lista de strings
-        self.player_states = {}      # Dict {str: dict}
+        self.active_fighters = set() # Set de PlayerIDs (Strings)
+        self.waiting_queue = []      # Lista de PlayerIDs (Strings)
+        self.player_states = {}      # Dict {PlayerID: State}
         self.current_wave_mob_pool = []
         self.total_mobs_in_wave = 0
         self.max_concurrent_fighters = 10
@@ -146,7 +135,7 @@ class KingdomDefenseManager:
         self.reset_event()
         self.is_active = True
         await self.setup_wave(wave_number)
-        return {"success": f"Evento de teste iniciado na Onda {wave_number}!"}
+        return {"success": f"Evento iniciado na Onda {wave_number}!"}
     
     async def setup_wave(self, wave_number: int):
         if wave_number not in self.wave_definitions:
@@ -164,39 +153,39 @@ class KingdomDefenseManager:
         wave_data = self.wave_definitions[wave_number]
         self.current_wave_mob_pool = wave_data.get('mob_pool', []).copy()
         self.total_mobs_in_wave = len(self.current_wave_mob_pool)
+        logger.info(f"Onda {wave_number} configurada.")
 
-    def get_player_status(self, user_id: str):
-        uid = str(user_id)
-        if uid in self.active_fighters: return "active"
-        if uid in self.waiting_queue: return "waiting"
+    def get_player_status(self, player_id: str):
+        if player_id in self.active_fighters: return "active"
+        if player_id in self.waiting_queue: return "waiting"
         return "not_in_event"
 
-    async def add_player_to_event(self, user_id: str, player_data: dict):
-        uid = str(user_id)
+    async def add_player_to_event(self, player_id: str, player_data: dict):
         if not self.is_active:
             return "event_inactive"
-        status = self.get_player_status(uid)
+        status = self.get_player_status(player_id)
         if status != "not_in_event": return status
         
         if len(self.active_fighters) < self.max_concurrent_fighters:
-            self.active_fighters.add(uid)
-            await self._setup_player_battle_state(uid, player_data) 
+            self.active_fighters.add(player_id)
+            await self._setup_player_battle_state(player_id, player_data) 
             return "active"
         else:
-            if uid not in self.waiting_queue:
-                self.waiting_queue.append(uid)
+            if player_id not in self.waiting_queue:
+                self.waiting_queue.append(player_id)
             return "waiting"
 
-    async def _setup_player_battle_state(self, user_id: str, player_data: dict):
-        uid = str(user_id)
+    async def _setup_player_battle_state(self, player_id: str, player_data: dict):
         total_stats = await player_manager.get_player_total_stats(player_data) 
         current_wave_info = self.wave_definitions[self.current_wave]
         
+        # Recupera o Telegram ID para notificações futuras
+        telegram_id = player_data.get("telegram_id_owner")
+
         mob_template = None
         if not self.boss_mode_active:
             if not self.current_wave_mob_pool:
-                if self.total_mobs_in_wave > 0:
-                     return
+                if self.total_mobs_in_wave > 0: return
             else:
                 mob_id = self.current_wave_mob_pool[0] 
                 mob_template = _find_monster_template(mob_id)
@@ -204,8 +193,7 @@ class KingdomDefenseManager:
             boss_id = current_wave_info.get('boss_id')
             mob_template = _find_monster_template(boss_id)
             
-        if not mob_template:
-            return
+        if not mob_template: return
 
         mob_instance = mob_template.copy()
         mob_instance['active_effects'] = []
@@ -215,8 +203,8 @@ class KingdomDefenseManager:
             mob_instance.update({'max_hp': mob_instance['hp'], 'is_boss': False})
 
         max_hp = int(total_stats.get('max_hp', 100))
-        if uid in self.player_states and self.player_states[uid].get('player_hp', 0) > 0:
-            previous_hp = self.player_states[uid]['player_hp']
+        if player_id in self.player_states and self.player_states[player_id].get('player_hp', 0) > 0:
+            previous_hp = self.player_states[player_id]['player_hp']
             current_hp = min(previous_hp, max_hp) 
         else:
             db_hp = player_data.get('current_hp')
@@ -227,8 +215,8 @@ class KingdomDefenseManager:
 
         max_mp = int(total_stats.get('max_mana', 50))
         
-        if uid in self.player_states:
-             current_mp = self.player_states[uid].get('player_mp', max_mp)
+        if player_id in self.player_states:
+             current_mp = self.player_states[player_id].get('player_mp', max_mp)
         else:
              db_mp = player_data.get('current_mp')
              if db_mp is None: db_mp = player_data.get('mana')
@@ -236,11 +224,11 @@ class KingdomDefenseManager:
         
         current_mp = min(current_mp, max_mp)
 
-        current_damage = self.player_states.get(uid, {}).get('damage_dealt', 0)
-        current_message_id = self.player_states.get(uid, {}).get('message_id', None)
-        saved_cooldowns = self.player_states.get(uid, {}).get('skill_cooldowns', {})
+        current_damage = self.player_states.get(player_id, {}).get('damage_dealt', 0)
+        current_message_id = self.player_states.get(player_id, {}).get('message_id', None)
+        saved_cooldowns = self.player_states.get(player_id, {}).get('skill_cooldowns', {})
 
-        self.player_states[uid] = {
+        self.player_states[player_id] = {
             'player_hp': current_hp,
             'player_max_hp': max_hp,
             'player_mp': current_mp,
@@ -249,15 +237,15 @@ class KingdomDefenseManager:
             'damage_dealt': current_damage,
             'active_effects': [],
             'message_id': current_message_id,
-            'skill_cooldowns': saved_cooldowns
+            'skill_cooldowns': saved_cooldowns,
+            'telegram_id': telegram_id # ✅ ARMAZENA O TG ID
         }
 
-    async def process_player_attack(self, user_id: str, player_data: dict, player_full_stats: dict):
-        uid = str(user_id)
-        if uid not in self.active_fighters:
+    async def process_player_attack(self, player_id: str, player_data: dict, player_full_stats):
+        if player_id not in self.active_fighters:
             return {"error": "Você não está em uma batalha ativa."}
 
-        player_state = self.player_states[uid]
+        player_state = self.player_states[player_id]
         mob = player_state['current_mob']
         is_boss_fight = mob.get('is_boss', False)
 
@@ -286,25 +274,24 @@ class KingdomDefenseManager:
         else:
             mob['hp'] = max(0, mob['hp'] - final_damage)
 
-        return await self._resolve_turn(uid, player_data, logs)
+        return await self._resolve_turn(player_id, player_data, logs)
     
     async def _promote_next_player(self):
         if self.waiting_queue and len(self.active_fighters) < self.max_concurrent_fighters:
-            next_player_id = str(self.waiting_queue.pop(0)) # Garante string
+            next_player_id = self.waiting_queue.pop(0)
             player_data = await player_manager.get_player_data(next_player_id)
             if player_data:
                 self.active_fighters.add(next_player_id)
                 await self._setup_player_battle_state(next_player_id, player_data) 
-                logger.info(f"Jogador {next_player_id} promovido da fila.")
-            else:
-                logger.warning(f"Jogador {next_player_id} na fila mas sem data.")
+                logger.info(f"Jogador {next_player_id} promovido.")
 
-    async def _resolve_turn(self, user_id: str, player_data: dict, logs: list) -> dict:
-        uid = str(user_id)
-        player_state = self.player_states[uid]
+    async def _resolve_turn(self, player_id: str, player_data: dict, logs: list) -> dict:
+        player_state = self.player_states[player_id]
         mob = player_state['current_mob']
         is_boss_fight = mob.get('is_boss', False)
+
         player_full_stats = await player_manager.get_player_total_stats(player_data)
+
         mob_hp = self.boss_global_hp if is_boss_fight else mob['hp']
         loot_msg = ""
 
@@ -318,7 +305,7 @@ class KingdomDefenseManager:
         
             player_state['player_hp'] = player_data.get('current_hp')
             player_state['player_mp'] = player_data.get('current_mp')
-            await player_manager.save_player_data(uid, player_data)
+            await player_manager.save_player_data(player_id, player_data)
 
             if is_boss_fight:
                 logs.append(f"🎉 A ONDA {self.current_wave} FOI CONCLUÍDA! 🎉")
@@ -327,8 +314,8 @@ class KingdomDefenseManager:
                 if not self.is_active:
                     return {"event_over": True, "action_log": "\n".join(logs)}
                 
-                await self._setup_player_battle_state(uid, player_data)
-                await player_manager.save_player_data(uid, player_data)
+                await self._setup_player_battle_state(player_id, player_data)
+                await player_manager.save_player_data(player_id, player_data)
                 
                 return {
                     "monster_defeated": True, 
@@ -339,17 +326,16 @@ class KingdomDefenseManager:
             else:
                 drops = []
                 item_id = 'fragmento_bravura'
-                player_manager.add_item_to_inventory(player_data, item_id, 1)
+                reward_amount = 1
+                player_manager.add_item_to_inventory(player_data, item_id, reward_amount)
                 item_info = game_items.ITEMS_DATA.get(item_id, {})
                 item_name = item_info.get('display_name', 'Fragmento de Bravura')
                 drops.append(f"1x {item_name}")
             
+                novo_item_id = 'sigilo_protecao' 
                 if random.random() < 0.01:
-                    novo_item_id = 'sigilo_protecao' 
                     player_manager.add_item_to_inventory(player_data, novo_item_id, 1)
-                    novo_item_info = game_items.ITEMS_DATA.get(novo_item_id, {})
-                    novo_item_name = novo_item_info.get('display_name', novo_item_id)
-                    drops.append(f"1x {novo_item_name} (Raro!)")
+                    drops.append(f"🛡️ 1x Sigilo de Proteção (Raro!)")
             
                 loot_msg = f"💎 𝐋𝐨𝐨𝐭: {', '.join(drops)}" 
                 logs.append(loot_msg) 
@@ -369,39 +355,29 @@ class KingdomDefenseManager:
                 
                     self.boss_max_hp = int(hp_base + hp_extra)
                     self.boss_global_hp = self.boss_max_hp
-                
-                    boss_name = boss_template.get("name", "Chefe")
-                    logs.append(f"\n🚨 <b>{boss_name}</b> APARECEU COM {self.boss_global_hp:,} HP! 🚨")
+                    logs.append(f"\n🚨 <b>{boss_template.get('name', 'Chefe')}</b> APARECEU! 🚨")
 
-            if uid in self.player_states:
-                await self._setup_player_battle_state(uid, player_data)
-                await player_manager.save_player_data(uid, player_data) 
-
+            if player_id in self.player_states:
+                await self._setup_player_battle_state(player_id, player_data)
+                await player_manager.save_player_data(player_id, player_data) 
                 return {
                     "monster_defeated": True, 
                     "action_log": "\n".join(logs), 
                     "loot_message": loot_msg 
                 }
             else:
-                return {
-                    "event_over": True, 
-                    "action_log": "\n".join(logs)
-                }
+                return { "event_over": True, "action_log": "\n".join(logs) }
 
-        # --- MONSTRO VIVO ---
+        # --- CONTRA-ATAQUE ---
         else:
-            if is_boss_fight:
-                self.boss_attack_counter += 1
-        
+            if is_boss_fight: self.boss_attack_counter += 1
             special_attack_data = mob.get("special_attack")
 
-            # AOE
             if is_boss_fight and special_attack_data and special_attack_data.get("is_aoe") and self.boss_attack_counter % 3 == 0:
                 logs.append(f"👑 <b>{special_attack_data['name']}</b> (Em Área!)")
                 aoe_results = []
             
                 for fighter_id in list(self.active_fighters):
-                    # fighter_id é string
                     f_state = self.player_states.get(fighter_id)
                     f_data = await player_manager.get_player_data(fighter_id)
                     if not f_state or not f_data: continue
@@ -411,11 +387,10 @@ class KingdomDefenseManager:
                     final_dmg = int(base_dmg * special_attack_data.get("damage_multiplier", 1.0))
                 
                     f_state['player_hp'] = max(0, f_state['player_hp'] - final_dmg)
-                
                     logs.append(f"🔥 {f_data.get('character_name','Herói')} sofreu {final_dmg}!")
                 
                     was_defeated = f_state['player_hp'] <= 0
-                    aoe_results.append({"user_id": fighter_id, "was_defeated": was_defeated})
+                    aoe_results.append({"user_id": fighter_id, "was_defeated": was_defeated}) # Use user_id as player_id logic
                 
                     if was_defeated:
                         self.active_fighters.remove(fighter_id)
@@ -428,7 +403,6 @@ class KingdomDefenseManager:
             
                 return { "monster_defeated": False, "action_log": "\n".join(logs), "aoe_results": aoe_results }
 
-            # Single Target
             else:
                 dodge_chance = await player_stats_engine.get_player_dodge_chance(player_data)
                 if random.random() < dodge_chance:
@@ -448,12 +422,12 @@ class KingdomDefenseManager:
 
                 if player_state['player_hp'] <= 0:
                     logs.append("\n💀 <b>VOCÊ FOI DERROTADO!</b>")
-                    self.active_fighters.remove(uid)
+                    self.active_fighters.remove(player_id)
                     await self._promote_next_player()
                 
                     player_data['current_hp'] = 1 
                     player_data['player_state'] = {"action": "idle"}
-                    await player_manager.save_player_data(uid, player_data)
+                    await player_manager.save_player_data(player_id, player_data)
                 
                     return { "game_over": True, "action_log": "\n".join(logs) }
 
@@ -462,21 +436,19 @@ class KingdomDefenseManager:
                 player_state['player_hp'] = player_data.get('current_hp')
                 player_state['player_mp'] = player_data.get('current_mp')
                 logs.extend(msgs_cd)
-                await player_manager.save_player_data(uid, player_data)
+                await player_manager.save_player_data(player_id, player_data)
 
                 return { "monster_defeated": False, "game_over": False, "action_log": "\n".join(logs) }
 
-    async def process_player_skill(self, user_id: str, player_data: dict, skill_id: str, target_id: str | None = None):
-        uid = str(user_id)
-        if uid not in self.active_fighters:
+    async def process_player_skill(self, player_id: str, player_data: dict, skill_id, target_id=None):
+        if player_id not in self.active_fighters:
             return {"error": "Você não está em uma batalha ativa."}
 
-        player_state = self.player_states[uid]
+        player_state = self.player_states[player_id]
         
         from modules.cooldowns import verificar_cooldown
         pode_usar, msg_cd = verificar_cooldown(player_data, skill_id)
-        if not pode_usar:
-            return {"error": msg_cd}
+        if not pode_usar: return {"error": msg_cd}
 
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
         if not skill_info: return {"error": "Habilidade desconhecida."}
@@ -490,7 +462,7 @@ class KingdomDefenseManager:
         player_state['player_mp'] -= mana_cost
         player_data['current_mp'] = player_state['player_mp']
         player_data['mana'] = player_state['player_mp'] 
-        await player_manager.save_player_data(uid, player_data)
+        await player_manager.save_player_data(player_id, player_data)
         
         logs = [f"Você usa {skill_info['display_name']}! (-{mana_cost} MP)"]
 
@@ -505,6 +477,7 @@ class KingdomDefenseManager:
         
         if skill_type == "active": 
             player_full_stats = await player_manager.get_player_total_stats(player_data)
+            
             attacker_stats = self._get_stats_with_effects(player_full_stats, player_state.get('active_effects', []))
             target_stats = self._get_stats_with_effects(mob, mob.get('active_effects', []))
             
@@ -528,6 +501,7 @@ class KingdomDefenseManager:
                 mob.setdefault('active_effects', []).append({"stat": debuff["stat"], "multiplier": debuff["value"], "turns_left": debuff["duration_turns"]})
                 logs.append(f"🛡️ Defesa inimiga reduzida!")
             
+
         elif skill_type == "support": 
             heal_applied = False
             player_full_stats = await player_manager.get_player_total_stats(player_data)
@@ -554,12 +528,11 @@ class KingdomDefenseManager:
 
             return { "monster_defeated": False, "action_log": "\n".join(logs), "skip_monster_turn": True }
         
-        return await self._resolve_turn(uid, player_data, logs)
+        return await self._resolve_turn(player_id, player_data, logs)
 
-    def get_battle_data(self, user_id: str):
-        uid = str(user_id)
-        if uid not in self.player_states: return None
-        player_state_copy = self.player_states[uid].copy()
+    def get_battle_data(self, player_id: str):
+        if player_id not in self.player_states: return None
+        player_state_copy = self.player_states[player_id].copy()
         player_state_copy['current_wave'] = self.current_wave
         if player_state_copy['current_mob'].get('is_boss'):
             player_state_copy['current_mob']['hp'] = self.boss_global_hp
@@ -585,20 +558,16 @@ class KingdomDefenseManager:
     
     def _get_stats_with_effects(self, base_stats: dict, active_effects: list) -> dict:
         modified_stats = base_stats.copy()
-
         for effect in active_effects:
             stat_to_modify = effect.get("stat")
             multiplier = effect.get("multiplier", 0.0)
-        
             if stat_to_modify in modified_stats:
                 bonus_value = modified_stats[stat_to_modify] * multiplier
                 modified_stats[stat_to_modify] += int(bonus_value)
-
         return modified_stats
     
-    def _tick_effects(self, user_id: str):
-        uid = str(user_id)
-        player_state = self.player_states.get(uid)
+    def _tick_effects(self, player_id: str):
+        player_state = self.player_states.get(player_id)
         if not player_state: return
 
         if player_state.get('active_effects'):
@@ -622,10 +591,9 @@ class KingdomDefenseManager:
         all_participants_ids = set(self.active_fighters) | set(self.player_states.keys())
         if not all_participants_ids: return "Nenhum herói participou do evento ainda."
         leaderboard_data = []
-        for user_id in all_participants_ids:
-            # user_id é string
-            state = self.player_states.get(user_id)
-            player_data = await player_manager.get_player_data(user_id)
+        for player_id in all_participants_ids:
+            state = self.player_states.get(player_id)
+            player_data = await player_manager.get_player_data(player_id)
             if state and player_data and state.get('damage_dealt', 0) > 0:
                 leaderboard_data.append({
                     "name": player_data.get('character_name', 'Herói'),
@@ -639,7 +607,6 @@ class KingdomDefenseManager:
             lines.append(f"{medal} {status['name']}: {status['damage']:,} de dano")
         return "\n".join(lines)
 
-# --- INSTÂNCIA ÚNICA ---
 event_manager = KingdomDefenseManager()
 
 async def start_event_job(context: ContextTypes.DEFAULT_TYPE):
