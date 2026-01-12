@@ -256,8 +256,8 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
     # World Boss
     if world_boss_manager.state["is_active"] and final_region_key == world_boss_manager.state["location"]:
         hud_text = await world_boss_manager.get_battle_hud()
-        caption = (f"‼️ **PERIGO IMINENTE** ‼️\nO **Demônio Dimensional** está aqui!\n\n{hud_text}")
-        keyboard = [[InlineKeyboardButton("⚔️ ENTRAR NA RAID ⚔️", callback_data='wb_menu')], [InlineKeyboardButton("🗺️ Fugir", callback_data='travel')]]
+        caption = (f"‼️ 𝐏𝐄𝐑𝐈𝐆𝐎 𝐈𝐌𝐈𝐍𝐄𝐍𝐓𝐄 ‼️\nO 𝕯𝖊𝖒𝖔̂𝖓𝖎𝖔 𝕯𝖎𝖒𝖊𝖓𝖘𝖎𝖔𝖓𝖆𝖑 está aqui!\n\n{hud_text}")
+        keyboard = [[InlineKeyboardButton("🛡⚔️ 𝐄𝐍𝐓𝐑𝐀𝐑 𝐍𝐀 𝐑𝐀𝐈𝐃 ⚔️🛡", callback_data='wb_menu')], [InlineKeyboardButton("🗺️ 𝐅𝐮𝐠𝐢𝐫", callback_data='travel')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         try:
             fd = media_ids.get_file_data("boss_raid")

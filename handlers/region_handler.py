@@ -190,13 +190,13 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id: str, cha
     boss_location = world_boss_manager.boss_location
 
     if is_boss_active and region_key == boss_location:
-        caption = (f"‼️ **PERIGO IMINENTE** ‼️\n\n"
-                   f"O **Demônio Dimensional** está nesta região!\n\n"
+        caption = (f"‼️ 𝐏𝐄𝐑𝐈𝐆𝐎 𝐈𝐌𝐈𝐍𝐄𝐍𝐓𝐄 ‼️\n\n"
+                   f"O 𝕯𝖊𝖒𝖔̂𝖓𝖎𝖔 𝕯𝖎𝖒𝖊𝖓𝖘𝖎𝖔𝖓𝖆𝖑 está nesta região!\n\n"
                    f"{world_boss_manager.get_status_text()}")
         keyboard = [
-            [InlineKeyboardButton("⚔️ ATACAR O DEMÔNIO ⚔️", callback_data='wb_attack')],
-            [InlineKeyboardButton("👤 Personagem", callback_data='profile')],
-            [InlineKeyboardButton("🗺️ Ver Mapa", callback_data='travel')]
+            [InlineKeyboardButton("🛡⚔️ 𝐀𝐓𝐀𝐂𝐀𝐑 𝐎 𝐃𝐄𝐌𝐎̂𝐍𝐈𝐎 ⚔️🛡", callback_data='wb_attack')],
+            [InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data='profile')],
+            [InlineKeyboardButton("🗺️ 𝐕𝐞𝐫 𝐌𝐚𝐩𝐚", callback_data='travel')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         file_data = file_id_manager.get_file_data(BOSS_STATS.get("media_key"))

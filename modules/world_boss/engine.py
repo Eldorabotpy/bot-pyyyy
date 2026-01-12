@@ -1,5 +1,5 @@
 # modules/world_boss/engine.py
-# (VERSÃO FINAL: Full String ID + Compatibilidade ObjectId)
+# (VERSÃO CORRIGIDA: Anti-Spam de Contas Múltiplas + Notificação Admin)
 
 import json
 import os
@@ -24,7 +24,7 @@ from modules.combat.party_engine import process_party_effects
 
 logger = logging.getLogger(__name__)
 
-# --- CONSTANTES ---
+# --- CONFIGURAÇÃO ---
 BOSS_STATE_FILE = "world_boss_state.json"
 ANNOUNCEMENT_CHAT_ID = -1002881364171 
 ANNOUNCEMENT_THREAD_ID = 24           
@@ -47,7 +47,7 @@ SKILL_REWARD_POOL = [
     "berserker_golpe_selvagem", "berserker_golpe_divino_da_ira", "berserker_ultimo_recurso",
     "guerreiro_corte_perfurante", "guerreiro_colossal_defense", "guerreiro_bencao_sagrada"
 ]
-SKILL_CHANCE = 1.0 
+SKILL_CHANCE = 0.9 
 
 SKIN_REWARD_POOL = [
     "samurai_armadura_shogun", "samurai_armadura_demoniaca",
@@ -96,23 +96,23 @@ class WorldBossManager:
         self.entities = {
             "boss": {
                 "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬", "hp": 40000, "max_hp": 40000, 
-                "alive": True, "stats": {"attack": 80, "defense": 60, "initiative": 5, "luck": 20},
+                "alive": True, "stats": {"attack": 80, "defense": 40, "initiative": 5, "luck": 20},
                 "turn_counter": 0,
                 "loot_table": generated_loot
             },
             "witch_heal": {
                 "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚", "hp": 10000, "max_hp": 10000, 
-                "alive": True, "stats": {"attack": 50, "defense": 50, "initiative": 5, "luck": 10},
+                "alive": True, "stats": {"attack": 50, "defense": 40, "initiative": 5, "luck": 10},
                 "turn_counter": 0 
             },
             "witch_debuff": {
                 "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬", "hp": 10000, "max_hp": 10000, 
-                "alive": True, "stats": {"attack": 50, "defense": 50, "initiative": 5, "luck": 15},
+                "alive": True, "stats": {"attack": 50, "defense": 40, "initiative": 5, "luck": 15},
                 "turn_counter": 0 
             },
         }
 
-    # --- PERSISTÊNCIA (JSON) ---
+    # --- PERSISTÊNCIA ---
     def save_state(self):
         data = {
             "is_active": self.is_active,
@@ -120,7 +120,7 @@ class WorldBossManager:
             "entities": self.entities,
             "active_fighters": list(self.active_fighters), 
             "waiting_queue": self.waiting_queue,
-            "player_states": {str(k): v for k, v in self.player_states.items()}, # ✅ Força Chave String
+            "player_states": {str(k): v for k, v in self.player_states.items()},
             "environment_hazard": self.environment_hazard,
             "hazard_turns": self.hazard_turns,
             "damage_leaderboard": self.damage_leaderboard,
@@ -142,33 +142,25 @@ class WorldBossManager:
             self.is_active = data.get("is_active", False)
             self.location = data.get("location", "Terras Devastadas")
             self.entities = data.get("entities", {})
-            
-            # ✅ Restaura como String
             self.active_fighters = set(str(x) for x in data.get("active_fighters", []))
             self.waiting_queue = [str(x) for x in data.get("waiting_queue", [])]
-            
-            # ✅ Restaura chaves do dict como String (ObjectId)
             p_states_raw = data.get("player_states", {})
             self.player_states = {str(k): v for k, v in p_states_raw.items()}
-            
             self.environment_hazard = data.get("environment_hazard", False)
             self.hazard_turns = data.get("hazard_turns", 0)
             self.damage_leaderboard = data.get("damage_leaderboard", {})
             self.last_hitter_id = str(data.get("last_hitter_id")) if data.get("last_hitter_id") else None
-            
             logger.info("Estado do World Boss carregado com sucesso.")
         except Exception as e:
             logger.error(f"Erro ao carregar estado do World Boss: {e}")
             self._reset_entities()
 
     # --- CONTROLE ---
-    
     @property
     def state(self):
         return {"is_active": self.is_active, "location": self.location, "entities": self.entities}
     
     async def get_battle_hud(self):
-        # ... (Mantém igual)
         ents = self.entities
         boss = ents.get("boss")
         if not self.is_active or not boss or not boss["alive"]: return "O Boss foi derrotado!"
@@ -212,7 +204,7 @@ class WorldBossManager:
         }
 
     async def add_player_to_event(self, user_id, player_data):
-        user_id = str(user_id) # ✅ Garante String
+        user_id = str(user_id)
         if not self.is_active: return "inactive"
         if user_id in self.active_fighters: return "active"
         if user_id in self.waiting_queue: return "waiting"
@@ -247,7 +239,7 @@ class WorldBossManager:
         return False
 
     async def process_action(self, user_id, player_data, action_type, skill_id=None):
-        user_id = str(user_id) # ✅ Garante String
+        user_id = str(user_id)
         if user_id not in self.active_fighters: 
             return {"error": "𝙑𝙤𝙘𝙚̂ 𝙣𝙖̃𝙤 𝙚𝙨𝙩𝙖́ 𝙣𝙖 𝙡𝙪𝙩𝙖."}
         
@@ -335,9 +327,7 @@ class WorldBossManager:
         await self._process_mobs_turn(user_id, state, p_stats, logs)
 
         if state['hp'] <= 0:
-            # Lógica de Morte / Milagre
             has_miracle = False
-            # (Verificação simplificada de milagre - Mantenha sua lógica original se tiver passivas complexas)
             if not state.get("miracle_used") and has_miracle:
                 state['hp'] = 1 
                 state['miracle_used'] = True
@@ -371,7 +361,6 @@ class WorldBossManager:
         return {"success": True, "state": state}
     
     async def _process_mobs_turn(self, user_id, state, p_stats, logs):
-        # (Lógica mantida idêntica à sua, apenas garantindo que funcione)
         if self.environment_hazard:
             burn_dmg = int(state['max_hp'] * 0.05) 
             state['hp'] -= burn_dmg
@@ -401,7 +390,6 @@ class WorldBossManager:
                 state['hp'] -= edmg
                 logs.append(f"🤕 𝗕𝗼𝘀𝘀 hit: -{edmg} HP")
 
-        # Bruxas... (Código simplificado, mantendo a lógica original)
         for w_key in ["witch_heal", "witch_debuff"]:
             w = self.entities[w_key]
             if w["alive"]:
@@ -414,7 +402,7 @@ class WorldBossManager:
 world_boss_manager = WorldBossManager()
 
 # ======================================================
-# --- DM & LOOT DISTRIBUTION (CORE FIX HERE) ---
+# --- NOTIFICAÇÕES E ANÚNCIOS (AQUI ESTÁ A CORREÇÃO) ---
 # ======================================================
 
 async def _send_dm_to_winner(context: ContextTypes.DEFAULT_TYPE, chat_id: int, loot_messages: list[str]):
@@ -495,11 +483,12 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                 
                 player_mudou = True
 
-                # 2. Gacha Loot
+                # 2. Gacha Loot (AGORA CORRIGIDO PARA USAR AS VARIÁVEIS)
                 roll_rare = random.random() * 100
                 rare_item_id = None
                 
-                if roll_rare <= 3.0: 
+                # Chance da Skin (Ex: 2.0%)
+                if roll_rare <= SKIN_CHANCE: 
                     chosen_skin = random.choice(SKIN_REWARD_POOL)
                     rare_item_id = f"caixa_{chosen_skin}"
                     skn_id = rare_item_id.replace("caixa_", "")
@@ -507,7 +496,9 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     loot_won_messages.append(f"🎨 <b>SKIN RARA:</b> {d_name}")
                     skin_winners_msg.append(f"• {player_name} obteve <b>{d_name}</b>!")
                     
-                elif roll_rare <= 10.0:
+                # Chance da Skill (Ex: 0.09%) - Acumulativo
+                # Se roll_rare for maior que 2.0 mas menor que 2.09, cai aqui.
+                elif roll_rare <= (SKIN_CHANCE + SKILL_CHANCE):
                     chosen_skill = random.choice(SKILL_REWARD_POOL)
                     rare_item_id = f"tomo_{chosen_skill}"
                     sk_id = rare_item_id.replace("tomo_", "")
@@ -519,6 +510,7 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
                     player_manager.add_item_to_inventory(pdata, rare_item_id, 1)
                     player_mudou = True
 
+                # Loot Comum (50% de chance)
                 if random.random() * 100 <= 50.0:
                     loot_tuple = random.choice(LOOT_REWARD_POOL)
                     item_id_common = loot_tuple[0]
@@ -545,51 +537,40 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
             except Exception as e:
                 logger.error(f"[WB_LOOT] Erro ao processar player {uid}: {e}")
 
-    # --- ANÚNCIO CANAL (VISUAL CORRIGIDO IGUAL À PRINT) ---
+    # --- ANÚNCIO CANAL ---
     separator = "━━━━━━━━━━━━━━━━━━"
     if not boss_defeated:
         title = "☁️ <b>AS SOMBRAS PERMANECEM...</b>"
         body = f"<i>Inimigo recuou.\n\n🛡️ <b>Top 3:</b>\n" + "\n".join(top_3_msg)
     else:
-        # Título Exato da Print
         title = "⚔️ <b>A LENDA FOI ESCRITA!</b>"
-        
-        # Corpo: Boss e Lore
         body = f"<i>O Boss <b>{boss_data.get('name', 'Lorde das Sombras')}</b> foi derrotado!</i>\n"
         body += f"<i>A glória deste dia será cantada nas tavernas!</i>\n\n"
         
-        # MVP
         body += f"🏆 <b>HALL DA GLÓRIA (MVP)</b>\n"
         body += "\n".join(top_3_msg)
         
-        # Last Hit
         if last_hit_msg: body += f"\n{last_hit_msg}"
         
-        # Espólios (Stats Globais)
         body += f"\n\n{separator}\n🌍 <b>ESPÓLIOS DE GUERRA</b>\n"
         body += f"├ ⚔️ <b>Heróis:</b> {total_participants}\n"
         body += f"├ 💰 <b>Ouro:</b> {total_gold_distributed:,}\n"
         body += f"└ ✨ <b>XP:</b> {total_xp_distributed:,}\n"
         
-        # Recursos Globais Dropados (Resumo)
         if loot_summary:
             body += f"\n📦 <b>RECURSOS (Global)</b>\n"
-            # Mostra apenas os 4 primeiros para não poluir, ou todos se quiser
             itens_mostrados = 0
             for iname, iqtd in loot_summary.items():
                 if itens_mostrados >= 5: break
                 body += f"▪️ {iqtd}x {iname}\n"
                 itens_mostrados += 1
         
-        # Artefatos Lendários (Skills/Skins)
         if skin_winners_msg or skill_winners_msg:
             body += f"\n🚨 <b>ARTEFATOS LENDÁRIOS</b>\n"
             for msg in skin_winners_msg + skill_winners_msg:
-                # Remove o bullet padrão para usar um emoji melhor se quiser
                 clean_msg = msg.replace("• ", "").strip()
                 body += f"{clean_msg}\n"
 
-    # ENVIO PARA O CANAL
     try:
         if ANNOUNCEMENT_CHAT_ID:
             await context.bot.send_message(
@@ -601,6 +582,10 @@ async def distribute_loot_and_announce(context: ContextTypes.DEFAULT_TYPE, battl
     except Exception as e:
         logger.error(f"Erro ao enviar anúncio no canal: {e}")
 
+# ======================================================
+# --- BROADCAST COM DEDUPLICAÇÃO (A CORREÇÃO) ---
+# ======================================================
+
 async def broadcast_boss_announcement(application, location_key: str, forced_media_id: str = None):
     location_name = (game_data.REGIONS_DATA.get(location_key) or {}).get("display_name", location_key)
     
@@ -611,18 +596,17 @@ async def broadcast_boss_announcement(application, location_key: str, forced_med
             media_id = file_ids.get_file_id("boss_raid")
         except: pass
 
-    # --- TEXTO DA DM (Privado) ---
+    # --- TEXTO DA DM ---
     anuncio_dm = f"🚨 𝐀𝐋𝐄𝐑𝐓𝐀 𝐆𝐋𝐎𝐁𝐀𝐋 🚨\nᴜᴍ ᴅᴇᴍôɴɪᴏ ᴅɪᴍᴇɴsɪᴏɴᴀʟ sᴜʀɢɪᴜ ᴇᴍ {location_name}!\n\nᴄʟɪǫᴜᴇ ᴀʙᴀɪxᴏ ᴘᴀʀᴀ ᴠɪᴀᴊᴀʀ!"
     kb_dm = InlineKeyboardMarkup([[InlineKeyboardButton("🗺️ 𝔸𝔹ℝ𝕀ℝ 𝕄𝔸ℙ𝔸 𝔻𝔼 𝕍𝕀𝔸𝔾𝔼𝕄 🗺️", callback_data="travel")]])
 
-    # --- TEXTO DO CANAL (Igual à Print 1) ---
+    # --- TEXTO DO CANAL ---
     anuncio_canal = f"👺 <b>WORLD BOSS SURGIU!</b>\n📍 <b>Local:</b> {location_name}\n\nO monstro despertou! Ataquem!"
     
-    # 1. ENVIA PARA O CANAL/GRUPO OFICIAL (Correção Principal)
+    # 1. ENVIA PARA O CANAL
     try:
         if ANNOUNCEMENT_CHAT_ID:
             if media_id:
-                # Tenta Video -> Foto
                 try:
                     await application.bot.send_video(chat_id=ANNOUNCEMENT_CHAT_ID, video=media_id, caption=anuncio_canal, parse_mode='HTML', message_thread_id=ANNOUNCEMENT_THREAD_ID)
                 except:
@@ -634,15 +618,24 @@ async def broadcast_boss_announcement(application, location_key: str, forced_med
     except Exception as e:
         logger.error(f"Erro broadcast canal: {e}")
 
-    # 2. ENVIA PARA OS JOGADORES (DM)
+    # 2. ENVIA PARA OS JOGADORES (COM ANTI-DUP)
+    sent_chat_ids = set() # ✅ SET para evitar duplicação por Telegram ID
     count = 0
+    
     async for _oid, pdata in player_manager.iter_players():
         try:
             target_chat_id = pdata.get("last_chat_id")
             if not target_chat_id: target_chat_id = pdata.get("telegram_id_owner")
+            
             if not target_chat_id: continue
                 
             chat_id_int = int(target_chat_id)
+            
+            # ✅ VERIFICA SE JÁ ENVIOU PARA ESTE ID
+            if chat_id_int in sent_chat_ids:
+                continue
+                
+            sent_chat_ids.add(chat_id_int)
             sent = False
             
             if media_id:
@@ -666,9 +659,23 @@ async def broadcast_boss_announcement(application, location_key: str, forced_med
 async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
     await distribute_loot_and_announce(context, battle_results)
-    async for user_id, _ in player_manager.iter_players():
-        try: await context.bot.send_message(chat_id=user_id, text="⏳ 𝗧𝗲𝗺𝗽𝗼 𝗘𝘀𝗴𝗼𝘁𝗮𝗱𝗼! 𝗕𝗼𝘀𝘀 𝘀𝘂𝗺𝗶𝘂.")
-        except: pass
+    
+    # ✅ TAMBÉM ADICIONADO ANTI-DUP NO FIM
+    sent_chat_ids = set()
+    
+    async for user_id, pdata in player_manager.iter_players():
+        try:
+            target_chat_id = pdata.get("last_chat_id") or pdata.get("telegram_id_owner")
+            if not target_chat_id: continue
+            
+            chat_id_int = int(target_chat_id)
+            if chat_id_int in sent_chat_ids: continue
+            
+            sent_chat_ids.add(chat_id_int)
+            
+            await context.bot.send_message(chat_id=chat_id_int, text="⏳ 𝗢 𝘁𝗲𝗺𝗽𝗼 𝗮𝗰𝗮𝗯𝗼𝘂! 𝗢 𝗗𝗲𝗺𝗼̂𝗻𝗶𝗼 𝗗𝗶𝗺𝗲𝗻𝘀𝗶𝗼𝗻𝗮𝗹 𝗱𝗲𝘀𝗮𝗽𝗮𝗿𝗲𝗰𝗲𝘂...")
+            await asyncio.sleep(0.05) 
+        except: continue
 
 async def iniciar_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     if world_boss_manager.is_active: return
@@ -677,4 +684,3 @@ async def iniciar_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
         await broadcast_boss_announcement(context.application, res["location"])
         hours = context.job.data.get("duration_hours", 1) if context.job.data else 1
         context.job_queue.run_once(end_world_boss_job, when=timedelta(hours=hours))
-        
