@@ -166,7 +166,7 @@ async def show_kingdom_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             ],
             [
                 InlineKeyboardButton("⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐏𝐯𝐏", callback_data='pvp_arena'), 
-                InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬", callback_data='evt_hub_principal')
+                InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬", callback_data='evt_hub_principal'),
             ],
             # --- BOTÃO DO GUIA NOVO ---
             [InlineKeyboardButton("📘 𝐆𝐮𝐢𝐚 𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data='guide_main')],

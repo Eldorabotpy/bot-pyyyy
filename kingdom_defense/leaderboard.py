@@ -1,4 +1,5 @@
 # Arquivo: kingdom_defense/leaderboard.py
+# (VERSÃO ZERO-TOLERANCE: IDs STRINGS)
 
 import json
 from pathlib import Path
@@ -21,19 +22,18 @@ def _save_leaderboard(data: dict):
     try:
         LEADERBOARD_FILE.write_text(json.dumps(data, indent=4, ensure_ascii=False), encoding="utf-8")
     except IOError as e:
-        # Mantemos apenas logs de erro real, se necessário pode remover este print também
         print(f"Erro crítico ao salvar leaderboard: {e}")
 
-def update_top_score(user_id: int, character_name: str, damage: int):
+def update_top_score(user_id: str, character_name: str, damage: int):
     """
     Salva o MVP do evento atual.
-    Sobrescreve sempre o anterior para mostrar quem venceu o último evento.
+    Recebe user_id como STRING.
     """
     leaderboard = _load_leaderboard()
     
     # Cria o registro do novo vencedor
     new_record = {
-        "user_id": user_id,
+        "user_id": str(user_id), # Garante string no JSON
         "character_name": character_name,
         "damage": damage,
         "set_on": datetime.date.today().isoformat()
@@ -46,7 +46,6 @@ def update_top_score(user_id: int, character_name: str, damage: int):
 def get_top_score_text() -> str:
     """
     Retorna apenas o nome e o dano formatado para o Menu do Reino.
-    Formato: Nome (Dano) 🏆
     """
     leaderboard = _load_leaderboard()
     top_score = leaderboard.get("top_damage_record")
@@ -57,5 +56,4 @@ def get_top_score_text() -> str:
     name = top_score['character_name']
     damage = top_score.get('damage', 0)
     
-    # Retorna limpo para encaixar no layout do kingdom.py
     return f"<b>{name}</b> ({damage:,}) 🏆"

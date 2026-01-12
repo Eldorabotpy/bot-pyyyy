@@ -1,7 +1,8 @@
-# Arquivo: kingdom_defense/handler.py (VERSÃO FINAL CORRIGIDA)
+# Arquivo: kingdom_defense/handler.py (VERSÃO ZERO-TOLERANCE)
 
 import logging
 import html
+from typing import Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, CallbackQuery
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from .engine import event_manager
@@ -13,12 +14,28 @@ from handlers.menu.kingdom import show_kingdom_menu
 from modules.game_data.skills import SKILL_DATA
 from telegram.error import BadRequest
 from modules.game_data.class_evolution import can_player_use_skill
-from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TEST_IMAGE_ID = "AgACAgEAAxkBAAIMYWkeGkMHPgg2krbl_XdLH-evWuSRAAI1C2sbRHzxRHd5LKc3RFg1AQADAgADeAADNgQ"
 VICTORY_PHOTO_ID = "AgACAgEAAxkBAAIW52jztXfEWirRJSoo9yUx5pjGQ7u_AAInC2sbR-agR7yizwIUvB1jAQADAgADeQADNgQ" 
+
+# =============================================================================
+# HELPER DE SEGURANÇA (ID ESTRITO)
+# =============================================================================
+def _get_kingdom_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
+    """
+    Retorna o ID do jogador (ObjectId String) da sessão.
+    NÃO faz fallback para ID do Telegram. Se não tiver sessão, retorna None.
+    """
+    logged_id = context.user_data.get("logged_player_id")
+    if logged_id:
+        return str(logged_id)
+    # Se não tiver sessão, tenta pegar do Telegram mas converte para string
+    # (Apenas para comandos iniciais que não exigem login complexo, se houver)
+    if update.effective_user:
+        return str(update.effective_user.id)
+    return None
 
 async def _safe_interface_update(query, context, user_id, caption, media_key, keyboard):
     file_data = file_ids.get_file_data(media_key) if media_key else None
@@ -173,19 +190,18 @@ def _get_game_over_keyboard() -> InlineKeyboardMarkup:
 async def handle_exit_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Saindo do campo de batalha...")
-    
     try:
         await query.message.delete()
     except:
         pass
-
     await show_kingdom_menu(update, context)
 
-async def _get_target_selection_keyboard(user_id: int, skill_id: str) -> InlineKeyboardMarkup:
+async def _get_target_selection_keyboard(user_id: str, skill_id: str) -> InlineKeyboardMarkup:
     active_fighters_ids = list(event_manager.active_fighters)
     keyboard = []
     target_list = []
     for fighter_id in active_fighters_ids:
+        # fighter_id já é string vindo do event_manager
         player_data = await player_manager.get_player_data(fighter_id)
         player_state = event_manager.get_battle_data(fighter_id)
         if not player_data or not player_state: continue
@@ -201,16 +217,17 @@ async def _get_target_selection_keyboard(user_id: int, skill_id: str) -> InlineK
     sorted_targets = sorted(target_list, key=lambda t: t['hp_percent'])
     for target in sorted_targets:
         button_text = f"🛡️ {target['name']} ({target['hp_str']})"
-        callback_data = f"apply_skill:{skill_id}:{target['id']}"
+        callback_data = f"apply_skill:{skill_id}:{target['id']}" # Passa ID como string
         keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="show_skill_menu")])
     return InlineKeyboardMarkup(keyboard)
 
 async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, result: dict):
-    user_id = query.from_user.id
+    user_id = _get_kingdom_user_id(query, context)
+    
     if "aoe_results" in result:
         for event in result["aoe_results"]:
-            affected_id = event["user_id"]
+            affected_id = str(event["user_id"])
             if affected_id == user_id: continue
             try:
                 affected_player_data = await player_manager.get_player_data(affected_id) 
@@ -229,60 +246,37 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
                     except: pass
             except Exception as e: logger.error(f"Falha ao notificar jogador passivo {affected_id}: {e}")
 
-    # -------------------------------------------------------------------------
-    # 1. VERIFICAÇÃO DE VITÓRIA (FIM DO EVENTO)
-    # -------------------------------------------------------------------------
     if result.get("event_over"):
         final_log = result.get("action_log", "")
         victory_caption = f"🏆 <b>VITÓRIA!</b> 🏆\n\nO reino está a salvo!\n\n<i>Últimas ações:\n{html.escape(final_log)}</i>"
-        
         try:
-            # Tenta editar a mensagem atual trocando a foto pela de vitória
             media_victory = InputMediaPhoto(media=VICTORY_PHOTO_ID, caption=victory_caption, parse_mode='HTML')
             await query.edit_message_media(media=media_victory, reply_markup=_get_game_over_keyboard())
         except Exception:
-            # Fallback: Se não der para editar (ex: imagem antiga expirou), apaga e envia nova
             try: await query.message.delete()
             except: pass
-            await context.bot.send_photo(
-                chat_id=user_id, 
-                photo=VICTORY_PHOTO_ID, 
-                caption=victory_caption, 
-                reply_markup=_get_game_over_keyboard(), 
-                parse_mode='HTML'
-            )
+            await context.bot.send_photo(chat_id=user_id, photo=VICTORY_PHOTO_ID, caption=victory_caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
         return
 
-    # -------------------------------------------------------------------------
-    # 2. VERIFICAÇÃO DE DERROTA (GAME OVER DO JOGADOR)
-    # -------------------------------------------------------------------------
-    # Verifica se morreu por ataque normal OU por dano em área (AOE)
     is_player_defeated = result.get("game_over") or (
         "aoe_results" in result and 
-        any(e['user_id'] == user_id and e['was_defeated'] for e in result["aoe_results"])
+        any(str(e['user_id']) == user_id and e['was_defeated'] for e in result["aoe_results"])
     )
 
     if is_player_defeated:
         final_log = result.get('action_log', 'Você foi derrotado.')
         caption = f"☠️ <b>FIM DE JOGO</b> ☠️\n\nSua jornada na defesa chegou ao fim.\n\n<b>Última Ação:</b>\n<code>{html.escape(final_log)}</code>"
-        
         try: 
-            # Tenta pegar a imagem de caveira/game over
             defeat_media_id = file_ids.get_file_id('game_over_skull')
-            
             if defeat_media_id:
                 media = InputMediaPhoto(media=defeat_media_id, caption=caption, parse_mode="HTML")
                 await query.edit_message_media(media=media, reply_markup=_get_game_over_keyboard())
             else: 
                 raise ValueError("Imagem de Game Over não encontrada")
         except Exception:
-            # Fallback 1: Tenta editar apenas a legenda mantendo a imagem atual
-            try: 
-                await query.edit_message_caption(caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
+            try: await query.edit_message_caption(caption=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
             except: 
-                # Fallback 2: Se não tiver imagem, edita o texto
-                try: 
-                    await query.edit_message_text(text=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
+                try: await query.edit_message_text(text=caption, reply_markup=_get_game_over_keyboard(), parse_mode='HTML')
                 except: pass
         return
 
@@ -332,27 +326,18 @@ async def _resolve_battle_turn(query: CallbackQuery, context: ContextTypes.DEFAU
              try: await query.edit_message_caption(caption="A batalha terminou.", reply_markup=_get_game_over_keyboard())
              except: pass
 
-# =============================================================================
-# HANDLERS DE SKILLS CORRIGIDOS
-# =============================================================================
-
 async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    # 1. Responde imediatamente para parar o "reloginho" de carregamento
     try: await query.answer()
     except: pass
     
-    user_id = query.from_user.id
+    user_id = _get_kingdom_user_id(update, context)
     player_data = await player_manager.get_player_data(user_id) 
     if not player_data: return
     
-    # Previne erro se o player não tiver classe definida (comum em ADMs ou contas novas)
     player_class = (player_data.get("class_key") or player_data.get("class") or "aventureiro").lower()
-    
-    # Garante que equipped_skills seja uma lista
     equipped_skills = player_data.get("equipped_skills", [])
     if not equipped_skills:
-        # Tenta pegar todas as skills se não tiver nenhuma equipada (fallback)
         if player_data.get("skills"):
             equipped_skills = list(player_data["skills"].keys())
         else:
@@ -365,47 +350,36 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     
     for skill_id in equipped_skills:
-        # Usa a função local que lida com raridade
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
-        
-        # Pula se a skill não existir ou for passiva
         if not skill_info or skill_info.get("type") == "passive": 
             continue 
 
-        # --- PROTEÇÃO CONTRA ERRO DE CLASSE ---
         allowed_classes = skill_info.get("allowed_classes", [])
         try:
-            # Se a lista de permitidos não for vazia, verifica se pode usar
             if allowed_classes and can_player_use_skill:
                 if not can_player_use_skill(player_class, allowed_classes):
                     continue 
         except Exception as e:
-            # Se der erro na verificação (ex: função não existe), PERMITE o uso para não travar
             logger.error(f"Erro ao verificar classe da skill {skill_id}: {e}")
-        # ----------------------------------------
 
         mana_cost = skill_info.get('mana_cost', 0)
         turns_left = active_cooldowns.get(skill_id, 0)
         
-        # Formata o texto do botão
         status_icon = "💥"
         if turns_left > 0:
             status_icon = f"⏳ ({turns_left})"
         elif current_mana < mana_cost:
-            status_icon = "💧" # Sem mana
+            status_icon = "💧" 
             
         button_text = f"{status_icon} {skill_info['display_name']} ({mana_cost} MP)"
         
-        # Lógica de alvo (Single Target vs Auto)
         skill_type = skill_info.get("type", "active")
-        is_single_target = skill_type == "support_heal" # Exemplo de target manual
+        is_single_target = skill_type == "support_heal"
         
         callback_action = ""
         if turns_left > 0:
-            # Botão de cooldown (apenas informativo)
             callback_action = f"kd_cooldown_alert:{turns_left}" 
         elif current_mana < mana_cost:
-            # Botão de sem mana
             callback_action = "kd_no_mana_alert"
         else:
             if is_single_target:
@@ -415,7 +389,6 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
         keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_action)])
     
-    # Se depois de filtrar não sobrou nada
     if not keyboard:
         keyboard.append([InlineKeyboardButton("🚫 Nenhuma skill ativa disponível", callback_data="noop")])
     
@@ -430,13 +403,12 @@ async def show_skill_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text=text_content, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     except Exception as e:
         logger.error(f"Erro ao exibir menu de skills: {e}")
-        # Tenta mandar uma mensagem nova se a edição falhar
         await context.bot.send_message(chat_id=user_id, text="Erro ao abrir skills. Tente novamente.", parse_mode="HTML")
 
 async def select_skill_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user_id = _get_kingdom_user_id(update, context)
     try: skill_id = query.data.split(':')[1]
     except: await query.answer("Erro na skill.", show_alert=True); return
     
@@ -456,7 +428,7 @@ async def select_skill_target(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def back_to_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
+    user_id = _get_kingdom_user_id(update, context)
     player_data = await player_manager.get_player_data(user_id)
     total_stats = await player_manager.get_player_total_stats(player_data)
     battle_data = event_manager.get_battle_data(user_id)
@@ -470,7 +442,7 @@ async def back_to_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = get_current_player_id(update, context)
+    user_id = _get_kingdom_user_id(update, context)
     now = time.time()
     last_attack_time = context.user_data.get('kd_last_attack_time', 0)
     if now - last_attack_time < 2.0: await query.answer("Aguarde!", cache_time=1); return
@@ -492,53 +464,43 @@ async def handle_marathon_attack(update: Update, context: ContextTypes.DEFAULT_T
 
 async def use_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_kingdom_user_id(update, context)
     now = time.time()
     
-    # Controle de Spam (Cooldown de clique)
     last_action_time = context.user_data.get('kd_last_action_time', 0)
     if now - last_action_time < 2.0: 
         await query.answer("Aguarde!", cache_time=1)
         return
     context.user_data['kd_last_action_time'] = now
     
-    # Tenta extrair o ID da skill do botão
     try: 
         skill_id = query.data.split(':')[1]
     except (IndexError, AttributeError): 
         return
 
-    # Carrega dados do jogador
     player_data = await player_manager.get_player_data(user_id) 
     if not player_data: 
         return
 
-    # Carrega dados da skill com raridade para verificar custo de mana
     skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
     if not skill_info: 
         await query.answer("Erro: Habilidade não encontrada.", show_alert=True)
         return
 
-    # Verificação de Mana
     mana_cost = skill_info.get("mana_cost", 0)
     current_mana = player_data.get("mana", 0)
     if current_mana < mana_cost:
         await query.answer(f"Mana insuficiente! ({current_mana}/{mana_cost})", show_alert=True)
         return
 
-    # Confirma o clique para a UI parar de carregar
     await query.answer()
     
     try:
-        # Processa a skill no engine
         result = await event_manager.process_player_skill(user_id, player_data, skill_id)
-        
-        # Se o engine retornou erro explícito (ex: Cooldown)
         if "error" in result:
             await query.answer(result["error"], show_alert=True)
             return
 
-        # Resolve o turno (atualiza a mensagem com log de batalha e dano)
         await _resolve_battle_turn(query, context, result)
         
     except Exception as e:
@@ -547,15 +509,17 @@ async def use_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def apply_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
+    user_id = _get_kingdom_user_id(update, context)
     now = time.time()
     last_action_time = context.user_data.get('kd_last_action_time', 0)
     if now - last_action_time < 2.0: await query.answer("Aguarde!", cache_time=1); return
     context.user_data['kd_last_action_time'] = now
 
     try:
+        # Pega o ID alvo como STRING
         _, skill_id, target_id_str = query.data.split(':')
-        target_id = int(target_id_str)
+        target_id = target_id_str 
+
         player_data = await player_manager.get_player_data(user_id)
         if not player_data: return
         skill_info = _get_player_skill_data_by_rarity(player_data, skill_id)
@@ -565,7 +529,6 @@ async def apply_skill_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.answer()
         result = await event_manager.process_player_skill(user_id, player_data, skill_id, target_id=target_id)
         
-        # CORREÇÃO IMPORTANTE: Checa erro antes de atualizar UI
         if "error" in result:
             await query.answer(result["error"], show_alert=True)
             return
@@ -610,7 +573,7 @@ async def show_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = get_current_player_id(update, context)
+    user_id = _get_kingdom_user_id(update, context)
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
     if player_data.get('inventory', {}).get('ticket_defesa_reino', 0) <= 0:
@@ -635,7 +598,7 @@ async def handle_join_and_start_battle(update: Update, context: ContextTypes.DEF
 
 async def check_queue_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = get_current_player_id(update, context)
+    user_id = _get_kingdom_user_id(update, context)
     if not event_manager.is_active:
         await query.edit_message_text("Evento encerrado.", reply_markup=_get_game_over_keyboard()); return
 
