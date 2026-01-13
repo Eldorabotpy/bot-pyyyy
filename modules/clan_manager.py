@@ -1,5 +1,5 @@
 # modules/clan_manager.py
-# (VERSÃO FINAL: COMPATÍVEL COM OBJECTID STRING E COLEÇÃO USERS)
+# (VERSÃO FINAL: COMPATÍVEL COM OBJECTID E SISTEMA DE CARGOS)
 
 import os
 import logging
@@ -14,19 +14,28 @@ from modules.game_data.clans import CLAN_PRESTIGE_LEVELS, CLAN_CONFIG
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
+# CONFIGURAÇÃO DE CARGOS (RANKING)
+# ==============================================================================
+CLAN_RANKS = {
+    "leader": {"lvl": 4, "name": "Líder",   "emoji": "👑"},
+    "vice":   {"lvl": 3, "name": "General", "emoji": "⚔️"},
+    "elder":  {"lvl": 2, "name": "Ancião",  "emoji": "🛡️"},
+    "member": {"lvl": 1, "name": "Membro",  "emoji": "👤"}
+}
+
+# ==============================================================================
 # CONFIGURAÇÃO BLINDADA DO MONGODB
 # ==============================================================================
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 clans_col = None
-users_col = None # Referência para limpar vínculo ao deletar clã
+users_col = None 
 
 try:
     client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
     db = client["eldora_db"]
     clans_col = db["clans"]
-    users_col = db["users"] # Coleção nova de jogadores
+    users_col = db["users"] 
     
-    # Cria índice para garantir que nomes de clãs sejam únicos
     clans_col.create_index("name_lower", unique=True)
     logger.info("✅ [CLAN MANAGER] Conectado ao MongoDB Atlas (Clans + Users).")
 except Exception as e:
@@ -44,7 +53,6 @@ def _generate_clan_id() -> str:
     return f"clan_{uuid.uuid4().hex[:8]}"
 
 def _ensure_str(value: Any) -> str:
-    """Garante que IDs sejam strings para compatibilidade com ObjectId."""
     return str(value)
 
 # ==============================================================================
@@ -52,30 +60,32 @@ def _ensure_str(value: Any) -> str:
 # ==============================================================================
 
 async def get_clan(clan_id: str) -> Optional[dict]:
-    """Busca os dados de um clã pelo ID."""
     if clans_col is None or not clan_id: return None
     return clans_col.find_one({"_id": clan_id})
 
 async def find_clan_by_display_name(name: str) -> Optional[dict]:
-    """Busca clã pelo nome (case-insensitive)."""
     if clans_col is None: return None
     return clans_col.find_one({"name_lower": name.strip().lower()})
+
+async def get_member_rank(clan: dict, user_id: str) -> str:
+    """Retorna a chave do rank (leader, vice, elder, member)."""
+    user_id = _ensure_str(user_id)
+    if user_id == _ensure_str(clan.get("leader_id")):
+        return "leader"
+    
+    ranks = clan.get("member_ranks", {})
+    return ranks.get(user_id, "member")
 
 # ==============================================================================
 # FUNÇÕES DE GERENCIAMENTO (CRIAR, ENTRAR, SAIR)
 # ==============================================================================
 
 async def create_clan(leader_id: Union[str, int], clan_name: str, payment_method: str = 'gold') -> str:
-    """
-    Cria um novo clã no banco de dados.
-    Retorna o clan_id gerado.
-    """
     if clans_col is None: raise ValueError("Banco de dados offline.")
     
     leader_id_str = _ensure_str(leader_id)
-    
-    # Verifica nome duplicado
     name_clean = clan_name.strip()
+    
     if clans_col.find_one({"name_lower": name_clean.lower()}):
         raise ValueError(f"O nome '{name_clean}' já está em uso.")
 
@@ -86,14 +96,15 @@ async def create_clan(leader_id: Union[str, int], clan_name: str, payment_method
         "name": name_clean,
         "name_lower": name_clean.lower(),
         "display_name": name_clean,
-        "leader_id": leader_id_str, # String
+        "leader_id": leader_id_str,
         "created_at": _now_iso(),
         "level": 1,
         "xp": 0,
         "prestige_level": 1,
         "prestige_points": 0,
         "bank": 0, 
-        "members": [leader_id_str], # Lista de Strings
+        "members": [leader_id_str],
+        "member_ranks": {}, # Novo campo para armazenar cargos extras
         "max_members": 10,
         "pending_applications": [],
         "bank_log": [],
@@ -107,12 +118,10 @@ async def create_clan(leader_id: Union[str, int], clan_name: str, payment_method
     return clan_id
 
 async def add_application(clan_id: str, user_id: Union[str, int]):
-    """Adiciona um jogador à lista de espera."""
     user_id_str = _ensure_str(user_id)
     clan = await get_clan(clan_id)
     if not clan: raise ValueError("Clã não encontrado.")
     
-    # Verifica em strings
     members = [_ensure_str(m) for m in clan.get("members", [])]
     if user_id_str in members:
         raise ValueError("Você já é membro deste clã.")
@@ -127,14 +136,12 @@ async def add_application(clan_id: str, user_id: Union[str, int]):
     )
 
 async def accept_application(clan_id: str, applicant_id: Union[str, int]):
-    """Aceita um membro (Move de pending para members)."""
     app_id_str = _ensure_str(applicant_id)
-    
     clan = await get_clan(clan_id)
     if not clan: raise ValueError("Clã inválido.")
     
     if len(clan.get("members", [])) >= clan.get("max_members", 10):
-        raise ValueError("O clã está lotado! Aumente o nível para recrutar mais.")
+        raise ValueError("O clã está lotado!")
         
     clans_col.update_one(
         {"_id": clan_id},
@@ -145,7 +152,6 @@ async def accept_application(clan_id: str, applicant_id: Union[str, int]):
     )
 
 async def decline_application(clan_id: str, applicant_id: Union[str, int]):
-    """Recusa um membro."""
     app_id_str = _ensure_str(applicant_id)
     clans_col.update_one(
         {"_id": clan_id},
@@ -153,27 +159,26 @@ async def decline_application(clan_id: str, applicant_id: Union[str, int]):
     )
 
 async def remove_member(clan_id: str, user_id: Union[str, int], kicked_by_leader: bool = True):
-    """Remove um membro do clã."""
     user_id_str = _ensure_str(user_id)
-    
     clan = await get_clan(clan_id)
     if not clan: raise ValueError("Clã não encontrado.")
     
     if user_id_str == _ensure_str(clan.get("leader_id")):
-        raise ValueError("O líder não pode sair/ser expulso. Transfira a liderança ou desfaça o clã.")
+        raise ValueError("O líder não pode sair. Transfira a liderança primeiro.")
         
     clans_col.update_one(
         {"_id": clan_id},
-        {"$pull": {"members": user_id_str}}
+        {
+            "$pull": {"members": user_id_str},
+            "$unset": {f"member_ranks.{user_id_str}": ""} # Remove o cargo também
+        }
     )
 
 async def transfer_leadership(clan_id: str, old_leader_id: Union[str, int], new_leader_id: Union[str, int]):
-    """Passa a coroa para outro membro."""
     new_leader_str = _ensure_str(new_leader_id)
+    old_leader_str = _ensure_str(old_leader_id)
     
     clan = await get_clan(clan_id)
-    
-    # Normaliza lista de membros para verificação
     members_str = [_ensure_str(m) for m in clan.get("members", [])]
     
     if new_leader_str not in members_str:
@@ -181,30 +186,93 @@ async def transfer_leadership(clan_id: str, old_leader_id: Union[str, int], new_
         
     clans_col.update_one(
         {"_id": clan_id},
-        {"$set": {"leader_id": new_leader_str}}
+        {
+            "$set": {"leader_id": new_leader_str},
+            "$unset": {f"member_ranks.{new_leader_str}": ""} # Novo líder não precisa de rank no dict
+        }
     )
 
 async def set_clan_media(clan_id: str, user_id: str, media_data: dict):
-    """Salva o file_id da logo do clã."""
     clans_col.update_one(
         {"_id": clan_id},
-        {"$set": {
-            "logo_media_key": f"clan_logo_{clan_id}", 
-            "custom_logo_data": media_data 
-        }}
+        {"$set": {"logo_media_key": f"clan_logo_{clan_id}", "custom_logo_data": media_data}}
     )
 
 # ==============================================================================
-# BANCO E ECONOMIA
+# CARGOS E PROMOÇÕES (NOVO)
+# ==============================================================================
+
+async def promote_member(clan_id: str, actor_id: str, target_id: str) -> tuple[bool, str]:
+    """Promove um membro para o próximo cargo."""
+    clan = await get_clan(clan_id)
+    if not clan: return False, "Clã não encontrado."
+
+    actor_rank = await get_member_rank(clan, actor_id)
+    target_rank_key = await get_member_rank(clan, target_id)
+    
+    # Regra: Só Líder pode promover (simplificação para evitar loops)
+    if actor_rank != "leader":
+        return False, "Apenas o Líder pode promover membros."
+        
+    if target_rank_key == "leader":
+        return False, "Não pode promover o líder."
+    
+    # Define a hierarquia
+    next_rank = None
+    if target_rank_key == "member": next_rank = "elder"
+    elif target_rank_key == "elder": next_rank = "vice"
+    elif target_rank_key == "vice": return False, "Cargo máximo atingido! Transfira a liderança."
+
+    # Atualiza no Banco
+    clans_col.update_one(
+        {"_id": clan_id},
+        {"$set": {f"member_ranks.{target_id}": next_rank}}
+    )
+    
+    rank_name = CLAN_RANKS[next_rank]["name"]
+    return True, f"Membro promovido para **{rank_name}**!"
+
+async def demote_member(clan_id: str, actor_id: str, target_id: str) -> tuple[bool, str]:
+    """Rebaixa um membro."""
+    clan = await get_clan(clan_id)
+    if not clan: return False, "Clã não encontrado."
+    
+    actor_rank = await get_member_rank(clan, actor_id)
+    target_rank_key = await get_member_rank(clan, target_id)
+    
+    if actor_rank != "leader":
+         return False, "Apenas o Líder pode rebaixar."
+
+    if target_rank_key == "member":
+        return False, "Já está no cargo mais baixo."
+        
+    prev_rank = None
+    if target_rank_key == "vice": prev_rank = "elder"
+    elif target_rank_key == "elder": prev_rank = "member"
+    
+    # Se voltar para membro, removemos a chave do dicionário
+    if prev_rank == "member":
+        clans_col.update_one(
+            {"_id": clan_id},
+            {"$unset": {f"member_ranks.{target_id}": ""}}
+        )
+    else:
+        clans_col.update_one(
+            {"_id": clan_id},
+            {"$set": {f"member_ranks.{target_id}": prev_rank}}
+        )
+
+    rank_name = CLAN_RANKS[prev_rank]["name"]
+    return True, f"Membro rebaixado para **{rank_name}**."
+
+# ==============================================================================
+# BANCO, ECONOMIA, PROGRESSO E MISSÕES (Mantidos iguais)
 # ==============================================================================
 
 async def bank_deposit(clan_id: str, user_id: Union[str, int], amount: int) -> Tuple[bool, str]:
-    """Adiciona ouro ao banco do clã e registra log."""
     if amount <= 0: return False, "Valor inválido."
     user_id_str = _ensure_str(user_id)
-    
     try:
-        # Pega info do jogador para o log (opcional, pode ser só ID se falhar)
         player_name = f"ID {user_id_str}"
         try:
             from modules import player_manager
@@ -218,13 +286,7 @@ async def bank_deposit(clan_id: str, user_id: Union[str, int], amount: int) -> T
                 "$inc": {"bank": amount, "prestige_points": int(amount * 0.01)}, 
                 "$push": {
                     "bank_log": {
-                        "$each": [{
-                            "action": "depositou",
-                            "player_id": user_id_str,
-                            "player_name": player_name,
-                            "amount": amount,
-                            "timestamp": _now_iso()
-                        }],
+                        "$each": [{"action": "depositou", "player_id": user_id_str, "player_name": player_name, "amount": amount, "timestamp": _now_iso()}],
                         "$slice": -20 
                     }
                 }
@@ -236,191 +298,73 @@ async def bank_deposit(clan_id: str, user_id: Union[str, int], amount: int) -> T
         return False, "Erro no banco de dados."
 
 async def bank_withdraw(clan_id: str, user_id: str, amount: int) -> Tuple[bool, str]:
-    """Retira ouro do banco do clã (apenas líder)."""
     user_id_str = _ensure_str(user_id)
     clan = await get_clan(clan_id)
     if not clan: return False, "Clã não encontrado."
-    
-    if _ensure_str(clan.get("leader_id")) != user_id_str:
-        return False, "Apenas o líder pode sacar."
-        
-    current_balance = clan.get("bank", 0)
-    if current_balance < amount:
-        return False, f"Saldo insuficiente (Atual: {current_balance})."
+    if _ensure_str(clan.get("leader_id")) != user_id_str: return False, "Apenas o líder pode sacar."
+    if clan.get("bank", 0) < amount: return False, "Saldo insuficiente."
         
     clans_col.update_one(
         {"_id": clan_id},
-        {
-            "$inc": {"bank": -amount},
-            "$push": {
-                "bank_log": {
-                    "$each": [{
-                        "action": "sacou",
-                        "player_id": user_id_str,
-                        "player_name": "Líder",
-                        "amount": amount,
-                        "timestamp": _now_iso()
-                    }],
-                    "$slice": -20
-                }
-            }
-        }
+        {"$inc": {"bank": -amount}, "$push": {"bank_log": {"$each": [{"action": "sacou", "player_id": user_id_str, "player_name": "Líder", "amount": amount, "timestamp": _now_iso()}], "$slice": -20}}}
     )
     return True, f"Saque de {amount} realizado."
 
-# ==============================================================================
-# PROGRESSÃO E MISSÕES
-# ==============================================================================
-
 async def level_up_clan(clan_id: str, user_id: str, payment_method: str):
-    """Tenta subir o nível de prestígio do clã e consome recursos."""
     clan = await get_clan(clan_id)
     if not clan: raise ValueError("Clã não encontrado.")
     
     current_lvl = clan.get("prestige_level", 1)
     current_pts = clan.get("prestige_points", 0)
-    
-    # Busca dados do próximo nível
     next_lvl_info = CLAN_PRESTIGE_LEVELS.get(current_lvl + 1)
-    if not next_lvl_info:
-        raise ValueError("Nível máximo atingido!")
-        
+    if not next_lvl_info: raise ValueError("Nível máximo atingido!")
     req_pts = next_lvl_info.get("points_to_next_level", 999999)
     cost = next_lvl_info.get("upgrade_cost", {})
-    
-    # 1. Verifica XP
-    if current_pts < req_pts:
-        raise ValueError(f"Faltam pontos de prestígio ({current_pts}/{req_pts}).")
-        
+    if current_pts < req_pts: raise ValueError(f"Faltam pontos de prestígio.")
     cost_val = cost.get(payment_method, 0)
-    
-    # 2. Verifica e Cobra o Custo Monetário (Gold/Dimas)
     update_query = {}
-    
-    # OBS: O custo em Ouro do player ou Dimas do player deve ser descontado no Handler.
-    # Aqui descontamos do BANCO DO CLÃ se for ouro, ou apenas o XP se for Dimas (pago pelo player).
-    
     if payment_method == 'gold':
-        if clan.get("bank", 0) < cost_val:
-            raise ValueError(f"Ouro insuficiente no cofre ({cost_val} necessários).")
-        
-        update_query = {
-            "$inc": {
-                "bank": -cost_val, 
-                "prestige_level": 1,
-                "prestige_points": -req_pts 
-            },
-            "$set": {"max_members": next_lvl_info.get("max_members", 10)}
-        }
-        
+        if clan.get("bank", 0) < cost_val: raise ValueError("Ouro insuficiente.")
+        update_query = {"$inc": {"bank": -cost_val, "prestige_level": 1, "prestige_points": -req_pts}, "$set": {"max_members": next_lvl_info.get("max_members", 10)}}
     elif payment_method == 'dimas':
-        # O handler já cobrou os diamantes do usuário. Aqui só evoluímos.
-        update_query = {
-            "$inc": {
-                "prestige_level": 1,
-                "prestige_points": -req_pts 
-            },
-            "$set": {"max_members": next_lvl_info.get("max_members", 10)}
-        }
-    
-    # 3. Executa a atualização
+        update_query = {"$inc": {"prestige_level": 1, "prestige_points": -req_pts}, "$set": {"max_members": next_lvl_info.get("max_members", 10)}}
     clans_col.update_one({"_id": clan_id}, update_query)
-    
-    logger.info(f"[CLAN] Clã {clan_id} subiu para nível {current_lvl + 1} por {user_id}.")
 
 async def get_active_guild_mission(clan_id: str) -> Optional[dict]:
-    """Retorna a missão ativa do clã."""
     clan = await get_clan(clan_id)
     return clan.get("active_mission") if clan else None
 
 async def assign_mission_to_clan(clan_id: str, mission_id: str, user_id: str):
-    """Define uma missão ativa para o clã."""
     from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG
-    
     mission_template = GUILD_MISSIONS_CATALOG.get(mission_id)
     if not mission_template: raise ValueError("Missão inválida.")
-    
-    active_mission = {
-        "id": mission_id,
-        "title": mission_template["title"],
-        "type": mission_template["type"],
-        "target_monster_id": mission_template.get("target_monster_id"),
-        "target_item_id": mission_template.get("target_item_id"),
-        "target_count": mission_template["target_count"],
-        "current_progress": 0,
-        "start_date": _now_iso(),
-        "rewards": mission_template["rewards"],
-        "description": mission_template.get("description", ""),
-        "completed": False
-    }
-    
-    clans_col.update_one(
-        {"_id": clan_id},
-        {"$set": {"active_mission": active_mission}}
-    )
+    active_mission = {"id": mission_id, "title": mission_template["title"], "type": mission_template["type"], "target_monster_id": mission_template.get("target_monster_id"), "target_item_id": mission_template.get("target_item_id"), "target_count": mission_template["target_count"], "current_progress": 0, "start_date": _now_iso(), "rewards": mission_template["rewards"], "description": mission_template.get("description", ""), "completed": False}
+    clans_col.update_one({"_id": clan_id}, {"$set": {"active_mission": active_mission}})
 
 async def update_guild_mission_progress(user_id: Union[str, int], action_type: str, target_id: str, quantity: int = 1):
-    """
-    Atualiza o progresso da missão do clã se a ação corresponder.
-    """
     user_id_str = _ensure_str(user_id)
-    
-    # Importação local para evitar ciclo
     from modules import player_manager
     pdata = await player_manager.get_player_data(user_id_str)
-    
-    if not pdata or not pdata.get("clan_id"):
-        return
-
+    if not pdata or not pdata.get("clan_id"): return
     clan_id = pdata.get("clan_id")
     clan = await get_clan(clan_id)
     if not clan: return
-
     mission = clan.get("active_mission")
-    if not mission or mission.get("completed"):
-        return
-
+    if not mission or mission.get("completed"): return
     mission_type = str(mission.get("type", "")).upper()
     action_type = str(action_type).upper()
-
     match = False
-    
     if mission_type == 'HUNT' and action_type == 'HUNT':
-        target_monster = mission.get("target_monster_id")
-        if target_monster == target_id:
-            match = True
-            
+        if mission.get("target_monster_id") == target_id: match = True
     elif mission_type == 'COLLECT' and action_type == 'COLLECT':
-        target_item = mission.get("target_item_id")
-        if target_item == target_id:
-            match = True
-
-    if match:
-        clans_col.update_one(
-            {"_id": clan_id},
-            {"$inc": {"active_mission.current_progress": quantity}}
-        )
+        if mission.get("target_item_id") == target_id: match = True
+    if match: clans_col.update_one({"_id": clan_id}, {"$inc": {"active_mission.current_progress": quantity}})
 
 async def delete_clan(clan_id: str, leader_id: Union[str, int]):
-    """
-    Apaga permanentemente um clã e remove os membros.
-    """
     leader_id_str = _ensure_str(leader_id)
     clan = await get_clan(clan_id)
-    if not clan: 
-        raise ValueError("Clã não encontrado.")
-    
-    if _ensure_str(clan.get("leader_id")) != leader_id_str:
-        raise ValueError("Apenas o líder pode dissolver o clã.")
-
-    # 1. Remove o documento do Clã
+    if not clan: raise ValueError("Clã não encontrado.")
+    if _ensure_str(clan.get("leader_id")) != leader_id_str: raise ValueError("Apenas o líder pode dissolver o clã.")
     clans_col.delete_one({"_id": clan_id})
-
-    # 2. Remove o vínculo de TODOS os jogadores na coleção USERS
-    if users_col is not None:
-        users_col.update_many(
-            {"clan_id": clan_id},
-            {"$set": {"clan_id": None}}
-        )
-    
+    if users_col is not None: users_col.update_many({"clan_id": clan_id}, {"$set": {"clan_id": None}})
     logger.info(f"[CLAN] Clã {clan_id} foi deletado pelo líder {leader_id_str}.")
