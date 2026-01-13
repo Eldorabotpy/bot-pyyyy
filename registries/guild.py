@@ -2,7 +2,7 @@
 # REGISTRY COMPLETO DO SISTEMA DE GUILDA / CLÃ
 # (inclui: Guilda de Aventureiros (NPC) + Clã (guilda real) + Banco + Missões + Guerra)
 
-from telegram.ext import Application
+from telegram.ext import Application, CallbackQueryHandler
 
 # ==============================================================================
 # CONVERSATIONS (Fluxos longos – prioridade máxima)
@@ -93,8 +93,7 @@ except ImportError:
 from handlers.guild.dashboard import clan_handler
 
 # ==============================================================================
-# ✅ GUILDA DE AVENTUREIROS (NPC) — ESTES ERAM OS HANDLERS FALTANDO
-# (é isso que faz "adventurer_guild_main" responder no Reino e no Personagem)
+# ✅ GUILDA DE AVENTUREIROS (NPC)
 # ==============================================================================
 from handlers.guild_menu_handler import (
     adventurer_guild_handler,
@@ -102,6 +101,16 @@ from handlers.guild_menu_handler import (
     mission_claim_handler,
     clan_board_handler,
 )
+
+# ==============================================================================
+# ✅ FIX: botão "Acessar Meu Clã" (callback_data="clan_menu")
+# ------------------------------------------------------------------------------
+# Algumas telas (como a Guilda de Aventureiros) usam callback_data="clan_menu".
+# Esse callback não tinha um handler dedicado. Aqui garantimos que ele chama
+# o roteador principal do clã (clan_handler), antes do roteador genérico.
+# ==============================================================================
+clan_menu_shortcut_handler = CallbackQueryHandler(clan_handler, pattern=r"^clan_menu$")
+
 
 # ==============================================================================
 # REGISTRO PRINCIPAL
@@ -179,8 +188,7 @@ def register_guild_handlers(application: Application):
     application.add_handler(war_ranking_handler)
 
     # --------------------------------------------------------------------------
-    # 6) ✅ GUILDA DE AVENTUREIROS (NPC) — ADICIONADO AGORA
-    # (isso resolve o botão "Guilda" do Reino e do Personagem)
+    # 6) ✅ GUILDA DE AVENTUREIROS (NPC)
     # --------------------------------------------------------------------------
     application.add_handler(adventurer_guild_handler)
     application.add_handler(mission_view_handler)
@@ -188,7 +196,12 @@ def register_guild_handlers(application: Application):
     application.add_handler(clan_board_handler)
 
     # --------------------------------------------------------------------------
-    # 7) ROTEADOR GENÉRICO DO CLÃ (SEMPRE POR ÚLTIMO)
+    # 7) ✅ FIX: atalhos de callbacks que precisam cair no clã
+    # --------------------------------------------------------------------------
+    application.add_handler(clan_menu_shortcut_handler)
+
+    # --------------------------------------------------------------------------
+    # 8) ROTEADOR GENÉRICO DO CLÃ (SEMPRE POR ÚLTIMO)
     # --------------------------------------------------------------------------
     application.add_handler(clan_handler)
 

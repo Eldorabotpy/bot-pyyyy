@@ -1,11 +1,13 @@
 # registries/__init__.py
-# (VERSÃO CORRIGIDA: Importação de Eventos e Remoção de Duplicatas)
+# (VERSÃO CORRIGIDA: Importação de Eventos + Registro do Claim Diário + Compatibilidade de callbacks)
 
 import logging
+from datetime import datetime, timezone
+
 from telegram import Update
 from telegram.ext import Application, TypeHandler, ContextTypes, CallbackQueryHandler
+
 from modules import player_manager
-from datetime import datetime, timezone
 from handlers import runes_handler
 
 # --- IMPORTS DOS REGISTROS (SEUS MÓDULOS) ---
@@ -15,7 +17,7 @@ from .combat import register_combat_handlers
 from .crafting import register_crafting_handlers
 from .market import register_market_handlers
 from .regions import register_regions_handlers
-from .guild import register_guild_handlers 
+from .guild import register_guild_handlers
 from .events import register_event_handlers
 
 # --- IMPORTS DIRETOS DE HANDLERS ESPECÍFICOS ---
@@ -24,94 +26,130 @@ from handlers.potion_handler import all_potion_handlers
 # from handlers.autohunt_handler import all_autohunt_handlers
 
 # --- IMPORTS DE MENUS E NAVEGAÇÃO ---
-from handlers.menu import kingdom  # Para o botão "Voltar ao Reino"
+from handlers.menu import kingdom  # Para voltar ao Reino
 
 # [CORREÇÃO]: Importação robusta do Menu de Eventos
 # Tenta importar do local novo (handlers/events), depois tenta os antigos
 try:
-    # 1. Tenta o local novo sugerido (handlers/events/event_menu.py)
+    # 1) Local novo sugerido
     from handlers.events import event_menu as events_menu_handler
 except ImportError:
     try:
-        # 2. Tenta o local antigo 1
+        # 2) Local antigo 1
         from handlers.menu import events as events_menu_handler
     except ImportError:
-        # 3. Tenta o local antigo 2 (modules)
+        # 3) Local antigo 2 (modules)
         from modules.events import event_menu as events_menu_handler
 
-# Importa Entry (Entrada/Lobby) E Combat (Luta) das Catacumbas
+# Importa Entry (Entrada/Lobby) e Combat das Catacumbas
 from modules.events.catacumbas import entry_handler as cat_entry
 from modules.events.catacumbas import combat_handler as cat_combat
+
 from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
+
 async def update_last_seen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler global (Middleware) que atualiza 'last_seen'."""
     if not update.effective_user:
-        return 
-        
+        return
+
     user_id = get_current_player_id(update, context)
     try:
-        # Otimização: Não precisamos carregar o dado todo se for só pra salvar timestamp, 
-        # mas mantendo sua lógica original para segurança:
-        pdata = await player_manager.get_player_data(user_id) 
+        pdata = await player_manager.get_player_data(user_id)
         if pdata:
-            pdata['last_seen'] = datetime.now(timezone.utc).isoformat()
+            pdata["last_seen"] = datetime.now(timezone.utc).isoformat()
             await player_manager.save_player_data(user_id, pdata)
     except Exception as e:
         logger.warning(f"Erro ao atualizar last_seen: {e}")
 
-def register_all_handlers(application: Application):
-    """Chama todas as funções de registo de cada categoria na ordem correta."""
-    logger.info("Iniciando o registo de todos os handlers...")
 
-    # 1. Middleware Global
+def _register_events_hub_and_claim(application: Application):
+    """
+    Registra:
+      - Hub de Eventos (evt_hub_principal, abrir_hub_eventos_v2, back_to_event_hub)
+      - Claim diário (evt_claim_daily_entries)
+    Com prioridade para usar register_handlers(application) se existir.
+    """
+    # 1) Melhor caso: o módulo de eventos já expõe register_handlers(application)
+    if hasattr(events_menu_handler, "register_handlers"):
+        try:
+            events_menu_handler.register_handlers(application)
+            logger.info("✅ Eventos: register_handlers() do event_menu registrado com sucesso.")
+            return
+        except Exception as e:
+            logger.warning(f"Falha ao chamar event_menu.register_handlers: {e}")
+
+    # 2) Fallback manual (caso o módulo não tenha register_handlers)
+    # Detecta função do Hub
+    hub_fn = None
+    if hasattr(events_menu_handler, "show_events_menu"):
+        hub_fn = events_menu_handler.show_events_menu
+    elif hasattr(events_menu_handler, "show_active_events"):
+        hub_fn = events_menu_handler.show_active_events
+
+    if hub_fn:
+        application.add_handler(CallbackQueryHandler(hub_fn, pattern=r"^evt_hub_principal$"))
+        application.add_handler(CallbackQueryHandler(hub_fn, pattern=r"^back_to_event_hub$"))
+        application.add_handler(CallbackQueryHandler(hub_fn, pattern=r"^abrir_hub_eventos_v2$"))
+        logger.info("✅ Eventos: Hub registrado (evt_hub_principal/back_to_event_hub/abrir_hub_eventos_v2).")
+    else:
+        logger.warning("⚠️ Eventos: Não achei show_events_menu nem show_active_events no módulo event_menu.")
+
+    # Claim diário
+    if hasattr(events_menu_handler, "evt_claim_daily_entries"):
+        application.add_handler(
+            CallbackQueryHandler(events_menu_handler.evt_claim_daily_entries, pattern=r"^evt_claim_daily_entries$")
+        )
+        logger.info("✅ Eventos: Claim diário registrado (evt_claim_daily_entries).")
+    else:
+        logger.warning("⚠️ Eventos: Não achei evt_claim_daily_entries no módulo event_menu.")
+
+
+def register_all_handlers(application: Application):
+    """Chama todas as funções de registro de cada categoria na ordem correta."""
+    logger.info("Iniciando o registro de todos os handlers...")
+
+    # 1) Middleware Global
     application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
-    
-    # 2. Registo por Módulos (Organização Padrão)
+
+    # 2) Registro por Módulos
     register_admin_handlers(application)
     register_character_handlers(application)
     register_combat_handlers(application)
-    register_crafting_handlers(application) 
+    register_crafting_handlers(application)
     register_market_handlers(application)
     register_guild_handlers(application)
     register_regions_handlers(application)
-    
-    # 3. Registra eventos gerais (Inclui Defesa do Reino e World Boss)
+
+    # 3) Eventos gerais (Defesa do Reino, World Boss etc.)
     register_event_handlers(application)
-    
-    # --- NOVO REGISTRO DO MÍSTICO RÚNICO ---
-    application.add_handler(CallbackQueryHandler(runes_handler.action_router, pattern="^rune_npc:"))
-    application.add_handler(CallbackQueryHandler(runes_handler.runes_router, pattern="^rune_mgr:"))
-    
-    # [REMOVIDO]: register_kingdom_defense_handlers(application) 
-    # Motivo: Já está sendo chamado dentro de register_event_handlers acima.
-    
-    # 4. Registo de Listas de Handlers (Legado/Outros)
+
+    # 4) Rúnico
+    application.add_handler(CallbackQueryHandler(runes_handler.action_router, pattern=r"^rune_npc:"))
+    application.add_handler(CallbackQueryHandler(runes_handler.runes_router, pattern=r"^rune_mgr:"))
+
+    # 5) Listas de handlers (legado/outros)
     application.add_handlers(all_world_boss_handlers)
     application.add_handlers(all_potion_handlers)
     # application.add_handlers(all_autohunt_handlers)
-    
+
     # ============================================================
-    # 💀 REGISTRO DO SISTEMA DE EVENTOS & NAVEGAÇÃO
+    # 💀 EVENTOS (HUB + CLAIM) & NAVEGAÇÃO
     # ============================================================
-    
-    # A. Menu Principal de Eventos (O Hub)
-    # Conecta o botão "💀 Eventos" (callback: evt_hub_principal) ao menu correto
-    if hasattr(events_menu_handler, 'show_events_menu'):
-        application.add_handler(CallbackQueryHandler(events_menu_handler.show_events_menu, pattern="^evt_hub_principal$"))
-    else:
-        # Se você usou o código que enviei anteriormente, a função é show_active_events
-        application.add_handler(CallbackQueryHandler(events_menu_handler.show_active_events, pattern="^evt_hub_principal$"))
-    
-    # B. Botão Voltar para o Reino
-    application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern="^back_to_kingdom$"))
-    
-    # C. Lógica das Catacumbas (Lobby, Criar Sala, Entrar)
+
+    # A) Hub de Eventos + Claim diário
+    _register_events_hub_and_claim(application)
+
+    # B) Voltar ao Reino (compatibilidade de callbacks)
+    application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern=r"^back_to_kingdom$"))
+    application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern=r"^show_kingdom_menu$"))
+
+    # C) Catacumbas (Lobby/Entrar/Criar)
     application.add_handlers(cat_entry.handlers)
 
-    # D. Lógica de Combate das Catacumbas
+    # D) Combate das Catacumbas
     application.add_handlers(cat_combat.handlers)
-    
-    logger.info("Todos os handlers foram registrados com sucesso no __init__.")
+
+    logger.info("✅ Todos os handlers foram registrados com sucesso no registries/__init__.py")
