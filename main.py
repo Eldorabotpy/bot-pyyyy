@@ -23,6 +23,7 @@ from telegram.ext import (
     ApplicationHandlerStop
 )
 from telegram.constants import ChatType
+from registries.combat import register_combat_handlers
 
 # Configuração de Path (Garante que módulos sejam encontrados)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -212,6 +213,7 @@ if __name__ == "__main__":
     # Registries
     register_all_handlers(application)
     register_guild_handlers(application)
+    register_combat_handlers(application)
     register_evolution_handlers(application)
 
     # Fallbacks
