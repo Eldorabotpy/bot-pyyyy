@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from functools import wraps
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -6,71 +8,100 @@ from bson import ObjectId
 try:
     from modules.sessions import get_persistent_session
 except ImportError:
-    async def get_persistent_session(tid): return None
+    async def get_persistent_session(tid):  # type: ignore
+        return None
+
+
+def _normalize_player_id(pid) -> str | None:
+    """
+    Aceita qualquer valor e retorna SOMENTE string ObjectId válida.
+    """
+    if pid is None:
+        return None
+
+    if isinstance(pid, ObjectId):
+        return str(pid)
+
+    if isinstance(pid, str):
+        pid = pid.strip()
+        if ObjectId.is_valid(pid):
+            return pid
+        return None
+
+    # legado (int) ou outros tipos: rejeita
+    return None
+
 
 def get_current_player_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str | None:
     """
-    Retorna o ID do jogador logado como STRING (Representação do ObjectId).
-    NÃO aceita IDs numéricos antigos.
+    Versão síncrona: consulta apenas RAM (context.user_data).
+    Retorna ObjectId string válida ou None.
     """
     user_data = getattr(context, "user_data", None)
-    
-    # 1. Verifica na RAM (user_data)
-    if user_data:
-        pid = user_data.get("logged_player_id")
-        
-        if pid:
-            # Se for um objeto ObjectId, converte pra string e retorna
-            if isinstance(pid, ObjectId):
-                return str(pid)
-            
-            # Se for string (Verifica se parece ObjectId)
-            if isinstance(pid, str) and ObjectId.is_valid(pid):
-                return pid
-            
-            # Ignora int/legacy
+    if not user_data:
+        return None
+
+    pid = user_data.get("logged_player_id")
+    return _normalize_player_id(pid)
+
+
+async def get_current_player_id_async(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str | None:
+    """
+    Versão robusta: tenta RAM; se falhar, tenta sessão persistente no banco e repõe RAM.
+    Retorna ObjectId string válida ou None.
+    """
+    # 1) RAM
+    pid = get_current_player_id(update, context)
+    if pid:
+        return pid
+
+    # 2) Persistência
+    if not update.effective_user:
+        return None
+
+    tg_id = update.effective_user.id
+    saved_player_id = await get_persistent_session(tg_id)
+
+    pid2 = _normalize_player_id(saved_player_id)
+    if pid2:
+        # repõe RAM para o restante do fluxo
+        try:
+            if getattr(context, "user_data", None) is not None:
+                context.user_data["logged_player_id"] = pid2
+        except Exception:
+            pass
+        return pid2
 
     return None
 
+
 def requires_login(func):
     """
-    Decorator blindado: Tenta recuperar a sessão do banco se a RAM falhar.
+    Decorator blindado:
+    - Garante sessão válida (RAM ou persistência).
+    - Se inválida, avisa /start.
     """
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         # Permite injeção manual para testes
-        if "player_data" in kwargs and kwargs["player_data"]:
+        if kwargs.get("player_data"):
             return await func(update, context, *args, **kwargs)
 
-        user_data = getattr(context, "user_data", None)
-        
-        # 1. Se não achou na RAM, tenta recuperar do Banco (Persistência)
-        if not user_data or not get_current_player_id(update, context):
-            
-            if update.effective_user:
-                tg_id = update.effective_user.id
-                
-                # Busca no banco de sessões
-                saved_player_id = await get_persistent_session(tg_id)
-                
-                if saved_player_id:
-                    # [CORREÇÃO]: Usando a variável correta 'saved_player_id'
-                    if ObjectId.is_valid(saved_player_id):
-                        if user_data is not None:
-                            context.user_data["logged_player_id"] = str(saved_player_id)
-                        return await func(update, context, *args, **kwargs)
-
-            # 2. Se falhou tudo, avisa o usuário
-            if update.effective_message:
-                msg = "⚠️ <b>Sessão expirada.</b>\nPor favor, digite /start para reconectar."
-                try:
-                    if update.callback_query:
-                        try: await update.callback_query.answer("⚠️ Reconectando...", show_alert=False)
-                        except: pass
-                    else:
-                        await update.effective_message.reply_text(msg, parse_mode="HTML")
-                except: pass
+        pid = await get_current_player_id_async(update, context)
+        if not pid:
+            msg = "⚠️ <b>Sessão expirada.</b>\nPor favor, digite /start para reconectar."
+            try:
+                if update.callback_query:
+                    try:
+                        await update.callback_query.answer("⚠️ Sessão expirada. Use /start.", show_alert=True)
+                    except Exception:
+                        pass
+                elif update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="HTML")
+            except Exception:
+                pass
             return
 
         return await func(update, context, *args, **kwargs)
+
     return wrapper
