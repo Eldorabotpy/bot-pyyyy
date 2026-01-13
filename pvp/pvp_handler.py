@@ -10,7 +10,7 @@ import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
-
+from telegram.error import BadRequest
 from bson import ObjectId
 
 # --- Módulos do Sistema ---
@@ -350,6 +350,140 @@ async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 @requires_login
+async def _pvp_send_or_edit_menu(query, context, txt: str, kb, media: dict | None):
+    """
+    Render robusto do menu PvP:
+    - Se a mensagem atual tiver mídia, edita caption.
+    - Se a mensagem atual não tiver mídia, edita texto.
+    - Se foi fornecida mídia (menu_arena_pvp) e a mensagem atual NÃO tem a mesma mídia,
+      deleta e reenvia com foto/vídeo/animação.
+    - Nunca falha silenciosamente: sempre tenta um fallback de envio.
+    """
+    reply_markup = InlineKeyboardMarkup(kb)
+    msg = query.message
+
+    # Detecta se a mensagem atual tem mídia
+    has_photo = bool(getattr(msg, "photo", None))
+    has_video = bool(getattr(msg, "video", None))
+    has_anim = bool(getattr(msg, "animation", None))
+    has_any_media = has_photo or has_video or has_anim
+
+    # Dados de mídia desejada (se existir)
+    desired_type = None
+    desired_fid = None
+    if media:
+        desired_type = (media.get("type") or "photo").lower()
+        desired_fid = media.get("file_id")
+
+    # Funções de envio por tipo
+    async def _send_new():
+        chat_id = msg.chat_id
+        if desired_fid and desired_type:
+            if desired_type == "video":
+                await context.bot.send_video(
+                    chat_id=chat_id,
+                    video=desired_fid,
+                    caption=txt,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+            elif desired_type in ("animation", "gif"):
+                await context.bot.send_animation(
+                    chat_id=chat_id,
+                    animation=desired_fid,
+                    caption=txt,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+            else:
+                # default photo
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=desired_fid,
+                    caption=txt,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=txt,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+
+    # 1) Se foi fornecida mídia mas a mensagem atual não tem mídia compatível, reenvia
+    if desired_fid:
+        needs_resend = False
+
+        # Se a mensagem atual não tem mídia, precisa reenviar
+        if not has_any_media:
+            needs_resend = True
+        else:
+            # Tem mídia, mas pode ser de tipo diferente
+            if desired_type == "video" and not has_video:
+                needs_resend = True
+            elif desired_type in ("animation", "gif") and not has_anim:
+                needs_resend = True
+            elif desired_type == "photo" and not has_photo:
+                needs_resend = True
+
+        if needs_resend:
+            try:
+                await query.delete_message()
+            except Exception:
+                pass
+
+            try:
+                await _send_new()
+                return
+            except Exception:
+                # se falhar enviar mídia, tenta texto puro
+                try:
+                    await context.bot.send_message(
+                        chat_id=msg.chat_id,
+                        text=txt,
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+                return
+
+    # 2) Se não precisa reenviar, tenta editar de forma correta
+    try:
+        if has_any_media:
+            # ✅ mensagem com mídia -> editar caption
+            await query.edit_message_caption(
+                caption=txt,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+        else:
+            # ✅ mensagem só texto -> editar text
+            await query.edit_message_text(
+                text=txt,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+        return
+
+    except BadRequest as e:
+        # "message is not modified", "message to edit not found", etc.
+        # fallback: enviar novo
+        try:
+            await _send_new()
+        except Exception:
+            pass
+        return
+    except Exception:
+        try:
+            await _send_new()
+        except Exception:
+            pass
+        return
+
+
 async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = await _get_pid(update, context)
     pdata = await player_manager.get_player_data(user_id)
@@ -367,7 +501,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     day_desc = day_effect.get("description", "Sem efeitos hoje.")
     day_title = day_effect.get("name", "Dia Comum")
 
-    media = file_ids.get_file_data("menu_arena_pvp")
+    media = file_ids.get_file_data("menu_arena_pvp")  # pode ser None ou dict com type/file_id
 
     txt = (
         f"⚔️ <b>ARENA DE ELDORA</b> ⚔️\n\n"
@@ -390,33 +524,34 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if tournament_system.CURRENT_MATCH_STATE.get("active"):
         kb.insert(0, [InlineKeyboardButton("🏆 TORNEIO (Em andamento)", callback_data="torneio_menu")])
 
+    # CALLBACK (botão)
     if update.callback_query:
+        query = update.callback_query
         try:
-            await update.callback_query.answer()
+            await query.answer()
         except Exception:
             pass
 
-        if media:
-            try:
-                if media.get("type") == "video":
-                    await update.callback_query.edit_message_caption(
-                        caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML"
-                    )
-                else:
-                    await update.callback_query.edit_message_text(
-                        text=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML"
-                    )
-            except Exception:
-                await context.bot.send_message(
-                    update.effective_chat.id, txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML"
-                )
-        else:
-            await update.callback_query.edit_message_text(
-                text=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML"
-            )
-    else:
-        await update.message.reply_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        await _pvp_send_or_edit_menu(query, context, txt, kb, media)
+        return
 
+    # MENSAGEM (comando / fallback)
+    if update.message:
+        if media and media.get("file_id"):
+            mtype = (media.get("type") or "photo").lower()
+            fid = media.get("file_id")
+            try:
+                if mtype == "video":
+                    await update.message.reply_video(fid, caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                elif mtype in ("animation", "gif"):
+                    await update.message.reply_animation(fid, caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                else:
+                    await update.message.reply_photo(fid, caption=txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                return
+            except Exception:
+                pass
+
+        await update.message.reply_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
 async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

@@ -237,7 +237,11 @@ if __name__ == "__main__":
         application.add_handler(CommandHandler("debug_reset", cmd_force_pvp_reset))
     except ImportError:
         pass
-    
+    from telegram.ext import CallbackQueryHandler
+    from pvp.pvp_handler import pvp_menu_command
+
+    application.add_handler(CallbackQueryHandler(pvp_menu_command, pattern=r"^pvp_arena$"))
+
     logger.info("✅ Todos os Handlers Registrados.")
     logger.info("🚀 Iniciando Polling...")
 
