@@ -31,7 +31,7 @@ DEFAULT_ELITE_CHANCE = getattr(game_data, "ELITE_CHANCE", 0.12)
 ELITE_MULTS = {
     "hp": 2.0, "attack": 1.4, "defense": 1.3,
     "initiative_add": 2, "luck_add": 5,
-    "gold": 2.5, "xp": 3.0, "loot_bonus_pct": 10,
+    "gold": 1.5, "xp": 1.5, "loot_bonus_pct": 10,
 }
 
 # =========================
@@ -68,27 +68,54 @@ def _coerce_monster_entry(entry) -> dict | None:
     return None
 
 def _pick_monster_template(region_key: str, player_level: int) -> dict:
+    # 1. Busca dados da região para saber a dificuldade real
+    reg_info = _get_region_info(region_key)
+    # Se a região tiver 'min_level', usamos ele. Senão, 1.
+    region_min_lvl = int(reg_info.get("min_level", 1))
+    
+    # O nível base para cálculos será o MAIOR entre: Nível do Jogador ou Nível da Região
+    # Isso impede que um jogador Nível 10 enfrente monstros Nível 10 em uma zona Nível 50.
+    calc_level = max(player_level, region_min_lvl)
+
+    # --- TENTATIVA 1: Monstros Específicos da Lista ---
     lst = _get_monsters_from_region_dict(region_key)
     if lst:
         pool = [e for e in lst if isinstance(e, dict)]
-        if pool: return dict(random.choice(pool))
+        if pool: 
+            chosen = dict(random.choice(pool))
+            # Força o min_level do monstro a respeitar a região
+            chosen["min_level"] = max(int(chosen.get("min_level", 1)), region_min_lvl)
+            return chosen
 
+    # --- TENTATIVA 2: Monstros do Campo 'monsters' da Região ---
     mons = _get_monsters_from_region_field(region_key)
     if mons:
         pool = []
         for e in mons:
             m = _coerce_monster_entry(e)
             if m: pool.append(m)
-        if pool: return dict(random.choice(pool))
+        if pool: 
+            chosen = dict(random.choice(pool))
+            chosen["min_level"] = max(int(chosen.get("min_level", 1)), region_min_lvl)
+            return chosen
 
-    base_hp = 20 + player_level * 5
+    # --- FALLBACK: Monstro Genérico (Se não achar nada) ---
+    # Agora usa 'calc_level' (Região ou Player) para definir a força base
+    base_hp = 20 + calc_level * 5
+    
     return {
-        "id": f"generic_{region_key}", "name": "Criatura Sombria",
+        "id": f"generic_{region_key}", 
+        "name": "Criatura Sombria",
         "hp": base_hp, "max_hp": base_hp,
-        "attack": 3 + player_level // 2, "defense": 2,
+        "attack": 3 + calc_level // 2, 
+        "defense": 2,
         "initiative": 4, "luck": 3,
-        "xp_reward": 8 + player_level, "gold_drop": 4 + player_level,
+        # Define XP/Gold baseados no nível da região também
+        "xp_reward": 5 + (calc_level // 2), 
+        "gold_drop": 2 + (calc_level // 3),
         "loot_table": [],
+        # Importante: Define o nível mínimo para a função de escala não reduzir depois
+        "min_level": region_min_lvl 
     }
 
 def _roll_is_elite(luck_stat: int) -> bool:
@@ -101,11 +128,25 @@ def _apply_elite_scaling(mon: dict) -> dict:
     m["name"] = f"{name} (🅴🅻I🆃🅴) 👑"
     m["_elite"] = True
     
+    # 1. GARANTIA: Se não tiver max_hp, usa o hp atual como base para não zerar
+    if "max_hp" not in m and "hp" in m:
+        m["max_hp"] = m["hp"]
+
+    # 2. ESCALONAMENTO DE NÍVEL (Novo):
+    # Aumenta o nível mínimo do Elite. Se a região for lvl 10, o Elite será calculado como lvl 12+
+    # Isso afeta o cálculo final de stats na próxima etapa (scale_monster_stats)
+    base_min_lvl = int(m.get("min_level", 1))
+    m["min_level"] = base_min_lvl + 3  # Elite é sempre 3 níveis acima da base da região
+
+    # Aplica os multiplicadores (Definidos no ELITE_MULTS reduzido)
     keys_mult = [("max_hp", "hp"), ("attack", "attack"), ("defense", "defense"), 
                  ("xp_reward", "xp"), ("gold_drop", "gold")]
     
     for k_mon, k_mult in keys_mult:
         base = int(m.get(k_mon, 0))
+        # Se base for 0 (ex: defesa nula), força pelo menos 1 para o multiplicador funcionar
+        if base == 0 and k_mon in ["attack", "defense"]: 
+            base = 5
         m[k_mon] = int(base * ELITE_MULTS[k_mult])
     
     m["hp"] = m["max_hp"] 
@@ -118,6 +159,7 @@ def _apply_elite_scaling(mon: dict) -> dict:
         it2["drop_chance"] = min(100.0, float(it2.get("drop_chance", 0.0)) + ELITE_MULTS["loot_bonus_pct"])
         loot.append(it2)
     m["loot_table"] = loot
+    
     return m
 
 def _scale_monster_stats(mon: dict, player_level: int) -> dict:
@@ -142,10 +184,10 @@ def _scale_monster_stats(mon: dict, player_level: int) -> dict:
     GROWTH_HP = 3        
     GROWTH_ATK = 0.6     
     GROWTH_DEF = 0.1     
-    GROWTH_XP = 3       
-    GROWTH_GOLD = 1.0   
+    GROWTH_XP = 1.5       
+    GROWTH_GOLD = 0.3   
     
-    scaling_bonus = 1 + (target_lvl * 0.05) 
+    scaling_bonus = 1 + (target_lvl * 0.03) 
 
     base_hp = int(mon.get("max_hp", 10))
     base_atk = int(mon.get("attack", 2))

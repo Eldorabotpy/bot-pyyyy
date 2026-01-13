@@ -1,27 +1,29 @@
 # handlers/kingdom_shop_handler.py
 import logging
-from typing import List
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
+
+# --- IMPORTS DO SISTEMA ---
 from modules import player_manager, game_data, file_ids
+# Importante: Pega o ID da sessão atual (ObjectId) em vez do ID do Telegram
+from modules.auth_utils import get_current_player_id 
 
 logger = logging.getLogger(__name__)
 
-# ==============================
-#  CONFIG: Loja do Reino (Gold)
-# ==============================
+# ==============================================================================
+#  CONFIGURAÇÃO: Loja do Reino (Gold)
+# ==============================================================================
 KINGDOM_SHOP = {
     "pedra_do_aprimoramento": ("Pedra de Aprimoramento", 350),
     "pergaminho_durabilidade": ("Pergaminho de Reparo", 350),
     "joia_da_forja": ("Joia de Aprimoramento", 400),
     "nucleo_forja_fraco": ("Núcleo Fraco", 500),
     "nucleo_forja_comum": ("Núcleo Comum", 1000),
-
 }
 
-# ==============================
+# ==============================================================================
 #  FUNÇÕES AUXILIARES
-# ==============================
+# ==============================================================================
 def _gold(pdata: dict) -> int:
     return int(pdata.get("gold", 0))
 
@@ -31,14 +33,8 @@ def _set_gold(pdata: dict, value: int):
 def _item_info(base_id: str) -> dict:
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {})
 
-async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML'):
-    try: await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except: pass
-    try: await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode); return
-    except: pass
-    await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
-
 async def _send_with_media(chat_id, context, caption, kb, keys):
+    """Envia mensagem com imagem/vídeo se disponível, ou apenas texto."""
     for key in keys:
         fd = file_ids.get_file_data(key)
         if fd and fd.get("id"):
@@ -51,24 +47,25 @@ async def _send_with_media(chat_id, context, caption, kb, keys):
             except: pass
     await context.bot.send_message(chat_id, caption, reply_markup=kb, parse_mode="HTML")
 
-# ==============================
-#  LÓGICA PRINCIPAL
-# ==============================
-
+# ==============================================================================
+#  GERENCIAMENTO DE ESTADO (MEMÓRIA TEMPORÁRIA)
+# ==============================================================================
 def _king_state(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    """Recupera ou inicia o estado da loja na memória do usuário."""
     st = context.user_data.get("kingdom_shop")
     if not st:
-        # Seleciona o primeiro item por padrão
+        # Seleciona o primeiro item da lista por padrão
         first = next(iter(KINGDOM_SHOP.keys()))
         st = {"base_id": first, "qty": 1}
         context.user_data["kingdom_shop"] = st
     return st
 
 def _build_kingdom_keyboard(selected_id: str, qty: int) -> InlineKeyboardMarkup:
+    """Monta o teclado visual da loja."""
     # 1. Grade de Itens (2 Colunas)
     item_rows = []
     row = []
-    for i, (base_id, (name_override, price)) in enumerate(KINGDOM_SHOP.items(), 1):
+    for base_id, (name_override, price) in KINGDOM_SHOP.items():
         # Nome curto para caber no botão
         label_name = name_override.split(" ")[0] if len(name_override) > 15 else name_override
         
@@ -79,10 +76,11 @@ def _build_kingdom_keyboard(selected_id: str, qty: int) -> InlineKeyboardMarkup:
         row.append(InlineKeyboardButton(btn_text, callback_data=f"king_set_{base_id}"))
         
         if len(row) == 2:
-            item_rows.append(row); row = []
+            item_rows.append(row)
+            row = []
     if row: item_rows.append(row)
 
-    # 2. Controles de Quantidade (Só aparecem se tiver seleção)
+    # 2. Controles de Quantidade e Botão de Compra
     control_rows = []
     if selected_id:
         qty_row = [
@@ -103,24 +101,40 @@ def _build_kingdom_keyboard(selected_id: str, qty: int) -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup(item_rows + control_rows + [nav_row])
 
+# ==============================================================================
+#  HANDLER PRINCIPAL (EXIBIR LOJA)
+# ==============================================================================
 async def market_kingdom(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+    
+    # 🔒 SEGURANÇA: Obtém o ID da sessão (MongoDB ObjectId)
+    user_id = get_current_player_id(update, context)
     chat_id = update.effective_chat.id
-    user_id = q.from_user.id
+    
+    if not user_id:
+        await q.answer("❌ Sessão expirada. Digite /start para logar.", show_alert=True)
+        return
 
+    # Busca dados usando o player_manager (que lida com a conversão str -> ObjectId)
     pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        await q.answer("❌ Erro ao carregar perfil.", show_alert=True)
+        return
+
     gold = _gold(pdata)
     
+    # Recupera estado visual
     st = _king_state(context)
     base_id = st["base_id"]
     qty = max(1, int(st.get("qty", 1)))
 
-    # --- TEXTO VISUAL ---
+    # Monta Texto
     item_info = _item_info(base_id)
-    shop_name = KINGDOM_SHOP.get(base_id, ["Item", 0])[0]
+    shop_data = KINGDOM_SHOP.get(base_id, ["Item", 0])
+    shop_name = shop_data[0]
+    price = shop_data[1]
     desc = item_info.get("description", "Item essencial para aventureiros.")
-    price = KINGDOM_SHOP.get(base_id, [0, 0])[1]
     
     text = (
         f"🏰 <b>SUPRIMENTOS DO REINO</b>\n"
@@ -134,16 +148,16 @@ async def market_kingdom(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     kb = _build_kingdom_keyboard(base_id, qty)
     
-    # Tenta apagar a mensagem anterior para enviar a nova com foto limpa
+    # Limpa mensagem anterior para evitar glitches visuais
     try: await q.delete_message()
     except: pass
     
     keys = ["loja_do_reino", "img_loja_reino", "market_kingdom"]
     await _send_with_media(chat_id, context, text, kb, keys)
 
-# ==============================
-#  AÇÕES (Seleção, Qtd, Compra)
-# ==============================
+# ==============================================================================
+#  AÇÕES (SELEÇÃO, QUANTIDADE, COMPRA)
+# ==============================================================================
 
 async def kingdom_set_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -154,27 +168,25 @@ async def kingdom_set_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("Item indisponível.", show_alert=True); return
 
     st = _king_state(context)
-    if st["base_id"] == base_id:
-        # Se clicar no mesmo, não faz nada ou reseta (opcional)
-        pass
-    else:
+    if st["base_id"] != base_id:
         st["base_id"] = base_id
-        st["qty"] = 1 # Reseta qtd ao trocar item
+        st["qty"] = 1 # Reseta quantidade ao trocar de item
         
     context.user_data["kingdom_shop"] = st
     await market_kingdom(update, context)
 
 async def kingdom_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    # Pequeno hack para feedback tátil sem popup
     try: await q.answer() 
     except: pass
     
     st = _king_state(context)
     qty = max(1, int(st.get("qty", 1)))
 
-    if q.data == "king_q_minus": qty = max(1, qty - 1)
-    elif q.data == "king_q_plus": qty += 1
+    if q.data == "king_q_minus": 
+        qty = max(1, qty - 1)
+    elif q.data == "king_q_plus": 
+        qty += 1
 
     st["qty"] = qty
     context.user_data["kingdom_shop"] = st
@@ -182,7 +194,13 @@ async def kingdom_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def market_kingdom_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    user_id = q.from_user.id
+    
+    # 🔒 SEGURANÇA: Garante que estamos operando no usuário logado
+    user_id = get_current_player_id(update, context)
+    
+    if not user_id:
+        await q.answer("❌ Você não está logado!", show_alert=True)
+        return
     
     st = _king_state(context)
     base_id = st["base_id"]
@@ -194,32 +212,38 @@ async def market_kingdom_buy(update: Update, context: ContextTypes.DEFAULT_TYPE)
     name, price = KINGDOM_SHOP[base_id]
     total_cost = price * qty
 
-    # Transação Segura
+    # Carrega dados do jogador (ObjectId handled by player_manager)
     pdata = await player_manager.get_player_data(user_id)
-    if _gold(pdata) < total_cost:
-        await q.answer(f"Falta Ouro! Custa {total_cost}.", show_alert=True); return
+    if not pdata:
+        await q.answer("❌ Erro de dados.", show_alert=True)
+        return
 
+    # Verifica saldo
+    if _gold(pdata) < total_cost:
+        await q.answer(f"Falta Ouro! Custa {total_cost} 🪙.", show_alert=True); return
+
+    # EXECUTA A COMPRA
     _set_gold(pdata, _gold(pdata) - total_cost)
     player_manager.add_item_to_inventory(pdata, base_id, qty)
+    
+    # Salva no banco
     await player_manager.save_player_data(user_id, pdata)
 
-    # Feedback
-    await q.answer("Compra realizada!", show_alert=False)
+    await q.answer(f"✅ Comprou {qty}x {name}!", show_alert=False)
     
-    # Reseta qtd e atualiza tela
+    # Reseta quantidade para 1 após a compra
     st["qty"] = 1
     context.user_data["kingdom_shop"] = st
     
-    # Envia mensagem de sucesso temporária ou atualiza o menu
     await market_kingdom(update, context)
 
 async def market_kingdom_buy_legacy(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Compatibilidade com botões antigos se houver."""
-    await market_kingdom(update, context)
+    """Redireciona chamadas antigas para a função nova de compra."""
+    await market_kingdom_buy(update, context)
 
-# ==============================
-#  EXPORTS
-# ==============================
+# ==============================================================================
+#  HANDLERS EXPORTADOS
+# ==============================================================================
 market_kingdom_handler = CallbackQueryHandler(market_kingdom, pattern=r'^market_kingdom$')
 kingdom_set_item_handler = CallbackQueryHandler(kingdom_set_item, pattern=r'^king_set_')
 kingdom_qty_minus_handler = CallbackQueryHandler(kingdom_qty, pattern=r'^king_q_minus$')

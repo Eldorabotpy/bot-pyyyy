@@ -1,15 +1,15 @@
 {
   "is_active": false,
-  "location": "pradaria_inicial",
+  "location": "pantano_maldito",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",
-      "hp": 35000,
-      "max_hp": 35000,
+      "hp": 40000,
+      "max_hp": 40000,
       "alive": true,
       "stats": {
-        "attack": 50,
-        "defense": 20,
+        "attack": 80,
+        "defense": 40,
         "initiative": 5,
         "luck": 20
       },
@@ -17,99 +17,99 @@
       "loot_table": [
         [
           "samurai_sombra_demoniaca",
-          2.0
+          0.9
         ],
         [
           "samurai_corte_iaijutsu",
-          2.0
+          0.9
         ],
         [
           "samurai_passive_perfect_parry",
-          2.0
+          0.9
         ],
         [
           "assassino_ataque_furtivo",
-          2.0
+          0.9
         ],
         [
           "assassino_active_guillotine_strike",
-          2.0
+          0.9
         ],
         [
           "assassino_passive_potent_toxins",
-          2.0
+          0.9
         ],
         [
           "bardo_melodia_restauradora",
-          2.0
+          0.9
         ],
         [
           "bardo_passive_perfect_pitch",
-          2.0
+          0.9
         ],
         [
           "bardo_passive_symphony_of_power",
-          2.0
+          0.9
         ],
         [
           "mago_bola_de_fogo",
-          2.0
+          0.9
         ],
         [
           "mago_active_arcane_ward",
-          2.0
+          0.9
         ],
         [
           "mago_active_meteor_swarm",
-          2.0
+          0.9
         ],
         [
           "monge_rajada_de_punhos",
-          2.0
+          0.9
         ],
         [
           "monge_active_thunder_palm",
-          2.0
+          0.9
         ],
         [
           "monge_active_transcendence",
-          2.0
+          0.9
         ],
         [
           "cacador_flecha_precisa",
-          2.0
+          0.9
         ],
         [
           "cacador_active_ricochet_arrow",
-          2.0
+          0.9
         ],
         [
           "cacador_passive_apex_predator",
-          2.0
+          0.9
         ],
         [
           "berserker_golpe_selvagem",
-          2.0
+          0.9
         ],
         [
           "berserker_golpe_divino_da_ira",
-          2.0
+          0.9
         ],
         [
           "berserker_ultimo_recurso",
-          2.0
+          0.9
         ],
         [
           "guerreiro_corte_perfurante",
-          2.0
+          0.9
         ],
         [
           "guerreiro_colossal_defense",
-          2.0
+          0.9
         ],
         [
           "guerreiro_bencao_sagrada",
-          2.0
+          0.9
         ],
         [
           "samurai_armadura_shogun",
@@ -177,46 +177,46 @@
         ],
         [
           "pocao_cura_leve",
-          20.0
+          10.0
         ],
         [
           "pocao_cura_media",
-          20.0
+          10.0
         ],
         [
           "gems",
-          20.0
+          10.0
         ],
         [
           "frasco_sabedoria",
-          20.0
+          10.0
         ],
         [
           "cristal_de_abertura",
-          20.0
+          10.0
         ],
         [
           "pedra_do_aprimoramento",
-          20.0
+          10.0
         ],
         [
           "pergaminho_durabilidade",
-          20.0
+          10.0
         ],
         [
           "sigilo_protecao",
-          20.0
+          10.0
         ]
       ]
     },
     "witch_heal": {
       "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐮𝐫𝐚",
-      "hp": 5000,
-      "max_hp": 5000,
+      "hp": 10000,
+      "max_hp": 10000,
       "alive": true,
       "stats": {
-        "attack": 15,
-        "defense": 10,
+        "attack": 50,
+        "defense": 40,
         "initiative": 5,
         "luck": 10
       },
@@ -224,12 +224,12 @@
     },
     "witch_debuff": {
       "name": "𝐁𝐫𝐮𝐱𝐚 𝐝𝐚 𝐂𝐚𝐨𝐬",
-      "hp": 5000,
-      "max_hp": 5000,
+      "hp": 10000,
+      "max_hp": 10000,
       "alive": true,
       "stats": {
-        "attack": 20,
-        "defense": 10,
+        "attack": 50,
+        "defense": 40,
         "initiative": 5,
         "luck": 15
       },

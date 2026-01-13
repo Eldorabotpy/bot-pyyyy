@@ -1495,7 +1495,7 @@ MONSTER_SKILLS_DB = {
 # Coloque isso no FINAL do arquivo monsters.py
 # ==============================================================================
 
-ENABLE_CHRISTMAS_EVENT = True 
+ENABLE_CHRISTMAS_EVENT = False 
 
 if ENABLE_CHRISTMAS_EVENT:
     print("🎅 HO HO HO! Injetando Presentes de Natal nos Monstros...")
