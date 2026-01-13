@@ -1,17 +1,12 @@
 # handlers/guild/dashboard.py
-# (VERSÃO CORRIGIDA: Captura o botão 'Guilda' do menu principal e faz o roteamento)
+# (VERSÃO CORRIGIDA: valida membresia para impedir "fantasmas" + remove import inexistente)
 
 import logging
 from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InputMediaPhoto,
-    InputMediaAnimation,
-    InputMediaVideo
+    Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    InputMediaPhoto, InputMediaAnimation, InputMediaVideo
 )
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from telegram.error import BadRequest
 
 from modules import player_manager, clan_manager
 from modules import file_ids
@@ -28,21 +23,16 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     if not query or not query.message:
         return
 
-    # Sempre tenta responder o callback cedo
-    try:
-        await query.answer()
-    except Exception:
-        pass
-
     media_fid = None
     media_type = "photo"
 
-    # Logo do clã (se existir)
-    if clan_data and clan_data.get("logo_media_key"):
-        media_fid = clan_data.get("logo_media_key")
-        media_type = clan_data.get("logo_type", "photo")
+    try:
+        if clan_data and clan_data.get("logo_media_key"):
+            media_fid = clan_data.get("logo_media_key")
+            media_type = clan_data.get("logo_type", "photo")
+    except Exception:
+        pass
 
-    # Fallback de mídia padrão
     if not media_fid:
         try:
             media_fid = file_ids.get_file_id("img_clan_default")
@@ -54,7 +44,6 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     reply_markup = InlineKeyboardMarkup(keyboard)
     target_has_media = bool(media_fid)
 
-    # Estado atual da mensagem
     current_has_media = False
     try:
         current_has_media = bool(query.message.photo or query.message.video or query.message.animation)
@@ -63,11 +52,9 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
 
     must_delete_resend = False
 
-    # Se o tipo "tem mídia vs não tem mídia" mudou, a edição direta costuma falhar
     if target_has_media != current_has_media:
         must_delete_resend = True
     elif target_has_media:
-        # Se tem mídia, precisa casar o tipo (foto/video/gif)
         try:
             if media_type == "video" and not query.message.video:
                 must_delete_resend = True
@@ -78,7 +65,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
         except Exception:
             must_delete_resend = True
 
-    # 1) Tenta editar sem deletar
+    # 1) tenta editar
     if not must_delete_resend:
         try:
             if target_has_media:
@@ -93,83 +80,36 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
             else:
                 await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
             return
-
-        except BadRequest as e:
-            # Caso comum: "message is not modified" ou incompatibilidade de mídia
-            logger.warning(f"[CLAN_RENDER] BadRequest ao editar: {e}. Vai reenviar.")
-            must_delete_resend = True
-        except Exception as e:
-            logger.exception(f"[CLAN_RENDER] Erro ao editar, vai reenviar: {e}")
-            must_delete_resend = True
-
-    # 2) Se não deu para editar, deleta e reenvia
-    if must_delete_resend:
-        chat_id = None
-        try:
-            chat_id = query.message.chat.id
         except Exception:
-            try:
-                chat_id = query.message.chat_id  # compat
-            except Exception:
-                chat_id = None
+            must_delete_resend = True
 
-        if not chat_id:
-            return
-
+    # 2) se falhar, reenvia
+    if must_delete_resend:
         try:
             await query.delete_message()
         except Exception:
             pass
 
         try:
+            chat_id = query.message.chat_id
             if media_fid:
                 if media_type == "video":
-                    await context.bot.send_video(
-                        chat_id,
-                        video=media_fid,
-                        caption=text,
-                        reply_markup=reply_markup,
-                        parse_mode="HTML"
-                    )
+                    await context.bot.send_video(chat_id, video=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
                 elif media_type == "animation":
-                    await context.bot.send_animation(
-                        chat_id,
-                        animation=media_fid,
-                        caption=text,
-                        reply_markup=reply_markup,
-                        parse_mode="HTML"
-                    )
+                    await context.bot.send_animation(chat_id, animation=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
                 else:
-                    await context.bot.send_photo(
-                        chat_id,
-                        photo=media_fid,
-                        caption=text,
-                        reply_markup=reply_markup,
-                        parse_mode="HTML"
-                    )
+                    await context.bot.send_photo(chat_id, photo=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
             else:
-                await context.bot.send_message(
-                    chat_id,
-                    text,
-                    reply_markup=reply_markup,
-                    parse_mode="HTML"
-                )
-
+                await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
         except Exception as e:
-            logger.exception(f"[CLAN_RENDER] Erro fatal ao reenviar tela do clã: {e}")
-
+            logger.error(f"Erro fatal rendering clan dashboard: {e}")
 
 # ==============================================================================
-# 2. ENTRY POINT (ROTEADOR DE ENTRADA)
+# 2. ENTRY POINT
 # ==============================================================================
 async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Função principal chamada pelo botão 'Guilda' do Reino.
-    Decide se mostra o Dashboard (tem clã) ou Menu de Criação (sem clã).
-    """
     query = update.callback_query
 
-    # Autenticação
     user_id = get_current_player_id(update, context)
     if not user_id:
         if query:
@@ -179,7 +119,6 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
                 pass
         return
 
-    # Dados do jogador
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         if query:
@@ -190,11 +129,9 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     clan_id = player_data.get("clan_id")
-
     if clan_id:
         await show_clan_dashboard(update, context)
     else:
-        # Import tardio para evitar circular import
         try:
             from handlers.guild.creation_search import show_create_clan_menu
             await show_create_clan_menu(update, context)
@@ -205,9 +142,8 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
                 except Exception:
                     pass
 
-
 # ==============================================================================
-# 3. DASHBOARD
+# 3. DASHBOARD (COM VALIDAÇÃO ANTI-FANTASMA)
 # ==============================================================================
 async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE, came_from: str = "kingdom"):
     query = update.callback_query
@@ -219,11 +155,6 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     user_id = get_current_player_id(update, context)
     if not user_id:
-        if query:
-            try:
-                await query.answer("Sessão inválida.", show_alert=True)
-            except Exception:
-                pass
         return
 
     player_data = await player_manager.get_player_data(user_id)
@@ -232,11 +163,9 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     clan_id = player_data.get("clan_id")
     if not clan_id:
-        # Se o botão "clan_menu" foi apertado mas o player não tem clã, manda pro menu de criação
         await adventurer_guild_menu(update, context)
         return
 
-    # Carrega clã (async ou sync)
     try:
         res = clan_manager.get_clan(clan_id)
         clan_data = await res if hasattr(res, "__await__") else res
@@ -244,27 +173,40 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
         clan_data = None
 
     if not clan_data:
-        # Se o player tem clan_id mas o clã sumiu do banco, limpa e redireciona
+        # clã sumiu: limpa e volta
         try:
-            pdata = await player_manager.get_player_data(user_id)
-            if pdata:
-                pdata["clan_id"] = None
-                await player_manager.save_player_data(user_id, pdata)
+            player_data["clan_id"] = None
+            await player_manager.save_player_data(user_id, player_data)
         except Exception:
             pass
-
         await adventurer_guild_menu(update, context)
         return
-
-    # Dados do clã
-    clan_name = clan_data.get("display_name", "Clã")
-    level = clan_data.get("prestige_level", 1)
-    xp = clan_data.get("prestige_points", 0)
 
     leader_id = str(clan_data.get("leader_id", "0"))
     is_leader = (str(user_id) == leader_id)
 
-    # Cálculo do XP
+    # ✅ FIX ANTI-FANTASMA: precisa estar em members (ou ser líder)
+    members = [str(x) for x in clan_data.get("members", [])]
+    if (not is_leader) and (str(user_id) not in members):
+        # usuário está com clan_id preso, mas não é membro
+        try:
+            player_data["clan_id"] = None
+            await player_manager.save_player_data(user_id, player_data)
+        except Exception:
+            pass
+        if query:
+            try:
+                await query.answer("Você não faz mais parte deste clã.", show_alert=True)
+            except Exception:
+                pass
+        await adventurer_guild_menu(update, context)
+        return
+
+    # Dados visuais
+    clan_name = clan_data.get("display_name", "Clã")
+    level = clan_data.get("prestige_level", 1)
+    xp = clan_data.get("prestige_points", 0)
+
     current_level_info = CLAN_PRESTIGE_LEVELS.get(level, {})
     xp_needed = current_level_info.get("points_to_next_level", 999999)
     if not xp_needed:
@@ -274,7 +216,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     filled = int(percent * 10)
     bar = "🟦" * filled + "⬜" * (10 - filled)
 
-    members_count = len(clan_data.get("members", []))
+    members_count = len(members)
     max_members = current_level_info.get("max_members", 10)
 
     text = (
@@ -288,14 +230,10 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
     keyboard = [
-        [
-            InlineKeyboardButton("📜 Missões", callback_data="clan_mission_details"),
-            InlineKeyboardButton("🏦 Banco", callback_data="clan_bank_menu"),
-        ],
-        [
-            InlineKeyboardButton("👥 Membros", callback_data="gld_view_members"),
-            InlineKeyboardButton("✨ Melhorias", callback_data="clan_upgrade_menu"),
-        ],
+        [InlineKeyboardButton("📜 Missões", callback_data="clan_mission_details"),
+         InlineKeyboardButton("🏦 Banco", callback_data="clan_bank_menu")],
+        [InlineKeyboardButton("👥 Membros", callback_data="gld_view_members"),
+         InlineKeyboardButton("✨ Melhorias", callback_data="clan_upgrade_menu")]
     ]
 
     if is_leader:
@@ -305,7 +243,6 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await _render_clan_screen(update, context, clan_data, text, keyboard)
 
-
 # ==============================================================================
 # 4. ROTEADOR
 # ==============================================================================
@@ -313,20 +250,15 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query:
         return
-
     action = query.data
 
-    # Imports tardios para evitar circular import
+    # ✅ IMPORT CORRIGIDO: removido show_kick_member_menu (não existe)
     from handlers.guild.management import (
-        show_clan_management_menu,
-        show_members_list,
-        warn_kick_member,
-        do_kick_member,
-        warn_leave_clan,
-        do_leave_clan,
+        show_clan_management_menu, show_members_list,
+        warn_kick_member, do_kick_member, warn_leave_clan, do_leave_clan
     )
 
-    # Opcional: módulos podem não existir dependendo do build
+    # opcionais
     show_guild_mission_details = None
     finish_mission_callback = None
     cancel_mission_callback = None
@@ -342,7 +274,7 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             finish_mission_callback,
             cancel_mission_callback,
             show_mission_selection_menu,
-            start_mission_callback,
+            start_mission_callback
         )
     except Exception:
         pass
@@ -357,105 +289,98 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-    came_from = "kingdom"
-
-    # 1) Botão "Guilda" do Menu Principal (NPC/entrada)
-    if action == "adventurer_guild_main":
-        await adventurer_guild_menu(update, context)
-        return
-
-    # 2) Atalho "clan_menu" (Acessar Meu Clã)
     if action == "clan_menu":
-        await show_clan_dashboard(update, context, came_from=came_from)
+        await show_clan_dashboard(update, context)
         return
 
-    # --- MISSÕES ---
+    if action == "clan_manage_menu":
+        await show_clan_management_menu(update, context)
+        return
+
+    if action in ("clan_view_members", "gld_view_members"):
+        await show_members_list(update, context)
+        return
+
+    if action.startswith("clan_kick_ask:"):
+        await warn_kick_member(update, context)
+        return
+
+    if action.startswith("clan_kick_do:"):
+        await do_kick_member(update, context)
+        return
+
+    if action == "clan_leave_ask":
+        await warn_leave_clan(update, context)
+        return
+
+    if action == "clan_leave_perform":
+        await do_leave_clan(update, context)
+        return
+
+    if action == "clan_bank_menu":
+        if show_clan_bank_menu:
+            await show_clan_bank_menu(update, context)
+        else:
+            await query.answer("Em breve!", show_alert=True)
+        return
+
+    if action == "clan_upgrade_menu":
+        if show_clan_upgrade_menu:
+            await show_clan_upgrade_menu(update, context)
+        else:
+            await query.answer("Em breve!", show_alert=True)
+        return
+
+    if action.startswith("clan_upgrade_confirm"):
+        if confirm_clan_upgrade_callback:
+            await confirm_clan_upgrade_callback(update, context)
+        else:
+            await query.answer("Em breve!", show_alert=True)
+        return
+
     if action == "clan_mission_details":
         if show_guild_mission_details:
             await show_guild_mission_details(update, context)
         else:
             await query.answer("Em breve!", show_alert=True)
+        return
 
-    elif action == "gld_mission_finish":
+    if action == "gld_mission_finish":
         if finish_mission_callback:
             await finish_mission_callback(update, context)
         else:
             await query.answer("Em breve!", show_alert=True)
+        return
 
-    elif action == "gld_mission_cancel":
+    if action == "gld_mission_cancel":
         if cancel_mission_callback:
             await cancel_mission_callback(update, context)
         else:
             await query.answer("Em breve!", show_alert=True)
+        return
 
-    elif action == "gld_mission_select_menu":
+    if action == "gld_mission_select_menu":
         if show_mission_selection_menu:
             await show_mission_selection_menu(update, context)
         else:
             await query.answer("Em breve!", show_alert=True)
+        return
 
-    elif action.startswith("gld_start_hunt"):
+    if action.startswith("gld_start_hunt"):
         if start_mission_callback:
             await start_mission_callback(update, context)
         else:
             await query.answer("Em breve!", show_alert=True)
+        return
 
-    # --- SAIR ---
-    elif action == "clan_leave_ask":
-        await warn_leave_clan(update, context)
-    elif action == "clan_leave_perform":
-        await do_leave_clan(update, context)
-
-    # --- BANCO E GESTÃO ---
-    elif action == "clan_bank_menu":
-        if show_clan_bank_menu:
-            await show_clan_bank_menu(update, context)
-        else:
-            await query.answer("Em breve!", show_alert=True)
-
-    elif action == "clan_manage_menu":
-        await show_clan_management_menu(update, context)
-
-    elif action == "gld_view_members":
-        await show_members_list(update, context)
-
-    elif action == "clan_view_members":
-        await show_members_list(update, context)
-
-    # --- KICK / PERFIL ---
-    # IMPORTANTE: removido show_kick_member_menu (não existe).
-    # O menu de kick já redireciona pra lista/perfil via management.py.
-    elif action == "clan_kick_menu":
-        await show_members_list(update, context)
-
-    elif action.startswith("clan_kick_ask"):
-        await warn_kick_member(update, context)
-
-    elif action.startswith("clan_kick_do"):
-        await do_kick_member(update, context)
-
-    # --- UPGRADE ---
-    elif action == "clan_upgrade_menu":
-        if show_clan_upgrade_menu:
-            await show_clan_upgrade_menu(update, context)
-        else:
-            await query.answer("Em breve!", show_alert=True)
-
-    elif action.startswith("clan_upgrade_confirm"):
-        if confirm_clan_upgrade_callback:
-            await confirm_clan_upgrade_callback(update, context)
-        else:
-            await query.answer("Em breve!", show_alert=True)
-
-    else:
-        try:
-            await query.answer("Opção não encontrada.", show_alert=True)
-        except Exception:
-            pass
+    try:
+        await query.answer("Opção não encontrada.", show_alert=True)
+    except Exception:
+        pass
 
 
-# Regex expandido para capturar também "clan_menu" (atalho do botão na guilda)
+# Handler principal do clã (router)
 clan_handler = CallbackQueryHandler(
     clan_router,
-    pattern=r"^clan_|^gld_|^adventurer_guild_main$"
+    pattern=r"^clan_|^gld_|^clan_menu$"
 )

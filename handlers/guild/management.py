@@ -7,7 +7,7 @@ from telegram.ext import (
     ContextTypes, CallbackQueryHandler, ConversationHandler,
     MessageHandler, filters, CommandHandler
 )
-
+from bson import ObjectId
 from modules import player_manager, clan_manager
 from modules.clan_manager import CLAN_RANKS, get_member_rank, check_permission, set_member_rank, get_rank_value
 from handlers.guild.dashboard import _render_clan_screen
@@ -19,6 +19,38 @@ logger = logging.getLogger(__name__)
 ASKING_INVITEE = 0
 ASKING_LOGO = 1
 ASKING_TRANSFER_TARGET = 2
+
+
+def _get_clans_collection():
+    """
+    Tenta obter a collection de clãs do Mongo, sem depender de implementação interna do clan_manager.
+    """
+    try:
+        from modules.database import db
+        # db pode ser dict-like ou ter atributo clans
+        if hasattr(db, "__getitem__"):
+            return db["clans"]
+        if hasattr(db, "clans"):
+            return db.clans
+    except Exception:
+        pass
+
+    # fallback: alguns projetos expõem a collection pelo clan_manager
+    for attr in ("clans_collection", "clans", "clan_collection"):
+        col = getattr(clan_manager, attr, None)
+        if col is not None:
+            return col
+    return None
+
+def _to_oid(cid):
+    try:
+        if isinstance(cid, ObjectId):
+            return cid
+        if isinstance(cid, str) and ObjectId.is_valid(cid):
+            return ObjectId(cid)
+    except Exception:
+        pass
+    return cid
 
 # --- HELPER DE LIMPEZA ---
 async def _clean_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -136,19 +168,61 @@ async def do_cleanup_apps(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Apenas o líder pode usar a limpeza.", show_alert=True)
         return
 
-    removed_count, removed_ids = await clan_manager.cleanup_pending_applications(clan_id)
+    apps = clan.get("pending_applications", []) or []
+    members = set(str(x) for x in (clan.get("members", []) or []))
+
+    kept = []
+    removed = []
+
+    for aid in apps:
+        aid_str = str(aid)
+
+        # 1) se já virou membro, remove da lista de pendências
+        if aid_str in members:
+            removed.append(aid_str)
+            continue
+
+        # 2) se player não existe, remove
+        ap = await player_manager.get_player_data(aid_str)
+        if not ap:
+            removed.append(aid_str)
+            continue
+
+        # 3) se já está em outro clã, remove
+        if ap.get("clan_id"):
+            # se por acaso for o mesmo clã, mas não está em members, melhor remover a pendência (evita bug)
+            removed.append(aid_str)
+            continue
+
+        kept.append(aid_str)
+
+    # atualiza no banco
+    col = _get_clans_collection()
+    if col is None:
+        await query.answer("Erro: collection de clãs não encontrada.", show_alert=True)
+        return
+
+    await col.update_one(
+        {"_id": _to_oid(clan_id)},
+        {"$set": {"pending_applications": kept}}
+    )
 
     text = (
         "📩 <b>LIMPEZA DE PEDIDOS PENDENTES</b>\n"
         "━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Removidos: <b>{removed_count}</b>\n"
+        f"Pendências antes: <b>{len(apps)}</b>\n"
+        f"Removidos: <b>{len(removed)}</b>\n"
+        f"Restantes: <b>{len(kept)}</b>\n"
     )
 
-    if removed_ids:
-        shown = removed_ids[:20]
+    if removed:
+        shown = removed[:20]
         text += "\n<i>IDs removidos:</i>\n" + "\n".join([f"• <code>{rid}</code>" for rid in shown])
-        if len(removed_ids) > 20:
-            text += f"\n… e mais {len(removed_ids) - 20}"
+        if len(removed) > 20:
+            text += f"\n… e mais {len(removed) - 20}"
+
+    # recarrega clã para refletir na tela
+    clan = await clan_manager.get_clan(clan_id)
 
     kb = [
         [InlineKeyboardButton("⬅️ Voltar", callback_data="clan_cleanup_menu")],
@@ -169,32 +243,87 @@ async def do_cleanup_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer("Clã não encontrado.", show_alert=True)
         return
 
-    is_leader = (str(clan.get("leader_id")) == str(actor_id))
+    leader_id = str(clan.get("leader_id"))
+    is_leader = (leader_id == str(actor_id))
     if not is_leader:
         await query.answer("Apenas o líder pode usar a limpeza.", show_alert=True)
         return
 
-    removed_count, removed_ids = await clan_manager.cleanup_invalid_members(clan_id)
+    members = [str(x) for x in (clan.get("members", []) or [])]
+
+    kept_members = []
+    removed_members = []
+
+    for mid in members:
+        mid_str = str(mid)
+
+        # líder nunca remove
+        if mid_str == leader_id:
+            if mid_str not in kept_members:
+                kept_members.append(mid_str)
+            continue
+
+        # se player não existe -> remove
+        p = await player_manager.get_player_data(mid_str)
+        if not p:
+            removed_members.append(mid_str)
+            continue
+
+        # se player existe mas clan_id não bate -> remove
+        if str(p.get("clan_id")) != str(clan_id):
+            removed_members.append(mid_str)
+            continue
+
+        kept_members.append(mid_str)
+
+    # atualiza clã no banco
+    col = _get_clans_collection()
+    if col is None:
+        await query.answer("Erro: collection de clãs não encontrada.", show_alert=True)
+        return
+
+    # também limpa ranks/cargos se existirem com keys antigas (sem saber o nome exato, tenta os mais comuns)
+    set_doc = {"members": kept_members}
+    for ranks_key in ("member_ranks", "ranks", "roles"):
+        if isinstance(clan.get(ranks_key), dict):
+            cleaned = {k: v for k, v in clan[ranks_key].items() if str(k) in set(kept_members)}
+            set_doc[ranks_key] = cleaned
+
+    await col.update_one(
+        {"_id": _to_oid(clan_id)},
+        {"$set": set_doc}
+    )
+
+    # limpa clan_id dos removidos (se ainda estiver preso)
+    for rid in removed_members:
+        rp = await player_manager.get_player_data(rid)
+        if rp and str(rp.get("clan_id")) == str(clan_id):
+            rp["clan_id"] = None
+            await player_manager.save_player_data(rid, rp)
 
     text = (
-        "👥 <b>LIMPEZA DE MEMBROS</b>\n"
+        "👥 <b>LIMPEZA DE MEMBROS (SEGURA)</b>\n"
         "━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Removidos: <b>{removed_count}</b>\n"
+        f"Membros antes: <b>{len(members)}</b>\n"
+        f"Removidos: <b>{len(removed_members)}</b>\n"
+        f"Restantes: <b>{len(kept_members)}</b>\n"
         "<i>Obs.: o líder nunca é removido.</i>\n"
     )
 
-    if removed_ids:
-        shown = removed_ids[:20]
+    if removed_members:
+        shown = removed_members[:20]
         text += "\n<i>IDs removidos:</i>\n" + "\n".join([f"• <code>{rid}</code>" for rid in shown])
-        if len(removed_ids) > 20:
-            text += f"\n… e mais {len(removed_ids) - 20}"
+        if len(removed_members) > 20:
+            text += f"\n… e mais {len(removed_members) - 20}"
+
+    clan = await clan_manager.get_clan(clan_id)
 
     kb = [
         [InlineKeyboardButton("⬅️ Voltar", callback_data="clan_cleanup_menu")],
         [InlineKeyboardButton("⚙️ Gestão do Clã", callback_data="clan_manage_menu")],
     ]
     await _render_clan_screen(update, context, clan, text, kb)
-
+    
 # ==============================================================================
 # 2. LISTA DE MEMBROS (VISUAL LIMPO)
 # ==============================================================================
