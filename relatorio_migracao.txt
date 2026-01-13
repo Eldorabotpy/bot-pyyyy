@@ -1,4 +1,63 @@
+RELATÓRIO DE MIGRAÇÃO - 94.3% CONCLUÍDO
+Gerado em: 2026-01-12 21:11:07
+==================================================
 
+Arquivo: .\handlers\admin\media_handler.py
+Prioridade: 5 | Status: ❌ CRÍTICO
+Encontrado: update.effective_user.id
+----------------------------------------
+Arquivo: .\handlers\skill_upgrade_handler.py
+Prioridade: 6 | Status: ❌ CRÍTICO
+Encontrado: query.from_user.id
+----------------------------------------
+Arquivo: .\handlers\world_boss\handler.py
+Prioridade: 6 | Status: ⚠️ MISTO
+Encontrado: update.effective_user.id
+----------------------------------------
+Arquivo: .\main.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: update.effective_user.id
+----------------------------------------
+Arquivo: .\kingdom_defense\handler.py
+Prioridade: 99 | Status: ⚠️ MISTO
+Encontrado: update.effective_user.id, query.from_user.id
+----------------------------------------
+Arquivo: .\modules\clan_manager.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: user_id: int
+----------------------------------------
+Arquivo: .\modules\class_evolution_service.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: user_id: int
+----------------------------------------
+Arquivo: .\modules\evolution_battle.py
+Prioridade: 99 | Status: ⚠️ MISTO
+Encontrado: query.from_user.id
+----------------------------------------
+Arquivo: .\modules\mission_manager.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: user_id: int
+----------------------------------------
+Arquivo: .\modules\party_manager.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: user_id: int
+----------------------------------------
+Arquivo: .\modules\sessions.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: user_id: int
+----------------------------------------
+Arquivo: .\modules\dungeons\runtime.py
+Prioridade: 99 | Status: ⚠️ MISTO
+Encontrado: user_id: int
+----------------------------------------
+Arquivo: .\modules\dungeons\runtime_api.py
+Prioridade: 99 | Status: ❌ CRÍTICO
+Encontrado: user_id: int
+----------------------------------------
+Arquivo: .\pvp\pvp_handler.py
+Prioridade: 99 | Status: ⚠️ MISTO
+Encontrado: query.from_user.id, players_collection.find
+----------------------------------------
 
 ==================================================
 📂 ESTRUTURA DO PROJETO (Arquivos .py)
@@ -12,6 +71,7 @@
 │   📄 destravar_jogador.py
 │   📄 fix_duplicate_vips.py
 │   📄 fix_mongo_tomos.py
+│   📄 fix_professions.py
 │   📄 fix_skins.py
 │   📄 gerente_migracao.py
 │   📄 inspect_mongo.py
@@ -47,6 +107,7 @@
 │   │   📄 forge_handler.py
 │   │   📄 gem_market_handler.py
 │   │   📄 gem_shop_handler.py
+│   │   📄 guide_handler.py
 │   │   📄 guild_handler.py
 │   │   📄 guild_menu_handler.py
 │   │   📄 hunt_handler.py
@@ -64,6 +125,7 @@
 │   │   📄 refining_handler.py
 │   │   📄 region_handler.py
 │   │   📄 runes_handler.py
+│   │   📄 skill_upgrade_handler.py
 │   │   📄 skin_handler.py
 │   │   📄 start_handler.py
 │   │   📄 status_handler.py
@@ -196,6 +258,8 @@
 │   │   │   📄 items_evolution.py
 │   │   │   📄 items_materials.py
 │   │   │   📄 items_runes.py
+│   │   │   📄 items_tools.py
+│   │   │   📄 loot_tables.py
 │   │   │   📄 market.py
 │   │   │   📄 missions.py
 │   │   │   📄 monsters.py
@@ -229,6 +293,11 @@
 │   │   │   📄 berserker_t2.py
 │   │   │   📄 cacador_t1.py
 │   │   │   📄 cacador_t2.py
+│   │   │   📄 coleta_t1.py
+│   │   │   📄 coleta_t2.py
+│   │   │   📄 coleta_t3.py
+│   │   │   📄 coleta_t4.py
+│   │   │   📄 coleta_t5.py
 │   │   │   📄 guerreiro_t1.py
 │   │   │   📄 guerreiro_t2.py
 │   │   │   📄 mago_t1.py
@@ -238,6 +307,8 @@
 │   │   │   📄 samurai_t1.py
 │   │   │   📄 samurai_t2.py
 │   │   │   📄 __init__.py
+│   │   📁 ui/
+│   │   │   📄 text_utils.py
 │   │   📁 world_boss/
 │   │   │   📄 engine.py
 │   📁 parties/

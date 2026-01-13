@@ -1,5 +1,5 @@
 # handlers/admin/sell_gems.py
-# (VERSÃO CORRIGIDA: Callback Sincronizado + Busca Estrita ObjectId)
+# (VERSÃO FLEXÍVEL: Aceita ObjectId OU Nome do Personagem)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -12,6 +12,8 @@ from bson import ObjectId
 # Imports do Core
 from modules.player.core import get_player_data, save_player_data
 from modules.player.inventory import add_gems
+# Importamos a busca por nome que já existe no queries.py
+from modules.player.queries import find_player_by_name 
 from handlers.admin.utils import ensure_admin
 
 logger = logging.getLogger(__name__)
@@ -20,30 +22,26 @@ logger = logging.getLogger(__name__)
 (ASK_TARGET_PLAYER, ASK_QUANTITY, CONFIRM_ACTION) = range(3)
 
 # ==============================================================================
-# BUSCA RESTRITA (APENAS OBJECTID)
+# BUSCA INTELIGENTE (ID ou NOME)
 # ==============================================================================
-async def smart_search_player_strict(term: str):
+async def smart_search_player(term: str):
     """
-    Busca ESTRITAMENTE por ObjectId (24 chars hex).
-    Ignora nomes e IDs numéricos antigos.
+    Tenta encontrar o jogador pelo ObjectId OU pelo Nome/Username.
+    Retorna: O ID do jogador (str ou ObjectId) ou None.
     """
     term = str(term).strip()
     
-    # Validação estrita: Se não for ObjectId válido, retorna None imediatamente.
-    if not ObjectId.is_valid(term):
-        return None
-
-    # Busca direta no banco via Core
-    # (ObjectId válido é convertido automaticamente dentro do get_player_data se necessário,
-    # mas aqui já passamos o objeto limpo)
-    try:
-        oid = ObjectId(term)
-        pdata = await get_player_data(oid)
-        
+    # 1. Tenta buscar direto por ObjectId se o formato for válido
+    if ObjectId.is_valid(term):
+        pdata = await get_player_data(ObjectId(term))
         if pdata:
-            return pdata.get("_id") # Retorna o ObjectId do documento
-    except Exception:
-        return None
+            return pdata.get("_id") # Retorna o ID encontrado
+
+    # 2. Se não achou por ID, busca por Nome usando a query do sistema
+    # find_player_by_name retorna uma tupla (user_id, user_data)
+    found = await find_player_by_name(term)
+    if found:
+        return found[0] # Retorna apenas o ID (primeiro item da tupla)
 
     return None
 
@@ -61,9 +59,8 @@ async def start_add_gems(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     await update.callback_query.edit_message_text(
         "💎 <b>VENDER/ADICIONAR GEMAS</b>\n\n"
-        "Envie o <b>ObjectId</b> do jogador (24 caracteres).\n"
-        "<i>Ex: 675da...</i>\n\n"
-        "⚠️ <b>Atenção:</b> Somente ID Hexadecimal é aceito.",
+        "Envie o <b>NOME</b> do personagem ou o <b>ObjectId</b>.\n"
+        "<i>Ex: 'Guerreiro01' ou '675da...'</i>",
         parse_mode="HTML"
     )
     return ASK_TARGET_PLAYER
@@ -78,8 +75,7 @@ async def start_remove_gems(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     await update.callback_query.edit_message_text(
         "🔥 <b>REMOVER GEMAS</b>\n\n"
-        "Envie o <b>ObjectId</b> do jogador para debitar.\n"
-        "⚠️ <b>Atenção:</b> Somente ID Hexadecimal é aceito.",
+        "Envie o <b>NOME</b> do personagem ou o <b>ObjectId</b> para debitar.",
         parse_mode="HTML"
     )
     return ASK_TARGET_PLAYER
@@ -90,29 +86,23 @@ async def start_remove_gems(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def receive_target_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not update.message or not update.message.text:
-        await update.message.reply_text("Envie apenas o ID (texto).")
+        await update.message.reply_text("Envie apenas texto.")
         return ASK_TARGET_PLAYER
 
     txt = update.message.text.strip()
-    
-    # Verificação rápida visual antes de ir ao banco
-    if not ObjectId.is_valid(txt):
-        await update.message.reply_text("❌ <b>ID Inválido!</b>\nO ID deve ter 24 caracteres hexadecimais.\nTente novamente:", parse_mode="HTML")
-        return ASK_TARGET_PLAYER
-
-    status = await update.message.reply_text(f"🔍 Buscando ID: {txt}...")
+    status = await update.message.reply_text(f"🔍 Buscando: '{txt}'...")
     
     try:
-        # Busca estrita
-        uid = await smart_search_player_strict(txt)
+        # Usa a busca inteligente (Nome ou ID)
+        uid = await smart_search_player(txt)
 
         if not uid:
-            await status.edit_text(f"❌ Jogador com ID <code>{txt}</code> não encontrado no banco.", parse_mode="HTML")
+            await status.edit_text(f"❌ Jogador '{txt}' não encontrado (nem por Nome, nem por ID).")
             return ASK_TARGET_PLAYER
 
         pdata = await get_player_data(uid)
         if not pdata:
-            await status.edit_text("❌ Erro crítico ao carregar dados do jogador.")
+            await status.edit_text("❌ Erro ao carregar dados do jogador encontrado.")
             return ASK_TARGET_PLAYER
 
         # Salva dados no contexto
@@ -232,7 +222,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # ==============================================================================
 sell_gems_conv_handler = ConversationHandler(
     entry_points=[
-        # ✅ CORREÇÃO: "admin_sell_gems" para bater com o menu do admin_handler.py
         CallbackQueryHandler(start_add_gems, pattern=r"^admin_sell_gems$"),    
         CallbackQueryHandler(start_remove_gems, pattern=r"^admin_remove_gems$")
     ],
