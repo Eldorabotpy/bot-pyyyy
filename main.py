@@ -1,5 +1,5 @@
 # main.py
-# (VERSÃO FINAL CORRIGIDA: Com Registro de Evolução)
+# (VERSÃO FINAL CORRIGIDA: Com Guilda Nova e Auth Segura)
 
 from __future__ import annotations
 import asyncio
@@ -47,14 +47,13 @@ from handlers.admin.file_id_conv import file_id_conv_handler
 from handlers.admin.media_handler import set_media_command
 
 # --- IMPORTS DOS REGISTROS (A Mágica acontece aqui) ---
-# Importamos a função MESTRA que carrega todos os sistemas do jogo
 from registries import register_all_handlers
-# Importamos as tarefas de inicialização (Jobs, Watchdogs)
 from registries.startup import run_system_startup_tasks
 from handlers.guide_handler import guide_handlers
-
-# 👇 [NOVO] IMPORTA O REGISTRO DE EVOLUÇÃO AQUI 👇
 from registries.class_evolution import register_evolution_handlers
+
+# 👇 [NOVO] Importa o registro da Guilda explicitamente para garantir carregamento
+from registries.guild import register_guild_handlers
 
 try:
     from modules.world_boss.engine import world_boss_manager
@@ -192,11 +191,11 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("setmedia", set_media_command))
     
     # 3️⃣ SISTEMAS DO JOGO (Registries)
-    # Carrega: Admin, Character, Combat, Crafting, Market, Regions, Guild, Events
     register_all_handlers(application)
-
-    # 👇 [NOVO] ATIVA O SISTEMA DE EVOLUÇÃO AQUI 👇
-    # Isso carrega o arquivo registries/class_evolution.py que contém o botão de duelo
+    
+    # 👇 Registra a Guilda separadamente para garantir (pois desativamos no character.py)
+    register_guild_handlers(application)
+    
     register_evolution_handlers(application)
 
     # 4️⃣ FALLBACKS (Comandos Gerais)
@@ -204,6 +203,7 @@ if __name__ == '__main__':
     application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
     application.add_handler(start_command_handler)
     application.add_handlers(guide_handlers)
+    
     # --------------------------------------------------------------------------
     # DEBUG (Opcional)
     try:
@@ -216,4 +216,3 @@ if __name__ == '__main__':
     
     # Inicia o bot
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-    

@@ -148,8 +148,12 @@ def register_market_handlers(application: Application):
             gem_qty_minus_handler,
             gem_qty_plus_handler,
             gem_buy_handler,
-            gem_shop_command_handler
+            gem_shop_command_handler,
+            gift_conv_handler  # <--- IMPORTAÇÃO ADICIONADA AQUI
         )
+        
+        # REGISTRO DO CONVERSATION HANDLER (PRIORIDADE)
+        application.add_handler(gift_conv_handler) # <--- REGISTRO ADICIONADO AQUI
         
         application.add_handler(gem_shop_open_handler)
         application.add_handler(gem_tab_handler)

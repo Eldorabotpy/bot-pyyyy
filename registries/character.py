@@ -1,5 +1,5 @@
 # registries/character.py
-# (VERSÃO CORRIGIDA: Compatível com Inventário Visual Rico e Novos Handlers)
+# (VERSÃO LIMPA: Guilda removida para evitar conflito com registries/guild.py)
 
 import logging
 from telegram.ext import Application, BaseHandler 
@@ -27,9 +27,9 @@ from handlers.profile_handler import (
 # 3. Inventário (ATUALIZADO)
 from handlers.inventory_handler import (
     inventory_menu_handler,
-    inventory_list_handler,  # Substitui inventory_cat_handler
-    inventory_view_handler,  # Novo: Visualizar detalhes
-    inventory_use_handler    # Renomeado: De use_item_handler para inventory_use_handler
+    inventory_list_handler,
+    inventory_view_handler,
+    inventory_use_handler
 )
 
 # 4. Conversor e Skins
@@ -72,14 +72,14 @@ from telegram.ext import CallbackQueryHandler
 from handlers.menu.kingdom import show_kingdom_menu
 kingdom_menu_handler = CallbackQueryHandler(show_kingdom_menu, pattern=r'^continue_after_action$')
 
-# 9. GUILDA E CLÃ
-from handlers.guild_menu_handler import (
-    adventurer_guild_handler, 
-    clan_board_handler,
-    mission_view_handler,
-    mission_claim_handler
-)
-from handlers.guild_handler import all_guild_handlers
+# 9. GUILDA E CLÃ (DESATIVADO - MIGRADO PARA registries/guild.py)
+# from handlers.guild_menu_handler import (
+#     adventurer_guild_handler, 
+#     clan_board_handler,
+#     mission_view_handler,
+#     mission_claim_handler
+# )
+# from handlers.guild_handler import all_guild_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -143,19 +143,19 @@ def register_character_handlers(application: Application):
         job_list_handler,     
         job_do_handler,  
         
-        # --- SISTEMA DE GUILDA ---
-        adventurer_guild_handler,
-        clan_board_handler,
-        mission_view_handler,
-        mission_claim_handler
+        # --- SISTEMA DE GUILDA (MIGRADO) ---
+        # adventurer_guild_handler,
+        # clan_board_handler,
+        # mission_view_handler,
+        # mission_claim_handler
     ]
     
     # Adiciona listas externas
     if all_skin_handlers:
         raw_handlers.extend(all_skin_handlers)
     
-    if all_guild_handlers:
-        raw_handlers.extend(all_guild_handlers)
+    # if all_guild_handlers:
+    #     raw_handlers.extend(all_guild_handlers)
     
     # === FILTRO DE SEGURANÇA ===
     clean_handlers = []

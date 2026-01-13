@@ -1,5 +1,5 @@
 # handlers/guild/dashboard.py
-# (VERSÃO FINAL: CÁLCULO DE XP CORRIGIDO PARA O NÍVEL ATUAL)
+# (VERSÃO CORRIGIDA: Captura o botão 'Guilda' do menu principal e faz o roteamento)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaAnimation, InputMediaVideo
@@ -85,7 +85,44 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
             logger.error(f"Erro fatal rendering clan dashboard: {e}")
 
 # ==============================================================================
-# 2. DASHBOARD (AQUI ESTAVA O ERRO DE LÓGICA)
+# 2. ENTRY POINT (ROTEADOR DE ENTRADA) - AQUI ESTÁ A CORREÇÃO PRINCIPAL
+# ==============================================================================
+async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Função principal chamada pelo botão 'Guilda' do Reino.
+    Decide se mostra o Dashboard (tem clã) ou Menu de Criação (sem clã).
+    """
+    query = update.callback_query
+    
+    # 1. Autenticação
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        if query: await query.answer("Sessão inválida.", show_alert=True)
+        return
+
+    # 2. Verifica dados do jogador
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        if query: await query.answer("Perfil não encontrado.", show_alert=True)
+        return
+
+    # 3. Verifica se tem Clã
+    clan_id = player_data.get("clan_id")
+    
+    if clan_id:
+        # --> Tem clã: Mostra Dashboard
+        await show_clan_dashboard(update, context)
+    else:
+        # --> Não tem clã: Mostra Menu de Criação/Busca
+        # Importação tardia para evitar Circular Import com creation_search.py
+        try:
+            from handlers.guild.creation_search import show_create_clan_menu
+            await show_create_clan_menu(update, context)
+        except ImportError:
+            await query.answer("Erro: Módulo de criação não encontrado.", show_alert=True)
+
+# ==============================================================================
+# 3. DASHBOARD
 # ==============================================================================
 async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE, came_from: str = "kingdom"):
     query = update.callback_query
@@ -103,8 +140,14 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     except: clan_data = None
 
     if not clan_data:
-        try: await query.edit_message_text("Você não está em um clã.")
-        except: pass
+        # Fallback se o ID existe no player mas o clã sumiu do banco
+        pdata = await player_manager.get_player_data(user_id)
+        if pdata:
+            pdata["clan_id"] = None
+            await player_manager.save_player_data(user_id, pdata)
+        
+        # Redireciona para criação
+        await adventurer_guild_menu(update, context)
         return
 
     # Dados
@@ -115,13 +158,9 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     leader_id = str(clan_data.get("leader_id", 0))
     is_leader = (str(user_id) == leader_id)
 
-    # --- CORREÇÃO DO XP ---
-    # Antes: Olhava o Nível Seguinte (level + 1). Errado!
-    # Agora: Olha o Nível ATUAL para saber quanto falta para completar.
+    # Cálculo do XP
     current_level_info = CLAN_PRESTIGE_LEVELS.get(level, {})
     xp_needed = current_level_info.get("points_to_next_level", 999999)
-    
-    # Se xp_needed for None (nível máximo) ou 0, evita erro
     if not xp_needed: xp_needed = xp if xp > 0 else 1
     
     percent = min(1.0, max(0.0, xp / xp_needed))
@@ -129,7 +168,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     bar = "🟦" * filled + "⬜" * (10 - filled)
     
     members_count = len(clan_data.get('members', []))
-    max_members = current_level_info.get('max_members', 10) # Usa info do nível atual também
+    max_members = current_level_info.get('max_members', 10)
 
     text = (
         f"🛡️ <b>CLÃ: {clan_name.upper()}</b> [Nv. {level}]\n"
@@ -149,13 +188,14 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     if is_leader:
         keyboard.append([InlineKeyboardButton("👑 Gerir Clã", callback_data="clan_manage_menu")])
 
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="adventurer_guild_main")])
+    # Alterado para voltar ao menu principal do Reino
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")])
 
     await _render_clan_screen(update, context, clan_data, text, keyboard)
 
 
 # ==============================================================================
-# 3. ROTEADOR
+# 4. ROTEADOR
 # ==============================================================================
 async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -180,14 +220,17 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ImportError: pass
     
     came_from = "kingdom"
-    if ":" in action:
-         try: action_base, param = action.split(":", 1)
-         except: action_base = action
-    else:
-         action_base = action
-             
-    # --- NAVEGAÇÃO PRINCIPAL ---
-    if action == 'clan_menu': await show_clan_dashboard(update, context, came_from=came_from) 
+    
+    # --- ROTEAMENTO PRINCIPAL ---
+    
+    # 1. Botão "Guilda" do Menu Principal
+    if action == 'adventurer_guild_main': 
+        await adventurer_guild_menu(update, context)
+        return
+
+    # 2. Navegação Interna
+    if action == 'clan_menu': 
+        await show_clan_dashboard(update, context, came_from=came_from) 
     
     # --- MISSÕES ---
     elif action == 'clan_mission_details': await show_guild_mission_details(update, context)
@@ -222,4 +265,5 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try: await query.answer("Opção não encontrada.", show_alert=True)
         except: pass
 
-clan_handler = CallbackQueryHandler(clan_router, pattern=r'^clan_|^gld_')
+# Regex expandido para capturar o botão principal
+clan_handler = CallbackQueryHandler(clan_router, pattern=r'^clan_|^gld_|^adventurer_guild_main$')

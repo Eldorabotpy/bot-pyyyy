@@ -1,5 +1,5 @@
 # handlers/gem_shop_handler.py
-# (VERSÃO CORRIGIDA: AUTH OBJECTID E SYNC MANUAL SEGURO)
+# (VERSÃO FINAL: SISTEMA DE PRESENTES VIP ADICIONADO)
 
 import logging
 import math
@@ -8,12 +8,18 @@ from datetime import datetime, timezone, timedelta
 
 from telegram.error import BadRequest
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
+from telegram.ext import (
+    ContextTypes, CallbackQueryHandler, CommandHandler, 
+    ConversationHandler, MessageHandler, filters
+)
 from bson import ObjectId
 
+# --- IMPORTS DO SISTEMA ---
 from modules import player_manager, game_data
 from modules.game_data.items_evolution import EVOLUTION_ITEMS_DATA
 from modules.auth_utils import get_current_player_id
+from modules.player.queries import find_player_by_name # <--- NECESSÁRIO PARA BUSCAR O ALVO
+
 try:
     from modules.game_data.premium import PREMIUM_PLANS_FOR_SALE, get_benefits_text
 except ImportError:
@@ -28,6 +34,9 @@ logger = logging.getLogger(__name__)
 NOTIFICATION_GROUP_ID = -1002881364171
 NOTIFICATION_TOPIC_ID = 24475 
 
+# ESTADOS DA CONVERSA DE PRESENTE
+GIFT_WAIT_INPUT, GIFT_CONFIRM = range(2)
+
 # -------------------------------
 # Configuração de Listas
 # -------------------------------
@@ -36,10 +45,10 @@ TAB_EVOLUTION = list(EVOLUTION_ITEMS_DATA.keys())
 TAB_MISC = ["sigilo_protecao", "ticket_arena", "cristal_de_abertura", "pocao_mana_grande"]
 
 GEM_SHOP: Dict[str, int] = {
-    "sigilo_protecao": 5,
-    "ticket_arena": 5,
-    "cristal_de_abertura": 5,
-    "pocao_mana_grande": 5,
+    "sigilo_protecao": 2,
+    "ticket_arena": 1,
+    "cristal_de_abertura": 3,
+    "pocao_mana_grande": 1,
 }
 
 ITEMS_PER_PAGE = 3 
@@ -98,8 +107,15 @@ def _build_shop_keyboard(context_state: dict, page_items: list = None) -> Inline
             ]
             actions.append(qty_row)
         
-        buy_text = "✨ ASSINAR" if is_plan else "🛒 COMPRAR"
-        actions.append([InlineKeyboardButton(buy_text, callback_data="gem_buy")])
+        # Botões de Compra
+        buy_text = "✨ ASSINAR AGORA" if is_plan else "🛒 COMPRAR"
+        row_buy = [InlineKeyboardButton(buy_text, callback_data="gem_buy")]
+        
+        # [NOVO] Botão de Presentear se for Plano
+        if is_plan:
+            row_buy.append(InlineKeyboardButton("🎁 PRESENTEAR", callback_data="gem_gift_start"))
+            
+        actions.append(row_buy)
         actions.append([InlineKeyboardButton("🔙 Voltar à Lista", callback_data=f"gem_pick_{selected_id}")]) 
         return InlineKeyboardMarkup(actions)
 
@@ -137,7 +153,7 @@ def _build_shop_keyboard(context_state: dict, page_items: list = None) -> Inline
     return InlineKeyboardMarkup(kb_rows)
 
 # -------------------------------
-# Handlers
+# Handlers da Loja
 # -------------------------------
 async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -177,6 +193,7 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lines.append(f"⏱ <b>Duração:</b> {plan.get('days', 30)} dias")
             lines.append(f"<i>{get_benefits_text(plan.get('tier', 'free'))}</i>")
             lines.append(f"🏷️ <b>Valor: {price} 💎</b>")
+            lines.append("\n🎁 <i>Use 'Presentear' para enviar este plano a um amigo!</i>")
         else:
             info = _get_item_info(base_id)
             total = price * qty
@@ -214,7 +231,7 @@ async def gem_shop_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await context.bot.send_message(chat_id, text_content, reply_markup=kb, parse_mode="HTML")
 
-# --- ACTIONS ---
+# --- ACTIONS BÁSICAS ---
 async def gem_switch_tab(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = get_current_player_id(update, context)
     if not user_id: return
@@ -251,6 +268,9 @@ async def gem_change_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     st["qty"] = max(1, st.get("qty", 1) + (1 if "plus" in d else -1))
     await gem_shop_open(update, context)
 
+# -------------------------------
+# COMPRA PESSOAL (SELF)
+# -------------------------------
 async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     buyer_id = get_current_player_id(update, context)
@@ -277,31 +297,10 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         plan = PREMIUM_PLANS_FOR_SALE[base_id]
         new_tier = plan["tier"]
         days = plan.get("days", 30)
-        now = datetime.now(timezone.utc)
         
-        # Define Expiração
-        curr_iso = buyer.get("premium_expires_at")
-        start_time = now
-        if buyer.get("premium_tier") == new_tier and curr_iso:
-            try:
-                curr_dt = datetime.fromisoformat(curr_iso)
-                if curr_dt > now: start_time = curr_dt
-            except: pass
-            
-        new_exp = start_time + timedelta(days=days)
-        buyer["premium_tier"] = new_tier
-        buyer["premium_expires_at"] = new_exp.isoformat()
-        
-        # SYNC MANUAL COM BANCO (Users Collection)
-        try:
-            from modules.database import db
-            # Converte buyer_id string para ObjectId
-            query = {"_id": ObjectId(buyer_id)} if ObjectId.is_valid(buyer_id) else {"_id": buyer_id}
-            db["users"].update_one(query, {"$set": {"premium_tier": new_tier, "premium_expires_at": new_exp.isoformat()}})
-        except Exception as e:
-            logger.error(f"Erro sync vip: {e}")
+        _apply_vip_to_player(buyer, buyer_id, new_tier, days)
 
-        msg = f"✅ <b>Assinatura VIP Ativa!</b>\n👑 {plan['name']}\n📅 Até: {new_exp.strftime('%d/%m/%Y')}"
+        msg = f"✅ <b>Assinatura VIP Ativa!</b>\n👑 {plan['name']}\n💎 -{total_cost}"
         
         # Notificação Grupo
         try:
@@ -321,6 +320,212 @@ async def gem_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="gem_shop")]])
     try: await q.edit_message_caption(caption=msg, reply_markup=kb, parse_mode="HTML")
     except: await q.edit_message_text(text=msg, reply_markup=kb, parse_mode="HTML")
+
+# -------------------------------
+# 🎁 LÓGICA DE PRESENTE (GIFT)
+# -------------------------------
+
+async def gift_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Inicia o fluxo de presente."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = get_current_player_id(update, context)
+    st = _state(context, user_id)
+    base_id = st.get("base_id")
+    
+    if not base_id or base_id not in PREMIUM_PLANS_FOR_SALE:
+        await query.answer("Selecione um plano VIP primeiro.", show_alert=True)
+        return ConversationHandler.END
+        
+    plan_name = PREMIUM_PLANS_FOR_SALE[base_id]["name"]
+    price = _price_for(base_id)
+    
+    msg = (
+        f"🎁 <b>PRESENTEAR {plan_name.upper()}</b>\n\n"
+        f"💎 Custo: <b>{price} gemas</b> (Debitado de você)\n\n"
+        "✍️ <b>Digite o NOME ou ID do jogador que receberá o presente:</b>\n"
+        "<i>Envie 'cancelar' para desistir.</i>"
+    )
+    
+    await query.edit_message_caption(caption=msg, parse_mode="HTML", reply_markup=None)
+    context.user_data['gift_plan_id'] = base_id
+    return GIFT_WAIT_INPUT
+
+async def gift_check_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Recebe o nome, busca o jogador e pede confirmação."""
+    text = update.message.text.strip()
+    if text.lower() == 'cancelar':
+        await update.message.reply_text("🎁 Presente cancelado.")
+        return ConversationHandler.END
+        
+    # Busca o jogador (Nome ou ID)
+    found = await find_player_by_name(text)
+    
+    if not found:
+        # Tenta verificar se é um ObjectId direto
+        if ObjectId.is_valid(text):
+             found_pdata = await player_manager.get_player_data(text)
+             if found_pdata: found = (text, found_pdata)
+    
+    if not found:
+        await update.message.reply_text("❌ Jogador não encontrado. Tente novamente o Nome ou ID:")
+        return GIFT_WAIT_INPUT
+        
+    target_id, target_data = found
+    sender_id = get_current_player_id(update, context)
+    
+    if str(target_id) == str(sender_id):
+        await update.message.reply_text("🎁 Você não pode presentear a si mesmo aqui! Use o botão 'ASSINAR'.")
+        return ConversationHandler.END
+
+    # Salva dados para confirmação
+    plan_id = context.user_data.get('gift_plan_id')
+    plan = PREMIUM_PLANS_FOR_SALE[plan_id]
+    price = _price_for(plan_id)
+    
+    context.user_data['gift_target_id'] = target_id
+    context.user_data['gift_target_name'] = target_data.get("character_name", "Desconhecido")
+    
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ CONFIRMAR ENVIO", callback_data="gift_confirm_yes")],
+        [InlineKeyboardButton("❌ CANCELAR", callback_data="gift_confirm_no")]
+    ])
+    
+    msg = (
+        f"🎁 <b>CONFIRMAÇÃO DE PRESENTE</b>\n\n"
+        f"👤 <b>Para:</b> {context.user_data['gift_target_name']}\n"
+        f"👑 <b>Plano:</b> {plan['name']} ({plan['days']} dias)\n"
+        f"💎 <b>Custo:</b> {price} Gemas\n\n"
+        "Deseja finalizar a transação?"
+    )
+    
+    await update.message.reply_text(msg, reply_markup=kb, parse_mode="HTML")
+    return GIFT_CONFIRM
+
+async def gift_execute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Executa a transação."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "gift_confirm_no":
+        await query.edit_message_text("❌ Presente cancelado.")
+        return ConversationHandler.END
+        
+    # Dados
+    sender_id = get_current_player_id(update, context)
+    target_id = context.user_data['gift_target_id']
+    plan_id = context.user_data['gift_plan_id']
+    
+    sender_pdata = await player_manager.get_player_data(sender_id)
+    target_pdata = await player_manager.get_player_data(target_id)
+    
+    if not sender_pdata or not target_pdata:
+        await query.edit_message_text("❌ Erro ao processar dados (Jogador não encontrado).")
+        return ConversationHandler.END
+        
+    price = _price_for(plan_id)
+    
+    # Valida Saldo
+    if _gems(sender_pdata) < price:
+        await query.edit_message_text(f"❌ Saldo insuficiente! Você precisa de {price} gemas.")
+        return ConversationHandler.END
+        
+    # Executa Transação
+    _spend_gems(sender_pdata, price)
+    await player_manager.save_player_data(sender_id, sender_pdata)
+    
+    # Aplica VIP no Destinatário
+    plan = PREMIUM_PLANS_FOR_SALE[plan_id]
+    new_expiration = _apply_vip_to_player(target_pdata, target_id, plan["tier"], plan["days"])
+    
+    # Resposta Sender
+    await query.edit_message_text(
+        f"✅ <b>PRESENTE ENVIADO COM SUCESSO!</b>\n\n"
+        f"💎 <b>Debitado:</b> {price} Gemas\n"
+        f"🎁 <b>Enviado para:</b> {target_pdata.get('character_name')}",
+        parse_mode="HTML"
+    )
+    
+    # Notifica Destinatário (Tenta achar chat_id)
+    target_chat_id = target_pdata.get("telegram_id_owner") or target_pdata.get("last_chat_id")
+    if target_chat_id:
+        try:
+            notify_msg = (
+                "🎁 <b>VOCÊ RECEBEU UM PRESENTE!</b> 🎁\n\n"
+                f"Um benfeitor lhe enviou o plano <b>{plan['name']}</b>!\n"
+                f"🌟 <b>Benefícios Ativos até:</b> {new_expiration.strftime('%d/%m/%Y')}\n\n"
+                "<i>Aproveite sua jornada em Eldora!</i>"
+            )
+            await context.bot.send_message(target_chat_id, notify_msg, parse_mode="HTML")
+        except: pass
+        
+    # Notifica Grupo
+    try:
+        sender_name = sender_pdata.get("character_name", "Alguém")
+        target_name = target_pdata.get("character_name", "Sortudo")
+        await context.bot.send_message(
+            chat_id=NOTIFICATION_GROUP_ID, message_thread_id=NOTIFICATION_TOPIC_ID,
+            text=f"🎁 <b>{sender_name}</b> presenteou <b>{target_name}</b> com VIP <b>{plan['name']}</b>!", parse_mode="HTML"
+        )
+    except: pass
+    
+    return ConversationHandler.END
+
+async def gift_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Operação cancelada.")
+    return ConversationHandler.END
+
+# Helper VIP Application
+def _apply_vip_to_player(pdata: dict, uid_str: str, tier: str, days: int):
+    now = datetime.now(timezone.utc)
+    curr_iso = pdata.get("premium_expires_at")
+    start_time = now
+    
+    # Se já tem o mesmo tier e não venceu, estende
+    if pdata.get("premium_tier") == tier and curr_iso:
+        try:
+            curr_dt = datetime.fromisoformat(curr_iso)
+            if curr_dt.tzinfo is None: curr_dt = curr_dt.replace(tzinfo=timezone.utc)
+            if curr_dt > now: start_time = curr_dt
+        except: pass
+        
+    new_exp = start_time + timedelta(days=days)
+    pdata["premium_tier"] = tier
+    pdata["premium_expires_at"] = new_exp.isoformat()
+    
+    # SYNC MANUAL COM DB (Garante persistência imediata)
+    try:
+        from modules.database import db
+        # Lógica Híbrida de ID (ObjectId vs String)
+        query_id = ObjectId(uid_str) if ObjectId.is_valid(uid_str) else uid_str
+        db["users"].update_one(
+            {"_id": query_id}, 
+            {"$set": {"premium_tier": tier, "premium_expires_at": new_exp.isoformat()}}
+        )
+        # Salva também via cache para garantir
+        # (save_player_data é async, mas aqui estamos num fluxo sync safe ou chamaremos depois)
+    except Exception as e:
+        logger.error(f"Erro ao salvar VIP no DB: {e}")
+        
+    # Nota: O caller deve chamar save_player_data(uid, pdata) depois para garantir cache update
+    return new_exp
+
+# -------------------------------
+# Definição do ConversationHandler
+# -------------------------------
+gift_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(gift_start, pattern='^gem_gift_start$')],
+    states={
+        GIFT_WAIT_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, gift_check_player)],
+        GIFT_CONFIRM: [
+            CallbackQueryHandler(gift_execute, pattern='^gift_confirm_yes$'),
+            CallbackQueryHandler(gift_execute, pattern='^gift_confirm_no$')
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', gift_cancel)],
+    per_message=False
+)
 
 # Exports
 gem_shop_open_handler = CallbackQueryHandler(gem_shop_open, pattern=r'^gem_shop$')
