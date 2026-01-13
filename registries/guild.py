@@ -1,13 +1,12 @@
 # registries/guild.py
-# CORREÇÃO: Registra todos os handlers necessários para Guilda/Clã,
-# evitando botões mudos (Perfil, Kingdom, lista de membros, cargos, etc.)
+# REGISTRY COMPLETO DO SISTEMA DE GUILDA / CLÃ
+# (inclui PERFIL, CARGOS, LIMPEZA DE LEGADOS, CONVITES, BANCO, MISSÕES e GUERRA)
 
 from telegram.ext import Application
 
-# ============================================================================
+# ==============================================================================
 # CONVERSATIONS (Fluxos longos – prioridade máxima)
-# ============================================================================
-
+# ==============================================================================
 from handlers.guild.creation_search import (
     clan_creation_conv_handler,
     clan_search_conv_handler
@@ -24,10 +23,9 @@ from handlers.guild.bank import (
     clan_withdraw_conv_handler
 )
 
-# ============================================================================
-# CALLBACKS DE CRIAÇÃO / BUSCA
-# ============================================================================
-
+# ==============================================================================
+# CALLBACKS – CRIAÇÃO / BUSCA
+# ==============================================================================
 from handlers.guild.creation_search import (
     clan_create_menu_handler,
     clan_apply_handler,
@@ -36,24 +34,28 @@ from handlers.guild.creation_search import (
     clan_app_decline_handler
 )
 
-# ============================================================================
-# GESTÃO DE MEMBROS E CARGOS  (ESSENCIAL PARA NÃO FICAR MUDO)
-# ============================================================================
-
+# ==============================================================================
+# CALLBACKS – GESTÃO DE MEMBROS / PERFIL / CARGOS
+# ==============================================================================
 from handlers.guild.management import (
     clan_manage_menu_handler,
     clan_view_members_handler,
 
-    # PERFIL E CARGOS
+    # PERFIL E CARGOS (ESSENCIAIS)
     clan_profile_handler,
     clan_setrank_menu_handler,
     clan_do_rank_handler,
 
-    # Ações diversas
+    # LIMPEZA (LEGADOS / INVÁLIDOS)
+    clan_cleanup_menu_handler,
+    clan_cleanup_apps_handler,
+    clan_cleanup_members_handler,
+
+    # AÇÕES DIVERSAS
     clan_invite_accept_handler,
     clan_invite_decline_handler,
-    clan_promote_handler,    # compatibilidade
-    clan_demote_handler,     # compatibilidade
+    clan_promote_handler,   # legado (mantido)
+    clan_demote_handler,    # legado (mantido)
     clan_kick_menu_handler,
     clan_kick_ask_handler,
     clan_kick_do_handler,
@@ -63,25 +65,17 @@ from handlers.guild.management import (
     clan_delete_do_handler
 )
 
-# ============================================================================
-# GUERRA DE CLÃS
-# ============================================================================
-
+# ==============================================================================
+# GUERRA
+# ==============================================================================
 from handlers.guild.war import (
     war_menu_handler,
     war_ranking_handler
 )
 
-# ============================================================================
-# DASHBOARD / ROTEADOR PRINCIPAL DO CLÃ
-# ============================================================================
-
-from handlers.guild.dashboard import clan_handler
-
-# ============================================================================
-# MISSÕES DE CLÃ (opcional)
-# ============================================================================
-
+# ==============================================================================
+# MISSÕES (opcional – protegido por try)
+# ==============================================================================
 try:
     from handlers.guild.missions import (
         clan_mission_start_handler,
@@ -93,21 +87,25 @@ try:
 except ImportError:
     clan_mission_start_handler = None
 
+# ==============================================================================
+# DASHBOARD / ROTEADOR FINAL
+# ==============================================================================
+from handlers.guild.dashboard import clan_handler
 
-# ============================================================================
-# REGISTRO CENTRAL
-# ============================================================================
 
+# ==============================================================================
+# REGISTRO PRINCIPAL
+# ==============================================================================
 def register_guild_handlers(application: Application):
     """
-    Registra todos os handlers do sistema de Guilda/Clã.
-    A ORDEM IMPORTA.
+    Registra TODOS os handlers do sistema de Guilda/Clã.
+    A ordem é CRÍTICA: específicos primeiro, genéricos por último.
     """
     print("🛡️ [REGISTRY] Conectando botões de Guilda...")
 
-    # ----------------------------------------------------------------------
-    # 1. CONVERSATIONS (PRIORIDADE MÁXIMA)
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # 1. CONVERSATIONS (prioridade máxima)
+    # --------------------------------------------------------------------------
     application.add_handler(clan_creation_conv_handler)
     application.add_handler(clan_search_conv_handler)
     application.add_handler(invite_conv_handler)
@@ -116,27 +114,32 @@ def register_guild_handlers(application: Application):
     application.add_handler(clan_deposit_conv_handler)
     application.add_handler(clan_withdraw_conv_handler)
 
-    # ----------------------------------------------------------------------
-    # 2. CRIAÇÃO / BUSCA
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # 2. CRIAÇÃO E BUSCA DE CLÃ
+    # --------------------------------------------------------------------------
     application.add_handler(clan_create_menu_handler)
     application.add_handler(clan_apply_handler)
     application.add_handler(clan_manage_apps_handler)
     application.add_handler(clan_app_accept_handler)
     application.add_handler(clan_app_decline_handler)
 
-    # ----------------------------------------------------------------------
-    # 3. GESTÃO DE MEMBROS E CARGOS (CORREÇÃO CRÍTICA)
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # 3. GESTÃO DE MEMBROS / PERFIL / CARGOS
+    # --------------------------------------------------------------------------
     application.add_handler(clan_manage_menu_handler)
     application.add_handler(clan_view_members_handler)
 
-    # PERFIL E CARGOS — SEM ISSO O CLIQUE FICA MUDO
+    # PERFIL E CARGOS (EVITA BOTÕES “MUDOS”)
     application.add_handler(clan_profile_handler)
     application.add_handler(clan_setrank_menu_handler)
     application.add_handler(clan_do_rank_handler)
 
-    # AÇÕES
+    # LIMPEZA DE LEGADOS (NOVO)
+    application.add_handler(clan_cleanup_menu_handler)
+    application.add_handler(clan_cleanup_apps_handler)
+    application.add_handler(clan_cleanup_members_handler)
+
+    # AÇÕES DIVERSAS
     application.add_handler(clan_invite_accept_handler)
     application.add_handler(clan_invite_decline_handler)
     application.add_handler(clan_promote_handler)
@@ -149,9 +152,9 @@ def register_guild_handlers(application: Application):
     application.add_handler(clan_delete_warn_handler)
     application.add_handler(clan_delete_do_handler)
 
-    # ----------------------------------------------------------------------
-    # 4. MISSÕES DE CLÃ
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # 4. MISSÕES
+    # --------------------------------------------------------------------------
     if clan_mission_start_handler:
         application.add_handler(clan_mission_start_handler)
         application.add_handler(clan_guild_mission_details_handler)
@@ -159,13 +162,15 @@ def register_guild_handlers(application: Application):
         application.add_handler(clan_mission_finish_handler)
         application.add_handler(clan_mission_cancel_handler)
 
-    # ----------------------------------------------------------------------
-    # 5. GUERRA E DASHBOARD
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # 5. GUERRA
+    # --------------------------------------------------------------------------
     application.add_handler(war_menu_handler)
     application.add_handler(war_ranking_handler)
 
-    # ROTEADOR FINAL (SEMPRE POR ÚLTIMO)
+    # --------------------------------------------------------------------------
+    # 6. ROTEADOR GENÉRICO (SEMPRE POR ÚLTIMO)
+    # --------------------------------------------------------------------------
     application.add_handler(clan_handler)
 
-    print("✅ [REGISTRY] Botões de Guilda conectados.")
+    print("✅ [REGISTRY] Botões de Guilda conectados com sucesso.")
