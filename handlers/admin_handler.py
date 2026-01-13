@@ -1,11 +1,11 @@
 # handlers/admin_handler.py
-# (VERSÃO FINAL: Corrigido "fix_premium_dates_command not defined")
+# (VERSÃO FINAL: Blindado contra imports legados de jobs e event_manager)
 
 from __future__ import annotations
 import io
-import logging 
+import logging
 import json
-import asyncio 
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Union
 
@@ -27,41 +27,62 @@ from modules.auth_utils import get_current_player_id
 from handlers.admin.utils import ensure_admin, ADMIN_LIST, parse_hybrid_id
 
 # --- Imports de Funcionalidades Administrativas ---
-from handlers.jobs import distribute_kingdom_defense_ticket_job
-from handlers.admin.grant_item import grant_item_conv_handler 
-from handlers.admin.generate_equip import generate_equip_conv_handler 
-from handlers.admin.file_id_conv import file_id_conv_handler 
-from handlers.admin.premium_panel import premium_panel_handler 
-from handlers.admin.reset_panel import reset_panel_conversation_handler 
+from handlers.admin.grant_item import grant_item_conv_handler
+from handlers.admin.generate_equip import generate_equip_conv_handler
+from handlers.admin.file_id_conv import file_id_conv_handler
+from handlers.admin.premium_panel import premium_panel_handler
+from handlers.admin.reset_panel import reset_panel_conversation_handler
 from handlers.admin.grant_skill import grant_skill_conv_handler
 from handlers.admin.grant_skin import grant_skin_conv_handler
 from handlers.admin.player_management_handler import player_management_conv_handler
 from handlers.admin.debug_skill import debug_skill_handler
+
 from modules.player.core import (
-    get_player_data, 
-    save_player_data, 
-    clear_player_cache, 
+    get_player_data,
+    save_player_data,
+    clear_player_cache,
     clear_all_player_cache,
     users_collection,
     _player_cache
 )
 from modules.player.queries import (
-    find_player_by_name, 
-    iter_players, 
+    find_player_by_name,
+    iter_players,
     delete_player
 )
 from modules.player.inventory import add_item_to_inventory
 from modules.player.stats import (
-    allowed_points_for_level, 
-    compute_spent_status_points, 
+    allowed_points_for_level,
+    compute_spent_status_points,
     reset_stats_and_refund_points
 )
 
 from modules import game_data
-from handlers.jobs import reset_pvp_season, force_grant_daily_crystals 
-from kingdom_defense.engine import event_manager
 
-logger = logging.getLogger(__name__) 
+# ----------------------------------------------------------------------
+# ✅ BLINDAGEM: imports legados do handlers.jobs (evita ImportError)
+# ----------------------------------------------------------------------
+from handlers.jobs import reset_pvp_season
+
+try:
+    from handlers.jobs import distribute_kingdom_defense_ticket_job
+except Exception:
+    distribute_kingdom_defense_ticket_job = None
+
+try:
+    from handlers.jobs import force_grant_daily_crystals
+except Exception:
+    force_grant_daily_crystals = None
+
+# ----------------------------------------------------------------------
+# ✅ BLINDAGEM: event_manager pode não existir em ambientes sem o módulo
+# ----------------------------------------------------------------------
+try:
+    from kingdom_defense.engine import event_manager
+except Exception:
+    event_manager = None
+
+logger = logging.getLogger(__name__)
 HTML = ParseMode.HTML
 
 # --- CONSTANTES DE ESTADO ---
@@ -77,13 +98,17 @@ ASK_GHOST_CLAN_ID = 6
 
 async def _safe_answer(update: Update):
     if q := update.callback_query:
-        try: await q.answer()
-        except: pass
+        try:
+            await q.answer()
+        except:
+            pass
 
 async def _safe_edit_text(update, context, text, reply_markup=None):
     if update.callback_query:
-        try: await update.callback_query.edit_message_text(text, parse_mode=HTML, reply_markup=reply_markup)
-        except: pass
+        try:
+            await update.callback_query.edit_message_text(text, parse_mode=HTML, reply_markup=reply_markup)
+        except:
+            pass
     else:
         await context.bot.send_message(update.effective_chat.id, text, parse_mode=HTML, reply_markup=reply_markup)
 
@@ -115,7 +140,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("💀 𝐃𝐄𝐋𝐄𝐓𝐀𝐑 𝐂𝐎𝐍𝐓𝐀", callback_data="admin_delete_start")],
         [InlineKeyboardButton("🔁 𝔽𝕠𝕣ç𝕒𝕣 𝔻𝕚á𝕣𝕚𝕠𝕤", callback_data="admin_force_daily")],
         [InlineKeyboardButton("💎 𝐕𝐞𝐧𝐝𝐞𝐫 𝐆𝐞𝐦𝐚𝐬", callback_data="admin_sell_gems"),
-        InlineKeyboardButton("🔥 Remover Gemas", callback_data="admin_remove_gems")],
+         InlineKeyboardButton("🔥 Remover Gemas", callback_data="admin_remove_gems")],
         [InlineKeyboardButton("👑 ℙ𝕣𝕖𝕞𝕚𝕦𝕞", callback_data="admin_premium")],
         [InlineKeyboardButton("🎉 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝔼𝕧𝕖𝕟𝕥𝕠𝕤", callback_data="admin_event_menu")],
         [InlineKeyboardButton("🔬 𝕋𝕖𝕤𝕥𝕖𝕤 𝕕𝕖 𝔼𝕧𝕖𝕟𝕥𝕠", callback_data="admin_test_menu")],
@@ -145,7 +170,8 @@ def _admin_test_menu_kb() -> InlineKeyboardMarkup:
 # =========================================================
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return 
+    if not await ensure_admin(update): 
+        return
     await update.message.reply_text(
         "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:",
         reply_markup=_admin_menu_kb(),
@@ -153,9 +179,11 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def _handle_admin_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
-    if update.callback_query: await update.callback_query.answer()
-    
+    if not await ensure_admin(update): 
+        return
+    if update.callback_query:
+        await update.callback_query.answer()
+
     text = "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:"
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=_admin_menu_kb(), parse_mode=HTML)
@@ -174,22 +202,30 @@ async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=HTML)
 
 async def _handle_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     await _safe_answer(update)
     help_text = "ℹ️ <b>Ajuda</b>\n/fixme - Reseta seus status\n/mydata - Baixa JSON\n/find_player <nome> - Busca ID\n/delete_player <id> - Deleta conta"
-    await _safe_edit_text(update, context, help_text, InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
+    await _safe_edit_text(update, context, help_text,
+                          InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
 
 # =========================================================
 # EVENTOS
 # =========================================================
 
 async def _handle_admin_event_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     await _safe_answer(update)
     await _safe_edit_text(update, context, "🎉 <b>Gerenciamento de Eventos</b>", _admin_event_menu_kb())
 
 async def _handle_force_start_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
+    if event_manager is None:
+        await update.callback_query.answer("event_manager indisponível.", show_alert=True)
+        return
+
     query = update.callback_query
     await query.answer("Iniciando...")
     result = await event_manager.start_event()
@@ -197,7 +233,12 @@ async def _handle_force_start_event(update: Update, context: ContextTypes.DEFAUL
     await query.message.reply_text(f"Event Start: {msg}")
 
 async def _handle_force_end_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
+    if event_manager is None:
+        await update.callback_query.answer("event_manager indisponível.", show_alert=True)
+        return
+
     query = update.callback_query
     await query.answer("Finalizando...")
     result = await event_manager.end_event(context)
@@ -205,7 +246,8 @@ async def _handle_force_end_event(update: Update, context: ContextTypes.DEFAULT_
     await query.message.reply_text(f"Event End: {msg}")
 
 async def _handle_force_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     query = update.callback_query
     uid = get_current_player_id(update, context)
     pdata = await get_player_data(uid)
@@ -215,26 +257,55 @@ async def _handle_force_ticket(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Ticket entregue!", show_alert=True)
 
 async def _handle_force_ticket_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     query = update.callback_query
     await query.answer("Executando job...")
+
+    if distribute_kingdom_defense_ticket_job is None:
+        await query.message.reply_text("⚠️ Job legado de tickets não existe mais (foi substituído por claim diário).")
+        return
+
+    # Cria um objeto Job fake para compatibilidade com a função (caso ela exista)
     context.job = type('Job', (object,), {'data': {"event_time": "FORCE"}, 'name': 'admin_force'})
     await distribute_kingdom_defense_ticket_job(context)
     await query.message.reply_text("Tickets distribuídos.")
 
 async def _handle_admin_force_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     await _safe_answer(update)
+
+    if force_grant_daily_crystals is None:
+        await _safe_edit_text(
+            update, context,
+            "⚠️ O comando legado de 'forçar cristais diários' foi removido.\n"
+            "Agora as entradas/eventos são via CLAIM diário no menu Eventos.",
+            InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]])
+        )
+        return
+
     await force_grant_daily_crystals(context)
-    await _safe_edit_text(update, context, "✅ Cristais diários entregues.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
+    await _safe_edit_text(
+        update, context,
+        "✅ Cristais diários entregues.",
+        InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]])
+    )
 
 async def force_daily_crystals_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
+
+    if force_grant_daily_crystals is None:
+        await update.message.reply_text("⚠️ Função legada removida. Use o claim diário no menu Eventos.")
+        return
+
     await force_grant_daily_crystals(context)
     await update.message.reply_text("Cristais entregues.")
 
 async def _reset_pvp_now_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     await reset_pvp_season(context)
     await update.message.reply_text("PvP resetado.")
 
@@ -243,15 +314,17 @@ async def _reset_pvp_now_command(update: Update, context: ContextTypes.DEFAULT_T
 # =========================================================
 
 async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     user_id = get_current_player_id(update, context)
     player_data = await get_player_data(user_id)
-    if not player_data: return
+    if not player_data: 
+        return
 
     try:
-        player_data['xp'] = 0 
-        allowed = allowed_points_for_level(player_data) 
-        spent = compute_spent_status_points(player_data) 
+        player_data['xp'] = 0
+        allowed = allowed_points_for_level(player_data)
+        spent = compute_spent_status_points(player_data)
         player_data['stat_points'] = max(0, allowed - spent)
         await save_player_data(user_id, player_data)
         await update.message.reply_text("✅ Status corrigidos!")
@@ -259,13 +332,16 @@ async def fix_my_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Erro: {e}")
 
 async def my_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     user_id = get_current_player_id(update, context)
     player_data = await get_player_data(user_id)
-    if not player_data: return
+    if not player_data: 
+        return
 
     pdata_copy = player_data.copy()
-    if '_id' in pdata_copy: pdata_copy['_id'] = str(pdata_copy['_id'])
+    if '_id' in pdata_copy:
+        pdata_copy['_id'] = str(pdata_copy['_id'])
 
     try:
         data_str = json.dumps(pdata_copy, indent=2, ensure_ascii=False)
@@ -275,25 +351,31 @@ async def my_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Erro: {e}")
 
 async def inspect_item_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
-    if not context.args: return
+    if not await ensure_admin(update): 
+        return
+    if not context.args: 
+        return
     item_id = context.args[0]
     info = (game_data.ITEMS_DATA or {}).get(item_id)
     await update.message.reply_text(f"INFO {item_id}: {info}")
 
 async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return 
-    try: uid = parse_hybrid_id(context.args[0])
-    except: return
-    
+    if not await ensure_admin(update): 
+        return
+    try:
+        uid = parse_hybrid_id(context.args[0])
+    except:
+        return
+
     in_cache = str(uid) in _player_cache
     in_new = False
-    
+
     if users_collection is not None:
         try:
             search_id = ObjectId(uid) if ObjectId.is_valid(uid) else uid
             in_new = await asyncio.to_thread(users_collection.find_one, {"_id": search_id}) is not None
-        except: pass
+        except:
+            pass
 
     await update.message.reply_text(
         f"🔍 <b>Debug Info</b>\n🆔 ID: <code>{uid}</code>\n💾 Cache: {'✅' if in_cache else '❌'}\n☁️ DB Users: {'✅' if in_new else '❌'}",
@@ -301,17 +383,23 @@ async def debug_player_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def find_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return 
-    if not context.args: return
+    if not await ensure_admin(update): 
+        return
+    if not context.args: 
+        return
     name = " ".join(context.args)
     found = await find_player_by_name(name)
     if found:
-        await update.message.reply_text(f"Encontrado: {found[1].get('character_name')}\nID: <code>{found[0]}</code>", parse_mode=HTML)
+        await update.message.reply_text(
+            f"Encontrado: {found[1].get('character_name')}\nID: <code>{found[0]}</code>",
+            parse_mode=HTML
+        )
     else:
         await update.message.reply_text("Não encontrado.")
 
 async def hard_respec_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     msg = await update.message.reply_text("⏳ Iniciando Reset Total...")
     count = 0
     async for uid, _ in iter_players():
@@ -320,7 +408,8 @@ async def hard_respec_all_command(update: Update, context: ContextTypes.DEFAULT_
             await reset_stats_and_refund_points(pdata)
             await save_player_data(uid, pdata)
             count += 1
-            if count % 50 == 0: await asyncio.sleep(0.1)
+            if count % 50 == 0:
+                await asyncio.sleep(0.1)
     clear_all_player_cache()
     await msg.edit_text(f"✅ Reset Concluído! {count} jogadores.")
 
@@ -328,8 +417,10 @@ async def admin_clean_market_names(update: Update, context: ContextTypes.DEFAULT
     await update.message.reply_text("Funcionalidade temporariamente desativada na migração.")
 
 async def clean_clan_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
-    if not context.args: return
+    if not await ensure_admin(update): 
+        return
+    if not context.args: 
+        return
     uid = parse_hybrid_id(context.args[0])
     pdata = await get_player_data(uid)
     if pdata:
@@ -339,7 +430,8 @@ async def clean_clan_status_command(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text("Clã limpo.")
 
 async def fix_deleted_clan_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     clan_id = context.args[0]
     count = 0
     async for uid, pdata in iter_players():
@@ -349,64 +441,59 @@ async def fix_deleted_clan_command(update: Update, context: ContextTypes.DEFAULT
             count += 1
     await update.message.reply_text(f"Clã fantasma removido de {count} jogadores.")
 
-# === 🛠️ AQUI ESTÁ A CORREÇÃO: DEFINIÇÃO DA FUNÇÃO QUE FALTAVA ===
+# === 🛠️ DEFINIÇÃO DA FUNÇÃO QUE FALTAVA ===
 async def fix_premium_dates_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Varre todos os jogadores e corrige o formato da data de expiração do VIP.
     Converte objetos datetime do MongoDB para strings ISO compatíveis com JSON.
     """
-    if not await ensure_admin(update): return
-    
+    if not await ensure_admin(update): 
+        return
+
     msg = await update.message.reply_text("⏳ Verificando e corrigindo datas VIP...")
     count = 0
     fixed = 0
-    
+
     async for uid, pdata in iter_players():
         count += 1
-        
-        # Pega a data bruta
+
         raw_date = pdata.get("premium_expires_at")
         tier = pdata.get("premium_tier", "free")
-        
+
         if not raw_date:
             continue
-            
+
         new_date_str = None
         needs_fix = False
-        
-        # Verifica se é datetime (objeto do mongo) e converte para str
+
         if isinstance(raw_date, datetime):
             needs_fix = True
-            # Garante UTC
             if raw_date.tzinfo is None:
                 raw_date = raw_date.replace(tzinfo=timezone.utc)
             new_date_str = raw_date.isoformat()
-            
+
         elif isinstance(raw_date, str):
-            # Se já é string, verifica se é parseável, senão corrige
             try:
                 datetime.fromisoformat(raw_date)
             except ValueError:
                 needs_fix = True
-                # Tenta recuperar ou remove se inválido
-                new_date_str = None 
+                new_date_str = None
                 if tier != "free":
-                    # Se tem tier mas data ruim, define para agora (expira) ou remove
-                    # Aqui optamos por remover a data para não bugar
                     pass
-        
+
         if needs_fix:
             pdata["premium_expires_at"] = new_date_str
             await save_player_data(uid, pdata)
             fixed += 1
-            
+
         if count % 50 == 0:
             await asyncio.sleep(0.01)
 
     await msg.edit_text(f"✅ Concluído!\n👥 Verificados: {count}\n🔧 Corrigidos: {fixed}")
 
 async def _delete_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): return
+    if not await ensure_admin(update): 
+        return
     uid = parse_hybrid_id(context.args[0])
     if await delete_player(uid):
         await update.message.reply_text("Deletado.")
@@ -419,7 +506,8 @@ async def _delete_player_command(update: Update, context: ContextTypes.DEFAULT_T
 
 # --- Cache ---
 async def _cache_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await ensure_admin(update): return ConversationHandler.END
+    if not await ensure_admin(update): 
+        return ConversationHandler.END
     await _safe_edit_text(update, context, "Opções de Cache:", InlineKeyboardMarkup([
         [InlineKeyboardButton("Limpar UM", callback_data="cache_clear_one")],
         [InlineKeyboardButton("Limpar TUDO", callback_data="cache_clear_all_confirm")],
@@ -433,7 +521,8 @@ async def _cache_ask_for_user(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def _cache_clear_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     uid = parse_hybrid_id(update.message.text)
-    if uid: await clear_player_cache(uid)
+    if uid:
+        await clear_player_cache(uid)
     await update.message.reply_text("Cache limpo.")
     await _send_admin_menu(update.effective_chat.id, context)
     return ConversationHandler.END
@@ -462,7 +551,7 @@ clear_cache_conv_handler = ConversationHandler(
             CallbackQueryHandler(_cache_ask_for_user, pattern="^cache_clear_one$"),
             CallbackQueryHandler(_cache_confirm_clear_all, pattern="^cache_clear_all_confirm$"),
             CallbackQueryHandler(_cache_do_clear_all, pattern="^cache_do_clear_all$"),
-            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$"), 
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$"),
         ],
         ASK_USER_FOR_CACHE_CLEAR: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_LIST), _cache_clear_user)],
     },
@@ -475,7 +564,8 @@ clear_cache_conv_handler = ConversationHandler(
 
 # --- Test Event ---
 async def _handle_admin_test_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await ensure_admin(update): return ConversationHandler.END
+    if not await ensure_admin(update): 
+        return ConversationHandler.END
     await _safe_edit_text(update, context, "Painel de Teste", _admin_test_menu_kb())
     return SELECT_TEST_ACTION
 
@@ -484,8 +574,15 @@ async def _test_ask_wave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return ASK_WAVE_NUMBER
 
 async def _test_start_wave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    try: wave = int(update.message.text)
-    except: wave = 1
+    try:
+        wave = int(update.message.text)
+    except:
+        wave = 1
+
+    if event_manager is None:
+        await update.message.reply_text("event_manager indisponível.")
+        return ConversationHandler.END
+
     event_manager.start_event_at_wave(wave)
     await update.message.reply_text(f"Iniciado na wave {wave}")
     return ConversationHandler.END
@@ -497,24 +594,35 @@ async def _test_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 test_event_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(_handle_admin_test_menu, pattern=r"^admin_test_menu$")],
     states={
-        SELECT_TEST_ACTION: [CallbackQueryHandler(_test_ask_wave, pattern="^test_start_at_wave$"), CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")],
+        SELECT_TEST_ACTION: [
+            CallbackQueryHandler(_test_ask_wave, pattern="^test_start_at_wave$"),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+        ],
         ASK_WAVE_NUMBER: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _test_start_wave)],
     },
-    fallbacks=[CommandHandler("cancelar", _test_cancel), CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")],
+    fallbacks=[
+        CommandHandler("cancelar", _test_cancel),
+        CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+    ],
     per_message=False
 )
 
 # --- Delete Player ---
 async def _delete_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await ensure_admin(update): return ConversationHandler.END
+    if not await ensure_admin(update): 
+        return ConversationHandler.END
     await _safe_edit_text(update, context, "Envie ID para DELETAR:")
     return ASK_DELETE_ID
 
 async def _delete_resolve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     uid = parse_hybrid_id(update.message.text)
-    if not uid: return ConversationHandler.END
+    if not uid:
+        return ConversationHandler.END
     context.user_data['del_id'] = uid
-    await update.message.reply_text(f"Confirmar deletar {uid}?", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SIM", callback_data="confirm_delete_yes")]]))
+    await update.message.reply_text(
+        f"Confirmar deletar {uid}?",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SIM", callback_data="confirm_delete_yes")]])
+    )
     return CONFIRM_DELETE_ACTION
 
 async def _delete_perform_btn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -531,14 +639,21 @@ delete_player_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(_delete_entry_point, pattern=r"^admin_delete_start$")],
     states={
         ASK_DELETE_ID: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _delete_resolve)],
-        CONFIRM_DELETE_ACTION: [CallbackQueryHandler(_delete_perform_btn, pattern="^confirm_delete_yes$"), CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
+        CONFIRM_DELETE_ACTION: [
+            CallbackQueryHandler(_delete_perform_btn, pattern="^confirm_delete_yes$"),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+        ]
     },
-    fallbacks=[CommandHandler("cancelar", _delete_cancel), CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
+    fallbacks=[
+        CommandHandler("cancelar", _delete_cancel),
+        CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+    ]
 )
 
 # --- Fix Clan ---
 async def _fix_clan_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await ensure_admin(update): return ConversationHandler.END
+    if not await ensure_admin(update): 
+        return ConversationHandler.END
     await _safe_edit_text(update, context, "Digite o ID do Clã:")
     return ASK_GHOST_CLAN_ID
 
@@ -561,7 +676,8 @@ fix_clan_conv_handler = ConversationHandler(
 
 # --- Change ID ---
 async def _change_id_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await ensure_admin(update): return ConversationHandler.END
+    if not await ensure_admin(update): 
+        return ConversationHandler.END
     await _safe_edit_text(update, context, "Digite ID ORIGEM (User ID):")
     return ASK_OLD_ID_CHANGE
 
@@ -572,30 +688,32 @@ async def _change_id_ask_new(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def _change_id_confirm_step(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['new_id'] = parse_hybrid_id(update.message.text)
-    await update.message.reply_text("Confirmar clonagem/migração?", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SIM", callback_data="do_change_id_yes")]]))
+    await update.message.reply_text(
+        "Confirmar clonagem/migração?",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SIM", callback_data="do_change_id_yes")]])
+    )
     return CONFIRM_ID_CHANGE
 
 async def _change_id_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     old = context.user_data['old_id']
     new = context.user_data['new_id']
-    import asyncio
-    
-    # Busca apenas no sistema novo
+
     pdata = None
     if users_collection is not None:
         try:
             oid = ObjectId(old) if ObjectId.is_valid(old) else old
             pdata = await asyncio.to_thread(users_collection.find_one, {"_id": oid})
-        except: pass
+        except:
+            pass
 
     if pdata:
         try:
             if users_collection is not None:
                 final_oid = ObjectId(new) if ObjectId.is_valid(new) else new
                 pdata['_id'] = final_oid
-                
+
                 await asyncio.to_thread(users_collection.replace_one, {"_id": final_oid}, pdata, upsert=True)
-                
+
                 old_oid = ObjectId(old) if ObjectId.is_valid(old) else old
                 await asyncio.to_thread(users_collection.delete_one, {"_id": old_oid})
 
@@ -611,7 +729,10 @@ change_id_conv_handler = ConversationHandler(
     states={
         ASK_OLD_ID_CHANGE: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _change_id_ask_new)],
         ASK_NEW_ID_CHANGE: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _change_id_confirm_step)],
-        CONFIRM_ID_CHANGE: [CallbackQueryHandler(_change_id_perform, pattern="^do_change_id_yes$"), CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
+        CONFIRM_ID_CHANGE: [
+            CallbackQueryHandler(_change_id_perform, pattern="^do_change_id_yes$"),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")
+        ]
     },
     fallbacks=[CommandHandler("cancelar", _delete_cancel)]
 )
@@ -646,42 +767,42 @@ admin_force_ticket_job_handler = CallbackQueryHandler(_handle_force_ticket_job, 
 admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_help$")
 
 all_admin_handlers = [
-    admin_command_handler, 
-    delete_player_handler, 
-    inspect_item_handler, 
+    admin_command_handler,
+    delete_player_handler,
+    inspect_item_handler,
     force_daily_handler,
-    find_player_handler, 
-    debug_player_handler, 
-    get_id_command_handler, 
+    find_player_handler,
+    debug_player_handler,
+    get_id_command_handler,
     fixme_handler,
-    admin_main_handler, 
+    admin_main_handler,
 
-    admin_force_daily_callback_handler, 
+    admin_force_daily_callback_handler,
     admin_event_menu_handler,
-    admin_force_start_handler, 
-    admin_force_end_handler, 
+    admin_force_start_handler,
+    admin_force_end_handler,
     admin_force_ticket_handler,
-    admin_force_ticket_job_handler, 
-    clear_cache_conv_handler, 
+    admin_force_ticket_job_handler,
+    clear_cache_conv_handler,
     test_event_conv_handler,
-    grant_item_conv_handler, 
-    my_data_handler, 
-    reset_pvp_now_handler, 
+    grant_item_conv_handler,
+    my_data_handler,
+    reset_pvp_now_handler,
     generate_equip_conv_handler,
-    file_id_conv_handler, 
-    premium_panel_handler, 
+    file_id_conv_handler,
+    premium_panel_handler,
     reset_panel_conversation_handler,
-    grant_skill_conv_handler, 
-    grant_skin_conv_handler, 
+    grant_skill_conv_handler,
+    grant_skin_conv_handler,
     player_management_conv_handler,
-    admin_help_handler, 
-    delete_player_conv_handler, 
-    hard_respec_all_handler, 
+    admin_help_handler,
+    delete_player_conv_handler,
+    hard_respec_all_handler,
     clean_clan_handler,
-    change_id_conv_handler, 
-    fix_ghost_clan_handler, 
-    fix_clan_conv_handler, 
+    change_id_conv_handler,
+    fix_ghost_clan_handler,
+    fix_clan_conv_handler,
     debug_skill_handler,
-    clean_market_handler, 
+    clean_market_handler,
     fix_premium_handler
 ]

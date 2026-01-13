@@ -278,14 +278,15 @@ async def show_member_profile(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     text = (
         f"👤 <b>FICHA DO MEMBRO</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🏷️ <b>Nome:</b> {pdata_target.get('character_name')}\n"
-        f"🛡️ <b>Classe:</b> {str(pdata_target.get('class', 'Aventureiro')).title()}\n"
-        f"🆙 <b>Nível:</b> {pdata_target.get('level', 1)}\n"
-        f"🎖️ <b>Cargo Atual:</b> {target_rank_info['emoji']} {target_rank_info['name'].upper()}\n\n"
-        f"⚔️ <b>Poder:</b>\n"
-        f"   🗡️ Atk: {pdata_target.get('stats', {}).get('attack', 0)}\n"
-        f"   🛡️ Def: {pdata_target.get('stats', {}).get('defense', 0)}\n"
+        f"╭━━━━━━━━━━━━━━━━━━━➤\n\n"
+        f"├➤🏷️ <b>Nome:</b> {pdata_target.get('character_name')}\n"
+        f"├➤🛡️ <b>Classe:</b> {str(pdata_target.get('class', 'Aventureiro')).title()}\n"
+        f"├➤🆙 <b>Nível:</b> {pdata_target.get('level', 1)}\n"
+        f"├➤🎖️ <b>Cargo Atual:</b> {target_rank_info['emoji']} {target_rank_info['name'].upper()}\n\n"
+        f"│\n"
+        f"├➤⚔️ <b>Poder:</b>\n"
+        f"├➤  🗡️ Atk: {pdata_target.get('stats', {}).get('attack', 0)}\n"
+        f"╰─➤ 🛡️ Def: {pdata_target.get('stats', {}).get('defense', 0)}\n"
     )
 
     keyboard = []

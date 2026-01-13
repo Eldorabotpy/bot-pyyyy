@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 # 1. Importa os sistemas de eventos
 from kingdom_defense.handler import register_handlers as register_kingdom_defense_handlers
 from handlers.world_boss.handler import all_world_boss_handlers
+from handlers.menu.events import events_menu_handler, evt_claim_daily_entries_handler
 
 # 2. Importação CORRIGIDA (Apontando para handlers/menu/events.py)
 try:
@@ -39,3 +40,6 @@ def register_event_handlers(application: Application):
     
     # Registra o botão de voltar também
     application.add_handler(CallbackQueryHandler(show_active_events, pattern='^back_to_event_hub$'))
+    
+    application.add_handler(events_menu_handler)
+    application.add_handler(evt_claim_daily_entries_handler)
