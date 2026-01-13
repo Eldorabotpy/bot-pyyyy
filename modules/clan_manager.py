@@ -1,5 +1,5 @@
 # modules/clan_manager.py
-# (VERSÃO FINAL: COMPATÍVEL COM OBJECTID E SISTEMA DE CARGOS)
+# (VERSÃO FINAL COMPLETA: PERMISSÕES HIERÁRQUICAS, SET_RANK E FUNÇÕES DE GERENCIAMENTO)
 
 import os
 import logging
@@ -14,13 +14,14 @@ from modules.game_data.clans import CLAN_PRESTIGE_LEVELS, CLAN_CONFIG
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# CONFIGURAÇÃO DE CARGOS (RANKING)
+# CONFIGURAÇÃO DE CARGOS E HIERARQUIA
 # ==============================================================================
+# Value: Nível de autoridade (Maior = Mais poder)
 CLAN_RANKS = {
-    "leader": {"lvl": 4, "name": "Líder",   "emoji": "👑"},
-    "vice":   {"lvl": 3, "name": "General", "emoji": "⚔️"},
-    "elder":  {"lvl": 2, "name": "Ancião",  "emoji": "🛡️"},
-    "member": {"lvl": 1, "name": "Membro",  "emoji": "👤"}
+    "leader": {"val": 4, "name": "Líder",   "emoji": "👑"},
+    "vice":   {"val": 3, "name": "General", "emoji": "⚔️"},
+    "elder":  {"val": 2, "name": "Ancião",  "emoji": "📜"},
+    "member": {"val": 1, "name": "Membro",  "emoji": "👤"}
 }
 
 # ==============================================================================
@@ -43,9 +44,8 @@ except Exception as e:
     clans_col = None
 
 # ==============================================================================
-# HELPERS
+# HELPERS DE DATA E ID
 # ==============================================================================
-
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -76,6 +76,94 @@ async def get_member_rank(clan: dict, user_id: str) -> str:
     ranks = clan.get("member_ranks", {})
     return ranks.get(user_id, "member")
 
+async def get_rank_value(rank_key: str) -> int:
+    """Retorna o valor numérico de autoridade do cargo."""
+    return CLAN_RANKS.get(rank_key, CLAN_RANKS["member"])["val"]
+
+# ==============================================================================
+# SISTEMA DE PERMISSÕES
+# ==============================================================================
+
+async def check_permission(clan: dict, actor_id: str, action: str, target_id: str = None) -> bool:
+    """
+    Centraliza a lógica de quem pode fazer o quê baseada na hierarquia.
+    Actions: 'kick', 'invite_manage', 'mission_manage', 'change_rank'
+    """
+    actor_rank_key = await get_member_rank(clan, actor_id)
+    actor_val = await get_rank_value(actor_rank_key)
+    
+    # 1. Gerenciar Convites (Ancião, General, Líder)
+    if action == 'invite_manage':
+        return actor_val >= 2 # Elder(2), Vice(3), Leader(4)
+
+    # 2. Gerenciar Missões (General, Líder)
+    if action == 'mission_manage':
+        return actor_val >= 3 # Vice(3), Leader(4)
+
+    # 3. Ações contra outro membro (Expulsar, Alterar Cargo)
+    if target_id:
+        # Ninguém pode afetar a si mesmo aqui (transferência de líder é outra função)
+        if str(actor_id) == str(target_id): return False
+        
+        target_rank_key = await get_member_rank(clan, target_id)
+        target_val = await get_rank_value(target_rank_key)
+
+        # Regra de Ouro: Só pode mexer em quem tem rank ESTRITAMENTE INFERIOR
+        if actor_val <= target_val: return False
+        
+        if action == 'kick':
+            # Ancião (2) pode chutar Membro (1).
+            # General (3) pode chutar Ancião (2) e Membro (1).
+            # Líder (4) pode chutar todos.
+            return True 
+
+        if action == 'change_rank':
+            # Apenas General (3) e Líder (4) podem alterar cargos
+            # Ancião não promove ninguém.
+            return actor_val >= 3
+
+    return False
+
+# ==============================================================================
+# GERENCIAMENTO DE MEMBROS E CARGOS (SET_RANK)
+# ==============================================================================
+
+async def set_member_rank(clan_id: str, actor_id: str, target_id: str, new_rank_key: str) -> Tuple[bool, str]:
+    """Define um cargo específico para um membro."""
+    clan = await get_clan(clan_id)
+    if not clan: return False, "Clã não encontrado."
+
+    actor_id = _ensure_str(actor_id)
+    target_id = _ensure_str(target_id)
+    
+    # Validações de Permissão
+    if not await check_permission(clan, actor_id, 'change_rank', target_id):
+        return False, "Você não tem autoridade sobre este membro."
+
+    # Validação: Não pode promover alguém para um cargo igual ou maior que o seu próprio
+    actor_rank_key = await get_member_rank(clan, actor_id)
+    actor_val = await get_rank_value(actor_rank_key)
+    new_rank_val = await get_rank_value(new_rank_key)
+
+    if new_rank_val >= actor_val:
+        return False, "Você não pode promover alguém ao seu nível ou superior."
+
+    if new_rank_key == "leader":
+        return False, "Use a função de transferir liderança para trocar o líder."
+
+    # Aplica a mudança
+    update_data = {}
+    if new_rank_key == "member":
+        # Se virou membro comum, remove do dicionário para economizar espaço
+        update_data["$unset"] = {f"member_ranks.{target_id}": ""}
+    else:
+        update_data["$set"] = {f"member_ranks.{target_id}": new_rank_key}
+
+    clans_col.update_one({"_id": clan_id}, update_data)
+    
+    rank_name = CLAN_RANKS.get(new_rank_key, {}).get("name", new_rank_key)
+    return True, f"Cargo alterado para **{rank_name}** com sucesso."
+
 # ==============================================================================
 # FUNÇÕES DE GERENCIAMENTO (CRIAR, ENTRAR, SAIR)
 # ==============================================================================
@@ -104,7 +192,7 @@ async def create_clan(leader_id: Union[str, int], clan_name: str, payment_method
         "prestige_points": 0,
         "bank": 0, 
         "members": [leader_id_str],
-        "member_ranks": {}, # Novo campo para armazenar cargos extras
+        "member_ranks": {}, # Armazena cargos extras: {user_id: "vice", user_id2: "elder"}
         "max_members": 10,
         "pending_applications": [],
         "bank_log": [],
@@ -191,6 +279,11 @@ async def transfer_leadership(clan_id: str, old_leader_id: Union[str, int], new_
             "$unset": {f"member_ranks.{new_leader_str}": ""} # Novo líder não precisa de rank no dict
         }
     )
+    # Opcional: O antigo líder vira Vice (General) automaticamente
+    clans_col.update_one(
+        {"_id": clan_id},
+        {"$set": {f"member_ranks.{old_leader_str}": "vice"}}
+    )
 
 async def set_clan_media(clan_id: str, user_id: str, media_data: dict):
     clans_col.update_one(
@@ -199,74 +292,47 @@ async def set_clan_media(clan_id: str, user_id: str, media_data: dict):
     )
 
 # ==============================================================================
-# CARGOS E PROMOÇÕES (NOVO)
+# MÉTODOS DE COMPATIBILIDADE (PROMOTE/DEMOTE LEGADO)
 # ==============================================================================
+# Estes métodos são mantidos para não quebrar chamadas antigas, mas usam a nova lógica internamente se possível.
 
 async def promote_member(clan_id: str, actor_id: str, target_id: str) -> tuple[bool, str]:
-    """Promove um membro para o próximo cargo."""
+    """
+    Método legado de promoção cíclica (Membro -> Elder -> Vice).
+    Agora usa set_member_rank internamente.
+    """
     clan = await get_clan(clan_id)
     if not clan: return False, "Clã não encontrado."
 
-    actor_rank = await get_member_rank(clan, actor_id)
     target_rank_key = await get_member_rank(clan, target_id)
     
-    # Regra: Só Líder pode promover (simplificação para evitar loops)
-    if actor_rank != "leader":
-        return False, "Apenas o Líder pode promover membros."
-        
-    if target_rank_key == "leader":
-        return False, "Não pode promover o líder."
-    
-    # Define a hierarquia
     next_rank = None
     if target_rank_key == "member": next_rank = "elder"
     elif target_rank_key == "elder": next_rank = "vice"
     elif target_rank_key == "vice": return False, "Cargo máximo atingido! Transfira a liderança."
+    elif target_rank_key == "leader": return False, "Não pode promover o líder."
 
-    # Atualiza no Banco
-    clans_col.update_one(
-        {"_id": clan_id},
-        {"$set": {f"member_ranks.{target_id}": next_rank}}
-    )
-    
-    rank_name = CLAN_RANKS[next_rank]["name"]
-    return True, f"Membro promovido para **{rank_name}**!"
+    return await set_member_rank(clan_id, actor_id, target_id, next_rank)
 
 async def demote_member(clan_id: str, actor_id: str, target_id: str) -> tuple[bool, str]:
-    """Rebaixa um membro."""
+    """
+    Método legado de rebaixamento cíclico (Vice -> Elder -> Membro).
+    """
     clan = await get_clan(clan_id)
     if not clan: return False, "Clã não encontrado."
     
-    actor_rank = await get_member_rank(clan, actor_id)
     target_rank_key = await get_member_rank(clan, target_id)
-    
-    if actor_rank != "leader":
-         return False, "Apenas o Líder pode rebaixar."
 
-    if target_rank_key == "member":
-        return False, "Já está no cargo mais baixo."
-        
     prev_rank = None
     if target_rank_key == "vice": prev_rank = "elder"
     elif target_rank_key == "elder": prev_rank = "member"
-    
-    # Se voltar para membro, removemos a chave do dicionário
-    if prev_rank == "member":
-        clans_col.update_one(
-            {"_id": clan_id},
-            {"$unset": {f"member_ranks.{target_id}": ""}}
-        )
-    else:
-        clans_col.update_one(
-            {"_id": clan_id},
-            {"$set": {f"member_ranks.{target_id}": prev_rank}}
-        )
+    elif target_rank_key == "member": return False, "Já está no cargo mais baixo."
+    elif target_rank_key == "leader": return False, "Não pode rebaixar o líder."
 
-    rank_name = CLAN_RANKS[prev_rank]["name"]
-    return True, f"Membro rebaixado para **{rank_name}**."
+    return await set_member_rank(clan_id, actor_id, target_id, prev_rank)
 
 # ==============================================================================
-# BANCO, ECONOMIA, PROGRESSO E MISSÕES (Mantidos iguais)
+# BANCO, ECONOMIA, PROGRESSO E MISSÕES
 # ==============================================================================
 
 async def bank_deposit(clan_id: str, user_id: Union[str, int], amount: int) -> Tuple[bool, str]:

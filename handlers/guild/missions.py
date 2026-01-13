@@ -1,5 +1,5 @@
 # handlers/guild/missions.py
-# (VERSÃO ZERO LEGADO: MISSÕES DE CLÃ + AUTH SEGURA + STRING IDs)
+# (VERSÃO RPG: MISSÕES COM PERMISSÕES DE HIERARQUIA)
 
 import logging
 import random
@@ -44,8 +44,9 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     if not clan: return
 
     mission = clan.get("active_mission")
-    # Comparação segura de IDs (String)
-    is_leader = (str(clan.get("leader_id")) == str(user_id))
+    
+    # VERIFICAÇÃO DE PERMISSÃO (Líder ou General)
+    can_manage = await clan_manager.check_permission(clan, user_id, 'mission_manage')
 
     # Filtra missões antigas do tipo COLLECT se necessário, ou adapta
     if mission and str(mission.get('type')).upper() == 'COLLECT':
@@ -57,10 +58,10 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
             f"Clã: {clan.get('display_name')}\n"
             "━━━━━━━━━━━━━━━━━━━\n\n"
             "<i>Nenhuma missão ativa no momento.</i>\n\n"
-            "O Líder deve selecionar um contrato para iniciar a caçada."
+            "Líderes e Generais podem selecionar um contrato para iniciar a caçada."
         )
         kb = []
-        if is_leader:
+        if can_manage:
             kb.append([InlineKeyboardButton("⚔️ Iniciar Nova Caçada", callback_data="gld_mission_select_menu")])
         
         kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="clan_menu")])
@@ -91,21 +92,23 @@ async def show_guild_mission_details(update: Update, context: ContextTypes.DEFAU
     )
 
     kb = []
-    if is_leader:
+    
+    # Se a missão estiver completa ou ativa, mostra opções de gestão para quem tem permissão
+    if can_manage:
         if prog >= target:
              text += "\n\n✅ <b>MISSÃO COMPLETA!</b>"
              kb.append([InlineKeyboardButton("🏆 Finalizar e Receber Prêmios", callback_data="gld_mission_finish")])
-        kb.append([InlineKeyboardButton("❌ Cancelar Missão (Líder)", callback_data="gld_mission_cancel")])
+        kb.append([InlineKeyboardButton("❌ Cancelar Missão", callback_data="gld_mission_cancel")])
     
     elif prog >= target:
-        text += "\n\n✅ <b>Aguardando Líder finalizar.</b>"
+        text += "\n\n✅ <b>Aguardando Líder/General finalizar.</b>"
     
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="clan_menu")])
     await _render_clan_screen(update, context, clan, text, kb)
 
 
 # ==============================================================================
-# 2. MENU DE SELEÇÃO (LÍDER)
+# 2. MENU DE SELEÇÃO (LÍDER/GENERAL)
 # ==============================================================================
 async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -119,8 +122,9 @@ async def show_mission_selection_menu(update: Update, context: ContextTypes.DEFA
     clan_id = pdata.get("clan_id")
     clan = await clan_manager.get_clan(clan_id)
     
-    if not clan or str(clan.get("leader_id")) != str(user_id):
-        await query.answer("Apenas o líder pode iniciar missões!", show_alert=True)
+    # PERMISSÃO: General ou Líder
+    if not await clan_manager.check_permission(clan, user_id, 'mission_manage'):
+        await query.answer("Apenas Generais e Líderes podem iniciar missões!", show_alert=True)
         return
 
     text = (
@@ -154,15 +158,20 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.answer()
     
+    pdata = await player_manager.get_player_data(user_id)
+    clan_id = pdata.get("clan_id")
+    clan = await clan_manager.get_clan(clan_id)
+
+    # PERMISSÃO
+    if not await clan_manager.check_permission(clan, user_id, 'mission_manage'):
+        await query.answer("Permissão negada.", show_alert=True)
+        return
+    
     try:
         selected_difficulty = query.data.split(":")[1]
     except:
         selected_difficulty = "easy"
         
-    pdata = await player_manager.get_player_data(user_id)
-    clan_id = pdata.get("clan_id")
-    clan = await clan_manager.get_clan(clan_id)
-    
     # --- FILTRAGEM DO CATÁLOGO ---
     available_keys = [
         k for k, v in GUILD_MISSIONS_CATALOG.items() 
@@ -222,7 +231,7 @@ async def start_mission_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ==============================================================================
-# 4. FINALIZAR MISSÃO (Líder)
+# 4. FINALIZAR MISSÃO (Líder/General)
 # ==============================================================================
 async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -241,8 +250,9 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.answer("Nenhuma missão ativa.", show_alert=True)
         return
 
-    if str(clan.get("leader_id")) != str(user_id):
-        await query.answer("Apenas o líder pode finalizar.", show_alert=True)
+    # PERMISSÃO
+    if not await clan_manager.check_permission(clan, user_id, 'mission_manage'):
+        await query.answer("Apenas Generais e Líderes podem finalizar.", show_alert=True)
         return
 
     current = mission.get("current_progress", 0)
@@ -271,7 +281,7 @@ async def finish_mission_callback(update: Update, context: ContextTypes.DEFAULT_
         f"O clã recebeu:\n"
         f"💠 <b>+{xp}</b> Pontos de Prestígio\n"
         f"💰 <b>+{gold}</b> Ouro no Cofre\n\n"
-        f"Bom trabalho, líder! O clã está mais forte."
+        f"Bom trabalho! O clã está mais forte."
     )
     kb = [[InlineKeyboardButton("🛡️ Voltar", callback_data="clan_menu")]]
     await _render_clan_screen(update, context, updated_clan, text, kb)
@@ -291,8 +301,9 @@ async def cancel_mission_callback(update: Update, context: ContextTypes.DEFAULT_
     clan_id = pdata.get("clan_id")
     clan = await clan_manager.get_clan(clan_id)
     
-    if str(clan.get("leader_id")) != str(user_id):
-        await query.answer("Apenas o líder!", show_alert=True)
+    # PERMISSÃO
+    if not await clan_manager.check_permission(clan, user_id, 'mission_manage'):
+        await query.answer("Apenas Generais e Líderes podem cancelar.", show_alert=True)
         return
 
     db.clans.update_one(
@@ -305,7 +316,7 @@ async def cancel_mission_callback(update: Update, context: ContextTypes.DEFAULT_
 
     text = (
         "❌ <b>Missão Cancelada.</b>\n\n"
-        "O contrato foi rasgado. Você pode escolher outra missão no mural."
+        "O contrato foi rasgado. Vocês podem escolher outra missão no mural."
     )
     kb = [[InlineKeyboardButton("🛡️ Voltar ao Clã", callback_data="clan_menu")]]
     await _render_clan_screen(update, context, clan, text, kb)
