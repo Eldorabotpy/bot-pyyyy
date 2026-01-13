@@ -276,8 +276,53 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         [InlineKeyboardButton("⚔️ Lutar Novamente", callback_data=PVP_PROCURAR_OPONENTE)],
         [InlineKeyboardButton("⬅️ Menu Arena", callback_data="pvp_arena")],
     ]
+    reply_markup = InlineKeyboardMarkup(kb)
 
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    # ====== NOVO: MÍDIA DO OPONENTE (CLASSE) COM FALLBACK 'classe_default_media' ======
+    enemy_media = pvp_utils.get_player_class_media(enemy_data)
+    caption_safe = msg[:1024]  # limite do Telegram para caption
+
+    if enemy_media:
+        try:
+            media_type = str(enemy_media.get("type", "video"))
+            file_id = enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file")
+
+            if media_type == "photo":
+                input_media = InputMediaPhoto(media=file_id, caption=caption_safe, parse_mode="HTML")
+            else:
+                input_media = InputMediaVideo(media=file_id, caption=caption_safe, parse_mode="HTML")
+
+            # Tenta trocar a mídia da mensagem atual (se ela já tiver mídia).
+            # Se falhar (mensagem era texto, etc.), cai no fallback abaixo.
+            await query.edit_message_media(media=input_media, reply_markup=reply_markup)
+            return
+        except Exception:
+            pass
+
+        # Fallback: envia uma nova mensagem com mídia (caso não dê para editar a atual)
+        try:
+            if str(enemy_media.get("type", "video")) == "photo":
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file"),
+                    caption=caption_safe,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML",
+                )
+            else:
+                await context.bot.send_video(
+                    chat_id=update.effective_chat.id,
+                    video=enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file"),
+                    caption=caption_safe,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML",
+                )
+            return
+        except Exception:
+            pass
+
+    # Se não achou mídia (ou falhou tudo), mantém como texto
+    await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode="HTML")
 
 
 @requires_login
@@ -401,7 +446,13 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     day_desc = day_effect.get("description", "Sem efeitos hoje.")
     day_title = day_effect.get("name", "Dia Comum")
 
-    media = file_ids.get_file_data("menu_arena_pvp")
+    # ====== NOVO: ao clicar no botão Arena PvP (callback "pvp_arena"), usar "pvp_arena_media" ======
+    media_key = "menu_arena_pvp"
+    if update.callback_query and update.callback_query.data == "pvp_arena":
+        media_key = "pvp_arena_media"
+
+    # fallback: se não existir pvp_arena_media, tenta menu_arena_pvp
+    media = file_ids.get_file_data(media_key) or file_ids.get_file_data("menu_arena_pvp")
 
     txt = (
         f"⚔️ <b>ARENA DE ELDORA</b> ⚔️\n\n"
@@ -443,9 +494,9 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 file_id = media.get("file_id") or media.get("id") or media.get("file")
 
                 if media_type == "video":
-                    input_media = InputMediaVideo(media=file_id, caption=txt, parse_mode="HTML")
+                    input_media = InputMediaVideo(media=file_id, caption=txt[:1024], parse_mode="HTML")
                 else:
-                    input_media = InputMediaPhoto(media=file_id, caption=txt, parse_mode="HTML")
+                    input_media = InputMediaPhoto(media=file_id, caption=txt[:1024], parse_mode="HTML")
 
                 # Tenta trocar/colocar mídia na mesma mensagem
                 await query.edit_message_media(media=input_media, reply_markup=reply_markup)
@@ -455,13 +506,13 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     if query.message and (query.message.photo or query.message.video):
                         await query.edit_message_caption(
-                            caption=txt,
+                            caption=txt[:1024],
                             reply_markup=reply_markup,
                             parse_mode="HTML",
                         )
                     else:
                         await query.edit_message_text(
-                            text=txt,
+                            text=txt[:4096],
                             reply_markup=reply_markup,
                             parse_mode="HTML",
                         )
@@ -470,7 +521,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_video(
                             chat_id=update.effective_chat.id,
                             video=media.get("file_id") or media.get("id") or media.get("file"),
-                            caption=txt,
+                            caption=txt[:1024],
                             reply_markup=reply_markup,
                             parse_mode="HTML",
                         )
@@ -478,13 +529,13 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_photo(
                             chat_id=update.effective_chat.id,
                             photo=media.get("file_id") or media.get("id") or media.get("file"),
-                            caption=txt,
+                            caption=txt[:1024],
                             reply_markup=reply_markup,
                             parse_mode="HTML",
                         )
         else:
             # Sem mídia: só edita texto
-            await query.edit_message_text(text=txt, reply_markup=reply_markup, parse_mode="HTML")
+            await query.edit_message_text(text=txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
     else:
         # Comando /pvp: aqui é seguro enviar com mídia (se existir)
         reply_markup = InlineKeyboardMarkup(kb)
@@ -492,19 +543,19 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if str(media.get("type")) == "video":
                 await update.message.reply_video(
                     media.get("file_id") or media.get("id") or media.get("file"),
-                    caption=txt,
+                    caption=txt[:1024],
                     reply_markup=reply_markup,
                     parse_mode="HTML",
                 )
             else:
                 await update.message.reply_photo(
                     media.get("file_id") or media.get("id") or media.get("file"),
-                    caption=txt,
+                    caption=txt[:1024],
                     reply_markup=reply_markup,
                     parse_mode="HTML",
                 )
         else:
-            await update.message.reply_text(txt, reply_markup=reply_markup, parse_mode="HTML")
+            await update.message.reply_text(txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
 
 
 async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
