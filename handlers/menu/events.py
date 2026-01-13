@@ -1,5 +1,6 @@
 # handlers/menu/events.py
 # (VERSÃO FINAL: Hub de Eventos + Claim Diário 1x por dia + sem acúmulo)
+# (OBJETIVO: 100% ObjectId — sem dependência de Telegram ID)
 
 from __future__ import annotations
 
@@ -7,10 +8,17 @@ import logging
 import datetime
 from zoneinfo import ZoneInfo
 
+from bson import ObjectId
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager
+
+# Identificação do jogador via sessão/login (ObjectId)
+try:
+    from modules.auth_utils import get_current_player_id_async
+except Exception:  # pragma: no cover
+    get_current_player_id_async = None  # type: ignore
 
 # Tenta importar o manager da defesa
 try:
@@ -28,6 +36,7 @@ try:
 except Exception:
     JOB_TIMEZONE = "America/Fortaleza"
 
+
 def _today_str() -> str:
     try:
         tz = ZoneInfo(JOB_TIMEZONE)
@@ -41,10 +50,10 @@ async def show_events_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Exibe o Hub de Eventos (Defesa do Reino, Raids, etc).
     CORREÇÃO: Deleta a mensagem anterior para evitar erro de edição (foto -> texto).
     """
-    query = update.callback_query
-    if query:
+    callback = update.callback_query
+    if callback:
         try:
-            await query.answer()
+            await callback.answer()
         except Exception:
             pass
 
@@ -58,9 +67,7 @@ async def show_events_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
 
     # Catacumbas (Raid)
-    keyboard.append([
-        InlineKeyboardButton("💀 Catacumbas (Raid)", callback_data="evt_cat_menu")
-    ])
+    keyboard.append([InlineKeyboardButton("💀 Catacumbas (Raid)", callback_data="evt_cat_menu")])
 
     # Defesa do Reino (se disponível)
     defense_btn_text = "🛡️ Defesa do Reino"
@@ -73,26 +80,20 @@ async def show_events_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             defense_btn_text = f"🔥 DEFESA DO REINO ({getattr(event_manager, 'current_wave', 1)}ª Onda)"
             text += f"\n\n🚨 **ALERTA DE INVASÃO:**\n{status}"
 
-    keyboard.append([
-        InlineKeyboardButton(defense_btn_text, callback_data="defesa_reino_main")
-    ])
+    keyboard.append([InlineKeyboardButton(defense_btn_text, callback_data="defesa_reino_main")])
 
-    # NOVO: Claim diário
-    keyboard.append([
-        InlineKeyboardButton("🎁 Reivindicar Entradas Diárias", callback_data="evt_claim_daily_entries")
-    ])
+    # Claim diário
+    keyboard.append([InlineKeyboardButton("🎁 Reivindicar Entradas Diárias", callback_data="evt_claim_daily_entries")])
 
     # Voltar ao Reino
-    keyboard.append([
-        InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")
-    ])
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Deleta a mensagem anterior para não dar erro quando a anterior era foto/vídeo
     try:
-        if query and query.message:
-            await query.message.delete()
+        if callback and callback.message:
+            await callback.message.delete()
     except Exception as e:
         logger.warning(f"Não foi possível apagar mensagem anterior: {e}")
 
@@ -113,20 +114,60 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
       - 4 cristal_de_abertura
     Não acumula porque o JOB da meia-noite zera tudo.
     """
-    query = update.callback_query
-    if query:
+    callback = update.callback_query
+    if callback:
         try:
-            await query.answer()
+            await callback.answer()
         except Exception:
             pass
 
-    user_id = str(query.from_user.id) if query and query.from_user else None
-    if not user_id:
+    if not get_current_player_id_async:
+        msg = (
+            "❌ Sistema de autenticação indisponível.\n\n"
+            "get_current_player_id_async não pôde ser importado. Verifique modules/auth_utils.py."
+        )
+        if callback:
+            try:
+                await callback.edit_message_text(msg)
+            except Exception:
+                pass
         return
 
-    pdata = await player_manager.get_player_data(user_id)
+    player_id = await get_current_player_id_async(update, context)
+    if not player_id:
+        msg = "❌ Não foi possível identificar seu jogador. Faça login novamente."
+        if callback:
+            try:
+                await callback.edit_message_text(msg)
+            except Exception:
+                pass
+        return
+
+    # Normalização defensiva: garante ObjectId
+    if isinstance(player_id, str):
+        if ObjectId.is_valid(player_id):
+            player_id = ObjectId(player_id)
+        else:
+            msg = "❌ Sessão inválida (player_id não é ObjectId). Faça login novamente."
+            if callback:
+                try:
+                    await callback.edit_message_text(msg)
+                except Exception:
+                    pass
+            return
+    elif not isinstance(player_id, ObjectId):
+        msg = "❌ Sessão inválida (player_id não é ObjectId). Faça login novamente."
+        if callback:
+            try:
+                await callback.edit_message_text(msg)
+            except Exception:
+                pass
+        return
+
+    pdata = await player_manager.get_player_data(player_id)
     if not pdata:
-        await query.edit_message_text("❌ Jogador não encontrado.")
+        if callback:
+            await callback.edit_message_text("❌ Jogador não encontrado.")
         return
 
     today = _today_str()
@@ -135,10 +176,11 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
     last_date = str(daily_claims.get("event_entries_claim_date", ""))
 
     if last_date == today:
-        await query.edit_message_text(
-            "⏳ Você já reivindicou suas entradas de hoje.\n\n"
-            "O resete acontece à meia-noite."
-        )
+        if callback:
+            await callback.edit_message_text(
+                "⏳ Você já reivindicou suas entradas de hoje.\n\n"
+                "O resete acontece à meia-noite."
+            )
         return
 
     inv = pdata.get("inventory") or {}
@@ -153,7 +195,7 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
     pdata["inventory"] = inv
     pdata["daily_claims"] = daily_claims
 
-    await player_manager.save_player_data(user_id, pdata)
+    await player_manager.save_player_data(player_id, pdata)
 
     text = (
         "✅ **Entradas diárias reivindicadas!**\n\n"
@@ -168,20 +210,23 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
         [InlineKeyboardButton("🏰 Voltar ao Reino", callback_data="show_kingdom_menu")],
     ])
 
-    # Se veio de uma mensagem “nova” enviada, não existe edit_message_text seguro aqui.
-    # Mas como este handler é acionado por botão inline, existe query.message.
     try:
-        await query.edit_message_text(text=text, reply_markup=kb, parse_mode="Markdown")
+        if callback:
+            await callback.edit_message_text(text=text, reply_markup=kb, parse_mode="Markdown")
+        else:
+            raise RuntimeError("callback_query ausente")
     except Exception:
-        # fallback: manda mensagem nova
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_markup=kb, parse_mode="Markdown")
+        if update.effective_chat:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=text,
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
 
 
 # ------------------------------------------------------------------------------
 # HANDLERS EXPORTADOS
 # ------------------------------------------------------------------------------
-# ESTE é o callback que o Kingdom usa: 'abrir_hub_eventos_v2'
 events_menu_handler = CallbackQueryHandler(show_events_menu, pattern=r"^abrir_hub_eventos_v2$")
-
-# Claim diário
 evt_claim_daily_entries_handler = CallbackQueryHandler(evt_claim_daily_entries, pattern=r"^evt_claim_daily_entries$")

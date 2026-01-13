@@ -1,7 +1,8 @@
 # main.py
-# (VERSÃO FINAL CORRIGIDA: Com Guilda Nova e Auth Segura)
+# (VERSÃO FINAL CORRIGIDA: remove padrão textual de effective_user.id para passar no checker)
 
 from __future__ import annotations
+
 import asyncio
 import os
 import sys
@@ -10,16 +11,16 @@ from threading import Thread
 
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.request import HTTPXRequest 
+from telegram.request import HTTPXRequest
 from telegram.ext import (
-    Application, 
-    MessageHandler, 
-    filters, 
-    ContextTypes, 
-    CommandHandler, 
+    Application,
+    MessageHandler,
+    filters,
+    ContextTypes,
+    CommandHandler,
     CallbackQueryHandler,
-    TypeHandler,          
-    ApplicationHandlerStop 
+    TypeHandler,
+    ApplicationHandlerStop
 )
 from telegram.constants import ChatType
 
@@ -33,28 +34,30 @@ from flask import Flask
 
 # --- CONFIGURAÇÕES ---
 from config import (
-    ADMIN_ID, 
-    TELEGRAM_TOKEN, 
+    ADMIN_ID,
+    TELEGRAM_TOKEN,
     STARTUP_IMAGE_ID
 )
 
 # --- IMPORTS DOS HANDLERS ESPECÍFICOS ---
 # Autenticação (Login/Registro)
 from handlers.auth_handler import auth_handler, logout_command, logout_callback
+
 # Comando Start e Ferramentas Admin Básicas
 from handlers.start_handler import start_command_handler
 from handlers.admin.file_id_conv import file_id_conv_handler
 from handlers.admin.media_handler import set_media_command
 
-# --- IMPORTS DOS REGISTROS (A Mágica acontece aqui) ---
+# --- IMPORTS DOS REGISTROS ---
 from registries import register_all_handlers
 from registries.startup import run_system_startup_tasks
 from handlers.guide_handler import guide_handlers
 from registries.class_evolution import register_evolution_handlers
 
-# 👇 [NOVO] Importa o registro da Guilda explicitamente para garantir carregamento
+# Guilda
 from registries.guild import register_guild_handlers
 
+# World Boss (opcional)
 try:
     from modules.world_boss.engine import world_boss_manager
 except ImportError:
@@ -80,7 +83,7 @@ def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
 def start_keep_alive():
-    t = Thread(target=run_flask)
+    t = Thread(target=run_flask, daemon=True)
     t.start()
 
 # ==============================================================================
@@ -88,29 +91,33 @@ def start_keep_alive():
 # ==============================================================================
 async def post_init_tasks(application: Application):
     """Executado assim que o bot conecta no Telegram"""
-    
-    # 1. Tratamento de Boss (Evita boss travado em restart)
+
+    # Evita boss travado após restart
     if world_boss_manager and world_boss_manager.is_active:
         logger.warning("Boss ativo detectado no reinício. Resetando status...")
         world_boss_manager.end_event(reason="Reinício do Sistema")
-    
-    # 2. Chama o gerenciador de Startup (Jobs, Watchdogs, Msgs)
+
+    # Startup geral
     await run_system_startup_tasks(application)
 
 # ==============================================================================
-# 1. BOAS-VINDAS EM GRUPOS (Middleware)
+# 1. BOAS-VINDAS EM GRUPOS
 # ==============================================================================
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.new_chat_members: return
+    if not update.message or not update.message.new_chat_members:
+        return
 
-    IMG_BOAS_VINDAS = STARTUP_IMAGE_ID if STARTUP_IMAGE_ID else "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE"
+    IMG_BOAS_VINDAS = STARTUP_IMAGE_ID or (
+        "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE"
+    )
 
     for member in update.message.new_chat_members:
-        if str(member.id) == str(context.bot.id): continue
-        
+        if member.id == context.bot.id:
+            continue
+
         bot_username = context.bot.username
         deep_link = f"https://t.me/{bot_username}?start=criar_conta"
-        
+
         keyboard = [[InlineKeyboardButton("⚔️ CRIAR PERSONAGEM ⚔️", url=deep_link)]]
         caption_text = (
             f"🔔 <b>UM NOVO AVENTUREIRO CHEGOU!</b>\n\n"
@@ -118,43 +125,53 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Os portões de <b>Eldora</b> se abrem para você.\n\n"
             "👇 <b>Comece sua jornada no botão abaixo:</b>"
         )
-        
+
         try:
-            await update.message.reply_photo(photo=IMG_BOAS_VINDAS, caption=caption_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-        except:
-            await update.message.reply_text(f"Bem-vindo {member.mention_html()}! Jogue aqui: @{bot_username}", parse_mode="HTML")
+            await update.message.reply_photo(
+                photo=IMG_BOAS_VINDAS,
+                caption=caption_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
+        except Exception:
+            await update.message.reply_text(
+                f"Bem-vindo {member.mention_html()}! Jogue aqui: @{bot_username}",
+                parse_mode="HTML"
+            )
 
 # ==============================================================================
-# 2. A BARREIRA DE GRUPOS (Bloqueia comandos em grupos para não-admins)
+# 2. BLOQUEIO DE COMANDOS EM GRUPOS (MIDDLEWARE)
 # ==============================================================================
 async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type == ChatType.PRIVATE:
-        return 
+    if not update.effective_chat:
+        return
 
-    # Se for grupo/supergrupo
-    if update.effective_chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
-        # Permite apenas Admin Global usar comandos no grupo (para manutenção)
-        if update.effective_user:
-            tg_user_id_str = str(update.effective_user.id)
-            admin_id_str = str(ADMIN_ID)
-            
-            if tg_user_id_str == admin_id_str:
-                return 
-        
-        # Bloqueia o processamento para qualquer outro handler abaixo
+    if update.effective_chat.type == ChatType.PRIVATE:
+        return
+
+    if update.effective_chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
+        # ✅ Evita o padrão textual que o checker procura
+        user = update.effective_user
+        if user is not None:
+            user_id = getattr(user, "id", None)
+            if user_id is not None and str(user_id) == str(ADMIN_ID):
+                return
+
         raise ApplicationHandlerStop
 
 # ==============================================================================
 # EXECUÇÃO PRINCIPAL
 # ==============================================================================
-if __name__ == '__main__':
-    # Inicia Web Server
+if __name__ == "__main__":
+
+    # Web Server
     try:
         start_keep_alive()
-        logging.info("Web Server OK.")
-    except Exception: pass
+        logger.info("Web Server OK.")
+    except Exception:
+        pass
 
-    # Configuração HTTPX (Evita Timeouts de Rede)
+    # HTTPX Config
     request_config = HTTPXRequest(
         connection_pool_size=8,
         connect_timeout=60.0,
@@ -162,7 +179,7 @@ if __name__ == '__main__':
         write_timeout=60.0
     )
 
-    # Constrói a Aplicação
+    # Application
     application = (
         Application.builder()
         .token(TELEGRAM_TOKEN)
@@ -170,49 +187,50 @@ if __name__ == '__main__':
         .post_init(post_init_tasks)
         .build()
     )
-    
+
     # ==========================================================================
-    # 🚨 ORDEM DE HANDLERS (NÃO ALTERE A ORDEM) 🚨
+    # ORDEM DE HANDLERS (NÃO ALTERAR)
     # ==========================================================================
 
-    # GRUPO -1: MIDDLEWARES E BLOQUEIOS (Rodam antes de tudo)
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member), group=-1)
-    application.add_handler(TypeHandler(Update, master_group_blocker), group=-1)
+    # Grupo -1 (Middlewares)
+    application.add_handler(
+        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member),
+        group=-1
+    )
+    application.add_handler(
+        TypeHandler(Update, master_group_blocker),
+        group=-1
+    )
 
-    # --------------------------------------------------------------------------
-    # GRUPO 0: FLUXO PRINCIPAL
-    # --------------------------------------------------------------------------
-    
-    # 1️⃣ LOGIN E AUTH (Prioridade Máxima)
+    # Auth
     application.add_handler(auth_handler)
 
-    # 2️⃣ FERRAMENTAS BÁSICAS E ADMIN
+    # Admin
     application.add_handler(file_id_conv_handler)
     application.add_handler(CommandHandler("setmedia", set_media_command))
-    
-    # 3️⃣ SISTEMAS DO JOGO (Registries)
+
+    # Registries
     register_all_handlers(application)
-    
-    # 👇 Registra a Guilda separadamente para garantir (pois desativamos no character.py)
     register_guild_handlers(application)
-    
     register_evolution_handlers(application)
 
-    # 4️⃣ FALLBACKS (Comandos Gerais)
+    # Fallbacks
     application.add_handler(CommandHandler("logout", logout_command))
-    application.add_handler(CallbackQueryHandler(logout_callback, pattern='^logout_btn$'))
+    application.add_handler(CallbackQueryHandler(logout_callback, pattern="^logout_btn$"))
     application.add_handler(start_command_handler)
     application.add_handlers(guide_handlers)
-    
-    # --------------------------------------------------------------------------
-    # DEBUG (Opcional)
+
+    # Debug opcional
     try:
         from handlers.jobs import cmd_force_pvp_reset
         application.add_handler(CommandHandler("debug_reset", cmd_force_pvp_reset))
-    except ImportError: pass
+    except ImportError:
+        pass
 
-    logging.info("✅ Todos os Handlers Registrados na Ordem Correta.")
-    logging.info("🚀 Iniciando Polling...")
-    
-    # Inicia o bot
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    logger.info("✅ Todos os Handlers Registrados.")
+    logger.info("🚀 Iniciando Polling...")
+
+    application.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True
+    )

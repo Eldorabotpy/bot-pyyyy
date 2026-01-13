@@ -1,12 +1,17 @@
 # modules/party_manager.py
 
+from __future__ import annotations
+
 import json
 import os
-from typing import Iterator, Tuple, Optional
+from typing import Iterator, Tuple, Optional, Union
+
+from bson import ObjectId
 
 from modules import player_manager
 
 PARTIES_DIR = "parties"
+PlayerId = Union[ObjectId, str]
 
 
 # -----------------------------
@@ -15,8 +20,10 @@ PARTIES_DIR = "parties"
 def _ensure_dir_exists():
     os.makedirs(PARTIES_DIR, exist_ok=True)
 
+
 def _party_file_path(party_id: str) -> str:
     return os.path.join(PARTIES_DIR, f"{party_id}.json")
+
 
 def _load_json(fp: str) -> Optional[dict]:
     try:
@@ -25,6 +32,7 @@ def _load_json(fp: str) -> Optional[dict]:
     except Exception:
         return None
 
+
 def _dump_json(fp: str, data: dict) -> None:
     tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -32,41 +40,63 @@ def _dump_json(fp: str, data: dict) -> None:
     os.replace(tmp, fp)
 
 
+def _normalize_player_id(pid: PlayerId) -> str:
+    """
+    Normaliza para string de ObjectId (forma canônica usada no arquivo JSON).
+    """
+    if isinstance(pid, ObjectId):
+        return str(pid)
+    if isinstance(pid, str) and ObjectId.is_valid(pid.strip()):
+        return str(ObjectId(pid.strip()))
+    raise ValueError("player_id inválido (esperado ObjectId ou string de ObjectId).")
+
+
 # -----------------------------
 # Leitura / escrita de party
 # -----------------------------
 def get_party_data(party_id: str) -> Optional[dict]:
-    """Busca os dados de um grupo pelo seu ID."""
+    """Busca os dados de um grupo pelo seu ID (party_id é string de ObjectId)."""
     _ensure_dir_exists()
-    data = _load_json(_party_file_path(party_id))
+    data = _load_json(_party_file_path(str(party_id)))
     if not data:
         return None
+
     # saneamento mínimo
     data.setdefault("leader_id", str(party_id))
     data.setdefault("leader_name", "")
     data.setdefault("members", {})
     if not isinstance(data["members"], dict):
         data["members"] = {}
+
     # campos opcionais usados pelo lobby
     data.setdefault("dungeon_id", None)
     data.setdefault("player_lobby_messages", {})
     if not isinstance(data["player_lobby_messages"], dict):
         data["player_lobby_messages"] = {}
+
+    # normaliza chaves do members / player_lobby_messages
+    data["members"] = {str(k): v for k, v in (data["members"].items() if isinstance(data["members"], dict) else [])}
+    data["player_lobby_messages"] = {
+        str(k): v for k, v in (data["player_lobby_messages"].items() if isinstance(data["player_lobby_messages"], dict) else [])
+    }
+
     return data
+
 
 def save_party_data(party_id: str, party_info: dict) -> None:
     """Salva os dados de um grupo específico."""
     _ensure_dir_exists()
-    # normaliza tipos
+
     party_info = dict(party_info or {})
     party_info["leader_id"] = str(party_info.get("leader_id", party_id))
-    # garante dicts básicos
+
     members = party_info.get("members") or {}
     party_info["members"] = {str(k): v for k, v in (members.items() if isinstance(members, dict) else [])}
+
     plm = party_info.get("player_lobby_messages") or {}
     party_info["player_lobby_messages"] = {str(k): v for k, v in (plm.items() if isinstance(plm, dict) else [])}
-    # grava
-    _dump_json(_party_file_path(party_id), party_info)
+
+    _dump_json(_party_file_path(str(party_id)), party_info)
 
 
 def iter_parties() -> Iterator[Tuple[str, dict]]:
@@ -102,109 +132,112 @@ def _get_party_max_players(party_data: dict) -> int:
 
 
 # -----------------------------
-# API principal
+# API principal (ObjectId)
 # -----------------------------
-def create_party(leader_id: str, leader_name: str) -> dict:
+async def create_party(leader_id: PlayerId, leader_name: str) -> dict:
     """
     Cria um novo grupo com o jogador como líder.
+    party_id = leader_id (string ObjectId).
     Se já existir um grupo com o mesmo ID do líder, desfaz antes.
     """
-    party_id = str(leader_id)
+    party_id = _normalize_player_id(leader_id)
+
     # limpa uma party antiga com mesmo id (se houver lixo)
     old = get_party_data(party_id)
     if old:
-        disband_party(party_id)
+        await disband_party(party_id)
 
     new_party = {
         "leader_id": party_id,
         "leader_name": leader_name,
         "members": {party_id: leader_name},
-        # campos opcionais, serão ajustados depois pelo fluxo
         "dungeon_id": None,
         "player_lobby_messages": {}
     }
     save_party_data(party_id, new_party)
 
-    # seta vínculo no jogador
-    p = player_manager.get_player_data(int(leader_id))
-    if p:
-        p["party_id"] = party_id
-        player_manager.save_player_data(int(leader_id), p)
+    # seta vínculo no jogador (ObjectId)
+    pdata = await player_manager.get_player_data(party_id)
+    if pdata:
+        pdata["party_id"] = party_id
+        await player_manager.save_player_data(party_id, pdata)
 
     return new_party
 
 
-def add_member(party_id: str, user_id: int | str, character_name: str) -> bool:
+async def add_member(party_id: str, player_id: PlayerId, character_name: str) -> bool:
     """
     Adiciona um membro a um grupo existente.
     Respeita a capacidade da dungeon (fallback 4).
     """
-    party_data = get_party_data(party_id)
+    party_data = get_party_data(str(party_id))
     if not party_data:
         return False
 
     # checa capacidade dinâmica
     max_players = _get_party_max_players(party_data)
-    members = party_data.get("members", {})
+    members = party_data.get("members", {}) or {}
     if len(members) >= max_players:
         return False
 
-    uid_str = str(user_id)
-    if uid_str in members:
+    pid_str = _normalize_player_id(player_id)
+    if pid_str in members:
         return True  # já está no grupo
 
-    members[uid_str] = character_name
+    members[pid_str] = character_name
     party_data["members"] = members
-    save_party_data(party_id, party_data)
+    save_party_data(str(party_id), party_data)
 
     # vincula no jogador
-    p = player_manager.get_player_data(int(user_id))
-    if p:
-        p["party_id"] = party_id
-        player_manager.save_player_data(int(user_id), p)
+    pdata = await player_manager.get_player_data(pid_str)
+    if pdata:
+        pdata["party_id"] = str(party_id)
+        await player_manager.save_player_data(pid_str, pdata)
+
     return True
 
 
-def remove_member(party_id: str, user_id: int | str) -> None:
-    """Remove um membro de um grupo (não deixa o líder automaticamente)."""
-    party_data = get_party_data(party_id)
+async def remove_member(party_id: str, player_id: PlayerId) -> None:
+    """Remove um membro de um grupo (não remove o líder automaticamente)."""
+    party_data = get_party_data(str(party_id))
     if not party_data:
         return
 
-    uid = str(user_id)
-    if uid in party_data.get("members", {}):
-        del party_data["members"][uid]
-        save_party_data(party_id, party_data)
+    pid_str = _normalize_player_id(player_id)
 
-    p = player_manager.get_player_data(int(user_id))
-    if p:
-        p["party_id"] = None
-        player_manager.save_player_data(int(user_id), p)
+    members = party_data.get("members", {}) or {}
+    if pid_str in members:
+        del members[pid_str]
+        party_data["members"] = members
+        save_party_data(str(party_id), party_data)
+
+    pdata = await player_manager.get_player_data(pid_str)
+    if pdata:
+        pdata["party_id"] = None
+        await player_manager.save_player_data(pid_str, pdata)
 
 
-def disband_party(party_id: str) -> None:
+async def disband_party(party_id: str) -> None:
     """Desfaz o grupo e limpa os dados de todos os membros."""
-    party_data = get_party_data(party_id)
+    party_data = get_party_data(str(party_id))
     if not party_data:
-        # nada a fazer
-        fp = _party_file_path(party_id)
+        fp = _party_file_path(str(party_id))
         if os.path.exists(fp):
             os.remove(fp)
         return
 
     # limpa vínculo em todos os membros
-    for member_id in list(party_data.get("members", {}).keys()):
-        try:
-            uid = int(member_id)
-        except Exception:
+    for member_id in list((party_data.get("members") or {}).keys()):
+        if not (isinstance(member_id, str) and ObjectId.is_valid(member_id)):
             continue
-        p = player_manager.get_player_data(uid)
-        if p:
-            p["party_id"] = None
-            player_manager.save_player_data(uid, p)
+
+        pdata = await player_manager.get_player_data(member_id)
+        if pdata:
+            pdata["party_id"] = None
+            await player_manager.save_player_data(member_id, pdata)
 
     # remove arquivo
-    fp = _party_file_path(party_id)
+    fp = _party_file_path(str(party_id))
     if os.path.exists(fp):
         os.remove(fp)
 
@@ -212,13 +245,17 @@ def disband_party(party_id: str) -> None:
 # -----------------------------
 # Ajuda ao fluxo de convite
 # -----------------------------
-def get_party_of(user_id: int | str) -> Optional[str]:
+def get_party_of(player_id: PlayerId) -> Optional[str]:
     """
-    Retorna o party_id do grupo ao qual 'user_id' pertence, ou None.
+    Retorna o party_id do grupo ao qual o jogador pertence, ou None.
     Usado para bloquear convite se o alvo já estiver em outro grupo.
     """
-    uid = str(user_id)
+    try:
+        pid_str = _normalize_player_id(player_id)
+    except Exception:
+        return None
+
     for pid, pdata in iter_parties():
-        if uid in (pdata.get("members") or {}):
+        if pid_str in (pdata.get("members") or {}):
             return pid
     return None
