@@ -287,49 +287,143 @@ async def job_pvp_monthly_reset(context: ContextTypes.DEFAULT_TYPE):
     if now.day != 1:
         return
 
-    await executar_reset_pvp(context.bot, force_run=False)
+    # 1) Entrega recompensas (com base nos pontos atuais)
+    await distribute_pvp_rewards(context)
+
+    # 2) Zera a temporada (pontos voltam a 0)
+    await reset_pvp_season(context)
+
+    # 3) Se você ainda quiser chamar o seu engine legado/atual, chame após o reset.
+    #    (ou remova se o engine faz reset e conflita)
+    try:
+        await executar_reset_pvp(context.bot, force_run=True)
+    except Exception:
+        pass
+
 
 
 async def distribute_pvp_rewards(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Distribui recompensas mensais do ranking PvP.
+    Corrigido para:
+      - suportar user_id como ObjectId/string (não é chat_id do Telegram)
+      - creditar gemas no DB de forma segura (sync ou async collection)
+      - notificar usando last_chat_id/telegram_id_owner/telegram_id quando existir
+      - pagar apenas ranks definidos em MONTHLY_RANKING_REWARDS
+    """
+    # Sem tabela de recompensas, não faz nada
+    if not MONTHLY_RANKING_REWARDS:
+        return
+
+    # ranks que realmente pagam
+    paying_ranks = sorted(int(r) for r in MONTHLY_RANKING_REWARDS.keys())
+    max_rank = max(paying_ranks)
+
     all_players_ranked = []
     try:
         async for user_id, p_data in player_manager.iter_players():
             try:
                 pts = player_manager.get_pvp_points(p_data)
-                if pts > 0:
-                    all_players_ranked.append({"user_id": user_id, "points": pts})
+                if pts and pts > 0:
+                    all_players_ranked.append({"user_id": user_id, "points": int(pts)})
             except Exception:
                 pass
     except Exception:
         return
 
+    if not all_players_ranked:
+        # ainda assim pode anunciar
+        if ANNOUNCEMENT_CHAT_ID:
+            try:
+                await context.bot.send_message(
+                    chat_id=ANNOUNCEMENT_CHAT_ID,
+                    message_thread_id=ANNOUNCEMENT_THREAD_ID,
+                    text="🏆 <b>Ranking PvP Finalizado!</b>\n\nNinguém pontuou nesta temporada.",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+        return
+
     all_players_ranked.sort(key=lambda p: p["points"], reverse=True)
 
-    if MONTHLY_RANKING_REWARDS:
-        for i, player in enumerate(all_players_ranked):
-            rank = i + 1
-            reward_amount = MONTHLY_RANKING_REWARDS.get(rank)
-            if reward_amount:
-                user_id = player["user_id"]
-                col, query_id = get_col_and_id(user_id)
+    # Paga apenas até o maior rank premiado
+    winners = all_players_ranked[:max_rank]
 
-                if col is not None:
-                    col.update_one({"_id": query_id}, {"$inc": {"gems": reward_amount}})
-                    try:
-                        await context.bot.send_message(chat_id=user_id, text=f"🏆 Rank {rank}: Recebeu {reward_amount} gemas!")
-                    except Exception:
-                        pass
+    paid_count = 0
+    total_gems = 0
 
+    for i, player in enumerate(winners):
+        rank = i + 1
+        reward_amount = MONTHLY_RANKING_REWARDS.get(rank)
+        if not reward_amount:
+            continue
+
+        user_id = player["user_id"]
+        col, query_id = get_col_and_id(user_id)
+
+        if col is None:
+            continue
+
+        # --- Credita gemas (compatível com collection sync/async) ---
+        try:
+            upd = col.update_one({"_id": query_id}, {"$inc": {"gems": int(reward_amount)}})
+            # se for coroutine (motor/async), aguarda
+            if hasattr(upd, "__await__"):
+                await upd
+        except Exception:
+            continue
+
+        paid_count += 1
+        total_gems += int(reward_amount)
+
+        # --- Notificação (não usar user_id como chat_id!) ---
+        target_chat_id = None
+        try:
+            pdata = await player_manager.get_player_data(user_id)
+            if pdata:
+                target_chat_id = (
+                    pdata.get("last_chat_id")
+                    or pdata.get("telegram_id_owner")
+                    or pdata.get("telegram_id")
+                )
+        except Exception:
+            target_chat_id = None
+
+        if target_chat_id:
+            try:
+                await context.bot.send_message(
+                    chat_id=target_chat_id,
+                    text=f"🏆 Você terminou em <b>#{rank}</b> na Arena PvP e recebeu <b>{reward_amount}</b> gemas!",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
+    # --- Anúncio no chat definido ---
     if ANNOUNCEMENT_CHAT_ID:
         try:
+            top_preview = []
+            for i, p in enumerate(winners[:min(5, len(winners))]):
+                r = i + 1
+                if r in MONTHLY_RANKING_REWARDS:
+                    top_preview.append(f"#{r} — <code>{p['user_id']}</code> ({p['points']} pts)")
+
+            preview_txt = "\n".join(top_preview) if top_preview else "Sem top 5."
             await context.bot.send_message(
                 chat_id=ANNOUNCEMENT_CHAT_ID,
                 message_thread_id=ANNOUNCEMENT_THREAD_ID,
-                text="🏆 <b>Ranking PvP Finalizado!</b>",
+                text=(
+                    "🏆 <b>Ranking PvP Finalizado!</b>\n\n"
+                    f"Premiados: <b>{paid_count}</b>\n"
+                    f"Gemas distribuídas: <b>{total_gems}</b>\n\n"
+                    f"<b>Top:</b>\n{preview_txt}"
+                ),
                 parse_mode="HTML"
             )
         except Exception:
             pass
+
 
 
 async def reset_pvp_season(context: ContextTypes.DEFAULT_TYPE):
