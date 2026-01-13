@@ -1,5 +1,6 @@
 # pvp/pvp_handler.py
 # (VERSÃO 5.1: Sessão ObjectId + Ranking via aggregate)
+# (MELHORIAS: Matchmaking robusto p/ pvp_points ausente + filtro de docs inválidos + delta inimigo explícito)
 
 import logging
 import random
@@ -74,6 +75,10 @@ async def find_opponents_hybrid(
 ) -> list:
     """
     Busca oponentes em AMBAS as coleções (players e users) e retorna misturado.
+
+    MELHORIAS:
+      - Trata documentos sem pvp_points como 0 (via $ifNull)
+      - Filtra somente docs que parecem "personagem jogável" (character_name existe e não vazio)
     """
     candidates = []
 
@@ -83,8 +88,16 @@ async def find_opponents_hybrid(
         min_elo = max(0, player_elo - int(elo_delta))
     max_elo = player_elo + int(elo_delta)
 
-    match_query = {"pvp_points": {"$gte": min_elo, "$lte": max_elo}}
-    pipeline = [{"$match": match_query}, {"$sample": {"size": int(limit_per_col)}}]
+    pipeline = [
+        {"$addFields": {"_pvp_points": {"$ifNull": ["$pvp_points", 0]}}},
+        {
+            "$match": {
+                "_pvp_points": {"$gte": min_elo, "$lte": max_elo},
+                "character_name": {"$exists": True, "$ne": ""},
+            }
+        },
+        {"$sample": {"size": int(limit_per_col)}},
+    ]
 
     if players_collection is not None:
         try:
@@ -245,19 +258,24 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
     # Atualiza Jogador
     pdata = await player_manager.get_player_data(user_id)
-    new_points = max(0, pdata.get("pvp_points", 0) + elo_delta)
+    new_points = max(0, int(pdata.get("pvp_points", 0)) + elo_delta)
     pdata["pvp_points"] = new_points
 
     if is_win:
-        pdata["pvp_wins"] = pdata.get("pvp_wins", 0) + 1
+        pdata["pvp_wins"] = int(pdata.get("pvp_wins", 0)) + 1
     else:
-        pdata["pvp_losses"] = pdata.get("pvp_losses", 0) + 1
+        pdata["pvp_losses"] = int(pdata.get("pvp_losses", 0)) + 1
 
     player_manager.add_gold(pdata, gold_reward)
     await player_manager.save_player_data(user_id, pdata)
 
-    # Atualiza Inimigo (passivo)
-    enemy_points = max(0, enemy_data.get("pvp_points", 0) - (15 if is_win else -25))
+    # Atualiza Inimigo (passivo) - EXPLÍCITO (evita confusão de sinal)
+    if is_win:
+        enemy_delta = -15
+    else:
+        enemy_delta = +25
+
+    enemy_points = max(0, int(enemy_data.get("pvp_points", 0)) + enemy_delta)
     enemy_data["pvp_points"] = enemy_points
     await player_manager.save_player_data(enemy_id, enemy_data)
 
@@ -278,7 +296,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     ]
     reply_markup = InlineKeyboardMarkup(kb)
 
-    # ====== NOVO: MÍDIA DO OPONENTE (CLASSE) COM FALLBACK 'classe_default_media' ======
+    # ====== MÍDIA DO OPONENTE (CLASSE) COM FALLBACK 'classe_default_media' ======
     enemy_media = pvp_utils.get_player_class_media(enemy_data)
     caption_safe = msg[:1024]  # limite do Telegram para caption
 
@@ -292,14 +310,12 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             else:
                 input_media = InputMediaVideo(media=file_id, caption=caption_safe, parse_mode="HTML")
 
-            # Tenta trocar a mídia da mensagem atual (se ela já tiver mídia).
-            # Se falhar (mensagem era texto, etc.), cai no fallback abaixo.
             await query.edit_message_media(media=input_media, reply_markup=reply_markup)
             return
         except Exception:
             pass
 
-        # Fallback: envia uma nova mensagem com mídia (caso não dê para editar a atual)
+        # Fallback: envia nova mensagem com mídia
         try:
             if str(enemy_media.get("type", "video")) == "photo":
                 await context.bot.send_photo(
@@ -321,7 +337,6 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         except Exception:
             pass
 
-    # Se não achou mídia (ou falhou tudo), mantém como texto
     await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode="HTML")
 
 
@@ -446,7 +461,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     day_desc = day_effect.get("description", "Sem efeitos hoje.")
     day_title = day_effect.get("name", "Dia Comum")
 
-    # ====== NOVO: ao clicar no botão Arena PvP (callback "pvp_arena"), usar "pvp_arena_media" ======
+    # ====== ao clicar no botão Arena PvP (callback "pvp_arena"), usar "pvp_arena_media" ======
     media_key = "menu_arena_pvp"
     if update.callback_query and update.callback_query.data == "pvp_arena":
         media_key = "pvp_arena_media"
@@ -455,21 +470,25 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     media = file_ids.get_file_data(media_key) or file_ids.get_file_data("menu_arena_pvp")
 
     txt = (
-        f"⚔️ <b>ARENA DE ELDORA</b> ⚔️\n\n"
-        f"👤 <b>Guerreiro:</b> {pdata.get('character_name')}\n"
-        f"🏆 <b>Elo:</b> {elo_name} ({points} pts)\n"
-        f"📊 <b>Histórico:</b> {wins}V / {losses}D\n\n"
-        f"📅 <b>Evento de Hoje:</b> {day_title}\n"
-        f"<i>{day_desc}</i>"
+        f"╭┈┈┈┈┈➤➤⚔️ 𝐀𝐑𝐄𝐍𝐀 𝐃𝐄 𝐄𝐋𝐃𝐎𝐑𝐀 ⚔️\n"
+        f"│\n"
+        f"├┈➤👤 𝑮𝒖𝒆𝒓𝒓𝒆𝒊𝒓𝒐: {pdata.get('character_name')}\n"
+        f"├┈➤🏆 𝑬𝒍𝒐: {elo_name} ({points} pts)\n"
+        f"├┈➤📊 𝑯𝒊𝒔𝒕𝒐́𝒓𝒊𝒄𝒐: {wins}V / {losses}D\n\n"
+        f"│\n"
+        f"├┈➤📅 𝐄𝐯𝐞𝐧𝐭𝐨 𝐝𝐞 𝐇𝐨𝐣𝐞 {day_title}\n"
+        f"├┈➤<i>{day_desc}</i>"
+        f"├┈➤"
+        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤"
     )
 
     kb = [
-        [InlineKeyboardButton("⚔️ PROCURAR OPONENTE", callback_data=PVP_PROCURAR_OPONENTE)],
+        [InlineKeyboardButton("⚔️ 𝗣𝗥𝗢𝗖𝗨𝗥𝗔𝗥 𝗢𝗣𝗢𝗡𝗘𝗡𝗧𝗘 ⚔️", callback_data=PVP_PROCURAR_OPONENTE)],
         [
-            InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
-            InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO),
+            InlineKeyboardButton("🏆 𝗥𝗮𝗻𝗸𝗶𝗻𝗴 🏆", callback_data=PVP_RANKING),
+            InlineKeyboardButton("📜 𝗛𝗶𝘀𝘁𝗼́𝗿𝗶𝗰𝗼 📜", callback_data=PVP_HISTORICO),
         ],
-        [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")],
+        [InlineKeyboardButton("⬅️ 𝑽𝒐𝒍𝒕𝒂𝒓", callback_data="show_kingdom_menu")],
     ]
 
     if tournament_system.CURRENT_MATCH_STATE.get("active"):
@@ -498,11 +517,8 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     input_media = InputMediaPhoto(media=file_id, caption=txt[:1024], parse_mode="HTML")
 
-                # Tenta trocar/colocar mídia na mesma mensagem
                 await query.edit_message_media(media=input_media, reply_markup=reply_markup)
             except Exception:
-                # Fallback: se não deu para editar mídia, tenta editar texto.
-                # Se também falhar, reenvia.
                 try:
                     if query.message and (query.message.photo or query.message.video):
                         await query.edit_message_caption(
@@ -534,10 +550,8 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             parse_mode="HTML",
                         )
         else:
-            # Sem mídia: só edita texto
             await query.edit_message_text(text=txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
     else:
-        # Comando /pvp: aqui é seguro enviar com mídia (se existir)
         reply_markup = InlineKeyboardMarkup(kb)
         if media:
             if str(media.get("type")) == "video":
