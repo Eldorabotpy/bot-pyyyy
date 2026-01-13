@@ -1,5 +1,5 @@
 RELATÓRIO DE MIGRAÇÃO - 100.0% CONCLUÍDO
-Gerado em: 2026-01-13 08:29:10
+Gerado em: 2026-01-13 08:37:18
 ============================================================
 
 Nenhum problema encontrado. Migração completa!
