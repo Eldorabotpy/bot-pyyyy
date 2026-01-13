@@ -1,15 +1,21 @@
 # modules/events/event_menu.py
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler, Application
+# (VERSÃO FINAL: Hub de Eventos + Claim Diário 1x/dia + SOMENTE ObjectId via login/senha)
+
+from __future__ import annotations
+
 import logging
 import datetime
 from zoneinfo import ZoneInfo
 
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CallbackQueryHandler, Application
+
 from modules import player_manager
+from modules.auth_utils import get_current_player_id  # ✅ ID do jogador (ObjectId / sessão)
 
 logger = logging.getLogger(__name__)
 
-# Timezone do reset diário (usa config se existir)
+# Timezone do reset diário (usa config se existir; fallback Fortaleza)
 try:
     from config import JOB_TIMEZONE
 except Exception:
@@ -35,12 +41,13 @@ except ImportError:
 
 
 async def show_active_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra a lista de TODOS os eventos disponíveis."""
+    """Mostra a lista de eventos disponíveis."""
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        pass
+    if query:
+        try:
+            await query.answer()
+        except Exception:
+            pass
 
     text = (
         "🌌 **HUB DE EVENTOS DE ELDORA** 🌌\n\n"
@@ -50,53 +57,56 @@ async def show_active_events(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard = []
 
-    # --- 1) Catacumbas (Raid) ---
+    # 1) Catacumbas (Raid)
     keyboard.append([
         InlineKeyboardButton("💀 Catacumbas do Reino (Raid)", callback_data="evt_cat_menu")
     ])
 
-    # --- 2) Defesa do Reino ---
+    # 2) Defesa do Reino
     is_defense_on = False
     if DEFENSE_AVAILABLE and defense_manager:
         try:
-            if getattr(defense_manager, "is_active", False):
-                is_defense_on = True
+            is_defense_on = bool(getattr(defense_manager, "is_active", False))
         except Exception as e:
             logger.error(f"Erro ao checar status da defesa: {e}")
 
-    if is_defense_on:
-        btn_text = "🔥 DEFESA DO REINO (EM ANDAMENTO!) 🔥"
-    else:
-        btn_text = "🛡️ Defesa do Reino (Inativo)"
-
+    btn_text = "🔥 DEFESA DO REINO (EM ANDAMENTO!) 🔥" if is_defense_on else "🛡️ Defesa do Reino (Inativo)"
     keyboard.append([
         InlineKeyboardButton(btn_text, callback_data="defesa_reino_main")
     ])
 
-    # --- 3) ✅ NOVO: Claim diário (tickets + cristais) ---
+    # 3) ✅ Claim diário
     keyboard.append([
         InlineKeyboardButton("🎁 Reivindicar Entradas Diárias", callback_data="evt_claim_daily_entries")
     ])
 
-    # --- 4) Voltar ---
+    # 4) Voltar
     keyboard.append([
         InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")
     ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Lógica de envio seguro (Apaga msg anterior se for mídia, ou edita se for texto)
+    # Tenta editar a mensagem atual; se falhar (ex.: mensagem antiga era mídia), envia nova
     try:
-        if query.message.photo or query.message.video or query.message.document:
-            await query.message.delete()
+        if query and query.message:
+            # Se for mídia, delete e envia texto
+            if getattr(query.message, "photo", None) or getattr(query.message, "video", None) or getattr(query.message, "document", None):
+                try:
+                    await query.message.delete()
+                except Exception:
+                    pass
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode="Markdown"
+                )
+            else:
+                await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="Markdown")
+        else:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode="Markdown"
-            )
-        else:
-            await query.edit_message_text(
                 text=text,
                 reply_markup=reply_markup,
                 parse_mode="Markdown"
@@ -116,24 +126,41 @@ async def show_active_events(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Claim 1x por dia (não acumula pois o JOB da meia-noite zera).
-    Entrega:
+    Claim 1x por dia (SOMENTE ObjectId via login/senha).
+    Entrega (SET, não soma) para não acumular:
       - ticket_arena: 10
       - ticket_defesa_reino: 4
       - cristal_de_abertura: 4
     """
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        pass
+    if query:
+        try:
+            await query.answer()
+        except Exception:
+            pass
 
-    user_id = str(query.from_user.id)
+    # ✅ Usa o ID do jogador (ObjectId / sessão autenticada), NÃO usa Telegram ID
+    player_id = get_current_player_id(update, context)
+    if not player_id:
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Voltar aos Eventos", callback_data="back_to_event_hub")],
+            [InlineKeyboardButton("🏰 Voltar ao Reino", callback_data="show_kingdom_menu")],
+        ])
+        try:
+            await query.edit_message_text(
+                "❌ Sessão inválida ou expirada.\n\n"
+                "Faça login novamente e tente de novo.",
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+        return
 
-    pdata = await player_manager.get_player_data(user_id)
+    pdata = await player_manager.get_player_data(player_id)
     if not pdata:
         try:
-            await query.edit_message_text("❌ Jogador não encontrado.")
+            await query.edit_message_text("❌ Jogador não encontrado (ID inválido).")
         except Exception:
             pass
         return
@@ -143,12 +170,12 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
     daily_claims = pdata.get("daily_claims") or {}
     last = str(daily_claims.get("event_entries_claim_date", ""))
 
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ Voltar aos Eventos", callback_data="back_to_event_hub")],
+        [InlineKeyboardButton("🏰 Voltar ao Reino", callback_data="show_kingdom_menu")],
+    ])
+
     if last == today:
-        # Já pegou hoje
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Voltar aos Eventos", callback_data="back_to_event_hub")],
-            [InlineKeyboardButton("🏰 Voltar ao Reino", callback_data="show_kingdom_menu")],
-        ])
         try:
             await query.edit_message_text(
                 "⏳ Você já reivindicou suas entradas de hoje.\n\n"
@@ -162,7 +189,7 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
 
     inv = pdata.get("inventory") or {}
 
-    # SET (não soma) para garantir que não acumule por bug/atraso
+    # ✅ SET (não acumula)
     inv["ticket_arena"] = 10
     inv["ticket_defesa_reino"] = 4
     inv["cristal_de_abertura"] = 4
@@ -172,9 +199,9 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
     pdata["inventory"] = inv
     pdata["daily_claims"] = daily_claims
 
-    # Salva
+    # Salva usando ObjectId
     try:
-        await player_manager.save_player_data(user_id, pdata)
+        await player_manager.save_player_data(player_id, pdata)
     except Exception as e:
         logger.error(f"Erro ao salvar claim diário: {e}")
         try:
@@ -182,11 +209,6 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
         except Exception:
             pass
         return
-
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Voltar aos Eventos", callback_data="back_to_event_hub")],
-        [InlineKeyboardButton("🏰 Voltar ao Reino", callback_data="show_kingdom_menu")],
-    ])
 
     msg = (
         "✅ **Entradas diárias reivindicadas!**\n\n"
@@ -211,13 +233,16 @@ async def evt_claim_daily_entries(update: Update, context: ContextTypes.DEFAULT_
 
 
 def register_handlers(application: Application):
-    """Registra os handlers deste módulo."""
-    # Menu de eventos (você já tinha estes)
+    """
+    Registra os handlers deste módulo.
+    Mantém compatibilidade com callbacks antigos/novos.
+    """
+    # Menu de eventos
     application.add_handler(CallbackQueryHandler(show_active_events, pattern=r"^evt_hub_principal$"))
     application.add_handler(CallbackQueryHandler(show_active_events, pattern=r"^back_to_event_hub$"))
 
-    # ✅ Compatibilidade: em outros menus você usa este callback
+    # Compatibilidade (outros menus podem chamar isso)
     application.add_handler(CallbackQueryHandler(show_active_events, pattern=r"^abrir_hub_eventos_v2$"))
 
-    # ✅ Claim diário
+    # Claim diário
     application.add_handler(CallbackQueryHandler(evt_claim_daily_entries, pattern=r"^evt_claim_daily_entries$"))
