@@ -90,7 +90,7 @@ except ImportError:
 # ==============================================================================
 # DASHBOARD / ROTEADOR FINAL DO CLÃ
 # ==============================================================================
-from handlers.guild.dashboard import clan_handler
+from handlers.guild.dashboard import clan_handler, show_clan_dashboard
 
 # ==============================================================================
 # ✅ GUILDA DE AVENTUREIROS (NPC)
@@ -109,8 +109,10 @@ from handlers.guild_menu_handler import (
 # Esse callback não tinha um handler dedicado. Aqui garantimos que ele chama
 # o roteador principal do clã (clan_handler), antes do roteador genérico.
 # ==============================================================================
-clan_menu_shortcut_handler = CallbackQueryHandler(clan_handler, pattern=r"^clan_menu$")
-
+clan_menu_shortcut_handler = CallbackQueryHandler(
+    show_clan_dashboard,
+    pattern=r"^clan_menu$"
+)
 
 # ==============================================================================
 # REGISTRO PRINCIPAL
