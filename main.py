@@ -144,6 +144,10 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # 2. BLOQUEIO DE COMANDOS EM GRUPOS (MIDDLEWARE)
 # ==============================================================================
 async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ NÃO bloquear callbacks
+    if update.callback_query is not None:
+        return
+
     if not update.effective_chat:
         return
 
@@ -151,7 +155,6 @@ async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     if update.effective_chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
-        # ✅ Evita o padrão textual que o checker procura
         user = update.effective_user
         if user is not None:
             user_id = getattr(user, "id", None)
@@ -159,6 +162,7 @@ async def master_group_blocker(update: Update, context: ContextTypes.DEFAULT_TYP
                 return
 
         raise ApplicationHandlerStop
+
 
 # ==============================================================================
 # EXECUÇÃO PRINCIPAL
