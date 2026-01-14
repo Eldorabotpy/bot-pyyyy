@@ -26,6 +26,7 @@ from .pvp_config import ARENA_MODIFIERS, MONTHLY_RANKING_REWARDS
 from . import pvp_battle
 from . import pvp_utils
 from . import tournament_system
+from .ui import build_arena_screen
 
 from modules.auth_utils import get_current_player_id, requires_login
 
@@ -57,6 +58,26 @@ def _safe_str(x) -> str:
     except Exception:
         return "<err>"
 
+def wrap_text(text: str, max_len: int = 42):
+    if not text:
+        return []
+
+    words = str(text).split()
+    lines = []
+    current = ""
+
+    for w in words:
+        if len(current) + len(w) + (1 if current else 0) <= max_len:
+            current += (" " if current else "") + w
+        else:
+            if current:
+                lines.append(current)
+            current = w
+
+    if current:
+        lines.append(current)
+
+    return lines
 
 def _try_objectid(x):
     if isinstance(x, ObjectId):
@@ -466,14 +487,17 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         media_key = "pvp_arena_media"
     media = file_ids.get_file_data(media_key) or file_ids.get_file_data("menu_arena_pvp")
 
-    txt = (
-        f"⚔️ <b>ARENA DE ELDORA</b> ⚔️\n\n"
-        f"👤 <b>Guerreiro:</b> {html.escape(pdata.get('character_name', ''))}\n"
-        f"🏆 <b>Elo:</b> {elo_name} ({points} pts)\n"
-        f"📊 <b>Histórico:</b> {wins}V / {losses}D\n\n"
-        f"📅 <b>Evento de Hoje:</b> {html.escape(day_title)}\n"
-        f"<i>{html.escape(day_desc)}</i>"
+    txt = build_arena_screen(
+        pdata=pdata,
+        elo_name=elo_name,
+        points=points,
+        wins=wins,
+        losses=losses,
+        day_title=day_title,
+        day_desc=day_desc,
     )
+
+
 
     kb = [
         [InlineKeyboardButton("⚔️ PROCURAR OPONENTE", callback_data=PVP_PROCURAR_OPONENTE)],
@@ -481,8 +505,10 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
             InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO),
         ],
+        [InlineKeyboardButton("🎨 Tema", callback_data="pvp_theme_menu")],
         [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")],
     ]
+
 
     if tournament_system.CURRENT_MATCH_STATE.get("active"):
         kb.insert(0, [InlineKeyboardButton("🏆 TORNEIO (Em andamento)", callback_data="torneio_menu")])
@@ -529,6 +555,57 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
 
+PVP_THEME_MENU = "pvp_theme_menu"
+PVP_THEME_SET_PREFIX = "pvp_theme_set:"  # ex: pvp_theme_set:sombrio
+
+@requires_login
+async def pvp_theme_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer("🎨 Escolha um tema")
+
+    user_id = await _get_pid(update, context)
+    pdata = await player_manager.get_player_data(user_id) or {}
+    current = pdata.get("ui_theme", "sombrio")
+
+    kb = [
+        [InlineKeyboardButton(("✅ " if current == "sombrio" else "") + "🕯️ Sombrio", callback_data=f"{PVP_THEME_SET_PREFIX}sombrio")],
+        [InlineKeyboardButton(("✅ " if current == "dourado" else "") + "✨ Dourado", callback_data=f"{PVP_THEME_SET_PREFIX}dourado")],
+        [InlineKeyboardButton(("✅ " if current == "arcano" else "") + "🔮 Arcano", callback_data=f"{PVP_THEME_SET_PREFIX}arcano")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")],
+    ]
+
+    txt = (
+        "🎨 <b>Tema da Arena</b>\n\n"
+        "Escolha como a Arena será exibida.\n"
+        "O tema fica salvo no seu personagem."
+    )
+
+    await query.edit_message_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+
+@requires_login
+async def pvp_theme_set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data or ""
+    await query.answer("Aplicando tema...")
+
+    theme = data.split(":", 1)[-1].strip().lower()
+    if theme not in ("sombrio", "dourado", "arcano"):
+        await query.answer("Tema inválido.", show_alert=True)
+        return
+
+    user_id = await _get_pid(update, context)
+    pdata = await player_manager.get_player_data(user_id)
+
+    if not pdata:
+        await query.answer("Não consegui carregar seu personagem.", show_alert=True)
+        return
+
+    pdata["ui_theme"] = theme
+    await player_manager.save_player_data(user_id, pdata)
+
+    # volta para a Arena renderizada com o novo tema
+    await pvp_menu_command(update, context)
 
 async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -545,6 +622,9 @@ def pvp_handlers() -> list:
         CallbackQueryHandler(pvp_battle_action_callback, pattern=r"^pvp_battle_attack$"),
         CallbackQueryHandler(torneio_signup_callback, pattern=r"^torneio_signup$"),
         CallbackQueryHandler(torneio_ready_callback, pattern=r"^torneio_ready$"),
+        CallbackQueryHandler(pvp_theme_menu_callback, pattern=f"^{PVP_THEME_MENU}$"),
+        CallbackQueryHandler(pvp_theme_set_callback, pattern=f"^{PVP_THEME_SET_PREFIX}"),
+
     ]
 
 
