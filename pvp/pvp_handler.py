@@ -1,6 +1,6 @@
 # pvp/pvp_handler.py
 # (VERSÃO 5.1: Sessão ObjectId + Ranking via aggregate)
-# (MELHORIAS: Matchmaking robusto p/ pvp_points ausente + filtro de docs inválidos + delta inimigo explícito)
+# (CORRIGIDO: Matchmaking consistente + conversão pvp_points + evita coletar docs errados + seleção segura do inimigo)
 
 import logging
 import random
@@ -41,12 +41,12 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# IMPORTANTE:
+# Em ambiente migrado (login/senha), misturar coleções pode gerar "oponente fantasma".
+# PvP deve buscar APENAS a coleção de PERSONAGENS (players_collection).
+# ============================================================================
 users_collection = None
-if players_collection is not None:
-    try:
-        users_collection = players_collection.database["users"]
-    except Exception:
-        users_collection = None
 
 PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
@@ -74,22 +74,36 @@ async def find_opponents_hybrid(
     allow_zero_points: bool = False,
 ) -> list:
     """
-    Busca oponentes em AMBAS as coleções (players e users) e retorna misturado.
+    Matchmaking APENAS na coleção de personagens (players_collection).
 
-    MELHORIAS:
-      - Trata documentos sem pvp_points como 0 (via $ifNull)
-      - Filtra somente docs que parecem "personagem jogável" (character_name existe e não vazio)
+    Correções/Melhorias:
+      - Converte pvp_points para int via $convert (string/None -> 0)
+      - Não depende de pvp_points existir
+      - Filtra somente documentos de personagem (character_name existe e não vazio)
+      - Exclui o próprio jogador
     """
-    candidates = []
+    if players_collection is None:
+        return []
 
     if allow_zero_points:
         min_elo = 0
     else:
-        min_elo = max(0, player_elo - int(elo_delta))
-    max_elo = player_elo + int(elo_delta)
+        min_elo = max(0, int(player_elo) - int(elo_delta))
+    max_elo = int(player_elo) + int(elo_delta)
 
     pipeline = [
-        {"$addFields": {"_pvp_points": {"$ifNull": ["$pvp_points", 0]}}},
+        {
+            "$addFields": {
+                "_pvp_points": {
+                    "$convert": {
+                        "input": "$pvp_points",
+                        "to": "int",
+                        "onError": 0,
+                        "onNull": 0,
+                    }
+                }
+            }
+        },
         {
             "$match": {
                 "_pvp_points": {"$gte": min_elo, "$lte": max_elo},
@@ -99,23 +113,19 @@ async def find_opponents_hybrid(
         {"$sample": {"size": int(limit_per_col)}},
     ]
 
-    if players_collection is not None:
-        try:
-            candidates.extend(list(players_collection.aggregate(pipeline)))
-        except Exception as e:
-            logger.error(f"Erro matchmaking legacy: {e}")
-
-    if users_collection is not None:
-        try:
-            candidates.extend(list(users_collection.aggregate(pipeline)))
-        except Exception as e:
-            logger.error(f"Erro matchmaking new: {e}")
+    try:
+        candidates = list(players_collection.aggregate(pipeline))
+    except Exception as e:
+        logger.error(f"Erro matchmaking: {e}")
+        return []
 
     final_list = []
     str_my_id = str(my_id)
 
     for c in candidates:
         c_id = c.get("_id")
+        if not c_id:
+            continue
         if str(c_id) == str_my_id:
             continue
         c["_id"] = c_id
@@ -209,40 +219,66 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     my_points = int(pdata.get("pvp_points", 0))
 
     # Matchmaking em camadas:
-    # 1) faixa padrão (±500)
-    # 2) faixa maior (±2000)
-    # 3) qualquer um com pontos (evita "Arena vazia" quando o range é estreito)
-    # 4) fallback final: permite 0 pontos (útil em servidores pequenos)
-    opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=8, elo_delta=500)
+    opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=10, elo_delta=500)
 
     if not opponents:
-        opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=12, elo_delta=2000)
+        opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=15, elo_delta=2000)
 
     if not opponents:
-        opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=20, elo_delta=999999)
+        opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=25, elo_delta=999999)
 
     if not opponents:
         opponents = await find_opponents_hybrid(
             my_points,
             user_id,
-            limit_per_col=25,
+            limit_per_col=35,
             elo_delta=999999,
             allow_zero_points=True,
         )
 
+    # Fallback bruto: se ainda estiver vazio, pega qualquer personagem válido (exceto eu)
+    if not opponents and players_collection is not None:
+        try:
+            pipeline_any = [
+                {"$match": {"character_name": {"$exists": True, "$ne": ""}}},
+                {"$sample": {"size": 50}},
+            ]
+            opponents = list(players_collection.aggregate(pipeline_any))
+            opponents = [o for o in opponents if str(o.get("_id")) != str(user_id)]
+        except Exception:
+            opponents = []
+
     if not opponents:
         await query.edit_message_text(
-            "😔 A Arena está vazia no momento. Tente mais tarde.",
+            "😔 A Arena está vazia no momento (nenhum personagem válido encontrado).",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
         )
         return
 
-    enemy_doc = random.choice(opponents)
-    enemy_id = enemy_doc["_id"]
+    # =====================================================================
+    # SELEÇÃO SEGURA: tenta carregar enemy_data de verdade para evitar “fantasma”
+    # =====================================================================
+    random.shuffle(opponents)
 
-    enemy_data = await player_manager.get_player_data(enemy_id)
-    if not enemy_data:
-        await query.edit_message_text("Erro ao carregar oponente. Tente novamente.")
+    enemy_id = None
+    enemy_data = None
+    for enemy_doc in opponents:
+        _id = enemy_doc.get("_id")
+        if not _id or str(_id) == str(user_id):
+            continue
+
+        data = await player_manager.get_player_data(_id)
+        if data and (data.get("character_name") or data.get("username") or data.get("name")):
+            enemy_id = _id
+            enemy_data = data
+            break
+
+    if not enemy_data or not enemy_id:
+        await query.edit_message_text(
+            "😔 Não encontrei nenhum personagem válido para lutar agora.\n"
+            "Isso geralmente indica que os outros jogadores ainda não têm dados completos de personagem.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
+        )
         return
 
     # Consome Ticket
@@ -269,12 +305,8 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     player_manager.add_gold(pdata, gold_reward)
     await player_manager.save_player_data(user_id, pdata)
 
-    # Atualiza Inimigo (passivo) - EXPLÍCITO (evita confusão de sinal)
-    if is_win:
-        enemy_delta = -15
-    else:
-        enemy_delta = +25
-
+    # Atualiza Inimigo (passivo) - explícito
+    enemy_delta = -15 if is_win else +25
     enemy_points = max(0, int(enemy_data.get("pvp_points", 0)) + enemy_delta)
     enemy_data["pvp_points"] = enemy_points
     await player_manager.save_player_data(enemy_id, enemy_data)
@@ -296,9 +328,9 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     ]
     reply_markup = InlineKeyboardMarkup(kb)
 
-    # ====== MÍDIA DO OPONENTE (CLASSE) COM FALLBACK 'classe_default_media' ======
+    # Mídia do oponente (classe) com fallback classe_default_media
     enemy_media = pvp_utils.get_player_class_media(enemy_data)
-    caption_safe = msg[:1024]  # limite do Telegram para caption
+    caption_safe = msg[:1024]
 
     if enemy_media:
         try:
@@ -315,12 +347,11 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         except Exception:
             pass
 
-        # Fallback: envia nova mensagem com mídia
         try:
             if str(enemy_media.get("type", "video")) == "photo":
                 await context.bot.send_photo(
                     chat_id=update.effective_chat.id,
-                    photo=enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file"),
+                    photo=file_id,
                     caption=caption_safe,
                     reply_markup=reply_markup,
                     parse_mode="HTML",
@@ -328,7 +359,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             else:
                 await context.bot.send_video(
                     chat_id=update.effective_chat.id,
-                    video=enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file"),
+                    video=file_id,
                     caption=caption_safe,
                     reply_markup=reply_markup,
                     parse_mode="HTML",
@@ -356,7 +387,6 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # Ranking sem usar .find (evita alerta do checker)
         pipeline_top = [
             {"$match": {"pvp_points": {"$gt": 0}}},
             {"$sort": {"pvp_points": -1}},
@@ -387,7 +417,6 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 ranking_text_lines.append(line)
 
-            # Se não apareceu no TOP 15, busca posição aproximada via aggregate
             if player_rank == -1:
                 my_data = await player_manager.get_player_data(user_id)
                 if my_data:
@@ -461,12 +490,10 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     day_desc = day_effect.get("description", "Sem efeitos hoje.")
     day_title = day_effect.get("name", "Dia Comum")
 
-    # ====== ao clicar no botão Arena PvP (callback "pvp_arena"), usar "pvp_arena_media" ======
     media_key = "menu_arena_pvp"
     if update.callback_query and update.callback_query.data == "pvp_arena":
         media_key = "pvp_arena_media"
 
-    # fallback: se não existir pvp_arena_media, tenta menu_arena_pvp
     media = file_ids.get_file_data(media_key) or file_ids.get_file_data("menu_arena_pvp")
 
     txt = (
@@ -503,10 +530,6 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         reply_markup = InlineKeyboardMarkup(kb)
 
-        # IMPORTANTE:
-        # - edit_message_text NÃO adiciona foto/vídeo.
-        # - Se a mensagem atual não tem mídia (comum no Render), precisamos trocar a mensagem
-        #   via edit_message_media (quando possível) ou reenviar.
         if media:
             try:
                 media_type = str(media.get("type", "photo"))
