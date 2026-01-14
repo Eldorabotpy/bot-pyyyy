@@ -1,12 +1,11 @@
 # pvp/pvp_handler.py
-# (VERSÃO 5.1: Sessão ObjectId + Ranking via aggregate)
-# (CORRIGIDO: Matchmaking consistente + conversão pvp_points + evita coletar docs errados + seleção segura do inimigo)
+# (VERSÃO 5.2: Sessão ObjectId + Ranking via aggregate)
+# (CORRIGIDO: Matchmaking na collection CERTA (users) + conversão pvp_points + seleção segura + fallback bruto)
 
 import logging
 import random
 import datetime
 import html
-import asyncio
 
 from telegram import (
     Update,
@@ -18,15 +17,12 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
-from bson import ObjectId
-
 # --- Módulos do Sistema ---
-from modules import player_manager, file_ids, game_data
-from modules.player.core import players_collection
+from modules import player_manager, file_ids, game_data  # noqa: F401 (game_data pode ser usado em outros trechos do projeto)
+from modules.player.core import players_collection  # usamos o DB daqui para chegar em "users"
 
 from .pvp_config import ARENA_MODIFIERS, MONTHLY_RANKING_REWARDS
 from . import pvp_battle
-from . import pvp_config
 from . import pvp_utils
 from . import tournament_system
 
@@ -38,15 +34,19 @@ try:
 except Exception:
     get_current_player_id_async = None  # type: ignore
 
-
 logger = logging.getLogger(__name__)
 
-# ============================================================================
+# =============================================================================
 # IMPORTANTE:
-# Em ambiente migrado (login/senha), misturar coleções pode gerar "oponente fantasma".
-# PvP deve buscar APENAS a coleção de PERSONAGENS (players_collection).
-# ============================================================================
+# Seus personagens estão em eldora_db.users (collection "users").
+# Portanto, PvP deve buscar/atualizar SOMENTE nela.
+# =============================================================================
 users_collection = None
+if players_collection is not None:
+    try:
+        users_collection = players_collection.database["users"]
+    except Exception:
+        users_collection = None
 
 PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
@@ -74,15 +74,15 @@ async def find_opponents_hybrid(
     allow_zero_points: bool = False,
 ) -> list:
     """
-    Matchmaking APENAS na coleção de personagens (players_collection).
+    Matchmaking NA COLLECTION CERTA: users_collection.
 
-    Correções/Melhorias:
+    Melhorias:
       - Converte pvp_points para int via $convert (string/None -> 0)
       - Não depende de pvp_points existir
       - Filtra somente documentos de personagem (character_name existe e não vazio)
       - Exclui o próprio jogador
     """
-    if players_collection is None:
+    if users_collection is None:
         return []
 
     if allow_zero_points:
@@ -114,9 +114,9 @@ async def find_opponents_hybrid(
     ]
 
     try:
-        candidates = list(players_collection.aggregate(pipeline))
+        candidates = list(users_collection.aggregate(pipeline))
     except Exception as e:
-        logger.error(f"Erro matchmaking: {e}")
+        logger.error(f"Erro matchmaking (users): {e}")
         return []
 
     final_list = []
@@ -139,9 +139,9 @@ async def find_opponents_hybrid(
 # =============================================================================
 async def aplicar_resultado_pvp_seguro(user_id, pontos_delta, ouro_delta=0):
     """
-    Salva pontos e ouro diretamente no MongoDB (Atomic Update).
+    Salva pontos e ouro diretamente no MongoDB (Atomic Update) na collection correta (users).
     """
-    if players_collection is None:
+    if users_collection is None:
         return False
 
     try:
@@ -152,8 +152,8 @@ async def aplicar_resultado_pvp_seguro(user_id, pontos_delta, ouro_delta=0):
             updates["gold"] = ouro_delta
 
         if updates:
-            # PyMongo é síncrono, sem await
-            players_collection.update_one({"_id": user_id}, {"$inc": updates})
+            # PyMongo é síncrono (sem await)
+            users_collection.update_one({"_id": user_id}, {"$inc": updates})
             await player_manager.clear_player_cache(user_id)
         return True
     except Exception as e:
@@ -162,7 +162,7 @@ async def aplicar_resultado_pvp_seguro(user_id, pontos_delta, ouro_delta=0):
 
 
 # =============================================================================
-# HANDLERS DO TORNEIO (MIGRADOS PARA SESSÃO)
+# HANDLERS DO TORNEIO
 # =============================================================================
 async def torneio_signup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -194,7 +194,7 @@ async def torneio_ready_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # =============================================================================
-# HANDLERS
+# PvP - Procurar Oponente
 # =============================================================================
 @requires_login
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -218,7 +218,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
     my_points = int(pdata.get("pvp_points", 0))
 
-    # Matchmaking em camadas:
+    # Matchmaking em camadas
     opponents = await find_opponents_hybrid(my_points, user_id, limit_per_col=10, elo_delta=500)
 
     if not opponents:
@@ -236,14 +236,14 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             allow_zero_points=True,
         )
 
-    # Fallback bruto: se ainda estiver vazio, pega qualquer personagem válido (exceto eu)
-    if not opponents and players_collection is not None:
+    # Fallback bruto: pega qualquer personagem válido (exceto eu)
+    if not opponents and users_collection is not None:
         try:
             pipeline_any = [
                 {"$match": {"character_name": {"$exists": True, "$ne": ""}}},
-                {"$sample": {"size": 50}},
+                {"$sample": {"size": 60}},
             ]
-            opponents = list(players_collection.aggregate(pipeline_any))
+            opponents = list(users_collection.aggregate(pipeline_any))
             opponents = [o for o in opponents if str(o.get("_id")) != str(user_id)]
         except Exception:
             opponents = []
@@ -255,9 +255,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         )
         return
 
-    # =====================================================================
-    # SELEÇÃO SEGURA: tenta carregar enemy_data de verdade para evitar “fantasma”
-    # =====================================================================
+    # Seleção segura: tenta carregar enemy_data de verdade
     random.shuffle(opponents)
 
     enemy_id = None
@@ -276,7 +274,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     if not enemy_data or not enemy_id:
         await query.edit_message_text(
             "😔 Não encontrei nenhum personagem válido para lutar agora.\n"
-            "Isso geralmente indica que os outros jogadores ainda não têm dados completos de personagem.",
+            "Isso indica que os outros jogadores ainda não têm dados completos de personagem.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
         )
         return
@@ -347,6 +345,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         except Exception:
             pass
 
+        # Fallback: envia nova mensagem com mídia
         try:
             if str(enemy_media.get("type", "video")) == "photo":
                 await context.bot.send_photo(
@@ -371,6 +370,9 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode="HTML")
 
 
+# =============================================================================
+# Ranking
+# =============================================================================
 @requires_login
 async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -382,17 +384,17 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = await _get_pid(update, context)
 
-    if players_collection is None:
-        await query.edit_message_text("❌ Erro: Banco de dados desconectado.")
+    if users_collection is None:
+        await query.edit_message_text("❌ Erro: Banco de dados desconectado (users).")
         return
 
     try:
         pipeline_top = [
-            {"$match": {"pvp_points": {"$gt": 0}}},
+            {"$match": {"pvp_points": {"$gt": 0}, "character_name": {"$exists": True, "$ne": ""}}},
             {"$sort": {"pvp_points": -1}},
             {"$limit": 15},
         ]
-        top_players = list(players_collection.aggregate(pipeline_top))
+        top_players = list(users_collection.aggregate(pipeline_top))
 
         ranking_text_lines = ["🏆 <b>Ranking da Arena de Eldora</b> 🏆\n"]
 
@@ -417,16 +419,17 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 ranking_text_lines.append(line)
 
+            # Se não apareceu no TOP 15, estima posição via aggregate
             if player_rank == -1:
                 my_data = await player_manager.get_player_data(user_id)
                 if my_data:
                     my_points = int(my_data.get("pvp_points", 0))
                     if my_points > 0:
                         pipeline_pos = [
-                            {"$match": {"pvp_points": {"$gt": my_points}}},
+                            {"$match": {"pvp_points": {"$gt": my_points}, "character_name": {"$exists": True, "$ne": ""}}},
                             {"$count": "above"},
                         ]
-                        res = list(players_collection.aggregate(pipeline_pos))
+                        res = list(users_collection.aggregate(pipeline_pos))
                         above = int(res[0]["above"]) if res else 0
                         position = above + 1
 
@@ -466,12 +469,18 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
 
+# =============================================================================
+# Histórico
+# =============================================================================
 @requires_login
 async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Função 'Histórico' ainda em construção!", show_alert=True)
 
 
+# =============================================================================
+# Menu PvP
+# =============================================================================
 @requires_login
 async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = await _get_pid(update, context)
@@ -532,7 +541,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if media:
             try:
-                media_type = str(media.get("type", "photo"))
+                media_type = str(media.get("type", "photo")).lower()
                 file_id = media.get("file_id") or media.get("id") or media.get("file")
 
                 if media_type == "video":
@@ -556,28 +565,32 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             parse_mode="HTML",
                         )
                 except Exception:
-                    if str(media.get("type")) == "video":
-                        await context.bot.send_video(
-                            chat_id=update.effective_chat.id,
-                            video=media.get("file_id") or media.get("id") or media.get("file"),
-                            caption=txt[:1024],
-                            reply_markup=reply_markup,
-                            parse_mode="HTML",
-                        )
-                    else:
-                        await context.bot.send_photo(
-                            chat_id=update.effective_chat.id,
-                            photo=media.get("file_id") or media.get("id") or media.get("file"),
-                            caption=txt[:1024],
-                            reply_markup=reply_markup,
-                            parse_mode="HTML",
-                        )
+                    # fallback: envia nova mensagem com mídia
+                    try:
+                        if str(media.get("type", "")).lower() == "video":
+                            await context.bot.send_video(
+                                chat_id=update.effective_chat.id,
+                                video=file_id,
+                                caption=txt[:1024],
+                                reply_markup=reply_markup,
+                                parse_mode="HTML",
+                            )
+                        else:
+                            await context.bot.send_photo(
+                                chat_id=update.effective_chat.id,
+                                photo=file_id,
+                                caption=txt[:1024],
+                                reply_markup=reply_markup,
+                                parse_mode="HTML",
+                            )
+                    except Exception:
+                        pass
         else:
             await query.edit_message_text(text=txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
     else:
         reply_markup = InlineKeyboardMarkup(kb)
         if media:
-            if str(media.get("type")) == "video":
+            if str(media.get("type", "")).lower() == "video":
                 await update.message.reply_video(
                     media.get("file_id") or media.get("id") or media.get("file"),
                     caption=txt[:1024],
