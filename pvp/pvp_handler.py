@@ -1,5 +1,5 @@
 # pvp/pvp_handler.py
-# (VERSÃO 5.3: Corrige ID int->ObjectId e usa simular_batalha_completa)
+# (VERSÃO 5.4: PvP por inventário, sem limite diário, menu resiliente, ordem de handlers corrigida)
 
 import logging
 import random
@@ -19,7 +19,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from bson import ObjectId
 
 # --- Módulos do Sistema ---
-from modules import player_manager, file_ids  # game_data não é necessário aqui
+from modules import player_manager, file_ids
 from modules.player.core import players_collection  # usamos para obter database
 
 from .pvp_config import ARENA_MODIFIERS, MONTHLY_RANKING_REWARDS
@@ -47,48 +47,110 @@ if players_collection is not None:
     except Exception:
         users_collection = None
 
+# ==============================
+# CALLBACKS / CONSTANTES
+# ==============================
 PVP_PROCURAR_OPONENTE = "pvp_procurar_oponente"
 PVP_RANKING = "pvp_ranking"
 PVP_HISTORICO = "pvp_historico"
 
+PVP_THEME_MENU = "pvp_theme_menu"
+PVP_THEME_SET_PREFIX = "pvp_theme_set:"  # ex: pvp_theme_set:sombrio
 
+# Ticket/Entrada do PvP (inventário)
+PVP_TICKET_KEY = "ticket_arena"
+
+
+# ==============================
+# UTILS INVENTÁRIO (robustos)
+# ==============================
 def _safe_str(x) -> str:
     try:
         return str(x)
     except Exception:
         return "<err>"
 
-def wrap_text(text: str, max_len: int = 42):
-    if not text:
-        return []
 
-    words = str(text).split()
-    lines = []
-    current = ""
+def _inv_get_qty(pdata: dict, item_key: str) -> int:
+    """
+    Lê quantidade de um item no inventário.
+    Suporta:
+      - inventory: {"ticket_arena": 3, ...}
+      - inventory: {"items": {"ticket_arena": 3}}
+      - inventory: [{"id":"ticket_arena","qty":3}] (ou key/item_id/name + qty/amount/count)
+    """
+    inv = pdata.get("inventory") or {}
 
-    for w in words:
-        if len(current) + len(w) + (1 if current else 0) <= max_len:
-            current += (" " if current else "") + w
+    # dict direto ou dict com "items"
+    if isinstance(inv, dict):
+        if "items" in inv and isinstance(inv["items"], dict):
+            try:
+                return int(inv["items"].get(item_key, 0) or 0)
+            except Exception:
+                return 0
+        try:
+            return int(inv.get(item_key, 0) or 0)
+        except Exception:
+            return 0
+
+    # lista de itens
+    if isinstance(inv, list):
+        for it in inv:
+            if not isinstance(it, dict):
+                continue
+            k = it.get("id") or it.get("key") or it.get("item_id") or it.get("name")
+            if k == item_key:
+                v = it.get("qty") or it.get("amount") or it.get("count") or it.get("qtd") or 0
+                try:
+                    return int(v)
+                except Exception:
+                    return 0
+
+    return 0
+
+
+def _inv_set_qty(pdata: dict, item_key: str, qty: int):
+    """
+    Escreve quantidade de um item no inventário (mesmos formatos do _inv_get_qty).
+    """
+    qty = max(0, int(qty))
+    inv = pdata.get("inventory")
+
+    if inv is None:
+        pdata["inventory"] = {}
+        inv = pdata["inventory"]
+
+    if isinstance(inv, dict):
+        if "items" in inv and isinstance(inv["items"], dict):
+            inv["items"][item_key] = qty
         else:
-            if current:
-                lines.append(current)
-            current = w
+            inv[item_key] = qty
+        return
 
-    if current:
-        lines.append(current)
+    if isinstance(inv, list):
+        for it in inv:
+            if not isinstance(it, dict):
+                continue
+            k = it.get("id") or it.get("key") or it.get("item_id") or it.get("name")
+            if k == item_key:
+                it["qty"] = qty
+                return
+        inv.append({"id": item_key, "qty": qty})
+        return
 
-    return lines
+    # fallback: normaliza para dict
+    pdata["inventory"] = {item_key: qty}
+
 
 def _try_objectid(x):
     if isinstance(x, ObjectId):
         return x
     if isinstance(x, str):
         s = x.strip()
-        # tenta converter string hex de ObjectId
         try:
             return ObjectId(s)
         except Exception:
-            return x  # pode ser string id interno do projeto
+            return x
     return x
 
 
@@ -103,7 +165,6 @@ async def _resolve_player_id(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
     # 2) Se vier int (Telegram ID), tenta resolver pelo session/context.user_data
     if isinstance(raw_id, int):
-        # Sessão comum em bots: salva o id real em user_data
         for key in ("player_id", "user_id", "mongo_id", "account_id"):
             v = context.user_data.get(key) if context and hasattr(context, "user_data") else None
             if isinstance(v, (str, ObjectId)) and v:
@@ -127,8 +188,7 @@ async def _resolve_player_id(update: Update, context: ContextTypes.DEFAULT_TYPE,
                 except Exception:
                     pass
 
-        # 4) Último fallback: retorna str(int) para evitar crash,
-        # mas isso provavelmente NÃO encontrará o player no seu banco.
+        # 4) fallback: retorna str(int)
         return str(raw_id)
 
     # 5) Outro tipo inesperado
@@ -151,13 +211,15 @@ async def _get_pid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pid = await _resolve_player_id(update, context, pid)
 
-    # log útil
     if isinstance(pid, int):
         logger.warning(f"[PvP] ID ainda é int após resolve: {pid}")
 
     return pid
 
 
+# ==============================
+# MATCHMAKING
+# ==============================
 async def find_opponents(
     player_elo: int,
     my_id,
@@ -207,13 +269,145 @@ async def find_opponents(
     return [c for c in candidates if c.get("_id") and str(c.get("_id")) != my_str]
 
 
+# ==============================
+# MENU PRINCIPAL PvP (resiliente)
+# ==============================
+@requires_login
+async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = await _get_pid(update, context)
+    pdata = await player_manager.get_player_data(user_id)
+
+    if not pdata:
+        if update.callback_query:
+            await update.callback_query.edit_message_text(
+                f"❌ Não consegui carregar seu personagem.\nID: {_safe_str(user_id)}"
+            )
+        return
+
+    # Entradas atuais (inventário)
+    ticket_qty = 0
+    try:
+        ticket_qty = _inv_get_qty(pdata, PVP_TICKET_KEY)
+    except Exception:
+        ticket_qty = 0
+
+    points = int(pdata.get("pvp_points", 0))
+    wins = int(pdata.get("pvp_wins", 0))
+    losses = int(pdata.get("pvp_losses", 0))
+    elo_name = pvp_utils.get_player_elo(points)
+
+    weekday = datetime.datetime.now().weekday()
+    day_effect = ARENA_MODIFIERS.get(weekday, {})
+    day_desc = day_effect.get("description", "Sem efeitos hoje.")
+    day_title = day_effect.get("name", "Dia Comum")
+
+    # mídia do menu (opcional)
+    media_key = "menu_arena_pvp"
+    if update.callback_query and update.callback_query.data == "pvp_arena":
+        media_key = "pvp_arena_media"
+    media = file_ids.get_file_data(media_key) or file_ids.get_file_data("menu_arena_pvp")
+
+    # injeta contagem para UI, sem depender de "pvp_entries"
+    pdata["_ticket_arena_qty"] = ticket_qty
+
+    txt = build_arena_screen(
+        pdata=pdata,
+        elo_name=elo_name,
+        points=points,
+        wins=wins,
+        losses=losses,
+        day_title=day_title,
+        day_desc=day_desc,
+    )
+
+    # Botões (sem "usar ticket" para virar entrada; ticket já é a entrada)
+    kb = [
+        [InlineKeyboardButton(f"⚔️ PROCURAR OPONENTE  (🎟️ {ticket_qty})", callback_data=PVP_PROCURAR_OPONENTE)],
+        [
+            InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
+            InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO),
+        ],
+        [InlineKeyboardButton("🎨 Tema", callback_data=PVP_THEME_MENU)],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")],
+    ]
+
+    if tournament_system.CURRENT_MATCH_STATE.get("active"):
+        kb.insert(0, [InlineKeyboardButton("🏆 TORNEIO (Em andamento)", callback_data="torneio_menu")])
+
+    reply_markup = InlineKeyboardMarkup(kb)
+
+    # Render resiliente (mídia opcional)
+    if update.callback_query:
+        query = update.callback_query
+        try:
+            await query.answer()
+        except Exception:
+            pass
+
+        if media:
+            file_id = media.get("file_id") or media.get("id") or media.get("file")
+            media_type = str(media.get("type", "photo")).lower()
+
+            try:
+                if media_type == "video":
+                    input_media = InputMediaVideo(media=file_id, caption=txt[:1024], parse_mode="HTML")
+                else:
+                    input_media = InputMediaPhoto(media=file_id, caption=txt[:1024], parse_mode="HTML")
+
+                await query.edit_message_media(media=input_media, reply_markup=reply_markup)
+                return
+            except Exception:
+                # fallback: editar caption/texto
+                try:
+                    if query.message and (query.message.photo or query.message.video):
+                        await query.edit_message_caption(
+                            caption=txt[:1024],
+                            reply_markup=reply_markup,
+                            parse_mode="HTML",
+                        )
+                    else:
+                        await query.edit_message_text(
+                            text=txt[:4096],
+                            reply_markup=reply_markup,
+                            parse_mode="HTML",
+                        )
+                    return
+                except Exception:
+                    pass
+
+        await query.edit_message_text(text=txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        if media:
+            file_id = media.get("file_id") or media.get("id") or media.get("file")
+            media_type = str(media.get("type", "photo")).lower()
+
+            if media_type == "video":
+                await update.message.reply_video(
+                    file_id,
+                    caption=txt[:1024],
+                    reply_markup=reply_markup,
+                    parse_mode="HTML",
+                )
+            else:
+                await update.message.reply_photo(
+                    file_id,
+                    caption=txt[:1024],
+                    reply_markup=reply_markup,
+                    parse_mode="HTML",
+                )
+        else:
+            await update.message.reply_text(txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
+
+
+# ==============================
+# PROCURAR OPONENTE (consome ticket do inventário)
+# ==============================
 @requires_login
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("🔍 Buscando oponente digno...")
 
     user_id = await _get_pid(update, context)
-
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         await query.edit_message_text(
@@ -223,13 +417,18 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         )
         return
 
-    # Tickets
-    tickets = player_manager.get_pvp_entries(pdata)
-    if tickets <= 0:
+    # Entradas = ticket_arena no inventário (sem limite diário)
+    ticket_qty = 0
+    try:
+        ticket_qty = _inv_get_qty(pdata, PVP_TICKET_KEY)
+    except Exception:
+        ticket_qty = 0
+
+    if ticket_qty <= 0:
         await query.edit_message_text(
-            "🚫 <b>Sem Tickets de Arena!</b>\n\n"
-            "Você usou todas as suas 5 lutas diárias.\n"
-            "Volte amanhã ou use um item de recarga.",
+            "🚫 <b>Sem Entradas da Arena!</b>\n\n"
+            "Você não tem <b>Ticket da Arena</b> no inventário.\n"
+            "Aguarde o job diário enviar suas entradas ou compre na loja.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
             parse_mode="HTML",
         )
@@ -288,9 +487,17 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         )
         return
 
-    # Consome Ticket
-    player_manager.use_pvp_entry(pdata)
-    await player_manager.save_player_data(user_id, pdata)
+    # Consome 1 Ticket do inventário (entrada real)
+    try:
+        _inv_set_qty(pdata, PVP_TICKET_KEY, ticket_qty - 1)
+        await player_manager.save_player_data(user_id, pdata)
+    except Exception:
+        # Se falhar por algum motivo, não permite a luta (evita exploit)
+        await query.edit_message_text(
+            "❌ Não consegui consumir sua entrada no inventário. Tente novamente.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
+        )
+        return
 
     # Modificador do dia (para a simulação completa)
     weekday = datetime.datetime.now().weekday()
@@ -330,7 +537,6 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
 
     # Mensagem
     result_text = "🏆 <b>VITÓRIA!</b>" if is_win else "💀 <b>DERROTA...</b>"
-    # log pode ser grande; pega últimas linhas
     try:
         full_log = "\n".join(log[-10:])
     except Exception:
@@ -395,6 +601,9 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode="HTML")
 
 
+# ==============================
+# RANKING / HISTÓRICO
+# ==============================
 @requires_login
 async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -442,9 +651,17 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         if query.message.photo or query.message.video:
-            await query.edit_message_caption(caption=final_text[:1024], reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            await query.edit_message_caption(
+                caption=final_text[:1024],
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+            )
         else:
-            await query.edit_message_text(text=final_text[:4096], reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            await query.edit_message_text(
+                text=final_text[:4096],
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+            )
 
     except Exception as e:
         logger.error(f"Erro no Ranking: {e}")
@@ -460,104 +677,9 @@ async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer("Função 'Histórico' ainda em construção!", show_alert=True)
 
 
-@requires_login
-async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = await _get_pid(update, context)
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        # Mostra erro claro quando ID está errado
-        if update.callback_query:
-            await update.callback_query.edit_message_text(
-                f"❌ Não consegui carregar seu personagem.\nID: {_safe_str(user_id)}"
-            )
-        return
-
-    points = int(pdata.get("pvp_points", 0))
-    wins = int(pdata.get("pvp_wins", 0))
-    losses = int(pdata.get("pvp_losses", 0))
-    elo_name = pvp_utils.get_player_elo(points)
-
-    weekday = datetime.datetime.now().weekday()
-    day_effect = ARENA_MODIFIERS.get(weekday, {})
-    day_desc = day_effect.get("description", "Sem efeitos hoje.")
-    day_title = day_effect.get("name", "Dia Comum")
-
-    media_key = "menu_arena_pvp"
-    if update.callback_query and update.callback_query.data == "pvp_arena":
-        media_key = "pvp_arena_media"
-    media = file_ids.get_file_data(media_key) or file_ids.get_file_data("menu_arena_pvp")
-
-    txt = build_arena_screen(
-        pdata=pdata,
-        elo_name=elo_name,
-        points=points,
-        wins=wins,
-        losses=losses,
-        day_title=day_title,
-        day_desc=day_desc,
-    )
-
-
-
-    kb = [
-        [InlineKeyboardButton("⚔️ PROCURAR OPONENTE", callback_data=PVP_PROCURAR_OPONENTE)],
-        [
-            InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
-            InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO),
-        ],
-        [InlineKeyboardButton("🎨 Tema", callback_data="pvp_theme_menu")],
-        [InlineKeyboardButton("⬅️ Voltar", callback_data="show_kingdom_menu")],
-    ]
-
-
-    if tournament_system.CURRENT_MATCH_STATE.get("active"):
-        kb.insert(0, [InlineKeyboardButton("🏆 TORNEIO (Em andamento)", callback_data="torneio_menu")])
-
-    reply_markup = InlineKeyboardMarkup(kb)
-
-    if update.callback_query:
-        query = update.callback_query
-        try:
-            await query.answer()
-        except Exception:
-            pass
-
-        if media:
-            file_id = media.get("file_id") or media.get("id") or media.get("file")
-            media_type = str(media.get("type", "photo")).lower()
-            try:
-                if media_type == "video":
-                    input_media = InputMediaVideo(media=file_id, caption=txt[:1024], parse_mode="HTML")
-                else:
-                    input_media = InputMediaPhoto(media=file_id, caption=txt[:1024], parse_mode="HTML")
-                await query.edit_message_media(media=input_media, reply_markup=reply_markup)
-                return
-            except Exception:
-                # se não der pra editar mídia, edita texto/caption
-                try:
-                    if query.message and (query.message.photo or query.message.video):
-                        await query.edit_message_caption(caption=txt[:1024], reply_markup=reply_markup, parse_mode="HTML")
-                    else:
-                        await query.edit_message_text(text=txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
-                    return
-                except Exception:
-                    pass
-
-        await query.edit_message_text(text=txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
-    else:
-        if media:
-            file_id = media.get("file_id") or media.get("id") or media.get("file")
-            media_type = str(media.get("type", "photo")).lower()
-            if media_type == "video":
-                await update.message.reply_video(file_id, caption=txt[:1024], reply_markup=reply_markup, parse_mode="HTML")
-            else:
-                await update.message.reply_photo(file_id, caption=txt[:1024], reply_markup=reply_markup, parse_mode="HTML")
-        else:
-            await update.message.reply_text(txt[:4096], reply_markup=reply_markup, parse_mode="HTML")
-
-PVP_THEME_MENU = "pvp_theme_menu"
-PVP_THEME_SET_PREFIX = "pvp_theme_set:"  # ex: pvp_theme_set:sombrio
-
+# ==============================
+# TEMA
+# ==============================
 @requires_login
 async def pvp_theme_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -604,31 +726,12 @@ async def pvp_theme_set_callback(update: Update, context: ContextTypes.DEFAULT_T
     pdata["ui_theme"] = theme
     await player_manager.save_player_data(user_id, pdata)
 
-    # volta para a Arena renderizada com o novo tema
     await pvp_menu_command(update, context)
 
-async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer("Ação registrada.")
 
-
-def pvp_handlers() -> list:
-    return [
-        CommandHandler("pvp", pvp_menu_command),
-        CallbackQueryHandler(pvp_menu_command, pattern=r"^pvp_arena$"),
-        CallbackQueryHandler(procurar_oponente_callback, pattern=f"^{PVP_PROCURAR_OPONENTE}$"),
-        CallbackQueryHandler(ranking_callback, pattern=f"^{PVP_RANKING}$"),
-        CallbackQueryHandler(historico_callback, pattern=f"^{PVP_HISTORICO}$"),
-        CallbackQueryHandler(pvp_battle_action_callback, pattern=r"^pvp_battle_attack$"),
-        CallbackQueryHandler(torneio_signup_callback, pattern=r"^torneio_signup$"),
-        CallbackQueryHandler(torneio_ready_callback, pattern=r"^torneio_ready$"),
-        CallbackQueryHandler(pvp_theme_menu_callback, pattern=f"^{PVP_THEME_MENU}$"),
-        CallbackQueryHandler(pvp_theme_set_callback, pattern=f"^{PVP_THEME_SET_PREFIX}"),
-
-    ]
-
-
-# ====== torneio callbacks (mantidos) ======
+# ==============================
+# TORNEIO (mantidos, mas posicionados ANTES de pvp_handlers)
+# ==============================
 async def torneio_signup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try:
@@ -656,3 +759,29 @@ async def torneio_ready_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.answer(msg, show_alert=True)
     await pvp_menu_command(update, context)
+
+
+# ==============================
+# AÇÃO PvP (placeholder)
+# ==============================
+async def pvp_battle_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer("Ação registrada.")
+
+
+# ==============================
+# REGISTRO DE HANDLERS
+# ==============================
+def pvp_handlers() -> list:
+    return [
+        CommandHandler("pvp", pvp_menu_command),
+        CallbackQueryHandler(pvp_menu_command, pattern=r"^pvp_arena$"),
+        CallbackQueryHandler(procurar_oponente_callback, pattern=f"^{PVP_PROCURAR_OPONENTE}$"),
+        CallbackQueryHandler(ranking_callback, pattern=f"^{PVP_RANKING}$"),
+        CallbackQueryHandler(historico_callback, pattern=f"^{PVP_HISTORICO}$"),
+        CallbackQueryHandler(pvp_battle_action_callback, pattern=r"^pvp_battle_attack$"),
+        CallbackQueryHandler(torneio_signup_callback, pattern=r"^torneio_signup$"),
+        CallbackQueryHandler(torneio_ready_callback, pattern=r"^torneio_ready$"),
+        CallbackQueryHandler(pvp_theme_menu_callback, pattern=f"^{PVP_THEME_MENU}$"),
+        CallbackQueryHandler(pvp_theme_set_callback, pattern=f"^{PVP_THEME_SET_PREFIX}"),
+    ]
