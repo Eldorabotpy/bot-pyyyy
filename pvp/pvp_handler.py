@@ -683,16 +683,22 @@ async def historico_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 @requires_login
 async def pvp_theme_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer("🎨 Escolha um tema")
+    try:
+        await query.answer("🎨 Escolha um tema")
+    except Exception:
+        pass
 
     user_id = await _get_pid(update, context)
     pdata = await player_manager.get_player_data(user_id) or {}
     current = pdata.get("ui_theme", "sombrio")
 
     kb = [
-        [InlineKeyboardButton(("✅ " if current == "sombrio" else "") + "🕯️ Sombrio", callback_data=f"{PVP_THEME_SET_PREFIX}sombrio")],
-        [InlineKeyboardButton(("✅ " if current == "dourado" else "") + "✨ Dourado", callback_data=f"{PVP_THEME_SET_PREFIX}dourado")],
-        [InlineKeyboardButton(("✅ " if current == "arcano" else "") + "🔮 Arcano", callback_data=f"{PVP_THEME_SET_PREFIX}arcano")],
+        [InlineKeyboardButton(("✅ " if current == "sombrio" else "") + "🕯️ Sombrio",
+                              callback_data=f"{PVP_THEME_SET_PREFIX}sombrio")],
+        [InlineKeyboardButton(("✅ " if current == "dourado" else "") + "✨ Dourado",
+                              callback_data=f"{PVP_THEME_SET_PREFIX}dourado")],
+        [InlineKeyboardButton(("✅ " if current == "arcano" else "") + "🔮 Arcano",
+                              callback_data=f"{PVP_THEME_SET_PREFIX}arcano")],
         [InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")],
     ]
 
@@ -702,14 +708,43 @@ async def pvp_theme_menu_callback(update: Update, context: ContextTypes.DEFAULT_
         "O tema fica salvo no seu personagem."
     )
 
-    await query.edit_message_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    reply_markup = InlineKeyboardMarkup(kb)
+
+    # ✅ Se a mensagem atual tem mídia (photo/video), edita a LEGENDA
+    try:
+        if query.message and (query.message.photo or query.message.video):
+            await query.edit_message_caption(
+                caption=txt[:1024],
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+        else:
+            await query.edit_message_text(
+                text=txt[:4096],
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+    except Exception as e:
+        logger.error(f"[PvP] Falha ao abrir menu de tema: {e}")
+        # fallback seguro: tenta texto simples
+        try:
+            await query.edit_message_text(
+                text=txt[:4096],
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
 
 
 @requires_login
 async def pvp_theme_set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data or ""
-    await query.answer("Aplicando tema...")
+    try:
+        await query.answer("Aplicando tema...")
+    except Exception:
+        pass
 
     theme = data.split(":", 1)[-1].strip().lower()
     if theme not in ("sombrio", "dourado", "arcano"):
@@ -718,7 +753,6 @@ async def pvp_theme_set_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     user_id = await _get_pid(update, context)
     pdata = await player_manager.get_player_data(user_id)
-
     if not pdata:
         await query.answer("Não consegui carregar seu personagem.", show_alert=True)
         return
@@ -726,8 +760,8 @@ async def pvp_theme_set_callback(update: Update, context: ContextTypes.DEFAULT_T
     pdata["ui_theme"] = theme
     await player_manager.save_player_data(user_id, pdata)
 
+    # ✅ Volta para o menu (pvp_menu_command já está caption-safe)
     await pvp_menu_command(update, context)
-
 
 # ==============================
 # TORNEIO (mantidos, mas posicionados ANTES de pvp_handlers)
