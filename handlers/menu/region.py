@@ -232,6 +232,34 @@ async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 # =============================================================================
 # Menu Principal da Região
 # =============================================================================
+@requires_login
+async def continue_after_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_id = get_current_player_id(update, context)
+    chat_id = query.message.chat_id
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        await context.bot.send_message(chat_id, "Sessão inválida.")
+        return
+
+    loc = player_data.get("current_location", "reino_eldora")
+
+    try:
+        await query.delete_message()
+    except Exception:
+        pass
+
+    if loc == "reino_eldora":
+        if show_kingdom_menu:
+            await show_kingdom_menu(None, context, player_data=player_data, chat_id=chat_id)
+        else:
+            await context.bot.send_message(chat_id, "🏰 Reino de Eldora")
+    else:
+        await send_region_menu(context, user_id, chat_id)
+
 
 async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
     if player_data is None:

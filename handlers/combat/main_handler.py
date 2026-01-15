@@ -7,7 +7,11 @@ import asyncio
 from typing import Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaVideo, InputMediaPhoto
 from telegram.ext import ContextTypes, CallbackQueryHandler
+# war
 from telegram.error import BadRequest
+from modules.guild_war.combat_integration import try_award_pve_kill_for_guild_war
+from modules.game_data import regions as game_data_regions
+
 
 # Importações dos módulos
 from modules import player_manager, game_data, class_evolution_service, clan_manager
@@ -319,82 +323,115 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         # VITÓRIA
         # ============================================
         if monster_defeated:
-            if "cooldowns" in player_data: player_data.pop("cooldowns", None)
+            # limpa cooldowns e salva
+            if "cooldowns" in player_data:
+                player_data.pop("cooldowns", None)
+
             await player_manager.save_player_data(user_id, player_data)
 
             try:
                 log.append(f"🏆 <b>{monster_stats.get('name')} derrotado!</b>")
-                
-                state_action = player_data.get('player_state', {}).get('action')
-                
-                if state_action == 'evolution_combat':
-                    context.user_data.pop('battle_cache', None)
-                    if "cooldowns" in player_data: player_data.pop("cooldowns", None)
-                    
-                    details = player_data.get('player_state', {}).get('details', {})
-                    target_class = details.get('target_class_reward')
-                    
+
+                state_action = player_data.get("player_state", {}).get("action")
+
+                # =========================
+                # EVOLUTION COMBAT
+                # =========================
+                if state_action == "evolution_combat":
+                    context.user_data.pop("battle_cache", None)
+
+                    if "cooldowns" in player_data:
+                        player_data.pop("cooldowns", None)
+
+                    details = player_data.get("player_state", {}).get("details", {})
+                    target_class = details.get("target_class_reward")
+
                     success, msg_evo = await class_evolution_service.finalize_evolution(user_id, target_class)
-                    player_data = await player_manager.get_player_data(user_id) 
-                    
-                    player_data['player_state'] = {'action': 'idle'}
+                    player_data = await player_manager.get_player_data(user_id)
+
+                    player_data["player_state"] = {"action": "idle"}
                     await player_manager.save_player_data(user_id, player_data)
 
-                    media_sucesso = (file_id_manager.get_file_data("media_evolution_success") or {}).get('id')
-                    final_text = f"🏆 <b>VITÓRIA LENDÁRIA!</b>\n\n{msg_evo}\n\n<i>Seus atributos aumentaram e novas habilidades foram desbloqueadas.</i>"
+                    media_sucesso = (file_id_manager.get_file_data("media_evolution_success") or {}).get("id")
+                    final_text = (
+                        f"🏆 <b>VITÓRIA LENDÁRIA!</b>\n\n{msg_evo}\n\n"
+                        f"<i>Seus atributos aumentaram e novas habilidades foram desbloqueadas.</i>"
+                    )
                     kb_fim = [[InlineKeyboardButton("📜 Ver Perfil", callback_data="profile")]]
-                    
-                    await _edit_media_or_caption(context, battle_cache, final_text, media_sucesso, "photo", InlineKeyboardMarkup(kb_fim))
+
+                    await _edit_media_or_caption(
+                        context,
+                        battle_cache,
+                        final_text,
+                        media_sucesso,
+                        "photo",
+                        InlineKeyboardMarkup(kb_fim),
+                    )
                     return
-                
-                # CASO 1: Dungeon
+
+                # =========================
+                # CASO 1: DUNGEON (NÃO CONTA PARA GUERRA)
+                # =========================
                 if in_dungeon:
                     combat_details_recon = {
-                         "region_key": battle_cache.get("region_key"),
-                         "difficulty": dungeon_ctx.get("difficulty"),
-                         "dungeon_stage": dungeon_ctx.get("floor_idx", 0),
-                         "dungeon_ctx": dungeon_ctx,
-                         "loot_table": monster_stats.get("loot_table", []),
-                         "file_id_name": battle_cache.get("monster_media_id") 
+                        "region_key": battle_cache.get("region_key"),
+                        "difficulty": dungeon_ctx.get("difficulty"),
+                        "dungeon_stage": dungeon_ctx.get("floor_idx", 0),
+                        "dungeon_ctx": dungeon_ctx,
+                        "loot_table": monster_stats.get("loot_table", []),
+                        "file_id_name": battle_cache.get("monster_media_id"),
                     }
+
                     r_ctx = battle_cache.copy()
                     r_ctx.update(monster_stats)
+
                     xp, gold, items = rewards.calculate_victory_rewards(player_data, r_ctx)
-                    
+
                     fmt_items = []
                     for i in items:
-                        if isinstance(i, str): fmt_items.append((i, 1, {}))
-                        elif isinstance(i, (list, tuple)): fmt_items.append((i[0], i[1], {}))
+                        if isinstance(i, str):
+                            fmt_items.append((i, 1, {}))
+                        elif isinstance(i, (list, tuple)):
+                            fmt_items.append((i[0], i[1], {}))
 
                     pkg = {"xp": xp, "gold": gold, "items": fmt_items}
                     await dungeons_runtime.advance_after_victory(update, context, user_id, chat_id, combat_details_recon, pkg)
                     return
-                
-                # CASO 2: Combate Normal
-                durability.apply_end_of_battle_wear(player_data, battle_cache, log) 
+
+                # =========================
+                # CASO 2: COMBATE NORMAL
+                # =========================
+                durability.apply_end_of_battle_wear(player_data, battle_cache, log)
                 await player_manager.save_player_data(user_id, player_data)
 
                 r_ctx = battle_cache.copy()
                 r_ctx.update(monster_stats)
+
                 xp, gold, items = rewards.calculate_victory_rewards(player_data, r_ctx)
-                
+
                 player_data["xp"] = player_data.get("xp", 0) + xp
                 player_data["gold"] = player_data.get("gold", 0) + gold
-                
+
                 processed_loot = []
                 for i in items:
-                     if isinstance(i, str): processed_loot.append((i, 1))
-                     elif isinstance(i, (list, tuple)): processed_loot.append((i[0], i[1]))
-                
+                    if isinstance(i, str):
+                        processed_loot.append((i, 1))
+                    elif isinstance(i, (list, tuple)):
+                        processed_loot.append((i[0], i[1]))
+
                 for i_id, qty in processed_loot:
                     player_manager.add_item_to_inventory(player_data, i_id, qty)
 
-                summary = f"🏆 <b>VITÓRIA!</b>\n\nDerrotou {monster_stats.get('name')}!\n✨ XP: +{xp}\n💰 Ouro: +{gold}\n"
-                
+                summary = (
+                    f"🏆 <b>VITÓRIA!</b>\n\n"
+                    f"Derrotou {monster_stats.get('name')}!\n"
+                    f"✨ XP: +{xp}\n"
+                    f"💰 Ouro: +{gold}\n"
+                )
+
                 if processed_loot:
                     summary += "\n📦 <b>Loot Encontrado:</b>\n"
-                    for item_data in processed_loot:
-                        i_id, qty = item_data
+                    for i_id, qty in processed_loot:
                         item_info = game_data.ITEMS_DATA.get(i_id, {})
                         i_name = item_info.get("display_name") or i_id.replace("_", " ").title()
                         i_emoji = item_info.get("emoji", "🎲")
@@ -402,27 +439,52 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
                 try:
                     _, _, lvl_msg = player_manager.check_and_apply_level_up(player_data)
-                    if lvl_msg: summary += lvl_msg
+                    if lvl_msg:
+                        summary += lvl_msg
+
                     mid = monster_stats.get("id")
-                    if mid: await mission_manager.update_mission_progress(user_id, "hunt", mid, 1)
-                except: pass
-                
+                    if mid:
+                        await mission_manager.update_mission_progress(user_id, "hunt", mid, 1)
+                except Exception:
+                    pass
+
                 stats = await player_manager.get_player_total_stats(player_data)
-                player_data['current_hp'] = stats.get('max_hp', 100)
-                player_data['current_mp'] = stats.get('max_mana', 50)
-                player_data['player_state'] = {'action': 'idle'}
-                
+                player_data["current_hp"] = stats.get("max_hp", 100)
+                player_data["current_mp"] = stats.get("max_mana", 50)
+                player_data["player_state"] = {"action": "idle"}
+
+                # =========================
+                # GUERRA DE CLÃ (PVE KILL) - SOMENTE COMBATE NORMAL
+                # =========================
+                try:
+                    await try_award_pve_kill_for_guild_war(
+                        player_id=user_id,
+                        player_data=player_data,
+                        region_key=battle_cache.get("region_key"),
+                        game_data_regions_module=game_data_regions,
+                        base_points=3,
+                    )
+                except Exception:
+                    pass
+
                 await player_manager.save_player_data(user_id, player_data)
-                context.user_data.pop('battle_cache', None)
-                
-                await _edit_media_or_caption(context, battle_cache, summary, battle_cache['player_media_id'], battle_cache['player_media_type'], kb_voltar)
-                return 
+                context.user_data.pop("battle_cache", None)
+
+                await _edit_media_or_caption(
+                    context,
+                    battle_cache,
+                    summary,
+                    battle_cache["player_media_id"],
+                    battle_cache["player_media_type"],
+                    kb_voltar,
+                )
+                return
 
             except Exception as e:
                 logger.error(f"Erro vitória: {e}")
-                player_data['player_state'] = {'action': 'idle'}
+                player_data["player_state"] = {"action": "idle"}
                 await player_manager.save_player_data(user_id, player_data)
-                context.user_data.pop('battle_cache', None)
+                context.user_data.pop("battle_cache", None)
                 await context.bot.send_message(chat_id, "⚠️ Erro na vitória.", reply_markup=kb_voltar)
                 return
 

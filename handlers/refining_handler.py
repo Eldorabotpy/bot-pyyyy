@@ -217,7 +217,8 @@ async def refining_main_callback(update: Update, context: ContextTypes.DEFAULT_T
     if page < total_p: nav.append(InlineKeyboardButton("▶️", callback_data=f"ref_main_PAGE_{page+1}"))
     if nav: kb.append(nav)
     
-    kb.append([InlineKeyboardButton("🔙 Fechar", callback_data="continue_after_action")])
+    kb.append([InlineKeyboardButton("🔙 Fechar", callback_data="back_to_kingdom")])
+
 
     await _safe_edit_or_send_with_media(q, context, "\n".join(lines), InlineKeyboardMarkup(kb))
 

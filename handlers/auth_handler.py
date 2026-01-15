@@ -346,17 +346,34 @@ async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    try: await q.answer("Saindo...")
-    except: pass
+    try:
+        await q.answer("Saindo...")
+    except:
+        pass
+
     await clear_persistent_session(update.effective_user.id)
     context.user_data.clear()
-    if context.chat_data: context.chat_data.clear()
-    try: await q.delete_message()
-    except: pass
+    if context.chat_data:
+        context.chat_data.clear()
 
-    keyboard = [[InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')], [InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')]]
-    await context.bot.send_photo(chat_id=update.effective_chat.id, photo=IMG_NOVO, caption="🔒 <b>Desconectado.</b>\nEntre novamente para jogar:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-    return ConversationHandler.END
+    try:
+        await q.delete_message()
+    except:
+        pass
+
+    keyboard = [
+        [InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')],
+        [InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')]
+    ]
+
+    await context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=IMG_NOVO,
+        caption="🔒 <b>Desconectado.</b>\nEntre novamente para jogar:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="HTML"
+    )
+
 
 auth_handler = ConversationHandler(
     entry_points=[
