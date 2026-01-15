@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from modules import player_manager, guild_system, clan_manager, file_ids
 # --- IMPORT NOVO ---
 from modules.auth_utils import get_current_player_id
+from modules.clan_war_engine import get_war_status
 
 async def _smart_media_edit(query, text, markup, media_key, context):
     chat_id = query.message.chat_id
@@ -118,13 +119,70 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard.append([InlineKeyboardButton(btn_txt, callback_data=f"gld_mission_view_{idx}")])
 
     if pdata.get("clan_id"):
-        keyboard.append([InlineKeyboardButton("🛡️ Acessar Meu Clã", callback_data="clan_menu")])
+        keyboard.append([InlineKeyboardButton("🛡️ Acessar Meu Clã", callback_data="clan_menu")]),
+        keyboard.append([InlineKeyboardButton("⚔️ Guerra de Clãs (Evento)", callback_data="gld_war_status")])
     else:
         keyboard.append([InlineKeyboardButton("🛡️ Criar ou Buscar Clã", callback_data="clan_create_menu_start")])
 
     keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="profile")])
     markup = InlineKeyboardMarkup(keyboard)
     await _smart_media_edit(query, text, markup, "img_guild_npc", context)
+
+async def guild_war_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    try:
+        await query.answer()
+    except:
+        pass
+
+    user_id = get_current_player_id(update, context)
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        return
+
+    ws = await get_war_status()
+    state = ws.get("state", {})
+    phase = state.get("phase", "idle")
+    wtype = state.get("war_type", "-")
+    war_id = state.get("war_id", "-")
+
+    txt = (
+        f"⚔️ <b>GUERRA DE CLÃS</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🆔 <b>Rodada:</b> <code>{war_id}</code>\n"
+        f"🧭 <b>Tipo:</b> <b>{wtype}</b>\n"
+        f"⏳ <b>Fase:</b> <b>{phase}</b>\n\n"
+    )
+
+    if phase == "prep":
+        txt += (
+            "✅ <b>Inscrições abertas!</b>\n"
+            "👑 O <b>Líder do Clã</b> deve abrir a inscrição no menu do Clã.\n"
+            "Depois, os membros entram e confirmam participação.\n"
+        )
+    elif phase == "active":
+        txt += (
+            "🔥 <b>Guerra ativa!</b>\n"
+            "⚠️ Somente jogadores <b>inscritos</b> nesta rodada podem caçar/atacar e pontuar.\n"
+        )
+    else:
+        nxt = ws.get("next", {})
+        txt += (
+            "ℹ️ Evento fora de combate no momento.\n\n"
+            f"📅 Próxima Escaramuça: <code>{nxt.get('skirmish', {}).get('start', '-')}</code>\n"
+            f"📅 Próxima Conquista: <code>{nxt.get('total', {}).get('start', '-')}</code>\n"
+        )
+
+    kb = []
+    if pdata.get("clan_id"):
+        kb.append([InlineKeyboardButton("🛡️ Ir para meu Clã", callback_data="clan_menu")])
+    else:
+        kb.append([InlineKeyboardButton("🛡️ Criar/Buscar Clã", callback_data="clan_create_menu_start")])
+
+    kb.append([InlineKeyboardButton("🔙 Voltar", callback_data="adventurer_guild_main")])
+    await _safe_edit(query, txt, InlineKeyboardMarkup(kb))
+
+war_status_handler = CallbackQueryHandler(guild_war_status, pattern=r"^gld_war_status$")
 
 async def view_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -238,7 +296,7 @@ async def clan_mission_board(update: Update, context: ContextTypes.DEFAULT_TYPE)
         target_pretty = str(target_raw).replace("_", " ").title()
         percent = (prog / targ) * 100 if targ > 0 else 0
         
-        text += (
+        text += ( 
             f"⚔️ <b>MISSÃO ATIVA:</b>\n📜 <b>{title}</b>\n<i>\"{desc}\"</i>\n\n"
             f"🎯 <b>Objetivo:</b> Derrotar {targ}x <b>{target_pretty}</b>\n"
             f"📊 <b>Progresso:</b> {prog}/{targ} ({percent:.1f}%)\n"

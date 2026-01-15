@@ -47,6 +47,7 @@ from modules.events.catacumbas import entry_handler as cat_entry
 from modules.events.catacumbas import combat_handler as cat_combat
 
 from modules.auth_utils import get_current_player_id
+from modules.clan_war_engine import register_war_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,7 @@ def register_all_handlers(application: Application):
     register_market_handlers(application)
     register_guild_handlers(application)
     register_regions_handlers(application)
+    register_war_jobs(application)
 
     # 3) Eventos gerais (Defesa do Reino, World Boss etc.)
     register_event_handlers(application)

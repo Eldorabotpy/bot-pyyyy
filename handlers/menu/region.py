@@ -1,9 +1,16 @@
 # handlers/menu/region.py
-# (VERSÃO FINAL CORRIGIDA: Exibição de Plano + Botão Auto Hunt Bloqueado)
+# (VERSÃO FINAL CORRIGIDA + GUERRA DE CLÃS: Botão Atacar/Conquistar só p/ registrados)
 
 import time
 import logging
+import html
+
 from datetime import datetime, timezone, timedelta
+
+from pvp import pvp_battle
+from pvp import pvp_utils
+from bson import ObjectId
+from modules.player.core import players_collection  # para acessar database
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -17,6 +24,19 @@ from modules.game_data import monsters as monsters_data
 from modules.game_data.worldmap import WORLD_MAP
 from modules.dungeons.registry import get_dungeon_for_region
 from modules.auth_utils import get_current_player_id, requires_login
+
+# --- GUERRA DE CLÃS ---
+# Usa seu engine central (gate oficial para mostrar botões e bloquear callbacks)
+try:
+    from modules import clan_war_engine
+except Exception:
+    clan_war_engine = None
+WAR_PRESENCE_COL = None
+try:
+    if players_collection is not None:
+        WAR_PRESENCE_COL = players_collection.database["clan_war_presence"]
+except Exception:
+    WAR_PRESENCE_COL = None
 
 # --- IMPORTS DE HANDLERS ESPECÍFICOS ---
 from modules.world_boss.engine import world_boss_manager
@@ -34,7 +54,7 @@ except Exception:
 try:
     from handlers.menu.kingdom import show_kingdom_menu
 except Exception:
-    show_kingdom_menu = None 
+    show_kingdom_menu = None
 
 try:
     from modules.dungeons.runtime import build_region_dungeon_button
@@ -60,10 +80,13 @@ async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, p
             await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
             return
         except Exception:
-            try: await query.delete_message()
-            except Exception: pass
-    
+            try:
+                await query.delete_message()
+            except Exception:
+                pass
+
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+
 
 def _humanize_duration(seconds: int) -> str:
     seconds = int(seconds)
@@ -72,15 +95,14 @@ def _humanize_duration(seconds: int) -> str:
         return f"{mins} min"
     return f"{seconds} s"
 
+
 def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
     """Calcula o tempo de viagem (VIP = 0)."""
-    # 1. Verificação Direta
     tier = str(player_data.get("premium_tier", "free")).lower().strip()
     if tier in ["lenda", "vip", "admin", "premium"]:
-       return 0
+        return 0
 
-    # 2. Lógica Padrão
-    base = 360 
+    base = 360
     try:
         pm = PremiumManager(player_data)
         mult = float(pm.get_perk_value("travel_time_multiplier", 1.0))
@@ -90,6 +112,7 @@ def _get_travel_time_seconds(player_data: dict, dest_key: str) -> int:
         mult = 1.0
 
     return max(0, int(round(base * mult)))
+
 
 async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_id) -> bool:
     """Finaliza viagem silenciosamente se o tempo já passou."""
@@ -105,10 +128,31 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
                     if dest and dest in (game_data.REGIONS_DATA or {}):
                         player["current_location"] = dest
                     player["player_state"] = {"action": "idle"}
-                    await player_manager.save_player_data(user_id, player) 
+                    await player_manager.save_player_data(user_id, player)
                     return True
-            except Exception: pass 
+            except Exception:
+                pass
     return False
+
+
+def _get_player_clan_id_fallback(pdata: dict):
+    """
+    Fallback local para extrair clan_id sem depender do engine.
+    Compatível com variações de schema (clan_id / guild_id / clan._id / guild._id).
+    """
+    if not isinstance(pdata, dict):
+        return None
+
+    cid = pdata.get("clan_id") or pdata.get("guild_id")
+    if cid:
+        return cid
+
+    obj = pdata.get("clan") or pdata.get("guild")
+    if isinstance(obj, dict):
+        return obj.get("_id") or obj.get("id")
+
+    return None
+
 
 # =============================================================================
 # Menus de Navegação (Mapa e Info)
@@ -118,28 +162,28 @@ async def _auto_finalize_travel_if_due(context: ContextTypes.DEFAULT_TYPE, user_
 async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
+
     user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
-    
-    player_data = await player_manager.get_player_data(user_id) or {} 
+
+    player_data = await player_manager.get_player_data(user_id) or {}
     current_location = player_data.get("current_location", "reino_eldora")
     region_info = (game_data.REGIONS_DATA or {}).get(current_location) or {}
-    
+
     # --- CHECK VIP ---
     is_vip = False
     try:
         tier = str(player_data.get("premium_tier", "free")).lower().strip()
         if tier in ["lenda", "vip", "premium", "admin"]:
             is_vip = True
-    except: pass
+    except Exception:
+        pass
 
     if is_vip:
-        # Ordem personalizada do mapa múndi
         REGION_ORDER = [
-            "reino_eldora", "pradaria_inicial", "floresta_sombria", 
-            "campos_linho", "pedreira_granito", "mina_ferro", 
-            "pantano_maldito", "pico_grifo", "forja_abandonada", 
+            "reino_eldora", "pradaria_inicial", "floresta_sombria",
+            "campos_linho", "pedreira_granito", "mina_ferro",
+            "pantano_maldito", "pico_grifo", "forja_abandonada",
             "picos_gelados", "deserto_ancestral"
         ]
         all_regions = list((game_data.REGIONS_DATA or {}).keys())
@@ -154,20 +198,24 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     row = []
     for dest_key in possible_destinations:
         dest_info = (game_data.REGIONS_DATA or {}).get(dest_key, {})
-        if not dest_info: continue
+        if not dest_info:
+            continue
         d_name = dest_info.get('display_name', dest_key)
         d_emoji = dest_info.get('emoji', '📍')
         row.append(InlineKeyboardButton(f"{d_emoji} {d_name}", callback_data=f"region_{dest_key}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
-    if row: keyboard.append(row)
+    if row:
+        keyboard.append(row)
 
     keyboard.append([InlineKeyboardButton("⬅️ 𝐂𝐚𝐧𝐜𝐞𝐥𝐚𝐫", callback_data=f'open_region:{current_location}')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    try: await query.delete_message()
-    except: pass
+    try:
+        await query.delete_message()
+    except Exception:
+        pass
 
     fd = media_ids.get_file_data("mapa_mundo")
     if fd and fd.get("id"):
@@ -177,9 +225,11 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await context.bot.send_photo(chat_id=chat_id, photo=fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
             return
-        except: pass
+        except Exception:
+            pass
 
     await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
+
 
 @requires_login
 async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -187,53 +237,70 @@ async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     user_id = get_current_player_id(update, context)
     chat_id = query.message.chat_id
-    
-    try: region_key = query.data.split(':')[1]
-    except IndexError: region_key = 'reino_eldora'
+
+    try:
+        region_key = query.data.split(':')[1]
+    except IndexError:
+        region_key = 'reino_eldora'
 
     player_data = await player_manager.get_player_data(user_id)
     if player_data:
         player_data['current_location'] = region_key
-        await player_manager.save_player_data(user_id, player_data) 
+        await player_manager.save_player_data(user_id, player_data)
 
-    try: await query.delete_message()
-    except: pass
+    try:
+        await query.delete_message()
+    except Exception:
+        pass
 
     await send_region_menu(context, user_id, chat_id)
+
 
 @requires_login
 async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    try: region_key = query.data.split(':')[1]
-    except IndexError: return
-        
+    try:
+        region_key = query.data.split(':')[1]
+    except IndexError:
+        return
+
     region_info = game_data.REGIONS_DATA.get(region_key, {})
     info_parts = [f"ℹ️ <b>{region_info.get('display_name', region_key)}</b>", f"<i>{region_info.get('description', '')}</i>\n"]
-    
+
     if region_key == 'reino_eldora':
         info_parts.extend([" 🏇 - 𝐕𝐢𝐚𝐣𝐚𝐫 ", " 🔰 - 𝐆𝐮𝐢𝐥𝐝𝐚", " 🛒 - 𝐌𝐞𝐫𝐜𝐚𝐝𝐨", " ⚒️ - 𝐅𝐨𝐫𝐣𝐚"])
     else:
-        if region_info.get('resource'): info_parts.append("- Coleta disponível")
-        if monsters_data.MONSTERS_DATA.get(region_key): info_parts.append("- Caça disponível")
-        if get_dungeon_for_region(region_key): info_parts.append("- Calabouço")
-    
+        if region_info.get('resource'):
+            info_parts.append("- Coleta disponível")
+        if monsters_data.MONSTERS_DATA.get(region_key):
+            info_parts.append("- Caça disponível")
+        if get_dungeon_for_region(region_key):
+            info_parts.append("- Calabouço")
+
     info_parts.append("\n<b>Criaturas:</b>")
     mons = monsters_data.MONSTERS_DATA.get(region_key, [])
-    if not mons: info_parts.append("- <i>Nenhuma.</i>")
+    if not mons:
+        info_parts.append("- <i>Nenhuma.</i>")
     else:
-        for m in mons: info_parts.append(f"- {m.get('name', '???')}")
-            
+        for m in mons:
+            info_parts.append(f"- {m.get('name', '???')}")
+
     text = "\n".join(info_parts)
     back_cb = 'continue_after_action' if region_key == 'reino_eldora' else f"open_region:{region_key}"
     keyboard = [[InlineKeyboardButton("⬅️ 𝐕𝐎𝐋𝐓𝐀𝐑", callback_data=back_cb)]]
     await _safe_edit_or_send(query, context, query.message.chat_id, text, InlineKeyboardMarkup(keyboard))
 
+
 # =============================================================================
 # Menu Principal da Região
 # =============================================================================
+
 @requires_login
 async def continue_after_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handler usado como "Voltar" genérico (muito usado no Reino).
+    """
     query = update.callback_query
     await query.answer()
 
@@ -254,6 +321,7 @@ async def continue_after_action(update: Update, context: ContextTypes.DEFAULT_TY
 
     if loc == "reino_eldora":
         if show_kingdom_menu:
+            # mantém compatível com seu padrão atual
             await show_kingdom_menu(None, context, player_data=player_data, chat_id=chat_id)
         else:
             await context.bot.send_message(chat_id, "🏰 Reino de Eldora")
@@ -261,55 +329,77 @@ async def continue_after_action(update: Update, context: ContextTypes.DEFAULT_TY
         await send_region_menu(context, user_id, chat_id)
 
 
-async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id: int, region_key: str | None = None, player_data: dict | None = None):
+async def send_region_menu(
+    context: ContextTypes.DEFAULT_TYPE,
+    user_id,
+    chat_id: int,
+    region_key: str | None = None,
+    player_data: dict | None = None
+):
     if player_data is None:
         player_data = await player_manager.get_player_data(user_id) or {}
-    
+
     # Sincronia de energia
     if player_actions._apply_energy_autoregen_inplace(player_data):
         await player_manager.save_player_data(user_id, player_data)
 
     final_region_key = region_key or player_data.get("current_location", "reino_eldora")
+    try:
+        if clan_war_engine:
+            # user_id no seu projeto é ObjectId/str; normaliza para ObjectId (strict)
+            # player_manager já trabalha com ObjectId; aqui precisamos do ObjectId real no presence
+            from bson import ObjectId as _OID
+            pid = user_id if isinstance(user_id, _OID) else (_OID(str(user_id)) if _OID.is_valid(str(user_id)) else None)
+            if pid:
+                await clan_war_engine.update_presence(pid, player_data, final_region_key, chat_id=chat_id)
+    except Exception:
+        pass
     player_data['current_location'] = final_region_key
     region_info = (game_data.REGIONS_DATA or {}).get(final_region_key)
 
     if not region_info or final_region_key == "reino_eldora":
         if show_kingdom_menu:
-            fake_update = Update(update_id=0) 
+            fake_update = Update(update_id=0)
             await show_kingdom_menu(fake_update, context, player_data=player_data, chat_id=chat_id)
         else:
             await context.bot.send_message(chat_id=chat_id, text="Bem-vindo ao Reino.", parse_mode="HTML")
-        return 
+        return
 
     # World Boss
     if world_boss_manager.state["is_active"] and final_region_key == world_boss_manager.state["location"]:
         hud_text = await world_boss_manager.get_battle_hud()
         caption = (f"‼️ 𝐏𝐄𝐑𝐈𝐆𝐎 𝐈𝐌𝐈𝐍𝐄𝐍𝐓𝐄 ‼️\nO 𝕯𝖊𝖒𝖔̂𝖓𝖎𝖔 𝕯𝖎𝖒𝖊𝖓𝖘𝖎𝖔𝖓𝖆𝖑 está aqui!\n\n{hud_text}")
-        keyboard = [[InlineKeyboardButton("🛡⚔️ 𝐄𝐍𝐓𝐑𝐀𝐑 𝐍𝐀 𝐑𝐀𝐈𝐃 ⚔️🛡", callback_data='wb_menu')], [InlineKeyboardButton("🗺️ 𝐅𝐮𝐠𝐢𝐫", callback_data='travel')]]
+        keyboard = [
+            [InlineKeyboardButton("🛡⚔️ 𝐄𝐍𝐓𝐑𝐀𝐑 𝐍𝐀 𝐑𝐀𝐈𝐃 ⚔️🛡", callback_data='wb_menu')],
+            [InlineKeyboardButton("🗺️ 𝐅𝐮𝐠𝐢𝐫", callback_data='travel')]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         try:
             fd = media_ids.get_file_data("boss_raid")
-            if fd: await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
-            else: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
-        except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+            if fd:
+                await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+            else:
+                await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+        except Exception:
+            await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
         return
 
     # --- CÁLCULOS DO HUD ---
     stats = await player_manager.get_player_total_stats(player_data)
-    
+
     char_name = player_data.get("character_name", "Aventureiro")
     char_lvl = player_data.get("level", 1)
-    
+
     prof_data = player_data.get("profession", {}) or {}
     prof_name = prof_data.get("type", "adventurer").capitalize()
     prof_lvl = int(prof_data.get("level", 1))
-    
-    # ⚠️ CORREÇÃO: Usa o dicionário local PREMIUM_TIERS, não o do game_data (que pode ser vazio)
+
     tier_key = str(player_data.get("premium_tier", "free")).lower()
-    tier_info = PREMIUM_TIERS.get(tier_key, {}) 
+    tier_info = PREMIUM_TIERS.get(tier_key, {})
     tier_display = tier_info.get("display_name", tier_key.capitalize())
-    if tier_key == "free": tier_display = "Comum"
-    
+    if tier_key == "free":
+        tier_display = "Comum"
+
     p_hp, max_hp = int(player_data.get('current_hp', 0)), int(stats.get('max_hp', 1))
     p_mp, max_mp = int(player_data.get('current_mp', 0)), int(stats.get('max_mana', 1))
     max_en = int(player_manager.get_player_max_energy(player_data))
@@ -326,35 +416,72 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
         f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
         f"╰───────────────────────➤"
     )
-    
+
     caption = f"🗺️ Você está em <b>{region_info.get('display_name', 'Região')}</b>.\n╰┈➤ <i>O que deseja fazer?</i>\n{status_hud}"
     keyboard = []
-    
+
+    # =========================================================
+    # GUERRA DE CLÃS (BOTÕES SÓ PARA REGISTRADOS)
+    # - Mostra Conquistar se região neutra (sem owner)
+    # - Mostra Atacar se região dominada por clã diferente
+    # =========================================================
+    try:
+        if clan_war_engine:
+            ok, _reason = await clan_war_engine.can_player_participate_in_war(player_data)
+            if ok:
+                state = await clan_war_engine.get_region_control_state(final_region_key)
+                owner = None
+                if isinstance(state, dict):
+                    owner = state.get("owner_clan_id")
+
+                my_clan_id = _get_player_clan_id_fallback(player_data)
+
+                if not owner:
+                    keyboard.append([InlineKeyboardButton("🛡️ Conquistar Região", callback_data=f"war_claim:{final_region_key}")])
+                else:
+                    # compara por string para evitar ObjectId vs str
+                    if my_clan_id and str(owner) != str(my_clan_id):
+                        keyboard.append([InlineKeyboardButton("⚔️ Atacar Região", callback_data=f"war_attack:{final_region_key}")])
+                    else:
+                        keyboard.append([InlineKeyboardButton("🏰 Região sob domínio do seu clã", callback_data="noop")])
+    except Exception:
+        # nunca quebrar o menu por causa da guerra
+        pass
+
     # Botões Especiais (NPCs, Eventos)
-    if final_region_key == 'floresta_sombria': keyboard.append([InlineKeyboardButton("⛺ 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta')])
+    if final_region_key == 'floresta_sombria':
+        keyboard.append([InlineKeyboardButton("⛺ 𝐀𝐥𝐪𝐮𝐢𝐦𝐢𝐬𝐭𝐚", callback_data='npc_trade:alquimista_floresta')])
+
     if final_region_key == 'deserto_ancestral':
-         row = [InlineKeyboardButton("🧙‍♂️ 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main')]
-         if can_see_evolution_menu(player_data): row.append(InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu'))
-         keyboard.append(row)
-    if final_region_key == 'picos_gelados' and is_event_active(): keyboard.append([InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
+        row = [InlineKeyboardButton("🧙‍♂️ 𝐌𝐢́𝐬𝐭𝐢𝐜𝐨", callback_data='rune_npc:main')]
+        if can_see_evolution_menu(player_data):
+            row.append(InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu'))
+        keyboard.append(row)
+
+    if final_region_key == 'picos_gelados' and is_event_active():
+        keyboard.append([InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
 
     # --- LÓGICA BLINDADA SUPREMA (CHECK VIP) ---
     is_vip_visual = False
-    if tier_key in ["premium", "vip", "lenda", "admin"]: is_vip_visual = True
-    elif max_en > 20: is_vip_visual = True # Fallback
+    if tier_key in ["premium", "vip", "lenda", "admin"]:
+        is_vip_visual = True
+    elif max_en > 20:
+        is_vip_visual = True  # Fallback
 
     # --- LINHA DE COMBATE ---
     combat = [InlineKeyboardButton("⚔️ 𝐂𝐚𝐜̧𝐚𝐫", callback_data=f"hunt_{final_region_key}")]
-    
-    # ⚠️ CORREÇÃO: Adiciona botão Auto Hunt Bloqueado se for Free
+
+    # Auto Hunt bloqueado se free
     if not is_vip_visual:
         combat.append(InlineKeyboardButton("🤖 Auto (🔒)", callback_data="premium_info"))
-        
-    if build_region_dungeon_button: 
+
+    if build_region_dungeon_button:
         btn = build_region_dungeon_button(final_region_key)
-        if btn: combat.append(btn)
+        if btn:
+            combat.append(btn)
     elif get_dungeon_for_region(final_region_key):
         combat.append(InlineKeyboardButton("🏰 𝐂𝐚𝐥𝐚𝐛𝐨𝐮𝐜̧𝐨", callback_data=f"dungeon_open:{final_region_key}"))
+
     keyboard.append(combat)
 
     # --- LINHA VIP: Auto Hunt Rápido ---
@@ -376,36 +503,311 @@ async def send_region_menu(context: ContextTypes.DEFAULT_TYPE, user_id, chat_id:
             item_name = item_info.get("display_name", res_id.replace("_", " ").title())
             keyboard.append([InlineKeyboardButton(f"⛏️ Coletar {item_name}", callback_data=f"collect_{res_id}")])
 
-    keyboard.append([InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"), InlineKeyboardButton("👤 𝐏𝐞𝐫𝐟𝐢𝐥", callback_data="profile")])
-    keyboard.append([InlineKeyboardButton("📜 𝐑𝐞𝐩𝐚𝐫𝐚𝐫", callback_data="restore_durability_menu"), InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨", callback_data=f"region_info:{final_region_key}")])
+    keyboard.append([
+        InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"),
+        InlineKeyboardButton("👤 𝐏𝐞𝐫𝐟𝐢𝐥", callback_data="profile")
+    ])
+    keyboard.append([
+        InlineKeyboardButton("📜 𝐑𝐞𝐩𝐚𝐫𝐚𝐫", callback_data="restore_durability_menu"),
+        InlineKeyboardButton("ℹ️ 𝐈𝐧𝐟𝐨", callback_data=f"region_info:{final_region_key}")
+    ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     try:
         fd = media_ids.get_file_data(f"regiao_{final_region_key}")
-        if fd: await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
-        else: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
-    except: await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+        if fd:
+            await context.bot.send_photo(chat_id, fd["id"], caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+        else:
+            await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+    except Exception:
+        await context.bot.send_message(chat_id, caption, reply_markup=reply_markup, parse_mode="HTML")
+
 
 async def show_region_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, region_key: str | None = None, player_data: dict | None = None):
     q = getattr(update, "callback_query", None)
     uid = get_current_player_id(update, context)
-    
+
     if q:
         await q.answer()
-        try: await q.delete_message()
-        except Exception: pass
+        try:
+            await q.delete_message()
+        except Exception:
+            pass
         cid = q.message.chat_id
     else:
         cid = update.effective_chat.id
 
-    if not uid: return
+    if not uid:
+        return
 
     await _auto_finalize_travel_if_due(context, uid)
-    try: await player_manager.try_finalize_timed_action_for_user(uid)
-    except: pass
-    
+    try:
+        await player_manager.try_finalize_timed_action_for_user(uid)
+    except Exception:
+        pass
+
     await send_region_menu(context, uid, cid, region_key=region_key, player_data=player_data)
-    
+
+
+# =============================================================================
+# Handlers de Guerra de Clãs (callbacks)
+# =============================================================================
+
+@requires_login
+async def war_claim_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    uid = get_current_player_id(update, context)
+    pdata = await player_manager.get_player_data(uid) or {}
+    if not pdata:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
+    # BLOQUEIO HARD: só registrado e ACTIVE
+    if not clan_war_engine:
+        await q.answer("Guerra indisponível.", show_alert=True)
+        return
+
+    ok, reason = await clan_war_engine.can_player_participate_in_war(pdata)
+    if not ok:
+        await q.answer(reason or "⛔ Você não pode participar da guerra.", show_alert=True)
+        return
+
+    try:
+        region_key = (q.data or "").split(":", 1)[1]
+    except Exception:
+        region_key = pdata.get("current_location", "reino_eldora")
+
+    # Nesta etapa: apenas confirma.
+    await q.answer("🛡️ Pedido de conquista enviado!", show_alert=True)
+
+    try:
+        await q.delete_message()
+    except Exception:
+        pass
+    await send_region_menu(context, uid, q.message.chat_id, region_key=region_key, player_data=pdata)
+
+
+@requires_login
+async def war_attack_callback(update, context):
+    q = update.callback_query
+    await q.answer()
+
+    uid = get_current_player_id(update, context)
+    pdata = await player_manager.get_player_data(uid) or {}
+    if not pdata:
+        await q.answer("Sessão inválida.", show_alert=True)
+        return
+
+    # ✅ Gate da guerra (inscrito + ACTIVE)
+    player_id_str = str(uid)
+    ok, reason = await clan_war_engine.can_player_participate_in_war(pdata)
+    if not ok:
+        await q.answer(f"⛔ {reason}", show_alert=True)
+        return
+
+    # região alvo
+    try:
+        region_key = (q.data or "").split(":", 1)[1]
+    except Exception:
+        region_key = pdata.get("current_location", "reino_eldora")
+
+    # encontra um inimigo elegível na mesma região
+    enemy_id, enemy_data = await _find_enemy_for_region_war(uid, pdata, region_key)
+    if not enemy_id or not enemy_data:
+        await q.answer("😔 Nenhum inimigo registrado encontrado nesta região agora.", show_alert=True)
+        return
+
+    # ✅ SIMULA PvP (IMPORTANTE: sem ticket / sem arena ranking)
+    winner_id, log = await pvp_battle.simular_batalha_completa(
+        uid,
+        enemy_id,
+        modifier_effect=None,   # guerra não usa modificador da arena (a não ser que você queira)
+        nivel_padrao=None
+    )
+
+    is_win = (str(winner_id) == str(uid))
+
+    # ✅ Pontua GUERRA (não Arena)
+    my_clan_id = (pdata or {}).get("clan_id")
+    if my_clan_id:
+        await clan_war_engine.register_battle(
+            clan_id=str(my_clan_id),
+            region_id=str(region_key),
+            outcome=("win" if is_win else "loss"),
+        )
+
+    # Mensagem de resultado (com mídia do oponente, fallback)
+    my_name = html.escape(pdata.get("character_name", "Você"))
+    enemy_name = html.escape(enemy_data.get("character_name", "Inimigo"))
+
+    try:
+        summary = "\n".join(log[-10:])
+    except Exception:
+        summary = str(log)
+
+    header = "🏆 <b>VITÓRIA TERRITORIAL!</b>" if is_win else "💀 <b>DERROTA TERRITORIAL...</b>"
+    msg = (
+        f"{header}\n\n"
+        f"🗺️ <b>Região:</b> {html.escape(str(region_key))}\n"
+        f"🆚 <b>{my_name}</b> vs <b>{enemy_name}</b>\n\n"
+        f"📜 <b>Resumo:</b>\n{summary}"
+    )
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚔️ Atacar Novamente", callback_data=f"war_attack:{region_key}")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{region_key}")],
+    ])
+
+    enemy_media = pvp_utils.get_player_class_media(enemy_data)
+
+    try:
+        if enemy_media:
+            file_id = enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file")
+            media_type = str(enemy_media.get("type", "video")).lower()
+            caption = msg[:1024]
+
+            if media_type == "photo":
+                await context.bot.send_photo(
+                    chat_id=q.message.chat_id,
+                    photo=file_id,
+                    caption=caption,
+                    reply_markup=kb,
+                    parse_mode="HTML",
+                )
+            else:
+                await context.bot.send_video(
+                    chat_id=q.message.chat_id,
+                    video=file_id,
+                    caption=caption,
+                    reply_markup=kb,
+                    parse_mode="HTML",
+                )
+        else:
+            await context.bot.send_message(
+                chat_id=q.message.chat_id,
+                text=msg[:4096],
+                reply_markup=kb,
+                parse_mode="HTML",
+            )
+    except Exception:
+        await context.bot.send_message(
+            chat_id=q.message.chat_id,
+            text=msg[:4096],
+            reply_markup=kb,
+            parse_mode="HTML",
+        )
+
+async def _find_enemy_for_region_war(my_id, my_data: dict, region_key: str):
+    """
+    Encontra um inimigo elegível para guerra territorial:
+    - ambos registrados na guerra (registered_players do get_war_status)
+    - fase ACTIVE
+    - na mesma região (presence)
+    - clã diferente
+    - last_seen dentro do TTL
+    """
+    try:
+        # 1) Preciso ter clã
+        my_clan_id = (my_data or {}).get("clan_id")
+        if not my_clan_id:
+            return None, None
+
+        # Normaliza meu_id para ObjectId
+        if not isinstance(my_id, ObjectId):
+            if ObjectId.is_valid(str(my_id)):
+                my_oid = ObjectId(str(my_id))
+            else:
+                return None, None
+        else:
+            my_oid = my_id
+
+        # 2) War status (fase + lista de registrados)
+        ws = await clan_war_engine.get_war_status()
+        state = (ws or {}).get("state", {}) or {}
+        phase = str(state.get("phase", "idle")).lower()
+
+        if phase != "active":
+            return None, None
+
+        registered_players = state.get("registered_players", {}) or {}
+        if not isinstance(registered_players, dict):
+            return None, None
+
+        # Eu preciso estar registrado e o clã precisa bater
+        my_reg_clan = registered_players.get(str(my_oid))
+        if not my_reg_clan or str(my_reg_clan) != str(my_clan_id):
+            return None, None
+
+        # 3) Presence collection precisa existir
+        if WAR_PRESENCE_COL is None:
+            return None, None
+
+        # 4) Atualiza minha presença AGORA (para eu ser encontrado também)
+        now = datetime.now(timezone.utc)
+        WAR_PRESENCE_COL.update_one(
+            {"player_id": my_oid},
+            {"$set": {
+                "player_id": my_oid,
+                "clan_id": str(my_clan_id),
+                "region_key": str(region_key),
+                "last_seen": now,
+            }},
+            upsert=True
+        )
+
+        # 5) Busca inimigos na mesma região, registrados e online no TTL
+        ttl_seconds = 180
+        cutoff = now - timedelta(seconds=ttl_seconds)
+
+        # Pega candidatos na região dentro do TTL
+        candidates = list(WAR_PRESENCE_COL.find({
+            "region_key": str(region_key),
+            "last_seen": {"$gte": cutoff},
+            "player_id": {"$ne": my_oid},
+            "clan_id": {"$ne": str(my_clan_id)},
+        }).limit(30))
+
+        if not candidates:
+            return None, None
+
+        # 6) Filtra por "registrado na guerra"
+        # registered_players guarda player_id como string de ObjectId
+        for c in candidates:
+            enemy_oid = c.get("player_id")
+            if not enemy_oid:
+                continue
+
+            enemy_pid_str = str(enemy_oid)
+
+            # precisa estar registrado e o registro dele deve apontar para o clã dele
+            enemy_reg_clan = registered_players.get(enemy_pid_str)
+            if not enemy_reg_clan:
+                continue
+
+            # Confere consistência: clan_id do presence bate com registered_players
+            if str(enemy_reg_clan) != str(c.get("clan_id")):
+                continue
+
+            # Carrega dados reais do inimigo
+            enemy_data = await player_manager.get_player_data(enemy_oid)
+            if not enemy_data:
+                continue
+
+            # Confere também o clan_id do inimigo no profile (evita “presence fraud”)
+            if str(enemy_data.get("clan_id")) != str(enemy_reg_clan):
+                continue
+
+            return enemy_oid, enemy_data
+
+        return None, None
+
+    except Exception:
+        return None, None
+
+
+
 # =============================================================================
 # Handlers de Ação: Viagem e Coleta
 # =============================================================================
@@ -416,15 +818,16 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
     uid = get_current_player_id(update, context)
     cid = q.message.chat_id
-    
+
     await _auto_finalize_travel_if_due(context, uid)
 
     dest = q.data.replace("region_", "", 1)
     pdata = await player_manager.get_player_data(uid)
-    if not pdata: return
+    if not pdata:
+        return
 
     cur = pdata.get("current_location", "reino_eldora")
-    
+
     # --- VERIFICAÇÃO VIP CONSISTENTE ---
     is_vip = False
     try:
@@ -433,7 +836,8 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_vip = True
         else:
             pm = PremiumManager(pdata)
-            if pm.is_premium(): is_vip = True
+            if pm.is_premium():
+                is_vip = True
     except Exception:
         pass
 
@@ -458,29 +862,40 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pdata["current_location"] = dest
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(uid, pdata)
-        try: await q.delete_message()
-        except: pass
+        try:
+            await q.delete_message()
+        except Exception:
+            pass
         await send_region_menu(context, uid, cid)
         return
 
     finish = datetime.now(timezone.utc) + timedelta(seconds=secs)
     pdata["player_state"] = {
-        "action": "travel", 
-        "finish_time": finish.isoformat(), 
+        "action": "travel",
+        "finish_time": finish.isoformat(),
         "details": {"destination": dest}
     }
     await player_manager.save_player_data(uid, pdata)
 
-    try: await q.delete_message()
-    except: pass
-    
+    try:
+        await q.delete_message()
+    except Exception:
+        pass
+
     human = _humanize_duration(secs)
     dest_name = (game_data.REGIONS_DATA or {}).get(dest, {}).get("display_name", dest)
     txt = f"🧭 Viajando para <b>{dest_name}</b>… (~{human})"
-    
+
     await context.bot.send_message(chat_id=cid, text=txt, parse_mode="HTML")
-    context.job_queue.run_once(finish_travel_job, when=secs, data={"player_id": str(uid), "dest": dest}, chat_id=cid, name=f"finish_travel_{uid}")
-    
+    context.job_queue.run_once(
+        finish_travel_job,
+        when=secs,
+        data={"player_id": str(uid), "dest": dest},
+        chat_id=cid,
+        name=f"finish_travel_{uid}"
+    )
+
+
 async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     job_data = job.data or {}
@@ -493,32 +908,35 @@ async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
         pdata["current_location"] = dest
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(uid, pdata)
-    
+
     if context.user_data is not None:
         context.user_data['logged_player_id'] = str(uid)
-        
+
     await send_region_menu(context, uid, cid)
-    
+
+
 @requires_login
 async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    from handlers.job_handler import finish_collection_job 
+    from handlers.job_handler import finish_collection_job
     await q.answer()
-    
+
     uid = get_current_player_id(update, context)
     cid = q.message.chat_id
     res_id = (q.data or "").replace("collect_", "", 1)
-    
+
     pdata = await player_manager.get_player_data(uid)
-    if not pdata: return
+    if not pdata:
+        return
 
     prem = PremiumManager(pdata)
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
     if int(pdata.get("energy", 0)) < cost:
-        await q.answer(f"Sem energia ({cost}⚡).", show_alert=True); return
+        await q.answer(f"Sem energia ({cost}⚡).", show_alert=True)
+        return
 
     player_manager.spend_energy(pdata, cost)
-    
+
     req_prof = game_data.get_profession_for_resource(res_id)
     p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get('resources', {})
     item_yielded = p_res.get(res_id, res_id)
@@ -526,30 +944,41 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
     spd = float(prem.get_perk_value("gather_speed_multiplier", 1.0))
     dur = max(1, int(base_secs / max(0.25, spd)))
-    
+
     finish = datetime.now(timezone.utc) + timedelta(seconds=dur)
     pdata['player_state'] = {
         'action': 'collecting',
-        'finish_time': finish.isoformat(), 
+        'finish_time': finish.isoformat(),
         'details': {'resource_id': res_id, 'item_id_yielded': item_yielded, 'quantity': 1}
     }
     player_manager.set_last_chat_id(pdata, cid)
-    
+
     human = _humanize_duration(dur)
     cap = f"⛏️ <b>Coletando...</b>\n⏳ Tempo: {human}"
-    try: await q.delete_message()
-    except: pass
+    try:
+        await q.delete_message()
+    except Exception:
+        pass
     msg = await context.bot.send_message(cid, cap, parse_mode="HTML")
-    
-    if msg: pdata['player_state']['details']['collect_message_id'] = msg.message_id
+
+    if msg:
+        pdata['player_state']['details']['collect_message_id'] = msg.message_id
     await player_manager.save_player_data(uid, pdata)
 
     context.job_queue.run_once(
         finish_collection_job,
         when=dur,
-        data={'user_id': uid, 'chat_id': cid, 'resource_id': res_id, 'item_id_yielded': item_yielded, 'quantity': 1, 'message_id': msg.message_id},
+        data={
+            'user_id': uid,
+            'chat_id': cid,
+            'resource_id': res_id,
+            'item_id_yielded': item_yielded,
+            'quantity': 1,
+            'message_id': msg.message_id
+        },
         name=f"collect_{uid}"
     )
+
 
 # =============================================================================
 # Durabilidade e Registro
@@ -561,18 +990,21 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
     await q.answer()
     uid = get_current_player_id(update, context)
     pdata = await player_manager.get_player_data(uid) or {}
-    
+
     lines = ["<b>📜 Restaurar Durabilidade</b>\n"]
     lines.append("<i>Restaura TODOS os itens equipados consumindo apenas 1 Pergaminho.</i>\n")
 
     inv, equip = pdata.get("inventory", {}), pdata.get("equipment", {})
-    def _d(raw): 
-        try: return int(raw[0]), int(raw[1])
-        except: return 20, 20
+    def _d(raw):
+        try:
+            return int(raw[0]), int(raw[1])
+        except Exception:
+            return 20, 20
 
     items_broken_count = 0
     for slot, uid_item in equip.items():
-        if not uid_item: continue
+        if not uid_item:
+            continue
         inst = inv.get(uid_item)
         if isinstance(inst, dict):
             cur, mx = _d(inst.get("durability"))
@@ -580,25 +1012,30 @@ async def show_restore_durability_menu(update: Update, context: ContextTypes.DEF
                 items_broken_count += 1
                 nm = (game_data.ITEMS_DATA or {}).get(inst.get("base_id"), {}).get("display_name", "Item")
                 lines.append(f"• {nm} <b>({cur}/{mx})</b>")
-    
+
     kb = []
     if items_broken_count > 0:
         kb.append([InlineKeyboardButton(f"✨ REPARAR TUDO (Gasta 1x 📜)", callback_data="rd_fix_all")])
     else:
         lines.append("✅ <i>Todos os equipamentos estão perfeitos.</i>")
-    
+
     loc = pdata.get("current_location", "reino_eldora")
     back = 'continue_after_action' if loc == 'reino_eldora' else f"open_region:{loc}"
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data=back)])
-    
+
     await _safe_edit_or_send(q, context, q.message.chat_id, "\n".join(lines), InlineKeyboardMarkup(kb))
+
+@requires_login
+async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer("✅", show_alert=False)
 
 @requires_login
 async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     uid = get_current_player_id(update, context)
-    
+
     target = q.data.replace("rd_fix_", "", 1)
     if target != "all":
         await q.answer("Opção antiga inválida. Use 'Reparar Tudo'.", show_alert=True)
@@ -608,17 +1045,21 @@ async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE
     pdata = await player_manager.get_player_data(uid)
     from modules.profession_engine import restore_all_equipped_durability
     res = await restore_all_equipped_durability(pdata)
-    
+
     if isinstance(res, dict) and res.get("error"):
         await q.answer(res["error"], show_alert=True)
     else:
         count = res.get("count", 0)
         await player_manager.save_player_data(uid, pdata)
         await q.answer(f"✨ Sucesso! {count} itens reparados!", show_alert=True)
-    
+
     await show_restore_durability_menu(update, context)
 
+
+# =============================================================================
 # REGISTRO DOS HANDLERS
+# =============================================================================
+
 region_handler = CallbackQueryHandler(region_callback, pattern=r"^region_[A-Za-z0-9_]+$")
 travel_handler = CallbackQueryHandler(show_travel_menu, pattern=r"^travel$")
 collect_handler = CallbackQueryHandler(collect_callback, pattern=r"^collect_[A-Za-z0-9_]+$")
@@ -626,3 +1067,13 @@ open_region_handler = CallbackQueryHandler(open_region_callback, pattern=r"^open
 restore_durability_menu_handler = CallbackQueryHandler(show_restore_durability_menu, pattern=r"^restore_durability_menu$")
 restore_durability_fix_handler = CallbackQueryHandler(fix_item_durability, pattern=r"^rd_fix_all$")
 region_info_handler = CallbackQueryHandler(region_info_callback, pattern=r"^region_info:.*$")
+
+# ✅ Corrigido: handler que existia, mas não estava registrado
+continue_after_action_handler = CallbackQueryHandler(continue_after_action, pattern=r"^continue_after_action$")
+
+# ✅ Guerra de Clãs
+war_claim_handler = CallbackQueryHandler(war_claim_callback, pattern=r"^war_claim:")
+war_attack_handler = CallbackQueryHandler(war_attack_callback, pattern=r"^war_attack:")
+
+# ✅ No-op (botões informativos)
+noop_handler = CallbackQueryHandler(noop_callback, pattern=r"^noop$")

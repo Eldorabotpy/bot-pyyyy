@@ -15,7 +15,12 @@ from handlers.menu.region import (
     region_info_handler,
     restore_durability_menu_handler,
     restore_durability_fix_handler,
-    collect_handler
+    collect_handler,
+    noop_handler,
+    war_claim_handler,
+    war_attack_handler,
+    continue_after_action_handler
+
 )
 
 # --- CORREÇÃO DO NATAL AQUI ---
@@ -58,6 +63,12 @@ def register_regions_handlers(application: Application):
     application.add_handler(region_handler)
     application.add_handler(open_region_handler)
     application.add_handler(region_info_handler)
+    application.add_handler(noop_handler)
+    application.add_handler(war_claim_handler)
+    application.add_handler(war_attack_handler)
+    application.add_handler(continue_after_action_handler)
+    
+
     
     # Durabilidade
     application.add_handler(restore_durability_menu_handler)

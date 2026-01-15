@@ -70,7 +70,8 @@ from handlers.guild.management import (
 # ==============================================================================
 from handlers.guild.war import (
     war_menu_handler,
-    war_ranking_handler
+    war_ranking_handler,
+    
 )
 
 # ==============================================================================

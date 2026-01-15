@@ -1,37 +1,40 @@
 # registries/startup.py
-
 import logging
 import asyncio
 from datetime import time as dt_time
 from zoneinfo import ZoneInfo
 from telegram.ext import Application
 
+# Config Imports
 from config import ADMIN_ID, STARTUP_IMAGE_ID, JOB_TIMEZONE, EVENT_TIMES, WORLD_BOSS_TIMES
 
+# Jobs e Watchdogs Imports
 from handlers.jobs import (
-    # NOVO: reset diário do sistema de claim
     daily_reset_event_entries_job,
-
-    # Watchdogs e essenciais
     regenerate_energy_job,
     start_kingdom_defense_event,
+    end_kingdom_defense_event,
     start_world_boss_job,
     end_world_boss_job,
     check_premium_expiry_job,
-    job_pvp_monthly_reset,
+    job_pvp_monthly_reset
 )
+
 
 logger = logging.getLogger(__name__)
 
 
 async def run_system_startup_tasks(application: Application):
     """
-    Centraliza tarefas ao ligar o bot:
+    Centraliza TODAS as tarefas que rodam ao ligar o bot:
     - Watchdogs (Destravar jogadores)
     - Mensagem de Startup
     - Agendamento de Jobs
     """
+
+    # 1. WATCHDOGS (Essencial para destravar Auto Hunt)
     logger.info("🐶 Iniciando Watchdogs...")
+
     try:
         from modules.player.actions import check_stale_actions_on_startup
         await check_stale_actions_on_startup(application)
@@ -45,7 +48,10 @@ async def run_system_startup_tasks(application: Application):
         asyncio.create_task(recover_active_hunts(application))
     except ImportError:
         pass
+    except Exception as e:
+        logger.error(f"Erro ao iniciar recover_active_hunts: {e}")
 
+    # 2. MENSAGEM DE BOAS-VINDAS AO ADMIN
     if ADMIN_ID:
         try:
             msg_text = (
@@ -72,11 +78,13 @@ async def run_system_startup_tasks(application: Application):
         except Exception as e:
             logger.error(f"Falha ao enviar msg de startup: {e}")
 
+    # 3. AGENDAMENTO DE JOBS (Scheduler)
     setup_scheduler(application)
 
 
 def setup_scheduler(application: Application):
     jq = application.job_queue
+
     try:
         tz = ZoneInfo(JOB_TIMEZONE)
     except Exception:
@@ -93,11 +101,32 @@ def setup_scheduler(application: Application):
     # Jobs diários (meia-noite)
     midnight = dt_time(hour=0, minute=0, tzinfo=tz)
 
-    # ✅ NOVO: reseta as entradas do sistema de claim (impede acúmulo)
-    jq.run_daily(daily_reset_event_entries_job, time=midnight, name="daily_reset_event_entries")
+    # ✅ OPCIONAL: reseta entradas do sistema de claim (se existir no projeto)
+    # Evita crash quando a função não existe/ não foi implementada.
+    try:
+        # Ajuste este import se o job estiver em outro local:
+        from handlers.jobs import daily_reset_event_entries_job  # type: ignore
+        jq.run_daily(daily_reset_event_entries_job, time=midnight, name="daily_reset_event_entries")
+        logger.info("✅ [SCHEDULER] Job daily_reset_event_entries agendado.")
+    except ImportError:
+        logger.warning("⚠️ [SCHEDULER] daily_reset_event_entries_job não encontrado (import). Job ignorado.")
+    except NameError:
+        logger.warning("⚠️ [SCHEDULER] daily_reset_event_entries_job não definido. Job ignorado.")
+    except Exception as e:
+        logger.warning(f"⚠️ [SCHEDULER] Falha ao agendar daily_reset_event_entries_job: {e}")
 
     # PvP mensal (mantido)
     jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=0, minute=5, tzinfo=tz), name="pvp_monthly_check")
+
+    # ✅ GUERRA DE CLÃS: tick + jobs específicos (não derruba caso engine falhe)
+
+    try:
+        from modules import clan_war_engine
+        clan_war_engine.register_war_jobs(application)
+        logger.info("✅ [SCHEDULER] Jobs de Guerra de Clãs registrados.")
+    except Exception as e:
+        logger.warning(f"⚠️ [SCHEDULER] Falha ao registrar jobs da Guerra de Clãs: {e}")
+
 
     # Eventos agendados
     if EVENT_TIMES:
@@ -115,8 +144,8 @@ def setup_scheduler(application: Application):
                     name=f"kingdom_defense_{i}",
                     data={"event_duration_minutes": duration}
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Falha ao agendar kingdom_defense_{i}: {e}")
 
     # World Boss
     if WORLD_BOSS_TIMES:
@@ -124,7 +153,7 @@ def setup_scheduler(application: Application):
             try:
                 jq.run_daily(start_world_boss_job, time=dt_time(hour=sh, minute=sm, tzinfo=tz), name=f"start_boss_{i}")
                 jq.run_daily(end_world_boss_job, time=dt_time(hour=eh, minute=em, tzinfo=tz), name=f"end_boss_{i}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"⚠️ Falha ao agendar WorldBoss {i}: {e}")
 
     logger.info(f"✅ [SCHEDULER] Todos os jobs agendados em {JOB_TIMEZONE}.")
