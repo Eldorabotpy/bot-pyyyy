@@ -66,12 +66,11 @@ from handlers.guild.management import (
 )
 
 # ==============================================================================
-# GUERRA
+# GUERRA (handlers.guild.war) — manter, mas evitar colisão
 # ==============================================================================
 from handlers.guild.war import (
     war_menu_handler,
     war_ranking_handler,
-    
 )
 
 # ==============================================================================
@@ -87,11 +86,15 @@ try:
     )
 except ImportError:
     clan_mission_start_handler = None
+    clan_guild_mission_details_handler = None
+    clan_mission_accept_handler = None
+    clan_mission_finish_handler = None
+    clan_mission_cancel_handler = None
 
 # ==============================================================================
 # DASHBOARD / ROTEADOR FINAL DO CLÃ
 # ==============================================================================
-from handlers.guild.dashboard import clan_handler, show_clan_dashboard
+from handlers.guild.dashboard import clan_handler, show_clan_dashboard, show_clan_war_menu
 
 # ==============================================================================
 # ✅ GUILDA DE AVENTUREIROS (NPC)
@@ -105,14 +108,18 @@ from handlers.guild_menu_handler import (
 
 # ==============================================================================
 # ✅ FIX: botão "Acessar Meu Clã" (callback_data="clan_menu")
-# ------------------------------------------------------------------------------
-# Algumas telas (como a Guilda de Aventureiros) usam callback_data="clan_menu".
-# Esse callback não tinha um handler dedicado. Aqui garantimos que ele chama
-# o roteador principal do clã (clan_handler), antes do roteador genérico.
 # ==============================================================================
 clan_menu_shortcut_handler = CallbackQueryHandler(
     show_clan_dashboard,
     pattern=r"^clan_menu$"
+)
+
+# ==============================================================================
+# ✅ FIX: atalho dedicado para a aba Guerra do Dashboard (blindagem)
+# ==============================================================================
+clan_war_menu_shortcut_handler = CallbackQueryHandler(
+    show_clan_war_menu,
+    pattern=r"^clan_war_menu$"
 )
 
 # ==============================================================================
@@ -185,8 +192,10 @@ def register_guild_handlers(application: Application):
         application.add_handler(clan_mission_cancel_handler)
 
     # --------------------------------------------------------------------------
-    # 5) GUERRA
+    # 5) GUERRA (handlers.guild.war)
     # --------------------------------------------------------------------------
+    # IMPORTANTE: estes handlers devem usar pattern '^war_' (e não '^clan_war_')
+    # para não colidir com o router do dashboard.
     application.add_handler(war_menu_handler)
     application.add_handler(war_ranking_handler)
 
@@ -202,6 +211,7 @@ def register_guild_handlers(application: Application):
     # 7) ✅ FIX: atalhos de callbacks que precisam cair no clã
     # --------------------------------------------------------------------------
     application.add_handler(clan_menu_shortcut_handler)
+    application.add_handler(clan_war_menu_shortcut_handler)
 
     # --------------------------------------------------------------------------
     # 8) ROTEADOR GENÉRICO DO CLÃ (SEMPRE POR ÚLTIMO)
