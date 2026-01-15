@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from telegram import Update
 from telegram.ext import Application, TypeHandler, ContextTypes, CallbackQueryHandler
+from modules.auth_utils import get_current_player_id_async
 
 from modules import player_manager
 from handlers import runes_handler
@@ -64,6 +65,25 @@ async def update_last_seen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.warning(f"Erro ao atualizar last_seen: {e}")
 
+async def restore_session_from_persistent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Middleware global: após restart, repõe logged_player_id na RAM
+    usando a sessão persistente do Mongo, sem exigir /start.
+    NÃO faz logout e NÃO limpa nada.
+    """
+    try:
+        # se já está em RAM, não faz nada
+        if getattr(context, "user_data", None) and context.user_data.get("logged_player_id"):
+            return
+
+        # tenta repor via Mongo (active_sessions)
+        pid = await get_current_player_id_async(update, context)
+        if pid:
+            # get_current_player_id_async já repõe RAM, mas garantimos
+            if getattr(context, "user_data", None) is not None:
+                context.user_data["logged_player_id"] = pid
+    except Exception:
+        pass
 
 def _register_events_hub_and_claim(application: Application):
     """
@@ -112,6 +132,9 @@ def register_all_handlers(application: Application):
     logger.info("Iniciando o registro de todos os handlers...")
 
     # 1) Middleware Global
+    application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-1)
+    application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
+
     application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
 
     # 2) Registro por Módulos

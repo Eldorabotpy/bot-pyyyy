@@ -191,8 +191,9 @@ async def show_enhance_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "\n<i>𝑵𝒆𝒏𝒉𝒖𝒎 𝒆𝒒𝒖𝒊𝒑𝒂𝒎𝒆𝒏𝒕𝒐 𝒖́𝒏𝒊𝒄𝒐 𝒆𝒔𝒕𝒂́ 𝒆𝒒𝒖𝒊𝒑𝒂𝒅𝒐.</i>\n"
     else:
         kb.append([InlineKeyboardButton("📜 Restaurar Todos (1x 📜)", callback_data="enh_rest_all")])
+ 
+    kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="forge:main")])
 
-    kb.append([InlineKeyboardButton("⬅️ 𝐕𝐨𝐥𝐭𝐚𝐫", callback_data="continue_after_action")])
     
     await _edit_caption_or_text(q, text, InlineKeyboardMarkup(kb), context=context)
 
