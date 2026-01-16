@@ -66,7 +66,7 @@ from handlers.guild.management import (
 )
 
 # ==============================================================================
-# GUERRA (handlers.guild.war) — manter, mas evitar colisão
+# GUERRA (menu visual + ranking por região)
 # ==============================================================================
 from handlers.guild.war import (
     war_menu_handler,
@@ -94,7 +94,7 @@ except ImportError:
 # ==============================================================================
 # DASHBOARD / ROTEADOR FINAL DO CLÃ
 # ==============================================================================
-from handlers.guild.dashboard import clan_handler, show_clan_dashboard, show_clan_war_menu
+from handlers.guild.dashboard import clan_handler, show_clan_dashboard
 
 # ==============================================================================
 # ✅ GUILDA DE AVENTUREIROS (NPC)
@@ -104,6 +104,7 @@ from handlers.guild_menu_handler import (
     mission_view_handler,
     mission_claim_handler,
     clan_board_handler,
+    war_status_handler,  # ✅ ADICIONADO: CAPTURA gld_war_status
 )
 
 # ==============================================================================
@@ -112,14 +113,6 @@ from handlers.guild_menu_handler import (
 clan_menu_shortcut_handler = CallbackQueryHandler(
     show_clan_dashboard,
     pattern=r"^clan_menu$"
-)
-
-# ==============================================================================
-# ✅ FIX: atalho dedicado para a aba Guerra do Dashboard (blindagem)
-# ==============================================================================
-clan_war_menu_shortcut_handler = CallbackQueryHandler(
-    show_clan_war_menu,
-    pattern=r"^clan_war_menu$"
 )
 
 # ==============================================================================
@@ -158,17 +151,14 @@ def register_guild_handlers(application: Application):
     application.add_handler(clan_manage_menu_handler)
     application.add_handler(clan_view_members_handler)
 
-    # PERFIL / CARGOS
     application.add_handler(clan_profile_handler)
     application.add_handler(clan_setrank_menu_handler)
     application.add_handler(clan_do_rank_handler)
 
-    # LIMPEZA
     application.add_handler(clan_cleanup_menu_handler)
     application.add_handler(clan_cleanup_apps_handler)
     application.add_handler(clan_cleanup_members_handler)
 
-    # AÇÕES DIVERSAS
     application.add_handler(clan_invite_accept_handler)
     application.add_handler(clan_invite_decline_handler)
     application.add_handler(clan_promote_handler)
@@ -192,10 +182,8 @@ def register_guild_handlers(application: Application):
         application.add_handler(clan_mission_cancel_handler)
 
     # --------------------------------------------------------------------------
-    # 5) GUERRA (handlers.guild.war)
+    # 5) GUERRA (menu visual / ranking por região)
     # --------------------------------------------------------------------------
-    # IMPORTANTE: estes handlers devem usar pattern '^war_' (e não '^clan_war_')
-    # para não colidir com o router do dashboard.
     application.add_handler(war_menu_handler)
     application.add_handler(war_ranking_handler)
 
@@ -206,12 +194,12 @@ def register_guild_handlers(application: Application):
     application.add_handler(mission_view_handler)
     application.add_handler(mission_claim_handler)
     application.add_handler(clan_board_handler)
+    application.add_handler(war_status_handler)  # ✅ ADICIONADO: botão "Guerra de Clãs (Evento)" da guilda NPC
 
     # --------------------------------------------------------------------------
-    # 7) ✅ FIX: atalhos de callbacks que precisam cair no clã
+    # 7) ✅ FIX: atalhos
     # --------------------------------------------------------------------------
     application.add_handler(clan_menu_shortcut_handler)
-    application.add_handler(clan_war_menu_shortcut_handler)
 
     # --------------------------------------------------------------------------
     # 8) ROTEADOR GENÉRICO DO CLÃ (SEMPRE POR ÚLTIMO)

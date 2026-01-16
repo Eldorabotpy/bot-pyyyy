@@ -108,8 +108,10 @@ def _week_id(dt: datetime) -> str:
     return f"{iso.year}-W{int(iso.week):02d}"
 
 def _ensure_system_doc(_id: str, default_doc: dict) -> dict:
-    if not SYSTEM_COL:
+    # ❗ PyMongo: Collection não pode ser avaliada como bool()
+    if SYSTEM_COL is None:
         return dict(default_doc)
+
     doc = SYSTEM_COL.find_one({"_id": _id})
     if not doc:
         SYSTEM_COL.insert_one({"_id": _id, **default_doc})
@@ -139,7 +141,8 @@ class WarState:
 # ============================================================
 
 def get_season() -> WarSeason:
-    if not SYSTEM_COL:
+    # ❗ PyMongo: Collection não pode ser avaliada como bool()
+    if SYSTEM_COL is None:
         return WarSeason()
 
     doc = SYSTEM_COL.find_one({"_id": SEASON_DOC_ID})
@@ -152,7 +155,8 @@ def get_season() -> WarSeason:
     return WarSeason(**doc)
 
 def load_state() -> WarState:
-    if not SYSTEM_COL:
+    # ❗ PyMongo: Collection não pode ser avaliada como bool()
+    if SYSTEM_COL is None:
         return WarState()
 
     doc = SYSTEM_COL.find_one({"_id": STATE_DOC_ID})
@@ -165,7 +169,8 @@ def load_state() -> WarState:
     return WarState(**doc)
 
 def save_state(state: WarState):
-    if SYSTEM_COL:
+    # ❗ PyMongo: Collection não pode ser avaliada como bool()
+    if SYSTEM_COL is not None:
         SYSTEM_COL.update_one({"_id": STATE_DOC_ID}, {"$set": asdict(state)}, upsert=True)
 
 # ============================================================
@@ -190,13 +195,13 @@ def _load_weekly_doc(now_local: datetime) -> dict:
     # Se trocou a semana, reseta doc
     if doc.get("week_id") != wid:
         doc = {"_id": WEEKLY_DOC_ID, **default}
-        if SYSTEM_COL:
+        if SYSTEM_COL is not None:
             SYSTEM_COL.update_one({"_id": WEEKLY_DOC_ID}, {"$set": default}, upsert=True)
 
     return doc
 
 def _save_weekly_doc(doc: dict):
-    if not SYSTEM_COL:
+    if SYSTEM_COL is None:
         return
     # remove _id duplicado no $set se vier
     d = dict(doc)
@@ -216,7 +221,7 @@ async def add_war_points(
     - Separado do PvP normal
     - Seguro contra dados inválidos
     """
-    if not SYSTEM_COL:
+    if SYSTEM_COL is None:
         return
 
     # Sanitização
@@ -284,7 +289,7 @@ async def get_war_status() -> dict:
 
     registered_players: Dict[str, str] = {}
     try:
-        if PRESENCE_COL:
+        if PRESENCE_COL is not None:
             cutoff = _now_utc() - timedelta(seconds=DEFAULT_PRESENCE_TTL_SECONDS)
             for p in PRESENCE_COL.find({"last_seen": {"$gte": cutoff}}, {"player_id": 1, "clan_id": 1}):
                 pid = p.get("player_id")
@@ -315,7 +320,7 @@ async def can_player_participate_in_war(pdata: dict) -> Tuple[bool, str]:
     if not clan_id:
         return False, "⛔ Você não possui clã."
 
-    if not REGISTRATION_COL:
+    if REGISTRATION_COL is None:
         return False, "⛔ Registro indisponível."
 
     if not REGISTRATION_COL.find_one({
@@ -332,7 +337,7 @@ async def can_player_participate_in_war(pdata: dict) -> Tuple[bool, str]:
 # ============================================================
 
 async def update_presence(player_id: ObjectId, pdata: dict, region_key: str, chat_id: Optional[int] = None):
-    if not PRESENCE_COL:
+    if PRESENCE_COL is None:
         return
 
     ok, _ = await can_player_participate_in_war(pdata)
@@ -352,7 +357,7 @@ async def update_presence(player_id: ObjectId, pdata: dict, region_key: str, cha
     )
 
 async def find_enemy_in_region(my_player_id: ObjectId, my_clan_id: ObjectId, region_key: str):
-    if not PRESENCE_COL:
+    if PRESENCE_COL is None:
         return None
 
     cutoff = _now_utc() - timedelta(seconds=DEFAULT_PRESENCE_TTL_SECONDS)
@@ -372,7 +377,7 @@ async def register_battle(clan_id: ObjectId, region_key: str, outcome: str):
     """
     Mantém pontos por região (controle local) + adiciona pontos semanais globais.
     """
-    if not REGION_COL:
+    if REGION_COL is None:
         return
 
     # ---- (A) Controle local por região (mantido) ----
@@ -412,7 +417,7 @@ async def weekly_finalize_and_announce(application):
     - zera placar semanal
     - (opcional) marca temporada como ENDED e volta para PREP
     """
-    if not SYSTEM_COL:
+    if SYSTEM_COL is None:
         return
 
     tz = _get_local_tz()
@@ -481,7 +486,7 @@ async def weekly_finalize_and_announce(application):
         season = get_season()
         if season.active:
             season.phase = PHASE_ENDED
-            if SYSTEM_COL:
+            if SYSTEM_COL is not None:
                 SYSTEM_COL.update_one({"_id": SEASON_DOC_ID}, {"$set": asdict(season)}, upsert=True)
     except Exception:
         pass
@@ -495,7 +500,7 @@ async def weekly_finalize_and_announce(application):
             "scores": {},
             "logs": []
         }
-        if SYSTEM_COL:
+        if SYSTEM_COL is not None:
             SYSTEM_COL.update_one({"_id": WEEKLY_DOC_ID}, {"$set": reset_doc}, upsert=True)
     except Exception:
         pass
@@ -505,7 +510,7 @@ async def weekly_finalize_and_announce(application):
         season = get_season()
         season.phase = PHASE_PREP
         season.active = True if season.season_id else season.active  # mantém como está se não houver season_id
-        if SYSTEM_COL:
+        if SYSTEM_COL is not None:
             SYSTEM_COL.update_one({"_id": SEASON_DOC_ID}, {"$set": asdict(season)}, upsert=True)
     except Exception:
         pass
@@ -522,6 +527,17 @@ async def war_tick(context=None):
     state.last_tick = _now_utc().isoformat()
     save_state(state)
 
+async def _weekly_finalize_job(context):
+    """
+    JobQueue callback (precisa ser async e receber context).
+    Evita lambda retornando coroutine sem await.
+    """
+    try:
+        application = context.application
+    except Exception:
+        application = None
+    await weekly_finalize_and_announce(application)
+
 def register_war_jobs(application):
     """
     Registra:
@@ -531,7 +547,6 @@ def register_war_jobs(application):
     """
     jq = application.job_queue
 
-    # Tick (corrigido: passa coroutine diretamente)
     jq.run_repeating(
         war_tick,
         interval=60,
@@ -545,13 +560,17 @@ def register_war_jobs(application):
         # Domingo às 23:55 (ajustável)
         finalize_time = dt_time(hour=23, minute=55, tzinfo=tz)
         jq.run_daily(
-            lambda ctx: weekly_finalize_and_announce(application),
+            _weekly_finalize_job,
             time=finalize_time,
             days=(6,),  # 0=seg ... 6=dom
             name="clan_war_weekly_finalize"
         )
     except Exception as e:
         logger.warning(f"[WAR] Falha ao agendar finalize semanal: {e}")
+
+# ============================================================
+# COMPAT: Funções legadas usadas por handlers/guild/dashboard.py
+# ============================================================
 
 async def open_clan_registration():
     """
@@ -560,21 +579,19 @@ async def open_clan_registration():
     - garantir season_id
     - marcar guerra ativa em PREP (pré-guerra/inscrição aberta)
     """
-    if not SYSTEM_COL:
+    if SYSTEM_COL is None:
         return False
 
     tz = _get_local_tz()
     now_local = datetime.now(tz)
     season = get_season()
 
-    # Garante season_id estável (se não existir, usa week_id atual)
     if not season.season_id:
         season.season_id = _week_id(now_local)
 
     season.active = True
     season.phase = PHASE_PREP
 
-    # Campo extra para compatibilidade com UIs antigas (se existirem)
     try:
         SYSTEM_COL.update_one(
             {"_id": SEASON_DOC_ID},
@@ -586,18 +603,16 @@ async def open_clan_registration():
 
     return True
 
-
 async def close_clan_registration():
     """
     Compat: fecha período de inscrição.
     Mantemos a guerra em PREP, mas com flag registration_open False.
     """
-    if not SYSTEM_COL:
+    if SYSTEM_COL is None:
         return False
 
     season = get_season()
     if not season.season_id:
-        # se alguém fechar sem abrir, não quebra
         season.season_id = _week_id(datetime.now(_get_local_tz()))
 
     season.active = True
@@ -614,12 +629,11 @@ async def close_clan_registration():
 
     return True
 
-
 async def start_clan_war():
     """
     Compat: inicia guerra (fase ACTIVE).
     """
-    if not SYSTEM_COL:
+    if SYSTEM_COL is None:
         return False
 
     season = get_season()
@@ -632,13 +646,12 @@ async def start_clan_war():
     SYSTEM_COL.update_one({"_id": SEASON_DOC_ID}, {"$set": asdict(season)}, upsert=True)
     return True
 
-
 async def end_clan_war(application=None):
     """
     Compat: encerra guerra (fase ENDED).
     Se application for passado, dispara o fechamento semanal + anúncio.
     """
-    if not SYSTEM_COL:
+    if SYSTEM_COL is None:
         return False
 
     season = get_season()
@@ -646,7 +659,6 @@ async def end_clan_war(application=None):
     season.phase = PHASE_ENDED
     SYSTEM_COL.update_one({"_id": SEASON_DOC_ID}, {"$set": asdict(season)}, upsert=True)
 
-    # Se quiser aproveitar e anunciar/zerar (domingo ou admin)
     if application is not None:
         try:
             await weekly_finalize_and_announce(application)
@@ -655,13 +667,12 @@ async def end_clan_war(application=None):
 
     return True
 
-
 async def register_clan_for_war(clan_id):
     """
     Compat: registra um clã na guerra atual.
     (Seu sistema já usa REGISTRATION_COL; isso é só um wrapper.)
     """
-    if not REGISTRATION_COL:
+    if REGISTRATION_COL is None:
         return False
 
     season = get_season()
@@ -669,7 +680,7 @@ async def register_clan_for_war(clan_id):
         season.season_id = _week_id(datetime.now(_get_local_tz()))
         season.active = True
         season.phase = PHASE_PREP
-        if SYSTEM_COL:
+        if SYSTEM_COL is not None:
             SYSTEM_COL.update_one({"_id": SEASON_DOC_ID}, {"$set": asdict(season)}, upsert=True)
 
     cid = _oid(clan_id) or clan_id
@@ -691,18 +702,10 @@ async def register_clan_for_war(clan_id):
 async def join_war_as_member(player_id, player_data: dict, region_key: str = None, chat_id: int | None = None):
     """
     Compat: 'inscrever membro na guerra'.
-    No seu fluxo atual, o requisito real para PvP territorial é:
-      - guerra ACTIVE
-      - clã do jogador está registrado (REGISTRATION_COL)
-      - jogador aparece em 'registered_players' para matchmaking
-
-    Nesta engine, 'registered_players' é derivado da PRESENCE_COL.
-    Portanto, a forma mais segura e simples é:
+    Participar do PvP territorial depende de PRESENCE_COL (TTL), então:
       -> atualizar presença do jogador (update_presence)
-    Assim ele passa a ser elegível sem criar um sistema paralelo.
     """
     try:
-        # valida sessão/inputs
         pid = _oid(player_id) or player_id
         if not pid:
             return False, "ID de jogador inválido."
@@ -714,19 +717,15 @@ async def join_war_as_member(player_id, player_data: dict, region_key: str = Non
         if not ok:
             return False, reason or "⛔ Você não pode participar da guerra."
 
-        # região padrão = localização atual
         rk = region_key or player_data.get("current_location") or "reino_eldora"
 
-        # garante presença (é o que torna o jogador “registrado” para o PvP territorial)
         try:
             await update_presence(pid, player_data, rk, chat_id=chat_id)
         except Exception:
-            # se presence falhar por algum motivo, não derruba
             pass
 
-        # opcional: marca em system_data para compat com UIs antigas (não interfere na lógica)
         try:
-            if SYSTEM_COL:
+            if SYSTEM_COL is not None:
                 SYSTEM_COL.update_one(
                     {"_id": STATE_DOC_ID},
                     {"$set": {"last_member_join_at": _now_utc().isoformat()}},
@@ -739,16 +738,11 @@ async def join_war_as_member(player_id, player_data: dict, region_key: str = Non
 
     except Exception as e:
         return False, f"Erro ao entrar na guerra: {e}"
-    
-# ============================================================
-# COMPAT: usado por handlers/guild/dashboard.py
-# ============================================================
 
 async def leave_war_as_member(player_id, player_data: dict | None = None):
     """
     Compat: 'sair da guerra como membro'.
-    No seu fluxo atual, participar do PvP territorial depende de PRESENCE_COL (TTL).
-    Então sair = remover presença (ou marcar last_seen expirado).
+    Sair = remover presença.
     """
     try:
         pid = _oid(player_id) or player_id
@@ -758,12 +752,10 @@ async def leave_war_as_member(player_id, player_data: dict | None = None):
         if PRESENCE_COL is None:
             return False, "Sistema de presença indisponível."
 
-        # Remove a presença imediatamente
         PRESENCE_COL.delete_one({"player_id": pid})
 
-        # opcional: registra telemetria/compat
         try:
-            if SYSTEM_COL:
+            if SYSTEM_COL is not None:
                 SYSTEM_COL.update_one(
                     {"_id": STATE_DOC_ID},
                     {"$set": {"last_member_leave_at": _now_utc().isoformat()}},
@@ -776,3 +768,58 @@ async def leave_war_as_member(player_id, player_data: dict | None = None):
 
     except Exception as e:
         return False, f"Erro ao sair da guerra: {e}"
+
+# ============================================================
+# COMPAT para handlers/guild/war.py
+# ============================================================
+
+def get_current_war_mode() -> str:
+    """
+    Compat: retorna "PVE" ou "PVP".
+    """
+    try:
+        tz = _get_local_tz()
+        wd = datetime.now(tz).weekday()  # 0 seg ... 6 dom
+        if wd in (2, 6):  # quarta e domingo
+            return "PVP"
+        return "PVE"
+    except Exception:
+        return "PVE"
+
+async def get_region_leaderboard(region_key: str, limit: int = 10):
+    """
+    Compat: Top clãs por pontos naquela região.
+    """
+    if REGION_COL is None:
+        return []
+
+    doc = REGION_COL.find_one({"region_key": region_key}) or {}
+    points_map = doc.get("points") or {}
+    if not isinstance(points_map, dict) or not points_map:
+        return []
+
+    ranking = []
+    for clan_id_str, pts in points_map.items():
+        try:
+            p = int(pts)
+        except Exception:
+            p = 0
+        ranking.append((clan_id_str, p))
+    ranking.sort(key=lambda x: x[1], reverse=True)
+    ranking = ranking[: max(1, int(limit))]
+
+    out = []
+    CLANS_COL = _col("clans") or _col("guilds")
+    for clan_id_str, p in ranking:
+        clan_name = clan_id_str
+        try:
+            if CLANS_COL is not None:
+                cid = _oid(clan_id_str) or clan_id_str
+                clan_doc = CLANS_COL.find_one({"_id": cid}, {"display_name": 1, "name": 1})
+                if clan_doc:
+                    clan_name = clan_doc.get("display_name") or clan_doc.get("name") or clan_name
+        except Exception:
+            pass
+        out.append({"clan_name": clan_name, "points": p})
+
+    return out
