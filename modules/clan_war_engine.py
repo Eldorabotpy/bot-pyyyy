@@ -65,6 +65,18 @@ PVE_DUNGEON_POINTS = 3
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
+
+def current_week_id(now: datetime | None = None) -> str:
+    """
+    Retorna o identificador da semana da Guerra de Clãs.
+    Formato: YYYY-WW (ISO week).
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    year, week, _ = now.isocalendar()
+    return f"{year}-W{week:02d}"
+
 def _oid(x: Any) -> Optional[ObjectId]:
     if isinstance(x, ObjectId):
         return x
@@ -127,6 +139,8 @@ class WarSeason:
     season_id: Optional[str] = None
     active: bool = False
     phase: str = PHASE_PREP
+    registration_open: bool = False
+
 
 @dataclass
 class WarState:
@@ -141,17 +155,29 @@ class WarState:
 # ============================================================
 
 def get_season() -> WarSeason:
-    # ❗ PyMongo: Collection não pode ser avaliada como bool()
     if SYSTEM_COL is None:
         return WarSeason()
 
     doc = SYSTEM_COL.find_one({"_id": SEASON_DOC_ID})
     if not doc:
-        season = WarSeason()
-        SYSTEM_COL.insert_one({"_id": SEASON_DOC_ID, **asdict(season)})
+        season = WarSeason(
+            season_id=current_week_id(),
+            active=True,
+            phase=PHASE_PREP,
+            registration_open=False
+        )
+        SYSTEM_COL.insert_one({
+            "_id": SEASON_DOC_ID,
+            **asdict(season)
+        })
         return season
 
     doc.pop("_id", None)
+
+    # 🔒 blindagem retrocompat
+    doc.setdefault("active", True)
+    doc.setdefault("registration_open", False)
+
     return WarSeason(**doc)
 
 def load_state() -> WarState:
@@ -280,32 +306,42 @@ async def add_war_points(
 # ============================================================
 
 async def get_war_status() -> dict:
-    """
-    Retorna status para UI/handlers.
-    IMPORTANTE: seu handlers/menu/region.py espera registered_players como dict,
-    então vamos fornecer um mapa de 'player_id_str -> clan_id_str' baseado na presença recente.
-    """
     season = get_season()
 
     registered_players: Dict[str, str] = {}
     try:
         if PRESENCE_COL is not None:
             cutoff = _now_utc() - timedelta(seconds=DEFAULT_PRESENCE_TTL_SECONDS)
-            for p in PRESENCE_COL.find({"last_seen": {"$gte": cutoff}}, {"player_id": 1, "clan_id": 1}):
-                pid = p.get("player_id")
-                cid = p.get("clan_id")
-                if pid and cid:
-                    registered_players[str(pid)] = str(cid)
+            for p in PRESENCE_COL.find(
+                {"last_seen": {"$gte": cutoff}},
+                {"player_id": 1, "clan_id": 1}
+            ):
+                if p.get("player_id") and p.get("clan_id"):
+                    registered_players[str(p["player_id"])] = str(p["clan_id"])
+    except Exception:
+        pass
+
+    # 🔑 AQUI ESTAVA O PROBLEMA
+    registration_open = False
+    try:
+        if SYSTEM_COL is not None:
+            doc = SYSTEM_COL.find_one({"_id": SEASON_DOC_ID})
+            registration_open = bool(doc.get("registration_open")) if doc else False
     except Exception:
         pass
 
     return {
-        "season": asdict(season),
+        "season": {
+            **asdict(season),
+            "registration_open": registration_open
+        },
         "state": {
             "phase": season.phase,
-            "registered_players": registered_players
+            "registered_players": registered_players,
+            "registrations_by_clan": {}
         }
     }
+
 
 # ============================================================
 # ELEGIBILIDADE
