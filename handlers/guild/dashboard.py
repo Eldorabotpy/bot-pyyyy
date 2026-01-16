@@ -713,40 +713,57 @@ async def clan_war_register_clan(update: Update, context: ContextTypes.DEFAULT_T
 
 async def clan_war_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    if not query:
+        return
+
+    # ✅ feedback imediato (evita parecer "travado")
     try:
-        await query.answer()
+        await query.answer("Processando inscrição...", show_alert=False)
     except Exception:
         pass
 
     user_id = get_current_player_id(update, context)
     if not user_id:
-        return
-
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        return
-
-    # ✅ engine semanal: join_war_as_member(player_id, pdata, region_key, chat_id)
-    region_key = pdata.get("current_location") or "reino_eldora"
-    chat_id = None
-    try:
-        if query and query.message:
-            chat_id = query.message.chat_id
-    except Exception:
-        chat_id = None
-
-    res = await _engine_call("join_war_as_member", user_id, pdata, region_key, chat_id=chat_id)
-    if not res.get("ok"):
         try:
-            await query.answer("Não foi possível entrar na lista agora.", show_alert=True)
+            await query.answer("Sessão inválida.", show_alert=True)
         except Exception:
             pass
         return
 
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        try:
+            await query.answer("Perfil não encontrado.", show_alert=True)
+        except Exception:
+            pass
+        return
+
+    region_key = pdata.get("current_location") or "reino_eldora"
+
+    chat_id = None
     try:
-        await query.answer("Você entrou na lista de inscritos!", show_alert=True)
+        if query.message:
+            chat_id = query.message.chat_id
+    except Exception:
+        chat_id = None
+
+    # chama engine (com compat)
+    res = await _engine_call("join_war_as_member", user_id, pdata, region_key, chat_id=chat_id)
+
+    if not res.get("ok"):
+        msg = res.get("message") or "Não foi possível entrar na lista agora."
+        try:
+            await query.answer(msg, show_alert=True)
+        except Exception:
+            pass
+        return
+
+    # ✅ confirma visualmente e re-renderiza o menu (vai mudar para INSCRITO)
+    try:
+        await query.answer(res.get("message") or "✅ Você entrou na Guerra de Clãs!", show_alert=True)
     except Exception:
         pass
+
     await show_clan_war_menu(update, context)
 
 

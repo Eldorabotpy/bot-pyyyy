@@ -94,8 +94,16 @@ except ImportError:
 # ==============================================================================
 # DASHBOARD / ROTEADOR FINAL DO CLÃ
 # ==============================================================================
-from handlers.guild.dashboard import clan_handler, show_clan_dashboard
-
+from handlers.guild.dashboard import (
+    clan_handler, 
+    show_clan_dashboard,
+    clan_war_join, 
+    clan_war_leave, 
+    clan_war_open, 
+    clan_war_close,
+    clan_war_register_clan, 
+    clan_war_view,
+)
 # ==============================================================================
 # ✅ GUILDA DE AVENTUREIROS (NPC)
 # ==============================================================================
@@ -170,6 +178,14 @@ def register_guild_handlers(application: Application):
     application.add_handler(clan_leave_do_handler)
     application.add_handler(clan_delete_warn_handler)
     application.add_handler(clan_delete_do_handler)
+    
+     # ✅ handlers específicos primeiro (evita "engolir" callback)
+    application.add_handler(CallbackQueryHandler(clan_war_open, pattern=r"^clan_war_open$"))
+    application.add_handler(CallbackQueryHandler(clan_war_close, pattern=r"^clan_war_close$"))
+    application.add_handler(CallbackQueryHandler(clan_war_register_clan, pattern=r"^clan_war_register_clan$"))
+    application.add_handler(CallbackQueryHandler(clan_war_join, pattern=r"^clan_war_join$"))
+    application.add_handler(CallbackQueryHandler(clan_war_leave, pattern=r"^clan_war_leave$"))
+    application.add_handler(CallbackQueryHandler(clan_war_view, pattern=r"^clan_war_view$"))
 
     # --------------------------------------------------------------------------
     # 4) MISSÕES DO CLÃ
