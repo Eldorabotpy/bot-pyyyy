@@ -1,5 +1,5 @@
 {
-  "is_active": true,
+  "is_active": false,
   "location": "forja_abandonada",
   "entities": {
     "boss": {

@@ -1,9 +1,6 @@
 # handlers/guild/dashboard.py
-# (VERSÃO CORRIGIDA E BLINDADA)
-# - Mantém anti-fantasma
-# - Aba "Guerra de Clãs" funcionando com engine semanal/compat
-# - Corrige comparação de fase (PREP/ACTIVE/ENDED)
-# - Corrige 400 BadRequest: nunca tenta sendPhoto com media_fid None/inválido
+# (VERSÃO CORRIGIDA: valida membresia para impedir "fantasmas" + remove import inexistente)
+# + (NOVO) ABA "GUERRA DE CLÃS": líder abre inscrição, membros aderem (PREP), gating no engine.
 
 import logging
 from telegram import (
@@ -13,18 +10,21 @@ from telegram import (
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from typing import Any, Dict, Optional, Tuple
 
+from bson import ObjectId
+
 from modules import player_manager, clan_manager
 from modules import file_ids
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS
 from modules.auth_utils import get_current_player_id
 
-# Engine Guerra de Clãs
+# ✅ Engine Guerra de Clãs (compat)
 from modules import clan_war_engine
 
 logger = logging.getLogger(__name__)
 
+
 # ==============================================================================
-# 0. HELPERS
+# 0. HELPERS / COMPAT
 # ==============================================================================
 
 def _sid(x: Any) -> str:
@@ -37,68 +37,29 @@ def _phase_norm(x: Any) -> str:
     p = _sid(x).strip()
     return p.upper() if p else "IDLE"
 
-def _looks_like_telegram_file_id(x: str) -> bool:
-    """
-    Heurística simples: file_id do Telegram costuma ter comprimento grande e não parece 'chave' interna.
-    Não é perfeito, mas evita 400 por ids óbvios errados.
-    """
-    if not x or not isinstance(x, str):
-        return False
-    x = x.strip()
-    if not x:
-        return False
-    # URL também vale
-    if x.startswith("http://") or x.startswith("https://"):
-        return True
-    if len(x) < 20:
-        return False
-    # chaves internas comuns
-    if x.startswith(("img_", "menu_", "file_", "logo_", "clan_", "guild_")):
-        return False
-    return True
-
-
-# ==============================================================================
-# 1. COMPAT LAYER (NORMALIZA engine)
-# ==============================================================================
 
 def _norm_engine_result(res: Any) -> Dict[str, Any]:
-    """
-    Normaliza resultados do engine para o formato:
-      {"ok": bool, "reason": str|None, "message": str|None, ...}
-    Aceita:
-      - dict já no formato
-      - bool
-      - tuple/list (ok, msg) ou (ok, msg, reason)
-      - None
-    """
+    # Normaliza retornos do engine para {ok, reason, message, ...}
     if isinstance(res, dict):
         out = dict(res)
         if "ok" not in out:
-            out["ok"] = bool(out.get("success", False))
+            # Heurística: status do engine vem como {'season':..., 'state':...}
+            if 'state' in out or 'season' in out:
+                out['ok'] = True
+            else:
+                out['ok'] = bool(out.get('success', False))
         return out
-
     if isinstance(res, bool):
         return {"ok": res, "reason": None, "message": None}
-
-    if isinstance(res, (tuple, list)) and len(res) >= 1:
+    if isinstance(res, (tuple, list)) and res:
         ok = bool(res[0])
         msg = res[1] if len(res) >= 2 else None
         reason = res[2] if len(res) >= 3 else None
         return {"ok": ok, "message": msg, "reason": reason}
-
     return {"ok": False, "reason": "engine_error", "message": None}
 
 
 async def _engine_call(fn_name: str, *args, **kwargs) -> Dict[str, Any]:
-    """
-    Chama clan_war_engine.<fn_name> com compat de assinatura.
-    Estratégia:
-      1) tenta com args/kwargs
-      2) tenta só args
-      3) tenta sem args (muito importante p/ engine semanal)
-      4) tenta só (args[0]) se existir
-    """
     fn = getattr(clan_war_engine, fn_name, None)
     if not fn:
         return {"ok": False, "reason": "missing_fn", "message": f"Função ausente: {fn_name}"}
@@ -125,74 +86,61 @@ async def _engine_call(fn_name: str, *args, **kwargs) -> Dict[str, Any]:
     except Exception as e:
         return {"ok": False, "reason": "engine_exception", "message": str(e)}
 
-    # 3) sem args (✅ necessário para open/close no engine semanal)
+    # 3) sem args
     try:
         res = fn()
         if hasattr(res, "__await__"):
             res = await res
         return _norm_engine_result(res)
-    except TypeError:
-        pass
     except Exception as e:
         return {"ok": False, "reason": "engine_exception", "message": str(e)}
 
-    # 4) só (args[0])
+
+async def _safe_answer(query, text: str = "", show_alert: bool = False):
+    if not query:
+        return
     try:
-        if args:
-            res = fn(args[0])
-            if hasattr(res, "__await__"):
-                res = await res
-            return _norm_engine_result(res)
+        await query.answer(text, show_alert=show_alert)
     except Exception:
         pass
 
-    return {"ok": False, "reason": "signature_mismatch", "message": None}
+
+async def _show_loading_overlay(update: Update, context: ContextTypes.DEFAULT_TYPE, title: str, subtitle: str = ""):
+    # Simula um popup de carregamento editando a mensagem atual
+    query = update.callback_query
+    if not query or not query.message:
+        return
+
+    txt = f"⏳ <b>{title}</b>"
+    if subtitle:
+        txt += f"\n\n<i>{subtitle}</i>"
+
+    try:
+        if query.message.photo or query.message.video or query.message.animation:
+            await query.edit_message_caption(txt, parse_mode="HTML", reply_markup=None)
+        else:
+            await query.edit_message_text(txt, parse_mode="HTML", reply_markup=None)
+    except Exception:
+        pass
 
 
-def _extract_war_ui_state(ws: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normaliza estado retornado por get_war_status() para a UI.
-    """
-    state = (ws or {}).get("state") or {}
-    season = (ws or {}).get("season") or {}
-
-    phase = state.get("phase") or season.get("phase") or "IDLE"
-    phase = _phase_norm(phase)
-
-    war_id = (
-        state.get("war_id")
-        or season.get("season_id")
-        or state.get("week_id")
-        or "-"
-    )
-
-    war_type = state.get("war_type") or "SEMANAL"
-
-    prep_at = state.get("prep_starts_at") or "-"
-    start_at = state.get("starts_at") or "-"
-    end_at = state.get("ends_at") or "-"
-
-    reg_by_clan = state.get("registrations_by_clan") or {}
-    registered_players = state.get("registered_players") or {}
-
-    # ✅ Flag opcional (se engine guardar no season)
-    registration_open = bool(season.get("registration_open", False))
-
-    return {
-        "war_id": war_id,
-        "phase": phase,  # PREP/ACTIVE/ENDED/IDLE
-        "war_type": war_type,
-        "prep_at": prep_at,
-        "start_at": start_at,
-        "end_at": end_at,
-        "registrations_by_clan": reg_by_clan if isinstance(reg_by_clan, dict) else {},
-        "registered_players": registered_players if isinstance(registered_players, dict) else {},
-        "registration_open": registration_open,
-    }
+async def _is_clan_registered(clan_id: Any, season_id: str) -> bool:
+    try:
+        reg_col = getattr(clan_war_engine, "REGISTRATION_COL", None)
+        if reg_col is None:
+            return False
+        # tenta ObjectId quando aplicável
+        cid = clan_id
+        if isinstance(clan_id, str) and ObjectId.is_valid(clan_id):
+            cid = ObjectId(clan_id)
+        doc = reg_col.find_one({"season_id": season_id, "clan_id": cid, "active": True})
+        return bool(doc)
+    except Exception:
+        return False
 
 
 # ==============================================================================
-# 2. RENDERIZADOR INTELIGENTE (corrigido 400)
+# 1. RENDERIZADOR INTELIGENTE
 # ==============================================================================
 async def _render_clan_screen(update, context, clan_data, text, keyboard):
     query = update.callback_query
@@ -202,7 +150,6 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     media_fid = None
     media_type = "photo"
 
-    # 1) tenta logo do clã
     try:
         if clan_data and clan_data.get("logo_media_key"):
             media_fid = clan_data.get("logo_media_key")
@@ -210,7 +157,6 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     except Exception:
         pass
 
-    # 2) fallback padrão do sistema
     if not media_fid:
         try:
             media_fid = file_ids.get_file_id("img_clan_default")
@@ -219,14 +165,10 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
         except Exception:
             media_fid = None
 
-    # 3) blindagem: não tente mídia inválida
-    if media_fid and not _looks_like_telegram_file_id(str(media_fid)):
-        media_fid = None
-        media_type = "photo"
-
     reply_markup = InlineKeyboardMarkup(keyboard)
     target_has_media = bool(media_fid)
 
+    current_has_media = False
     try:
         current_has_media = bool(query.message.photo or query.message.video or query.message.animation)
     except Exception:
@@ -265,7 +207,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
         except Exception:
             must_delete_resend = True
 
-    # 2) se falhar, reenvia (✅ nunca manda send_photo com None)
+    # 2) se falhar, reenvia
     if must_delete_resend:
         try:
             await query.delete_message()
@@ -274,7 +216,6 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
 
         try:
             chat_id = query.message.chat_id
-
             if media_fid:
                 if media_type == "video":
                     await context.bot.send_video(chat_id, video=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
@@ -284,13 +225,11 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
                     await context.bot.send_photo(chat_id, photo=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
             else:
                 await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
-
         except Exception as e:
             logger.error(f"Erro fatal rendering clan dashboard: {e}")
 
-
 # ==============================================================================
-# 3. ENTRY POINT
+# 2. ENTRY POINT
 # ==============================================================================
 async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -327,9 +266,8 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
                 except Exception:
                     pass
 
-
 # ==============================================================================
-# 4. DASHBOARD (COM VALIDAÇÃO ANTI-FANTASMA)
+# 3. DASHBOARD (COM VALIDAÇÃO ANTI-FANTASMA)
 # ==============================================================================
 async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE, came_from: str = "kingdom"):
     query = update.callback_query
@@ -368,12 +306,13 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
         await adventurer_guild_menu(update, context)
         return
 
-    leader_id = _sid(clan_data.get("leader_id", "0"))
-    is_leader = (_sid(user_id) == leader_id)
+    leader_id = str(clan_data.get("leader_id", "0"))
+    is_leader = (str(user_id) == leader_id)
 
-    # anti-fantasma
-    members = [_sid(x) for x in clan_data.get("members", [])]
-    if (not is_leader) and (_sid(user_id) not in members):
+    # ✅ FIX ANTI-FANTASMA: precisa estar em members (ou ser líder)
+    members = [str(x) for x in clan_data.get("members", [])]
+    if (not is_leader) and (str(user_id) not in members):
+        # usuário está com clan_id preso, mas não é membro
         try:
             player_data["clan_id"] = None
             await player_manager.save_player_data(user_id, player_data)
@@ -387,6 +326,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
         await adventurer_guild_menu(update, context)
         return
 
+    # Dados visuais
     clan_name = clan_data.get("display_name", "Clã")
     level = clan_data.get("prestige_level", 1)
     xp = clan_data.get("prestige_points", 0)
@@ -418,7 +358,8 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
          InlineKeyboardButton("🏦 Banco", callback_data="clan_bank_menu")],
         [InlineKeyboardButton("👥 Membros", callback_data="gld_view_members"),
          InlineKeyboardButton("✨ Melhorias", callback_data="clan_upgrade_menu")],
-        [InlineKeyboardButton("⚔️ Guerra de Clãs (Evento)", callback_data="clan_war_menu")],
+        # ✅ NOVO: Aba de evento do clã
+        [InlineKeyboardButton("⚔️ Guerra de Clãs", callback_data="clan_war_menu")],
     ]
 
     if is_leader:
@@ -428,9 +369,8 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await _render_clan_screen(update, context, clan_data, text, keyboard)
 
-
 # ==============================================================================
-# 5. WAR MENU (ABA GUERRA DE CLÃS) — CORRIGIDO
+# 3.1 WAR MENU (ABA GUERRA DE CLÃS)
 # ==============================================================================
 async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -453,7 +393,7 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await adventurer_guild_menu(update, context)
         return
 
-    # carrega clã
+    # carrega clã (para logo + validações)
     try:
         res = clan_manager.get_clan(clan_id)
         clan_data = await res if hasattr(res, "__await__") else res
@@ -464,11 +404,10 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await show_clan_dashboard(update, context)
         return
 
-    leader_id = _sid(clan_data.get("leader_id", "0"))
-    is_leader = (_sid(user_id) == leader_id)
-
-    members = [_sid(x) for x in clan_data.get("members", [])]
-    if (not is_leader) and (_sid(user_id) not in members):
+    leader_id = str(clan_data.get("leader_id", "0"))
+    is_leader = (str(user_id) == leader_id)
+    members = [str(x) for x in clan_data.get("members", [])]
+    if (not is_leader) and (str(user_id) not in members):
         # anti-fantasma
         try:
             pdata["clan_id"] = None
@@ -483,80 +422,89 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await adventurer_guild_menu(update, context)
         return
 
-    ws = await clan_war_engine.get_war_status()
-    ui = _extract_war_ui_state(ws)
+    ws = await _engine_call("get_war_status")
+    state = ws.get("state", {}) or {}
 
-    war_id = ui["war_id"]
-    phase = ui["phase"]          # PREP/ACTIVE/ENDED/IDLE
-    war_type = ui["war_type"]
-    prep_at = ui["prep_at"]
-    start_at = ui["start_at"]
-    end_at = ui["end_at"]
+    war_id = state.get("war_id", "-")
+    phase = state.get("phase", "idle")
+    phase_u = _phase_norm(phase)
+    war_type = state.get("war_type", "-")
+    prep_at = state.get("prep_starts_at", "-")
+    start_at = state.get("starts_at", "-")
+    end_at = state.get("ends_at", "-")
 
-    # ✅ inscrição aberta: usa flag do season se existir; senão tenta reg_by_clan
-    reg_by_clan = ui["registrations_by_clan"]
-    reg = reg_by_clan.get(_sid(clan_id), {}) if isinstance(reg_by_clan, dict) else {}
+    # Identificador de temporada/rodada (usa war_id como season_id no modelo semanal)
+    season_id = state.get("war_id") or state.get("season_id") or (ws.get("season", {}) or {}).get("season_id") or war_id
+    clan_registered = await _is_clan_registered(str(clan_id), str(season_id))
 
-    # se reg_by_clan não existir no engine semanal, isso fica vazio
-    is_open = bool(ui.get("registration_open", False))
-    if isinstance(reg, dict) and "is_open" in reg:
-        is_open = bool(reg.get("is_open"))
-
+    reg_by_clan = state.get("registrations_by_clan", {}) or {}
+    reg = reg_by_clan.get(str(clan_id), {}) if isinstance(reg_by_clan, dict) else {}
+    is_open = bool(reg.get("is_open")) if isinstance(reg, dict) else False
     reg_members = reg.get("members", []) if isinstance(reg, dict) and isinstance(reg.get("members"), list) else []
     reg_count = len(reg_members)
 
-    registered_players = ui["registered_players"]
     me_registered = False
+    registered_players = state.get("registered_players", {}) or {}
     if isinstance(registered_players, dict):
-        me_registered = (_sid(registered_players.get(_sid(user_id))) == _sid(clan_id))
+        me_registered = (registered_players.get(str(user_id)) == str(clan_id))
 
     clan_name = clan_data.get("display_name", "Clã")
 
+    # Texto
+    # Texto
     text = (
         f"⚔️ <b>GUERRA DE CLÃS — {clan_name.upper()}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🆔 <b>Rodada:</b> <code>{war_id}</code>\n"
         f"🧭 <b>Tipo:</b> <b>{war_type}</b>\n"
-        f"⏳ <b>Fase:</b> <b>{phase}</b>\n\n"
+        f"⏳ <b>Fase:</b> <b>{phase_u}</b>\n\n"
         f"🕰️ <b>Horários:</b>\n"
         f"• PREP: <code>{prep_at}</code>\n"
         f"• Início: <code>{start_at}</code>\n"
         f"• Fim: <code>{end_at}</code>\n\n"
         f"📝 <b>Inscrição do Clã:</b> {'<b>ABERTA</b>' if is_open else '<b>FECHADA</b>'}\n"
-        f"👥 <b>Inscritos (lista):</b> {reg_count}\n"
+        f"🏷️ <b>Clã:</b> {'<b>INSCRITO</b>' if clan_registered else '<b>NÃO INSCRITO</b>'}\n"
+        f"👥 <b>Inscritos:</b> {reg_count}\n"
         f"✅ <b>Você:</b> {'INSCRITO' if me_registered else 'NÃO INSCRITO'}\n"
     )
 
     keyboard = []
 
-    # ✅ PREP: líder sempre vê controles (não pode ficar travado em "fechada")
-    if phase == "PREP":
+    # Regras de ação conforme fase
+    if phase_u == "PREP":
+        # Líder abre/fecha
+        # Líder registra o clã na rodada (marca check no botão)
+        if is_leader and is_open:
+            if not clan_registered:
+                keyboard.append([InlineKeyboardButton("🏷️ Inscrever Clã na Guerra", callback_data="clan_war_register_clan")])
+            else:
+                keyboard.append([InlineKeyboardButton("✅ Clã Inscrito na Guerra", callback_data="clan_noop")])
+
         if is_leader:
             if not is_open:
                 keyboard.append([InlineKeyboardButton("📝 Abrir inscrição do Clã", callback_data="clan_war_open")])
             else:
                 keyboard.append([InlineKeyboardButton("🔒 Fechar inscrição do Clã", callback_data="clan_war_close")])
 
-            # ✅ registro do clã na semana (necessário p/ participar)
-            if is_open:
-                keyboard.append([InlineKeyboardButton("🏷️ Inscrever Clã na Guerra", callback_data="clan_war_register_clan")])
-
-        # membros só podem entrar na lista se estiver aberto
+        # Membro entra/sai (somente após o clã estar inscrito na rodada)
         if is_open:
-            if not me_registered:
-                keyboard.append([InlineKeyboardButton("✅ Participar desta rodada", callback_data="clan_war_join")])
+            if not clan_registered:
+                keyboard.append([InlineKeyboardButton("⛔ Clã ainda não inscrito", callback_data="clan_noop")])
             else:
-                keyboard.append([InlineKeyboardButton("❌ Sair da lista", callback_data="clan_war_leave")])
+                if not me_registered:
+                    keyboard.append([InlineKeyboardButton("✅ Participar desta rodada", callback_data="clan_war_join")])
+                else:
+                    keyboard.append([InlineKeyboardButton("❌ Sair da lista", callback_data="clan_war_leave")])
 
         keyboard.append([InlineKeyboardButton("👥 Ver inscritos", callback_data="clan_war_view")])
 
-    elif phase == "ACTIVE":
+    elif phase_u == "ACTIVE":
         text += "\n🔥 <b>Guerra ativa!</b>\n"
         text += "⚠️ Somente inscritos nesta rodada podem caçar/atacar e pontuar.\n"
         keyboard.append([InlineKeyboardButton("👥 Ver inscritos", callback_data="clan_war_view")])
 
     else:
-        text += "\nℹ️ Inscrição só pode ser feita durante <b>PREP</b>.\n"
+        text += "\nℹ️ Inscrição só pode ser feita durante <b>PREP</b> (no dia do evento).\n"
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="clan_menu")])
 
@@ -564,6 +512,9 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def _require_clan_leader(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[Dict[str, Any]], bool]:
+    """
+    Helper: valida sessão + clã + anti-fantasma. Retorna (user_id, player_data, clan_data, is_leader).
+    """
     query = update.callback_query
     user_id = get_current_player_id(update, context)
     if not user_id:
@@ -575,7 +526,7 @@ async def _require_clan_leader(update: Update, context: ContextTypes.DEFAULT_TYP
 
     clan_id = pdata.get("clan_id")
     if not clan_id:
-        return _sid(user_id), pdata, None, False
+        return str(user_id), pdata, None, False
 
     try:
         res = clan_manager.get_clan(clan_id)
@@ -584,13 +535,14 @@ async def _require_clan_leader(update: Update, context: ContextTypes.DEFAULT_TYP
         clan_data = None
 
     if not clan_data:
-        return _sid(user_id), pdata, None, False
+        return str(user_id), pdata, None, False
 
-    leader_id = _sid(clan_data.get("leader_id", "0"))
-    is_leader = (_sid(user_id) == leader_id)
+    leader_id = str(clan_data.get("leader_id", "0"))
+    is_leader = (str(user_id) == leader_id)
 
-    members = [_sid(x) for x in clan_data.get("members", [])]
-    if (not is_leader) and (_sid(user_id) not in members):
+    members = [str(x) for x in clan_data.get("members", [])]
+    if (not is_leader) and (str(user_id) not in members):
+        # anti-fantasma
         try:
             pdata["clan_id"] = None
             await player_manager.save_player_data(user_id, pdata)
@@ -603,7 +555,7 @@ async def _require_clan_leader(update: Update, context: ContextTypes.DEFAULT_TYP
                 pass
         return None, None, None, False
 
-    return _sid(user_id), pdata, clan_data, is_leader
+    return str(user_id), pdata, clan_data, is_leader
 
 
 async def clan_war_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -612,6 +564,8 @@ async def clan_war_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
     except Exception:
         pass
+
+    await _show_loading_overlay(update, context, "Processando...", "Aguarde")
 
     user_id, pdata, clan_data, is_leader = await _require_clan_leader(update, context)
     if not user_id or not pdata or not clan_data:
@@ -624,11 +578,17 @@ async def clan_war_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         return
 
-    # ✅ engine semanal: open_clan_registration() (sem args)
-    res = await _engine_call("open_clan_registration")
+    clan_id = str(pdata.get("clan_id"))
+    res = await _engine_call("open_clan_registration", clan_id, str(user_id))
     if not res.get("ok"):
+        reason = res.get("reason", "erro")
+        msg = "Não foi possível abrir."
+        if reason == "registration_closed":
+            msg = "Inscrições fechadas. Só abre durante PREP."
+        elif reason == "no_war_scheduled":
+            msg = "Nenhuma guerra programada."
         try:
-            await query.answer("Não foi possível abrir a inscrição agora.", show_alert=True)
+            await query.answer(msg, show_alert=True)
         except Exception:
             pass
         return
@@ -647,6 +607,8 @@ async def clan_war_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
+    await _show_loading_overlay(update, context, "Processando...", "Aguarde")
+
     user_id, pdata, clan_data, is_leader = await _require_clan_leader(update, context)
     if not user_id or not pdata or not clan_data:
         return
@@ -658,11 +620,11 @@ async def clan_war_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         return
 
-    # ✅ engine semanal: close_clan_registration() (sem args)
-    res = await _engine_call("close_clan_registration")
+    clan_id = str(pdata.get("clan_id"))
+    res = await _engine_call("close_clan_registration", clan_id, str(user_id))
     if not res.get("ok"):
         try:
-            await query.answer("Não foi possível fechar a inscrição.", show_alert=True)
+            await query.answer("Não foi possível fechar.", show_alert=True)
         except Exception:
             pass
         return
@@ -674,58 +636,47 @@ async def clan_war_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_clan_war_menu(update, context)
 
 
+
+
 async def clan_war_register_clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Registra o clã na guerra da semana (REGISTRATION_COL).
-    """
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        pass
+    if not query:
+        return
+
+    await _show_loading_overlay(update, context, "Inscrevendo clã na rodada...", "Aguarde")
 
     user_id, pdata, clan_data, is_leader = await _require_clan_leader(update, context)
     if not user_id or not pdata or not clan_data:
         return
 
     if not is_leader:
-        try:
-            await query.answer("Apenas o líder pode inscrever o clã.", show_alert=True)
-        except Exception:
-            pass
+        await _safe_answer(query, "Apenas o líder pode inscrever o clã.", show_alert=True)
+        await show_clan_war_menu(update, context)
         return
 
     clan_id = pdata.get("clan_id")
     res = await _engine_call("register_clan_for_war", clan_id)
     if not res.get("ok"):
-        try:
-            await query.answer("Não foi possível inscrever o clã agora.", show_alert=True)
-        except Exception:
-            pass
+        msg = res.get("message") or "Não foi possível inscrever o clã agora."
+        await _safe_answer(query, msg, show_alert=True)
+        await show_clan_war_menu(update, context)
         return
 
-    try:
-        await query.answer("Clã inscrito na Guerra desta semana!", show_alert=True)
-    except Exception:
-        pass
+    await _safe_answer(query, res.get("message") or "✅ Clã inscrito na Guerra!", show_alert=True)
     await show_clan_war_menu(update, context)
-
 
 async def clan_war_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query:
         return
 
-    # ✅ feedback imediato (evita parecer "travado")
-    try:
-        await query.answer("Processando inscrição...", show_alert=False)
-    except Exception:
-        pass
+    # ✅ modal de carregamento (em vez de toast silencioso)
+    await _show_loading_overlay(update, context, '⏳ Processando sua inscrição...', 'Aguarde')
 
     user_id = get_current_player_id(update, context)
     if not user_id:
         try:
-            await query.answer("Sessão inválida.", show_alert=True)
+            await query.answer('Sessão inválida.', show_alert=True)
         except Exception:
             pass
         return
@@ -733,12 +684,12 @@ async def clan_war_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         try:
-            await query.answer("Perfil não encontrado.", show_alert=True)
+            await query.answer('Perfil não encontrado.', show_alert=True)
         except Exception:
             pass
         return
 
-    region_key = pdata.get("current_location") or "reino_eldora"
+    region_key = pdata.get('current_location') or 'reino_eldora'
 
     chat_id = None
     try:
@@ -747,20 +698,20 @@ async def clan_war_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         chat_id = None
 
-    # chama engine (com compat)
-    res = await _engine_call("join_war_as_member", user_id, pdata, region_key, chat_id=chat_id)
-
-    if not res.get("ok"):
-        msg = res.get("message") or "Não foi possível entrar na lista agora."
+    res = await _engine_call('join_war_as_member', user_id, pdata, region_key, chat_id=chat_id)
+    if not res.get('ok'):
+        msg = res.get('message') or 'Não foi possível participar agora.'
         try:
             await query.answer(msg, show_alert=True)
         except Exception:
             pass
+        # volta para o menu para o usuário não ficar preso no loading
+        await show_clan_war_menu(update, context)
         return
 
-    # ✅ confirma visualmente e re-renderiza o menu (vai mudar para INSCRITO)
+    # confirma e re-renderiza
     try:
-        await query.answer(res.get("message") or "✅ Você entrou na Guerra de Clãs!", show_alert=True)
+        await query.answer(res.get('message') or '✅ Você foi inscrito na Guerra de Clãs!', show_alert=True)
     except Exception:
         pass
 
@@ -774,18 +725,21 @@ async def clan_war_leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-    user_id = get_current_player_id(update, context)
-    if not user_id:
+    await _show_loading_overlay(update, context, "Removendo você da lista...", "Aguarde")
+
+    user_id, pdata, clan_data, _is_leader = await _require_clan_leader(update, context)
+    if not user_id or not pdata or not clan_data:
         return
 
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        return
-
-    res = await _engine_call("leave_war_as_member", user_id, pdata)
+    clan_id = str(pdata.get("clan_id"))
+    res = await _engine_call("leave_war_as_member", clan_id, str(user_id))
     if not res.get("ok"):
+        reason = res.get("reason", "erro")
+        msg = "Não foi possível sair."
+        if reason == "registration_closed":
+            msg = "Inscrições fechadas. Só durante PREP."
         try:
-            await query.answer("Não foi possível sair agora.", show_alert=True)
+            await query.answer(msg, show_alert=True)
         except Exception:
             pass
         return
@@ -817,6 +771,7 @@ async def clan_war_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_clan_dashboard(update, context)
         return
 
+    # Carrega clã (para logo + validações)
     try:
         res = clan_manager.get_clan(clan_id)
         clan_data = await res if hasattr(res, "__await__") else res
@@ -827,25 +782,42 @@ async def clan_war_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_clan_dashboard(update, context)
         return
 
-    ws = await clan_war_engine.get_war_status()
-    ui = _extract_war_ui_state(ws)
+    # Estado da guerra
+    ws = await _engine_call("get_war_status")
+    state = ws.get("state", {}) or {}
 
-    war_id = ui["war_id"]
-    phase = ui["phase"]
+    war_id = state.get("war_id", "-")
+    phase = state.get("phase", "idle")
+    phase_u = _phase_norm(phase)  # ✅ FIX DEFINITIVO
 
-    # fallback: lista via presence (registered_players)
-    rp = ui["registered_players"] or {}
-    members = [pid for pid, cid in rp.items() if _sid(cid) == _sid(clan_id)]
+    # Inscrições
+    reg_by_clan = state.get("registrations_by_clan", {}) or {}
+    reg = reg_by_clan.get(str(clan_id), {}) if isinstance(reg_by_clan, dict) else {}
+    members = (
+        reg.get("members", [])
+        if isinstance(reg, dict) and isinstance(reg.get("members"), list)
+        else []
+    )
 
+    # Lista (limite visual)
     preview = members[:25]
-    lines = "\n".join([f"• <code>{m}</code>" for m in preview]) if preview else "<i>Ninguém inscrito ainda.</i>"
-    more = f"\n\n… e mais {len(members) - 25}." if len(members) > 25 else ""
+    if preview:
+        lines = "\n".join([f"• <code>{m}</code>" for m in preview])
+    else:
+        lines = "<i>Ninguém inscrito ainda.</i>"
+
+    more = ""
+    if len(members) > 25:
+        more = f"\n\n… e mais {len(members) - 25} jogador(es)."
+
+    clan_name = clan_data.get("display_name", "Clã")
 
     text = (
         f"👥 <b>INSCRITOS — GUERRA DE CLÃS</b>\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
+        f"🏰 <b>Clã:</b> {clan_name}\n"
         f"🆔 <b>Rodada:</b> <code>{war_id}</code>\n"
-        f"⏳ <b>Fase:</b> <b>{phase}</b>\n\n"
+        f"⏳ <b>Fase:</b> <b>{phase_u}</b>\n\n"
         f"{lines}{more}"
     )
 
@@ -853,23 +825,25 @@ async def clan_war_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ Voltar", callback_data="clan_war_menu")],
         [InlineKeyboardButton("🏠 Dashboard do Clã", callback_data="clan_menu")],
     ]
+
     await _render_clan_screen(update, context, clan_data, text, keyboard)
 
-
 # ==============================================================================
-# 6. ROTEADOR
+# 4. ROTEADOR
 # ==============================================================================
 async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query:
         return
-    action = query.data or ""
+    action = query.data
 
+    # ✅ IMPORT CORRIGIDO: removido show_kick_member_menu (não existe)
     from handlers.guild.management import (
         show_clan_management_menu, show_members_list,
         warn_kick_member, do_kick_member, warn_leave_clan, do_leave_clan
     )
 
+    # opcionais
     show_guild_mission_details = None
     finish_mission_callback = None
     cancel_mission_callback = None
@@ -910,7 +884,6 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "clan_war_menu":
         await show_clan_war_menu(update, context)
         return
-
     if action == "clan_war_open":
         await clan_war_open(update, context)
         return
@@ -933,6 +906,13 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "clan_war_view":
         await clan_war_view(update, context)
+        return
+
+    if action == "clan_noop":
+        try:
+            await query.answer("Nada a fazer aqui.", show_alert=False)
+        except Exception:
+            pass
         return
 
     # -------------------------
@@ -1024,7 +1004,6 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("Em breve!", show_alert=True)
         return
 
-    # fallback
     try:
         await query.answer("Opção não encontrada.", show_alert=True)
     except Exception:
