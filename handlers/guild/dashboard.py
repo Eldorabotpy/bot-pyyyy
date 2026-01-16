@@ -408,7 +408,6 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     is_leader = (str(user_id) == leader_id)
     members = [str(x) for x in clan_data.get("members", [])]
     if (not is_leader) and (str(user_id) not in members):
-        # anti-fantasma
         try:
             pdata["clan_id"] = None
             await player_manager.save_player_data(user_id, pdata)
@@ -423,45 +422,48 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     ws = await _engine_call("get_war_status")
+
+    season = ws.get("season", {}) or {}
     state = ws.get("state", {}) or {}
 
-    war_id = state.get("war_id", "-")
-    phase = state.get("phase", "idle")
+    # ---- fase (vem do engine)
+    phase = state.get("phase", season.get("phase", "idle"))
     phase_u = _phase_norm(phase)
-    war_type = state.get("war_type", "-")
-    prep_at = state.get("prep_starts_at", "-")
-    start_at = state.get("starts_at", "-")
-    end_at = state.get("ends_at", "-")
 
-    # Identificador de temporada/rodada (usa war_id como season_id no modelo semanal)
-    season_id = state.get("war_id") or state.get("season_id") or (ws.get("season", {}) or {}).get("season_id") or war_id
-    clan_registered = await _is_clan_registered(str(clan_id), str(season_id))
+    # ✅ AQUI ESTÁ O FIX: inscrição aberta/fechada vem do SEASON.registration_open
+    is_open = bool(season.get("registration_open", False))
 
-    reg_by_clan = state.get("registrations_by_clan", {}) or {}
-    reg = reg_by_clan.get(str(clan_id), {}) if isinstance(reg_by_clan, dict) else {}
-    is_open = bool(reg.get("is_open")) if isinstance(reg, dict) else False
-    reg_members = reg.get("members", []) if isinstance(reg, dict) and isinstance(reg.get("members"), list) else []
+    # season_id / rodada
+    season_id = season.get("season_id") or season.get("war_id") or "-"
+    war_id = season_id
+
+    # inscritos (deriva de registered_players: player_id -> clan_id)
+    registered_players = state.get("registered_players", {}) or {}
+    clan_sid = str(clan_id)
+
+    reg_members = []
+    if isinstance(registered_players, dict):
+        for pid, cid in registered_players.items():
+            if str(cid) == clan_sid:
+                reg_members.append(str(pid))
+
     reg_count = len(reg_members)
 
+    # eu inscrito?
     me_registered = False
-    registered_players = state.get("registered_players", {}) or {}
     if isinstance(registered_players, dict):
-        me_registered = (registered_players.get(str(user_id)) == str(clan_id))
+        me_registered = (str(registered_players.get(str(user_id))) == clan_sid)
+
+    # clã registrado na rodada? (usa REGISTRATION_COL)
+    clan_registered = await _is_clan_registered(str(clan_id), str(season_id))
 
     clan_name = clan_data.get("display_name", "Clã")
 
-    # Texto
-    # Texto
     text = (
         f"⚔️ <b>GUERRA DE CLÃS — {clan_name.upper()}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🆔 <b>Rodada:</b> <code>{war_id}</code>\n"
-        f"🧭 <b>Tipo:</b> <b>{war_type}</b>\n"
         f"⏳ <b>Fase:</b> <b>{phase_u}</b>\n\n"
-        f"🕰️ <b>Horários:</b>\n"
-        f"• PREP: <code>{prep_at}</code>\n"
-        f"• Início: <code>{start_at}</code>\n"
-        f"• Fim: <code>{end_at}</code>\n\n"
         f"📝 <b>Inscrição do Clã:</b> {'<b>ABERTA</b>' if is_open else '<b>FECHADA</b>'}\n"
         f"🏷️ <b>Clã:</b> {'<b>INSCRITO</b>' if clan_registered else '<b>NÃO INSCRITO</b>'}\n"
         f"👥 <b>Inscritos:</b> {reg_count}\n"
@@ -470,23 +472,21 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard = []
 
-    # Regras de ação conforme fase
     if phase_u == "PREP":
-        # Líder abre/fecha
-        # Líder registra o clã na rodada (marca check no botão)
-        if is_leader and is_open:
+        # líder registra o clã na rodada
+        if is_leader:
             if not clan_registered:
                 keyboard.append([InlineKeyboardButton("🏷️ Inscrever Clã na Guerra", callback_data="clan_war_register_clan")])
             else:
                 keyboard.append([InlineKeyboardButton("✅ Clã Inscrito na Guerra", callback_data="clan_noop")])
 
-        if is_leader:
+            # líder abre/fecha inscrição (global no engine)
             if not is_open:
                 keyboard.append([InlineKeyboardButton("📝 Abrir inscrição do Clã", callback_data="clan_war_open")])
             else:
                 keyboard.append([InlineKeyboardButton("🔒 Fechar inscrição do Clã", callback_data="clan_war_close")])
 
-        # Membro entra/sai (somente após o clã estar inscrito na rodada)
+        # membro entra/sai (só se inscrição aberta e clã inscrito)
         if is_open:
             if not clan_registered:
                 keyboard.append([InlineKeyboardButton("⛔ Clã ainda não inscrito", callback_data="clan_noop")])
@@ -502,9 +502,8 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text += "\n🔥 <b>Guerra ativa!</b>\n"
         text += "⚠️ Somente inscritos nesta rodada podem caçar/atacar e pontuar.\n"
         keyboard.append([InlineKeyboardButton("👥 Ver inscritos", callback_data="clan_war_view")])
-
     else:
-        text += "\nℹ️ Inscrição só pode ser feita durante <b>PREP</b> (no dia do evento).\n"
+        text += "\nℹ️ Inscrição só pode ser feita durante <b>PREP</b>.\n"
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="clan_menu")])
 
@@ -732,7 +731,8 @@ async def clan_war_leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     clan_id = str(pdata.get("clan_id"))
-    res = await _engine_call("leave_war_as_member", clan_id, str(user_id))
+    res = await _engine_call("leave_war_as_member", user_id, pdata)
+
     if not res.get("ok"):
         reason = res.get("reason", "erro")
         msg = "Não foi possível sair."
