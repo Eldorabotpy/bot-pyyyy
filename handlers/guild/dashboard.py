@@ -160,6 +160,10 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
                 media_fid = file_ids.get_file_id("guild_dashboard_media")
         except Exception:
             media_fid = None
+    # ✅ Blindagem: não tente enviar mídia inválida
+    if media_fid and not _looks_like_telegram_file_id(str(media_fid)):
+        media_fid = None
+        media_type = "photo"
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     target_has_media = bool(media_fid)
@@ -219,7 +223,22 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
                 else:
                     await context.bot.send_photo(chat_id, photo=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
             else:
-                await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
+                try:
+                    await context.bot.send_photo(
+                        chat_id,
+                        photo=media_fid,
+                        caption=text,
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    # fallback seguro: manda só texto (não quebra menu)
+                    await context.bot.send_message(
+                        chat_id,
+                        text,
+                        reply_markup=reply_markup,
+                        parse_mode="HTML"
+                    )
         except Exception as e:
             logger.error(f"Erro fatal rendering clan dashboard: {e}")
 
@@ -757,6 +776,21 @@ async def clan_war_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🏠 Dashboard do Clã", callback_data="clan_menu")],
     ]
     await _render_clan_screen(update, context, clan_data, text, keyboard)
+
+def _looks_like_telegram_file_id(x: str) -> bool:
+    """
+    Heurística simples: file_id do Telegram costuma ter comprimento grande e não parece 'chave' interna.
+    Não é perfeito, mas evita 400 por ids óbvios errados.
+    """
+    if not x or not isinstance(x, str):
+        return False
+    x = x.strip()
+    if len(x) < 20:
+        return False
+    # chaves internas comuns
+    if x.startswith("img_") or x.startswith("menu_") or x.startswith("file_") or x.startswith("logo_"):
+        return False
+    return True
 
 
 # ==============================================================================

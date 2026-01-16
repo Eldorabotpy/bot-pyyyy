@@ -1,11 +1,8 @@
 # handlers/guild/war.py
-# (VERSÃO CORRIGIDA: Menu Visual da Guerra de Clãs + ranking por região)
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from modules import clan_war_engine, game_data
 
-# Lista de regiões disputáveis (certifique-se que estas chaves existem no seu game_data)
 WAR_REGIONS = [
     "floresta_sombria",
     "pedreira_granito",
@@ -14,12 +11,38 @@ WAR_REGIONS = [
     "pico_grifo"
 ]
 
+async def _safe_edit(query, text: str, reply_markup: InlineKeyboardMarkup):
+    """
+    Edita TEXT se a mensagem for texto puro.
+    Edita CAPTION se a mensagem tiver mídia (foto/video/animação).
+    """
+    try:
+        has_media = bool(query.message.photo or query.message.video or query.message.animation)
+    except Exception:
+        has_media = False
+
+    if has_media:
+        try:
+            await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode="HTML")
+            return
+        except Exception:
+            pass
+
+    # fallback: tenta editar texto normal
+    try:
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+    except Exception:
+        # fallback final
+        try:
+            await query.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
+        except Exception:
+            pass
+
+
 async def show_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o menu principal da guerra com o modo do dia."""
     query = update.callback_query
     await query.answer()
 
-    # ✅ Compat: engine pode não ter o modo; fallback PVE
     try:
         mode = clan_war_engine.get_current_war_mode()
     except Exception:
@@ -43,23 +66,18 @@ async def show_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name = reg_info.get("display_name", reg_key.replace("_", " ").title())
 
         row.append(InlineKeyboardButton(name, callback_data=f"war_view:{reg_key}"))
-
         if len(row) == 2:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("🔙 Voltar ao Clã", callback_data="clan_menu")])
+    keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="gld_menu")])
 
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="HTML"
-    )
+    await _safe_edit(query, text, InlineKeyboardMarkup(keyboard))
+
 
 async def show_region_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra o Top 10 Clãs daquela região."""
     query = update.callback_query
     await query.answer()
 
@@ -72,14 +90,12 @@ async def show_region_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE
     reg_info = (getattr(game_data, "REGIONS_DATA", None) or {}).get(region_key, {})
     reg_name = reg_info.get("display_name", region_key.replace("_", " ").title())
 
-    # ✅ Compat: se engine não tiver, retorna vazio
     try:
         leaderboard = await clan_war_engine.get_region_leaderboard(region_key)
     except Exception:
         leaderboard = []
 
     text = f"🚩 <b>Domínio: {reg_name}</b>\n\n"
-
     if not leaderboard:
         text += "<i>Nenhum clã conquistou pontos aqui ainda. Seja o primeiro!</i>"
     else:
@@ -92,19 +108,10 @@ async def show_region_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     text += "\n<i>Pontue derrotando inimigos nesta região!</i>"
 
-    keyboard = [[InlineKeyboardButton("🔙 Voltar", callback_data="clan_war_menu")]]
-
-    # Edição segura (texto vs caption)
-    try:
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-    except Exception:
-        try:
-            await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-        except Exception:
-            await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    keyboard = [[InlineKeyboardButton("🔙 Voltar", callback_data="war_menu")]]
+    await _safe_edit(query, text, InlineKeyboardMarkup(keyboard))
 
 
-# --- HANDLERS PARA EXPORTAR ---
-# ✅ Mantém: 'clan_war_menu' abre este menu visual (ranking por região)
-war_menu_handler = CallbackQueryHandler(show_war_menu, pattern=r"^clan_war_menu$")
+# ✅ NÃO usar mais clan_war_menu aqui (para não colidir com menu do clã)
+war_menu_handler = CallbackQueryHandler(show_war_menu, pattern=r"^war_menu$")
 war_ranking_handler = CallbackQueryHandler(show_region_ranking, pattern=r"^war_view:")
