@@ -3,6 +3,7 @@
 # + (NOVO) ABA "GUERRA DE CLÃS": líder abre inscrição, membros aderem (PREP), gating no engine.
 
 import logging
+from ui.ui_renderer import render_photo_or_text
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     InputMediaPhoto, InputMediaAnimation, InputMediaVideo
@@ -147,6 +148,16 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     if not query or not query.message:
         return
 
+    # Resolve chat_id ANTES de qualquer delete
+    chat_id = None
+    try:
+        chat_id = query.message.chat_id
+    except Exception:
+        try:
+            chat_id = update.effective_chat.id
+        except Exception:
+            chat_id = None
+
     media_fid = None
     media_type = "photo"
 
@@ -154,7 +165,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     try:
         if clan_data and clan_data.get("logo_media_key"):
             media_fid = clan_data.get("logo_media_key")
-            media_type = clan_data.get("logo_type", "photo")
+            media_type = clan_data.get("logo_type", "photo") or "photo"
     except Exception:
         pass
 
@@ -170,27 +181,29 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     reply_markup = InlineKeyboardMarkup(keyboard)
     target_has_media = bool(media_fid)
 
-    # Mídia atual da mensagem
+    # Mídia atual da mensagem (tipos)
     try:
-        current_has_media = bool(query.message.photo or query.message.video or query.message.animation)
+        current_is_photo = bool(query.message.photo)
+        current_is_video = bool(query.message.video)
+        current_is_anim = bool(query.message.animation)
+        current_has_media = current_is_photo or current_is_video or current_is_anim
     except Exception:
+        current_is_photo = current_is_video = current_is_anim = False
         current_has_media = False
 
+    # Decide se é seguro editar sem deletar
     must_delete_resend = False
 
-    # Se muda de "com mídia" para "sem mídia" (ou vice-versa), não dá pra só editar texto/caption com segurança
+    # Se muda entre "tem mídia" e "não tem", geralmente é mais seguro deletar+reenviar
     if target_has_media != current_has_media:
         must_delete_resend = True
     elif target_has_media:
-        # Se o tipo de mídia mudou (photo/video/animation), melhor deletar e reenviar
-        try:
-            if media_type == "video" and not query.message.video:
-                must_delete_resend = True
-            elif media_type == "animation" and not query.message.animation:
-                must_delete_resend = True
-            elif media_type == "photo" and not query.message.photo:
-                must_delete_resend = True
-        except Exception:
+        # Ambos têm mídia: se o tipo mudou, deletar+reenviar
+        if media_type == "video" and not current_is_video:
+            must_delete_resend = True
+        elif media_type == "animation" and not current_is_anim:
+            must_delete_resend = True
+        elif media_type == "photo" and not current_is_photo:
             must_delete_resend = True
 
     # --------------------------------------------------------------------------
@@ -199,19 +212,26 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     if not must_delete_resend:
         try:
             if target_has_media:
-                if media_type == "video":
-                    new_media = InputMediaVideo(media=media_fid, caption=text, parse_mode="HTML")
-                elif media_type == "animation":
-                    new_media = InputMediaAnimation(media=media_fid, caption=text, parse_mode="HTML")
-                else:
-                    new_media = InputMediaPhoto(media=media_fid, caption=text, parse_mode="HTML")
-
-                await query.edit_message_media(media=new_media, reply_markup=reply_markup)
+                # Se já há mídia do MESMO tipo, o correto é editar caption + teclado
+                # (Trocar "media" em foto->foto costuma falhar/desnecessário)
+                await query.edit_message_caption(
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup
+                )
             else:
-                await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+                await query.edit_message_text(
+                    text,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
             return
         except Exception as e:
-            # Se falhar qualquer edição (mídia inválida, etc.), forçamos delete+resend
+            # "Message is not modified" não é fatal: só sai
+            msg = str(e)
+            if "Message is not modified" in msg:
+                return
+
             logger.warning(f"[RENDER] Falha ao editar mensagem, caindo para delete+resend. Err={e}")
             must_delete_resend = True
 
@@ -224,16 +244,6 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
             await query.delete_message()
         except Exception:
             pass
-
-        # resolve chat_id com fallback
-        chat_id = None
-        try:
-            chat_id = query.message.chat_id
-        except Exception:
-            try:
-                chat_id = update.effective_chat.id
-            except Exception:
-                chat_id = None
 
         if not chat_id:
             return
@@ -269,7 +279,6 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
                     )
                     return
             except Exception as e:
-                # ✅ Aqui está o principal: se o file_id estiver inválido, cai para texto.
                 logger.warning(
                     f"[MEDIA FALLBACK] Falha ao enviar mídia ({media_type}). "
                     f"media_fid={media_fid} -> enviando TEXTO. Err={e}"
@@ -285,6 +294,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
             )
         except Exception as e:
             logger.error(f"Erro fatal rendering clan dashboard (texto): {e}")
+
 
 
 # ==============================================================================
@@ -744,16 +754,32 @@ async def clan_war_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def clan_war_register_clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()  # <- OBRIGATÓRIO
+    if query:
+        try: await query.answer()
+        except Exception: pass
 
-    user_id = get_current_player_id(update, context)
-    pdata = await player_manager.get_player_data(user_id)
+    user_id, pdata, clan_data, is_leader = await _require_clan_leader(update, context)
+    if not user_id or not pdata or not clan_data:
+        return
+
+    if not is_leader:
+        await _safe_answer(query, "Apenas o líder pode inscrever o clã.", show_alert=True)
+        return
+
     clan_id = pdata.get("clan_id")
+    res = await _engine_call("register_clan_for_war", str(clan_id), str(user_id))
 
-    await _engine_call("register_clan_for_war", str(clan_id), str(user_id))
+    if not res.get("ok"):
+        err = res.get("error") or res.get("reason") or "erro"
+        msg = res.get("message") or "Não foi possível inscrever o clã."
+        if err == "DB_OFFLINE":
+            msg = "Banco indisponível no momento. Verifique a conexão do Mongo no Render."
+        elif err == "SIGNUP_CLOSED":
+            msg = "Inscrição fechada (só em PREP com inscrição aberta)."
+        await _safe_answer(query, msg, show_alert=True)
 
-    # Atualiza menu
     await show_clan_war_menu(update, context)
+
 
 
 async def clan_war_join(update: Update, context: ContextTypes.DEFAULT_TYPE):

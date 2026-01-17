@@ -7,6 +7,7 @@ import html
 from datetime import datetime, timezone, timedelta 
 from zoneinfo import ZoneInfo
 from bson import ObjectId
+from ui.ui_renderer import render_menu, render_scope_text
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -26,6 +27,7 @@ from handlers.admin.utils import ensure_admin, parse_hybrid_id
 JOB_TIMEZONE = "America/Sao_Paulo"
 logger = logging.getLogger(__name__)
 (ASK_NAME,) = range(1)
+PREM_SCOPE = "admin_premium"
 
 def _parse_smart_date(value) -> datetime:
     if not value: return datetime.now(timezone.utc)
@@ -69,42 +71,70 @@ async def _entry_from_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await _show_player_panel(update, context, pdata)
             return ASK_NAME
     
-    await query.edit_message_text(
+    await render_menu(
+        update, context,
         "💎 <b>GERENCIADOR PREMIUM</b>\nEnvie o <b>Nome</b> ou <b>@Usuario</b>:",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]]),
+        scope=PREM_SCOPE,
+        allow_edit=True,
+        delete_previous_on_send=True,
     )
     return ASK_NAME
 
 async def _receive_name_or_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     txt = update.message.text.strip()
-    loading = await update.message.reply_text("🔍 ...", quote=True)
-    
+    chat_id = update.effective_chat.id
+
+    # Tenta editar o painel para "pesquisando..."
+    await render_scope_text(
+        context,
+        chat_id,
+        "🔍 <b>Buscando jogador...</b>",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]]),
+        scope=PREM_SCOPE,
+        parse_mode="HTML",
+    )
+
     try:
-        # 1. Tenta ID direto
         target_id = parse_hybrid_id(txt)
         pdata = None
-        
+
         if target_id:
             pdata = await get_player_data(target_id)
-            
-        # 2. Tenta por NOME ou USERNAME (Função corrigida no queries.py)
+
         if not pdata:
             found = await find_player_by_name(txt)
             if found:
                 target_id, pdata = found
-        
+
         if not pdata:
-            await loading.edit_text(f"❌ Não encontrado: <b>{html.escape(txt)}</b>\nVerifique se o nome/user está exato.", parse_mode="HTML")
+            # Edita o mesmo painel com erro
+            await render_scope_text(
+                context,
+                chat_id,
+                f"❌ Não encontrado: <b>{html.escape(txt)}</b>\nVerifique se o nome/user está exato.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Voltar", callback_data="admin_premium")],
+                    [InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]
+                ]),
+                scope=PREM_SCOPE,
+                parse_mode="HTML",
+            )
             return ASK_NAME
-            
+
         context.user_data['prem_target_id'] = target_id
-        await loading.delete()
         await _show_player_panel(update, context, pdata)
-        
+
     except Exception as e:
         logger.error(f"Erro painel premium: {e}")
-        await loading.edit_text(f"⚠️ Erro técnico: {str(e)}")
+        await render_scope_text(
+            context,
+            chat_id,
+            f"⚠️ Erro técnico: <code>{html.escape(str(e))}</code>",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Cancelar", callback_data="prem_close")]]),
+            scope=PREM_SCOPE,
+            parse_mode="HTML",
+        )
 
     return ASK_NAME
 
@@ -148,10 +178,23 @@ async def _show_player_panel(update: Update, context: ContextTypes.DEFAULT_TYPE,
     ]
     
     markup = InlineKeyboardMarkup(kb)
+
     if update.callback_query:
         await update.callback_query.edit_message_text(msg, reply_markup=markup, parse_mode="HTML")
     else:
-        await update.message.reply_text(msg, reply_markup=markup, parse_mode="HTML")
+        # EDITA o painel existente do scope
+        chat_id = update.effective_chat.id
+        ok = await render_scope_text(
+            context,
+            chat_id,
+            msg,
+            reply_markup=markup,
+            scope=PREM_SCOPE,
+            parse_mode="HTML",
+        )
+        if not ok:
+            # fallback: se por algum motivo não existir painel, cria via render_menu
+            await render_menu(update, context, msg, reply_markup=markup, scope=PREM_SCOPE, allow_edit=False)
 
 # --- AÇÕES DO MENU ---
 async def _action_set_tier(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -220,13 +263,23 @@ async def _action_change_user(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
     return ASK_NAME
 
+
 async def _action_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    try: 
-        await query.answer()
-        await query.delete_message()
-    except: pass
-    context.user_data.clear()
+    from handlers.admin_handler import _admin_menu_kb
+    await update.callback_query.answer()
+
+    # limpa apenas dados do premium
+    context.user_data.pop("prem_target_id", None)
+
+    # volta para o menu admin PRINCIPAL (markup correto)
+    await render_menu(
+        update, context,
+        "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:",
+        reply_markup=_admin_menu_kb(),   # <<<<<< AQUI está o ponto
+        scope="admin",
+        allow_edit=True,
+        delete_previous_on_send=True
+    )
     return ConversationHandler.END
 
 async def _cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

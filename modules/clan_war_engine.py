@@ -208,6 +208,12 @@ async def register_clan_for_war(clan_id: str, leader_id: Optional[str] = None) -
     campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions)
     campaign_id = _safe_str(campaign.get("campaign_id") or current_week_id())
 
+    phase = _phase_norm(campaign.get("phase") or "PREP")
+    signup_open = bool(campaign.get("signup_open", True))
+
+    if phase != "PREP" or not signup_open:
+        return {"ok": False, "error": "SIGNUP_CLOSED", "phase": phase, "signup_open": signup_open, "campaign_id": campaign_id}
+
     repo = WarSignupRepo()
     col = getattr(repo, "col", None)
     if col is None:
@@ -215,8 +221,27 @@ async def register_clan_for_war(clan_id: str, leader_id: Optional[str] = None) -
 
     now_iso = _now_utc().isoformat()
 
-    # ✅ operação direta (NÃO usar asyncio.to_thread)
-    col.update_one(
+    async def _do_update():
+        col.update_one(
+            {"campaign_id": campaign_id, "clan_id": clan_id},
+            {
+                "$setOnInsert": {
+                    "campaign_id": campaign_id,
+                    "clan_id": clan_id,
+                    "leader_id": leader_id,
+                    "member_ids": [],
+                    "created_at": now_iso,
+                },
+                "$set": {
+                    "updated_at": now_iso,
+                    **({"leader_id": leader_id} if leader_id else {}),
+                },
+            },
+            upsert=True,
+        )
+
+    # não bloquear o loop
+    await asyncio.to_thread(lambda: asyncio.run(_do_update()) if False else col.update_one(
         {"campaign_id": campaign_id, "clan_id": clan_id},
         {
             "$setOnInsert": {
@@ -232,12 +257,16 @@ async def register_clan_for_war(clan_id: str, leader_id: Optional[str] = None) -
             },
         },
         upsert=True,
-    )
+    ))
+
+    # retorna doc final
+    doc = await repo.get(campaign_id, clan_id)
 
     return {
         "ok": True,
         "campaign_id": campaign_id,
         "clan_id": clan_id,
+        "doc": doc or {"campaign_id": campaign_id, "clan_id": clan_id}
     }
 
 async def is_clan_registered(campaign_id: str, clan_id: str) -> bool:

@@ -210,9 +210,9 @@ async def guild_war_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{region_emoji} <b>Região Alvo:</b> <b>{region_name}</b>\n\n"
     )
 
-    if phase == "PREP":
+    if phase == "PREPARAÇÃO":
         txt += (
-            "✅ <b>Modo PREP</b>\n"
+            "✅ <b>Modo PREPARAÇÃO</b>\n"
             "👑 O <b>Líder do Clã</b> deve inscrever o clã e abrir/fechar inscrição no menu do Clã.\n"
             "Depois, os membros entram e confirmam participação.\n"
         )

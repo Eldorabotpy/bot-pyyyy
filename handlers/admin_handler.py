@@ -20,6 +20,7 @@ from telegram.ext import (
     ConversationHandler
 )
 from telegram.constants import ParseMode
+from modules.auth_utils import get_current_player_id
 
 # --- Imports de Banco e Utils ---
 from bson import ObjectId
@@ -58,6 +59,8 @@ from modules.player.stats import (
 )
 
 from modules import game_data
+from ui.ui_renderer import render_menu, notify
+from ui.ui_renderer import render_text
 
 # ----------------------------------------------------------------------
 # ✅ BLINDAGEM: imports legados do handlers.jobs (evita ImportError)
@@ -104,24 +107,82 @@ async def _safe_answer(update: Update):
             pass
 
 async def _safe_edit_text(update, context, text, reply_markup=None):
+    # "scope" do admin: tudo do painel admin fica no mesmo fluxo (uma tela só)
+    await render_text(
+        update,
+        context,
+        text,
+        reply_markup=reply_markup,
+        scope="admin",
+        parse_mode=HTML,
+        delete_previous_on_send=True,
+        allow_edit=True,
+    )
+
+
+# =========================================================
+# UI CLEAN HELPERS (1 mensagem por fluxo)
+# =========================================================
+
+async def _ui_try_delete(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int) -> None:
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception:
+        pass
+
+def _ui_get_chat_and_msg(update: Update):
+    if update.callback_query and update.callback_query.message:
+        return update.callback_query.message.chat_id, update.callback_query.message
+    return update.effective_chat.id, None
+
+async def ui_render_text(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_markup=None) -> None:
+    """
+    Regra:
+    - Callback: tenta editar a mensagem do menu.
+      Se falhar (BadRequest etc.), deleta e envia uma nova.
+    - Comando/mensagem: apaga o último menu do bot (se existir) e envia um novo.
+    Salva o menu atual em context.user_data["last_menu_msg_id"].
+    """
+    chat_id, msg = _ui_get_chat_and_msg(update)
+
+    # Responde callback para tirar "loading..."
     if update.callback_query:
         try:
-            await update.callback_query.edit_message_text(text, parse_mode=HTML, reply_markup=reply_markup)
-        except:
+            await update.callback_query.answer()
+        except Exception:
             pass
-    else:
-        await context.bot.send_message(update.effective_chat.id, text, parse_mode=HTML, reply_markup=reply_markup)
 
-async def _send_admin_menu(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
-    try:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="🎛️ <b>Painel do Admin</b>\nEscolha uma opção:",
-            reply_markup=_admin_menu_kb(),
-            parse_mode=HTML,
-        )
-    except Exception as e:
-        logger.error(f"Falha menu admin: {e}")
+    # Caso callback: tenta editar primeiro
+    if msg is not None:
+        try:
+            await msg.edit_text(text=text, parse_mode=HTML, reply_markup=reply_markup, disable_web_page_preview=True)
+            context.user_data["last_menu_msg_id"] = msg.message_id
+            return
+        except Exception:
+            # se não der para editar: apaga e manda novo
+            await _ui_try_delete(context, chat_id, msg.message_id)
+
+    # Não-callback ou fallback: apaga menu anterior do bot
+    last_id = context.user_data.get("last_menu_msg_id")
+    if last_id:
+        await _ui_try_delete(context, chat_id, last_id)
+
+    sent = await context.bot.send_message(chat_id=chat_id, text=text, parse_mode=HTML, reply_markup=reply_markup, disable_web_page_preview=True)
+    context.user_data["last_menu_msg_id"] = sent.message_id
+
+async def _send_admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await render_text(
+        update,
+        context,
+        "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:",
+        reply_markup=_admin_menu_kb(),
+        scope="admin",
+        parse_mode=HTML,
+        delete_previous_on_send=True,
+        allow_edit=True
+    )
+
+
 
 # =========================================================
 # MENUS
@@ -164,6 +225,58 @@ def _admin_test_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🚀 Iniciar Wave X", callback_data="test_start_at_wave")],
         [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")],
     ])
+
+async def ui_render(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_markup=None, media: dict | None = None) -> None:
+    """
+    media esperado:
+      {"file_id": "...", "file_type": "photo"|"video"|"animation"|"document"}
+    Se não houver media ou for inválida, envia texto normalmente.
+    Para callback, tenta editar texto/caption; se falhar, deleta e reenvia.
+    """
+    chat_id, msg = _ui_get_chat_and_msg(update)
+
+    if update.callback_query:
+        try:
+            await update.callback_query.answer()
+        except Exception:
+            pass
+
+    # Se não tem media válida, cai no texto puro
+    file_id = (media or {}).get("file_id")
+    ftype = ((media or {}).get("file_type") or "").lower()
+
+    if not file_id or ftype not in ("photo", "video", "animation", "document"):
+        return await ui_render_text(update, context, text, reply_markup=reply_markup)
+
+    # Callback: tenta editar caption (quando existir)
+    if msg is not None:
+        try:
+            await msg.edit_caption(caption=text, parse_mode=HTML, reply_markup=reply_markup)
+            context.user_data["last_menu_msg_id"] = msg.message_id
+            return
+        except Exception:
+            await _ui_try_delete(context, chat_id, msg.message_id)
+
+    # Apaga menu anterior
+    last_id = context.user_data.get("last_menu_msg_id")
+    if last_id:
+        await _ui_try_delete(context, chat_id, last_id)
+
+    try:
+        if ftype == "photo":
+            sent = await context.bot.send_photo(chat_id=chat_id, photo=file_id, caption=text, parse_mode=HTML, reply_markup=reply_markup)
+        elif ftype == "video":
+            sent = await context.bot.send_video(chat_id=chat_id, video=file_id, caption=text, parse_mode=HTML, reply_markup=reply_markup)
+        elif ftype == "animation":
+            sent = await context.bot.send_animation(chat_id=chat_id, animation=file_id, caption=text, parse_mode=HTML, reply_markup=reply_markup)
+        else:
+            sent = await context.bot.send_document(chat_id=chat_id, document=file_id, caption=text, parse_mode=HTML, reply_markup=reply_markup)
+
+        context.user_data["last_menu_msg_id"] = sent.message_id
+        return
+    except Exception:
+        # fallback absoluto: texto
+        return await ui_render_text(update, context, text, reply_markup=reply_markup)
 
 # =========================================================
 # HANDLERS GERAIS
@@ -226,11 +339,16 @@ async def _handle_force_start_event(update: Update, context: ContextTypes.DEFAUL
         await update.callback_query.answer("event_manager indisponível.", show_alert=True)
         return
 
-    query = update.callback_query
-    await query.answer("Iniciando...")
+    await update.callback_query.answer("Iniciando...")
     result = await event_manager.start_event()
     msg = result.get("success") or result.get("error") or "Erro desconhecido"
-    await query.message.reply_text(f"Event Start: {msg}")
+
+    await ui_render_text(
+        update, context,
+        f"✅ <b>Event Start</b>\n{msg}",
+        reply_markup=_admin_event_menu_kb()
+    )
+
 
 async def _handle_force_end_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_admin(update): 
@@ -524,7 +642,7 @@ async def _cache_clear_user(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if uid:
         await clear_player_cache(uid)
     await update.message.reply_text("Cache limpo.")
-    await _send_admin_menu(update.effective_chat.id, context)
+    await _send_admin_menu(update, context)
     return ConversationHandler.END
 
 async def _cache_confirm_clear_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -541,7 +659,7 @@ async def _cache_do_clear_all(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ConversationHandler.END
 
 async def _cache_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await _send_admin_menu(update.effective_chat.id, context)
+    await _send_admin_menu(update, context)
     return ConversationHandler.END
 
 clear_cache_conv_handler = ConversationHandler(
@@ -632,7 +750,7 @@ async def _delete_perform_btn(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ConversationHandler.END
 
 async def _delete_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await _send_admin_menu(update.effective_chat.id, context)
+    await _send_admin_menu(update, context)
     return ConversationHandler.END
 
 delete_player_conv_handler = ConversationHandler(
