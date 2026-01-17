@@ -40,6 +40,10 @@ from config import (
     STARTUP_IMAGE_ID
 )
 
+# 🔑 Inicializa o banco ANTES de qualquer handler
+from modules.database import initialize_database
+initialize_database()
+
 # --- IMPORTS DOS HANDLERS ESPECÍFICOS ---
 # Autenticação (Login/Registro)
 from handlers.auth_handler import auth_handler, logout_command, logout_callback

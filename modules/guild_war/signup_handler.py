@@ -1,5 +1,4 @@
 # handlers/guild_war/signup_handler.py
-
 from __future__ import annotations
 
 import logging
@@ -14,11 +13,9 @@ from modules import player_manager
 from modules.game_data import regions as game_data_regions
 
 from modules.guild_war.campaign import ensure_weekly_campaign
-from modules.guild_war.war_event import RegionWarRepo
+from modules.guild_war.war_event import WarSignupRepo
 from modules.guild_war.region import (
-    register_participant,
-    is_participant,
-    WarPhase,
+    CampaignPhase,
     get_region_meta,
     can_participate_in_region_war,
 )
@@ -38,7 +35,6 @@ def _fmt_dt_br(dt: Optional[datetime]) -> str:
 
 
 def _safe_level(player_data: Dict[str, Any]) -> int:
-    # fallback defensivo
     for k in ("level", "lvl", "player_level"):
         v = player_data.get(k)
         if isinstance(v, int):
@@ -49,20 +45,14 @@ def _safe_level(player_data: Dict[str, Any]) -> int:
 
 
 def _safe_clan_id(player_data: Dict[str, Any]) -> Optional[str]:
-    """
-    Ajuste aqui se no seu projeto o campo tiver outro nome.
-    """
-    # Mais comum
     cid = player_data.get("clan_id")
     if cid:
         return str(cid)
 
-    # Alternativas comuns
     cid = player_data.get("guild_id")
     if cid:
         return str(cid)
 
-    # Às vezes vem aninhado
     clan_obj = player_data.get("clan") or player_data.get("guild") or {}
     if isinstance(clan_obj, dict):
         cid = clan_obj.get("id") or clan_obj.get("_id")
@@ -84,10 +74,10 @@ async def guild_war_signup_handler(update: Update, context: ContextTypes.DEFAULT
     """
     Handler do botão: "Inscrever-se na Guerra".
 
-    Regras:
-    - 1 alvo por semana (bot define)
-    - Só permite inscrição se phase == SIGNUP_OPEN
-    - Dungeon não entra aqui (isso é no combate)
+    Regras do sistema único:
+    - 1 alvo por semana via war_campaigns.target_region_id
+    - Inscrição só quando phase==PREP e signup_open==True
+    - Registro de inscrição em war_signups (campaign_id+clan_id)
     """
     cq = update.callback_query
     if cq:
@@ -98,7 +88,6 @@ async def guild_war_signup_handler(update: Update, context: ContextTypes.DEFAULT
 
     player_id = await get_current_player_id_async(update, context)
     if not player_id:
-        # requires_login já cuida normalmente, mas mantém segurança
         if cq:
             await cq.answer("⚠️ Sessão expirada. Use /start.", show_alert=True)
         return
@@ -119,58 +108,56 @@ async def guild_war_signup_handler(update: Update, context: ContextTypes.DEFAULT
             await cq.edit_message_text(msg, parse_mode="HTML", reply_markup=_kb_after_signup())
         return
 
-    # 1) campanha semanal (bot escolhe)
+    # 1) campanha semanal (fonte única do alvo)
     campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions)
+    campaign_id = str(campaign.get("campaign_id") or "")
     target_region_id = str(campaign.get("target_region_id") or "")
-    if not target_region_id:
+    phase = str(campaign.get("phase") or "PREP").upper()
+    signup_open = bool(campaign.get("signup_open", True))
+
+    if not campaign_id or not target_region_id:
         msg = "⚠️ <b>Campanha semanal indisponível.</b>\nTente novamente em instantes."
         if cq:
             await cq.edit_message_text(msg, parse_mode="HTML", reply_markup=_kb_after_signup())
         return
 
-    # 2) carrega doc da região alvo
-    repo = RegionWarRepo()
-    doc = await repo.get(target_region_id)
+    region_meta = get_region_meta(game_data_regions, target_region_id)
 
-    # 3) valida fase
-    if doc.war.phase != WarPhase.SIGNUP_OPEN:
-        # Mostra status e janela se existir
-        window = doc.war.current_window
-        region_meta = get_region_meta(game_data_regions, target_region_id)
-
-        phase_label = {
-            WarPhase.PEACE: "Fora de Guerra",
-            WarPhase.SIGNUP_OPEN: "Inscrições Abertas",
-            WarPhase.ACTIVE: "Guerra Ativa",
-            WarPhase.LOCKED: "Apuração",
-        }.get(doc.war.phase, doc.war.phase.value)
-
+    # 2) valida fase/inscrição
+    if phase != CampaignPhase.PREP.value or not signup_open:
         msg = (
             f"{region_meta.get('emoji','📍')} <b>Guerra de Clãs</b>\n"
+            f"Rodada: <b>{campaign_id}</b>\n"
             f"Alvo da Semana: <b>{region_meta.get('display_name')}</b>\n\n"
-            f"Status: <b>{phase_label}</b>\n\n"
+            f"Status: <b>{phase}</b>\n"
+            f"Inscrição: <b>{'ABERTA' if signup_open else 'FECHADA'}</b>\n\n"
+            f"<i>A inscrição só é liberada durante o período de preparação (PREP) com inscrições abertas.</i>"
         )
-
-        if window:
-            msg += (
-                f"🕒 Janela: <b>{window.day.value}</b>\n"
-                f"Início: {_fmt_dt_br(window.starts_at)}\n"
-                f"Fim: {_fmt_dt_br(window.ends_at)}\n"
-            )
-        else:
-            msg += "🕒 Janela: —\n"
-
-        msg += "\n<i>A inscrição só é liberada quando o período de inscrição estiver aberto.</i>"
-
         if cq:
             await cq.edit_message_text(msg, parse_mode="HTML", reply_markup=_kb_after_signup())
         return
 
-    # 4) já inscrito?
-    if is_participant(doc, str(player_id)):
-        region_meta = get_region_meta(game_data_regions, target_region_id)
+    # 3) valida nível vs região (se quiser ser 100% livre, você pode remover este bloco)
+    level = _safe_level(player_data)
+    level_range = region_meta.get("level_range", (1, 999))
+    if not can_participate_in_region_war(level, level_range):
+        msg = (
+            f"❌ <b>Nível insuficiente para este alvo.</b>\n\n"
+            f"Alvo: <b>{region_meta.get('display_name')}</b>\n"
+            f"Faixa recomendada: <b>{level_range[0]}–{level_range[1]}</b>\n"
+            f"Seu nível: <b>{level}</b>\n"
+        )
+        if cq:
+            await cq.edit_message_text(msg, parse_mode="HTML", reply_markup=_kb_after_signup())
+        return
+
+    # 4) registra inscrição (por campanha + clã)
+    repo = WarSignupRepo()
+    already = await repo.is_member_signed_up(campaign_id, clan_id, str(player_id))
+    if already:
         msg = (
             f"✅ Você já está inscrito(a) na Guerra desta semana.\n\n"
+            f"Rodada: <b>{campaign_id}</b>\n"
             f"Alvo: <b>{region_meta.get('display_name')}</b>"
         )
         if cq:
@@ -178,43 +165,16 @@ async def guild_war_signup_handler(update: Update, context: ContextTypes.DEFAULT
             await cq.edit_message_text(msg, parse_mode="HTML", reply_markup=_kb_after_signup())
         return
 
-    # 5) valida level x região (se você quiser ser mais permissivo, pode remover)
-    level = _safe_level(player_data)
-    region_meta = get_region_meta(game_data_regions, target_region_id)
-    level_range = region_meta.get("level_range", (1, 999))
+    await repo.upsert_add_member(campaign_id, clan_id, member_id=str(player_id), leader_id=None)
 
-    if not can_participate_in_region_war(level, level_range):
-        msg = (
-            f"❌ <b>Nível insuficiente para este alvo.</b>\n\n"
-            f"Alvo: <b>{region_meta.get('display_name')}</b>\n"
-            f"Faixa recomendada: <b>{level_range[0]}–{level_range[1]}</b>\n"
-            f"Seu nível: <b>{level}</b>\n\n"
-            f"<i>Suba de nível e tente novamente na próxima janela de inscrição.</i>"
-        )
-        if cq:
-            await cq.edit_message_text(msg, parse_mode="HTML", reply_markup=_kb_after_signup())
-        return
-
-    # 6) registra inscrição
-    register_participant(doc, player_id=str(player_id), clan_id=str(clan_id), level=int(level))
-    await repo.upsert(doc)
-
-    window = doc.war.current_window
     msg = (
         f"✅ <b>Inscrição confirmada!</b>\n\n"
-        f"{region_meta.get('emoji','📍')} Alvo da Semana: <b>{region_meta.get('display_name')}</b>\n"
-        f"🏰 Seu clã: <b>{clan_id}</b>\n"
-        f"🎚️ Seu nível: <b>{level}</b>\n\n"
+        f"Rodada: <b>{campaign_id}</b>\n"
+        f"{region_meta.get('emoji','📍')} Alvo: <b>{region_meta.get('display_name')}</b>\n"
+        f"🏰 Clã: <b>{clan_id}</b>\n"
+        f"🎚️ Nível: <b>{level}</b>\n\n"
+        f"<i>Quando estiver ACTIVE, lute na região-alvo para somar pontos ao seu clã.</i>"
     )
-    if window:
-        msg += (
-            f"🕒 <b>Janela da Guerra</b>\n"
-            f"Dia: <b>{window.day.value}</b>\n"
-            f"Início: {_fmt_dt_br(window.starts_at)}\n"
-            f"Fim: {_fmt_dt_br(window.ends_at)}\n\n"
-        )
-
-    msg += "<i>Agora é só aguardar a guerra começar e lutar na região-alvo para somar influência.</i>"
 
     if cq:
         await cq.edit_message_text(msg, parse_mode="HTML", reply_markup=_kb_after_signup())

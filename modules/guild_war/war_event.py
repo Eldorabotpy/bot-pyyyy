@@ -1,242 +1,274 @@
 # modules/guild_war/war_event.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone, time
-from typing import Dict, Any, Optional
+import logging
 import asyncio
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional, List, Tuple
 
-from modules.database import db  # PyMongo sync global :contentReference[oaicite:2]{index=2}
+from modules.database import db
 
-from .region import (
-    WarDay, WarPhase, WarWindow,
-    RegionWarDocument, to_mongo, from_mongo,
-    open_signup, start_war, lock_war, resolve_war,
-)
+from .campaign import ensure_weekly_campaign, set_campaign_phase
+from .region import CampaignPhase
 
-# Campanha semanal: 1 alvo por semana definido pelo bot
-from .campaign import ensure_weekly_campaign
-
-
-# =============================================================================
-# Configuração
-# =============================================================================
-
+logger = logging.getLogger(__name__)
 UTC = timezone.utc
 
-# Horários (UTC) - se você quiser que seja horário Brasil (-03), ajustamos depois.
-THURSDAY_START = time(18, 0)
-THURSDAY_END   = time(22, 0)
-
-SUNDAY_START   = time(15, 0)
-SUNDAY_END     = time(21, 0)
-
-# Quanto tempo antes abrir inscrição
-SIGNUP_LEAD_TIME = timedelta(hours=1)
-
-# Coleção do estado de guerra por região
-REGION_WAR_COLLECTION = "region_war_state"
+WAR_SIGNUPS_COLLECTION = "war_signups"
+WAR_SCORES_COLLECTION = "war_scores"
 
 
-def _get_collection():
+def _get_col(name: str):
     if db is None:
         raise RuntimeError("Mongo db não inicializado (modules.database.db is None).")
-    return db.get_collection(REGION_WAR_COLLECTION)
+    return db.get_collection(name)
+
+
+def _now_utc() -> datetime:
+    return datetime.now(UTC)
+
+
+def _norm_id(v: Any) -> str:
+    if v is None:
+        return ""
+    return str(v)
+
+
+def _safe_int(v: Any, default: int = 0) -> int:
+    try:
+        return int(v)
+    except Exception:
+        return int(default)
 
 
 # =============================================================================
-# Persistência (PyMongo sync -> asyncio.to_thread)
+# Repositórios (campanha -> inscrições -> placares)
 # =============================================================================
 
-class RegionWarRepo:
-    """
-    Repositório de estado de guerra por região.
-    Como o PyMongo é síncrono no seu projeto, usamos asyncio.to_thread.
-    """
+class WarSignupRepo:
+    def __init__(self):
+        self.col = _get_col(WAR_SIGNUPS_COLLECTION)
 
-    async def get(self, region_id: str) -> RegionWarDocument:
-        col = _get_collection()
-        data = await asyncio.to_thread(col.find_one, {"region_id": str(region_id)})
+    async def get(self, campaign_id: str, clan_id: str) -> Optional[Dict[str, Any]]:
+        cid = _norm_id(campaign_id)
+        gid = _norm_id(clan_id)
+        return await asyncio.to_thread(self.col.find_one, {"campaign_id": cid, "clan_id": gid})
 
-        if not data:
-            doc = RegionWarDocument(region_id=str(region_id))
-            await asyncio.to_thread(col.insert_one, to_mongo(doc))
-            return doc
+    async def upsert_add_member(
+        self,
+        campaign_id: str,
+        clan_id: str,
+        member_id: str,
+        leader_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Insere doc se não existir e adiciona membro ao set.
+        """
+        cid = _norm_id(campaign_id)
+        gid = _norm_id(clan_id)
+        mid = _norm_id(member_id)
+        now_iso = _now_utc().isoformat()
 
-        return from_mongo(data)
+        base_set: Dict[str, Any] = {"updated_at": now_iso}
+        if leader_id:
+            base_set["leader_id"] = _norm_id(leader_id)
 
-    async def upsert(self, doc: RegionWarDocument) -> None:
-        col = _get_collection()
-        payload = to_mongo(doc)
-
-        # update_one(filter, update, upsert=True)
         await asyncio.to_thread(
-            col.update_one,
-            {"region_id": doc.region_id},
-            {"$set": payload},
-            True,  # upsert=True (posição 4, compatível com PyMongo)
+            self.col.update_one,
+            {"campaign_id": cid, "clan_id": gid},
+            {
+                "$setOnInsert": {
+                    "campaign_id": cid,
+                    "clan_id": gid,
+                    "leader_id": base_set.get("leader_id"),
+                    "member_ids": [],
+                    "created_at": now_iso,
+                },
+                "$set": base_set,
+                "$addToSet": {"member_ids": mid},
+            },
+            True,
+        )
+        return (await self.get(cid, gid)) or {"campaign_id": cid, "clan_id": gid, "member_ids": [mid]}
+
+    async def remove_member(self, campaign_id: str, clan_id: str, member_id: str) -> None:
+        cid = _norm_id(campaign_id)
+        gid = _norm_id(clan_id)
+        mid = _norm_id(member_id)
+        await asyncio.to_thread(
+            self.col.update_one,
+            {"campaign_id": cid, "clan_id": gid},
+            {"$pull": {"member_ids": mid}, "$set": {"updated_at": _now_utc().isoformat()}},
+            False,
         )
 
+    async def is_member_signed_up(self, campaign_id: str, clan_id: str, member_id: str) -> bool:
+        doc = await self.get(campaign_id, clan_id)
+        if not doc:
+            return False
+        mids = doc.get("member_ids") or []
+        return _norm_id(member_id) in set(_norm_id(x) for x in mids)
 
-# =============================================================================
-# Scheduler de janelas (quinta e domingo)
-# =============================================================================
-
-def _weekday_to_war_day(dt: datetime) -> Optional[WarDay]:
-    # Monday=0 ... Sunday=6
-    wd = dt.weekday()
-    if wd == 3:
-        return WarDay.THURSDAY
-    if wd == 6:
-        return WarDay.SUNDAY
-    return None
-
-
-def _make_window_for_date(day: WarDay, date_utc: datetime) -> WarWindow:
-    """
-    Cria WarWindow para uma data (UTC).
-    """
-    if day == WarDay.THURSDAY:
-        start_t, end_t = THURSDAY_START, THURSDAY_END
-    else:
-        start_t, end_t = SUNDAY_START, SUNDAY_END
-
-    starts_at = datetime.combine(date_utc.date(), start_t, tzinfo=UTC)
-    ends_at   = datetime.combine(date_utc.date(), end_t, tzinfo=UTC)
-
-    if ends_at <= starts_at:
-        ends_at += timedelta(days=1)
-
-    return WarWindow(day=day, starts_at=starts_at, ends_at=ends_at)
+    async def count_members(self, campaign_id: str, clan_id: str) -> int:
+        doc = await self.get(campaign_id, clan_id)
+        if not doc:
+            return 0
+        return len(doc.get("member_ids") or [])
 
 
-def get_next_window(now: Optional[datetime] = None) -> WarWindow:
-    """
-    Retorna a próxima janela de guerra (quinta ou domingo) a partir de agora.
-    """
-    now = now or datetime.now(UTC)
+class WarScoreRepo:
+    def __init__(self):
+        self.col = _get_col(WAR_SCORES_COLLECTION)
 
-    today_day = _weekday_to_war_day(now)
-    if today_day:
-        w = _make_window_for_date(today_day, now)
-        if now < w.ends_at:
-            return w
+    async def get(self, campaign_id: str, clan_id: str) -> Dict[str, Any]:
+        cid = _norm_id(campaign_id)
+        gid = _norm_id(clan_id)
+        doc = await asyncio.to_thread(self.col.find_one, {"campaign_id": cid, "clan_id": gid})
+        if not doc:
+            return {"campaign_id": cid, "clan_id": gid, "total": 0, "pve": 0, "pvp": 0}
+        return {
+            "campaign_id": cid,
+            "clan_id": gid,
+            "total": _safe_int(doc.get("total"), 0),
+            "pve": _safe_int(doc.get("pve"), 0),
+            "pvp": _safe_int(doc.get("pvp"), 0),
+        }
 
-    for i in range(1, 8):
-        d = now + timedelta(days=i)
-        wd = _weekday_to_war_day(d)
-        if wd:
-            return _make_window_for_date(wd, d)
+    async def add_points(self, campaign_id: str, clan_id: str, pve: int = 0, pvp: int = 0) -> Dict[str, Any]:
+        cid = _norm_id(campaign_id)
+        gid = _norm_id(clan_id)
+        pve = _safe_int(pve, 0)
+        pvp = _safe_int(pvp, 0)
+        total = pve + pvp
+        if total == 0:
+            return await self.get(cid, gid)
 
-    # fallback (não deveria ocorrer)
-    return _make_window_for_date(WarDay.SUNDAY, now + timedelta(days=7))
+        now_iso = _now_utc().isoformat()
+        await asyncio.to_thread(
+            self.col.update_one,
+            {"campaign_id": cid, "clan_id": gid},
+            {
+                "$setOnInsert": {"campaign_id": cid, "clan_id": gid, "created_at": now_iso},
+                "$inc": {"total": total, "pve": pve, "pvp": pvp},
+                "$set": {"updated_at": now_iso},
+            },
+            True,
+        )
+        return await self.get(cid, gid)
 
+    async def reset_campaign(self, campaign_id: str) -> None:
+        cid = _norm_id(campaign_id)
+        await asyncio.to_thread(self.col.delete_many, {"campaign_id": cid})
 
-def get_current_window(now: Optional[datetime] = None) -> Optional[WarWindow]:
-    """
-    Se estamos dentro de uma janela de quinta/domingo, retorna a janela atual.
-    """
-    now = now or datetime.now(UTC)
-    wd = _weekday_to_war_day(now)
-    if not wd:
-        return None
-
-    w = _make_window_for_date(wd, now)
-    return w if w.is_open(now) else None
-
-
-# =============================================================================
-# Orquestrador por região
-# =============================================================================
-
-@dataclass
-class TickResult:
-    did_change: bool
-    message: Optional[str] = None
-    resolved_result: Optional[Dict[str, Any]] = None
-
-
-class WarEventService:
-    """
-    Serviço que roda periodicamente (tick) e:
-    - abre inscrição (SIGNUP_OPEN)
-    - inicia guerra (ACTIVE)
-    - fecha e resolve (LOCKED -> resolve -> PEACE)
-    """
-
-    def __init__(self, repo: RegionWarRepo):
-        self.repo = repo
-
-    async def tick_region(self, region_id: str, now: Optional[datetime] = None) -> TickResult:
-        now = now or datetime.now(UTC)
-        doc = await self.repo.get(region_id)
-
-        # Se já existe uma janela associada, continua nela; senão calcula a próxima.
-        next_window = doc.war.current_window or get_next_window(now)
-
-        # 1) PEACE -> SIGNUP_OPEN quando entra no lead time
-        if doc.war.phase == WarPhase.PEACE:
-            if (next_window.starts_at - SIGNUP_LEAD_TIME) <= now < next_window.starts_at:
-                open_signup(doc, next_window)
-                await self.repo.upsert(doc)
-                return TickResult(True, f"[WAR] Signup aberto para {next_window.day.value} (region={region_id})")
-            return TickResult(False)
-
-        # 2) SIGNUP_OPEN -> ACTIVE ao iniciar janela
-        if doc.war.phase == WarPhase.SIGNUP_OPEN:
-            if next_window.starts_at <= now < next_window.ends_at:
-                start_war(doc)
-                await self.repo.upsert(doc)
-                return TickResult(True, f"[WAR] Guerra iniciada ({next_window.day.value}) (region={region_id})")
-
-            # Se já passou do fim sem iniciar, reseta
-            if now >= next_window.ends_at:
-                doc.war.phase = WarPhase.PEACE
-                doc.war.current_window = None
-                await self.repo.upsert(doc)
-                return TickResult(True, f"[WAR] Janela expirou sem iniciar. Reset (region={region_id})")
-
-            return TickResult(False)
-
-        # 3) ACTIVE -> resolve no fim
-        if doc.war.phase == WarPhase.ACTIVE:
-            if now >= next_window.ends_at:
-                lock_war(doc)
-                result = resolve_war(doc, next_window.day)
-                await self.repo.upsert(doc)
-                return TickResult(True, f"[WAR] Guerra encerrada ({next_window.day.value}) (region={region_id})", result)
-
-            return TickResult(False)
-
-        # 4) LOCKED -> PEACE (segurança, normalmente resolve_war já voltou pra PEACE)
-        if doc.war.phase == WarPhase.LOCKED:
-            doc.war.phase = WarPhase.PEACE
-            doc.war.current_window = None
-            await self.repo.upsert(doc)
-            return TickResult(True, f"[WAR] LOCKED limpo (region={region_id})")
-
-        return TickResult(False)
+    async def top_clans(self, campaign_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        cid = _norm_id(campaign_id)
+        cursor = await asyncio.to_thread(
+            lambda: list(self.col.find({"campaign_id": cid}).sort("total", -1).limit(int(limit)))
+        )
+        out: List[Dict[str, Any]] = []
+        for d in cursor or []:
+            out.append({
+                "clan_id": _norm_id(d.get("clan_id")),
+                "total": _safe_int(d.get("total"), 0),
+                "pve": _safe_int(d.get("pve"), 0),
+                "pvp": _safe_int(d.get("pvp"), 0),
+            })
+        return out
 
 
 # =============================================================================
-# Tick do ALVO SEMANAL (1 alvo por semana, bot escolhe)
+# Orquestração (admin/testes e tick)
 # =============================================================================
 
-async def tick_weekly_target(
-    game_data_regions_module,
-    now: Optional[datetime] = None,
-) -> TickResult:
+async def start_week_prep(game_data_regions_module, now: Optional[datetime] = None) -> Dict[str, Any]:
     """
-    Garante a campanha semanal e roda o tick SOMENTE na região-alvo da semana.
+    Admin: inicia semana em PREP, abre inscrição, zera placar.
     """
-    now = now or datetime.now(UTC)
+    now = now or _now_utc()
+    campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions_module, now=now)
 
-    campaign = await ensure_weekly_campaign(
-        game_data_regions_module=game_data_regions_module,
-        now=now,
-        avoid_last_n=2,
+    campaign_id = _norm_id(campaign.get("campaign_id"))
+    await set_campaign_phase(campaign_id, phase=CampaignPhase.PREP.value, signup_open=True)
+
+    # zera placares da campanha
+    await WarScoreRepo().reset_campaign(campaign_id)
+
+    # opcional: limpar inscrições da campanha (recomeço de teste rápido)
+    await asyncio.to_thread(_get_col(WAR_SIGNUPS_COLLECTION).delete_many, {"campaign_id": campaign_id})
+
+    campaign["phase"] = CampaignPhase.PREP.value
+    campaign["signup_open"] = True
+    return campaign
+
+
+async def force_active(game_data_regions_module, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """
+    Admin: força ACTIVE (quinta/domingo) para teste.
+    """
+    now = now or _now_utc()
+    campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions_module, now=now)
+    campaign_id = _norm_id(campaign.get("campaign_id"))
+    await set_campaign_phase(campaign_id, phase=CampaignPhase.ACTIVE.value, signup_open=False)
+    campaign["phase"] = CampaignPhase.ACTIVE.value
+    campaign["signup_open"] = False
+    return campaign
+
+
+async def finalize_campaign(game_data_regions_module, now: Optional[datetime] = None, top_n: int = 5) -> Dict[str, Any]:
+    """
+    Admin: encerra e gera ranking (topN).
+    """
+    now = now or _now_utc()
+    campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions_module, now=now)
+    campaign_id = _norm_id(campaign.get("campaign_id"))
+
+    score_repo = WarScoreRepo()
+    top = await score_repo.top_clans(campaign_id, limit=int(top_n))
+
+    winner = top[0] if top else None
+
+    await set_campaign_phase(
+        campaign_id,
+        phase=CampaignPhase.ENDED.value,
+        signup_open=False,
+        extra_set={
+            "result": {
+                "winner": winner,
+                "top": top,
+                "finalized_at": _now_utc().isoformat(),
+            }
+        }
     )
-    target_region_id = str(campaign["target_region_id"])
 
-    service = WarEventService(repo=RegionWarRepo())
-    return await service.tick_region(target_region_id, now=now)
+    campaign["phase"] = CampaignPhase.ENDED.value
+    campaign["signup_open"] = False
+    campaign["result"] = {"winner": winner, "top": top}
+    return campaign
+
+
+async def tick_weekly_campaign(game_data_regions_module, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """
+    Tick único do evento (scheduler chamará isso):
+    - garante campanha semanal
+    - ajusta phase/signups conforme dia (quinta/domingo ACTIVE; resto PREP)
+    """
+    now = now or _now_utc()
+    campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions_module, now=now)
+    campaign_id = _norm_id(campaign.get("campaign_id"))
+
+    # ISO weekday: Monday=1 ... Sunday=7
+    wd = int(now.isoweekday())
+
+    # Quinta (4) e Domingo (7) -> ACTIVE
+    should_be_active = wd in (4, 7)
+
+    if should_be_active:
+        await set_campaign_phase(campaign_id, phase=CampaignPhase.ACTIVE.value, signup_open=False)
+        campaign["phase"] = CampaignPhase.ACTIVE.value
+        campaign["signup_open"] = False
+    else:
+        await set_campaign_phase(campaign_id, phase=CampaignPhase.PREP.value, signup_open=True)
+        campaign["phase"] = CampaignPhase.PREP.value
+        campaign["signup_open"] = True
+
+    return campaign

@@ -6,8 +6,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Tuple
 import random
 import asyncio
+import logging
 
-from modules.database import db  # usa o db global (pymongo sync) :contentReference[oaicite:2]{index=2}
+from modules.database import db  # pymongo sync
+
+logger = logging.getLogger(__name__)
 
 UTC = timezone.utc
 WAR_CAMPAIGNS_COLLECTION = "war_campaigns"
@@ -15,23 +18,30 @@ WAR_CAMPAIGNS_COLLECTION = "war_campaigns"
 
 @dataclass
 class WarCampaign:
-    campaign_id: str          # ex: "2026-W03"
-    season: int               # ano ISO
-    week: int                 # semana ISO
-    starts_at: str            # ISO UTC
-    ends_at: str              # ISO UTC
+    campaign_id: str
+    season: int
+    week: int
+    starts_at: str
+    ends_at: str
     target_region_id: str
-    created_at: str           # ISO UTC
+    phase: str
+    signup_open: bool
+    created_at: str
+    updated_at: str
 
 
 def _col():
+    """
+    Retorna a collection de campanhas.
+    NÃO derruba a aplicação se o DB ainda não estiver inicializado.
+    """
     if db is None:
-        raise RuntimeError("Mongo db não inicializado (modules.database.db is None).")
+        return None
     return db.get_collection(WAR_CAMPAIGNS_COLLECTION)
 
 
 def _iso_week_id(dt: datetime) -> Tuple[int, int, str]:
-    iso = dt.isocalendar()  # (year, week, weekday)
+    iso = dt.isocalendar()
     season = int(iso.year)
     week = int(iso.week)
     cid = f"{season}-W{week:02d}"
@@ -39,9 +49,6 @@ def _iso_week_id(dt: datetime) -> Tuple[int, int, str]:
 
 
 def _week_bounds_utc(dt: datetime) -> Tuple[datetime, datetime]:
-    """
-    Semana ISO: segunda 00:00:00 até domingo 23:59:59.999 (UTC).
-    """
     dt = dt.astimezone(UTC)
     monday = dt - timedelta(days=dt.weekday())
     monday0 = datetime(monday.year, monday.month, monday.day, 0, 0, 0, tzinfo=UTC)
@@ -51,21 +58,69 @@ def _week_bounds_utc(dt: datetime) -> Tuple[datetime, datetime]:
 
 async def get_campaign(campaign_id: str) -> Optional[Dict[str, Any]]:
     col = _col()
+    if col is None:
+        return None
     return await asyncio.to_thread(col.find_one, {"campaign_id": str(campaign_id)})
 
 
 async def get_latest_campaign() -> Optional[Dict[str, Any]]:
     col = _col()
+    if col is None:
+        return None
     return await asyncio.to_thread(col.find_one, {}, sort=[("created_at", -1)])
 
 
 async def upsert_campaign(payload: Dict[str, Any]) -> None:
     col = _col()
+    if col is None:
+        logger.warning("[GUILD_WAR] DB indisponível — campanha não persistida.")
+        return
+
+    now_iso = datetime.now(UTC).isoformat()
+
+    payload = dict(payload or {})
+    payload.setdefault("phase", "PREP")
+    payload.setdefault("signup_open", True)
+    payload.setdefault("updated_at", now_iso)
+    payload.setdefault("created_at", now_iso)
+
     await asyncio.to_thread(
         col.update_one,
         {"campaign_id": payload["campaign_id"]},
         {"$set": payload},
-        True,  # upsert=True
+        True,
+    )
+
+
+async def set_campaign_phase(
+    campaign_id: str,
+    phase: str,
+    signup_open: Optional[bool] = None,
+    extra_set: Optional[Dict[str, Any]] = None,
+) -> None:
+    col = _col()
+    if col is None:
+        logger.warning("[GUILD_WAR] DB indisponível — set_campaign_phase ignorado.")
+        return
+
+    phase = str(phase).upper()
+    if phase not in ("PREP", "ACTIVE", "ENDED"):
+        raise ValueError(f"phase inválida: {phase}")
+
+    payload: Dict[str, Any] = {
+        "phase": phase,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    if signup_open is not None:
+        payload["signup_open"] = bool(signup_open)
+    if extra_set:
+        payload.update(extra_set)
+
+    await asyncio.to_thread(
+        col.update_one,
+        {"campaign_id": str(campaign_id)},
+        {"$set": payload},
+        False,
     )
 
 
@@ -79,12 +134,6 @@ def choose_weekly_target_region(
     regions_data: Dict[str, Any],
     previous_targets: List[str],
 ) -> str:
-    """
-    Seleciona 1 alvo por semana.
-    Regras:
-    - evita repetir as últimas N (previous_targets)
-    - ignora regiões marcadas como disabled=True (se existir)
-    """
     regions_data = regions_data or {}
     all_ids = list(regions_data.keys())
 
@@ -93,16 +142,16 @@ def choose_weekly_target_region(
         meta = regions_data.get(rid) or {}
         if meta.get("disabled") is True:
             continue
-        candidates.append(rid)
+        candidates.append(str(rid))
 
     if not candidates:
-        raise ValueError("Nenhuma região candidata disponível (REGIONS_DATA vazio ou tudo disabled).")
+        raise ValueError("Nenhuma região candidata disponível.")
 
-    blocked = set(previous_targets or [])
+    blocked = set(str(x) for x in (previous_targets or []))
     non_repeating = [r for r in candidates if r not in blocked]
 
     pool = non_repeating if non_repeating else candidates
-    return random.choice(pool)
+    return str(random.choice(pool))
 
 
 async def ensure_weekly_campaign(
@@ -112,17 +161,38 @@ async def ensure_weekly_campaign(
 ) -> Dict[str, Any]:
     """
     Garante campanha da semana atual.
-    - Se existe, retorna.
-    - Se não existe, cria com 1 alvo (bot escolhe).
+    Se DB não estiver disponível, retorna fallback seguro.
     """
     now = now or datetime.now(UTC)
     season, week, cid = _iso_week_id(now)
 
+    # --- DB OFFLINE: fallback seguro ---
+    if _col() is None:
+        return {
+            "campaign_id": cid,
+            "season": season,
+            "week": week,
+            "starts_at": "",
+            "ends_at": "",
+            "target_region_id": "",
+            "phase": "PREP",
+            "signup_open": False,
+            "created_at": "",
+            "updated_at": "",
+        }
+
     existing = await get_campaign(cid)
     if existing:
+        phase = str(existing.get("phase") or "PREP").upper()
+        signup_open = bool(existing.get("signup_open", True))
+        if phase not in ("PREP", "ACTIVE", "ENDED"):
+            phase = "PREP"
+        if existing.get("phase") != phase or existing.get("signup_open") != signup_open:
+            await set_campaign_phase(cid, phase=phase, signup_open=signup_open)
+            existing["phase"] = phase
+            existing["signup_open"] = signup_open
         return existing
 
-    # histórico mínimo: evita repetir a última (ou mais, se você buscar N docs)
     previous_targets: List[str] = []
     latest = await get_latest_campaign()
     if latest and latest.get("target_region_id"):
@@ -134,6 +204,7 @@ async def ensure_weekly_campaign(
     target = choose_weekly_target_region(regions_data, previous_targets)
 
     start, end = _week_bounds_utc(now)
+    now_iso = datetime.now(UTC).isoformat()
 
     payload = {
         "campaign_id": cid,
@@ -142,7 +213,10 @@ async def ensure_weekly_campaign(
         "starts_at": start.isoformat(),
         "ends_at": end.isoformat(),
         "target_region_id": str(target),
-        "created_at": datetime.now(UTC).isoformat(),
+        "phase": "PREP",
+        "signup_open": True,
+        "created_at": now_iso,
+        "updated_at": now_iso,
     }
 
     await upsert_campaign(payload)

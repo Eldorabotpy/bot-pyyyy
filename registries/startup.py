@@ -17,9 +17,10 @@ from handlers.jobs import (
     start_world_boss_job,
     end_world_boss_job,
     check_premium_expiry_job,
-    job_pvp_monthly_reset
+    job_pvp_monthly_reset,
+    # NOVO: guerra de clãs (jobs do sistema único)
+    guild_war_finalize_job,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +68,13 @@ async def run_system_startup_tasks(application: Application):
                     chat_id=target_chat_id,
                     photo=STARTUP_IMAGE_ID,
                     caption=msg_text,
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
             else:
                 await application.bot.send_message(
                     chat_id=target_chat_id,
                     text=msg_text,
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
         except Exception as e:
             logger.error(f"Falha ao enviar msg de startup: {e}")
@@ -94,17 +95,19 @@ def setup_scheduler(application: Application):
 
     logger.info(f"📅 Configurando Jobs no fuso: {tz}")
 
-    # Watchdogs contínuos
+    # -------------------------------------------------------------------------
+    # WATCHDOGS contínuos
+    # -------------------------------------------------------------------------
     jq.run_repeating(check_premium_expiry_job, interval=60, first=10, name="premium_watchdog")
     jq.run_repeating(regenerate_energy_job, interval=60, first=5, name="energy_regen")
 
-    # Jobs diários (meia-noite)
+    # -------------------------------------------------------------------------
+    # JOBS diários (meia-noite)
+    # -------------------------------------------------------------------------
     midnight = dt_time(hour=0, minute=0, tzinfo=tz)
 
-    # ✅ OPCIONAL: reseta entradas do sistema de claim (se existir no projeto)
-    # Evita crash quando a função não existe/ não foi implementada.
+    # ✅ Opcional: reseta entradas do sistema de claim (se existir)
     try:
-        # Ajuste este import se o job estiver em outro local:
         from handlers.jobs import daily_reset_event_entries_job  # type: ignore
         jq.run_daily(daily_reset_event_entries_job, time=midnight, name="daily_reset_event_entries")
         logger.info("✅ [SCHEDULER] Job daily_reset_event_entries agendado.")
@@ -118,17 +121,39 @@ def setup_scheduler(application: Application):
     # PvP mensal (mantido)
     jq.run_daily(job_pvp_monthly_reset, time=dt_time(hour=0, minute=5, tzinfo=tz), name="pvp_monthly_check")
 
-    # ✅ GUERRA DE CLÃS: tick + jobs específicos (não derruba caso engine falhe)
-
+    # -------------------------------------------------------------------------
+    # ✅ GUERRA DE CLÃS — SISTEMA ÚNICO (guild_war)
+    # -------------------------------------------------------------------------
     try:
-        from modules import clan_war_engine
-        clan_war_engine.register_war_jobs(application)
-        logger.info("✅ [SCHEDULER] Jobs de Guerra de Clãs registrados.")
+        from modules.game_data import regions as game_data_regions
+        from modules.guild_war.war_event import tick_weekly_campaign
+
+        async def _guild_war_tick(context):
+            # Tick único: define PREP/ACTIVE com base no dia (quinta/domingo ACTIVE)
+            try:
+                await tick_weekly_campaign(game_data_regions_module=game_data_regions)
+            except Exception as e:
+                logger.warning(f"[GUILD_WAR] tick falhou: {e}")
+
+        # Tick frequente para “refletir” a fase sem precisar de múltiplos jobs
+        jq.run_repeating(_guild_war_tick, interval=60, first=15, name="guild_war_tick")
+        logger.info("✅ [SCHEDULER] guild_war_tick agendado (interval=60s).")
+
+        # Finalização no domingo à noite (ranking + ENDED)
+        jq.run_daily(guild_war_finalize_job, time=dt_time(hour=23, minute=55, tzinfo=tz), name="guild_war_finalize")
+        logger.info("✅ [SCHEDULER] guild_war_finalize agendado (domingo 23:55).")
+
     except Exception as e:
-        logger.warning(f"⚠️ [SCHEDULER] Falha ao registrar jobs da Guerra de Clãs: {e}")
+        logger.warning(f"⚠️ [SCHEDULER] Falha ao agendar guerra de clãs (guild_war): {e}")
 
+    # -------------------------------------------------------------------------
+    # ❌ GUERRA DE CLÃS — SISTEMA LEGADO (DESATIVADO NA UNIFICAÇÃO)
+    # -------------------------------------------------------------------------
+    logger.info("ℹ️ [SCHEDULER] Guerra de Clãs (LEGADO) não será registrada (evitar conflito).")
 
-    # Eventos agendados
+    # -------------------------------------------------------------------------
+    # EVENTOS agendados (Kingdom Defense)
+    # -------------------------------------------------------------------------
     if EVENT_TIMES:
         for i, (sh, sm, eh, em) in enumerate(EVENT_TIMES):
             try:
@@ -142,12 +167,14 @@ def setup_scheduler(application: Application):
                     start_kingdom_defense_event,
                     time=dt_time(hour=sh, minute=sm, tzinfo=tz),
                     name=f"kingdom_defense_{i}",
-                    data={"event_duration_minutes": duration}
+                    data={"event_duration_minutes": duration},
                 )
             except Exception as e:
                 logger.warning(f"⚠️ Falha ao agendar kingdom_defense_{i}: {e}")
 
+    # -------------------------------------------------------------------------
     # World Boss
+    # -------------------------------------------------------------------------
     if WORLD_BOSS_TIMES:
         for i, (sh, sm, eh, em) in enumerate(WORLD_BOSS_TIMES):
             try:

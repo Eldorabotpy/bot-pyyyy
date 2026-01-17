@@ -150,6 +150,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     media_fid = None
     media_type = "photo"
 
+    # 1) Tenta logo do clã
     try:
         if clan_data and clan_data.get("logo_media_key"):
             media_fid = clan_data.get("logo_media_key")
@@ -157,6 +158,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     except Exception:
         pass
 
+    # 2) Fallbacks globais
     if not media_fid:
         try:
             media_fid = file_ids.get_file_id("img_clan_default")
@@ -168,7 +170,7 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
     reply_markup = InlineKeyboardMarkup(keyboard)
     target_has_media = bool(media_fid)
 
-    current_has_media = False
+    # Mídia atual da mensagem
     try:
         current_has_media = bool(query.message.photo or query.message.video or query.message.animation)
     except Exception:
@@ -176,9 +178,11 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
 
     must_delete_resend = False
 
+    # Se muda de "com mídia" para "sem mídia" (ou vice-versa), não dá pra só editar texto/caption com segurança
     if target_has_media != current_has_media:
         must_delete_resend = True
     elif target_has_media:
+        # Se o tipo de mídia mudou (photo/video/animation), melhor deletar e reenviar
         try:
             if media_type == "video" and not query.message.video:
                 must_delete_resend = True
@@ -189,7 +193,9 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
         except Exception:
             must_delete_resend = True
 
-    # 1) tenta editar
+    # --------------------------------------------------------------------------
+    # 1) Tenta editar (quando compatível)
+    # --------------------------------------------------------------------------
     if not must_delete_resend:
         try:
             if target_has_media:
@@ -204,29 +210,82 @@ async def _render_clan_screen(update, context, clan_data, text, keyboard):
             else:
                 await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
             return
-        except Exception:
+        except Exception as e:
+            # Se falhar qualquer edição (mídia inválida, etc.), forçamos delete+resend
+            logger.warning(f"[RENDER] Falha ao editar mensagem, caindo para delete+resend. Err={e}")
             must_delete_resend = True
 
-    # 2) se falhar, reenvia
+    # --------------------------------------------------------------------------
+    # 2) Delete + Resend (SEMPRE com fallback para texto)
+    # --------------------------------------------------------------------------
     if must_delete_resend:
+        # tenta apagar a mensagem antiga
         try:
             await query.delete_message()
         except Exception:
             pass
 
+        # resolve chat_id com fallback
+        chat_id = None
         try:
             chat_id = query.message.chat_id
-            if media_fid:
+        except Exception:
+            try:
+                chat_id = update.effective_chat.id
+            except Exception:
+                chat_id = None
+
+        if not chat_id:
+            return
+
+        # tentativa 1: enviar com mídia (se existir)
+        if media_fid:
+            try:
                 if media_type == "video":
-                    await context.bot.send_video(chat_id, video=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                    await context.bot.send_video(
+                        chat_id,
+                        video=media_fid,
+                        caption=text,
+                        reply_markup=reply_markup,
+                        parse_mode="HTML",
+                    )
+                    return
                 elif media_type == "animation":
-                    await context.bot.send_animation(chat_id, animation=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                    await context.bot.send_animation(
+                        chat_id,
+                        animation=media_fid,
+                        caption=text,
+                        reply_markup=reply_markup,
+                        parse_mode="HTML",
+                    )
+                    return
                 else:
-                    await context.bot.send_photo(chat_id, photo=media_fid, caption=text, reply_markup=reply_markup, parse_mode="HTML")
-            else:
-                await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
+                    await context.bot.send_photo(
+                        chat_id,
+                        photo=media_fid,
+                        caption=text,
+                        reply_markup=reply_markup,
+                        parse_mode="HTML",
+                    )
+                    return
+            except Exception as e:
+                # ✅ Aqui está o principal: se o file_id estiver inválido, cai para texto.
+                logger.warning(
+                    f"[MEDIA FALLBACK] Falha ao enviar mídia ({media_type}). "
+                    f"media_fid={media_fid} -> enviando TEXTO. Err={e}"
+                )
+
+        # tentativa 2 (garantia): SEMPRE envia texto
+        try:
+            await context.bot.send_message(
+                chat_id,
+                text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+            )
         except Exception as e:
-            logger.error(f"Erro fatal rendering clan dashboard: {e}")
+            logger.error(f"Erro fatal rendering clan dashboard (texto): {e}")
+
 
 # ==============================================================================
 # 2. ENTRY POINT
@@ -406,7 +465,8 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     leader_id = str(clan_data.get("leader_id", "0"))
     is_leader = (str(user_id) == leader_id)
-    members = [str(x) for x in clan_data.get("members", [])]
+
+    members = [str(x) for x in (clan_data.get("members", []) or [])]
     if (not is_leader) and (str(user_id) not in members):
         try:
             pdata["clan_id"] = None
@@ -421,41 +481,80 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await adventurer_guild_menu(update, context)
         return
 
+    # ---------------------------------------------------------------------
+    # FONTE ÚNICA (via engine compat -> war_campaigns / war_signups / war_scores)
+    # ---------------------------------------------------------------------
     ws = await _engine_call("get_war_status")
+    season = (ws.get("season", {}) or {})  # campanha semanal
+    # state legado não é mais usado para inscritos/pontuação (fica vazio no compat)
+    # state = (ws.get("state", {}) or {})
 
-    season = ws.get("season", {}) or {}
-    state = ws.get("state", {}) or {}
+    # fase (PREP/ACTIVE/ENDED)
+    phase_raw = str(season.get("phase") or "PREP").upper()
+    phase_u = _phase_norm(phase_raw)
 
-    # ---- fase (vem do engine)
-    phase = state.get("phase", season.get("phase", "idle"))
-    phase_u = _phase_norm(phase)
+    # inscrição aberta/fechada (campo pode variar entre versões)
+    is_open = bool(season.get("signup_open", season.get("registration_open", False)))
 
-    # ✅ AQUI ESTÁ O FIX: inscrição aberta/fechada vem do SEASON.registration_open
-    is_open = bool(season.get("registration_open", False))
-
-    # season_id / rodada
-    season_id = season.get("season_id") or season.get("war_id") or "-"
+    # rodada/campaign_id
+    season_id = (
+        season.get("season_id")
+        or season.get("campaign_id")
+        or season.get("war_id")
+        or "-"
+    )
     war_id = season_id
 
-    # inscritos (deriva de registered_players: player_id -> clan_id)
-    registered_players = state.get("registered_players", {}) or {}
-    clan_sid = str(clan_id)
+    # região alvo SEMPRE da campanha (fallback compat: domination_region)
+    target_region_id = (
+        season.get("target_region_id")
+        or season.get("domination_region")
+        or season.get("domination_region_id")
+        or "?"
+    )
 
+    # nome bonito da região
+    try:
+        from modules.game_data import regions as game_data_regions
+        from modules.guild_war.region import get_region_meta
+        region_meta = get_region_meta(game_data_regions, str(target_region_id))
+        region_name = region_meta.get("display_name", str(target_region_id))
+        region_emoji = region_meta.get("emoji", "📍")
+    except Exception:
+        region_name = str(target_region_id)
+        region_emoji = "📍"
+
+    # inscritos (NOVO: war_signups por campaign_id + clan_id)
     reg_members = []
-    if isinstance(registered_players, dict):
-        for pid, cid in registered_players.items():
-            if str(cid) == clan_sid:
-                reg_members.append(str(pid))
+    clan_registered = False
+    me_registered = False
+    try:
+        from modules.guild_war.war_event import WarSignupRepo
+        signup_repo = WarSignupRepo()
+        signup_doc = await signup_repo.get(str(season_id), str(clan_id))
+        clan_registered = bool(signup_doc)
+        if signup_doc:
+            reg_members = [str(x) for x in (signup_doc.get("member_ids", []) or [])]
+            me_registered = (str(user_id) in reg_members)
+    except Exception:
+        reg_members = []
+        clan_registered = False
+        me_registered = False
 
     reg_count = len(reg_members)
 
-    # eu inscrito?
-    me_registered = False
-    if isinstance(registered_players, dict):
-        me_registered = (str(registered_players.get(str(user_id))) == clan_sid)
+    # pontuação do clã (NOVO: war_scores)
+    score = {"total": 0, "pve": 0, "pvp": 0}
+    try:
+        score = await _engine_call("get_clan_weekly_score", str(clan_id))
+        if not isinstance(score, dict):
+            score = {"total": 0, "pve": 0, "pvp": 0}
+    except Exception:
+        score = {"total": 0, "pve": 0, "pvp": 0}
 
-    # clã registrado na rodada? (usa REGISTRATION_COL)
-    clan_registered = await _is_clan_registered(str(clan_id), str(season_id))
+    total_pts = int(score.get("total", 0) or 0)
+    pve_pts = int(score.get("pve", 0) or 0)
+    pvp_pts = int(score.get("pvp", 0) or 0)
 
     clan_name = clan_data.get("display_name", "Clã")
 
@@ -463,28 +562,33 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"⚔️ <b>GUERRA DE CLÃS — {clan_name.upper()}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🆔 <b>Rodada:</b> <code>{war_id}</code>\n"
-        f"⏳ <b>Fase:</b> <b>{phase_u}</b>\n\n"
-        f"📝 <b>Inscrição do Clã:</b> {'<b>ABERTA</b>' if is_open else '<b>FECHADA</b>'}\n"
+        f"⏳ <b>Fase:</b> <b>{phase_u}</b>\n"
+        f"{region_emoji} <b>Região da Dominação:</b> <b>{region_name}</b>\n\n"
+        f"📝 <b>Inscrição:</b> {'<b>ABERTA</b>' if is_open else '<b>FECHADA</b>'}\n"
         f"🏷️ <b>Clã:</b> {'<b>INSCRITO</b>' if clan_registered else '<b>NÃO INSCRITO</b>'}\n"
         f"👥 <b>Inscritos:</b> {reg_count}\n"
-        f"✅ <b>Você:</b> {'INSCRITO' if me_registered else 'NÃO INSCRITO'}\n"
+        f"✅ <b>Você:</b> {'INSCRITO' if me_registered else 'NÃO INSCRITO'}\n\n"
+        f"⭐ <b>PONTUAÇÃO DO CLÃ</b>\n"
+        f"• <b>Total da Semana:</b> <b>{total_pts}</b> pts\n"
+        f"• PvE: {pve_pts} | PvP: {pvp_pts}\n"
     )
 
     keyboard = []
 
-    if phase_u == "PREP":
-        # líder registra o clã na rodada
+    # LÓGICA DE BOTÕES: usar phase_raw (não o texto normalizado)
+    if phase_raw == "PREP":
+        # líder registra o clã na rodada (seu callback deve criar/registrar signup_doc)
         if is_leader:
             if not clan_registered:
                 keyboard.append([InlineKeyboardButton("🏷️ Inscrever Clã na Guerra", callback_data="clan_war_register_clan")])
             else:
-                keyboard.append([InlineKeyboardButton("✅ Clã Inscrito na Guerra", callback_data="clan_noop")])
+                keyboard.append([InlineKeyboardButton("✅ Clã Inscrito na Guerra", callback_data="clan_war_view")])
 
-            # líder abre/fecha inscrição (global no engine)
+            # abre/fecha inscrição (no sistema único isso é flag da campanha; para teste rápido, serve)
             if not is_open:
-                keyboard.append([InlineKeyboardButton("📝 Abrir inscrição do Clã", callback_data="clan_war_open")])
+                keyboard.append([InlineKeyboardButton("📝 Abrir inscrição", callback_data="clan_war_open")])
             else:
-                keyboard.append([InlineKeyboardButton("🔒 Fechar inscrição do Clã", callback_data="clan_war_close")])
+                keyboard.append([InlineKeyboardButton("🔒 Fechar inscrição", callback_data="clan_war_close")])
 
         # membro entra/sai (só se inscrição aberta e clã inscrito)
         if is_open:
@@ -498,10 +602,11 @@ async def show_clan_war_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         keyboard.append([InlineKeyboardButton("👥 Ver inscritos", callback_data="clan_war_view")])
 
-    elif phase_u == "ACTIVE":
+    elif phase_raw == "ACTIVE":
         text += "\n🔥 <b>Guerra ativa!</b>\n"
         text += "⚠️ Somente inscritos nesta rodada podem caçar/atacar e pontuar.\n"
         keyboard.append([InlineKeyboardButton("👥 Ver inscritos", callback_data="clan_war_view")])
+
     else:
         text += "\nℹ️ Inscrição só pode ser feita durante <b>PREP</b>.\n"
 
@@ -639,30 +744,17 @@ async def clan_war_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def clan_war_register_clan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    if not query:
-        return
+    await query.answer()  # <- OBRIGATÓRIO
 
-    await _show_loading_overlay(update, context, "Inscrevendo clã na rodada...", "Aguarde")
-
-    user_id, pdata, clan_data, is_leader = await _require_clan_leader(update, context)
-    if not user_id or not pdata or not clan_data:
-        return
-
-    if not is_leader:
-        await _safe_answer(query, "Apenas o líder pode inscrever o clã.", show_alert=True)
-        await show_clan_war_menu(update, context)
-        return
-
+    user_id = get_current_player_id(update, context)
+    pdata = await player_manager.get_player_data(user_id)
     clan_id = pdata.get("clan_id")
-    res = await _engine_call("register_clan_for_war", clan_id)
-    if not res.get("ok"):
-        msg = res.get("message") or "Não foi possível inscrever o clã agora."
-        await _safe_answer(query, msg, show_alert=True)
-        await show_clan_war_menu(update, context)
-        return
 
-    await _safe_answer(query, res.get("message") or "✅ Clã inscrito na Guerra!", show_alert=True)
+    await _engine_call("register_clan_for_war", str(clan_id), str(user_id))
+
+    # Atualiza menu
     await show_clan_war_menu(update, context)
+
 
 async def clan_war_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -910,10 +1002,11 @@ async def clan_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if action == "clan_noop":
         try:
-            await query.answer("Nada a fazer aqui.", show_alert=False)
+            await query.answer("✅ Seu clã já está inscrito nesta rodada.", show_alert=True)
         except Exception:
             pass
         return
+
 
     # -------------------------
     # CLÃ: gestão / membros

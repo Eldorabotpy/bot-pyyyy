@@ -7,7 +7,9 @@ import datetime
 import asyncio
 import certifi
 from zoneinfo import ZoneInfo
-from typing import Dict
+from typing import Any, List, Dict, Optional
+from config import ADMIN_ID
+
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 from telegram.error import BadRequest, Forbidden
@@ -35,6 +37,18 @@ except ImportError:
     event_manager = None
 
 from pvp.pvp_config import MONTHLY_RANKING_REWARDS
+
+# --- NOVO: Guerra de Clãs (sistema único) ---
+from modules.game_data import regions as game_data_regions
+from modules.guild_war.war_event import (
+    start_week_prep,
+    force_active,
+    finalize_campaign,
+    tick_weekly_campaign,
+    WarScoreRepo,
+)
+from modules.guild_war.campaign import ensure_weekly_campaign
+from modules.guild_war.region import get_region_meta
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +105,6 @@ def get_col_and_id(user_id):
 
     return None, None
 
-
 def _today_str(tzname: str = JOB_TIMEZONE) -> str:
     try:
         tz = ZoneInfo(tzname)
@@ -99,6 +112,7 @@ def _today_str(tzname: str = JOB_TIMEZONE) -> str:
     except Exception:
         now = datetime.datetime.now()
     return now.date().isoformat()
+
 
 
 # ==============================================================================
@@ -125,7 +139,6 @@ async def daily_reset_event_entries_job(context: ContextTypes.DEFAULT_TYPE):
         },
         "$unset": {
             "daily_claims.event_entries_claim_date": "",
-            # Limpando também flags antigos (se existirem) para não reativar comportamento legado:
             "daily_awards.last_arena_ticket_date": "",
             "daily_awards.last_kingdom_ticket_date": "",
             "daily_awards.last_crystal_date": "",
@@ -142,7 +155,150 @@ async def daily_reset_event_entries_job(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"[JOB] Erro no reset diário de entradas/eventos: {e}")
 
+# ==============================================================================
+# ⚔️ GUERRA DE CLÃS — SISTEMA ÚNICO (guild_war)
+# ==============================================================================
 
+async def guild_war_finalize_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Rodar no domingo à noite (ex.: 23:55 no timezone do JOB_TIMEZONE).
+    - Finaliza a campanha semanal (ENDED + ranking top5)
+    - Opcionalmente anuncia no grupo (se ANNOUNCEMENT_CHAT_ID estiver setado)
+    """
+    try:
+        # garante que a fase do dia também foi aplicada (boa prática)
+        await tick_weekly_campaign(game_data_regions_module=game_data_regions)
+
+        campaign = await finalize_campaign(game_data_regions_module=game_data_regions, top_n=5)
+        cid = str(campaign.get("campaign_id") or "")
+        target_region_id = str(campaign.get("target_region_id") or "")
+        region_meta = get_region_meta(game_data_regions, target_region_id) if target_region_id else {}
+
+        result = campaign.get("result") or {}
+        winner = result.get("winner")
+        top = result.get("top") or []
+
+        if ANNOUNCEMENT_CHAT_ID:
+            lines: List[str] = []
+            for i, row in enumerate(top, start=1):
+                lines.append(
+                    f"{i}. <code>{row.get('clan_id')}</code> — "
+                    f"<b>{row.get('total', 0)}</b> (PvE {row.get('pve', 0)} | PvP {row.get('pvp', 0)})"
+                )
+            ranking_txt = "\n".join(lines) if lines else "<i>Ninguém pontuou nesta rodada.</i>"
+
+            winner_txt = (
+                f"🏆 Vencedor: <code>{winner.get('clan_id')}</code> — <b>{winner.get('total')}</b>"
+                if winner else "🏆 Vencedor: <i>sem vencedor</i>"
+            )
+
+            msg = (
+                "⚔️ <b>Guerra de Clãs — Encerrada!</b>\n\n"
+                f"Rodada: <b>{cid}</b>\n"
+                f"{region_meta.get('emoji','📍')} Região Alvo: <b>{region_meta.get('display_name', target_region_id)}</b>\n\n"
+                f"{winner_txt}\n\n"
+                f"<b>Top 5:</b>\n{ranking_txt}"
+            )
+
+            try:
+                await context.bot.send_message(
+                    chat_id=ANNOUNCEMENT_CHAT_ID,
+                    message_thread_id=ANNOUNCEMENT_THREAD_ID,
+                    text=msg,
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.warning(f"[GUILD_WAR] Falha ao anunciar ranking: {e}")
+
+        logger.info(f"[GUILD_WAR] Finalização concluída (campaign={cid}).")
+
+    except Exception as e:
+        logger.error(f"[GUILD_WAR] guild_war_finalize_job falhou: {e}")
+
+def _is_admin_id(user_id: Any) -> bool:
+    return str(user_id) == str(ADMIN_ID)
+
+async def _admin_reply(update: Update, text: str):
+    if update.effective_message:
+        await update.effective_message.reply_text(text, parse_mode="HTML")
+
+async def cmd_war_week_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = get_current_player_id(update, context)
+    if not _is_admin_id(uid):
+        return
+    campaign = await start_week_prep(game_data_regions_module=game_data_regions)
+    cid = str(campaign.get("campaign_id"))
+    target = str(campaign.get("target_region_id") or "")
+    meta = get_region_meta(game_data_regions, target) if target else {}
+    await _admin_reply(
+        update,
+        (
+            "✅ <b>Semana iniciada (PREP)</b>\n\n"
+            f"Rodada: <b>{cid}</b>\n"
+            f"{meta.get('emoji','📍')} Alvo: <b>{meta.get('display_name', target)}</b>\n"
+            "Inscrição: <b>ABERTA</b>\n"
+            "Placar: <b>ZERADO</b>"
+        )
+    )
+
+async def cmd_war_force_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = get_current_player_id(update, context)
+    if not _is_admin_id(uid):
+        return
+    campaign = await force_active(game_data_regions_module=game_data_regions)
+    cid = str(campaign.get("campaign_id"))
+    await _admin_reply(update, f"✅ <b>ACTIVE forçado</b>\nRodada: <b>{cid}</b>\nInscrição: <b>FECHADA</b>")
+
+
+async def cmd_war_finalize(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = get_current_player_id(update, context)
+    if not _is_admin_id(uid):
+        return
+    campaign = await finalize_campaign(game_data_regions_module=game_data_regions, top_n=5)
+    cid = str(campaign.get("campaign_id"))
+    result = campaign.get("result") or {}
+    winner = result.get("winner")
+    await _admin_reply(
+        update,
+        (
+            f"✅ <b>Campanha finalizada</b>\nRodada: <b>{cid}</b>\n"
+            f"Vencedor: <code>{(winner or {}).get('clan_id','—')}</code>"
+        )
+    )
+
+async def cmd_war_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = get_current_player_id(update, context)
+    if not _is_admin_id(uid):
+        return
+
+    campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions)
+    cid = str(campaign.get("campaign_id") or "")
+    phase = str(campaign.get("phase") or "PREP")
+    signup_open = bool(campaign.get("signup_open", True))
+    target = str(campaign.get("target_region_id") or "")
+    meta = get_region_meta(game_data_regions, target) if target else {}
+
+    # mostra top 5 atual (debug)
+    top = await WarScoreRepo().top_clans(cid, limit=5)
+    lines = []
+    for i, row in enumerate(top, start=1):
+        lines.append(
+            f"{i}. <code>{row.get('clan_id')}</code> — <b>{row.get('total', 0)}</b> "
+            f"(PvE {row.get('pve', 0)} | PvP {row.get('pvp', 0)})"
+        )
+    ranking_txt = "\n".join(lines) if lines else "<i>Sem pontuação ainda.</i>"
+
+    await _admin_reply(
+        update,
+        (
+            "📌 <b>Status Guerra de Clãs</b>\n\n"
+            f"Rodada: <b>{cid}</b>\n"
+            f"Fase: <b>{phase}</b>\n"
+            f"Inscrição: <b>{'ABERTA' if signup_open else 'FECHADA'}</b>\n"
+            f"{meta.get('emoji','📍')} Alvo: <b>{meta.get('display_name', target)}</b>\n\n"
+            f"<b>Top 5 (parcial):</b>\n{ranking_txt}"
+        )
+    )
 # ==============================================================================
 # 🛡️ KINGDOM DEFENSE (EVENTO) — SEM DAR TICKETS AUTOMATICAMENTE
 # ==============================================================================
@@ -561,3 +717,7 @@ async def cmd_force_pvp_reset(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 admin_force_pvp_reset_handler = CommandHandler("force_pvp_reset", cmd_force_pvp_reset)
+war_week_start_handler = CommandHandler("war_week_start", cmd_war_week_start)
+war_force_active_handler = CommandHandler("war_force_active", cmd_war_force_active)
+war_finalize_handler = CommandHandler("war_finalize", cmd_war_finalize)
+war_status_handler = CommandHandler("war_status", cmd_war_status)
