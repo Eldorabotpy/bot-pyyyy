@@ -5,19 +5,17 @@ import asyncio
 from datetime import datetime, timezone
 from pymongo import MongoClient
 from bson import ObjectId
-
+from modules.database import db
 logger = logging.getLogger(__name__)
 
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 sessions_collection = None
 
 try:
-    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
-    db = client["eldora_db"]
-    sessions_collection = db["active_sessions"]
+    sessions_collection = None
+    if db is not None:
+        sessions_collection = db.get_collection("active_sessions")
 
-    # Índice para garantir 1 sessão por Telegram ID (agora como string normalizada)
-    sessions_collection.create_index("telegram_id", unique=True)
 
 except Exception as e:
     logger.error(f"❌ [SESSIONS] Erro conexão: {e}")

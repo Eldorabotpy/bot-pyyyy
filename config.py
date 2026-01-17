@@ -12,6 +12,7 @@ ADMIN_ID_STR = os.getenv("ADMIN_ID")
 
 MONGO_CONNECTION_STRING = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 MONGO_URL = MONGO_CONNECTION_STRING
+MONGO_STR = MONGO_CONNECTION_STRING
 
 os.environ["MONGO_CONNECTION_STRING"] = MONGO_CONNECTION_STRING
 os.environ["MONGO_URL"] = MONGO_CONNECTION_STRING

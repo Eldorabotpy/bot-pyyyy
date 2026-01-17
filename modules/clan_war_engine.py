@@ -240,6 +240,29 @@ async def register_clan_for_war(clan_id: str, leader_id: Optional[str] = None) -
         "clan_id": clan_id,
     }
 
+async def is_clan_registered(campaign_id: str, clan_id: str) -> bool:
+    """
+    Fonte única: war_signups.
+    Clã está registrado se existir doc {campaign_id, clan_id}.
+    """
+    campaign_id = _safe_str(campaign_id)
+    clan_id = _safe_str(clan_id)
+
+    repo = WarSignupRepo()
+    doc = await repo.get(campaign_id, clan_id)
+    return bool(doc)
+
+
+async def get_clan_signup(campaign_id: str, clan_id: str) -> Dict[str, Any]:
+    """
+    Retorna doc de inscrição do clã em war_signups (ou shape vazio).
+    """
+    campaign_id = _safe_str(campaign_id)
+    clan_id = _safe_str(clan_id)
+
+    repo = WarSignupRepo()
+    doc = await repo.get(campaign_id, clan_id)
+    return doc or {"campaign_id": campaign_id, "clan_id": clan_id, "member_ids": []}
 
 async def engine_call(method: str, *args) -> Any:
     m = (method or "").strip()
@@ -263,6 +286,16 @@ async def engine_call(method: str, *args) -> Any:
         member_id = _safe_str(args[2]) if len(args) >= 3 else ""
         return await is_member_signed_up(campaign_id, clan_id, member_id)
     
+    if m == "is_clan_registered":
+        campaign_id = _safe_str(args[0]) if len(args) >= 1 else ""
+        clan_id = _safe_str(args[1]) if len(args) >= 2 else ""
+        return await is_clan_registered(campaign_id, clan_id)
+
+    if m == "get_clan_signup":
+        campaign_id = _safe_str(args[0]) if len(args) >= 1 else ""
+        clan_id = _safe_str(args[1]) if len(args) >= 2 else ""
+        return await get_clan_signup(campaign_id, clan_id)
+
     if m == "register_clan_for_war":
         # args: clan_id, leader_id(opcional)
         clan_id = _safe_str(args[0]) if len(args) >= 1 else ""

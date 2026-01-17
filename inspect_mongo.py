@@ -1,61 +1,76 @@
-import pymongo
-from pprint import pprint
 import os
+import json
+import pymongo
+from pprint import pformat
 
-# --- Configurações (VERIFICADAS COM A IMAGEM) ---
+SENSITIVE_KEYS = {
+    "password", "senha", "pass", "hash", "password_hash",
+    "token", "access_token", "refresh_token", "session_token",
+    "secret", "api_key", "key"
+}
 
-# URI do MongoDB (Usando a string anterior)
-# ATENÇÃO: Contém credenciais. Recomenda-se usar variáveis de ambiente no futuro.
-MONGO_URI = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+def _mask_sensitive(obj):
+    """Mascara valores sensíveis sem remover as chaves."""
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            lk = str(k).lower()
+            if lk in SENSITIVE_KEYS or any(s in lk for s in ["token", "senha", "password", "secret", "key", "hash"]):
+                out[k] = "***"
+            else:
+                out[k] = _mask_sensitive(v)
+        return out
+    if isinstance(obj, list):
+        return [_mask_sensitive(x) for x in obj]
+    return obj
 
-DB_NAME = "eldora_db"          # Confirmado pela imagem
-COLLECTION_NAME = "jogadores"  # Confirmado pela imagem
-USER_ID_FIELD = "_id"          # Confirmado pela imagem (assumindo que _id guarda o ID do Telegram)
+def main():
+    # Use variável de ambiente se possível:
+    # set MONGO_URI=...
+    MONGO_URI = os.getenv("MONGO_URI") or "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    DB_NAME = os.getenv("DB_NAME") or "eldora_db"
 
-# Lista dos IDs que queres inspecionar
-IDS_PARA_INSPECIONAR = [7262799478, 1160420540] # Mantive os IDs do log anterior
-
-# --- Fim das Configurações ---
-
-client = None
-
-try:
-    print(f"Tentando conectar ao cluster MongoDB Atlas...")
-    client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    client.admin.command('ping')
-    print("Conexão ao MongoDB Atlas bem-sucedida!")
+    client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=8000)
+    client.admin.command("ping")
 
     db = client[DB_NAME]
-    collection = db[COLLECTION_NAME]
-    print(f"Acedendo à coleção: '{COLLECTION_NAME}' na base de dados '{DB_NAME}'")
+    colls = sorted(db.list_collection_names())
 
-    for user_id_to_find in IDS_PARA_INSPECIONAR:
-        print(f"\n--- Procurando por {USER_ID_FIELD} = {user_id_to_find} ---")
-        
-        # <<< IMPORTANTE: O filtro agora usa USER_ID_FIELD (que é '_id') >>>
-        query_filter = {USER_ID_FIELD: user_id_to_find} 
-        document = collection.find_one(query_filter)
-        
-        if document:
-            print(f"Documento encontrado para {user_id_to_find}:")
-            if isinstance(document, dict):
-                pprint(document)
-            else:
-                # Se for só um número ou outro tipo, indica corrupção
-                print(f"CONTEÚDO NÃO É UM DICIONÁRIO (Possivelmente Corrompido): {repr(document)}")
-        else:
-            print(f"Nenhum documento encontrado para {USER_ID_FIELD} = {user_id_to_find}")
+    lines = []
+    lines.append(f"DB: {DB_NAME}")
+    lines.append(f"Collections ({len(colls)}): {', '.join(colls)}")
+    lines.append("")
 
-except pymongo.errors.ConfigurationError as e:
-    print(f"\nErro de Configuração: Verifique a sua MONGO_URI. Detalhes: {e}")
-except pymongo.errors.OperationFailure as e:
-     print(f"\nErro de Operação (Autenticação?): Verifique usuário/senha ou permissões. Detalhes: {e}")
-except pymongo.errors.ConnectionFailure as e:
-    print(f"\nErro de Conexão: Não foi possível conectar ao servidor MongoDB Atlas. Verifique a URI, firewall ou estado do cluster. Detalhes: {e}")
-except Exception as e:
-    print(f"\nOcorreu um erro inesperado: {type(e).__name__} - {e}")
+    for c in colls:
+        col = db[c]
+        lines.append("=" * 80)
+        lines.append(f"COLLECTION: {c}")
+        lines.append("=" * 80)
 
-finally:
-    if client:
-        client.close()
-        print("\nConexão fechada.")
+        # Indexes
+        try:
+            indexes = col.index_information()
+        except Exception as e:
+            indexes = {"ERROR": str(e)}
+        lines.append("INDEXES:")
+        lines.append(pformat(indexes))
+
+        # Sample docs
+        try:
+            docs = list(col.find({}).limit(2))
+            docs = _mask_sensitive(docs)
+        except Exception as e:
+            docs = [{"ERROR": str(e)}]
+        lines.append("\nSAMPLE_DOCS (limit 2):")
+        lines.append(pformat(docs))
+        lines.append("")
+
+    out_path = "mongo_snapshot.txt"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    client.close()
+    print(f"OK: snapshot gerado em {out_path}")
+
+if __name__ == "__main__":
+    main()

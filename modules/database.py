@@ -22,17 +22,17 @@ MONGO_CONNECTION_STRING = os.environ.get("MONGO_CONNECTION_STRING")
 
 
 def _get_mongo_uri_fallback() -> str | None:
-    """
-    Fallback seguro: tenta pegar uma URI do config.py caso a env não exista.
-    Isso resolve o cenário local (Windows) onde você não setou MONGO_CONNECTION_STRING.
-    """
     try:
-        from config import MONGO_STR  # você já usa isso em outro lugar do projeto
-        if isinstance(MONGO_STR, str) and MONGO_STR.strip():
-            return MONGO_STR.strip()
+        import config
+
+        for name in ("MONGO_CONNECTION_STRING", "MONGO_URL", "MONGO_STR"):
+            val = getattr(config, name, None)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
     except Exception:
         pass
     return None
+
 
 
 def initialize_database() -> None:
