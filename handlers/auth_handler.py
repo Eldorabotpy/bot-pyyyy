@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # CONEXÃO MONGODB (Local para garantir funcionamento)
 # ==============================================================================
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
 users_collection = None
 
 try:
@@ -58,6 +59,8 @@ TYPING_USER_REG = 4
 TYPING_PASS_REG = 5
 TYPING_USER_MIGRATE = 6
 TYPING_PASS_MIGRATE = 7
+TYPING_USER_FORGOT = 8
+TYPING_PASS_FORGOT = 9
 
 # --- IMAGENS ---
 IMG_LOGIN = "https://i.ibb.co/Fb8VkHjw/photo-2025-12-30-21-56-50.jpg"
@@ -147,8 +150,10 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Sua jornada começa aqui.\n"
             "Faça login ou crie sua conta para jogar."
         )
-        keyboard.append([InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')])
-        keyboard.append([InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')])
+        # ... dentro de start_auth, onde cria o keyboard ...
+    keyboard.append([InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')])
+    keyboard.append([InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')])
+    keyboard.append([InlineKeyboardButton("🆘 Esqueci a Senha", callback_data='btn_forgot')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -205,6 +210,68 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         await update.message.reply_text("❌ <b>Dados incorretos.</b> Tente novamente (/start).", parse_mode="HTML")
         return ConversationHandler.END
+
+# --- FLUXO DE ESQUECI A SENHA ---
+
+async def btn_forgot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Inicia o fluxo perguntando o usuário"""
+    if not await _check_private(update): return ConversationHandler.END
+    
+    q = update.callback_query
+    await q.answer()
+    
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="🆘 <b>RECUPERAÇÃO DE SENHA</b>\n\nDigite o <b>USUÁRIO</b> da conta que deseja recuperar:",
+        parse_mode="HTML"
+    )
+    return TYPING_USER_FORGOT
+
+async def receive_user_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = update.message.text.strip().lower()
+    tg_id = update.effective_user.id
+    
+    if users_collection is None:
+        await update.message.reply_text("❌ Erro de conexão.")
+        return ConversationHandler.END
+
+    # SEGURANÇA: Verifica se o usuário existe E se pertence a esse Telegram ID
+    user_doc = await asyncio.to_thread(users_collection.find_one, {"username": username})
+    
+    if not user_doc:
+        await update.message.reply_text("❌ Usuário não encontrado.")
+        return ConversationHandler.END
+        
+    # Verifica se o dono do Telegram é o mesmo que criou a conta
+    # Nota: No registro, você salva 'telegram_id_owner'
+    owner_id = user_doc.get("telegram_id_owner")
+    
+    # Se for string no banco e int no update, normaliza
+    if str(owner_id) != str(tg_id):
+        await update.message.reply_text("⛔ <b>Acesso Negado.</b>\nEssa conta não está vinculada ao seu Telegram.", parse_mode="HTML")
+        return ConversationHandler.END
+
+    context.user_data['forgot_temp_user'] = username
+    await update.message.reply_text(f"✅ Conta <b>{username}</b> verificada!\n\nDigite sua <b>NOVA SENHA</b>:", parse_mode="HTML")
+    return TYPING_PASS_FORGOT
+
+async def receive_pass_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    new_password = update.message.text.strip()
+    username = context.user_data.get('forgot_temp_user')
+    
+    new_hash = hash_password(new_password)
+    
+    if users_collection is not None:
+        await asyncio.to_thread(
+            users_collection.update_one,
+            {"username": username},
+            {"$set": {"password": new_hash}}
+        )
+        
+    await update.message.reply_text(f"🔄 <b>Senha Alterada!</b>\nAgora você pode fazer login com a nova senha.", parse_mode="HTML")
+    
+    # Retorna para o menu inicial
+    return await start_auth(update, context)
 
 # ==============================================================================
 # 3. REGISTRO
@@ -381,6 +448,7 @@ auth_handler = ConversationHandler(
         CallbackQueryHandler(btn_login_callback, pattern='^btn_login$'),
         CallbackQueryHandler(start_register_flow, pattern='^btn_register$'),
         CallbackQueryHandler(btn_migrate_callback, pattern='^btn_migrate$'),
+        CallbackQueryHandler(btn_forgot_callback, pattern='^btn_forgot$'),
     ],
     states={
         CHOOSING_ACTION: [
@@ -388,6 +456,7 @@ auth_handler = ConversationHandler(
             CallbackQueryHandler(btn_login_callback, pattern='^btn_login$'),
             CallbackQueryHandler(start_register_flow, pattern='^btn_register$'),
             CallbackQueryHandler(btn_migrate_callback, pattern='^btn_migrate$'),
+            CallbackQueryHandler(btn_forgot_callback, pattern='^btn_forgot$'),
         ],
         TYPING_USER_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_login)],
         TYPING_PASS_LOGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_login)],
@@ -395,6 +464,8 @@ auth_handler = ConversationHandler(
         TYPING_PASS_REG: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_reg)],
         TYPING_USER_MIGRATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_migrate)],
         TYPING_PASS_MIGRATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_migrate)],
+        TYPING_USER_FORGOT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_user_forgot)],
+        TYPING_PASS_FORGOT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pass_forgot)],
     },
     fallbacks=[
         CommandHandler('cancel', cancel),
