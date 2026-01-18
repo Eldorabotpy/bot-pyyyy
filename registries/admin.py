@@ -12,7 +12,7 @@ from handlers.admin.admin_tools import cmd_trocar_id
 
 # Guerra de Clãs (sistema único)
 from handlers.admin.clan_war_admin import cmd_wardom, cmd_warthu, cmd_warend, cmd_warstatus
-
+from handlers.admin.clan_war_admin import cmd_war_hard_reset
 
 def register_admin_handlers(application: Application):
 
@@ -34,3 +34,4 @@ def register_admin_handlers(application: Application):
     application.add_handler(CommandHandler("warthu", cmd_warthu))
     application.add_handler(CommandHandler("warend", cmd_warend))
     application.add_handler(CommandHandler("warstatus", cmd_warstatus))
+    application.add_handler(CommandHandler("warreset", cmd_war_hard_reset))

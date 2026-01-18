@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import Any, List
-
+from modules.database import db
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -141,3 +142,15 @@ async def cmd_warstatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"{meta.get('emoji','📍')} Alvo: <b>{meta.get('display_name', target)}</b>"
         ),
     )
+
+async def cmd_war_hard_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Apaga a campanha atual do banco para forçar um reset total."""
+    if not _is_admin(update):
+        return
+
+    # Apaga campanhas e inscrições
+    await asyncio.to_thread(db.war_campaigns.delete_many, {})
+    await asyncio.to_thread(db.war_signups.delete_many, {})
+    await asyncio.to_thread(db.war_scores.delete_many, {})
+    
+    await _reply(update, "☢️ <b>RESET TOTAL!</b>\nTodas as campanhas foram apagadas.\nAbra o menu de guerra para gerar uma nova.")

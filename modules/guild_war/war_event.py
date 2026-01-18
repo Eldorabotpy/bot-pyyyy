@@ -250,25 +250,28 @@ async def tick_weekly_campaign(game_data_regions_module, now: Optional[datetime]
     """
     Tick único do evento (scheduler chamará isso):
     - garante campanha semanal
-    - ajusta phase/signups conforme dia (quinta/domingo ACTIVE; resto PREP)
+    - (LÓGICA AUTOMÁTICA DESLIGADA PARA TESTES MANUAIS)
     """
     now = now or _now_utc()
     campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions_module, now=now)
-    campaign_id = _norm_id(campaign.get("campaign_id"))
+    
+    # --- BLOCO COMENTADO PARA PARAR O ROBÔ ---
+    # campaign_id = _norm_id(campaign.get("campaign_id"))
 
-    # ISO weekday: Monday=1 ... Sunday=7
-    wd = int(now.isoweekday())
+    # # ISO weekday: Monday=1 ... Sunday=7
+    # wd = int(now.isoweekday())
 
-    # Quinta (4) e Domingo (7) -> ACTIVE
-    should_be_active = wd in (4, 7)
+    # # Quinta (4) e Domingo (7) -> ACTIVE
+    # should_be_active = wd in (4, 7)
 
-    if should_be_active:
-        await set_campaign_phase(campaign_id, phase=CampaignPhase.ACTIVE.value, signup_open=False)
-        campaign["phase"] = CampaignPhase.ACTIVE.value
-        campaign["signup_open"] = False
-    else:
-        await set_campaign_phase(campaign_id, phase=CampaignPhase.PREP.value, signup_open=True)
-        campaign["phase"] = CampaignPhase.PREP.value
-        campaign["signup_open"] = True
+    # if should_be_active:
+    #     await set_campaign_phase(campaign_id, phase=CampaignPhase.ACTIVE.value, signup_open=False)
+    #     campaign["phase"] = CampaignPhase.ACTIVE.value
+    #     campaign["signup_open"] = False
+    # else:
+    #     await set_campaign_phase(campaign_id, phase=CampaignPhase.PREP.value, signup_open=True)
+    #     campaign["phase"] = CampaignPhase.PREP.value
+    #     campaign["signup_open"] = True
+    # -----------------------------------------
 
     return campaign

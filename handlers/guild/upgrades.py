@@ -1,14 +1,18 @@
 # handlers/guild/upgrades.py
-# (VERSÃO FINAL: VISUAL LIMPO, ORGANIZADO E IMERSIVO)
+# (VERSÃO CORRIGIDA: UI RENDERER + SEM DEPENDÊNCIA CIRCULAR)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
-from modules import player_manager, clan_manager
+from modules import player_manager, clan_manager, file_ids
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS
 from modules.auth_utils import get_current_player_id
+from ui.ui_renderer import render_photo_or_text
 
-# --- HELPER VISUAL PARA FORMATAR BUFFS ---
+# ==============================================================================
+# HELPERS VISUAIS
+# ==============================================================================
+
 def _format_buffs(buffs):
     """Transforma o dicionário de buffs em texto legível."""
     if not buffs: 
@@ -21,7 +25,8 @@ def _format_buffs(buffs):
         "gold_bonus": "Bônus de Ouro",
         "drop_rate": "Sorte de Drop",
         "damage": "Dano em Raids",
-        "crafting_speed": "Velocidade de Forja"
+        "crafting_speed": "Velocidade de Forja",
+        "member_cap": "Capacidade de Membros"
     }
     
     for k, v in buffs.items():
@@ -38,6 +43,42 @@ def _bar(current, total, blocks=10):
     filled = int(ratio * blocks)
     return "🟦" * filled + "⬜" * (blocks - filled)
 
+def _pick_upgrade_media(clan_data):
+    """
+    Tenta pegar uma imagem de 'Clan Hall' ou 'Castelo' para ilustrar a evolução.
+    Se não tiver, usa o logo do clã.
+    """
+    # 1. Tenta imagem de upgrade/hall
+    try:
+        fid = file_ids.get_file_id("img_clan_hall")
+        if fid: return fid
+    except: pass
+
+    # 2. Logo do Clã
+    if clan_data and clan_data.get("logo_media_key"):
+        return clan_data.get("logo_media_key")
+    
+    # 3. Fallback
+    try:
+        return file_ids.get_file_id("img_clan_default")
+    except:
+        return None
+
+async def _render_upgrade_screen(update, context, clan_data, text, keyboard):
+    """Renderiza a tela usando o sistema unificado UI Renderer."""
+    media_id = _pick_upgrade_media(clan_data)
+    
+    await render_photo_or_text(
+        update,
+        context,
+        text=text,
+        photo_file_id=media_id,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        scope="clan_upgrade_screen", 
+        parse_mode="HTML",
+        allow_edit=True
+    )
+
 # ==============================================================================
 # MENU DE APRIMORAMENTO
 # ==============================================================================
@@ -45,28 +86,24 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
     """Mostra o menu de aprimoramento usando o renderizador imersivo."""
     query = update.callback_query
     
-    # IMPORTAÇÃO TARDIA (Essencial para usar a função do Dashboard sem travar)
-    from handlers.guild.dashboard import _render_clan_screen
-
     user_id = get_current_player_id(update, context)
+    if not user_id: return # Auth handler trata
     
     player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
     
     if not clan_id:
-        await query.answer("Você não tem um clã!", show_alert=True)
+        if query: await query.answer("Você não tem um clã!", show_alert=True)
         return
         
     clan_data = await clan_manager.get_clan(clan_id)
     
     # Validação de Líder
-    leader_id = int(clan_data.get("leader_id", 0))
-    is_leader = (user_id == leader_id)
+    leader_id = str(clan_data.get("leader_id", 0))
+    is_leader = (str(user_id) == leader_id)
 
-    if not is_leader:
-        await query.answer("Apenas o líder pode gerenciar melhorias.", show_alert=True)
-        return
-        
+    # Nota: Permitimos que membros vejam a tela, mas apenas líder vê botões de ação
+    
     # Dados Atuais
     current_level = clan_data.get("prestige_level", 1)
     current_points = clan_data.get("prestige_points", 0)
@@ -113,14 +150,17 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
             f"   💎 {cost_dimas:,} Diamantes\n"
         )
         
-        # Botões de Ação (Só aparecem se tiver XP suficiente)
+        # Botões de Ação (Só aparecem se tiver XP suficiente E for Líder)
         if current_points >= points_needed:
-            text += "\n✅ <b>XP Alcançado!</b> Escolha como pagar a taxa:"
-            keyboard.append([InlineKeyboardButton(f"Pagar 🪙 {cost_gold:,} Ouro", callback_data='clan_upgrade_confirm:gold')])
-            keyboard.append([InlineKeyboardButton(f"Pagar 💎 {cost_dimas:,} Dimas", callback_data='clan_upgrade_confirm:dimas')])
+            if is_leader:
+                text += "\n✅ <b>XP Alcançado!</b> Escolha como pagar a taxa:"
+                keyboard.append([InlineKeyboardButton(f"Pagar 🪙 {cost_gold:,} Ouro", callback_data='clan_upgrade_confirm:gold')])
+                keyboard.append([InlineKeyboardButton(f"Pagar 💎 {cost_dimas:,} Dimas", callback_data='clan_upgrade_confirm:dimas')])
+            else:
+                 text += "\n⚠️ <i>Apenas o Líder pode realizar a evolução.</i>"
         else:
             remaining = points_needed - current_points
-            text += f"\n🔒 <i>Complete missões para ganhar +{remaining} XP.</i>"
+            text += f"\n🔒 <i>Complete missões e guerras para ganhar +{remaining} XP.</i>"
 
     else:
         text += "\n🌟 <b>NÍVEL MÁXIMO ATINGIDO!</b>\nSeu clã alcançou o ápice do poder."
@@ -128,8 +168,7 @@ async def show_clan_upgrade_menu(update: Update, context: ContextTypes.DEFAULT_T
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Painel", callback_data='clan_menu')])
     
     # --- RENDERIZAÇÃO IMERSIVA ---
-    # Mantém o logo do clã, sem piscar a tela
-    await _render_clan_screen(update, context, clan_data, text, keyboard)
+    await _render_upgrade_screen(update, context, clan_data, text, keyboard)
 
 
 # ==============================================================================
@@ -142,14 +181,25 @@ async def confirm_clan_upgrade_callback(update: Update, context: ContextTypes.DE
     
     player_data = await player_manager.get_player_data(user_id)
     clan_id = player_data.get("clan_id")
-    payment_method = query.data.split(':')[1]
     
+    # Validação extra de segurança
+    if not clan_id: return
+    clan_data = await clan_manager.get_clan(clan_id)
+    if str(clan_data.get("leader_id")) != str(user_id):
+        await query.answer("Apenas o líder pode fazer isso.", show_alert=True)
+        return
+
     try:
-        # Tenta subir de nível (o clan_manager vai descontar o XP e o Ouro)
+        payment_method = query.data.split(':')[1]
+    except:
+        return
+
+    try:
+        # Tenta subir de nível (o clan_manager deve ter a lógica de descontar o XP e o Ouro)
         await clan_manager.level_up_clan(clan_id, user_id, payment_method)
         
         # Se não deu erro, sucesso!
-        clan_data = await clan_manager.get_clan(clan_id)
+        clan_data = await clan_manager.get_clan(clan_id) # Recarrega dados atualizados
         new_level = clan_data.get("prestige_level")
         
         await query.answer(f"🎉 SUCESSO! Clã nível {new_level}!", show_alert=True)

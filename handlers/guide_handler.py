@@ -1,14 +1,18 @@
 # handlers/guide_handler.py
-# (VERSÃO BLINDADA: Detecta se é Foto ou Texto para não dar erro)
+# (VERSÃO ATUALIZADA: UI RENDERER + IMAGENS POR TÓPICO)
 
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
-# --- IMPORTS PARA LER OS DADOS REAIS ---
+# --- IMPORTS DE DADOS ---
 from modules.player.stats import CLASS_PROGRESSIONS, CLASS_POINT_GAINS
 from modules.game_data.classes import CLASSES_DATA
 from modules.game_data.attributes import STAT_EMOJI
+from modules import file_ids
+
+# --- IMPORT VISUAL ---
+from ui.ui_renderer import render_photo_or_text
 
 logger = logging.getLogger(__name__)
 
@@ -23,49 +27,57 @@ STAT_NAMES = {
 }
 
 # ==============================================================================
-# HELPER DE EDIÇÃO SEGURA (A CORREÇÃO ESTÁ AQUI)
+# HELPERS VISUAIS
 # ==============================================================================
-async def _safe_edit_guide(query, text_content, keyboard):
-    """
-    Edita a mensagem verificando se ela é Mídia (Caption) ou Texto (Text).
-    Isso evita o erro 'There is no caption in the message to edit'.
-    """
-    reply_markup = InlineKeyboardMarkup(keyboard)
+
+def _pick_guide_media(topic="main"):
+    """Seleciona a imagem baseada no tópico do guia."""
+    key_map = {
+        "main": "img_guide_main",       # Capa do guia
+        "classes": "img_guide_classes", # Árvore de classes
+        "stats": "img_guide_stats",     # Tabela de status
+        "mana": "img_guide_mana"        # Explicação de mana
+    }
+    
+    key = key_map.get(topic, "img_guide_main")
     
     try:
-        # Verifica se a mensagem original tem mídia (Foto, Vídeo ou Documento)
-        if query.message.photo or query.message.video or query.message.document:
-            await query.edit_message_caption(
-                caption=text_content,
-                reply_markup=reply_markup,
-                parse_mode="HTML"
-            )
-        else:
-            # Se não tiver mídia, edita como texto normal
-            await query.edit_message_text(
-                text=text_content,
-                reply_markup=reply_markup,
-                parse_mode="HTML"
-            )
-    except Exception as e:
-        logger.error(f"Erro ao editar guia: {e}")
-        # Em último caso, tenta enviar como nova mensagem se a edição falhar muito feio
-        try:
-            await query.message.reply_text(text_content, reply_markup=reply_markup, parse_mode="HTML")
-        except: pass
+        fid = file_ids.get_file_id(key)
+        if fid: return fid
+    except: pass
+    
+    # Fallback genérico
+    try:
+        return file_ids.get_file_id("img_scroll_generic")
+    except:
+        return None
+
+async def _render_guide(update, context, text, keyboard, topic="main"):
+    """Renderiza a tela do guia usando o sistema unificado."""
+    media_fid = _pick_guide_media(topic)
+    
+    await render_photo_or_text(
+        update,
+        context,
+        text=text,
+        photo_file_id=media_fid,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        scope="guide_book", # Mantém a navegação fluida na mesma "janela"
+        parse_mode="HTML",
+        allow_edit=True
+    )
 
 # ==============================================================================
-# GERADORES DE TEXTO DINÂMICO
+# GERADORES DE TEXTO
 # ==============================================================================
 
 def _generate_stats_guide_text():
-    """Gera o texto de status lendo direto do stats.py"""
-    text = "<b>📊 MATEMÁTICA DO PODER (Dinâmico)</b>\n\n"
-    text += "<i>Estes são os valores atuais do servidor:</i>\n\n"
+    text = "<b>📊 MATEMÁTICA DO PODER</b>\n\n"
+    text += "<i>Como seus atributos crescem neste mundo:</i>\n\n"
     
-    # --- 1. CRESCIMENTO POR NÍVEL ---
+    # 1. CRESCIMENTO POR NÍVEL
     text += "<b>1️⃣ CRESCIMENTO AUTOMÁTICO (Por Nível)</b>\n"
-    text += "Ao subir de nível, você ganha isso automaticamente:\n\n"
+    text += "Ao subir de nível, você ganha status base:\n\n"
     
     tier_1_classes = [k for k, v in CLASSES_DATA.items() if v.get('tier') == 1]
     
@@ -88,9 +100,9 @@ def _generate_stats_guide_text():
             
     text += "\n━━━━━━━━━━━━━━━━━\n\n"
     
-    # --- 2. EFICIÊNCIA DOS PONTOS ---
-    text += "<b>2️⃣ EFICIÊNCIA DOS PONTOS (Cliques)</b>\n"
-    text += "O quanto seu atributo sobe ao gastar <b>1 Ponto</b>:\n\n"
+    # 2. EFICIÊNCIA DOS PONTOS
+    text += "<b>2️⃣ EFICIÊNCIA DOS PONTOS</b>\n"
+    text += "Quanto ganha ao gastar <b>1 Ponto de Atributo</b>:\n\n"
     
     for cls_key in tier_1_classes:
         cls_info = CLASSES_DATA.get(cls_key, {})
@@ -111,13 +123,12 @@ def _generate_stats_guide_text():
         else:
             text += f"{emoji} <b>{name}:</b> Padrão (+1 em tudo)\n"
 
-    text += "\n<i>💡 Os demais atributos ganham +1 por ponto.</i>"
+    text += "\n<i>💡 Demais atributos ganham +1 por ponto gasto.</i>"
     return text
 
 def _generate_mana_guide_text():
-    """Gera o guia de Mana lendo a configuração do stats.py"""
     text = "<b>💧 FONTES DE MANA (MP)</b>\n\n"
-    text += "Seu atributo de Mana depende da sua classe:\n\n"
+    text += "Seu MP máximo depende de um atributo específico, baseado na sua classe:\n\n"
     
     mana_map = {}
     tier_1_classes = [k for k, v in CLASSES_DATA.items() if v.get('tier') == 1]
@@ -141,41 +152,32 @@ def _generate_mana_guide_text():
         text += "\n".join([f" • {c}" for c in classes_list])
         text += "\n\n"
 
-    text += "<i>⚠️ Dica: Distribua pontos neste atributo para ganhar MP!</i>"
+    text += "<i>⚠️ Dica: Distribua pontos neste atributo para aumentar sua Mana Máxima!</i>"
     return text
 
 TEXT_MAIN_MENU = """
 <b>📘 BIBLIOTECA DE ELDORA</b>
 
-Os conhecimentos arcanos do servidor estão aqui.
-Estes dados são extraídos diretamente das leis do mundo (código).
+Os conhecimentos arcanos do servidor estão reunidos aqui.
+Estes dados são extraídos diretamente das leis do mundo.
 
-<i>Selecione um tópico:</i>
+<i>Selecione um tomo para ler:</i>
 """
 
 TEXT_CLASSES_INFO = """
 <b>⛩️ ÁRVORES DE EVOLUÇÃO</b>
 
-Veja o destino de cada classe:
+Conheça o destino glorioso de cada caminho:
 
-⚔️ <b>GUERREIRO</b> ➔ 
-Cavaleiro ➔ Templário ➔ Guardião Divino ➔ Avatar da Égide ➔ <b>Lenda Divina</b>
-🪓 <b>BERSERKER</b> ➔ 
-Bárbaro ➔ Selvagem ➔ Ira Primordial ➔ Avatar da Calamidade ➔ <b>Deus da Ira</b>
-🏹 <b>CAÇADOR</b> ➔ 
-Franco Atirador ➔ Olho de Águia ➔ Atirador Espectral ➔ O Horizonte ➔ <b>Lenda do Arco</b>
-🔪 <b>ASSASSINO</b> ➔ 
-Ladrão de Sombras ➔ Ninja ➔ Mestre das Lâminas ➔ Ceifador ➔ <b>Aspecto da Noite</b>
-🧙 <b>MAGO</b> ➔ 
-Elementalista ➔ Arquimago ➔ Mago de Batalha ➔ Arcanista Supremo ➔ <b>Aspecto Arcano</b>
-🧘 <b>MONGE</b> ➔ 
-Punho Elemental ➔ Ascendente ➔ Punho Divino ➔ Dragão Interior ➔ <b>Lenda do Punho</b>
-🥷 <b>SAMURAI</b> ➔ 
-Ronin ➔ Kenshi ➔ Shogunato ➔ Mestre de Bushido ➔ <b>Aspecto da Lâmina</b>
-🎶 <b>BARDO</b> ➔ 
-Menestrel ➔ Trovador ➔ Mestre de Concerto ➔ Harmonista ➔ <b>Aspecto Musical</b>
-🩹 <b>CURANDEIRO</b> ➔ 
-Clérigo ➔ Sacerdote ➔ Hierofante ➔ Oráculo Celestial ➔ <b>Lenda da Cura</b>
+⚔️ <b>GUERREIRO</b> ➔ Cavaleiro ➔ Templário ➔ Guardião Divino ➔ <b>Lenda Divina</b>
+🪓 <b>BERSERKER</b> ➔ Bárbaro ➔ Selvagem ➔ Ira Primordial ➔ <b>Deus da Ira</b>
+🏹 <b>CAÇADOR</b> ➔ Franco Atirador ➔ Olho de Águia ➔ O Horizonte ➔ <b>Lenda do Arco</b>
+🔪 <b>ASSASSINO</b> ➔ Ladrão ➔ Ninja ➔ Ceifador ➔ <b>Aspecto da Noite</b>
+🧙 <b>MAGO</b> ➔ Elementalista ➔ Arquimago ➔ Arcanista Supremo ➔ <b>Aspecto Arcano</b>
+🧘 <b>MONGE</b> ➔ Punho Elemental ➔ Ascendente ➔ Dragão Interior ➔ <b>Lenda do Punho</b>
+🥷 <b>SAMURAI</b> ➔ Ronin ➔ Kenshi ➔ Shogunato ➔ <b>Aspecto da Lâmina</b>
+🎶 <b>BARDO</b> ➔ Menestrel ➔ Trovador ➔ Harmonista ➔ <b>Aspecto Musical</b>
+🩹 <b>CURANDEIRO</b> ➔ Clérigo ➔ Sacerdote ➔ Oráculo Celestial ➔ <b>Lenda da Cura</b>
 """
 
 # ==============================================================================
@@ -184,7 +186,7 @@ Clérigo ➔ Sacerdote ➔ Hierofante ➔ Oráculo Celestial ➔ <b>Lenda da Cur
 
 async def show_guide_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    if query: await query.answer()
     
     keyboard = [
         [
@@ -195,8 +197,7 @@ async def show_guide_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")]
     ]
     
-    # Usa o helper seguro
-    await _safe_edit_guide(query, TEXT_MAIN_MENU, keyboard)
+    await _render_guide(update, context, TEXT_MAIN_MENU, keyboard, topic="main")
 
 async def show_topic_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -205,7 +206,7 @@ async def show_topic_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dynamic_text = _generate_stats_guide_text()
     keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="guide_main")]]
     
-    await _safe_edit_guide(query, dynamic_text, keyboard)
+    await _render_guide(update, context, dynamic_text, keyboard, topic="stats")
 
 async def show_topic_mana(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -214,7 +215,7 @@ async def show_topic_mana(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dynamic_text = _generate_mana_guide_text()
     keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="guide_main")]]
     
-    await _safe_edit_guide(query, dynamic_text, keyboard)
+    await _render_guide(update, context, dynamic_text, keyboard, topic="mana")
 
 async def show_topic_classes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -222,7 +223,7 @@ async def show_topic_classes(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     keyboard = [[InlineKeyboardButton("⬅️ Voltar ao Menu", callback_data="guide_main")]]
     
-    await _safe_edit_guide(query, TEXT_CLASSES_INFO, keyboard)
+    await _render_guide(update, context, TEXT_CLASSES_INFO, keyboard, topic="classes")
 
 # Lista para registrar no main.py
 guide_handlers = [

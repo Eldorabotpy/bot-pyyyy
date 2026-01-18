@@ -1,80 +1,33 @@
 # handlers/guild_menu_handler.py
+# (VERSÃO ATUALIZADA: UI RENDERER + GUILDAS)
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from datetime import datetime, timedelta, timezone
 
 from modules import player_manager, guild_system, clan_manager, file_ids
-
-# --- IMPORT NOVO ---
 from modules.auth_utils import get_current_player_id
-
-# ✅ Compat (menu antigo) -> deve existir no modules/clan_war_engine.py
 from modules.clan_war_engine import get_war_status
 
+# --- IMPORT VISUAL ---
+from ui.ui_renderer import render_photo_or_text
 
-async def _smart_media_edit(query, text, markup, media_key, context):
-    chat_id = query.message.chat_id
-    media_fid = None
-    try:
-        media_fid = file_ids.get_file_id(media_key)
-    except Exception:
-        pass
-
-    has_media_now = bool(query.message.photo or query.message.video or query.message.animation)
-    is_current_photo = bool(query.message.photo)
-
-    should_resend = False
-    if media_fid and not has_media_now:
-        should_resend = True
-    elif not media_fid and has_media_now:
-        should_resend = True
-    elif media_fid and not is_current_photo:
-        should_resend = True
-
-    if not should_resend:
-        try:
-            if media_fid:
-                await query.edit_message_media(
-                    media=InputMediaPhoto(media=media_fid, caption=text, parse_mode="HTML"),
-                    reply_markup=markup,
-                )
-            else:
-                await query.edit_message_text(text=text, reply_markup=markup, parse_mode="HTML")
-            return
-        except Exception:
-            should_resend = True
-
-    if should_resend:
-        try:
-            await query.delete_message()
-        except Exception:
-            pass
-        try:
-            if media_fid:
-                await context.bot.send_photo(chat_id, photo=media_fid, caption=text, reply_markup=markup, parse_mode="HTML")
-            else:
-                await context.bot.send_message(chat_id, text, reply_markup=markup, parse_mode="HTML")
-        except Exception:
-            pass
-
+# ==============================================================================
+# HELPERS
+# ==============================================================================
 
 def _bar(current, total, blocks=8):
-    if total <= 0:
-        return "🟩" * blocks
+    if total <= 0: return "🟩" * blocks
     ratio = min(1.0, max(0.0, current / total))
     filled = int(ratio * blocks)
     return "🟩" * filled + "⬜" * (blocks - filled)
 
-
 def _mini_bar(current, total):
     blocks = 5
-    if total <= 0:
-        return "▪️" * blocks
+    if total <= 0: return "▪️" * blocks
     ratio = min(1.0, max(0.0, current / total))
     filled = int(ratio * blocks)
     return "▪️" * filled + "▫️" * (blocks - filled)
-
 
 def _get_time_until_reset():
     now = datetime.now(timezone.utc)
@@ -84,36 +37,44 @@ def _get_time_until_reset():
     minutes, _ = divmod(remainder, 60)
     return f"{hours}h {minutes}m"
 
-
-async def _safe_edit(query, text, markup):
-    try:
-        await query.edit_message_text(text=text, reply_markup=markup, parse_mode="HTML")
-    except Exception:
+async def _render_guild_screen(update, context, text, keyboard, media_key=None, scope="adventurer_guild"):
+    """Wrapper para renderizar telas da guilda de aventureiros."""
+    media_fid = None
+    if media_key:
         try:
-            await query.edit_message_caption(caption=text, reply_markup=markup, parse_mode="HTML")
-        except Exception:
-            try:
-                await query.delete_message()
-            except Exception:
-                pass
-            await query.message.reply_text(text, reply_markup=markup, parse_mode="HTML")
+            media_fid = file_ids.get_file_id(media_key)
+        except: pass
+    
+    # Fallback visual
+    if not media_fid:
+        try:
+            media_fid = file_ids.get_file_id("img_guild_npc")
+        except: pass
 
+    await render_photo_or_text(
+        update,
+        context,
+        text=text,
+        photo_file_id=media_fid,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        scope=scope,
+        parse_mode="HTML",
+        allow_edit=True
+    )
 
-# --- HANDLERS PRINCIPAIS ---
+# ==============================================================================
+# HANDLERS PRINCIPAIS
+# ==============================================================================
 
 async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        pass
+    if query: await query.answer()
 
     user_id = get_current_player_id(update, context)
-
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        return
+    if not pdata: return
 
+    # Atualiza missões diárias
     gdata = pdata.get("adventurer_guild", {})
     missions = guild_system.generate_daily_missions(pdata)
     await player_manager.save_player_data(user_id, pdata)
@@ -164,32 +125,28 @@ async def adventurer_guild_menu(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard.append([InlineKeyboardButton("🛡️ Criar ou Buscar Clã", callback_data="clan_create_menu_start")])
 
     keyboard.append([InlineKeyboardButton("🔙 Voltar", callback_data="profile")])
-    markup = InlineKeyboardMarkup(keyboard)
-    await _smart_media_edit(query, text, markup, "img_guild_npc", context)
+    
+    # Renderiza
+    await _render_guild_screen(update, context, text, keyboard, media_key="img_guild_npc")
 
 
 async def guild_war_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostra status resumido da Guerra (atalho no menu pessoal)."""
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        pass
+    if query: await query.answer()
 
     user_id = get_current_player_id(update, context)
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        return
+    if not pdata: return
 
-    # ✅ Compat retorna season/state; o sistema novo está em season
     ws = await get_war_status()
     season = ws.get("season", {}) or {}
 
-    war_id = season.get("season_id") or season.get("campaign_id") or season.get("war_id") or "-"
+    war_id = season.get("season_id") or season.get("campaign_id") or "-"
     phase = str(season.get("phase") or "PREP").upper()
     signup_open = bool(season.get("signup_open", season.get("registration_open", False)))
-    target_region_id = str(season.get("target_region_id") or season.get("domination_region") or "")
+    target_region_id = str(season.get("target_region_id") or "")
 
-    # Nome bonito da região
     region_name = target_region_id or "—"
     region_emoji = "📍"
     try:
@@ -198,46 +155,41 @@ async def guild_war_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         meta = get_region_meta(game_data_regions, target_region_id) if target_region_id else {}
         region_name = meta.get("display_name", region_name)
         region_emoji = meta.get("emoji", region_emoji)
-    except Exception:
-        pass
+    except: pass
 
     txt = (
-        f"⚔️ <b>GUERRA DE CLÃS</b>\n"
+        f"⚔️ <b>GUERRA DE CLÃS (Evento Global)</b>\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"🆔 <b>Rodada:</b> <code>{war_id}</code>\n"
-        f"⏳ <b>Fase:</b> <b>{phase}</b>\n"
-        f"📝 <b>Inscrição:</b> {'<b>ABERTA</b>' if signup_open else '<b>FECHADA</b>'}\n"
+        f"⏳ <b>Fase Atual:</b> <b>{phase}</b>\n"
+        f"📝 <b>Inscrições:</b> {'🟢 ABERTA' if signup_open else '🔴 FECHADA'}\n"
         f"{region_emoji} <b>Região Alvo:</b> <b>{region_name}</b>\n\n"
     )
 
-    if phase == "PREPARAÇÃO":
+    if phase == "PREP" or phase == "PREPARAÇÃO":
         txt += (
             "✅ <b>Modo PREPARAÇÃO</b>\n"
-            "👑 O <b>Líder do Clã</b> deve inscrever o clã e abrir/fechar inscrição no menu do Clã.\n"
-            "Depois, os membros entram e confirmam participação.\n"
+            "Os líderes de clã devem inscrever suas guildas agora.\n"
+            "Se você tem clã, verifique o painel dele para entrar na lista de batalha.\n"
         )
     elif phase == "ACTIVE":
         txt += (
-            "🔥 <b>Guerra ativa!</b>\n"
-            "⚠️ Somente jogadores <b>inscritos</b> nesta rodada pontuam (PvE/PvP) na região alvo.\n"
+            "🔥 <b>GUERRA ATIVA!</b>\n"
+            "O combate começou! Apenas membros inscritos pontuam.\n"
+            "Vá para a região alvo e derrote inimigos para ajudar seu clã.\n"
         )
     else:
-        txt += (
-            "🏁 <b>Campanha encerrada.</b>\n"
-            "A próxima rodada será preparada automaticamente na próxima semana.\n"
-        )
+        txt += "🏁 <b>Rodada Encerrada.</b> Aguardando próxima temporada.\n"
 
     kb = []
     if pdata.get("clan_id"):
-        kb.append([InlineKeyboardButton("🛡️ Ir para meu Clã", callback_data="clan_menu")])
+        kb.append([InlineKeyboardButton("🛡️ Painel do Meu Clã", callback_data="clan_menu")])
     else:
-        kb.append([InlineKeyboardButton("🛡️ Criar/Buscar Clã", callback_data="clan_create_menu_start")])
+        kb.append([InlineKeyboardButton("🛡️ Buscar Clã", callback_data="clan_create_menu_start")])
 
     kb.append([InlineKeyboardButton("🔙 Voltar", callback_data="adventurer_guild_main")])
-    await _safe_edit(query, txt, InlineKeyboardMarkup(kb))
-
-
-war_status_handler = CallbackQueryHandler(guild_war_status, pattern=r"^gld_war_status$")
+    
+    await _render_guild_screen(update, context, txt, kb, media_key="img_war_default")
 
 
 async def view_mission_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -245,21 +197,18 @@ async def view_mission_details(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
 
     user_id = get_current_player_id(update, context)
-
     try:
         idx = int(query.data.split("_")[-1])
-    except Exception:
-        return
+    except: return
 
     pdata = await player_manager.get_player_data(user_id)
     missions = pdata.get("adventurer_guild", {}).get("active_missions", [])
-    if idx >= len(missions):
-        return
+    if idx >= len(missions): return
 
     m = missions[idx]
 
     if str(m.get("type", "")).upper() == "COLLECT":
-        await query.answer("Esta missão foi removida.", show_alert=True)
+        await query.answer("Missão antiga removida.", show_alert=True)
         await adventurer_guild_menu(update, context)
         return
 
@@ -267,128 +216,74 @@ async def view_mission_details(update: Update, context: ContextTypes.DEFAULT_TYP
     desc = m.get("description") or m.get("desc") or "Sem descrição."
     status = m.get("status", "active")
     rewards = m.get("rewards", {})
+    
     xp = rewards.get("xp", m.get("xp", 0))
     gold = rewards.get("gold", m.get("reward_gold", 0))
     pts = rewards.get("prestige_points", m.get("reward_points", 0))
+    
     prog = m.get("progress", 0)
     target = m.get("target_count", m.get("qty", 1))
 
     text = (
-        f"📜 <b>{title}</b>\n"
-        f"<i>{desc}</i>\n\n"
+        f"📜 <b>DETALHES DO CONTRATO</b>\n\n"
+        f"📌 <b>{title}</b>\n"
+        f"<i>\"{desc}\"</i>\n\n"
         f"📊 <b>Progresso:</b> {prog}/{target}\n"
-        f"💰 <b>Recompensas:</b> {gold} Ouro, {xp} XP, {pts} Prestígio\n\n"
+        f"💰 <b>Recompensas:</b>\n"
+        f"   • {gold} Ouro\n"
+        f"   • {xp} XP\n"
+        f"   • {pts} pts de Prestígio\n\n"
     )
 
     kb = []
     if status == "completed":
-        text += "\n✅ <b>Concluída!</b> Toque abaixo para receber."
-        kb.append([InlineKeyboardButton("🎁 RESGATAR RECOMPENSA", callback_data=f"gld_mission_claim_{idx}")])
+        text += "✅ <b>Concluída!</b> Resgate sua recompensa abaixo."
+        kb.append([InlineKeyboardButton("🎁 RESGATAR AGORA", callback_data=f"gld_mission_claim_{idx}")])
     elif status == "claimed":
-        text += "\n📦 <b>Recompensa já coletada.</b>"
+        text += "📦 <b>Recompensa já coletada.</b>"
 
     kb.append([InlineKeyboardButton("🔙 Voltar", callback_data="adventurer_guild_main")])
-    await _safe_edit(query, text, InlineKeyboardMarkup(kb))
+    
+    await _render_guild_screen(update, context, text, kb, media_key="img_mission_scroll")
 
 
 async def claim_mission_reward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = get_current_player_id(update, context)
-
     try:
         idx = int(query.data.split("_")[-1])
-    except Exception:
-        return
+    except: return
 
     from modules import mission_manager
-
     result = await mission_manager.claim_personal_reward(user_id, idx)
+    
     if not result:
-        await query.answer("Já coletada ou inválida.", show_alert=True)
+        await query.answer("Erro ao coletar ou já coletada.", show_alert=True)
     else:
-        msg = f"🎉 Recompensa: +{result['gold']} Ouro"
-        if result.get("xp"):
-            msg += f", +{result['xp']} XP"
+        msg = f"🎉 +{result['gold']} Ouro"
+        if result.get("xp"): msg += f", +{result['xp']} XP"
         if result.get("rank_up"):
-            msg += f"\n🏆 SUBIU DE RANK: {result['rank_up']['title']}!"
+            msg += f"\n🏆 NOVO RANK: {result['rank_up']['title']}!"
         await query.answer(msg, show_alert=True)
 
     await adventurer_guild_menu(update, context)
 
 
 async def clan_mission_board(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Visualização alternativa do quadro de missões do clã via menu da Guilda de Aventureiros.
+    Redireciona para o handler oficial do clã para consistência.
+    """
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        pass
+    await query.answer()
+    
+    # Importação tardia para evitar ciclo
+    from handlers.guild.missions import show_guild_mission_details
+    await show_guild_mission_details(update, context)
 
-    user_id = get_current_player_id(update, context)
-
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata.get("clan_id"):
-        await query.answer("Você precisa estar em um Clã!", show_alert=True)
-        return
-
-    try:
-        clan_data = await clan_manager.get_clan(pdata["clan_id"])
-    except Exception:
-        clan_data = {}
-
-    if not clan_data:
-        await query.answer("Clã não encontrado.", show_alert=True)
-        return
-
-    clan_lvl = clan_data.get("level", 1)
-    clan_name = clan_data.get("name", "Seu Clã")
-    leader_id = clan_data.get("leader_id", 0)
-
-    # comparação robusta (id pode ser int/str/ObjectId)
-    is_leader = (str(user_id) == str(leader_id))
-
-    active_m = clan_data.get("active_mission")
-    text = f"🛡️ <b>MISSÕES DE EXPANSÃO DO CLÃ</b>\nClã: <b>{clan_name}</b> | Nível: {clan_lvl}\n\n"
-    keyboard = []
-
-    if active_m and str(active_m.get("type", "")).upper() == "COLLECT":
-        text += "⚠️ <i>Missão antiga detectada. Líder deve cancelar.</i>\n\n"
-
-    if active_m:
-        title = active_m.get("title", "Missão")
-        prog = active_m.get("current_progress", 0)
-        targ = active_m.get("target_count", 1)
-        desc = active_m.get("description", "")
-        target_raw = active_m.get("target_monster_id") or active_m.get("target_item_id") or "Alvo"
-        target_pretty = str(target_raw).replace("_", " ").title()
-        percent = (prog / targ) * 100 if targ > 0 else 0
-
-        text += (
-            f"⚔️ <b>MISSÃO ATIVA:</b>\n📜 <b>{title}</b>\n<i>\"{desc}\"</i>\n\n"
-            f"🎯 <b>Objetivo:</b> Derrotar {targ}x <b>{target_pretty}</b>\n"
-            f"📊 <b>Progresso:</b> {prog}/{targ} ({percent:.1f}%)\n"
-            f"<code>[{_bar(prog, targ, 10)}]</code>\n"
-        )
-
-        if prog >= targ:
-            text += "\n✅ <b>CONCLUÍDA! O líder deve finalizar.</b>"
-            if is_leader:
-                keyboard.append([InlineKeyboardButton("🏆 Finalizar Missão", callback_data="gld_mission_finish")])
-        else:
-            if is_leader:
-                keyboard.append([InlineKeyboardButton("❌ Cancelar Missão (Líder)", callback_data="gld_mission_cancel")])
-    else:
-        text += "💤 <i>Nenhuma missão ativa no momento.</i>\n\n"
-        if is_leader:
-            text += "👑 <b>Você é o Líder!</b> Inicie uma missão para seu clã."
-            keyboard.append([InlineKeyboardButton("📜 Iniciar Nova Missão", callback_data="gld_mission_select_menu")])
-        else:
-            text += "<i>Peça ao seu Líder para iniciar uma missão.</i>"
-
-    keyboard.append([InlineKeyboardButton("🔙 Voltar à Guilda", callback_data="adventurer_guild_main")])
-    await _safe_edit(query, text, InlineKeyboardMarkup(keyboard))
-
-
+# --- CONFIGURAÇÃO ---
 adventurer_guild_handler = CallbackQueryHandler(adventurer_guild_menu, pattern=r"^adventurer_guild_main$")
 clan_board_handler = CallbackQueryHandler(clan_mission_board, pattern=r"^gld_clan_board$")
+war_status_handler = CallbackQueryHandler(guild_war_status, pattern=r"^gld_war_status$")
 mission_view_handler = CallbackQueryHandler(view_mission_details, pattern=r"^gld_mission_view_")
 mission_claim_handler = CallbackQueryHandler(claim_mission_reward, pattern=r"^gld_mission_claim_")
