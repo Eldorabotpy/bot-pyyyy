@@ -94,20 +94,24 @@ async def get_clan_weekly_score(clan_id: str) -> Dict[str, Any]:
     return await WarScoreRepo().get(cid, clan_id)
 
 async def get_clan_signup(campaign_id: str, clan_id: str) -> Dict[str, Any]:
-    if not campaign_id:
-        campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions)
-        campaign_id = _safe_str(campaign.get("campaign_id") or current_week_id())
-    
+    """
+    Retorna doc de inscrição do clã em war_signups.
+    CORREÇÃO: Adiciona 'ok=True' explicitamente para o Dashboard entender.
+    """
+    campaign_id = _safe_str(campaign_id)
+    clan_id = _safe_str(clan_id)
+
     repo = WarSignupRepo()
-    doc = await repo.get(_safe_str(campaign_id), _safe_str(clan_id))
+    doc = await repo.get(campaign_id, clan_id)
     
-    if not doc:
-        return {"campaign_id": campaign_id, "clan_id": clan_id, "member_ids": []}
-    
-    if "member_ids" not in doc:
-        doc["member_ids"] = []
-    
-    return doc
+    # Se encontrou o documento no banco...
+    if doc:
+        # ...marca como OK para o Dashboard mostrar 'INSCRITO'
+        doc["ok"] = True
+        return doc
+        
+    # Se não achou nada
+    return {"ok": False, "campaign_id": campaign_id, "clan_id": clan_id, "member_ids": []}
 
 # =============================================================================
 # 2. API DE AÇÕES (Inscrição e Gestão)
