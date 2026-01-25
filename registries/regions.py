@@ -19,7 +19,9 @@ from handlers.menu.region import (
     noop_handler,
     war_claim_handler,
     war_attack_handler,
-    continue_after_action_handler
+    continue_after_action_handler,
+    war_search_handler,      
+    war_pvp_fight_handler,
 
 )
 
@@ -54,7 +56,9 @@ except ImportError:
 
 def register_regions_handlers(application: Application):
     """Regista os handlers de regiões, viagens, coleta e calabouços."""
-
+    
+    application.add_handler(war_search_handler)
+    application.add_handler(war_pvp_fight_handler)
     # --- Grupo 1: Região e Viagem --- 
     if kingdom_menu_handler:
         application.add_handler(kingdom_menu_handler)
@@ -66,6 +70,7 @@ def register_regions_handlers(application: Application):
     application.add_handler(noop_handler)
     application.add_handler(war_claim_handler)
     application.add_handler(war_attack_handler)
+    
     application.add_handler(continue_after_action_handler)
     
 

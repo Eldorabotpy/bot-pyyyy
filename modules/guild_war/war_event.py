@@ -63,33 +63,50 @@ class WarSignupRepo:
     ) -> Dict[str, Any]:
         """
         Insere doc se não existir e adiciona membro ao set.
+        FIX: não usar 'member_ids' em $setOnInsert para evitar conflito com $addToSet.
         """
         cid = _norm_id(campaign_id)
         gid = _norm_id(clan_id)
         mid = _norm_id(member_id)
         now_iso = _now_utc().isoformat()
 
-        base_set: Dict[str, Any] = {"updated_at": now_iso}
+        # $set: sempre seguro
+        set_payload: Dict[str, Any] = {"updated_at": now_iso}
         if leader_id:
-            base_set["leader_id"] = _norm_id(leader_id)
+            set_payload["leader_id"] = _norm_id(leader_id)
+
+        # $setOnInsert: NÃO coloca member_ids aqui
+        set_on_insert: Dict[str, Any] = {
+            "campaign_id": cid,
+            "clan_id": gid,
+            "created_at": now_iso,
+            # leader_id aqui é opcional, mas para evitar conflitos, mantenha apenas no $set
+            # "leader_id": _norm_id(leader_id) if leader_id else None,
+        }
+
+        update_doc: Dict[str, Any] = {
+            "$setOnInsert": set_on_insert,
+            "$set": set_payload,
+        }
+
+        # Só adiciona se tiver ID válido
+        if mid:
+            update_doc["$addToSet"] = {"member_ids": mid}
 
         await asyncio.to_thread(
             self.col.update_one,
             {"campaign_id": cid, "clan_id": gid},
-            {
-                "$setOnInsert": {
-                    "campaign_id": cid,
-                    "clan_id": gid,
-                    "leader_id": base_set.get("leader_id"),
-                    "member_ids": [],
-                    "created_at": now_iso,
-                },
-                "$set": base_set,
-                "$addToSet": {"member_ids": mid},
-            },
+            update_doc,
             True,
         )
-        return (await self.get(cid, gid)) or {"campaign_id": cid, "clan_id": gid, "member_ids": [mid]}
+
+        doc = await self.get(cid, gid)
+        if not doc:
+            # fallback extremo (não deveria acontecer)
+            return {"campaign_id": cid, "clan_id": gid, "member_ids": ([mid] if mid else [])}
+        return doc
+
+
 
     async def remove_member(self, campaign_id: str, clan_id: str, member_id: str) -> None:
         cid = _norm_id(campaign_id)

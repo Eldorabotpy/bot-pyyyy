@@ -1011,122 +1011,236 @@ SKILL_DATA = {
     # --- Novas Habilidades de Evolução do Assassino (Furtividade/Crítico) ---
 
     "evo_shadow_thief_ambush": {
-        "display_name": "Emboscada do Ladrão de Sombras",
-        "type": "passive",
-        "description": "Especialista em ataques de oportunidade. Seu primeiro ataque em combate causa dano massivo.",
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum: O primeiro ataque em cada combate causa +50% de dano e tem +25% de Chance de Crítico.",
-                "effects": {"first_hit_bonus": {"damage_mult": 0.50, "crit_chance_flat": 0.25}}
-            },
-            "epica": {
-                "description": "Épica: Primeiro ataque causa +75% de dano, +50% Chance de Crítico e ignora 50% da DEF.",
-                "effects": {"first_hit_bonus": {"damage_mult": 0.75, "crit_chance_flat": 0.50, "armor_penetration": 0.50}}
-            },
-            "lendaria": {
-                "description": "Lendária: Primeiro ataque causa +100% de dano, tem 100% de Chance de Crítico e ignora 100% da DEF.",
-                "effects": {"first_hit_bonus": {"damage_mult": 1.0, "crit_chance_flat": 1.0, "armor_penetration": 1.0}}
+    "display_name": "Emboscada do Ladrão de Sombras",
+    "type": "passive",
+    "description": "Especialista em ataques de oportunidade. Seu primeiro ataque em combate causa dano massivo.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum: O primeiro ataque em cada combate causa +50% de dano e tem +25% de Chance de Crítico.",
+            "effects": {
+                "first_hit_bonus": {
+                    "damage_mult": 0.50,
+                    "crit_chance_flat": 0.25
+                }
+            }
+        },
+        "epica": {
+            "description": "Épica: Primeiro ataque causa +75% de dano, +50% Chance de Crítico e ignora 50% da DEF.",
+            "effects": {
+                "first_hit_bonus": {
+                    "damage_mult": 0.75,
+                    "crit_chance_flat": 0.50,
+                    "armor_penetration": 0.50
+                }
+            }
+        },
+        "lendaria": {
+            "description": "Lendária: Primeiro ataque causa +100% de dano, tem 100% de Chance de Crítico e ignora 100% da DEF.",
+            "effects": {
+                "first_hit_bonus": {
+                    "damage_mult": 1.00,
+                    "crit_chance_flat": 1.00,
+                    "armor_penetration": 1.00
+                }
             }
         }
-    },
-
+    }
+},
     "evo_ninja_poison_arts": {
-        "display_name": "Artes Venenosas do Ninja",
-        "type": "passive",
-        "description": "Mestre de venenos e ferramentas táticas, seus ataques aplicam toxinas letais.",
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum: 20% de chance de aplicar 'Veneno Letal' (10% Atk por 3 turnos).",
-                "effects": {"chance_on_hit": {"effect": "dot", "chance": 0.20, "damage_type": "physical", "scale": "attack", "value": 0.10, "duration_turns": 3}}
-            },
-            "epica": {
-                "description": "Épica: 30% chance 'Veneno Letal' (15% Atk por 3 turnos). O veneno agora acumula 2x.",
-                "effects": {"chance_on_hit": {"effect": "dot", "chance": 0.30, "damage_type": "physical", "scale": "attack", "value": 0.15, "duration_turns": 3, "stack": 2}}
-            },
-            "lendaria": {
-                "description": "Lendária: 40% chance 'Veneno Letal' (20% Atk por 3 turnos). Acumula 3x. Alvos envenenados recebem -15% DEF.",
-                "effects": {"chance_on_hit": {"effect": "dot", "chance": 0.40, "damage_type": "physical", "scale": "attack", "value": 0.20, "duration_turns": 3, "stack": 3,
-                                              "debuff": {"stat": "defense", "value": -0.15, "duration_turns": 3}}}
+    "display_name": "Artes Venenosas do Ninja",
+    "type": "passive",
+    "description": "Mestre de venenos e ferramentas táticas, seus ataques aplicam toxinas letais.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum: 20% de chance de aplicar 'Veneno Letal' (10% Atk por 3 turnos).",
+            "effects": {
+                "chance_on_hit": {
+                    "effect": "dot",
+                    "chance": 0.20,
+                    "damage_type": "physical",
+                    "scale": "attack",
+                    "value": 0.10,
+                    "duration_turns": 3,
+                    "dot_id": "poison"
+                }
+            }
+        },
+        "epica": {
+            "description": "Épica: 30% chance 'Veneno Letal' (15% Atk por 3 turnos). O veneno agora acumula 2x.",
+            "effects": {
+                "chance_on_hit": {
+                    "effect": "dot",
+                    "chance": 0.30,
+                    "damage_type": "physical",
+                    "scale": "attack",
+                    "value": 0.15,
+                    "duration_turns": 3,
+                    "stack": 2,
+                    "dot_id": "poison"
+                }
+            }
+        },
+        "lendaria": {
+            "description": "Lendária: 40% chance 'Veneno Letal' (20% Atk por 3 turnos). Acumula 3x. Alvos envenenados recebem -15% DEF.",
+            "effects": {
+                "chance_on_hit": {
+                    "effect": "dot",
+                    "chance": 0.40,
+                    "damage_type": "physical",
+                    "scale": "attack",
+                    "value": 0.20,
+                    "duration_turns": 3,
+                    "stack": 3,
+                    "debuff": {
+                        "stat": "defense",
+                        "value": -0.15,
+                        "duration_turns": 3
+                    },
+                    "dot_id": "poison"
+                }
             }
         }
-    },
-
+    }
+},
     "evo_blademaster_focus": {
-        "display_name": "Foco do Mestre das Lâminas",
-        "type": "passive",
-        "description": "Um duelista mortal focado em ataques críticos e precisão.",
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum: +10% Chance de Crítico, +25% Dano Crítico.",
-                "effects": {"stat_add_mult": {"crit_chance_flat": 0.10, "crit_damage_mult": 0.25}}
-            },
-            "epica": {
-                "description": "Épica: +15% Chance de Crítico, +40% Dano Crítico. Ataques críticos ganham +15% Pen. Armadura.",
-                "effects": {"stat_add_mult": {"crit_chance_flat": 0.15, "crit_damage_mult": 0.40},
-                            "on_crit_buff": {"effect": "armor_penetration", "value": 0.15}}
-            },
-            "lendaria": {
-                "description": "Lendária: +20% Chance de Crítico, +60% Dano Crítico. Críticos ganham +30% Pen. Armadura. Críticos não podem ser 'Esquivados'.",
-                "effects": {"stat_add_mult": {"crit_chance_flat": 0.20, "crit_damage_mult": 0.60},
-                            "on_crit_buff": {"effect": "armor_penetration", "value": 0.30, "cannot_be_dodged": True}}
+    "display_name": "Foco do Mestre das Lâminas",
+    "type": "passive",
+    "description": "Um duelista mortal focado em ataques críticos e precisão.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum: +10% Chance de Crítico, +25% Dano Crítico.",
+            "effects": {
+                "stat_add_mult": {
+                    "crit_chance_flat": 0.10,
+                    "crit_damage_mult": 0.25
+                }
+            }
+        },
+        "epica": {
+            "description": "Épica: +15% Chance de Crítico, +40% Dano Crítico. Ataques críticos ganham +15% Pen. Armadura.",
+            "effects": {
+                "stat_add_mult": {
+                    "crit_chance_flat": 0.15,
+                    "crit_damage_mult": 0.40
+                },
+                "on_crit_buff": {
+                    "effect": "armor_penetration",
+                    "value": 0.15
+                }
+            }
+        },
+        "lendaria": {
+            "description": "Lendária: +20% Chance de Crítico, +60% Dano Crítico. Críticos ganham +30% Pen. Armadura. Críticos não podem ser 'Esquivados'.",
+            "effects": {
+                "stat_add_mult": {
+                    "crit_chance_flat": 0.20,
+                    "crit_damage_mult": 0.60
+                },
+                "on_crit_buff": {
+                    "effect": "armor_penetration",
+                    "value": 0.30,
+                    "cannot_be_dodged": True
+                }
             }
         }
-    },
-
+    }
+},
     "evo_reaper_mark_of_death": {
-        "display_name": "Marca do Ceifador",
-        "type": "active", # Execução
-        "description": "Canaliza a energia da morte, marcando um alvo para o abate. Garante que nenhum alvo escape.",
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum (CD 8, Mana 40): Causa 2.5x Dano. Causa 50% de dano bônus contra alvos com menos de 25% HP.",
-                "mana_cost": 40,
-                "effects": {"cooldown_turns": 8, "damage_type": "physical", "damage_scale": 2.5,
-                            "bonus_damage_vs_low_hp": {"hp_threshold": 0.25, "bonus_mult": 0.50}}
-            },
-            "epica": {
-                "description": "Épica (CD 7, Mana 35): Dano 2.8x. Causa 100% de dano bônus contra alvos com menos de 35% HP.",
-                "mana_cost": 35,
-                "effects": {"cooldown_turns": 7, "damage_type": "physical", "damage_scale": 2.8,
-                            "bonus_damage_vs_low_hp": {"hp_threshold": 0.35, "bonus_mult": 1.0}}
-            },
-            "lendaria": {
-                "description": "Lendária (CD 6, Mana 30): Dano 3.0x. Causa 150% de dano bônus contra alvos com menos de 50% HP. Se esta skill matar o alvo, o Cooldown é resetado.",
-                "mana_cost": 30,
-                "effects": {"cooldown_turns": 6, "damage_type": "physical", "damage_scale": 3.0,
-                            "bonus_damage_vs_low_hp": {"hp_threshold": 0.50, "bonus_mult": 1.50},
-                            "cooldown_reduction_on_kill": 1.0} # 1.0 = Reseta
+    "display_name": "Marca do Ceifador",
+    "type": "active",  # Execução
+    "description": "Canaliza a energia da morte, marcando um alvo para o abate. Garante que nenhum alvo escape.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum (CD 8, Mana 40): Causa 2.5x Dano. Causa 50% de dano bônus contra alvos com menos de 25% HP.",
+            "mana_cost": 40,
+            "effects": {
+                "cooldown_turns": 8,
+                "damage_type": "physical",
+                "damage_scale": 2.5,
+                "damage_multiplier": 2.5,
+                "bonus_damage_vs_low_hp": {"hp_threshold": 0.25, "bonus_mult": 0.50},
+                "bonus_damage_if_low_hp_target": {"threshold": 0.25, "bonus": 0.50}
+            }
+        },
+        "epica": {
+            "description": "Épica (CD 7, Mana 35): Dano 2.8x. Causa 100% de dano bônus contra alvos com menos de 35% HP.",
+            "mana_cost": 35,
+            "effects": {
+                "cooldown_turns": 7,
+                "damage_type": "physical",
+                "damage_scale": 2.8,
+                "damage_multiplier": 2.8,
+                "bonus_damage_vs_low_hp": {"hp_threshold": 0.35, "bonus_mult": 1.00},
+                "bonus_damage_if_low_hp_target": {"threshold": 0.35, "bonus": 1.00}
+            }
+        },
+        "lendaria": {
+            "description": "Lendária (CD 6, Mana 30): Dano 3.0x. Causa 150% de dano bônus contra alvos com menos de 50% HP. Se esta skill matar o alvo, o Cooldown é resetado.",
+            "mana_cost": 30,
+            "effects": {
+                "cooldown_turns": 6,
+                "damage_type": "physical",
+                "damage_scale": 3.0,
+                "damage_multiplier": 3.0,
+                "bonus_damage_vs_low_hp": {"hp_threshold": 0.50, "bonus_mult": 1.50},
+                "bonus_damage_if_low_hp_target": {"threshold": 0.50, "bonus": 1.50},
+                "cooldown_reduction_on_kill": 1.0  # 1.0 = Reseta
             }
         }
-    },
-
+    }
+},
     "evo_night_aspect_invisibility": {
-        "display_name": "Aspecto da Noite Eterna",
-        "type": "passive",
-        "description": "Tornou-se um com o manto da noite. Abates o fazem desaparecer.",
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum: Ao matar um inimigo, você ganha 'Invisibilidade' por 1 turno (impossível de ser alvo).",
-                "effects": {"on_kill_buff": {"effect": "invisibility", "duration_turns": 1}}
-            },
-            "epica": {
-                "description": "Épica: Ao matar, ganha 'Invisibilidade' por 1 turno. O primeiro ataque saindo da 'Invisibilidade' é um Crítico Garantido.",
-                "effects": {"on_kill_buff": {"effect": "invisibility", "duration_turns": 1,
-                                              "on_exit_buff": {"effect": "guaranteed_crit", "duration_turns": 1}}}
-            },
-            "lendaria": {
-                "description": "Lendária: Ao matar, ganha 'Invisibilidade' (2 turnos). Sair da 'Invisibilidade' concede +50% Atk e +50% Crítico Dano por 3 turnos.",
-                "effects": {"on_kill_buff": {"effect": "invisibility", "duration_turns": 2,
-                                              "on_exit_buff": {"effect": "multi_stat_buff", "duration_turns": 3,
-                                                               "buffs": {"attack_mult": 0.50, "crit_damage_mult": 0.50}}}}
+    "display_name": "Aspecto da Noite Eterna",
+    "type": "passive",
+    "description": "Tornou-se um com o manto da noite. Abates o fazem desaparecer.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum: Ao matar um inimigo, você ganha 'Invisibilidade' por 1 turno (impossível de ser alvo).",
+            "effects": {
+                "on_kill_buff": {
+                    "effect": "invisibility",
+                    "duration_turns": 1
+                }
+            }
+        },
+        "epica": {
+            "description": "Épica: Ao matar, ganha 'Invisibilidade' por 1 turno. O primeiro ataque saindo da 'Invisibilidade' é um Crítico Garantido.",
+            "effects": {
+                "on_kill_buff": {
+                    "effect": "invisibility",
+                    "duration_turns": 1,
+                    "on_exit_buff": {
+                        "effect": "guaranteed_crit",
+                        "duration_turns": 1
+                    }
+                }
+            }
+        },
+        "lendaria": {
+            "description": "Lendária: Ao matar, ganha 'Invisibilidade' (2 turnos). Sair da 'Invisibilidade' concede +50% Atk e +50% Crítico Dano por 3 turnos.",
+            "effects": {
+                "on_kill_buff": {
+                    "effect": "invisibility",
+                    "duration_turns": 2,
+                    "on_exit_buff": {
+                        "effect": "multi_stat_buff",
+                        "duration_turns": 3,
+                        "buffs": {
+                            "attack_mult": 0.50,
+                            "crit_damage_mult": 0.50
+                        }
+                    }
+                }
             }
         }
-    },
+    }
+},
+    
     # --- Novas Habilidades de Evolução do Samurai (Bushido/Lâmina) ---
 
     "evo_ronin_wanderers_focus": {
@@ -2167,95 +2281,192 @@ SKILL_DATA = {
     # --- HABILIDADES DE EVENTO (Assassino) ---
 
     "assassino_active_shadow_strike": {
-        "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐒𝐨𝐦𝐛𝐫𝐢𝐨", "type": "active", 
-        "description": "Um ataque rápido das sombras que não pode ser esquivado.", 
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum (CD 3, Mana 15): Dano 1.4x, Acerto Garantido.",
-                "mana_cost": 15, 
-                "effects": {"cooldown_turns": 3, "guaranteed_hit": True, "damage_multiplier": 1.4}
-            },
-            "epica": {
-                "description": "Épica (CD 3, Mana 12): Dano 1.6x, Acerto Garantido, +10% Chance de Crítico.",
-                "mana_cost": 12, 
-                "effects": {"cooldown_turns": 3, "guaranteed_hit": True, "damage_multiplier": 1.6, "bonus_crit_chance": 0.10}
-            },
-            "lendaria": {
-                "description": "Lendária (CD 2, Mana 10): Dano 1.8x, Acerto Garantido, +25% Chance de Crítico.",
-                "mana_cost": 10, 
-                "effects": {"cooldown_turns": 2, "guaranteed_hit": True, "damage_multiplier": 1.8, "bonus_crit_chance": 0.25}
+    "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐒𝐨𝐦𝐛𝐫𝐢𝐨",
+    "type": "active",
+    "description": "Um ataque rápido das sombras que não pode ser esquivado.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum (CD 3, Mana 15): Dano 1.4x, Acerto Garantido.",
+            "mana_cost": 15,
+            "effects": {
+                "cooldown_turns": 3,
+                "guaranteed_hit": True,
+                "cannot_be_dodged": True,
+                "damage_multiplier": 1.4
+            }
+        },
+        "epica": {
+            "description": "Épica (CD 3, Mana 12): Dano 1.6x, Acerto Garantido, +10% Chance de Crítico.",
+            "mana_cost": 12,
+            "effects": {
+                "cooldown_turns": 3,
+                "guaranteed_hit": True,
+                "cannot_be_dodged": True,
+                "damage_multiplier": 1.6,
+                "bonus_crit_chance": 0.10
+            }
+        },
+        "lendaria": {
+            "description": "Lendária (CD 2, Mana 10): Dano 1.8x, Acerto Garantido, +25% Chance de Crítico.",
+            "mana_cost": 10,
+            "effects": {
+                "cooldown_turns": 2,
+                "guaranteed_hit": True,
+                "cannot_be_dodged": True,
+                "damage_multiplier": 1.8,
+                "bonus_crit_chance": 0.25
             }
         }
-    },
-    # evento portal
+    }
+},
     "assassino_passive_potent_toxins": {
-        "display_name": "𝐓𝐨𝐱𝐢𝐧𝐚𝐬 𝐏𝐨𝐭𝐞𝐧𝐭𝐞𝐬", "type": "passive", 
-        "description": "Os seus ataques têm chance de aplicar veneno.", 
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum: 30% de chance de aplicar veneno (10% Atk / 3 turnos).",
-                # Dano original (15) não escala. Mudei para escalar com Atk.
-                "effects": {"chance_on_hit": {"effect": "dot", "damage_type": "physical", "scale": "attack", "value": 0.10, "duration_turns": 3, "chance": 0.3}}
-            },
-            "epica": {
-                "description": "Épica: 35% chance, veneno (15% Atk / 3t). Acumula 2x.",
-                "effects": {"chance_on_hit": {"effect": "dot", "damage_type": "physical", "scale": "attack", "value": 0.15, "duration_turns": 3, "chance": 0.35, "stack": 2}}
-            },
-            "lendaria": {
-                "description": "Lendária: 40% chance, veneno (20% Atk / 3t). Acumula 3x. Alvos envenenados têm -10% Agilidade.",
-                "effects": {"chance_on_hit": {"effect": "dot", "damage_type": "physical", "scale": "attack", "value": 0.20, "duration_turns": 3, "chance": 0.40, "stack": 3,
-                                              "debuff": {"stat": "agility", "value": -0.10, "duration_turns": 3}}}
+    "display_name": "𝐓𝐨𝐱𝐢𝐧𝐚𝐬 𝐏𝐨𝐭𝐞𝐧𝐭𝐞𝐬",
+    "type": "passive",
+    "description": "Os seus ataques têm chance de aplicar veneno.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum: 30% de chance de aplicar veneno (10% Atk / 3 turnos).",
+            "effects": {
+                "chance_on_hit": {
+                    "effect": "dot",
+                    "damage_type": "physical",
+                    "scale": "attack",
+                    "value": 0.10,
+                    "duration_turns": 3,
+                    "chance": 0.30,
+                    "dot_id": "poison"
+                }
+            }
+        },
+        "epica": {
+            "description": "Épica: 35% chance, veneno (15% Atk / 3t). Acumula 2x.",
+            "effects": {
+                "chance_on_hit": {
+                    "effect": "dot",
+                    "damage_type": "physical",
+                    "scale": "attack",
+                    "value": 0.15,
+                    "duration_turns": 3,
+                    "chance": 0.35,
+                    "stack": 2,
+                    "dot_id": "poison"
+                }
+            }
+        },
+        "lendaria": {
+            "description": "Lendária: 40% chance, veneno (20% Atk / 3t). Acumula 3x. Alvos envenenados têm -10% Agilidade.",
+            "effects": {
+                "chance_on_hit": {
+                    "effect": "dot",
+                    "damage_type": "physical",
+                    "scale": "attack",
+                    "value": 0.20,
+                    "duration_turns": 3,
+                    "chance": 0.40,
+                    "stack": 3,
+                    "debuff": {
+                        "stat": "agility",
+                        "value": -0.10,
+                        "duration_turns": 3
+                    },
+                    "dot_id": "poison"
+                }
             }
         }
-    },
+    }
+},
     "assassino_active_dance_of_a_thousand_cuts": {
-        "display_name": "𝐃𝐚𝐧𝐜̧𝐚 𝐝𝐚𝐬 𝐌𝐢𝐥 𝐋𝐚̂𝐦𝐢𝐧𝐚𝐬", "type": "active", 
-        "description": "Desfere uma rajada de golpes rápidos.", 
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum (CD 5, Mana 25): 3-5 golpes (0.6x Dano).",
-                "mana_cost": 25, 
-                "effects": {"cooldown_turns": 5, "multi_hit_min": 3, "multi_hit_max": 5, "damage_multiplier": 0.6}
-            },
-            "epica": {
-                "description": "Épica (CD 4, Mana 20): 4-6 golpes (0.6x Dano).",
-                "mana_cost": 20, 
-                "effects": {"cooldown_turns": 4, "multi_hit_min": 4, "multi_hit_max": 6, "damage_multiplier": 0.6}
-            },
-            "lendaria": {
-                "description": "Lendária (CD 4, Mana 20): 5-7 golpes (0.7x Dano). Cada golpe tem 10% de chance de aplicar 'Sangramento'.",
-                "mana_cost": 20, 
-                "effects": {"cooldown_turns": 4, "multi_hit_min": 5, "multi_hit_max": 7, "damage_multiplier": 0.7,
-                            "chance_on_hit": {"effect": "dot", "chance": 0.10, "value": 0.1, "duration_turns": 2}}
+    "display_name": "𝐃𝐚𝐧𝐜̧𝐚 𝐝𝐚𝐬 𝐌𝐢𝐥 𝐋𝐚̂𝐦𝐢𝐧𝐚𝐬",
+    "type": "active",
+    "description": "Desfere uma rajada de golpes rápidos.",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum (CD 5, Mana 25): 3-5 golpes (0.6x Dano).",
+            "mana_cost": 25,
+            "effects": {
+                "cooldown_turns": 5,
+                "multi_hit_min": 3,
+                "multi_hit_max": 5,
+                "damage_multiplier": 0.6,
+                "per_hit_mult": 0.6
+            }
+        },
+        "epica": {
+            "description": "Épica (CD 4, Mana 20): 4-6 golpes (0.6x Dano).",
+            "mana_cost": 20,
+            "effects": {
+                "cooldown_turns": 4,
+                "multi_hit_min": 4,
+                "multi_hit_max": 6,
+                "damage_multiplier": 0.6,
+                "per_hit_mult": 0.6
+            }
+        },
+        "lendaria": {
+            "description": "Lendária (CD 4, Mana 20): 5-7 golpes (0.7x Dano). Cada golpe tem 10% de chance de aplicar 'Sangramento'.",
+            "mana_cost": 20,
+            "effects": {
+                "cooldown_turns": 4,
+                "multi_hit_min": 5,
+                "multi_hit_max": 7,
+                "damage_multiplier": 0.7,
+                "per_hit_mult": 0.7,
+                "chance_on_hit": {
+                    "effect": "dot",
+                    "chance": 0.10,
+                    "damage_type": "physical",
+                    "scale": "attack",
+                    "value": 0.10,
+                    "duration_turns": 2,
+                    "dot_id": "bleed"
+                }
             }
         }
-    },
+    }
+},
     "assassino_active_guillotine_strike": {
-        "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐆𝐮𝐢𝐥𝐡𝐨𝐭𝐢𝐧𝐚", "type": "active", 
-        "description": "Ataque massivo com dano bônus contra alvos com HP baixo (Execução).",
-        "allowed_classes": ["assassino"],
-        "rarity_effects": {
-            "comum": {
-                "description": "Comum (CD 6, Mana 45): Dano 2.5x. +50% Dano bônus se alvo < 30% HP.",
-                "mana_cost": 45,
-                "effects": {"cooldown_turns": 6, "damage_multiplier": 2.5, "bonus_damage_if_low_hp_target": {"threshold": 0.30, "bonus": 0.50}}
-            },
-            "epica": {
-                "description": "Épica (CD 6, Mana 40): Dano 2.5x. +75% Dano bônus se alvo < 40% HP.",
-                "mana_cost": 40,
-                "effects": {"cooldown_turns": 6, "damage_multiplier": 2.5, "bonus_damage_if_low_hp_target": {"threshold": 0.40, "bonus": 0.75}}
-            },
-            "lendaria": {
-                "description": "Lendária (CD 5, Mana 35): Dano 3.0x. +100% Dano bônus se alvo < 50% HP. Reseta o Cooldown se matar o alvo.",
-                "mana_cost": 35,
-                "effects": {"cooldown_turns": 5, "damage_multiplier": 3.0, "bonus_damage_if_low_hp_target": {"threshold": 0.50, "bonus": 1.0},
-                            "cooldown_reduction_on_kill": 1.0}
+    "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐆𝐮𝐢𝐥𝐡𝐨𝐭𝐢𝐧𝐚",
+    "type": "active",
+    "description": "Ataque massivo com dano bônus contra alvos com HP baixo (Execução).",
+    "allowed_classes": ["assassino"],
+    "rarity_effects": {
+        "comum": {
+            "description": "Comum (CD 6, Mana 45): Dano 2.5x. +50% Dano bônus se alvo < 30% HP.",
+            "mana_cost": 45,
+            "effects": {
+                "cooldown_turns": 6,
+                "damage_multiplier": 2.5,
+                "bonus_damage_if_low_hp_target": {"threshold": 0.30, "bonus": 0.50},
+                "bonus_damage_vs_low_hp": {"hp_threshold": 0.30, "bonus_mult": 0.50}
+            }
+        },
+        "epica": {
+            "description": "Épica (CD 6, Mana 40): Dano 2.5x. +75% Dano bônus se alvo < 40% HP.",
+            "mana_cost": 40,
+            "effects": {
+                "cooldown_turns": 6,
+                "damage_multiplier": 2.5,
+                "bonus_damage_if_low_hp_target": {"threshold": 0.40, "bonus": 0.75},
+                "bonus_damage_vs_low_hp": {"hp_threshold": 0.40, "bonus_mult": 0.75}
+            }
+        },
+        "lendaria": {
+            "description": "Lendária (CD 5, Mana 35): Dano 3.0x. +100% Dano bônus se alvo < 50% HP. Reseta o Cooldown se matar o alvo.",
+            "mana_cost": 35,
+            "effects": {
+                "cooldown_turns": 5,
+                "damage_multiplier": 3.0,
+                "bonus_damage_if_low_hp_target": {"threshold": 0.50, "bonus": 1.00},
+                "bonus_damage_vs_low_hp": {"hp_threshold": 0.50, "bonus_mult": 1.00},
+                "cooldown_reduction_on_kill": 1.0
             }
         }
-    },
+    }
+},
+    
 
     # --- HABILIDADES DE EVENTO (Samurai) ---
 

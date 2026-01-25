@@ -76,6 +76,7 @@
 │   │   📁 admin/
 │   │   │   📄 admin_commands.py
 │   │   │   📄 admin_tools.py
+│   │   │   📄 clan_war_admin.py
 │   │   │   📄 debug_skill.py
 │   │   │   📄 file_id_conv.py
 │   │   │   📄 force_daily.py
@@ -174,6 +175,10 @@
 │   │   │   📄 runtime.py
 │   │   │   📄 runtime_api.py
 │   │   │   📄 _init_.py
+│   │   📁 effects/
+│   │   │   📄 engine.py
+│   │   │   📄 models.py
+│   │   │   📄 registry.py
 │   │   📁 events/
 │   │   │   📄 event_menu.py
 │   │   │   📄 __init__.py
@@ -255,6 +260,9 @@
 │   │   │   📄 samurai_t1.py
 │   │   │   📄 samurai_t2.py
 │   │   │   📄 __init__.py
+│   │   📁 skills/
+│   │   │   📄 skill_canonical_adapter.py
+│   │   │   📄 skill_effects_adapter.py
 │   │   📁 ui/
 │   │   │   📄 text_utils.py
 │   │   📁 world_boss/
@@ -288,3 +296,6 @@
 │   │   📄 hard_respec_all.py
 │   │   📄 migrate_market.py
 │   │   📄 normalize_file_ids.py
+│   📁 ui/
+│   │   📄 ui_renderer.py
+│   │   📄 __init__.py

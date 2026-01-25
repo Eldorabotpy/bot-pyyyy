@@ -10,9 +10,15 @@ from handlers.admin.sell_gems import sell_gems_conv_handler
 from handlers.admin.player_edit_panel import create_admin_edit_player_handler
 from handlers.admin.admin_tools import cmd_trocar_id
 
-# Guerra de Clãs (sistema único)
-from handlers.admin.clan_war_admin import cmd_wardom, cmd_warthu, cmd_warend, cmd_warstatus
-from handlers.admin.clan_war_admin import cmd_war_hard_reset
+# Guerra de Clãs (sistema único) — somente comandos seguros
+from handlers.admin.clan_war_admin import (
+    cmd_wardom,
+    cmd_warthu,
+    cmd_warend,
+    cmd_warstatus,
+    cmd_war_hard_reset,
+)
+
 
 def register_admin_handlers(application: Application):
 
@@ -29,7 +35,7 @@ def register_admin_handlers(application: Application):
     application.add_handlers(pvp_panel_handlers)
     application.add_handler(CommandHandler("trocarid", cmd_trocar_id))
 
-    # 5. Guerra de Clãs — comandos de teste rápido
+    # 5. Guerra de Clãs — comandos oficiais/seguros
     application.add_handler(CommandHandler("wardom", cmd_wardom))
     application.add_handler(CommandHandler("warthu", cmd_warthu))
     application.add_handler(CommandHandler("warend", cmd_warend))

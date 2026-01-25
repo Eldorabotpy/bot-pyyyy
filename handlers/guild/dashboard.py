@@ -170,8 +170,12 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if query: await _safe_answer(query)
 
-    user_id, _, clan_data, is_leader = await _require_clan_member(update, context)
+    # 1. CORREÇÃO AQUI: Captura o 'pdata' (segundo retorno) em vez de ignorar com '_'
+    user_id, pdata, clan_data, is_leader = await _require_clan_member(update, context)
     if not clan_data: return
+
+    # 2. Define a região atual para o botão voltar funcionar
+    current_region = pdata.get("current_location", "reino_eldora")
 
     # Dados Visuais
     clan_name = clan_data.get("display_name", "Clã")
@@ -182,7 +186,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     xp_needed = int(lvl_info.get("points_to_next_level", 1000))
     if xp_needed < 1: xp_needed = 1
     
-    # Barra
+    # Barra de XP
     percent = min(1.0, max(0.0, xp / xp_needed))
     filled = int(percent * 10)
     bar = "🟦" * filled + "⬜" * (10 - filled)
@@ -190,7 +194,7 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     members_count = len(clan_data.get("members", []))
     max_members = int(lvl_info.get("max_members", 10))
     
-    # Mídia
+    # Texto
     text = (
         f"🛡️ <b>CLÃ: {clan_name.upper()}</b> [Nv. {level}]\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
@@ -212,11 +216,10 @@ async def show_clan_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE
     if is_leader:
         keyboard.append([InlineKeyboardButton("👑 Gerir Clã", callback_data="clan_manage_menu")])
 
-    keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Reino", callback_data="show_kingdom_menu")])
+    # 3. Agora a variável current_region existe e o botão funciona
+    keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_region}")])
 
-    # Usa a função local para garantir consistência
     await _render_clan_screen(update, context, clan_data, text, keyboard)
-
 
 # ==============================================================================
 # 2. GUERRA DE CLÃS (Lógica Avançada no Dashboard)

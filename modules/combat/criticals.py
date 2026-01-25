@@ -69,60 +69,69 @@ def get_crit_params(stats: dict) -> dict:
 
 def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) -> tuple[int, bool, bool]:
     """
-    Rola o dano aplicando as novas regras.
+    Rola o dano aplicando crítico, mega crítico, sorte excedente
+    e agora SUPORTE A ESQUIVA + ACERTO GARANTIDO.
     """
     if options is None:
         options = {}
 
     raw_attack = int(attacker_stats.get('attack', 0))
     target_defense = int(target_stats.get('defense', 0))
-    
-    # Pega os parâmetros calculados acima
+
+    # ==========================
+    # ESQUIVA DO ALVO (TARGET EVADE)
+    # ==========================
+    cannot_be_dodged = bool(options.get("cannot_be_dodged", False))
+
+    if not cannot_be_dodged:
+        target_ini = float(target_stats.get("initiative", 0) or 0)
+        attacker_acc = float(attacker_stats.get("accuracy_flat", 0) or 0)
+
+        # Chance base de esquiva (máx 25%)
+        evade_chance = min(0.25, (target_ini * 0.25) / 100.0)
+        evade_chance = max(0.0, evade_chance - attacker_acc)
+
+        if random.random() < evade_chance:
+            # Esquivou completamente
+            return 0, False, False
+
+    # ==========================
+    # CRÍTICO / MEGA CRÍTICO
+    # ==========================
     params = get_crit_params(attacker_stats)
 
     skill_mult = float(options.get("damage_multiplier", 1.0))
 
-    # --- Rolagem do Dado ---
     r = random.random() * 100.0
-    
-    # Bônus direto na chance (ex: Skill ativa "Tiro Certeiro" +50% chance)
-    # Esse bônus PODE passar do cap, pois é temporário da skill
+
     bonus_chance_skill = float(options.get("bonus_crit_chance", 0.0)) * 100.0
-    
-    # Bônus passivo flat (ex: +10% de chance fixa de um item lendário)
-    passive_flat = float(attacker_stats.get("crit_chance_flat", 0.0)) # Já vem como 10.0
-    
+    passive_flat = float(attacker_stats.get("crit_chance_flat", 0.0))
+
     final_chance = float(params.get("chance", 0.0)) + bonus_chance_skill + passive_flat
-    
+
     is_crit = (r <= final_chance)
     crit_mult, is_mega = 1.0, False
 
     if is_crit:
-        # Tenta Mega Crítico
         if random.random() * 100.0 <= float(params.get("mega_chance", 0.0)):
             crit_mult, is_mega = float(params.get("mega_mult", 2.0)), True
         else:
             crit_mult = float(params.get("mult", 1.6))
-            
-        # Adiciona bônus específico de Dano Crítico da skill (se houver)
-        # Ex: "Próximo ataque tem +50% Dano Crítico"
+
         skill_crit_dmg_boost = float(options.get("next_hit_crit_damage_boost", 0.0))
         crit_mult += skill_crit_dmg_boost
 
-    # --- Cálculo Final ---
+    # ==========================
+    # CÁLCULO FINAL DE DANO
+    # ==========================
     attack_with_skill = float(raw_attack) * skill_mult
-    
-    # Aplica o multiplicador (que agora pode ser gigante se tiver 200 Luck)
     boosted_attack = math.ceil(attack_with_skill * crit_mult)
-    
-    # Defesa reduz o dano final (exceto se for mágico puro ou penetração)
+
     damage_type = options.get("damage_type", "physical")
-    
+
     if damage_type == "magic":
-        # Magia ignora defesa física (usa M.Def em outro lugar, ou ignora aqui se for true dmg)
         final_damage = max(int(params.get("min_damage", 1)), boosted_attack)
     else:
-        # Dano Físico sofre redução da defesa
         final_damage = max(int(params.get("min_damage", 1)), boosted_attack - target_defense)
-    
+
     return final_damage, is_crit, is_mega

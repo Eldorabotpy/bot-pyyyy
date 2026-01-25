@@ -27,6 +27,7 @@ from . import pvp_battle
 from . import pvp_utils
 from . import tournament_system
 from .ui import build_arena_screen
+from modules.game_data import regions as game_data_regions
 
 from modules.auth_utils import get_current_player_id, requires_login
 
@@ -59,7 +60,44 @@ PVP_THEME_SET_PREFIX = "pvp_theme_set:"  # ex: pvp_theme_set:sombrio
 
 # Ticket/Entrada do PvP (inventário)
 PVP_TICKET_KEY = "ticket_arena"
+WAR_PVP_PICK_PREFIX = "war_pvp_pick:"
+WAR_PVP_REFRESH = "war_pvp_refresh"
 
+
+
+
+def _get_region_key(pdata: dict) -> str:
+    return str(
+        pdata.get("current_location")
+        or pdata.get("region")
+        or pdata.get("region_key")
+        or pdata.get("location")
+        or ""
+    )
+
+def _parse_iso(dt_str: str):
+    try:
+        return datetime.datetime.fromisoformat(dt_str)
+    except Exception:
+        return None
+
+def _is_war_pvp_on_cooldown(pdata: dict) -> tuple[bool, int]:
+    cd = (pdata.get("cooldowns") or {}).get("war_pvp_attack")
+    if not cd:
+        return (False, 0)
+    dt = _parse_iso(str(cd))
+    if not dt:
+        return (False, 0)
+    # 5 min
+    now = datetime.datetime.now(datetime.timezone.utc)
+    # se dt não tem tz, assume UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    end = dt + datetime.timedelta(minutes=5)
+    if now >= end:
+        return (False, 0)
+    secs = int((end - now).total_seconds())
+    return (True, secs)
 
 # ==============================
 # UTILS INVENTÁRIO (robustos)
@@ -404,8 +442,18 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==============================
 @requires_login
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import datetime
+    import random
+    import html
+    import asyncio
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram import InputMediaPhoto, InputMediaVideo
+
     query = update.callback_query
-    await query.answer("🔍 Buscando oponente digno...")
+    try:
+        await query.answer("🔍 Buscando oponente digno...")
+    except Exception:
+        pass
 
     user_id = await _get_pid(update, context)
     pdata = await player_manager.get_player_data(user_id)
@@ -416,6 +464,172 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
         )
         return
+
+    # ------------------------------
+    # Helpers locais (sem depender de outros arquivos)
+    # ------------------------------
+    def _get_region_key(d: dict) -> str:
+        return str(
+            d.get("current_location")
+            or d.get("region")
+            or d.get("region_key")
+            or d.get("location")
+            or ""
+        )
+
+    def _parse_iso(dt_str: str):
+        try:
+            return datetime.datetime.fromisoformat(dt_str)
+        except Exception:
+            return None
+
+    def _war_attack_cooldown_seconds(d: dict) -> int:
+        """
+        Retorna segundos restantes do cooldown de ataque (5 min).
+        Base: d["cooldowns"]["war_pvp_attack"] = iso datetime UTC.
+        """
+        cd = (d.get("cooldowns") or {}).get("war_pvp_attack")
+        if not cd:
+            return 0
+        dt = _parse_iso(str(cd))
+        if not dt:
+            return 0
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        end = dt + datetime.timedelta(minutes=5)
+        if now >= end:
+            return 0
+        return int((end - now).total_seconds())
+
+    # ------------------------------
+    # 🔥 MODO GUERRA (por região + escolha de alvo, sem ticket)
+    # ------------------------------
+    try:
+        from modules.game_data import regions as game_data_regions
+        from modules.guild_war.campaign import ensure_weekly_campaign
+        from modules.guild_war.region import CampaignPhase
+        from modules.guild_war.war_event import WarSignupRepo
+
+        campaign = await ensure_weekly_campaign(game_data_regions_module=game_data_regions)
+        phase = str(campaign.get("phase") or "").upper()
+        campaign_id = str(campaign.get("campaign_id") or "")
+        target_region_id = str(campaign.get("target_region_id") or "")
+
+        my_region = _get_region_key(pdata)
+
+        if (
+            phase == CampaignPhase.ACTIVE.value
+            and campaign_id
+            and target_region_id
+            and my_region == target_region_id
+        ):
+            # Cooldown de ataque do modo guerra (5 min)
+            remaining = _war_attack_cooldown_seconds(pdata)
+            if remaining > 0:
+                await query.edit_message_text(
+                    "⏳ <b>Cooldown de Guerra</b>\n\n"
+                    "Você atacou recentemente na zona de guerra.\n"
+                    f"Tente novamente em <b>{remaining}</b> segundos.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
+                    parse_mode="HTML",
+                )
+                return
+
+            # Pool de candidatos: todos inscritos na campanha -> filtra quem está na região alvo
+            signup_repo = WarSignupRepo()
+            col = signup_repo.col
+
+            # busca apenas member_ids
+            docs = await asyncio.to_thread(
+                lambda: list(col.find({"campaign_id": campaign_id}, {"member_ids": 1}))
+            )
+
+            my_id_str = str(user_id)
+            my_clan = str(pdata.get("clan_id") or pdata.get("guild_id") or "")
+
+            all_ids = []
+            for d in docs:
+                mids = d.get("member_ids") or []
+                if isinstance(mids, list):
+                    all_ids.extend([str(x) for x in mids if x])
+
+            # remove eu + dupes
+            seen = {my_id_str}
+            uniq_ids = []
+            for mid in all_ids:
+                if mid and mid not in seen:
+                    seen.add(mid)
+                    uniq_ids.append(mid)
+
+            candidates = []
+            # limita para não travar
+            for mid in uniq_ids[:120]:
+                edata = await player_manager.get_player_data(mid)
+                if not edata:
+                    continue
+
+                # precisa estar na região alvo
+                if _get_region_key(edata) != target_region_id:
+                    continue
+
+                # precisa ter clã e ser inimigo (clã diferente)
+                e_clan = str(edata.get("clan_id") or edata.get("guild_id") or "")
+                if not e_clan:
+                    continue
+                if my_clan and e_clan == my_clan:
+                    continue
+
+                # nome válido
+                if not (edata.get("character_name") or edata.get("username") or edata.get("name")):
+                    continue
+
+                candidates.append((mid, edata))
+
+            if not candidates:
+                await query.edit_message_text(
+                    "🏰 <b>PvP de Guerra</b>\n\n"
+                    "Não há inimigos na região agora.\n"
+                    "Tente novamente em instantes.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔄 Atualizar", callback_data="war_pvp_refresh")],
+                        [InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")],
+                    ]),
+                    parse_mode="HTML",
+                )
+                return
+
+            # embaralha e mostra top 10
+            random.shuffle(candidates)
+            kb = []
+            for enemy_id, edata in candidates[:10]:
+                name = html.escape(edata.get("character_name", "Guerreiro"))
+                pts = int(edata.get("pvp_points", 0) or 0)
+                kb.append([
+                    InlineKeyboardButton(
+                        f"⚔️ {name} ({pts} pts)",
+                        callback_data=f"war_pvp_pick:{enemy_id}"
+                    )
+                ])
+
+            kb.append([InlineKeyboardButton("🔄 Atualizar", callback_data="war_pvp_refresh")])
+            kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")])
+
+            await query.edit_message_text(
+                "🔥 <b>PvP de Guerra — inimigos na região</b>\n\n"
+                "Escolha um alvo para duelar:",
+                reply_markup=InlineKeyboardMarkup(kb),
+                parse_mode="HTML",
+            )
+            return
+
+    except Exception as e:
+        # Se der qualquer erro no modo guerra, não quebra o PvP normal.
+        logger.error(f"[PvP] Falha ao montar modo guerra: {e}", exc_info=True)
+
+    # ------------------------------
+    # PvP NORMAL (se não entrou no modo guerra)
+    # ------------------------------
 
     # Entradas = ticket_arena no inventário (sem limite diário)
     ticket_qty = 0
@@ -492,7 +706,6 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         _inv_set_qty(pdata, PVP_TICKET_KEY, ticket_qty - 1)
         await player_manager.save_player_data(user_id, pdata)
     except Exception:
-        # Se falhar por algum motivo, não permite a luta (evita exploit)
         await query.edit_message_text(
             "❌ Não consegui consumir sua entrada no inventário. Tente novamente.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
@@ -504,7 +717,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     day_effect = ARENA_MODIFIERS.get(weekday, {})
     modifier_effect = day_effect.get("effect")
 
-    # ✅ CHAMADA CORRETA: pvp_battle.py tem simular_batalha_completa (async)
+    # Batalha
     winner_id, log = await pvp_battle.simular_batalha_completa(
         user_id,
         enemy_id,
@@ -564,7 +777,6 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         file_id = enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file")
         media_type = str(enemy_media.get("type", "video")).lower()
 
-        # tenta editar mídia
         try:
             if media_type == "photo":
                 input_media = InputMediaPhoto(media=file_id, caption=caption_safe, parse_mode="HTML")
@@ -576,7 +788,6 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         except Exception:
             pass
 
-        # fallback: envia nova msg com mídia
         try:
             if media_type == "photo":
                 await context.bot.send_photo(
@@ -594,6 +805,182 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
                     reply_markup=reply_markup,
                     parse_mode="HTML",
                 )
+            return
+        except Exception:
+            pass
+
+    await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode="HTML")
+
+@requires_login
+async def war_pvp_pick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import datetime
+    import html
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
+
+    query = update.callback_query
+    data = query.data or ""
+    try:
+        await query.answer()
+    except Exception:
+        pass
+
+    user_id = await _get_pid(update, context)
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata:
+        await query.edit_message_text("❌ Não consegui carregar seu personagem.")
+        return
+
+    # -----------------------------
+    # Cooldown 5 min (winner)
+    # -----------------------------
+    def _parse_iso(dt_str: str):
+        try:
+            return datetime.datetime.fromisoformat(dt_str)
+        except Exception:
+            return None
+
+    def _cooldown_remaining(d: dict) -> int:
+        cd = (d.get("cooldowns") or {}).get("war_pvp_attack")
+        if not cd:
+            return 0
+        dt = _parse_iso(str(cd))
+        if not dt:
+            return 0
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        end = dt + datetime.timedelta(minutes=5)
+        if now >= end:
+            return 0
+        return int((end - now).total_seconds())
+
+    rem = _cooldown_remaining(pdata)
+    if rem > 0:
+        await query.answer(f"Cooldown: {rem}s", show_alert=True)
+        return
+
+    # -----------------------------
+    # Alvo
+    # -----------------------------
+    enemy_id = data.split(":", 1)[-1].strip()
+    if not enemy_id:
+        await query.answer("Alvo inválido.", show_alert=True)
+        return
+
+    enemy_data = await player_manager.get_player_data(enemy_id)
+    if not enemy_data:
+        await query.answer("Alvo indisponível.", show_alert=True)
+        return
+
+    # -----------------------------
+    # Batalha (sem ticket)
+    # -----------------------------
+    weekday = datetime.datetime.now().weekday()
+    day_effect = ARENA_MODIFIERS.get(weekday, {})
+    modifier_effect = day_effect.get("effect")
+
+    winner_id, log = await pvp_battle.simular_batalha_completa(
+        user_id,
+        enemy_id,
+        modifier_effect=modifier_effect,
+        nivel_padrao=None,
+    )
+
+    is_win = (str(winner_id) == str(user_id))
+
+    # -----------------------------
+    # PvP de GUERRA: NÃO altera elo (pvp_points).
+    # Apenas registra win/loss e ouro (opcional).
+    # -----------------------------
+    gold_reward = 100 if is_win else 10
+
+    pdata = await player_manager.get_player_data(user_id) or pdata
+    if is_win:
+        pdata["pvp_wins"] = int(pdata.get("pvp_wins", 0)) + 1
+    else:
+        pdata["pvp_losses"] = int(pdata.get("pvp_losses", 0)) + 1
+    player_manager.add_gold(pdata, gold_reward)
+    await player_manager.save_player_data(user_id, pdata)
+
+    enemy_data = await player_manager.get_player_data(enemy_id) or enemy_data
+    if is_win:
+        enemy_data["pvp_losses"] = int(enemy_data.get("pvp_losses", 0)) + 1
+    else:
+        enemy_data["pvp_wins"] = int(enemy_data.get("pvp_wins", 0)) + 1
+    await player_manager.save_player_data(enemy_id, enemy_data)
+
+    # -----------------------------
+    # 🔥 Aplica GUERRA (cooldown winner + ban loser + pontos do clã)
+    # -----------------------------
+    war_info = None
+    try:
+        from modules.game_data import regions as game_data_regions
+        from modules.guild_war.combat_integration import process_war_pvp_result
+
+        loser_id = str(enemy_id) if is_win else str(user_id)
+        war_info = await process_war_pvp_result(
+            str(winner_id),
+            loser_id,
+            game_data_regions_module=game_data_regions
+        )
+    except Exception as e:
+        logger.error(f"[WAR PvP] Erro ao aplicar PvP de guerra: {e}", exc_info=True)
+        war_info = None
+
+    # -----------------------------
+    # Mensagem
+    # -----------------------------
+    result_text = "🏆 <b>VITÓRIA!</b>" if is_win else "💀 <b>DERROTA...</b>"
+    try:
+        full_log = "\n".join(log[-10:]) if isinstance(log, list) else str(log)
+    except Exception:
+        full_log = str(log)
+
+    msg = (
+        f"{result_text}\n\n"
+        f"🆚 <b>Oponente:</b> {html.escape(enemy_data.get('character_name', 'Desconhecido'))}\n"
+        f"📜 <b>Resumo da Luta:</b>\n{full_log}\n\n"
+        f"💰 <b>Ouro:</b> +{gold_reward}\n"
+        f"🛡️ <b>Elo:</b> (não altera em PvP de Guerra)"
+    )
+
+    # ✅ anexa resultado da GUERRA no texto (se aplicado)
+    if isinstance(war_info, dict) and war_info.get("applied"):
+        msg += (
+            f"\n\n🔥 <b>Guerra de Clãs:</b> "
+            f"{int(war_info.get('winner_pvp', 0)):+d} para o clã vencedor, "
+            f"{int(war_info.get('loser_pvp', 0)):+d} para o clã perdedor\n"
+            f"⏳ Cooldown: {int(war_info.get('cooldown_minutes', 5))} min | "
+            f"🚫 Ban PvE (perdedor): {int(war_info.get('ban_minutes', 30))} min"
+        )
+    elif war_info is False:
+        # caso seu process_war_pvp_result retorne boolean (implementação antiga)
+        msg += "\n\n⚠️ <i>Guerra:</i> resultado não aplicado (fora das condições)."
+
+    # -----------------------------
+    # Botões
+    # -----------------------------
+    kb = [
+        [InlineKeyboardButton("⚔️ Procurar na Região", callback_data="war_pvp_refresh")],
+        [InlineKeyboardButton("⬅️ Menu Arena", callback_data="pvp_arena")],
+    ]
+    reply_markup = InlineKeyboardMarkup(kb)
+
+    # -----------------------------
+    # Mídia do oponente
+    # -----------------------------
+    enemy_media = pvp_utils.get_player_class_media(enemy_data)
+    caption_safe = msg[:1024]
+
+    if enemy_media:
+        file_id = enemy_media.get("file_id") or enemy_media.get("id") or enemy_media.get("file")
+        media_type = str(enemy_media.get("type", "video")).lower()
+        try:
+            if media_type == "photo":
+                input_media = InputMediaPhoto(media=file_id, caption=caption_safe, parse_mode="HTML")
+            else:
+                input_media = InputMediaVideo(media=file_id, caption=caption_safe, parse_mode="HTML")
+            await query.edit_message_media(media=input_media, reply_markup=reply_markup)
             return
         except Exception:
             pass
@@ -810,6 +1197,9 @@ def pvp_handlers() -> list:
     return [
         CommandHandler("pvp", pvp_menu_command),
         CallbackQueryHandler(pvp_menu_command, pattern=r"^pvp_arena$"),
+        CallbackQueryHandler(war_pvp_pick_callback, pattern=f"^{WAR_PVP_PICK_PREFIX}"),
+        CallbackQueryHandler(procurar_oponente_callback, pattern=f"^{WAR_PVP_REFRESH}$"),
+
         CallbackQueryHandler(procurar_oponente_callback, pattern=f"^{PVP_PROCURAR_OPONENTE}$"),
         CallbackQueryHandler(ranking_callback, pattern=f"^{PVP_RANKING}$"),
         CallbackQueryHandler(historico_callback, pattern=f"^{PVP_HISTORICO}$"),
@@ -818,4 +1208,6 @@ def pvp_handlers() -> list:
         CallbackQueryHandler(torneio_ready_callback, pattern=r"^torneio_ready$"),
         CallbackQueryHandler(pvp_theme_menu_callback, pattern=f"^{PVP_THEME_MENU}$"),
         CallbackQueryHandler(pvp_theme_set_callback, pattern=f"^{PVP_THEME_SET_PREFIX}"),
+        CallbackQueryHandler(procurar_oponente_callback, pattern=r"^war_pvp_refresh$")
+
     ]

@@ -73,6 +73,10 @@ from handlers.guild.war import (
     war_ranking_handler,
 )
 
+from handlers.menu.region import (
+    war_search_handler,      # Botão 'pvp_search_targets'
+    war_pvp_fight_handler    # Botão 'pvp_fight_start'
+)
 # ==============================================================================
 # MISSÕES (opcional – protegido por try)
 # ==============================================================================
@@ -112,7 +116,8 @@ from handlers.guild_menu_handler import (
     mission_view_handler,
     mission_claim_handler,
     clan_board_handler,
-    war_status_handler,  # ✅ ADICIONADO: CAPTURA gld_war_status
+    war_status_handler,
+    
 )
 
 # ==============================================================================
@@ -202,7 +207,8 @@ def register_guild_handlers(application: Application):
     # --------------------------------------------------------------------------
     application.add_handler(war_menu_handler)
     application.add_handler(war_ranking_handler)
-
+    application.add_handler(war_search_handler)      # Radar (pvp_search_targets)
+    application.add_handler(war_pvp_fight_handler)
     # --------------------------------------------------------------------------
     # 6) ✅ GUILDA DE AVENTUREIROS (NPC)
     # --------------------------------------------------------------------------

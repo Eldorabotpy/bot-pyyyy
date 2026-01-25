@@ -24,6 +24,11 @@ from modules.game_data import monsters as monsters_data
 from modules.game_data.worldmap import WORLD_MAP
 from modules.dungeons.registry import get_dungeon_for_region
 from modules.auth_utils import get_current_player_id, requires_login
+from modules.guild_war.combat_integration import process_war_pvp_result # <--- Importante!
+from pvp import pvp_battle, pvp_utils
+from modules.game_data import regions as game_data_regions
+from modules.guild_war.campaign import ensure_weekly_campaign
+from modules.guild_war.region import CampaignPhase
 
 # --- GUERRA DE CLÃS ---
 # Usa seu engine central (gate oficial para mostrar botões e bloquear callbacks)
@@ -328,6 +333,162 @@ async def continue_after_action(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         await send_region_menu(context, user_id, chat_id)
 
+@requires_login
+async def war_pvp_fight_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Executa a luta PvP da Guerra de Clãs.
+    """
+    query = update.callback_query
+    # Responde rápido ao clique para parar o "reloginho" do botão
+    try:
+        await query.answer()
+    except:
+        pass
+    
+    # 1. Identifica os lutadores
+    user_id = get_current_player_id(update, context)
+    
+    try:
+        # Formato esperado: "pvp_fight_start:ID_DO_INIMIGO"
+        enemy_id = query.data.split(":")[1]
+    except IndexError:
+        await query.answer("❌ Erro ao identificar oponente.", show_alert=True)
+        return
+
+    # Verifica se não é você mesmo (bug de radar/cache)
+    if str(user_id) == str(enemy_id):
+        await query.answer("Você não pode lutar contra si mesmo!", show_alert=True)
+        return
+
+    # 2. Carrega dados para validar e exibir
+    pdata = await player_manager.get_player_data(user_id)
+    enemy_data = await player_manager.get_player_data(enemy_id)
+    
+    if not enemy_data:
+        await query.edit_message_text("❌ Oponente não encontrado (pode ter deslogado ou mudado de região).")
+        return
+
+    # 3. EXECUTA A BATALHA (Simulação)
+    # A função simular_batalha_completa calcula o vencedor baseada nos stats reais,
+    # mas sem gastar tickets da Arena comum.
+    try:
+        winner_id, log = await pvp_battle.simular_batalha_completa(
+            user_id,
+            enemy_id,
+            modifier_effect=None, 
+            nivel_padrao=None
+        )
+    except Exception as e:
+        logger.error(f"Erro na simulação PvP Guerra: {e}")
+        await query.answer("Erro ao simular combate. Tente novamente.", show_alert=True)
+        return
+    
+    # Define quem ganhou e quem perdeu
+    is_win = (str(winner_id) == str(user_id))
+    loser_id = enemy_id if is_win else user_id
+
+    # 4. APLICA AS REGRAS DA GUERRA (Pontos, Ban, Cooldown)
+    # process_war_pvp_result aplica:
+    # - Vitória: Cooldown de ataque (5 min) + Pontos pro Clã
+    # - Derrota: Ban de PvE (30 min) + Perda de Pontos
+    try:
+        from modules.game_data import regions as game_data_regions
+        await process_war_pvp_result(
+            winner_id=str(winner_id), 
+            loser_id=str(loser_id), 
+            game_data_regions_module=game_data_regions
+        )
+    except Exception as e:
+        logger.error(f"Erro ao processar resultado PvP Guerra (DB): {e}")
+
+    # 5. GERAR O RELATÓRIO VISUAL (Log da Luta)
+    my_name = html.escape(pdata.get("character_name", "Você"))
+    enemy_name = html.escape(enemy_data.get("character_name", "Inimigo"))
+    
+    # Pega as últimas 8 linhas do log para não poluir a tela
+    try:
+        summary_log = "\n".join(log[-8:])
+    except:
+        summary_log = "Detalhes do combate indisponíveis."
+
+    # Cabeçalho muda se ganhou ou perdeu
+    if is_win:
+        header = f"🏆 <b>VITÓRIA NA GUERRA!</b>\n<i>Você derrotou {enemy_name}!</i>"
+        status_txt = (
+            "✅ <b>Inimigo neutralizado!</b> (Ban PvE 30m)\n"
+            "📈 <b>+Pontos</b> garantidos para seu Clã.\n"
+            "⏳ Você entrou em cooldown de ataque."
+        )
+    else:
+        header = f"💀 <b>VOCÊ FOI DERROTADO!</b>\n<i>{enemy_name} te venceu...</i>"
+        status_txt = (
+            "🚫 <b>Você está ferido!</b> (30m sem caçar)\n"
+            "📉 Seu clã perdeu pontos de influência.\n"
+            "Recupere-se antes de tentar novamente."
+        )
+
+    msg_text = (
+        f"{header}\n\n"
+        f"⚔️ <b>Log de Combate:</b>\n"
+        f"<blockquote expandable>{summary_log}</blockquote>\n\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"{status_txt}"
+    )
+
+    # Botões de Navegação
+    # Garante que temos a região para o botão de voltar
+    current_region = pdata.get("current_location", "floresta_sombria")
+    
+    kb = [
+        # CORREÇÃO: callback deve ser 'pvp_search_targets' para reabrir o radar
+        [InlineKeyboardButton("🔭 Buscar Outro Alvo", callback_data="pvp_search_targets")],
+        [InlineKeyboardButton("⬅️ Voltar para Região", callback_data=f"open_region:{current_region}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(kb)
+
+    # 6. ENVIAR COM FOTO/VÍDEO (Do Oponente)
+    # Tenta limpar a mensagem anterior (radar) para focar no resultado
+    try:
+        await query.delete_message()
+    except Exception:
+        pass # Se falhar (msg muito antiga), ignora
+
+    # Busca a mídia da classe do inimigo para ilustrar
+    enemy_media = pvp_utils.get_player_class_media(enemy_data)
+    
+    if enemy_media:
+        file_id = enemy_media.get("file_id") or enemy_media.get("id")
+        media_type = str(enemy_media.get("type", "photo")).lower()
+        
+        try:
+            if media_type == "video":
+                await context.bot.send_video(
+                    chat_id=query.message.chat_id,
+                    video=file_id,
+                    caption=msg_text,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+            else:
+                await context.bot.send_photo(
+                    chat_id=query.message.chat_id,
+                    photo=file_id,
+                    caption=msg_text,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+            return # Enviado com sucesso
+        except Exception as e:
+            logger.warning(f"Falha ao enviar mídia no PvP ({e}), enviando texto puro.")
+            # Se der erro na mídia, cai para o envio de texto abaixo
+
+    # Fallback: Envia apenas texto se não tiver mídia ou der erro
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=msg_text,
+        reply_markup=reply_markup,
+        parse_mode="HTML"
+    )
 
 async def send_region_menu(
     context: ContextTypes.DEFAULT_TYPE,
@@ -420,32 +581,45 @@ async def send_region_menu(
     caption = f"🗺️ Você está em <b>{region_info.get('display_name', 'Região')}</b>.\n╰┈➤ <i>O que deseja fazer?</i>\n{status_hud}"
     keyboard = []
 
-    # =========================================================
-    # GUERRA DE CLÃS (BOTÕES SÓ PARA REGISTRADOS)
-    # - Mostra Conquistar se região neutra (sem owner)
-    # - Mostra Atacar se região dominada por clã diferente
+        # =========================================================
+    # GUERRA DE CLÃS — BOTÕES CONDICIONAIS (DOMÍNIO + PvP REGIÃO)
     # =========================================================
     try:
         if clan_war_engine:
-            ok, _reason = await clan_war_engine.can_player_participate_in_war(player_data)
-            if ok:
-                state = await clan_war_engine.get_region_control_state(final_region_key)
-                owner = None
-                if isinstance(state, dict):
-                    owner = state.get("owner_clan_id")
+            # status da guerra
+            status = await clan_war_engine.get_war_status()
+            season = status.get("season", {}) if isinstance(status, dict) else {}
+            is_war_active = bool(season.get("active", False))
+            target_region = str(season.get("target_region_id") or "")
 
+            # jogador apto (inscrito/pronto)
+            if is_war_active and target_region and final_region_key == target_region:
+                keyboard.insert(0, [
+                    InlineKeyboardButton("⚔️ Procurar na Região", callback_data="war_pvp_refresh")
+                ])
+
+                # 1) Botões de domínio (só faz sentido quando a guerra está ativa)
+                state = await clan_war_engine.get_region_control_state(final_region_key)
+                owner = state.get("owner_clan_id") if isinstance(state, dict) else None
                 my_clan_id = _get_player_clan_id_fallback(player_data)
 
                 if not owner:
-                    keyboard.append([InlineKeyboardButton("🛡️ Conquistar Região", callback_data=f"war_claim:{final_region_key}")])
-                else:
-                    # compara por string para evitar ObjectId vs str
-                    if my_clan_id and str(owner) != str(my_clan_id):
-                        keyboard.append([InlineKeyboardButton("⚔️ Atacar Região", callback_data=f"war_attack:{final_region_key}")])
-                    else:
-                        keyboard.append([InlineKeyboardButton("🏰 Região sob domínio do seu clã", callback_data="noop")])
-    except Exception:
-        # nunca quebrar o menu por causa da guerra
+                    keyboard.append([
+                        InlineKeyboardButton("🛡️ Conquistar Região", callback_data=f"war_claim:{final_region_key}")
+                    ])
+                elif my_clan_id and str(owner) != str(my_clan_id):
+                    keyboard.append([
+                        InlineKeyboardButton("🏰 Atacar o Castelo", callback_data=f"war_attack:{final_region_key}")
+                    ])
+
+                # 2) PvP de Guerra: aparece NO TOPO apenas na região alvo (e se horário permitir)
+                if target_region and final_region_key == target_region:
+                    # Se você NÃO quiser limitar por horário, remova esse if e insira direto.
+                    keyboard.insert(0, [InlineKeyboardButton("⚔️ Procurar na Região", callback_data="war_pvp_refresh")])
+
+
+    except Exception as e:
+        print(f"Erro menu guerra: {e}")
         pass
 
     # Botões Especiais (NPCs, Eventos)
@@ -1055,7 +1229,67 @@ async def fix_item_durability(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await show_restore_durability_menu(update, context)
 
+@requires_login
+async def war_search_targets_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Mostra a lista de inimigos (Radar) na região atual.
+    """
+    query = update.callback_query
+    # Avisa ao Telegram que o clique foi recebido
+    await query.answer("🔭 Escaneando a área...")
 
+    user_id = update.effective_user.id
+    pdata = await player_manager.get_player_data(user_id)
+    
+    # --- CORREÇÃO AQUI ---
+    # 1. Identifica onde o jogador está. Se falhar, joga para um local seguro (ex: floresta).
+    current_region = pdata.get("current_location", "floresta_sombria")
+    
+    # Formatação visual do nome da região
+    region_display_name = current_region.replace("_", " ").title()
+    # ---------------------
+
+    # 2. Busca alvos no Engine (filtrando pela região atual)
+    targets = await clan_war_engine.get_war_targets_in_region(str(user_id), current_region)
+    
+    kb = []
+
+    if not targets:
+        text = (
+            f"🔭 <b>RADAR DE GUERRA: {region_display_name}</b>\n\n"
+            f"<i>Nenhum inimigo rival encontrado rondando por aqui no momento.</i>\n"
+            "Tente novamente em instantes."
+        )
+        # Botão apenas para atualizar
+        kb.append([InlineKeyboardButton("🔄 Buscar Novamente", callback_data="pvp_search_targets")])
+    
+    else:
+        text = (
+            f"🔭 <b>RADAR DE GUERRA: {region_display_name}</b>\n"
+            f"<i>{len(targets)} inimigos detectados na área. Ataque para pontuar!</i>"
+        )
+        
+        # 3. Lista os alvos encontrados
+        for t in targets:
+            # Botão de ataque: Espada + Nome + Nível
+            # Callback leva o ID do alvo para o handler de luta
+            btn_text = f"⚔️ {t['name']} (Nv.{t['lvl']})"
+            kb.append([InlineKeyboardButton(btn_text, callback_data=f"pvp_fight_start:{t['user_id']}")])
+        
+        # Botão de atualizar lista
+        kb.append([InlineKeyboardButton("🔄 Atualizar Radar", callback_data="pvp_search_targets")])
+    
+    # --- BOTÃO VOLTAR CORRIGIDO ---
+    # Agora a variável 'current_region' existe e ele voltará para o mapa certo
+    kb.append([InlineKeyboardButton("⬅️ Voltar para Região", callback_data=f"open_region:{current_region}")])
+    
+    # Renderiza o menu
+    await query.edit_message_text(
+        text=text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(kb)
+    )
+    
 # =============================================================================
 # REGISTRO DOS HANDLERS
 # =============================================================================
@@ -1077,3 +1311,6 @@ war_attack_handler = CallbackQueryHandler(war_attack_callback, pattern=r"^war_at
 
 # ✅ No-op (botões informativos)
 noop_handler = CallbackQueryHandler(noop_callback, pattern=r"^noop$")
+
+war_search_handler = CallbackQueryHandler(war_search_targets_callback, pattern=r"^pvp_search_targets$")
+war_pvp_fight_handler = CallbackQueryHandler(war_pvp_fight_callback, pattern=r"^pvp_fight_start:")
