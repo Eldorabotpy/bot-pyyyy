@@ -113,7 +113,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     IMG_BOAS_VINDAS = STARTUP_IMAGE_ID or (
-        "AgACAgEAAxkBAAEEbP5pUVfo8d4oSZTe1twEpMxGv-elcgACpwtrG71CiUbxmRRM9xLX1wEAAwIAA3kAAzYE"
+        "AgACAgEAAxkBAAEFrGtpdpSaCwyw_zNTAQXzgIOa42wBAAMHDGsbLt-wRx6YfHKCzxDqAQADAgADeQADOAQ"
     )
 
     for member in update.message.new_chat_members:
@@ -125,10 +125,10 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         keyboard = [[InlineKeyboardButton("⚔️ CRIAR PERSONAGEM ⚔️", url=deep_link)]]
         caption_text = (
-            f"🔔 <b>UM NOVO AVENTUREIRO CHEGOU!</b>\n\n"
-            f"Seja bem-vindo(a), {member.mention_html()}!\n"
-            f"Os portões de <b>Eldora</b> se abrem para você.\n\n"
-            "👇 <b>Comece sua jornada no botão abaixo:</b>"
+            f"🔔 𝕌𝕄 ℕ𝕆𝕍𝕆 𝔸𝕍𝔼ℕ𝕋𝕌ℝ𝔼𝕀ℝ𝕆 ℂℍ𝔼𝔾𝕆𝕌\n\n"
+            f"𝑺𝒆𝒋𝒂 𝒃𝒆𝒎-𝒗𝒊𝒏𝒅𝒐(𝒂), {member.mention_html()}!\n"
+            f"𝙊𝙨 𝙥𝙤𝙧𝙩𝙤̃𝙚𝙨 𝙙𝙚 𝐄𝐥𝐝𝐨𝐫𝐚 𝙨𝙚 𝙖𝙗𝙧𝙚𝙢 𝙥𝙖𝙧𝙖 𝙫𝙤𝙘𝙚̂.\n\n"
+            "👇 𝘾𝙤𝙢𝙚𝙘𝙚 𝙨𝙪𝙖 𝙟𝙤𝙧𝙣𝙖𝙙𝙖 𝙣𝙤 𝙗𝙤𝙩𝙖̃𝙤 𝙖𝙗𝙖𝙞𝙭𝙤:"
         )
 
         try:
