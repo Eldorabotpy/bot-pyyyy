@@ -222,6 +222,19 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     'id': details.get('id'),
                     'loot_table': details.get('loot_table', [])
                 }
+                # ==================================================
+                # NORMALIZAÇÃO DE STATS DO MONSTRO (IGUAL AO PLAYER)
+                # ==================================================
+                monster_stats.setdefault("accuracy", 0.0)
+                monster_stats.setdefault("dodge_chance_flat", 0.0)
+                monster_stats.setdefault("crit_chance_flat", 0.0)
+                monster_stats.setdefault("crit_damage_mult", 0.0)
+                monster_stats.setdefault("armor_penetration", 0.0)
+                monster_stats.setdefault("cannot_be_dodged", False)
+
+                # Garantia de hp_max para efeitos e engine
+                monster_stats["hp_max"] = monster_stats.get("max_hp", monster_stats.get("hp", 1))
+
                 p_media = _get_class_media(player_data, purpose="combate")
                 new_cache = {
                     'player_id': user_id, # String ID
@@ -254,7 +267,7 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
             return
 
     # --- VARIÁVEIS DE BATALHA ---
-    log = battle_cache.get('battle_log', [])
+    log = list(battle_cache.get('battle_log', []))
     player_stats = battle_cache.get('player_stats', {}) 
     monster_stats = battle_cache.get('monster_stats', {})
     dungeon_ctx = battle_cache.get('dungeon_ctx')
@@ -419,9 +432,10 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         else:
             # ATAQUE BÁSICO
             # Regra de design:
-            # - NÃO aplica DOT (bleed/poison/etc)
-            # - DOTs só entram via SKILLS ATIVAS ou PASSIVAS explícitas
+            # - NÃO aplica DOT ATIVO (bleed)
+            # - PASSIVAS on-hit (ex.: veneno) podem proc-ar aqui
             log.append("⚔️ Ataque básico.")
+
             passive_overrides = _build_passive_overrides_for_player_attack(player_data, battle_cache)
 
             res = await combat_engine.processar_acao_combate(
@@ -432,6 +446,23 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 battle_cache.get('player_hp'),
                 passive_overrides=passive_overrides,
             )
+
+            player_damage = res["total_damage"]
+            log.extend(res["log_messages"])
+
+            # ============================
+            # PASSIVAS ON-HIT (VENENO ETC)
+            # ============================
+            apply_on_hit_passives(
+                player_data=player_data,
+                player_id=user_id,
+                player_stats=player_stats,
+                battle_cache=battle_cache,
+                monster_stats=monster_stats,
+                log=log,
+                combat_result=res,
+            )
+
 
             player_damage = res["total_damage"]
             log.extend(res["log_messages"])
@@ -588,6 +619,14 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     f"✨ XP: +{xp}\n"
                     f"💰 Ouro: +{gold}\n"
                 )
+                # =========================
+                # LOG FINAL (últimos eventos)
+                # =========================
+                final_log_lines = log[-10:]  # ajuste 8-12 como preferir
+                if final_log_lines:
+                    summary += "\n\n📜 <b>Últimos eventos:</b>\n"
+                    for line in final_log_lines:
+                        summary += f"• {line}\n"
 
                 if processed_loot:
                     summary += "\n📦 <b>Loot Encontrado:</b>\n"
@@ -807,7 +846,16 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 await player_manager.save_player_data(user_id, player_data)
                 context.user_data.pop('battle_cache', None)
                 media_derrota = (file_id_manager.get_file_data("media_derrota_cacada") or {}).get('id')
-                await _edit_media_or_caption(context, battle_cache, f"☠️ <b>Derrota!</b> -{xp_loss} XP", media_derrota, "photo", kb_voltar)
+                defeat_text = f"☠️ <b>Derrota!</b>\n-{xp_loss} XP\n"
+
+                final_log_lines = log[-10:]
+                if final_log_lines:
+                    defeat_text += "\n📜 <b>Últimos eventos:</b>\n"
+                    for line in final_log_lines:
+                        defeat_text += f"• {line}\n"
+
+                await _edit_media_or_caption(context, battle_cache, defeat_text, media_derrota, "photo", kb_voltar)
+
                 return
 
             player_data, msgs_cd = iniciar_turno(player_data)

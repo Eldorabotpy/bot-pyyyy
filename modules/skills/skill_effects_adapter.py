@@ -166,6 +166,7 @@ def apply_skill_effects(
 def apply_on_hit_passives(
     *,
     player_data: Dict[str, Any],
+    player_id: int,
     player_stats: Dict[str, Any],
     battle_cache: Dict[str, Any],
     monster_stats: Dict[str, Any],
@@ -180,12 +181,8 @@ def apply_on_hit_passives(
     if not skills:
         return
 
-    for sid in list(skills.keys()):
-        try:
-            s_info = get_skill_data_with_rarity(player_data, sid)
-        except Exception:
-            s_info = None
-
+    for sid in skills.keys():
+        s_info = get_skill_data_with_rarity(player_data, sid)
         if not s_info:
             continue
         if s_info.get("type") != "passive":
@@ -195,11 +192,10 @@ def apply_on_hit_passives(
         if "chance_on_hit" not in eff:
             continue
 
-        # Reaproveita o pipeline existente
         apply_skill_effects(
             skill_id=sid,
             skill_info=s_info,
-            player_id=int(player_data.get("player_id", 0) or 0),
+            player_id=player_id,
             player_stats=player_stats,
             battle_cache=battle_cache,
             monster_stats=monster_stats,

@@ -211,7 +211,7 @@ async def processar_acao_combate(
         # --- CONSTROI A MENSAGEM DO GOLPE ---
         if final_hit == 0:
             hit_msg = "💨 O alvo esquivou!"
-        if is_mega:
+        elif is_mega:
             hit_msg = f"💥💥 𝑴𝑬𝑮𝑨 𝑪𝑹𝑰́𝑻𝑰𝑪𝑶: {final_hit}!"
         elif is_crit:
             hit_msg = f"💥 𝗖𝗥𝗜́𝗧𝗜𝗖𝗢: {final_hit}!"
