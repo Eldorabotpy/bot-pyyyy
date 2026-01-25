@@ -139,6 +139,27 @@ def _build_passive_overrides_for_player_attack(player_data: dict, battle_cache: 
 # ================================================
 # 3. MOTOR DE COMBATE
 # ================================================
+def _dedupe_log_lines(lines: list[str], limit: int = 10) -> list[str]:
+    """
+    Remove repetições consecutivas e repetições idênticas dentro da janela final.
+    Mantém ordem e corta no limite final.
+    """
+    cleaned = []
+    last = None
+    seen = set()
+    for ln in lines:
+        ln = (ln or "").strip()
+        if not ln:
+            continue
+        if ln == last:
+            continue
+        # evita duplicatas exatas (ex.: o mesmo bloco repetido)
+        if ln in seen:
+            continue
+        cleaned.append(ln)
+        seen.add(ln)
+        last = ln
+    return cleaned[-limit:]
 
 async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str = None) -> None:
     query = update.callback_query
@@ -514,6 +535,10 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         # VITÓRIA
         # ============================================
         if monster_defeated:
+            if battle_cache.get("_battle_finished"):
+                return
+            battle_cache["_battle_finished"] = True
+            
             # limpa cooldowns e salva
             if "cooldowns" in player_data:
                 player_data.pop("cooldowns", None)
@@ -613,20 +638,28 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                 for i_id, qty in processed_loot:
                     player_manager.add_item_to_inventory(player_data, i_id, qty)
 
+                monster_name = monster_stats.get("name", "Inimigo")
+                xp_str = f"+{xp}"
+                gold_str = f"+{gold}"
+
+                # últimos eventos (limpos)
+                final_log_lines = _dedupe_log_lines(log[-20:], limit=10)
+
                 summary = (
-                    f"🏆 <b>VITÓRIA!</b>\n\n"
-                    f"Derrotou {monster_stats.get('name')}!\n"
-                    f"✨ XP: +{xp}\n"
-                    f"💰 Ouro: +{gold}\n"
+                    "╭┈➤➤⚔️🏆 𝐕𝐈𝐓𝐎́𝐑𝐈𝐀!\n"
+                    f"├┈➤ Derrotou {monster_name}!\n"
+                    f"├┈┈➤✨ XP: {xp_str}\n"
+                    f"├┈┈➤💰 Ouro: {gold_str}\n"
+                    "├─────────────────────────────┤\n"
                 )
-                # =========================
-                # LOG FINAL (últimos eventos)
-                # =========================
-                final_log_lines = log[-10:]  # ajuste 8-12 como preferir
+
                 if final_log_lines:
-                    summary += "\n\n📜 <b>Últimos eventos:</b>\n"
+                    summary += "├┈➤📜 𝐔́𝐥𝐭𝐢𝐦𝐨𝐬 𝐞𝐯𝐞𝐧𝐭𝐨𝐬:\n"
                     for line in final_log_lines:
-                        summary += f"• {line}\n"
+                        summary += f"├┈➤• {line}\n"
+
+                summary += "╰─────────────────────────────╯"
+
 
                 if processed_loot:
                     summary += "\n📦 <b>Loot Encontrado:</b>\n"
