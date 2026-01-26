@@ -1105,20 +1105,27 @@ account_lock_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(_lock_entry, pattern="^admin_account_lock$")],
     states={
         ASK_LOCK_QUERY_NAME: [
-            MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_search_by_name)
+            MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_search_by_name),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$"),
         ],
         ASK_LOCK_SELECT_PLAYER: [
-            CallbackQueryHandler(_lock_pick_player, pattern=r"^lock_pick:")
+            CallbackQueryHandler(_lock_pick_player, pattern=r"^lock_pick:"),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$"),
         ],
         ASK_LOCK_DURATION: [
-            CallbackQueryHandler(_lock_duration, pattern="^lock_")
+            CallbackQueryHandler(_lock_duration, pattern="^lock_"),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$"),
         ],
         ASK_LOCK_REASON: [
-            MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_reason)
+            MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_reason),
+            CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$"),
         ],
     },
-    fallbacks=[CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
+    fallbacks=[
+        CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$"),
+    ],
 )
+
 
 # =========================================================
 # REGISTRO
