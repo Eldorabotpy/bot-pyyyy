@@ -827,28 +827,114 @@ async def _lock_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def _lock_get_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     uid = parse_hybrid_id(update.message.text)
     if not uid:
-        await update.message.reply_text("ID inválido.")
+        await update.message.reply_text("❌ ID inválido.")
+        return ConversationHandler.END
+
+    pdata = await get_player_data(uid)
+    if not pdata:
+        await update.message.reply_text("❌ Jogador não encontrado.")
         return ConversationHandler.END
 
     context.user_data["lock_uid"] = uid
 
+    # Status atual
+    lock = (pdata or {}).get("account_lock") or {}
+    if lock.get("active"):
+        reason = lock.get("reason") or "Não informado"
+        until = lock.get("until")
+        status_line = f"🔒 <b>Status:</b> BLOQUEADO\n📝 <b>Motivo:</b> {reason}\n"
+        status_line += f"⏳ <b>Até:</b> <code>{until}</code>" if until else "⏳ <b>Até:</b> Indeterminado"
+    else:
+        status_line = "🟢 <b>Status:</b> LIBERADO"
+
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("1 Hora", callback_data="lock_1h")],
-        [InlineKeyboardButton("24 Horas", callback_data="lock_24h")],
-        [InlineKeyboardButton("7 Dias", callback_data="lock_7d")],
-        [InlineKeyboardButton("Indeterminado", callback_data="lock_inf")],
-        [InlineKeyboardButton("⬅️ Cancelar", callback_data="admin_main")]
+        [InlineKeyboardButton("🕠 Bloquear 1 Hora", callback_data="lock_1h")],
+        [InlineKeyboardButton("🕗 Bloquear 24 Horas", callback_data="lock_24h")],
+        [InlineKeyboardButton("🕡 Bloquear 7 Dias", callback_data="lock_7d")],
+        [InlineKeyboardButton("🔐 Bloquear Indeterminado", callback_data="lock_inf")],
+        [InlineKeyboardButton("🔓 Desbloquear Agora", callback_data="lock_unlock")],
+        [InlineKeyboardButton("🔄📓 Recarregar Status", callback_data="lock_refresh")],
+        [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")],
     ])
 
-    await _safe_edit_text(update, context, "⏳ Escolha a duração:", kb)
+    await _safe_edit_text(
+        update,
+        context,
+        f"🔒 <b>Bloqueio de Conta</b>\n\n"
+        f"🆔 <b>ID:</b> <code>{uid}</code>\n\n"
+        f"{status_line}\n\n"
+        f"Escolha uma ação:",
+        kb
+    )
     return ASK_LOCK_DURATION
+
 
 async def _lock_duration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
 
-    now = datetime.now(timezone.utc)
+    uid = context.user_data.get("lock_uid")
+    if not uid:
+        await _safe_edit_text(update, context, "❌ Sessão de bloqueio perdida. Reabra o painel.")
+        return ConversationHandler.END
+
     data = q.data
+
+    # Desbloquear agora
+    if data == "lock_unlock":
+        pdata = await get_player_data(uid)
+        if not pdata:
+            await _safe_edit_text(update, context, "❌ Jogador não encontrado.")
+            return ConversationHandler.END
+
+        if "account_lock" in pdata:
+            pdata.pop("account_lock", None)
+            await save_player_data(uid, pdata)
+            await clear_player_cache(uid)
+
+        await _safe_edit_text(
+            update, context,
+            f"🔓 <b>Conta desbloqueada</b>\n🆔 <code>{uid}</code>",
+            InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]])
+        )
+        return ConversationHandler.END
+
+    # Recarregar status
+    if data == "lock_refresh":
+        # Simplesmente reusa a tela anterior
+        # (chama _lock_get_player exigiria texto; então recarrega aqui)
+        pdata = await get_player_data(uid)
+        lock = (pdata or {}).get("account_lock") or {}
+        if lock.get("active"):
+            reason = lock.get("reason") or "Não informado"
+            until = lock.get("until")
+            status_line = f"🔒 <b>Status:</b> BLOQUEADO\n📝 <b>Motivo:</b> {reason}\n"
+            status_line += f"⏳ <b>Até:</b> <code>{until}</code>" if until else "⏳ <b>Até:</b> Indeterminado"
+        else:
+            status_line = "🟢 <b>Status:</b> LIBERADO"
+
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⏳ Bloquear 1 Hora", callback_data="lock_1h")],
+            [InlineKeyboardButton("⏳ Bloquear 24 Horas", callback_data="lock_24h")],
+            [InlineKeyboardButton("⏳ Bloquear 7 Dias", callback_data="lock_7d")],
+            [InlineKeyboardButton("🔒 Bloquear Indeterminado", callback_data="lock_inf")],
+            [InlineKeyboardButton("🔓 Desbloquear Agora", callback_data="lock_unlock")],
+            [InlineKeyboardButton("🔄 Recarregar Status", callback_data="lock_refresh")],
+            [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")],
+        ])
+
+        await _safe_edit_text(
+            update, context,
+            f"🔒 <b>Bloqueio de Conta</b>\n\n"
+            f"🆔 <b>ID:</b> <code>{uid}</code>\n\n"
+            f"{status_line}\n\n"
+            f"Escolha uma ação:",
+            kb
+        )
+        return ASK_LOCK_DURATION
+
+    # Bloqueios por duração (inclui indeterminado)
+    now = datetime.now(timezone.utc)
 
     if data == "lock_1h":
         until = now + timedelta(hours=1)
@@ -856,33 +942,56 @@ async def _lock_duration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         until = now + timedelta(days=1)
     elif data == "lock_7d":
         until = now + timedelta(days=7)
-    else:
+    elif data == "lock_inf":
         until = None
+    else:
+        await _safe_edit_text(update, context, "❌ Ação inválida.", InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]]))
+        return ConversationHandler.END
 
     context.user_data["lock_until"] = until.isoformat() if until else None
+
     await _safe_edit_text(update, context, "✏️ Informe o motivo do bloqueio:")
     return ASK_LOCK_REASON
 
+
 async def _lock_reason(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    reason = update.message.text.strip()
-    uid = context.user_data["lock_uid"]
+    reason = (update.message.text or "").strip()
+    uid = context.user_data.get("lock_uid")
+
+    if not uid:
+        await update.message.reply_text("❌ Sessão de bloqueio perdida. Reabra o painel.")
+        return ConversationHandler.END
+
+    if not reason:
+        await update.message.reply_text("❌ Motivo não pode ser vazio. Envie o motivo:")
+        return ASK_LOCK_REASON
 
     pdata = await get_player_data(uid)
     if not pdata:
-        await update.message.reply_text("Jogador não encontrado.")
+        await update.message.reply_text("❌ Jogador não encontrado.")
         return ConversationHandler.END
 
     pdata["account_lock"] = {
         "active": True,
         "reason": reason,
-        "until": context.user_data["lock_until"],
+        "until": context.user_data.get("lock_until"),  # None => indeterminado
         "by": str(update.effective_user.id),
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
     await save_player_data(uid, pdata)
+    await clear_player_cache(uid)
 
-    await update.message.reply_text("🔒 Conta bloqueada com sucesso.")
+    until = context.user_data.get("lock_until")
+    until_txt = f"<code>{until}</code>" if until else "Indeterminado"
+
+    await update.message.reply_text(
+        "✅ <b>Conta bloqueada com sucesso</b>\n"
+        f"🆔 <b>ID:</b> <code>{uid}</code>\n"
+        f"⏳ <b>Até:</b> {until_txt}\n"
+        f"📝 <b>Motivo:</b> {reason}",
+        parse_mode=HTML
+    )
     return ConversationHandler.END
 
 async def admin_unlock_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -893,7 +1002,9 @@ async def admin_unlock_account(update: Update, context: ContextTypes.DEFAULT_TYP
     if pdata and "account_lock" in pdata:
         pdata.pop("account_lock")
         await save_player_data(uid, pdata)
+        await clear_player_cache(uid)   # 🔁 LIMPA CACHE
         await update.message.reply_text("🔓 Conta desbloqueada.")
+
 
 
 async def _change_id_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -945,6 +1056,8 @@ account_lock_conv_handler = ConversationHandler(
         ASK_LOCK_PLAYER_ID: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_get_player)],
         ASK_LOCK_DURATION: [CallbackQueryHandler(_lock_duration, pattern="^lock_")],
         ASK_LOCK_REASON: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_reason)],
+        ASK_LOCK_DURATION: [CallbackQueryHandler(_lock_duration, pattern="^lock_")],
+
     },
     fallbacks=[CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
 )
@@ -1007,6 +1120,8 @@ all_admin_handlers = [
     grant_skill_conv_handler,
     grant_skin_conv_handler,
     player_management_conv_handler,
+    account_lock_conv_handler,
+    account_lock_conv_handler,
     admin_help_handler,
     delete_player_conv_handler,
     hard_respec_all_handler,
