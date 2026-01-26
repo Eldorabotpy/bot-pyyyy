@@ -6,7 +6,8 @@ from telegram.ext import ContextTypes
 from bson import ObjectId
 from telegram.constants import ParseMode
 from modules.player.account_lock import check_account_lock
-from modules.player import player_manager
+from modules import player_manager
+
 
 
 try:
