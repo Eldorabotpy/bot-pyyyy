@@ -300,16 +300,15 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def _handle_admin_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_admin(update): 
-        return
+    if not await ensure_admin(update):
+        return ConversationHandler.END
+
     if update.callback_query:
         await update.callback_query.answer()
 
     text = "🎛️ <b>Painel do Admin</b>\nEscolha uma opção:"
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=_admin_menu_kb(), parse_mode=HTML)
-    else:
-        await update.message.reply_text(text, reply_markup=_admin_menu_kb(), parse_mode=HTML)
+    await _safe_edit_text(update, context, text, _admin_menu_kb())
+    return ConversationHandler.END
 
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id

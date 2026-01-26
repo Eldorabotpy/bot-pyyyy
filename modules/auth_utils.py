@@ -4,6 +4,10 @@ from functools import wraps
 from telegram import Update
 from telegram.ext import ContextTypes
 from bson import ObjectId
+from telegram.constants import ParseMode
+from modules.player.account_lock import check_account_lock
+from modules.player import player_manager
+
 
 try:
     from modules.sessions import get_persistent_session
@@ -79,7 +83,7 @@ def requires_login(func):
     """
     Decorator blindado:
     - Garante sessão válida (RAM ou persistência).
-    - Se inválida, avisa /start.
+    - BLOQUEIA contas com account_lock ativo.
     """
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
@@ -93,15 +97,51 @@ def requires_login(func):
             try:
                 if update.callback_query:
                     try:
-                        await update.callback_query.answer("⚠️ Sessão expirada. Use /start.", show_alert=True)
+                        await update.callback_query.answer(
+                            "⚠️ Sessão expirada. Use /start.",
+                            show_alert=True
+                        )
                     except Exception:
                         pass
                 elif update.effective_message:
-                    await update.effective_message.reply_text(msg, parse_mode="HTML")
+                    await update.effective_message.reply_text(msg, parse_mode=ParseMode.HTML)
             except Exception:
                 pass
             return
 
+        # ===============================
+        # 🔒 BLOQUEIO GLOBAL DE CONTA
+        # ===============================
+        try:
+            pdata = await player_manager.get_player_data(pid)
+            if pdata:
+                locked, lock_msg = check_account_lock(pdata)
+                if locked:
+                    if update.callback_query:
+                        await update.callback_query.answer()
+                        try:
+                            await update.callback_query.edit_message_text(
+                                lock_msg,
+                                parse_mode=ParseMode.HTML
+                            )
+                        except Exception:
+                            # fallback se a msg for mídia
+                            await update.callback_query.message.reply_text(
+                                lock_msg,
+                                parse_mode=ParseMode.HTML
+                            )
+                    elif update.effective_message:
+                        await update.effective_message.reply_text(
+                            lock_msg,
+                            parse_mode=ParseMode.HTML
+                        )
+                    return  # 🚫 BLOQUEIA QUALQUER AÇÃO
+        except Exception:
+            # segurança: nunca quebra fluxo por erro de bloqueio
+            pass
+
+        # Sessão válida e conta liberada
         return await func(update, context, *args, **kwargs)
 
     return wrapper
+
