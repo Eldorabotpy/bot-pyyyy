@@ -8,6 +8,8 @@ from handlers.menu.kingdom import show_kingdom_menu
 from handlers.menu.region import show_region_menu
 from modules import player_manager
 from modules.auth_utils import requires_login 
+from modules.player.account_lock import check_account_lock
+from telegram.constants import ParseMode
 
 try:
     from bson import ObjectId
@@ -50,6 +52,20 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Garante que user_id seja string na chamada se necessário
             await player_manager.set_last_chat_id(str(player_data["user_id"]), update.effective_chat.id)
     except Exception: pass
+    
+    # ===============================
+    # 🔒 BLOQUEIO DE CONTA
+    # ===============================
+    locked, lock_msg = check_account_lock(player_data)
+
+    # 🔁 Persistir auto-unlock (se o lock expirou e foi removido)
+    if not locked and "account_lock" not in player_data:
+        await player_manager.save_player_data(player_data["_id"], player_data)
+
+    if locked:
+        from telegram.constants import ParseMode
+        await update.message.reply_text(lock_msg, parse_mode=ParseMode.HTML)
+        return
 
     await update.message.reply_text("🎒 Abrindo seu menu...")
     await resume_game_state(update, context, player_data)

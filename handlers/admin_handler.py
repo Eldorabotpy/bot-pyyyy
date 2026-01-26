@@ -8,7 +8,7 @@ import json
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Union
-
+from datetime import timedelta
 # --- Imports do Telegram ---
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -94,7 +94,11 @@ HTML = ParseMode.HTML
 (ASK_DELETE_ID, CONFIRM_DELETE_ACTION) = range(4, 6)
 ASK_GHOST_CLAN_ID = 6
 (ASK_OLD_ID_CHANGE, ASK_NEW_ID_CHANGE, CONFIRM_ID_CHANGE) = range(7, 10)
-
+(
+    ASK_LOCK_PLAYER_ID,
+    ASK_LOCK_DURATION,
+    ASK_LOCK_REASON,
+) = range(10, 13)
 # =========================================================
 # HELPERS
 # =========================================================
@@ -194,6 +198,7 @@ def _admin_menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🛠️ 𝔾𝕖𝕣𝕒𝕣 𝔼𝕢𝕦𝕚𝕡𝕒𝕞𝕖𝕟𝕥𝕠", callback_data="admin_generate_equip")],
         [InlineKeyboardButton("📚 𝔼𝕟𝕤𝕚𝕟𝕒𝕣 𝕊𝕜𝕚𝕝𝕝", callback_data="admin_grant_skill")],
         [InlineKeyboardButton("🎨 𝔼𝕟𝕥𝕣𝕖𝕘𝕒𝕣 𝕊𝕜𝕚𝕟", callback_data="admin_grant_skin")],
+        [InlineKeyboardButton("🔒 𝐁𝐥𝐨𝐪𝐮𝐞𝐢𝐨 𝐝𝐞 𝐂𝐨𝐧𝐭𝐚", callback_data="admin_account_lock")],
         [InlineKeyboardButton("✏️ 𝐄𝐝𝐢𝐭𝐚𝐫 𝐉𝐨𝐠𝐚𝐝𝐨𝐫", callback_data="admin_edit_player")],
         [InlineKeyboardButton("👥 𝔾𝕖𝕣𝕖𝕟𝕔𝕚𝕒𝕣 𝕁𝕠𝕘𝕒𝕕𝕠𝕣𝕖𝕤", callback_data="admin_pmanage_main")],
         [InlineKeyboardButton("🚀 𝐌𝐈𝐆𝐑𝐀𝐑/CLONAR 𝐈𝐃", callback_data="admin_change_id_start")],
@@ -812,6 +817,85 @@ async def _change_id_confirm_step(update: Update, context: ContextTypes.DEFAULT_
     )
     return CONFIRM_ID_CHANGE
 
+async def _lock_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not await ensure_admin(update):
+        return ConversationHandler.END
+
+    await _safe_edit_text(update, context, "🔒 Envie o ID do jogador:")
+    return ASK_LOCK_PLAYER_ID
+
+async def _lock_get_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    uid = parse_hybrid_id(update.message.text)
+    if not uid:
+        await update.message.reply_text("ID inválido.")
+        return ConversationHandler.END
+
+    context.user_data["lock_uid"] = uid
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("1 Hora", callback_data="lock_1h")],
+        [InlineKeyboardButton("24 Horas", callback_data="lock_24h")],
+        [InlineKeyboardButton("7 Dias", callback_data="lock_7d")],
+        [InlineKeyboardButton("Indeterminado", callback_data="lock_inf")],
+        [InlineKeyboardButton("⬅️ Cancelar", callback_data="admin_main")]
+    ])
+
+    await _safe_edit_text(update, context, "⏳ Escolha a duração:", kb)
+    return ASK_LOCK_DURATION
+
+async def _lock_duration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+
+    now = datetime.now(timezone.utc)
+    data = q.data
+
+    if data == "lock_1h":
+        until = now + timedelta(hours=1)
+    elif data == "lock_24h":
+        until = now + timedelta(days=1)
+    elif data == "lock_7d":
+        until = now + timedelta(days=7)
+    else:
+        until = None
+
+    context.user_data["lock_until"] = until.isoformat() if until else None
+    await _safe_edit_text(update, context, "✏️ Informe o motivo do bloqueio:")
+    return ASK_LOCK_REASON
+
+async def _lock_reason(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    reason = update.message.text.strip()
+    uid = context.user_data["lock_uid"]
+
+    pdata = await get_player_data(uid)
+    if not pdata:
+        await update.message.reply_text("Jogador não encontrado.")
+        return ConversationHandler.END
+
+    pdata["account_lock"] = {
+        "active": True,
+        "reason": reason,
+        "until": context.user_data["lock_until"],
+        "by": str(update.effective_user.id),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    await save_player_data(uid, pdata)
+
+    await update.message.reply_text("🔒 Conta bloqueada com sucesso.")
+    return ConversationHandler.END
+
+async def admin_unlock_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_admin(update):
+        return
+    uid = parse_hybrid_id(context.args[0])
+    pdata = await get_player_data(uid)
+    if pdata and "account_lock" in pdata:
+        pdata.pop("account_lock")
+        await save_player_data(uid, pdata)
+        await update.message.reply_text("🔓 Conta desbloqueada.")
+
+
 async def _change_id_perform(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     old = context.user_data['old_id']
     new = context.user_data['new_id']
@@ -853,6 +937,16 @@ change_id_conv_handler = ConversationHandler(
         ]
     },
     fallbacks=[CommandHandler("cancelar", _delete_cancel)]
+)
+
+account_lock_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(_lock_entry, pattern="^admin_account_lock$")],
+    states={
+        ASK_LOCK_PLAYER_ID: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_get_player)],
+        ASK_LOCK_DURATION: [CallbackQueryHandler(_lock_duration, pattern="^lock_")],
+        ASK_LOCK_REASON: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_reason)],
+    },
+    fallbacks=[CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
 )
 
 # =========================================================
