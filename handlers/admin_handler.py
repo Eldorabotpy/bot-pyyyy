@@ -21,6 +21,7 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 from modules.auth_utils import get_current_player_id
+from modules.player.queries import find_player_by_name, find_players_by_name_partial
 
 # --- Imports de Banco e Utils ---
 from bson import ObjectId
@@ -95,10 +96,12 @@ HTML = ParseMode.HTML
 ASK_GHOST_CLAN_ID = 6
 (ASK_OLD_ID_CHANGE, ASK_NEW_ID_CHANGE, CONFIRM_ID_CHANGE) = range(7, 10)
 (
-    ASK_LOCK_PLAYER_ID,
-    ASK_LOCK_DURATION,
-    ASK_LOCK_REASON,
-) = range(10, 13)
+    ASK_LOCK_QUERY_NAME,        # admin digita nome
+    ASK_LOCK_SELECT_PLAYER,     # escolhe na lista
+    ASK_LOCK_DURATION,          # duração / ações
+    ASK_LOCK_REASON,            # motivo
+) = range(10, 14)
+
 # =========================================================
 # HELPERS
 # =========================================================
@@ -821,31 +824,82 @@ async def _lock_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if not await ensure_admin(update):
         return ConversationHandler.END
 
-    await _safe_edit_text(update, context, "🔒 Envie o ID do jogador:")
-    return ASK_LOCK_PLAYER_ID
+    context.user_data.clear()
 
-async def _lock_get_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    uid = parse_hybrid_id(update.message.text)
-    if not uid:
-        await update.message.reply_text("❌ ID inválido.")
+    await _safe_edit_text(
+        update, context,
+        "🔒 <b>Bloqueio de Conta</b>\n\n"
+        "Digite o <b>nome do personagem</b> para localizar a conta:",
+        InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")]
+        ])
+    )
+    return ASK_LOCK_QUERY_NAME
+
+
+async def _lock_search_by_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = (update.message.text or "").strip()
+    if not query:
+        await update.message.reply_text("❌ Digite um nome válido.")
+        return ASK_LOCK_QUERY_NAME
+
+    results = await find_players_by_name_partial(query)
+
+    if not results:
+        await update.message.reply_text("❌ Nenhum personagem encontrado.")
+        return ASK_LOCK_QUERY_NAME
+
+    buttons = []
+    for uid, pdata in results:
+        char_name = pdata.get("character_name", "Sem nome")
+        level = pdata.get("level", "?")
+        buttons.append([
+            InlineKeyboardButton(
+                f"👤 {char_name} (Nv {level})",
+                callback_data=f"lock_pick:{uid}"
+            )
+        ])
+
+    buttons.append([InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")])
+
+    await _safe_edit_text(
+        update, context,
+        f"🔍 <b>Resultados para:</b> <i>{query}</i>\n\n"
+        "Selecione o personagem:",
+        InlineKeyboardMarkup(buttons)
+    )
+    return ASK_LOCK_SELECT_PLAYER
+
+
+async def _lock_pick_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+
+    if not q.data.startswith("lock_pick:"):
         return ConversationHandler.END
 
+    uid = q.data.split(":", 1)[1]
     pdata = await get_player_data(uid)
+
     if not pdata:
-        await update.message.reply_text("❌ Jogador não encontrado.")
+        await _safe_edit_text(update, context, "❌ Jogador não encontrado.")
         return ConversationHandler.END
 
     context.user_data["lock_uid"] = uid
 
-    # Status atual
-    lock = (pdata or {}).get("account_lock") or {}
+    char_name = pdata.get("character_name", "Sem nome")
+
+    lock = pdata.get("account_lock") or {}
     if lock.get("active"):
-        reason = lock.get("reason") or "Não informado"
+        reason = lock.get("reason", "Não informado")
         until = lock.get("until")
-        status_line = f"🔒 <b>Status:</b> BLOQUEADO\n📝 <b>Motivo:</b> {reason}\n"
-        status_line += f"⏳ <b>Até:</b> <code>{until}</code>" if until else "⏳ <b>Até:</b> Indeterminado"
+        status = (
+            f"🔒 <b>Status:</b> BLOQUEADO\n"
+            f"📝 <b>Motivo:</b> {reason}\n"
+            + (f"⏳ <b>Até:</b> <code>{until}</code>" if until else "⏳ <b>Até:</b> Indeterminado")
+        )
     else:
-        status_line = "🟢 <b>Status:</b> LIBERADO"
+        status = "🟢 <b>Status:</b> LIBERADO"
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🕠 Bloquear 1 Hora", callback_data="lock_1h")],
@@ -853,21 +907,18 @@ async def _lock_get_player(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         [InlineKeyboardButton("🕡 Bloquear 7 Dias", callback_data="lock_7d")],
         [InlineKeyboardButton("🔐 Bloquear Indeterminado", callback_data="lock_inf")],
         [InlineKeyboardButton("🔓 Desbloquear Agora", callback_data="lock_unlock")],
-        [InlineKeyboardButton("🔄📓 Recarregar Status", callback_data="lock_refresh")],
         [InlineKeyboardButton("⬅️ Voltar", callback_data="admin_main")],
     ])
 
     await _safe_edit_text(
-        update,
-        context,
-        f"🔒 <b>Bloqueio de Conta</b>\n\n"
-        f"🆔 <b>ID:</b> <code>{uid}</code>\n\n"
-        f"{status_line}\n\n"
-        f"Escolha uma ação:",
+        update, context,
+        "🔒 <b>Bloqueio de Conta</b>\n\n"
+        f"👤 <b>Personagem:</b> {char_name}\n\n"
+        f"{status}\n\n"
+        "Escolha uma ação:",
         kb
     )
     return ASK_LOCK_DURATION
-
 
 async def _lock_duration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
@@ -1053,11 +1104,18 @@ change_id_conv_handler = ConversationHandler(
 account_lock_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(_lock_entry, pattern="^admin_account_lock$")],
     states={
-        ASK_LOCK_PLAYER_ID: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_get_player)],
-        ASK_LOCK_DURATION: [CallbackQueryHandler(_lock_duration, pattern="^lock_")],
-        ASK_LOCK_REASON: [MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_reason)],
-        ASK_LOCK_DURATION: [CallbackQueryHandler(_lock_duration, pattern="^lock_")],
-
+        ASK_LOCK_QUERY_NAME: [
+            MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_search_by_name)
+        ],
+        ASK_LOCK_SELECT_PLAYER: [
+            CallbackQueryHandler(_lock_pick_player, pattern=r"^lock_pick:")
+        ],
+        ASK_LOCK_DURATION: [
+            CallbackQueryHandler(_lock_duration, pattern="^lock_")
+        ],
+        ASK_LOCK_REASON: [
+            MessageHandler(filters.TEXT & filters.User(ADMIN_LIST), _lock_reason)
+        ],
     },
     fallbacks=[CallbackQueryHandler(_handle_admin_main, pattern="^admin_main$")]
 )
