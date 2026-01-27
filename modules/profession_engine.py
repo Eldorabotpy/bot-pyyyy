@@ -143,6 +143,83 @@ def _get_item_info(base_id: str) -> dict:
     except Exception: pass
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
+# =========================
+# Ferramentas de Coleta
+# =========================
+def _get_equipped_tool(player_data: dict) -> tuple[str | None, dict | None, dict | None]:
+    """
+    Retorna (unique_id, instância, item_base) da ferramenta equipada.
+    """
+    equip = player_data.get("equipment", {}) or {}
+    inv = player_data.get("inventory", {}) or {}
+
+    uid = equip.get("tool")
+    if not uid:
+        return None, None, None
+
+    inst = inv.get(uid)
+    if not isinstance(inst, dict):
+        return None, None, None
+
+    base_id = inst.get("base_id")
+    info = _get_item_info(base_id)
+    if not info:
+        return None, None, None
+
+    return uid, inst, info
+
+
+def _consume_tool_durability(tool_inst: dict, amount: int = 1) -> bool:
+    """
+    Consome durabilidade da ferramenta.
+    Retorna False se quebrar.
+    """
+    cur, mx = _dur_tuple(tool_inst.get("durability"))
+    cur -= amount
+    if cur <= 0:
+        _set_dur(tool_inst, 0, mx)
+        return False
+
+    _set_dur(tool_inst, cur, mx)
+    return True
+
+def validate_and_prepare_gather(player_data: dict) -> dict:
+    """
+    Valida se o jogador pode coletar:
+    - tem profissão
+    - tem ferramenta equipada
+    - ferramenta é compatível
+    - tem durabilidade
+    """
+    prof = player_data.get("profession", {}) or {}
+    prof_key = prof.get("key") or prof.get("type")
+
+    if not prof_key:
+        return {"ok": False, "error": "Você não possui uma profissão ativa."}
+
+    uid, tool_inst, tool_info = _get_equipped_tool(player_data)
+    if not tool_inst:
+        return {"ok": False, "error": "Você precisa equipar uma ferramenta de coleta."}
+
+    tool_type = tool_info.get("tool_type")
+    if tool_type != prof_key:
+        return {
+            "ok": False,
+            "error": f"Ferramenta incompatível com a profissão ({prof_key})."
+        }
+
+    cur, _ = _dur_tuple(tool_inst.get("durability"))
+    if cur <= 0:
+        return {"ok": False, "error": "Sua ferramenta está quebrada."}
+
+    return {
+        "ok": True,
+        "tool_uid": uid,
+        "tool_inst": tool_inst,
+        "tool_info": tool_info,
+        "profession": prof_key
+    }
+
 def _is_weapon(item_inst: dict) -> bool:
     base_id = (item_inst or {}).get("base_id")
     info = _get_item_info(base_id)

@@ -29,7 +29,8 @@ from handlers.inventory_handler import (
     inventory_menu_handler,
     inventory_list_handler,
     inventory_view_handler,
-    inventory_use_handler
+    inventory_use_handler,
+    inventory_repair_handler,
 )
 
 # 4. Conversor e Skins
@@ -110,7 +111,8 @@ def register_character_handlers(application: Application):
         inventory_list_handler,
         inventory_view_handler,
         inventory_use_handler,
-        
+        inventory_repair_handler,
+
         # Conversor
         converter_main_handler,
         converter_list_handler,
@@ -168,3 +170,4 @@ def register_character_handlers(application: Application):
             logger.warning(f"⚠️ Ignorando handler inválido no registro: {type(h)}")
 
     application.add_handlers(clean_handlers)
+    

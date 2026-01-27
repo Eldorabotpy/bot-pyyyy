@@ -15,6 +15,47 @@ from modules.player.premium import PremiumManager
 
 logger = logging.getLogger(__name__)
 
+# ==========================================================
+# 🎯 BALANCEAMENTO DE COLETA POR TIER DE FERRAMENTA
+# ==========================================================
+# qty     → bônus fixo de quantidade
+# crit    → bônus de chance crítica (%)
+# rare    → bônus direto na chance de recurso raro
+# no_dura → chance de NÃO consumir durabilidade (0.0 a 1.0)
+# ==========================================================
+TIER_BALANCE = {
+    1: {  # Ferramentas básicas
+        "qty": 0,
+        "crit": 0.0,
+        "rare": 0.000,
+        "no_dura": 0.00,
+    },
+    2: {  # Ferro
+        "qty": 1,
+        "crit": 1.0,
+        "rare": 0.003,
+        "no_dura": 0.10,
+    },
+    3: {  # Aço
+        "qty": 2,
+        "crit": 2.0,
+        "rare": 0.007,
+        "no_dura": 0.25,
+    },
+    4: {  # Mithril / Obsidiana
+        "qty": 3,
+        "crit": 3.5,
+        "rare": 0.015,
+        "no_dura": 0.45,
+    },
+    5: {  # Adamantio / Lendárias
+        "qty": 4,
+        "crit": 5.0,
+        "rare": 0.030,
+        "no_dura": 0.70,
+    },
+}
+
 # --- Helpers ---
 def _int(v: Any, default: int = 0) -> int:
     try: return int(v)
@@ -25,11 +66,43 @@ def _clamp_float(v: Any, lo: float, hi: float, default: float) -> float:
     except Exception: f = default
     return max(lo, min(hi, f))
 
+def _get_item_info(base_id: str) -> dict:
+    return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
+
+def _dur_tuple(raw):
+    cur, mx = 0, 0
+    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+        try:
+            cur = int(raw[0]); mx = int(raw[1])
+        except Exception:
+            cur, mx = 0, 0
+    elif isinstance(raw, dict):
+        try:
+            cur = int(raw.get("current", 0)); mx = int(raw.get("max", 0))
+        except Exception:
+            cur, mx = 0, 0
+    return max(0, min(cur, mx)), max(0, mx)
+
+def _set_dur(item: dict, cur: int, mx: int) -> None:
+    item["durability"] = [int(max(0, min(cur, mx))), int(max(0, mx))]
+
+def _get_item_max_durability_from_info(info: dict, fallback_max: int) -> int:
+    """
+    Pega max dur do item base (ITEMS_DATA). Se não tiver, usa fallback.
+    """
+    dur = info.get("durability")
+    if isinstance(dur, (list, tuple)) and len(dur) >= 2:
+        try:
+            return int(dur[1])
+        except Exception:
+            return int(fallback_max or 0)
+    return int(fallback_max or 0)
+
 # ==============================================================================
 # 1. A LÓGICA PURA (BLINDADA COM TRY/FINALLY)
 # ==============================================================================
 async def execute_collection_logic(
-    user_id: str, 
+    user_id: str,
     chat_id: int,
     resource_id: str,
     item_id_yielded: str,
@@ -46,183 +119,232 @@ async def execute_collection_logic(
         "tin_ore": "minerio_de_estanho",
         "madeira_rara_bruta": "madeira_rara"
     }
-    
-    if resource_id in FIX_IDS: resource_id = FIX_IDS[resource_id]
-    if item_id_yielded in FIX_IDS: item_id_yielded = FIX_IDS[item_id_yielded]
-        
-    """
-    Executa a matemática da coleta, entrega itens e notifica.
-    USANDO ESTRUTURA BLINDADA PARA EVITAR TRAVAMENTOS.
-    """
+
+    if resource_id in FIX_IDS:
+        resource_id = FIX_IDS[resource_id]
+    if item_id_yielded in FIX_IDS:
+        item_id_yielded = FIX_IDS[item_id_yielded]
+
     player_data = await player_manager.get_player_data(user_id)
-    if not player_data: return
+    if not player_data:
+        return
 
-    # 1. Tenta deletar mensagem antiga de "Coletando..." (Cosmético)
+    # 1) Limpa mensagem "Coletando..." (cosmético)
     if message_id_to_delete:
-        try: await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
-        except: pass
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
+        except Exception:
+            pass
 
-    if not resource_id: 
-        # Se não tem recurso, destrava e sai
-        player_data['player_state'] = {'action': 'idle'}
+    # resource_id pode ser None em regiões especiais
+    if resource_id is None:
+        pass
+    elif not resource_id:
+        player_data["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(user_id, player_data)
         return
 
-    # Variáveis para controle de erro
     sucesso_operacao = False
-    
+
     try:
-        # ==========================================================
-        # 🔓 DESTRAVAMENTO NA MEMÓRIA (Obrigatório)
-        # ==========================================================
-        # Definimos como idle aqui, mas só será salvo no 'finally'
-        player_data['player_state'] = {'action': 'idle'}
-        
-        # ==========================================================
+        # 🔓 Estado
+        player_data["player_state"] = {"action": "idle"}
+        current_loc = player_data.get("current_location", "reino_eldora")
+
+        # 🔧 Normaliza estrutura legado (garante slot tool existir)
+        equip = player_data.setdefault("equipment", {})
+        equip.setdefault("tool", None)
+        inv = player_data.setdefault("inventory", {})
+
+        # ================================
         # 🛑 TRAVA DE PROFISSÃO
-        # ==========================================================
-        prof = player_data.get('profession', {}) or {}
-        user_prof_key = prof.get('key') or prof.get('type')
-        required_profession = game_data.get_profession_for_resource(resource_id)
-        
+        # ================================
+        prof = player_data.get("profession", {}) or {}
+        user_prof_key = (prof.get("key") or prof.get("type") or "").strip().lower()
+
+        required_profession = None
+        if resource_id is not None:
+            required_profession = game_data.get_profession_for_resource(resource_id)
+
         if required_profession and user_prof_key != required_profession:
             prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {})
-            prof_name_display = prof_info.get('display_name', required_profession.capitalize())
-            
-            msg_erro = (
+            prof_name = prof_info.get("display_name", required_profession.capitalize())
+
+            await context.bot.send_message(
+                chat_id,
                 f"❌ <b>Falha na Coleta!</b>\n\n"
-                f"Você tentou coletar este recurso, mas não tem o conhecimento necessário.\n"
-                f"⚠️ Requisito: Ser um <b>{prof_name_display}</b>."
+                f"⚠️ Requisito: <b>{prof_name}</b>.",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
+                ),
+                parse_mode="HTML"
             )
-            current_loc = player_data.get('current_location', 'reino_eldora')
-            kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]])
-            await context.bot.send_message(chat_id, msg_erro, reply_markup=kb, parse_mode='HTML')
-            return # Sai da função, mas o FINALLY vai rodar e salvar o estado IDLE
+            return
 
-        # ==========================================================
-        # 🧮 CÁLCULOS E RECOMPENSAS
-        # ==========================================================
-        prof_level = _int(prof.get('level', 1), 1)
-        total_stats = await player_manager.get_player_total_stats(player_data)
-        luck_stat = _int(total_stats.get("luck", 5))
+        # ================================
+        # 🛠️ TRAVA DE FERRAMENTA
+        # ================================
+        tool_uid = equip.get("tool")
 
-        # Quantidade
-        quantidade_final = quantity_base + prof_level 
-        
-        # Crítico
-        is_crit = False
-        chance_critica = 3.0 + (prof_level * 0.1) + (luck_stat * 0.05)
-        if random.uniform(0, 100) < chance_critica:
-            is_crit = True
-            quantidade_final *= 2
-        
-        # Entrega Item
-        final_item_id = item_id_yielded or resource_id
-        player_manager.add_item_to_inventory(player_data, final_item_id, quantidade_final)
+        if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
+            await context.bot.send_message(
+                chat_id,
+                "❌ <b>Falha na Coleta!</b>\n\n"
+                "Você precisa equipar uma <b>ferramenta</b>.",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
+                ),
+                parse_mode="HTML"
+            )
+            return
 
-        # Atualiza Missões (Protegido)
-        try:
-            if mission_manager:
-                await mission_manager.update_mission_progress(user_id, 'collect', final_item_id, quantidade_final)
-        except Exception: pass
+        tool_inst = inv[tool_uid]
+        tool_base_id = tool_inst.get("base_id")
+        if not tool_base_id:
+            await context.bot.send_message(
+                chat_id,
+                "❌ <b>Falha na Coleta!</b>\n\n"
+                "Sua ferramenta equipada está inválida (sem base_id).",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
+                ),
+                parse_mode="HTML"
+            )
+            return
 
-        # XP Profissão
-        xp_base_unit = 3
-        base_calc = (1 + prof_level) * xp_base_unit
-        premium = PremiumManager(player_data)
-        xp_mult = _clamp_float(premium.get_perk_value('gather_xp_multiplier', 1.0), 1.0, 5.0, 1.0)
-        
-        xp_ganho = int(base_calc * xp_mult)
-        if is_crit: xp_ganho *= 2
-        
-        prof['xp'] = _int(prof.get('xp', 0)) + xp_ganho
-        
-        # Level Up Loop
-        cur_level = prof_level
-        level_up_text = ""
-        while True:
-            try: xp_need = int(game_data.get_xp_for_next_collection_level(cur_level))
-            except: xp_need = int(100 * (cur_level ** 1.5))
-            
-            if xp_need <= 0 or prof['xp'] < xp_need: break
-                
-            prof['xp'] -= xp_need
-            cur_level += 1
-            prof['level'] = cur_level
-            level_up_text += f"\n🆙 Profissão subiu para nível {cur_level}!"
-            
-        player_data['profession'] = prof
+        tool_info = _get_item_info(tool_base_id)
+        if not tool_info or tool_info.get("type") != "tool":
+            await context.bot.send_message(
+                chat_id,
+                "❌ <b>Falha na Coleta!</b>\n\n"
+                "O item equipado não é uma ferramenta válida.",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
+                ),
+                parse_mode="HTML"
+            )
+            return
 
-        # Item Raro (Sorte)
-        rare_msg = ""
-        try:
-            current_loc = player_data.get('current_location', 'reino_eldora')
-            region_info = (game_data.REGIONS_DATA or {}).get(current_loc, {})
-            rare_cfg = region_info.get("rare_resource")
-            
-            if isinstance(rare_cfg, dict) and rare_cfg.get("key"):
-                chance = 0.01 + (luck_stat / 2000.0)
-                if random.random() < chance:
-                    rare_key = rare_cfg["key"]
-                    r_info = (game_data.ITEMS_DATA.get(rare_key, {}))
-                    r_name = r_info.get("display_name", rare_key)
-                    player_manager.add_item_to_inventory(player_data, rare_key, 1)
-                    rare_msg = f"\n💎 <b>Achado Raro!</b> +1 {r_name}"
-        except Exception: pass
+        tool_type = (tool_info.get("tool_type") or "").strip().lower()
+        if required_profession and tool_type != required_profession:
+            prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {})
+            prof_name = prof_info.get("display_name", required_profession.capitalize())
 
-        # Prepara Mensagem de Sucesso
-        item_info = (game_data.ITEMS_DATA.get(final_item_id, {}))
-        item_name = item_info.get("display_name", final_item_id)
-        
-        crit_msg = "✨ <b>Sorte!</b> Coleta Crítica!\n" if is_crit else ""
-        xp_txt = f" (+{xp_ganho} XP)" if xp_ganho > 0 else ""
-        
-        msg_text = (
-            f"{crit_msg}{rare_msg}"
-            f"✅ <b>Coleta Finalizada!</b>\n"
-            f"Recebeu: <b>{quantidade_final}x {item_name}</b>{xp_txt}"
-            f"{level_up_text}"
+            await context.bot.send_message(
+                chat_id,
+                "❌ <b>Falha na Coleta!</b>\n\n"
+                "Sua ferramenta não é compatível com este recurso.\n"
+                f"⚠️ Requer: <b>{prof_name}</b>.",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
+                ),
+                parse_mode="HTML"
+            )
+            return
+
+        # ================================
+        # 🧱 DURABILIDADE
+        # ================================
+        cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
+        if cur_d <= 0:
+            await context.bot.send_message(
+                chat_id,
+                "❌ <b>Falha na Coleta!</b>\n\n"
+                "Sua ferramenta está <b>quebrada</b>.\n"
+                "➡️ Use um pergaminho de reparo ou equipe outra ferramenta.",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
+                ),
+                parse_mode="HTML"
+            )
+            return
+
+        # ================================
+        # ⚙️ TIER BALANCE
+        # ================================
+        tier_balance = globals().get("TIER_BALANCE") or {
+            1: {"qty": 0, "crit": 0.0, "rare": 0.0, "no_dura": 0.0}
+        }
+        tool_tier = _int(tool_info.get("tier", 1), 1)
+        tier_cfg = tier_balance.get(tool_tier, tier_balance[1])
+
+        # ================================
+        # 🧮 CÁLCULOS
+        # ================================
+        prof_level = _int(prof.get("level", 1), 1)
+        stats = await player_manager.get_player_total_stats(player_data)
+        luck = _int(stats.get("luck", 5))
+
+        quantidade = quantity_base + prof_level + _int(tier_cfg.get("qty", 0), 0)
+        crit_chance = (
+            3.0
+            + (prof_level * 0.1)
+            + (luck * 0.05)
+            + float(tier_cfg.get("crit", 0.0) or 0.0)
         )
 
-        media_key = item_info.get("media_key") or "coleta_sucesso"
-        file_data = file_ids.get_file_data(media_key)
-        
-        current_loc = player_data.get('current_location', 'reino_eldora')
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]])
+        is_crit = random.uniform(0, 100) < crit_chance
+        if is_crit:
+            quantidade *= 2
 
-        try:
-            if file_data and file_data.get("id"):
-                ftyp = file_data.get("type", "photo")
-                if ftyp == "video":
-                    await context.bot.send_video(chat_id, file_data["id"], caption=msg_text, reply_markup=kb, parse_mode='HTML')
-                else:
-                    await context.bot.send_photo(chat_id, file_data["id"], caption=msg_text, reply_markup=kb, parse_mode='HTML')
-            else:
-                await context.bot.send_message(chat_id, msg_text, reply_markup=kb, parse_mode='HTML')
-        except Forbidden:
-            logger.warning(f"[Collection] Usuário {user_id} bloqueou o bot.")
-        except Exception:
-            await context.bot.send_message(chat_id, msg_text, reply_markup=kb, parse_mode='HTML')
+        # ================================
+        # 🎲 GATHER TABLE
+        # ================================
+        # fallback seguro: se resource_id for None e item_id_yielded também, evita inserir None no inventário
+        final_item_id = item_id_yielded or resource_id or "madeira"
+
+        region_info = (game_data.REGIONS_DATA or {}).get(current_loc, {}) or {}
+        gather_table = region_info.get("gather_table", {}) or {}
+        options = gather_table.get(user_prof_key, []) or []
+
+        eligible = []
+        for opt in options:
+            if not isinstance(opt, dict):
+                continue
+            min_lvl = _int(opt.get("min_level", 1), 1)
+            if prof_level < min_lvl:
+                continue
+            item_key = opt.get("item")
+            w = _int(opt.get("weight", 0), 0)
+            if item_key and w > 0:
+                eligible.append((item_key, w))
+
+        if eligible:
+            total = sum(w for _, w in eligible)
+            roll = random.randint(1, total)
+            acc = 0
+            for item, w in eligible:
+                acc += w
+                if roll <= acc:
+                    final_item_id = item
+                    break
+
+        player_manager.add_item_to_inventory(player_data, final_item_id, quantidade)
+
+        logger.info(
+            f"[GATHER] user={user_id} item={final_item_id} "
+            f"qty={quantidade} region={current_loc} "
+            f"prof={user_prof_key} lvl={prof_level}"
+        )
+
+        # ================================
+        # 🔧 DURABILIDADE (chance não consumir)
+        # ================================
+        no_dura = float(tier_cfg.get("no_dura", 0.0) or 0.0)
+        if no_dura <= 0.0 or random.random() >= no_dura:
+            cur_d = max(0, cur_d - 1)
+        _set_dur(tool_inst, cur_d, mx_d)
 
         sucesso_operacao = True
 
     except Exception as e:
-        logger.error(f"❌ [Collection] ERRO CRÍTICO usuário {user_id}: {e}")
-        traceback.print_exc()
-        try:
-            await context.bot.send_message(chat_id, "⚠️ Ocorreu um erro na coleta, mas você foi destravado.")
-        except: pass
-        
+        logger.error(f"[Collection] ERRO CRÍTICO {user_id}: {e}", exc_info=True)
+
     finally:
-        # ==========================================================
-        # 🔓 O SALVAMENTO FINAL OBRIGATÓRIO (BLINDAGEM)
-        # ==========================================================
-        # Isso garante que, independente do erro acima, o jogador
-        # seja salvo como 'idle' e seus itens sejam persistidos.
         try:
             await player_manager.save_player_data(user_id, player_data)
         except Exception as e:
-            logger.critical(f"❌ [Collection] FALHA AO SALVAR DADOS DE {user_id}: {e}")
+            logger.critical(f"[Collection] FALHA AO SALVAR {user_id}: {e}")
 
 # ==============================================================================
 # 2. O WRAPPER DO TELEGRAM (MANTIDO E PROTEGIDO)

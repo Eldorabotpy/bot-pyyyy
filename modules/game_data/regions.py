@@ -74,60 +74,6 @@ REGIONS_DATA = {
         'resource': None,
         'file_id_name': 'regiao_reino_eldora',
     },
-    'floresta_sombria': {
-        'display_name': '𝐅𝐥𝐨𝐫𝐞𝐬𝐭𝐚 𝐒𝐨𝐦𝐛𝐫𝐢𝐚',
-        'emoji': '🌳',
-        'description': "Uma floresta densa e antiga, envolta em mistério. As suas árvores retorcidas são uma fonte valiosa de madeira, mas cuidado com as criaturas que se escondem nas sombras.",
-        'resource': 'madeira',
-        'file_id_name': 'regiao_floresta_sombria',
-        'ambush_chance': 0.20,
-        'level_range': (6, 20),
-    },
-    'pedreira_granito': {
-        'display_name': '𝐏𝐞𝐝𝐫𝐞𝐢𝐫𝐚 𝐝𝐞 𝐆𝐫𝐚𝐧𝐢𝐭𝐨',
-        'emoji': '🪨',
-        'description': "Uma enorme pedreira a céu aberto, rica em pedra de alta qualidade. O som de picaretas ecoa durante o dia, mas à noite, criaturas rochosas vagueiam livremente.",
-        'resource': 'pedra',
-        'file_id_name': 'regiao_pedreira_granito',
-    },
-    'campos_linho': {
-        'display_name': '𝐂𝐚𝐦𝐩𝐨𝐬 𝐝𝐞 𝐋𝐢𝐧𝐡𝐨',
-        'emoji': '🌾',
-        'description': "Vastas planícies cobertas por linho dourado. É um local relativamente pacífico, ideal para colhedores experientes reunirem fibras para tecelagem.",
-        'resource': 'linho',
-        'file_id_name': 'regiao_campos_linho',
-    },
-    'pico_grifo': {
-        'display_name': '𝐏𝐢𝐜𝐨 𝐝𝐨 𝐆𝐫𝐢𝐟𝐨',
-        'emoji': '🦅',
-        'description': "Uma montanha alta e ventosa, cujo cume está acima das nuvens. É o lar de grifos majestosos e outras feras aladas, cujas penas são muito cobiçadas.",
-        'resource': 'pena',
-        'file_id_name': 'regiao_pico_grifo',
-        'ambush_chance': 0.25,
-    },
-    'mina_ferro': {
-        'display_name': '𝐌𝐢𝐧𝐚 𝐝𝐞 𝐅𝐞𝐫𝐫𝐨',
-        'emoji': '⛏️',
-        'description': "Uma rede de túneis escuros e profundos, rica em veios de minério de ferro. O perigo espreita em cada sombra, mas a recompensa para os mineiros corajosos é grande.",
-        'resource': 'ferro',
-        'file_id_name': 'regiao_mina_ferro',
-    },
-    'forja_abandonada': {
-        'display_name': '𝐅𝐨𝐫𝐣𝐚 𝐀𝐛𝐚𝐧𝐝𝐨𝐧𝐚𝐝𝐚',
-        'emoji': '🔥',
-        'description': "As ruínas de uma antiga forja elemental. O calor ainda emana das suas bigornas esquecidas, e diz-se que espíritos de fogo e golens de ferro ainda guardam o local.",
-        'resource': None,
-        'file_id_name': 'regiao_forja_abandonada',
-    },
-    'pantano_maldito': {
-        'display_name': '𝐏𝐚̂𝐧𝐭𝐚𝐧𝐨 𝐌𝐚𝐥𝐝𝐢𝐭𝐨',
-        'emoji': '🩸',
-        'description': "Um pântano sombrio e enevoado, onde o ar é pesado e a água tem uma cor estranha. É um local perigoso, mas rico em ingredientes alquímicos raros, como o sangue de criaturas do pântano.",
-        'resource': 'sangue',
-        'file_id_name': 'regiao_pantano_maldito',
-        'ambush_chance': 0.30,
-    },
-    # Adicionei as regiões que faltavam da tua outra lista
     "pradaria_inicial": {
         "display_name": "𝐏𝐫𝐚𝐝𝐚𝐫𝐢𝐚 𝐈𝐧𝐢𝐜𝐢𝐚𝐥",
         "emoji": '🌱', 
@@ -135,6 +81,185 @@ REGIONS_DATA = {
         'resource': None,
         "level_range": (1, 10),
     },
+
+    'floresta_sombria': {
+    'display_name': '𝐅𝐥𝐨𝐫𝐞𝐬𝐭𝐚 𝐒𝐨𝐦𝐛𝐫𝐢𝐚',
+    'emoji': '🌳',
+    'description': "Uma floresta densa e antiga, envolta em mistério. As suas árvores retorcidas são uma fonte valiosa de madeira, mas cuidado com as criaturas que se escondem nas sombras.",
+    'resource': 'madeira',
+    'file_id_name': 'regiao_floresta_sombria',
+    'ambush_chance': 0.20,
+    'level_range': (6, 20),
+
+    'gather_table': {
+        'lenhador': [
+            {'item': 'madeira',             'min_level': 1,  'weight': 70},
+            {'item': 'madeira_de_carvalho', 'min_level': 5,  'weight': 20},
+            {'item': 'seiva_de_ent',        'min_level': 5,  'weight': 6},
+            {'item': 'madeira_rara',        'min_level': 9,  'weight': 8},
+            {'item': 'madeira_mogno',       'min_level': 15, 'weight': 2},
+            {'item': 'tronco_antigo',       'min_level': 20, 'weight': 1},
+
+        ]
+    },
+},
+
+    'pedreira_granito': {
+    'display_name': '𝐏𝐞𝐝𝐫𝐞𝐢𝐫𝐚 𝐝𝐞 𝐆𝐫𝐚𝐧𝐢𝐭𝐨',
+    'emoji': '🪨',
+    'description': "Uma enorme pedreira a céu aberto, rica em pedra de alta qualidade. O som de picaretas ecoa durante o dia, mas à noite, criaturas rochosas vagueiam livremente.",
+    'resource': 'pedra',
+    'file_id_name': 'regiao_pedreira_granito',
+
+    'gather_table': {
+        'minerador': [
+            # Base absoluta
+            {'item': 'pedra',               'min_level': 1,  'weight': 65},
+
+            # Combustível essencial para refino
+            {'item': 'carvao',              'min_level': 20,  'weight': 15},  # ref_aco / ref_ferro
+
+            
+
+            # Raro de suporte (mid game)
+            {'item': 'pedra_vulcanica',     'min_level': 50, 'weight': 3},   # ref_ligas especiais
+        ]
+    },
+},
+
+    'campos_linho': {
+    'display_name': '𝐂𝐚𝐦𝐩𝐨𝐬 𝐝𝐞 𝐋𝐢𝐧𝐡𝐨',
+    'emoji': '🌾',
+    'description': "Vastas planícies cobertas por linho dourado. É um local relativamente pacífico, ideal para colhedores experientes reunirem fibras para tecelagem.",
+    'resource': 'linho',
+    'file_id_name': 'regiao_campos_linho',
+
+    'gather_table': {
+        'colhedor': [
+            # Base
+            {'item': 'linho',               'min_level': 1,  'weight': 70},
+
+            # Qualidade melhor de fibra
+            {'item': 'linho_fino',          'min_level': 10,  'weight': 20},  # ref_fio_linho_fino / ref_tecido_fino
+
+            # Reagente natural
+            {'item': 'fibra_resistente',    'min_level': 20, 'weight': 8},   # reforço têxtil
+
+            # Material raro têxtil
+            {'item': 'fibra_sedosa',        'min_level': 30, 'weight': 2},   # tecidos avançados
+        ]
+    },
+},
+
+    'pico_grifo': {
+    'display_name': '𝐏𝐢𝐜𝐨 𝐝𝐨 𝐆𝐫𝐢𝐟𝐨',
+    'emoji': '🦅',
+    'description': "Uma montanha alta e ventosa, cujo cume está acima das nuvens. É o lar de grifos majestosos e outras feras aladas, cujas penas são muito cobiçadas.",
+    'resource': 'pena',
+    'file_id_name': 'regiao_pico_grifo',
+    'ambush_chance': 0.25,
+
+    'gather_table': {
+        'esfolador': [
+            # Base absoluta
+            {'item': 'pena',               'min_level': 1,  'weight': 55},
+
+            # Partes comuns de criaturas aéreas
+            {'item': 'pena_grande',        'min_level': 10,  'weight': 20},  # reforços leves / flechas
+            {'item': 'asa_de_morcego',     'min_level': 20,  'weight': 15},  # reagente curtume/alquimia
+
+            # Couros e partes mais valiosas
+            {'item': 'couro_de_grifo',     'min_level': 30, 'weight': 7},   # armaduras leves raras
+            {'item': 'garras_de_grifo',    'min_level': 40, 'weight': 2},   # receitas especiais
+
+            # Raro / épico
+            {'item': 'pluma_celestial',    'min_level': 50, 'weight': 1},   # encantamentos / épico
+        ]
+    },
+},
+
+    'mina_ferro': {
+    'display_name': '𝐌𝐢𝐧𝐚 𝐝𝐞 𝐅𝐞𝐫𝐫𝐨',
+    'emoji': '⛏️',
+    'description': "Uma rede de túneis escuros e profundos, rica em veios de minério de ferro. O perigo espreita em cada sombra, mas a recompensa para os mineiros corajosos é grande.",
+    'resource': 'ferro',
+    'file_id_name': 'regiao_mina_ferro',
+
+    'gather_table': {
+        'minerador': [
+            # Base absoluta
+            {'item': 'minerio_de_ferro',   'min_level': 1,  'weight': 60},
+
+            # Liga inicial
+            {'item': 'minerio_de_estanho', 'min_level': 10,  'weight': 12},  # ref_bronze
+
+            # Minérios nobres
+            {'item': 'minerio_de_prata',   'min_level': 20, 'weight': 7},   # ref_prata_pura
+            {'item': 'minerio_de_ouro',    'min_level': 38, 'weight': 2},   # ref_barra_ouro
+
+            # Material especial (late game)
+            {'item': 'pedra_vulcanica',    'min_level': 50, 'weight': 3},   # ligas especiais
+        ]
+    },
+},
+
+    'forja_abandonada': {
+    'display_name': '𝐅𝐨𝐫𝐣𝐚 𝐀𝐛𝐚𝐧𝐝𝐨𝐧𝐚𝐝𝐚',
+    'emoji': '🔥',
+    'description': "As ruínas de uma antiga forja elemental. O calor ainda emana das suas bigornas esquecidas, e diz-se que espíritos de fogo e golens de ferro ainda guardam o local.",
+    'resource': None,
+    'file_id_name': 'regiao_forja_abandonada',
+    'ambush_chance': 0.55,
+
+    # Região especial: coleta avançada (sem resource base)
+    'gather_table': {
+        # ⛏️ Minerador / Fundição avançada
+        'minerador': [
+            {'item': 'pedra_vulcanica',     'min_level': 15, 'weight': 40},
+            {'item': 'escoria_metalica',    'min_level': 12, 'weight': 25},  # subproduto refino
+            {'item': 'fragmento_de_magma',  'min_level': 18, 'weight': 20},  # ligas especiais
+            {'item': 'nucleo_igneo',        'min_level': 25, 'weight': 5},   # épico
+        ],
+
+        # 🧪 Alquimista (essências ígneas)
+        'alquimista': [
+            {'item': 'essencia_de_fogo',    'min_level': 12, 'weight': 35},
+            {'item': 'cinzas_elementais',   'min_level': 10, 'weight': 30},
+            {'item': 'fragmento_de_magma',  'min_level': 18, 'weight': 15},
+            {'item': 'nucleo_igneo',        'min_level': 25, 'weight': 5},
+        ],
+    },
+},
+
+    'pantano_maldito': {
+    'display_name': '𝐏𝐚̂𝐧𝐭𝐚𝐧𝐨 𝐌𝐚𝐥𝐝𝐢𝐭𝐨',
+    'emoji': '🩸',
+    'description': "Um pântano sombrio e enevoado, onde o ar é pesado e a água tem uma cor estranha. É um local perigoso, mas rico em ingredientes alquímicos raros, como o sangue de criaturas do pântano.",
+    'resource': 'sangue',
+    'file_id_name': 'regiao_pantano_maldito',
+    'ambush_chance': 0.30,
+
+    'gather_table': {
+        'alquimista': [
+            # Base (sempre cai algo útil)
+            {'item': 'sangue',              'min_level': 1,  'weight': 55},
+
+            # Componentes comuns de alquimia
+            {'item': 'esporo_de_cogumelo',  'min_level': 10,  'weight': 18},
+            {'item': 'lodo_toxico',         'min_level': 20,  'weight': 15},
+
+            # Componentes de refino / avançados
+            {'item': 'ectoplasma',          'min_level': 30, 'weight': 8},
+            {'item': 'sangue_regenerativo', 'min_level': 40, 'weight': 3},
+
+            # Raro / épico (pântano maldito tem que ter “pico”)
+            {'item': 'essencia_sombra',     'min_level': 50, 'weight': 1},
+        ]
+    },
+},
+
+    # Adicionei as regiões que faltavam da tua outra lista
+    
     "picos_gelados": {
         "display_name": "𝐏𝐢𝐜𝐨𝐬 𝐆𝐞𝐥𝐚𝐝𝐨𝐬",
         "emoji": '🏔️', 

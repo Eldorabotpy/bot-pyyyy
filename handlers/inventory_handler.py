@@ -79,6 +79,57 @@ def _determine_tab(item_key: str, item_value) -> str:
     if tipo == "material_magico": return "especial"
     return "consumivel"
 
+def _dur_tuple(raw):
+    """
+    Normaliza durabilidade para (cur, max).
+    Aceita [cur, max], (cur, max) ou {"current":cur,"max":max}
+    """
+    cur, mx = 0, 0
+
+    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+        try:
+            cur = int(raw[0])
+            mx = int(raw[1])
+        except Exception:
+            cur, mx = 0, 0
+
+    elif isinstance(raw, dict):
+        try:
+            cur = int(raw.get("current", 0))
+            mx = int(raw.get("max", 0))
+        except Exception:
+            cur, mx = 0, 0
+
+    # clamp
+    if mx < 0:
+        mx = 0
+    if cur < 0:
+        cur = 0
+    if cur > mx:
+        cur = mx
+
+    return cur, mx
+
+
+def _set_dur(item: dict, cur: int, mx: int) -> None:
+    """
+    Salva durabilidade na instância como [cur, max]
+    """
+    try:
+        cur = int(cur)
+        mx = int(mx)
+    except Exception:
+        cur, mx = 0, 0
+
+    if mx < 0:
+        mx = 0
+    if cur < 0:
+        cur = 0
+    if cur > mx:
+        cur = mx
+
+    item["durability"] = [cur, mx]
+
 async def _safe_edit_or_send(query, context, chat_id, text, reply_markup=None, parse_mode='HTML', media_key="img_inventario"):
     fd = file_ids.get_file_data(media_key) or file_ids.get_file_data("inventario_img")
     media_id = fd.get("id") if fd else None
@@ -189,6 +240,77 @@ async def inventory_menu_callback(update: Update, context: ContextTypes.DEFAULT_
     else:
         await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="HTML")
 
+async def repair_item_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+
+    try:
+        item_uid = query.data.split(":", 1)[1]
+    except Exception:
+        await query.answer("Item inválido.", show_alert=True)
+        return
+
+    player_data = await player_manager.get_player_data(user_id)
+    if not player_data:
+        return
+
+    inv = player_data.get("inventory", {}) or {}
+    inst = inv.get(item_uid)
+
+    # Precisa ser item único
+    if not isinstance(inst, dict):
+        await query.answer("Este item não pode ser reparado.", show_alert=True)
+        return
+
+    # Verifica pergaminho
+    if int(inv.get("pergaminho_durabilidade", 0) or 0) <= 0:
+        await query.answer("Você não tem Pergaminho de Durabilidade.", show_alert=True)
+        return
+
+    base_id = inst.get("base_id")
+    if not base_id:
+        await query.answer("Item inválido para reparo.", show_alert=True)
+        return
+
+    info = _info_for(base_id)
+
+    # Durabilidade atual
+    cur_d, mx_d = _dur_tuple(inst.get("durability"))
+    if mx_d <= 0:
+        await query.answer("Este item não possui durabilidade.", show_alert=True)
+        return
+
+    # Pega durabilidade máxima do item base (se existir)
+    base_dur = info.get("durability")
+    if isinstance(base_dur, (list, tuple)) and len(base_dur) >= 2:
+        try:
+            mx_d = int(base_dur[1])
+        except Exception:
+            pass
+
+    # Repara totalmente
+    _set_dur(inst, mx_d, mx_d)
+
+    # Consome 1 pergaminho
+    ok = player_manager.remove_item_from_inventory(
+        player_data, "pergaminho_durabilidade", 1
+    )
+    if not ok:
+        await query.answer("Erro ao consumir o pergaminho.", show_alert=True)
+        return
+
+    await player_manager.save_player_data(user_id, player_data)
+
+    await query.answer("🛠️ Item reparado com sucesso!", show_alert=True)
+
+    # Reabre a view do item
+    query.data = f"inv_view:{item_uid}"
+    await inventory_view_callback(update, context)
+
 # -----------------------------------------------------------
 # 2. LISTA DE ITENS (CATÁLOGO)
 # -----------------------------------------------------------
@@ -277,15 +399,20 @@ async def inventory_view_callback(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
 
     user_id = get_current_player_id(update, context)
-    if not user_id: return
+    if not user_id:
+        return
 
-    try: item_id = query.data.split(":", 1)[1]
-    except: return
+    try:
+        item_id = query.data.split(":", 1)[1]
+    except Exception:
+        return
 
     player_data = await player_manager.get_player_data(user_id)
-    if not player_data: return
+    if not player_data:
+        return
 
-    item_val = player_data.get("inventory", {}).get(item_id)
+    inv = player_data.get("inventory", {}) or {}
+    item_val = inv.get(item_id)
     if not item_val:
         await query.answer("Item não encontrado ou removido.", show_alert=True)
         await inventory_menu_callback(update, context)
@@ -295,7 +422,7 @@ async def inventory_view_callback(update: Update, context: ContextTypes.DEFAULT_
     is_unique = isinstance(item_val, dict)
     base_id = item_val.get("base_id") if is_unique else item_id
     qty = 1 if is_unique else item_val
-    
+
     # Carrega Info
     info = _info_for(base_id)
     name = info.get("display_name") or base_id.replace("_", " ").title()
@@ -305,56 +432,99 @@ async def inventory_view_callback(update: Update, context: ContextTypes.DEFAULT_
     tipo = (info.get("type") or "Item").replace("_", " ").title()
     cat_key = _determine_tab(base_id, item_val)
     cat_label = CATEGORIES.get(cat_key, {}).get("label", "Outros")
-    
+
     # Validações de Uso
     player_class_key = player_stats._get_class_key_normalized(player_data)
     can_use = True
     lock_reason = ""
 
-    # Verifica se é equipamento (Redireciona para menu de equip)
-    is_equip = is_unique or info.get("type") == "equipamento"
-    
+    # Verifica se é equipamento (únicos e/ou itens com slot)
+    slot = (info.get("slot") or "").lower()
+    is_equip = bool(is_unique or slot or info.get("type") == "equipamento")
+
     if not is_equip:
         # Verifica efeitos para saber se é "usável"
         effects = info.get("on_use") or info.get("effects") or {}
         if not effects:
-            can_use = False # Apenas material, não tem botão usar
-        
+            can_use = False  # Apenas material, não tem botão usar
+
         # Verifica Classe
         class_req = info.get("class_req")
         if class_req and not can_player_use_skill(player_class_key, class_req):
             can_use = False
             lock_reason = f"(Req: {class_req[0].title()})"
 
+    # --- DURABILIDADE (itens únicos/equipáveis) ---
+    dur_line = ""
+    tool_broken_line = ""
+    if is_unique:
+        cur_d, mx_d = _dur_tuple(item_val.get("durability"))
+        if mx_d > 0:
+            dur_line = f"\n╰┈➤ <b>Durabilidade:</b> {cur_d}/{mx_d}"
+            if cur_d <= 0:
+                tool_broken_line = "\n⚠️ <b>Quebrado:</b> Repare para usar novamente."
+
     # --- MONTAGEM DO TEXTO (LAYOUT SOLICITADO) ---
-    text = (
-        f"📊 <b>{full_name}</b>\n"
-        f"├┈➤ {desc}\n"
-        f"├┈➤ <b>Categoria:</b> {cat_label}\n"
-        f"├┈➤ <b>Tipo:</b> {tipo}\n"
-        f"╰┈➤ <b>Quantidade:</b> {qty}"
-    )
+    # Observação: se houver durabilidade, a última linha do bloco vira a durabilidade.
+    if dur_line:
+        text = (
+            f"📊 <b>{full_name}</b>\n"
+            f"├┈➤ {desc}\n"
+            f"├┈➤ <b>Categoria:</b> {cat_label}\n"
+            f"├┈➤ <b>Tipo:</b> {tipo}\n"
+            f"├┈➤ <b>Quantidade:</b> {qty}"
+            f"{dur_line}"
+            f"{tool_broken_line}"
+        )
+    else:
+        text = (
+            f"📊 <b>{full_name}</b>\n"
+            f"├┈➤ {desc}\n"
+            f"├┈➤ <b>Categoria:</b> {cat_label}\n"
+            f"├┈➤ <b>Tipo:</b> {tipo}\n"
+            f"╰┈➤ <b>Quantidade:</b> {qty}"
+        )
+
     if lock_reason:
         text += f"\n\n🔒 <b>Bloqueado:</b> {lock_reason}"
 
     # --- MONTAGEM DOS BOTÕES ---
     buttons = []
-    
+
     # Botão de Ação
     if is_equip:
         # Se for equip, botão manda para menu de equipamentos
         buttons.append([InlineKeyboardButton("⚙️ Gerenciar Equipamento", callback_data="equipment_menu")])
+
+        # Botão Reparar: apenas para item único com durabilidade e danificado
+        if is_unique:
+            cur_d, mx_d = _dur_tuple(item_val.get("durability"))
+            if mx_d > 0 and cur_d < mx_d:
+                has_scroll = int(inv.get("pergaminho_durabilidade", 0) or 0) > 0
+                if has_scroll:
+                    label = "📜 Reparar (Pergaminho)"
+                    if cur_d <= 0:
+                        label = "📜 Reparar (Ferramenta Quebrada)"
+                    buttons.append([InlineKeyboardButton(label, callback_data=f"inv_repair_item:{item_id}")])
+
     elif can_use:
         # Se for consumível e puder usar
         buttons.append([InlineKeyboardButton("✅ Usar Item", callback_data=f"inv_use_item:{item_id}")])
-    
+
     # Botão Voltar (Calcula a aba correta para não perder o lugar)
     back_data = f"inv_open_{cat_key}_1"
     buttons.append([InlineKeyboardButton("🔙 Voltar ao Menu Anterior", callback_data=back_data)])
 
     # Usa a função segura com a media_key do item (se tiver imagem específica) ou padrão
     media_k = info.get("media_key", "img_inventario")
-    await _safe_edit_or_send(query, context, query.message.chat.id, text, InlineKeyboardMarkup(buttons), media_key=media_k)
+    await _safe_edit_or_send(
+        query,
+        context,
+        query.message.chat.id,
+        text,
+        InlineKeyboardMarkup(buttons),
+        media_key=media_k
+    )
 
 
 # -----------------------------------------------------------
@@ -485,6 +655,7 @@ async def noop_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -----------------------------------------------------------
 # DEFINIÇÃO DOS HANDLERS (EXPORTS CRÍTICOS)
 # -----------------------------------------------------------
+inventory_repair_handler = CallbackQueryHandler(repair_item_callback, pattern=r'^inv_repair_item:')
 
 inventory_menu_handler = CallbackQueryHandler(inventory_menu_callback, pattern=r'^inventory_menu$')
 inventory_cat_handler = CallbackQueryHandler(inventory_category_callback, pattern=r'^inv_open_')

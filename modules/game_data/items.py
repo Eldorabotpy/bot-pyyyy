@@ -46,6 +46,13 @@ except ImportError as e:
     print(f"⚠️ Aviso: items_runes não encontrado ou com erro ({e}). Ignorando.")
     RUNE_ITEMS_DATA = {}
 
+try:
+    from modules.game_data.items_tools import TOOLS_DATA
+    print(f"✅ Ferramentas carregadas: {len(TOOLS_DATA)}")
+except ImportError as e:
+    print(f"⚠️ Aviso: items_tools não encontrado ({e}). Ignorando.")
+    TOOLS_DATA = {}
+
 # ==============================================================================
 # 2. FUSÃO DOS DADOS
 # ==============================================================================
@@ -58,7 +65,7 @@ ITEMS_DATA.update(CONSUMABLES_DATA)
 ITEMS_DATA.update(EQUIPMENTS_DATA)
 ITEMS_DATA.update(EVOLUTION_ITEMS_DATA)
 ITEMS_DATA.update(RUNE_ITEMS_DATA)
-
+ITEMS_DATA.update(TOOLS_DATA)
 print(f"📦 TOTAL DE ITENS NO SISTEMA: {len(ITEMS_DATA)}")
 
 # --- 3. ALIAS E HELPERS ---

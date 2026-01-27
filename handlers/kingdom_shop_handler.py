@@ -19,7 +19,17 @@ KINGDOM_SHOP = {
     "joia_da_forja": ("Joia de Aprimoramento", 400),
     "nucleo_forja_fraco": ("Núcleo Fraco", 500),
     "nucleo_forja_comum": ("Núcleo Comum", 1000),
+
+    # ==========================
+    # Ferramentas de Coleta (T1)
+    # ==========================
+    "machado_pedra": ("Machado de Pedra (Lenhador)", 250),
+    "picareta_pedra": ("Picareta de Pedra (Minerador)", 250),
+    "foice_pedra": ("Foice de Pedra (Colhedor)", 250),
+    "faca_pedra": ("Faca de Pederneira (Esfolador)", 250),
+    "frasco_vidro": ("Frasco de Vidro (Alquimista)", 250),
 }
+
 
 # ==============================================================================
 #  FUNÇÕES AUXILIARES
@@ -192,50 +202,71 @@ async def kingdom_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["kingdom_shop"] = st
     await market_kingdom(update, context)
 
+def _is_unique_equipable(base_id: str) -> bool:
+    info = _item_info(base_id)
+    # Qualquer item com "slot" deve ser tratado como equipamento único
+    return bool(info.get("slot"))
+
+def _instantiate_unique_item(base_id: str) -> dict:
+    info = _item_info(base_id) or {}
+    inst = {"base_id": base_id}
+
+    # Se tiver durabilidade no item base, copia como estado inicial
+    dur = info.get("durability")
+    if isinstance(dur, (list, tuple)) and len(dur) == 2:
+        inst["durability"] = [int(dur[0]), int(dur[1])]
+
+    return inst
+
 async def market_kingdom_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    
-    # 🔒 SEGURANÇA: Garante que estamos operando no usuário logado
+
     user_id = get_current_player_id(update, context)
-    
     if not user_id:
         await q.answer("❌ Você não está logado!", show_alert=True)
         return
-    
+
     st = _king_state(context)
     base_id = st["base_id"]
     qty = max(1, int(st.get("qty", 1)))
 
     if base_id not in KINGDOM_SHOP:
-        await q.answer("Erro: Item inválido.", show_alert=True); return
+        await q.answer("Erro: Item inválido.", show_alert=True)
+        return
+
+    # ✅ Se for equipamento/ferramenta, trava quantidade ANTES do preço
+    if _is_unique_equipable(base_id):
+        qty = 1
 
     name, price = KINGDOM_SHOP[base_id]
     total_cost = price * qty
 
-    # Carrega dados do jogador (ObjectId handled by player_manager)
     pdata = await player_manager.get_player_data(user_id)
     if not pdata:
         await q.answer("❌ Erro de dados.", show_alert=True)
         return
 
-    # Verifica saldo
     if _gold(pdata) < total_cost:
-        await q.answer(f"Falta Ouro! Custa {total_cost} 🪙.", show_alert=True); return
+        await q.answer(f"Falta Ouro! Custa {total_cost} 🪙.", show_alert=True)
+        return
 
-    # EXECUTA A COMPRA
     _set_gold(pdata, _gold(pdata) - total_cost)
-    player_manager.add_item_to_inventory(pdata, base_id, qty)
-    
-    # Salva no banco
+
+    if _is_unique_equipable(base_id):
+        inst = _instantiate_unique_item(base_id)
+        player_manager.add_unique_item(pdata, inst)
+    else:
+        player_manager.add_item_to_inventory(pdata, base_id, qty)
+
     await player_manager.save_player_data(user_id, pdata)
 
     await q.answer(f"✅ Comprou {qty}x {name}!", show_alert=False)
-    
-    # Reseta quantidade para 1 após a compra
+
     st["qty"] = 1
     context.user_data["kingdom_shop"] = st
-    
+
     await market_kingdom(update, context)
+
 
 async def market_kingdom_buy_legacy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Redireciona chamadas antigas para a função nova de compra."""

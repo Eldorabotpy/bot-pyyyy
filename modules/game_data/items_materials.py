@@ -508,4 +508,185 @@ MATERIALS_DATA = {
         "stackable": True, "value": 1600,
         "media_key": "item_luz_estelar"
     },    
+
+    # =========================
+# COLETA / REFINO (NOVOS)
+# =========================
+
+"tronco_antigo": {
+    "display_name": "Tronco Antigo",
+    "emoji": "🪵",
+    "type": "material",
+    "category": "madeira",
+    "stackable": True,
+    "tier": 4,
+    "profession": "lenhador",
+    "description": "Um tronco ancestral, denso e resistente. Usado em tábuas avançadas."
+},
+
+"pedra_vulcanica": {
+    "display_name": "Pedra Vulcânica",
+    "emoji": "🌋",
+    "type": "material",
+    "category": "mineral",
+    "stackable": True,
+    "tier": 3,
+    "profession": "minerador",
+    "description": "Rocha quente e rica em minerais. Usada em ligas especiais."
+},
+
+"linho_fino": {
+    "display_name": "Linho Fino",
+    "emoji": "🧵",
+    "type": "material",
+    "category": "fibra",
+    "stackable": True,
+    "tier": 2,
+    "profession": "colhedor",
+    "description": "Fibra de linho de alta qualidade. Ideal para tecidos superiores."
+},
+
+"fibra_resistente": {
+    "display_name": "Fibra Resistente",
+    "emoji": "🪢",
+    "type": "material",
+    "category": "fibra",
+    "stackable": True,
+    "tier": 3,
+    "profession": "colhedor",
+    "description": "Fibra robusta usada para reforçar tecidos e equipamentos leves."
+},
+
+"fibra_sedosa": {
+    "display_name": "Fibra Sedosa",
+    "emoji": "🕸️",
+    "type": "material",
+    "category": "fibra",
+    "stackable": True,
+    "tier": 4,
+    "profession": "colhedor",
+    "description": "Fibra rara e sedosa para tecidos avançados e especiais."
+},
+
+"pena_grande": {
+    "display_name": "Pena Grande",
+    "emoji": "🪶",
+    "type": "material",
+    "category": "caça",
+    "stackable": True,
+    "tier": 2,
+    "profession": "esfolador",
+    "description": "Pena grande e resistente, valorizada por artesãos."
+},
+
+"couro_de_grifo": {
+    "display_name": "Couro de Grifo",
+    "emoji": "🟫",
+    "type": "material",
+    "category": "couro",
+    "stackable": True,
+    "tier": 3,
+    "profession": "esfolador",
+    "description": "Couro raro de criatura alada, usado em armaduras leves superiores."
+},
+
+"garras_de_grifo": {
+    "display_name": "Garras de Grifo",
+    "emoji": "🦴",
+    "type": "material",
+    "category": "caça",
+    "stackable": True,
+    "tier": 4,
+    "profession": "esfolador",
+    "description": "Garras afiadas usadas em receitas especiais e itens raros."
+},
+
+"pluma_celestial": {
+    "display_name": "Pluma Celestial",
+    "emoji": "✨",
+    "type": "material",
+    "category": "caça",
+    "stackable": True,
+    "tier": 5,
+    "profession": "esfolador",
+    "description": "Uma pluma raríssima com energia mística. Material épico."
+},
+
+"lodo_toxico": {
+    "display_name": "Lodo Tóxico",
+    "emoji": "🧫",
+    "type": "material",
+    "category": "alquimia",
+    "stackable": True,
+    "tier": 2,
+    "profession": "alquimista",
+    "description": "Substância corrosiva do pântano, usada em venenos e reagentes."
+},
+
+"sangue_regenerativo": {
+    "display_name": "Sangue Regenerativo",
+    "emoji": "🩸",
+    "type": "material",
+    "category": "alquimia",
+    "stackable": True,
+    "tier": 3,
+    "profession": "alquimista",
+    "description": "Sangue raro com propriedades regenerativas. Muito valioso."
+},
+
+"essencia_sombra": {
+    "display_name": "Essência da Sombra",
+    "emoji": "🌑",
+    "type": "material",
+    "category": "alquimia",
+    "stackable": True,
+    "tier": 5,
+    "profession": "alquimista",
+    "description": "Essência sombria concentrada. Usada em receitas épicas."
+},
+
+"escoria_metalica": {
+    "display_name": "Escória Metálica",
+    "emoji": "⚙️",
+    "type": "material",
+    "category": "mineral",
+    "stackable": True,
+    "tier": 2,
+    "profession": "minerador",
+    "description": "Resíduo metálico de forjas antigas. Pode ser usado em ligas e refino."
+},
+
+"fragmento_de_magma": {
+    "display_name": "Fragmento de Magma",
+    "emoji": "🔥",
+    "type": "material",
+    "category": "mineral",
+    "stackable": True,
+    "tier": 4,
+    "profession": "minerador",
+    "description": "Fragmento incandescente usado em ligas e processos avançados."
+},
+
+"nucleo_igneo": {
+    "display_name": "Núcleo Ígneo",
+    "emoji": "💠",
+    "type": "material",
+    "category": "mineral",
+    "stackable": True,
+    "tier": 5,
+    "profession": "minerador",
+    "description": "Núcleo elemental extremamente raro. Material épico de refino."
+},
+
+"cinzas_elementais": {
+    "display_name": "Cinzas Elementais",
+    "emoji": "🌪️",
+    "type": "material",
+    "category": "alquimia",
+    "stackable": True,
+    "tier": 3,
+    "profession": "alquimista",
+    "description": "Cinzas carregadas de energia elemental. Reagente versátil."
+},
+
 }
