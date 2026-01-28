@@ -1103,6 +1103,59 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not pdata:
         return
 
+    # ==========================================================
+    # 🔧 Normaliza legado: garante equipment/tool e inventory existirem
+    # ==========================================================
+    equip = pdata.setdefault("equipment", {}) or {}
+    equip.setdefault("tool", None)
+    inv = pdata.setdefault("inventory", {}) or {}
+
+    # ==========================================================
+    # 🛠️ TRAVA DE FERRAMENTA (ANTES DE GASTAR ENERGIA / JOB)
+    # ==========================================================
+    tool_uid = equip.get("tool")
+    if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
+        await q.answer("❌ Você precisa equipar uma ferramenta para coletar.", show_alert=True)
+        return
+
+    tool_inst = inv.get(tool_uid) or {}
+    tool_base_id = tool_inst.get("base_id")
+    if not tool_base_id:
+        await q.answer("❌ Ferramenta inválida (sem base_id).", show_alert=True)
+        return
+
+    tool_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(tool_base_id)
+    if not tool_info or tool_info.get("type") != "tool":
+        await q.answer("❌ O item equipado não é uma ferramenta válida.", show_alert=True)
+        return
+
+    # Profissão do jogador (normalizada)
+    prof = pdata.get("profession", {}) or {}
+    user_prof_key = (prof.get("key") or prof.get("type") or "").strip().lower()
+
+    # Profissão exigida pelo recurso
+    req_prof = game_data.get_profession_for_resource(res_id)
+
+    # Se existir requisito, o jogador precisa ter a profissão correta
+    if req_prof and user_prof_key != req_prof:
+        prof_info = game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}
+        prof_name = prof_info.get("display_name", req_prof.capitalize())
+        await q.answer(f"❌ Requer profissão: {prof_name}.", show_alert=True)
+        return
+
+    # Ferramenta compatível com profissão
+    tool_type = (tool_info.get("tool_type") or "").strip().lower()
+    if req_prof and tool_type != req_prof:
+        prof_info = game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}
+        prof_name = prof_info.get("display_name", req_prof.capitalize())
+        await q.answer(f"❌ Ferramenta incompatível. Requer: {prof_name}.", show_alert=True)
+        return
+
+    # (Durabilidade será validada no execute_collection_logic — blindagem final)
+
+    # ==========================================================
+    # ⚡ ENERGIA (só depois de validar ferramenta)
+    # ==========================================================
     prem = PremiumManager(pdata)
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
     if int(pdata.get("energy", 0)) < cost:
@@ -1111,44 +1164,56 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     player_manager.spend_energy(pdata, cost)
 
-    req_prof = game_data.get_profession_for_resource(res_id)
-    p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get('resources', {})
+    # ==========================================================
+    # 📦 Determina item_yielded (compatível com seu sistema atual)
+    # ==========================================================
+    p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get("resources", {})
     item_yielded = p_res.get(res_id, res_id)
 
+    # ==========================================================
+    # ⏳ Tempo de coleta
+    # ==========================================================
     base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
     spd = float(prem.get_perk_value("gather_speed_multiplier", 1.0))
     dur = max(1, int(base_secs / max(0.25, spd)))
 
     finish = datetime.now(timezone.utc) + timedelta(seconds=dur)
-    pdata['player_state'] = {
-        'action': 'collecting',
-        'finish_time': finish.isoformat(),
-        'details': {'resource_id': res_id, 'item_id_yielded': item_yielded, 'quantity': 1}
+    pdata["player_state"] = {
+        "action": "collecting",
+        "finish_time": finish.isoformat(),
+        "details": {
+            "resource_id": res_id,
+            "item_id_yielded": item_yielded,
+            "quantity": 1
+        }
     }
     player_manager.set_last_chat_id(pdata, cid)
 
     human = _humanize_duration(dur)
     cap = f"⛏️ <b>Coletando...</b>\n⏳ Tempo: {human}"
+
     try:
         await q.delete_message()
     except Exception:
         pass
+
     msg = await context.bot.send_message(cid, cap, parse_mode="HTML")
 
     if msg:
-        pdata['player_state']['details']['collect_message_id'] = msg.message_id
+        pdata["player_state"]["details"]["collect_message_id"] = msg.message_id
+
     await player_manager.save_player_data(uid, pdata)
 
     context.job_queue.run_once(
         finish_collection_job,
         when=dur,
         data={
-            'user_id': uid,
-            'chat_id': cid,
-            'resource_id': res_id,
-            'item_id_yielded': item_yielded,
-            'quantity': 1,
-            'message_id': msg.message_id
+            "user_id": uid,
+            "chat_id": cid,
+            "resource_id": res_id,
+            "item_id_yielded": item_yielded,
+            "quantity": 1,
+            "message_id": msg.message_id if msg else None
         },
         name=f"collect_{uid}"
     )
