@@ -451,11 +451,12 @@ async def execute_collection_logic(
             lvl_line = f"\n⬆️ <b>{prof_name_ui} subiu de nível!</b>" if lvl_up > 0 else ""
 
             await _notify(
-                f"✅ <b>Coleta Finalizada!</b>{crit_tag}\n\n"
-                f"{emoji} <b>{item_name}</b> x<b>{quantidade}</b>"
-                f"{xp_line}"
-                f"{lvl_line}"
-                f"{dura_tag}"
+                f"╭┈┈┈┈┈➤➤✅ <b>Coleta Finalizada!</b>{crit_tag}\n\n"
+                f"├┈➤{emoji} <b>{item_name}</b> x<b>{quantidade}</b>"
+                f"├┈➤{xp_line}"
+                f"├┈➤{lvl_line}"
+                f"├┈➤{dura_tag}"
+                f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤"
             )
 
 # ==============================================================================

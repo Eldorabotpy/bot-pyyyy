@@ -1245,11 +1245,13 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item_emoji = item_info.get("emoji", "📦")
 
     cap = (
-        f"⛏️ <b>Coletando</b>\n\n"
-        f"{item_emoji} <b>{item_name}</b>\n"
-        f"🛠️ {tool_name} ({cur_d}/{mx_d})\n"
-        f"⚡ Custo: {cost}\n"
-        f"⏳ Tempo: {human}"
+        f"╭┈┈┈┈┈➤➤⛏️ <b>Coletando</b>\n"
+        f"│\n"
+        f"├┈➤{item_emoji} <b>{item_name}</b>\n"
+        f"├┈➤🛠️ {tool_name} ({cur_d}/{mx_d})\n"
+        f"├┈➤⚡ Custo: {cost}\n"
+        f"├┈➤⏳ Tempo: {human}"
+        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤"
     )
 
     try:
