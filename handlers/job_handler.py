@@ -155,7 +155,7 @@ async def execute_collection_logic(
     - adiciona no inventário
     - dá XP de profissão (centralizado em xp.py)
     - consome 1 de durabilidade (com chance de não consumir por tier)
-    - NOTIFICA o jogador (sucesso ou falha)
+    - NOTIFICA o jogador (sucesso ou falha) COM MÍDIA
     """
 
     FIX_IDS = {
@@ -178,7 +178,7 @@ async def execute_collection_logic(
 
     current_loc = player_data.get("current_location", "reino_eldora")
 
-    async def _notify(text: str, back_region: str | None = None):
+    async def _notify_text(text: str, back_region: str | None = None):
         back_region = back_region or current_loc
         try:
             await context.bot.send_message(
@@ -189,28 +189,8 @@ async def execute_collection_logic(
                 ),
                 parse_mode="HTML",
             )
-        except Forbidden:
-            return
         except Exception:
             return
-
-    # limpa "Coletando..." (modo antigo por message_id)
-    if message_id_to_delete:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
-        except Exception:
-            pass
-
-    # resource_id pode ser None em regiões especiais
-    if resource_id is None:
-        pass
-    elif not resource_id:
-        try:
-            player_data["player_state"] = {"action": "idle"}
-            await player_manager.save_player_data(user_id, player_data)
-        except Exception:
-            pass
-        return
 
     # ==========================================================
     # ✅ GUARDA ANTI-JOB DUPLICADO (IDEMPOTÊNCIA)
@@ -233,6 +213,31 @@ async def execute_collection_logic(
         except Exception:
             pass
 
+    # ✅ se o job não passou message_id, tenta pegar do estado salvo
+    if not message_id_to_delete:
+        try:
+            message_id_to_delete = int(details.get("collect_message_id") or 0) or None
+        except Exception:
+            message_id_to_delete = None
+
+    # tenta apagar a msg "Coletando..."
+    if message_id_to_delete:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
+        except Exception:
+            pass
+
+    # resource_id pode ser None em regiões especiais
+    if resource_id is None:
+        pass
+    elif not resource_id:
+        try:
+            player_data["player_state"] = {"action": "idle"}
+            await player_manager.save_player_data(user_id, player_data)
+        except Exception:
+            pass
+        return
+
     sucesso_operacao = False
     is_crit = False
     quantidade = int(quantity_base or 1)
@@ -240,7 +245,6 @@ async def execute_collection_logic(
     tool_name = "Ferramenta"
     dur_txt = ""
 
-    # ✅ evita NameError no finally
     xp_result = {}
     user_prof_key = ""
 
@@ -255,7 +259,6 @@ async def execute_collection_logic(
         prof = player_data.get("profession", {}) or {}
         user_prof_key = (prof.get("type") or prof.get("key") or "").strip().lower()
 
-        # padroniza para Mongo atual: profession.type
         if user_prof_key and not prof.get("type"):
             prof["type"] = user_prof_key
             player_data["profession"] = prof
@@ -267,9 +270,8 @@ async def execute_collection_logic(
         if required_profession and user_prof_key != required_profession:
             prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}
             prof_name = prof_info.get("display_name", required_profession.capitalize())
-            await _notify(
-                f"❌ <b>Falha na Coleta!</b>\n\n"
-                f"⚠️ Requisito: <b>{prof_name}</b>."
+            await _notify_text(
+                f"❌ <b>Falha na Coleta!</b>\n\n⚠️ Requisito: <b>{prof_name}</b>."
             )
             return
 
@@ -278,26 +280,23 @@ async def execute_collection_logic(
         # ================================
         tool_uid = equip.get("tool")
         if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
-            await _notify(
-                "❌ <b>Falha na Coleta!</b>\n\n"
-                "Você precisa equipar uma <b>ferramenta</b>."
+            await _notify_text(
+                "❌ <b>Falha na Coleta!</b>\n\nVocê precisa equipar uma <b>ferramenta</b>."
             )
             return
 
         tool_inst = inv[tool_uid]
         tool_base_id = tool_inst.get("base_id")
         if not tool_base_id:
-            await _notify(
-                "❌ <b>Falha na Coleta!</b>\n\n"
-                "Sua ferramenta equipada está inválida (sem base_id)."
+            await _notify_text(
+                "❌ <b>Falha na Coleta!</b>\n\nSua ferramenta equipada está inválida (sem base_id)."
             )
             return
 
         tool_info = _get_item_info(tool_base_id) or {}
         if tool_info.get("type") != "tool":
-            await _notify(
-                "❌ <b>Falha na Coleta!</b>\n\n"
-                "O item equipado não é uma ferramenta válida."
+            await _notify_text(
+                "❌ <b>Falha na Coleta!</b>\n\nO item equipado não é uma ferramenta válida."
             )
             return
 
@@ -307,7 +306,7 @@ async def execute_collection_logic(
         if required_profession and tool_type != required_profession:
             prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}
             prof_name = prof_info.get("display_name", required_profession.capitalize())
-            await _notify(
+            await _notify_text(
                 "❌ <b>Falha na Coleta!</b>\n\n"
                 "Sua ferramenta não é compatível com este recurso.\n"
                 f"⚠️ Requer: <b>{prof_name}</b>."
@@ -319,7 +318,7 @@ async def execute_collection_logic(
         # ================================
         cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
         if cur_d <= 0:
-            await _notify(
+            await _notify_text(
                 "❌ <b>Falha na Coleta!</b>\n\n"
                 "Sua ferramenta está <b>quebrada</b>.\n"
                 "➡️ Use um pergaminho de reparo ou equipe outra ferramenta."
@@ -389,14 +388,8 @@ async def execute_collection_logic(
 
         player_manager.add_item_to_inventory(player_data, final_item_id, quantidade)
 
-        logger.info(
-            f"[GATHER] user={user_id} item={final_item_id} "
-            f"qty={quantidade} region={current_loc} "
-            f"prof={user_prof_key} lvl={prof_level}"
-        )
-
         # ================================
-        # ⭐ XP DE PROFISSÃO (centralizado em xp.py)
+        # ⭐ XP DE PROFISSÃO
         # ================================
         xp_gain = 6 + prof_level
         if is_crit:
@@ -435,29 +428,58 @@ async def execute_collection_logic(
         except Exception as e:
             logger.critical(f"[Collection] FALHA AO SALVAR {user_id}: {e}")
 
-        if sucesso_operacao:
-            item_info = _get_item_info(final_item_id) or {}
-            item_name = item_info.get("display_name", final_item_id.replace("_", " ").title())
-            emoji = item_info.get("emoji", "📦")
+        if not sucesso_operacao:
+            return
 
-            crit_tag = " ✨<b>CRÍTICO!</b>" if is_crit else ""
-            dura_tag = f"\n🛠️ <b>{tool_name}</b> (Durab.: <b>{dur_txt}</b>)" if dur_txt else ""
+        # ==========================================================
+        # ✅ TEXTO FINAL
+        # ==========================================================
+        item_info = _get_item_info(final_item_id) or {}
+        item_name = item_info.get("display_name", final_item_id.replace("_", " ").title())
+        emoji = item_info.get("emoji", "📦")
 
-            xp_added = int((xp_result or {}).get("xp_added", 0) or 0)
-            lvl_up = int((xp_result or {}).get("levels_gained", 0) or 0)
+        crit_tag = " ✨<b>CRÍTICO!</b>" if is_crit else ""
 
-            xp_line = f"\n⭐ <b>XP da Profissão:</b> +<b>{xp_added}</b>" if xp_added else ""
-            prof_name_ui = (user_prof_key or "profissão").title()
-            lvl_line = f"\n⬆️ <b>{prof_name_ui} subiu de nível!</b>" if lvl_up > 0 else ""
+        xp_added = int((xp_result or {}).get("xp_added", 0) or 0)
+        lvl_up = int((xp_result or {}).get("levels_gained", 0) or 0)
 
-            await _notify(
-                f"╭┈┈┈┈┈➤➤✅ <b>Coleta Finalizada!</b>{crit_tag}\n\n"
-                f"├┈➤{emoji} <b>{item_name}</b> x<b>{quantidade}</b>"
-                f"├┈➤{xp_line}"
-                f"├┈➤{lvl_line}"
-                f"├┈➤{dura_tag}"
-                f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤"
-            )
+        prof_name_ui = (user_prof_key or "profissão").title()
+
+        lines = []
+        lines.append(f"╭┈┈┈┈┈➤➤✅ <b>Coleta Finalizada!</b>{crit_tag}")
+        lines.append("│")
+        lines.append(f"├┈➤{emoji} <b>{item_name}</b> x<b>{quantidade}</b>")
+
+        if xp_added:
+            lines.append(f"├┈➤⭐ <b>XP da Profissão:</b> +<b>{xp_added}</b>")
+        if lvl_up > 0:
+            lines.append(f"├┈➤⬆️ <b>{prof_name_ui} subiu de nível!</b>")
+
+        if dur_txt:
+            lines.append(f"├┈➤🛠️ <b>{tool_name}</b> (Durab.: <b>{dur_txt}</b>)")
+
+        lines.append("╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤")
+        final_text = "\n".join(lines)
+
+        # ==========================================================
+        # ✅ MÍDIA DE FINALIZAÇÃO POR PROFISSÃO
+        # collect_done_{prof} -> fallback collect_done_generic
+        # ==========================================================
+        done_key = f"collect_done_{user_prof_key}"
+        done_media = file_ids.get_file_data(done_key) or file_ids.get_file_data("collect_done_generic") or {}
+        done_id = done_media.get("id")
+        done_type = (done_media.get("type") or "photo").strip().lower()
+
+        try:
+            if done_id and done_type == "video":
+                await context.bot.send_video(chat_id, done_id, caption=final_text, parse_mode="HTML")
+            elif done_id:
+                await context.bot.send_photo(chat_id, done_id, caption=final_text, parse_mode="HTML")
+            else:
+                await context.bot.send_message(chat_id, final_text, parse_mode="HTML")
+        except Exception:
+            await context.bot.send_message(chat_id, final_text, parse_mode="HTML")
+
 
 # ==============================================================================
 # 2. O WRAPPER DO TELEGRAM (MANTIDO E PROTEGIDO)

@@ -1094,16 +1094,6 @@ async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
 
 @requires_login
 async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Inicia a coleta:
-    - valida sessão
-    - evita coleta duplicada
-    - valida ferramenta + profissão + durabilidade
-    - consome energia
-    - grava player_state collecting
-    - mostra tela de coleta COM mídia (por profissão)
-    - agenda job finish_collection_job
-    """
     q = update.callback_query
     from handlers.job_handler import finish_collection_job
 
@@ -1129,119 +1119,148 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ==========================================================
-    # 🧷 Anti-dupe
+    # 🧷 Anti-dupe (melhorado)
+    # - se estiver coletando e já venceu, tenta finalizar e não trava
     # ==========================================================
     state = pdata.get("player_state") or {}
     if state.get("action") == "collecting":
-        await q.answer("⏳ Você já está coletando algo.", show_alert=True)
-        return
+        finish_iso = state.get("finish_time")
+        if finish_iso:
+            try:
+                # aceita "...Z"
+                finish_dt = datetime.fromisoformat(str(finish_iso).replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) >= finish_dt:
+                    try:
+                        await player_manager.try_finalize_timed_action_for_user(uid)
+                    except Exception:
+                        pass
+                    # depois de tentar finalizar, recarrega
+                    pdata = await player_manager.get_player_data(uid) or pdata
+                    state = pdata.get("player_state") or {}
+                    if state.get("action") == "collecting":
+                        await q.answer("⏳ Você ainda está coletando.", show_alert=True)
+                        return
+                else:
+                    await q.answer("⏳ Você já está coletando algo.", show_alert=True)
+                    return
+            except Exception:
+                # estado corrompido -> destrava pra não bricar
+                pdata["player_state"] = {"action": "idle"}
+                try:
+                    await player_manager.save_player_data(uid, pdata)
+                except Exception:
+                    pass
+        else:
+            await q.answer("⏳ Você já está coletando algo.", show_alert=True)
+            return
 
     # ==========================================================
-    # 🔧 Equipamento / inventário
+    # 🧨 Remove jobs antigos ANTES de criar novo
     # ==========================================================
-    equip = pdata.setdefault("equipment", {})
-    inv = pdata.setdefault("inventory", {})
+    try:
+        for j in context.job_queue.get_jobs_by_name(f"collect_{uid}"):
+            j.schedule_removal()
+    except Exception:
+        pass
+
+    equip = pdata.setdefault("equipment", {}) or {}
+    inv = pdata.setdefault("inventory", {}) or {}
+
     tool_uid = equip.get("tool")
-
-    if not tool_uid or tool_uid not in inv:
-        await q.answer("❌ Você precisa equipar uma ferramenta.", show_alert=True)
+    if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
+        await q.answer("❌ Você precisa equipar uma ferramenta para coletar.", show_alert=True)
         return
 
-    tool_inst = inv.get(tool_uid)
+    tool_inst = inv.get(tool_uid) or {}
     tool_base_id = tool_inst.get("base_id")
-    tool_info = (game_data.ITEMS_DATA or {}).get(tool_base_id, {})
-
-    if tool_info.get("type") != "tool":
-        await q.answer("❌ Ferramenta inválida.", show_alert=True)
+    if not tool_base_id:
+        await q.answer("❌ Ferramenta inválida (sem base_id).", show_alert=True)
         return
 
-    tool_name = tool_info.get("display_name", tool_base_id.title())
+    tool_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(tool_base_id) or {}
+    if tool_info.get("type") != "tool":
+        await q.answer("❌ O item equipado não é uma ferramenta válida.", show_alert=True)
+        return
 
+    tool_name = tool_info.get("display_name", tool_base_id.replace("_", " ").title())
+
+    # Durabilidade
     try:
         cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
     except Exception:
         cur_d, mx_d = 0, 0
 
     if cur_d <= 0:
-        await q.answer("❌ Ferramenta quebrada.", show_alert=True)
+        await q.answer("❌ Sua ferramenta está quebrada. Repare ou equipe outra.", show_alert=True)
         return
 
     # ==========================================================
-    # 🧑‍🏭 Profissão
+    # 🧑‍🏭 Profissão (Mongo: profession.type)
     # ==========================================================
     prof = pdata.get("profession", {}) or {}
     user_prof_key = (prof.get("type") or prof.get("key") or "").strip().lower()
 
+    # padroniza caso tenha vindo legado
     if user_prof_key and not prof.get("type"):
         prof["type"] = user_prof_key
         pdata["profession"] = prof
+
+    # se ainda estiver vazio, evita key "collecting_"
+    if not user_prof_key:
+        user_prof_key = "generic"
 
     req_prof = game_data.get_profession_for_resource(res_id)
     if req_prof and user_prof_key != req_prof:
         await q.answer("❌ Profissão incompatível.", show_alert=True)
         return
 
-    # ==========================================================
-    # ⚡ Energia
-    # ==========================================================
-    prem = PremiumManager(pdata)
-    cost = int(prem.get_perk_value("gather_energy_cost", 1))
-    if pdata.get("energy", 0) < cost:
-        await q.answer("⚡ Energia insuficiente.", show_alert=True)
+    tool_type = (tool_info.get("tool_type") or "").strip().lower()
+    if req_prof and tool_type != req_prof:
+        await q.answer("❌ Ferramenta incompatível com este recurso.", show_alert=True)
         return
 
+    # ==========================================================
+    # ⚡ Energia + tempo por tier
+    # ==========================================================
+    from modules.player import premium as prem_cfg
+    prem = PremiumManager(pdata)
+
+    cost = int(prem.get_perk_value("gather_energy_cost", 1))
+    if int(pdata.get("energy", 0)) < cost:
+        await q.answer(f"Sem energia ({cost}⚡).", show_alert=True)
+        return
     player_manager.spend_energy(pdata, cost)
 
-    # ==========================================================
-    # 📦 Item coletado
-    # ==========================================================
+    base_secs = int(getattr(prem_cfg, "COLLECTION_TIME_MINUTES", 1) * 60)
+    spd = float(prem.get_perk_value("gather_speed_multiplier", 1.0))
+    dur = max(1, int(base_secs / max(0.25, spd)))
+
+    # item_yielded
     if req_prof:
-        item_yielded = (
-            game_data.PROFESSIONS_DATA
-            .get(req_prof, {})
-            .get("resources", {})
-            .get(res_id, res_id)
-        )
+        p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get("resources", {}) or {}
+        item_yielded = p_res.get(res_id, res_id)
     else:
         item_yielded = res_id
 
-    # ==========================================================
-    # ⏳ Tempo
-    # ==========================================================
-    base_secs = int(getattr(game_data, "COLLECTION_TIME_MINUTES", 1) * 60)
-    dur = max(1, base_secs)
-
     now = datetime.now(timezone.utc)
+    finish = now + timedelta(seconds=dur)
+
     pdata["player_state"] = {
         "action": "collecting",
-        "finish_time": (now + timedelta(seconds=dur)).isoformat(),
+        "finish_time": finish.isoformat(),
         "details": {
             "resource_id": res_id,
             "item_id_yielded": item_yielded,
             "quantity": 1,
+            "started_at": now.isoformat(),
         },
     }
-
     player_manager.set_last_chat_id(pdata, cid)
 
-    # ==========================================================
-    # 🖼️ MÍDIA (POR PROFISSÃO)
-    # ==========================================================
-    media_key = f"collecting_{user_prof_key}"
-    media = file_ids.get_file_data(media_key)
-
-    if not isinstance(media, dict):
-        media = file_ids.get_file_data("collecting_generic") or {}
-
-    media_id = media.get("id")
-    media_type = (media.get("type") or "").lower()
-
-    # ==========================================================
-    # 🧾 TEXTO
-    # ==========================================================
+    # Texto
     human = _humanize_duration(dur)
-    item_info = (game_data.ITEMS_DATA or {}).get(item_yielded, {})
-    item_name = item_info.get("display_name", item_yielded.title())
+    item_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(item_yielded, {}) or {}
+    item_name = item_info.get("display_name", item_yielded.replace("_", " ").title())
     item_emoji = item_info.get("emoji", "📦")
 
     cap = (
@@ -1250,7 +1269,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"├┈➤{item_emoji} <b>{item_name}</b>\n"
         f"├┈➤🛠️ {tool_name} ({cur_d}/{mx_d})\n"
         f"├┈➤⚡ Custo: {cost}\n"
-        f"├┈➤⏳ Tempo: {human}"
+        f"├┈➤⏳ Tempo: {human}\n"
         f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤"
     )
 
@@ -1259,18 +1278,26 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-    # ==========================================================
-    # 📤 ENVIO FINAL (GARANTIDO)
-    # ==========================================================
+    # ✅ Mídia por PROFISSÃO (collecting_{prof})
+    media_key = f"collecting_{user_prof_key}"
+    media = file_ids.get_file_data(media_key) or file_ids.get_file_data("collecting_generic") or {}
+    media_id = media.get("id")
+    media_type = (media.get("type") or "photo").strip().lower()
+
+    sent = None
     try:
         if media_id and media_type == "video":
-            await context.bot.send_video(cid, media_id, caption=cap, parse_mode="HTML")
+            sent = await context.bot.send_video(cid, media_id, caption=cap, parse_mode="HTML")
         elif media_id:
-            await context.bot.send_photo(cid, media_id, caption=cap, parse_mode="HTML")
+            sent = await context.bot.send_photo(cid, media_id, caption=cap, parse_mode="HTML")
         else:
-            await context.bot.send_message(cid, cap, parse_mode="HTML")
+            sent = await context.bot.send_message(cid, cap, parse_mode="HTML")
     except Exception:
-        await context.bot.send_message(cid, cap, parse_mode="HTML")
+        sent = await context.bot.send_message(cid, cap, parse_mode="HTML")
+
+    # ✅ salva message_id para o job deletar depois
+    if sent:
+        pdata["player_state"]["details"]["collect_message_id"] = sent.message_id
 
     await player_manager.save_player_data(uid, pdata)
 
@@ -1283,10 +1310,11 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "resource_id": res_id,
             "item_id_yielded": item_yielded,
             "quantity": 1,
-            "message_id": None,
+            "message_id": sent.message_id if sent else None,
         },
         name=f"collect_{uid}",
     )
+
 
 # =============================================================================
 # Durabilidade e Registro
