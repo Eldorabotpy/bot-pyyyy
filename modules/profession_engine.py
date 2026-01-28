@@ -408,36 +408,111 @@ async def restore_durability(player_data: dict, unique_id: str) -> dict:
 async def restore_all_equipped_durability(player_data: dict) -> dict:
     """
     Restaura TODOS os itens equipados consumindo APENAS 1 Pergaminho.
+    - Só gasta o pergaminho se houver ao menos 1 item com durabilidade < max
+    - Suporta formatos de durabilidade: [cur,max], (cur,max), {"current","max"}
     """
-    inv = player_data.get('inventory', {}) or {}
-    equip = player_data.get('equipment', {}) or {}
-    
+
+    inv = player_data.get("inventory", {}) or {}
+    equip = player_data.get("equipment", {}) or {}
+
+    # -------- helpers locais (blindados) --------
+    def _dur_tuple(raw):
+        cur, mx = 0, 0
+        if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+            try:
+                cur, mx = int(raw[0]), int(raw[1])
+            except Exception:
+                cur, mx = 0, 0
+        elif isinstance(raw, dict):
+            try:
+                cur = int(raw.get("current", 0))
+                mx = int(raw.get("max", 0))
+            except Exception:
+                cur, mx = 0, 0
+        mx = max(0, mx)
+        cur = max(0, min(cur, mx)) if mx > 0 else max(0, cur)
+        return cur, mx
+
+    def _max_from_info(info: dict, fallback_max: int) -> int:
+        """
+        Extrai max de ITEMS_DATA:
+          - durability: [cur,max] ou (cur,max)
+          - durability: int (assume max=int)
+          - durability: {"max": x} (se existir)
+        """
+        if not isinstance(info, dict):
+            return int(fallback_max or 0)
+
+        raw = info.get("durability")
+
+        if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+            try:
+                return int(raw[1])
+            except Exception:
+                return int(fallback_max or 0)
+
+        if isinstance(raw, int):
+            return int(raw)
+
+        if isinstance(raw, dict):
+            try:
+                return int(raw.get("max", fallback_max or 0))
+            except Exception:
+                return int(fallback_max or 0)
+
+        return int(fallback_max or 0)
+
+    def _set_dur(item: dict, cur: int, mx: int) -> None:
+        item["durability"] = [int(max(0, min(cur, mx))), int(max(0, mx))]
+
+    def _get_item_info(base_id: str) -> dict:
+        return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
+
+    # -------- valida pergaminho --------
     if _inv_qty(player_data, PARCHMENT_ID) <= 0:
         return {"error": "Você precisa de 1x Pergaminho de Durabilidade."}
 
+    # -------- pega itens equipados únicos --------
+    equipped_uids = {uid for uid in (equip or {}).values() if uid}
     items_to_repair = []
-    # Pega valores únicos (IDs dos itens)
-    for uid in set(equip.values()):
-        if uid and uid in inv:
+    for uid in equipped_uids:
+        inst = inv.get(uid)
+        if isinstance(inst, dict):
             items_to_repair.append(uid)
 
     if not items_to_repair:
         return {"error": "Nenhum equipamento equipado para restaurar."}
 
+    # -------- descobre quem realmente precisa reparar --------
+    need_repair = []
+    for uid in items_to_repair:
+        inst = inv[uid]
+        cur, mx = _dur_tuple(inst.get("durability"))
+
+        base_id = inst.get("base_id")
+        info = _get_item_info(base_id)
+        real_max = _max_from_info(info, mx)
+
+        # se ainda não tem max, não tenta reparar
+        if real_max <= 0:
+            continue
+
+        if cur < real_max:
+            need_repair.append((uid, real_max))
+
+    if not need_repair:
+        return {"error": "Todos os equipamentos equipados já estão com durabilidade máxima."}
+
+    # ✅ só aqui consome o pergaminho
     player_manager.remove_item_from_inventory(player_data, PARCHMENT_ID, 1)
 
+    # -------- repara --------
     count = 0
-    for uid in items_to_repair:
-        item = inv[uid]
-        base_id = item.get("base_id")
-        info = _get_item_info(base_id)
-        
-        real_max = 20
-        raw_dur = info.get("durability")
-        if isinstance(raw_dur, list) and len(raw_dur) > 1: real_max = int(raw_dur[1])
-        elif isinstance(raw_dur, int): real_max = raw_dur
-            
-        _set_dur(item, real_max, real_max)
+    for uid, real_max in need_repair:
+        inst = inv.get(uid)
+        if not isinstance(inst, dict):
+            continue
+        _set_dur(inst, real_max, real_max)
         count += 1
 
     return {"success": True, "count": count, "message": f"Reparados {count} itens!"}

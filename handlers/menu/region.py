@@ -1327,43 +1327,97 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @requires_login
 async def show_restore_durability_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    await q.answer()
+    if not q or not q.message:
+        return
+
+    try:
+        await q.answer()
+    except Exception:
+        pass
+
     uid = get_current_player_id(update, context)
     pdata = await player_manager.get_player_data(uid) or {}
 
     lines = ["<b>📜 Restaurar Durabilidade</b>\n"]
     lines.append("<i>Restaura TODOS os itens equipados consumindo apenas 1 Pergaminho.</i>\n")
 
-    inv, equip = pdata.get("inventory", {}), pdata.get("equipment", {})
-    def _d(raw):
-        try:
-            return int(raw[0]), int(raw[1])
-        except Exception:
-            return 20, 20
+    inv = pdata.get("inventory", {}) or {}
+    equip = pdata.get("equipment", {}) or {}
+
+    def _dur_from_base(inst: dict, fallback_max: int) -> int:
+        base_id = (inst or {}).get("base_id")
+        base = (game_data.ITEMS_DATA or {}).get(base_id, {}) or {}
+        bd = base.get("durability")
+        if isinstance(bd, (list, tuple)) and len(bd) >= 2:
+            try:
+                return int(bd[1])
+            except Exception:
+                return int(fallback_max or 0)
+        return int(fallback_max or 0)
+
+    def _d(inst: dict):
+        """
+        Retorna (cur, max) saneado.
+        Aceita durability como:
+          - [cur, max]
+          - {"current": cur, "max": max}
+          - None/invalid -> tenta pegar max do ITEMS_DATA
+        """
+        raw = (inst or {}).get("durability")
+        cur, mx = 0, 0
+
+        if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+            try:
+                cur, mx = int(raw[0]), int(raw[1])
+            except Exception:
+                cur, mx = 0, 0
+        elif isinstance(raw, dict):
+            try:
+                cur, mx = int(raw.get("current", 0)), int(raw.get("max", 0))
+            except Exception:
+                cur, mx = 0, 0
+
+        # se max não veio, tenta puxar do item base
+        mx = _dur_from_base(inst, mx)
+
+        mx = max(0, mx)
+        cur = max(0, min(cur, mx)) if mx > 0 else max(0, cur)
+
+        return cur, mx
 
     items_broken_count = 0
-    for slot, uid_item in equip.items():
+    for slot, uid_item in (equip or {}).items():
         if not uid_item:
             continue
+
         inst = inv.get(uid_item)
-        if isinstance(inst, dict):
-            cur, mx = _d(inst.get("durability"))
-            if cur < mx:
-                items_broken_count += 1
-                nm = (game_data.ITEMS_DATA or {}).get(inst.get("base_id"), {}).get("display_name", "Item")
-                lines.append(f"• {nm} <b>({cur}/{mx})</b>")
+        if not isinstance(inst, dict):
+            continue
+
+        cur, mx = _d(inst)
+        if mx > 0 and cur < mx:
+            items_broken_count += 1
+            base_id = inst.get("base_id")
+            nm = (game_data.ITEMS_DATA or {}).get(base_id, {}).get("display_name", "Item")
+            lines.append(f"• {nm} <b>({cur}/{mx})</b>")
 
     kb = []
     if items_broken_count > 0:
-        kb.append([InlineKeyboardButton(f"✨ REPARAR TUDO (Gasta 1x 📜)", callback_data="rd_fix_all")])
+        kb.append([InlineKeyboardButton("✨ REPARAR TUDO (Gasta 1x 📜)", callback_data="rd_fix_all")])
     else:
         lines.append("✅ <i>Todos os equipamentos estão perfeitos.</i>")
 
     loc = pdata.get("current_location", "reino_eldora")
-    back = 'continue_after_action' if loc == 'reino_eldora' else f"open_region:{loc}"
+    back = "continue_after_action" if loc == "reino_eldora" else f"open_region:{loc}"
     kb.append([InlineKeyboardButton("⬅️ Voltar", callback_data=back)])
 
-    await _safe_edit_or_send(q, context, q.message.chat_id, "\n".join(lines), InlineKeyboardMarkup(kb))
+    await _safe_edit_or_send(
+        q,
+        context,
+        q.message.chat_id,
+        "\n".join(lines),
+        InlineKeyboardMarkup(kb)
+    )
 
 @requires_login
 async def noop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
