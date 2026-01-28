@@ -7,7 +7,7 @@ RECIPES = {
     "machado_pedra": {
         "display_name": "Machado de Pedra",
         "description": "Ferramenta primitiva. Quebra rápido.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "lenhador",
         "tier": 1,
         "profession_req": None,     # Qualquer um pode fazer
@@ -28,7 +28,7 @@ RECIPES = {
     "picareta_pedra": {
         "display_name": "Picareta de Pedra",
         "description": "Pedra amarrada num graveto. Funciona... por enquanto.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "minerador",
         "tier": 1,
         "profession_req": None,
@@ -49,7 +49,7 @@ RECIPES = {
     "foice_pedra": {
         "display_name": "Foice de Pedra Lascada",
         "description": "Corte irregular, mas colhe plantas.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "colhedor",
         "tier": 1,
         "profession_req": None,
@@ -69,7 +69,7 @@ RECIPES = {
     "faca_pedra": {
         "display_name": "Faca de Pederneira",
         "description": "Afiada o suficiente para tirar peles.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "esfolador",
         "tier": 1,
         "profession_req": None,
@@ -90,7 +90,7 @@ RECIPES = {
     "frasco_vidro": {
         "display_name": "Frasco de Vidro",
         "description": "Vidro simples feito de areia derretida.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "alquimista",
         "tier": 1,
         "profession_req": None,

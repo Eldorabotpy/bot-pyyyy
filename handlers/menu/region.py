@@ -29,6 +29,7 @@ from pvp import pvp_battle, pvp_utils
 from modules.game_data import regions as game_data_regions
 from modules.guild_war.campaign import ensure_weekly_campaign
 from modules.guild_war.region import CampaignPhase
+from handlers.job_handler import _dur_tuple
 
 # --- GUERRA DE CLÃS ---
 # Usa seu engine central (gate oficial para mostrar botões e bloquear callbacks)
@@ -1091,12 +1092,37 @@ async def finish_travel_job(context: ContextTypes.DEFAULT_TYPE):
 
 @requires_login
 async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Inicia a coleta:
+    - valida sessão
+    - evita coleta duplicada (player_state collecting)
+    - valida ferramenta + profissão + compatibilidade + durabilidade
+    - valida energia e consome
+    - grava player_state collecting
+    - cria msg "Coletando..." e agenda job finish_collection_job
+    """
     q = update.callback_query
     from handlers.job_handler import finish_collection_job
 
+    # ✅ garante que existe callback_query
+    if not q or not q.message:
+        return
+
+    try:
+        await q.answer()
+    except Exception:
+        pass
+
     uid = get_current_player_id(update, context)
     cid = q.message.chat_id
+
     res_id = (q.data or "").replace("collect_", "", 1)
+    if not res_id:
+        try:
+            await q.answer("❌ Recurso inválido.", show_alert=True)
+        except Exception:
+            pass
+        return
 
     pdata = await player_manager.get_player_data(uid)
     if not pdata:
@@ -1105,6 +1131,38 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
         return
+
+    # ==========================================================
+    # 🧷 Anti-dupe: já está coletando?
+    # ==========================================================
+    state = pdata.get("player_state") or {}
+    if state.get("action") == "collecting":
+        # se já passou do tempo, tenta finalizar (evita ficar preso)
+        finish_iso = state.get("finish_time")
+        if finish_iso:
+            try:
+                finish_dt = datetime.fromisoformat(finish_iso)
+                if datetime.now(timezone.utc) >= finish_dt:
+                    # finalização "silenciosa" via manager (se existir)
+                    try:
+                        await player_manager.try_finalize_timed_action_for_user(uid)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        await q.answer("⏳ Você já está coletando algo.", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+            except Exception:
+                # se finish_time inválido, destrava para não bricar
+                pdata["player_state"] = {"action": "idle"}
+        else:
+            try:
+                await q.answer("⏳ Você já está coletando algo.", show_alert=True)
+            except Exception:
+                pass
+            return
 
     # ==========================================================
     # 🔧 Normaliza legado
@@ -1127,12 +1185,26 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer("❌ Ferramenta inválida (sem base_id).", show_alert=True)
         return
 
-    tool_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(tool_base_id)
+    tool_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(tool_base_id) or {}
     if not tool_info or tool_info.get("type") != "tool":
         await q.answer("❌ O item equipado não é uma ferramenta válida.", show_alert=True)
         return
 
+    # ==========================================================
+    # 🧱 DURABILIDADE (bloqueia começar coleta com ferramenta quebrada)
+    # ==========================================================
+    try:
+        cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
+    except Exception:
+        cur_d, mx_d = 0, 0
+
+    if cur_d <= 0:
+        await q.answer("❌ Sua ferramenta está quebrada. Repare ou equipe outra.", show_alert=True)
+        return
+
+    # ==========================================================
     # Profissão do jogador (normalizada)
+    # ==========================================================
     prof = pdata.get("profession", {}) or {}
     user_prof_key = (prof.get("key") or prof.get("type") or "").strip().lower()
 
@@ -1154,7 +1226,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ==========================================================
-    # ⚡ ENERGIA (só depois de validar ferramenta)
+    # ⚡ ENERGIA (só depois de validar tudo)
     # ==========================================================
     prem = PremiumManager(pdata)
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
@@ -1165,10 +1237,13 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_manager.spend_energy(pdata, cost)
 
     # ==========================================================
-    # 📦 item_yielded
+    # 📦 item_yielded (fallback robusto se req_prof for None)
     # ==========================================================
-    p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get("resources", {})
-    item_yielded = p_res.get(res_id, res_id)
+    if req_prof:
+        p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get("resources", {}) or {}
+        item_yielded = p_res.get(res_id, res_id)
+    else:
+        item_yielded = res_id
 
     # ==========================================================
     # ⏳ Tempo de coleta
@@ -1178,47 +1253,71 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dur = max(1, int(base_secs / max(0.25, spd)))
 
     finish = datetime.now(timezone.utc) + timedelta(seconds=dur)
+
+    # ✅ salva estado collecting + detalhes completos (inclui message id depois)
     pdata["player_state"] = {
         "action": "collecting",
         "finish_time": finish.isoformat(),
-        "details": {"resource_id": res_id, "item_id_yielded": item_yielded, "quantity": 1}
+        "details": {
+            "resource_id": res_id,
+            "item_id_yielded": item_yielded,
+            "quantity": 1,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        },
     }
+
     player_manager.set_last_chat_id(pdata, cid)
 
     human = _humanize_duration(dur)
     cap = f"⛏️ <b>Coletando...</b>\n⏳ Tempo: {human}"
 
-    # aqui sim, se quiser “answer” sem texto só pra tirar loading
-    try:
-        await q.answer()
-    except Exception:
-        pass
-
+    # limpa msg anterior do menu (se possível)
     try:
         await q.delete_message()
     except Exception:
         pass
 
-    msg = await context.bot.send_message(cid, cap, parse_mode="HTML")
+    msg = None
+    try:
+        msg = await context.bot.send_message(cid, cap, parse_mode="HTML")
+    except Exception:
+        msg = None
 
     if msg:
         pdata["player_state"]["details"]["collect_message_id"] = msg.message_id
 
+    # ✅ persistir antes de agendar (evita perder state se crashar)
     await player_manager.save_player_data(uid, pdata)
 
+    # ==========================================================
+    # 🧨 Reagenda único job por player (evita múltiplos jobs empilhados)
+    # ==========================================================
+    try:
+        for j in context.job_queue.get_jobs_by_name(f"collect_{uid}"):
+            try:
+                j.schedule_removal()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # ==========================================================
+    # 🧠 Agenda o job
+    # ==========================================================
     context.job_queue.run_once(
         finish_collection_job,
         when=dur,
         data={
-            "user_id": uid,
+            "user_id": str(uid),  # ✅ sempre string (compat com player_manager/auth)
             "chat_id": cid,
             "resource_id": res_id,
             "item_id_yielded": item_yielded,
             "quantity": 1,
-            "message_id": msg.message_id if msg else None
+            "message_id": msg.message_id if msg else None,
         },
-        name=f"collect_{uid}"
+        name=f"collect_{uid}",
     )
+
 
 
 # =============================================================================

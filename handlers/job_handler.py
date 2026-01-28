@@ -8,6 +8,7 @@ from typing import Any
 from telegram.error import Forbidden
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from datetime import datetime, timedelta, timezone
 
 # Módulos do Jogo
 from modules import player_manager, game_data, mission_manager, file_ids
@@ -110,6 +111,18 @@ async def execute_collection_logic(
     context: ContextTypes.DEFAULT_TYPE,
     message_id_to_delete: int = None
 ):
+    """
+    Finaliza a coleta (IDEMPOTENTE):
+    - Só executa se o player ainda estiver em player_state.action == "collecting"
+      e o resource bater com o estado atual (evita job duplicado consumir durabilidade).
+    - valida profissão + ferramenta + durabilidade
+    - calcula qty + crit
+    - escolhe item via gather_table (se existir)
+    - adiciona no inventário
+    - consome 1 de durabilidade (com chance de não consumir por tier)
+    - NOTIFICA o jogador (sucesso ou falha)
+    """
+
     # --- AUTO-CORREÇÃO DE IDs (Compatibilidade Legado) ---
     FIX_IDS = {
         "minerio_ferro": "minerio_de_ferro",
@@ -117,7 +130,7 @@ async def execute_collection_logic(
         "pedra_ferro": "minerio_de_ferro",
         "minerio_estanho": "minerio_de_estanho",
         "tin_ore": "minerio_de_estanho",
-        "madeira_rara_bruta": "madeira_rara"
+        "madeira_rara_bruta": "madeira_rara",
     }
 
     if resource_id in FIX_IDS:
@@ -128,6 +141,24 @@ async def execute_collection_logic(
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         return
+
+    current_loc = player_data.get("current_location", "reino_eldora")
+
+    async def _notify(text: str, back_region: str | None = None):
+        back_region = back_region or current_loc
+        try:
+            await context.bot.send_message(
+                chat_id,
+                text,
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{back_region}")]]
+                ),
+                parse_mode="HTML",
+            )
+        except Forbidden:
+            return
+        except Exception:
+            return
 
     # 1) Limpa mensagem "Coletando..." (cosmético)
     if message_id_to_delete:
@@ -140,21 +171,52 @@ async def execute_collection_logic(
     if resource_id is None:
         pass
     elif not resource_id:
-        player_data["player_state"] = {"action": "idle"}
-        await player_manager.save_player_data(user_id, player_data)
+        # estado inválido, destrava
+        try:
+            player_data["player_state"] = {"action": "idle"}
+            await player_manager.save_player_data(user_id, player_data)
+        except Exception:
+            pass
         return
 
+    # ==========================================================
+    # ✅ GUARDA ANTI-JOB DUPLICADO (IDEMPOTÊNCIA)
+    # ==========================================================
+    state = player_data.get("player_state") or {}
+    if state.get("action") != "collecting":
+        # Já foi finalizado por outro job (ou cancelado). Não faz nada.
+        return
+
+    details = state.get("details") or {}
+    state_res = details.get("resource_id")
+    if state_res and resource_id and str(state_res) != str(resource_id):
+        # Job órfão/antigo: não consome nada.
+        return
+
+    # Se quiser ser mais rígido: só finalize quando estiver "vencido"
+    finish_iso = state.get("finish_time")
+    if finish_iso:
+        try:
+            finish_dt = datetime.fromisoformat(finish_iso)
+            if datetime.now(timezone.utc) < finish_dt:
+                # Ainda não venceu (job adiantado/duplicado). Sai sem consumir.
+                return
+        except Exception:
+            # se parse falhar, não bloqueia (mas ainda assim é collecting)
+            pass
+
     sucesso_operacao = False
+    is_crit = False
+    quantidade = int(quantity_base or 1)
+    final_item_id = item_id_yielded or resource_id or "madeira"
+    tool_name = "Ferramenta"
+    dur_txt = ""
 
     try:
-        # 🔓 Estado
-        player_data["player_state"] = {"action": "idle"}
-        current_loc = player_data.get("current_location", "reino_eldora")
-
         # 🔧 Normaliza estrutura legado (garante slot tool existir)
-        equip = player_data.setdefault("equipment", {})
+        equip = player_data.setdefault("equipment", {}) or {}
         equip.setdefault("tool", None)
-        inv = player_data.setdefault("inventory", {})
+        inv = player_data.setdefault("inventory", {}) or {}
 
         # ================================
         # 🛑 TRAVA DE PROFISSÃO
@@ -167,17 +229,12 @@ async def execute_collection_logic(
             required_profession = game_data.get_profession_for_resource(resource_id)
 
         if required_profession and user_prof_key != required_profession:
-            prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {})
+            prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}
             prof_name = prof_info.get("display_name", required_profession.capitalize())
 
-            await context.bot.send_message(
-                chat_id,
+            await _notify(
                 f"❌ <b>Falha na Coleta!</b>\n\n"
-                f"⚠️ Requisito: <b>{prof_name}</b>.",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
-                ),
-                parse_mode="HTML"
+                f"⚠️ Requisito: <b>{prof_name}</b>."
             )
             return
 
@@ -185,77 +242,53 @@ async def execute_collection_logic(
         # 🛠️ TRAVA DE FERRAMENTA
         # ================================
         tool_uid = equip.get("tool")
-
         if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
-            await context.bot.send_message(
-                chat_id,
+            await _notify(
                 "❌ <b>Falha na Coleta!</b>\n\n"
-                "Você precisa equipar uma <b>ferramenta</b>.",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
-                ),
-                parse_mode="HTML"
+                "Você precisa equipar uma <b>ferramenta</b>."
             )
             return
 
         tool_inst = inv[tool_uid]
         tool_base_id = tool_inst.get("base_id")
         if not tool_base_id:
-            await context.bot.send_message(
-                chat_id,
+            await _notify(
                 "❌ <b>Falha na Coleta!</b>\n\n"
-                "Sua ferramenta equipada está inválida (sem base_id).",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
-                ),
-                parse_mode="HTML"
+                "Sua ferramenta equipada está inválida (sem base_id)."
             )
             return
 
-        tool_info = _get_item_info(tool_base_id)
-        if not tool_info or tool_info.get("type") != "tool":
-            await context.bot.send_message(
-                chat_id,
+        tool_info = _get_item_info(tool_base_id) or {}
+        if tool_info.get("type") != "tool":
+            await _notify(
                 "❌ <b>Falha na Coleta!</b>\n\n"
-                "O item equipado não é uma ferramenta válida.",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
-                ),
-                parse_mode="HTML"
+                "O item equipado não é uma ferramenta válida."
             )
             return
+
+        tool_name = tool_info.get("display_name", tool_base_id.replace("_", " ").title())
 
         tool_type = (tool_info.get("tool_type") or "").strip().lower()
         if required_profession and tool_type != required_profession:
-            prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {})
+            prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}
             prof_name = prof_info.get("display_name", required_profession.capitalize())
 
-            await context.bot.send_message(
-                chat_id,
+            await _notify(
                 "❌ <b>Falha na Coleta!</b>\n\n"
                 "Sua ferramenta não é compatível com este recurso.\n"
-                f"⚠️ Requer: <b>{prof_name}</b>.",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
-                ),
-                parse_mode="HTML"
+                f"⚠️ Requer: <b>{prof_name}</b>."
             )
             return
 
         # ================================
-        # 🧱 DURABILIDADE
+        # 🧱 DURABILIDADE (consome só aqui, só 1)
         # ================================
         cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
         if cur_d <= 0:
-            await context.bot.send_message(
-                chat_id,
+            await _notify(
                 "❌ <b>Falha na Coleta!</b>\n\n"
                 "Sua ferramenta está <b>quebrada</b>.\n"
-                "➡️ Use um pergaminho de reparo ou equipe outra ferramenta.",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{current_loc}")]]
-                ),
-                parse_mode="HTML"
+                "➡️ Use um pergaminho de reparo ou equipe outra ferramenta."
             )
             return
 
@@ -275,7 +308,9 @@ async def execute_collection_logic(
         stats = await player_manager.get_player_total_stats(player_data)
         luck = _int(stats.get("luck", 5))
 
-        quantidade = quantity_base + prof_level + _int(tier_cfg.get("qty", 0), 0)
+        quantidade = int(quantity_base or 1) + prof_level + _int(tier_cfg.get("qty", 0), 0)
+        quantidade = max(1, quantidade)
+
         crit_chance = (
             3.0
             + (prof_level * 0.1)
@@ -283,14 +318,13 @@ async def execute_collection_logic(
             + float(tier_cfg.get("crit", 0.0) or 0.0)
         )
 
-        is_crit = random.uniform(0, 100) < crit_chance
+        is_crit = (random.uniform(0, 100) < crit_chance)
         if is_crit:
             quantidade *= 2
 
         # ================================
-        # 🎲 GATHER TABLE
+        # 🎲 GATHER TABLE (por região)
         # ================================
-        # fallback seguro: se resource_id for None e item_id_yielded também, evita inserir None no inventário
         final_item_id = item_id_yielded or resource_id or "madeira"
 
         region_info = (game_data.REGIONS_DATA or {}).get(current_loc, {}) or {}
@@ -319,6 +353,9 @@ async def execute_collection_logic(
                     final_item_id = item
                     break
 
+        if not final_item_id:
+            final_item_id = "madeira"
+
         player_manager.add_item_to_inventory(player_data, final_item_id, quantidade)
 
         logger.info(
@@ -328,12 +365,14 @@ async def execute_collection_logic(
         )
 
         # ================================
-        # 🔧 DURABILIDADE (chance não consumir)
+        # 🔧 DURABILIDADE (✅ só -1 por job)
         # ================================
         no_dura = float(tier_cfg.get("no_dura", 0.0) or 0.0)
         if no_dura <= 0.0 or random.random() >= no_dura:
             cur_d = max(0, cur_d - 1)
+
         _set_dur(tool_inst, cur_d, mx_d)
+        dur_txt = f"{cur_d}/{mx_d}"
 
         sucesso_operacao = True
 
@@ -341,10 +380,31 @@ async def execute_collection_logic(
         logger.error(f"[Collection] ERRO CRÍTICO {user_id}: {e}", exc_info=True)
 
     finally:
+        # ✅ garante idle sempre (e salva)
+        try:
+            player_data["player_state"] = {"action": "idle"}
+        except Exception:
+            pass
+
         try:
             await player_manager.save_player_data(user_id, player_data)
         except Exception as e:
             logger.critical(f"[Collection] FALHA AO SALVAR {user_id}: {e}")
+
+        # ✅ NOTIFICAÇÃO FINAL
+        if sucesso_operacao:
+            item_info = _get_item_info(final_item_id) or {}
+            item_name = item_info.get("display_name", final_item_id.replace("_", " ").title())
+            emoji = item_info.get("emoji", "📦")
+
+            crit_tag = " ✨<b>CRÍTICO!</b>" if is_crit else ""
+            dura_tag = f"\n🛠️ <b>{tool_name}</b> (Durab.: <b>{dur_txt}</b>)" if dur_txt else ""
+
+            await _notify(
+                f"✅ <b>Coleta Finalizada!</b>{crit_tag}\n\n"
+                f"{emoji} <b>{item_name}</b> x<b>{quantidade}</b>"
+                f"{dura_tag}"
+            )
 
 # ==============================================================================
 # 2. O WRAPPER DO TELEGRAM (MANTIDO E PROTEGIDO)

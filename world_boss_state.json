@@ -1,6 +1,6 @@
 {
-  "is_active": false,
-  "location": "pico_grifo",
+  "is_active": true,
+  "location": "pradaria_inicial",
   "entities": {
     "boss": {
       "name": "𝐋𝐨𝐫𝐝𝐞 𝐝𝐚𝐬 𝐒𝐨𝐦𝐛𝐫𝐚𝐬",
