@@ -7,7 +7,7 @@ RECIPES = {
     "machado_mithril": {
         "display_name": "Machado de Mithril",
         "description": "Leve como pluma, corta aço como papel.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "lenhador",
         "tier": 4,
         "profession_req": "ferreiro",
@@ -29,7 +29,7 @@ RECIPES = {
     "picareta_mithril": {
         "display_name": "Picareta de Mithril",
         "description": "Ressoa com a magia da terra.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "minerador",
         "tier": 4,
         "profession_req": "ferreiro",
@@ -51,7 +51,7 @@ RECIPES = {
     "foice_mithril": {
         "display_name": "Foice de Mithril",
         "description": "Colhe a essência da planta, não apenas o corpo.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "colhedor",
         "tier": 4,
         "profession_req": "ferreiro",
@@ -73,7 +73,7 @@ RECIPES = {
     "faca_obsidiana": {
         "display_name": "Lâmina de Obsidiana",
         "description": "Mais afiada que qualquer metal. Extremamente frágil se não for mágica.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "esfolador",
         "tier": 4,
         "profession_req": "joalheiro",  # Requer precisão de joalheiro
@@ -94,7 +94,7 @@ RECIPES = {
     "coletor_runico": {
         "display_name": "Coletor Rúnico",
         "description": "Atrai espíritos e energias instáveis.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "alquimista",
         "tier": 4,
         "profession_req": "alfaiate",   # Foco em tecidos mágicos e runas

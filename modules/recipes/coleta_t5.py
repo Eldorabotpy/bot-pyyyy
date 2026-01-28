@@ -7,7 +7,7 @@ RECIPES = {
     "machado_adamantio": {
         "display_name": "Machado de Adamantio",
         "description": "Forjado com fogo de dragão. Corta a realidade.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "lenhador",
         "tier": 5,
         "profession_req": "ferreiro",
@@ -28,7 +28,7 @@ RECIPES = {
     "picareta_adamantio": {
         "display_name": "Picareta de Adamantio",
         "description": "Pode quebrar as paredes do abismo.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "minerador",
         "tier": 5,
         "profession_req": "ferreiro",
@@ -49,7 +49,7 @@ RECIPES = {
     "foice_druidica": {
         "display_name": "Foice da Natureza",
         "description": "As plantas se entregam voluntariamente a esta lâmina.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "colhedor",
         "tier": 5,
         "profession_req": "ferreiro",   # Ou Artesão Mestre
@@ -70,7 +70,7 @@ RECIPES = {
     "faca_vorpal": {
         "display_name": "A Estripadora",
         "description": "Uma lenda sanguinária.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "esfolador",
         "tier": 5,
         "profession_req": "ferreiro",
@@ -91,7 +91,7 @@ RECIPES = {
     "cubo_vazio": {
         "display_name": "Cubo de Contenção",
         "description": "Uma caixa que guarda o nada e o tudo.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "alquimista",
         "tier": 5,
         "profession_req": "joalheiro",

@@ -7,7 +7,7 @@ RECIPES = {
     "machado_aco": {
         "display_name": "Machado de Aço",
         "description": "Aço temperado, capaz de cortar madeiras nobres.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "lenhador",
         "tier": 3,
         "profession_req": "ferreiro",
@@ -28,7 +28,7 @@ RECIPES = {
     "picareta_aco": {
         "display_name": "Picareta de Aço",
         "description": "Ponta endurecida para extrair metais preciosos.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "minerador",
         "tier": 3,
         "profession_req": "ferreiro",
@@ -49,7 +49,7 @@ RECIPES = {
     "foice_aco": {
         "display_name": "Foice de Aço Fino",
         "description": "Corte cirúrgico para não danificar flores raras.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "colhedor",
         "tier": 3,
         "profession_req": "ferreiro",
@@ -70,7 +70,7 @@ RECIPES = {
     "faca_aco": {
         "display_name": "Faca de Esfolar",
         "description": "Lâmina perfeita para separar couro de escamas.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "esfolador",
         "tier": 3,
         "profession_req": "ferreiro",
@@ -91,7 +91,7 @@ RECIPES = {
     "extrator_cristal": {
         "display_name": "Extrator de Cristal",
         "description": "Vidro reforçado com pó de gema para conter gases.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "alquimista",
         "tier": 3,
         "profession_req": "joalheiro",

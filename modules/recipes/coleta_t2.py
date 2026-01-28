@@ -7,7 +7,7 @@ RECIPES = {
     "machado_ferro": {
         "display_name": "Machado de Ferro",
         "description": "Lâmina pesada. Requer força para manusear.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "lenhador",
         "tier": 2,
         "profession_req": "ferreiro",
@@ -28,7 +28,7 @@ RECIPES = {
     "picareta_ferro": {
         "display_name": "Picareta de Ferro",
         "description": "Ponta reforçada para quebrar rochas duras.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "minerador",
         "tier": 2,
         "profession_req": "ferreiro",
@@ -49,7 +49,7 @@ RECIPES = {
     "foice_ferro": {
         "display_name": "Foice de Ferro",
         "description": "Lâmina curva e afiada para corte preciso.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "colhedor",
         "tier": 2,
         "profession_req": "ferreiro",
@@ -70,7 +70,7 @@ RECIPES = {
     "faca_ferro": {
         "display_name": "Faca de Caça",
         "description": "Curta e extremamente afiada.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "esfolador",
         "tier": 2,
         "profession_req": "ferreiro",
@@ -91,7 +91,7 @@ RECIPES = {
     "frasco_ceramica": {
         "display_name": "Recipiente de Cerâmica",
         "description": "Resistente a corrosão básica.",
-        "type": "ferramenta",
+        "type": "tool",
         "sub_type": "alquimista",
         "tier": 2,
         "profession_req": "artesao", # Ou oleiro, se tiver
