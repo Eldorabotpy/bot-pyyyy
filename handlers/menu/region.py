@@ -18,6 +18,8 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 # --- IMPORTS DE MÓDULOS ---
 from modules import player_manager, game_data
 from modules import file_ids as file_id_manager
+from modules import file_ids
+from ui.ui_renderer import render_media_or_text
 from modules.player.premium import PremiumManager
 from modules.player import actions as player_actions
 from modules.game_data import monsters as monsters_data
@@ -1099,15 +1101,16 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     - valida ferramenta + profissão + compatibilidade + durabilidade
     - valida energia e consome
     - grava player_state collecting
-    - cria msg "Coletando..." e agenda job finish_collection_job
+    - mostra tela "Coletando: X" (com mídia) usando ui_renderer + file_ids
+    - agenda job finish_collection_job
     """
     q = update.callback_query
     from handlers.job_handler import finish_collection_job
 
-    # ✅ garante que existe callback_query
     if not q or not q.message:
         return
 
+    # tira o "loading" do Telegram
     try:
         await q.answer()
     except Exception:
@@ -1116,7 +1119,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = get_current_player_id(update, context)
     cid = q.message.chat_id
 
-    res_id = (q.data or "").replace("collect_", "", 1)
+    res_id = (q.data or "").replace("collect_", "", 1).strip()
     if not res_id:
         try:
             await q.answer("❌ Recurso inválido.", show_alert=True)
@@ -1137,13 +1140,11 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ==========================================================
     state = pdata.get("player_state") or {}
     if state.get("action") == "collecting":
-        # se já passou do tempo, tenta finalizar (evita ficar preso)
         finish_iso = state.get("finish_time")
         if finish_iso:
             try:
                 finish_dt = datetime.fromisoformat(finish_iso)
                 if datetime.now(timezone.utc) >= finish_dt:
-                    # finalização "silenciosa" via manager (se existir)
                     try:
                         await player_manager.try_finalize_timed_action_for_user(uid)
                     except Exception:
@@ -1155,8 +1156,12 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         pass
                     return
             except Exception:
-                # se finish_time inválido, destrava para não bricar
+                # finish_time inválido -> destrava e salva
                 pdata["player_state"] = {"action": "idle"}
+                try:
+                    await player_manager.save_player_data(uid, pdata)
+                except Exception:
+                    pass
         else:
             try:
                 await q.answer("⏳ Você já está coletando algo.", show_alert=True)
@@ -1186,12 +1191,14 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     tool_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(tool_base_id) or {}
-    if not tool_info or tool_info.get("type") != "tool":
+    if tool_info.get("type") != "tool":
         await q.answer("❌ O item equipado não é uma ferramenta válida.", show_alert=True)
         return
 
+    tool_name = tool_info.get("display_name", tool_base_id.replace("_", " ").title())
+
     # ==========================================================
-    # 🧱 DURABILIDADE (bloqueia começar coleta com ferramenta quebrada)
+    # 🧱 DURABILIDADE (bloqueia começar com ferramenta quebrada)
     # ==========================================================
     try:
         cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
@@ -1203,12 +1210,15 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ==========================================================
-    # Profissão do jogador (normalizada)
+    # 🧑‍🏭 PROFISSÃO (Mongo: profession.type)
     # ==========================================================
     prof = pdata.get("profession", {}) or {}
-    user_prof_key = (prof.get("key") or prof.get("type") or "").strip().lower()
+    user_prof_key = (prof.get("type") or prof.get("key") or "").strip().lower()
 
-    # Profissão exigida pelo recurso
+    if user_prof_key and not prof.get("type"):
+        prof["type"] = user_prof_key
+        pdata["profession"] = prof
+
     req_prof = game_data.get_profession_for_resource(res_id)
 
     if req_prof and user_prof_key != req_prof:
@@ -1217,7 +1227,6 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.answer(f"❌ Requer profissão: {prof_name}.", show_alert=True)
         return
 
-    # Ferramenta compatível
     tool_type = (tool_info.get("tool_type") or "").strip().lower()
     if req_prof and tool_type != req_prof:
         prof_info = game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}
@@ -1226,7 +1235,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ==========================================================
-    # ⚡ ENERGIA (só depois de validar tudo)
+    # ⚡ ENERGIA
     # ==========================================================
     prem = PremiumManager(pdata)
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
@@ -1237,7 +1246,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_manager.spend_energy(pdata, cost)
 
     # ==========================================================
-    # 📦 item_yielded (fallback robusto se req_prof for None)
+    # 📦 item_yielded
     # ==========================================================
     if req_prof:
         p_res = (game_data.PROFESSIONS_DATA.get(req_prof, {}) or {}).get("resources", {}) or {}
@@ -1252,9 +1261,9 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     spd = float(prem.get_perk_value("gather_speed_multiplier", 1.0))
     dur = max(1, int(base_secs / max(0.25, spd)))
 
-    finish = datetime.now(timezone.utc) + timedelta(seconds=dur)
+    now = datetime.now(timezone.utc)
+    finish = now + timedelta(seconds=dur)
 
-    # ✅ salva estado collecting + detalhes completos (inclui message id depois)
     pdata["player_state"] = {
         "action": "collecting",
         "finish_time": finish.isoformat(),
@@ -1262,35 +1271,65 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "resource_id": res_id,
             "item_id_yielded": item_yielded,
             "quantity": 1,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": now.isoformat(),
         },
     }
 
     player_manager.set_last_chat_id(pdata, cid)
 
-    human = _humanize_duration(dur)
-    cap = f"⛏️ <b>Coletando...</b>\n⏳ Tempo: {human}"
+    # ==========================================================
+    # 🖼️ MÍDIA por chave (seu sistema file_ids)
+    # - gather_<resource_id> → fallback gather_default
+    # ==========================================================
+    media_key = f"gather_{res_id}"
+    media = file_ids.get_file_data(media_key) or file_ids.get_file_data("gather_default") or {}
+    media_id = media.get("id")
+    media_type = (media.get("type") or "photo").strip().lower()
 
-    # limpa msg anterior do menu (se possível)
+    # ==========================================================
+    # 🧾 Texto melhorado (mostra o que está coletando)
+    # ==========================================================
+    human = _humanize_duration(dur)
+    res_name = res_id.replace("_", " ").title()
+
+    item_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(item_yielded, {}) or {}
+    item_name = item_info.get("display_name", item_yielded.replace("_", " ").title())
+    item_emoji = item_info.get("emoji", "📦")
+
+    cap = (
+        f"⛏️ <b>Coletando: {res_name}</b>\n"
+        f"{item_emoji} <b>Alvo:</b> {item_name}\n"
+        f"⚡ <b>Custo:</b> {cost}\n"
+        f"⏳ <b>Tempo:</b> {human}\n"
+        f"🛠️ <b>{tool_name}</b> (Durab.: <b>{cur_d}/{mx_d}</b>)"
+    )
+
+    # remove menu anterior
     try:
         await q.delete_message()
     except Exception:
         pass
 
-    msg = None
-    try:
-        msg = await context.bot.send_message(cid, cap, parse_mode="HTML")
-    except Exception:
-        msg = None
+    # ==========================================================
+    # ✅ Render padronizado (foto OU vídeo) via ui_renderer
+    # ==========================================================
+    await render_media_or_text(
+        update,
+        context,
+        text=cap,
+        file_id=media_id,
+        file_type=media_type,
+        reply_markup=None,
+        scope="collecting",
+        delete_previous_on_send=True,
+        allow_edit=False,
+    )
 
-    if msg:
-        pdata["player_state"]["details"]["collect_message_id"] = msg.message_id
-
-    # ✅ persistir antes de agendar (evita perder state se crashar)
+    # salva antes de agendar
     await player_manager.save_player_data(uid, pdata)
 
     # ==========================================================
-    # 🧨 Reagenda único job por player (evita múltiplos jobs empilhados)
+    # 🧨 Reagenda único job por player
     # ==========================================================
     try:
         for j in context.job_queue.get_jobs_by_name(f"collect_{uid}"):
@@ -1308,16 +1347,16 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         finish_collection_job,
         when=dur,
         data={
-            "user_id": str(uid),  # ✅ sempre string (compat com player_manager/auth)
+            "user_id": str(uid),
             "chat_id": cid,
             "resource_id": res_id,
             "item_id_yielded": item_yielded,
             "quantity": 1,
-            "message_id": msg.message_id if msg else None,
+            # não dependemos mais disso, mas mantemos por compatibilidade
+            "message_id": None,
         },
         name=f"collect_{uid}",
     )
-
 
 
 # =============================================================================

@@ -256,3 +256,137 @@ async def clear_scope(
     if isinstance(msg_id, int):
         await _safe_delete(chat_id, msg_id, context)
     store.pop(scope, None)
+
+async def send_scope_media_or_text(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    text: str,
+    file_id: Optional[str],
+    file_type: Optional[str] = "photo",
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
+    *,
+    scope: str = "default",
+    parse_mode: str = ParseMode.HTML,
+    delete_previous_on_send: bool = True,
+) -> int | None:
+    """
+    Para JOBs (sem Update): envia photo/video + caption (ou texto) e registra message_id no scope.
+    """
+    store = _get_store(context)
+
+    if delete_previous_on_send:
+        last_id = store.get(scope)
+        if isinstance(last_id, int):
+            await _safe_delete(chat_id, last_id, context)
+
+    if not file_id:
+        sent = await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+        )
+        store[scope] = sent.message_id
+        return sent.message_id
+
+    ftype = (file_type or "photo").lower().strip()
+    try:
+        if ftype == "video":
+            sent = await context.bot.send_video(
+                chat_id=chat_id,
+                video=file_id,
+                caption=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+        else:
+            sent = await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=file_id,
+                caption=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+        store[scope] = sent.message_id
+        return sent.message_id
+
+    except BadRequest as e:
+        if _is_wrong_file_id(e):
+            sent = await context.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+            store[scope] = sent.message_id
+            return sent.message_id
+        raise
+
+
+async def render_media_or_text(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+    file_id: Optional[str],
+    file_type: Optional[str] = "photo",
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
+    *,
+    scope: str = "default",
+    parse_mode: str = ParseMode.HTML,
+    delete_previous_on_send: bool = True,
+    allow_edit: bool = True,
+) -> None:
+    """
+    Para callbacks: tenta editar (caption se for photo/video), senão envia novo.
+    Observação: editar vídeo é bem limitado; aqui a gente prioriza SEND limpo.
+    """
+    chat_id = update.effective_chat.id if update.effective_chat else None
+    if chat_id is None:
+        return
+
+    store = _get_store(context)
+
+    if not file_id:
+        return await render_text(
+            update, context, text, reply_markup,
+            scope=scope, parse_mode=parse_mode,
+            delete_previous_on_send=delete_previous_on_send,
+            allow_edit=allow_edit
+        )
+
+    ftype = (file_type or "photo").lower().strip()
+
+    # Para foto, tenta editar caption (melhor UX)
+    if ftype != "video":
+        return await render_photo_or_text(
+            update, context, text, file_id, reply_markup,
+            scope=scope, parse_mode=parse_mode,
+            delete_previous_on_send=delete_previous_on_send,
+            allow_edit=allow_edit
+        )
+
+    # Para vídeo: não tenta edit (Telegram costuma falhar); faz SEND limpo
+    if delete_previous_on_send:
+        last_id = store.get(scope)
+        if isinstance(last_id, int):
+            await _safe_delete(chat_id, last_id, context)
+
+    try:
+        sent = await context.bot.send_video(
+            chat_id=chat_id,
+            video=file_id,
+            caption=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup
+        )
+        store[scope] = sent.message_id
+    except BadRequest as e:
+        if _is_wrong_file_id(e):
+            await render_text(
+                update, context, text, reply_markup,
+                scope=scope, parse_mode=parse_mode,
+                delete_previous_on_send=delete_previous_on_send,
+                allow_edit=False
+            )
+        else:
+            raise

@@ -174,3 +174,79 @@ async def add_combat_xp(user_id, amount: int) -> Dict[str, int]:
     await player_manager.save_player_data(db_id, pdata)
     
     return result
+
+# ================================
+# XP DE PROFISSÃO (Coleta)
+# ================================
+
+PROF_MAX_LEVEL = 50
+
+def get_xp_for_next_profession_level(level: int) -> int:
+    if level >= PROF_MAX_LEVEL:
+        return 0
+    # curva mais leve que combate
+    base = 40
+    lin = 25 * (level - 1)
+    quad = 8 * (level - 1) * (level - 1)
+    return int(base + lin + quad)
+
+def add_profession_xp_inplace(
+    player_data: dict,
+    amount: int,
+    expected_type: str | None = None,
+) -> dict:
+    """
+    Soma XP na profissão ativa (player_data["profession"])
+    expected_type: garante que a XP vai para a profissão correta (lenhador, minerador, etc.)
+    """
+    if not isinstance(player_data, dict):
+        return {}
+
+    try:
+        amount = int(amount)
+    except Exception:
+        amount = 0
+    if amount <= 0:
+        return {"xp_added": 0}
+
+    prof = player_data.setdefault("profession", {}) or {}
+
+    prof_type = (prof.get("type") or "").strip().lower()
+    if expected_type and prof_type != expected_type.strip().lower():
+        # job duplicado ou profissão trocada no meio
+        return {"xp_added": 0, "ignored": True}
+
+    level = int(prof.get("level", 1) or 1)
+    xp = int(prof.get("xp", 0) or 0)
+
+    xp += amount
+
+    levels_gained = 0
+    while True:
+        need = get_xp_for_next_profession_level(level + levels_gained)
+        if need <= 0:
+            xp = 0
+            break
+        if xp < need:
+            break
+        xp -= need
+        levels_gained += 1
+        if (level + levels_gained) >= PROF_MAX_LEVEL:
+            xp = 0
+            break
+
+    new_level = level + levels_gained
+
+    prof["level"] = new_level
+    prof["xp"] = xp
+    player_data["profession"] = prof
+
+    return {
+        "xp_added": amount,
+        "old_level": level,
+        "new_level": new_level,
+        "levels_gained": levels_gained,
+        "current_xp": xp,
+        "next_level_xp": get_xp_for_next_profession_level(new_level),
+        "profession_type": prof_type,
+    }

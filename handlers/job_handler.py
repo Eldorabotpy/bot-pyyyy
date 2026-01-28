@@ -9,7 +9,7 @@ from telegram.error import Forbidden
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from datetime import datetime, timedelta, timezone
-
+from modules.game_data import xp as xp_sys
 # Módulos do Jogo
 from modules import player_manager, game_data, mission_manager, file_ids
 from modules.player.premium import PremiumManager
@@ -88,20 +88,54 @@ def _set_dur(item: dict, cur: int, mx: int) -> None:
     item["durability"] = [int(max(0, min(cur, mx))), int(max(0, mx))]
 
 def _get_item_max_durability_from_info(info: dict, fallback_max: int) -> int:
-    """
-    Pega max dur do item base (ITEMS_DATA). Se não tiver, usa fallback.
-    """
-    dur = info.get("durability")
+    dur = (info or {}).get("durability")
+
     if isinstance(dur, (list, tuple)) and len(dur) >= 2:
         try:
             return int(dur[1])
         except Exception:
             return int(fallback_max or 0)
+
+    if isinstance(dur, int):
+        return int(dur)
+
+    if isinstance(dur, dict):
+        try:
+            return int(dur.get("max", fallback_max or 0))
+        except Exception:
+            return int(fallback_max or 0)
+
     return int(fallback_max or 0)
+
 
 # ==============================================================================
 # 1. A LÓGICA PURA (BLINDADA COM TRY/FINALLY)
 # ==============================================================================
+def _get_item_max_durability_from_info(info: dict, fallback_max: int) -> int:
+    """
+    Pega max dur do item base (ITEMS_DATA). Se não tiver, usa fallback.
+    Aceita: [cur,max], int, {"max":x}
+    """
+    dur = (info or {}).get("durability")
+
+    if isinstance(dur, (list, tuple)) and len(dur) >= 2:
+        try:
+            return int(dur[1])
+        except Exception:
+            return int(fallback_max or 0)
+
+    if isinstance(dur, int):
+        return int(dur)
+
+    if isinstance(dur, dict):
+        try:
+            return int(dur.get("max", fallback_max or 0))
+        except Exception:
+            return int(fallback_max or 0)
+
+    return int(fallback_max or 0)
+
+
 async def execute_collection_logic(
     user_id: str,
     chat_id: int,
@@ -119,11 +153,11 @@ async def execute_collection_logic(
     - calcula qty + crit
     - escolhe item via gather_table (se existir)
     - adiciona no inventário
+    - dá XP de profissão (centralizado em xp.py)
     - consome 1 de durabilidade (com chance de não consumir por tier)
     - NOTIFICA o jogador (sucesso ou falha)
     """
 
-    # --- AUTO-CORREÇÃO DE IDs (Compatibilidade Legado) ---
     FIX_IDS = {
         "minerio_ferro": "minerio_de_ferro",
         "iron_ore": "minerio_de_ferro",
@@ -160,7 +194,7 @@ async def execute_collection_logic(
         except Exception:
             return
 
-    # 1) Limpa mensagem "Coletando..." (cosmético)
+    # limpa "Coletando..." (modo antigo por message_id)
     if message_id_to_delete:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
@@ -171,7 +205,6 @@ async def execute_collection_logic(
     if resource_id is None:
         pass
     elif not resource_id:
-        # estado inválido, destrava
         try:
             player_data["player_state"] = {"action": "idle"}
             await player_manager.save_player_data(user_id, player_data)
@@ -184,25 +217,20 @@ async def execute_collection_logic(
     # ==========================================================
     state = player_data.get("player_state") or {}
     if state.get("action") != "collecting":
-        # Já foi finalizado por outro job (ou cancelado). Não faz nada.
         return
 
     details = state.get("details") or {}
     state_res = details.get("resource_id")
     if state_res and resource_id and str(state_res) != str(resource_id):
-        # Job órfão/antigo: não consome nada.
         return
 
-    # Se quiser ser mais rígido: só finalize quando estiver "vencido"
     finish_iso = state.get("finish_time")
     if finish_iso:
         try:
             finish_dt = datetime.fromisoformat(finish_iso)
             if datetime.now(timezone.utc) < finish_dt:
-                # Ainda não venceu (job adiantado/duplicado). Sai sem consumir.
                 return
         except Exception:
-            # se parse falhar, não bloqueia (mas ainda assim é collecting)
             pass
 
     sucesso_operacao = False
@@ -212,8 +240,11 @@ async def execute_collection_logic(
     tool_name = "Ferramenta"
     dur_txt = ""
 
+    # ✅ evita NameError no finally
+    xp_result = {}
+    user_prof_key = ""
+
     try:
-        # 🔧 Normaliza estrutura legado (garante slot tool existir)
         equip = player_data.setdefault("equipment", {}) or {}
         equip.setdefault("tool", None)
         inv = player_data.setdefault("inventory", {}) or {}
@@ -222,7 +253,12 @@ async def execute_collection_logic(
         # 🛑 TRAVA DE PROFISSÃO
         # ================================
         prof = player_data.get("profession", {}) or {}
-        user_prof_key = (prof.get("key") or prof.get("type") or "").strip().lower()
+        user_prof_key = (prof.get("type") or prof.get("key") or "").strip().lower()
+
+        # padroniza para Mongo atual: profession.type
+        if user_prof_key and not prof.get("type"):
+            prof["type"] = user_prof_key
+            player_data["profession"] = prof
 
         required_profession = None
         if resource_id is not None:
@@ -231,7 +267,6 @@ async def execute_collection_logic(
         if required_profession and user_prof_key != required_profession:
             prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}
             prof_name = prof_info.get("display_name", required_profession.capitalize())
-
             await _notify(
                 f"❌ <b>Falha na Coleta!</b>\n\n"
                 f"⚠️ Requisito: <b>{prof_name}</b>."
@@ -272,7 +307,6 @@ async def execute_collection_logic(
         if required_profession and tool_type != required_profession:
             prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}
             prof_name = prof_info.get("display_name", required_profession.capitalize())
-
             await _notify(
                 "❌ <b>Falha na Coleta!</b>\n\n"
                 "Sua ferramenta não é compatível com este recurso.\n"
@@ -281,7 +315,7 @@ async def execute_collection_logic(
             return
 
         # ================================
-        # 🧱 DURABILIDADE (consome só aqui, só 1)
+        # 🧱 DURABILIDADE
         # ================================
         cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
         if cur_d <= 0:
@@ -295,11 +329,8 @@ async def execute_collection_logic(
         # ================================
         # ⚙️ TIER BALANCE
         # ================================
-        tier_balance = globals().get("TIER_BALANCE") or {
-            1: {"qty": 0, "crit": 0.0, "rare": 0.0, "no_dura": 0.0}
-        }
         tool_tier = _int(tool_info.get("tier", 1), 1)
-        tier_cfg = tier_balance.get(tool_tier, tier_balance[1])
+        tier_cfg = TIER_BALANCE.get(tool_tier, TIER_BALANCE[1])
 
         # ================================
         # 🧮 CÁLCULOS
@@ -323,7 +354,7 @@ async def execute_collection_logic(
             quantidade *= 2
 
         # ================================
-        # 🎲 GATHER TABLE (por região)
+        # 🎲 GATHER TABLE
         # ================================
         final_item_id = item_id_yielded or resource_id or "madeira"
 
@@ -365,7 +396,20 @@ async def execute_collection_logic(
         )
 
         # ================================
-        # 🔧 DURABILIDADE (✅ só -1 por job)
+        # ⭐ XP DE PROFISSÃO (centralizado em xp.py)
+        # ================================
+        xp_gain = 6 + prof_level
+        if is_crit:
+            xp_gain = int(xp_gain * 1.5)
+
+        xp_result = xp_sys.add_profession_xp_inplace(
+            player_data,
+            xp_gain,
+            expected_type=user_prof_key
+        )
+
+        # ================================
+        # 🔧 DURABILIDADE (✅ só -1)
         # ================================
         no_dura = float(tier_cfg.get("no_dura", 0.0) or 0.0)
         if no_dura <= 0.0 or random.random() >= no_dura:
@@ -380,7 +424,7 @@ async def execute_collection_logic(
         logger.error(f"[Collection] ERRO CRÍTICO {user_id}: {e}", exc_info=True)
 
     finally:
-        # ✅ garante idle sempre (e salva)
+        # garante idle + salva
         try:
             player_data["player_state"] = {"action": "idle"}
         except Exception:
@@ -391,7 +435,6 @@ async def execute_collection_logic(
         except Exception as e:
             logger.critical(f"[Collection] FALHA AO SALVAR {user_id}: {e}")
 
-        # ✅ NOTIFICAÇÃO FINAL
         if sucesso_operacao:
             item_info = _get_item_info(final_item_id) or {}
             item_name = item_info.get("display_name", final_item_id.replace("_", " ").title())
@@ -400,9 +443,18 @@ async def execute_collection_logic(
             crit_tag = " ✨<b>CRÍTICO!</b>" if is_crit else ""
             dura_tag = f"\n🛠️ <b>{tool_name}</b> (Durab.: <b>{dur_txt}</b>)" if dur_txt else ""
 
+            xp_added = int((xp_result or {}).get("xp_added", 0) or 0)
+            lvl_up = int((xp_result or {}).get("levels_gained", 0) or 0)
+
+            xp_line = f"\n⭐ <b>XP da Profissão:</b> +<b>{xp_added}</b>" if xp_added else ""
+            prof_name_ui = (user_prof_key or "profissão").title()
+            lvl_line = f"\n⬆️ <b>{prof_name_ui} subiu de nível!</b>" if lvl_up > 0 else ""
+
             await _notify(
                 f"✅ <b>Coleta Finalizada!</b>{crit_tag}\n\n"
                 f"{emoji} <b>{item_name}</b> x<b>{quantidade}</b>"
+                f"{xp_line}"
+                f"{lvl_line}"
                 f"{dura_tag}"
             )
 
