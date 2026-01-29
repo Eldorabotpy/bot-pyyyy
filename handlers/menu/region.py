@@ -1104,30 +1104,29 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = q.message.chat_id
 
     # ==========================================================
-    # ✅ Safe answer (Telegram só aceita 1 answerCallbackQuery por clique)
+    # ✅ Notificação robusta (alert + fallback no chat)
+    # - NÃO damos ACK vazio no começo (isso "come" o show_alert em muitos clients)
     # ==========================================================
-    async def _safe_answer(text: str | None = None, alert: bool = False) -> bool:
+    async def _notify(text: str, alert: bool = True) -> None:
         try:
-            await q.answer(text or "", show_alert=alert)
-            return True
+            await q.answer(text, show_alert=alert)
+            return
         except Exception:
-            return False
-
-    # ACK rápido (para parar o "loading" do botão)
-    await _safe_answer()
+            pass
+        # fallback garantido (usuário sempre vê algo)
+        try:
+            await context.bot.send_message(chat_id=cid, text=text, parse_mode="HTML")
+        except Exception:
+            pass
 
     res_id = (q.data or "").replace("collect_", "", 1).strip()
     if not res_id:
-        ok = await _safe_answer("❌ Recurso inválido.", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ Recurso inválido.", parse_mode="HTML")
+        await _notify("❌ Recurso inválido.", alert=True)
         return
 
     pdata = await player_manager.get_player_data(uid)
     if not pdata:
-        ok = await _safe_answer("❌ Personagem não encontrado.", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ Personagem não encontrado.", parse_mode="HTML")
+        await _notify("❌ Personagem não encontrado.", alert=True)
         return
 
     # ==========================================================
@@ -1146,18 +1145,13 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except Exception:
                         pass
 
-                    # depois de tentar finalizar, recarrega
                     pdata = await player_manager.get_player_data(uid) or pdata
                     state = pdata.get("player_state") or {}
                     if state.get("action") == "collecting":
-                        ok = await _safe_answer("⏳ Você ainda está coletando.", alert=True)
-                        if not ok:
-                            await context.bot.send_message(chat_id=cid, text="⏳ Você ainda está coletando.", parse_mode="HTML")
+                        await _notify("⏳ Você ainda está coletando.", alert=True)
                         return
                 else:
-                    ok = await _safe_answer("⏳ Você já está coletando algo.", alert=True)
-                    if not ok:
-                        await context.bot.send_message(chat_id=cid, text="⏳ Você já está coletando algo.", parse_mode="HTML")
+                    await _notify("⏳ Você já está coletando algo.", alert=True)
                     return
             except Exception:
                 # estado corrompido -> destrava pra não bricar
@@ -1167,9 +1161,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     pass
         else:
-            ok = await _safe_answer("⏳ Você já está coletando algo.", alert=True)
-            if not ok:
-                await context.bot.send_message(chat_id=cid, text="⏳ Você já está coletando algo.", parse_mode="HTML")
+            await _notify("⏳ Você já está coletando algo.", alert=True)
             return
 
     # ==========================================================
@@ -1186,24 +1178,18 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     tool_uid = equip.get("tool")
     if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
-        ok = await _safe_answer("❌ Você precisa equipar uma ferramenta para coletar.", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ Você precisa equipar uma ferramenta para coletar.", parse_mode="HTML")
+        await _notify("❌ Você precisa equipar uma ferramenta para coletar.", alert=True)
         return
 
     tool_inst = inv.get(tool_uid) or {}
     tool_base_id = tool_inst.get("base_id")
     if not tool_base_id:
-        ok = await _safe_answer("❌ Ferramenta inválida (sem base_id).", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ Ferramenta inválida (sem base_id).", parse_mode="HTML")
+        await _notify("❌ Ferramenta inválida (sem base_id).", alert=True)
         return
 
     tool_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(tool_base_id) or {}
     if tool_info.get("type") != "tool":
-        ok = await _safe_answer("❌ O item equipado não é uma ferramenta válida.", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ O item equipado não é uma ferramenta válida.", parse_mode="HTML")
+        await _notify("❌ O item equipado não é uma ferramenta válida.", alert=True)
         return
 
     tool_name = tool_info.get("display_name", tool_base_id.replace("_", " ").title())
@@ -1215,9 +1201,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cur_d, mx_d = 0, 0
 
     if cur_d <= 0:
-        ok = await _safe_answer("❌ Sua ferramenta está quebrada. Repare ou equipe outra.", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ Sua ferramenta está quebrada. Repare ou equipe outra.", parse_mode="HTML")
+        await _notify("❌ Sua ferramenta está quebrada. Repare ou equipe outra.", alert=True)
         return
 
     # ==========================================================
@@ -1237,16 +1221,12 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     req_prof = game_data.get_profession_for_resource(res_id)
     if req_prof and user_prof_key != req_prof:
-        ok = await _safe_answer("❌ Profissão incompatível.", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ Profissão incompatível.", parse_mode="HTML")
+        await _notify("❌ Profissão incompatível.", alert=True)
         return
 
     tool_type = (tool_info.get("tool_type") or "").strip().lower()
     if req_prof and tool_type != req_prof:
-        ok = await _safe_answer("❌ Ferramenta incompatível com este recurso.", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text="❌ Ferramenta incompatível com este recurso.", parse_mode="HTML")
+        await _notify("❌ Ferramenta incompatível com este recurso.", alert=True)
         return
 
     # ==========================================================
@@ -1255,12 +1235,10 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from modules.player.premium import PremiumManager, get_collection_duration_seconds
 
     prem = PremiumManager(pdata)
-
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
+
     if int(pdata.get("energy", 0)) < cost:
-        ok = await _safe_answer(f"Sem energia ({cost}⚡).", alert=True)
-        if not ok:
-            await context.bot.send_message(chat_id=cid, text=f"Sem energia ({cost}⚡).", parse_mode="HTML")
+        await _notify(f"Sem energia ({cost}⚡).", alert=True)
         return
 
     player_manager.spend_energy(pdata, cost)
@@ -1289,6 +1267,12 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         },
     }
     player_manager.set_last_chat_id(pdata, cid)
+
+    # ✅ ACK de sucesso (agora sim)
+    try:
+        await q.answer("⛏️ Coleta iniciada!", show_alert=False)
+    except Exception:
+        pass
 
     # Texto
     human = _humanize_duration(dur)
@@ -1348,6 +1332,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         },
         name=f"collect_{uid}",
     )
+
 
 # =============================================================================
 # Durabilidade e Registro
