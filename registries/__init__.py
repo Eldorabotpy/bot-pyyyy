@@ -11,12 +11,6 @@ from modules.auth_utils import get_current_player_id_async
 from modules import player_manager
 from handlers import runes_handler
 
-# 🔒 ACTION LOCK (IMPORTS)
-from handlers.action_lock_handler import (
-    action_lock_callback_handler,
-    action_lock_message_handler,
-)
-
 # --- IMPORTS DOS REGISTROS (SEUS MÓDULOS) ---
 from .admin import register_admin_handlers
 from .character import register_character_handlers
@@ -36,20 +30,29 @@ from handlers.potion_handler import all_potion_handlers
 from handlers.menu import kingdom  # Para voltar ao Reino
 
 # [CORREÇÃO]: Importação robusta do Menu de Eventos
+# Tenta importar do local novo (handlers/events), depois tenta os antigos
 try:
+    # 1) Local novo sugerido
     from handlers.events import event_menu as events_menu_handler
 except ImportError:
     try:
+        # 2) Local antigo 1
         from handlers.menu import events as events_menu_handler
     except ImportError:
+        # 3) Local antigo 2 (modules)
         from modules.events import event_menu as events_menu_handler
 
 # Importa Entry (Entrada/Lobby) e Combat das Catacumbas
 from modules.events.catacumbas import entry_handler as cat_entry
 from modules.events.catacumbas import combat_handler as cat_combat
+from handlers.action_status_handler import action_status_handler, action_refresh_handler
 
 from modules.auth_utils import get_current_player_id
 from modules.clan_war_engine import register_war_jobs
+from handlers.action_lock_handler import (
+    action_lock_callback_handler,
+    action_lock_message_handler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +71,6 @@ async def update_last_seen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.warning(f"Erro ao atualizar last_seen: {e}")
 
-
 async def restore_session_from_persistent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Middleware global: após restart, repõe logged_player_id na RAM
@@ -76,23 +78,27 @@ async def restore_session_from_persistent(update: Update, context: ContextTypes.
     NÃO faz logout e NÃO limpa nada.
     """
     try:
+        # se já está em RAM, não faz nada
         if getattr(context, "user_data", None) and context.user_data.get("logged_player_id"):
             return
 
+        # tenta repor via Mongo (active_sessions)
         pid = await get_current_player_id_async(update, context)
         if pid:
+            # get_current_player_id_async já repõe RAM, mas garantimos
             if getattr(context, "user_data", None) is not None:
                 context.user_data["logged_player_id"] = pid
     except Exception:
         pass
-
 
 def _register_events_hub_and_claim(application: Application):
     """
     Registra:
       - Hub de Eventos (evt_hub_principal, abrir_hub_eventos_v2, back_to_event_hub)
       - Claim diário (evt_claim_daily_entries)
+    Com prioridade para usar register_handlers(application) se existir.
     """
+    # 1) Melhor caso: o módulo de eventos já expõe register_handlers(application)
     if hasattr(events_menu_handler, "register_handlers"):
         try:
             events_menu_handler.register_handlers(application)
@@ -101,6 +107,8 @@ def _register_events_hub_and_claim(application: Application):
         except Exception as e:
             logger.warning(f"Falha ao chamar event_menu.register_handlers: {e}")
 
+    # 2) Fallback manual (caso o módulo não tenha register_handlers)
+    # Detecta função do Hub
     hub_fn = None
     if hasattr(events_menu_handler, "show_events_menu"):
         hub_fn = events_menu_handler.show_events_menu
@@ -115,6 +123,7 @@ def _register_events_hub_and_claim(application: Application):
     else:
         logger.warning("⚠️ Eventos: Não achei show_events_menu nem show_active_events no módulo event_menu.")
 
+    # Claim diário
     if hasattr(events_menu_handler, "evt_claim_daily_entries"):
         application.add_handler(
             CallbackQueryHandler(events_menu_handler.evt_claim_daily_entries, pattern=r"^evt_claim_daily_entries$")
@@ -125,27 +134,25 @@ def _register_events_hub_and_claim(application: Application):
 
 
 def register_all_handlers(application: Application):
-    """Chama todas as funções de registro de cada categoria na ordem correta."""
     logger.info("Iniciando o registro de todos os handlers...")
 
     # ============================================================
-    # 1) Sessão PRIMEIRO (senão o lock não acha pid e libera tudo)
+    # 🔒 ACTION LOCK GLOBAL (SEMPRE PRIMEIRO)
     # ============================================================
-    application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-100)
+    application.add_handler(action_lock_callback_handler, group=-2)
+    application.add_handler(action_lock_message_handler,  group=-2)
 
     # ============================================================
-    # 2) 🔒 ACTION LOCK TOTAL (firewall de verdade)
+    # Middleware Global
     # ============================================================
-    application.add_handler(action_lock_callback_handler, group=-90)
-    application.add_handler(action_lock_message_handler,  group=-90)
+    application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-1)
+    application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
+    
+    application.add_handler(action_status_handler)
+    application.add_handler(action_refresh_handler)
 
     # ============================================================
-    # 3) Outros middlewares
-    # ============================================================
-    application.add_handler(TypeHandler(Update, update_last_seen), group=-10)
-
-    # ============================================================
-    # 4) Registro por Módulos
+    # Registro por Módulos
     # ============================================================
     register_admin_handlers(application)
     register_character_handlers(application)
@@ -156,14 +163,15 @@ def register_all_handlers(application: Application):
     register_regions_handlers(application)
     register_war_jobs(application)
 
-    # 5) Eventos gerais (Defesa do Reino, World Boss etc.)
+
+    # 3) Eventos gerais (Defesa do Reino, World Boss etc.)
     register_event_handlers(application)
 
-    # 6) Rúnico
+    # 4) Rúnico
     application.add_handler(CallbackQueryHandler(runes_handler.action_router, pattern=r"^rune_npc:"))
     application.add_handler(CallbackQueryHandler(runes_handler.runes_router, pattern=r"^rune_mgr:"))
 
-    # 7) Listas de handlers (legado/outros)
+    # 5) Listas de handlers (legado/outros)
     application.add_handlers(all_world_boss_handlers)
     application.add_handlers(all_potion_handlers)
     # application.add_handlers(all_autohunt_handlers)
@@ -171,12 +179,18 @@ def register_all_handlers(application: Application):
     # ============================================================
     # 💀 EVENTOS (HUB + CLAIM) & NAVEGAÇÃO
     # ============================================================
+
+    # A) Hub de Eventos + Claim diário
     _register_events_hub_and_claim(application)
 
+    # B) Voltar ao Reino (compatibilidade de callbacks)
     application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern=r"^back_to_kingdom$"))
     application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern=r"^show_kingdom_menu$"))
 
+    # C) Catacumbas (Lobby/Entrar/Criar)
     application.add_handlers(cat_entry.handlers)
+
+    # D) Combate das Catacumbas
     application.add_handlers(cat_combat.handlers)
 
     logger.info("✅ Todos os handlers foram registrados com sucesso no registries/__init__.py")
