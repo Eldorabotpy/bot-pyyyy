@@ -49,33 +49,29 @@ def is_busy(pdata: dict) -> Tuple[bool, str, dict]:
 
 
 async def guard_or_notify(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """
-    🔒 LOCK TOTAL:
-    - Se estiver em ação: BLOQUEIA TUDO
-    - Não edita mensagens
-    - Não edita teclados
-    - Não permite navegação
-    - Apenas notifica e encerra
-    """
-
     pid = await get_current_player_id_async(update, context)
     if not pid:
-        # deixa o middleware de sessão agir
         return True
 
     try:
         pdata = await player_manager.get_player_data(pid)
     except Exception:
         return True
-
     if not pdata:
         return True
 
-    busy, action, state = is_busy(pdata)
-    if not busy:
+    state = (pdata.get("player_state") or {})
+    action = (state.get("action") or "idle")
+    finish_dt = _parse_finish_time(state.get("finish_time"))
+
+    # ✅ SÓ BLOQUEIA AÇÕES CRONOMETRADAS (finish_time no futuro)
+    if action == "idle" or not finish_dt:
         return True
 
-    finish_dt = _parse_finish_time(state.get("finish_time"))
+    now = datetime.now(timezone.utc)
+    if finish_dt <= now:
+        return True  # já acabou / está finalizando
+
     remaining = _format_remaining(finish_dt)
 
     msg = f"⏳ Você está em ação: <b>{action}</b>."
@@ -83,7 +79,6 @@ async def guard_or_notify(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         msg += f"\n⏱️ Tempo restante: <b>{remaining}</b>"
     msg += "\n\nAguarde concluir."
 
-    # CALLBACK → só popup, nada mais
     if update.callback_query:
         try:
             await update.callback_query.answer(msg, show_alert=True)
@@ -91,15 +86,11 @@ async def guard_or_notify(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             pass
         return False
 
-    # COMANDO / TEXTO → mensagem simples
     try:
         if update.effective_chat:
-            await context.bot.send_message(
-                update.effective_chat.id,
-                msg,
-                parse_mode="HTML",
-            )
+            await context.bot.send_message(update.effective_chat.id, msg, parse_mode="HTML")
     except Exception:
         pass
 
     return False
+
