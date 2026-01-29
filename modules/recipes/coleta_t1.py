@@ -15,7 +15,8 @@ RECIPES = {
         "ingredients": {
             "pedra": 3,             # Cabeça do machado
             "madeira": 2,           # Cabo
-            "linho": 1              # Amarra (dropa de plantas ou monstros iniciais)
+            "linho": 1,              # Amarra (dropa de plantas ou monstros iniciais)
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 50,
         "craft_time": 20,           # Rápido
@@ -36,7 +37,8 @@ RECIPES = {
         "ingredients": {
             "pedra": 4,
             "madeira": 2,
-            "linho": 1
+            "linho": 1,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 50,
         "craft_time": 20,
@@ -56,7 +58,8 @@ RECIPES = {
         "level_req": 1,
         "ingredients": {
             "pedra": 2,             # Lâmina lascada
-            "madeira": 3            # Cabo longo
+            "madeira": 3,            # Cabo longo
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 40,
         "craft_time": 15,
@@ -77,7 +80,8 @@ RECIPES = {
         "ingredients": {
             "pedra": 1,
             "madeira": 1,
-            "pano_simples": 1       # Dropa de monstros T1 (Ex: Goblins/Bandidos)
+            "pano_simples": 1,       # Dropa de monstros T1 (Ex: Goblins/Bandidos)
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 40,
         "craft_time": 15,
@@ -97,7 +101,8 @@ RECIPES = {
         "level_req": 1,
         "ingredients": {
             "pedra": 3,             # Simbolizando areia/sílica
-            "carvao": 1             # Combustível para derreter
+            "carvao": 1,
+            "nucleo_forja_fraco": 1                          # Combustível para derreter
         },
         "gold_cost": 30,
         "craft_time": 30,

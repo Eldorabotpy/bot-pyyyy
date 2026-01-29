@@ -16,7 +16,8 @@ RECIPES = {
             "barra_de_prata": 5,        # Base metálica condutora
             "cristal_mana": 2,          # Infusão mágica (transforma em Mithril)
             "madeira_elfica": 2,        # Cabo raro
-            "veludo_runico": 1          # Empunhadura mágica
+            "veludo_runico": 1,          # Empunhadura mágica
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 5000,
         "craft_time": 300,              # 5 minutos
@@ -38,7 +39,9 @@ RECIPES = {
             "barra_de_prata": 6,
             "cristal_mana": 3,
             "madeira_elfica": 2,
-            "nucleo_de_energia_instavel": 1 # Item de Golem processado
+            "nucleo_de_energia_instavel": 1,
+            "barra_de_mithril": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 5500,
         "craft_time": 300,
@@ -60,7 +63,9 @@ RECIPES = {
             "barra_de_prata": 4,
             "cristal_mana": 2,
             "madeira_elfica": 3,
-            "essencia_fungica": 2       # Item refinado de alquimia
+            "essencia_fungica": 2,       # Item refinado de alquimia
+            "barra_de_mithril": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 4800,
         "craft_time": 280,
@@ -81,7 +86,9 @@ RECIPES = {
         "ingredients": {
             "obsidiana_ancestral": 3,   # Drop raro de mineração
             "couro_dragao": 1,          # Drop de esfolamento T3+
-            "fio_de_prata": 4           # Para amarrar a lâmina
+            "fio_de_prata": 4,           # Para amarrar a lâmina
+            "barra_de_mithril": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 4500,
         "craft_time": 250,
@@ -102,7 +109,9 @@ RECIPES = {
         "ingredients": {
             "veludo_runico": 4,         # Bolsa de contenção
             "cristal_mana": 2,
-            "essencia_espiritual": 2    # Ectoplasma refinado
+            "essencia_espiritual": 2,    # Ectoplasma refinado
+            "barra_de_mithril": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 4200,
         "craft_time": 240,

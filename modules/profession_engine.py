@@ -37,46 +37,121 @@ async def try_refine(user_id: str, player_data: dict, recipe_id: str) -> dict:
 
 async def try_craft(user_id: str, player_data: dict, recipe_id: str) -> dict:
     recipe = crafting_registry.get_recipe(recipe_id)
-    if not recipe: return {"success": False, "error": "Receita não encontrada."}
+    if not recipe:
+        return {"success": False, "error": "Receita não encontrada."}
 
-    # Trava de Profissão
-    my_prof_data = player_data.get("profession", {})
+    # ----------------------------
+    # 1) Trava de Profissão
+    # ----------------------------
+    my_prof_data = player_data.get("profession", {}) or {}
     my_prof = my_prof_data.get("key") or my_prof_data.get("type")
     req_prof = recipe.get("profession_req")
-    
-    if req_prof and req_prof != my_prof:
-        return {"success": False, "error": f"Requer profissão: {req_prof.capitalize()}"}
 
-    inv = player_data.get("inventory", {})
-    mats = recipe.get("materials", {})
+    if req_prof and req_prof != my_prof:
+        return {"success": False, "error": f"Requer profissão: {str(req_prof).capitalize()}"}
+
+    # ----------------------------
+    # 2) Trava de FERRAMENTA DE CRIAÇÃO (Modelo A)
+    #   - Qualquer tier serve; exige apenas tipo correto e durabilidade > 0
+    # ----------------------------
+    req_tool_type = recipe.get("required_tool_type")
+
+    tool_inst = None
+    tool_info = None
+    tool_tier = 1
+
+    if req_tool_type:
+        _, tool_inst, tool_info = _get_equipped_tool(player_data)
+
+        if not tool_inst or not tool_info:
+            return {"success": False, "error": "Você precisa equipar a ferramenta correta para criar este item."}
+
+        if str(tool_info.get("tool_type")) != str(req_tool_type):
+            return {"success": False, "error": f"Ferramenta incompatível. Requer ferramenta de {req_tool_type}."}
+
+        tool_tier = int(tool_info.get("tier", 1) or 1)
+
+        cur, _ = _dur_tuple((tool_inst or {}).get("durability"))
+        if cur <= 0:
+            return {"success": False, "error": "Sua ferramenta de criação está quebrada."}
+
+    # ----------------------------
+    # 3) Verifica e consome materiais
+    # ----------------------------
+    inv = player_data.get("inventory", {}) or {}
+    mats = recipe.get("materials", {}) or {}
+
     for mat_id, qty in mats.items():
-        have = int(inv.get(mat_id, 0)) if isinstance(inv.get(mat_id), (int, float, str)) else 0
-        if have < int(qty):
+        need = int(qty or 0)
+        have_raw = inv.get(mat_id, 0)
+
+        # inventário pode ter ints (stack) ou dict (unique) — aqui é stack
+        have = int(have_raw) if isinstance(have_raw, (int, float, str)) else 0
+        if have < need:
             return {"success": False, "error": f"Falta: {mat_id}"}
 
     for mat_id, qty in mats.items():
-        player_manager.remove_item_from_inventory(player_data, mat_id, qty)
+        player_manager.remove_item_from_inventory(player_data, mat_id, int(qty or 0))
 
-    base_id = recipe["result_base_id"]
+    # ----------------------------
+    # 4) Cria item (unique instância)
+    # ----------------------------
+    base_id = recipe.get("result_base_id")
+    if not base_id:
+        return {"success": False, "error": "Receita inválida (sem result_base_id)."}
+
     new_item = {
-        "base_id": base_id, "rarity": "comum", "upgrade_level": 1, 
-        "durability": [20, 20], "crafter": player_data.get("character_name", "Alguém")
+        "base_id": base_id,
+        "rarity": "comum",
+        "upgrade_level": 1,
+        "durability": [20, 20],
+        "crafter": player_data.get("character_name", "Alguém"),
+        "crafted_recipe_id": recipe_id,  # útil pro enhance/custos depois
     }
-    
-    # Sorte no craft
+
+        # ----------------------------
+    # 4) Sorte no craft (com bônus do tier da ferramenta)
+    # ----------------------------
     r = random.random()
-    if r < 0.05: new_item["rarity"] = "lendario"
-    elif r < 0.15: new_item["rarity"] = "epico"
-    elif r < 0.35: new_item["rarity"] = "raro"
-    
-    # Aplica a lógica de atributos da sua engine original
+
+    # bônus leve por tier (não explode economia)
+    # T1: 0.00 | T2: 0.01 | T3: 0.02 | T4: 0.03 | T5: 0.04
+    bonus = max(0.0, min(0.04, 0.01 * (tool_tier - 1)))
+    r = max(0.0, r - bonus)
+
+    if r < 0.002:
+        new_item["rarity"] = "lendario"
+    elif r < 0.05:
+        new_item["rarity"] = "epico"
+    elif r < 0.15:
+        new_item["rarity"] = "raro"
+    else:
+        new_item["rarity"] = "comum"
+
+
     _sync_attrs_to_upgrade(new_item)
 
+    # ----------------------------
+    # 5) Entrega + XP
+    # ----------------------------
     await player_manager.add_unique_item_to_player(user_id, new_item)
     _add_xp(player_data, recipe.get("xp_gain", 10))
+
+    # ----------------------------
+    # 6) Consome durabilidade da ferramenta (sem interromper o save)
+    # ----------------------------
+    extra_msg = ""
+    if req_tool_type and tool_inst:
+        broke = not _consume_tool_durability(tool_inst, amount=1)
+        if broke:
+            extra_msg = "\n⚠️ Sua ferramenta de criação quebrou."
+
     await player_manager.save_player_data(user_id, player_data)
 
-    return {"success": True, "message": f"Criado: {base_id} ({new_item['rarity']})!"}
+    return {
+        "success": True,
+        "message": f"Criado: {base_id} ({new_item['rarity']})!{extra_msg}"
+    }
 
 # ==================================================================
 # 2. SUA ENGINE ORIGINAL (Enhance, Atributos, Failstacks, Tabelas)
@@ -95,8 +170,8 @@ PARCHMENT_ID     = "pergaminho_durabilidade"
 # Regras de chance (ajustadas)
 BASE_SUCCESS_BY_TARGET = {
     1: 1.00, 2: 1.00, 3: 1.00, 4: 1.00, 5: 1.00,
-    6: 1.00, 7: 0.98, 8: 0.97, 9: 0.60, 10: 0.45,
-    11: 0.30, 12: 0.36, 13: 0.20, 14: 0.22, 15: 0.15,
+    6: 1.00, 7: 1.00, 8: 1.00, 9: 1.00, 10: 1.00,
+    11: 0.30, 12: 0.20, 13: 0.18, 14: 0.16, 15: 0.15,
     16: 0.10, 17: 0.08, 18: 0.05, 19: 0.02, 20: 0.01
 }
 

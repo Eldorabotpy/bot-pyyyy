@@ -113,7 +113,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     IMG_BOAS_VINDAS = STARTUP_IMAGE_ID or (
-        "AgACAgEAAxkBAAEFrGtpdpSaCwyw_zNTAQXzgIOa42wBAAMHDGsbLt-wRx6YfHKCzxDqAQADAgADeQADOAQ"
+        "AgACAgEAAxkBAAEFwT5pe_K198YjOWcd1n_JBsbMutbL1wACIAxrG9Is4UdD0rQaxUORTQEAAwIAA3kAAzgE"
     )
 
     for member in update.message.new_chat_members:
@@ -133,7 +133,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         try:
             await update.message.reply_photo(
-                photo=IMG_BOAS_VINDAS,
+                photo=STARTUP_IMAGE_ID,
                 caption=caption_text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="HTML"

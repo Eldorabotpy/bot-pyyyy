@@ -328,4 +328,37 @@ REFINING_RECIPES = {
         "outputs": {"corda_de_linho": 1},
         "xp_gain": 8
     },
+
+        # --- METAIS RAROS (MITHRIL / ADAMANTIO) ---
+
+    "ref_barra_de_mithril": {
+        "display_name": "🔷 Fundição de Mithril",
+        "profession": ["fundidor", "ferreiro", "armeiro"],
+        "level_req": 45,
+        "time_seconds": 60 * 60,  # 1h
+        "inputs": {
+            "minerio_de_mithril": 4,
+            "carvao": 3
+        },
+        "outputs": {
+            "barra_de_mithril": 1
+        },
+        "xp_gain": 120
+    },
+
+    "ref_barra_de_adamantio": {
+        "display_name": "🔴 Fundição de Adamantio",
+        "profession": ["fundidor", "ferreiro", "armeiro"],
+        "level_req": 70,
+        "time_seconds": 120 * 60,  # 2h
+        "inputs": {
+            "minerio_de_adamantio": 5,
+            "carvao": 5
+        },
+        "outputs": {
+            "barra_de_adamantio": 1
+        },
+        "xp_gain": 220
+    },
+
 }

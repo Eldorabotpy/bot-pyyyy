@@ -28,6 +28,17 @@ KINGDOM_SHOP = {
     "foice_pedra": ("Foice de Pedra (Colhedor)", 250),
     "faca_pedra": ("Faca de Pederneira (Esfolador)", 250),
     "frasco_vidro": ("Frasco de Vidro (Alquimista)", 250),
+    
+        # ==========================
+    # Ferramentas de CRIAÇÃO (T1)
+    # ==========================
+    "martelo_ferreiro_t1": ("Martelo de Ferreiro (Criação)", 600),
+    "martelo_armeiro_t1": ("Martelo de Armeiro (Criação)", 600),
+    "ferramentas_alfaiate_t1": ("Ferramentas de Alfaiate (Criação)", 550),
+    "ferramentas_joalheiro_t1": ("Ferramentas de Joalheiro (Criação)", 550),
+    "ferramentas_curtidor_t1": ("Ferramentas de Curtidor (Criação)", 550),
+    "ferramentas_fundidor_t1": ("Ferramentas de Fundidor (Criação)", 550),
+
 }
 
 

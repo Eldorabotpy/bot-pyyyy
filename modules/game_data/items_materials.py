@@ -688,5 +688,41 @@ MATERIALS_DATA = {
     "profession": "alquimista",
     "description": "Cinzas carregadas de energia elemental. Reagente versátil."
 },
+    # --- MINÉRIOS RAROS (T4 / T5) ---
+    "minerio_de_mithril": {
+        "display_name": "Minério de Mithril", "emoji": "⛓️🔷",
+        "type": "material_bruto", "category": "coletavel",
+        "tier": 4, "profession": "minerador",
+        "description": "Minério raro, leve e extremamente resistente.",
+        "stackable": True,
+        "media_key": "item_minerio_de_mithril"
+    },
+    "minerio_de_adamantio": {
+        "display_name": "Minério de Adamantio", "emoji": "⛓️🔴",
+        "type": "material_bruto", "category": "coletavel",
+        "tier": 5, "profession": "minerador",
+        "description": "Minério lendário quase indestrutível.",
+        "stackable": True,
+        "media_key": "item_minerio_de_adamantio"
+    },
+
+    # --- BARRAS REFINADAS (MITHRIL / ADAMANTIO) ---
+    "barra_de_mithril": {
+        "display_name": "Barra de Mithril", "emoji": "🧱🔷",
+        "type": "material_refinado", "category": "coletavel",
+        "tier": 4,
+        "description": "Barra refinada de mithril, usada em equipamentos avançados.",
+        "stackable": True,
+        "media_key": "item_barra_de_mithril"
+    },
+    "barra_de_adamantio": {
+        "display_name": "Barra de Adamantio", "emoji": "🧱🔴",
+        "type": "material_refinado", "category": "coletavel",
+        "tier": 5,
+        "description": "Barra lendária de adamantio, base de itens épicos.",
+        "stackable": True,
+        "media_key": "item_barra_de_adamantio"
+    },
+
 
 }

@@ -15,7 +15,9 @@ RECIPES = {
         "ingredients": {
             "placa_draconica_negra": 2, # Refinado (Escama Dragão + Coração Magma)
             "raiz_do_mundo": 1,         # Madeira Lendária
-            "essencia_draconica_pura": 1 # Refinado (Coração + Sangue)
+            "essencia_draconica_pura": 1, # Refinado (Coração + Sangue)
+            "barra_de_adamantio": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 20000,
         "craft_time": 600,              # 10 minutos
@@ -36,7 +38,9 @@ RECIPES = {
         "ingredients": {
             "placa_draconica_negra": 3,
             "raiz_do_mundo": 1,
-            "nucleo_de_energia_instavel": 3
+            "nucleo_de_energia_instavel": 3,
+            "barra_de_adamantio": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 22000,
         "craft_time": 600,
@@ -57,7 +61,9 @@ RECIPES = {
         "ingredients": {
             "raiz_do_mundo": 3,         # Feita quase inteira de madeira divina
             "essencia_vital": 2,        # Drop raro T5
-            "lente_petrificante": 1     # Olho de Basilisco Refinado (para o gume eterno)
+            "lente_petrificante": 1,     # Olho de Basilisco Refinado (para o gume eterno)
+            "barra_de_adamantio": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 18000,
         "craft_time": 550,
@@ -78,7 +84,9 @@ RECIPES = {
         "ingredients": {
             "placa_draconica_negra": 1,
             "dente_afiado_superior": 5, # Refinado T4
-            "essencia_draconica_pura": 2
+            "essencia_draconica_pura": 2,
+            "barra_de_adamantio": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 19000,
         "craft_time": 500,
@@ -99,7 +107,9 @@ RECIPES = {
         "ingredients": {
             "lente_petrificante": 4,    # Paredes de cristal indestrutível
             "essencia_sombra": 5,
-            "luz_estelar": 1            # O núcleo
+            "luz_estelar": 1,            # O núcleo
+            "barra_de_adamantio": 3,
+            "nucleo_forja_fraco": 1
         },
         "gold_cost": 25000,
         "craft_time": 700,

@@ -6,6 +6,7 @@ import logging
 from modules import game_data
 # Importamos refining apenas para tipagem ou acesso direto se necessário
 from modules.game_data import refining 
+from modules.game_data.xp import add_profession_xp_inplace
 
 logger = logging.getLogger(__name__)
 
@@ -230,16 +231,14 @@ async def finish_refine(player_data: dict) -> dict | str:
     if action == "refining": 
         xp_gain = rec.get("xp_gain", 0)
     
-    prof = player_data.get("profession", {})
-    prof["xp"] = int(prof.get("xp", 0)) + int(xp_gain)
-    
-    cur_lvl = int(prof.get("level", 1))
-    req = cur_lvl * 100
-    if prof["xp"] >= req:
-        prof["xp"] -= req
-        prof["level"] = cur_lvl + 1
-    
-    player_data["profession"] = prof
+    # XP DE PROFISSÃO (centralizado no xp.py)
+    if xp_gain > 0:
+        add_profession_xp_inplace(
+            player_data,
+            amount=int(xp_gain),
+            expected_type=rec.get("profession_type") or rec.get("profession")
+        )
+
     player_data["player_state"] = {"action": "idle"}
     
     uid_str = get_uid_str(player_data)
