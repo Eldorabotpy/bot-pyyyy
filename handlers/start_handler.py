@@ -22,36 +22,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# ==============================================================================
-# Helpers (Action Lock)
-# ==============================================================================
-def _parse_finish_time(finish_time_str: str | None) -> datetime | None:
-    if not finish_time_str:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(finish_time_str).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except Exception:
-        return None
-
-
-def _format_remaining(finish_dt: datetime | None) -> str | None:
-    if not finish_dt:
-        return None
-    now = datetime.now(timezone.utc)
-    sec = int((finish_dt - now).total_seconds())
-    if sec <= 0:
-        return "finalizando..."
-    m, s = divmod(sec, 60)
-    h, m = divmod(m, 60)
-    if h > 0:
-        return f"{h}h {m}m"
-    if m > 0:
-        return f"{m}m {s}s"
-    return f"{s}s"
-
 
 # ==============================================================================
 # COMANDO /MENU e /START (Protegido)
@@ -103,32 +73,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if locked:
         await update.message.reply_text(lock_msg, parse_mode=ParseMode.HTML)
-        return
-
-    # ===============================
-    # ⛔ BLOQUEIO POR AÇÃO EM ANDAMENTO
-    # ===============================
-    state = player_data.get("player_state", {}) or {}
-    action = (state.get("action") or "idle")
-
-    if action and action != "idle":
-        finish_dt = _parse_finish_time(state.get("finish_time"))
-        remaining = _format_remaining(finish_dt)
-
-        msg = f"⏳ Você está em ação: <b>{action}</b>."
-        if remaining:
-            msg += f"\n⏱️ Tempo restante: <b>{remaining}</b>"
-        msg += "\n\n⛔ Aguarde concluir para acessar o menu."
-
-        kb = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("📍 Ver ação atual", callback_data="action_status")]]
-        )
-
-        await update.message.reply_text(
-            msg,
-            reply_markup=kb,
-            parse_mode=ParseMode.HTML
-        )
         return
 
     await resume_game_state(update, context, player_data)
