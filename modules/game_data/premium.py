@@ -1,6 +1,6 @@
 # modules/game_data/premium.py
 HUNT_ENERGY_COST = 1
-COLLECTION_TIME_MINUTES = 1
+COLLECTION_TIME_MINUTES = 10
 
 # Probabilidades
 ELITE_CHANCE = 0.20  # 12% de chance base de aparecer Elite

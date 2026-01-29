@@ -1231,7 +1231,7 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     player_manager.spend_energy(pdata, cost)
 
-    base_secs = int(getattr(prem_cfg, "COLLECTION_TIME_MINUTES", 1) * 60)
+    base_secs = int(getattr(prem_cfg, "COLLECTION_TIME_MINUTES", 10) * 60)
     spd = float(prem.get_perk_value("gather_speed_multiplier", 1.0))
     dur = max(1, int(base_secs / max(0.25, spd)))
 
@@ -1264,13 +1264,13 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item_emoji = item_info.get("emoji", "📦")
 
     cap = (
-        f"╭┈┈┈┈┈➤➤⛏️ <b>Coletando</b>\n"
+        f"╭┈┈┈┈┈➤➤⛏️ ℂ𝕠𝕝𝕖𝕥𝕒𝕟𝕕𝕠 ┈┈┈➤➤\n"
         f"│\n"
         f"├┈➤{item_emoji} <b>{item_name}</b>\n"
         f"├┈➤🛠️ {tool_name} ({cur_d}/{mx_d})\n"
         f"├┈➤⚡ Custo: {cost}\n"
         f"├┈➤⏳ Tempo: {human}\n"
-        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤"
+        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤➤"
     )
 
     try:

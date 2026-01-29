@@ -446,7 +446,7 @@ async def execute_collection_logic(
         prof_name_ui = (user_prof_key or "profissão").title()
 
         lines = []
-        lines.append(f"╭┈┈┈┈┈➤➤✅ <b>Coleta Finalizada!</b>{crit_tag}")
+        lines.append(f"╭┈┈┈┈┈➤➤✅ ℂ𝕠𝕝𝕖𝕥𝕒 𝔽𝕚𝕟𝕒𝕝𝕚𝕫𝕒𝕕𝕒!┈┈┈➤➤{crit_tag}")
         lines.append("│")
         lines.append(f"├┈➤{emoji} <b>{item_name}</b> x<b>{quantidade}</b>")
 
@@ -460,7 +460,13 @@ async def execute_collection_logic(
 
         lines.append("╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤")
         final_text = "\n".join(lines)
-
+        # ==========================================================
+        # ✅ BOTÃO VOLTAR (sempre)
+        # ==========================================================
+        back_region = current_loc
+        reply_markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{back_region}")]]
+        )
         # ==========================================================
         # ✅ MÍDIA DE FINALIZAÇÃO POR PROFISSÃO
         # collect_done_{prof} -> fallback collect_done_generic
@@ -472,14 +478,35 @@ async def execute_collection_logic(
 
         try:
             if done_id and done_type == "video":
-                await context.bot.send_video(chat_id, done_id, caption=final_text, parse_mode="HTML")
+                await context.bot.send_video(
+                    chat_id,
+                    done_id,
+                    caption=final_text,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup
+                )
             elif done_id:
-                await context.bot.send_photo(chat_id, done_id, caption=final_text, parse_mode="HTML")
+                await context.bot.send_photo(
+                    chat_id,
+                    done_id,
+                    caption=final_text,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup
+                )
             else:
-                await context.bot.send_message(chat_id, final_text, parse_mode="HTML")
+                await context.bot.send_message(
+                    chat_id,
+                    final_text,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup
+                )
         except Exception:
-            await context.bot.send_message(chat_id, final_text, parse_mode="HTML")
-
+            await context.bot.send_message(
+                chat_id,
+                final_text,
+                parse_mode="HTML",
+                reply_markup=reply_markup
+            )
 
 # ==============================================================================
 # 2. O WRAPPER DO TELEGRAM (MANTIDO E PROTEGIDO)

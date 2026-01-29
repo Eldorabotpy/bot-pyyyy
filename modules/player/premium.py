@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # 1. CONFIGURAÇÕES GERAIS
 # =================================================================
 HUNT_ENERGY_COST = 1
-COLLECTION_TIME_MINUTES = 1
+COLLECTION_TIME_MINUTES = 10
 ELITE_CHANCE = 0.20
 
 # =================================================================
