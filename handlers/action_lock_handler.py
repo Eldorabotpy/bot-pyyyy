@@ -1,5 +1,5 @@
 # handlers/action_lock_handler.py
-# Middleware de bloqueio global por ação em andamento (LOCK TOTAL)
+# Firewall global: se player_state.action != idle, BLOQUEIA TUDO
 
 from telegram import Update
 from telegram.ext import (
@@ -24,13 +24,12 @@ async def block_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-# 🔒 CALLBACKS — SEM pattern (captura absolutamente tudo)
+# ✅ SEM pattern = pega absolutamente todos os callbacks
 action_lock_callback_handler = CallbackQueryHandler(
     block_callbacks,
     block=True
 )
 
-# 🔒 MENSAGENS / COMANDOS
 action_lock_message_handler = MessageHandler(
     filters.ALL,
     block_messages,

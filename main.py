@@ -220,8 +220,6 @@ if __name__ == "__main__":
 
     # Registries
     register_all_handlers(application)
-    register_guild_handlers(application)
-    register_combat_handlers(application)
     from telegram.ext import CallbackQueryHandler
     from pvp.pvp_handler import pvp_menu_command
 
