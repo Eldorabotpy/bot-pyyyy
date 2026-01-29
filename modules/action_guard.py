@@ -16,8 +16,6 @@ DEFAULT_ALLOWED_CALLBACKS = {
     "action_refresh",
     "continue_after_action",
     "noop",
-    "open_region:",
-    "region_info:",
 }
 
 
@@ -113,8 +111,9 @@ async def guard_or_notify(
         if _is_allowed_callback_data(data, allow_callback_data):
             return True
 
-        finish_dt = _parse_finish_time(state.get("finish_time"))
+    finish_dt = _parse_finish_time(state.get("finish_time"))
     remaining = _format_remaining(finish_dt)
+
 
     base_msg = f"⏳ Você está em ação: <b>{_action_label(action)}</b>."
     if remaining:
@@ -142,22 +141,23 @@ async def guard_or_notify(
     )
 
     if update.callback_query:
-        # ✅ callback: popup completo (zero lixo no chat)
+        q = update.callback_query
+
+        # popup (zero lixo)
         try:
-            await update.callback_query.answer(msg_full, show_alert=True)
+            await q.answer(msg_full, show_alert=True)
         except Exception:
             try:
-                await update.callback_query.answer("⏳ Você já está em uma ação. Aguarde.", show_alert=True)
+                await q.answer("⏳ Você já está em uma ação. Aguarde.", show_alert=True)
             except Exception:
                 pass
+
+        # ✅ trava a UI atual (mapa/menus) substituindo os botões
+        try:
+            await q.edit_message_reply_markup(reply_markup=kb)
+        except Exception:
+            pass
+
         return False
 
-    # ✅ comandos/texto: mensagem curta (pra não poluir)
-    try:
-        if update.effective_chat:
-            await context.bot.send_message(update.effective_chat.id, msg_short, parse_mode="HTML", reply_markup=kb)
-    except Exception:
-        pass
-
-    return False
 
