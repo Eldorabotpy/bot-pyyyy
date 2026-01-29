@@ -133,22 +133,23 @@ def _register_events_hub_and_claim(application: Application):
 
 
 def register_all_handlers(application: Application):
-    """Chama todas as funções de registro de cada categoria na ordem correta."""
     logger.info("Iniciando o registro de todos os handlers...")
 
-    # 1) Middleware Global
-    application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-1)
-    application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
-    
-        # ============================================================
-    # 🔒 ACTION LOCK GLOBAL (bloqueia ações durante player_state)
+    # ============================================================
+    # 🔒 ACTION LOCK GLOBAL (SEMPRE PRIMEIRO)
     # ============================================================
     application.add_handler(action_lock_callback_handler, group=-2)
     application.add_handler(action_lock_message_handler,  group=-2)
 
+    # ============================================================
+    # Middleware Global
+    # ============================================================
+    application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-1)
     application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
 
-    # 2) Registro por Módulos
+    # ============================================================
+    # Registro por Módulos
+    # ============================================================
     register_admin_handlers(application)
     register_character_handlers(application)
     register_combat_handlers(application)
@@ -157,6 +158,7 @@ def register_all_handlers(application: Application):
     register_guild_handlers(application)
     register_regions_handlers(application)
     register_war_jobs(application)
+
 
     # 3) Eventos gerais (Defesa do Reino, World Boss etc.)
     register_event_handlers(application)

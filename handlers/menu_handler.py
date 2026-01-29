@@ -131,11 +131,6 @@ async def navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     data = (query.data or "").strip()
     button = ALIASES.get(data, data)
 
-    # Bloqueio de ação (exceto se for para continuar/voltar)
-    if player_state.get("action") not in ("idle", None) and button != "continue_after_action":
-        await query.answer("Conclua sua ação atual primeiro.", show_alert=True)
-        return
-
     try:
         current_location = player_data.get("current_location", "reino_eldora")
         
