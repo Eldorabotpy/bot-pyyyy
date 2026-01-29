@@ -137,23 +137,39 @@ def register_all_handlers(application: Application):
     logger.info("Iniciando o registro de todos os handlers...")
 
     # ============================================================
-    # 🔒 ACTION LOCK GLOBAL (SEMPRE PRIMEIRO)
+    # 1️⃣ MIDDLEWARE DE SESSÃO (SEMPRE PRIMEIRO)
     # ============================================================
-    application.add_handler(action_lock_callback_handler, group=-2)
-    application.add_handler(action_lock_message_handler,  group=-2)
+    application.add_handler(
+        TypeHandler(Update, restore_session_from_persistent),
+        group=-100
+    )
 
     # ============================================================
-    # Middleware Global
+    # 2️⃣ ACTION LOCK TOTAL (BLOQUEIA TUDO)
     # ============================================================
-    application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-1)
-    application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
-    
+    application.add_handler(
+        action_lock_callback_handler,
+        group=-90
+    )
+    application.add_handler(
+        action_lock_message_handler,
+        group=-90
+    )
+
+    # ============================================================
+    # 3️⃣ OUTROS MIDDLEWARES
+    # ============================================================
+    application.add_handler(
+        TypeHandler(Update, update_last_seen),
+        group=-10
+    )
+
+    # ============================================================
+    # 4️⃣ HANDLERS NORMAIS
+    # ============================================================
     application.add_handler(action_status_handler)
     application.add_handler(action_refresh_handler)
 
-    # ============================================================
-    # Registro por Módulos
-    # ============================================================
     register_admin_handlers(application)
     register_character_handlers(application)
     register_combat_handlers(application)
@@ -163,34 +179,20 @@ def register_all_handlers(application: Application):
     register_regions_handlers(application)
     register_war_jobs(application)
 
-
-    # 3) Eventos gerais (Defesa do Reino, World Boss etc.)
     register_event_handlers(application)
 
-    # 4) Rúnico
     application.add_handler(CallbackQueryHandler(runes_handler.action_router, pattern=r"^rune_npc:"))
     application.add_handler(CallbackQueryHandler(runes_handler.runes_router, pattern=r"^rune_mgr:"))
 
-    # 5) Listas de handlers (legado/outros)
     application.add_handlers(all_world_boss_handlers)
     application.add_handlers(all_potion_handlers)
-    # application.add_handlers(all_autohunt_handlers)
 
-    # ============================================================
-    # 💀 EVENTOS (HUB + CLAIM) & NAVEGAÇÃO
-    # ============================================================
-
-    # A) Hub de Eventos + Claim diário
     _register_events_hub_and_claim(application)
 
-    # B) Voltar ao Reino (compatibilidade de callbacks)
     application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern=r"^back_to_kingdom$"))
     application.add_handler(CallbackQueryHandler(kingdom.show_kingdom_menu, pattern=r"^show_kingdom_menu$"))
 
-    # C) Catacumbas (Lobby/Entrar/Criar)
     application.add_handlers(cat_entry.handlers)
-
-    # D) Combate das Catacumbas
     application.add_handlers(cat_combat.handlers)
 
-    logger.info("✅ Todos os handlers foram registrados com sucesso no registries/__init__.py")
+    logger.info("✅ Todos os handlers foram registrados com sucesso")
