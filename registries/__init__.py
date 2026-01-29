@@ -45,14 +45,9 @@ except ImportError:
 # Importa Entry (Entrada/Lobby) e Combat das Catacumbas
 from modules.events.catacumbas import entry_handler as cat_entry
 from modules.events.catacumbas import combat_handler as cat_combat
-from handlers.action_status_handler import action_status_handler, action_refresh_handler
-
 from modules.auth_utils import get_current_player_id
 from modules.clan_war_engine import register_war_jobs
-from handlers.action_lock_handler import (
-    action_lock_callback_handler,
-    action_lock_message_handler,
-)
+
 
 logger = logging.getLogger(__name__)
 
@@ -136,20 +131,12 @@ def _register_events_hub_and_claim(application: Application):
 def register_all_handlers(application: Application):
     logger.info("Iniciando o registro de todos os handlers...")
 
-    # ============================================================
-    # 🔒 ACTION LOCK GLOBAL (SEMPRE PRIMEIRO)
-    # ============================================================
-    application.add_handler(action_lock_callback_handler, group=-2)
-    application.add_handler(action_lock_message_handler,  group=-2)
 
     # ============================================================
     # Middleware Global
     # ============================================================
     application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-1)
     application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
-    
-    application.add_handler(action_status_handler)
-    application.add_handler(action_refresh_handler)
 
     # ============================================================
     # Registro por Módulos
