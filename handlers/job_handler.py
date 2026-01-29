@@ -3,69 +3,34 @@
 
 import random
 import logging
-import traceback
 from typing import Any
-from telegram.error import Forbidden
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from modules.game_data import xp as xp_sys
+
 # Módulos do Jogo
-from modules import player_manager, game_data, mission_manager, file_ids
-from modules.player.premium import PremiumManager
+from modules import player_manager, game_data, file_ids
 
 logger = logging.getLogger(__name__)
 
 # ==========================================================
 # 🎯 BALANCEAMENTO DE COLETA POR TIER DE FERRAMENTA
 # ==========================================================
-# qty     → bônus fixo de quantidade
-# crit    → bônus de chance crítica (%)
-# rare    → bônus direto na chance de recurso raro
-# no_dura → chance de NÃO consumir durabilidade (0.0 a 1.0)
-# ==========================================================
 TIER_BALANCE = {
-    1: {  # Ferramentas básicas
-        "qty": 0,
-        "crit": 0.0,
-        "rare": 0.000,
-        "no_dura": 0.00,
-    },
-    2: {  # Ferro
-        "qty": 1,
-        "crit": 1.0,
-        "rare": 0.003,
-        "no_dura": 0.10,
-    },
-    3: {  # Aço
-        "qty": 2,
-        "crit": 2.0,
-        "rare": 0.007,
-        "no_dura": 0.25,
-    },
-    4: {  # Mithril / Obsidiana
-        "qty": 3,
-        "crit": 3.5,
-        "rare": 0.015,
-        "no_dura": 0.45,
-    },
-    5: {  # Adamantio / Lendárias
-        "qty": 4,
-        "crit": 5.0,
-        "rare": 0.030,
-        "no_dura": 0.70,
-    },
+    1: {"qty": 0, "crit": 0.0, "rare": 0.000, "no_dura": 0.00},
+    2: {"qty": 1, "crit": 1.0, "rare": 0.003, "no_dura": 0.10},
+    3: {"qty": 2, "crit": 2.0, "rare": 0.007, "no_dura": 0.25},
+    4: {"qty": 3, "crit": 3.5, "rare": 0.015, "no_dura": 0.45},
+    5: {"qty": 4, "crit": 5.0, "rare": 0.030, "no_dura": 0.70},
 }
 
 # --- Helpers ---
 def _int(v: Any, default: int = 0) -> int:
-    try: return int(v)
-    except Exception: return int(default)
-
-def _clamp_float(v: Any, lo: float, hi: float, default: float) -> float:
-    try: f = float(v)
-    except Exception: f = default
-    return max(lo, min(hi, f))
+    try:
+        return int(v)
+    except Exception:
+        return int(default)
 
 def _get_item_info(base_id: str) -> dict:
     return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
@@ -87,75 +52,48 @@ def _dur_tuple(raw):
 def _set_dur(item: dict, cur: int, mx: int) -> None:
     item["durability"] = [int(max(0, min(cur, mx))), int(max(0, mx))]
 
-def _get_item_max_durability_from_info(info: dict, fallback_max: int) -> int:
-    dur = (info or {}).get("durability")
+def _parse_iso(dt_str: str | None) -> datetime | None:
+    if not dt_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
 
-    if isinstance(dur, (list, tuple)) and len(dur) >= 2:
-        try:
-            return int(dur[1])
-        except Exception:
-            return int(fallback_max or 0)
-
-    if isinstance(dur, int):
-        return int(dur)
-
-    if isinstance(dur, dict):
-        try:
-            return int(dur.get("max", fallback_max or 0))
-        except Exception:
-            return int(fallback_max or 0)
-
-    return int(fallback_max or 0)
-
+def _resolve_bot(context) -> Any:
+    """
+    Aceita ContextTypes.DEFAULT_TYPE ou Application.
+    Retorna um objeto bot com .send_message/.send_photo/.delete_message.
+    """
+    bot = getattr(context, "bot", None)
+    if bot is not None:
+        return bot
+    app = getattr(context, "application", None)
+    if app is not None and getattr(app, "bot", None) is not None:
+        return app.bot
+    # fallback final: context pode ser Application direto
+    if getattr(context, "bot", None) is not None:
+        return context.bot
+    return None
 
 # ==============================================================================
-# 1. A LÓGICA PURA (BLINDADA COM TRY/FINALLY)
+# COLETA (LÓGICA FINAL)
 # ==============================================================================
-def _get_item_max_durability_from_info(info: dict, fallback_max: int) -> int:
-    """
-    Pega max dur do item base (ITEMS_DATA). Se não tiver, usa fallback.
-    Aceita: [cur,max], int, {"max":x}
-    """
-    dur = (info or {}).get("durability")
-
-    if isinstance(dur, (list, tuple)) and len(dur) >= 2:
-        try:
-            return int(dur[1])
-        except Exception:
-            return int(fallback_max or 0)
-
-    if isinstance(dur, int):
-        return int(dur)
-
-    if isinstance(dur, dict):
-        try:
-            return int(dur.get("max", fallback_max or 0))
-        except Exception:
-            return int(fallback_max or 0)
-
-    return int(fallback_max or 0)
-
-
 async def execute_collection_logic(
     user_id: str,
-    chat_id: int,
+    chat_id: int | None,
     resource_id: str,
     item_id_yielded: str,
     quantity_base: int,
-    context: ContextTypes.DEFAULT_TYPE,
+    context,
     message_id_to_delete: int = None
 ):
     """
-    Finaliza a coleta (IDEMPOTENTE):
-    - Só executa se o player ainda estiver em player_state.action == "collecting"
-      e o resource bater com o estado atual (evita job duplicado consumir durabilidade).
-    - valida profissão + ferramenta + durabilidade
-    - calcula qty + crit
-    - escolhe item via gather_table (se existir)
-    - adiciona no inventário
-    - dá XP de profissão (centralizado em xp.py)
-    - consome 1 de durabilidade (com chance de não consumir por tier)
-    - NOTIFICA o jogador (sucesso ou falha) COM MÍDIA
+    Finaliza a coleta (IDEMPOTENTE) e notifica com mídia.
+    Compatível com context=CallbackContext OU context=Application.
     """
 
     FIX_IDS = {
@@ -172,58 +110,58 @@ async def execute_collection_logic(
     if item_id_yielded in FIX_IDS:
         item_id_yielded = FIX_IDS[item_id_yielded]
 
+    bot = _resolve_bot(context)
     player_data = await player_manager.get_player_data(user_id)
     if not player_data:
         return
 
     current_loc = player_data.get("current_location", "reino_eldora")
 
-    async def _notify_text(text: str, back_region: str | None = None):
-        back_region = back_region or current_loc
-        try:
-            await context.bot.send_message(
-                chat_id,
-                text,
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{back_region}")]]
-                ),
-                parse_mode="HTML",
-            )
-        except Exception:
-            return
-
-    # ==========================================================
-    # ✅ GUARDA ANTI-JOB DUPLICADO (IDEMPOTÊNCIA)
-    # ==========================================================
     state = player_data.get("player_state") or {}
     if state.get("action") != "collecting":
         return
 
     details = state.get("details") or {}
+
+    # ==========================================================
+    # ✅ Resolve chat_id (pós-restart)
+    # ==========================================================
+    if not chat_id:
+        try:
+            chat_id = int(details.get("collect_chat_id") or 0) or None
+        except Exception:
+            chat_id = None
+
+    if not chat_id:
+        try:
+            chat_id = int(player_data.get("last_chat_id") or 0) or None
+        except Exception:
+            chat_id = None
+
+    # ==========================================================
+    # ✅ Guard anti-job duplicado (idempotência)
+    # ==========================================================
     state_res = details.get("resource_id")
     if state_res and resource_id and str(state_res) != str(resource_id):
         return
 
     finish_iso = state.get("finish_time")
-    if finish_iso:
-        try:
-            finish_dt = datetime.fromisoformat(finish_iso)
-            if datetime.now(timezone.utc) < finish_dt:
-                return
-        except Exception:
-            pass
+    finish_dt = _parse_iso(finish_iso) if finish_iso else None
+    if finish_dt:
+        if datetime.now(timezone.utc) < finish_dt:
+            return
 
-    # ✅ se o job não passou message_id, tenta pegar do estado salvo
+    # ✅ Se o job não passou message_id, tenta pegar do estado salvo
     if not message_id_to_delete:
         try:
             message_id_to_delete = int(details.get("collect_message_id") or 0) or None
         except Exception:
             message_id_to_delete = None
 
-    # tenta apagar a msg "Coletando..."
-    if message_id_to_delete:
+    # tenta apagar a msg "Coletando..." (somente se tiver chat_id/bot)
+    if bot and chat_id and message_id_to_delete:
         try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
+            await bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
         except Exception:
             pass
 
@@ -244,21 +182,33 @@ async def execute_collection_logic(
     final_item_id = item_id_yielded or resource_id or "madeira"
     tool_name = "Ferramenta"
     dur_txt = ""
-
     xp_result = {}
     user_prof_key = ""
+
+    async def _notify_text(text: str, back_region: str | None = None):
+        if not bot or not chat_id:
+            return
+        back_region = back_region or current_loc
+        try:
+            await bot.send_message(
+                chat_id,
+                text,
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{back_region}")]]
+                ),
+                parse_mode="HTML",
+            )
+        except Exception:
+            return
 
     try:
         equip = player_data.setdefault("equipment", {}) or {}
         equip.setdefault("tool", None)
         inv = player_data.setdefault("inventory", {}) or {}
 
-        # ================================
-        # 🛑 TRAVA DE PROFISSÃO
-        # ================================
+        # 🛑 profissão
         prof = player_data.get("profession", {}) or {}
         user_prof_key = (prof.get("type") or prof.get("key") or "").strip().lower()
-
         if user_prof_key and not prof.get("type"):
             prof["type"] = user_prof_key
             player_data["profession"] = prof
@@ -270,34 +220,24 @@ async def execute_collection_logic(
         if required_profession and user_prof_key != required_profession:
             prof_info = game_data.PROFESSIONS_DATA.get(required_profession, {}) or {}
             prof_name = prof_info.get("display_name", required_profession.capitalize())
-            await _notify_text(
-                f"❌ <b>Falha na Coleta!</b>\n\n⚠️ Requisito: <b>{prof_name}</b>."
-            )
+            await _notify_text(f"❌ <b>Falha na Coleta!</b>\n\n⚠️ Requisito: <b>{prof_name}</b>.")
             return
 
-        # ================================
-        # 🛠️ TRAVA DE FERRAMENTA
-        # ================================
+        # 🛠️ ferramenta
         tool_uid = equip.get("tool")
         if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
-            await _notify_text(
-                "❌ <b>Falha na Coleta!</b>\n\nVocê precisa equipar uma <b>ferramenta</b>."
-            )
+            await _notify_text("❌ <b>Falha na Coleta!</b>\n\nVocê precisa equipar uma <b>ferramenta</b>.")
             return
 
         tool_inst = inv[tool_uid]
         tool_base_id = tool_inst.get("base_id")
         if not tool_base_id:
-            await _notify_text(
-                "❌ <b>Falha na Coleta!</b>\n\nSua ferramenta equipada está inválida (sem base_id)."
-            )
+            await _notify_text("❌ <b>Falha na Coleta!</b>\n\nSua ferramenta equipada está inválida (sem base_id).")
             return
 
         tool_info = _get_item_info(tool_base_id) or {}
         if tool_info.get("type") != "tool":
-            await _notify_text(
-                "❌ <b>Falha na Coleta!</b>\n\nO item equipado não é uma ferramenta válida."
-            )
+            await _notify_text("❌ <b>Falha na Coleta!</b>\n\nO item equipado não é uma ferramenta válida.")
             return
 
         tool_name = tool_info.get("display_name", tool_base_id.replace("_", " ").title())
@@ -313,9 +253,7 @@ async def execute_collection_logic(
             )
             return
 
-        # ================================
-        # 🧱 DURABILIDADE
-        # ================================
+        # 🧱 durabilidade
         cur_d, mx_d = _dur_tuple(tool_inst.get("durability"))
         if cur_d <= 0:
             await _notify_text(
@@ -325,15 +263,11 @@ async def execute_collection_logic(
             )
             return
 
-        # ================================
-        # ⚙️ TIER BALANCE
-        # ================================
+        # ⚙️ tier
         tool_tier = _int(tool_info.get("tier", 1), 1)
         tier_cfg = TIER_BALANCE.get(tool_tier, TIER_BALANCE[1])
 
-        # ================================
-        # 🧮 CÁLCULOS
-        # ================================
+        # 🧮 cálculos
         prof_level = _int(prof.get("level", 1), 1)
         stats = await player_manager.get_player_total_stats(player_data)
         luck = _int(stats.get("luck", 5))
@@ -352,9 +286,7 @@ async def execute_collection_logic(
         if is_crit:
             quantidade *= 2
 
-        # ================================
-        # 🎲 GATHER TABLE
-        # ================================
+        # 🎲 gather table
         final_item_id = item_id_yielded or resource_id or "madeira"
 
         region_info = (game_data.REGIONS_DATA or {}).get(current_loc, {}) or {}
@@ -388,9 +320,7 @@ async def execute_collection_logic(
 
         player_manager.add_item_to_inventory(player_data, final_item_id, quantidade)
 
-        # ================================
-        # ⭐ XP DE PROFISSÃO
-        # ================================
+        # ⭐ XP profissão
         xp_gain = 6 + prof_level
         if is_crit:
             xp_gain = int(xp_gain * 1.5)
@@ -401,9 +331,7 @@ async def execute_collection_logic(
             expected_type=user_prof_key
         )
 
-        # ================================
-        # 🔧 DURABILIDADE (✅ só -1)
-        # ================================
+        # 🔧 durabilidade (-1)
         no_dura = float(tier_cfg.get("no_dura", 0.0) or 0.0)
         if no_dura <= 0.0 or random.random() >= no_dura:
             cur_d = max(0, cur_d - 1)
@@ -417,7 +345,7 @@ async def execute_collection_logic(
         logger.error(f"[Collection] ERRO CRÍTICO {user_id}: {e}", exc_info=True)
 
     finally:
-        # garante idle + salva
+        # garante idle + salva sempre
         try:
             player_data["player_state"] = {"action": "idle"}
         except Exception:
@@ -431,119 +359,91 @@ async def execute_collection_logic(
         if not sucesso_operacao:
             return
 
-        # ==========================================================
-        # ✅ TEXTO FINAL
-        # ==========================================================
+        # ✅ texto final
         item_info = _get_item_info(final_item_id) or {}
         item_name = item_info.get("display_name", final_item_id.replace("_", " ").title())
         emoji = item_info.get("emoji", "📦")
-
         crit_tag = " ✨<b>CRÍTICO!</b>" if is_crit else ""
 
         xp_added = int((xp_result or {}).get("xp_added", 0) or 0)
         lvl_up = int((xp_result or {}).get("levels_gained", 0) or 0)
-
         prof_name_ui = (user_prof_key or "profissão").title()
 
         lines = []
         lines.append(f"╭┈┈┈┈┈➤➤✅ ℂ𝕠𝕝𝕖𝕥𝕒 𝔽𝕚𝕟𝕒𝕝𝕚𝕫𝕒𝕕𝕒!┈┈┈➤➤{crit_tag}")
         lines.append("│")
         lines.append(f"├┈➤{emoji} <b>{item_name}</b> x<b>{quantidade}</b>")
-
         if xp_added:
             lines.append(f"├┈➤⭐ <b>XP da Profissão:</b> +<b>{xp_added}</b>")
         if lvl_up > 0:
             lines.append(f"├┈➤⬆️ <b>{prof_name_ui} subiu de nível!</b>")
-
         if dur_txt:
             lines.append(f"├┈➤🛠️ <b>{tool_name}</b> (Durab.: <b>{dur_txt}</b>)")
-
         lines.append("╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤")
         final_text = "\n".join(lines)
-        # ==========================================================
-        # ✅ BOTÃO VOLTAR (sempre)
-        # ==========================================================
+
+        # botão voltar
         back_region = current_loc
         reply_markup = InlineKeyboardMarkup(
             [[InlineKeyboardButton("⬅️ Voltar", callback_data=f"open_region:{back_region}")]]
         )
-        # ==========================================================
-        # ✅ MÍDIA DE FINALIZAÇÃO POR PROFISSÃO
-        # collect_done_{prof} -> fallback collect_done_generic
-        # ==========================================================
+
+        # mídia final
         done_key = f"collect_done_{user_prof_key}"
         done_media = file_ids.get_file_data(done_key) or file_ids.get_file_data("collect_done_generic") or {}
         done_id = done_media.get("id")
         done_type = (done_media.get("type") or "photo").strip().lower()
 
+        if not bot or not chat_id:
+            return
+
         try:
             if done_id and done_type == "video":
-                await context.bot.send_video(
-                    chat_id,
-                    done_id,
-                    caption=final_text,
-                    parse_mode="HTML",
-                    reply_markup=reply_markup
-                )
+                await bot.send_video(chat_id, done_id, caption=final_text, parse_mode="HTML", reply_markup=reply_markup)
             elif done_id:
-                await context.bot.send_photo(
-                    chat_id,
-                    done_id,
-                    caption=final_text,
-                    parse_mode="HTML",
-                    reply_markup=reply_markup
-                )
+                await bot.send_photo(chat_id, done_id, caption=final_text, parse_mode="HTML", reply_markup=reply_markup)
             else:
-                await context.bot.send_message(
-                    chat_id,
-                    final_text,
-                    parse_mode="HTML",
-                    reply_markup=reply_markup
-                )
+                await bot.send_message(chat_id, final_text, parse_mode="HTML", reply_markup=reply_markup)
         except Exception:
-            await context.bot.send_message(
-                chat_id,
-                final_text,
-                parse_mode="HTML",
-                reply_markup=reply_markup
-            )
+            try:
+                await bot.send_message(chat_id, final_text, parse_mode="HTML", reply_markup=reply_markup)
+            except Exception:
+                pass
 
 # ==============================================================================
-# 2. O WRAPPER DO TELEGRAM (MANTIDO E PROTEGIDO)
+# JOB WRAPPER
 # ==============================================================================
 async def finish_collection_job(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Job chamado pelo scheduler.
-    """
     job = context.job
-    if not job: return
+    if not job:
+        return
 
     job_data = job.data or {}
-    
-    # --- RECUPERAÇÃO SEGURA DO ID ---
-    raw_uid = job_data.get('user_id') or job.user_id
-    user_id = str(raw_uid) # Garante String para Auth
-    
-    chat_id = job_data.get('chat_id') or job.chat_id
-    
-    # Injeção de Sessão
+
+    raw_uid = job_data.get("user_id") or getattr(job, "user_id", None)
+    user_id = str(raw_uid)
+
+    chat_id = job_data.get("chat_id") or getattr(job, "chat_id", None)
+
+    # compat: injeta sessão se existir
     if context.user_data is not None:
-        context.user_data['logged_player_id'] = user_id
-    
-    msg_id = job_data.get('message_id')
+        context.user_data["logged_player_id"] = user_id
+
+    msg_id = job_data.get("message_id")
     if not msg_id:
         try:
             pdata = await player_manager.get_player_data(user_id)
             if pdata:
-                msg_id = pdata.get('player_state', {}).get('details', {}).get('collect_message_id')
-        except: pass
+                msg_id = (pdata.get("player_state", {}) or {}).get("details", {}).get("collect_message_id")
+        except Exception:
+            pass
 
     await execute_collection_logic(
         user_id=user_id,
         chat_id=chat_id,
-        resource_id=job_data.get('resource_id'),
-        item_id_yielded=job_data.get('item_id_yielded'),
-        quantity_base=job_data.get('quantity', 1),
+        resource_id=job_data.get("resource_id"),
+        item_id_yielded=job_data.get("item_id_yielded"),
+        quantity_base=job_data.get("quantity", 1),
         context=context,
-        message_id_to_delete=msg_id
+        message_id_to_delete=msg_id,
     )

@@ -635,8 +635,8 @@ async def send_region_menu(
             row.append(InlineKeyboardButton("⛩️ 𝐀𝐬𝐜𝐞𝐧𝐬𝐚̃𝐨", callback_data='open_evolution_menu'))
         keyboard.append(row)
 
-    if final_region_key == 'picos_gelados' and is_event_active():
-        keyboard.append([InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
+    #if final_region_key == 'picos_gelados' and is_event_active():
+        #keyboard.append([InlineKeyboardButton("🎅 𝐍𝐨𝐞𝐥", callback_data="christmas_shop_open")])
 
     # --- LÓGICA BLINDADA SUPREMA (CHECK VIP) ---
     is_vip_visual = False
@@ -1100,22 +1100,34 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not q or not q.message:
         return
 
-    try:
-        await q.answer()
-    except Exception:
-        pass
-
     uid = get_current_player_id(update, context)
     cid = q.message.chat_id
 
+    # ==========================================================
+    # ✅ Safe answer (Telegram só aceita 1 answerCallbackQuery por clique)
+    # ==========================================================
+    async def _safe_answer(text: str | None = None, alert: bool = False) -> bool:
+        try:
+            await q.answer(text or "", show_alert=alert)
+            return True
+        except Exception:
+            return False
+
+    # ACK rápido (para parar o "loading" do botão)
+    await _safe_answer()
+
     res_id = (q.data or "").replace("collect_", "", 1).strip()
     if not res_id:
-        await q.answer("❌ Recurso inválido.", show_alert=True)
+        ok = await _safe_answer("❌ Recurso inválido.", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ Recurso inválido.", parse_mode="HTML")
         return
 
     pdata = await player_manager.get_player_data(uid)
     if not pdata:
-        await q.answer("❌ Personagem não encontrado.", show_alert=True)
+        ok = await _safe_answer("❌ Personagem não encontrado.", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ Personagem não encontrado.", parse_mode="HTML")
         return
 
     # ==========================================================
@@ -1127,21 +1139,25 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         finish_iso = state.get("finish_time")
         if finish_iso:
             try:
-                # aceita "...Z"
                 finish_dt = datetime.fromisoformat(str(finish_iso).replace("Z", "+00:00"))
                 if datetime.now(timezone.utc) >= finish_dt:
                     try:
                         await player_manager.try_finalize_timed_action_for_user(uid)
                     except Exception:
                         pass
+
                     # depois de tentar finalizar, recarrega
                     pdata = await player_manager.get_player_data(uid) or pdata
                     state = pdata.get("player_state") or {}
                     if state.get("action") == "collecting":
-                        await q.answer("⏳ Você ainda está coletando.", show_alert=True)
+                        ok = await _safe_answer("⏳ Você ainda está coletando.", alert=True)
+                        if not ok:
+                            await context.bot.send_message(chat_id=cid, text="⏳ Você ainda está coletando.", parse_mode="HTML")
                         return
                 else:
-                    await q.answer("⏳ Você já está coletando algo.", show_alert=True)
+                    ok = await _safe_answer("⏳ Você já está coletando algo.", alert=True)
+                    if not ok:
+                        await context.bot.send_message(chat_id=cid, text="⏳ Você já está coletando algo.", parse_mode="HTML")
                     return
             except Exception:
                 # estado corrompido -> destrava pra não bricar
@@ -1151,7 +1167,9 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     pass
         else:
-            await q.answer("⏳ Você já está coletando algo.", show_alert=True)
+            ok = await _safe_answer("⏳ Você já está coletando algo.", alert=True)
+            if not ok:
+                await context.bot.send_message(chat_id=cid, text="⏳ Você já está coletando algo.", parse_mode="HTML")
             return
 
     # ==========================================================
@@ -1168,18 +1186,24 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     tool_uid = equip.get("tool")
     if not tool_uid or tool_uid not in inv or not isinstance(inv.get(tool_uid), dict):
-        await q.answer("❌ Você precisa equipar uma ferramenta para coletar.", show_alert=True)
+        ok = await _safe_answer("❌ Você precisa equipar uma ferramenta para coletar.", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ Você precisa equipar uma ferramenta para coletar.", parse_mode="HTML")
         return
 
     tool_inst = inv.get(tool_uid) or {}
     tool_base_id = tool_inst.get("base_id")
     if not tool_base_id:
-        await q.answer("❌ Ferramenta inválida (sem base_id).", show_alert=True)
+        ok = await _safe_answer("❌ Ferramenta inválida (sem base_id).", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ Ferramenta inválida (sem base_id).", parse_mode="HTML")
         return
 
     tool_info = (getattr(game_data, "ITEMS_DATA", {}) or {}).get(tool_base_id) or {}
     if tool_info.get("type") != "tool":
-        await q.answer("❌ O item equipado não é uma ferramenta válida.", show_alert=True)
+        ok = await _safe_answer("❌ O item equipado não é uma ferramenta válida.", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ O item equipado não é uma ferramenta válida.", parse_mode="HTML")
         return
 
     tool_name = tool_info.get("display_name", tool_base_id.replace("_", " ").title())
@@ -1191,7 +1215,9 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cur_d, mx_d = 0, 0
 
     if cur_d <= 0:
-        await q.answer("❌ Sua ferramenta está quebrada. Repare ou equipe outra.", show_alert=True)
+        ok = await _safe_answer("❌ Sua ferramenta está quebrada. Repare ou equipe outra.", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ Sua ferramenta está quebrada. Repare ou equipe outra.", parse_mode="HTML")
         return
 
     # ==========================================================
@@ -1211,29 +1237,34 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     req_prof = game_data.get_profession_for_resource(res_id)
     if req_prof and user_prof_key != req_prof:
-        await q.answer("❌ Profissão incompatível.", show_alert=True)
+        ok = await _safe_answer("❌ Profissão incompatível.", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ Profissão incompatível.", parse_mode="HTML")
         return
 
     tool_type = (tool_info.get("tool_type") or "").strip().lower()
     if req_prof and tool_type != req_prof:
-        await q.answer("❌ Ferramenta incompatível com este recurso.", show_alert=True)
+        ok = await _safe_answer("❌ Ferramenta incompatível com este recurso.", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text="❌ Ferramenta incompatível com este recurso.", parse_mode="HTML")
         return
 
     # ==========================================================
-    # ⚡ Energia + tempo por tier
+    # ⚡ Energia + tempo por tier (centralizado)
     # ==========================================================
-    from modules.player import premium as prem_cfg
+    from modules.player.premium import PremiumManager, get_collection_duration_seconds
+
     prem = PremiumManager(pdata)
 
     cost = int(prem.get_perk_value("gather_energy_cost", 1))
     if int(pdata.get("energy", 0)) < cost:
-        await q.answer(f"Sem energia ({cost}⚡).", show_alert=True)
+        ok = await _safe_answer(f"Sem energia ({cost}⚡).", alert=True)
+        if not ok:
+            await context.bot.send_message(chat_id=cid, text=f"Sem energia ({cost}⚡).", parse_mode="HTML")
         return
-    player_manager.spend_energy(pdata, cost)
 
-    base_secs = int(getattr(prem_cfg, "COLLECTION_TIME_MINUTES", 10) * 60)
-    spd = float(prem.get_perk_value("gather_speed_multiplier", 1.0))
-    dur = max(1, int(base_secs / max(0.25, spd)))
+    player_manager.spend_energy(pdata, cost)
+    dur = int(get_collection_duration_seconds(pdata))
 
     # item_yielded
     if req_prof:
@@ -1253,6 +1284,8 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "item_id_yielded": item_yielded,
             "quantity": 1,
             "started_at": now.isoformat(),
+            # ✅ persistência p/ pós-restart e p/ deletar "Coletando"
+            "collect_chat_id": cid,
         },
     }
     player_manager.set_last_chat_id(pdata, cid)
@@ -1295,9 +1328,10 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         sent = await context.bot.send_message(cid, cap, parse_mode="HTML")
 
-    # ✅ salva message_id para o job deletar depois
+    # ✅ salva message_id para o job deletar depois + persistência no state
     if sent:
         pdata["player_state"]["details"]["collect_message_id"] = sent.message_id
+        pdata["player_state"]["details"]["collect_chat_id"] = cid
 
     await player_manager.save_player_data(uid, pdata)
 
@@ -1314,7 +1348,6 @@ async def collect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         },
         name=f"collect_{uid}",
     )
-
 
 # =============================================================================
 # Durabilidade e Registro
