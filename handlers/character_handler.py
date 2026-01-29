@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # FUNÇÕES DE EXIBIÇÃO
 # =============================================================================
-MAX_EQUIPPED_SKILLS = 6
+MAX_EQUIPPED_SKILLS = 8
 
 def _format_enchantments(enchantments: dict) -> str:
     """Formata encantamentos com emojis e usa o VALUE do encanto."""
@@ -362,7 +362,7 @@ async def show_character_sheet(update: Update, context: ContextTypes.DEFAULT_TYP
         [InlineKeyboardButton("📊 𝐒𝐭𝐚𝐭𝐮𝐬 & 𝐀𝐭𝐫𝐢𝐛𝐮𝐭𝐨𝐬", callback_data='char_status')],
         [InlineKeyboardButton("🎒 𝐈𝐧𝐯𝐞𝐧𝐭𝐚́𝐫𝐢𝐨", callback_data='char_inventory')],
         [InlineKeyboardButton("⚔️ 𝐄𝐪𝐮𝐢𝐩𝐚𝐦𝐞𝐧𝐭𝐨", callback_data='char_equipment')],
-        [InlineKeyboardButton("📚 Habilidades", callback_data='skills_menu_open')],
+        [InlineKeyboardButton("📚 𝐇𝐚𝐛𝐢𝐥𝐢𝐝𝐚𝐝𝐞𝐬", callback_data='skills_menu_open')],
     ]
     
     if int(player_data.get('level', 1)) >= 5 and (player_data.get('profession') or {}).get('type') is None:

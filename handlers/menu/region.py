@@ -571,14 +571,14 @@ async def send_region_menu(
     p_gold, p_gems = player_manager.get_gold(player_data), player_manager.get_gems(player_data)
 
     status_hud = (
-        f"\n╭─────── [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ─────────➤\n"
-        f"│ ╭┈➤ 👤 {char_name} (Nv. {char_lvl})\n"
+        f"\n╭┈┈┈┈┈┈┈ [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ┈┈┈┈┈┈┈┈┈➤\n"
+        f"│ ╭┈➤ 👤 {char_name} (𝐍𝐯. {char_lvl})\n"
         f"│ ├┈➤ 🎖️ 𝐏𝐥𝐚𝐧𝐨: <b>{tier_display}</b>\n"
-        f"│ ├┈➤ 🛠 {prof_name} [Prof. {prof_lvl}]\n"
-        f"│ ├┈➤ ❤️ HP: {p_hp}/{max_hp}  💙 MP: {p_mp}/{max_mp}\n"
-        f"│ ├┈➤ ⚡ ENERGIA: 🪫{p_en}/🔋{max_en}\n"
+        f"│ ├┈➤ 🛠 {prof_name} [𝐏𝐫𝐨𝐟.nv {prof_lvl}]\n"
+        f"│ ├┈➤ ❤️ 𝐇𝐏: {p_hp}/{max_hp}  💙 𝐌𝐏: {p_mp}/{max_mp}\n"
+        f"│ ├┈➤ ⚡ 𝐄𝐍𝐄𝐑𝐆𝐈𝐀: 🪫{p_en} /🔋{max_en} \n"
         f"│ ╰┈➤ 💰 {p_gold:,}  💎 {p_gems:,}\n"
-        f"╰───────────────────────➤"
+        f"╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤"
     )
 
     caption = f"🗺️ Você está em <b>{region_info.get('display_name', 'Região')}</b>.\n╰┈➤ <i>O que deseja fazer?</i>\n{status_hud}"
@@ -650,7 +650,7 @@ async def send_region_menu(
 
     # Auto Hunt bloqueado se free
     if not is_vip_visual:
-        combat.append(InlineKeyboardButton("🤖 Auto (🔒)", callback_data="premium_info"))
+        combat.append(InlineKeyboardButton("🤖 𝐀𝐮𝐭𝐨 𝐂𝐚𝐜̧𝐚 (🔒)", callback_data="premium_info"))
 
     if build_region_dungeon_button:
         btn = build_region_dungeon_button(final_region_key)
@@ -664,9 +664,9 @@ async def send_region_menu(
     # --- LINHA VIP: Auto Hunt Rápido ---
     if is_vip_visual:
         keyboard.append([
-            InlineKeyboardButton("⏱ 10x", callback_data=f"autohunt_start_10_{final_region_key}"),
-            InlineKeyboardButton("⏱ 25x", callback_data=f"autohunt_start_25_{final_region_key}"),
-            InlineKeyboardButton("⏱ 35x", callback_data=f"autohunt_start_35_{final_region_key}"),
+            InlineKeyboardButton("⏱ 𝟙𝟘𝕩", callback_data=f"autohunt_start_10_{final_region_key}"),
+            InlineKeyboardButton("⏱ 𝟚𝟝𝕩", callback_data=f"autohunt_start_25_{final_region_key}"),
+            InlineKeyboardButton("⏱ 𝟛𝟝𝕩", callback_data=f"autohunt_start_35_{final_region_key}"),
         ])
 
     # Coleta
@@ -678,7 +678,7 @@ async def send_region_menu(
         if not req_prof or (my_prof and my_prof == req_prof):
             item_info = (game_data.ITEMS_DATA or {}).get(res_id, {})
             item_name = item_info.get("display_name", res_id.replace("_", " ").title())
-            keyboard.append([InlineKeyboardButton(f"⛏️ Coletar {item_name}", callback_data=f"collect_{res_id}")])
+            keyboard.append([InlineKeyboardButton(f"⛏️ 𝐂𝐨𝐥𝐞𝐭𝐚𝐫 {item_name}", callback_data=f"collect_{res_id}")])
 
     keyboard.append([
         InlineKeyboardButton("🗺️ 𝐌𝐚𝐩𝐚", callback_data="travel"),
@@ -1020,14 +1020,14 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     is_neighbor = dest in WORLD_MAP.get(cur, []) or cur == dest
     if not is_vip and not is_neighbor:
-        await q.answer("Muito longe para viajar a pé.", show_alert=True)
+        await q.answer("𝑴𝒖𝒊𝒕𝒐 𝒍𝒐𝒏𝒈𝒆 𝒑𝒂𝒓𝒂 𝒗𝒊𝒂𝒋𝒂𝒓 𝒂 𝒑𝒆́.", show_alert=True)
         return
 
     # Calcula custo de viagem
     cost = int(((game_data.REGIONS_DATA or {}).get(dest, {}) or {}).get("travel_cost", 0))
     current_energy = int(pdata.get("energy", 0))
     if cost > 0 and current_energy < cost:
-        await q.answer(f"Energia insuficiente. Precisa de {cost}⚡.", show_alert=True)
+        await q.answer(f"𝑬𝒏𝒆𝒓𝒈𝒊𝒂 𝒊𝒏𝒔𝒖𝒇𝒊𝒄𝒊𝒆𝒏𝒕𝒆. 𝑷𝒓𝒆𝒄𝒊𝒔𝒂 𝒅𝒆 {cost}⚡.", show_alert=True)
         return
 
     if cost > 0:
@@ -1061,7 +1061,7 @@ async def region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     human = _humanize_duration(secs)
     dest_name = (game_data.REGIONS_DATA or {}).get(dest, {}).get("display_name", dest)
-    txt = f"🧭 Viajando para <b>{dest_name}</b>… (~{human})"
+    txt = f"🧭 𝑽𝒊𝒂𝒋𝒂𝒏𝒅𝒐 𝒑𝒂𝒓𝒂 <b>>>>┈➤ {dest_name}</b>… (~{human})"
 
     await context.bot.send_message(chat_id=cid, text=txt, parse_mode="HTML")
     context.job_queue.run_once(
