@@ -201,6 +201,9 @@ async def execute_collection_logic(
         except Exception:
             return
 
+    # 🔒 guard: nível anterior para fallback do UI (mesmo se xp_result vier vazio/ignored)
+    prof_level_before_xp = 1
+
     try:
         equip = player_data.setdefault("equipment", {}) or {}
         equip.setdefault("tool", None)
@@ -269,6 +272,7 @@ async def execute_collection_logic(
 
         # 🧮 cálculos
         prof_level = _int(prof.get("level", 1), 1)
+        prof_level_before_xp = prof_level  # fallback UI
         stats = await player_manager.get_player_total_stats(player_data)
         luck = _int(stats.get("luck", 5))
 
@@ -367,26 +371,46 @@ async def execute_collection_logic(
 
         xp_added = int((xp_result or {}).get("xp_added", 0) or 0)
 
-        old_lvl = int((xp_result or {}).get("old_level", 0) or 0)
+        # ✅ usa old/new do xp_result; fallback para o nível real anterior
+        old_lvl = int((xp_result or {}).get("old_level", prof_level_before_xp) or prof_level_before_xp)
         new_lvl = int((xp_result or {}).get("new_level", old_lvl) or old_lvl)
-        levels_gained = max(0, new_lvl - old_lvl)
 
-        prof_name_ui = (user_prof_key or "profissão").title()
+        # ✅ preferir levels_gained do xp_result quando vier
+        levels_gained = (xp_result or {}).get("levels_gained", None)
+        if levels_gained is None:
+            levels_gained = max(0, new_lvl - old_lvl)
+        else:
+            try:
+                levels_gained = max(0, int(levels_gained))
+            except Exception:
+                levels_gained = max(0, new_lvl - old_lvl)
 
+        # ✅ nome bonito da profissão (se existir)
+        prof_display = None
+        try:
+            prof_info = (game_data.PROFESSIONS_DATA or {}).get(user_prof_key, {}) or {}
+            prof_display = prof_info.get("display_name")
+        except Exception:
+            prof_display = None
+        prof_name_ui = (prof_display or user_prof_key or "profissão").title()
 
         lines = []
         lines.append(f"╭┈┈┈┈┈➤➤✅ ℂ𝕠𝕝𝕖𝕥𝕒 𝔽𝕚𝕟𝕒𝕝𝕚𝕫𝕒𝕕𝕒!┈┈┈➤➤{crit_tag}")
         lines.append("│")
         lines.append(f"├┈➤{emoji} <b>{item_name}</b> x<b>{quantidade}</b>")
+
         if xp_added:
             lines.append(f"├┈➤⭐ <b>XP da Profissão:</b> +<b>{xp_added}</b>")
+
         if levels_gained > 0:
             lines.append(
                 f"├┈➤⬆️ <b>{prof_name_ui} subiu {levels_gained} nível(is)!</b> "
                 f"(Lv. <b>{old_lvl}</b> → <b>{new_lvl}</b>)"
-    )
+            )
+
         if dur_txt:
             lines.append(f"├┈➤🛠️ <b>{tool_name}</b> (Durab.: <b>{dur_txt}</b>)")
+
         lines.append("╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤")
         final_text = "\n".join(lines)
 

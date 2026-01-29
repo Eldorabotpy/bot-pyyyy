@@ -48,6 +48,10 @@ from modules.events.catacumbas import combat_handler as cat_combat
 
 from modules.auth_utils import get_current_player_id
 from modules.clan_war_engine import register_war_jobs
+from handlers.action_lock_handler import (
+    action_lock_callback_handler,
+    action_lock_message_handler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +139,12 @@ def register_all_handlers(application: Application):
     # 1) Middleware Global
     application.add_handler(TypeHandler(Update, restore_session_from_persistent), group=-1)
     application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
+    
+        # ============================================================
+    # 🔒 ACTION LOCK GLOBAL (bloqueia ações durante player_state)
+    # ============================================================
+    application.add_handler(action_lock_callback_handler, group=-2)
+    application.add_handler(action_lock_message_handler,  group=-2)
 
     application.add_handler(TypeHandler(Update, update_last_seen), group=-1)
 
