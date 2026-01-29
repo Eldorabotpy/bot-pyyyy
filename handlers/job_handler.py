@@ -404,7 +404,7 @@ async def execute_collection_logic(
 
         if levels_gained > 0:
             lines.append(
-                f"├┈➤⬆️ <b>{prof_name_ui} subiu {levels_gained} nível(is)!</b> "
+                f"├┈➤⬆️ <b>{prof_name_ui} subiu {levels_gained} nível!</b> "
                 f"(Lv. <b>{old_lvl}</b> → <b>{new_lvl}</b>)"
             )
 

@@ -1,7 +1,14 @@
 # handlers/action_lock_handler.py
+# Middleware de bloqueio global por ação em andamento (LOCK TOTAL)
 
 from telegram import Update
-from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import (
+    ContextTypes,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+)
+
 from modules.action_guard import guard_or_notify
 
 
@@ -17,7 +24,7 @@ async def block_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-# 🔒 CALLBACKS — SEM pattern (captura TUDO)
+# 🔒 CALLBACKS — SEM pattern (captura absolutamente tudo)
 action_lock_callback_handler = CallbackQueryHandler(
     block_callbacks,
     block=True

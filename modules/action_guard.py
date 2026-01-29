@@ -52,15 +52,16 @@ async def guard_or_notify(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """
     🔒 LOCK TOTAL:
     - Se estiver em ação: BLOQUEIA TUDO
-    - Não edita mensagem
-    - Não troca teclado
-    - Não abre mapa
+    - Não edita mensagens
+    - Não edita teclados
+    - Não permite navegação
     - Apenas notifica e encerra
     """
 
     pid = await get_current_player_id_async(update, context)
     if not pid:
-        return True  # deixa login/sessão acontecer
+        # deixa o middleware de sessão agir
+        return True
 
     try:
         pdata = await player_manager.get_player_data(pid)
