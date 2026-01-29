@@ -366,8 +366,13 @@ async def execute_collection_logic(
         crit_tag = " ✨<b>CRÍTICO!</b>" if is_crit else ""
 
         xp_added = int((xp_result or {}).get("xp_added", 0) or 0)
-        lvl_up = int((xp_result or {}).get("levels_gained", 0) or 0)
+
+        old_lvl = int((xp_result or {}).get("old_level", 0) or 0)
+        new_lvl = int((xp_result or {}).get("new_level", old_lvl) or old_lvl)
+        levels_gained = max(0, new_lvl - old_lvl)
+
         prof_name_ui = (user_prof_key or "profissão").title()
+
 
         lines = []
         lines.append(f"╭┈┈┈┈┈➤➤✅ ℂ𝕠𝕝𝕖𝕥𝕒 𝔽𝕚𝕟𝕒𝕝𝕚𝕫𝕒𝕕𝕒!┈┈┈➤➤{crit_tag}")
@@ -375,8 +380,11 @@ async def execute_collection_logic(
         lines.append(f"├┈➤{emoji} <b>{item_name}</b> x<b>{quantidade}</b>")
         if xp_added:
             lines.append(f"├┈➤⭐ <b>XP da Profissão:</b> +<b>{xp_added}</b>")
-        if lvl_up > 0:
-            lines.append(f"├┈➤⬆️ <b>{prof_name_ui} subiu de nível!</b>")
+        if levels_gained > 0:
+            lines.append(
+                f"├┈➤⬆️ <b>{prof_name_ui} subiu {levels_gained} nível(is)!</b> "
+                f"(Lv. <b>{old_lvl}</b> → <b>{new_lvl}</b>)"
+    )
         if dur_txt:
             lines.append(f"├┈➤🛠️ <b>{tool_name}</b> (Durab.: <b>{dur_txt}</b>)")
         lines.append("╰┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈➤")
