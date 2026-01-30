@@ -62,7 +62,12 @@ async def finish_refine_job(context: ContextTypes.DEFAULT_TYPE):
     
     if xp > 0:
         lines.append(f" ╰┈➤ ✨ <b>XP Profissão:</b> <code>+{xp}</code>")
-        
+    # 🔔 NOTIFICA LEVEL UP DA PROFISSÃO
+    xp_info = res.get("xp_info") or {}
+    if xp_info.get("levels_gained", 0) > 0:
+        new_lvl = xp_info.get("new_level")
+        lines.append(f" ╰┈➤ 🏅 <b>Profissão subiu para Nv.{new_lvl}!</b>")
+     
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar ao Refino", callback_data="ref_main")]])
     await _safe_send_with_media(context, chat_id, "\n".join(lines), kb)
 

@@ -115,65 +115,133 @@ async def start_refine(player_data: dict, recipe_id: str) -> dict | str:
     # ✅ IMPORTAÇÃO TARDIA
     from modules import player_manager
 
-    # Usa o preview que já calcula o tempo correto com Premium
+    # Preview já valida nível/materiais e calcula tempo com Premium
     prev = preview_refine(recipe_id, player_data)
-    if not prev: return "Receita inválida."
-    if not prev["can_refine"]: return "Materiais ou nível insuficientes."
-    
-    inputs = prev["inputs"]
-    for item, qty in inputs.items():
-        if not player_manager.consume_item(player_data, item, qty):
-            return f"Erro ao consumir {item}."
+    if not prev:
+        return "Receita inválida."
+    if not prev.get("can_refine"):
+        return "Materiais ou nível insuficientes."
+
+    inputs = prev.get("inputs", {}) or {}
+    for item_id, qty in inputs.items():
+        try:
+            qty = int(qty or 0)
+        except Exception:
+            qty = 0
+
+        if qty <= 0:
+            continue
+
+        ok = player_manager.consume_item(player_data, item_id, qty)
+        if not ok:
+            return f"Erro ao consumir {item_id}."
 
     now = datetime.now(timezone.utc)
-    duration = prev["duration_seconds"]
+
+    try:
+        duration = int(prev.get("duration_seconds", 0) or 0)
+    except Exception:
+        duration = 0
+    duration = max(1, duration)
+
     finish_time = now + timedelta(seconds=duration)
-    
+
+    # ✅ Anti-exploit: salva o tipo da profissão ATIVA no momento do start
+    prof = player_data.get("profession", {}) or {}
+    prof_type = (prof.get("type") or prof.get("key") or "")
+    prof_type = str(prof_type).strip().lower()
+
+    # XP base (por execução)
+    rec = game_data.REFINING_RECIPES.get(recipe_id, {}) or {}
+    try:
+        xp_gain = int(rec.get("xp_gain", 0) or 0)
+    except Exception:
+        xp_gain = 0
+
     player_data["player_state"] = {
         "action": "refining",
         "started_at": now.isoformat(),
         "finish_time": finish_time.isoformat(),
         "details": {
             "recipe_id": recipe_id,
-            "xp_gain": game_data.REFINING_RECIPES[recipe_id].get("xp_gain", 0)
+            "quantity": 1,
+            "xp_gain": xp_gain,
+            "profession_type": prof_type,  # <- CRÍTICO pro xp.py aplicar e subir nível
         }
     }
-    
+
     uid_str = get_uid_str(player_data)
     await player_manager.save_player_data(uid_str, player_data)
-    
+
     return {
         "success": True,
         "duration_seconds": duration,
-        "finish_time": finish_time
+        "finish_time": finish_time.isoformat()
     }
+
 
 async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int) -> dict | str:
     # ✅ IMPORTAÇÃO TARDIA
     from modules import player_manager
 
     rec = game_data.REFINING_RECIPES.get(recipe_id)
-    if not rec: return "Receita inválida."
-    
+    if not rec:
+        return "Receita inválida."
+
+    # Normaliza quantity
+    try:
+        quantity = int(quantity or 0)
+    except Exception:
+        quantity = 0
+
     real_max = get_max_refine_quantity(player_data, rec)
-    if quantity > real_max: quantity = real_max
-    if quantity < 1: return "Materiais insuficientes."
+    if quantity > real_max:
+        quantity = real_max
+    if quantity < 1:
+        return "Materiais insuficientes."
 
-    inputs = rec.get("inputs", {})
-    for item, req in inputs.items():
-        total_need = req * quantity
-        player_manager.consume_item(player_data, item, total_need)
+    # ✅ Consome materiais do batch
+    inputs = rec.get("inputs", {}) or {}
+    for item_id, req in inputs.items():
+        try:
+            req = int(req or 0)
+        except Exception:
+            req = 0
 
-    # ✅ CORREÇÃO: Calcula o tempo unitário COM bônus e multiplica pela quantidade
+        total_need = max(0, req * quantity)
+        if total_need <= 0:
+            continue
+
+        # Obs: assumindo que consume_item já lida com stack/validação
+        player_manager.consume_item(player_data, item_id, total_need)
+
+    # ✅ Tempo total = tempo unitário (com bônus) * quantidade
     unit_time = _calculate_single_duration(rec, player_data)
+    try:
+        unit_time = int(unit_time or 0)
+    except Exception:
+        unit_time = 0
+    unit_time = max(1, unit_time)
+
     total_time = unit_time * quantity
-    
-    base_xp = rec.get("xp_gain", 0)
-    total_xp = int((base_xp * quantity) * 0.5) 
+
+    # ✅ XP total do batch (sua regra: 50% do total por execução)
+    try:
+        base_xp = int(rec.get("xp_gain", 0) or 0)
+    except Exception:
+        base_xp = 0
+
+    total_xp = max(0, int((base_xp * quantity) * 0.5))
 
     now = datetime.now(timezone.utc)
     finish_time = now + timedelta(seconds=total_time)
-    
+
+    # ✅ Anti-exploit: grava o tipo de profissão ativa no START
+    prof_type = (player_data.get("profession", {}) or {}).get("type") \
+        or (player_data.get("profession", {}) or {}).get("key") \
+        or ""
+    prof_type = str(prof_type).strip().lower()
+
     player_data["player_state"] = {
         "action": "refining_batch",
         "started_at": now.isoformat(),
@@ -181,13 +249,16 @@ async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int) -
         "details": {
             "recipe_id": recipe_id,
             "quantity": quantity,
-            "xp_reward": total_xp
+            # padroniza pro finish_refine ler sem ambiguidade
+            "xp_gain": total_xp,
+            # garante que o xp.py aplique XP e permita notificação de level
+            "profession_type": prof_type,
         }
     }
-    
+
     uid_str = get_uid_str(player_data)
     await player_manager.save_player_data(uid_str, player_data)
-    
+
     return {
         "success": True,
         "qty": quantity,
@@ -198,20 +269,26 @@ async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int) -
 # ==============================================================================
 # 3. FINISH (Entregar recompensas)
 # ==============================================================================
-async def finish_refine(player_data: dict) -> dict | str:
-    # ✅ IMPORTAÇÃO TARDIA
+async def finish_refine(player_data: dict) -> dict | str | None:
+    # ✅ IMPORTAÇÕES TARDIAS (evita ciclos)
     from modules import player_manager
+    from modules.game_data.xp import add_profession_xp_inplace
 
-    state = player_data.get("player_state", {})
+    state = player_data.get("player_state", {}) or {}
     action = state.get("action")
-    
-    if action not in ("refining", "refining_batch"):
-        return None 
 
-    details = state.get("details", {})
+    if action not in ("refining", "refining_batch"):
+        return None
+
+    details = state.get("details", {}) or {}
     rid = details.get("recipe_id")
-    qty = details.get("quantity", 1) 
-    
+
+    try:
+        qty = int(details.get("quantity", 1) or 1)
+    except Exception:
+        qty = 1
+    qty = max(1, qty)
+
     rec = game_data.REFINING_RECIPES.get(rid)
     if not rec:
         player_data["player_state"] = {"action": "idle"}
@@ -219,33 +296,75 @@ async def finish_refine(player_data: dict) -> dict | str:
         await player_manager.save_player_data(uid_str, player_data)
         return "Erro: Receita não existe mais."
 
-    outputs = rec.get("outputs", {})
-    final_outputs = {}
-    
-    for item, base_amt in outputs.items():
-        total_amt = base_amt * qty
-        player_manager.add_item_to_inventory(player_data, item, total_amt)
-        final_outputs[item] = total_amt
+    # ----------------------------
+    # 1) Entrega outputs
+    # ----------------------------
+    outputs = rec.get("outputs", {}) or {}
+    final_outputs: dict[str, int] = {}
 
-    xp_gain = details.get("xp_gain") or details.get("xp_reward") or rec.get("xp_gain", 0)
-    if action == "refining": 
-        xp_gain = rec.get("xp_gain", 0)
-    
-    # XP DE PROFISSÃO (centralizado no xp.py)
+    for item_id, base_amt in outputs.items():
+        try:
+            base_amt = int(base_amt or 0)
+        except Exception:
+            base_amt = 0
+
+        total_amt = max(0, base_amt * qty)
+        if total_amt <= 0:
+            continue
+
+        player_manager.add_item_to_inventory(player_data, item_id, total_amt)
+        final_outputs[item_id] = total_amt
+
+    # ----------------------------
+    # 2) Calcula XP (centralizado no xp.py)
+    # ----------------------------
+    # Preferência:
+    # - Se details já trouxe um TOTAL (ex: no start você calculou), respeita
+    # - Senão, usa rec["xp_gain"] por execução * qty
+    try:
+        xp_from_details = details.get("xp_gain") or details.get("xp_reward")
+        xp_from_details = int(xp_from_details) if xp_from_details is not None else None
+    except Exception:
+        xp_from_details = None
+
+    try:
+        base_xp = int(rec.get("xp_gain", 0) or 0)
+    except Exception:
+        base_xp = 0
+
+    if xp_from_details is not None:
+        xp_gain = max(0, xp_from_details)
+    else:
+        xp_gain = max(0, base_xp * qty)
+
+    # expected_type: DEVE ser string (evita lista/erro e evita exploit de troca de profissão)
+    expected_type = (
+        (details.get("profession_type") or "").strip().lower()
+        or (rec.get("profession_type") or "").strip().lower()
+        or None
+    )
+
+    xp_info = {"xp_added": 0}
     if xp_gain > 0:
-        add_profession_xp_inplace(
+        xp_info = add_profession_xp_inplace(
             player_data,
             amount=int(xp_gain),
-            expected_type=rec.get("profession_type") or rec.get("profession")
+            expected_type=expected_type,
         )
 
+    # ----------------------------
+    # 3) Finaliza estado e salva
+    # ----------------------------
     player_data["player_state"] = {"action": "idle"}
-    
+
     uid_str = get_uid_str(player_data)
     await player_manager.save_player_data(uid_str, player_data)
-    
+
     return {
         "success": True,
         "outputs": final_outputs,
-        "xp_gained": xp_gain
+        "xp_gained": int(xp_gain),
+        "xp_info": xp_info,  # <-- use isso pra notificar level up no menu
+        "quantity": qty,
+        "recipe_id": rid,
     }
