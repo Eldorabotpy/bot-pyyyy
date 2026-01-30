@@ -49,11 +49,6 @@ WORLD_BOSS_TIMES = [
     (23, 0,   1, 0),  # Evento das 23:00 (duração: 2 horas, termina à 01:00 do dia seguinte)
 ]
 
-# --- IMAGEM DE BROADCAST (REINÍCIO) ---
-# Cole o ID da imagem que você pegou com o bot dentro das aspas.
-# Se não quiser imagem, deixe como None (sem aspas).
-STARTUP_IMAGE_ID = "AgACAgEAAxkBAAECOz5pL533_VndqEmAavHC3Rw2BYcu1QAChwtrGxz-eUV_qi1GsCu9cAEAAwIAA3kAAzYE"
-
 # --- CONFIGURAÇÃO DE GRUPOS E CANAIS (ADICIONADO) ---
 # ID do seu grupo de avisos
 ANNOUNCEMENT_CHAT_ID = -1002881364171 

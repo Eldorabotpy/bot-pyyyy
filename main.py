@@ -44,6 +44,9 @@ from config import (
 from modules.database import initialize_database
 initialize_database()
 
+# ✅ File IDs (Mongo + cache)
+from modules import file_ids
+
 # --- IMPORTS DOS HANDLERS ESPECÍFICOS ---
 # Autenticação (Login/Registro)
 from handlers.auth_handler import auth_handler, logout_command, logout_callback
@@ -112,8 +115,11 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not update.message or not update.message.new_chat_members:
         return
 
-    IMG_BOAS_VINDAS = STARTUP_IMAGE_ID or (
-        "AgACAgEAAxkBAAEFwT5pe_K198YjOWcd1n_JBsbMutbL1wACIAxrG9Is4UdD0rQaxUORTQEAAwIAA3kAAzgE"
+    # ✅ Sistema automático de mídia
+    IMG_BOAS_VINDAS = (
+        file_ids.get_file_id("welcome")
+        or file_ids.get_file_id("startup")
+        or STARTUP_IMAGE_ID
     )
 
     for member in update.message.new_chat_members:
@@ -124,6 +130,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         deep_link = f"https://t.me/{bot_username}?start=criar_conta"
 
         keyboard = [[InlineKeyboardButton("⚔️ CRIAR PERSONAGEM ⚔️", url=deep_link)]]
+
         caption_text = (
             f"🔔 𝕌𝕄 ℕ𝕆𝕍𝕆 𝔸𝕍𝔼ℕ𝕋𝕌ℝ𝔼𝕀ℝ𝕆 ℂℍ𝔼𝔾𝕆𝕌\n\n"
             f"𝑺𝒆𝒋𝒂 𝒃𝒆𝒎-𝒗𝒊𝒏𝒅𝒐(𝒂), {member.mention_html()}!\n"
@@ -132,12 +139,16 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
         try:
-            await update.message.reply_photo(
-                photo=STARTUP_IMAGE_ID,
-                caption=caption_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="HTML"
-            )
+            if IMG_BOAS_VINDAS:
+                await update.message.reply_photo(
+                    photo=IMG_BOAS_VINDAS,
+                    caption=caption_text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode="HTML"
+                )
+            else:
+                raise Exception("Sem imagem configurada")
+
         except Exception:
             await update.message.reply_text(
                 f"Bem-vindo {member.mention_html()}! Jogue aqui: @{bot_username}",

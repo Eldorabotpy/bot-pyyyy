@@ -1,5 +1,5 @@
 # registries/admin.py
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 # Importa lista geral (Que já inclui o premium_panel_handler)
 from handlers.admin_handler import all_admin_handlers
@@ -9,6 +9,9 @@ from handlers.admin.pvp_panel_handler import pvp_panel_handlers
 from handlers.admin.sell_gems import sell_gems_conv_handler
 from handlers.admin.player_edit_panel import create_admin_edit_player_handler
 from handlers.admin.admin_tools import cmd_trocar_id
+
+# ✅ Auto-captura de mídia por hashtag (#startup, #welcome, etc.)
+from handlers.admin.media_capture import admin_auto_capture_media
 
 # Guerra de Clãs (sistema único) — somente comandos seguros
 from handlers.admin.clan_war_admin import (
@@ -21,6 +24,19 @@ from handlers.admin.clan_war_admin import (
 
 
 def register_admin_handlers(application: Application):
+
+    # 0) ✅ Auto-captura de mídia (Alta prioridade)
+    # Envie foto/vídeo com legenda começando com "#chave"
+    # Ex: foto + "#startup" => salva file_id na chave "startup"
+    application.add_handler(
+        MessageHandler(
+            (
+                (filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.Document.IMAGE)
+                & filters.CaptionRegex(r"^#")
+            ),
+            admin_auto_capture_media,
+        )
+    )
 
     # 1. Registra Gemas (Alta Prioridade)
     application.add_handler(sell_gems_conv_handler)

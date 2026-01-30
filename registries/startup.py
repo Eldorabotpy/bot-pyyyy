@@ -8,6 +8,9 @@ from telegram.ext import Application
 # Config Imports
 from config import ADMIN_ID, STARTUP_IMAGE_ID, JOB_TIMEZONE, EVENT_TIMES, WORLD_BOSS_TIMES
 
+# ✅ File IDs (Mongo + cache)
+from modules import file_ids
+
 # Jobs e Watchdogs Imports
 from handlers.jobs import (
     daily_reset_event_entries_job,
@@ -63,10 +66,13 @@ async def run_system_startup_tasks(application: Application):
             )
             target_chat_id = int(ADMIN_ID) if str(ADMIN_ID).isdigit() else ADMIN_ID
 
-            if STARTUP_IMAGE_ID:
+            # ✅ automático: mongo -> fallback config
+            startup_img = file_ids.get_file_id("startup") or STARTUP_IMAGE_ID
+
+            if startup_img:
                 await application.bot.send_photo(
                     chat_id=target_chat_id,
-                    photo=STARTUP_IMAGE_ID,
+                    photo=startup_img,
                     caption=msg_text,
                     parse_mode="HTML",
                 )
