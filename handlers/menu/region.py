@@ -238,31 +238,64 @@ async def show_travel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode="HTML")
 
-
 @requires_login
 async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    user_id = get_current_player_id(update, context)
-    chat_id = query.message.chat_id
+    if not query or not query.message:
+        return
 
     try:
-        region_key = query.data.split(':')[1]
-    except IndexError:
-        region_key = 'reino_eldora'
+        await query.answer()
+    except Exception:
+        pass
 
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        return
+
+    chat_id = getattr(query.message, "chat_id", None) or (update.effective_chat.id if update.effective_chat else None)
+    if not chat_id:
+        return
+
+    # region_key
+    data = query.data or ""
+    try:
+        region_key = data.split(":", 1)[1]
+    except Exception:
+        region_key = "reino_eldora"
+
+    # carrega player
     player_data = await player_manager.get_player_data(user_id)
-    if player_data:
-        player_data['current_location'] = region_key
-        await player_manager.save_player_data(user_id, player_data)
+    if not player_data:
+        return
 
+    # salva local
+    player_data["current_location"] = region_key
+    await player_manager.save_player_data(user_id, player_data)
+
+    # ==========================
+    # ✅ DORA TUTORIAL HOOKS
+    # ==========================
+    try:
+        from handlers.tutorial.dora_hunting import maybe_continue_hunting_on_arrival
+        await maybe_continue_hunting_on_arrival(update, context, user_id, region_key)
+    except Exception as e:
+        print("Tutorial hunting arrival hook error:", e)
+
+    try:
+        from handlers.tutorial.dora_gathering import maybe_continue_gathering_tutorial
+        await maybe_continue_gathering_tutorial(update, context, user_id, region_key)
+    except Exception as e:
+        print("Tutorial gathering hook error:", e)
+
+    # limpa mensagem anterior (opcional)
     try:
         await query.delete_message()
     except Exception:
         pass
 
+    # abre menu da região
     await send_region_menu(context, user_id, chat_id)
-
 
 @requires_login
 async def region_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

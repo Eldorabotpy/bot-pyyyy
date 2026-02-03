@@ -75,6 +75,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(lock_msg, parse_mode=ParseMode.HTML)
         return
 
+    from handlers.tutorial.tutorial_router import route_onboarding
+
+    handled = await route_onboarding(update, context, player_data)
+    if handled:
+        return
+
     await resume_game_state(update, context, player_data)
 
 

@@ -52,7 +52,7 @@ WORLD_BOSS_TIMES = [
 # --- IMAGEM DE BROADCAST (REINÍCIO) ---
 # Cole o ID da imagem que você pegou com o bot dentro das aspas.
 # Se não quiser imagem, deixe como None (sem aspas).
-STARTUP_IMAGE_ID = "AgACAgEAAxkBAAECOz5pL533_VndqEmAavHC3Rw2BYcu1QAChwtrGxz-eUV_qi1GsCu9cAEAAwIAA3kAAzYE"
+STARTUP_IMAGE_ID = "AgACAgEAAxkBAAEFwT5pe_K198YjOWcd1n_JBsbMutbL1wACIAxrG9Is4UdD0rQaxUORTQEAAwIAA3kAAzgE"
 
 # --- CONFIGURAÇÃO DE GRUPOS E CANAIS (ADICIONADO) ---
 # ID do seu grupo de avisos

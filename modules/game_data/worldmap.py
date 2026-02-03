@@ -84,8 +84,8 @@ REGIONS_DATA = {
     'pedreira_granito': {'display_name': 'Pedreira de Granito',  'resource': 'pedra', 'emoji': '🪨', 'file_id_name': 'regiao_pedreira_granito'},
     'campos_linho':     {'display_name': 'Campos de Linho',      'resource': 'linho', 'emoji': '🌾', 'file_id_name': 'regiao_campos_linho'},
     'pico_grifo':       {'display_name': 'Pico do Grifo',        'resource': 'pena',  'emoji': '🦅', 'file_id_name': 'regiao_pico_grifo', 'ambush_chance': 0.25},
-    'mina_ferro':       {'display_name': 'Mina de Ferro',        'resource': 'ferro', 'emoji': '⛏️', 'file_id_name': 'regiao_mina_ferro'},
-    'forja_abandonada': {'display_name': 'Forja Abandonada',     'resource': None,    'emoji': '🔥', 'file_id_name': 'regiao_forja_abandonada'},
+    'mina_ferro':       {'display_name': 'Mina de Ferro',        'resource': 'minerio_de_ferro', 'emoji': '⛏️', 'file_id_name': 'regiao_mina_ferro'},
+    'forja_abandonada': {'display_name': 'Forja Abandonada',     'resource': 'minerio_de_prata',    'emoji': '🔥', 'file_id_name': 'regiao_forja_abandonada'},
     'pantano_maldito':  {'display_name': 'Pântano Maldito',      'resource': 'sangue','emoji': '🩸', 'file_id_name': 'regiao_pantano_maldito', 'ambush_chance': 0.30},
     
     # --- NOVAS REGIÕES ADICIONADAS ---

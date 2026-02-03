@@ -151,9 +151,9 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Faça login ou crie sua conta para jogar."
         )
         # ... dentro de start_auth, onde cria o keyboard ...
-    keyboard.append([InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')])
-    keyboard.append([InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')])
-    keyboard.append([InlineKeyboardButton("🆘 Esqueci a Senha", callback_data='btn_forgot')])
+        keyboard.append([InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')])
+        keyboard.append([InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')])
+        keyboard.append([InlineKeyboardButton("🆘 Esqueci a Senha", callback_data='btn_forgot')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -306,35 +306,52 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     password = update.message.text.strip()
-    try: await update.message.delete()
-    except: pass
-    
+    try:
+        await update.message.delete()
+    except:
+        pass
+
     username = context.user_data['reg_temp_user']
     owner_id = update.effective_user.id
     now_iso = datetime.now().isoformat()
-    
+
     new_player_doc = {
         "username": username,
         "password": hash_password(password),
-        "telegram_id_owner": owner_id, 
+        "telegram_id_owner": owner_id,
         "created_at": now_iso,
         "last_seen": now_iso,
-        "character_name": username.capitalize(),
+
+        # ✅ IMPORTANTE: nome do personagem começa vazio (Dora vai definir)
+        "character_name": None,
+
+        # ✅ Onboarding / tutorial
+        "onboarding_stage": "name",
+        "tutorial_flags": {},
+
         "level": 1, "xp": 0, "gold": 100, "class": None,
-        "max_hp": 50, "current_hp": 50, "energy": 20, "max_energy": 20, "energy_last_ts": now_iso,
+        "max_hp": 50, "current_hp": 50,
+        "energy": 20, "max_energy": 20, "energy_last_ts": now_iso,
         "inventory": {}, "equipment": {},
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
         "premium_tier": "free", "gems": 0
     }
-    
-    # CORREÇÃO CRÍTICA: is not None
+
     if users_collection is not None:
         result = await asyncio.to_thread(users_collection.insert_one, new_player_doc)
         new_player_id = str(result.inserted_id)
         context.user_data['logged_player_id'] = new_player_id
         await save_persistent_session(owner_id, new_player_id)
-        await update.message.reply_photo(photo=IMG_NOVO, caption="🎉 <b>Conta Criada!</b>\nVocê já está logado.", parse_mode="HTML")
-        if start_command: await start_command(update, context)
+
+        await update.message.reply_photo(
+            photo=IMG_NOVO,
+            caption="🎉 <b>Conta Criada!</b>\nVocê já está logado.",
+            parse_mode="HTML"
+        )
+
+        if start_command:
+            await start_command(update, context)
+
     return ConversationHandler.END
 
 # ==============================================================================

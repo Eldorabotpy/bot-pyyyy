@@ -56,7 +56,6 @@ PROFESSIONS_DATA = {
     'alfaiate':  {'display_name': '𝐀𝐥𝐟𝐚𝐢𝐚𝐭𝐞',  'category': 'crafting'},
     'joalheiro': {'display_name': '𝐉𝐨𝐚𝐥𝐡𝐞𝐢𝐫𝐨', 'category': 'crafting'},
     'curtidor':  {'display_name': '𝐂𝐮𝐫𝐭𝐢𝐝𝐨𝐫',  'category': 'crafting'},
-    'fundidor':  {'display_name': '𝐅𝐮𝐧𝐝𝐢𝐝𝐨𝐫',  'category': 'crafting'},
 }
 # ===================================================================
 # <<< FIM DA CORREÇÃO >>>

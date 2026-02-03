@@ -8,7 +8,8 @@ import os
 import sys
 import logging
 from threading import Thread
-
+# Tutorial Dora iniciantes
+from registries.onboarding import register_onboarding_handlers
 # Telegram Imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.request import HTTPXRequest
@@ -237,7 +238,9 @@ if __name__ == "__main__":
     application.add_handler(CallbackQueryHandler(pvp_menu_command, pattern=r"^pvp_arena$"))
 
     register_evolution_handlers(application)
-
+    
+    #Tutoril Dora Iniciantes
+    register_onboarding_handlers(application)
     # Fallbacks
     application.add_handler(CommandHandler("logout", logout_command))
     application.add_handler(CallbackQueryHandler(logout_callback, pattern="^logout_btn$"))

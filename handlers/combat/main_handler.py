@@ -670,13 +670,13 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                         summary += f"• {qty}x {i_emoji} {i_name}\n"
 
                 try:
-                    before_lvl = player_data.get("level")
-                    before_xp = player_data.get("xp")
+                    before_lvl = int(player_data.get("level") or 1)
+                    before_xp = int(player_data.get("xp") or 0)
 
                     _, _, lvl_msg = player_manager.check_and_apply_level_up(player_data)
 
-                    after_lvl = player_data.get("level")
-                    after_xp = player_data.get("xp")
+                    after_lvl = int(player_data.get("level") or before_lvl)
+                    after_xp = int(player_data.get("xp") or before_xp)
 
                     logger.warning(
                         f"[LEVELUP] before: lvl={before_lvl} xp={before_xp} | "
@@ -685,6 +685,19 @@ async def combat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
 
                     if lvl_msg:
                         summary += lvl_msg
+
+                    # ==================================================
+                    # 🐺 DORA — Tutorial de Caça (Pradaria até Nível 5)
+                    # ==================================================
+                    if after_lvl > before_lvl:
+                        try:
+                            from handlers.tutorial.dora_hunting import maybe_notify_level_progress
+                            await maybe_notify_level_progress(update, context, user_id, after_lvl)
+                        except Exception as e:
+                            logger.error(f"[Tutorial Hunting] erro ao notificar progresso: {e}", exc_info=True)
+
+                except Exception as e:
+                    logger.error(f"[LEVELUP] erro ao aplicar level up: {e}", exc_info=True)
 
                     mid = monster_stats.get("id")
                     if mid:
