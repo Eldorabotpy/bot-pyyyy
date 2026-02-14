@@ -15,11 +15,9 @@ logger = logging.getLogger(__name__)
 _UI_KEY = "_ui_last_messages"  # dict: {scope: message_id}
 
 def _get_store(context: ContextTypes.DEFAULT_TYPE) -> dict:
-    store = context.user_data.get(_UI_KEY)
-    if not isinstance(store, dict):
-        store = {}
-        context.user_data[_UI_KEY] = store
-    return store
+    if _UI_KEY not in context.user_data:
+        context.user_data[_UI_KEY] = {}
+    return context.user_data[_UI_KEY]
 
 async def _safe_delete(chat_id: int, message_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
@@ -28,144 +26,131 @@ async def _safe_delete(chat_id: int, message_id: int, context: ContextTypes.DEFA
         pass
 
 def _is_wrong_file_id(err: Exception) -> bool:
+    """Verifica se o erro é culpa de um ID de arquivo inválido."""
     msg = str(err).lower()
-    return ("wrong file identifier" in msg) or ("wrong file_id" in msg) or ("http url specified" in msg)
+    return ("wrong remote file identifier" in msg) or \
+           ("wrong file identifier" in msg) or \
+           ("can't unserialize" in msg) or \
+           ("file_id" in msg and "invalid" in msg)
 
 async def render_text(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     text: str,
     reply_markup: Optional[InlineKeyboardMarkup] = None,
-    *,
-    scope: str = "default",
-    parse_mode: str = ParseMode.HTML,
-    delete_previous_on_send: bool = True,
-    allow_edit: bool = True,
-) -> None:
-    """
-    Renderiza uma "tela" de texto:
-    - Se veio de callback_query: tenta editar a mensagem atual.
-    - Se não der para editar: envia uma nova e (opcional) apaga a anterior daquele scope.
-    - Se veio de comando/mensagem normal: apaga a anterior (scope) e envia nova.
-    """
-    chat_id = update.effective_chat.id if update.effective_chat else None
-    if chat_id is None:
-        return
-
+    scope: str = "main",
+    parse_mode: str = ParseMode.MARKDOWN,
+    delete_previous_on_send: bool = False,
+    allow_edit: bool = True
+):
+    """Renderiza apenas texto (Fallback seguro)."""
+    chat_id = update.effective_chat.id
     store = _get_store(context)
+    last_id = store.get(scope)
 
-    # 1) Tentativa de EDIT (mantém o fluxo limpo sem novas mensagens)
-    if allow_edit and update.callback_query:
+    # 1. Tenta EDITAR se permitido
+    if allow_edit and last_id:
         try:
-            await update.callback_query.edit_message_text(
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=last_id,
                 text=text,
-                parse_mode=parse_mode,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode=parse_mode
             )
-            # não atualiza store aqui porque a msg já é a mesma
             return
-        except Exception:
-            # Cai para send abaixo
-            pass
+        except BadRequest as e:
+            # Se não deu para editar (ex: mensagem antiga era foto), ignora e reenvia
+            if "message is not modified" in str(e): return
 
-    # 2) SEND (com limpeza do anterior por scope)
-    if delete_previous_on_send:
-        last_id = store.get(scope)
-        if isinstance(last_id, int):
-            await _safe_delete(chat_id, last_id, context)
+    # 2. Se pediu para apagar a anterior antes de enviar a nova
+    if delete_previous_on_send and last_id:
+        await _safe_delete(chat_id, last_id, context)
 
-    sent = await context.bot.send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode=parse_mode,
-        reply_markup=reply_markup
-    )
-    store[scope] = sent.message_id
+    # 3. Envia nova mensagem
+    try:
+        sent = await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode
+        )
+        store[scope] = sent.message_id
+    except Exception as e:
+        logger.error(f"Erro ao renderizar texto: {e}")
 
 async def render_photo_or_text(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     text: str,
-    photo_file_id: Optional[str],
+    file_id: str,
     reply_markup: Optional[InlineKeyboardMarkup] = None,
-    *,
-    scope: str = "default",
-    parse_mode: str = ParseMode.HTML,
-    delete_previous_on_send: bool = True,
-    allow_edit: bool = True,
-) -> None:
+    scope: str = "main",
+    parse_mode: str = ParseMode.MARKDOWN,
+    delete_previous_on_send: bool = False,
+    allow_edit: bool = True
+):
     """
-    Renderiza uma "tela" com FOTO + legenda, mas se não houver mídia ou der erro (BadRequest 400),
-    envia só texto.
+    Renderiza Foto + Texto. 
+    🔥 BLINDAGEM: Se a foto falhar, chama render_text automaticamente.
     """
-    chat_id = update.effective_chat.id if update.effective_chat else None
-    if chat_id is None:
-        return
-
+    chat_id = update.effective_chat.id
     store = _get_store(context)
+    last_id = store.get(scope)
 
-    # Se não tem mídia: só texto.
-    if not photo_file_id:
-        await render_text(
-            update, context, text, reply_markup,
-            scope=scope, parse_mode=parse_mode,
-            delete_previous_on_send=delete_previous_on_send,
-            allow_edit=allow_edit
-        )
-        return
+    # Se não tiver ID, vai direto pro texto
+    if not file_id or str(file_id) == "None":
+        return await render_text(update, context, text, reply_markup, scope, parse_mode, delete_previous_on_send, allow_edit)
 
-    # 1) Tenta EDIT caption se veio de callback
-    if allow_edit and update.callback_query:
+    # 1. Tenta EDITAR (apenas Caption)
+    if allow_edit and last_id:
         try:
-            # Se a mensagem atual já é foto, edita caption
-            await update.callback_query.edit_message_caption(
+            await context.bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=last_id,
                 caption=text,
-                parse_mode=parse_mode,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode=parse_mode
             )
             return
         except BadRequest as e:
-            # Se a msg atual não tem caption (era texto), ou o file_id está ruim, cai para send
+            # Se o erro for de ID inválido no edit, avisa e tenta reenviar
             if _is_wrong_file_id(e):
-                logger.warning("[UI] file_id inválido, fallback para texto: %s", e)
-                await render_text(
-                    update, context, text, reply_markup,
-                    scope=scope, parse_mode=parse_mode,
-                    delete_previous_on_send=delete_previous_on_send,
-                    allow_edit=False
-                )
+                logger.warning(f"⚠️ ID inválido no Edit: {file_id}. Tentando reenvio limpo.")
+            elif "message is not modified" in str(e):
                 return
-        except Exception:
-            pass
+            # Se não conseguiu editar, continua para o envio normal
 
-    # 2) SEND foto (apaga anterior do scope)
-    if delete_previous_on_send:
-        last_id = store.get(scope)
-        if isinstance(last_id, int):
-            await _safe_delete(chat_id, last_id, context)
+    # 2. Apaga anterior se necessário
+    if delete_previous_on_send and last_id:
+        await _safe_delete(chat_id, last_id, context)
 
+    # 3. Tenta ENVIAR NOVA FOTO
     try:
         sent = await context.bot.send_photo(
             chat_id=chat_id,
-            photo=photo_file_id,
+            photo=file_id,
             caption=text,
             parse_mode=parse_mode,
             reply_markup=reply_markup
         )
         store[scope] = sent.message_id
+        
     except BadRequest as e:
+        # 🔥 AQUI ESTÁ A CORREÇÃO:
         if _is_wrong_file_id(e):
-            logger.warning("[UI] sendPhoto 400 (file_id inválido). Enviando só texto. Err=%s", e)
+            logger.error(f"❌ Erro de Imagem (ID Inválido): {file_id}. Usando Fallback Texto.")
+            # Chama o renderizador de texto para o jogo não parar
             await render_text(
-                update, context, text, reply_markup,
-                scope=scope, parse_mode=parse_mode,
-                delete_previous_on_send=delete_previous_on_send,
-                allow_edit=False
+                update, context, 
+                text=f"⚠️ [Imagem Quebrada]\n\n{text}", 
+                reply_markup=reply_markup, 
+                scope=scope, 
+                parse_mode=parse_mode,
+                delete_previous_on_send=False 
             )
         else:
-            raise
-
-# --- Compatibilidade: nomes usados em handlers antigos ---
+            logger.error(f"Erro desconhecido ao enviar foto: {e}")
 
 async def render_menu(
     update,
@@ -327,66 +312,55 @@ async def render_media_or_text(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     text: str,
-    file_id: Optional[str],
-    file_type: Optional[str] = "photo",
+    media_key: str, # Pode ser chave do gerenciador ou ID direto
     reply_markup: Optional[InlineKeyboardMarkup] = None,
-    *,
-    scope: str = "default",
-    parse_mode: str = ParseMode.HTML,
-    delete_previous_on_send: bool = True,
+    scope: str = "main",
+    parse_mode: str = ParseMode.MARKDOWN,
+    delete_previous_on_send: bool = False,
     allow_edit: bool = True,
-) -> None:
-    """
-    Para callbacks: tenta editar (caption se for photo/video), senão envia novo.
-    Observação: editar vídeo é bem limitado; aqui a gente prioriza SEND limpo.
-    """
-    chat_id = update.effective_chat.id if update.effective_chat else None
-    if chat_id is None:
-        return
-
-    store = _get_store(context)
-
-    if not file_id:
-        return await render_text(
-            update, context, text, reply_markup,
-            scope=scope, parse_mode=parse_mode,
-            delete_previous_on_send=delete_previous_on_send,
-            allow_edit=allow_edit
-        )
+    file_type: str = "photo"
+):
+    """Resolve a chave de mídia e chama a função apropriada."""
+    
+    final_file_id = media_key
+    
+    # Tenta resolver o ID via file_id_manager (se existir no projeto)
+    try:
+        from modules import file_id_manager
+        file_data = file_id_manager.get_file_data(media_key)
+        if file_data and "id" in file_data:
+            final_file_id = file_data["id"]
+            if "type" in file_data: file_type = file_data["type"]
+    except ImportError:
+        pass 
+    except Exception:
+        pass
 
     ftype = (file_type or "photo").lower().strip()
 
-    # Para foto, tenta editar caption (melhor UX)
-    if ftype != "video":
-        return await render_photo_or_text(
-            update, context, text, file_id, reply_markup,
+    if ftype == "video":
+        # Lógica simplificada para vídeo (costuma dar erro em edit, então enviamos novo)
+        if delete_previous_on_send:
+            last = _get_store(context).get(scope)
+            if last: await _safe_delete(update.effective_chat.id, last, context)
+        
+        try:
+            sent = await context.bot.send_video(
+                chat_id=update.effective_chat.id,
+                video=final_file_id,
+                caption=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup
+            )
+            _get_store(context)[scope] = sent.message_id
+        except Exception:
+            # Fallback vídeo
+            await render_text(update, context, f"⚠️ [Vídeo Indisponível]\n\n{text}", reply_markup, scope)
+    else:
+        # Foto (ou padrão)
+        await render_photo_or_text(
+            update, context, text, final_file_id, reply_markup,
             scope=scope, parse_mode=parse_mode,
             delete_previous_on_send=delete_previous_on_send,
             allow_edit=allow_edit
         )
-
-    # Para vídeo: não tenta edit (Telegram costuma falhar); faz SEND limpo
-    if delete_previous_on_send:
-        last_id = store.get(scope)
-        if isinstance(last_id, int):
-            await _safe_delete(chat_id, last_id, context)
-
-    try:
-        sent = await context.bot.send_video(
-            chat_id=chat_id,
-            video=file_id,
-            caption=text,
-            parse_mode=parse_mode,
-            reply_markup=reply_markup
-        )
-        store[scope] = sent.message_id
-    except BadRequest as e:
-        if _is_wrong_file_id(e):
-            await render_text(
-                update, context, text, reply_markup,
-                scope=scope, parse_mode=parse_mode,
-                delete_previous_on_send=delete_previous_on_send,
-                allow_edit=False
-            )
-        else:
-            raise

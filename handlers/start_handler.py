@@ -1,10 +1,10 @@
 # handlers/start_handler.py
-# (VERSÃO BLINDADA 4.3 - Action Lock)
+# (VERSÃO BLINDADA 4.4 - Sem Tutorial)
 
 import logging
 from datetime import datetime, timezone
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ParseMode
 
@@ -14,11 +14,6 @@ from handlers.menu.region import show_region_menu
 from modules import player_manager
 from modules.auth_utils import requires_login
 from modules.player.account_lock import check_account_lock
-
-try:
-    from bson import ObjectId
-except ImportError:
-    ObjectId = None
 
 logger = logging.getLogger(__name__)
 
@@ -39,32 +34,23 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session_id = context.user_data["logged_player_id"]
     logger.info("[START] Menu solicitado por Sessão ID=%s", session_id)
 
-    # Carrega dados
+    # Carrega dados do jogador
     try:
         player_data = await player_manager.get_player_data(session_id)
+        if not player_data:
+            await update.message.reply_text("❌ Conta não encontrada no banco de dados. Use /login.")
+            return
     except Exception as e:
-        logger.error(f"Erro ID start: {e}")
+        logger.error(f"Erro ao carregar dados em /start: {e}")
+        await update.message.reply_text("❌ Erro interno ao acessar os dados da conta.")
         return
-
-    if not player_data:
-        # Caso raro onde a sessão existe mas o player foi deletado do banco
-        await update.message.reply_text("❌ Erro: Conta não encontrada no banco de dados.")
-        context.user_data.clear()
-        return
-
-    # Atualiza Chat ID para notificações
-    try:
-        if "user_id" in player_data:
-            await player_manager.set_last_chat_id(str(player_data["user_id"]), update.effective_chat.id)
-    except Exception:
-        pass
 
     # ===============================
-    # 🔒 BLOQUEIO DE CONTA
+    # 2. VERIFICAÇÃO DE BLOQUEIO DE CONTA
     # ===============================
     locked, lock_msg = check_account_lock(player_data)
 
-    # 🔁 Persistir auto-unlock (se o lock expirou e foi removido)
+    # Persistir auto-unlock (se o lock expirou e foi removido)
     if not locked and "account_lock" not in player_data:
         try:
             await player_manager.save_player_data(player_data["_id"], player_data)
@@ -75,12 +61,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(lock_msg, parse_mode=ParseMode.HTML)
         return
 
-    from handlers.tutorial.tutorial_router import route_onboarding
-
-    handled = await route_onboarding(update, context, player_data)
-    if handled:
-        return
-
+    # Sem tutorial: Vai direto para o jogo
     await resume_game_state(update, context, player_data)
 
 
@@ -95,9 +76,7 @@ async def resume_game_state(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             await show_region_menu(update, context, region_key=current_location)
 
     except Exception as e:
-        logger.error("Erro abrindo menu: %s", e, exc_info=True)
-        await update.message.reply_text("⚠️ Erro ao abrir o menu.")
-
-
-start_command_handler = CommandHandler("menu", start_command)
-start_fallback_handler = CommandHandler("start", start_command)
+        logger.error(f"[START] Erro ao retomar estado: {e}")
+        await update.message.reply_text("Ocorreu um erro ao carregar o menu. Tente novamente.")
+        
+start_command_handler = CommandHandler(['start', 'menu'], start_command)

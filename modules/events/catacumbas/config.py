@@ -7,10 +7,10 @@ from typing import List, Dict, Optional
 # ⚙️ CONFIGURAÇÕES GERAIS
 # ==============================================================================
 EVENT_NAME = "As Catacumbas Reais"
-MIN_PLAYERS = 1  # Mantido em 1 para você testar sozinho
-MAX_PLAYERS = 4
+MIN_PLAYERS = 1  # Pode ser 1 para testes
+MAX_PLAYERS = 6
 REQUIRED_KEY_ITEM = "chave_catacumba"
-TOTAL_FLOORS = 3 
+TOTAL_FLOORS = 5 
 
 # ==============================================================================
 # 🖼️ SISTEMA DE MÍDIA
@@ -30,61 +30,38 @@ MEDIA_KEYS = {
 }
 
 # ==============================================================================
-# 👹 DEFINIÇÃO DOS INIMIGOS (MODO TESTE - NERFADO)
+# 👹 INIMIGOS E BOSSES
 # ==============================================================================
 @dataclass
-class RaidEnemy:
-    id: str
+class EnemyConfig:
     name: str
     max_hp: int
     attack: int
     defense: int
     speed: int
-    image_key: str
     xp_reward: int
-    desc: str
+    image_key: str
 
 MOBS = {
-    "skeleton_warrior": RaidEnemy(
-        id="skeleton_warrior",
-        name="Esqueleto Fraco",  # Nome alterado para indicar teste
-        max_hp=300,             # Antes: 5000 (Agora morre em ~3 hits)
-        attack=15,              # Antes: 80 (Agora tira ~15% da vida de um novato)
-        defense=5,
-        speed=2,                # Lento, para você atacar primeiro
-        image_key="mob_skeleton",
-        xp_reward=50,
-        desc="Um esqueleto velho e quebradiço."
+    "skeleton_warrior": EnemyConfig(
+        name="Esqueleto Guerreiro",
+        max_hp=150, attack=35, defense=10, speed=12,
+        xp_reward=50, image_key="mob_skeleton"
     ),
-    "royal_guard": RaidEnemy(
-        id="royal_guard",
-        name="Guarda Zumbi",
-        max_hp=600,             # Antes: 8500
-        attack=25,              # Antes: 110
-        defense=10,
-        speed=4,
-        image_key="mob_guard",
-        xp_reward=100,
-        desc="Ainda sabe usar a espada, mas é lento."
+    "royal_guard": EnemyConfig(
+        name="Guarda Real Corrompido",
+        max_hp=280, attack=55, defense=25, speed=10,
+        xp_reward=120, image_key="mob_guard"
     ),
-    "spectral_wraith": RaidEnemy(
-        id="spectral_wraith",
-        name="Fantasminha",
-        max_hp=200,             # Antes: 4000
-        attack=40,              # Antes: 150 (Bate forte, mas tem pouca vida)
-        defense=0,
-        speed=15,               # Rápido
-        image_key="mob_wraith",
-        xp_reward=150,
-        desc="Assustador, mas frágil."
+    "spectral_wraith": EnemyConfig(
+        name="Aparição Espectral",
+        max_hp=200, attack=70, defense=5, speed=25,
+        xp_reward=150, image_key="mob_wraith"
     )
 }
 
-# ==============================================================================
-# ☠️ CONFIGURAÇÃO DO BOSS (MODO TESTE - NERFADO)
-# ==============================================================================
 @dataclass
-class RaidBossConfig:
+class BossConfig:
     name: str
     max_hp: int
     attack: int
@@ -94,12 +71,12 @@ class RaidBossConfig:
     image_enraged: str
     phases: List[str]
 
-BOSS_CONFIG = RaidBossConfig(
-    name="Lorde Eskel (Teste)",
-    max_hp=1500,        # Antes: 65000 (Agora é viável solar)
-    attack=45,          # Antes: 180 (Não dá Hit Kill em lvl baixo)
-    defense=15,         # Antes: 50
-    initiative=8,       # Antes: 15
+BOSS_CONFIG = BossConfig(
+    name="Rei Eskel, o Traído",
+    max_hp=2500,  
+    attack=120,
+    defense=40,
+    initiative=15,
     image_normal="boss_phase_1",
     image_enraged="boss_phase_2",
     phases=["normal", "enraged"]
@@ -108,11 +85,12 @@ BOSS_CONFIG = RaidBossConfig(
 # ==============================================================================
 # 🗺️ MAPA DOS ANDARES
 # ==============================================================================
-# Define quem aparece em cada andar
 FLOOR_MAP = {
     1: "skeleton_warrior",
     2: "royal_guard",
-    3: "BOSS"
+    3: "spectral_wraith",
+    4: "royal_guard", 
+    5: "BOSS"
 }
 
 # ==============================================================================
@@ -134,14 +112,9 @@ TEXTS = {
         "Avance para testar a mecânica de andares e loot.\n\n"
         "⚠️ **Requisito:** 1x Chave"
     ),
-    "victory": (
-        "🏆 **VITÓRIA (TESTE CONCLUÍDO)!** 🏆\n\n"
-        "O sistema de combate funcionou.\n"
-        "Você derrotou o chefe de teste."
-    ),
     "defeat": (
-        "☠️ **DERROTA**\n\n"
-        "Você morreu. Se isso aconteceu no primeiro turno, verifique se sua vida está cheia.\n"
-        "Use uma poção ou peça cura."
+        "💀 **VOCÊ CAIU EM BATALHA!**\n\n"
+        "Seus aliados ainda lutam... ou morrerão tentando.\n"
+        "Você pode assistir e torcer, mas não pode mais agir."
     )
 }

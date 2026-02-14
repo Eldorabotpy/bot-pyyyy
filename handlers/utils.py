@@ -627,3 +627,146 @@ def format_buffs_text(buffs_dict: dict) -> str:
     if buffs_dict.get("gold_bonus_percent"):
         text += f"   - Bónus de Ouro: +{buffs_dict['gold_bonus_percent']}%\n"
     return text if text else "   - Nenhum\n"
+
+def _format_effects(entity: dict) -> str:
+    """
+    Formata efeitos ativos (buffs/debuffs) de uma entidade.
+    Espera algo como entity["_effects"] = { "bleed": {...}, ... }
+    """
+    effects = entity.get("_effects") or {}
+    if not effects:
+        return ""
+
+    icons = {
+        "bleed": "🩸",
+        "poison": "☠️",
+        "stun": "💫",
+        "shield": "🛡",
+        "regen": "✨"
+    }
+
+    parts = []
+    for eid, data in effects.items():
+        icon = icons.get(eid, "🔹")
+        stacks = data.get("stacks", 1)
+        parts.append(f"{icon}{stacks}")
+
+    return " " + " ".join(parts)
+
+
+
+async def format_catacomb_interface(session: dict, user_id, all_players_data: dict) -> str:
+    """
+    Interface visual da dungeon em grupo com suporte a Turno Sequencial.
+    Blindada para identificação via ObjectID (strings).
+    """
+
+    # 1. Identificação do Turno Atual (Blindagem de ObjectID)
+    turn_order = session.get("turn_order", [])
+    current_idx = session.get("current_turn_idx", 0)
+    
+    # Garantimos que o ID do ator atual seja tratado como string para comparação
+    current_actor_id = str(turn_order[current_idx]) if turn_order else None
+    user_id_str = str(user_id) 
+
+    # =========================
+    # CABEÇALHO
+    # =========================
+    floor = session.get("current_floor", 1)
+    leader_id = str(session.get("leader_id"))
+    scaling = session.get("scaling_factor", 1.0)
+
+    header = (
+        f"🏰 **CATACUMBAS – ANDAR {floor}**\n"
+        f"👑 Líder: {all_players_data.get(leader_id, {}).get('character_name', '???')}\n"
+        f"👥 Grupo: {len(session.get('players', {}))}/6 | ⚔️ Desafio: {scaling}x\n"
+    )
+
+    # =========================
+    # GRUPO (PLAYERS)
+    # =========================
+    group_lines = ["\n━━━━━━━━━━━━━━━━━━\n👥 **HERÓIS**"]
+
+    for pid in session.get("players", {}):
+        pid_str = str(pid) # Normalização do ObjectID do player
+        pdata = all_players_data.get(pid_str, {})
+        
+        name = pdata.get("character_name") or pdata.get("name") or "Herói"
+        hp = pdata.get("current_hp", 0)
+        max_hp = pdata.get("max_hp") or pdata.get("hp") or "?"
+
+        effects = _format_effects(pdata)
+        
+        # Marcadores Visuais (Comparação de Strings)
+        is_my_turn = (pid_str == current_actor_id)
+        turn_marker = "⚔️ " if is_my_turn else "  "
+        marker = "👉" if pid_str == user_id_str else "  "
+
+        # Se o HP for 0, marca como morto
+        name_display = f"💀 {name}" if hp <= 0 else name
+
+        group_lines.append(
+            f"{marker}{turn_marker}{name_display} — ❤️ {hp}/{max_hp}{effects}"
+        )
+
+    # =========================
+    # INIMIGO (BOSS/MOB)
+    # =========================
+    enemy = session.get("boss")
+    enemy_block = []
+
+    if enemy:
+        is_boss_turn = (current_actor_id == "boss")
+        boss_marker = "⚔️ " if is_boss_turn else ""
+        
+        e_name = enemy.get("name", "Inimigo")
+        e_hp = enemy.get("current_hp", 0)
+        e_max = enemy.get("max_hp", "?")
+        atk = enemy.get("attack", "?")
+        df = enemy.get("defense", "?")
+
+        effects = _format_effects(enemy)
+
+        enemy_block = [
+            "\n━━━━━━━━━━━━━━━━━━",
+            f"{boss_marker}👹 **INIMIGO**",
+            f"<b>{e_name}</b>",
+            f"❤️ {e_hp}/{e_max}",
+            f"⚔ ATK {atk} | 🛡 DEF {df}{effects}"
+        ]
+
+    # =========================
+    # STATUS DO TURNO
+    # =========================
+    if current_actor_id == "boss":
+        turn_info = f"\n━━━━━━━━━━━━━━━━━━\n⚠️ **TURNO DO INIMIGO:** {enemy.get('name')} está agindo..."
+    elif current_actor_id == user_id_str:
+        turn_info = "\n━━━━━━━━━━━━━━━━━━\n🔥 **SEU TURNO!** Escolha sua ação abaixo."
+    else:
+        # Busca o nome do aliado que está agindo agora
+        actor_data = all_players_data.get(current_actor_id, {})
+        actor_name = actor_data.get("character_name") or actor_data.get("name") or "Companheiro"
+        turn_info = f"\n━━━━━━━━━━━━━━━━━━\n⏳ **TURNO ATUAL:** {actor_name} agindo..."
+
+    # =========================
+    # LOG RECENTE
+    # =========================
+    logs = session.get("turn_log", [])[-3:]
+    log_block = []
+    if logs:
+        log_block.append("\n━━━━━━━━━━━━━━━━━━\n📜 **ÚLTIMAS AÇÕES**")
+        for l in logs:
+            log_block.append(f"• {l}")
+
+    # =========================
+    # MONTAGEM FINAL
+    # =========================
+    full_text = "\n".join(
+        [header] +
+        group_lines +
+        enemy_block +
+        [turn_info] +
+        log_block
+    )
+
+    return full_text

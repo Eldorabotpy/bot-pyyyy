@@ -8,7 +8,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from datetime import datetime, timezone
 from modules.game_data import xp as xp_sys
-from handlers.tutorial.dora_hunting import start_hunting_chapter_job
 
 # Módulos do Jogo
 from modules import player_manager, game_data, file_ids
@@ -364,24 +363,24 @@ async def execute_collection_logic(
         # ==========================================================
         # ✅ DORA: após a 1ª coleta, inicia tutorial de caça (Pradaria)
         # ==========================================================
-        try:
-            flags = player_data.setdefault("tutorial_flags", {})
-            if not flags.get("first_collect_done"):
-                flags["first_collect_done"] = True
-                player_data["onboarding_stage"] = "tutorial_hunting"
-                await player_manager.save_player_data(user_id, player_data)
+        #try:
+         #   flags = player_data.setdefault("tutorial_flags", {})
+          #  if not flags.get("first_collect_done"):
+           #     flags["first_collect_done"] = True
+            #    player_data["onboarding_stage"] = "tutorial_hunting"
+             #   await player_manager.save_player_data(user_id, player_data)
 
                 # ⚠️ context aqui pode ser CallbackContext ou Application -> seu _resolve_bot já lida
-                await start_hunting_chapter_job(
-                    context=context,
-                    chat_id=chat_id,
-                    user_id=user_id
-                )
-        except Exception as e:
-            logger.error(f"[Tutorial] Falha ao iniciar hunting após coleta: {e}", exc_info=True)
+              #  await start_hunting_chapter_job(
+               #     context=context,
+                #    chat_id=chat_id,
+                 #   user_id=user_id
+                #)
+        #except Exception as e:
+         #   logger.error(f"[Tutorial] Falha ao iniciar hunting após coleta: {e}", exc_info=True)
 
-        if not sucesso_operacao:
-            return
+#        if not sucesso_operacao:
+ #           return
 
         # ✅ texto final
         item_info = _get_item_info(final_item_id) or {}
