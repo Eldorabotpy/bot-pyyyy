@@ -1,5 +1,5 @@
 # modules/events/catacumbas/raid_manager.py
-# (VERSÃO CORRIGIDA: Tratamento de Erro 'NoneType' e Logger Definido)
+# (VERSÃO CORRIGIDA: INTEGRAÇÃO TOTAL COM EFFECT ENGINE)
 
 import time
 import random
@@ -9,7 +9,6 @@ from typing import Dict, Optional, Union
 from . import config
 from modules import player_manager
 
-# ✅ 1. Definindo o Logger para evitar erro de "logger not defined"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -23,39 +22,23 @@ def _generate_room_code() -> str:
         if code not in LOBBIES and code not in ACTIVE_RAIDS:
             return code
 
-# ==============================================================================
-# 🧹 LIMPEZA ABSOLUTA DE JOGADOR
-# ==============================================================================
 def force_clear_player(user_id: Union[int, str]):
-    """Remove o jogador de TUDO incondicionalmente."""
+    """Remove o jogador de Lobbies, Raids e Localização de forma absoluta."""
     uid = str(user_id)
-    
-    # 1. Remove de qualquer Lobby fantasma
     for code, lobby in list(LOBBIES.items()):
         if uid in lobby.get("players", {}):
             del lobby["players"][uid]
             if len(lobby["players"]) == 0: del LOBBIES[code]
-            
-    # 2. Remove de qualquer Raid fantasma
     for code, raid in list(ACTIVE_RAIDS.items()):
         if uid in raid.get("players", {}):
             del raid["players"][uid]
             if len(raid["players"]) == 0: del ACTIVE_RAIDS[code]
-            
-    # 3. APAGA A LOCALIZAÇÃO (Isto é o que te estava a prender)
     if uid in PLAYER_LOCATION:
         del PLAYER_LOCATION[uid]
 
-
-# ==============================================================================
-# 🏰 GESTÃO DE LOBBY
-# ==============================================================================
 def create_lobby(leader_id: Union[int, str], leader_name: str) -> Optional[str]:
     uid = str(leader_id)
-    
-    # 🔥 A MÁGICA ACONTECE AQUI: Limpa qualquer lixo antes de criar a sala
     force_clear_player(uid)
-    
     code = _generate_room_code()
     LOBBIES[code] = {
         "code": code,
@@ -69,26 +52,14 @@ def create_lobby(leader_id: Union[int, str], leader_name: str) -> Optional[str]:
     PLAYER_LOCATION[uid] = code
     return code
 
-def leave_lobby(user_id: Union[int, str]):
-    # Agora o leave_lobby apenas chama a nossa limpeza absoluta
-    force_clear_player(user_id)
-
-def register_lobby_message(code: str, message_id: int, chat_id: int = None):
-    if code in LOBBIES: 
-        LOBBIES[code]['ui_message_id'] = message_id
-        if chat_id: LOBBIES[code]['chat_id'] = chat_id
-
 def join_lobby_by_code(user_id: Union[int, str], user_name: str, code: str) -> str:
-    uid = str(user_id)
-    code = code.upper().strip()
-    
+    uid, code = str(user_id), code.upper().strip()
     lobby = LOBBIES.get(code)
     if not lobby: return "not_found"
     if lobby["status"] != "waiting": return "started"
     if len(lobby["players"]) >= config.MAX_PLAYERS: return "full"
     if uid in lobby["players"]: return "already_in"
     if uid in PLAYER_LOCATION: return "in_another_lobby"
-
     lobby["players"][uid] = user_name
     PLAYER_LOCATION[uid] = code
     return "success"
@@ -96,139 +67,90 @@ def join_lobby_by_code(user_id: Union[int, str], user_name: str, code: str) -> s
 def get_player_lobby(user_id: Union[int, str]) -> Optional[dict]:
     uid = str(user_id)
     code = PLAYER_LOCATION.get(uid)
-    if code: return LOBBIES.get(code)
-    return None
-
-
-# ==============================================================================
-# 🚀 LÓGICA DE ESCALONAMENTO E CRIAÇÃO DE RAID
-# ==============================================================================
+    return LOBBIES.get(code) if code else None
 
 async def calculate_group_scaling(player_ids: list) -> float:
-    """Calcula dificuldade baseada nos stats reais, ignorando erros."""
-    total_atk = 0
-    total_hp = 0
-    count = 0
-    
+    """Calcula dificuldade baseada nos stats reais, com limites de segurança."""
+    total_atk, total_hp, count = 0, 0, 0
     for pid in player_ids:
         try:
-            if str(pid) == 'None': continue 
-            
             pdata = await player_manager.get_player_data(pid)
-            if not pdata: continue # Pula jogador inexistente
-
+            if not pdata: continue
             stats = await player_manager.get_player_total_stats(pdata)
-            
             total_atk += stats.get('attack', 20)
             total_hp += stats.get('max_hp', 100)
             count += 1
-        except Exception as e:
-            logger.error(f"Erro calc scaling {pid}: {e}")
+        except: continue
 
     if count == 0: return 1.0
 
     avg_atk = total_atk / count
     avg_hp = total_hp / count
 
-    # Fórmula: Dificuldade baseada na média do grupo
-    power_mult = (avg_hp / 100) * 0.4 + (avg_atk / 20) * 0.6
-    size_mult = 1.0 + (count - 1) * 0.25 # +25% por player extra
+    # FÓRMULA SUAVIZADA: Divide por valores base mais altos (250 HP / 80 ATK)
+    power_mult = (avg_hp / 250) * 0.4 + (avg_atk / 80) * 0.4 + 0.2
+    size_mult = 1.0 + (count - 1) * 0.15 # +15% por player extra (em vez de 25%)
     
-    return round(power_mult * size_mult, 2)
+    # CAP: Máximo de 4.5x de dificuldade total
+    return min(4.5, max(1.0, round(power_mult * size_mult, 2)))
 
 def _get_enemy_data_for_floor(floor: int, scaling: float = 1.0) -> dict:
     key = config.FLOOR_MAP.get(floor, "skeleton_warrior")
+    is_boss = (key == "BOSS")
+    base = config.BOSS_CONFIG if is_boss else config.MOBS.get(key)
     
-    if key == "BOSS":
-        base = config.BOSS_CONFIG
-        hp = int(base.max_hp * scaling)
-        atk = int(base.attack * scaling)
-        df = int(base.defense * (1 + (scaling - 1) * 0.5))
-        
-        return {
-            "name": base.name,
-            "current_hp": hp, "max_hp": hp,
-            "attack": atk, "defense": df,
-            "initiative": base.initiative,
-            "image_normal": base.image_normal,
-            "image_enraged": base.image_enraged,
-            "is_boss": True, "_effects": []
-        }
-    else:
-        base = config.MOBS.get(key, config.MOBS["skeleton_warrior"])
-        hp = int(base.max_hp * scaling)
-        atk = int(base.attack * scaling)
-        df = int(base.defense * (1 + (scaling - 1) * 0.5))
-        
-        return {
-            "name": base.name,
-            "current_hp": hp, "max_hp": hp,
-            "attack": atk, "defense": df,
-            "initiative": base.speed,
-            "image": base.image_key,
-            "is_boss": False, "_effects": []
-        }
+    hp = int(base.max_hp * scaling)
+    atk = int(base.attack * scaling)
+    # DEFESA: Scaling reduzido (0.2) para evitar mobs imunes a dano
+    df = int(base.defense * (1 + (scaling - 1) * 0.2)) 
+    
+    return {
+        "name": base.name,
+        "current_hp": hp, "max_hp": hp, "hp_max": hp,
+        "attack": atk, "defense": df,
+        "initiative": base.initiative if is_boss else base.speed,
+        "image": base.image_normal if is_boss else base.image_key,
+        "is_boss": is_boss, "_effects": []
+    }
 
 async def start_raid_from_lobby(leader_id: Union[int, str]) -> Optional[dict]:
     uid = str(leader_id)
     code = PLAYER_LOCATION.get(uid)
     lobby = LOBBIES.get(code)
-    
     if not lobby or str(lobby["leader_id"]) != uid: return None
     
-    # ✅ CORREÇÃO CRÍTICA: Filtra apenas jogadores válidos antes de começar
-    raw_players = list(lobby["players"].keys())
     valid_players_dict = {}
-    
-    for pid in raw_players:
+    for pid in list(lobby["players"].keys()):
         if not pid or str(pid) == 'None': continue
-        
-        # Verifica se existe no banco para evitar crash depois
         p_data = await player_manager.get_player_data(pid)
-        if p_data:
-            valid_players_dict[pid] = lobby["players"][pid]
-        else:
-            logger.warning(f"Jogador fantasma removido da raid: {pid}")
+        if p_data: valid_players_dict[pid] = lobby["players"][pid]
 
-    if len(valid_players_dict) < config.MIN_PLAYERS: 
-        logger.warning("Raid abortada: Jogadores insuficientes após filtro.")
-        return None
+    if len(valid_players_dict) < config.MIN_PLAYERS: return None
 
-    # Recalcula lista de IDs válidos
-    player_ids = list(valid_players_dict.keys())
-    scaling = await calculate_group_scaling(player_ids)
-    
-    start_floor = 1
-    first_enemy = _get_enemy_data_for_floor(start_floor, scaling)
-
+    scaling = await calculate_group_scaling(list(valid_players_dict.keys()))
     session = {
         "raid_id": code,
-        "players": valid_players_dict, # Usa o dicionário limpo
+        "players": valid_players_dict,
         "leader_id": uid,
-        "current_floor": start_floor,
+        "current_floor": 1,
         "total_floors": config.TOTAL_FLOORS,
         "scaling_factor": scaling,
-        "boss": first_enemy,
-        "turn_log": [f"⚔️ Grupo ({len(player_ids)}) entrou. Nível de Desafio: {scaling}x"],
+        "boss": _get_enemy_data_for_floor(1, scaling),
+        "turn_log": [f"⚔️ Grupo ({len(valid_players_dict)}) entrou. Desafio: {scaling}x"],
         "status": "active",
         "floor_cleared": False,
-        "start_time": time.time()
+        "monster_turn_counter": 0,
+        "monster_turn_threshold": max(3, len(valid_players_dict) * 2) 
     }
-    
     ACTIVE_RAIDS[code] = session
-    
-    # Remove do lobby de espera, pois agora é uma raid ativa
     if code in LOBBIES: del LOBBIES[code]
-    
     return session
 
 def advance_to_next_floor(session: dict) -> bool:
     next_f = session["current_floor"] + 1
     if next_f > config.TOTAL_FLOORS: return False
-
-    scaling = session.get("scaling_factor", 1.0)
     session["current_floor"] = next_f
-    session["boss"] = _get_enemy_data_for_floor(next_f, scaling)
+    session["boss"] = _get_enemy_data_for_floor(next_f, session.get("scaling_factor", 1.0))
     session["floor_cleared"] = False 
     session["turn_log"].append(f"🚪 Descendo para o Andar {next_f}...")
     return True

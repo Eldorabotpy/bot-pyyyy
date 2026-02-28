@@ -49,40 +49,37 @@ def verificar_cooldown(player, skill_id):
     return True, "Ok"
 
 def aplicar_cooldown(player, skill_id, raridade="comum"):
-    """
-    Aplica o tempo de recarga a uma skill baseada na sua raridade.
-    Procura o valor em 'rarity_effects' ou usa o padrão da skill.
-    """
+    """Aplica o tempo de recarga a uma skill baseada na sua raridade."""
+    from modules.game_data.skills import SKILL_DATA
     skill_info = SKILL_DATA.get(skill_id)
     if not skill_info: 
         return player
 
-    # 1. Tenta pegar a configuração específica da raridade
     rarity_data = skill_info.get('rarity_effects', {}).get(raridade, {})
     
-    # Procura 'cooldown_turns' direto na raridade OU dentro de 'effects' (para compatibilidade)
     tempo_recarga = rarity_data.get('cooldown_turns')
     if tempo_recarga is None:
         tempo_recarga = rarity_data.get('effects', {}).get('cooldown_turns')
 
-    # 2. Se não achou na raridade específica, tenta na raridade "comum" (fallback)
     if tempo_recarga is None:
         common_data = skill_info.get('rarity_effects', {}).get('comum', {})
         tempo_recarga = common_data.get('cooldown_turns')
     
-    # 3. Se ainda for None, tenta na raiz da skill (valor base)
     if tempo_recarga is None:
         tempo_recarga = skill_info.get('cooldown_turns', 0)
+        
+    if tempo_recarga is None:
+        tempo_recarga = skill_info.get('effects', {}).get('cooldown_turns', 0)
 
-    # Converte para int e aplica
+    # 🔥 A MÁGICA FICA AQUI: Só aplica se realmente tiver cooldown!
     try:
         tempo_recarga = int(tempo_recarga)
-    except:
+    except (ValueError, TypeError):
         tempo_recarga = 0
 
     if tempo_recarga > 0:
-        if "cooldowns" not in player: 
+        if "cooldowns" not in player:
             player["cooldowns"] = {}
         player["cooldowns"][skill_id] = tempo_recarga
-        
+
     return player

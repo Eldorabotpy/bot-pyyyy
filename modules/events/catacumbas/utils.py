@@ -1,11 +1,18 @@
 # modules/events/catacumbas/utils.py
+import re
+from modules.effects import engine as effects_engine
+
+def clean_md(text: str) -> str:
+    """Garante que o texto não quebre o Markdown do Telegram."""
+    if not text: return ""
+    # Remove caracteres que costumam causar 'Can't find end of entity'
+    return text.replace("_", " ").replace("*", "").replace("`", "").replace("[", "(").replace("]", ")")
 
 def get_hp_bar(current: int, max_val: int, length: int = 10) -> str:
     """Gera uma barra de vida visual (ex: 🟩🟩🟩⬜⬜)"""
     if max_val <= 0: max_val = 1
     pct = current / max_val
     
-    # Limita entre 0 e 1
     if pct < 0: pct = 0
     if pct > 1: pct = 1
     
@@ -21,72 +28,98 @@ def get_hp_bar(current: int, max_val: int, length: int = 10) -> str:
 
 async def format_catacomb_interface(session: dict, user_id: str, all_players_data: dict) -> str:
     """
-    Gera o texto principal da tela de combate.
-    Mostra: Andar, Boss (HP Bar), Lista de Jogadores e Log de Turnos.
+    Gera o texto principal da tela de combate com suporte à Engine de Efeitos.
+    Blindado contra erros de formatação Markdown.
     """
     # 1. Cabeçalho
     floor = session.get("current_floor", 1)
+    total_floors = session.get("total_floors", 5)
     scaling = session.get("scaling_factor", 1.0)
     raid_id = session.get("raid_id", "???")
     
-    text = f"🏰 **CATACUMBAS REAIS** | Andar {floor}\n"
-    text += f"💀 Dificuldade: {scaling}x | ID: `{raid_id}`\n"
-    text += "─" * 20 + "\n"
+    text = f"🏰 **As Catacumbas Reais** (Sala: `{raid_id}`)\n"
+    text += f"📍 Andar {floor}/{total_floors} | ⚖️ Escalonamento: {scaling}x\n\n"
     
-    # 2. Status do Chefe / Inimigo
+    # ==========================================================
+    # 2. STATUS DO MONSTRO / BOSS
+    # ==========================================================
     boss = session.get("boss")
     if boss:
-        b_name = boss.get("name", "Inimigo")
-        b_hp = boss.get("current_hp", 0)
-        b_max = boss.get("max_hp", 100)
-        b_bar = get_hp_bar(b_hp, b_max, length=12)
+        nome_monstro = clean_md(boss.get("name", "Monstro"))
+        icone = "👑" if boss.get("is_boss") else "👹"
         
-        # Ícone de status do boss
-        b_status = ""
-        if boss.get("is_enraged"): b_status = "😡 **ENFURECIDO**"
-        if boss.get("is_stunned"): b_status += " 💫 Atordoado"
+        hp = int(boss.get("current_hp", 0))
+        max_hp = int(boss.get("hp_max", boss.get("max_hp", 100)))
         
-        text += f"👹 **{b_name}** {b_status}\n"
-        text += f"{b_bar} `({b_hp}/{b_max})`\n"
+        text += f"{icone} **{nome_monstro}**\n"
         
-        # Mostra buffs/debuffs do boss se houver (opcional)
-        if "_effects" in boss and boss["_effects"]:
-            effects_str = ", ".join([e['name'] for e in boss["_effects"]])
-            text += f"💫 Efeitos: _{effects_str}_\n"
+        if hp <= 0:
+            text += "💀 **DERROTADO**\n"
+        else:
+            hp_bar = get_hp_bar(hp, max_hp, length=10)
+            text += f"❤️ Vida: {hp_bar} {hp}/{max_hp}\n"
+            text += f"⚔️ ATK: {boss.get('attack', 0)} | 🛡️ DEF: {boss.get('defense', 0)}\n"
             
+            # EXIBIÇÃO DE EFEITOS ATIVOS (Engine)
+            try:
+                # Usa a lógica interna da engine para recuperar instâncias ativas
+                active_effects = effects_engine._ensure_effects(boss)
+                if active_effects:
+                    eff_list = []
+                    for e in active_effects:
+                        # Limpa o ID do efeito para não quebrar o MD (ex: 'stun_effect' -> 'Stun Effect')
+                        name = clean_md(e.effect_id.replace("_", " ").title())
+                        stacks = f" x{e.stacks}" if e.stacks > 1 else ""
+                        eff_list.append(f"{name}{stacks}")
+                    
+                    if eff_list:
+                        text += f"💫 Efeitos: _{', '.join(eff_list)}_\n"
+            except: pass
+                
     text += "\n"
     
-    # 3. Status do Grupo
+    # ==========================================================
+    # 3. STATUS DO GRUPO (JOGADORES)
+    # ==========================================================
     text += "👥 **Esquadrão:**\n"
     for pid, pdata in all_players_data.items():
-        # Nome e HP
-        name = pdata.get("name", "Desconhecido")
-        # Tenta pegar apelido do telegram se não tiver nome de char
-        if name == "Desconhecido" and "username" in pdata:
-             name = pdata["username"]
+        # Nome blindado contra caracteres especiais
+        raw_name = pdata.get("name") or pdata.get("username", "Desconhecido")
+        name = clean_md(raw_name)
+        
+        level = pdata.get("level", 1)
+        classe = clean_md(pdata.get("class", "Novato")).capitalize()
 
-        hp = pdata.get("current_hp", 0)
-        # Tenta pegar max_hp (pode não estar atualizado se não recalcular, mas serve para display rápido)
-        max_hp = pdata.get("max_hp", 100) 
-        if "stats" in pdata and "max_hp" in pdata["stats"]:
-            max_hp = pdata["stats"]["max_hp"]
+        hp = int(pdata.get("current_hp", 0))
+        max_hp = int(pdata.get("hp_max", pdata.get("max_hp", 100)))
 
-        # Identificador visual para o próprio usuário
         marker = "👤" if str(pid) == str(user_id) else "🛡️"
         
         if hp <= 0:
-            text += f"{marker} ~{name}~ 💀 **MORTO**\n"
+            text += f"{marker} ~Lv.{level} {name}~ 💀 **MORTO**\n"
         else:
-            hp_pct = int((hp / max_hp) * 100) if max_hp > 0 else 0
-            text += f"{marker} **{name}**: {hp}/{max_hp} ({hp_pct}%)\n"
+            # Check de Atordoamento via Engine
+            status_icon = ""
+            if not effects_engine.can_act(pdata):
+                status_icon = " 💫"
+
+            hp_bar = get_hp_bar(hp, max_hp, length=6)
+            text += f"{marker} **Lv.{level} {name}** ({classe}){status_icon}\n"
+            text += f"   ❤️ {hp_bar} {hp}/{max_hp} HP\n"
             
-    # 4. Log de Combate (Últimas ações)
+    text += "\n"
+    
+    # ==========================================================
+    # 4. LOG DE COMBATE (Últimos Eventos)
+    # ==========================================================
     turn_log = session.get("turn_log", [])
     if turn_log:
-        text += "\n📜 **Registro de Batalha:**\n"
-        # Mostra apenas as últimas 4 linhas para não poluir
-        recent_logs = turn_log[-4:]
+        text += "📜 **Últimos Eventos:**\n"
+        # Mostra apenas as últimas 5 linhas e escapa caracteres de MD em cada uma
+        recent_logs = turn_log[-5:]
         for line in recent_logs:
-            text += f"• {line}\n"
-            
+            # Escapa manualmente o underscore para evitar erro de itálico não fechado
+            safe_line = line.replace("_", "\\_")
+            text += f"• {safe_line}\n"
+
     return text

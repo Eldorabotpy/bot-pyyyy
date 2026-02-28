@@ -3,18 +3,17 @@
 from typing import Dict, List
 
 BASE_STATS_BY_RARITY = {
-    # slots com primary fixo
-    "elmo":      {"vida":      {"comum":[3,5],  "bom":[5,8],  "raro":[8,12],  "epico":[12,16], "lendario":[16,22]}},
-    "armadura":  {"vida":      {"comum":[6,9],  "bom":[9,13], "raro":[13,18], "epico":[18,24], "lendario":[24,32]}},
-    "calca":     {"vida":      {"comum":[4,6],  "bom":[6,9],  "raro":[9,13],  "epico":[13,18], "lendario":[18,24]}},
-    "colar":     {"vida":      {"comum":[2,4],  "bom":[4,6],  "raro":[6,9],   "epico":[9,12],  "lendario":[12,16]}},
-    "botas":     {"agilidade": {"comum":[1,2],  "bom":[2,3],  "raro":[3,5],   "epico":[5,7],   "lendario":[7,10]}},
-    "luvas":     {"sorte":     {"comum":[1,2],  "bom":[2,3],  "raro":[3,4],   "epico":[4,6],   "lendario":[6,8]}},
+    # Adicionando os ranges para Único e Mítico nos slots fixos [Min, Max]
+    "elmo":      {"vida":      {"comum":[3,5], "bom":[5,8], "raro":[8,12], "epico":[12,16], "lendario":[16,22], "unico":[22,30], "mitico":[30,45]}},
+    "armadura":  {"vida":      {"comum":[6,9], "bom":[9,13], "raro":[13,18], "epico":[18,24], "lendario":[24,32], "unico":[32,45], "mitico":[45,60]}},
+    "calca":     {"vida":      {"comum":[4,6], "bom":[6,9], "raro":[9,13], "epico":[13,18], "lendario":[18,24], "unico":[24,32], "mitico":[32,45]}},
+    "colar":     {"vida":      {"comum":[2,4], "bom":[4,6], "raro":[6,9], "epico":[9,12], "lendario":[12,16], "unico":[16,22], "mitico":[22,30]}},
+    "botas":     {"agilidade": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7], "lendario":[7,10], "unico":[10,14], "mitico":[14,20]}},
+    "luvas":     {"sorte":     {"comum":[1,2], "bom":[2,3], "raro":[3,4], "epico":[4,6], "lendario":[6,8], "unico":[8,12], "mitico":[12,18]}},
 
-    # slots com atributo primário de classe
-    "arma":      {"__class_primary__": {"comum":[2,4], "bom":[4,6], "raro":[6,9], "epico":[9,12], "lendario":[12,16]}},
-    "anel":      {"__class_primary__": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7],  "lendario":[7,10]}},
-    "brinco":    {"__class_primary__": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7],  "lendario":[7,10]}},
+    "arma":      {"__class_primary__": {"comum":[2,4], "bom":[4,6], "raro":[6,9], "epico":[9,12], "lendario":[12,16], "unico":[16,22], "mitico":[22,32]}},
+    "anel":      {"__class_primary__": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7], "lendario":[7,10], "unico":[10,14], "mitico":[14,20]}},
+    "brinco":    {"__class_primary__": {"comum":[1,2], "bom":[2,3], "raro":[3,5], "epico":[5,7], "lendario":[7,10], "unico":[10,14], "mitico":[14,20]}},
 }
 
 RARITY_DATA = {
@@ -23,6 +22,8 @@ RARITY_DATA = {
     "raro":     {"name": "Raro",     "emoji": "🔵", "tier": 1, "bonus_stats": 2},
     "epico":    {"name": "Épico",    "emoji": "🟣", "tier": 1, "bonus_stats": 3},
     "lendario": {"name": "Lendário", "emoji": "🟡", "tier": 1, "bonus_stats": 4},
+    "unico":    {"name": "Único",    "emoji": "🔴", "tier": 2, "bonus_stats": 5},
+    "mitico":   {"name": "Mítico",   "emoji": "💠", "tier": 3, "bonus_stats": 6},
 }
 
 # Quantos atributos cada raridade deve ter (inclui o primário)
@@ -32,6 +33,8 @@ ATTR_COUNT_BY_RARITY = {
     "raro": 3,
     "epico": 4,
     "lendario": 5,
+    "unico": 6, 
+    "mitico": 7,
 }
 
 # Teto de aprimoramento por raridade
@@ -41,6 +44,8 @@ UPGRADE_CAP_BY_RARITY = {
     "raro": 30,
     "epico": 35,
     "lendario": 40,
+    "unico": 50, 
+    "mitico": 60,
 }
 
 # modules/game_data/rarity.py

@@ -221,17 +221,20 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                 total[target_key] += (_ival(clicks, 0) * gain_per_click)
 
     # ----------------------------------------------------
-    # PASSO 4: EQUIPAMENTOS
+    # PASSO 4: EQUIPAMENTOS E CONJUNTOS (SETS)
     # ----------------------------------------------------
     inventory = player_data.get('inventory', {}) or {}
     equipped = player_data.get('equipment', {}) or {}
     
+    equipped_sets = {} # 🔥 NOVO: Rastreador de Conjuntos
+
     if isinstance(equipped, dict):
         for slot, unique_id in equipped.items():
             if not unique_id: continue
             inst = inventory.get(unique_id)
             if not isinstance(inst, dict) or is_item_broken(inst): continue 
             
+            # --- 1. Soma os atributos normais da peça ---
             def add_item_stat(r_stat, r_val):
                 v = _ival(r_val, 0)
                 if v <= 0: return
@@ -248,6 +251,46 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
             ench = inst.get('enchantments', {}) or {}
             for k, data in ench.items(): add_item_stat(k, (data or {}).get('value', 0))
 
+            # --- 2. NOVO: Conta as peças de Conjunto (Set) ---
+            try:
+                base_id = inst.get("base_id") or inst.get("id")
+                if base_id:
+                    from modules.game_data import equipment as equip_data
+                    item_info = equip_data.ITEM_DATABASE.get(base_id, {})
+                    set_id = item_info.get("set_id")
+                    
+                    if set_id:
+                        # Se a peça tem um set, adiciona 1 ao contador
+                        equipped_sets[set_id] = equipped_sets.get(set_id, 0) + 1
+            except Exception as e:
+                logger.error(f"Erro ao contar Sets de Equipamento: {e}")
+
+    # --- 3. NOVO: Aplica os Bónus de Conjunto (Sets Completos) ---
+    if equipped_sets:
+        try:
+            from modules.game_data import equipment as equip_data
+            for set_id, count in equipped_sets.items():
+                set_info = equip_data.SETS_DATABASE.get(set_id)
+                
+                # Se o jogador tem peças suficientes (ex: 6/6)
+                if set_info and count >= set_info.get("pecas_necessarias", 99):
+                    buffs = set_info.get("buffs", {})
+                    
+                    # Aplica multiplicador de Vida
+                    if "max_hp_mult" in buffs:
+                        bonus_hp = int(total.get("max_hp", 0) * float(buffs["max_hp_mult"]))
+                        total["max_hp"] += bonus_hp
+                        
+                    # Aplica atributos fixos
+                    if "defense_add" in buffs:
+                        total["defense"] += int(buffs["defense_add"])
+                        
+                    if "attack_mult" in buffs:
+                        bonus_atk = int(total.get("attack", 0) * float(buffs["attack_mult"]))
+                        total["attack"] += bonus_atk
+                        
+        except Exception as e:
+            logger.error(f"Erro ao aplicar Bónus de Set: {e}")
     # ----------------------------------------------------
     # PASSO 5: BÔNUS EXTERNOS (CLÃ, PREMIUM, BUFFS)
     # ----------------------------------------------------

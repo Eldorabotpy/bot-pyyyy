@@ -37,6 +37,19 @@ SLOT_LABELS = {
 }
 
 # ============================================================================
+# SISTEMA DE CONJUNTOS (SET BONUSES) - CATACUMBAS
+# ============================================================================
+SETS_DATABASE = {
+    "set_heranca_real": {
+        "nome": "Herança do Rei Caído",
+        "pecas_necessarias": 6, 
+        "buffs": {
+            "max_hp_mult": 0.25, # +25% de Vida Máxima
+        },
+        "descricao": "A aura do antigo rei envolve o portador. (Bónus: +25% Vida, +20 Defesa)"
+    }
+}
+# ============================================================================
 # BANCO DE DADOS MESTRE DE ITENS EQUIPÁVEIS (NOVOS)
 # ============================================================================
 
@@ -230,6 +243,82 @@ ITEM_DATABASE = {
     "anel_damasco_samurai":        {"slot": "anel",     "nome_exibicao": "Anel de Aço Damasco"},
     "colar_damasco_samurai":       {"slot": "colar",    "nome_exibicao": "Colar de Aço Damasco"},
     "brinco_damasco_samurai":      {"slot": "brinco",   "nome_exibicao": "Brinco de Aço Damasco"},
+
+    # =====================================================================
+    # 👑 SETS EXCLUSIVOS DAS CATACUMBAS (HERANÇA DO REI CAÍDO)
+    # =====================================================================
+
+    # --- GUERREIRO ---
+    "espada_real_guerreiro":   {"slot": "arma",     "nome_exibicao": "Espada do Rei Caído", "set_id": "set_heranca_real", "class_req": ["guerreiro", "cavaleiro", "gladiador", "templario"]},
+    "elmo_real_guerreiro":     {"slot": "elmo",     "nome_exibicao": "Coroa de Ferro do Rei", "set_id": "set_heranca_real", "class_req": ["guerreiro", "cavaleiro", "gladiador", "templario"]},
+    "armadura_real_guerreiro": {"slot": "armadura", "nome_exibicao": "Égide do Rei Caído",  "set_id": "set_heranca_real", "class_req": ["guerreiro", "cavaleiro", "gladiador", "templario"]},
+    "calca_real_guerreiro":    {"slot": "calca",    "nome_exibicao": "Grevas Reais Corrompidas", "set_id": "set_heranca_real", "class_req": ["guerreiro", "cavaleiro", "gladiador", "templario"]},
+    "botas_real_guerreiro":    {"slot": "botas",    "nome_exibicao": "Sabatões do Rei Caído", "set_id": "set_heranca_real", "class_req": ["guerreiro", "cavaleiro", "gladiador", "templario"]},
+    "luvas_real_guerreiro":    {"slot": "luvas",    "nome_exibicao": "Manoplas Reais Corrompidas", "set_id": "set_heranca_real", "class_req": ["guerreiro", "cavaleiro", "gladiador", "templario"]},
+
+    # --- BERSERKER ---
+    "machado_real_berserker":  {"slot": "arma",     "nome_exibicao": "Machado da Fúria Real", "set_id": "set_heranca_real", "class_req": ["berserker", "barbaro", "juggernaut", "ira_primordial"]},
+    "elmo_real_berserker":     {"slot": "elmo",     "nome_exibicao": "Elmo de Ossos Reais", "set_id": "set_heranca_real", "class_req": ["berserker", "barbaro", "juggernaut", "ira_primordial"]},
+    "armadura_real_berserker": {"slot": "armadura", "nome_exibicao": "Peitoral da Fúria Real", "set_id": "set_heranca_real", "class_req": ["berserker", "barbaro", "juggernaut", "ira_primordial"]},
+    "calca_real_berserker":    {"slot": "calca",    "nome_exibicao": "Calças da Fúria Real", "set_id": "set_heranca_real", "class_req": ["berserker", "barbaro", "juggernaut", "ira_primordial"]},
+    "botas_real_berserker":    {"slot": "botas",    "nome_exibicao": "Botas da Fúria Real", "set_id": "set_heranca_real", "class_req": ["berserker", "barbaro", "juggernaut", "ira_primordial"]},
+    "luvas_real_berserker":    {"slot": "luvas",    "nome_exibicao": "Luvas da Fúria Real", "set_id": "set_heranca_real", "class_req": ["berserker", "barbaro", "juggernaut", "ira_primordial"]},
+
+    # --- ASSASSINO ---
+    "adaga_real_assassino":    {"slot": "arma",     "nome_exibicao": "Adaga Sombria do Rei", "set_id": "set_heranca_real", "class_req": ["assassino", "ladrao_de_sombras", "ninja", "mestre_das_laminas"]},
+    "elmo_real_assassino":     {"slot": "elmo",     "nome_exibicao": "Máscara Sombria do Rei", "set_id": "set_heranca_real", "class_req": ["assassino", "ladrao_de_sombras", "ninja", "mestre_das_laminas"]},
+    "armadura_real_assassino": {"slot": "armadura", "nome_exibicao": "Couraça Sombria do Rei", "set_id": "set_heranca_real", "class_req": ["assassino", "ladrao_de_sombras", "ninja", "mestre_das_laminas"]},
+    "calca_real_assassino":    {"slot": "calca",    "nome_exibicao": "Calças Sombrias do Rei", "set_id": "set_heranca_real", "class_req": ["assassino", "ladrao_de_sombras", "ninja", "mestre_das_laminas"]},
+    "botas_real_assassino":    {"slot": "botas",    "nome_exibicao": "Botas Sombrias do Rei", "set_id": "set_heranca_real", "class_req": ["assassino", "ladrao_de_sombras", "ninja", "mestre_das_laminas"]},
+    "luvas_real_assassino":    {"slot": "luvas",    "nome_exibicao": "Luvas Sombrias do Rei", "set_id": "set_heranca_real", "class_req": ["assassino", "ladrao_de_sombras", "ninja", "mestre_das_laminas"]},
+
+    # --- SAMURAI ---
+    "katana_real_samurai":     {"slot": "arma",     "nome_exibicao": "Katana do Shogun Caído", "set_id": "set_heranca_real", "class_req": ["samurai", "kensei", "ronin", "shogun"]},
+    "elmo_real_samurai":       {"slot": "elmo",     "nome_exibicao": "Kabuto do Shogun Caído", "set_id": "set_heranca_real", "class_req": ["samurai", "kensei", "ronin", "shogun"]},
+    "armadura_real_samurai":   {"slot": "armadura", "nome_exibicao": "Do do Shogun Caído", "set_id": "set_heranca_real", "class_req": ["samurai", "kensei", "ronin", "shogun"]},
+    "calca_real_samurai":      {"slot": "calca",    "nome_exibicao": "Haidate do Shogun Caído", "set_id": "set_heranca_real", "class_req": ["samurai", "kensei", "ronin", "shogun"]},
+    "botas_real_samurai":      {"slot": "botas",    "nome_exibicao": "Suneate do Shogun Caído", "set_id": "set_heranca_real", "class_req": ["samurai", "kensei", "ronin", "shogun"]},
+    "luvas_real_samurai":      {"slot": "luvas",    "nome_exibicao": "Kote do Shogun Caído", "set_id": "set_heranca_real", "class_req": ["samurai", "kensei", "ronin", "shogun"]},
+
+    # --- MONGE ---
+    "arma_real_monge":         {"slot": "arma",     "nome_exibicao": "Manoplas do Templo Caído", "set_id": "set_heranca_real", "class_req": ["monge", "guardiao_do_templo", "punho_elemental", "ascendente"]},
+    "elmo_real_monge":         {"slot": "elmo",     "nome_exibicao": "Bandana do Templo Caído", "set_id": "set_heranca_real", "class_req": ["monge", "guardiao_do_templo", "punho_elemental", "ascendente"]},
+    "armadura_real_monge":     {"slot": "armadura", "nome_exibicao": "Gi do Templo Caído", "set_id": "set_heranca_real", "class_req": ["monge", "guardiao_do_templo", "punho_elemental", "ascendente"]},
+    "calca_real_monge":        {"slot": "calca",    "nome_exibicao": "Calças do Templo Caído", "set_id": "set_heranca_real", "class_req": ["monge", "guardiao_do_templo", "punho_elemental", "ascendente"]},
+    "botas_real_monge":        {"slot": "botas",    "nome_exibicao": "Sandálias do Templo Caído", "set_id": "set_heranca_real", "class_req": ["monge", "guardiao_do_templo", "punho_elemental", "ascendente"]},
+    "luvas_real_monge":        {"slot": "luvas",    "nome_exibicao": "Faixas do Templo Caído", "set_id": "set_heranca_real", "class_req": ["monge", "guardiao_do_templo", "punho_elemental", "ascendente"]},
+
+    # --- MAGO ---
+    "cajado_real_mago":        {"slot": "arma",     "nome_exibicao": "Cajado Arcano do Rei", "set_id": "set_heranca_real", "class_req": ["mago", "feiticeiro", "elementalista", "arquimago"]},
+    "elmo_real_mago":          {"slot": "elmo",     "nome_exibicao": "Coroa Arcana do Rei", "set_id": "set_heranca_real", "class_req": ["mago", "feiticeiro", "elementalista", "arquimago"]},
+    "armadura_real_mago":      {"slot": "armadura", "nome_exibicao": "Túnica Arcana do Rei", "set_id": "set_heranca_real", "class_req": ["mago", "feiticeiro", "elementalista", "arquimago"]},
+    "calca_real_mago":         {"slot": "calca",    "nome_exibicao": "Calças Arcanas do Rei", "set_id": "set_heranca_real", "class_req": ["mago", "feiticeiro", "elementalista", "arquimago"]},
+    "botas_real_mago":         {"slot": "botas",    "nome_exibicao": "Botas Arcanas do Rei", "set_id": "set_heranca_real", "class_req": ["mago", "feiticeiro", "elementalista", "arquimago"]},
+    "luvas_real_mago":         {"slot": "luvas",    "nome_exibicao": "Luvas Arcanas do Rei", "set_id": "set_heranca_real", "class_req": ["mago", "feiticeiro", "elementalista", "arquimago"]},
+
+    # --- BARDO ---
+    "arma_real_bardo":         {"slot": "arma",     "nome_exibicao": "Alaúde do Réquiem Real", "set_id": "set_heranca_real", "class_req": ["bardo", "menestrel", "encantador", "maestro"]},
+    "elmo_real_bardo":         {"slot": "elmo",     "nome_exibicao": "Chapéu do Réquiem Real", "set_id": "set_heranca_real", "class_req": ["bardo", "menestrel", "encantador", "maestro"]},
+    "armadura_real_bardo":     {"slot": "armadura", "nome_exibicao": "Casaco do Réquiem Real", "set_id": "set_heranca_real", "class_req": ["bardo", "menestrel", "encantador", "maestro"]},
+    "calca_real_bardo":        {"slot": "calca",    "nome_exibicao": "Calças do Réquiem Real", "set_id": "set_heranca_real", "class_req": ["bardo", "menestrel", "encantador", "maestro"]},
+    "botas_real_bardo":        {"slot": "botas",    "nome_exibicao": "Botas do Réquiem Real", "set_id": "set_heranca_real", "class_req": ["bardo", "menestrel", "encantador", "maestro"]},
+    "luvas_real_bardo":        {"slot": "luvas",    "nome_exibicao": "Luvas do Réquiem Real", "set_id": "set_heranca_real", "class_req": ["bardo", "menestrel", "encantador", "maestro"]},
+
+    # --- CAÇADOR ---
+    "arma_real_cacador":       {"slot": "arma",     "nome_exibicao": "Arco do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"]},
+    "elmo_real_cacador":       {"slot": "elmo",     "nome_exibicao": "Capuz do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"]},
+    "armadura_real_cacador":   {"slot": "armadura", "nome_exibicao": "Peitoral do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"]},
+    "calca_real_cacador":      {"slot": "calca",    "nome_exibicao": "Calças do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"]},
+    "botas_real_cacador":      {"slot": "botas",    "nome_exibicao": "Botas do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"]},
+    "luvas_real_cacador":      {"slot": "luvas",    "nome_exibicao": "Luvas do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"]},
+
+    # --- CURANDEIRO ---
+    "arma_real_curandeiro":    {"slot": "arma",     "nome_exibicao": "Cajado do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "elmo_real_curandeiro":    {"slot": "elmo",     "nome_exibicao": "Capuz do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "armadura_real_curandeiro":{"slot": "armadura", "nome_exibicao": "Veste do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "calca_real_curandeiro":   {"slot": "calca",    "nome_exibicao": "Calças do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "botas_real_curandeiro":   {"slot": "botas",    "nome_exibicao": "Sandálias do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "luvas_real_curandeiro":   {"slot": "luvas",    "nome_exibicao": "Luvas do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
 }
 
 def get_item_info(base_id: str) -> dict:

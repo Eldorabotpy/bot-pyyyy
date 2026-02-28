@@ -282,7 +282,22 @@ async def create_room_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del raid_manager.ACTIVE_RAIDS[code]
             break
 
-    code = raid_manager.create_lobby(user_id, user.first_name)
+    # ==========================================================
+    # 🔥 CORREÇÃO: BUSCAR O NOME REAL DO PERSONAGEM
+    # ==========================================================
+    from modules import player_manager
+    pdata = await player_manager.get_player_data(user_id)
+    
+    char_name = user.first_name # Fallback inicial
+    if pdata:
+        char_name = pdata.get("name", user.first_name)
+        # Se o nome estiver como o padrão inicial, tenta puxar o username
+        if char_name in ["Guerreiro", "Desconhecido"] and "username" in pdata:
+            char_name = pdata["username"]
+
+    # Cria a sala passando o NOME DO PERSONAGEM
+    code = raid_manager.create_lobby(user_id, char_name)
+    # ==========================================================
     
     if code:
         lobby = raid_manager.LOBBIES[code]
@@ -294,8 +309,7 @@ async def create_room_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
             raid_manager.register_lobby_message(code, msg.message_id, msg.chat.id)
     else:
         await query.answer("Erro inesperado ao criar sala.", show_alert=True)
-
-
+        
 async def start_raid_run_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
@@ -409,7 +423,11 @@ async def debug_give_key_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await player_manager.save_player_data(user_id, pdata)
     await update.message.reply_text(f"🔧 +10 {config.REQUIRED_KEY_ITEM}")
 
+# ==============================================================================
+# REGISTRO DE COMANDOS E BOTÕES (FINAL DO ARQUIVO)
+# ==============================================================================
 handlers = [
+    # Menus e Lobbies
     CallbackQueryHandler(menu_catacumba_main, pattern="^evt_cat_menu$"),
     CallbackQueryHandler(create_room_cb, pattern="^cat_create_room$"),
     CallbackQueryHandler(refresh_lobby_cb, pattern="^cat_refresh_lobby$"),
@@ -418,8 +436,13 @@ handlers = [
     CallbackQueryHandler(ask_for_code_cb, pattern="^cat_join_input$"),
     MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, process_code_input),
     CommandHandler("debug_key", debug_give_key_cb),
-    CallbackQueryHandler(combat_handler.process_player_attack, pattern="^cat_act_attack$"),
-    CallbackQueryHandler(combat_handler.refresh_combat_cb, pattern="^cat_combat_refresh$"), # <-- ADICIONE ESTA LINHA
-    CallbackQueryHandler(combat_handler.leave_active_raid_cb, pattern="^cat_leave_active$"),
     
+    # 1. 🔥 SISTEMA DE SKILLS (Vem antes para ter prioridade)
+    CallbackQueryHandler(combat_handler.show_catacomb_skills_cb, pattern="^cat_act_skills$"),
+    CallbackQueryHandler(combat_handler.catacomb_use_skill_cb, pattern="^cat_use_skill:.*"),
+    
+    # 2. ⚔️ COMBATE BÁSICO (Padrão restrito para não engolir outros botões)
+    CallbackQueryHandler(combat_handler.combat_action_cb, pattern="^cat_act_(attack|next_floor)$"), 
+    CallbackQueryHandler(combat_handler.refresh_cb, pattern="^cat_combat_refresh"), 
+    CallbackQueryHandler(combat_handler.leave_active_raid_cb, pattern="^cat_leave_active"), 
 ]

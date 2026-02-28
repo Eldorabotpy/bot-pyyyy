@@ -11,6 +11,9 @@ from modules import player_manager
 from modules.combat import criticals, combat_engine
 from handlers.profile_handler import _get_class_media
 from modules.auth_utils import get_current_player_id
+from modules.game_data.skills import get_skill_data_with_rarity
+from modules.cooldowns import verificar_cooldown
+from . import combat_handler
 
 # Integração com a Engine de Efeitos e Visual
 from modules.effects import engine as effects_engine
@@ -53,134 +56,202 @@ async def refresh_battle_interface(
     turn_state: str = "player_turn"
 ):
     """
-    Renderiza a tela de combate detalhada para o grupo, mantendo o chat limpo.
-    Usa o ui_renderer blindado para evitar crash por imagem.
+    Renderiza a tela de combate detalhada para o grupo.
+    Prioriza a Tela de Vitória para não prender os jogadores no Andar 5.
     """
     user_id_str = str(user_id)
     current_pdata = await player_manager.get_player_data(user_id_str)
     
     if not current_pdata:
-        return # Evita erro se o jogador não existir
+        return
 
-    # Define o escopo para o ui_renderer (garante que ele limpe apenas msgs desta raid)
     UI_SCOPE = f"dungeon_raid_{session.get('raid_id')}"
 
     # ==========================================================================
-    # 1. CASO: JOGADOR DERROTADO (OBSERVADOR)
+    # 1. PRIORIDADE MÁXIMA: RAID FINALIZADA (VITÓRIA FINAL)
     # ==========================================================================
-    # 1. CASO: JOGADOR DERROTADO (OBSERVADOR)
+    if session.get("status") == "finished" or turn_state == "victory":
+        txt = "🏆 **MASMORRA CONCLUÍDA!** 🏆\n\nTodos os inimigos foram derrotados e os tesouros foram garantidos!\n\n"
+        
+        # 🔥 Lê APENAS o log de Loot (ignora os ataques)
+        loot_log = session.get("loot_log", [])
+        if loot_log:
+            txt += "📜 **Recompensas do Grupo:**\n"
+            for line in loot_log:
+                safe_line = line.replace('_', '\\_') # Evita erro de Markdown
+                txt += f"• {safe_line}\n"
+                
+        kb = [[InlineKeyboardButton("🚪 Retornar à Cidade", callback_data="evt_cat_menu")]]
+        
+        # O ui_renderer vai cuidar de mostrar a imagem ou o fallback de texto
+        await ui_renderer.render_media_or_text(
+            update=update, context=context, text=txt, media_key="cat_lobby_default",
+            reply_markup=InlineKeyboardMarkup(kb), scope=UI_SCOPE, allow_edit=True
+        )
+        return
+
+    # ==========================================================================
+    # 2. CASO: JOGADOR DERROTADO (OBSERVADOR)
+    # ==========================================================================
     if current_pdata.get("current_hp", 0) <= 0:
         defeat_text = "💀 **Foste derrotado!**\nAguarda o fim do combate ou abandone a masmorra."
-        
         kb = [
             [InlineKeyboardButton("🔄 Atualizar Visão", callback_data="cat_combat_refresh")],
             [InlineKeyboardButton("🚪 Abandonar Catacumba", callback_data="cat_leave_active")]
         ]
         
-        # 1. Força apagar a mensagem anterior do Telegram para não dar erro de edição
         if update.callback_query and update.callback_query.message:
-            try:
-                await update.callback_query.message.delete()
-            except Exception as e:
-                logger.error(f"Erro ao apagar mensagem velha: {e}")
+            try: await update.callback_query.message.delete()
+            except: pass
 
-        # 2. Envia uma mensagem limpa, apenas de texto (Burla o erro do media)
         try:
             sent_msg = await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=defeat_text,
-                reply_markup=InlineKeyboardMarkup(kb),
-                parse_mode="Markdown"
+                chat_id=update.effective_chat.id, text=defeat_text,
+                reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown"
             )
-            
-            # 3. Informa ao bot que ESTA é a nova mensagem para ele gerenciar
             store = context.user_data.get("_ui_last_messages", {})
             store[UI_SCOPE] = sent_msg.message_id
             context.user_data["_ui_last_messages"] = store
-
         except Exception as e:
-             logger.error(f"Erro Crítico ao enviar tela de derrota: {e}")
-             
-        return # Impede de rodar o código de interface de combate vivo
+            logger.error(f"Erro ao enviar tela de derrota: {e}")
+        return
     
     # ==========================================================================
-    # 2. CASO: ANDAR LIMPO (VITÓRIA)
+    # 3. CASO: ANDAR LIMPO (PREPARAÇÃO PARA O PRÓXIMO OU PARA O LOOT)
     # ==========================================================================
     if session.get("floor_cleared", False):
-        floor = session["current_floor"]
-        txt = f"🚪 **ANDAR {floor} LIMPO!**\nOs inimigos foram derrotados.\nPreparem-se para descer..."
+        floor = session.get("current_floor", 1)
+        total = session.get("total_floors", 5)
         
-        kb = [[InlineKeyboardButton("⬇️ DESCER ESCADAS", callback_data="cat_act_next_floor")]]
+        # Se estamos no último andar, muda o texto para ficar mais épico!
+        if floor >= total:
+            txt = f"🚪 **SALA FINAL LIMPA!**\nO Guardião foi aniquilado.\nReivindiquem as vossas recompensas!"
+            btn_txt = "🏆 COLETAR LOOT"
+        else:
+            txt = f"🚪 **ANDAR {floor} LIMPO!**\nOs inimigos foram derrotados.\nPreparem-se para descer..."
+            btn_txt = "⬇️ DESCER ESCADAS"
+            
+        kb = [[InlineKeyboardButton(btn_txt, callback_data="cat_act_next_floor")]]
         lobby_media = config.MEDIA_KEYS.get("lobby_screen", "cat_lobby_default")
 
         await ui_renderer.render_media_or_text(
-            update=update,
-            context=context,
-            text=txt,
-            media_key=lobby_media, # ✅ Correção
-            reply_markup=InlineKeyboardMarkup(kb),
-            scope=UI_SCOPE,
-            allow_edit=True
+            update=update, context=context, text=txt, media_key=lobby_media,
+            reply_markup=InlineKeyboardMarkup(kb), scope=UI_SCOPE, allow_edit=True
         )
         return
 
     # ==========================================================================
-    # 3. COMBATE ATIVO: Formatar Dados
+    # 4. COMBATE ATIVO: Formatar Dados
     # ==========================================================================
-    
-    # Coleta dados atualizados de todos os jogadores da raid
     all_players_data = {}
     for pid in session.get("players", {}):
         p_data = await player_manager.get_player_data(str(pid))
-        if p_data:
-            all_players_data[str(pid)] = p_data
+        if p_data: all_players_data[str(pid)] = p_data
 
-    # Formata o texto principal (HP do Boss, Turnos, Lista de Players)
-    # Assumindo que utils.format_catacomb_interface existe e retorna string
     text = await utils.format_catacomb_interface(session, user_id_str, all_players_data)
 
-    # 4. Configuração dos botões de Ação
     kb = [
-        [InlineKeyboardButton("⚔️ ATACAR", callback_data="cat_act_attack"),
-         InlineKeyboardButton("✨ SKILLS", callback_data="combat_skill_menu")],
-        [InlineKeyboardButton("🧪 Poção", callback_data="cat_act_heal_small"),
-         InlineKeyboardButton("🔄 Atualizar", callback_data="cat_combat_refresh")]
+        [
+            InlineKeyboardButton("⚔️ ATACAR", callback_data="cat_act_attack"),
+            InlineKeyboardButton("✨ SKILLS", callback_data="cat_act_skills"),
+            InlineKeyboardButton("🧪 Poção", callback_data="cat_act_heal_small")
+        ],
+        [
+            InlineKeyboardButton("🔄 Atualizar Visão", callback_data="cat_combat_refresh"),
+            InlineKeyboardButton("🎒 Mochila", callback_data="cat_inventory")
+        ]
     ]
 
-    # 5. Seleção Inteligente de Mídia (Boss ou Jogador)
-    # Tenta pegar a imagem do Boss
     boss_data = session.get("boss", {})
     media_key = boss_data.get("image", "boss_default")
     
-    # Se o Boss estiver "Enraged" (com raiva), muda a foto
     if boss_data.get("is_enraged") and boss_data.get("image_enraged"):
         media_key = boss_data["image_enraged"]
-    
-    # Se for turno de "Dano no Jogador", opcionalmente mostra a classe do jogador
-    if turn_state == "monster_attacked":
-        # Tenta achar a imagem da classe no pdata ou config
-        class_name = current_pdata.get("class_name", "guerreiro").lower()
-        # Exemplo: procura chave 'classe_guerreiro'
-        class_media = f"classe_{class_name}" 
-        # Aqui você pode refinar a lógica de busca se quiser
-        # media_key = class_media 
 
-    # 6. ENVIO SEGURO (UI RENDERER)
     await ui_renderer.render_media_or_text(
-        update=update,
-        context=context,
-        text=text,
-        media_key=media_key, # O renderer vai tentar achar o ID ou usar fallback
-        reply_markup=InlineKeyboardMarkup(kb),
-        scope=UI_SCOPE,
-        allow_edit=True,
-        delete_previous_on_send=True # Garante limpeza do chat
+        update=update, context=context, text=text, media_key=media_key,
+        reply_markup=InlineKeyboardMarkup(kb), scope=UI_SCOPE, allow_edit=True,
+        delete_previous_on_send=True
     )
 
 # ==============================================================================
 # 🎮 LÓGICA DE AÇÕES (COMBATE)
 # ==============================================================================
 
+# ==============================================================================
+# ✨ SISTEMA DE SKILLS NAS CATACUMBAS
+# ==============================================================================
+async def show_catacomb_skills_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Abre o menu para escolher uma habilidade na Raid."""
+    query = update.callback_query
+    
+    from .entry_handler import _get_safe_id
+    user_id = await _get_safe_id(update, context)
+    if not user_id:
+        await query.answer("Erro de sessão.", show_alert=True)
+        return
+
+    from . import raid_manager
+    active_raid = None
+    for code, session in raid_manager.ACTIVE_RAIDS.items():
+        if user_id in session.get("players", {}):
+            active_raid = session
+            break
+            
+    if not active_raid:
+        await query.answer("Não estás numa raid ativa.", show_alert=True)
+        return
+
+    pdata = await player_manager.get_player_data(user_id)
+    skills = pdata.get("skills", {})
+    
+    if not skills:
+        await query.answer("Não tens nenhuma habilidade equipada!", show_alert=True)
+        return
+
+    from modules.game_data.skills import get_skill_data_with_rarity
+    from modules.cooldowns import verificar_cooldown
+    
+    kb = []
+    current_row = []
+    
+    for skill_id in skills.keys():
+        s_data = get_skill_data_with_rarity(pdata, skill_id)
+        if not s_data: continue
+        
+        if s_data.get("type") == "passive": continue
+        
+        name = s_data.get("display_name", skill_id)
+        mana = s_data.get("mana_cost", 0)
+        
+        # 🔥 CORREÇÃO DA LEITURA DE COOLDOWN 🔥
+        pode_usar, msg_cd = verificar_cooldown(pdata, skill_id)
+        
+        if not pode_usar:
+            # Pega os turnos diretamente do dicionário do jogador para ter o número exato
+            turnos_restantes = pdata.get("cooldowns", {}).get(skill_id, 0)
+            btn_text = f"⏳ {name} ({turnos_restantes}T)"
+            cb_data = f"cat_skill_cd:{turnos_restantes}" 
+        else:
+            btn_text = f"✨ {name} (-{mana}MP)"
+            cb_data = f"cat_use_skill:{skill_id}" 
+            
+        current_row.append(InlineKeyboardButton(btn_text, callback_data=cb_data))
+        
+        if len(current_row) == 2:
+            kb.append(current_row)
+            current_row = []
+            
+    if current_row:
+        kb.append(current_row)
+        
+    kb.append([InlineKeyboardButton("⬅️ Voltar ao Combate", callback_data="cat_combat_refresh")])
+
+    try:
+        await query.answer()
+        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(kb))
+    except Exception: pass
+        
 async def combat_action_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = str(get_current_player_id(update, context))
@@ -202,153 +273,286 @@ async def combat_action_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if raid_manager.advance_to_next_floor(session):
             await refresh_battle_interface(update, context, session, user_id)
         else:
-            await _handle_victory(update, context, session)
+            # FIX: Adicionado user_id que faltava na chamada
+            await _handle_victory(update, context, session, user_id)
         return
 
-    # --- Validação de Turno ---
-    target = session.get("boss")
-    if session.get("floor_cleared") or (target and target["current_hp"] <= 0):
-        await query.answer("Andar já limpo.")
-        await refresh_battle_interface(update, context, session, user_id)
+    # --- Ação: Ataque ---
+    if action == "cat_act_attack":
+        pdata = await player_manager.get_player_data(user_id)
+        if pdata.get("current_hp", 0) <= 0:
+            await query.answer("Estás morto!", show_alert=True)
+            return
+
+        boss = session.get("boss")
+        stats = await player_manager.get_player_total_stats(pdata)
+
+        # 1. PROCESSA ATAQUE VIA ENGINE (Garante Críticos e Atributos Reais)
+        res = await combat_engine.processar_acao_combate(
+            attacker_pdata=pdata,
+            attacker_stats=stats,
+            target_stats=boss,
+            skill_id=None,
+            attacker_current_hp=pdata.get("current_hp", 100)
+        )
+
+        # 2. DISPATCH DE EFEITOS
+        ctx = CombatContext(event=EVENT_ON_BEFORE_DAMAGE, source=pdata, target=boss, battle=session, damage=res["total_damage"])
+        effects_engine.dispatch(EVENT_ON_BEFORE_DAMAGE, ctx)
+        
+        boss["current_hp"] = max(0, boss["current_hp"] - ctx.damage)
+        
+        # 3. LOGS
+        for msg in res["log_messages"]:
+            session["turn_log"].append(f"⚔️ {msg}")
+
+        # 4. VERIFICA MORTE DO BOSS OU TURNO DO MONSTRO
+        if boss["current_hp"] <= 0:
+            session["floor_cleared"] = True
+            session["turn_log"].append(f"💀 **{boss['name']} DERROTADO!**")
+        else:
+            # Incrementa contador de turno do monstro
+            session["monster_turn_counter"] = session.get("monster_turn_counter", 0) + 1
+            if session["monster_turn_counter"] >= session.get("monster_turn_threshold", 3):
+                session["monster_turn_counter"] = 0
+                await execute_boss_turn(update, context, session)
+
+        await player_manager.save_player_data(user_id, pdata)
+        await refresh_battle_interface(update, context, session, user_id, turn_state="player_attacked")
+
+async def catacomb_use_skill_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Processa o uso de uma habilidade na Raid com Motor Unificado."""
+    query = update.callback_query
+    
+    try:
+        skill_id = query.data.split(":")[1]
+    except IndexError:
+        await query.answer("Erro ao ler habilidade.", show_alert=True)
+        return
+
+    from .entry_handler import _get_safe_id
+    user_id = await _get_safe_id(update, context)
+    if not user_id: return
+    
+    from . import raid_manager
+    code = raid_manager.PLAYER_LOCATION.get(str(user_id))
+    active_raid = raid_manager.ACTIVE_RAIDS.get(code)
+            
+    if not active_raid or active_raid.get("floor_cleared"):
+        await query.answer("Ação inválida no momento.", show_alert=True)
         return
 
     pdata = await player_manager.get_player_data(user_id)
-    stats = await player_manager.get_player_total_stats(pdata)
+    if not pdata or pdata.get("current_hp", 0) <= 0:
+        await query.answer("Estás morto ou inválido!", show_alert=True)
+        return
 
-    # ============================
-    # 1. ENGINE DE EFEITOS (TICK)
-    # ============================
-    # Processa DOTs (bleed/poison) e HOTs no jogador e no mob antes da ação
-    p_ticks = effects_engine.tick_turn(pdata, session, apply_to_hp_key="current_hp")
-    m_ticks = effects_engine.tick_turn(target, session, apply_to_hp_key="current_hp")
-    session["turn_log"].extend(p_ticks + m_ticks)
-
+    from modules.effects import engine as effects_engine
     if not effects_engine.can_act(pdata):
-        await query.answer("💫 Você está atordoado e não pode agir!", show_alert=True)
+        await query.answer("💫 Estás atordoado e não podes agir!", show_alert=True)
         return
 
-    # ============================
-    # 2. TURNO DO JOGADOR
-    # ============================
-    if action == "cat_act_attack":
-        # Motor de combate centralizado
-        res = await combat_engine.processar_acao_combate(pdata, stats, target, None, pdata.get("current_hp", 100))
-        
-        # Pipeline de dano da Engine (Modificadores + Shields)
-        ctx = CombatContext(event=EVENT_ON_BEFORE_DAMAGE, source=pdata, target=target, battle=session, damage=res["total_damage"])
-        effects_engine.dispatch(EVENT_ON_BEFORE_DAMAGE, ctx)
-        
-        target["current_hp"] -= ctx.damage
-        session["turn_log"].append(f"⚔️ {user_name} causou {ctx.damage} dano!")
-        
-    elif action == "cat_act_heal_small":
-        heal = int(stats["max_hp"] * 0.15) # Cura 15% em vez de valor fixo
-        pdata["current_hp"] = min(stats["max_hp"], pdata.get("current_hp", 0) + heal)
-        session["turn_log"].append(f"🧪 {user_name} recuperou {heal} HP.")
-
-    # Verifica Morte do Inimigo
-    if target["current_hp"] <= 0:
-        target["current_hp"] = 0
-        session["floor_cleared"] = True
-        session["turn_log"].append(f"💀 **{target['name']} DERROTADO!**")
-        await player_manager.save_player_data(user_id, pdata)
-        await refresh_battle_interface(update, context, session, user_id)
+    from modules.game_data.skills import get_skill_data_with_rarity
+    s_data = get_skill_data_with_rarity(pdata, skill_id)
+    if not s_data:
+        await query.answer("Habilidade não encontrada!", show_alert=True)
         return
 
-    # ============================
-    # 3. TURNO DO INIMIGO (GRUPO)
-    # ============================
-    # Seleciona um alvo aleatório do grupo que ainda esteja vivo
-    alive_players = []
-    for pid in session["players"]:
-        p_check = await player_manager.get_player_data(pid)
-        if p_check.get("current_hp", 0) > 0:
-            alive_players.append(pid)
+    # 🔥 CORREÇÃO DO BLOQUEIO AQUI 🔥
+    from modules.cooldowns import verificar_cooldown, aplicar_cooldown, iniciar_turno
+    pode_usar, msg_cd = verificar_cooldown(pdata, skill_id)
+    if not pode_usar:
+        await query.answer(msg_cd, show_alert=True)
+        return
 
-    if alive_players:
-        victim_id = random.choice(alive_players)
-        victim_data = await player_manager.get_player_data(victim_id)
-        victim_stats = await player_manager.get_player_total_stats(victim_data)
-        victim_name = session["players"][victim_id]
+    mana_cost = int(s_data.get("mana_cost", 0))
+    from modules.player.actions import spend_mana
+    if not spend_mana(pdata, mana_cost):
+        await query.answer(f"Mana insuficiente! Precisas de {mana_cost} MP.", show_alert=True)
+        return
 
-        # Inimigo ataca baseado nos status escalonados
-        bdmg, is_crit, _ = criticals.roll_damage(target, victim_stats)
-        
-        # Dispatch de defesa para a vítima (Check de Escudos/Reduções)
-        ctx_v = CombatContext(event=EVENT_ON_BEFORE_DAMAGE, source=target, target=victim_data, battle=session, damage=bdmg)
-        effects_engine.dispatch(EVENT_ON_BEFORE_DAMAGE, ctx_v)
-        
-        victim_data["current_hp"] -= ctx_v.damage
-        await player_manager.save_player_data(victim_id, victim_data)
-        
-        msg = f"👹 {target['name']} atacou {victim_name}: {ctx_v.damage}"
-        if is_crit: msg += " (CRIT!)"
-        session["turn_log"].append(msg)
+    rarity = pdata.get("skills", {}).get(skill_id, {}).get("rarity", "comum")
+    pdata = aplicar_cooldown(pdata, skill_id, rarity)
+
+    boss = active_raid.get("boss")
+    stats = await player_manager.get_player_total_stats(pdata)
     
-    await player_manager.save_player_data(user_id, pdata)
-    await refresh_battle_interface(update, context, session, user_id, turn_state="monster_attacked")
-
-# ==============================================================================
-# 🌟 SISTEMA DE AUTO-REVIVER
-# ==============================================================================
-async def auto_revive_player(user_id: str):
-    """Verifica se o jogador está com 0 HP e o ressuscita com 20% de vida."""
-    try:
-        pdata = await player_manager.get_player_data(user_id)
-        if pdata and pdata.get("current_hp", 0) <= 0:
-            max_hp = 100
-            if "stats" in pdata and "max_hp" in pdata["stats"]:
-                max_hp = pdata["stats"]["max_hp"]
-            
-            # Cura 20% do HP máximo (no mínimo 1 de vida)
-            novo_hp = max(1, int(max_hp * 0.20))
-            pdata["current_hp"] = novo_hp
-            
-            await player_manager.save_player_data(user_id, pdata)
-            print(f"[DEBUG] Jogador {user_id} ressuscitado com {novo_hp} HP.")
-    except Exception as e:
-        print(f"[ERRO] Falha ao tentar reviver jogador {user_id}: {e}")
-                
-async def _handle_victory(update: Update, context: ContextTypes.DEFAULT_TYPE, session: dict):
-    if session.get("status") == "finished": return
-    session["status"] = "finished"
-    
-    rewards = config.REWARDS
-    scaling = session.get("scaling_factor", 1.0)
-    
-    for pid in session["players"]:
-        pdata = await player_manager.get_player_data(pid)
-        
-        # Recompensa base escalonada pelo desafio
-        gold = int(rewards["gold_fixed"] * scaling)
-        xp = int(rewards["xp_fixed"] * scaling)
-        
-        pdata["gold"] = pdata.get("gold", 0) + gold
-        pdata["xp"] = pdata.get("xp", 0) + xp
-        
-        # Sorteio de Loot
-        inv = pdata.setdefault("inventory", {})
-        for item in rewards.get("rare_items", []):
-            if random.random() < item["chance"]:
-                inv[item["id"]] = inv.get(item["id"], 0) + 1
-        
-        # Recuperação pós-raid
-        ts = await player_manager.get_player_total_stats(pdata)
-        pdata["current_hp"] = ts["max_hp"]
-        
-        await player_manager.save_player_data(pid, pdata)
-        if pid in raid_manager.PLAYER_LOCATION: del raid_manager.PLAYER_LOCATION[pid]
-
-    if session["raid_id"] in raid_manager.ACTIVE_RAIDS:
-        del raid_manager.ACTIVE_RAIDS[session["raid_id"]]
-
-    await entry_handler.send_event_interface(
-        update, context, 
-        f"{config.TEXTS['victory']}\n\nRecompensas distribuídas para o grupo!", 
-        [[InlineKeyboardButton("🏆 SAIR", callback_data="back_to_kingdom")]],
-        media_key=config.MEDIA_KEYS["victory"]
+    from modules.combat import combat_engine
+    res = await combat_engine.processar_acao_combate(
+        attacker_pdata=pdata,
+        attacker_stats=stats,
+        target_stats=boss,
+        skill_id=skill_id,
+        attacker_current_hp=pdata.get("current_hp", 100)
     )
 
+    from modules.effects.models import CombatContext, EVENT_ON_BEFORE_DAMAGE
+    ctx = CombatContext(event=EVENT_ON_BEFORE_DAMAGE, source=pdata, target=boss, battle=active_raid, damage=res["total_damage"])
+    effects_engine.dispatch(EVENT_ON_BEFORE_DAMAGE, ctx)
+    
+    boss["current_hp"] = max(0, int(boss.get("current_hp", 0)) - ctx.damage)
+    
+    skill_name = s_data.get("display_name", skill_id)
+    player_name = pdata.get("name", "Jogador")
+    
+    if "turn_log" not in active_raid: active_raid["turn_log"] = []
+    active_raid["turn_log"].append(f"✨ **{player_name}** usou **{skill_name}**!")
+    
+    for msg in res["log_messages"]:
+        active_raid["turn_log"].append(f"   {msg}")
+
+    pdata, msgs_cd = iniciar_turno(pdata)
+    if msgs_cd: active_raid["turn_log"].extend(msgs_cd)
+    
+    await player_manager.save_player_data(user_id, pdata)
+
+    if boss["current_hp"] <= 0:
+        active_raid["floor_cleared"] = True
+        active_raid["turn_log"].append(f"💀 **{boss['name']}** foi derrotado!")
+        if active_raid["current_floor"] >= active_raid["total_floors"]:
+            await _handle_victory(update, context, active_raid, user_id)
+            return
+    else:
+        active_raid["monster_turn_counter"] = active_raid.get("monster_turn_counter", 0) + 1
+        if active_raid["monster_turn_counter"] >= active_raid.get("monster_turn_threshold", 3):
+            active_raid["monster_turn_counter"] = 0
+            active_raid["turn_log"].append(f"⚠️ **{boss['name']} revida em área!**")
+            boss_atk = boss.get("attack", 20)
+            
+            for pid in list(active_raid["players"].keys()):
+                ally_data = await player_manager.get_player_data(str(pid))
+                if ally_data and ally_data.get("current_hp", 0) > 0:
+                    ally_stats = await player_manager.get_player_total_stats(ally_data)
+                    boss_dmg = max(1, int(boss_atk * 0.8) - int(ally_stats.get("defense", 10) * 0.6))
+                    ally_data["current_hp"] = max(0, ally_data.get("current_hp", 100) - boss_dmg)
+                    await player_manager.save_player_data(str(pid), ally_data)
+                    
+                    if ally_data["current_hp"] == 0:
+                        active_raid["turn_log"].append(f"💀 {active_raid['players'][pid]} caiu!")
+
+    if len(active_raid["turn_log"]) > 10: 
+        active_raid["turn_log"] = active_raid["turn_log"][-10:]
+
+    try: await query.answer()
+    except: pass 
+    
+    from .combat_handler import refresh_battle_interface
+    await refresh_battle_interface(update, context, active_raid, user_id)
+
+async def catacomb_skill_cd_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    turnos = query.data.split(":")[1]
+    await query.answer(f"⏳ Habilidade em recarga! Aguarda {turnos} turnos.", show_alert=True)
+    
+# ==============================================================================
+# 🌟 SISTEMA DE RESTAURAÇÃO (PÓS-RAID)
+# ==============================================================================
+async def auto_revive_player(user_id: str):
+    """Restaura 100% do HP e MP do jogador ao finalizar ou abandonar a Raid."""
+    try:
+        pdata = await player_manager.get_player_data(user_id)
+        if pdata:
+            # Puxa os status totais reais do jogador (com equipamentos e bónus)
+            stats = await player_manager.get_player_total_stats(pdata)
+            
+            # Restaura a Vida e a Mana aos valores máximos
+            pdata["current_hp"] = stats.get("max_hp", 100)
+            pdata["current_mp"] = stats.get("max_mana", 50)
+            
+            # Liberta o jogador do estado de combate (evita que fique preso)
+            pdata["player_state"] = {"action": "idle"}
+            
+            await player_manager.save_player_data(user_id, pdata)
+            print(f"[DEBUG] Jogador {user_id} 100% restaurado após as Catacumbas.")
+    except Exception as e:
+        print(f"[ERRO] Falha ao tentar restaurar jogador {user_id}: {e}")
+                
+async def _handle_victory(update: Update, context: ContextTypes.DEFAULT_TYPE, active_raid: dict, user_id: str):
+    """Processa a vitória final, gera loot específico da classe e limpa a sessão."""
+    from modules.player import inventory as player_inventory
+    from modules.game_data.equipment import ITEM_DATABASE
+    from modules.game_data.rarity import RARITY_DATA
+    from . import raid_manager, config
+    import random
+    
+    active_raid["turn_log"].append(f"🏆 **VITÓRIA LENDÁRIA!** O Guardião caiu!")
+    
+    # 🔥 NOVO: Cria uma lista exclusiva só para o Loot!
+    active_raid["loot_log"] = []
+
+    scaling = active_raid.get("scaling_factor", 1.0)
+    xp_final = int(config.REWARDS.get("xp_fixed", 800) * scaling)
+    gold_final = int(config.REWARDS.get("gold_fixed", 1500) * scaling)
+    
+    drop_chance = config.REWARDS.get("equipment_drop_chance", 0.85)
+    rarity_weights = config.REWARDS.get("rarity_weights", {
+        "comum": 30, "bom": 30, "raro": 20, "epico": 10, "lendario": 7, "unico": 2.5, "mitico": 0.5
+    })
+
+    player_ids = list(active_raid.get("players", {}).keys())
+
+    for pid in player_ids:
+        pid_str = str(pid)
+        pdata = await player_manager.get_player_data(pid_str)
+        if not pdata: continue
+        
+        p_name = active_raid['players'][pid_str]
+
+        # 1. Dá Ouro e XP
+        player_manager.add_gold(pdata, gold_final)
+        pdata["xp"] = pdata.get("xp", 0) + xp_final
+        active_raid["loot_log"].append(f"✨ **{p_name}**: +{xp_final} XP | 💰 +{gold_final} Ouro")
+        
+        # 2. Rola o Drop de Equipamento do Set
+        if random.random() <= drop_chance:
+            player_class = pdata.get("class", "guerreiro").lower()
+            
+            # Filtra os itens do Set que a classe do jogador pode usar
+            possible_items = []
+            for item_id, item_data in ITEM_DATABASE.items():
+                if item_data.get("set_id") == "set_heranca_real":
+                    if player_class in item_data.get("class_req", []):
+                        possible_items.append((item_id, item_data))
+            
+            if possible_items:
+                # Escolhe uma peça aleatória (Elmo, Arma, Calça, etc)
+                chosen_item_id, chosen_item_data = random.choice(possible_items)
+                
+                # Rola a Raridade (Pode ser Mítico!)
+                r_keys = list(rarity_weights.keys())
+                r_weights = list(rarity_weights.values())
+                chosen_rarity = random.choices(r_keys, weights=r_weights, k=1)[0]
+                rarity_emoji = RARITY_DATA.get(chosen_rarity, {}).get("emoji", "💠")
+                
+                # Cria o item único e dá ao jogador
+                novo_item = {
+                    "base_id": chosen_item_id,
+                    "rarity": chosen_rarity,
+                    "obtido_em": "Catacumbas Reais",
+                    "stats": {} 
+                }
+                player_inventory.add_unique_item(pdata, novo_item)
+                
+                # Registra no painel visual
+                active_raid["loot_log"].append(f"📦 **{p_name}** achou: {rarity_emoji} _{chosen_item_data['nome_exibicao']}_ ({chosen_rarity.upper()})")
+
+        # Verifica Level Up e salva
+        player_manager.check_and_apply_level_up(pdata)
+        await player_manager.save_player_data(pid_str, pdata)
+        
+        # Ressurreição automática pós-raid
+        from .combat_handler import auto_revive_player
+        await auto_revive_player(pid_str)
+
+    # 3. Finaliza a Raid
+    active_raid["status"] = "finished"
+    for pid in player_ids:
+        if str(pid) in raid_manager.PLAYER_LOCATION:
+            del raid_manager.PLAYER_LOCATION[str(pid)]
+
+    # Chama a interface final
+    await refresh_battle_interface(update, context, active_raid, user_id, turn_state="victory")
+    
 async def execute_boss_turn(update: Update, context: ContextTypes.DEFAULT_TYPE, session: dict):
     """Executa a lógica automática do turno do inimigo."""
     target_boss = session.get("boss")
@@ -424,121 +628,8 @@ async def refresh_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif update.callback_query:
         await update.callback_query.answer("Raid finalizada.")
 
-async def process_player_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processa a ação de ataque básico do jogador."""
-    query = update.callback_query
-    
-    # 1. PEGA O ID COM SEGURANÇA E PROTEGE CONTRA 'None'
-    from modules.auth_utils import get_current_player_id
-    raw_id = get_current_player_id(update, context)
-    user_id = str(raw_id)
-    
-    if not user_id or user_id == 'None':
-        await query.answer("Erro de autenticação! Tente abrir o menu novamente.", show_alert=True)
-        return
-    
-    # Verifica se está no lobby de espera
-    lobby = raid_manager.get_player_lobby(user_id)
-    if lobby:
-        await query.answer("A Raid ainda não começou!", show_alert=True)
-        return
 
-    # Busca a raid ativa
-    active_raid = None
-    for code, session in raid_manager.ACTIVE_RAIDS.items():
-        if user_id in session.get("players", {}):
-            active_raid = session
-            break
-            
-    if not active_raid:
-        await query.answer("Você não está em uma Raid ativa.", show_alert=True)
-        return
         
-    if active_raid.get("floor_cleared"):
-        await query.answer("O andar já está limpo! Desça as escadas.", show_alert=True)
-        return
-
-    # 1. Carrega dados do Atacante e do Alvo
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata:
-        await query.answer("Erro: Dados do jogador não encontrados.", show_alert=True)
-        return
-
-    if pdata.get("current_hp", 0) <= 0:
-        await query.answer("Você está morto e não pode atacar!", show_alert=True)
-        return
-
-    stats = await player_manager.get_player_total_stats(pdata)
-    player_atk = stats.get("attack", 20)
-    
-    boss = active_raid.get("boss")
-    if not boss:
-        await query.answer("Erro crítico: Monstro não encontrado na sessão.", show_alert=True)
-        return
-
-    boss_def = boss.get("defense", 5)
-    
-    # 2. Calcula Dano do Jogador
-    base_dmg = max(1, player_atk - int(boss_def * 0.5))
-    variation = random.uniform(0.9, 1.1)
-    final_dmg = int(base_dmg * variation)
-    
-    boss["current_hp"] = max(0, boss.get("current_hp", 0) - final_dmg)
-    
-    player_name = pdata.get("name", "Guerreiro")
-    if player_name == "Guerreiro" and "username" in pdata:
-        player_name = pdata["username"]
-
-    log_msg = f"⚔️ **{player_name}** causou `{final_dmg}` de dano!"
-    
-    # Verifica se os logs existem na sessão
-    if "turn_log" not in active_raid:
-        active_raid["turn_log"] = []
-    
-    # 3. Verifica se o Monstro Morreu
-    if boss["current_hp"] <= 0:
-        active_raid["turn_log"].append(log_msg)
-        active_raid["turn_log"].append(f"💀 **{boss['name']}** foi derrotado!")
-        
-        if active_raid["current_floor"] >= active_raid["total_floors"]:
-            await query.answer("VITÓRIA! O Chefe caiu!", show_alert=True)
-            active_raid["turn_log"].append("🏆 **VOCÊS VENCERAM A RAID!**")
-        else:
-            active_raid["floor_cleared"] = True
-            await query.answer("Inimigo derrotado!")
-            
-        await refresh_battle_interface(update, context, active_raid, user_id)
-        return
-
-    # 4. Contra-ataque do Monstro (Apenas se o alvo estiver vivo)
-    # BLINDAGEM: O monstro não bate se o jogador já morreu com veneno, etc.
-    if pdata.get("current_hp", 0) > 0:
-        boss_atk = boss.get("attack", 20)
-        player_def = stats.get("defense", 10)
-        
-        base_boss_dmg = max(1, boss_atk - int(player_def * 0.6))
-        boss_dmg = int(base_boss_dmg * random.uniform(0.9, 1.1))
-        
-        pdata["current_hp"] = max(0, pdata.get("current_hp", 100) - boss_dmg)
-        await player_manager.save_player_data(user_id, pdata)
-        
-        log_msg += f"\n👹 O inimigo revidou com `{boss_dmg}` de dano!"
-        
-        # BLINDAGEM: Morte do Jogador
-        if pdata["current_hp"] == 0:
-             log_msg += f"\n💀 **{player_name} foi morto pelo golpe!**"
-    
-    active_raid["turn_log"].append(log_msg)
-    
-    if len(active_raid["turn_log"]) > 10:
-        active_raid["turn_log"] = active_raid["turn_log"][-10:]
-
-    try:
-        await query.answer("Você atacou!")
-    except: pass # Evita crash se o Telegram demorar
-    
-    await refresh_battle_interface(update, context, active_raid, user_id, turn_state="monster_attacked")
-
 async def refresh_combat_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Atualiza a tela de combate para quem clicou (Vivo ou Morto)."""
     query = update.callback_query
@@ -635,6 +726,9 @@ async def leave_active_raid_cb(update: Update, context: ContextTypes.DEFAULT_TYP
                                     
 handlers = [
     CallbackQueryHandler(combat_action_cb, pattern="^cat_act_"),
-    CallbackQueryHandler(refresh_cb, pattern="^cat_combat_refresh")
+    CallbackQueryHandler(refresh_cb, pattern="^cat_combat_refresh"),
+    # 👇 ADICIONA ESTES DOIS 👇
+    CallbackQueryHandler(combat_handler.catacomb_use_skill_cb, pattern="^cat_use_skill:.*$"),
+    CallbackQueryHandler(combat_handler.catacomb_skill_cd_cb, pattern="^cat_skill_cd:.*$"),
 
 ]

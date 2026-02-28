@@ -97,12 +97,15 @@ FLOOR_MAP = {
 # 💰 RECOMPENSAS
 # ==============================================================================
 REWARDS = {
-    "xp_fixed": 500,
-    "gold_fixed": 1000,
-    "rare_items": [
-        {"id": "espada_teste", "chance": 0.50},
-        {"id": "bau_tesouro_evento", "chance": 1.00}
-    ]
+    "xp_fixed": 800,
+    "gold_fixed": 1500,
+    "equipment_drop_chance": 0.85, # 85% de chance de o Boss dar um item do SET
+    # Tabela exclusiva da Masmorra (O crafting usa outra tabela que não tem unico/mitico)
+    "rarity_weights": {
+        "comum": 30, "bom": 30, "raro": 20, "epico": 10, "lendario": 7, 
+        "unico": 2.5,  # 2.5% de chance de ser Único
+        "mitico": 0.5  # 0.5% de chance de ser Mítico
+    }
 }
 
 TEXTS = {
