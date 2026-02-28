@@ -68,4 +68,4 @@ async def resume_game_state(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         logger.error(f"[START] Erro ao retomar estado: {e}")
         await update.message.reply_text("Erro ao carregar o menu. Tente /menu.")
 
-start_command_handler = CommandHandler(['start', 'menu'], start_command)
+start_command_handler = CommandHandler(['start', 'menu'], start_command) 
