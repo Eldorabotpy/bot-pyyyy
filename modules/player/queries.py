@@ -154,6 +154,9 @@ async def create_new_player(user_id: Union[str, ObjectId], character_name: str, 
     new_player_data = {
         "_id": oid,
         "name": character_name,             # Padrão novo
+        "class": "aventureiro",
+        "class_key": "aventureiro",
+        "current_location": "reino_eldora",
         "character_name": character_name,   # Compatibilidade
         "name_normalized": norm,
         "character_name_normalized": norm,
