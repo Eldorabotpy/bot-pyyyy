@@ -141,46 +141,34 @@ async def find_by_username(username: str) -> Optional[dict]:
 # ==============================================================================
 
 async def create_new_player(user_id: Union[str, ObjectId], character_name: str, username: str = None) -> dict:
-    """
-    Cria um novo jogador no banco de dados.
-    Garante a estrutura inicial correta e uso de ObjectId.
-    """
-    # Garante que user_id seja ObjectId se possível
     oid = ObjectId(user_id) if isinstance(user_id, str) and ObjectId.is_valid(user_id) else user_id
-    
     now_iso = datetime.now(timezone.utc).isoformat()
     norm = _normalize_char_name(character_name)
 
     new_player_data = {
         "_id": oid,
-        "name": character_name,             # Padrão novo
+        "name": str(character_name),
+        "character_name": str(character_name), 
+        "username": username or "",
+        "name_normalized": norm,
         "class": "aventureiro",
         "class_key": "aventureiro",
         "current_location": "reino_eldora",
-        "character_name": character_name,   # Compatibilidade
-        "name_normalized": norm,
-        "character_name_normalized": norm,
-        "username": username,
-        "level": 1, 
-        "xp": 0, 
-        "gold": 0, 
-        "gems": 0,
-        "premium_tier": "free", 
-        "premium_expires_at": None,
+        "level": 1, "xp": 0, "gold": 100, "gems": 0,
+        "premium_tier": "free", "premium_expires_at": None,
         "created_at": now_iso,
-        # Status Iniciais Balanceados
-        "stats": {"hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
+        
+        # --- BLINDAGEM CONTRA 'NONE' (HUD) ---
+        "hp": 50, "max_hp": 50, "current_hp": 50,
+        "mana": 50, "max_mana": 50, "current_mp": 50, "mp": 50,
+        "energy": 20, "max_energy": 20, "energy_last_ts": now_iso,
+
+        "stats": {"hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5, "mana": 50},
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
-        "current_hp": 50,
-        "energy": 20,
-        "max_energy": 20,
-        "inventory": {},
-        "equipment": {}
+        "inventory": {}, "equipment": {}, "skills": {}, "invested": {}
     }
     
-    # Salva usando a função do core para garantir cache e persistência
     await save_player_data(oid, new_player_data)
-        
     return new_player_data
 
 async def get_or_create_player(user_id: str, default_name: str = "Aventureiro") -> dict:
