@@ -140,16 +140,17 @@ async def find_by_username(username: str) -> Optional[dict]:
 # CRUD
 # ==============================================================================
 
-async def create_new_player(user_id: Union[str, ObjectId], character_name: str, username: str = None) -> dict:
+async def create_new_player(user_id: Union[str, ObjectId], character_name: str, username: str = None, telegram_id: int = None) -> dict:
     oid = ObjectId(user_id) if isinstance(user_id, str) and ObjectId.is_valid(user_id) else user_id
     now_iso = datetime.now(timezone.utc).isoformat()
     norm = _normalize_char_name(character_name)
 
     new_player_data = {
         "_id": oid,
+        "telegram_id": telegram_id,  # 🎯 CORREÇÃO: Vincula o ID real do jogador
         "name": str(character_name),
         "character_name": str(character_name), 
-        "username": username or "",
+        "username": username or "",  # 🎯 CORREÇÃO: Agora o @username será salvo
         "name_normalized": norm,
         "class": "aventureiro",
         "class_key": "aventureiro",
@@ -165,17 +166,26 @@ async def create_new_player(user_id: Union[str, ObjectId], character_name: str, 
 
         "stats": {"hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5, "mana": 50},
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
-        "inventory": {}, "equipment": {}, "skills": {}, "invested": {}
+        
+        # 🎯 CORREÇÃO: Estruturas que quebram o perfil se não existirem
+        "inventory": {}, 
+        "equipment": {}, 
+        "equipped_items": {}, 
+        "skills": [], 
+        "equipped_skills": [], 
+        "invested": {},
+        "profession": None,
+        "guild": None
     }
     
     await save_player_data(oid, new_player_data)
     return new_player_data
 
-async def get_or_create_player(user_id: str, default_name: str = "Aventureiro") -> dict:
+async def get_or_create_player(user_id: str, default_name: str = "Aventureiro", username: str = None, telegram_id: int = None) -> dict:
     """Tenta buscar; se não existir, cria."""
     pdata = await get_player_data(user_id)
     if not pdata: 
-        pdata = await create_new_player(user_id, default_name)
+        pdata = await create_new_player(user_id, default_name, username, telegram_id)
     return pdata
 
 async def delete_player(user_id: str) -> bool:

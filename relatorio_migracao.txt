@@ -1,3 +1,4 @@
+
 ==================================================
 📂 ESTRUTURA DO PROJETO (Arquivos .py)
 ==================================================
@@ -118,13 +119,6 @@
 │   │   │   📄 kingdom.py
 │   │   │   📄 region.py
 │   │   │   📄 __init__.py
-│   │   📁 tutorial/
-│   │   │   📄 dora_gathering.py
-│   │   │   📄 dora_hunting.py
-│   │   │   📄 dora_intro.py
-│   │   │   📄 dora_profession.py
-│   │   │   📄 tutorial_router.py
-│   │   │   📄 __init__.py
 │   │   📁 world_boss/
 │   │   │   📄 handler.py
 │   │   │   📄 __init__.py
@@ -195,6 +189,7 @@
 │   │   │   │   📄 config.py
 │   │   │   │   📄 entry_handler.py
 │   │   │   │   📄 raid_manager.py
+│   │   │   │   📄 utils.py
 │   │   │   │   📄 __init__.py
 │   │   📁 game_data/
 │   │   │   📄 attributes.py
@@ -302,7 +297,6 @@
 │   │   📄 events.py
 │   │   📄 guild.py
 │   │   📄 market.py
-│   │   📄 onboarding.py
 │   │   📄 regions.py
 │   │   📄 startup.py
 │   │   📄 __init__.py

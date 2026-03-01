@@ -28,14 +28,51 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("[START] Menu solicitado por Sessão ID=%s", session_id)
 
     try:
-        # Substitui a busca simples pela auto-criação inteligente
+        # Captura TODOS os dados do Telegram do jogador
         user_name = update.effective_user.first_name or "Aventureiro"
-        player_data = await get_or_create_player(session_id, user_name)
+        tg_username = update.effective_user.username or ""
+        tg_id = update.effective_user.id
+
+        # Passa os dados completos (contas novas já nascerão perfeitas aqui)
+        player_data = await get_or_create_player(
+            user_id=session_id, 
+            default_name=user_name,
+            username=tg_username,
+            telegram_id=tg_id
+        )
         
         if not player_data:
             await update.message.reply_text("❌ Falha crítica ao inicializar personagem.")
             return
+
+        # ==========================================
+        # 🛠️ AUTO-REPARO PARA CONTAS ANTIGAS BUGADAS
+        # ==========================================
+        needs_repair = False
+        
+        # 1. Conserta o ID do Telegram e Username ausentes
+        if not player_data.get("telegram_id"):
+            player_data["telegram_id"] = tg_id
+            player_data["username"] = tg_username
+            needs_repair = True
             
+        # 2. Conserta as estruturas que quebravam o menu
+        missing_keys = {
+            "inventory": {}, "equipment": {}, "equipped_items": {}, 
+            "skills": [], "equipped_skills": [], "invested": {},
+            "profession": None, "guild": None
+        }
+        
+        for key, default_value in missing_keys.items():
+            if key not in player_data:
+                player_data[key] = default_value
+                needs_repair = True
+                
+        # Se a conta era "oca", salva o conserto no banco de dados silenciosamente
+        if needs_repair:
+            await player_manager.save_player_data(player_data["_id"], player_data)
+            logger.info(f"[AUTO-REPARO] Conta {player_data['_id']} ({user_name}) consertada com sucesso!")
+
     except Exception as e:
         logger.error(f"Erro ao processar dados em /start: {e}")
         await update.message.reply_text("❌ Erro interno ao acessar os dados da conta.")
@@ -46,6 +83,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not locked and "account_lock" not in player_data:
         try:
+            # Salva qualquer atualização de lock
             await player_manager.save_player_data(player_data["_id"], player_data)
         except Exception:
             pass

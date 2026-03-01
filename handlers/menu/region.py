@@ -273,21 +273,6 @@ async def open_region_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     player_data["current_location"] = region_key
     await player_manager.save_player_data(user_id, player_data)
 
-    # ==========================
-    # ✅ DORA TUTORIAL HOOKS
-    # ==========================
-    try:
-        from handlers.tutorial.dora_hunting import maybe_continue_hunting_on_arrival
-        await maybe_continue_hunting_on_arrival(update, context, user_id, region_key)
-    except Exception as e:
-        print("Tutorial hunting arrival hook error:", e)
-
-    try:
-        from handlers.tutorial.dora_gathering import maybe_continue_gathering_tutorial
-        await maybe_continue_gathering_tutorial(update, context, user_id, region_key)
-    except Exception as e:
-        print("Tutorial gathering hook error:", e)
-
     # limpa mensagem anterior (opcional)
     try:
         await query.delete_message()
