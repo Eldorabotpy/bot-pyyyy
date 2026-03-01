@@ -50,7 +50,7 @@ async def job_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_data = await player_manager.get_player_data(user_id)
     if not player_data: return
 
-    prof_data = player_data.get("profession", {})
+    prof_data = player_data.get("profession") or {}
     current_prof_key = prof_data.get("type") or prof_data.get("key")
 
     # --- CENÁRIO A: JOGADOR JÁ TEM PROFISSÃO ---
@@ -126,7 +126,7 @@ async def pick_profession_callback(update: Update, context: ContextTypes.DEFAULT
     user_id = get_current_player_id(update, context)
     player_data = await player_manager.get_player_data(user_id)
     
-    prof_data = player_data.get("profession", {})
+    prof_data = player_data.get("profession") or {}
     if prof_data.get("type") or prof_data.get("key"):
         await query.answer("Você já tem uma profissão!", show_alert=True)
         await job_menu_callback(update, context)
@@ -158,7 +158,7 @@ async def job_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = get_current_player_id(update, context)
     player_data = await player_manager.get_player_data(user_id)
     
-    prof_data = player_data.get("profession", {})
+    prof_data = player_data.get("profession") or {}
     my_prof_key = prof_data.get("type") or prof_data.get("key")
     
     if not my_prof_key:
