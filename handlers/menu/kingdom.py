@@ -47,7 +47,7 @@ async def show_kingdom_menu(
         if not chat_id and query and query.message:
             chat_id = query.message.chat.id
         if not chat_id and player_data:
-            chat_id = player_data.get("last_chat_id") or player_data.get("telegram_id_owner")
+            chat_id = player_data.get("last_chat_id") or player_data.get("telegram_id") or player_data.get("telegram_id_owner")
 
         if not chat_id:
             logger.error("ERRO CRÍTICO: Não foi possível identificar o Chat ID no menu Kingdom.")
@@ -183,7 +183,8 @@ async def show_kingdom_menu(
 
         # Painel Admin (Usa Telegram ID para permissão visual)
         try:
-            tg_id = str(update.effective_user.id if update and update.effective_user else player_data.get("telegram_id_owner", ""))
+            tg_id_fallback = player_data.get("telegram_id") or player_data.get("telegram_id_owner", "")
+            tg_id = str(update.effective_user.id if update and update.effective_user else tg_id_fallback)
             if tg_id in ["5961634863"]:
                 keyboard.append([InlineKeyboardButton("🛠️ Painel Admin", callback_data="admin_main")])
         except Exception:

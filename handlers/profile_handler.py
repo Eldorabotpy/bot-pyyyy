@@ -332,7 +332,12 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     double_atk = int((await player_manager.get_player_double_attack_chance(player_data)) * 100)
 
     # Info Básica
-    char_name = player_data.get('character_name', 'Aventureiro')
+    # Info Básica - Correção: Garantir que char_name nunca é None
+    char_name = (
+        player_data.get("character_name") or 
+        player_data.get("name") or 
+        (update.effective_user.first_name if update and update.effective_user else "Aventureiro")
+    )
     loc_key = player_data.get('current_location', 'reino_eldora')
     loc_name = (game_data.REGIONS_DATA or {}).get(loc_key, {}).get('display_name', 'Desconhecido')
     

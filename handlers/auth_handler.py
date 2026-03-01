@@ -313,25 +313,24 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     username = context.user_data['reg_temp_user']
     owner_id = update.effective_user.id
-    
-    # Captura o nome do Telegram para pular a Dora
-    tg_first_name = update.effective_user.first_name or "Aventureiro"
     now_iso = datetime.now().isoformat()
 
-    # 🔥 AQUI ESTÁ A CORREÇÃO: Sem Dora, com ID real e Estrutura HUD Completa
+    # 🎯 CORREÇÃO: Pega o username escolhido e coloca a primeira letra maiúscula!
+    # Ex: se o jogador digitou "tutorial3", o nome será "Tutorial3"
+    char_name_display = username.capitalize()
+
     new_player_doc = {
         "username": username,
         "password": hash_password(password),
-        "telegram_id": owner_id,        # ID do Telegram real para o bot reconhecer
-        "telegram_id_owner": owner_id,  # Mantido para compatibilidade com sistemas antigos
+        "telegram_id": owner_id,
+        "telegram_id_owner": owner_id,
         "created_at": now_iso,
         "last_seen": now_iso,
 
-        # 🚫 REMOVIDO: tutorial_flags e onboarding_stage da Dora
-        # ✅ ADICIONADO: O jogador já recebe o nome do Telegram direto
-        "name": tg_first_name,
-        "character_name": tg_first_name,
-        "name_normalized": tg_first_name.lower(),
+        # ✅ ADICIONADO: Agora o nome do personagem é o username, não o Telegram!
+        "name": char_name_display,
+        "character_name": char_name_display,
+        "name_normalized": char_name_display.lower(),
         
         # Dados de Jogo Base
         "class": "aventureiro",
@@ -363,7 +362,7 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_photo(
             photo=IMG_NOVO,
-            caption=f"🎉 <b>Conta Criada!</b>\nBem-vindo a Eldora, {tg_first_name}.\nVocê já está logado.",
+            caption=f"🎉 <b>Conta Criada!</b>\nBem-vindo a Eldora, {char_name_display}.\nVocê já está logado.",
             parse_mode="HTML"
         )
 
