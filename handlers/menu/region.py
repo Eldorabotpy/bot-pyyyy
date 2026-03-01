@@ -582,9 +582,18 @@ async def send_region_menu(
         return
 
     # --- CÁLCULOS DO HUD ---
-    stats = await player_manager.get_player_total_stats(player_data)
+    # --- CÁLCULOS DO HUD (BLINDADO) ---
+    try:
+        stats = await player_manager.get_player_total_stats(player_data)
+    except Exception:
+        stats = {}
 
-    char_name = player_data.get("character_name", "Aventureiro")
+    # 1. Correção do Nome (Fim do "None")
+    char_name = (
+        player_data.get("character_name") or 
+        player_data.get("name") or 
+        "Aventureiro"
+    )
     char_lvl = player_data.get("level", 1)
 
     prof_data = player_data.get("profession", {}) or {}
@@ -597,11 +606,22 @@ async def send_region_menu(
     if tier_key == "free":
         tier_display = "Comum"
 
-    p_hp, max_hp = int(player_data.get('current_hp', 0)), int(stats.get('max_hp', 1))
-    p_mp, max_mp = int(player_data.get('current_mp', 0)), int(stats.get('max_mana', 1))
-    max_en = int(player_manager.get_player_max_energy(player_data))
+    # 2. Correção do HP e MP (Fim do 0/45)
+    p_hp = int(player_data.get('current_hp') or player_data.get('hp') or 0)
+    max_hp = int(stats.get('max_hp') or player_data.get('max_hp') or 50)
+    
+    p_mp = int(player_data.get('current_mp') or player_data.get('mana') or player_data.get('mp') or 0)
+    max_mp = int(stats.get('max_mana') or player_data.get('max_mana') or 50)
+    
+    # 3. Energia e Economia
+    try:
+        max_en = int(player_manager.get_player_max_energy(player_data))
+    except Exception:
+        max_en = 20
+        
     p_en = int(player_data.get('energy', 0))
-    p_gold, p_gems = player_manager.get_gold(player_data), player_manager.get_gems(player_data)
+    p_gold = int(player_data.get("gold", 0))
+    p_gems = int(player_data.get("gems", 0))
 
     status_hud = (
         f"\n╭┈┈┈┈┈┈┈ [ 𝐏𝐄𝐑𝐅𝐈𝐋 ] ┈┈┈┈┈┈┈┈┈➤\n"

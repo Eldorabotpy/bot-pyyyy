@@ -171,7 +171,7 @@ async def show_kingdom_menu(
 
         keyboard = [
             [InlineKeyboardButton("🗺 𝐕𝐢𝐚𝐣𝐚𝐫", callback_data="travel"),
-             InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨ｎ𝐚𝐠𝐞𝐦", callback_data="profile")],
+             InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data="profile")],
             [InlineKeyboardButton("🏪 𝐌𝐞𝐫𝐜𝐚𝐝𝐨", callback_data="market"),
              InlineKeyboardButton("⚒️ 𝐅𝐨𝐫𝐣𝐚", callback_data="forge:main")],
             [InlineKeyboardButton("🏰 𝐆𝐮𝐢𝐥𝐝𝐚", callback_data="adventurer_guild_main"),
