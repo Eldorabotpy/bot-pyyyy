@@ -313,28 +313,46 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     username = context.user_data['reg_temp_user']
     owner_id = update.effective_user.id
+    
+    # Captura o nome do Telegram para pular a Dora
+    tg_first_name = update.effective_user.first_name or "Aventureiro"
     now_iso = datetime.now().isoformat()
 
+    # 🔥 AQUI ESTÁ A CORREÇÃO: Sem Dora, com ID real e Estrutura HUD Completa
     new_player_doc = {
         "username": username,
         "password": hash_password(password),
-        "telegram_id_owner": owner_id,
+        "telegram_id": owner_id,        # ID do Telegram real para o bot reconhecer
+        "telegram_id_owner": owner_id,  # Mantido para compatibilidade com sistemas antigos
         "created_at": now_iso,
         "last_seen": now_iso,
 
-        # ✅ IMPORTANTE: nome do personagem começa vazio (Dora vai definir)
-        "character_name": None,
+        # 🚫 REMOVIDO: tutorial_flags e onboarding_stage da Dora
+        # ✅ ADICIONADO: O jogador já recebe o nome do Telegram direto
+        "name": tg_first_name,
+        "character_name": tg_first_name,
+        "name_normalized": tg_first_name.lower(),
+        
+        # Dados de Jogo Base
+        "class": "aventureiro",
+        "class_key": "aventureiro",
+        "current_location": "reino_eldora",
+        "level": 1, "xp": 0, "gold": 100, "gems": 0,
+        "premium_tier": "free", "premium_expires_at": None,
 
-        # ✅ Onboarding / tutorial
-        "onboarding_stage": "name",
-        "tutorial_flags": {},
-
-        "level": 1, "xp": 0, "gold": 100, "class": None,
-        "max_hp": 50, "current_hp": 50,
+        # Status Vitais
+        "hp": 50, "max_hp": 50, "current_hp": 50,
+        "mana": 50, "max_mana": 50, "current_mp": 50, "mp": 50,
         "energy": 20, "max_energy": 20, "energy_last_ts": now_iso,
-        "inventory": {}, "equipment": {},
+
+        # Atributos de Combate
+        "stats": {"hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5, "mana": 50},
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
-        "premium_tier": "free", "gems": 0
+
+        # Estruturas que evitam o crash do Menu de Personagem
+        "inventory": {}, "equipment": {}, "equipped_items": {},
+        "skills": [], "equipped_skills": [], "invested": {},
+        "profession": None, "guild": None
     }
 
     if users_collection is not None:
@@ -345,12 +363,14 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_photo(
             photo=IMG_NOVO,
-            caption="🎉 <b>Conta Criada!</b>\nVocê já está logado.",
+            caption=f"🎉 <b>Conta Criada!</b>\nBem-vindo a Eldora, {tg_first_name}.\nVocê já está logado.",
             parse_mode="HTML"
         )
 
         if start_command:
             await start_command(update, context)
+    else:
+        await update.message.reply_text("❌ Erro de conexão com banco de dados. Tente novamente mais tarde.")
 
     return ConversationHandler.END
 
