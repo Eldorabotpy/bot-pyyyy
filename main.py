@@ -11,6 +11,7 @@ from threading import Thread
 # Tutorial Dora iniciantes
 #from registries.onboarding import register_onboarding_handlers
 # Telegram Imports
+from flask import send_file
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.request import HTTPXRequest
 from telegram.ext import (
@@ -86,7 +87,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "I'm alive! Eldora Bot is running."
+    return send_file('index.html')
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
