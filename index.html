@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mundo de Eldora - App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--tg-theme-bg-color, #121212); color: var(--tg-theme-text-color, #e0e0e0); margin: 0; padding: 0; padding-bottom: 70px; }
+        header { background-color: var(--tg-theme-secondary-bg-color, #1a1a1a); padding: 12px; text-align: center; border-bottom: 2px solid #f39c12; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        header h1 { margin: 0; font-size: 1.1em; color: #f39c12; text-transform: uppercase; letter-spacing: 2px; }
+        .tab-content { display: none; padding: 20px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        nav { position: fixed; bottom: 0; left: 0; width: 100%; background-color: var(--tg-theme-secondary-bg-color, #1a1a1a); display: flex; justify-content: space-around; border-top: 1px solid #333; padding: 10px 0; z-index: 1000; }
+        nav button { background: none; border: none; color: #666; font-size: 0.85em; display: flex; flex-direction: column; align-items: center; cursor: pointer; width: 25%; transition: 0.3s; }
+        nav button.active { color: #f39c12; font-weight: bold; }
+        nav button i { font-size: 1.6em; margin-bottom: 2px; }
+
+        .home-banner { width: 100%; border-radius: 10px; overflow: hidden; border: 2px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.6); margin-bottom: 20px; background: #000; }
+        .home-banner img { width: 100%; display: block; object-fit: cover; }
+        .welcome-card { background: #1e1e1e; padding: 15px; border-radius: 8px; border-left: 4px solid #f39c12; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .welcome-card p { margin: 0; color: #ccc; font-size: 0.9em; line-height: 1.5; text-align: center; }
+
+        .game-menu-btn { display: flex; align-items: center; background: #252525; border: 1px solid #333; padding: 15px; border-radius: 10px; margin-bottom: 12px; width: 100%; text-align: left; cursor: pointer; box-sizing: border-box; transition: all 0.2s; }
+        .game-menu-btn:active { transform: scale(0.97); background: #2a2a2a; border-color: #f39c12; }
+        .game-menu-btn .btn-icon { font-size: 2em; margin-right: 15px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); }
+        .game-menu-btn .btn-text { flex: 1; display: flex; flex-direction: column; }
+        .game-menu-btn .btn-title { color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 3px; }
+        .game-menu-btn .btn-subtitle { color: #888; font-size: 0.8em; }
+        .game-menu-btn .btn-arrow { color: #555; font-size: 1.2em; font-weight: bold; }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0 5px; background-color: transparent; }
+        th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: left; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px; border-bottom: 2px solid #444; }
+
+        .rank-row { background-image: url('http://localhost:5000/static/rankings/textura_tabela.jpg'); background-size: cover; color: #2c3e50; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .rank-row td { padding: 12px; font-size: 0.9em; font-weight: 500; }
+
+        .rank-1 { background-image: none !important; background-color: #f1c40f !important; color: #000 !important; font-weight: 800 !important; } 
+        .rank-2 { background-image: none !important; background-color: #bdc3c7 !important; color: #000 !important; font-weight: 800 !important; } 
+        .rank-3 { background-image: none !important; background-color: #e67e22 !important; color: #000 !important; font-weight: 800 !important; }
+    </style>
+</head>
+<body>
+
+    <header><h1>⚔️ Reino de Eldora</h1></header>
+
+    <div id="aba-home" class="tab-content active">
+        <div class="home-banner"><img src="http://localhost:5000/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x300/111/333?text=Imagem+Nao+Encontrada'"></div>
+        <div class="welcome-card"><p>Saudações, guerreiro! O reino aguarda. Forje sua lenda, consulte as escrituras antigas ou acompanhe os maiores heróis do nosso mundo.</p></div>
+
+        <button class="game-menu-btn" onclick="mudarAba('ranking')">
+            <div class="btn-icon">🏆</div><div class="btn-text"><span class="btn-title">Ranking Global</span><span class="btn-subtitle">Veja quem lidera a supremacia</span></div><div class="btn-arrow">➔</div>
+        </button>
+        <button class="game-menu-btn" onclick="mudarAba('wiki')">
+            <div class="btn-icon">📖</div><div class="btn-text"><span class="btn-title">Enciclopédia</span><span class="btn-subtitle">Classes, Regiões e Monstros</span></div><div class="btn-arrow">➔</div>
+        </button>
+        <button class="game-menu-btn" onclick="mudarAba('perfil')">
+            <div class="btn-icon">👤</div><div class="btn-text"><span class="btn-title">Meu Perfil</span><span class="btn-subtitle">Acesse seu status e inventário</span></div><div class="btn-arrow">➔</div>
+        </button>
+    </div>
+
+    <div id="aba-ranking" class="tab-content">
+        <div id="container-menu-ranking">
+            <div class="home-banner"><img src="http://localhost:5000/static/banner_competicoes.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Competições+do+Reino'"></div>
+            <div class="welcome-card"><p>Escolha uma categoria abaixo para ver quem são os heróis que estão gravando seus nomes na história de Eldora.</p></div>
+            <div id="menu-ranking">
+                <button class="game-menu-btn" onclick="abrirTabelaRanking('level', '👑 Heróis Lendários')">
+                    <div class="btn-icon">👑</div><div class="btn-text"><span class="btn-title">Ranking de Nível</span><span class="btn-subtitle">Os guerreiros mais experientes</span></div><div class="btn-arrow">➔</div>
+                </button>
+                <button class="game-menu-btn" onclick="abrirTabelaRanking('ouro', '💰 Os Mais Ricos')">
+                    <div class="btn-icon">💰</div><div class="btn-text"><span class="btn-title">Cofres Reais</span><span class="btn-subtitle">Jogadores com mais ouro</span></div><div class="btn-arrow">➔</div>
+                </button>
+                <button class="game-menu-btn" onclick="abrirTabelaRanking('pvp', '⚔️ Mestres da Arena')">
+                    <div class="btn-icon">⚔️</div><div class="btn-text"><span class="btn-title">Arena PvP</span><span class="btn-subtitle">Os campeões de combate</span></div><div class="btn-arrow">➔</div>
+                </button>
+                <button class="game-menu-btn" onclick="abrirTabelaRanking('guildas', '🏰 Supremacia de Guildas')">
+                    <div class="btn-icon">🏰</div><div class="btn-text"><span class="btn-title">Guildas</span><span class="btn-subtitle">Clãs mais poderosos</span></div><div class="btn-arrow">➔</div>
+                </button>
+            </div>
+        </div>
+
+        <div id="conteudo-ranking" style="display: none;">
+            <button onclick="voltarParaMenuRanking()" style="background: none; border: none; color: #f39c12; font-size: 1em; cursor: pointer; margin-bottom: 15px; display: flex; align-items: center; gap: 5px;">⬅️ Voltar</button>
+            <div style="position: relative; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.8); background: #000; border: 1px solid #333;">
+                <img id="img-banner-ranking" src="" onerror="this.src='https://placehold.co/800x300/111/333?text=Reino+de+Eldora'" style="width: 100%; height: 160px; object-fit: cover; display: block;">
+                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.95) 100%);"></div>
+                <div style="position: absolute; bottom: 15px; width: 100%; text-align: center;">
+                    <h2 id="titulo-tabela-ranking" style="margin: 0; font-size: 1.6em; text-shadow: 2px 2px 8px #000; color: #f39c12; text-transform: uppercase; letter-spacing: 2px; font-weight: 800;">...</h2>
+                    <p id="desc-tabela-ranking" style="margin: 5px 0 0 0; color: #ffffff; font-size: 0.9em; text-shadow: 1px 1px 4px #000; font-weight: 400; opacity: 0.9;"></p>
+                </div>
+            </div>
+            <table>
+                <thead><tr><th style="width: 15%;">#</th><th>Jogador</th><th style="text-align: right;">Status</th></tr></thead>
+                <tbody id="corpo-tabela-ranking"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="aba-wiki" class="tab-content">
+        <h2 style="text-align: center; font-size: 1.1em; color: #f39c12;">📖 Enciclopédia</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button style="padding: 15px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 8px;">🗺️ Regiões</button>
+            <button style="padding: 15px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 8px;">👹 Monstros</button>
+            <button onclick="carregarClasses()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">🎭 Classes</button>
+            <button style="padding: 15px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 8px;">⚔️ Itens</button>
+        </div>
+        <div id="conteudo-wiki" style="margin-top: 25px; text-align: left;"></div>
+    </div>
+
+    <div id="aba-perfil" class="tab-content">
+        <div id="perfil-carregando" style="text-align: center; padding: 50px;">
+            <p id="perfil-msg-carregando">Consultando os registros reais... 📜</p>
+        </div>
+
+        <div id="perfil-dados" style="display: none;">
+    <div style="background: linear-gradient(135deg, #2c3e50, #1a1a1a); padding: 20px; border-radius: 15px; border: 2px solid #f39c12; text-align: center; margin-bottom: 20px;">
+        <img id="perf-avatar" src="" onerror="this.src='https://placehold.co/100x100/111/f39c12?text=?'" style="width: 110px; height: 110px; border-radius: 10px; border: 2px solid #f39c12; margin-bottom: 10px; object-fit: cover; object-position: top;">
+        <h2 id="perf-nome" style="margin: 0; color: #f39c12; font-size: 1.6em; text-shadow: 2px 2px 4px #000;">...</h2>
+        <span id="perf-classe" style="background: #f39c12; color: #000; padding: 3px 12px; border-radius: 5px; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">...</span>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+        <div style="background: #1e1e1e; padding: 10px; border-radius: 8px; border: 1px solid #c0392b;">
+            <span style="color: #e74c3c; font-size: 0.7em; font-weight: bold;">❤️ HP</span>
+            <div style="font-size: 1em; color: #fff;" id="perf-hp-texto">0/0</div>
+        </div>
+        <div style="background: #1e1e1e; padding: 10px; border-radius: 8px; border: 1px solid #2980b9;">
+            <span style="color: #3498db; font-size: 0.7em; font-weight: bold;">⚡ ENERGIA</span>
+            <div style="font-size: 1em; color: #fff;" id="perf-energia">0</div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+        <div style="background: #252525; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #333;">
+            <span style="color: #aaa; font-size: 0.7em; display: block;">OURO</span>
+            <strong id="perf-ouro" style="color: #ffd700; font-size: 1.2em;">0</strong>
+        </div>
+        <div style="background: #252525; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #333;">
+            <span style="color: #aaa; font-size: 0.7em; display: block;">GEMAS</span>
+            <strong id="perf-gems" style="color: #00f2fe; font-size: 1.2em;">0</strong>
+        </div>
+    </div>
+
+    <div style="background: #252525; padding: 15px; border-radius: 10px; border: 1px solid #333; margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 5px;">
+            <span style="color: #aaa;">Experiência (Nível <span id="perf-lvl">0</span>)</span>
+            <span id="perf-xp-texto" style="color: #fff;">0 / 0</span>
+        </div>
+        <div style="width: 100%; height: 8px; background: #111; border-radius: 4px; overflow: hidden;">
+            <div id="perf-xp-barra" style="width: 0%; height: 100%; background: linear-gradient(90deg, #8e44ad, #9b59b6); transition: 0.8s;"></div>
+        </div>
+    </div>
+</div>
+
+            <button class="game-menu-btn" style="padding: 10px;"><div class="btn-icon">🎒</div><div class="btn-text"><span class="btn-title" style="font-size: 0.9em;">Ver Inventário</span></div></button>
+        </div>
+    </div>
+    <div id="card-pontos" style="background: #1e1e1e; padding: 10px; border-radius: 8px; border-left: 4px solid #f1c40f; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: #ccc; font-size: 0.85em;">🎯 Pontos Disponíveis:</span>
+        <strong id="perf-pontos" style="color: #f1c40f; font-size: 1.1em;">0</strong>
+    </div>
+    <nav>
+        <button id="btn-home" class="active" onclick="mudarAba('home')"><i>🏰</i><span>Início</span></button>
+        <button id="btn-ranking" onclick="mudarAba('ranking')"><i>🏆</i><span>Ranking</span></button>
+        <button id="btn-wiki" onclick="mudarAba('wiki')"><i>📖</i><span>Wiki</span></button>
+        <button id="btn-perfil" onclick="mudarAba('perfil')"><i>👤</i><span>Perfil</span></button>
+    </nav>
+
+    <script>
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+
+        function mudarAba(nomeDaAba) {
+            document.querySelectorAll('.tab-content').forEach(aba => aba.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`aba-${nomeDaAba}`).classList.add('active');
+            document.getElementById(`btn-${nomeDaAba}`).classList.add('active');
+            
+            // CORREÇÃO: Chama a função de carregar perfil assim que mudar de aba!
+            if(nomeDaAba === 'perfil') carregarMeuPerfil();
+            if(nomeDaAba === 'ranking') voltarParaMenuRanking();
+        }
+
+        async function carregarMeuPerfil() {
+            const user = window.Telegram.WebApp.initDataUnsafe?.user;
+            // Utilize o seu ObjectId para testes locais
+            const userId = user ? user.id : '6952fb3566c4a0938686b8da'; 
+
+            try {
+                const resposta = await fetch(`http://localhost:5000/perfil/${userId}`);
+                const p = await resposta.json();
+
+                if (p.erro) {
+                    console.error("Erro retornado pela API:", p.erro);
+                    return;
+                }
+
+                // 1. Preenchimento de Textos e Identidade
+                document.getElementById('perf-nome').innerText = p.nome;
+                document.getElementById('perf-classe').innerText = p.classe.replace(/_/g, ' ');
+                document.getElementById('perf-lvl').innerText = p.level;
+
+                // 2. Status Monetários (Formatados com ponto: 220.255)
+                document.getElementById('perf-ouro').innerText = p.gold.toLocaleString('pt-BR');
+                document.getElementById('perf-gems').innerText = p.gems.toLocaleString('pt-BR');
+
+                // 3. Status de Combate e Energia
+                document.getElementById('perf-hp-texto').innerText = `${p.hp_atual} / ${p.hp_max}`;
+                document.getElementById('perf-energia').innerText = p.energy;
+
+                // 4. Lógica de XP DINÂMICO
+                const xpAtual = p.xp;
+                const xpMaximo = p.xp_max; // Este valor agora vem corrigido da lógica do xp.py
+
+                // Calcula a percentagem real baseada na lógica do bot
+                let percentagem = (xpAtual / xpMaximo) * 100;
+                if (percentagem > 100) percentagem = 100;
+
+                document.getElementById('perf-xp-barra').style.width = percentagem + "%";
+                document.getElementById('perf-xp-texto').innerText = `${xpAtual.toLocaleString('pt-BR')} / ${xpMaximo.toLocaleString('pt-BR')}`;
+                // 5. Carregamento da Skin Real
+                document.getElementById('perf-avatar').src = p.avatar;
+
+                // Mostra a ficha e esconde o carregamento
+                document.getElementById('perfil-carregando').style.display = 'none';
+                document.getElementById('perfil-dados').style.display = 'block';
+                // Dentro do carregarMeuPerfil
+                document.getElementById('perf-pontos').innerText = p.pontos_livres;
+            } catch (erro) {
+                console.error("Erro de conexão ao carregar perfil:", erro);
+                const msg = document.getElementById('perfil-carregando');
+                if(msg) msg.innerText = "⚠️ Erro ao conectar com o Reino.";
+            }
+        }
+
+        const configBanners = {
+            'level': { img: 'banner_level.jpg', desc: 'Os guerreiros com maior nível do servidor.' },
+            'ouro': { img: 'banner_ouro.jpg', desc: 'As fortunas mais incalculáveis do reino.' },
+            'pvp': { img: 'banner_pvp.jpg', desc: 'Os gladiadores mais letais da arena.' },
+            'guildas': { img: 'banner_guildas.jpg', desc: 'A glória das maiores ordens unidas.' }
+        };
+
+        function voltarParaMenuRanking() {
+            document.getElementById('container-menu-ranking').style.display = 'block';
+            document.getElementById('conteudo-ranking').style.display = 'none';
+        }
+
+        async function abrirTabelaRanking(tipoEndpoint, titulo) {
+            document.getElementById('container-menu-ranking').style.display = 'none';
+            document.getElementById('conteudo-ranking').style.display = 'block';
+            const info = configBanners[tipoEndpoint];
+            document.getElementById('img-banner-ranking').src = `http://localhost:5000/static/rankings/${info.img}`;
+            document.getElementById('titulo-tabela-ranking').innerText = titulo;
+            document.getElementById('desc-tabela-ranking').innerText = info.desc;
+            
+            const tabela = document.getElementById('corpo-tabela-ranking');
+            tabela.innerHTML = '<tr><td colspan="3" style="text-align:center; color: #888; padding: 30px;">Consultando oráculos... 🔮</td></tr>';
+
+            try {
+                const resposta = await fetch(`http://localhost:5000/ranking/${tipoEndpoint}`);
+                const dados = await resposta.json();
+                tabela.innerHTML = ''; 
+                dados.forEach((linha, index) => {
+                    let posicao = index + 1;
+                    let classeLinha = 'rank-row';
+                    if (posicao === 1) classeLinha += ' rank-1';
+                    else if (posicao === 2) classeLinha += ' rank-2';
+                    else if (posicao === 3) classeLinha += ' rank-3';
+
+                    tabela.innerHTML += `<tr class="${classeLinha}"><td style="font-weight: 800; width: 15%; text-align: center;">#${posicao}</td><td>${linha.nome}</td><td style="text-align: right;">${linha.valor}</td></tr>`;
+                });
+            } catch (erro) {
+                tabela.innerHTML = `<tr><td colspan="3" style="color: red; text-align: center;">Erro de conexão.</td></tr>`;
+            }
+        }
+
+        window.dadosEldoraClasses = [];
+        async function carregarClasses() {
+            const conteudo = document.getElementById('conteudo-wiki');
+            conteudo.innerHTML = '<p style="text-align: center; color: #888;">Lendo os tomos antigos... 🔮</p>';
+            try {
+                if (window.dadosEldoraClasses.length === 0) {
+                    const resposta = await fetch('http://localhost:5000/wiki/classes');
+                    window.dadosEldoraClasses = await resposta.json();
+                }
+                const classes = window.dadosEldoraClasses;
+                let html = `<div style="position: relative; text-align: center; margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 2px solid #333;"><img src="http://localhost:5000/static/classes/banner_classes.jpg" onerror="this.src='https://placehold.co/600x150/111/333?text=+'" style="width: 100%; height: 100px; object-fit: cover; display: block; opacity: 0.7;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%;"><h2 style="margin: 0; font-size: 1.8em; text-shadow: 2px 2px 4px #000; color: #f39c12; text-transform: uppercase;">🎭 Classes Base</h2></div></div>`;
+                classes.forEach(cls => {
+                    let tagEvo = cls.total_evolucoes > 0 ? `<span style="background: #2c3e50; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; color: #aaa;">${cls.total_evolucoes} Evoluções</span>` : '';
+                    html += `<div onclick="abrirDetalhesClasse('${cls.id}')" style="background: #252525; margin-bottom: 15px; padding: 12px; border-radius: 8px; border-left: 4px solid #f39c12; display: flex; gap: 15px; align-items: center; cursor: pointer; transition: 0.2s;"><img src="${cls.imagem}" onerror="this.src='https://placehold.co/80x80/2c3e50/f39c12?text=${cls.emoji}'" alt="${cls.nome}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; object-position: top center; border: 2px solid #1e1e1e;"><div style="flex: 1;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;"><h3 style="margin: 0; color: #f39c12; font-size: 1.2em;">${cls.emoji} ${cls.nome}</h3>${tagEvo}</div><p style="margin: 0 0 10px 0; font-size: 0.85em; color: #ccc; line-height: 1.3;">${cls.descricao}</p><div style="display: flex; gap: 10px; font-size: 0.75em; background: #1a1a1a; padding: 6px; border-radius: 5px; justify-content: space-around; color: #bbb;"><span>❤️ HP: ${cls.hp}</span><span>⚔️ ATQ: ${cls.ataque}</span><span>🛡️ DEF: ${cls.defesa}</span></div></div></div>`;
+                });
+                conteudo.innerHTML = html;
+            } catch (erro) { conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro na API.</p>'; }
+        }
+
+        function abrirDetalhesClasse(idClasse) {
+            const cls = window.dadosEldoraClasses.find(c => c.id === idClasse);
+            if (!cls) return;
+            const conteudo = document.getElementById('conteudo-wiki');
+            let htmlEvolucoes = '';
+            if (cls.evolucoes.length > 0) {
+                htmlEvolucoes = '<h4 style="color: #f39c12; margin-top: 20px; border-bottom: 1px solid #333; padding-bottom: 5px;">Caminhos de Evolução</h4>';
+                cls.evolucoes.forEach(evo => {
+                    htmlEvolucoes += `<div style="background: #1a1a1a; padding: 10px; border-radius: 5px; margin-bottom: 8px; border-left: 3px solid #666;"><strong style="color: #fff; font-size: 0.9em;">Tier ${evo.tier} - ${evo.nome}</strong><p style="margin: 5px 0 0 0; font-size: 0.8em; color: #aaa;">${evo.descricao}</p></div>`;
+                });
+            }
+            conteudo.innerHTML = `<button onclick="carregarClasses()" style="background: none; border: none; color: #f39c12; font-size: 1em; cursor: pointer; margin-bottom: 15px; padding: 0; display: flex; align-items: center; gap: 5px;">⬅️ Voltar</button><div style="display: flex; flex-wrap: wrap; gap: 20px; background: #252525; padding: 20px; border-radius: 8px; border-top: 4px solid #f39c12;"><div style="flex: 1; min-width: 150px;"><img src="${cls.imagem}" onerror="this.src='https://placehold.co/300x400/2c3e50/f39c12?text=${cls.emoji}'" alt="${cls.nome}" style="width: 100%; border-radius: 8px; border: 2px solid #1a1a1a; object-fit: cover;"></div><div style="flex: 2; min-width: 200px;"><h2 style="margin: 0 0 10px 0; color: #f39c12; font-size: 1.8em;">${cls.emoji} ${cls.nome}</h2><p style="font-size: 0.95em; color: #ddd; line-height: 1.4; margin-bottom: 15px;">${cls.descricao}</p><div style="display: flex; gap: 15px; background: #1a1a1a; padding: 12px; border-radius: 8px; justify-content: space-around; font-size: 0.85em; color: #ccc;"><span>❤️ <b>HP:</b> ${cls.hp}</span><span>⚔️ <b>ATQ:</b> ${cls.ataque}</span><span>🛡️ <b>DEF:</b> ${cls.defesa}</span></div>${htmlEvolucoes}</div></div>`;
+        }
+    </script>
+</body>
+</html>
