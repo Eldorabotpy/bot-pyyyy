@@ -34,7 +34,7 @@
         table { width: 100%; border-collapse: separate; border-spacing: 0 5px; background-color: transparent; }
         th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: left; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px; border-bottom: 2px solid #444; }
 
-        .rank-row { background-image: url('http://localhost:5000/static/rankings/textura_tabela.jpg'); background-size: cover; color: #2c3e50; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .rank-row { background-image: url('https://bot-pyyyy.onrender.com/static/rankings/textura_tabela.jpg'); background-size: cover; color: #2c3e50; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .rank-row td { padding: 12px; font-size: 0.9em; font-weight: 500; }
 
         .rank-1 { background-image: none !important; background-color: #f1c40f !important; color: #000 !important; font-weight: 800 !important; } 
@@ -47,7 +47,7 @@
     <header><h1>⚔️ Reino de Eldora</h1></header>
 
     <div id="aba-home" class="tab-content active">
-        <div class="home-banner"><img src="http://localhost:5000/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x300/111/333?text=Imagem+Nao+Encontrada'"></div>
+        <div class="home-banner"><img src="https://bot-pyyyy.onrender.com/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x300/111/333?text=Imagem+Nao+Encontrada'"></div>
         <div class="welcome-card"><p>Saudações, guerreiro! O reino aguarda. Forje sua lenda, consulte as escrituras antigas ou acompanhe os maiores heróis do nosso mundo.</p></div>
 
         <button class="game-menu-btn" onclick="mudarAba('ranking')">
@@ -63,7 +63,7 @@
 
     <div id="aba-ranking" class="tab-content">
         <div id="container-menu-ranking">
-            <div class="home-banner"><img src="http://localhost:5000/static/banner_competicoes.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Competições+do+Reino'"></div>
+            <div class="home-banner"><img src="https://bot-pyyyy.onrender.com/static/banner_competicoes.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Competições+do+Reino'"></div>
             <div class="welcome-card"><p>Escolha uma categoria abaixo para ver quem são os heróis que estão gravando seus nomes na história de Eldora.</p></div>
             <div id="menu-ranking">
                 <button class="game-menu-btn" onclick="abrirTabelaRanking('level', '👑 Heróis Lendários')">
@@ -189,7 +189,7 @@
             const userId = user ? user.id : '6952fb3566c4a0938686b8da'; 
 
             try {
-                const resposta = await fetch(`http://localhost:5000/perfil/${userId}`);
+                const resposta = await fetch(`https://bot-pyyyy.onrender.com/perfil/${userId}`);
                 const p = await resposta.json();
 
                 if (p.erro) {
@@ -251,7 +251,7 @@
             document.getElementById('container-menu-ranking').style.display = 'none';
             document.getElementById('conteudo-ranking').style.display = 'block';
             const info = configBanners[tipoEndpoint];
-            document.getElementById('img-banner-ranking').src = `http://localhost:5000/static/rankings/${info.img}`;
+            document.getElementById('img-banner-ranking').src = `https://bot-pyyyy.onrender.com/static/rankings/${info.img}`;
             document.getElementById('titulo-tabela-ranking').innerText = titulo;
             document.getElementById('desc-tabela-ranking').innerText = info.desc;
             
@@ -259,7 +259,7 @@
             tabela.innerHTML = '<tr><td colspan="3" style="text-align:center; color: #888; padding: 30px;">Consultando oráculos... 🔮</td></tr>';
 
             try {
-                const resposta = await fetch(`http://localhost:5000/ranking/${tipoEndpoint}`);
+                const resposta = await fetch(`https://bot-pyyyy.onrender.com/ranking/${tipoEndpoint}`);
                 const dados = await resposta.json();
                 tabela.innerHTML = ''; 
                 dados.forEach((linha, index) => {
@@ -282,11 +282,11 @@
             conteudo.innerHTML = '<p style="text-align: center; color: #888;">Lendo os tomos antigos... 🔮</p>';
             try {
                 if (window.dadosEldoraClasses.length === 0) {
-                    const resposta = await fetch('http://localhost:5000/wiki/classes');
+                    const resposta = await fetch('https://bot-pyyyy.onrender.com/wiki/classes');
                     window.dadosEldoraClasses = await resposta.json();
                 }
                 const classes = window.dadosEldoraClasses;
-                let html = `<div style="position: relative; text-align: center; margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 2px solid #333;"><img src="http://localhost:5000/static/classes/banner_classes.jpg" onerror="this.src='https://placehold.co/600x150/111/333?text=+'" style="width: 100%; height: 100px; object-fit: cover; display: block; opacity: 0.7;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%;"><h2 style="margin: 0; font-size: 1.8em; text-shadow: 2px 2px 4px #000; color: #f39c12; text-transform: uppercase;">🎭 Classes Base</h2></div></div>`;
+                let html = `<div style="position: relative; text-align: center; margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 2px solid #333;"><img src="https://bot-pyyyy.onrender.com/static/classes/banner_classes.jpg" onerror="this.src='https://placehold.co/600x150/111/333?text=+'" style="width: 100%; height: 100px; object-fit: cover; display: block; opacity: 0.7;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%;"><h2 style="margin: 0; font-size: 1.8em; text-shadow: 2px 2px 4px #000; color: #f39c12; text-transform: uppercase;">🎭 Classes Base</h2></div></div>`;
                 classes.forEach(cls => {
                     let tagEvo = cls.total_evolucoes > 0 ? `<span style="background: #2c3e50; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; color: #aaa;">${cls.total_evolucoes} Evoluções</span>` : '';
                     html += `<div onclick="abrirDetalhesClasse('${cls.id}')" style="background: #252525; margin-bottom: 15px; padding: 12px; border-radius: 8px; border-left: 4px solid #f39c12; display: flex; gap: 15px; align-items: center; cursor: pointer; transition: 0.2s;"><img src="${cls.imagem}" onerror="this.src='https://placehold.co/80x80/2c3e50/f39c12?text=${cls.emoji}'" alt="${cls.nome}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; object-position: top center; border: 2px solid #1e1e1e;"><div style="flex: 1;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;"><h3 style="margin: 0; color: #f39c12; font-size: 1.2em;">${cls.emoji} ${cls.nome}</h3>${tagEvo}</div><p style="margin: 0 0 10px 0; font-size: 0.85em; color: #ccc; line-height: 1.3;">${cls.descricao}</p><div style="display: flex; gap: 10px; font-size: 0.75em; background: #1a1a1a; padding: 6px; border-radius: 5px; justify-content: space-around; color: #bbb;"><span>❤️ HP: ${cls.hp}</span><span>⚔️ ATQ: ${cls.ataque}</span><span>🛡️ DEF: ${cls.defesa}</span></div></div></div>`;
