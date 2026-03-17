@@ -2,7 +2,7 @@
 # (VERSÃO CORRIGIDA: Voltar funciona + não salva com Telegram ID + callbacks do Kingdom tratados)
 
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from modules import player_manager, game_data, file_ids
@@ -178,7 +178,9 @@ async def show_kingdom_menu(
              InlineKeyboardButton("🧪 𝐑𝐞𝐟𝐢𝐧𝐨", callback_data="refining_main")],
             [InlineKeyboardButton("⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐏𝐯𝐏", callback_data="pvp_arena"),
              InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬", callback_data="abrir_hub_eventos_v2")],
-            [InlineKeyboardButton("📘 𝐆𝐮𝐢𝐚 𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data="guide_main")],
+            #[InlineKeyboardButton("📘 𝐆𝐮𝐢𝐚 𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data="guide_main")],
+            # ---> BOTÃO DO WEB APP ADICIONADO AQUI <---
+            [InlineKeyboardButton("🌐 𝐀𝐩𝐩 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚", web_app=WebAppInfo(url="https://bot-pyyyy.onrender.com/"))]
         ]
 
         # Painel Admin (Usa Telegram ID para permissão visual)

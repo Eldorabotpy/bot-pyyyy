@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -21,6 +21,13 @@ MONGO_URI = os.getenv("MONGO_CONNECTION_STRING")
 client = MongoClient(MONGO_URI)
 db = client['eldora_db']
 users_collection = db['users']
+
+# ==========================================
+# ROTA PRINCIPAL (MOSTRA O SITE)
+# ==========================================
+@app.route('/')
+def home():
+    return send_file('index.html')
 
 # ==========================================
 # ROTAS DE RANKING
