@@ -179,15 +179,15 @@ def obter_classes():
 def obter_regioes():
     lista = []
     try:
-        # Importa do seu arquivo de regiões
-        from modules.game_data.regions import REGIONS 
-        for chave, info in REGIONS.items():
+        from modules.game_data.worldmap import REGIONS_DATA, REGION_TARGET_POWER
+        for chave, info in REGIONS_DATA.items():
+            poder = REGION_TARGET_POWER.get(chave, 1)
             lista.append({
                 "id": chave,
-                "nome": info.get("name", info.get("display_name", "Região Desconhecida")),
+                "nome": info.get("display_name", "Região Desconhecida"),
                 "emoji": info.get("emoji", "🗺️"),
-                "descricao": info.get("description", "Área inexplorada."),
-                "level_min": info.get("min_level", 1),
+                "descricao": info.get("description", "Uma área selvagem de Eldora."),
+                "level_min": poder,
                 "imagem": f"{request.host_url}static/regions/{chave}.jpg"
             })
     except Exception as e:
@@ -201,22 +201,26 @@ def obter_regioes():
 def obter_monstros():
     lista = []
     try:
-        # Tenta importar do monsters_data ou monsters
-        try:
-            from modules.game_data.monsters_data import MONSTERS_DATA as MONSTROS
-        except:
-            from modules.game_data.monsters import MONSTERS as MONSTROS
-            
-        for chave, info in MONSTROS.items():
-            lista.append({
-                "id": chave,
-                "nome": info.get("name", "Monstro Desconhecido"),
-                "level": info.get("level", 1),
-                "hp": info.get("hp", 0),
-                "ataque": info.get("attack", 0),
-                "defesa": info.get("defense", 0),
-                "imagem": f"{request.host_url}static/monsters/{chave}.jpg"
-            })
+        from modules.game_data.monsters import MONSTERS_DATA
+        mobs_vistos = set() # Evita mostrar o mesmo monstro duas vezes se ele estiver em 2 mapas
+        
+        # Como o seu arquivo divide por regiões, precisamos de dois "fors"
+        for regiao, lista_mobs in MONSTERS_DATA.items():
+            for mob in lista_mobs:
+                mob_id = mob.get("id")
+                if mob_id in mobs_vistos:
+                    continue
+                mobs_vistos.add(mob_id)
+                
+                lista.append({
+                    "id": mob_id,
+                    "nome": mob.get("name", "Monstro Desconhecido"),
+                    "level": mob.get("min_level", mob.get("level", 1)),
+                    "hp": mob.get("hp", 0),
+                    "ataque": mob.get("attack", 0),
+                    "defesa": mob.get("defense", 0),
+                    "imagem": f"{request.host_url}static/monsters/{mob_id}.jpg"
+                })
     except Exception as e:
         print(f"Erro ao ler monstros: {e}")
     return jsonify(sorted(lista, key=lambda x: x["level"]))
@@ -228,19 +232,16 @@ def obter_monstros():
 def obter_itens():
     lista = []
     try:
-        # Importa do seu arquivo de itens
-        try:
-            from modules.game_data.items import ITEMS_DATA as ITENS
-        except:
-            from modules.game_data.items import ITEMS as ITENS
+        # Puxando direto da pasta onde você confirmou que o items.py está!
+        from modules.game_data.items import ITEMS_DATA
             
-        for chave, info in ITENS.items():
+        for chave, info in ITEMS_DATA.items():
             lista.append({
                 "id": chave,
-                "nome": info.get("name", "Item"),
-                "raridade": info.get("rarity", "comum").capitalize(),
-                "descricao": info.get("description", "Sem descrição."),
-                "preco": info.get("price", info.get("value", 0)),
+                "nome": info.get("display_name", "Item Desconhecido"),
+                "raridade": str(info.get("rarity", "Comum")).capitalize(),
+                "descricao": info.get("description", "Um item de Eldora."),
+                "preco": info.get("value", info.get("price", 0)),
                 "imagem": f"{request.host_url}static/items/{chave}.png"
             })
     except Exception as e:
