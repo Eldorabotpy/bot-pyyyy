@@ -139,19 +139,37 @@ def obter_perfil(user_id):
         return jsonify({"erro": str(e)}), 400
 
 # ==========================================
-# ROTAS DA WIKI
+# ROTAS DA WIKI (CORRIGIDA COM TODOS OS STATUS)
 # ==========================================
 @app.route('/wiki/classes')
 def obter_classes():
     lista_de_classes = []
     for chave, classe_info in CLASSES_DATA.items():
         if classe_info.get("tier") == 1:
+            # Puxa a lista de evoluções
+            caminho_evolucao = EVOLUTIONS.get(chave, [])
+            detalhes_evolucoes = [
+                {"nome": evo.get("display_name", ""), "tier": evo.get("tier_num", 0), "descricao": evo.get("desc", "")}
+                for evo in caminho_evolucao
+            ]
+            
+            # Puxa os atributos
+            status = classe_info.get("stat_modifiers", {})
+            
             dados_classe = {
                 "id": chave,
                 "nome": classe_info.get("display_name", "Desconhecida"),
+                "emoji": classe_info.get("emoji", "❓"),
+                "descricao": classe_info.get("description", "Sem descrição."),
+                "hp": status.get("hp", 0),
+                "ataque": status.get("attack", 0),
+                "defesa": status.get("defense", 0),
                 "imagem": f"{request.host_url}static/classes/{chave}.png",
+                "total_evolucoes": len(caminho_evolucao),
+                "evolucoes": detalhes_evolucoes
             }
             lista_de_classes.append(dados_classe)
+            
     return jsonify(sorted(lista_de_classes, key=lambda x: x["nome"]))
 
 if __name__ == "__main__":
