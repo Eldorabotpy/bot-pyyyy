@@ -184,16 +184,25 @@
         }
 
         async function carregarMeuPerfil() {
-            const user = window.Telegram.WebApp.initDataUnsafe?.user;
-            // Utilize o seu ObjectId para testes locais
-            const userId = user ? user.id : '6952fb3566c4a0938686b8da'; 
+            // 1. Lê a URL para ver se o bot enviou o ID exato da personagem (ObjectId)
+            const urlParams = new URLSearchParams(window.location.search);
+            let userId = urlParams.get('char_id');
+
+            // 2. Se não vier no link (testes no PC), tenta usar o do Telegram ou um ID de teste
+            if (!userId) {
+                const user = window.Telegram.WebApp.initDataUnsafe?.user;
+                userId = user ? user.id : '6952fb3566c4a0938686b8da'; 
+            }
 
             try {
+                // Vai buscar o perfil na API usando o ID correto
                 const resposta = await fetch(`https://bot-pyyyy.onrender.com/perfil/${userId}`);
                 const p = await resposta.json();
 
                 if (p.erro) {
                     console.error("Erro retornado pela API:", p.erro);
+                    const msg = document.getElementById('perfil-carregando');
+                    if(msg) msg.innerText = "⚠️ " + p.erro;
                     return;
                 }
 
@@ -206,13 +215,14 @@
                 document.getElementById('perf-ouro').innerText = p.gold.toLocaleString('pt-BR');
                 document.getElementById('perf-gems').innerText = p.gems.toLocaleString('pt-BR');
 
-                // 3. Status de Combate e Energia
+                // 3. Status de Combate, Energia e Pontos Livres
                 document.getElementById('perf-hp-texto').innerText = `${p.hp_atual} / ${p.hp_max}`;
                 document.getElementById('perf-energia').innerText = p.energy;
+                document.getElementById('perf-pontos').innerText = p.pontos_livres;
 
                 // 4. Lógica de XP DINÂMICO
                 const xpAtual = p.xp;
-                const xpMaximo = p.xp_max; // Este valor agora vem corrigido da lógica do xp.py
+                const xpMaximo = p.xp_max; 
 
                 // Calcula a percentagem real baseada na lógica do bot
                 let percentagem = (xpAtual / xpMaximo) * 100;
@@ -220,14 +230,14 @@
 
                 document.getElementById('perf-xp-barra').style.width = percentagem + "%";
                 document.getElementById('perf-xp-texto').innerText = `${xpAtual.toLocaleString('pt-BR')} / ${xpMaximo.toLocaleString('pt-BR')}`;
+                
                 // 5. Carregamento da Skin Real
                 document.getElementById('perf-avatar').src = p.avatar;
 
-                // Mostra a ficha e esconde o carregamento
+                // Mostra a ficha e esconde o texto de carregamento
                 document.getElementById('perfil-carregando').style.display = 'none';
                 document.getElementById('perfil-dados').style.display = 'block';
-                // Dentro do carregarMeuPerfil
-                document.getElementById('perf-pontos').innerText = p.pontos_livres;
+
             } catch (erro) {
                 console.error("Erro de conexão ao carregar perfil:", erro);
                 const msg = document.getElementById('perfil-carregando');

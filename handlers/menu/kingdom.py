@@ -169,6 +169,13 @@ async def show_kingdom_menu(
             except Exception:
                 pass
 
+        # ---> LÓGICA DO LINK DINÂMICO AQUI <---
+        # Pega o ObjectId exato da personagem ativa e transforma em texto
+        char_id_str = str(uid)
+        
+        # Cria o link do site passando o ID na frente (ex: /?char_id=6951...)
+        site_url = f"https://bot-pyyyy.onrender.com/?char_id={char_id_str}"
+
         keyboard = [
             [InlineKeyboardButton("🗺 𝐕𝐢𝐚𝐣𝐚𝐫", callback_data="travel"),
              InlineKeyboardButton("👤 𝐏𝐞𝐫𝐬𝐨𝐧𝐚𝐠𝐞𝐦", callback_data="profile")],
@@ -179,8 +186,9 @@ async def show_kingdom_menu(
             [InlineKeyboardButton("⚔️ 𝐀𝐫𝐞𝐧𝐚 𝐏𝐯𝐏", callback_data="pvp_arena"),
              InlineKeyboardButton("💀 𝐄𝐯𝐞𝐧𝐭𝐨𝐬", callback_data="abrir_hub_eventos_v2")],
             #[InlineKeyboardButton("📘 𝐆𝐮𝐢𝐚 𝐝𝐨 𝐀𝐯𝐞𝐧𝐭𝐮𝐫𝐞𝐢𝐫𝐨", callback_data="guide_main")],
-            # ---> BOTÃO DO WEB APP ADICIONADO AQUI <---
-            [InlineKeyboardButton("🌐 𝐀𝐩𝐩 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚", web_app=WebAppInfo(url="https://bot-pyyyy.onrender.com/"))]
+            
+            # ---> BOTÃO DO WEB APP ATUALIZADO <---
+            [InlineKeyboardButton("📖 𝕎𝕀𝕂𝕀", web_app=WebAppInfo(url=site_url))]
         ]
 
         # Painel Admin (Usa Telegram ID para permissão visual)
