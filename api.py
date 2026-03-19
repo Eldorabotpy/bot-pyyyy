@@ -172,6 +172,81 @@ def obter_classes():
             
     return jsonify(sorted(lista_de_classes, key=lambda x: x["nome"]))
 
+# ==========================================
+# ROTA: REGIÕES
+# ==========================================
+@app.route('/wiki/regioes')
+def obter_regioes():
+    lista = []
+    try:
+        # Importa do seu arquivo de regiões
+        from modules.game_data.regions import REGIONS 
+        for chave, info in REGIONS.items():
+            lista.append({
+                "id": chave,
+                "nome": info.get("name", info.get("display_name", "Região Desconhecida")),
+                "emoji": info.get("emoji", "🗺️"),
+                "descricao": info.get("description", "Área inexplorada."),
+                "level_min": info.get("min_level", 1),
+                "imagem": f"{request.host_url}static/regions/{chave}.jpg"
+            })
+    except Exception as e:
+        print(f"Erro ao ler regiões: {e}")
+    return jsonify(sorted(lista, key=lambda x: x["level_min"]))
+
+# ==========================================
+# ROTA: MONSTROS
+# ==========================================
+@app.route('/wiki/monstros')
+def obter_monstros():
+    lista = []
+    try:
+        # Tenta importar do monsters_data ou monsters
+        try:
+            from modules.game_data.monsters_data import MONSTERS_DATA as MONSTROS
+        except:
+            from modules.game_data.monsters import MONSTERS as MONSTROS
+            
+        for chave, info in MONSTROS.items():
+            lista.append({
+                "id": chave,
+                "nome": info.get("name", "Monstro Desconhecido"),
+                "level": info.get("level", 1),
+                "hp": info.get("hp", 0),
+                "ataque": info.get("attack", 0),
+                "defesa": info.get("defense", 0),
+                "imagem": f"{request.host_url}static/monsters/{chave}.jpg"
+            })
+    except Exception as e:
+        print(f"Erro ao ler monstros: {e}")
+    return jsonify(sorted(lista, key=lambda x: x["level"]))
+
+# ==========================================
+# ROTA: ITENS
+# ==========================================
+@app.route('/wiki/itens')
+def obter_itens():
+    lista = []
+    try:
+        # Importa do seu arquivo de itens
+        try:
+            from modules.game_data.items import ITEMS_DATA as ITENS
+        except:
+            from modules.game_data.items import ITEMS as ITENS
+            
+        for chave, info in ITENS.items():
+            lista.append({
+                "id": chave,
+                "nome": info.get("name", "Item"),
+                "raridade": info.get("rarity", "comum").capitalize(),
+                "descricao": info.get("description", "Sem descrição."),
+                "preco": info.get("price", info.get("value", 0)),
+                "imagem": f"{request.host_url}static/items/{chave}.png"
+            })
+    except Exception as e:
+        print(f"Erro ao ler itens: {e}")
+    return jsonify(sorted(lista, key=lambda x: x["nome"]))
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

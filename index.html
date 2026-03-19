@@ -101,10 +101,10 @@
     <div id="aba-wiki" class="tab-content">
         <h2 style="text-align: center; font-size: 1.1em; color: #f39c12;">📖 Enciclopédia</h2>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <button style="padding: 15px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 8px;">🗺️ Regiões</button>
-            <button style="padding: 15px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 8px;">👹 Monstros</button>
+            <button onclick="carregarRegioes()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">🗺️ Regiões</button>
+            <button onclick="carregarMonstros()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">👹 Monstros</button>
             <button onclick="carregarClasses()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">🎭 Classes</button>
-            <button style="padding: 15px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 8px;">⚔️ Itens</button>
+            <button onclick="carregarItens()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">⚔️ Itens</button>
         </div>
         <div id="conteudo-wiki" style="margin-top: 25px; text-align: left;"></div>
     </div>
@@ -328,6 +328,88 @@
             const emoji = cls.emoji || "❓";
 
             conteudo.innerHTML = `<button onclick="carregarClasses()" style="background: none; border: none; color: #f39c12; font-size: 1em; cursor: pointer; margin-bottom: 15px; padding: 0; display: flex; align-items: center; gap: 5px;">⬅️ Voltar</button><div style="display: flex; flex-wrap: wrap; gap: 20px; background: #252525; padding: 20px; border-radius: 8px; border-top: 4px solid #f39c12;"><div style="flex: 1; min-width: 150px;"><img src="${cls.imagem}" onerror="this.src='https://placehold.co/300x400/2c3e50/f39c12?text=${emoji}'" alt="${cls.nome}" style="width: 100%; border-radius: 8px; border: 2px solid #1a1a1a; object-fit: cover;"></div><div style="flex: 2; min-width: 200px;"><h2 style="margin: 0 0 10px 0; color: #f39c12; font-size: 1.8em;">${emoji} ${cls.nome}</h2><p style="font-size: 0.95em; color: #ddd; line-height: 1.4; margin-bottom: 15px;">${desc}</p><div style="display: flex; gap: 15px; background: #1a1a1a; padding: 12px; border-radius: 8px; justify-content: space-around; font-size: 0.85em; color: #ccc;"><span>❤️ <b>HP:</b> ${hp}</span><span>⚔️ <b>ATQ:</b> ${atk}</span><span>🛡️ <b>DEF:</b> ${def}</span></div>${htmlEvolucoes}</div></div>`;
+        }
+
+        // ==========================================
+        // WIKI: REGIÕES
+        // ==========================================
+        async function carregarRegioes() {
+            const conteudo = document.getElementById('conteudo-wiki');
+            conteudo.innerHTML = '<p style="text-align: center; color: #888;">Desenhando o mapa... 🗺️</p>';
+            try {
+                const resposta = await fetch(`/wiki/regioes?v=${Date.now()}`);
+                const regioes = await resposta.json();
+                
+                let html = `<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #3498db;">🗺️ Mapas de Eldora</h2></div>`;
+                
+                regioes.forEach(reg => {
+                    html += `<div style="background: #252525; margin-bottom: 15px; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db; display: flex; gap: 15px; align-items: center;">
+                        <img src="${reg.imagem}" onerror="this.src='https://placehold.co/80x80/2c3e50/3498db?text=${reg.emoji}'" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover;">
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0 0 5px 0; color: #3498db; font-size: 1.1em;">${reg.emoji} ${reg.nome}</h3>
+                            <p style="margin: 0 0 8px 0; font-size: 0.8em; color: #aaa;">${reg.descricao}</p>
+                            <span style="background: #1a1a1a; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; color: #ccc;">Recomendado: Lvl ${reg.level_min}+</span>
+                        </div>
+                    </div>`;
+                });
+                conteudo.innerHTML = html;
+            } catch (erro) { conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao carregar o mapa.</p>'; }
+        }
+
+        // ==========================================
+        // WIKI: MONSTROS
+        // ==========================================
+        async function carregarMonstros() {
+            const conteudo = document.getElementById('conteudo-wiki');
+            conteudo.innerHTML = '<p style="text-align: center; color: #888;">Buscando bestiário... 👹</p>';
+            try {
+                const resposta = await fetch(`/wiki/monstros?v=${Date.now()}`);
+                const monstros = await resposta.json();
+                
+                let html = `<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #e74c3c;">👹 Bestiário</h2></div>`;
+                
+                monstros.forEach(mob => {
+                    html += `<div style="background: #252525; margin-bottom: 15px; padding: 12px; border-radius: 8px; border-left: 4px solid #e74c3c; display: flex; gap: 15px; align-items: center;">
+                        <img src="${mob.imagem}" onerror="this.src='https://placehold.co/70x70/2c3e50/e74c3c?text=?'" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #e74c3c;">
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0 0 5px 0; color: #e74c3c; font-size: 1.1em;">${mob.nome} <span style="font-size: 0.7em; color: #aaa;">(Lvl ${mob.level})</span></h3>
+                            <div style="display: flex; gap: 10px; font-size: 0.75em; background: #1a1a1a; padding: 6px; border-radius: 5px; color: #bbb;">
+                                <span>❤️ HP: ${mob.hp}</span><span>⚔️ ATQ: ${mob.ataque}</span><span>🛡️ DEF: ${mob.defesa}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                conteudo.innerHTML = html;
+            } catch (erro) { conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao carregar o bestiário.</p>'; }
+        }
+
+        // ==========================================
+        // WIKI: ITENS
+        // ==========================================
+        async function carregarItens() {
+            const conteudo = document.getElementById('conteudo-wiki');
+            conteudo.innerHTML = '<p style="text-align: center; color: #888;">Abrindo os baús... ⚔️</p>';
+            try {
+                const resposta = await fetch(`/wiki/itens?v=${Date.now()}`);
+                const itens = await resposta.json();
+                
+                let html = `<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #9b59b6;">⚔️ Arsenal e Itens</h2></div>`;
+                
+                itens.forEach(item => {
+                    html += `<div style="background: #252525; margin-bottom: 10px; padding: 12px; border-radius: 8px; border-left: 4px solid #9b59b6; display: flex; gap: 12px; align-items: center;">
+                        <img src="${item.imagem}" onerror="this.src='https://placehold.co/60x60/2c3e50/9b59b6?text=📦'" style="width: 60px; height: 60px; border-radius: 8px; object-fit: contain; background: #111;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <h3 style="margin: 0 0 3px 0; color: #9b59b6; font-size: 1em;">${item.nome}</h3>
+                                <span style="font-size: 0.7em; color: #f1c40f;">💰 ${item.preco}</span>
+                            </div>
+                            <p style="margin: 0 0 5px 0; font-size: 0.75em; color: #aaa;">${item.descricao}</p>
+                            <span style="font-size: 0.65em; background: #1a1a1a; padding: 2px 6px; border-radius: 3px; color: #ccc;">${item.raridade}</span>
+                        </div>
+                    </div>`;
+                });
+                conteudo.innerHTML = html;
+            } catch (erro) { conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao carregar itens.</p>'; }
         }
     </script>
 </body>
