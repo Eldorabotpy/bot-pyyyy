@@ -105,5 +105,20 @@ async function carregarInicio() {
     }
 }
 
+// ==========================================
+// FUNÇÃO DE SAIR / TROCAR PERSONAGEM
+// ==========================================
+function sairDoJogo() {
+    // Confirma se o jogador quer mesmo sair
+    if(confirm("Tem certeza que deseja fechar o grimório e trocar de personagem?")) {
+        // Apaga a memória do navegador
+        localStorage.removeItem("jogadorEldoraID");
+        localStorage.removeItem("jogadorEldoraNome");
+        
+        // Manda de volta para o Portal do Mago
+        window.location.href = "/login";
+    }
+}
+
 // Roda a mágica da tela inicial assim que o site abrir!
 carregarInicio();
