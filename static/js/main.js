@@ -14,16 +14,17 @@ function mudarAba(nomeDaAba) {
 }
 
 async function carregarInicio() {
-    const conteudo = document.getElementById('aba-home'); // Pega a aba inteira para desenhar por cima
+    const conteudo = document.getElementById('aba-home'); 
     
-    // Pega o ID que salvamos lá na tela de login!
+    // Pega o ID salvo no login
     const charId = localStorage.getItem("jogadorEldoraID");
 
     if (!charId) {
         conteudo.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px;">
-            <h3 style="color: #e74c3c;">Nenhum Herói Selecionado</h3>
-            <p style="color: #aaa;">Volte para o portal e escolha seu personagem.</p>
+        <div style="text-align: center; padding: 60px 20px;">
+            <h2 style="color: #e74c3c; margin-bottom: 10px;">Nenhum Herói Selecionado</h2>
+            <p style="color: #aaa; margin-bottom: 30px;">Os portões do reino estão fechados. Por favor, identifique-se no portal mágico.</p>
+            <button onclick="window.location.href='login.html'" style="background: linear-gradient(180deg, #f1c40f 0%, #d35400 100%); border: 2px solid #f39c12; padding: 12px 25px; border-radius: 8px; color: black; font-weight: bold; font-size: 1.1em; cursor: pointer;">Ir para o Portal de Login</button>
         </div>`;
         return;
     }
@@ -31,7 +32,6 @@ async function carregarInicio() {
     conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 30px;">Sincronizando com os deuses de Eldora... ⏳</p>';
 
     try {
-        // Vai lá no seu Python e pega a ficha criminal do jogador!
         const resposta = await fetch(`/api/personagem/${charId}`);
         const p = await resposta.json();
 
@@ -40,10 +40,10 @@ async function carregarInicio() {
             return;
         }
 
-        // O NOVO VISUAL DA TELA INICIAL
+        // VISUAL DA TELA INICIAL
         let html = `
         <div class="home-banner">
-            <img src="/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x300/111/333?text=Eldora'">
+            <img src="/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Eldora'">
         </div>
 
         <div style="background: linear-gradient(145deg, #1e293b, #0f172a); border: 2px solid #f39c12; border-radius: 10px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(243, 156, 18, 0.2);">
@@ -71,16 +71,30 @@ async function carregarInicio() {
             </div>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-            <button class="game-menu-btn" onclick="mudarAba('ranking')">
-                <div class="btn-icon">🏆</div><div class="btn-text"><span class="btn-title">Ranking Global</span><span class="btn-subtitle">Veja quem lidera a supremacia</span></div><div class="btn-arrow">➔</div>
+        <h4 style="color: #aaa; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 10px; font-weight: normal;">Ações do Reino</h4>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+            
+            <button onclick="alert('Sistema de Combate em desenvolvimento! ⚔️')" style="background: linear-gradient(135deg, #2c3e50, #1a252f); border: 1px solid #3498db; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">⚔️</span>
+                <strong style="color: #3498db; font-size: 1em;">Caçar</strong>
             </button>
-            <button class="game-menu-btn" onclick="mudarAba('wiki')">
-                <div class="btn-icon">📖</div><div class="btn-text"><span class="btn-title">Enciclopédia</span><span class="btn-subtitle">Classes, Regiões e Monstros</span></div><div class="btn-arrow">➔</div>
+            
+            <button onclick="alert('Os portões do evento se abrirão em breve! 🎪')" style="background: linear-gradient(135deg, #8e44ad, #5e3370); border: 1px solid #9b59b6; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">🎪</span>
+                <strong style="color: #9b59b6; font-size: 1em;">Eventos</strong>
             </button>
-            <button class="game-menu-btn" onclick="mudarAba('perfil')">
-                <div class="btn-icon">👤</div><div class="btn-text"><span class="btn-title">Meu Perfil</span><span class="btn-subtitle">Acesse seu status e inventário</span></div><div class="btn-arrow">➔</div>
+            
+            <button onclick="alert('As caravanas mercantes estão a caminho! 🏪')" style="background: linear-gradient(135deg, #d35400, #a04000); border: 1px solid #e67e22; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">🏪</span>
+                <strong style="color: #e67e22; font-size: 1em;">Mercado</strong>
             </button>
+            
+            <button onclick="alert('O calor da forja ainda está fraco... 🔥')" style="background: linear-gradient(135deg, #7f8c8d, #34495e); border: 1px solid #95a5a6; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">🔨</span>
+                <strong style="color: #95a5a6; font-size: 1em;">Forja</strong>
+            </button>
+
         </div>
         `;
         
