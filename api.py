@@ -291,6 +291,37 @@ def obter_itens():
         print(f"Erro ao ler itens: {e}")
     return jsonify(sorted(lista, key=lambda x: x["nome"]))
 
+# ==========================================
+# ROTA: SISTEMA DE LOGIN (SELEÇÃO DE PERSONAGEM)
+# ==========================================
+@app.route('/api/meus_personagens/<int:telegram_id>')
+def listar_personagens(telegram_id):
+    try:
+        # Importa a conexão do seu banco de dados igual você faz nos seus arquivos
+        from modules.player.core import users_collection
+        
+        if users_collection is None:
+            return jsonify({"erro": "Banco de dados desconectado"}), 500
+
+        # Busca personagens (usando a mesma lógica do seu queries.py)
+        cursor = users_collection.find({
+            "$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}]
+        })
+        
+        personagens = []
+        for p in cursor:
+            personagens.append({
+                "id": str(p["_id"]), # O seu precioso ObjectId!
+                "nome": p.get("character_name", "Desconhecido"),
+                "classe": str(p.get("class", "aventureiro")).capitalize(),
+                "level": p.get("level", 1)
+            })
+            
+        return jsonify(personagens)
+    except Exception as e:
+        print(f"Erro ao buscar personagens do ID {telegram_id}: {e}")
+        return jsonify([])
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

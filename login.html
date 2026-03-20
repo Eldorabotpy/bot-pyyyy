@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mundo de Eldora - Login</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            
+            /* COLOQUE O LINK DA FOTO DO MAGO DO GITHUB AQUI DENTRO DAS ASPAS */
+            background-image: url('https://raw.githubusercontent.com/.../suafoto.png'); 
+            
+            background-size: cover; background-position: center;
+            height: 100vh; display: flex; justify-content: center; align-items: center;
+            font-family: 'Cinzel', serif, sans-serif;
+        }
+
+        .login-box {
+            background: rgba(10, 15, 30, 0.85);
+            border: 2px solid #f39c12; border-radius: 10px;
+            padding: 30px; width: 85%; max-width: 350px; text-align: center;
+            box-shadow: 0 0 20px rgba(243, 156, 18, 0.5); backdrop-filter: blur(5px);
+        }
+
+        h2 { color: #f39c12; margin-top: 0; margin-bottom: 25px; letter-spacing: 2px; text-shadow: 0 0 10px rgba(243, 156, 18, 0.8); }
+        .loading { color: #aaa; font-size: 0.9em; margin-bottom: 20px; }
+
+        .btn-char {
+            width: 100%; padding: 12px; margin-bottom: 10px;
+            background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+            border: 1px solid #3498db; color: white; border-radius: 5px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center; transition: 0.2s;
+        }
+        .btn-char:active { transform: scale(0.95); }
+        .btn-char strong { color: #f39c12; font-size: 1.1em; }
+
+        .btn-new {
+            width: 100%; padding: 12px; margin-top: 15px;
+            background: linear-gradient(180deg, #27ae60 0%, #2ecc71 100%);
+            border: 2px solid #2ecc71; color: black; font-weight: bold; border-radius: 5px; cursor: pointer; text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h2>PORTAL DE ELDORA</h2>
+        <div id="area-personagens">
+            <div class="loading">Sincronizando com o cristal de mana... 🔮</div>
+        </div>
+    </div>
+
+    <script>
+        // Avisa o Telegram que o site carregou
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+
+        async function buscarPersonagens() {
+            const area = document.getElementById('area-personagens');
+            
+            // Tenta pegar o ID do Telegram (Se abrir no PC sem o Telegram, ele usa um ID de teste ou avisa erro)
+            let tgUser = window.Telegram.WebApp.initDataUnsafe.user;
+            
+            if (!tgUser) {
+                area.innerHTML = '<p style="color: #e74c3c;">Erro: Abra o jogo por dentro do Telegram!</p>';
+                return;
+            }
+
+            const telegramId = tgUser.id;
+
+            try {
+                // Chama a API que criamos no Python!
+                const resposta = await fetch(`https://bot-pyyyy.onrender.com/api/meus_personagens/${telegramId}`);
+                const personagens = await resposta.json();
+
+                let htmlBotoes = '';
+
+                // Desenha um botão para cada personagem encontrado no Banco de Dados
+                if (personagens.length > 0) {
+                    personagens.forEach(p => {
+                        htmlBotoes += `
+                        <button class="btn-char" onclick="entrarNoJogo('${p.id}', '${p.nome}')">
+                            <div style="text-align: left;">
+                                <strong>${p.nome}</strong><br>
+                                <span style="font-size: 0.8em; color: #bbb;">${p.classe} - Nv. ${p.level}</span>
+                            </div>
+                            <span style="font-size: 1.5em;">⚔️</span>
+                        </button>`;
+                    });
+                } else {
+                    htmlBotoes += '<p style="color: #aaa; font-size: 0.9em; margin-bottom: 20px;">Nenhum personagem encontrado nesta conta.</p>';
+                }
+
+                // Botão de Criar Novo
+                htmlBotoes += `<button class="btn-new" onclick="alert('Tela de criação em breve!')">➕ Criar Personagem</button>`;
+                
+                area.innerHTML = htmlBotoes;
+
+            } catch (erro) {
+                area.innerHTML = '<p style="color: #e74c3c;">Erro ao conectar com o servidor.</p>';
+            }
+        }
+
+        // Função que é chamada ao clicar no personagem
+        function entrarNoJogo(objectId, nome) {
+            // Salva o ID no "cérebro" do navegador para o site lembrar quem você é!
+            localStorage.setItem("jogadorEldoraID", objectId);
+            localStorage.setItem("jogadorEldoraNome", nome);
+            
+            alert(`Bem-vindo de volta, ${nome}! (ID: ${objectId})`);
+            
+            // O próximo passo seria: window.location.href = "index.html";
+        }
+
+        // Roda a busca assim que a tela abre!
+        buscarPersonagens();
+    </script>
+</body>
+</html>
