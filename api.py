@@ -6,7 +6,7 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 
-# Importações do seu jogo
+# Importações do teu jogo
 from modules.game_data.classes import CLASSES_DATA
 from modules.game_data.class_evolution import EVOLUTIONS
 
@@ -36,6 +36,13 @@ def home():
     return send_file('index.html')
 
 # ==========================================
+# ROTA: PÁGINA DE LOGIN (A CORREÇÃO ESTÁ AQUI!)
+# ==========================================
+@app.route('/login')
+def pagina_login():
+    return send_file('login.html')
+
+# ==========================================
 # ROTAS DE RANKING (COM ESCUDO DE ERROS)
 # ==========================================
 @app.route('/ranking/level')
@@ -45,7 +52,7 @@ def ranking_level():
         lista = [{"nome": j.get("character_name", "Desconhecido"), "valor": f"Lvl {j.get('level', 1)}"} for j in top]
         return jsonify(lista)
     except Exception as e:
-        # Se der erro no banco, ele MOSTRA o erro na tela do celular!
+        # Se der erro no banco, ele MOSTRA o erro no ecrã do telemóvel!
         return jsonify([{"nome": "⚠️ Erro no Banco", "valor": str(e)}])
 
 @app.route('/ranking/ouro')
@@ -167,7 +174,7 @@ def obter_classes():
                 "ataque": status.get("attack", 0),
                 "defesa": status.get("defense", 0),
                 "imagem": classe_info.get("image_url", f"{request.host_url}static/classes/{chave}.png"),
-                "video": classe_info.get("video_url", ""), # <--- A LINHA NOVA DO VÍDEO AQUI!
+                "video": classe_info.get("video_url", ""), 
                 "total_evolucoes": len(caminho_evolucao),
                 "evolucoes": detalhes_evolucoes
             }
@@ -191,7 +198,6 @@ def obter_regioes():
                 "emoji": info.get("emoji", "🗺️"),
                 "descricao": info.get("description", "Uma área selvagem de Eldora."),
                 "level_min": poder,
-                # Tenta o link do Github primeiro, se não tiver, tenta a pasta local
                 "imagem": info.get("image_url", f"{request.host_url}static/regions/{chave}.jpg")
             })
     except Exception as e:
@@ -207,7 +213,6 @@ def obter_monstros():
     try:
         from modules.game_data.monsters import MONSTERS_DATA
         
-        # Puxa o nome e o nível das regiões do seu arquivo worldmap
         nomes_regioes = {}
         poder_regioes = {}
         try:
@@ -233,7 +238,6 @@ def obter_monstros():
             elif regiao_id == "defesa_reino": regiao_nome = "Defesa do Reino"
             else: regiao_nome = nomes_regioes.get(regiao_id, regiao_id.replace("_", " ").title())
 
-            # Pegando a dificuldade (se for evento, joga lá pro final com 999)
             nivel_regiao = poder_regioes.get(regiao_id, 999) 
 
             for mob in lista_mobs:
@@ -261,13 +265,12 @@ def obter_monstros():
                     "imagem": mob.get("image_url", f"{request.host_url}static/monsters/{mob_id}.jpg"),
                     "regiao_id": regiao_id,
                     "regiao_nome": regiao_nome,
-                    "nivel_regiao": nivel_regiao, # <-- A dificuldade indo pro site!
+                    "nivel_regiao": nivel_regiao, 
                     "is_evento": is_evento
                 })
     except Exception as e:
         print(f"Erro ao ler monstros: {e}")
         
-    # Python já manda a lista arrumadinha!
     return jsonify(sorted(lista, key=lambda x: (x["is_evento"], x["nivel_regiao"], x["level"])))
 
 # ==========================================
@@ -285,7 +288,6 @@ def obter_itens():
                 "raridade": str(info.get("rarity", "Comum")).capitalize(),
                 "descricao": info.get("description", "Um item de Eldora."),
                 "preco": info.get("value", info.get("price", 0)),
-                # Tenta o link do Github primeiro
                 "imagem": info.get("image_url", f"{request.host_url}static/items/{chave}.png")
             })
     except Exception as e:
@@ -298,13 +300,11 @@ def obter_itens():
 @app.route('/api/meus_personagens/<int:telegram_id>')
 def listar_personagens(telegram_id):
     try:
-        # Importa a conexão do seu banco de dados igual você faz nos seus arquivos
         from modules.player.core import users_collection
         
         if users_collection is None:
             return jsonify({"erro": "Banco de dados desconectado"}), 500
 
-        # Busca personagens (usando a mesma lógica do seu queries.py)
         cursor = users_collection.find({
             "$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}]
         })
@@ -312,7 +312,7 @@ def listar_personagens(telegram_id):
         personagens = []
         for p in cursor:
             personagens.append({
-                "id": str(p["_id"]), # O seu precioso ObjectId!
+                "id": str(p["_id"]),
                 "nome": p.get("character_name", "Desconhecido"),
                 "classe": str(p.get("class", "aventureiro")).capitalize(),
                 "level": p.get("level", 1)
@@ -331,7 +331,6 @@ def obter_personagem_info(personagem_id):
     try:
         from modules.player.core import get_player_data
         
-        # Como o get_player_data é async, usamos o asyncio para rodar ele no Flask
         pdata = asyncio.run(get_player_data(personagem_id))
         
         if not pdata:
