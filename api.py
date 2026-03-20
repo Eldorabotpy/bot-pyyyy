@@ -1,4 +1,5 @@
 import os
+import asyncio
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from pymongo import MongoClient
@@ -321,6 +322,35 @@ def listar_personagens(telegram_id):
     except Exception as e:
         print(f"Erro ao buscar personagens do ID {telegram_id}: {e}")
         return jsonify([])
+    
+# ==========================================
+# ROTA: PEGAR DADOS DO PERSONAGEM ATUAL
+# ==========================================
+@app.route('/api/personagem/<personagem_id>')
+def obter_personagem_info(personagem_id):
+    try:
+        from modules.player.core import get_player_data
+        
+        # Como o get_player_data é async, usamos o asyncio para rodar ele no Flask
+        pdata = asyncio.run(get_player_data(personagem_id))
+        
+        if not pdata:
+            return jsonify({"erro": "Personagem não encontrado"}), 404
+            
+        return jsonify({
+            "nome": pdata.get("character_name", "Aventureiro"),
+            "classe": str(pdata.get("class", "aventureiro")).capitalize(),
+            "level": pdata.get("level", 1),
+            "ouro": pdata.get("gold", 0),
+            "diamantes": pdata.get("gems", 0),
+            "hp": pdata.get("current_hp", 0),
+            "max_hp": pdata.get("max_hp", 0),
+            "mp": pdata.get("current_mp", 0),
+            "max_mp": pdata.get("max_mana", 0)
+        })
+    except Exception as e:
+        print(f"Erro ao buscar personagem: {e}")
+        return jsonify({"erro": str(e)}), 500    
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
