@@ -9,8 +9,8 @@
         body {
             margin: 0; padding: 0;
             
-            /* 1️⃣ COLOQUE AQUI O LINK DA FOTO DO MAGO DO FUNDO */
-            background-image: url('https://raw.githubusercontent.com/.../fundo_mago.png'); 
+            /* 1️⃣ COLE O LINK EXTERNO DO SEU FUNDO AQUI */
+            background-image: url('https://github.com/user-attachments/assets/ea06a84b-c8fc-45d7-977f-c5a55f808815'); 
             
             background-size: cover; background-position: center;
             height: 100vh; display: flex; justify-content: center; align-items: center;
@@ -18,14 +18,13 @@
         }
 
         .login-box {
-            background: rgba(15, 23, 42, 0.92); /* Azul mais fechado e elegante */
+            background: rgba(15, 23, 42, 0.92); 
             border: 2px solid #f39c12; border-radius: 12px;
             padding: 25px 20px 20px 20px; width: 85%; max-width: 340px; text-align: center;
             box-shadow: 0 0 25px rgba(243, 156, 18, 0.4); backdrop-filter: blur(8px);
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* EFEITO DA LOGO SALTANDO PRA FORA DA CAIXA */
         .logo-eldora {
             width: 110px; height: 110px;
             margin-top: -70px; 
@@ -41,7 +40,6 @@
         
         #area-personagens { width: 100%; display: flex; flex-direction: column; gap: 10px; }
 
-        /* BOTÕES MENORES E MAIS SOFISTICADOS */
         .btn-char {
             width: 100%; padding: 10px 15px;
             background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
@@ -67,7 +65,7 @@
 
     <div class="login-box">
         
-        <img src="https://github.com/user-attachments/assets/5bbdd3c7-68ea-4dc5-927a-034390e54e80" class="logo-eldora" alt="Logo Eldora">
+        <img src="https://github.com/user-attachments/assets/0f2990de-2b0f-4d3d-90ae-060713ef5abb" class="logo-eldora" alt="Logo Eldora">
         
         <h2>Portal de Acesso</h2>
         <div id="area-personagens">
@@ -96,7 +94,6 @@
 
                 if (personagens.length > 0) {
                     personagens.forEach(p => {
-                        // Limpa nomes de classe zoados ou vazios do banco de dados antigo
                         let classeNome = p.classe;
                         if (!classeNome || classeNome === 'None' || classeNome === 'null') {
                             classeNome = 'Aventureiro';
@@ -124,7 +121,6 @@
         }
 
         function entrarNoJogo(objectId, nome) {
-            // Salva o ID na memória e redireciona de volta para a HOME do app
             localStorage.setItem("jogadorEldoraID", objectId);
             localStorage.setItem("jogadorEldoraNome", nome);
             window.location.href = "/"; 
