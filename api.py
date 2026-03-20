@@ -3,14 +3,13 @@ from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from bson.objectid import ObjectId
 
-# ==========================================
-# CONEXÃO COM O BANCO DE DADOS (CORRIGIDA)
-# ==========================================
-# Agora a API importa a conexão oficial do bot. 
-# Assim, se você usar Mongita (dev) ou Atlas (prod), a API saberá onde ir!
-from modules.database import players_col, clans_col
-
-users_collection = players_col
+# ==============================================================================
+# CONEXÃO COM O BANCO DE DADOS (CORREÇÃO DEFINITIVA)
+# ==============================================================================
+# Agora importamos a users_collection diretamente do core.py do seu bot!
+# Isso garante que a API olhe exatamente para o mesmo lugar onde o bot salva o jogo.
+from modules.player.core import users_collection
+from modules.database import clans_col
 
 app = Flask(__name__)
 CORS(app) 
@@ -83,7 +82,7 @@ def ranking_guildas():
         return jsonify([{"nome": "⚠️ Erro no Banco", "valor": str(e)}])
 
 # ==========================================
-# ROTA DE PERFIL
+# ROTA DE PERFIL (ABA PERFIL)
 # ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
@@ -135,7 +134,7 @@ def obter_perfil(user_id):
         return jsonify({"erro": str(e)}), 400
 
 # ==========================================
-# ROTAS DA WIKI: CLASSES
+# ROTAS DA WIKI (Mapas, Itens, Monstros)
 # ==========================================
 @app.route('/wiki/classes')
 def obter_classes():
@@ -170,12 +169,8 @@ def obter_classes():
                 lista_de_classes.append(dados_classe)
     except Exception as e:
         print(f"Erro ao ler classes: {e}")
-            
     return jsonify(sorted(lista_de_classes, key=lambda x: x["nome"]))
 
-# ==========================================
-# ROTA: REGIÕES
-# ==========================================
 @app.route('/wiki/regioes')
 def obter_regioes():
     lista = []
@@ -191,19 +186,14 @@ def obter_regioes():
                 "level_min": poder,
                 "imagem": info.get("image_url", f"{request.host_url}static/regions/{chave}.jpg")
             })
-    except Exception as e:
-        print(f"Erro ao ler regiões: {e}")
+    except: pass
     return jsonify(sorted(lista, key=lambda x: x["level_min"]))
 
-# ==========================================
-# ROTA: MONSTROS
-# ==========================================
 @app.route('/wiki/monstros')
 def obter_monstros():
     lista = []
     try:
         from modules.game_data.monsters import MONSTERS_DATA
-        
         nomes_regioes = {}
         poder_regioes = {}
         try:
@@ -259,14 +249,9 @@ def obter_monstros():
                     "nivel_regiao": nivel_regiao, 
                     "is_evento": is_evento
                 })
-    except Exception as e:
-        print(f"Erro ao ler monstros: {e}")
-        
+    except: pass
     return jsonify(sorted(lista, key=lambda x: (x["is_evento"], x["nivel_regiao"], x["level"])))
 
-# ==========================================
-# ROTA: ITENS
-# ==========================================
 @app.route('/wiki/itens')
 def obter_itens():
     lista = []
@@ -281,8 +266,7 @@ def obter_itens():
                 "preco": info.get("value", info.get("price", 0)),
                 "imagem": info.get("image_url", f"{request.host_url}static/items/{chave}.png")
             })
-    except Exception as e:
-        print(f"Erro ao ler itens: {e}")
+    except: pass
     return jsonify(sorted(lista, key=lambda x: x["nome"]))
 
 # ==========================================
@@ -310,11 +294,14 @@ def listar_personagens(telegram_id):
         return jsonify([])
     
 # ==========================================
-# ROTA: DADOS DO PERSONAGEM (HOME)
+# ROTA: DADOS DO PERSONAGEM (HOME/INICIO)
 # ==========================================
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
     try:
+        if users_collection is None:
+            return jsonify({"erro": "O servidor está conectando ao oráculo..."}), 500
+
         if len(str(personagem_id)) == 24:
             busca_id = ObjectId(personagem_id)
         else:
@@ -323,7 +310,7 @@ def obter_personagem_info(personagem_id):
         pdata = users_collection.find_one({"_id": busca_id})
         
         if not pdata:
-            return jsonify({"erro": "Personagem não encontrado"}), 404
+            return jsonify({"erro": "Personagem não encontrado. Crie um no bot."}), 404
             
         return jsonify({
             "nome": pdata.get("character_name", "Aventureiro"),
@@ -333,11 +320,12 @@ def obter_personagem_info(personagem_id):
             "diamantes": pdata.get("gems", 0),
             "hp": pdata.get("current_hp", 0),
             "max_hp": pdata.get("max_hp", 0),
-            "mp": pdata.get("energy", 0), 
-            "max_mp": pdata.get("max_energy", 0)
+            # Correção no MP baseada no seu core.py
+            "mp": pdata.get("current_mp", pdata.get("mana", 0)), 
+            "max_mp": pdata.get("max_mana", 0)
         })
     except Exception as e:
-        print(f"Erro ao buscar personagem: {e}")
+        print(f"Erro ao buscar personagem na API: {e}")
         return jsonify({"erro": str(e)}), 500    
 
 # ==========================================
