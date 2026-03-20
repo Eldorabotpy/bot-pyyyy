@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mundo de Eldora - Portal</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            
+            /* 1️⃣ COLOQUE AQUI O LINK DA FOTO DO MAGO DO FUNDO */
+            background-image: url('https://raw.githubusercontent.com/.../fundo_mago.png'); 
+            
+            background-size: cover; background-position: center;
+            height: 100vh; display: flex; justify-content: center; align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .login-box {
+            background: rgba(15, 23, 42, 0.92); /* Azul mais fechado e elegante */
+            border: 2px solid #f39c12; border-radius: 12px;
+            padding: 25px 20px 20px 20px; width: 85%; max-width: 340px; text-align: center;
+            box-shadow: 0 0 25px rgba(243, 156, 18, 0.4); backdrop-filter: blur(8px);
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* EFEITO DA LOGO SALTANDO PRA FORA DA CAIXA */
+        .logo-eldora {
+            width: 110px; height: 110px;
+            margin-top: -70px; 
+            border-radius: 50%;
+            border: 3px solid #f39c12;
+            box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000;
+            background: #000;
+            margin-bottom: 15px;
+            object-fit: cover;
+        }
+
+        h2 { color: #f39c12; margin: 0 0 20px 0; font-size: 1.3em; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 5px rgba(0,0,0,0.8); }
+        
+        #area-personagens { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+
+        /* BOTÕES MENORES E MAIS SOFISTICADOS */
+        .btn-char {
+            width: 100%; padding: 10px 15px;
+            background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid #3b82f6; border-left: 4px solid #3b82f6; 
+            color: white; border-radius: 6px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center; 
+            transition: 0.2s; box-sizing: border-box;
+        }
+        .btn-char:active { transform: scale(0.96); border-color: #f39c12; }
+        .btn-char-info { text-align: left; display: flex; flex-direction: column; }
+        .btn-char strong { color: #f39c12; font-size: 1em; margin-bottom: 2px; }
+        .btn-char span { font-size: 0.75em; color: #94a3b8; text-transform: capitalize; }
+
+        .btn-new {
+            width: 100%; padding: 12px; margin-top: 5px;
+            background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
+            border: 1px solid #2ecc71; color: white; font-weight: bold; font-size: 0.9em;
+            border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        
+        <img src="https://github.com/user-attachments/assets/5bbdd3c7-68ea-4dc5-927a-034390e54e80" class="logo-eldora" alt="Logo Eldora">
+        
+        <h2>Portal de Acesso</h2>
+        <div id="area-personagens">
+            <div style="color: #aaa; font-size: 0.9em;">Invocando registros mágicos... ⏳</div>
+        </div>
+    </div>
+
+    <script>
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+
+        async function buscarPersonagens() {
+            const area = document.getElementById('area-personagens');
+            let tgUser = window.Telegram.WebApp.initDataUnsafe.user;
+            
+            if (!tgUser) {
+                area.innerHTML = '<p style="color: #e74c3c; font-size: 0.9em;">Erro: Abra o jogo por dentro do Telegram!</p>';
+                return;
+            }
+
+            try {
+                const resposta = await fetch(`/api/meus_personagens/${tgUser.id}`);
+                const personagens = await resposta.json();
+
+                let htmlBotoes = '';
+
+                if (personagens.length > 0) {
+                    personagens.forEach(p => {
+                        // Limpa nomes de classe zoados ou vazios do banco de dados antigo
+                        let classeNome = p.classe;
+                        if (!classeNome || classeNome === 'None' || classeNome === 'null') {
+                            classeNome = 'Aventureiro';
+                        }
+                        
+                        htmlBotoes += `
+                        <button class="btn-char" onclick="entrarNoJogo('${p.id}', '${p.nome}')">
+                            <div class="btn-char-info">
+                                <strong>${p.nome}</strong>
+                                <span>${classeNome.replace(/_/g, ' ')} - Nv. ${p.level}</span>
+                            </div>
+                            <span style="font-size: 1.2em;">⚔️</span>
+                        </button>`;
+                    });
+                } else {
+                    htmlBotoes += '<p style="color: #aaa; font-size: 0.85em; margin-bottom: 15px;">Nenhum herói encontrado nesta conta.</p>';
+                }
+
+                htmlBotoes += `<button class="btn-new" onclick="alert('A criação de novos personagens estará disponível na próxima atualização!')">➕ Criar Novo Personagem</button>`;
+                area.innerHTML = htmlBotoes;
+
+            } catch (erro) {
+                area.innerHTML = '<p style="color: #e74c3c; font-size: 0.9em;">Erro ao conectar com o servidor.</p>';
+            }
+        }
+
+        function entrarNoJogo(objectId, nome) {
+            // Salva o ID na memória e redireciona de volta para a HOME do app
+            localStorage.setItem("jogadorEldoraID", objectId);
+            localStorage.setItem("jogadorEldoraNome", nome);
+            window.location.href = "/"; 
+        }
+
+        buscarPersonagens();
+    </script>
+</body>
+</html>
