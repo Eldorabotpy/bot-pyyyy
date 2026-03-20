@@ -280,40 +280,45 @@
             const conteudo = document.getElementById('conteudo-wiki');
             conteudo.innerHTML = '<p style="text-align: center; color: #888;">Lendo os tomos antigos... 🔮</p>';
             try {
-                // TRUQUE DO CACHE: Adicionar ?v=Date.now() obriga o celular a buscar a versão mais nova!
-                const resposta = await fetch(`/wiki/classes?v=${Date.now()}`);
+                const resposta = await fetch(`https://bot-pyyyy.onrender.com/wiki/classes?v=${Date.now()}`);
                 window.dadosEldoraClasses = await resposta.json();
                 
                 const classes = window.dadosEldoraClasses;
-                let html = `<div style="position: relative; text-align: center; margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 2px solid #333;"><img src="/static/classes/banner_classes.jpg" onerror="this.src='https://placehold.co/600x150/111/333?text=+'" style="width: 100%; height: 100px; object-fit: cover; display: block; opacity: 0.7;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%;"><h2 style="margin: 0; font-size: 1.8em; text-shadow: 2px 2px 4px #000; color: #f39c12; text-transform: uppercase;">🎭 Classes Base</h2></div></div>`;
+                let html = `<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #f39c12; margin: 0;">🎭 Classes Base</h2></div>`;
                 
                 classes.forEach(cls => {
-                    // Prevenção de erros: se faltar algum dado no banco, ele coloca o valor padrão
-                    const hp = cls.hp || 0;
-                    const atk = cls.ataque || 0;
-                    const def = cls.defesa || 0;
-                    const desc = cls.descricao || "Sem descrição disponível.";
-                    const emoji = cls.emoji || "❓";
-                    const totalEvo = cls.total_evolucoes || 0;
+                    const hp = cls.hp || 0; const atk = cls.ataque || 0; const def = cls.defesa || 0;
+                    const desc = cls.descricao || "Sem descrição."; const emoji = cls.emoji || "❓";
+                    let tagEvo = cls.total_evolucoes > 0 ? `<span style="background: #2c3e50; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; color: #aaa;">${cls.total_evolucoes} Evoluções</span>` : '';
                     
-                    let tagEvo = totalEvo > 0 ? `<span style="background: #2c3e50; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; color: #aaa;">${totalEvo} Evoluções</span>` : '';
-                    
-                    html += `<div onclick="abrirDetalhesClasse('${cls.id}')" style="background: #252525; margin-bottom: 15px; padding: 12px; border-radius: 8px; border-left: 4px solid #f39c12; display: flex; gap: 15px; align-items: center; cursor: pointer; transition: 0.2s;"><img src="${cls.imagem}" onerror="this.src='https://placehold.co/80x80/2c3e50/f39c12?text=${emoji}'" alt="${cls.nome}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; object-position: top center; border: 2px solid #1e1e1e;"><div style="flex: 1;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;"><h3 style="margin: 0; color: #f39c12; font-size: 1.2em;">${emoji} ${cls.nome}</h3>${tagEvo}</div><p style="margin: 0 0 10px 0; font-size: 0.85em; color: #ccc; line-height: 1.3;">${desc}</p><div style="display: flex; gap: 10px; font-size: 0.75em; background: #1a1a1a; padding: 6px; border-radius: 5px; justify-content: space-around; color: #bbb;"><span>❤️ HP: ${hp}</span><span>⚔️ ATQ: ${atk}</span><span>🛡️ DEF: ${def}</span></div></div></div>`;
+                    // A MÁGICA DO VÍDEO NA LISTA: autoplay loop muted playsinline garante que rode no celular sem som e sem travar!
+                    let mediaTag = cls.video 
+                        ? `<video src="${cls.video}" autoplay loop muted playsinline style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; border: 2px solid #1e1e1e;"></video>`
+                        : `<img src="${cls.imagem}" onerror="this.src='https://placehold.co/80x80/2c3e50/f39c12?text=${emoji}'" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; border: 2px solid #1e1e1e;">`;
+
+                    html += `<div onclick="abrirDetalhesClasse('${cls.id}')" style="background: #252525; margin-bottom: 15px; padding: 12px; border-radius: 8px; border-left: 4px solid #f39c12; display: flex; gap: 15px; align-items: center; cursor: pointer;">
+                        ${mediaTag}
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                <h3 style="margin: 0; color: #f39c12; font-size: 1.2em;">${emoji} ${cls.nome}</h3>${tagEvo}
+                            </div>
+                            <p style="margin: 0 0 10px 0; font-size: 0.85em; color: #ccc; line-height: 1.3;">${desc}</p>
+                            <div style="display: flex; gap: 10px; font-size: 0.75em; background: #1a1a1a; padding: 6px; border-radius: 5px; justify-content: space-around; color: #bbb;">
+                                <span>❤️ HP: ${hp}</span><span>⚔️ ATQ: ${atk}</span><span>🛡️ DEF: ${def}</span>
+                            </div>
+                        </div>
+                    </div>`;
                 });
                 conteudo.innerHTML = html;
-            } catch (erro) { 
-                console.error("Erro ao puxar as classes:", erro);
-                conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao ler escrituras. O servidor pode estar reiniciando.</p>'; 
-            }
+            } catch (erro) { conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao ler escrituras.</p>'; }
         }
 
         function abrirDetalhesClasse(idClasse) {
             const cls = window.dadosEldoraClasses.find(c => c.id === idClasse);
             if (!cls) return;
             const conteudo = document.getElementById('conteudo-wiki');
-            let htmlEvolucoes = '';
             
-            // Verifica se a lista de evoluções existe ANTES de ler o tamanho (Isso evita a tela congelar)
+            let htmlEvolucoes = '';
             if (cls.evolucoes && cls.evolucoes.length > 0) {
                 htmlEvolucoes = '<h4 style="color: #f39c12; margin-top: 20px; border-bottom: 1px solid #333; padding-bottom: 5px;">Caminhos de Evolução</h4>';
                 cls.evolucoes.forEach(evo => {
@@ -321,13 +326,25 @@
                 });
             }
             
-            const hp = cls.hp || 0;
-            const atk = cls.ataque || 0;
-            const def = cls.defesa || 0;
-            const desc = cls.descricao || "Sem descrição disponível.";
-            const emoji = cls.emoji || "❓";
+            // A MÁGICA DO VÍDEO GRANDE NA FICHA DA CLASSE
+            let mediaTagGrande = cls.video 
+                ? `<video src="${cls.video}" autoplay loop muted playsinline style="width: 100%; border-radius: 8px; border: 2px solid #1a1a1a; object-fit: cover;"></video>`
+                : `<img src="${cls.imagem}" onerror="this.src='https://placehold.co/300x400/2c3e50/f39c12?text=${cls.emoji}'" style="width: 100%; border-radius: 8px; border: 2px solid #1a1a1a; object-fit: cover;">`;
 
-            conteudo.innerHTML = `<button onclick="carregarClasses()" style="background: none; border: none; color: #f39c12; font-size: 1em; cursor: pointer; margin-bottom: 15px; padding: 0; display: flex; align-items: center; gap: 5px;">⬅️ Voltar</button><div style="display: flex; flex-wrap: wrap; gap: 20px; background: #252525; padding: 20px; border-radius: 8px; border-top: 4px solid #f39c12;"><div style="flex: 1; min-width: 150px;"><img src="${cls.imagem}" onerror="this.src='https://placehold.co/300x400/2c3e50/f39c12?text=${emoji}'" alt="${cls.nome}" style="width: 100%; border-radius: 8px; border: 2px solid #1a1a1a; object-fit: cover;"></div><div style="flex: 2; min-width: 200px;"><h2 style="margin: 0 0 10px 0; color: #f39c12; font-size: 1.8em;">${emoji} ${cls.nome}</h2><p style="font-size: 0.95em; color: #ddd; line-height: 1.4; margin-bottom: 15px;">${desc}</p><div style="display: flex; gap: 15px; background: #1a1a1a; padding: 12px; border-radius: 8px; justify-content: space-around; font-size: 0.85em; color: #ccc;"><span>❤️ <b>HP:</b> ${hp}</span><span>⚔️ <b>ATQ:</b> ${atk}</span><span>🛡️ <b>DEF:</b> ${def}</span></div>${htmlEvolucoes}</div></div>`;
+            conteudo.innerHTML = `<button onclick="carregarClasses()" style="background: none; border: none; color: #f39c12; font-size: 1em; cursor: pointer; margin-bottom: 15px; padding: 0; display: flex; align-items: center; gap: 5px;">⬅️ Voltar</button>
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; background: #252525; padding: 20px; border-radius: 8px; border-top: 4px solid #f39c12;">
+                <div style="flex: 1; min-width: 150px;">
+                    ${mediaTagGrande}
+                </div>
+                <div style="flex: 2; min-width: 200px;">
+                    <h2 style="margin: 0 0 10px 0; color: #f39c12; font-size: 1.8em;">${cls.emoji} ${cls.nome}</h2>
+                    <p style="font-size: 0.95em; color: #ddd; line-height: 1.4; margin-bottom: 15px;">${cls.descricao}</p>
+                    <div style="display: flex; gap: 15px; background: #1a1a1a; padding: 12px; border-radius: 8px; justify-content: space-around; font-size: 0.85em; color: #ccc;">
+                        <span>❤️ <b>HP:</b> ${cls.hp}</span><span>⚔️ <b>ATQ:</b> ${cls.ataque}</span><span>🛡️ <b>DEF:</b> ${cls.defesa}</span>
+                    </div>
+                    ${htmlEvolucoes}
+                </div>
+            </div>`;
         }
 
         // ==========================================

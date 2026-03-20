@@ -139,21 +139,22 @@ def obter_perfil(user_id):
         return jsonify({"erro": str(e)}), 400
 
 # ==========================================
-# ROTAS DA WIKI (CORRIGIDA COM TODOS OS STATUS)
+# ROTAS DA WIKI: CLASSES
 # ==========================================
 @app.route('/wiki/classes')
 def obter_classes():
     lista_de_classes = []
+    from modules.game_data.classes import CLASSES_DATA
+    from modules.game_data.class_evolution import EVOLUTIONS
+    
     for chave, classe_info in CLASSES_DATA.items():
         if classe_info.get("tier") == 1:
-            # Puxa a lista de evoluções
             caminho_evolucao = EVOLUTIONS.get(chave, [])
             detalhes_evolucoes = [
                 {"nome": evo.get("display_name", ""), "tier": evo.get("tier_num", 0), "descricao": evo.get("desc", "")}
                 for evo in caminho_evolucao
             ]
             
-            # Puxa os atributos
             status = classe_info.get("stat_modifiers", {})
             
             dados_classe = {
@@ -164,7 +165,8 @@ def obter_classes():
                 "hp": status.get("hp", 0),
                 "ataque": status.get("attack", 0),
                 "defesa": status.get("defense", 0),
-                "imagem": f"{request.host_url}static/classes/{chave}.png",
+                "imagem": classe_info.get("image_url", f"{request.host_url}static/classes/{chave}.png"),
+                "video": classe_info.get("video_url", ""), # <--- A LINHA NOVA DO VÍDEO AQUI!
                 "total_evolucoes": len(caminho_evolucao),
                 "evolucoes": detalhes_evolucoes
             }
