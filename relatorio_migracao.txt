@@ -4,6 +4,7 @@
 ==================================================
 
 📁 RAIZ (Projeto)/
+│   📄 api.py
 │   📄 audit_daily_cristal.py
 │   📄 config.py
 │   📄 debug_check_cristal.py
@@ -23,6 +24,7 @@
 │   📄 migrar_jogadores.py
 │   📄 repair_daily_cristal_today.py
 │   📄 run_daily_cristal_now.py
+│   📄 teste_ranking.py
 │   📁 assets/
 │   📁 data/
 │   │   📁 clans/
@@ -300,6 +302,15 @@
 │   │   📄 regions.py
 │   │   📄 startup.py
 │   │   📄 __init__.py
+│   📁 static/
+│   │   📁 classes/
+│   │   📁 css/
+│   │   📁 items/
+│   │   📁 js/
+│   │   📁 monsters/
+│   │   📁 rankings/
+│   │   📁 regions/
+│   📁 templates/
 │   📁 tools/
 │   │   📄 debug_market_item.py
 │   │   📄 find_legacy_usage.py

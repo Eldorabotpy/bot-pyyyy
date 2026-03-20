@@ -1,6 +1,6 @@
 import os
 import asyncio
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -33,14 +33,14 @@ except Exception as e:
 # ==========================================
 @app.route('/')
 def home():
-    return send_file('index.html')
+    return render_template('index.html')
 
 # ==========================================
-# ROTA: PÁGINA DE LOGIN (A CORREÇÃO ESTÁ AQUI!)
+# ROTA: PÁGINA DE LOGIN (CORRIGIDA!)
 # ==========================================
 @app.route('/login')
 def pagina_login():
-    return send_file('login.html')
+    return render_template('login.html')
 
 # ==========================================
 # ROTAS DE RANKING (COM ESCUDO DE ERROS)
