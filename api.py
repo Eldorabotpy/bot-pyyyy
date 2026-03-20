@@ -198,7 +198,7 @@ def obter_regioes():
     return jsonify(sorted(lista, key=lambda x: x["level_min"]))
 
 # ==========================================
-# ROTA: MONSTROS (COM LOOT E STATUS COMPLETOS)
+# ROTA: MONSTROS (COM LOOT E ORDEM DE DIFICULDADE)
 # ==========================================
 @app.route('/wiki/monstros')
 def obter_monstros():
@@ -206,15 +206,16 @@ def obter_monstros():
     try:
         from modules.game_data.monsters import MONSTERS_DATA
         
-        # Puxa o nome bonito das regiões
+        # Puxa o nome e o nível das regiões do seu arquivo worldmap
         nomes_regioes = {}
+        poder_regioes = {}
         try:
-            from modules.game_data.worldmap import REGIONS_DATA
+            from modules.game_data.worldmap import REGIONS_DATA, REGION_TARGET_POWER
             for k, v in REGIONS_DATA.items():
                 nomes_regioes[k] = v.get("display_name", k)
+            poder_regioes = REGION_TARGET_POWER
         except: pass
 
-        # Puxa os itens para mostrar os nomes reais no drop!
         nomes_itens = {}
         try:
             from modules.game_data.items import ITEMS_DATA
@@ -231,12 +232,14 @@ def obter_monstros():
             elif regiao_id == "defesa_reino": regiao_nome = "Defesa do Reino"
             else: regiao_nome = nomes_regioes.get(regiao_id, regiao_id.replace("_", " ").title())
 
+            # Pegando a dificuldade (se for evento, joga lá pro final com 999)
+            nivel_regiao = poder_regioes.get(regiao_id, 999) 
+
             for mob in lista_mobs:
                 mob_id = mob.get("id")
                 if mob_id in mobs_vistos: continue
                 mobs_vistos.add(mob_id)
                 
-                # Monta a lista de Drops do Monstro
                 loot_formatado = []
                 for loot in mob.get("loot_table", []):
                     item_id = loot.get("item_id")
@@ -253,15 +256,18 @@ def obter_monstros():
                     "defesa": mob.get("defense", mob.get("def", 0)),
                     "xp": mob.get("xp_reward", 0),
                     "gold": mob.get("gold_drop", 0),
-                    "loot": loot_formatado, # <-- A mochila indo pro site!
+                    "loot": loot_formatado, 
                     "imagem": mob.get("image_url", f"{request.host_url}static/monsters/{mob_id}.jpg"),
                     "regiao_id": regiao_id,
                     "regiao_nome": regiao_nome,
+                    "nivel_regiao": nivel_regiao, # <-- A dificuldade indo pro site!
                     "is_evento": is_evento
                 })
     except Exception as e:
         print(f"Erro ao ler monstros: {e}")
-    return jsonify(sorted(lista, key=lambda x: (x["is_evento"], x["regiao_id"], x["level"])))
+        
+    # Python já manda a lista arrumadinha!
+    return jsonify(sorted(lista, key=lambda x: (x["is_evento"], x["nivel_regiao"], x["level"])))
 
 # ==========================================
 # ROTA: ITENS

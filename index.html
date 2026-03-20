@@ -385,7 +385,7 @@
             'deserto_ancestral': '#f39c12', '_evolution_trials': '#9b59b6', 'defesa_reino': '#e056fd'
         };
 
-        // 1. TELA DE BOTÕES DAS REGIÕES
+        // 1. TELA DE BOTÕES DAS REGIÕES (ORDENADA POR DIFICULDADE)
         async function carregarMonstros() {
             const conteudo = document.getElementById('conteudo-wiki');
             conteudo.innerHTML = '<p style="text-align: center; color: #888;">Lendo os mapas de caçada... 🗺️</p>';
@@ -395,23 +395,32 @@
                     window.dadosEldoraMonstros = await resposta.json();
                 }
                 
-                // Agrupa para saber quantos monstros tem em cada região
+                // Agrupa para saber quantos monstros tem em cada região e salva o nível dela
                 const regioesAgrupadas = {};
                 window.dadosEldoraMonstros.forEach(mob => {
                     if (!regioesAgrupadas[mob.regiao_id]) {
-                        regioesAgrupadas[mob.regiao_id] = { nome: mob.regiao_nome, is_evento: mob.is_evento, qnts: 0 };
+                        regioesAgrupadas[mob.regiao_id] = { 
+                            nome: mob.regiao_nome, 
+                            is_evento: mob.is_evento, 
+                            qnts: 0,
+                            nivel_regiao: mob.nivel_regiao || 999 // Guarda a dificuldade do mapa
+                        };
                     }
                     regioesAgrupadas[mob.regiao_id].qnts++;
                 });
+
+                // A MÁGICA AQUI: Converte para lista e ordena as regiões da mais fraca para a mais forte!
+                const regioesOrdenadas = Object.entries(regioesAgrupadas).sort((a, b) => a[1].nivel_regiao - b[1].nivel_regiao);
 
                 let htmlCacada = `<div style="text-align: center; margin: 25px 0 15px 0;"><h3 style="color: #2ecc71; margin: 0;">🌲 Habitats de Caçada</h3></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">`;
                 let htmlEvento = `<div style="text-align: center; margin: 25px 0 15px 0;"><h3 style="color: #9b59b6; margin: 0;">⚔️ Áreas de Evento</h3></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">`;
                 let temCacada = false; let temEvento = false;
 
-                for (const [id, reg] of Object.entries(regioesAgrupadas)) {
+                // Cria os botões seguindo a ordem perfeita que criamos
+                for (const [id, reg] of regioesOrdenadas) {
                     const cor = coresRegiao[id] || '#e74c3c';
                     const btn = `<button onclick="abrirRegiaoMonstros('${id}')" style="padding: 15px; background: #252525; color: white; border: 1px solid ${cor}; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; transition: 0.2s;">
-                        <span style="font-weight: bold; color: ${cor}; font-size: 0.9em;">${reg.nome}</span>
+                        <span style="font-weight: bold; color: ${cor}; font-size: 0.9em; text-align: center;">${reg.nome}</span>
                         <span style="font-size: 0.7em; color: #888; background: #111; padding: 2px 8px; border-radius: 4px;">${reg.qnts} Monstros</span>
                     </button>`;
                     if (reg.is_evento) { htmlEvento += btn; temEvento = true; } 
