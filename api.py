@@ -196,18 +196,30 @@ def obter_regioes():
     return jsonify(sorted(lista, key=lambda x: x["level_min"]))
 
 # ==========================================
-# ROTA: MONSTROS
+# ROTA: MONSTROS (COM LOOT E STATUS COMPLETOS)
 # ==========================================
 @app.route('/wiki/monstros')
 def obter_monstros():
     lista = []
     try:
         from modules.game_data.monsters import MONSTERS_DATA
+        
+        # Puxa o nome bonito das regiões
         nomes_regioes = {}
         try:
             from modules.game_data.worldmap import REGIONS_DATA
             for k, v in REGIONS_DATA.items():
                 nomes_regioes[k] = v.get("display_name", k)
+        except: pass
+
+        # Puxa os itens para mostrar os nomes reais no drop!
+        nomes_itens = {}
+        try:
+            from modules.game_data.items import ITEMS_DATA
+            for k, v in ITEMS_DATA.items():
+                emoji = v.get("emoji", "📦")
+                nome = v.get("display_name", k.replace("_", " ").title())
+                nomes_itens[k] = f"{emoji} {nome}"
         except: pass
             
         mobs_vistos = set() 
@@ -222,6 +234,14 @@ def obter_monstros():
                 if mob_id in mobs_vistos: continue
                 mobs_vistos.add(mob_id)
                 
+                # Monta a lista de Drops do Monstro
+                loot_formatado = []
+                for loot in mob.get("loot_table", []):
+                    item_id = loot.get("item_id")
+                    chance = loot.get("drop_chance", 0)
+                    nome_formatado = nomes_itens.get(item_id, item_id.replace("_", " ").title())
+                    loot_formatado.append({"nome": nome_formatado, "chance": chance})
+                
                 lista.append({
                     "id": mob_id,
                     "nome": mob.get("name", "Monstro Desconhecido"),
@@ -229,7 +249,9 @@ def obter_monstros():
                     "hp": mob.get("hp", mob.get("max_hp", 0)),
                     "ataque": mob.get("attack", mob.get("atk", 0)),
                     "defesa": mob.get("defense", mob.get("def", 0)),
-                    # Tenta o link do Github primeiro
+                    "xp": mob.get("xp_reward", 0),
+                    "gold": mob.get("gold_drop", 0),
+                    "loot": loot_formatado, # <-- A mochila indo pro site!
                     "imagem": mob.get("image_url", f"{request.host_url}static/monsters/{mob_id}.jpg"),
                     "regiao_id": regiao_id,
                     "regiao_nome": regiao_nome,
