@@ -1,21 +1,18 @@
 import os
-import asyncio
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 
-# Importações do teu jogo
-from modules.game_data.classes import CLASSES_DATA
-from modules.game_data.class_evolution import EVOLUTIONS
-
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app) 
 
-# Conexão com o Banco de Dados
+# ==========================================
+# CONEXÃO COM O BANCO DE DADOS
+# ==========================================
 MONGO_URI = os.getenv("MONGO_CONNECTION_STRING")
 
 if not MONGO_URI:
@@ -24,7 +21,9 @@ if not MONGO_URI:
 try:
     client = MongoClient(MONGO_URI)
     db = client['eldora_db']
-    users_collection = db['users']
+    
+    # Vamos usar a coleção 'players' caso seja o padrão novo, ou 'users' como fallback
+    users_collection = db['players'] if 'players' in db.list_collection_names() else db['users']
 except Exception as e:
     print(f"Erro ao conectar no Mongo: {e}")
 
@@ -36,14 +35,14 @@ def home():
     return render_template('index.html')
 
 # ==========================================
-# ROTA: PÁGINA DE LOGIN (CORRIGIDA!)
+# ROTA: PÁGINA DE LOGIN
 # ==========================================
 @app.route('/login')
 def pagina_login():
     return render_template('login.html')
 
 # ==========================================
-# ROTAS DE RANKING (COM ESCUDO DE ERROS)
+# ROTAS DE RANKING
 # ==========================================
 @app.route('/ranking/level')
 def ranking_level():
@@ -52,7 +51,6 @@ def ranking_level():
         lista = [{"nome": j.get("character_name", "Desconhecido"), "valor": f"Lvl {j.get('level', 1)}"} for j in top]
         return jsonify(lista)
     except Exception as e:
-        # Se der erro no banco, ele MOSTRA o erro no ecrã do telemóvel!
         return jsonify([{"nome": "⚠️ Erro no Banco", "valor": str(e)}])
 
 @app.route('/ranking/ouro')
@@ -95,7 +93,7 @@ def ranking_guildas():
         return jsonify([{"nome": "⚠️ Erro no Banco", "valor": str(e)}])
 
 # ==========================================
-# ROTA DE PERFIL (BUSCA CORRETA PELO OBJECT_ID)
+# ROTA DE PERFIL
 # ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
@@ -152,33 +150,36 @@ def obter_perfil(user_id):
 @app.route('/wiki/classes')
 def obter_classes():
     lista_de_classes = []
-    from modules.game_data.classes import CLASSES_DATA
-    from modules.game_data.class_evolution import EVOLUTIONS
-    
-    for chave, classe_info in CLASSES_DATA.items():
-        if classe_info.get("tier") == 1:
-            caminho_evolucao = EVOLUTIONS.get(chave, [])
-            detalhes_evolucoes = [
-                {"nome": evo.get("display_name", ""), "tier": evo.get("tier_num", 0), "descricao": evo.get("desc", "")}
-                for evo in caminho_evolucao
-            ]
-            
-            status = classe_info.get("stat_modifiers", {})
-            
-            dados_classe = {
-                "id": chave,
-                "nome": classe_info.get("display_name", "Desconhecida"),
-                "emoji": classe_info.get("emoji", "❓"),
-                "descricao": classe_info.get("description", "Sem descrição."),
-                "hp": status.get("hp", 0),
-                "ataque": status.get("attack", 0),
-                "defesa": status.get("defense", 0),
-                "imagem": classe_info.get("image_url", f"{request.host_url}static/classes/{chave}.png"),
-                "video": classe_info.get("video_url", ""), 
-                "total_evolucoes": len(caminho_evolucao),
-                "evolucoes": detalhes_evolucoes
-            }
-            lista_de_classes.append(dados_classe)
+    try:
+        from modules.game_data.classes import CLASSES_DATA
+        from modules.game_data.class_evolution import EVOLUTIONS
+        
+        for chave, classe_info in CLASSES_DATA.items():
+            if classe_info.get("tier") == 1:
+                caminho_evolucao = EVOLUTIONS.get(chave, [])
+                detalhes_evolucoes = [
+                    {"nome": evo.get("display_name", ""), "tier": evo.get("tier_num", 0), "descricao": evo.get("desc", "")}
+                    for evo in caminho_evolucao
+                ]
+                
+                status = classe_info.get("stat_modifiers", {})
+                
+                dados_classe = {
+                    "id": chave,
+                    "nome": classe_info.get("display_name", "Desconhecida"),
+                    "emoji": classe_info.get("emoji", "❓"),
+                    "descricao": classe_info.get("description", "Sem descrição."),
+                    "hp": status.get("hp", 0),
+                    "ataque": status.get("attack", 0),
+                    "defesa": status.get("defense", 0),
+                    "imagem": classe_info.get("image_url", f"{request.host_url}static/classes/{chave}.png"),
+                    "video": classe_info.get("video_url", ""), 
+                    "total_evolucoes": len(caminho_evolucao),
+                    "evolucoes": detalhes_evolucoes
+                }
+                lista_de_classes.append(dados_classe)
+    except Exception as e:
+        print(f"Erro ao ler classes: {e}")
             
     return jsonify(sorted(lista_de_classes, key=lambda x: x["nome"]))
 
@@ -205,7 +206,7 @@ def obter_regioes():
     return jsonify(sorted(lista, key=lambda x: x["level_min"]))
 
 # ==========================================
-# ROTA: MONSTROS (COM LOOT E ORDEM DE DIFICULDADE)
+# ROTA: MONSTROS
 # ==========================================
 @app.route('/wiki/monstros')
 def obter_monstros():
@@ -295,18 +296,14 @@ def obter_itens():
     return jsonify(sorted(lista, key=lambda x: x["nome"]))
 
 # ==========================================
-# ROTA: SISTEMA DE LOGIN (SELEÇÃO DE PERSONAGEM)
+# ROTA: SISTEMA DE LOGIN (SELEÇÃO)
 # ==========================================
 @app.route('/api/meus_personagens/<int:telegram_id>')
 def listar_personagens(telegram_id):
     try:
-        from modules.player.core import users_collection
-        
-        if users_collection is None:
-            return jsonify({"erro": "Banco de dados desconectado"}), 500
-
+        # Busca direta e limpa via banco de dados global
         cursor = users_collection.find({
-            "$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}]
+            "$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}, {"last_chat_id": telegram_id}]
         })
         
         personagens = []
@@ -324,14 +321,19 @@ def listar_personagens(telegram_id):
         return jsonify([])
     
 # ==========================================
-# ROTA: PEGAR DADOS DO PERSONAGEM ATUAL
+# ROTA: DADOS DO PERSONAGEM (HOME)
 # ==========================================
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
     try:
-        from modules.player.core import get_player_data
-        
-        pdata = asyncio.run(get_player_data(personagem_id))
+        # Validação do ID para evitar Erro 500
+        if len(str(personagem_id)) == 24:
+            busca_id = ObjectId(personagem_id)
+        else:
+            return jsonify({"erro": "ID de personagem inválido"}), 400
+
+        # Busca limpa e direta no banco (sem usar asyncio na rota)
+        pdata = users_collection.find_one({"_id": busca_id})
         
         if not pdata:
             return jsonify({"erro": "Personagem não encontrado"}), 404
@@ -344,12 +346,37 @@ def obter_personagem_info(personagem_id):
             "diamantes": pdata.get("gems", 0),
             "hp": pdata.get("current_hp", 0),
             "max_hp": pdata.get("max_hp", 0),
-            "mp": pdata.get("current_mp", 0),
-            "max_mp": pdata.get("max_mana", 0)
+            "mp": pdata.get("energy", 0), # Ajustado para o campo correto do BD
+            "max_mp": pdata.get("max_energy", 0) # Ajustado para o campo correto do BD
         })
     except Exception as e:
         print(f"Erro ao buscar personagem: {e}")
         return jsonify({"erro": str(e)}), 500    
+
+# ==========================================
+# ROTA: NOTIFICAÇÕES DE JOGADORES PREMIUM
+# ==========================================
+@app.route('/api/recent_premium')
+def recent_premium():
+    try:
+        # Busca personagens direto pelo ObjectId
+        ativos = users_collection.find(
+            {"premium_tier": {"$in": ["premium", "vip", "lenda"]}},
+            {"character_name": 1, "premium_tier": 1, "_id": 1} 
+        ).sort("premium_expires_at", -1).limit(10)
+        
+        lista = []
+        for p in ativos:
+            lista.append({
+                "id": str(p["_id"]), 
+                "nome": p.get("character_name", "Um Herói"),
+                "tier": str(p.get("premium_tier", "premium")).capitalize()
+            })
+            
+        return jsonify(lista)
+    except Exception as e:
+        print(f"Erro ao buscar premium: {e}")
+        return jsonify([])    
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

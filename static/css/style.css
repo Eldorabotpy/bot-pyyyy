@@ -32,3 +32,33 @@ th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: 
 .rank-1 { background-image: none !important; background-color: #f1c40f !important; color: #000 !important; font-weight: 800 !important; } 
 .rank-2 { background-image: none !important; background-color: #bdc3c7 !important; color: #000 !important; font-weight: 800 !important; } 
 .rank-3 { background-image: none !important; background-color: #e67e22 !important; color: #000 !important; font-weight: 800 !important; }
+
+/* =========================================
+   LETREIRO DE NOTIFICAÇÕES (TICKER PREMIUM)
+   ========================================= */
+.premium-ticker-container {
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(90deg, #1a1a2e, #0f172a);
+    border: 1px solid #f39c12;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    padding: 8px 0;
+    box-shadow: 0 2px 10px rgba(243, 156, 18, 0.2);
+    position: relative;
+}
+
+.premium-ticker-text {
+    display: inline-block;
+    white-space: nowrap;
+    color: #f1c40f;
+    font-size: 0.85em;
+    font-weight: bold;
+    padding-left: 100%;
+    animation: ticker 25s linear infinite; /* Aumente os 25s se quiser que a mensagem passe mais devagar */
+}
+
+@keyframes ticker {
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-100%, 0, 0); }
+}

@@ -40,11 +40,38 @@ async function carregarInicio() {
             return;
         }
 
+        // ==========================================
+        // BUSCANDO AS NOTIFICAÇÕES PREMIUM
+        // ==========================================
+        let tickerHtml = '';
+        try {
+            const resPremium = await fetch('/api/recent_premium');
+            const premiums = await resPremium.json();
+            
+            if (premiums.length > 0) {
+                // Monta a frase com o nome exato do personagem que vem do ObjectId
+                let frases = premiums.map(jog => 
+                    `✨ O jogador <span style="color: #fff;">${jog.nome}</span> ativou o plano <span style="color: #3498db;">${jog.tier}</span> e sua jornada agora será muito mais épica!`
+                ).join(' &nbsp;&nbsp;&nbsp;⭐&nbsp;&nbsp;&nbsp; ');
+                
+                tickerHtml = `
+                <div class="premium-ticker-container">
+                    <div class="premium-ticker-text">${frases}</div>
+                </div>`;
+            }
+        } catch(e) { 
+            console.log("Erro ao carregar ticker", e); 
+        }
+
+        // ==========================================
         // VISUAL DA TELA INICIAL
+        // ==========================================
         let html = `
         <div class="home-banner">
             <img src="/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Eldora'">
         </div>
+
+        ${tickerHtml}
 
         <div style="background: linear-gradient(145deg, #1e293b, #0f172a); border: 2px solid #f39c12; border-radius: 10px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(243, 156, 18, 0.2);">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 10px;">
