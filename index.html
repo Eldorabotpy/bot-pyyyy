@@ -357,29 +357,69 @@
         }
 
         // ==========================================
-        // WIKI: MONSTROS
+        // WIKI: MONSTROS (COM CORES E SEPARAÇÃO DE EVENTOS)
         // ==========================================
         async function carregarMonstros() {
             const conteudo = document.getElementById('conteudo-wiki');
-            conteudo.innerHTML = '<p style="text-align: center; color: #888;">Buscando bestiário... 👹</p>';
+            conteudo.innerHTML = '<p style="text-align: center; color: #888;">Lendo o bestiário... 👹</p>';
             try {
-                const resposta = await fetch(`/wiki/monstros?v=${Date.now()}`);
+                const resposta = await fetch(`https://bot-pyyyy.onrender.com/wiki/monstros?v=${Date.now()}`);
                 const monstros = await resposta.json();
                 
-                let html = `<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #e74c3c;">👹 Bestiário</h2></div>`;
+                // Paleta de Cores baseada no nome da região
+                const coresRegiao = {
+                    'pradaria_inicial': '#2ecc71', // Verde Claro
+                    'floresta_sombria': '#27ae60', // Verde Escuro
+                    'pedreira_granito': '#95a5a6', // Cinza Pedra
+                    'campos_linho': '#f1c40f',     // Amarelo Trigo
+                    'pico_grifo': '#3498db',       // Azul Céu
+                    'mina_ferro': '#d35400',       // Laranja Ferrugem
+                    'forja_abandonada': '#e74c3c', // Vermelho Fogo
+                    'pantano_maldito': '#1abc9c',  // Verde Pântano
+                    'picos_gelados': '#82ccdd',    // Azul Gelo
+                    'deserto_ancestral': '#f39c12',// Amarelo Areia
+                    '_evolution_trials': '#9b59b6',// Roxo Mágico (Evento)
+                    'defesa_reino': '#e056fd'      // Rosa (Evento)
+                };
+
+                // Cria as duas "caixas" vazias para separar os monstros
+                let htmlCacada = `<div style="text-align: center; margin: 30px 0 15px 0;"><h2 style="color: #2ecc71; margin: 0; border-bottom: 2px solid #2ecc71; padding-bottom: 5px;">🌲 Monstros de Caçada</h2></div>`;
+                let htmlEvento = `<div style="text-align: center; margin: 30px 0 15px 0;"><h2 style="color: #9b59b6; margin: 0; border-bottom: 2px solid #9b59b6; padding-bottom: 5px;">⚔️ Desafios & Eventos</h2></div>`;
                 
+                let countCacada = 0;
+                let countEvento = 0;
+
                 monstros.forEach(mob => {
-                    html += `<div style="background: #252525; margin-bottom: 15px; padding: 12px; border-radius: 8px; border-left: 4px solid #e74c3c; display: flex; gap: 15px; align-items: center;">
-                        <img src="${mob.imagem}" onerror="this.src='https://placehold.co/70x70/2c3e50/e74c3c?text=?'" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #e74c3c;">
+                    // Pega a cor certa ou usa vermelho como padrão
+                    const cor = coresRegiao[mob.regiao_id] || '#e74c3c';
+                    
+                    let card = `<div style="background: #252525; margin-bottom: 15px; padding: 12px; border-radius: 8px; border-left: 4px solid ${cor}; display: flex; gap: 15px; align-items: center;">
+                        <img src="${mob.imagem}" onerror="this.src='https://placehold.co/70x70/2c3e50/${cor.replace('#','')}?text=?'" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid ${cor};">
                         <div style="flex: 1;">
-                            <h3 style="margin: 0 0 5px 0; color: #e74c3c; font-size: 1.1em;">${mob.nome} <span style="font-size: 0.7em; color: #aaa;">(Lvl ${mob.level})</span></h3>
+                            <h3 style="margin: 0 0 3px 0; color: ${cor}; font-size: 1.1em;">${mob.nome} <span style="font-size: 0.7em; color: #aaa;">(Lvl ${mob.level})</span></h3>
+                            <span style="background: #111; padding: 2px 6px; border-radius: 4px; font-size: 0.65em; color: #ccc; margin-bottom: 6px; display: inline-block; border: 1px solid #333;">📍 ${mob.regiao_nome}</span>
                             <div style="display: flex; gap: 10px; font-size: 0.75em; background: #1a1a1a; padding: 6px; border-radius: 5px; color: #bbb;">
                                 <span>❤️ HP: ${mob.hp}</span><span>⚔️ ATQ: ${mob.ataque}</span><span>🛡️ DEF: ${mob.defesa}</span>
                             </div>
                         </div>
                     </div>`;
+
+                    // Separa o cartão na lista certa
+                    if(mob.is_evento) {
+                        htmlEvento += card;
+                        countEvento++;
+                    } else {
+                        htmlCacada += card;
+                        countCacada++;
+                    }
                 });
-                conteudo.innerHTML = html;
+                
+                // Junta tudo para mostrar na tela
+                let htmlFinal = `<div style="text-align: center; margin-bottom: 10px;"><h2 style="color: #e74c3c; margin: 0;">👹 Bestiário Global</h2></div>`;
+                if (countCacada > 0) htmlFinal += htmlCacada;
+                if (countEvento > 0) htmlFinal += htmlEvento;
+
+                conteudo.innerHTML = htmlFinal;
             } catch (erro) { conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao carregar o bestiário.</p>'; }
         }
 

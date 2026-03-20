@@ -188,7 +188,8 @@ def obter_regioes():
                 "emoji": info.get("emoji", "🗺️"),
                 "descricao": info.get("description", "Uma área selvagem de Eldora."),
                 "level_min": poder,
-                "imagem": f"{request.host_url}static/regions/{chave}.jpg"
+                # Tenta o link do Github primeiro, se não tiver, tenta a pasta local
+                "imagem": info.get("image_url", f"{request.host_url}static/regions/{chave}.jpg")
             })
     except Exception as e:
         print(f"Erro ao ler regiões: {e}")
@@ -202,28 +203,41 @@ def obter_monstros():
     lista = []
     try:
         from modules.game_data.monsters import MONSTERS_DATA
-        mobs_vistos = set() # Evita mostrar o mesmo monstro duas vezes se ele estiver em 2 mapas
-        
-        # Como o seu arquivo divide por regiões, precisamos de dois "fors"
-        for regiao, lista_mobs in MONSTERS_DATA.items():
+        nomes_regioes = {}
+        try:
+            from modules.game_data.worldmap import REGIONS_DATA
+            for k, v in REGIONS_DATA.items():
+                nomes_regioes[k] = v.get("display_name", k)
+        except: pass
+            
+        mobs_vistos = set() 
+        for regiao_id, lista_mobs in MONSTERS_DATA.items():
+            is_evento = regiao_id.startswith("_") or regiao_id in ["defesa_reino"]
+            if regiao_id == "_evolution_trials": regiao_nome = "Desafios de Evolução"
+            elif regiao_id == "defesa_reino": regiao_nome = "Defesa do Reino"
+            else: regiao_nome = nomes_regioes.get(regiao_id, regiao_id.replace("_", " ").title())
+
             for mob in lista_mobs:
                 mob_id = mob.get("id")
-                if mob_id in mobs_vistos:
-                    continue
+                if mob_id in mobs_vistos: continue
                 mobs_vistos.add(mob_id)
                 
                 lista.append({
                     "id": mob_id,
                     "nome": mob.get("name", "Monstro Desconhecido"),
                     "level": mob.get("min_level", mob.get("level", 1)),
-                    "hp": mob.get("hp", 0),
-                    "ataque": mob.get("attack", 0),
-                    "defesa": mob.get("defense", 0),
-                    "imagem": f"{request.host_url}static/monsters/{mob_id}.jpg"
+                    "hp": mob.get("hp", mob.get("max_hp", 0)),
+                    "ataque": mob.get("attack", mob.get("atk", 0)),
+                    "defesa": mob.get("defense", mob.get("def", 0)),
+                    # Tenta o link do Github primeiro
+                    "imagem": mob.get("image_url", f"{request.host_url}static/monsters/{mob_id}.jpg"),
+                    "regiao_id": regiao_id,
+                    "regiao_nome": regiao_nome,
+                    "is_evento": is_evento
                 })
     except Exception as e:
         print(f"Erro ao ler monstros: {e}")
-    return jsonify(sorted(lista, key=lambda x: x["level"]))
+    return jsonify(sorted(lista, key=lambda x: (x["is_evento"], x["regiao_id"], x["level"])))
 
 # ==========================================
 # ROTA: ITENS
@@ -232,9 +246,7 @@ def obter_monstros():
 def obter_itens():
     lista = []
     try:
-        # Puxando direto da pasta onde você confirmou que o items.py está!
         from modules.game_data.items import ITEMS_DATA
-            
         for chave, info in ITEMS_DATA.items():
             lista.append({
                 "id": chave,
@@ -242,7 +254,8 @@ def obter_itens():
                 "raridade": str(info.get("rarity", "Comum")).capitalize(),
                 "descricao": info.get("description", "Um item de Eldora."),
                 "preco": info.get("value", info.get("price", 0)),
-                "imagem": f"{request.host_url}static/items/{chave}.png"
+                # Tenta o link do Github primeiro
+                "imagem": info.get("image_url", f"{request.host_url}static/items/{chave}.png")
             })
     except Exception as e:
         print(f"Erro ao ler itens: {e}")
