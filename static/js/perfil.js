@@ -1,14 +1,16 @@
 async function carregarMeuPerfil() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let userId = urlParams.get('char_id');
+    // 1. Agora o Perfil pega EXATAMENTE o ID salvo no Portal!
+    const charId = localStorage.getItem("jogadorEldoraID");
 
-    if (!userId) {
-        const user = window.Telegram.WebApp.initDataUnsafe?.user;
-        userId = user ? user.id : '6952fb3566c4a0938686b8da'; 
+    if (!charId) {
+        const msg = document.getElementById('perfil-carregando');
+        if(msg) msg.innerHTML = "<span style='color: #e74c3c;'>Nenhum herói selecionado. Feche e abra o portal.</span>";
+        return;
     }
 
     try {
-        const resposta = await fetch(`/perfil/${userId}`);
+        // 2. Busca no Python usando o ID único do personagem
+        const resposta = await fetch(`/perfil/${charId}`);
         const p = await resposta.json();
 
         if (p.erro) {
@@ -17,6 +19,7 @@ async function carregarMeuPerfil() {
             return;
         }
 
+        // 3. Preenche a tela com os dados do personagem correto
         document.getElementById('perf-nome').innerText = p.nome;
         document.getElementById('perf-classe').innerText = p.classe.replace(/_/g, ' ');
         document.getElementById('perf-lvl').innerText = p.level;
@@ -40,6 +43,6 @@ async function carregarMeuPerfil() {
 
     } catch (erro) {
         const msg = document.getElementById('perfil-carregando');
-        if(msg) msg.innerText = "⚠️ Erro ao conectar com o servidor.";
+        if(msg) msg.innerText = "⚠️ Erro ao conectar com os servidores reais.";
     }
 }
