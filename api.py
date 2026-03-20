@@ -1,31 +1,19 @@
 import os
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
-from pymongo import MongoClient
-from dotenv import load_dotenv
 from bson.objectid import ObjectId
 
-load_dotenv()
+# ==========================================
+# CONEXÃO COM O BANCO DE DADOS (CORRIGIDA)
+# ==========================================
+# Agora a API importa a conexão oficial do bot. 
+# Assim, se você usar Mongita (dev) ou Atlas (prod), a API saberá onde ir!
+from modules.database import players_col, clans_col
+
+users_collection = players_col
 
 app = Flask(__name__)
 CORS(app) 
-
-# ==========================================
-# CONEXÃO COM O BANCO DE DADOS
-# ==========================================
-MONGO_URI = os.getenv("MONGO_CONNECTION_STRING")
-
-if not MONGO_URI:
-    print("⚠️ AVISO: MONGO_CONNECTION_STRING não encontrada!")
-
-try:
-    client = MongoClient(MONGO_URI)
-    db = client['eldora_db']
-    
-    # Vamos usar a coleção 'players' caso seja o padrão novo, ou 'users' como fallback
-    users_collection = db['players'] if 'players' in db.list_collection_names() else db['users']
-except Exception as e:
-    print(f"Erro ao conectar no Mongo: {e}")
 
 # ==========================================
 # ROTA PRINCIPAL (MOSTRA O SITE)
@@ -73,8 +61,10 @@ def ranking_pvp():
 @app.route('/ranking/guildas')
 def ranking_guildas():
     try:
-        clans_collection = db['clans'] 
-        top_clans = clans_collection.find(
+        if clans_col is None:
+            return jsonify([{"nome": "Sistema de clãs offline", "valor": "-"}])
+            
+        top_clans = clans_col.find(
             {}, 
             {"name": 1, "prestige_level": 1, "prestige_points": 1, "_id": 0} 
         ).sort([("prestige_level", -1), ("prestige_points", -1)]).limit(10)
@@ -301,7 +291,6 @@ def obter_itens():
 @app.route('/api/meus_personagens/<int:telegram_id>')
 def listar_personagens(telegram_id):
     try:
-        # Busca direta e limpa via banco de dados global
         cursor = users_collection.find({
             "$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}, {"last_chat_id": telegram_id}]
         })
@@ -326,13 +315,11 @@ def listar_personagens(telegram_id):
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
     try:
-        # Validação do ID para evitar Erro 500
         if len(str(personagem_id)) == 24:
             busca_id = ObjectId(personagem_id)
         else:
             return jsonify({"erro": "ID de personagem inválido"}), 400
 
-        # Busca limpa e direta no banco (sem usar asyncio na rota)
         pdata = users_collection.find_one({"_id": busca_id})
         
         if not pdata:
@@ -346,8 +333,8 @@ def obter_personagem_info(personagem_id):
             "diamantes": pdata.get("gems", 0),
             "hp": pdata.get("current_hp", 0),
             "max_hp": pdata.get("max_hp", 0),
-            "mp": pdata.get("energy", 0), # Ajustado para o campo correto do BD
-            "max_mp": pdata.get("max_energy", 0) # Ajustado para o campo correto do BD
+            "mp": pdata.get("energy", 0), 
+            "max_mp": pdata.get("max_energy", 0)
         })
     except Exception as e:
         print(f"Erro ao buscar personagem: {e}")
@@ -359,7 +346,6 @@ def obter_personagem_info(personagem_id):
 @app.route('/api/recent_premium')
 def recent_premium():
     try:
-        # Busca personagens direto pelo ObjectId
         ativos = users_collection.find(
             {"premium_tier": {"$in": ["premium", "vip", "lenda"]}},
             {"character_name": 1, "premium_tier": 1, "_id": 1} 
