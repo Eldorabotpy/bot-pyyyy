@@ -298,6 +298,173 @@ def recent_premium():
         ativos = users_collection.find({"premium_tier": {"$in": ["premium", "vip", "lenda"]}}, {"character_name": 1, "premium_tier": 1, "_id": 1}).sort("premium_expires_at", -1).limit(10)
         return jsonify([{"id": str(p["_id"]), "nome": p.get("character_name", "Um Herói"), "tier": str(p.get("premium_tier", "premium")).capitalize()} for p in ativos])
     except: return jsonify([])    
+    
+# ==========================================
+# ROTA: SISTEMA DE CAÇA WEB APP (ENGINE REAL)
+# ==========================================
+@app.route('/api/cacar', methods=['POST'])
+def api_cacar():
+    import random
+    import asyncio
+    from modules.game_data import monsters as monsters_data
+    from modules.game_data import items as items_data
+    from modules.combat import combat_engine, durability, rewards
+
+    dados = request.json
+    user_id = dados.get("user_id")
+
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        if not pdata: return jsonify({"erro": "Personagem não encontrado"})
+
+        # 1. Valida Vida e Energia
+        hp_atual = int(pdata.get("current_hp", pdata.get("max_hp", 100)))
+        if hp_atual <= 0:
+            return jsonify({"erro": "Você está morto! Descanse ou use uma poção no bot."})
+        
+        if pdata.get("energy", 0) < 1:
+            return jsonify({"erro": "Você não tem Energia (⚡) suficiente."})
+
+        # Desconta Energia
+        users_collection.update_one({"_id": busca_id}, {"$inc": {"energy": -1}})
+        pdata["energy"] -= 1
+
+        # 2. Sorteia o Monstro da Região
+        regiao = pdata.get("current_location", "pradaria_inicial")
+        mobs_possiveis = monsters_data.MONSTERS_DATA.get(regiao, [])
+        if not mobs_possiveis:
+            return jsonify({"erro": "Nenhum monstro encontrado nesta região."})
+        
+        mob = random.choice(mobs_possiveis)
+        mob_nome = mob.get("name", "Monstro")
+        mob_hp = mob.get("hp", mob.get("max_hp", 50))
+        mob_img = mob.get("image_url", f"/static/monsters/{mob.get('id')}.jpg")
+        mob_stats = mob.copy()
+
+        # Puxa os stats reais do jogador se existirem no cache do banco, se não usa o base
+        player_stats = pdata.get("total_stats", pdata.copy())
+        if "max_hp" not in player_stats: player_stats["max_hp"] = pdata.get("max_hp", 100)
+        
+        log_batalha = []
+        hp_mob_atual = mob_hp
+        turno = 1
+        
+        # Helper para rodar a Engine Async dentro do Flask Sync
+        def rodar_engine(coro):
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    import nest_asyncio
+                    nest_asyncio.apply()
+                    return loop.run_until_complete(coro)
+            except RuntimeError:
+                return asyncio.run(coro)
+            return loop.run_until_complete(coro)
+
+        # 3. O Loop de Combate Mestre
+        while hp_atual > 0 and hp_mob_atual > 0 and turno <= 20:
+            
+            # --- TURNO DO JOGADOR ---
+            atk_p = rodar_engine(combat_engine.processar_acao_combate(
+                attacker_pdata=pdata,
+                attacker_stats=player_stats,
+                target_stats=mob_stats,
+                skill_id=None, # Ataque Básico (suporta ataque duplo, crítico, etc)
+                attacker_current_hp=hp_atual
+            ))
+            
+            dano_p = atk_p.get("total_damage", 0)
+            
+            # Lê as mensagens bonitas que sua engine já gera (Crítico, Esquiva, Mega Crítico)
+            for msg in atk_p.get("log_messages", []):
+                log_batalha.append({"atacante": "player", "dano": dano_p, "texto": f"🧑‍🚀 {msg}"})
+            
+            hp_mob_atual -= dano_p
+            if hp_mob_atual <= 0: break
+
+            # --- TURNO DO MONSTRO ---
+            mob_skills = mob.get("skills", [])
+            mob_skill = random.choice(mob_skills) if mob_skills else None
+            
+            atk_m = rodar_engine(combat_engine.processar_acao_combate(
+                attacker_pdata={}, 
+                attacker_stats=mob_stats,
+                target_stats=player_stats,
+                skill_id=None, 
+                attacker_current_hp=hp_mob_atual
+            ))
+            
+            dano_m = atk_m.get("total_damage", 0)
+            msg_padrao = atk_m.get("log_messages", [f"causou {dano_m}"])[0]
+            skill_log = f"🩸 {mob_nome} atacou: {msg_padrao}"
+            
+            # Checa se o monstro usou uma habilidade do seu banco MONSTER_SKILLS_DB
+            if mob_skill and hasattr(monsters_data, "MONSTER_SKILLS_DB") and mob_skill in monsters_data.MONSTER_SKILLS_DB:
+                s_info = monsters_data.MONSTER_SKILLS_DB[mob_skill]
+                base_frase = s_info.get("log", "").replace("{mob}", f"<b>{mob_nome}</b>")
+                dano_m = int(dano_m * s_info.get("damage_mult", 1.0))
+                skill_log = f"🩸 {base_frase} (-{dano_m} HP)"
+
+            log_batalha.append({"atacante": "mob", "dano": dano_m, "texto": skill_log})
+            hp_atual -= dano_m
+            turno += 1
+
+        # 4. Desgaste de Armas/Armaduras
+        log_dur = []
+        durability.apply_end_of_battle_wear(pdata, mob_stats, log_dur)
+        for msg in log_dur:
+            log_batalha.append({"atacante": "system", "dano": 0, "texto": f"⚠️ {msg}"})
+
+        # 5. Aplicação de Recompensas
+        vitoria = hp_atual > 0
+        pdata["current_hp"] = max(0, int(hp_atual))
+        recompensas = {"xp": 0, "gold": 0, "items": []}
+
+        if vitoria:
+            # Sua engine oficial cuidando do VIP, clã, ouro e loot
+            xp, gold, items_ids = rewards.calculate_victory_rewards(pdata, mob_stats)
+            
+            recompensas["xp"] = xp
+            recompensas["gold"] = gold
+            pdata["xp"] = pdata.get("xp", 0) + xp
+            pdata["gold"] = pdata.get("gold", 0) + gold
+            
+            if "inventory" not in pdata: pdata["inventory"] = {}
+            
+            for item_id in items_ids:
+                # Cria ou soma 1 no inventário
+                if item_id not in pdata["inventory"]:
+                    pdata["inventory"][item_id] = {"base_id": item_id, "quantity": 0}
+                pdata["inventory"][item_id]["quantity"] += 1
+                
+                # Busca o nome real do item para mostrar na tela
+                n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
+                recompensas["items"].append(n_item)
+
+            users_collection.replace_one({"_id": busca_id}, pdata)
+        else:
+            # Usar a engine oficial para perda de XP
+            msg_derrota, perdeu_xp = rewards.process_defeat(pdata, mob_stats)
+            users_collection.replace_one({"_id": busca_id}, pdata)
+            
+            # Avisa no Telegram da humilhação
+            chat_id = pdata.get("last_chat_id")
+            enviar_mensagem_telegram(chat_id, f"💀 <b>[App de Eldora]</b> {msg_derrota}")
+
+        return jsonify({
+            "sucesso": True,
+            "vitoria": vitoria,
+            "mob": {"nome": mob_nome, "hp_max": mob_hp, "imagem": mob_img},
+            "player": {"hp_max": player_stats.get("max_hp", 100)},
+            "log": log_batalha,
+            "recompensas": recompensas
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc() # Imprime no terminal do servidor o erro exato
+        return jsonify({"erro": "A magia do combate falhou. Comunique os deuses (Admin)."})  
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
