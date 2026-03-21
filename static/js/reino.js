@@ -17,7 +17,7 @@ const NOMES_REGIOES = {
 
 // 👇 AQUI VOCÊ COLA OS LINKS DO GITHUB DE CADA IMAGEM QUADRADA 👇
 const IMAGENS_DAS_REGIOES = {
-    "reino_eldora": "https://github.com/user-attachments/assets/abdbcb1f-b3ba-4e42-b082-be1a5d839d73",
+    "reino_eldora": "https://github.com/user-attachments/assets/a9d487d1-8d12-4dcf-8681-0c7fd4ef8d98",
     "pradaria_inicial": "https://github.com/user-attachments/assets/04217592-0102-4e08-ae26-99a4d6aca905",
     "floresta_sombria": "https://github.com/user-attachments/assets/70a315c5-15c2-4277-af98-1ee79c7dc5a8", // Exemplo com a sua imagem da floresta!
     "pedreira_granito": "https://github.com/user-attachments/assets/76e836d2-3a23-4564-9810-678408c520b9",
