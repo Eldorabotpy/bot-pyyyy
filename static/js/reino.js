@@ -131,7 +131,7 @@ async function carregarReino() {
 function renderizarCidade(conteudo, p) {
     conteudo.innerHTML = `
         <div class="home-banner" style="border-color: #f39c12; margin-bottom: 15px;">
-            <img src="/static/regions/reino_eldora.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=A+Capital+de+Eldora'">
+            <img src="/static/regions/reino_eldora.jpg" onerror="this.src='https://github.com/user-attachments/assets/abdbcb1f-b3ba-4e42-b082-be1a5d839d73'">
         </div>
         
         <div style="text-align: center; margin-bottom: 20px;">
@@ -269,7 +269,7 @@ async function abrirMapaEldora() {
             `;
         }
 
-        const LINK_IMAGEM_GITHUB = 'https://github.com/user-attachments/assets/f81b4ce7-5880-4116-b975-d478477b0cc8'; 
+        const LINK_IMAGEM_GITHUB = 'https://github.com/user-attachments/assets/0d242135-57d0-4435-9251-d48acbd5deba'; 
 
         conteudo.innerHTML = `
             ${infoPainel}
