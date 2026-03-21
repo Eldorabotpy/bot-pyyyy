@@ -22,7 +22,6 @@ def enviar_mensagem_telegram(chat_id, texto, destino=None):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
     
-    # Adiciona um botão para o jogador abrir o menu do bot!
     if destino:
         payload["reply_markup"] = {
             "inline_keyboard": [[
@@ -77,24 +76,40 @@ def ranking_guildas():
     except Exception as e: return jsonify([])
 
 # ==========================================
-# ROTA DE PERFIL
+# ROTA DE PERFIL (COM PROTEÇÃO CONTRA NULLS)
 # ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
     try:
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
         usuario = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
+        
         if usuario:
             lvl = int(usuario.get("level", 1))
             xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
+            
+            # Trava de segurança para garantir que a classe nunca seja nula
+            classe_bd = usuario.get("class")
+            classe_str = str(classe_bd) if classe_bd else "aprendiz"
+            
             return jsonify({
-                "nome": usuario.get("character_name", "Aventureiro"), "level": lvl, "gold": usuario.get("gold", 0), "gems": usuario.get("gems", 0),
-                "classe": usuario.get("class", "aprendiz"), "xp": int(usuario.get("xp", 0)), "xp_max": xp_visual_max,
-                "hp_atual": usuario.get("current_hp", 0), "hp_max": usuario.get("max_hp", 0), "energy": usuario.get("energy", 0),
-                "pontos_livres": usuario.get("stat_points", 0), "avatar": f"{request.host_url}static/classes/{usuario.get('class')}.png"
+                "nome": usuario.get("character_name", "Aventureiro"), 
+                "level": lvl, 
+                "gold": usuario.get("gold", 0), 
+                "gems": usuario.get("gems", 0),
+                "classe": classe_str.capitalize(), 
+                "xp": int(usuario.get("xp", 0)), 
+                "xp_max": xp_visual_max,
+                "hp_atual": usuario.get("current_hp", 0), 
+                "hp_max": usuario.get("max_hp", 0), 
+                "energy": usuario.get("energy", 0),
+                "pontos_livres": usuario.get("stat_points", 0), 
+                "avatar": f"{request.host_url}static/classes/{classe_str.lower()}.png"
             })
+            
         return jsonify({"erro": "Personagem não encontrado no banco."}), 404
-    except Exception as e: return jsonify({"erro": str(e)}), 400
+    except Exception as e: 
+        return jsonify({"erro": str(e)}), 400
 
 # ==========================================
 # ROTAS DA WIKI
@@ -232,14 +247,11 @@ def api_viajar():
             pdata["current_location"] = destino
             pdata["player_state"] = {"action": "idle"}
             users_collection.replace_one({"_id": busca_id}, pdata)
-            
-            # Sincroniza enviando pro chat e mandando o botão de região!
             enviar_mensagem_telegram(chat_id, f"🚀 <b>[Eldora App]</b> Viagem instantânea concluída! Você chegou em <b>{nome_destino}</b>.", destino)
         else:
             finish = datetime.now(timezone.utc) + timedelta(seconds=secs)
             pdata["player_state"] = {"action": "travel", "finish_time": finish.isoformat(), "details": {"destination": destino}}
             users_collection.replace_one({"_id": busca_id}, pdata)
-            
             enviar_mensagem_telegram(chat_id, f"🧭 <b>[Eldora App]</b> Viagem iniciada para <b>{nome_destino}</b>.\n⏳ Tempo estimado: {secs//60} minutos.")
         
         return jsonify({"sucesso": True, "secs": secs, "destino": destino, "is_vip": is_vip})
