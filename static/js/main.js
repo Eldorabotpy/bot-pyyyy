@@ -7,17 +7,14 @@ function mudarAba(nomeDaAba) {
     document.getElementById(`aba-${nomeDaAba}`).classList.add('active');
     document.getElementById(`btn-${nomeDaAba}`).classList.add('active');
     
-    // Agora ele sabe carregar o Início e o Reino também!
     if(nomeDaAba === 'home') carregarInicio();
-    if(nomeDaAba === 'reino') carregarReino(); // <-- Chama a função do seu novo arquivo reino.js
+    if(nomeDaAba === 'reino') carregarReino();
     if(nomeDaAba === 'perfil') carregarMeuPerfil();
     if(nomeDaAba === 'ranking') voltarParaMenuRanking();
 }
 
 async function carregarInicio() {
     const conteudo = document.getElementById('aba-home'); 
-    
-    // Pega o ID salvo no login
     const charId = localStorage.getItem("jogadorEldoraID");
 
     if (!charId) {
@@ -41,16 +38,12 @@ async function carregarInicio() {
             return;
         }
 
-        // ==========================================
-        // BUSCANDO AS NOTIFICAÇÕES PREMIUM
-        // ==========================================
         let tickerHtml = '';
         try {
             const resPremium = await fetch('/api/recent_premium');
             const premiums = await resPremium.json();
             
             if (premiums.length > 0) {
-                // Monta a frase com o nome exato do personagem que vem do ObjectId
                 let frases = premiums.map(jog => 
                     `✨ O jogador <span style="color: #f1c40f; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 8px #f1c40f;">${jog.nome}</span> ativou o plano <span style="color: #00f2fe; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 8px #00f2fe;">${jog.tier}</span> e sua jornada agora será épica!`
                 ).join(' &nbsp;&nbsp;&nbsp;🌟&nbsp;&nbsp;&nbsp; ');
@@ -60,13 +53,8 @@ async function carregarInicio() {
                     <div class="premium-ticker-text">${frases}</div>
                 </div>`;
             }
-        } catch(e) { 
-            console.log("Erro ao carregar ticker", e); 
-        }
+        } catch(e) { }
 
-        // ==========================================
-        // VISUAL DA TELA INICIAL (DASHBOARD LIMPO)
-        // ==========================================
         let html = `
         <div class="home-banner">
             <img src="/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Eldora'">
@@ -84,7 +72,7 @@ async function carregarInicio() {
             </div>
             
             <p style="margin: 0 0 18px 0; color: #94a3b8; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
-                ⚔️ Classe: <span style="color: #cbd5e1; font-weight: 500;">${p.classe.replace(/_/g, ' ')}</span>
+                ⚔️ Classe: <span style="color: #cbd5e1; font-weight: 500;">${p.classe ? p.classe.replace(/_/g, ' ') : 'Aventureiro'}</span>
             </p>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
@@ -113,20 +101,12 @@ async function carregarInicio() {
     }
 }
 
-// ==========================================
-// FUNÇÃO DE SAIR / TROCAR PERSONAGEM
-// ==========================================
 function sairDoJogo() {
-    // Confirma se o jogador quer mesmo sair
     if(confirm("Tem certeza que deseja fechar o grimório e trocar de personagem?")) {
-        // Apaga a memória do navegador
         localStorage.removeItem("jogadorEldoraID");
         localStorage.removeItem("jogadorEldoraNome");
-        
-        // Manda de volta para o Portal do Mago
         window.location.href = "/login";
     }
 }
 
-// Roda a mágica da tela inicial assim que o site abrir!
 carregarInicio();
