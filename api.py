@@ -2,12 +2,9 @@ import os
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from bson.objectid import ObjectId
+from datetime import datetime, timezone, timedelta
 
-# ==============================================================================
-# CONEXÃO COM O BANCO DE DADOS (CORREÇÃO DEFINITIVA)
-# ==============================================================================
-# Agora importamos a users_collection diretamente do core.py do seu bot!
-# Isso garante que a API olhe exatamente para o mesmo lugar onde o bot salva o jogo.
+# Importa as conexões oficiais do seu bot
 from modules.player.core import users_collection
 from modules.database import clans_col
 
@@ -15,15 +12,12 @@ app = Flask(__name__)
 CORS(app) 
 
 # ==========================================
-# ROTA PRINCIPAL (MOSTRA O SITE)
+# ROTA PRINCIPAL E LOGIN
 # ==========================================
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# ==========================================
-# ROTA: PÁGINA DE LOGIN
-# ==========================================
 @app.route('/login')
 def pagina_login():
     return render_template('login.html')
@@ -82,20 +76,12 @@ def ranking_guildas():
         return jsonify([{"nome": "⚠️ Erro no Banco", "valor": str(e)}])
 
 # ==========================================
-# ROTA DE PERFIL (ABA PERFIL)
+# ROTA DE PERFIL
 # ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
     try:
-        busca_id = user_id
-        
-        if len(str(user_id)) == 24:
-            try:
-                busca_id = ObjectId(user_id)
-            except:
-                pass
-        elif str(user_id).isdigit():
-            busca_id = int(user_id)
+        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
 
         usuario = users_collection.find_one({
             "$or": [
@@ -108,12 +94,9 @@ def obter_perfil(user_id):
 
         if usuario:
             lvl = int(usuario.get("level", 1))
-            base = 200
-            lin  = 100 * (lvl - 1)
-            quad = 40 * (lvl - 1) * (lvl - 1)
-            xp_visual_max = int(base + lin + quad) 
+            xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
 
-            dados_perfil = {
+            return jsonify({
                 "nome": usuario.get("character_name", "Aventureiro"),
                 "level": lvl,
                 "gold": usuario.get("gold", 0),
@@ -126,50 +109,37 @@ def obter_perfil(user_id):
                 "energy": usuario.get("energy", 0),
                 "pontos_livres": usuario.get("stat_points", 0),
                 "avatar": f"{request.host_url}static/classes/{usuario.get('class')}.png"
-            }
-            return jsonify(dados_perfil)
+            })
             
         return jsonify({"erro": "Personagem não encontrado no banco."}), 404
     except Exception as e:
         return jsonify({"erro": str(e)}), 400
 
 # ==========================================
-# ROTAS DA WIKI (Mapas, Itens, Monstros)
+# ROTAS DA WIKI
 # ==========================================
 @app.route('/wiki/classes')
 def obter_classes():
-    lista_de_classes = []
+    lista = []
     try:
         from modules.game_data.classes import CLASSES_DATA
         from modules.game_data.class_evolution import EVOLUTIONS
-        
         for chave, classe_info in CLASSES_DATA.items():
             if classe_info.get("tier") == 1:
-                caminho_evolucao = EVOLUTIONS.get(chave, [])
-                detalhes_evolucoes = [
-                    {"nome": evo.get("display_name", ""), "tier": evo.get("tier_num", 0), "descricao": evo.get("desc", "")}
-                    for evo in caminho_evolucao
-                ]
-                
+                evos = [{"nome": evo.get("display_name", ""), "tier": evo.get("tier_num", 0), "descricao": evo.get("desc", "")} for evo in EVOLUTIONS.get(chave, [])]
                 status = classe_info.get("stat_modifiers", {})
-                
-                dados_classe = {
+                lista.append({
                     "id": chave,
                     "nome": classe_info.get("display_name", "Desconhecida"),
                     "emoji": classe_info.get("emoji", "❓"),
                     "descricao": classe_info.get("description", "Sem descrição."),
-                    "hp": status.get("hp", 0),
-                    "ataque": status.get("attack", 0),
-                    "defesa": status.get("defense", 0),
+                    "hp": status.get("hp", 0), "ataque": status.get("attack", 0), "defesa": status.get("defense", 0),
                     "imagem": classe_info.get("image_url", f"{request.host_url}static/classes/{chave}.png"),
                     "video": classe_info.get("video_url", ""), 
-                    "total_evolucoes": len(caminho_evolucao),
-                    "evolucoes": detalhes_evolucoes
-                }
-                lista_de_classes.append(dados_classe)
-    except Exception as e:
-        print(f"Erro ao ler classes: {e}")
-    return jsonify(sorted(lista_de_classes, key=lambda x: x["nome"]))
+                    "total_evolucoes": len(evos), "evolucoes": evos
+                })
+    except: pass
+    return jsonify(sorted(lista, key=lambda x: x["nome"]))
 
 @app.route('/wiki/regioes')
 def obter_regioes():
@@ -177,13 +147,9 @@ def obter_regioes():
     try:
         from modules.game_data.worldmap import REGIONS_DATA, REGION_TARGET_POWER
         for chave, info in REGIONS_DATA.items():
-            poder = REGION_TARGET_POWER.get(chave, 1)
             lista.append({
-                "id": chave,
-                "nome": info.get("display_name", "Região Desconhecida"),
-                "emoji": info.get("emoji", "🗺️"),
-                "descricao": info.get("description", "Uma área selvagem de Eldora."),
-                "level_min": poder,
+                "id": chave, "nome": info.get("display_name", "Região"), "emoji": info.get("emoji", "🗺️"),
+                "descricao": info.get("description", ""), "level_min": REGION_TARGET_POWER.get(chave, 1),
                 "imagem": info.get("image_url", f"{request.host_url}static/regions/{chave}.jpg")
             })
     except: pass
@@ -194,63 +160,29 @@ def obter_monstros():
     lista = []
     try:
         from modules.game_data.monsters import MONSTERS_DATA
-        nomes_regioes = {}
-        poder_regioes = {}
-        try:
-            from modules.game_data.worldmap import REGIONS_DATA, REGION_TARGET_POWER
-            for k, v in REGIONS_DATA.items():
-                nomes_regioes[k] = v.get("display_name", k)
-            poder_regioes = REGION_TARGET_POWER
-        except: pass
-
         nomes_itens = {}
         try:
             from modules.game_data.items import ITEMS_DATA
-            for k, v in ITEMS_DATA.items():
-                emoji = v.get("emoji", "📦")
-                nome = v.get("display_name", k.replace("_", " ").title())
-                nomes_itens[k] = f"{emoji} {nome}"
+            for k, v in ITEMS_DATA.items(): nomes_itens[k] = f"{v.get('emoji', '📦')} {v.get('display_name', k.replace('_', ' ').title())}"
         except: pass
             
         mobs_vistos = set() 
         for regiao_id, lista_mobs in MONSTERS_DATA.items():
-            is_evento = regiao_id.startswith("_") or regiao_id in ["defesa_reino"]
-            if regiao_id == "_evolution_trials": regiao_nome = "Desafios de Evolução"
-            elif regiao_id == "defesa_reino": regiao_nome = "Defesa do Reino"
-            else: regiao_nome = nomes_regioes.get(regiao_id, regiao_id.replace("_", " ").title())
-
-            nivel_regiao = poder_regioes.get(regiao_id, 999) 
-
             for mob in lista_mobs:
                 mob_id = mob.get("id")
                 if mob_id in mobs_vistos: continue
                 mobs_vistos.add(mob_id)
-                
-                loot_formatado = []
-                for loot in mob.get("loot_table", []):
-                    item_id = loot.get("item_id")
-                    chance = loot.get("drop_chance", 0)
-                    nome_formatado = nomes_itens.get(item_id, item_id.replace("_", " ").title())
-                    loot_formatado.append({"nome": nome_formatado, "chance": chance})
-                
+                loot_formatado = [{"nome": nomes_itens.get(l.get("item_id"), l.get("item_id")), "chance": l.get("drop_chance", 0)} for l in mob.get("loot_table", [])]
                 lista.append({
-                    "id": mob_id,
-                    "nome": mob.get("name", "Monstro Desconhecido"),
-                    "level": mob.get("min_level", mob.get("level", 1)),
-                    "hp": mob.get("hp", mob.get("max_hp", 0)),
-                    "ataque": mob.get("attack", mob.get("atk", 0)),
-                    "defesa": mob.get("defense", mob.get("def", 0)),
-                    "xp": mob.get("xp_reward", 0),
-                    "gold": mob.get("gold_drop", 0),
-                    "loot": loot_formatado, 
+                    "id": mob_id, "nome": mob.get("name", "Monstro"), "level": mob.get("min_level", mob.get("level", 1)),
+                    "hp": mob.get("hp", mob.get("max_hp", 0)), "ataque": mob.get("attack", mob.get("atk", 0)), "defesa": mob.get("defense", mob.get("def", 0)),
+                    "xp": mob.get("xp_reward", 0), "gold": mob.get("gold_drop", 0), "loot": loot_formatado, 
                     "imagem": mob.get("image_url", f"{request.host_url}static/monsters/{mob_id}.jpg"),
-                    "regiao_id": regiao_id,
-                    "regiao_nome": regiao_nome,
-                    "nivel_regiao": nivel_regiao, 
-                    "is_evento": is_evento
+                    "regiao_id": regiao_id, "regiao_nome": regiao_id.replace("_", " ").title(),
+                    "nivel_regiao": 1, "is_evento": False
                 })
     except: pass
-    return jsonify(sorted(lista, key=lambda x: (x["is_evento"], x["nivel_regiao"], x["level"])))
+    return jsonify(lista)
 
 @app.route('/wiki/itens')
 def obter_itens():
@@ -259,58 +191,38 @@ def obter_itens():
         from modules.game_data.items import ITEMS_DATA
         for chave, info in ITEMS_DATA.items():
             lista.append({
-                "id": chave,
-                "nome": info.get("display_name", "Item Desconhecido"),
-                "raridade": str(info.get("rarity", "Comum")).capitalize(),
-                "descricao": info.get("description", "Um item de Eldora."),
-                "preco": info.get("value", info.get("price", 0)),
+                "id": chave, "nome": info.get("display_name", "Item"), "raridade": str(info.get("rarity", "Comum")).capitalize(),
+                "descricao": info.get("description", ""), "preco": info.get("value", info.get("price", 0)),
                 "imagem": info.get("image_url", f"{request.host_url}static/items/{chave}.png")
             })
     except: pass
     return jsonify(sorted(lista, key=lambda x: x["nome"]))
 
 # ==========================================
-# ROTA: SISTEMA DE LOGIN (SELEÇÃO)
+# ROTA: MEUS PERSONAGENS (LOGIN)
 # ==========================================
 @app.route('/api/meus_personagens/<int:telegram_id>')
 def listar_personagens(telegram_id):
     try:
-        cursor = users_collection.find({
-            "$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}, {"last_chat_id": telegram_id}]
-        })
-        
-        personagens = []
-        for p in cursor:
-            personagens.append({
-                "id": str(p["_id"]),
-                "nome": p.get("character_name", "Desconhecido"),
-                "classe": str(p.get("class", "aventureiro")).capitalize(),
-                "level": p.get("level", 1)
-            })
-            
+        cursor = users_collection.find({"$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}, {"last_chat_id": telegram_id}]})
+        personagens = [{"id": str(p["_id"]), "nome": p.get("character_name", "Desconhecido"), "classe": str(p.get("class", "aventureiro")).capitalize(), "level": p.get("level", 1)} for p in cursor]
         return jsonify(personagens)
-    except Exception as e:
-        print(f"Erro ao buscar personagens do ID {telegram_id}: {e}")
-        return jsonify([])
-    
+    except: return jsonify([])
+
 # ==========================================
-# ROTA: DADOS DO PERSONAGEM (HOME/INICIO)
+# ROTA: DADOS DO PERSONAGEM (HOME/MAPA)
 # ==========================================
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
     try:
         if users_collection is None:
-            return jsonify({"erro": "O servidor está conectando ao oráculo..."}), 500
+            return jsonify({"erro": "Servidor conectando..."}), 500
 
-        if len(str(personagem_id)) == 24:
-            busca_id = ObjectId(personagem_id)
-        else:
-            return jsonify({"erro": "ID de personagem inválido"}), 400
+        busca_id = ObjectId(personagem_id) if len(str(personagem_id)) == 24 else None
+        if not busca_id: return jsonify({"erro": "ID inválido"}), 400
 
         pdata = users_collection.find_one({"_id": busca_id})
-        
-        if not pdata:
-            return jsonify({"erro": "Personagem não encontrado. Crie um no bot."}), 404
+        if not pdata: return jsonify({"erro": "Personagem não encontrado."}), 404
             
         return jsonify({
             "nome": pdata.get("character_name", "Aventureiro"),
@@ -320,37 +232,61 @@ def obter_personagem_info(personagem_id):
             "diamantes": pdata.get("gems", 0),
             "hp": pdata.get("current_hp", 0),
             "max_hp": pdata.get("max_hp", 0),
-            # Correção no MP baseada no seu core.py
             "mp": pdata.get("current_mp", pdata.get("mana", 0)), 
-            "max_mp": pdata.get("max_mana", 0)
+            "max_mp": pdata.get("max_mana", 0),
+            
+            # 👇 OS DADOS QUE ESTAVAM FALTANDO PARA O MAPA FUNCIONAR 👇
+            "local_atual": pdata.get("current_location", "reino_eldora"),
+            "tier": str(pdata.get("premium_tier", "free")).lower(),
+            "estado": pdata.get("player_state", {"action": "idle"}),
+            "energia": pdata.get("energy", 0)
         })
     except Exception as e:
-        print(f"Erro ao buscar personagem na API: {e}")
         return jsonify({"erro": str(e)}), 500    
 
 # ==========================================
-# ROTA: NOTIFICAÇÕES DE JOGADORES PREMIUM
+# ROTA: INICIAR VIAGEM PELO MAPA
+# ==========================================
+@app.route('/api/viajar', methods=['POST'])
+def api_viajar():
+    dados = request.json
+    user_id = dados.get("user_id")
+    destino = dados.get("destino")
+
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        if not pdata: return jsonify({"erro": "Personagem não encontrado"})
+
+        estado = pdata.get("player_state", {})
+        if estado.get("action") == "travel":
+            return jsonify({"erro": "Você já está viajando!"})
+
+        tier = str(pdata.get("premium_tier", "free")).lower()
+        is_vip = tier in ["lenda", "vip", "premium", "admin"]
+        secs = 0 if is_vip else 360 
+        
+        if secs <= 0:
+            pdata["current_location"] = destino
+            pdata["player_state"] = {"action": "idle"}
+        else:
+            finish = datetime.now(timezone.utc) + timedelta(seconds=secs)
+            pdata["player_state"] = {"action": "travel", "finish_time": finish.isoformat(), "details": {"destination": destino}}
+        
+        users_collection.replace_one({"_id": busca_id}, pdata)
+        return jsonify({"sucesso": True, "secs": secs, "destino": destino, "is_vip": is_vip})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+# ==========================================
+# ROTA: LETREIRO VIP
 # ==========================================
 @app.route('/api/recent_premium')
 def recent_premium():
     try:
-        ativos = users_collection.find(
-            {"premium_tier": {"$in": ["premium", "vip", "lenda"]}},
-            {"character_name": 1, "premium_tier": 1, "_id": 1} 
-        ).sort("premium_expires_at", -1).limit(10)
-        
-        lista = []
-        for p in ativos:
-            lista.append({
-                "id": str(p["_id"]), 
-                "nome": p.get("character_name", "Um Herói"),
-                "tier": str(p.get("premium_tier", "premium")).capitalize()
-            })
-            
-        return jsonify(lista)
-    except Exception as e:
-        print(f"Erro ao buscar premium: {e}")
-        return jsonify([])    
+        ativos = users_collection.find({"premium_tier": {"$in": ["premium", "vip", "lenda"]}}, {"character_name": 1, "premium_tier": 1, "_id": 1}).sort("premium_expires_at", -1).limit(10)
+        return jsonify([{"id": str(p["_id"]), "nome": p.get("character_name", "Um Herói"), "tier": str(p.get("premium_tier", "premium")).capitalize()} for p in ativos])
+    except: return jsonify([])    
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

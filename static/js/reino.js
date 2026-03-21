@@ -92,6 +92,10 @@ async function abrirMapaEldora() {
         const resposta = await fetch(`/api/personagem/${charId}`);
         const p = await resposta.json();
         if (p.erro) return;
+        // FORÇA O VALOR PADRÃO CASO O PYTHON ESTEJA LENTO OU FALHE
+        p.local_atual = p.local_atual || "reino_eldora";
+        p.tier = p.tier || "free";
+        p.estado = p.estado || { action: "idle" };
 
         let ehVIP = ["lenda", "vip", "premium", "admin"].includes(p.tier);
         window.dadosViagemAtual = { local: p.local_atual, vip: ehVIP };
