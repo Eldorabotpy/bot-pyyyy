@@ -7,8 +7,9 @@ function mudarAba(nomeDaAba) {
     document.getElementById(`aba-${nomeDaAba}`).classList.add('active');
     document.getElementById(`btn-${nomeDaAba}`).classList.add('active');
     
-    // Agora ele sabe carregar o Início também!
+    // Agora ele sabe carregar o Início e o Reino também!
     if(nomeDaAba === 'home') carregarInicio();
+    if(nomeDaAba === 'reino') carregarReino(); // <-- Chama a função do seu novo arquivo reino.js
     if(nomeDaAba === 'perfil') carregarMeuPerfil();
     if(nomeDaAba === 'ranking') voltarParaMenuRanking();
 }
@@ -51,8 +52,8 @@ async function carregarInicio() {
             if (premiums.length > 0) {
                 // Monta a frase com o nome exato do personagem que vem do ObjectId
                 let frases = premiums.map(jog => 
-                    `✨ O jogador <span style="color: #fff;">${jog.nome}</span> ativou o plano <span style="color: #3498db;">${jog.tier}</span> e sua jornada agora será muito mais épica!`
-                ).join(' &nbsp;&nbsp;&nbsp;⭐&nbsp;&nbsp;&nbsp; ');
+                    `✨ O jogador <span style="color: #f1c40f; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 8px #f1c40f;">${jog.nome}</span> ativou o plano <span style="color: #00f2fe; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 8px #00f2fe;">${jog.tier}</span> e sua jornada agora será épica!`
+                ).join(' &nbsp;&nbsp;&nbsp;🌟&nbsp;&nbsp;&nbsp; ');
                 
                 tickerHtml = `
                 <div class="premium-ticker-container">
@@ -64,7 +65,7 @@ async function carregarInicio() {
         }
 
         // ==========================================
-        // VISUAL DA TELA INICIAL (DESIGN PROFISSIONAL)
+        // VISUAL DA TELA INICIAL (DASHBOARD LIMPO)
         // ==========================================
         let html = `
         <div class="home-banner">
@@ -102,32 +103,6 @@ async function carregarInicio() {
                 <span style="width: 1px; background: #334155;"></span>
                 <span style="color: #38bdf8; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">💎 ${p.diamantes.toLocaleString('pt-BR')}</span>
             </div>
-        </div>
-
-        <h4 style="color: #64748b; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; font-weight: 600;">Exploração e Reino</h4>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-            
-            <button onclick="alert('Sistema de Combate em desenvolvimento! ⚔️')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #3b82f6; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">⚔️</span>
-                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Caçar</strong>
-            </button>
-            
-            <button onclick="alert('Os portões do evento se abrirão em breve! 🎪')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #a855f7; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">🎪</span>
-                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Eventos</strong>
-            </button>
-            
-            <button onclick="alert('As caravanas mercantes estão a caminho! 🏪')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #f97316; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">🏪</span>
-                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Mercado</strong>
-            </button>
-            
-            <button onclick="alert('O calor da forja ainda está fraco... 🔥')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #64748b; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">🔨</span>
-                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Forja</strong>
-            </button>
-
         </div>
         `;
         
