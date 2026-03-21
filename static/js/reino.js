@@ -15,6 +15,21 @@ const NOMES_REGIOES = {
     "picos_gelados": "Picos Gelados"
 };
 
+// 👇 AQUI VOCÊ COLA OS LINKS DO GITHUB DE CADA IMAGEM QUADRADA 👇
+const IMAGENS_DAS_REGIOES = {
+    "reino_eldora": "https://github.com/user-attachments/assets/abdbcb1f-b3ba-4e42-b082-be1a5d839d73",
+    "pradaria_inicial": "https://github.com/user-attachments/assets/04217592-0102-4e08-ae26-99a4d6aca905",
+    "floresta_sombria": "https://github.com/user-attachments/assets/70a315c5-15c2-4277-af98-1ee79c7dc5a8", // Exemplo com a sua imagem da floresta!
+    "pedreira_granito": "https://github.com/user-attachments/assets/76e836d2-3a23-4564-9810-678408c520b9",
+    "campos_linho": "https://github.com/user-attachments/assets/24ced0e5-ab12-4a60-9962-c7efed362de5",
+    "pico_grifo": "https://github.com/user-attachments/assets/1978a416-381b-4dda-a819-bd3eaf23c894",
+    "mina_ferro": "https://github.com/user-attachments/assets/f3652694-9788-4676-bec1-2415b45be939",
+    "forja_abandonada": "https://github.com/user-attachments/assets/4aa66f7c-25eb-4b85-a060-24598520d049",
+    "pantano_maldito": "https://github.com/user-attachments/assets/28fb041c-7ec1-4d69-9d26-3b3001f1eb8e",
+    "deserto_ancestral": "https://github.com/user-attachments/assets/bbb9415b-c709-430b-9994-ff0d1dbfe58d",
+    "picos_gelados": "https://github.com/user-attachments/assets/18a87067-9158-4304-a9a7-3b71a8977263"
+};
+
 const COORDENADAS_MAPA = {
     "reino_eldora": { top: 48, left: 50 },
     "pradaria_inicial": { top: 33, left: 62 },
@@ -129,14 +144,18 @@ async function carregarReino() {
 }
 
 function renderizarCidade(conteudo, p) {
+    const imgCidade = IMAGENS_DAS_REGIOES["reino_eldora"] || "/static/regions/reino_eldora.jpg";
+    
     conteudo.innerHTML = `
-        <div class="home-banner" style="border-color: #f39c12; margin-bottom: 15px;">
-            <img src="/static/regions/reino_eldora.jpg" onerror="this.src='https://github.com/user-attachments/assets/abdbcb1f-b3ba-4e42-b082-be1a5d839d73'">
-        </div>
-        
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h2 style="color: #f8fafc; margin: 0 0 5px 0; font-size: 1.4em;">A Capital</h2>
-            <p style="color: #94a3b8; font-size: 0.85em; margin: 0;">O coração econômico e militar do mundo.</p>
+        <div class="home-banner" style="border-color: #f39c12; margin-bottom: 15px; border-radius: 12px; overflow: hidden; position: relative;">
+            <img src="${imgCidade}" onerror="this.src='https://placehold.co/600x600/111/333?text=A+Capital+de+Eldora'" style="width: 100%; aspect-ratio: 1 / 1; display: block; object-fit: cover;">
+            
+            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 35%; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.9));"></div>
+            
+            <div style="position: absolute; bottom: 15px; width: 100%; text-align: center;">
+                <h2 style="color: #f8fafc; margin: 0 0 5px 0; font-size: 1.6em; text-shadow: 2px 2px 5px #000;">A Capital</h2>
+                <p style="color: #f39c12; font-size: 0.9em; font-weight: bold; margin: 0; text-shadow: 1px 1px 3px #000;">O coração do mundo.</p>
+            </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
@@ -165,14 +184,19 @@ function renderizarCidade(conteudo, p) {
 
 function renderizarSelva(conteudo, p) {
     const nomeRegiao = NOMES_REGIOES[p.local_atual] || "Terras Selvagens";
+    // Puxa o link do dicionário, se não existir envia pro placeholder
+    const imagemLink = IMAGENS_DAS_REGIOES[p.local_atual] || ''; 
     
     conteudo.innerHTML = `
-        <div class="home-banner" style="border-color: #2ecc71; margin-bottom: 15px; position: relative;">
-            <img src="/static/regions/${p.local_atual}.jpg" onerror="this.src='https://placehold.co/600x300/111/333?text=${nomeRegiao}'" style="width: 100%; display: block; object-fit: cover;">
-            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 50%; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.9));"></div>
-            <div style="position: absolute; bottom: 10px; left: 15px;">
-                <h3 style="color: #fff; margin: 0; font-size: 1.3em; text-shadow: 1px 1px 5px #000;">📍 ${nomeRegiao}</h3>
-                <p style="color: #2ecc71; margin: 0; font-size: 0.85em; font-weight: bold; text-shadow: 1px 1px 3px #000;">Área de Exploração</p>
+        <div class="home-banner" style="border-color: #2ecc71; margin-bottom: 15px; position: relative; border-radius: 12px; overflow: hidden;">
+            
+            <img src="${imagemLink}" onerror="this.src='https://placehold.co/600x600/111/333?text=${nomeRegiao}'" style="width: 100%; aspect-ratio: 1 / 1; display: block; object-fit: cover;">
+            
+            <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 35%; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.95));"></div>
+            
+            <div style="position: absolute; bottom: 12px; left: 15px;">
+                <h3 style="color: #fff; margin: 0; font-size: 1.4em; text-shadow: 2px 2px 5px #000;">📍 ${nomeRegiao}</h3>
+                <p style="color: #2ecc71; margin: 0; font-size: 0.9em; font-weight: bold; text-shadow: 1px 1px 3px #000;">Área de Exploração</p>
             </div>
         </div>
 
@@ -269,7 +293,7 @@ async function abrirMapaEldora() {
             `;
         }
 
-        const LINK_IMAGEM_GITHUB = 'https://github.com/user-attachments/assets/0d242135-57d0-4435-9251-d48acbd5deba'; 
+        const LINK_IMAGEM_GITHUB = 'https://github.com/user-attachments/assets/f81b4ce7-5880-4116-b975-d478477b0cc8'; 
 
         conteudo.innerHTML = `
             ${infoPainel}
@@ -305,7 +329,7 @@ async function iniciarViagemServidor(destino) {
 
         if (dados.is_vip) {
             exibirAlertaCustom("Sucesso!", "Chegou ao destino instantaneamente!", true);
-            carregarReino(); // Já volta direto pra região com os botões certos
+            carregarReino(); 
         } else {
             abrirMapaEldora(); 
         }
