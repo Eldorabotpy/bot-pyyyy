@@ -5,10 +5,48 @@ header h1 { margin: 0; font-size: 1.1em; color: #f39c12; text-transform: upperca
 .tab-content.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-nav { position: fixed; bottom: 0; left: 0; width: 100%; background-color: var(--tg-theme-secondary-bg-color, #1a1a1a); display: flex; justify-content: space-around; border-top: 1px solid #333; padding: 10px 0; z-index: 1000; }
-nav button { background: none; border: none; color: #666; font-size: 0.85em; display: flex; flex-direction: column; align-items: center; cursor: pointer; width: 25%; transition: 0.3s; }
-nav button.active { color: #f39c12; font-weight: bold; }
-nav button i { font-size: 1.6em; margin-bottom: 2px; }
+/* =========================================
+   BARRA DE NAVEGAÇÃO INFERIOR (PROFISSIONAL)
+   ========================================= */
+nav { 
+    position: fixed; 
+    bottom: 0; 
+    left: 0; 
+    width: 100%; 
+    background-color: #0f172a; /* Azul escuro muito elegante */
+    display: flex; 
+    justify-content: space-around; 
+    border-top: 1px solid #1e293b; 
+    padding: 8px 0 6px 0; /* Mais fina */
+    z-index: 1000; 
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.6); 
+}
+nav button { 
+    background: none; 
+    border: none; 
+    color: #64748b; /* Texto inativo discreto */
+    font-size: 0.75em; /* Fonte menor */
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    cursor: pointer; 
+    width: 25%; 
+    transition: 0.2s; 
+    font-weight: 500;
+}
+nav button i { 
+    font-size: 1.3em; /* Ícones menores e mais contidos */
+    margin-bottom: 4px; 
+    filter: grayscale(100%) opacity(0.6); /* Ícone inativo sem cor/mais apagado */
+    transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+nav button.active { 
+    color: #f39c12; /* Texto ativo Dourado */
+}
+nav button.active i { 
+    filter: grayscale(0%) opacity(1); /* Traz a cor total de volta ao ativar */
+    transform: scale(1.15) translateY(-2px); /* Efeito de 'pular' levemente */
+}
 
 .home-banner { width: 100%; border-radius: 10px; overflow: hidden; border: 2px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.6); margin-bottom: 20px; background: #000; }
 .home-banner img { width: 100%; display: block; object-fit: cover; }
@@ -39,23 +77,24 @@ th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: 
 .premium-ticker-container {
     width: 100%;
     overflow: hidden;
-    background: linear-gradient(90deg, #1a1a2e, #0f172a);
-    border: 1px solid #f39c12;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    padding: 8px 0;
-    box-shadow: 0 2px 10px rgba(243, 156, 18, 0.2);
+    background: rgba(15, 23, 42, 0.8); /* Fundo sutil para não brigar com o resto */
+    border: 1px solid #1e293b; /* Borda fina e escura */
+    border-left: 3px solid #f39c12; /* Detalhe dourado apenas na esquerda (Moderno) */
+    border-radius: 6px;
+    margin-bottom: 20px;
+    padding: 6px 0; /* Mais fino para ocupar menos espaço da tela */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     position: relative;
 }
 
 .premium-ticker-text {
     display: inline-block;
     white-space: nowrap;
-    color: #f1c40f;
-    font-size: 0.85em;
-    font-weight: bold;
+    color: #e2e8f0; /* Texto menos amarelado, mais suave */
+    font-size: 0.8em;
+    font-weight: 500;
     padding-left: 100%;
-    animation: ticker 25s linear infinite; /* Aumente os 25s se quiser que a mensagem passe mais devagar */
+    animation: ticker 25s linear infinite;
 }
 
 @keyframes ticker {

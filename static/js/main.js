@@ -64,7 +64,7 @@ async function carregarInicio() {
         }
 
         // ==========================================
-        // VISUAL DA TELA INICIAL
+        // VISUAL DA TELA INICIAL (DESIGN PROFISSIONAL)
         // ==========================================
         let html = `
         <div class="home-banner">
@@ -73,53 +73,59 @@ async function carregarInicio() {
 
         ${tickerHtml}
 
-        <div style="background: linear-gradient(145deg, #1e293b, #0f172a); border: 2px solid #f39c12; border-radius: 10px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(243, 156, 18, 0.2);">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 10px;">
-                <h3 style="margin: 0; color: #f39c12; font-size: 1.3em;">🛡️ ${p.nome}</h3>
-                <span style="background: #2563eb; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold;">Nv. ${p.level}</span>
+        <div style="background: #0f172a; border: 1px solid #1e293b; border-top: 3px solid #f39c12; border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.6); position: relative;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 12px;">
+                <h3 style="margin: 0; color: #f8fafc; font-size: 1.3em; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.1em; filter: drop-shadow(0 0 5px rgba(243,156,18,0.5));">🛡️</span> ${p.nome}
+                </h3>
+                <span style="background: linear-gradient(90deg, #2563eb, #1d4ed8); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75em; font-weight: bold; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(37,99,235,0.4);">Lv. ${p.level}</span>
             </div>
             
-            <p style="margin: 0 0 15px 0; color: #cbd5e1; font-size: 0.95em;">⚔️ Classe: <b>${p.classe}</b></p>
+            <p style="margin: 0 0 18px 0; color: #94a3b8; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
+                ⚔️ Classe: <span style="color: #cbd5e1; font-weight: 500;">${p.classe.replace(/_/g, ' ')}</span>
+            </p>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                <div style="background: #020617; padding: 8px; border-radius: 6px; border-left: 3px solid #e74c3c; font-size: 0.85em;">
-                    <span style="color: #94a3b8; font-weight: bold;">❤️ Vida</span><br>
-                    <strong style="color: #f87171; font-size: 1.1em;">${p.hp} / ${p.max_hp}</strong>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+                <div style="background: #020617; padding: 10px; border-radius: 8px; border-left: 3px solid #ef4444; position: relative; overflow: hidden;">
+                    <span style="color: #64748b; font-size: 0.75em; font-weight: bold; text-transform: uppercase;">Vida</span><br>
+                    <strong style="color: #fca5a5; font-size: 1.1em; text-shadow: 0 0 8px rgba(239,68,68,0.3);">${p.hp} <span style="font-size: 0.8em; color: #7f1d1d;">/ ${p.max_hp}</span></strong>
                 </div>
-                <div style="background: #020617; padding: 8px; border-radius: 6px; border-left: 3px solid #3b82f6; font-size: 0.85em;">
-                    <span style="color: #94a3b8; font-weight: bold;">💧 Mana</span><br>
-                    <strong style="color: #60a5fa; font-size: 1.1em;">${p.mp} / ${p.max_mp}</strong>
+                <div style="background: #020617; padding: 10px; border-radius: 8px; border-left: 3px solid #3b82f6; position: relative; overflow: hidden;">
+                    <span style="color: #64748b; font-size: 0.75em; font-weight: bold; text-transform: uppercase;">Mana</span><br>
+                    <strong style="color: #93c5fd; font-size: 1.1em; text-shadow: 0 0 8px rgba(59,130,246,0.3);">${p.mp} <span style="font-size: 0.8em; color: #1e3a8a;">/ ${p.max_mp}</span></strong>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 10px; justify-content: space-around; background: #000; padding: 10px; border-radius: 8px; border: 1px solid #333;">
-                <span style="color: #f1c40f; font-weight: bold; font-size: 1.1em;">💰 ${p.ouro}</span>
-                <span style="color: #38bdf8; font-weight: bold; font-size: 1.1em;">💎 ${p.diamantes}</span>
+            <div style="display: flex; justify-content: space-around; background: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;">
+                <span style="color: #f1c40f; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">💰 ${p.ouro.toLocaleString('pt-BR')}</span>
+                <span style="width: 1px; background: #334155;"></span>
+                <span style="color: #38bdf8; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">💎 ${p.diamantes.toLocaleString('pt-BR')}</span>
             </div>
         </div>
 
-        <h4 style="color: #aaa; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 10px; font-weight: normal;">Ações do Reino</h4>
+        <h4 style="color: #64748b; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; font-weight: 600;">Exploração e Reino</h4>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
             
-            <button onclick="alert('Sistema de Combate em desenvolvimento! ⚔️')" style="background: linear-gradient(135deg, #2c3e50, #1a252f); border: 1px solid #3498db; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">⚔️</span>
-                <strong style="color: #3498db; font-size: 1em;">Caçar</strong>
+            <button onclick="alert('Sistema de Combate em desenvolvimento! ⚔️')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #3b82f6; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">⚔️</span>
+                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Caçar</strong>
             </button>
             
-            <button onclick="alert('Os portões do evento se abrirão em breve! 🎪')" style="background: linear-gradient(135deg, #8e44ad, #5e3370); border: 1px solid #9b59b6; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">🎪</span>
-                <strong style="color: #9b59b6; font-size: 1em;">Eventos</strong>
+            <button onclick="alert('Os portões do evento se abrirão em breve! 🎪')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #a855f7; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">🎪</span>
+                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Eventos</strong>
             </button>
             
-            <button onclick="alert('As caravanas mercantes estão a caminho! 🏪')" style="background: linear-gradient(135deg, #d35400, #a04000); border: 1px solid #e67e22; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">🏪</span>
-                <strong style="color: #e67e22; font-size: 1em;">Mercado</strong>
+            <button onclick="alert('As caravanas mercantes estão a caminho! 🏪')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #f97316; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">🏪</span>
+                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Mercado</strong>
             </button>
             
-            <button onclick="alert('O calor da forja ainda está fraco... 🔥')" style="background: linear-gradient(135deg, #7f8c8d, #34495e); border: 1px solid #95a5a6; padding: 15px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
-                <span style="font-size: 1.8em; margin-bottom: 5px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));">🔨</span>
-                <strong style="color: #95a5a6; font-size: 1em;">Forja</strong>
+            <button onclick="alert('O calor da forja ainda está fraco... 🔥')" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #64748b; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: 0.2s;">
+                <span style="font-size: 1.6em; margin-bottom: 4px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">🔨</span>
+                <strong style="color: #e2e8f0; font-size: 0.9em; font-weight: 500;">Forja</strong>
             </button>
 
         </div>
