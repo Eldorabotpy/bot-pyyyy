@@ -1,5 +1,5 @@
 import os
-import requests # NOVO: Para mandar mensagem pro bot
+import requests
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from bson.objectid import ObjectId
@@ -15,13 +15,23 @@ CORS(app)
 # ==========================================
 # FUNÇÃO PARA SINCRONIZAR COM O CHAT DO TELEGRAM
 # ==========================================
-def enviar_mensagem_telegram(chat_id, texto):
+def enviar_mensagem_telegram(chat_id, texto, destino=None):
     token = os.getenv("BOT_TOKEN")
     if not token or not chat_id: 
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
+    
+    # Adiciona um botão para o jogador abrir o menu do bot!
+    if destino:
+        payload["reply_markup"] = {
+            "inline_keyboard": [[
+                {"text": "🗺️ Abrir Menu da Região", "callback_data": f"open_region:{destino}"}
+            ]]
+        }
+        
     try:
-        requests.post(url, json={"chat_id": chat_id, "text": texto, "parse_mode": "HTML"})
+        requests.post(url, json=payload)
     except Exception as e:
         print("Erro ao enviar msg pro telegram:", e)
 
@@ -37,7 +47,7 @@ def pagina_login():
     return render_template('login.html')
 
 # ==========================================
-# ROTAS DE RANKING E PERFIL (MANTIDAS IGUAIS)
+# ROTAS DE RANKING
 # ==========================================
 @app.route('/ranking/level')
 def ranking_level():
@@ -66,6 +76,9 @@ def ranking_guildas():
         return jsonify(lista) if len(lista) > 0 else jsonify([{"nome": "Nenhuma guilda", "valor": "-"}])
     except Exception as e: return jsonify([])
 
+# ==========================================
+# ROTA DE PERFIL
+# ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
     try:
@@ -84,7 +97,7 @@ def obter_perfil(user_id):
     except Exception as e: return jsonify({"erro": str(e)}), 400
 
 # ==========================================
-# ROTAS DA WIKI (MANTIDAS IGUAIS)
+# ROTAS DA WIKI
 # ==========================================
 @app.route('/wiki/classes')
 def obter_classes():
@@ -207,7 +220,6 @@ def api_viajar():
         is_vip = tier in ["lenda", "vip", "premium", "admin"]
         secs = 0 if is_vip else 360 
         
-        # Pega o nome do mapa para a mensagem ficar bonita
         try:
             from modules.game_data.worldmap import REGIONS_DATA
             nome_destino = REGIONS_DATA.get(destino, {}).get("display_name", destino)
@@ -221,15 +233,14 @@ def api_viajar():
             pdata["player_state"] = {"action": "idle"}
             users_collection.replace_one({"_id": busca_id}, pdata)
             
-            # Sincroniza enviando pro chat!
-            enviar_mensagem_telegram(chat_id, f"🚀 <b>[App]</b> Viagem instantânea concluída! Você chegou em <b>{nome_destino}</b>.")
+            # Sincroniza enviando pro chat e mandando o botão de região!
+            enviar_mensagem_telegram(chat_id, f"🚀 <b>[Eldora App]</b> Viagem instantânea concluída! Você chegou em <b>{nome_destino}</b>.", destino)
         else:
             finish = datetime.now(timezone.utc) + timedelta(seconds=secs)
             pdata["player_state"] = {"action": "travel", "finish_time": finish.isoformat(), "details": {"destination": destino}}
             users_collection.replace_one({"_id": busca_id}, pdata)
             
-            # Sincroniza enviando pro chat!
-            enviar_mensagem_telegram(chat_id, f"🧭 <b>[App]</b> Viagem iniciada para <b>{nome_destino}</b>.\n⏳ Tempo estimado: {secs//60} minutos.")
+            enviar_mensagem_telegram(chat_id, f"🧭 <b>[Eldora App]</b> Viagem iniciada para <b>{nome_destino}</b>.\n⏳ Tempo estimado: {secs//60} minutos.")
         
         return jsonify({"sucesso": True, "secs": secs, "destino": destino, "is_vip": is_vip})
     except Exception as e:
@@ -258,14 +269,12 @@ def api_finalizar_viagem():
             except:
                 nome_destino = destino
             
-            # Libera o personagem no banco
             pdata["current_location"] = destino
             pdata["player_state"] = {"action": "idle"}
             users_collection.replace_one({"_id": busca_id}, pdata)
 
-            # Sincroniza enviando pro chat!
             chat_id = pdata.get("last_chat_id")
-            enviar_mensagem_telegram(chat_id, f"✅ <b>[App]</b> Sua viagem terminou! Você chegou em <b>{nome_destino}</b>.")
+            enviar_mensagem_telegram(chat_id, f"✅ <b>[Eldora App]</b> Sua viagem terminou! Você chegou em <b>{nome_destino}</b>.", destino)
             
         return jsonify({"sucesso": True})
     except Exception as e:
