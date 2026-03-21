@@ -65,16 +65,18 @@ window.dadosViagemAtual = {};
 // FUNÇÕES DE DIÁLOGOS PERSONALIZADOS (MODALS)
 // ==========================================
 function exibirAlertaCustom(titulo, mensagem, isSuccess=true) {
-    const cor = isSuccess ? '#2ecc71' : '#e74c3c';
-    const icone = isSuccess ? '✅' : '❌';
+    const corBase = isSuccess ? '#2ecc71' : '#e74c3c';
+    const icone = isSuccess ? '✨' : '❌';
+    
     const modalHtml = `
-    <div id="modal-alerta" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-        <div style="background: #0f172a; border: 2px solid ${cor}; border-radius: 12px; padding: 25px; width: 80%; max-width: 320px; text-align: center; box-shadow: 0 0 25px rgba(${isSuccess ? '46,204,113' : '231,76,60'}, 0.4);">
-            <h3 style="color: ${cor}; margin: 0 0 15px 0; font-size: 1.4em;">${icone} ${titulo}</h3>
-            <p style="color: #e2e8f0; margin: 0 0 25px 0; font-size: 1.05em;">${mensagem}</p>
-            <button onclick="document.getElementById('modal-alerta').remove()" style="width: 100%; padding: 12px; background: ${cor}; border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1.1em;">OK</button>
+    <div id="modal-alerta" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(3px);">
+        <div style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 2px solid ${corBase}; border-radius: 16px; padding: 20px; width: 75%; max-width: 280px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 0 15px rgba(${isSuccess ? '46,204,113' : '231,76,60'}, 0.2);">
+            <h3 style="color: ${corBase}; margin: 0 0 10px 0; font-size: 1.2em; text-transform: uppercase; letter-spacing: 1px;">${icone} ${titulo}</h3>
+            <p style="color: #cbd5e1; margin: 0 0 20px 0; font-size: 0.95em; line-height: 1.4;">${mensagem}</p>
+            <button onclick="document.getElementById('modal-alerta').remove()" style="width: 100%; padding: 10px; background: ${corBase}; border: none; color: #000; border-radius: 8px; cursor: pointer; font-weight: 800; font-size: 1em; text-transform: uppercase;">Entendido</button>
         </div>
     </div>`;
+    
     const m = document.getElementById('modal-alerta');
     if(m) m.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml);
@@ -83,18 +85,24 @@ function exibirAlertaCustom(titulo, mensagem, isSuccess=true) {
 function confirmarViagemMapa(destino) {
     const ehVip = window.dadosViagemAtual.vip;
     const nome = NOMES_REGIOES[destino] || destino;
+    
+    // LORE RPG PARA O TEXTO
+    const titulo = ehVip ? '🌌 Portal Místico' : '🗺️ Jornada Longa';
+    const corBorda = ehVip ? '#8b5cf6' : '#f39c12';
+    const corBotao = ehVip ? 'linear-gradient(90deg, #8b5cf6, #6d28d9)' : 'linear-gradient(90deg, #f59e0b, #d97706)';
+    
     const msg = ehVip 
-        ? `Usar sua viagem VIP instantânea para <b>${nome}</b>?`
-        : `Deseja iniciar a viagem para <b>${nome}</b>?<br><span style="font-size:0.85em; color:#94a3b8;">Leva 6 minutos para chegar.</span>`;
+        ? `Usar magia arcana para abrir um portal direto para <b>${nome}</b>?`
+        : `Deseja seguir pela estrada até <b>${nome}</b>?<br><span style="font-size:0.8em; color:#94a3b8; display:block; margin-top:8px;">⏳ A viagem levará 6 minutos.</span>`;
 
     const modalHtml = `
-    <div id="modal-viagem" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-        <div style="background: #0f172a; border: 2px solid #3b82f6; border-radius: 12px; padding: 25px; width: 80%; max-width: 320px; text-align: center; box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);">
-            <h3 style="color: #3b82f6; margin: 0 0 15px 0; font-size: 1.4em;">🗺️ Confirmar Destino</h3>
-            <p style="color: #e2e8f0; margin: 0 0 25px 0; font-size: 1.05em;">${msg}</p>
+    <div id="modal-viagem" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(3px);">
+        <div style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 2px solid ${corBorda}; border-radius: 16px; padding: 20px; width: 75%; max-width: 280px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(${ehVip ? '139,92,246' : '243,156,18'}, 0.3);">
+            <h3 style="color: ${corBorda}; margin: 0 0 10px 0; font-size: 1.2em; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 8px ${corBorda};">${titulo}</h3>
+            <p style="color: #e2e8f0; margin: 0 0 20px 0; font-size: 0.95em; line-height: 1.4;">${msg}</p>
             <div style="display: flex; gap: 10px;">
-                <button onclick="document.getElementById('modal-viagem').remove()" style="flex: 1; padding: 12px; background: #1e293b; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1em;">Não</button>
-                <button onclick="document.getElementById('modal-viagem').remove(); iniciarViagemServidor('${destino}');" style="flex: 1; padding: 12px; background: linear-gradient(90deg, #2563eb, #1d4ed8); border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1em;">Sim, Viajar</button>
+                <button onclick="document.getElementById('modal-viagem').remove()" style="flex: 1; padding: 10px; background: #0f172a; border: 1px solid #334155; color: #94a3b8; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9em;">Cancelar</button>
+                <button onclick="document.getElementById('modal-viagem').remove(); iniciarViagemServidor('${destino}');" style="flex: 1.2; padding: 10px; background: ${corBotao}; border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.95em; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">Viajar</button>
             </div>
         </div>
     </div>`;
@@ -113,7 +121,7 @@ async function carregarReino() {
 
     if (!charId) return;
 
-    conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">Viajando pelas terras de Eldora... 🐎</p>';
+    conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">Conectando ao reino... 🐎</p>';
 
     try {
         const resposta = await fetch(`/api/personagem/${charId}`);
@@ -143,6 +151,9 @@ async function carregarReino() {
     }
 }
 
+// ==========================================
+// RENDERIZA A CIDADE (A CAPITAL)
+// ==========================================
 function renderizarCidade(conteudo, p) {
     const imgCidade = IMAGENS_DAS_REGIOES["reino_eldora"] || "/static/regions/reino_eldora.jpg";
     
@@ -163,37 +174,36 @@ function renderizarCidade(conteudo, p) {
                 <span style="font-size: 2em; margin-bottom: 5px;">🗺️</span>
                 <strong style="color: #f8fafc; font-size: 0.95em;">Viajar / Mapa</strong>
             </button>
-            <button onclick="exibirAlertaCustom('Desenvolvimento', 'O Mercado Livre está em construção.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #f59e0b; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
+            <button onclick="exibirAlertaCustom('Bloqueado', 'O Mercado Livre está em construção.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #f59e0b; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
                 <span style="font-size: 2em; margin-bottom: 5px;">🏪</span><strong style="color: #f8fafc; font-size: 0.95em;">Mercado Livre</strong>
             </button>
-            <button onclick="exibirAlertaCustom('Desenvolvimento', 'A Forja Real será aberta em breve.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #64748b; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
+            <button onclick="exibirAlertaCustom('Bloqueado', 'A Forja Real será aberta em breve.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #64748b; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
                 <span style="font-size: 2em; margin-bottom: 5px;">⚒️</span><strong style="color: #f8fafc; font-size: 0.95em;">Forja Real</strong>
             </button>
-            <button onclick="exibirAlertaCustom('Desenvolvimento', 'Arena em manutenção.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #ef4444; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
+            <button onclick="exibirAlertaCustom('Bloqueado', 'Arena em manutenção.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #ef4444; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
                 <span style="font-size: 2em; margin-bottom: 5px;">⚔️</span><strong style="color: #f8fafc; font-size: 0.95em;">Arena PvP</strong>
             </button>
-            <button onclick="exibirAlertaCustom('Desenvolvimento', 'Guildas não liberadas ainda.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #eab308; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
+            <button onclick="exibirAlertaCustom('Bloqueado', 'Guildas não liberadas ainda.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #eab308; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
                 <span style="font-size: 2em; margin-bottom: 5px;">🏰</span><strong style="color: #f8fafc; font-size: 0.95em;">Guilda</strong>
             </button>
-            <button onclick="exibirAlertaCustom('Desenvolvimento', 'Laboratório isolado por risco de explosão.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #06b6d4; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
+            <button onclick="exibirAlertaCustom('Bloqueado', 'Laboratório isolado por risco de explosão.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #06b6d4; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
                 <span style="font-size: 2em; margin-bottom: 5px;">🧪</span><strong style="color: #f8fafc; font-size: 0.95em;">Laboratório</strong>
             </button>
         </div>
     `;
 }
 
+// ==========================================
+// RENDERIZA A SELVA (ÁREA EXTERNA)
+// ==========================================
 function renderizarSelva(conteudo, p) {
     const nomeRegiao = NOMES_REGIOES[p.local_atual] || "Terras Selvagens";
-    // Puxa o link do dicionário, se não existir envia pro placeholder
     const imagemLink = IMAGENS_DAS_REGIOES[p.local_atual] || ''; 
     
     conteudo.innerHTML = `
         <div class="home-banner" style="border-color: #2ecc71; margin-bottom: 15px; position: relative; border-radius: 12px; overflow: hidden;">
-            
             <img src="${imagemLink}" onerror="this.src='https://placehold.co/600x600/111/333?text=${nomeRegiao}'" style="width: 100%; aspect-ratio: 1 / 1; display: block; object-fit: cover;">
-            
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 35%; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.95));"></div>
-            
             <div style="position: absolute; bottom: 12px; left: 15px;">
                 <h3 style="color: #fff; margin: 0; font-size: 1.4em; text-shadow: 2px 2px 5px #000;">📍 ${nomeRegiao}</h3>
                 <p style="color: #2ecc71; margin: 0; font-size: 0.9em; font-weight: bold; text-shadow: 1px 1px 3px #000;">Área de Exploração</p>
@@ -201,23 +211,23 @@ function renderizarSelva(conteudo, p) {
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-            <button onclick="exibirAlertaCustom('Bloqueado', 'Caça será liberada no web app em breve!', false)" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #e74c3c; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <button onclick="exibirAlertaCustom('Aviso', 'A caça no mapa interativo será liberada em breve!', false)" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #e74c3c; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <span style="font-size: 1.2em;">⚔️</span> Caçar
             </button>
-            <button onclick="exibirAlertaCustom('Bloqueado', 'Calabouço será liberado no web app em breve!', false)" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #9b59b6; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <button onclick="exibirAlertaCustom('Aviso', 'O Calabouço será liberado em breve!', false)" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #9b59b6; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <span style="font-size: 1.2em;">🏰</span> Calabouço
             </button>
         </div>
 
         <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-            <button onclick="exibirAlertaCustom('Auto-Caça', 'Apenas no bot por enquanto.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 10x</button>
-            <button onclick="exibirAlertaCustom('Auto-Caça', 'Apenas no bot por enquanto.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 25x</button>
-            <button onclick="exibirAlertaCustom('Auto-Caça', 'Apenas no bot por enquanto.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 35x</button>
+            <button onclick="exibirAlertaCustom('Premium', 'Auto-Caça funciona apenas no chat do Telegram.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 10x</button>
+            <button onclick="exibirAlertaCustom('Premium', 'Auto-Caça funciona apenas no chat do Telegram.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 25x</button>
+            <button onclick="exibirAlertaCustom('Premium', 'Auto-Caça funciona apenas no chat do Telegram.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 35x</button>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
             <button onclick="abrirMapaEldora()" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 6px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">🗺️ Mapa</button>
-            <button onclick="exibirAlertaCustom('Info', 'Use a Wiki para obter dados da região.', false)" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 6px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">ℹ️ Info</button>
+            <button onclick="exibirAlertaCustom('Info', 'Use a aba Wiki para estudar os monstros desta região.', true)" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 6px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">ℹ️ Info</button>
         </div>
     `;
 }
@@ -229,7 +239,7 @@ async function abrirMapaEldora() {
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
 
-    conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">Desenhando pergaminho do mapa... 🗺️</p>';
+    conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">Abrindo pergaminho... 🗺️</p>';
 
     try {
         const resposta = await fetch(`/api/personagem/${charId}`);
@@ -246,13 +256,27 @@ async function abrirMapaEldora() {
         let infoPainel = '';
         let pinosHtml = '';
 
+        // TELA DE VIAGEM ANIMADA (Para jogadores Free)
         if (p.estado && p.estado.action === 'travel') {
             const dataFim = new Date(p.estado.finish_time);
+            const destinoNome = NOMES_REGIOES[p.estado.details.destination] || "Região Desconhecida";
+            
             infoPainel = `
-                <div style="background: #020617; border: 2px solid #ef4444; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 15px;">
-                    <h3 style="color: #ef4444; margin: 0 0 5px 0;">Em Viagem...</h3>
-                    <p style="color: #aaa; font-size: 0.9em; margin: 0 0 10px 0;">Destino: <b>${NOMES_REGIOES[p.estado.details.destination]}</b></p>
-                    <div style="font-size: 2.5em; color: #f1c40f; font-weight: bold; font-family: monospace;" id="timer-viagem">00:00</div>
+                <style>
+                    @keyframes pulseRing { 0% { transform: scale(0.9); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+                    @keyframes spin { 100% { transform: rotate(360deg); } }
+                </style>
+                <div style="background: linear-gradient(180deg, #0f172a, #020617); border: 2px solid #f39c12; border-radius: 12px; padding: 25px 15px; text-align: center; margin-bottom: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.6);">
+                    <h3 style="color: #f39c12; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">🐎 Na Estrada</h3>
+                    <p style="color: #94a3b8; font-size: 0.9em; margin: 0 0 20px 0;">Caminhando para <b>${destinoNome}</b></p>
+                    
+                    <div style="position: relative; width: 60px; height: 60px; margin: 0 auto 20px auto;">
+                        <div style="position: absolute; top:0; left:0; width:100%; height:100%; border-radius:50%; border: 3px dashed #f59e0b; animation: spin 4s linear infinite;"></div>
+                        <div style="position: absolute; top:0; left:0; width:100%; height:100%; border-radius:50%; border: 3px solid #d97706; animation: pulseRing 1.5s ease-out infinite;"></div>
+                        <div style="position: absolute; top:50%; left:50%; transform: translate(-50%, -50%); font-size: 1.5em;">🏇</div>
+                    </div>
+                    
+                    <div style="font-size: 2.8em; color: #fff; font-weight: 800; font-family: monospace; text-shadow: 0 0 10px rgba(243,156,18,0.8);" id="timer-viagem">00:00</div>
                 </div>
             `;
             iniciarCronometroViagem(dataFim);
@@ -261,16 +285,17 @@ async function abrirMapaEldora() {
             if(coord) pinosHtml += `<div class="map-pin accessible" style="top: ${coord.top}%; left: ${coord.left}%;"></div>`;
 
         } else {
+            // TELA DE ESCOLHER DESTINO NO MAPA
             let locaisPossiveis = ehVIP ? Object.keys(NOMES_REGIOES).filter(r => r !== p.local_atual) : (CONEXOES_MAPA[p.local_atual] || []);
 
             for (const regiaoId in COORDENADAS_MAPA) {
                 let coord = COORDENADAS_MAPA[regiaoId];
                 let classePino = 'map-pin';
-                let cliqueAcao = `exibirAlertaCustom('Distante', 'Você não pode viajar para cá agora! Vá para uma região vizinha primeiro.', false)`;
+                let cliqueAcao = `exibirAlertaCustom('Distante', 'Você precisa viajar para uma região vizinha primeiro.', false)`;
 
                 if (regiaoId === p.local_atual) {
                     classePino += ' current';
-                    cliqueAcao = `exibirAlertaCustom('Destino', 'Você já está em ${NOMES_REGIOES[regiaoId]}.', false)`;
+                    cliqueAcao = `exibirAlertaCustom('Local Atual', 'Você já está acampado aqui.', true)`;
                 } else if (locaisPossiveis.includes(regiaoId)) {
                     classePino += ' accessible';
                     cliqueAcao = `confirmarViagemMapa('${regiaoId}')`;
@@ -280,28 +305,28 @@ async function abrirMapaEldora() {
             }
 
             infoPainel = `
-                <div style="background: #020617; padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #1e293b;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: #94a3b8; font-size: 0.85em;">Local Atual:</span>
-                        <strong style="color: #f1c40f;">📍 ${NOMES_REGIOES[p.local_atual] || p.local_atual}</strong>
+                <div style="background: #020617; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 8px; margin-bottom: 8px;">
+                        <span style="color: #94a3b8; font-size: 0.85em; font-weight: bold; text-transform: uppercase;">Você está em:</span>
+                        <strong style="color: #f1c40f; font-size: 1.1em;">📍 ${NOMES_REGIOES[p.local_atual] || p.local_atual}</strong>
                     </div>
-                    <div style="margin-top: 5px; font-size: 0.8em; color: #aaa;">
-                        <span style="display:inline-block; width:10px; height:10px; background:#2ecc71; border-radius:50%; margin-right:5px;"></span> Destinos Disponíveis (${ehVIP ? 'Instântaneo' : '6 min'})<br>
-                        <span style="display:inline-block; width:10px; height:10px; background:#e74c3c; border-radius:50%; margin-right:5px;"></span> Bloqueado
+                    <div style="font-size: 0.8em; color: #cbd5e1; display: flex; flex-direction: column; gap: 4px;">
+                        <div><span style="display:inline-block; width:10px; height:10px; background:#2ecc71; border-radius:50%; margin-right:5px; box-shadow: 0 0 5px #2ecc71;"></span> <span style="color:#2ecc71; font-weight:bold;">Verde:</span> Clique para viajar (${ehVIP ? 'Portal Instantâneo' : 'Caminhada 6 min'})</div>
+                        <div><span style="display:inline-block; width:10px; height:10px; background:#e74c3c; border-radius:50%; margin-right:5px;"></span> <span style="color:#e74c3c; font-weight:bold;">Vermelho:</span> Muito distante / Bloqueado</div>
                     </div>
                 </div>
             `;
         }
 
-        const LINK_IMAGEM_GITHUB = 'https://github.com/user-attachments/assets/f81b4ce7-5880-4116-b975-d478477b0cc8'; 
+        const LINK_IMAGEM_GITHUB = 'https://github.com/user-attachments/assets/0d242135-57d0-4435-9251-d48acbd5deba'; 
 
         conteudo.innerHTML = `
             ${infoPainel}
-            <div class="map-container">
+            <div class="map-container" style="border: 2px solid ${p.estado && p.estado.action === 'travel' ? '#f39c12' : '#334155'}; transition: 0.3s;">
                 <img src="${LINK_IMAGEM_GITHUB}" style="width: 100%; display: block;">
                 ${pinosHtml}
             </div>
-            <button onclick="carregarReino()" style="width: 100%; background: #1a1a1a; padding: 12px; border: 1px solid #333; color: white; border-radius: 8px;">⬅️ Voltar para a Região</button>
+            <button onclick="carregarReino()" style="width: 100%; background: #0f172a; padding: 14px; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; font-weight: bold; font-size: 1em; margin-top: 10px; cursor: pointer;">⬅️ Voltar para a Região</button>
         `;
 
     } catch (e) {
@@ -323,18 +348,18 @@ async function iniciarViagemServidor(destino) {
         const dados = await res.json();
         
         if (dados.erro) { 
-            exibirAlertaCustom("Aviso", dados.erro, false); 
+            exibirAlertaCustom("Magia Falhou", dados.erro, false); 
             return; 
         }
 
         if (dados.is_vip) {
-            exibirAlertaCustom("Sucesso!", "Chegou ao destino instantaneamente!", true);
-            carregarReino(); 
+            exibirAlertaCustom("Portal Aberto!", `A magia te transportou para ${NOMES_REGIOES[destino]}!`, true);
+            carregarReino(); // Volta para a tela da região
         } else {
-            abrirMapaEldora(); 
+            abrirMapaEldora(); // Recarrega o mapa pra mostrar a animação de caminhada
         }
     } catch(e) {
-        exibirAlertaCustom("Erro", "Erro de magia nas rotas.", false);
+        exibirAlertaCustom("Erro Obscuro", "Não foi possível conjurar a magia de viagem.", false);
     }
 }
 
@@ -361,7 +386,10 @@ function iniciarCronometroViagem(dataFim) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: charId })
             }).then(() => {
-                setTimeout(() => carregarReino(), 1500); 
+                setTimeout(() => {
+                    exibirAlertaCustom("Jornada Concluída!", "Você chegou ao seu destino a salvo.", true);
+                    carregarReino(); 
+                }, 1000); 
             });
             return;
         }
