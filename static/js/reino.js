@@ -211,6 +211,9 @@ async function iniciarViagemServidor(destino) {
     }
 }
 
+// ==========================================
+// FUNÇÃO: CRONÔMETRO (CONTAGEM REGRESSIVA)
+// ==========================================
 function iniciarCronometroViagem(dataFim) {
     if (_intervaloViagem) clearInterval(_intervaloViagem);
     
@@ -220,11 +223,22 @@ function iniciarCronometroViagem(dataFim) {
 
         const diffMS = dataFim - new Date();
 
+        // QUANDO A VIAGEM ACABAR:
         if (diffMS <= 0) {
             clearInterval(_intervaloViagem);
             elementoTimer.innerHTML = "Chegou!";
             elementoTimer.style.color = "#2ecc71";
-            setTimeout(() => abrirMapaEldora(), 1500); 
+            
+            // 🔗 ENVIA O AVISO PRO PYTHON SINCRONIZAR O BOT DO TELEGRAM
+            const charId = localStorage.getItem("jogadorEldoraID");
+            fetch('/api/finalizar_viagem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: charId })
+            }).then(() => {
+                // Depois de avisar o bot, recarrega o mapa
+                setTimeout(() => abrirMapaEldora(), 1500); 
+            });
             return;
         }
 
