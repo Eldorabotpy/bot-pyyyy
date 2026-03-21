@@ -18,22 +18,18 @@ const NOMES_REGIOES = {
 // ==========================================
 // 📍 COORDENADAS DOS PINOS NO MAPA (%)
 // ==========================================
-// Você precisará ajustar estes números de top e left
-// para que a bolinha fique exatamente em cima do desenho da sua imagem.
-// top: 0% é o topo da imagem, 100% é embaixo.
-// left: 0% é a esquerda, 100% é a direita.
 const COORDENADAS_MAPA = {
-    "reino_eldora": { top: 50, left: 50 }, // Centralizado
-    "pradaria_inicial": { top: 65, left: 40 },
-    "floresta_sombria": { top: 75, left: 25 },
-    "pedreira_granito": { top: 35, left: 55 },
-    "campos_linho": { top: 25, left: 40 },
-    "pico_grifo": { top: 15, left: 20 },
-    "mina_ferro": { top: 20, left: 75 },
-    "forja_abandonada": { top: 40, left: 80 },
-    "pantano_maldito": { top: 80, left: 70 },
-    "deserto_ancestral": { top: 85, left: 50 },
-    "picos_gelados": { top: 90, left: 20 }
+    "reino_eldora": { top: 48, left: 50 }, // Castelo (Centro)
+    "pradaria_inicial": { top: 33, left: 62 }, // Casinha com plantação
+    "floresta_sombria": { top: 25, left: 82 }, // Árvores arroxeadas (Topo Dir)
+    "pedreira_granito": { top: 45, left: 85 }, // Pedras e picaretas (Meio Dir)
+    "campos_linho": { top: 58, left: 78 }, // Flores azuis e brancas
+    "pico_grifo": { top: 72, left: 75 }, // Montanha com ninho
+    "mina_ferro": { top: 82, left: 58 }, // Caverna com trilhos
+    "forja_abandonada": { top: 78, left: 35 }, // Ruína com fogo azul
+    "pantano_maldito": { top: 60, left: 20 }, // Água verde e caveira
+    "deserto_ancestral": { top: 32, left: 22 }, // Areia e pilares (Topo Esq)
+    "picos_gelados": { top: 15, left: 50 }  // Neve e lagos (Topo Centro)
 };
 
 // Quem se conecta com quem (para jogadores Free)
