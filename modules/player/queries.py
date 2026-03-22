@@ -1,5 +1,5 @@
 # modules/player/queries.py
-# (VERSÃO BLINDADA: Compatível com PyMongo Síncrono e Asyncio)
+# (VERSÃO BLINDADA E PADRONIZADA: Compatível com PyMongo Síncrono e Asyncio)
 
 from __future__ import annotations
 import re as _re
@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 def _normalize_char_name(_s: str) -> str:
     """Remove caracteres especiais invisíveis e normaliza espaços."""
-    if not isinstance(_s, str): return ""
+    if not isinstance(_s, str) or not _s: 
+        return ""
     # Remove caracteres de formatação invisíveis
     s = _re.sub(r"[\u200B-\u200D\uFEFF]", "", _s)
     # Remove emojis e espaços extras
@@ -44,7 +45,6 @@ async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
     user_text = raw_text.lstrip("@").lower()
 
     # 1. TENTATIVA: NOME DO PERSONAGEM (Exato/Normalizado)
-    # Busca por 'name_normalized' ou 'character_name_normalized' (compatibilidade)
     if norm_text:
         query_norm = {
             "$or": [
@@ -53,13 +53,11 @@ async def find_player_by_name(name: str) -> Optional[Tuple[str, dict]]:
                 {"character_name": {"$regex": f"^{_re.escape(raw_text)}$", "$options": "i"}}
             ]
         }
-        # Executa em thread separada para não bloquear o loop
         doc = await asyncio.to_thread(users_collection.find_one, query_norm)
         if doc:
             return (str(doc['_id']), await get_player_data(str(doc['_id'])))
 
     # 2. TENTATIVA: USERNAME DO TELEGRAM (Exato)
-    # Regex case-insensitive para username
     query_user = {
         "$or": [
             {"username": {"$regex": f"^{_re.escape(user_text)}$", "$options": "i"}},
@@ -111,14 +109,12 @@ async def find_players_by_name_partial(query: str) -> List[Tuple[str, dict]]:
     out = []
     
     def _run_query():
-        # Limita a 10 resultados para não pesar
         return list(users_collection.find(q).limit(10))
     
     docs = await asyncio.to_thread(_run_query)
     
     for doc in docs:
         uid = str(doc["_id"])
-        # Usa get_player_data para garantir cache e dados atualizados
         p = await get_player_data(uid)
         if p: out.append((uid, p))
     return out
@@ -140,17 +136,20 @@ async def find_by_username(username: str) -> Optional[dict]:
 # CRUD
 # ==============================================================================
 
-async def create_new_player(user_id: Union[str, ObjectId], character_name: str, username: str = None, telegram_id: int = None) -> dict:
+async def create_new_player(user_id: Union[str, ObjectId], character_name: str = None, username: str = None, telegram_id: int = None) -> dict:
     oid = ObjectId(user_id) if isinstance(user_id, str) and ObjectId.is_valid(user_id) else user_id
     now_iso = datetime.now(timezone.utc).isoformat()
-    norm = _normalize_char_name(character_name)
+    
+    # 🎯 CORREÇÃO: Evita salvar a string "None" se o jogador for criado sem nome
+    char_name_val = character_name if character_name else None
+    norm = _normalize_char_name(char_name_val) if char_name_val else None
 
     new_player_data = {
         "_id": oid,
-        "telegram_id": telegram_id,  # 🎯 CORREÇÃO: Vincula o ID real do jogador
-        "name": str(character_name),
-        "character_name": str(character_name), 
-        "username": username or "",  # 🎯 CORREÇÃO: Agora o @username será salvo
+        "telegram_id": telegram_id,  # 🎯 CORREÇÃO: ID unificado
+        "name": char_name_val,
+        "character_name": char_name_val, 
+        "username": username or "",
         "name_normalized": norm,
         "class": "aventureiro",
         "class_key": "aventureiro",
@@ -178,10 +177,14 @@ async def create_new_player(user_id: Union[str, ObjectId], character_name: str, 
         "guild": None
     }
     
+    # Se criou a conta sem nome, já ativa a trava do tutorial automaticamente
+    if not char_name_val:
+        new_player_data["onboarding_stage"] = "name"
+    
     await save_player_data(oid, new_player_data)
     return new_player_data
 
-async def get_or_create_player(user_id: str, default_name: str = "Aventureiro", username: str = None, telegram_id: int = None) -> dict:
+async def get_or_create_player(user_id: str, default_name: str = None, username: str = None, telegram_id: int = None) -> dict:
     """Tenta buscar; se não existir, cria."""
     pdata = await get_player_data(user_id)
     if not pdata: 
@@ -201,7 +204,7 @@ async def delete_player(user_id: str) -> bool:
     return True
 
 # ==============================================================================
-# ITERADORES (CORRIGIDO)
+# ITERADORES
 # ==============================================================================
 
 def iter_player_ids() -> Iterator[str]:
@@ -214,7 +217,6 @@ def iter_player_ids() -> Iterator[str]:
         return iter([])
 
     try:
-        # Retorna apenas o campo _id para ser rápido e leve
         cursor = users_collection.find({}, {"_id": 1})
         for d in cursor:
             yield str(d["_id"])
@@ -225,18 +227,12 @@ def iter_player_ids() -> Iterator[str]:
 async def iter_players():
     """
     Itera sobre todos os jogadores de forma segura para PyMongo + Asyncio.
-    IMPORTANTE: Não usar 'async for' direto no cursor do pymongo sem motor async (Motor).
-    Aqui usamos yield manual com sleep para não bloquear o loop.
     """
     if users_collection is not None:
         try:
-            # Pega o cursor síncrono
             cursor = users_collection.find({})
-            
-            # Itera sincronamente, mas cede o controle ao event loop a cada passo
             for doc in cursor:
                 yield str(doc["_id"]), doc
-                # Isso impede que o bot trave enquanto processa milhares de jogadores
                 await asyncio.sleep(0)
         except Exception as e:
             logger.error(f"Erro em iter_players: {e}")
@@ -256,8 +252,8 @@ async def check_migration_status(telegram_id: int) -> Tuple[bool, bool, Optional
     # 1. Verifica se já existe um usuário linkado a este Telegram ID na collection nova
     if users_collection is not None:
         try:
-            # Procura por telegram_id ou owner_id na coleção nova
-            q = {"$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}]}
+            # 🎯 CORREÇÃO: Removido o telegram_owner_id velho, agora busca só pelo padrão correto
+            q = {"telegram_id": telegram_id}
             doc = await asyncio.to_thread(users_collection.find_one, q)
             already_migrated = (doc is not None)
         except Exception as e:
