@@ -44,7 +44,6 @@ def _normalize_telegram_id(telegram_user_id) -> str | None:
             return tid
         return None
 
-    # outros -> tenta converter e validar
     try:
         tid = str(telegram_user_id).strip()
         if tid.isdigit():
@@ -58,27 +57,22 @@ def _normalize_telegram_id(telegram_user_id) -> str | None:
 def _normalize_player_id(player_id) -> str | None:
     """
     Aceita qualquer coisa, mas só retorna string de ObjectId válido.
-    Se for ID legado (int) ou string inválida, retorna None.
     """
     if player_id is None:
         return None
 
-    # Se vier ObjectId, ok
     if isinstance(player_id, ObjectId):
         return str(player_id)
 
-    # Se vier string, precisa ser ObjectId válido
     if isinstance(player_id, str):
         pid = player_id.strip()
         if ObjectId.is_valid(pid):
             return pid
         return None
 
-    # Se vier int (legado), rejeita
     if isinstance(player_id, int):
         return None
 
-    # Outros tipos: tenta converter pra string e validar
     try:
         pid = str(player_id).strip()
         if ObjectId.is_valid(pid):
@@ -92,19 +86,16 @@ def _normalize_player_id(player_id) -> str | None:
 async def save_persistent_session(telegram_user_id, player_id):
     """
     Salva sessão persistente do Telegram -> player ObjectId (string).
-    Se player_id não for ObjectId válido, NÃO salva.
     """
     if sessions_collection is None:
         return
 
     tid = _normalize_telegram_id(telegram_user_id)
     if not tid:
-        logger.warning(f"[SESSIONS] Ignorando save: telegram_id inválido ({telegram_user_id})")
         return
 
     pid = _normalize_player_id(player_id)
     if not pid:
-        logger.warning(f"[SESSIONS] Ignorando save: player_id inválido ({player_id}) para tg={tid}")
         return
 
     try:
@@ -126,7 +117,6 @@ async def save_persistent_session(telegram_user_id, player_id):
 async def get_persistent_session(telegram_user_id) -> str | None:
     """
     Retorna string ObjectId válida ou None.
-    Se no banco tiver lixo/legado, retorna None (forçando /start e login).
     """
     if sessions_collection is None:
         return None
@@ -143,7 +133,6 @@ async def get_persistent_session(telegram_user_id) -> str | None:
         pid = doc.get("player_id")
         pid_norm = _normalize_player_id(pid)
         if not pid_norm:
-            # sessão inválida -> apaga para evitar loop de erro
             try:
                 await clear_persistent_session(tid)
             except Exception:
