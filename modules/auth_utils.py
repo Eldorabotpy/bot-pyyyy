@@ -8,8 +8,6 @@ from telegram.constants import ParseMode
 from modules.player.account_lock import check_account_lock
 from modules import player_manager
 
-
-
 try:
     from modules.sessions import get_persistent_session
 except ImportError:
@@ -85,6 +83,7 @@ def requires_login(func):
     Decorator blindado:
     - Garante sessão válida (RAM ou persistência).
     - BLOQUEIA contas com account_lock ativo.
+    - BLOQUEIA contas que não finalizaram o onboarding (criação de personagem).
     """
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
@@ -111,11 +110,12 @@ def requires_login(func):
             return
 
         # ===============================
-        # 🔒 BLOQUEIO GLOBAL DE CONTA
+        # 🔒 BLOQUEIO GLOBAL DE CONTA E ONBOARDING
         # ===============================
         try:
             pdata = await player_manager.get_player_data(pid)
             if pdata:
+                # 1. Verifica se a conta está banida/bloqueada
                 locked, lock_msg = check_account_lock(pdata)
                 if locked:
                     if update.callback_query:
@@ -137,12 +137,30 @@ def requires_login(func):
                             parse_mode=ParseMode.HTML
                         )
                     return  # 🚫 BLOQUEIA QUALQUER AÇÃO
+
+                # 2. Verifica se a conta está travada na criação do personagem
+                if pdata.get("onboarding_stage") or not pdata.get("character_name"):
+                    msg_onboarding = "⚠️ <b>Ação bloqueada!</b>\nVocê precisa terminar de criar seu personagem (definir o nome) antes de jogar."
+                    if update.callback_query:
+                        try:
+                            await update.callback_query.answer(
+                                "⚠️ Termine a criação do personagem!", 
+                                show_alert=True
+                            )
+                        except Exception:
+                            pass
+                    elif update.effective_message:
+                        await update.effective_message.reply_text(
+                            msg_onboarding, 
+                            parse_mode=ParseMode.HTML
+                        )
+                    return # 🚫 BLOQUEIA A AÇÃO SE NÃO TIVER NOME CONCLUÍDO
+
         except Exception:
             # segurança: nunca quebra fluxo por erro de bloqueio
             pass
 
-        # Sessão válida e conta liberada
+        # Sessão válida, conta liberada e personagem criado
         return await func(update, context, *args, **kwargs)
 
     return wrapper
-
