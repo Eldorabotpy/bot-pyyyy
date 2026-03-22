@@ -1,6 +1,3 @@
-// ==========================================
-// CONFIGURAÇÃO DO MAPA MÚNDI E PINOS
-// ==========================================
 const NOMES_REGIOES = {
     "reino_eldora": "Capital do Reino",
     "pradaria_inicial": "Pradaria Inicial",
@@ -15,11 +12,11 @@ const NOMES_REGIOES = {
     "picos_gelados": "Picos Gelados"
 };
 
-// 👇 AQUI VOCÊ COLA OS LINKS DO GITHUB DE CADA IMAGEM QUADRADA 👇
+// 👇 COLOQUE OS LINKS DAS SUAS IMAGENS AQUI 👇
 const IMAGENS_DAS_REGIOES = {
     "reino_eldora": "https://github.com/user-attachments/assets/a9d487d1-8d12-4dcf-8681-0c7fd4ef8d98",
     "pradaria_inicial": "https://github.com/user-attachments/assets/04217592-0102-4e08-ae26-99a4d6aca905",
-    "floresta_sombria": "https://github.com/user-attachments/assets/70a315c5-15c2-4277-af98-1ee79c7dc5a8", // Exemplo com a sua imagem da floresta!
+    "floresta_sombria": "https://github.com/user-attachments/assets/70a315c5-15c2-4277-af98-1ee79c7dc5a8", 
     "pedreira_granito": "https://github.com/user-attachments/assets/76e836d2-3a23-4564-9810-678408c520b9",
     "campos_linho": "https://github.com/user-attachments/assets/24ced0e5-ab12-4a60-9962-c7efed362de5",
     "pico_grifo": "https://github.com/user-attachments/assets/1978a416-381b-4dda-a819-bd3eaf23c894",
@@ -61,9 +58,6 @@ const CONEXOES_MAPA = {
 let _intervaloViagem = null;
 window.dadosViagemAtual = {};
 
-// ==========================================
-// FUNÇÕES DE DIÁLOGOS PERSONALIZADOS (MODALS)
-// ==========================================
 function exibirAlertaCustom(titulo, mensagem, isSuccess=true) {
     const corBase = isSuccess ? '#2ecc71' : '#e74c3c';
     const icone = isSuccess ? '✨' : '❌';
@@ -85,8 +79,6 @@ function exibirAlertaCustom(titulo, mensagem, isSuccess=true) {
 function confirmarViagemMapa(destino) {
     const ehVip = window.dadosViagemAtual.vip;
     const nome = NOMES_REGIOES[destino] || destino;
-    
-    // LORE RPG PARA O TEXTO
     const titulo = ehVip ? '🌌 Portal Místico' : '🗺️ Jornada Longa';
     const corBorda = ehVip ? '#8b5cf6' : '#f39c12';
     const corBotao = ehVip ? 'linear-gradient(90deg, #8b5cf6, #6d28d9)' : 'linear-gradient(90deg, #f59e0b, #d97706)';
@@ -112,9 +104,6 @@ function confirmarViagemMapa(destino) {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-// ==========================================
-// FUNÇÃO PRINCIPAL: O REINO DINÂMICO
-// ==========================================
 async function carregarReino() {
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
@@ -151,18 +140,13 @@ async function carregarReino() {
     }
 }
 
-// ==========================================
-// RENDERIZA A CIDADE (A CAPITAL)
-// ==========================================
 function renderizarCidade(conteudo, p) {
     const imgCidade = IMAGENS_DAS_REGIOES["reino_eldora"] || "/static/regions/reino_eldora.jpg";
     
     conteudo.innerHTML = `
         <div class="home-banner" style="border-color: #f39c12; margin-bottom: 15px; border-radius: 12px; overflow: hidden; position: relative;">
             <img src="${imgCidade}" onerror="this.src='https://placehold.co/600x600/111/333?text=A+Capital+de+Eldora'" style="width: 100%; aspect-ratio: 1 / 1; display: block; object-fit: cover;">
-            
             <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 35%; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.9));"></div>
-            
             <div style="position: absolute; bottom: 15px; width: 100%; text-align: center;">
                 <h2 style="color: #f8fafc; margin: 0 0 5px 0; font-size: 1.6em; text-shadow: 2px 2px 5px #000;">A Capital</h2>
                 <p style="color: #f39c12; font-size: 0.9em; font-weight: bold; margin: 0; text-shadow: 1px 1px 3px #000;">O coração do mundo.</p>
@@ -183,22 +167,17 @@ function renderizarCidade(conteudo, p) {
             <button onclick="exibirAlertaCustom('Bloqueado', 'Arena em manutenção.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #ef4444; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
                 <span style="font-size: 2em; margin-bottom: 5px;">⚔️</span><strong style="color: #f8fafc; font-size: 0.95em;">Arena PvP</strong>
             </button>
-            <button onclick="exibirAlertaCustom('Bloqueado', 'Guildas não liberadas ainda.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #eab308; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
-                <span style="font-size: 2em; margin-bottom: 5px;">🏰</span><strong style="color: #f8fafc; font-size: 0.95em;">Guilda</strong>
-            </button>
-            <button onclick="exibirAlertaCustom('Bloqueado', 'Laboratório isolado por risco de explosão.', false)" style="background: #1e293b; border: 1px solid #334155; border-bottom: 3px solid #06b6d4; padding: 15px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center;">
-                <span style="font-size: 2em; margin-bottom: 5px;">🧪</span><strong style="color: #f8fafc; font-size: 0.95em;">Laboratório</strong>
-            </button>
         </div>
     `;
 }
 
-// ==========================================
-// RENDERIZA A SELVA (ÁREA EXTERNA)
-// ==========================================
 function renderizarSelva(conteudo, p) {
     const nomeRegiao = NOMES_REGIOES[p.local_atual] || "Terras Selvagens";
     const imagemLink = IMAGENS_DAS_REGIOES[p.local_atual] || ''; 
+    
+    // 👇 ISSO AQUI GERA A FOTO EXATA DA SUA CLASSE PARA A TELA DE COMBATE! 👇
+    const classeFormatada = (p.classe || 'aventureiro').toLowerCase().replace(/ /g, '_');
+    const playerAvatar = `/static/classes/${classeFormatada}.png`;
     
     conteudo.innerHTML = `
         <div class="home-banner" style="border-color: #2ecc71; margin-bottom: 15px; position: relative; border-radius: 12px; overflow: hidden;">
@@ -211,7 +190,7 @@ function renderizarSelva(conteudo, p) {
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-            <button onclick="iniciarCacaWeb()" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #e74c3c; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <button onclick="iniciarCacadaApp('${playerAvatar}')" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #e74c3c; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <span style="font-size: 1.2em;">⚔️</span> Caçar
             </button>
             <button onclick="exibirAlertaCustom('Aviso', 'O Calabouço será liberado em breve!', false)" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #9b59b6; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -227,14 +206,11 @@ function renderizarSelva(conteudo, p) {
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
             <button onclick="abrirMapaEldora()" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 6px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">🗺️ Mapa</button>
-            <button onclick="exibirAlertaCustom('Info', 'Use a aba Wiki para estudar os monstros desta região.', true)" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 6px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">ℹ️ Info</button>
+            <button onclick="exibirAlertaCustom('Info', 'Use a aba Wiki para estudar os monstros.', true)" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 6px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">ℹ️ Info</button>
         </div>
     `;
 }
 
-// ==========================================
-// FUNÇÃO: ABRIR O MAPA MÚNDI
-// ==========================================
 async function abrirMapaEldora() {
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
@@ -256,7 +232,6 @@ async function abrirMapaEldora() {
         let infoPainel = '';
         let pinosHtml = '';
 
-        // TELA DE VIAGEM ANIMADA (Para jogadores Free)
         if (p.estado && p.estado.action === 'travel') {
             const dataFim = new Date(p.estado.finish_time);
             const destinoNome = NOMES_REGIOES[p.estado.details.destination] || "Região Desconhecida";
@@ -285,7 +260,6 @@ async function abrirMapaEldora() {
             if(coord) pinosHtml += `<div class="map-pin accessible" style="top: ${coord.top}%; left: ${coord.left}%;"></div>`;
 
         } else {
-            // TELA DE ESCOLHER DESTINO NO MAPA
             let locaisPossiveis = ehVIP ? Object.keys(NOMES_REGIOES).filter(r => r !== p.local_atual) : (CONEXOES_MAPA[p.local_atual] || []);
 
             for (const regiaoId in COORDENADAS_MAPA) {
@@ -334,9 +308,6 @@ async function abrirMapaEldora() {
     }
 }
 
-// ==========================================
-// FUNÇÃO: INICIAR VIAGEM + SERVIDOR
-// ==========================================
 async function iniciarViagemServidor(destino) {
     const charId = localStorage.getItem("jogadorEldoraID");
     try {
@@ -354,18 +325,15 @@ async function iniciarViagemServidor(destino) {
 
         if (dados.is_vip) {
             exibirAlertaCustom("Portal Aberto!", `A magia te transportou para ${NOMES_REGIOES[destino]}!`, true);
-            carregarReino(); // Volta para a tela da região
+            carregarReino(); 
         } else {
-            abrirMapaEldora(); // Recarrega o mapa pra mostrar a animação de caminhada
+            abrirMapaEldora(); 
         }
     } catch(e) {
         exibirAlertaCustom("Erro Obscuro", "Não foi possível conjurar a magia de viagem.", false);
     }
 }
 
-// ==========================================
-// FUNÇÃO: CRONÔMETRO DE VIAGEM COM SINCRONIA
-// ==========================================
 function iniciarCronometroViagem(dataFim) {
     if (_intervaloViagem) clearInterval(_intervaloViagem);
     

@@ -38,7 +38,7 @@ async function iniciarCacadaApp(playerAvatar) {
                         <div style="width: 100%; height: 12px; background: #333; border-radius: 6px; border: 1px solid #000; margin-bottom: 5px; overflow: hidden;">
                             <div id="bar-hp-player" style="width: 100%; height: 100%; background: #2ecc71; transition: 0.3s;"></div>
                         </div>
-                        <img src="${playerAvatar}" style="width: 80px; height: 80px; border-radius: 8px; border: 2px solid #2ecc71;">
+                        <img src="${playerAvatar}" style="width: 80px; height: 80px; border-radius: 8px; border: 2px solid #2ecc71; object-fit: cover; object-position: top;">
                         <div style="color: white; font-weight: bold; font-size: 0.85em; margin-top: 5px;">Você</div>
                     </div>
 
@@ -48,7 +48,7 @@ async function iniciarCacadaApp(playerAvatar) {
                         <div style="width: 100%; height: 12px; background: #333; border-radius: 6px; border: 1px solid #000; margin-bottom: 5px; overflow: hidden;">
                             <div id="bar-hp-mob" style="width: 100%; height: 100%; background: #e74c3c; transition: 0.3s;"></div>
                         </div>
-                        <img src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/100x100/333/e74c3c?text=👹'" style="width: 80px; height: 80px; border-radius: 8px; border: 2px solid #e74c3c;">
+                        <img src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/100x100/333/e74c3c?text=👹'" style="width: 80px; height: 80px; border-radius: 8px; border: 2px solid #e74c3c; object-fit: cover;">
                         <div style="color: white; font-weight: bold; font-size: 0.85em; margin-top: 5px;">${dados.mob.nome}</div>
                     </div>
                 </div>
@@ -58,7 +58,7 @@ async function iniciarCacadaApp(playerAvatar) {
                 <div style="color: #f1c40f; text-align: center; font-weight: bold; margin-bottom: 5px;">Um ${dados.mob.nome} selvagem apareceu!</div>
             </div>
             
-            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: #1a1a1a; padding: 12px; border: 1px solid #333; color: white; border-radius: 8px; margin-top: 15px; display: none;">⬅️ Voltar</button>
+            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: #1a1a1a; padding: 12px; border: 1px solid #333; color: white; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer;">⬅️ Voltar para Região</button>
         `;
 
         // ----------------------------------------------------
@@ -85,12 +85,15 @@ async function iniciarCacadaApp(playerAvatar) {
                 mobHpAtual -= acao.dano;
                 const pctMob = Math.max(0, (mobHpAtual / dados.mob.hp_max) * 100);
                 document.getElementById('bar-hp-mob').style.width = pctMob + '%';
-            } else {
+            } else if (acao.atacante === "mob") {
                 pElem.style.color = "#e74c3c";
                 pElem.innerHTML = acao.texto;
                 playerHpAtual -= acao.dano;
                 const pctPlayer = Math.max(0, (playerHpAtual / dados.player.hp_max) * 100);
                 document.getElementById('bar-hp-player').style.width = pctPlayer + '%';
+            } else {
+                pElem.style.color = "#f39c12";
+                pElem.innerHTML = acao.texto;
             }
 
             logBox.appendChild(pElem);
@@ -99,6 +102,7 @@ async function iniciarCacadaApp(playerAvatar) {
         }, 800);
 
     } catch(e) {
+        console.error(e);
         exibirAlertaCustom("Erro", "Falha de conexão com a arena.", false);
         carregarReino();
     }
