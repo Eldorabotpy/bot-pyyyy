@@ -1,5 +1,5 @@
 // ==========================================
-// SISTEMA DE COMBATE (ESTILO POKÉMON GBA)
+// SISTEMA DE COMBATE (ESTILO POKÉMON GBA - PRO)
 // ==========================================
 async function iniciarCacadaApp(playerAvatar) {
     const conteudo = document.getElementById('aba-reino');
@@ -9,7 +9,7 @@ async function iniciarCacadaApp(playerAvatar) {
     conteudo.innerHTML = `
         <div style="height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
             <div style="font-size: 3em; animation: bob 1s infinite;">🌿</div>
-            <h3 style="color: #2ecc71; margin-top: 15px;">Andando pelo mato alto...</h3>
+            <h3 style="color: #2ecc71; margin-top: 15px; font-family: monospace;">Andando pelo mato alto...</h3>
         </div>
         <style>@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }</style>
     `;
@@ -29,58 +29,79 @@ async function iniciarCacadaApp(playerAvatar) {
         }
 
         // ====================================================
-        // CSS EMBUTIDO DA ARENA RETRÔ (ANIMAÇÕES E LAYOUT)
+        // CSS EMBUTIDO (UPGRADE POKÉMON ADVANCED)
         // ====================================================
         const arenaStyles = `
             <style>
                 .pkmn-arena {
                     position: relative; width: 100%; height: 280px;
-                    background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 45%, #7ec850 45%, #5ebd3e 100%);
-                    border: 4px solid #1e293b; border-radius: 8px; overflow: hidden; margin-bottom: 10px;
-                    box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+                    background: linear-gradient(to bottom, #1e3c72 0%, #2a5298 45%, #3e5151 45%, #609931 100%);
+                    border: 4px solid #0f172a; border-radius: 8px; overflow: hidden; margin-bottom: 12px;
+                    box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
                 }
                 
-                /* Sombras circulares (As bases) */
+                /* Sombras circulares no chão */
                 .pkmn-base {
-                    position: absolute; background: rgba(0,0,0,0.3); border-radius: 50%;
-                    height: 25px; left: 50%; transform: translateX(-50%); bottom: -10px;
+                    position: absolute; background: rgba(0,0,0,0.4); border-radius: 50%;
+                    height: 25px; left: 50%; transform: translateX(-50%); bottom: -12px;
+                    filter: blur(2px);
                 }
                 
-                /* Sprites dos personagens */
+                /* Sprites (Agora parecem Tokens de Batalha) */
                 .pkmn-sprite {
-                    position: relative; z-index: 2; border-radius: 8px; object-fit: cover;
-                    box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 2px solid #fff;
+                    position: relative; z-index: 2; border-radius: 12px; object-fit: cover;
+                    box-shadow: 0 10px 20px rgba(0,0,0,0.7); border: 3px solid #d4af37;
+                    background: #111;
                 }
 
-                /* Caixas de HP Flutuantes */
+                /* Caixas de Status */
                 .pkmn-info {
-                    position: absolute; background: #fffde7; border: 3px solid #475569;
-                    border-radius: 6px; padding: 6px 10px; color: #1e293b;
-                    font-weight: bold; width: 145px; box-shadow: 2px 2px 0px rgba(0,0,0,0.3);
-                    z-index: 10;
+                    position: absolute; background: #fffde7; 
+                    border: 3px solid #1e293b; border-bottom: 5px solid #1e293b; border-right: 5px solid #1e293b;
+                    padding: 8px 12px; color: #1e293b; font-weight: 900; width: 160px; 
+                    box-shadow: 2px 2px 5px rgba(0,0,0,0.4); z-index: 10;
                 }
-                .pkmn-name { font-size: 0.9em; text-transform: uppercase; margin-bottom: 4px; display: flex; justify-content: space-between; }
-                .pkmn-hp-bg { background: #475569; height: 8px; border-radius: 4px; width: 100%; overflow: hidden; border: 1px solid #1e293b; }
-                .pkmn-hp-bar { background: #2ecc71; width: 100%; height: 100%; transition: width 0.3s ease, background-color 0.3s ease; }
+                /* Curvas assimétricas clássicas do GBA */
+                .mob-info { border-radius: 8px 8px 8px 24px; top: 15px; left: 10px; }
+                .player-info { border-radius: 8px 8px 24px 8px; bottom: 15px; right: 10px; }
+
+                .pkmn-name { font-size: 0.95em; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; letter-spacing: 0.5px; }
                 
-                /* Caixas de Texto estilo GameBoy */
+                /* Barra de HP de Elite */
+                .hp-container { display: flex; align-items: center; background: #475569; border-radius: 10px; padding: 2px 4px; border: 2px solid #cbd5e1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+                .hp-tag { color: #f1c40f; font-size: 0.7em; font-weight: 900; margin-right: 5px; text-shadow: 1px 1px 0px #000; letter-spacing: 1px; }
+                .pkmn-hp-bg { background: #1e293b; height: 8px; border-radius: 4px; width: 100%; overflow: hidden; }
+                .pkmn-hp-bar { background: #2ecc71; width: 100%; height: 100%; transition: width 0.3s ease, background-color 0.3s ease; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2); }
+
+                /* Caixa de Diálogo Clássica */
                 .pkmn-dialog {
                     background: #fffde7; border: 4px solid #475569; border-radius: 8px;
-                    padding: 12px; font-family: 'Courier New', Courier, monospace; font-weight: 800;
-                    font-size: 1.05em; color: #1e293b; height: 100px; overflow-y: auto;
-                    box-shadow: 2px 2px 0px rgba(0,0,0,0.3);
+                    padding: 15px; font-family: 'Courier New', Courier, monospace; font-weight: 800;
+                    font-size: 1.1em; color: #1e293b; height: 110px; overflow-y: auto;
+                    box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.3);
+                    position: relative;
+                }
+                /* Setinha vermelha piscando */
+                .blinking-arrow {
+                    position: absolute; bottom: 10px; right: 15px;
+                    width: 0; height: 0; border-left: 8px solid transparent;
+                    border-right: 8px solid transparent; border-top: 12px solid #e74c3c;
+                    animation: blink 0.8s infinite;
                 }
 
-                /* Animações (Keyframes) */
-                @keyframes idleMob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-                @keyframes atkPlayer { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(25px, -25px) scale(1.1); } }
-                @keyframes atkMob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-25px, 25px) scale(1.1); } }
+                /* Animações Mágicas */
+                @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+                @keyframes idleMob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+                @keyframes atkPlayer { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(30px, -30px) scale(1.15); } }
+                @keyframes atkMob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-30px, 30px) scale(1.15); } }
                 @keyframes dmgFlash { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(2) sepia(1) hue-rotate(320deg) saturate(5); } }
+                @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px) rotate(-3deg); } 50% { transform: translateX(6px) rotate(3deg); } 75% { transform: translateX(-6px) rotate(-3deg); } }
 
                 .anim-idle { animation: idleMob 2.5s infinite ease-in-out; }
-                .anim-atk-p { animation: atkPlayer 0.3s ease-in-out; }
-                .anim-atk-m { animation: atkMob 0.3s ease-in-out; }
-                .anim-dmg { animation: dmgFlash 0.3s ease-in-out; }
+                .anim-atk-p { animation: atkPlayer 0.25s ease-in-out; }
+                .anim-atk-m { animation: atkMob 0.25s ease-in-out; }
+                /* O combo de dano: pisca vermelho E treme */
+                .anim-dmg { animation: dmgFlash 0.4s ease-in-out, shake 0.4s ease-in-out; }
             </style>
         `;
 
@@ -89,31 +110,40 @@ async function iniciarCacadaApp(playerAvatar) {
         // ====================================================
         conteudo.innerHTML = arenaStyles + `
             <div class="pkmn-arena">
-                <div class="pkmn-info" style="top: 15px; left: 15px;">
+                <div class="pkmn-info mob-info">
                     <div class="pkmn-name"><span>${dados.mob.nome}</span> <span>Lv?</span></div>
-                    <div class="pkmn-hp-bg"><div id="bar-hp-mob" class="pkmn-hp-bar"></div></div>
+                    <div class="hp-container">
+                        <span class="hp-tag">HP</span>
+                        <div class="pkmn-hp-bg"><div id="bar-hp-mob" class="pkmn-hp-bar"></div></div>
+                    </div>
                 </div>
                 <div style="position: absolute; top: 40px; right: 25px; text-align: center;">
                     <div class="pkmn-base" style="width: 80px;"></div>
-                    <img id="sprite-mob" src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/100/333/e74c3c?text=👹'" class="pkmn-sprite anim-idle" style="width: 85px; height: 85px;">
+                    <img id="sprite-mob" src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/100/333/e74c3c?text=👹'" class="pkmn-sprite anim-idle" style="width: 90px; height: 90px;">
                 </div>
 
-                <div style="position: absolute; bottom: 30px; left: 20px; text-align: center;">
+                <div style="position: absolute; bottom: 30px; left: 15px; text-align: center;">
                     <div class="pkmn-base" style="width: 100px;"></div>
-                    <img id="sprite-player" src="${playerAvatar}" class="pkmn-sprite" style="width: 110px; height: 110px;">
+                    <img id="sprite-player" src="${playerAvatar}" class="pkmn-sprite" style="width: 110px; height: 110px; object-position: top;">
                 </div>
-                <div class="pkmn-info" style="bottom: 15px; right: 15px;">
+                <div class="pkmn-info player-info">
                     <div class="pkmn-name"><span>Você</span></div>
-                    <div class="pkmn-hp-bg"><div id="bar-hp-player" class="pkmn-hp-bar"></div></div>
-                    <div style="text-align: right; font-size: 0.8em; margin-top: 4px;">HP: <span id="txt-hp-player">${dados.player.hp_max}</span> / ${dados.player.hp_max}</div>
+                    <div class="hp-container">
+                        <span class="hp-tag">HP</span>
+                        <div class="pkmn-hp-bg"><div id="bar-hp-player" class="pkmn-hp-bar"></div></div>
+                    </div>
+                    <div style="text-align: right; font-size: 0.85em; margin-top: 5px; color: #475569;">
+                        <span id="txt-hp-player" style="color:#1e293b;">${dados.player.hp_max}</span> / ${dados.player.hp_max}
+                    </div>
                 </div>
             </div>
 
             <div class="pkmn-dialog" id="combat-log-box">
-                Um <span style="color: #e74c3c;">${dados.mob.nome}</span> selvagem atacou!
+                <div class="blinking-arrow" id="dialog-arrow"></div>
+                <div>Um <span style="color: #e74c3c;">${dados.mob.nome}</span> selvagem atacou!</div>
             </div>
             
-            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: #1a1a1a; padding: 12px; border: 1px solid #333; color: white; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: bold;"> Fugir / Voltar </button>
+            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: #0f172a; padding: 14px; border: 2px solid #3b82f6; color: white; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: 900; font-size: 1.1em; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"> FUGIR / SAIR </button>
         `;
 
         // ====================================================
@@ -129,18 +159,18 @@ async function iniciarCacadaApp(playerAvatar) {
         let playerHpAtual = dados.player.hp_max;
         let mobHpAtual = dados.mob.hp_max;
 
-        // Função auxiliar para mudar a cor da barra de vida igual Pokémon
+        // Gerenciador de cor da barra de HP
         function atualizarBarra(barra, hpAtual, hpMax) {
             const pct = Math.max(0, (hpAtual / hpMax) * 100);
             barra.style.width = pct + '%';
-            if (pct > 50) barra.style.backgroundColor = "#2ecc71"; // Verde
-            else if (pct > 20) barra.style.backgroundColor = "#f1c40f"; // Amarelo
-            else barra.style.backgroundColor = "#e74c3c"; // Vermelho
+            if (pct > 50) barra.style.backgroundColor = "#2ecc71"; // Verde (Saudável)
+            else if (pct > 20) barra.style.backgroundColor = "#f1c40f"; // Amarelo (Atenção)
+            else barra.style.backgroundColor = "#e74c3c"; // Vermelho (Perigo)
         }
 
         let index = 0;
         
-        // Loop a cada 1 segundo para dar tempo de ver a animação
+        // Loop da Batalha (Lê os dados gerados pelo Python)
         const intervaloCombate = setInterval(() => {
             if (index >= dados.log.length) {
                 clearInterval(intervaloCombate);
@@ -150,46 +180,52 @@ async function iniciarCacadaApp(playerAvatar) {
 
             const acao = dados.log[index];
             
-            // Remove animações antigas para poder tocar de novo
+            // Limpa as animações para reiniciar o ciclo
             spritePlayer.classList.remove('anim-atk-p', 'anim-dmg');
             spriteMob.classList.remove('anim-atk-m', 'anim-dmg');
-            
-            // Força o navegador a recalcular as classes (Truque de magia do CSS)
             void spritePlayer.offsetWidth; 
             void spriteMob.offsetWidth;
 
+            // Insere o novo log
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginTop = "10px";
+            msgDiv.style.borderTop = "1px dashed #ccc";
+            msgDiv.style.paddingTop = "5px";
+
             if (acao.atacante === "player") {
-                // Jogador ataca, Monstro toma dano
+                // Jogador ataca
                 spritePlayer.classList.add('anim-atk-p');
-                setTimeout(() => spriteMob.classList.add('anim-dmg'), 150); // Monstro pisca logo depois
+                setTimeout(() => spriteMob.classList.add('anim-dmg'), 150); 
 
                 mobHpAtual -= acao.dano;
                 atualizarBarra(barMob, mobHpAtual, dados.mob.hp_max);
                 
-                // Texto azul/verde clássico para o herói
-                logBox.innerHTML += `<div style="color: #2980b9; margin-top: 8px;">▶ ${acao.texto}</div>`;
+                msgDiv.style.color = "#2980b9";
+                msgDiv.innerHTML = `▶ ${acao.texto}`;
                 
             } else if (acao.atacante === "mob") {
-                // Monstro ataca, Jogador toma dano
+                // Monstro ataca
                 spriteMob.classList.add('anim-atk-m');
-                setTimeout(() => spritePlayer.classList.add('anim-dmg'), 150); // Jogador pisca
+                setTimeout(() => spritePlayer.classList.add('anim-dmg'), 150); 
 
                 playerHpAtual -= acao.dano;
                 txtHpPlayer.innerText = Math.max(0, playerHpAtual);
                 atualizarBarra(barPlayer, playerHpAtual, dados.player.hp_max);
                 
-                // Texto vermelho para inimigo
-                logBox.innerHTML += `<div style="color: #c0392b; margin-top: 8px;">▶ ${acao.texto}</div>`;
+                msgDiv.style.color = "#c0392b";
+                msgDiv.innerHTML = `▶ ${acao.texto}`;
+
             } else {
-                // Dano de sistema/veneno
-                logBox.innerHTML += `<div style="color: #7f8c8d; margin-top: 8px;">▶ ${acao.texto}</div>`;
+                // Dano de Sistema / Durabilidade
+                msgDiv.style.color = "#7f8c8d";
+                msgDiv.innerHTML = `▶ ${acao.texto}`;
             }
 
-            // Faz a caixa de texto rolar para baixo automaticamente
+            logBox.appendChild(msgDiv);
             logBox.scrollTop = logBox.scrollHeight;
             index++;
             
-        }, 1100); // 1.1 segundos entre cada golpe para a animação não engasgar
+        }, 1200); // 1.2s garante que dá tempo de ler e ver o tremor!
 
     } catch(e) {
         console.error(e);
@@ -199,35 +235,38 @@ async function iniciarCacadaApp(playerAvatar) {
 }
 
 function finalizarAnimacaoCombate(dados) {
-    document.getElementById('btn-voltar-combate').style.display = "block";
-    document.getElementById('btn-voltar-combate').innerText = "⬅️ Voltar para o Mapa";
-    
+    const btnVoltar = document.getElementById('btn-voltar-combate');
     const logBox = document.getElementById('combat-log-box');
+    const seta = document.getElementById('dialog-arrow');
+    
+    btnVoltar.style.display = "block";
+    btnVoltar.innerText = "⬅️ Retornar ao Mapa";
+    if (seta) seta.style.display = "none"; // Some a setinha de carregar
     
     if (dados.vitoria) {
         let lootTexto = dados.recompensas.items.length > 0 
             ? `<br><span style="color:#8e44ad;">Ganhou: ${dados.recompensas.items.join(', ')}</span>`
             : "";
             
-        logBox.innerHTML += `<div style="color: #27ae60; margin-top: 10px; font-size: 1.1em; border-top: 2px dashed #ccc; padding-top: 5px;">
-            <b>Vitória!</b><br>Você ganhou ${dados.recompensas.xp} XP e ${dados.recompensas.gold} Ouro.${lootTexto}
+        logBox.innerHTML += `<div style="color: #27ae60; margin-top: 15px; font-size: 1.1em; border-top: 2px dashed #ccc; padding-top: 10px;">
+            <b>Batalha Vencida!</b><br>Você ganhou ${dados.recompensas.xp} XP e ${dados.recompensas.gold} Ouro.${lootTexto}
         </div>`;
         logBox.scrollTop = logBox.scrollHeight;
         
-        // Faz o monstro "desmaiar" afundando na tela
-        document.getElementById('sprite-mob').style.transition = "transform 1s, opacity 1s";
-        document.getElementById('sprite-mob').style.transform = "translateY(50px)";
+        // Inimigo desmaia (Cai para baixo da tela)
+        document.getElementById('sprite-mob').style.transition = "transform 0.8s ease-in, opacity 0.8s";
+        document.getElementById('sprite-mob').style.transform = "translateY(80px) scale(0.5)";
         document.getElementById('sprite-mob').style.opacity = "0";
 
     } else {
-        logBox.innerHTML += `<div style="color: #c0392b; margin-top: 10px; font-size: 1.1em; border-top: 2px dashed #ccc; padding-top: 5px;">
-            <b>Sua visão escureceu...</b><br>Você perdeu a batalha.
+        logBox.innerHTML += `<div style="color: #c0392b; margin-top: 15px; font-size: 1.1em; border-top: 2px dashed #ccc; padding-top: 10px;">
+            <b>Sua visão escureceu...</b><br>Você foi derrotado.
         </div>`;
         logBox.scrollTop = logBox.scrollHeight;
         
-        // Faz o jogador "desmaiar"
-        document.getElementById('sprite-player').style.transition = "transform 1s, opacity 1s";
-        document.getElementById('sprite-player').style.transform = "translateY(50px)";
+        // Jogador desmaia
+        document.getElementById('sprite-player').style.transition = "transform 0.8s ease-in, opacity 0.8s";
+        document.getElementById('sprite-player').style.transform = "translateY(80px) scale(0.5)";
         document.getElementById('sprite-player').style.opacity = "0";
     }
 }
