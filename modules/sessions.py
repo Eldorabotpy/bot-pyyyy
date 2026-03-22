@@ -5,20 +5,19 @@ import asyncio
 from datetime import datetime, timezone
 from pymongo import MongoClient
 from bson import ObjectId
-from modules.database import db
+
 logger = logging.getLogger(__name__)
 
+# Conexão direta e blindada para garantir que as sessões sempre funcionem
 MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-sessions_collection = None
 
 try:
-    sessions_collection = None
-    if db is not None:
-        sessions_collection = db.get_collection("active_sessions")
-
-
+    client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())
+    db = client["eldora_db"]
+    sessions_collection = db["active_sessions"]
+    logger.info("✅ [SESSIONS] Conexão MongoDB: SUCESSO.")
 except Exception as e:
-    logger.error(f"❌ [SESSIONS] Erro conexão: {e}")
+    logger.critical(f"❌ [SESSIONS] Erro conexão: {e}")
     sessions_collection = None
 
 
