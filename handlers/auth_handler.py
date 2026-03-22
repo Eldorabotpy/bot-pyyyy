@@ -1,5 +1,5 @@
 # handlers/auth_handler.py
-# (VERSÃO BLINDADA: Correção do erro 'Collection truth value')
+# (VERSÃO BLINDADA E PADRONIZADA PARA telegram_id)
 
 import logging
 import hashlib
@@ -95,7 +95,6 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not session_id:
         saved_id = await get_persistent_session(tg_id)
         if saved_id:
-            # CORREÇÃO CRÍTICA: is not None
             if users_collection is not None:
                 try:
                     user_exists = await asyncio.to_thread(users_collection.find_one, {"_id": ObjectId(saved_id)})
@@ -122,9 +121,9 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         legacy_data = await get_player_data(tg_id)
         if legacy_data:
             already_migrated = False
-            # CORREÇÃO CRÍTICA: is not None
             if users_collection is not None:
-                doc = await asyncio.to_thread(users_collection.find_one, {"telegram_id_owner": tg_id})
+                # CORREÇÃO: Busca por telegram_id padronizado
+                doc = await asyncio.to_thread(users_collection.find_one, {"telegram_id": tg_id})
                 if doc: already_migrated = True
             
             if not already_migrated:
@@ -150,7 +149,6 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Sua jornada começa aqui.\n"
             "Faça login ou crie sua conta para jogar."
         )
-        # ... dentro de start_auth, onde cria o keyboard ...
         keyboard.append([InlineKeyboardButton("🔐 ENTRAR", callback_data='btn_login')])
         keyboard.append([InlineKeyboardButton("📝 CRIAR CONTA", callback_data='btn_register')])
         keyboard.append([InlineKeyboardButton("🆘 Esqueci a Senha", callback_data='btn_forgot')])
@@ -177,7 +175,6 @@ async def btn_login_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return TYPING_USER_LOGIN
 
 async def receive_user_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Recebe o usuário e pede a senha
     context.user_data['auth_temp_user'] = update.message.text.strip().lower()
     await update.message.reply_text("🔑 Digite sua <b>SENHA</b>:", parse_mode="HTML")
     return TYPING_PASS_LOGIN
@@ -190,7 +187,6 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     username = context.user_data.get('auth_temp_user')
     password_hash = hash_password(password)
     
-    # CORREÇÃO CRÍTICA: is None
     if users_collection is None:
         await update.message.reply_text("❌ Erro de conexão com banco de dados.")
         return ConversationHandler.END
@@ -214,12 +210,8 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # --- FLUXO DE ESQUECI A SENHA ---
 
 async def btn_forgot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Inicia o fluxo perguntando o usuário"""
     if not await _check_private(update): return ConversationHandler.END
-    
-    q = update.callback_query
-    await q.answer()
-    
+    q = update.callback_query; await q.answer()
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="🆘 <b>RECUPERAÇÃO DE SENHA</b>\n\nDigite o <b>USUÁRIO</b> da conta que deseja recuperar:",
@@ -235,18 +227,15 @@ async def receive_user_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ Erro de conexão.")
         return ConversationHandler.END
 
-    # SEGURANÇA: Verifica se o usuário existe E se pertence a esse Telegram ID
     user_doc = await asyncio.to_thread(users_collection.find_one, {"username": username})
     
     if not user_doc:
         await update.message.reply_text("❌ Usuário não encontrado.")
         return ConversationHandler.END
         
-    # Verifica se o dono do Telegram é o mesmo que criou a conta
-    # Nota: No registro, você salva 'telegram_id_owner'
-    owner_id = user_doc.get("telegram_id_owner")
+    # CORREÇÃO: Lê prioritariamente o telegram_id correto
+    owner_id = user_doc.get("telegram_id") or user_doc.get("telegram_id_owner")
     
-    # Se for string no banco e int no update, normaliza
     if str(owner_id) != str(tg_id):
         await update.message.reply_text("⛔ <b>Acesso Negado.</b>\nEssa conta não está vinculada ao seu Telegram.", parse_mode="HTML")
         return ConversationHandler.END
@@ -258,7 +247,6 @@ async def receive_user_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def receive_pass_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_password = update.message.text.strip()
     username = context.user_data.get('forgot_temp_user')
-    
     new_hash = hash_password(new_password)
     
     if users_collection is not None:
@@ -269,8 +257,6 @@ async def receive_pass_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         
     await update.message.reply_text(f"🔄 <b>Senha Alterada!</b>\nAgora você pode fazer login com a nova senha.", parse_mode="HTML")
-    
-    # Retorna para o menu inicial
     return await start_auth(update, context)
 
 # ==============================================================================
@@ -290,7 +276,6 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Muito curto. Tente outro:")
         return TYPING_USER_REG
     
-    # CORREÇÃO CRÍTICA: is None
     if users_collection is None:
          await update.message.reply_text("❌ Erro no banco de dados. Tente mais tarde.")
          return ConversationHandler.END
@@ -306,49 +291,33 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     password = update.message.text.strip()
-    try:
-        await update.message.delete()
-    except:
-        pass
+    try: await update.message.delete()
+    except: pass
 
     username = context.user_data['reg_temp_user']
     owner_id = update.effective_user.id
     now_iso = datetime.now().isoformat()
-
-    # 🎯 CORREÇÃO: Pega o username escolhido e coloca a primeira letra maiúscula!
-    # Ex: se o jogador digitou "tutorial3", o nome será "Tutorial3"
     char_name_display = username.capitalize()
 
     new_player_doc = {
         "username": username,
         "password": hash_password(password),
-        "telegram_id": owner_id,
-        "telegram_id_owner": owner_id,
+        "telegram_id": owner_id, # CORREÇÃO: Apenas telegram_id
         "created_at": now_iso,
         "last_seen": now_iso,
-
-        # ✅ ADICIONADO: Agora o nome do personagem é o username, não o Telegram!
         "name": char_name_display,
         "character_name": char_name_display,
         "name_normalized": char_name_display.lower(),
-        
-        # Dados de Jogo Base
         "class": "aventureiro",
         "class_key": "aventureiro",
         "current_location": "reino_eldora",
         "level": 1, "xp": 0, "gold": 100, "gems": 0,
         "premium_tier": "free", "premium_expires_at": None,
-
-        # Status Vitais
         "hp": 50, "max_hp": 50, "current_hp": 50,
         "mana": 50, "max_mana": 50, "current_mp": 50, "mp": 50,
         "energy": 20, "max_energy": 20, "energy_last_ts": now_iso,
-
-        # Atributos de Combate
         "stats": {"hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5, "mana": 50},
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
-
-        # Estruturas que evitam o crash do Menu de Personagem
         "inventory": {}, "equipment": {}, "equipped_items": {},
         "skills": [], "equipped_skills": [], "invested": {},
         "profession": None, "guild": None
@@ -365,12 +334,9 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=f"🎉 <b>Conta Criada!</b>\nBem-vindo a Eldora, {char_name_display}.\nVocê já está logado.",
             parse_mode="HTML"
         )
-
-        if start_command:
-            await start_command(update, context)
+        if start_command: await start_command(update, context)
     else:
-        await update.message.reply_text("❌ Erro de conexão com banco de dados. Tente novamente mais tarde.")
-
+        await update.message.reply_text("❌ Erro de conexão.")
     return ConversationHandler.END
 
 # ==============================================================================
@@ -386,7 +352,6 @@ async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def receive_user_migrate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.text.strip().lower()
-    # CORREÇÃO CRÍTICA: is not None
     if users_collection is not None:
         exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
         if exists:
@@ -409,18 +374,18 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     if not old_data:
         new_data = {
             "username": username, "password": hash_password(password),
-            "telegram_id_owner": tg_id, "migrated_at": datetime.now().isoformat(),
+            "telegram_id": tg_id, "migrated_at": datetime.now().isoformat(),
             "character_name": username.capitalize(), "level": 1, "gold": 100
         }
     else:
         new_data = dict(old_data)
         if "_id" in new_data: del new_data["_id"]
+        # CORREÇÃO: Salva apenas telegram_id
         new_data.update({
             "username": username, "password": hash_password(password),
-            "telegram_id_owner": tg_id, "migrated_at": datetime.now().isoformat(), "is_migrated": True
+            "telegram_id": tg_id, "migrated_at": datetime.now().isoformat(), "is_migrated": True
         })
     
-    # CORREÇÃO CRÍTICA: is not None
     if users_collection is not None:
         result = await asyncio.to_thread(users_collection.insert_one, new_data)
         new_player_id = str(result.inserted_id)
@@ -476,7 +441,6 @@ async def logout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="HTML"
     )
-
 
 auth_handler = ConversationHandler(
     entry_points=[
