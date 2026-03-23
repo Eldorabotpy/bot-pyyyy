@@ -8,11 +8,51 @@ const FUNDOS_ARENAS = {
     "reino_eldora": "https://placehold.co/600x400/2980b9/111?text=Cenario+Reino"
 };
 
+// 👇 AQUI FICAM AS 10 IMAGENS BASE DE COSTAS (PNG Transparente) 👇
 const SPRITES_COSTA = {
-    "aventureiro": "https://github.com/user-attachments/assets/6621c6b9-691f-45dd-b738-7915bb576f53", 
-    "guerreiro": "https://placehold.co/200x300/transparent/fff?text=Guerreiro",
-    "mago": "https://placehold.co/200x300/transparent/fff?text=Mago",
-    "arqueiro": "https://placehold.co/200x300/transparent/fff?text=Arqueiro"
+    "aventureiro": "https://github.com/user-attachments/assets/6621c6b9-691f-45dd-b738-7915bb576f53", // Skin de quem tá sem classe
+    "guerreiro": "LINK_GITHUB_GUERREIRO_COSTA.png",
+    "berserker": "LINK_GITHUB_BERSERKER_COSTA.png",
+    "cacador": "LINK_GITHUB_CACADOR_COSTA.png",
+    "monge": "LINK_GITHUB_MONGE_COSTA.png",
+    "mago": "LINK_GITHUB_MAGO_COSTA.png",
+    "bardo": "LINK_GITHUB_BARDO_COSTA.png",
+    "assassino": "LINK_GITHUB_ASSASSINO_COSTA.png",
+    "samurai": "LINK_GITHUB_SAMURAI_COSTA.png",
+    "curandeiro": "LINK_GITHUB_CURANDEIRO_COSTA.png"
+};
+
+// Dicionário para descobrir a base de qualquer evolução
+const MAPA_CLASSES_BASE = {
+    // Aventureiro (Sem classe)
+    'aventureiro': 'aventureiro', 'aprendiz': 'aventureiro',
+
+    // Guerreiro e evoluções
+    'guerreiro': 'guerreiro', 'cavaleiro': 'guerreiro', 'gladiador': 'guerreiro', 'templario': 'guerreiro', 'guardiao_divino': 'guerreiro',
+    
+    // Berserker
+    'berserker': 'berserker', 'barbaro': 'berserker', 'juggernaut': 'berserker', 'ira_primordial': 'berserker',
+    
+    // Caçador
+    'cacador': 'cacador', 'patrulheiro': 'cacador', 'franco_atirador': 'cacador', 'olho_de_aguia': 'cacador',
+    
+    // Monge
+    'monge': 'monge', 'guardiao_do_templo': 'monge', 'punho_elemental': 'monge', 'ascendente': 'monge',
+    
+    // Mago
+    'mago': 'mago', 'feiticeiro': 'mago', 'elementalista': 'mago', 'arquimago': 'mago',
+    
+    // Bardo
+    'bardo': 'bardo', 'menestrel': 'bardo', 'encantador': 'bardo', 'maestro': 'bardo',
+    
+    // Assassino
+    'assassino': 'assassino', 'ladrao_de_sombras': 'assassino', 'ninja': 'assassino', 'mestre_das_laminas': 'assassino',
+    
+    // Samurai
+    'samurai': 'samurai', 'kensei': 'samurai', 'ronin': 'samurai', 'shogun': 'samurai',
+    
+    // Curandeiro
+    'curandeiro': 'curandeiro', 'clerigo': 'curandeiro', 'druida': 'curandeiro', 'sacerdote': 'curandeiro'
 };
 
 // ==========================================
@@ -113,6 +153,12 @@ async function iniciarCacadaApp() {
 
         const est = dados.estado; // Pega o estado simplificado
         const bgArena = FUNDOS_ARENAS[est.regiao] || "https://placehold.co/600x400/111/222?text=Arena+Desconhecida";
+        // 👇 NOVA LÓGICA DE SPRITE COM BASE 👇
+        const classeChave = (dados.classe_player || "aventureiro").toLowerCase();
+        
+        // Descobre a base (ex: se for 'templario', a base será 'guerreiro')
+        const classeBase = MAPA_CLASSES_BASE[classeChave] || "aventureiro";
+        
         const urlSpritePlayer = SPRITES_COSTA[dados.classe_player] || SPRITES_COSTA["aventureiro"];
         
         // Guardando o estado na janela para usarmos nas animações
