@@ -175,65 +175,77 @@ async function iniciarCacadaApp() {
                 /* Fonte Moderna Global para a Arena */
                 .modern-font { font-family: 'Poppins', sans-serif; }
                 
-                /* Caixas de HUD Modernas */
+                /* ==========================================
+                   CAIXAS DE HUD (AGORA BEM MAIS FINAS!) 
+                   ========================================== */
                 .modern-hud {
                     position: absolute;
                     background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.95) 100%);
                     border: 1px solid #334155;
-                    border-radius: 12px;
-                    padding: 12px 15px;
+                    border-radius: 8px; /* Bordas um pouco mais retas */
+                    padding: 6px 10px;  /* REDUZIDO: de 12px para 6px em cima/embaixo */
                     color: #f8fafc;
-                    box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
                     z-index: 10;
                     backdrop-filter: blur(4px);
                 }
 
-                #hud-monstro { top: 15px; left: 15px; width: 180px; border-top: 3px solid #e74c3c; }
-                #hud-jogador { bottom: 20px; right: 15px; width: 200px; border-top: 3px solid #3b82f6; }
+                #hud-monstro { top: 10px; left: 10px; width: 160px; border-top: 2px solid #e74c3c; }
+                #hud-jogador { bottom: 15px; right: 10px; width: 170px; border-top: 2px solid #3b82f6; }
 
-                .hud-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #1e293b; padding-bottom: 6px; }
-                .hud-name { font-size: 1.05em; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.5); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
-                .hud-level { font-size: 0.75em; color: #cbd5e1; font-weight: 800; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; }
+                /* Cabeçalho: Nome e Level */
+                .hud-header { 
+                    display: flex; justify-content: space-between; align-items: center; 
+                    margin-bottom: 4px; /* REDUZIDO */
+                    border-bottom: 1px solid #1e293b; 
+                    padding-bottom: 4px; /* REDUZIDO */
+                }
+                .hud-name { font-size: 0.9em; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.5); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+                .hud-level { font-size: 0.65em; color: #cbd5e1; font-weight: 800; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 4px; }
 
                 /* Linhas de Barras */
-                .hud-bar-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-                .hud-bar-label { font-size: 0.75em; font-weight: 800; letter-spacing: 0.5px; }
+                .hud-bar-row { 
+                    display: flex; align-items: center; justify-content: space-between; 
+                    margin-bottom: 3px; /* REDUZIDO: Barras mais coladas umas nas outras */
+                }
+                .hud-bar-row:last-child { margin-bottom: 0; } /* Tira a margem da última barra */
+                
+                .hud-bar-label { font-size: 0.65em; font-weight: 800; letter-spacing: 0.5px; }
                 .label-hp { color: #ef4444; }
                 .label-mp { color: #3b82f6; }
 
                 /* Fundo e Preenchimento das Barras */
-                .hud-bar-bg { width: 75%; height: 8px; background-color: #0f172a; border-radius: 4px; border: 1px solid #1e293b; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
-                .hud-hp-fill { height: 100%; background: linear-gradient(90deg, #ef4444, #b91c1c); transition: width 0.3s ease; border-radius: 4px; }
-                .hud-mp-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #1d4ed8); transition: width 0.3s ease; border-radius: 4px; }
+                .hud-bar-bg { width: 75%; height: 5px; background-color: #0f172a; border-radius: 3px; border: 1px solid #1e293b; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
+                .hud-hp-fill { height: 100%; background: linear-gradient(90deg, #ef4444, #b91c1c); transition: width 0.3s ease; border-radius: 3px; }
+                .hud-mp-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #1d4ed8); transition: width 0.3s ease; border-radius: 3px; }
 
                 /* Botões Modernos */
                 .modern-btn {
                     background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
                     border: 1px solid #334155;
-                    border-radius: 10px;
-                    padding: 12px;
-                    font-size: 0.95em;
+                    border-radius: 8px;
+                    padding: 10px;
+                    font-size: 0.9em;
                     color: #f8fafc;
                     font-weight: 600;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    gap: 8px;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+                    gap: 6px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
                     transition: all 0.2s ease;
                 }
                 .modern-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 2px rgba(0,0,0,0.4); border-color: #64748b; }
                 .modern-btn:disabled { opacity: 0.5; cursor: not-allowed; }
                 
-                /* Detalhes de cores nos botões */
-                .btn-atk { border-bottom: 3px solid #ef4444; }
-                .btn-mag { border-bottom: 3px solid #8b5cf6; }
-                .btn-bag { border-bottom: 3px solid #f59e0b; }
-                .btn-run { border-bottom: 3px solid #64748b; }
+                .btn-atk { border-bottom: 2px solid #ef4444; }
+                .btn-mag { border-bottom: 2px solid #8b5cf6; }
+                .btn-bag { border-bottom: 2px solid #f59e0b; }
+                .btn-run { border-bottom: 2px solid #64748b; }
             </style>
 
-            <div id="arena-box" class="modern-font" style="background: url('${bgArena}') center bottom / cover no-repeat; height: 350px; width: 100%; border-radius: 16px 16px 0 0; border: 2px solid #334155; border-bottom: none; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div id="arena-box" class="modern-font" style="background: url('${bgArena}') center bottom / cover no-repeat; height: 350px; width: 100%; border-radius: 12px 12px 0 0; border: 2px solid #334155; border-bottom: none; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
                 
                 <div style="position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.4) 100%); pointer-events: none;"></div>
 
@@ -263,29 +275,6 @@ async function iniciarCacadaApp() {
                     </div>
                 </div>
 
-                <img id="sprite-player" src="${urlSpritePlayer}" style="position: absolute; bottom: 10px; left: 10px; height: 130px; object-fit: contain; filter: drop-shadow(3px 10px 4px rgba(0,0,0,0.5)); transition: transform 0.1s;">
-                <img id="sprite-mob" src="${est.mob_img}" onerror="this.src='https://placehold.co/150x150/transparent/e74c3c?text=👹'" style="position: absolute; bottom: 80px; right: 15px; height: 120px; object-fit: contain; filter: drop-shadow(-3px 10px 4px rgba(0,0,0,0.5)); transition: transform 0.1s;">
-                <div id="damage-flash" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(231, 76, 60, 0.4); opacity: 0; transition: opacity 0.1s; pointer-events: none; z-index: 20;"></div>
-            </div>
-
-            <div style="background: #020617; border: 2px solid #334155; border-radius: 0 0 16px 16px; padding: 15px; height: 170px; display: flex; flex-direction: column; justify-content: space-between;" class="modern-font">
-                
-                <div id="combat-log-box" style="font-size: 1.1em; font-weight: 600; color: #cbd5e1; line-height: 1.3; height: 50px; overflow: hidden; background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid #1e293b; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-                    <span style="color: #ef4444;">Um ${est.mob_nome} selvagem apareceu!</span><br>O que você vai fazer?
-                </div>
-
-                <div id="menu-botoes" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                    <button class="modern-font modern-btn btn-atk" onclick="executarAcaoTurno('atacar')"><span style="font-size: 1.2em;">⚔️</span> Atacar</button>
-                    <button class="modern-font modern-btn btn-mag" onclick="exibirAlertaCustom('Aviso', 'Magias em breve!', false)"><span style="font-size: 1.2em;">✨</span> Magias</button>
-                    <button class="modern-font modern-btn btn-bag" onclick="exibirAlertaCustom('Aviso', 'Mochila em breve!', false)"><span style="font-size: 1.2em;">🎒</span> Mochila</button>
-                    <button class="modern-font modern-btn btn-run" onclick="executarAcaoTurno('fugir')"><span style="font-size: 1.2em;">🏃</span> Fugir</button>
-                </div>
-                
-               <div id="botoes-fim-batalha" style="display: none; gap: 10px; margin-top: 10px;">
-                    <button class="modern-font modern-btn" onclick="sairDaArena()" style="flex: 1; background: #1e293b; border-color: #334155;">⬅️ Sair</button>
-                    <button class="modern-font modern-btn" onclick="iniciarCacadaApp()" style="flex: 1.5; background: linear-gradient(180deg, #16a34a 0%, #15803d 100%); border-color: #14532d; color: white;">⚔️ Caçar Novamente</button>
-                </div>
-            </div>
         `;
 
         // Seta as barras iniciais (MANTÉM IGUAL PARA A ANIMAÇÃO FUNCIONAR)
