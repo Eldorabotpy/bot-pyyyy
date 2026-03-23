@@ -190,7 +190,7 @@ function renderizarSelva(conteudo, p) {
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-            <button onclick="iniciarCacadaApp('${playerAvatar}')" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #e74c3c; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <button onclick="iniciarCacadaApp()" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #e74c3c; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <span style="font-size: 1.2em;">⚔️</span> Caçar
             </button>
             <button onclick="exibirAlertaCustom('Aviso', 'O Calabouço será liberado em breve!', false)" style="background: linear-gradient(180deg, #1e293b, #0f172a); border: 1px solid #334155; border-bottom: 3px solid #9b59b6; padding: 12px; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; justify-content: center; gap: 8px;">

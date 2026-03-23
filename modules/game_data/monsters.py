@@ -557,7 +557,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 2,
             "loot_table": [{"item_id": "frasco_com_agua", "drop_chance": 10}],           
             "media_key": "slime_pequeno_media",
-            "image_url": "https://github.com/user-attachments/assets/COLE_SEU_LINK_AQUI"
+            "image_url": "https://github.com/user-attachments/assets/609ec99d-1ca8-42f2-b808-2f3f0d7b614e"
         },
         {
             "id": "slime_verde",
@@ -568,7 +568,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 3,
             "loot_table": [{"item_id": "geleia_slime", "drop_chance": 10}],
             "media_key": "slime_verde_media",
-            "image_url": "https://github.com/user-attachments/assets/bd2f3eed-fb87-415d-87eb-e66804f72422"
+            "image_url": "https://github.com/user-attachments/assets/61912d5a-6e21-47e0-8d75-40cf8e783d4a"
         },
         {
             "id": "slime_azul",
@@ -579,7 +579,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 4,
             "loot_table": [{"item_id": "cristal_mana_bruto", "drop_chance": 10}],
             "media_key": "slime_azul_media",
-            "image_url": "https://github.com/user-attachments/assets/e012b60e-11a8-4bf3-bc75-a05b34baaaa6"
+            "image_url": "https://github.com/user-attachments/assets/9b0cf130-b015-4828-9569-8c2f3673e663"
         },
         {
             "id": "slime_magma",
@@ -590,7 +590,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 4,
             "loot_table": [{"item_id": "pocao_cura_leve", "drop_chance": 2}],
             "media_key": "slime_magma_media",
-            "image_url": "https://github.com/user-attachments/assets/6b591496-f4e6-475e-bf0a-7a8377a3049e"
+            "image_url": "https://github.com/user-attachments/assets/b13215bb-a587-41ed-bc93-1476d69df2fa"
 
         },
         
@@ -604,7 +604,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 8,
             "loot_table": [{"item_id": "raiz_da_fortuna", "drop_chance": 10}],
             "media_key": "slime_terra_media",
-            "image_url": "https://github.com/user-attachments/assets/aa626719-97a9-4c2b-818d-ec8cd84943d6"
+            "image_url": "https://github.com/user-attachments/assets/68c88aa7-7e2d-4958-8d94-a57fc9ba7774"
 
         },
         {
@@ -616,7 +616,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 5,
             "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
             "media_key": "slime_venenoso_media",
-            "image_url": "https://github.com/user-attachments/assets/2dbd2a75-bcf8-49f3-b8d7-de64f74f6307"
+            "image_url": "https://github.com/user-attachments/assets/05d8d6ac-79d9-4f44-bf6d-c5fe1939224a"
         },
         {
             "id": "slime_eletrico",
@@ -627,7 +627,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 6,
             "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_eletrico_media",
-            "image_url": "https://github.com/user-attachments/assets/eb441987-7b3a-4993-902e-9f0e850d550c"
+            "image_url": "https://github.com/user-attachments/assets/2e25b9c9-1dea-4ee7-a080-1a9e57899bae"
         },
 
         # --- Raros ---
@@ -640,7 +640,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 5,
             "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_brilhante_media",
-            "image_url": "https://github.com/user-attachments/assets/6e9989bd-17e4-4ed9-a809-3767cf5eaf12"
+            "image_url": "https://github.com/user-attachments/assets/b9c97a0f-16da-4c24-a95d-52f6566658b1"
         },
         {
             "id": "slime_escuridao",
@@ -651,7 +651,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 1,
             "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
             "media_key": "slime_escuridao_media",
-            "image_url": "https://github.com/user-attachments/assets/a4962122-9373-4f27-a7a9-2f3c32f29396"
+            "image_url": "https://github.com/user-attachments/assets/ad9d7889-8f55-4d79-8b70-2780660f3241"
         },
 
         # --- Mini-Chefe (Muito Raro) ---
@@ -664,7 +664,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 1,
             "loot_table": [{"item_id": "po_de_iniciativa", "drop_chance": 5}],
             "media_key": "rei_slime_media",
-            "image_url": "https://github.com/user-attachments/assets/fda24181-d4b6-44d6-bbfe-db50861ad3a2"
+            "image_url": "https://github.com/user-attachments/assets/edac413d-681f-4c61-aeb2-340abf1daf32"
         }
     ],
 

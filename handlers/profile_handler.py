@@ -16,6 +16,7 @@ from modules.game_data import skills as skills_data
 from modules.player import stats as player_stats
 from modules.game_data.class_evolution import can_player_use_skill
 from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
+from modules.player.queries import find_player_by_name
 
 # Import para correção de energia
 from modules.player import actions as player_actions
@@ -464,6 +465,44 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML")
 
+async def mudar_nome_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 1. Verifica se o jogador está logado
+    user_id = get_current_player_id(update, context)
+    if not user_id:
+        await update.message.reply_text("⚠️ Precisas de entrar na tua conta primeiro.")
+        return
+
+    # 2. Verifica se ele digitou o nome junto com o comando
+    if not context.args:
+        await update.message.reply_text(
+            "⚠️ <b>Como usar:</b>\nDigite <code>/nome OTeuNovoNome</code>\n\nExemplo: <code>/nome Kratos</code>", 
+            parse_mode="HTML"
+        )
+        return
+
+    novo_nome = " ".join(context.args)
+
+    # 3. Regras de tamanho do nome
+    if len(novo_nome) < 3 or len(novo_nome) > 15:
+        await update.message.reply_text("⚠️ O nome do personagem deve ter entre 3 e 15 letras.")
+        return
+
+    # 4. Verifica se alguém já está a usar este nome no servidor
+    existe = await find_player_by_name(novo_nome)
+    if existe:
+        await update.message.reply_text(f"❌ O nome <b>{novo_nome}</b> já está em uso por outro jogador! Escolhe outro.", parse_mode="HTML")
+        return
+
+    # 5. Aplica a mudança no banco de dados
+    player_data = await player_manager.get_player_data(user_id)
+    if player_data:
+        player_data["character_name"] = novo_nome
+        player_data["name"] = novo_nome
+        player_data["name_normalized"] = novo_nome.strip().lower()
+        
+        await player_manager.save_player_data(user_id, player_data)
+        await update.message.reply_text(f"✅ Sucesso! O teu nome foi alterado para <b>{novo_nome}</b>.\nUsa /personagem para ver!", parse_mode="HTML")
+        
 # ====================================================================
 # EXPORTAÇÕES
 # ====================================================================
@@ -474,3 +513,4 @@ skills_equip_menu_handler = CallbackQueryHandler(show_equip_skills_menu, pattern
 equip_skill_handler = CallbackQueryHandler(equip_skill_callback, pattern=r'^equip_skill:')
 unequip_skill_handler = CallbackQueryHandler(unequip_skill_callback, pattern=r'^unequip_skill:')
 noop_handler = CallbackQueryHandler(noop_callback, pattern=r'^noop$')
+cmd_nome_handler = CommandHandler("nome", mudar_nome_command)

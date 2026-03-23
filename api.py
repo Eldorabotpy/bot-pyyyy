@@ -455,6 +455,8 @@ def api_cacar():
         return jsonify({
             "sucesso": True,
             "vitoria": vitoria,
+            "regiao": regiao, # <--- Enviando a região para puxar o fundo certo
+            "classe_player": str(pdata.get("class", "aventureiro")).lower(), # <--- Enviando a classe
             "mob": {"nome": mob_nome, "hp_max": mob_hp, "imagem": mob_img},
             "player": {"hp_max": player_stats.get("max_hp", 100)},
             "log": log_batalha,

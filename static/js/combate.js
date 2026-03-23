@@ -1,17 +1,37 @@
 // ==========================================
-// SISTEMA DE COMBATE (ESTILO POKÉMON GBA - PRO)
+// 1. DICIONÁRIO DE CENÁRIOS DAS ARENAS
 // ==========================================
-async function iniciarCacadaApp(playerAvatar) {
+const FUNDOS_ARENAS = {
+    "pradaria_inicial": "https://github.com/user-attachments/assets/3a16a7b1-69f4-4563-9493-20f07cf0b228", 
+    "floresta_sombria": "LINK_DA_FLORESTA",
+    "pedreira_granito": "LINK_DA_PEDREIRA",
+    "defesa_reino": "https://placehold.co/600x400/2980b9/111?text=Invasao+do+Reino" // Fundo para o evento de invasão!
+};
+
+// ==========================================
+// 2. DICIONÁRIO DAS CLASSES (DE COSTAS EM PNG)
+// ==========================================
+const SPRITES_COSTA = {
+    "aventureiro": "https://github.com/user-attachments/assets/f884e737-53e7-409b-837a-56fef5d2f9a8", 
+    "assassino": "https://github.com/user-attachments/assets/f089b0ad-f66a-40a1-adc8-6db8744bfbdf",
+    "guerreiro": "https://placehold.co/200x300/transparent/fff?text=Guerreiro",
+    "mago": "https://placehold.co/200x300/transparent/fff?text=Mago",
+    "arqueiro": "https://placehold.co/200x300/transparent/fff?text=Arqueiro"
+};
+
+// ==========================================
+// SISTEMA DE COMBATE ANIMADO E REALISTA
+// ==========================================
+async function iniciarCacadaApp() {
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
 
     // Tela de Carregamento
     conteudo.innerHTML = `
         <div style="height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-            <div style="font-size: 3em; animation: bob 1s infinite;">🌿</div>
-            <h3 style="color: #2ecc71; margin-top: 15px; font-family: monospace;">Andando pelo mato alto...</h3>
+            <div style="font-size: 3em; animation: pulseRing 1s infinite;">⚔️</div>
+            <h3 style="color: #e74c3c; margin-top: 15px; font-style: italic;">Adentrando a selva...</h3>
         </div>
-        <style>@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }</style>
     `;
 
     try {
@@ -28,245 +48,141 @@ async function iniciarCacadaApp(playerAvatar) {
             return;
         }
 
-        // ====================================================
-        // CSS EMBUTIDO (UPGRADE POKÉMON ADVANCED)
-        // ====================================================
-        const arenaStyles = `
-            <style>
-                .pkmn-arena {
-                    position: relative; width: 100%; height: 280px;
-                    background: linear-gradient(to bottom, #1e3c72 0%, #2a5298 45%, #3e5151 45%, #609931 100%);
-                    border: 4px solid #0f172a; border-radius: 8px; overflow: hidden; margin-bottom: 12px;
-                    box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
-                }
+        // CORREÇÃO: Nomes de variáveis separados para não dar conflito
+        const bgArena = FUNDOS_ARENAS[dados.regiao] || "https://placehold.co/600x400/111/222?text=Arena+Desconhecida";
+        const urlSpritePlayer = SPRITES_COSTA[dados.classe_player] || SPRITES_COSTA["aventureiro"];
+
+        // DESENHA A ARENA IMERSIVA
+        conteudo.innerHTML = `
+            <div style="background: url('${bgArena}') center/cover; height: 260px; border-radius: 12px; border: 2px solid #f39c12; position: relative; overflow: hidden; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
                 
-                /* Sombras circulares no chão */
-                .pkmn-base {
-                    position: absolute; background: rgba(0,0,0,0.4); border-radius: 50%;
-                    height: 25px; left: 50%; transform: translateX(-50%); bottom: -12px;
-                    filter: blur(2px);
-                }
+                <div style="position: absolute; top:0; left:0; width:100%; height: 70px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);"></div>
                 
-                /* Sprites (Agora parecem Tokens de Batalha) */
-                .pkmn-sprite {
-                    position: relative; z-index: 2; border-radius: 12px; object-fit: cover;
-                    box-shadow: 0 10px 20px rgba(0,0,0,0.7); border: 3px solid #d4af37;
-                    background: #111;
-                }
+                <div style="position: absolute; top: 12px; width: 100%; display: flex; justify-content: space-between; padding: 0 15px; z-index: 10;">
+                    <div style="width: 42%;">
+                        <div style="color: white; font-weight: 900; font-size: 0.9em; margin-bottom: 4px; text-shadow: 2px 2px 3px #000;">Você</div>
+                        <div style="width: 100%; height: 12px; background: rgba(0,0,0,0.8); border-radius: 6px; border: 2px solid #111; box-shadow: 0 0 5px #000;">
+                            <div id="bar-hp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); transition: 0.3s;"></div>
+                        </div>
+                    </div>
 
-                /* Caixas de Status */
-                .pkmn-info {
-                    position: absolute; background: #fffde7; 
-                    border: 3px solid #1e293b; border-bottom: 5px solid #1e293b; border-right: 5px solid #1e293b;
-                    padding: 8px 12px; color: #1e293b; font-weight: 900; width: 160px; 
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.4); z-index: 10;
-                }
-                /* Curvas assimétricas clássicas do GBA */
-                .mob-info { border-radius: 8px 8px 8px 24px; top: 15px; left: 10px; }
-                .player-info { border-radius: 8px 8px 24px 8px; bottom: 15px; right: 10px; }
-
-                .pkmn-name { font-size: 0.95em; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; letter-spacing: 0.5px; }
-                
-                /* Barra de HP de Elite */
-                .hp-container { display: flex; align-items: center; background: #475569; border-radius: 10px; padding: 2px 4px; border: 2px solid #cbd5e1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
-                .hp-tag { color: #f1c40f; font-size: 0.7em; font-weight: 900; margin-right: 5px; text-shadow: 1px 1px 0px #000; letter-spacing: 1px; }
-                .pkmn-hp-bg { background: #1e293b; height: 8px; border-radius: 4px; width: 100%; overflow: hidden; }
-                .pkmn-hp-bar { background: #2ecc71; width: 100%; height: 100%; transition: width 0.3s ease, background-color 0.3s ease; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2); }
-
-                /* Caixa de Diálogo Clássica */
-                .pkmn-dialog {
-                    background: #fffde7; border: 4px solid #475569; border-radius: 8px;
-                    padding: 15px; font-family: 'Courier New', Courier, monospace; font-weight: 800;
-                    font-size: 1.1em; color: #1e293b; height: 110px; overflow-y: auto;
-                    box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.3);
-                    position: relative;
-                }
-                /* Setinha vermelha piscando */
-                .blinking-arrow {
-                    position: absolute; bottom: 10px; right: 15px;
-                    width: 0; height: 0; border-left: 8px solid transparent;
-                    border-right: 8px solid transparent; border-top: 12px solid #e74c3c;
-                    animation: blink 0.8s infinite;
-                }
-
-                /* Animações Mágicas */
-                @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-                @keyframes idleMob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-                @keyframes atkPlayer { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(30px, -30px) scale(1.15); } }
-                @keyframes atkMob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-30px, 30px) scale(1.15); } }
-                @keyframes dmgFlash { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(2) sepia(1) hue-rotate(320deg) saturate(5); } }
-                @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px) rotate(-3deg); } 50% { transform: translateX(6px) rotate(3deg); } 75% { transform: translateX(-6px) rotate(-3deg); } }
-
-                .anim-idle { animation: idleMob 2.5s infinite ease-in-out; }
-                .anim-atk-p { animation: atkPlayer 0.25s ease-in-out; }
-                .anim-atk-m { animation: atkMob 0.25s ease-in-out; }
-                /* O combo de dano: pisca vermelho E treme */
-                .anim-dmg { animation: dmgFlash 0.4s ease-in-out, shake 0.4s ease-in-out; }
-            </style>
-        `;
-
-        // ====================================================
-        // ESTRUTURA HTML DA ARENA
-        // ====================================================
-        conteudo.innerHTML = arenaStyles + `
-            <div class="pkmn-arena">
-                <div class="pkmn-info mob-info">
-                    <div class="pkmn-name"><span>${dados.mob.nome}</span> <span>Lv?</span></div>
-                    <div class="hp-container">
-                        <span class="hp-tag">HP</span>
-                        <div class="pkmn-hp-bg"><div id="bar-hp-mob" class="pkmn-hp-bar"></div></div>
+                    <div style="width: 42%; text-align: right;">
+                        <div style="color: white; font-weight: 900; font-size: 0.9em; margin-bottom: 4px; text-shadow: 2px 2px 3px #000;">${dados.mob.nome}</div>
+                        <div style="width: 100%; height: 12px; background: rgba(0,0,0,0.8); border-radius: 6px; border: 2px solid #111; box-shadow: 0 0 5px #000; transform: scaleX(-1);">
+                            <div id="bar-hp-mob" style="width: 100%; height: 100%; background: linear-gradient(90deg, #c0392b, #e74c3c); transition: 0.3s;"></div>
+                        </div>
                     </div>
                 </div>
-                <div style="position: absolute; top: 40px; right: 25px; text-align: center;">
-                    <div class="pkmn-base" style="width: 80px;"></div>
-                    <img id="sprite-mob" src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/100/333/e74c3c?text=👹'" class="pkmn-sprite anim-idle" style="width: 90px; height: 90px;">
-                </div>
 
-                <div style="position: absolute; bottom: 30px; left: 15px; text-align: center;">
-                    <div class="pkmn-base" style="width: 100px;"></div>
-                    <img id="sprite-player" src="${playerAvatar}" class="pkmn-sprite" style="width: 110px; height: 110px; object-position: top;">
+                <div style="position: absolute; bottom: 5px; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px;">
+                    <img id="sprite-player" src="${urlSpritePlayer}" style="height: 140px; object-fit: contain; filter: drop-shadow(4px 10px 5px rgba(0,0,0,0.6)); transition: 0.15s;">
+                    
+                    <img id="sprite-mob" src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/150x150/transparent/e74c3c?text=👹'" style="height: 150px; object-fit: contain; filter: drop-shadow(-4px 10px 5px rgba(0,0,0,0.6)); transition: 0.15s; margin-bottom: 30px;">
                 </div>
-                <div class="pkmn-info player-info">
-                    <div class="pkmn-name"><span>Você</span></div>
-                    <div class="hp-container">
-                        <span class="hp-tag">HP</span>
-                        <div class="pkmn-hp-bg"><div id="bar-hp-player" class="pkmn-hp-bar"></div></div>
-                    </div>
-                    <div style="text-align: right; font-size: 0.85em; margin-top: 5px; color: #475569;">
-                        <span id="txt-hp-player" style="color:#1e293b;">${dados.player.hp_max}</span> / ${dados.player.hp_max}
-                    </div>
-                </div>
+                
+                <div id="damage-flash" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(231, 76, 60, 0.5); opacity: 0; transition: 0.1s; pointer-events: none;"></div>
             </div>
 
-            <div class="pkmn-dialog" id="combat-log-box">
-                <div class="blinking-arrow" id="dialog-arrow"></div>
-                <div>Um <span style="color: #e74c3c;">${dados.mob.nome}</span> selvagem atacou!</div>
+            <div style="background: linear-gradient(180deg, #020617, #0f172a); border: 2px solid #334155; border-radius: 8px; padding: 15px; height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; box-shadow: inset 0 0 15px rgba(0,0,0,0.9);" id="combat-log-box">
+                <div style="color: #f1c40f; text-align: center; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #334155; padding-bottom: 5px;">⚔️ Um ${dados.mob.nome} selvagem ataca!</div>
             </div>
             
-            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: #0f172a; padding: 14px; border: 2px solid #3b82f6; color: white; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: 900; font-size: 1.1em; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"> FUGIR / SAIR </button>
+            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: linear-gradient(90deg, #1e293b, #0f172a); padding: 14px; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: bold; text-transform: uppercase;">⬅️ Sair da Arena</button>
         `;
 
-        // ====================================================
-        // MOTOR DE ANIMAÇÃO DO COMBATE
-        // ====================================================
+        // ----------------------------------------------------
+        // ANIMAÇÃO DE GOLPES E TREMIDAS DE TELA
+        // ----------------------------------------------------
         const logBox = document.getElementById('combat-log-box');
-        const spritePlayer = document.getElementById('sprite-player');
-        const spriteMob = document.getElementById('sprite-mob');
-        const barPlayer = document.getElementById('bar-hp-player');
-        const barMob = document.getElementById('bar-hp-mob');
-        const txtHpPlayer = document.getElementById('txt-hp-player');
+        const elemSpriteMob = document.getElementById('sprite-mob');
+        // CORREÇÃO: Nova variável para controlar o HTML da foto na animação
+        const elemSpritePlayer = document.getElementById('sprite-player');
+        const flash = document.getElementById('damage-flash');
 
         let playerHpAtual = dados.player.hp_max;
         let mobHpAtual = dados.mob.hp_max;
 
-        // Gerenciador de cor da barra de HP
-        function atualizarBarra(barra, hpAtual, hpMax) {
-            const pct = Math.max(0, (hpAtual / hpMax) * 100);
-            barra.style.width = pct + '%';
-            if (pct > 50) barra.style.backgroundColor = "#2ecc71"; // Verde (Saudável)
-            else if (pct > 20) barra.style.backgroundColor = "#f1c40f"; // Amarelo (Atenção)
-            else barra.style.backgroundColor = "#e74c3c"; // Vermelho (Perigo)
-        }
-
         let index = 0;
-        
-        // Loop da Batalha (Lê os dados gerados pelo Python)
         const intervaloCombate = setInterval(() => {
             if (index >= dados.log.length) {
                 clearInterval(intervaloCombate);
-                finalizarAnimacaoCombate(dados);
+                
+                if (dados.vitoria) elemSpriteMob.style.opacity = "0";
+                else elemSpritePlayer.style.opacity = "0";
+
+                setTimeout(() => finalizarAnimacaoCombate(dados), 1000);
                 return;
             }
 
             const acao = dados.log[index];
+            const pElem = document.createElement('div');
             
-            // Limpa as animações para reiniciar o ciclo
-            spritePlayer.classList.remove('anim-atk-p', 'anim-dmg');
-            spriteMob.classList.remove('anim-atk-m', 'anim-dmg');
-            void spritePlayer.offsetWidth; 
-            void spriteMob.offsetWidth;
-
-            // Insere o novo log
-            const msgDiv = document.createElement('div');
-            msgDiv.style.marginTop = "10px";
-            msgDiv.style.borderTop = "1px dashed #ccc";
-            msgDiv.style.paddingTop = "5px";
-
             if (acao.atacante === "player") {
-                // Jogador ataca
-                spritePlayer.classList.add('anim-atk-p');
-                setTimeout(() => spriteMob.classList.add('anim-dmg'), 150); 
-
+                pElem.style.color = "#2ecc71";
+                pElem.innerHTML = acao.texto;
+                
                 mobHpAtual -= acao.dano;
-                atualizarBarra(barMob, mobHpAtual, dados.mob.hp_max);
-                
-                msgDiv.style.color = "#2980b9";
-                msgDiv.innerHTML = `▶ ${acao.texto}`;
-                
+                const pctMob = Math.max(0, (mobHpAtual / dados.mob.hp_max) * 100);
+                document.getElementById('bar-hp-mob').style.width = pctMob + '%';
+
+                elemSpritePlayer.style.transform = "translateX(20px)";
+                elemSpriteMob.style.transform = "translateX(15px) scale(0.9)";
+                setTimeout(() => {
+                    elemSpritePlayer.style.transform = "translateX(0)";
+                    elemSpriteMob.style.transform = "translateX(0) scale(1)";
+                }, 150);
+
             } else if (acao.atacante === "mob") {
-                // Monstro ataca
-                spriteMob.classList.add('anim-atk-m');
-                setTimeout(() => spritePlayer.classList.add('anim-dmg'), 150); 
-
-                playerHpAtual -= acao.dano;
-                txtHpPlayer.innerText = Math.max(0, playerHpAtual);
-                atualizarBarra(barPlayer, playerHpAtual, dados.player.hp_max);
+                pElem.style.color = "#e74c3c";
+                pElem.innerHTML = acao.texto;
                 
-                msgDiv.style.color = "#c0392b";
-                msgDiv.innerHTML = `▶ ${acao.texto}`;
+                playerHpAtual -= acao.dano;
+                const pctPlayer = Math.max(0, (playerHpAtual / dados.player.hp_max) * 100);
+                document.getElementById('bar-hp-player').style.width = pctPlayer + '%';
 
+                elemSpriteMob.style.transform = "translateX(-20px)";
+                elemSpritePlayer.style.transform = "translateX(-10px) scale(0.9)";
+                flash.style.opacity = "1";
+                setTimeout(() => {
+                    elemSpriteMob.style.transform = "translateX(0)";
+                    elemSpritePlayer.style.transform = "translateX(0) scale(1)";
+                    flash.style.opacity = "0";
+                }, 150);
             } else {
-                // Dano de Sistema / Durabilidade
-                msgDiv.style.color = "#7f8c8d";
-                msgDiv.innerHTML = `▶ ${acao.texto}`;
+                pElem.style.color = "#f39c12";
+                pElem.innerHTML = acao.texto;
             }
 
-            logBox.appendChild(msgDiv);
+            logBox.appendChild(pElem);
             logBox.scrollTop = logBox.scrollHeight;
             index++;
-            
-        }, 1200); // 1.2s garante que dá tempo de ler e ver o tremor!
+        }, 900); 
 
     } catch(e) {
         console.error(e);
-        exibirAlertaCustom("Erro", "Falha ao desenhar a arena.", false);
+        exibirAlertaCustom("Erro", "Falha de conexão com a arena.", false);
         carregarReino();
     }
 }
 
 function finalizarAnimacaoCombate(dados) {
-    const btnVoltar = document.getElementById('btn-voltar-combate');
-    const logBox = document.getElementById('combat-log-box');
-    const seta = document.getElementById('dialog-arrow');
-    
-    btnVoltar.style.display = "block";
-    btnVoltar.innerText = "⬅️ Retornar ao Mapa";
-    if (seta) seta.style.display = "none"; // Some a setinha de carregar
+    document.getElementById('btn-voltar-combate').style.display = "block";
     
     if (dados.vitoria) {
         let lootTexto = dados.recompensas.items.length > 0 
-            ? `<br><span style="color:#8e44ad;">Ganhou: ${dados.recompensas.items.join(', ')}</span>`
+            ? `<br><br><span style="color:#a855f7; font-weight: bold;">📦 Saqueou: ${dados.recompensas.items.join(', ')}</span>`
             : "";
             
-        logBox.innerHTML += `<div style="color: #27ae60; margin-top: 15px; font-size: 1.1em; border-top: 2px dashed #ccc; padding-top: 10px;">
-            <b>Batalha Vencida!</b><br>Você ganhou ${dados.recompensas.xp} XP e ${dados.recompensas.gold} Ouro.${lootTexto}
-        </div>`;
-        logBox.scrollTop = logBox.scrollHeight;
-        
-        // Inimigo desmaia (Cai para baixo da tela)
-        document.getElementById('sprite-mob').style.transition = "transform 0.8s ease-in, opacity 0.8s";
-        document.getElementById('sprite-mob').style.transform = "translateY(80px) scale(0.5)";
-        document.getElementById('sprite-mob').style.opacity = "0";
-
+        exibirAlertaCustom(
+            "Vitória!", 
+            `O inimigo tombou!<br><br>✨ +${dados.recompensas.xp} XP<br>💰 +${dados.recompensas.gold} Ouro${lootTexto}`, 
+            true
+        );
     } else {
-        logBox.innerHTML += `<div style="color: #c0392b; margin-top: 15px; font-size: 1.1em; border-top: 2px dashed #ccc; padding-top: 10px;">
-            <b>Sua visão escureceu...</b><br>Você foi derrotado.
-        </div>`;
-        logBox.scrollTop = logBox.scrollHeight;
-        
-        // Jogador desmaia
-        document.getElementById('sprite-player').style.transition = "transform 0.8s ease-in, opacity 0.8s";
-        document.getElementById('sprite-player').style.transform = "translateY(80px) scale(0.5)";
-        document.getElementById('sprite-player').style.opacity = "0";
+        exibirAlertaCustom(
+            "Derrota", 
+            "Você desmaiou em combate e foi resgatado... Perdeu experiência.", 
+            false
+        );
     }
 }

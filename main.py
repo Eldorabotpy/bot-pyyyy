@@ -63,7 +63,7 @@ from registries import register_all_handlers
 from registries.startup import run_system_startup_tasks
 from handlers.guide_handler import guide_handlers
 from registries.class_evolution import register_evolution_handlers
-
+from handlers.profile_handler import cmd_nome_handler
 # Guilda
 from registries.guild import register_guild_handlers
 
@@ -226,7 +226,7 @@ if __name__ == "__main__":
 
     # Auth
     application.add_handler(auth_handler)
-
+    application.add_handler(cmd_nome_handler)
     # Admin
     application.add_handler(file_id_conv_handler)
     application.add_handler(CommandHandler("setmedia", set_media_command))
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     register_all_handlers(application)
     from telegram.ext import CallbackQueryHandler
     from pvp.pvp_handler import pvp_menu_command
-
+ 
     application.add_handler(CallbackQueryHandler(pvp_menu_command, pattern=r"^pvp_arena$"))
 
     register_evolution_handlers(application)
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     application.add_handler(CallbackQueryHandler(logout_callback, pattern="^logout_btn$"))
     application.add_handler(start_command_handler)
     application.add_handlers(guide_handlers)
-
+    
     # Debug opcional
     try:
         from handlers.jobs import cmd_force_pvp_reset
