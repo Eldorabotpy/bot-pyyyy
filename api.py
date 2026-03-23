@@ -353,9 +353,27 @@ def api_combate_iniciar():
         pdata["player_state"] = {"action": "in_combat"}
         users_collection.replace_one({"_id": busca_id}, pdata)
 
+        # 👇 ADICIONE ISTO: O filtro que salva a vida do Flask 👇
+        estado_frontend = {
+            "player_hp": battle_cache["player_hp"],
+            "player_mp": battle_cache["player_mp"],
+            "monster_hp": battle_cache["monster_hp"],
+            "regiao": battle_cache["regiao"],
+            "mob_img": battle_cache["mob_img"],
+            "mob_nome": battle_cache["mob_nome"],
+            "player_stats": {
+                "max_hp": player_stats.get("max_hp", 100),
+                "max_mana": player_stats.get("max_mana", 50)
+            },
+            "monster_stats": {
+                "max_hp": monster_stats.get("max_hp", 100)
+            }
+        }
+
+        # E enviamos apenas o estado limpo!
         return jsonify({
             "sucesso": True,
-            "estado": battle_cache,
+            "estado": estado_frontend,
             "classe_player": str(pdata.get("class", "aventureiro")).lower()
         })
 
