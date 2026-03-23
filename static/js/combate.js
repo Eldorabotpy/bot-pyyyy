@@ -117,7 +117,7 @@ async function iniciarCacadaApp() {
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
 
-    // --- NOVA TELA DE CARREGAMENTO MODERNA ---
+    // --- NOVA TELA DE CARREGAMENTO MODERNA (CENTRALIZADA) ---
     conteudo.innerHTML = `
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
@@ -135,16 +135,28 @@ async function iniciarCacadaApp() {
                 box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
                 margin-top: 10px;
             }
+            
+            /* Novo Wrapper (Container) para alinhar perfeitamente o centro */
+            .loader-wrapper {
+                position: relative;
+                width: 75px;
+                height: 75px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin-bottom: 25px;
+            }
+            
             .loading-ring {
-                width: 70px;
-                height: 70px;
+                position: absolute;
+                width: 100%;
+                height: 100%;
                 border-radius: 50%;
                 border: 4px solid transparent;
                 border-top-color: #ef4444; /* Vermelho HP */
                 border-bottom-color: #3b82f6; /* Azul MP */
                 animation: spinLoader 1.2s linear infinite;
-                margin-bottom: 25px;
-                position: relative;
+                box-sizing: border-box;
             }
             .loading-ring:before {
                 content: '';
@@ -154,15 +166,16 @@ async function iniciarCacadaApp() {
                 border: 4px solid transparent;
                 border-left-color: #f1c40f; /* Dourado Ouro */
                 animation: spinLoader 0.8s linear infinite reverse;
+                box-sizing: border-box;
             }
+            
             .loading-icon {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                font-size: 1.5em;
-                /* O ícone dentro não gira, só os anéis em volta */
+                font-size: 2.2em;
+                z-index: 5;
+                line-height: 1;
+                margin-top: 2px; /* Ajuste fino porque emojis têm um "chão" invisível */
             }
+            
             .loading-title {
                 color: #f8fafc;
                 font-size: 1.3em;
@@ -187,9 +200,11 @@ async function iniciarCacadaApp() {
         </style>
         
         <div class="loading-container">
-            <div class="loading-ring">
-                <div class="loading-icon" style="animation: spinLoader 1.2s linear infinite reverse;">⚔️</div>
+            <div class="loader-wrapper">
+                <div class="loading-ring"></div>
+                <div class="loading-icon">⚔️</div>
             </div>
+            
             <h3 class="loading-title">Rastreando Inimigo</h3>
             <p class="loading-subtitle">Empunhe sua arma e prepare-se...</p>
         </div>
