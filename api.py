@@ -83,6 +83,68 @@ def ranking_ouro():
 def ranking_pvp():
     return jsonify([{"nome": "Murdock", "valor": "⚔️ 2500 Pontos"}, {"nome": "Skuks", "valor": "⚔️ 2340 Pontos"}])
 
+@app.route('/api/viajar', methods=['POST'])
+def api_viajar():
+    dados = request.json
+    user_id = dados.get("user_id")
+    destino = dados.get("destino")
+
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        
+        if not pdata:
+            return jsonify({"erro": "Personagem não encontrado"}), 404
+
+        # Se for VIP, viaja instantâneo
+        tier = str(pdata.get("premium_tier", "free")).lower()
+        eh_vip = tier in ["lenda", "vip", "premium", "admin"]
+
+        if eh_vip:
+            users_collection.update_one(
+                {"_id": busca_id}, 
+                {"$set": {"current_location": destino, "player_state": {"action": "idle"}}}
+            )
+            return jsonify({"sucesso": True, "is_vip": True})
+        
+        # Se for Free, inicia cronômetro de 6 minutos
+        tempo_viagem = 6 # minutos
+        finish_time = datetime.now(timezone.utc) + timedelta(minutes=tempo_viagem)
+        
+        users_collection.update_one(
+            {"_id": busca_id}, 
+            {"$set": {
+                "player_state": {
+                    "action": "travel",
+                    "finish_time": finish_time.isoformat(),
+                    "details": {"destination": destino}
+                }
+            }}
+        )
+        return jsonify({"sucesso": True, "is_vip": False})
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/finalizar_viagem', methods=['POST'])
+def api_finalizar_viagem():
+    dados = request.json
+    user_id = dados.get("user_id")
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        
+        estado = pdata.get("player_state", {})
+        if estado.get("action") == "travel":
+            destino = estado["details"]["destination"]
+            users_collection.update_one(
+                {"_id": busca_id},
+                {"$set": {"current_location": destino, "player_state": {"action": "idle"}}}
+            )
+        return jsonify({"sucesso": True})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    
 @app.route('/ranking/guildas')
 def ranking_guildas():
     try:
