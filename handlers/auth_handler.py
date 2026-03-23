@@ -1,5 +1,5 @@
 # handlers/auth_handler.py
-# (VERSÃO BLINDADA E PADRONIZADA PARA telegram_id)
+# (VERSÃO BLINDADA: Busca Case-Insensitive para reconhecer usuários antigos)
 
 import logging
 import hashlib
@@ -122,7 +122,6 @@ async def start_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if legacy_data:
             already_migrated = False
             if users_collection is not None:
-                # CORREÇÃO: Busca por telegram_id padronizado
                 doc = await asyncio.to_thread(users_collection.find_one, {"telegram_id": tg_id})
                 if doc: already_migrated = True
             
@@ -175,7 +174,8 @@ async def btn_login_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return TYPING_USER_LOGIN
 
 async def receive_user_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['auth_temp_user'] = update.message.text.strip().lower()
+    # Retiramos o .lower() daqui para preservar a forma original no cache se necessário
+    context.user_data['auth_temp_user'] = update.message.text.strip()
     await update.message.reply_text("🔑 Digite sua <b>SENHA</b>:", parse_mode="HTML")
     return TYPING_PASS_LOGIN
 
@@ -191,7 +191,12 @@ async def receive_pass_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ Erro de conexão com banco de dados.")
         return ConversationHandler.END
 
-    user_doc = await asyncio.to_thread(users_collection.find_one, {"username": username, "password": password_hash})
+    # 🎯 CORREÇÃO: Busca Case-Insensitive (ignora maiúsculas/minúsculas)
+    query = {
+        "username": {"$regex": f"^{username}$", "$options": "i"}, 
+        "password": password_hash
+    }
+    user_doc = await asyncio.to_thread(users_collection.find_one, query)
 
     if user_doc:
         new_player_id = str(user_doc['_id'])
@@ -220,20 +225,21 @@ async def btn_forgot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     return TYPING_USER_FORGOT
 
 async def receive_user_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.message.text.strip().lower()
+    username = update.message.text.strip()
     tg_id = update.effective_user.id
     
     if users_collection is None:
         await update.message.reply_text("❌ Erro de conexão.")
         return ConversationHandler.END
 
-    user_doc = await asyncio.to_thread(users_collection.find_one, {"username": username})
+    # 🎯 CORREÇÃO: Busca Case-Insensitive
+    query = {"username": {"$regex": f"^{username}$", "$options": "i"}}
+    user_doc = await asyncio.to_thread(users_collection.find_one, query)
     
     if not user_doc:
         await update.message.reply_text("❌ Usuário não encontrado.")
         return ConversationHandler.END
         
-    # CORREÇÃO: Lê prioritariamente o telegram_id correto
     owner_id = user_doc.get("telegram_id") or user_doc.get("telegram_id_owner")
     
     if str(owner_id) != str(tg_id):
@@ -250,9 +256,11 @@ async def receive_pass_forgot(update: Update, context: ContextTypes.DEFAULT_TYPE
     new_hash = hash_password(new_password)
     
     if users_collection is not None:
+        # 🎯 CORREÇÃO: Atualiza o documento ignorando a capitalização da busca
+        query = {"username": {"$regex": f"^{username}$", "$options": "i"}}
         await asyncio.to_thread(
             users_collection.update_one,
-            {"username": username},
+            query,
             {"$set": {"password": new_hash}}
         )
         
@@ -271,7 +279,7 @@ async def start_register_flow(update: Update, context: ContextTypes.DEFAULT_TYPE
     return TYPING_USER_REG
 
 async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.message.text.strip().lower()
+    username = update.message.text.strip()
     if len(username) < 4: 
         await update.message.reply_text("⚠️ Muito curto. Tente outro:")
         return TYPING_USER_REG
@@ -280,7 +288,9 @@ async def receive_user_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.reply_text("❌ Erro no banco de dados. Tente mais tarde.")
          return ConversationHandler.END
 
-    exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
+    # 🎯 CORREÇÃO: Garante que ninguém crie "GUSTAVO" se já existir "gustavo"
+    query = {"username": {"$regex": f"^{username}$", "$options": "i"}}
+    exists = await asyncio.to_thread(users_collection.find_one, query)
     if exists: 
         await update.message.reply_text("⚠️ Em uso. Tente outro:")
         return TYPING_USER_REG
@@ -302,7 +312,7 @@ async def receive_pass_reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_player_doc = {
         "username": username,
         "password": hash_password(password),
-        "telegram_id": owner_id, # CORREÇÃO: Apenas telegram_id
+        "telegram_id": owner_id,
         "created_at": now_iso,
         "last_seen": now_iso,
         "name": char_name_display,
@@ -351,9 +361,11 @@ async def btn_migrate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     return TYPING_USER_MIGRATE
 
 async def receive_user_migrate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.message.text.strip().lower()
+    username = update.message.text.strip()
     if users_collection is not None:
-        exists = await asyncio.to_thread(users_collection.find_one, {"username": username})
+        # 🎯 CORREÇÃO: Busca Case-Insensitive
+        query = {"username": {"$regex": f"^{username}$", "$options": "i"}}
+        exists = await asyncio.to_thread(users_collection.find_one, query)
         if exists:
             await update.message.reply_text("⚠️ Em uso. Tente outro:")
             return TYPING_USER_MIGRATE
@@ -380,7 +392,6 @@ async def receive_pass_migrate(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         new_data = dict(old_data)
         if "_id" in new_data: del new_data["_id"]
-        # CORREÇÃO: Salva apenas telegram_id
         new_data.update({
             "username": username, "password": hash_password(password),
             "telegram_id": tg_id, "migrated_at": datetime.now().isoformat(), "is_migrated": True
