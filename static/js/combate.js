@@ -52,42 +52,42 @@ async function iniciarCacadaApp() {
         const bgArena = FUNDOS_ARENAS[dados.regiao] || "https://placehold.co/600x400/111/222?text=Arena+Desconhecida";
         const urlSpritePlayer = SPRITES_COSTA[dados.classe_player] || SPRITES_COSTA["aventureiro"];
 
-        // DESENHA A ARENA IMERSIVA
+        // DESENHA A ARENA IMERSIVA (Ajustada para não cortar)
         conteudo.innerHTML = `
-            <div style="background: url('${bgArena}') center/cover; height: 260px; border-radius: 12px; border: 2px solid #f39c12; position: relative; overflow: hidden; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
+            <div style="background: url('${bgArena}') center bottom / cover no-repeat; aspect-ratio: 4 / 3; width: 100%; border-radius: 12px; border: 2px solid #f39c12; position: relative; overflow: hidden; margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
                 
-                <div style="position: absolute; top:0; left:0; width:100%; height: 70px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);"></div>
-                
-                <div style="position: absolute; top: 12px; width: 100%; display: flex; justify-content: space-between; padding: 0 15px; z-index: 10;">
-                    <div style="width: 42%;">
-                        <div style="color: white; font-weight: 900; font-size: 0.9em; margin-bottom: 4px; text-shadow: 2px 2px 3px #000;">Você</div>
-                        <div style="width: 100%; height: 12px; background: rgba(0,0,0,0.8); border-radius: 6px; border: 2px solid #111; box-shadow: 0 0 5px #000;">
-                            <div id="bar-hp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); transition: 0.3s;"></div>
-                        </div>
-                    </div>
-
-                    <div style="width: 42%; text-align: right;">
-                        <div style="color: white; font-weight: 900; font-size: 0.9em; margin-bottom: 4px; text-shadow: 2px 2px 3px #000;">${dados.mob.nome}</div>
-                        <div style="width: 100%; height: 12px; background: rgba(0,0,0,0.8); border-radius: 6px; border: 2px solid #111; box-shadow: 0 0 5px #000; transform: scaleX(-1);">
-                            <div id="bar-hp-mob" style="width: 100%; height: 100%; background: linear-gradient(90deg, #c0392b, #e74c3c); transition: 0.3s;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="position: absolute; bottom: 5px; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px;">
-                    <img id="sprite-player" src="${urlSpritePlayer}" style="height: 140px; object-fit: contain; filter: drop-shadow(4px 10px 5px rgba(0,0,0,0.6)); transition: 0.15s;">
+                <div style="position: absolute; top:0; left:0; width:100%; padding: 10px 15px 25px 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); display: flex; justify-content: space-between; z-index: 10;">
                     
-                    <img id="sprite-mob" src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/150x150/transparent/e74c3c?text=👹'" style="height: 150px; object-fit: contain; filter: drop-shadow(-4px 10px 5px rgba(0,0,0,0.6)); transition: 0.15s; margin-bottom: 30px;">
+                    <div style="width: 45%;">
+                        <div style="color: #fff; font-weight: 900; font-size: 0.85em; text-shadow: 1px 1px 3px #000; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Você</div>
+                        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.7); border-radius: 5px; border: 1px solid #111; box-shadow: 0 0 5px #000;">
+                            <div id="bar-hp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); border-radius: 4px; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+
+                    <div style="width: 45%; text-align: right;">
+                        <div style="color: #fff; font-weight: 900; font-size: 0.85em; text-shadow: 1px 1px 3px #000; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dados.mob.nome}</div>
+                        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.7); border-radius: 5px; border: 1px solid #111; box-shadow: 0 0 5px #000; transform: scaleX(-1);">
+                            <div id="bar-hp-mob" style="width: 100%; height: 100%; background: linear-gradient(90deg, #c0392b, #e74c3c); border-radius: 4px; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="position: absolute; bottom: 12%; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 15px; z-index: 5;">
+                    
+                    <img id="sprite-player" src="${urlSpritePlayer}" style="height: 125px; max-width: 45%; object-fit: contain; filter: drop-shadow(3px 12px 4px rgba(0,0,0,0.6)); transition: transform 0.15s ease, opacity 0.3s;">
+                    
+                    <img id="sprite-mob" src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/150x150/transparent/e74c3c?text=👹'" style="height: 125px; max-width: 50%; object-fit: contain; filter: drop-shadow(-3px 12px 4px rgba(0,0,0,0.6)); transition: transform 0.15s ease, opacity 0.3s;">
                 </div>
                 
-                <div id="damage-flash" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(231, 76, 60, 0.5); opacity: 0; transition: 0.1s; pointer-events: none;"></div>
+                <div id="damage-flash" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(231, 76, 60, 0.4); opacity: 0; transition: opacity 0.1s; pointer-events: none; z-index: 20;"></div>
             </div>
 
-            <div style="background: linear-gradient(180deg, #020617, #0f172a); border: 2px solid #334155; border-radius: 8px; padding: 15px; height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; box-shadow: inset 0 0 15px rgba(0,0,0,0.9);" id="combat-log-box">
+            <div style="background: linear-gradient(180deg, #020617, #0f172a); border: 2px solid #334155; border-radius: 8px; padding: 15px; height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; box-shadow: inset 0 0 15px rgba(0,0,0,0.9);" id="combat-log-box">
                 <div style="color: #f1c40f; text-align: center; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #334155; padding-bottom: 5px;">⚔️ Um ${dados.mob.nome} selvagem ataca!</div>
             </div>
             
-            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: linear-gradient(90deg, #1e293b, #0f172a); padding: 14px; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: bold; text-transform: uppercase;">⬅️ Sair da Arena</button>
+            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: linear-gradient(90deg, #1e293b, #0f172a); padding: 14px; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: bold; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">⬅️ Sair da Arena</button>
         `;
 
         // ----------------------------------------------------
