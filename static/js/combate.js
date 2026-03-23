@@ -1,23 +1,61 @@
 // ==========================================
-// 1. DICIONÁRIO DE CENÁRIOS DAS ARENAS
+// 1. DICIONÁRIO DE CENÁRIOS E CLASSES
 // ==========================================
 const FUNDOS_ARENAS = {
     "pradaria_inicial": "https://github.com/user-attachments/assets/8978e977-c5da-4d78-851a-ae28452b10ec", 
-    "floresta_sombria": "LINK_DA_FLORESTA",
-    "pedreira_granito": "LINK_DA_PEDREIRA",
-    "defesa_reino": "https://placehold.co/600x400/2980b9/111?text=Invasao+do+Reino" // Fundo para o evento de invasão!
+    "floresta_sombria": "https://placehold.co/600x400/2c3e50/111?text=Cenario+Floresta",
+    "pedreira_granito": "https://placehold.co/600x400/7f8c8d/111?text=Cenario+Pedras",
+    "reino_eldora": "https://placehold.co/600x400/2980b9/111?text=Cenario+Reino"
 };
 
-// ==========================================
-// 2. DICIONÁRIO DAS CLASSES (DE COSTAS EM PNG)
-// ==========================================
 const SPRITES_COSTA = {
     "aventureiro": "https://github.com/user-attachments/assets/6621c6b9-691f-45dd-b738-7915bb576f53", 
-    "assassino": "https://github.com/user-attachments/assets/5d3f8b40-7511-44ed-b9ce-636d7c9bd153",
     "guerreiro": "https://placehold.co/200x300/transparent/fff?text=Guerreiro",
     "mago": "https://placehold.co/200x300/transparent/fff?text=Mago",
     "arqueiro": "https://placehold.co/200x300/transparent/fff?text=Arqueiro"
 };
+
+// ==========================================
+// 2. DICIONÁRIO DE ÁUDIOS (Músicas e Efeitos)
+// Cole os links dos seus arquivos .mp3 ou .ogg aqui!
+// ==========================================
+const AUDIO_ASSETS = {
+    bgm_batalha: "https://github.com/user-attachments/files/26172245/psychronic-crystal-hunter-281389.mp3", // Música tocando em loop
+    som_espada: "https://github.com/user-attachments/files/26172264/attack.mp3",     // Som de ataque do herói
+    som_critico: "https://github.com/user-attachments/files/26172289/phatphrogstudio-rpg-female-attack-grunt-no-ai-481720.mp3",     // Som de impacto forte
+    som_monstro: "https://github.com/user-attachments/files/26172322/voicebosch-snarls-and-growls-172823.mp3",  // Som de garra ou magia inimiga
+    som_vitoria: "https://github.com/user-attachments/files/26172334/eaglaxle-gaming-victory-464016.mp3" // Toca quando o mob morre
+};
+
+let musicaDeFundoAtual = null; // Variável para controlar a música
+
+// Função auxiliar para tocar Efeitos Sonoros
+function tocarSFX(url) {
+    if (!url || url.includes("LINK_")) return; // Ignora se o link for o placeholder
+    let sfx = new Audio(url);
+    sfx.volume = 0.6; // Volume dos golpes (0.0 a 1.0)
+    sfx.play().catch(e => console.log("Áudio bloqueado:", e));
+}
+
+// Função auxiliar para criar a Animação Visual de Corte
+function animarCorteVisual(alvoId, cor_brilho) {
+    const alvo = document.getElementById(alvoId);
+    if (!alvo) return;
+
+    // Cria a "lâmina" de energia
+    const corte = document.createElement('div');
+    corte.className = 'slash-effect';
+    corte.style.boxShadow = `0 0 10px #fff, 0 0 20px ${cor_brilho}`; // Cor do clarão
+    
+    // Posiciona exatamente no meio do alvo
+    corte.style.left = (alvo.offsetLeft + alvo.offsetWidth / 2) + 'px';
+    corte.style.top = (alvo.offsetTop + alvo.offsetHeight / 2) + 'px';
+
+    alvo.parentElement.appendChild(corte);
+
+    // Remove o efeito da tela após a animação (0.3s)
+    setTimeout(() => corte.remove(), 300);
+}
 
 // ==========================================
 // SISTEMA DE COMBATE ANIMADO E REALISTA
@@ -26,7 +64,6 @@ async function iniciarCacadaApp() {
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
 
-    // Tela de Carregamento
     conteudo.innerHTML = `
         <div style="height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
             <div style="font-size: 3em; animation: pulseRing 1s infinite;">⚔️</div>
@@ -48,22 +85,55 @@ async function iniciarCacadaApp() {
             return;
         }
 
-        // CORREÇÃO: Nomes de variáveis separados para não dar conflito
+        // TOCA A MÚSICA DE FUNDO 🎵
+        if (AUDIO_ASSETS.bgm_batalha && !AUDIO_ASSETS.bgm_batalha.includes("LINK_")) {
+            musicaDeFundoAtual = new Audio(AUDIO_ASSETS.bgm_batalha);
+            musicaDeFundoAtual.loop = true;
+            musicaDeFundoAtual.volume = 0.3; // Volume da música mais baixo que o dos golpes
+            musicaDeFundoAtual.play().catch(e => console.log("Áudio bloqueado:", e));
+        }
+
         const bgArena = FUNDOS_ARENAS[dados.regiao] || "https://placehold.co/600x400/111/222?text=Arena+Desconhecida";
         const urlSpritePlayer = SPRITES_COSTA[dados.classe_player] || SPRITES_COSTA["aventureiro"];
 
-        // DESENHA A ARENA IMERSIVA (Ajustada para não cortar)
+        // Adicionamos a tag <style> com a animação mágica do corte
         conteudo.innerHTML = `
+            <style>
+                @keyframes animCorte {
+                    0% { width: 0px; opacity: 1; transform: translate(-50%, -50%) rotate(45deg); }
+                    50% { width: 120px; opacity: 1; transform: translate(-50%, -50%) rotate(45deg); }
+                    100% { width: 160px; opacity: 0; transform: translate(-50%, -50%) rotate(45deg); }
+                }
+                .slash-effect {
+                    position: absolute;
+                    height: 4px;
+                    background: #fff;
+                    border-radius: 50%;
+                    z-index: 30;
+                    pointer-events: none;
+                    animation: animCorte 0.3s ease-out forwards;
+                }
+            </style>
+
             <div style="background: url('${bgArena}') center bottom / cover no-repeat; aspect-ratio: 4 / 3; width: 100%; border-radius: 12px; border: 2px solid #f39c12; position: relative; overflow: hidden; margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
                 
-                <div style="position: absolute; top:0; left:0; width:100%; padding: 10px 15px 25px 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); display: flex; justify-content: space-between; z-index: 10;">
+                <div style="position: absolute; top:0; left:0; width:100%; padding: 10px 15px 25px 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); display: flex; flex-direction: column; gap: 4px; z-index: 10;">
                     
-                    <div style="width: 45%;">
-                        <div style="color: #fff; font-weight: 900; font-size: 0.85em; text-shadow: 1px 1px 3px #000; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Você</div>
-                        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.7); border-radius: 5px; border: 1px solid #111; box-shadow: 0 0 5px #000;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <div style="color: #fff; font-weight: 900; font-size: 0.9em; text-shadow: 1px 1px 3px #000; white-space: nowrap;">Você</div>
+                        <div style="color: #fff; font-weight: 900; font-size: 0.9em; text-shadow: 1px 1px 3px #000; white-space: nowrap;">${dados.mob.nome}</div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <div style="width: 45%; height: 10px; background: rgba(0,0,0,0.7); border-radius: 5px; border: 1px solid #111; box-shadow: 0 0 5px #000;">
                             <div id="bar-hp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71); border-radius: 4px; transition: width 0.3s;"></div>
                         </div>
+
+                        <div style="width: 45%; height: 10px; background: rgba(0,0,0,0.7); border-radius: 5px; border: 1px solid #111; box-shadow: 0 0 5px #000; transform: scaleX(-1);">
+                            <div id="bar-hp-mob" style="width: 100%; height: 100%; background: linear-gradient(90deg, #c0392b, #e74c3c); border-radius: 4px; transition: width 0.3s;"></div>
+                        </div>
                     </div>
+                </div>
 
                     <div style="width: 45%; text-align: right;">
                         <div style="color: #fff; font-weight: 900; font-size: 0.85em; text-shadow: 1px 1px 3px #000; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dados.mob.nome}</div>
@@ -73,10 +143,8 @@ async function iniciarCacadaApp() {
                     </div>
                 </div>
 
-                <div style="position: absolute; bottom: 12%; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 15px; z-index: 5;">
-                    
+                <div id="arena-characters" style="position: absolute; bottom: 12%; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 15px; z-index: 5;">
                     <img id="sprite-player" src="${urlSpritePlayer}" style="height: 125px; max-width: 45%; object-fit: contain; filter: drop-shadow(3px 12px 4px rgba(0,0,0,0.6)); transition: transform 0.15s ease, opacity 0.3s;">
-                    
                     <img id="sprite-mob" src="${dados.mob.imagem}" onerror="this.src='https://placehold.co/150x150/transparent/e74c3c?text=👹'" style="height: 125px; max-width: 50%; object-fit: contain; filter: drop-shadow(-3px 12px 4px rgba(0,0,0,0.6)); transition: transform 0.15s ease, opacity 0.3s;">
                 </div>
                 
@@ -87,15 +155,11 @@ async function iniciarCacadaApp() {
                 <div style="color: #f1c40f; text-align: center; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #334155; padding-bottom: 5px;">⚔️ Um ${dados.mob.nome} selvagem ataca!</div>
             </div>
             
-            <button id="btn-voltar-combate" onclick="carregarReino()" style="width: 100%; background: linear-gradient(90deg, #1e293b, #0f172a); padding: 14px; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: bold; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">⬅️ Sair da Arena</button>
+            <button id="btn-voltar-combate" onclick="sairDaArena()" style="width: 100%; background: linear-gradient(90deg, #1e293b, #0f172a); padding: 14px; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; margin-top: 15px; display: none; cursor: pointer; font-weight: bold; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">⬅️ Sair da Arena</button>
         `;
 
-        // ----------------------------------------------------
-        // ANIMAÇÃO DE GOLPES E TREMIDAS DE TELA
-        // ----------------------------------------------------
         const logBox = document.getElementById('combat-log-box');
         const elemSpriteMob = document.getElementById('sprite-mob');
-        // CORREÇÃO: Nova variável para controlar o HTML da foto na animação
         const elemSpritePlayer = document.getElementById('sprite-player');
         const flash = document.getElementById('damage-flash');
 
@@ -107,8 +171,12 @@ async function iniciarCacadaApp() {
             if (index >= dados.log.length) {
                 clearInterval(intervaloCombate);
                 
-                if (dados.vitoria) elemSpriteMob.style.opacity = "0";
-                else elemSpritePlayer.style.opacity = "0";
+                if (dados.vitoria) {
+                    elemSpriteMob.style.opacity = "0";
+                    tocarSFX(AUDIO_ASSETS.som_vitoria); // Toca fanfarra!
+                } else {
+                    elemSpritePlayer.style.opacity = "0";
+                }
 
                 setTimeout(() => finalizarAnimacaoCombate(dados), 1000);
                 return;
@@ -125,6 +193,16 @@ async function iniciarCacadaApp() {
                 const pctMob = Math.max(0, (mobHpAtual / dados.mob.hp_max) * 100);
                 document.getElementById('bar-hp-mob').style.width = pctMob + '%';
 
+                // EFEITO SONORO E VISUAL DO JOGADOR 🎵✨
+                if (acao.texto.includes("CRÍTICO")) {
+                    tocarSFX(AUDIO_ASSETS.som_critico);
+                    animarCorteVisual('sprite-mob', '#f1c40f'); // Clarão Dourado
+                } else {
+                    tocarSFX(AUDIO_ASSETS.som_espada);
+                    animarCorteVisual('sprite-mob', '#e74c3c'); // Clarão Vermelho
+                }
+
+                // Animação Movimento
                 elemSpritePlayer.style.transform = "translateX(20px)";
                 elemSpriteMob.style.transform = "translateX(15px) scale(0.9)";
                 setTimeout(() => {
@@ -140,6 +218,11 @@ async function iniciarCacadaApp() {
                 const pctPlayer = Math.max(0, (playerHpAtual / dados.player.hp_max) * 100);
                 document.getElementById('bar-hp-player').style.width = pctPlayer + '%';
 
+                // EFEITO SONORO E VISUAL DO MONSTRO 🎵✨
+                tocarSFX(AUDIO_ASSETS.som_monstro);
+                animarCorteVisual('sprite-player', '#9b59b6'); // Clarão Roxo no jogador
+
+                // Animação Movimento e Piscar
                 elemSpriteMob.style.transform = "translateX(-20px)";
                 elemSpritePlayer.style.transform = "translateX(-10px) scale(0.9)";
                 flash.style.opacity = "1";
@@ -185,4 +268,14 @@ function finalizarAnimacaoCombate(dados) {
             false
         );
     }
+}
+
+// Função para parar a música ao sair da arena
+function sairDaArena() {
+    if (musicaDeFundoAtual) {
+        musicaDeFundoAtual.pause(); // Para a música
+        musicaDeFundoAtual.currentTime = 0; // Reseta o áudio
+        musicaDeFundoAtual = null;
+    }
+    carregarReino(); // Volta pro mapa
 }
