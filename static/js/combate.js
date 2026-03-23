@@ -69,6 +69,13 @@ function atualizarVisualBarra(elementId, atual, maximo, isMana=false) {
 // SISTEMA DE COMBATE ANIMADO E REALISTA (ESTILO GBA)
 // ==========================================
 async function iniciarCacadaApp() {
+    // 1. PARA A MÚSICA DA LUTA ANTERIOR SE EXISTIR
+    if (musicaDeFundoAtual) {
+        musicaDeFundoAtual.pause(); 
+        musicaDeFundoAtual.currentTime = 0; 
+        musicaDeFundoAtual = null;
+    }
+
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
 
@@ -200,7 +207,8 @@ async function iniciarCacadaApp() {
 
     } catch(e) {
         console.error(e);
-        exibirAlertaCustom("Erro", "Falha de conexão com a arena.", false);
+        // 2. AGORA ELE MOSTRA O ERRO REAL NA TELA
+        exibirAlertaCustom("Erro no Servidor", `Motivo: ${e.message}<br>Verifique o terminal do Python!`, false);
         carregarReino();
     }
 }
@@ -280,7 +288,7 @@ function iniciarAnimacaoLog() {
 
 function finalizarAnimacaoCombate(dados) {
     document.getElementById('combat-log-box').innerHTML = dados.vitoria ? "O INIMIGO FOI DERROTADO!" : "VOCÊ DESMAIOU...";
-    document.getElementById('btn-voltar-combate').style.display = "flex";
+    document.getElementById('botoes-fim-batalha').style.display = "flex";
     
     if (dados.vitoria) {
         let lootTexto = dados.recompensas.items.length > 0 ? `<br><br>📦 Saqueou: ${dados.recompensas.items.join(', ')}` : "";
