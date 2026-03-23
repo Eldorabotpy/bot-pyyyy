@@ -192,8 +192,10 @@ async function iniciarCacadaApp() {
                     <button class="pkm-font pkm-btn" onclick="sairDaArena()">🏃 FUGIR</button>
                 </div>
                 
-                <button id="btn-voltar-combate" class="pkm-font pkm-btn" onclick="sairDaArena()" style="display: none; width: 100%; justify-content: center; background: #303030; color: white;">⬅️ SAIR DA ARENA</button>
-            </div>
+               <div id="botoes-fim-batalha" style="display: none; gap: 10px; margin-top: 10px;">
+                    <button class="pkm-font pkm-btn" onclick="sairDaArena()" style="flex: 1; justify-content: center; background: #303030; color: white; font-size: 18px;">⬅️ SAIR</button>
+                    <button class="pkm-font pkm-btn" onclick="iniciarCacadaApp()" style="flex: 1.5; justify-content: center; background: #27ae60; color: white; border-color: #1e8449; font-size: 18px;">⚔️ CAÇAR DE NOVO</button>
+                </div>
         `;
 
     } catch(e) {
