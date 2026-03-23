@@ -12,8 +12,8 @@ const FUNDOS_ARENAS = {
 // 2. DICIONÁRIO DAS CLASSES (DE COSTAS EM PNG)
 // ==========================================
 const SPRITES_COSTA = {
-    "aventureiro": "https://github.com/user-attachments/assets/f884e737-53e7-409b-837a-56fef5d2f9a8", 
-    "assassino": "https://github.com/user-attachments/assets/f089b0ad-f66a-40a1-adc8-6db8744bfbdf",
+    "aventureiro": "https://github.com/Eldorabotpy/personagem-costa-/issues/1#issue-4117552988", 
+    "assassino": "https://github.com/Eldorabotpy/personagem-costa-/issues/2#issue-4117557838",
     "guerreiro": "https://placehold.co/200x300/transparent/fff?text=Guerreiro",
     "mago": "https://placehold.co/200x300/transparent/fff?text=Mago",
     "arqueiro": "https://placehold.co/200x300/transparent/fff?text=Arqueiro"
