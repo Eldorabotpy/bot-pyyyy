@@ -105,6 +105,12 @@
 
             try {
                 const resposta = await fetch(`/api/meus_personagens/${tgUser.id}`);
+                
+                // 🛡️ TRAVA DE SEGURANÇA (O DEDO-DURO)
+                if (!resposta.ok) {
+                    throw new Error(`O servidor retornou Erro ${resposta.status}`);
+                }
+
                 const personagens = await resposta.json();
 
                 let htmlBotoes = '';
@@ -133,7 +139,8 @@
                 area.innerHTML = htmlBotoes;
 
             } catch (erro) {
-                area.innerHTML = '<p style="color: #e74c3c; font-size: 0.9em;">Erro ao conectar com o servidor.</p>';
+                // 🚨 MOSTRA O ERRO EXATO NA TELA
+                area.innerHTML = `<p style="color: #e74c3c; font-size: 0.9em; font-weight: bold;">Erro Real: ${erro.message}<br><span style="font-size:0.8em; color:#aaa;">Verifique o terminal do Python!</span></p>`;
             }
         }
 
