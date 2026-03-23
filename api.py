@@ -333,6 +333,7 @@ def api_combate_iniciar():
         mob_img = tpl.get("image_url", f"/static/monsters/{tpl.get('id')}.jpg")
 
         player_stats = pdata.get("total_stats", pdata.copy())
+        player_stats.pop("_id", None)
         if "max_hp" not in player_stats: player_stats["max_hp"] = pdata.get("max_hp", 100)
 
         # CRIA O CACHE DE BATALHA NO MONGODB
