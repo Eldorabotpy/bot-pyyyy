@@ -46,7 +46,7 @@ def pagina_login():
     return render_template('login.html')
 
 # ==========================================
-# ROTAS DE RANKING
+# ROTAS DE RANKING E WIKI (Resumidas)
 # ==========================================
 @app.route('/ranking/level')
 def ranking_level():
@@ -76,7 +76,7 @@ def ranking_guildas():
     except Exception as e: return jsonify([])
 
 # ==========================================
-# ROTA DE PERFIL (COM PROTEÇÃO CONTRA NULLS)
+# ROTA DE PERFIL
 # ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
@@ -87,8 +87,6 @@ def obter_perfil(user_id):
         if usuario:
             lvl = int(usuario.get("level", 1))
             xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
-            
-            # Trava de segurança para garantir que a classe nunca seja nula
             classe_bd = usuario.get("class")
             classe_str = str(classe_bd) if classe_bd else "aprendiz"
             
@@ -111,92 +109,9 @@ def obter_perfil(user_id):
     except Exception as e: 
         return jsonify({"erro": str(e)}), 400
 
-# ==========================================
-# ROTAS DA WIKI
-# ==========================================
-@app.route('/wiki/classes')
-def obter_classes():
-    lista = []
-    try:
-        from modules.game_data.classes import CLASSES_DATA
-        from modules.game_data.class_evolution import EVOLUTIONS
-        for chave, classe_info in CLASSES_DATA.items():
-            if classe_info.get("tier") == 1:
-                evos = [{"nome": evo.get("display_name", ""), "tier": evo.get("tier_num", 0), "descricao": evo.get("desc", "")} for evo in EVOLUTIONS.get(chave, [])]
-                status = classe_info.get("stat_modifiers", {})
-                lista.append({
-                    "id": chave, "nome": classe_info.get("display_name", "Desconhecida"), "emoji": classe_info.get("emoji", "❓"),
-                    "descricao": classe_info.get("description", "Sem descrição."), "hp": status.get("hp", 0), "ataque": status.get("attack", 0), "defesa": status.get("defense", 0),
-                    "imagem": classe_info.get("image_url", f"{request.host_url}static/classes/{chave}.png"), "video": classe_info.get("video_url", ""), "total_evolucoes": len(evos), "evolucoes": evos
-                })
-    except: pass
-    return jsonify(sorted(lista, key=lambda x: x["nome"]))
-
-@app.route('/wiki/regioes')
-def obter_regioes():
-    lista = []
-    try:
-        from modules.game_data.worldmap import REGIONS_DATA, REGION_TARGET_POWER
-        for chave, info in REGIONS_DATA.items():
-            lista.append({
-                "id": chave, "nome": info.get("display_name", "Região"), "emoji": info.get("emoji", "🗺️"),
-                "descricao": info.get("description", ""), "level_min": REGION_TARGET_POWER.get(chave, 1), "imagem": info.get("image_url", f"{request.host_url}static/regions/{chave}.jpg")
-            })
-    except: pass
-    return jsonify(sorted(lista, key=lambda x: x["level_min"]))
-
-@app.route('/wiki/monstros')
-def obter_monstros():
-    lista = []
-    try:
-        from modules.game_data.monsters import MONSTERS_DATA
-        nomes_itens = {}
-        try:
-            from modules.game_data.items import ITEMS_DATA
-            for k, v in ITEMS_DATA.items(): nomes_itens[k] = f"{v.get('emoji', '📦')} {v.get('display_name', k.replace('_', ' ').title())}"
-        except: pass
-        mobs_vistos = set() 
-        for regiao_id, lista_mobs in MONSTERS_DATA.items():
-            for mob in lista_mobs:
-                mob_id = mob.get("id")
-                if mob_id in mobs_vistos: continue
-                mobs_vistos.add(mob_id)
-                loot_formatado = [{"nome": nomes_itens.get(l.get("item_id"), l.get("item_id")), "chance": l.get("drop_chance", 0)} for l in mob.get("loot_table", [])]
-                lista.append({
-                    "id": mob_id, "nome": mob.get("name", "Monstro"), "level": mob.get("min_level", mob.get("level", 1)),
-                    "hp": mob.get("hp", mob.get("max_hp", 0)), "ataque": mob.get("attack", mob.get("atk", 0)), "defesa": mob.get("defense", mob.get("def", 0)),
-                    "xp": mob.get("xp_reward", 0), "gold": mob.get("gold_drop", 0), "loot": loot_formatado, 
-                    "imagem": mob.get("image_url", f"{request.host_url}static/monsters/{mob_id}.jpg"),
-                    "regiao_id": regiao_id, "regiao_nome": regiao_id.replace("_", " ").title(), "nivel_regiao": 1, "is_evento": False
-                })
-    except: pass
-    return jsonify(lista)
-
-@app.route('/wiki/itens')
-def obter_itens():
-    lista = []
-    try:
-        from modules.game_data.items import ITEMS_DATA
-        for chave, info in ITEMS_DATA.items():
-            lista.append({
-                "id": chave, "nome": info.get("display_name", "Item"), "raridade": str(info.get("rarity", "Comum")).capitalize(),
-                "descricao": info.get("description", ""), "preco": info.get("value", info.get("price", 0)), "imagem": info.get("image_url", f"{request.host_url}static/items/{chave}.png")
-            })
-    except: pass
-    return jsonify(sorted(lista, key=lambda x: x["nome"]))
-
-@app.route('/api/meus_personagens/<int:telegram_id>')
-def listar_personagens(telegram_id):
-    try:
-        cursor = users_collection.find({"$or": [{"telegram_id": telegram_id}, {"telegram_owner_id": telegram_id}, {"last_chat_id": telegram_id}]})
-        personagens = [{"id": str(p["_id"]), "nome": p.get("character_name", "Desconhecido"), "classe": str(p.get("class", "aventureiro")).capitalize(), "level": p.get("level", 1)} for p in cursor]
-        return jsonify(personagens)
-    except: return jsonify([])
-
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
     try:
-        if users_collection is None: return jsonify({"erro": "Servidor conectando..."}), 500
         busca_id = ObjectId(personagem_id) if len(str(personagem_id)) == 24 else None
         if not busca_id: return jsonify({"erro": "ID inválido"}), 400
 
@@ -215,90 +130,130 @@ def obter_personagem_info(personagem_id):
     except Exception as e: return jsonify({"erro": str(e)}), 500    
 
 # ==========================================
-# ROTA: INICIAR VIAGEM + AVISO TELEGRAM
+# ROTA: CAÇAR (ROTA CLÁSSICA RESTAURADA)
 # ==========================================
-@app.route('/api/viajar', methods=['POST'])
-def api_viajar():
+@app.route('/api/cacar', methods=['POST'])
+def api_cacar():
+    import asyncio
+    from handlers.hunt_handler import _pick_monster_template, _build_combat_details_from_template
+    from modules.combat import combat_engine, rewards
+
     dados = request.json
     user_id = dados.get("user_id")
-    destino = dados.get("destino")
 
     try:
         busca_id = ObjectId(user_id)
         pdata = users_collection.find_one({"_id": busca_id})
         if not pdata: return jsonify({"erro": "Personagem não encontrado"})
 
-        estado = pdata.get("player_state", {})
-        if estado.get("action") == "travel": return jsonify({"erro": "Você já está viajando!"})
+        hp_atual = int(pdata.get("current_hp", pdata.get("max_hp", 100)))
+        if hp_atual <= 0: return jsonify({"erro": "Você está desmaiado! Recupere-se antes de caçar."})
+        if pdata.get("energy", 0) < 1: return jsonify({"erro": "Sem energia suficiente (⚡)."})
 
-        tier = str(pdata.get("premium_tier", "free")).lower()
-        is_vip = tier in ["lenda", "vip", "premium", "admin"]
-        secs = 0 if is_vip else 360 
-        
-        try:
-            from modules.game_data.worldmap import REGIONS_DATA
-            nome_destino = REGIONS_DATA.get(destino, {}).get("display_name", destino)
-        except:
-            nome_destino = destino
-            
-        chat_id = pdata.get("last_chat_id")
-        
-        if secs <= 0:
-            pdata["current_location"] = destino
-            pdata["player_state"] = {"action": "idle"}
-            users_collection.replace_one({"_id": busca_id}, pdata)
-            enviar_mensagem_telegram(chat_id, f"🚀 <b>[Eldora App]</b> Viagem instantânea concluída! Você chegou em <b>{nome_destino}</b>.", destino)
-        else:
-            finish = datetime.now(timezone.utc) + timedelta(seconds=secs)
-            pdata["player_state"] = {"action": "travel", "finish_time": finish.isoformat(), "details": {"destination": destino}}
-            users_collection.replace_one({"_id": busca_id}, pdata)
-            enviar_mensagem_telegram(chat_id, f"🧭 <b>[Eldora App]</b> Viagem iniciada para <b>{nome_destino}</b>.\n⏳ Tempo estimado: {secs//60} minutos.")
-        
-        return jsonify({"sucesso": True, "secs": secs, "destino": destino, "is_vip": is_vip})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+        # Desconta Energia
+        users_collection.update_one({"_id": busca_id}, {"$inc": {"energy": -1}})
+        pdata["energy"] -= 1
 
-# ==========================================
-# ROTA: FINALIZAR VIAGEM PELO APP + AVISO TELEGRAM
-# ==========================================
-@app.route('/api/finalizar_viagem', methods=['POST'])
-def api_finalizar_viagem():
-    dados = request.json
-    user_id = dados.get("user_id")
-    
-    try:
-        busca_id = ObjectId(user_id)
-        pdata = users_collection.find_one({"_id": busca_id})
-        if not pdata: return jsonify({"erro": "Personagem não encontrado"})
+        player_lvl = int(pdata.get("level", 1))
+        regiao = pdata.get("current_location", "pradaria_inicial")
+        
+        tpl = _pick_monster_template(regiao, player_lvl)
+        monster_stats = _build_combat_details_from_template(tpl, player_lvl)
+        mob_img = tpl.get("image_url", f"/static/monsters/{tpl.get('id')}.jpg")
 
-        estado = pdata.get("player_state", {})
-        if estado.get("action") == "travel":
-            destino = estado.get("details", {}).get("destination", "reino_eldora")
-            
+        player_stats = pdata.get("total_stats", pdata.copy())
+        player_stats.pop("_id", None)
+        if "max_hp" not in player_stats: player_stats["max_hp"] = pdata.get("max_hp", 100)
+
+        # Helper para Async
+        def rodar_engine(coro):
             try:
-                from modules.game_data.worldmap import REGIONS_DATA
-                nome_destino = REGIONS_DATA.get(destino, {}).get("display_name", destino)
-            except:
-                nome_destino = destino
-            
-            pdata["current_location"] = destino
-            pdata["player_state"] = {"action": "idle"}
-            users_collection.replace_one({"_id": busca_id}, pdata)
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    import nest_asyncio
+                    nest_asyncio.apply()
+                    return loop.run_until_complete(coro)
+            except RuntimeError:
+                return asyncio.run(coro)
+            return loop.run_until_complete(coro)
 
-            chat_id = pdata.get("last_chat_id")
-            enviar_mensagem_telegram(chat_id, f"✅ <b>[Eldora App]</b> Sua viagem terminou! Você chegou em <b>{nome_destino}</b>.", destino)
+        log_batalha = []
+        mob_hp = monster_stats.get("max_hp", 50)
+        p_hp = hp_atual
+        
+        turno = 1
+        while p_hp > 0 and mob_hp > 0 and turno <= 20:
+            # Player ataca
+            res_p = rodar_engine(combat_engine.processar_acao_combate(
+                attacker_pdata=pdata, attacker_stats=player_stats,
+                target_stats=monster_stats, skill_id=None, attacker_current_hp=p_hp
+            ))
+            dano_p = res_p.get("total_damage", 0)
+            mob_hp -= dano_p
+            log_batalha.append({"atacante": "player", "dano": dano_p, "texto": res_p.get("log_messages", ["Atacou"])[0]})
             
-        return jsonify({"sucesso": True})
+            if mob_hp <= 0: break
+            
+            # Mob ataca
+            res_m = rodar_engine(combat_engine.processar_acao_combate(
+                attacker_pdata={}, attacker_stats=monster_stats,
+                target_stats=player_stats, skill_id=None, attacker_current_hp=mob_hp
+            ))
+            dano_m = res_m.get("total_damage", 0)
+            p_hp -= dano_m
+            log_batalha.append({"atacante": "mob", "dano": dano_m, "texto": res_m.get("log_messages", ["Atacou"])[0]})
+            
+            turno += 1
+
+        vitoria = mob_hp <= 0
+        recompensas = {"xp": 0, "gold": 0, "items": []}
+        
+        if vitoria:
+            xp, gold, items_ids = rewards.calculate_victory_rewards(pdata, monster_stats)
+            pdata["xp"] = pdata.get("xp", 0) + xp
+            pdata["gold"] = pdata.get("gold", 0) + gold
+            
+            # Formata os nomes dos itens para o JS
+            items_names = []
+            try:
+                from modules.game_data import items as items_data
+                for item_id in items_ids:
+                    n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id)
+                    items_names.append(n_item)
+            except:
+                items_names = items_ids
+                
+            recompensas = {"xp": xp, "gold": gold, "items": items_names}
+        else:
+            rewards.process_defeat(pdata, monster_stats)
+
+        pdata["current_hp"] = max(0, p_hp)
+        users_collection.replace_one({"_id": busca_id}, pdata)
+
+        return jsonify({
+            "sucesso": True,
+            "vitoria": vitoria,
+            "regiao": regiao,
+            "classe_player": str(pdata.get("class", "aventureiro")).lower(),
+            "mob": {
+                "nome": monster_stats.get("name", "Monstro"), 
+                "hp_max": monster_stats.get("max_hp", 50), 
+                "mp_max": monster_stats.get("max_mana", 0),
+                "imagem": mob_img
+            },
+            "player": {
+                "hp_max": player_stats.get("max_hp", 100),
+                "mp_max": pdata.get("max_mana", 50) 
+            },
+            "log": log_batalha,
+            "recompensas": recompensas
+        })
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
 
-@app.route('/api/recent_premium')
-def recent_premium():
-    try:
-        ativos = users_collection.find({"premium_tier": {"$in": ["premium", "vip", "lenda"]}}, {"character_name": 1, "premium_tier": 1, "_id": 1}).sort("premium_expires_at", -1).limit(10)
-        return jsonify([{"id": str(p["_id"]), "nome": p.get("character_name", "Um Herói"), "tier": str(p.get("premium_tier", "premium")).capitalize()} for p in ativos])
-    except: return jsonify([])    
-    
 
 # ==========================================
 # ROTA: INICIAR COMBATE WEB APP (NOVO SISTEMA)
@@ -324,7 +279,6 @@ def api_combate_iniciar():
         users_collection.update_one({"_id": busca_id}, {"$inc": {"energy": -1}})
         pdata["energy"] -= 1
 
-        # Sorteia Monstro usando a MESMA lógica do Telegram (hunt_handler)
         player_lvl = int(pdata.get("level", 1))
         regiao = pdata.get("current_location", "pradaria_inicial")
         
@@ -336,7 +290,6 @@ def api_combate_iniciar():
         player_stats.pop("_id", None)
         if "max_hp" not in player_stats: player_stats["max_hp"] = pdata.get("max_hp", 100)
 
-        # CRIA O CACHE DE BATALHA NO MONGODB
         battle_cache = {
             "player_stats": player_stats,
             "monster_stats": monster_stats,
@@ -353,7 +306,6 @@ def api_combate_iniciar():
         pdata["player_state"] = {"action": "in_combat"}
         users_collection.replace_one({"_id": busca_id}, pdata)
 
-        # 👇 ADICIONE ISTO: O filtro que salva a vida do Flask 👇
         estado_frontend = {
             "player_hp": battle_cache["player_hp"],
             "player_mp": battle_cache["player_mp"],
@@ -370,7 +322,6 @@ def api_combate_iniciar():
             }
         }
 
-        # E enviamos apenas o estado limpo!
         return jsonify({
             "sucesso": True,
             "estado": estado_frontend,
@@ -383,7 +334,7 @@ def api_combate_iniciar():
         return jsonify({"erro": str(e)})
 
 # ==========================================
-# ROTA: AÇÃO DO TURNO (O jogador clicou em algo)
+# ROTA: AÇÃO DO TURNO (NOVO SISTEMA)
 # ==========================================
 @app.route('/api/combate/acao', methods=['POST'])
 def api_combate_acao():
@@ -392,8 +343,8 @@ def api_combate_acao():
 
     dados = request.json
     user_id = dados.get("user_id")
-    acao = dados.get("acao") # Pode ser 'atacar', 'skill', 'pocao', 'fugir'
-    target_id = dados.get("target_id", None) # ID da skill ou poção se houver
+    acao = dados.get("acao") 
+    target_id = dados.get("target_id", None) 
 
     try:
         busca_id = ObjectId(user_id)
@@ -402,7 +353,6 @@ def api_combate_acao():
 
         if not cache: return jsonify({"erro": "Nenhuma batalha ativa."})
 
-        # Helper para rodar a Engine Async dentro do Flask Sync
         def rodar_engine(coro):
             try:
                 loop = asyncio.get_event_loop()
@@ -416,7 +366,6 @@ def api_combate_acao():
 
         log_turno = []
         
-        # 1. AÇÃO DO JOGADOR
         if acao == "fugir":
             pdata.pop("battle_cache", None)
             pdata["player_state"] = {"action": "idle"}
@@ -437,7 +386,6 @@ def api_combate_acao():
             for msg in res_p.get("log_messages", []):
                 log_turno.append({"autor": "player", "dano": dano_p, "texto": f"🧑‍🚀 {msg}"})
 
-        # 2. CHECA SE MONSTRO MORREU
         vitoria = cache["monster_hp"] <= 0
         derrota = False
         recompensas_finais = {}
@@ -462,7 +410,6 @@ def api_combate_acao():
             pdata["player_state"] = {"action": "idle"}
             log_turno.append({"autor": "system", "texto": f"🏆 {cache['mob_nome']} foi derrotado!"})
         else:
-            # 3. TURNO DO MONSTRO (Se sobreviveu)
             res_m = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata={}, 
                 attacker_stats=cache["monster_stats"],
@@ -476,7 +423,6 @@ def api_combate_acao():
             msg_padrao = res_m.get("log_messages", [f"causou {dano_m}"])[0]
             log_turno.append({"autor": "mob", "dano": dano_m, "texto": f"🩸 {cache['mob_nome']} {msg_padrao}"})
 
-            # Checa se jogador morreu
             if cache["player_hp"] <= 0:
                 derrota = True
                 log_turno.append({"autor": "system", "texto": "☠️ Você foi derrotado..."})
@@ -488,7 +434,6 @@ def api_combate_acao():
                 pdata.pop("battle_cache", None)
                 pdata["player_state"] = {"action": "idle"}
 
-        # Atualiza banco de dados
         if not vitoria and not derrota:
             cache["turno"] += 1
             pdata["battle_cache"] = cache
