@@ -117,10 +117,81 @@ async function iniciarCacadaApp() {
     const conteudo = document.getElementById('aba-reino');
     const charId = localStorage.getItem("jogadorEldoraID");
 
+    // --- NOVA TELA DE CARREGAMENTO MODERNA ---
     conteudo.innerHTML = `
-        <div style="height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: sans-serif;">
-            <div style="font-size: 3em; animation: pulseRing 1s infinite;">⚔️</div>
-            <h3 style="color: #e74c3c; margin-top: 15px; font-style: italic;">Adentrando a selva...</h3>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+            
+            .loading-container {
+                height: 380px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                font-family: 'Poppins', sans-serif;
+                background: radial-gradient(circle, #0f172a 0%, #020617 100%);
+                border-radius: 16px;
+                border: 1px solid #1e293b;
+                box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
+                margin-top: 10px;
+            }
+            .loading-ring {
+                width: 70px;
+                height: 70px;
+                border-radius: 50%;
+                border: 4px solid transparent;
+                border-top-color: #ef4444; /* Vermelho HP */
+                border-bottom-color: #3b82f6; /* Azul MP */
+                animation: spinLoader 1.2s linear infinite;
+                margin-bottom: 25px;
+                position: relative;
+            }
+            .loading-ring:before {
+                content: '';
+                position: absolute;
+                top: 5px; left: 5px; right: 5px; bottom: 5px;
+                border-radius: 50%;
+                border: 4px solid transparent;
+                border-left-color: #f1c40f; /* Dourado Ouro */
+                animation: spinLoader 0.8s linear infinite reverse;
+            }
+            .loading-icon {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 1.5em;
+                /* O ícone dentro não gira, só os anéis em volta */
+            }
+            .loading-title {
+                color: #f8fafc;
+                font-size: 1.3em;
+                font-weight: 800;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+                margin: 0;
+                animation: pulseText 2s ease-in-out infinite;
+                text-shadow: 0 0 10px rgba(255,255,255,0.2);
+            }
+            .loading-subtitle {
+                color: #64748b;
+                font-size: 0.9em;
+                margin-top: 8px;
+                font-weight: 600;
+            }
+            @keyframes spinLoader { 100% { transform: rotate(360deg); } }
+            @keyframes pulseText { 
+                0%, 100% { opacity: 0.7; } 
+                50% { opacity: 1; text-shadow: 0 0 15px rgba(255,255,255,0.5); } 
+            }
+        </style>
+        
+        <div class="loading-container">
+            <div class="loading-ring">
+                <div class="loading-icon" style="animation: spinLoader 1.2s linear infinite reverse;">⚔️</div>
+            </div>
+            <h3 class="loading-title">Rastreando Inimigo</h3>
+            <p class="loading-subtitle">Empunhe sua arma e prepare-se...</p>
         </div>
     `;
 
@@ -189,7 +260,7 @@ async function iniciarCacadaApp() {
                 }
 
                 #hud-monstro { top: 10px; left: 10px; width: 150px; border-top: 2px solid #e74c3c; }
-                #hud-jogador { bottom: 10px; right: 10px; width: 160px; border-top: 2px solid #3b82f6; }
+                #hud-jogador { bottom: 10px; right: 10px; width: 150px; border-top: 2px solid #3b82f6; }
 
                 .hud-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; border-bottom: 1px solid #1e293b; padding-bottom: 4px; }
                 .hud-name { font-size: 0.8em; font-weight: 800; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; }
