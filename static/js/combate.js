@@ -2,7 +2,7 @@
 // 1. DICIONÁRIO DE CENÁRIOS DAS ARENAS
 // ==========================================
 const FUNDOS_ARENAS = {
-    "pradaria_inicial": "https://github.com/user-attachments/assets/3a16a7b1-69f4-4563-9493-20f07cf0b228", 
+    "pradaria_inicial": "https://github.com/user-attachments/assets/8978e977-c5da-4d78-851a-ae28452b10ec", 
     "floresta_sombria": "LINK_DA_FLORESTA",
     "pedreira_granito": "LINK_DA_PEDREIRA",
     "defesa_reino": "https://placehold.co/600x400/2980b9/111?text=Invasao+do+Reino" // Fundo para o evento de invasão!
@@ -12,8 +12,8 @@ const FUNDOS_ARENAS = {
 // 2. DICIONÁRIO DAS CLASSES (DE COSTAS EM PNG)
 // ==========================================
 const SPRITES_COSTA = {
-    "aventureiro": "https://github.com/Eldorabotpy/personagem-costa-/issues/1#issue-4117552988", 
-    "assassino": "https://github.com/Eldorabotpy/personagem-costa-/issues/2#issue-4117557838",
+    "aventureiro": "https://github.com/user-attachments/assets/6621c6b9-691f-45dd-b738-7915bb576f53", 
+    "assassino": "https://github.com/user-attachments/assets/5d3f8b40-7511-44ed-b9ce-636d7c9bd153",
     "guerreiro": "https://placehold.co/200x300/transparent/fff?text=Guerreiro",
     "mago": "https://placehold.co/200x300/transparent/fff?text=Mago",
     "arqueiro": "https://placehold.co/200x300/transparent/fff?text=Arqueiro"

@@ -557,7 +557,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 2,
             "loot_table": [{"item_id": "frasco_com_agua", "drop_chance": 10}],           
             "media_key": "slime_pequeno_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/2#issue-4117610663"
+            "image_url": "https://github.com/user-attachments/assets/94dbce5a-9bec-411b-82cf-5f217786425e"
         },
         {
             "id": "slime_verde",
@@ -568,7 +568,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 3,
             "loot_table": [{"item_id": "geleia_slime", "drop_chance": 10}],
             "media_key": "slime_verde_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/3#issue-4117657009"
+            "image_url": "https://github.com/user-attachments/assets/0a008654-41db-46d1-bc14-14709b5d23a7"
         },
         {
             "id": "slime_azul",
@@ -579,7 +579,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 4,
             "loot_table": [{"item_id": "cristal_mana_bruto", "drop_chance": 10}],
             "media_key": "slime_azul_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/4#issue-4117658732"
+            "image_url": "https://github.com/user-attachments/assets/ad4841cd-b836-48d4-8f55-1f569eb84ef3"
         },
         {
             "id": "slime_magma",
@@ -590,7 +590,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 4,
             "loot_table": [{"item_id": "pocao_cura_leve", "drop_chance": 2}],
             "media_key": "slime_magma_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/5#issue-4117660833"
+            "image_url": "https://github.com/user-attachments/assets/f9df87ab-bd02-436e-b7d0-cc306a99cfab"
 
         },
         
@@ -604,7 +604,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 8,
             "loot_table": [{"item_id": "raiz_da_fortuna", "drop_chance": 10}],
             "media_key": "slime_terra_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/6#issue-4117663265"
+            "image_url": "https://github.com/user-attachments/assets/dc4222a7-d290-4c4b-a0c7-ca5092e7b153"
         },
         {
             "id": "slime_venenoso",
@@ -615,7 +615,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 5,
             "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
             "media_key": "slime_venenoso_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/7#issue-4117664227"
+            "image_url": "https://github.com/user-attachments/assets/6ccf9654-47c3-4e62-a133-282c09740af0"
         },
         {
             "id": "slime_eletrico",
@@ -626,7 +626,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 6,
             "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_eletrico_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/8#issue-4117665743"
+            "image_url": "https://github.com/user-attachments/assets/a9f2e648-294c-4315-aa19-43a7955d5b64"
         },
         # --- Raros ---
         {
@@ -638,7 +638,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 5,
             "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_brilhante_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/9#issue-4117667839"
+            "image_url": "https://github.com/user-attachments/assets/fd3037ae-494d-4b25-9fe5-10119076c1d5"
         },
         {
             "id": "slime_escuridao",
@@ -649,7 +649,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 1,
             "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
             "media_key": "slime_escuridao_media",
-            "image_url": "https://github.com/Eldorabotpy/pradaria-inicial/issues/11#issue-4117670332"
+            "image_url": "https://github.com/user-attachments/assets/8acb1a9b-9af9-4522-a509-2ec73c905b5e"
         },
 
         # --- Mini-Chefe (Muito Raro) ---
@@ -662,7 +662,7 @@ MONSTERS_DATA = {
             "xp_reward": 10, "gold_drop": 1,
             "loot_table": [{"item_id": "po_de_iniciativa", "drop_chance": 5}],
             "media_key": "rei_slime_media",
-            "image_url": ""
+            "image_url": "https://github.com/user-attachments/assets/65bed98b-0df7-477a-a9ae-e4bc5ff8541c"
         }
     ],
 
