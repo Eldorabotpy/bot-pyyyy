@@ -45,6 +45,23 @@ def home():
 def pagina_login():
     return render_template('login.html')
 
+# --- ROTA CORRIGIDA PARA O PORTAL DE ACESSO FUNCIONAR ---
+@app.route('/api/meus_personagens/<telegram_id>')
+def listar_personagens(telegram_id):
+    try:
+        # Se o JS mandar lixo (undefined/null), a gente devolve vazio sem dar Erro 404
+        if telegram_id in ["undefined", "null", ""]:
+            return jsonify([])
+            
+        busca_id = int(telegram_id)
+        
+        cursor = users_collection.find({"$or": [{"telegram_id": busca_id}, {"telegram_owner_id": busca_id}, {"last_chat_id": busca_id}]})
+        personagens = [{"id": str(p["_id"]), "nome": p.get("character_name", "Desconhecido"), "classe": str(p.get("class", "aventureiro")).capitalize(), "level": p.get("level", 1)} for p in cursor]
+        return jsonify(personagens)
+    except Exception as e: 
+        print(f"Erro ao buscar personagens: {e}")
+        return jsonify([])
+
 # ==========================================
 # ROTAS DE RANKING E WIKI (Resumidas)
 # ==========================================
