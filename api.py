@@ -330,6 +330,10 @@ def api_combate_iniciar():
             "regiao": battle_cache["regiao"],
             "mob_img": battle_cache["mob_img"],
             "mob_nome": battle_cache["mob_nome"],
+            # 👇 ADICIONE ESTAS DUAS LINHAS 👇
+            "player_level": player_lvl,
+            "monster_level": monster_stats.get("level", player_lvl), 
+            # 👆 ========================== 👆
             "player_stats": {
                 "max_hp": player_stats.get("max_hp", 100),
                 "max_mana": player_stats.get("max_mana", 50)
