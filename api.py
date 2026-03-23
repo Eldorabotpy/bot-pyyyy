@@ -145,6 +145,25 @@ def api_finalizar_viagem():
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
     
+@app.route('/api/recent_premium')
+def obter_recent_premium():
+    try:
+        # Busca os últimos 5 jogadores VIP/Premium no MongoDB
+        cursor = users_collection.find(
+            {"premium_tier": {"$ne": "free"}}, 
+            {"character_name": 1, "premium_tier": 1, "_id": 0}
+        ).sort("_id", -1).limit(5)
+        
+        colaboradores = []
+        for c in cursor:
+            colaboradores.append({
+                "nome": c.get("character_name", "Aventureiro"),
+                "tier": str(c.get("premium_tier", "VIP")).upper()
+            })
+        return jsonify(colaboradores)
+    except Exception as e:
+        return jsonify([])
+        
 @app.route('/ranking/guildas')
 def ranking_guildas():
     try:
