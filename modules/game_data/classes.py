@@ -327,7 +327,7 @@ CLASS_AVATARS = {
     "maestro": "LINK_GITHUB_MAESTRO.png",
     
     "assassino": "https://github.com/user-attachments/assets/cbc6a4a3-26c6-46fe-b03f-4b594b5c3b47",
-    "ladrao_de_sombras": "https://github.com/user-attachments/assets/ff8abd42-74f3-4f2c-a0ed-1f58c1d286f7",
+    "ladrao_de_sombras": "https://github.com/user-attachments/assets/8d7d1aed-1745-45cc-a6d8-34d000ae33c9",
     "ninja": "https://github.com/user-attachments/assets/cbc6a4a3-26c6-46fe-b03f-4b594b5c3b47",
     "mestre_das_laminas": "https://github.com/user-attachments/assets/cbc6a4a3-26c6-46fe-b03f-4b594b5c3b47",
     

@@ -101,7 +101,7 @@ async function carregarMeuPerfil() {
         const infoClasse = CLASSES_INFO[classeKey] || CLASSES_INFO['aprendiz'];
         
         // Se a classe não tiver PNG, usamos um placeholder
-        const avatarLink = p.avatar || 'https://i.ibb.co/3s6D5dC/char-aprendiz.png';
+        const avatarLink = p.avatar || 'https://github.com/user-attachments/assets/9a7300d0-63af-47bb-9f52-1fd99c40ed90';
 
         const xpAtual = p.xp || 0;
         const xpMaximo = p.xp_max || 1; 
