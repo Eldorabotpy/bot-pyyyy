@@ -292,7 +292,7 @@ CLASS_DMG_EMOJI = {
 # ============================================================================
 # Cole aqui os links das imagens com fundo transparente (PNG) hospedadas no GitHub.
 CLASS_AVATARS = {
-    "aprendiz": "https://i.ibb.co/3s6D5dC/char-aprendiz.png", # Imagem base
+    "aprendiz": "https://github.com/user-attachments/assets/b0f8f158-3d54-46ef-b1df-9bbd9300609f", # Imagem base
     "aventureiro": "LINK_GITHUB_AVENTUREIRO.png",
     
     "guerreiro": "LINK_GITHUB_GUERREIRO.png",
@@ -326,7 +326,7 @@ CLASS_AVATARS = {
     "encantador": "LINK_GITHUB_ENCANTADOR.png",
     "maestro": "LINK_GITHUB_MAESTRO.png",
     
-    "assassino": "LINK_GITHUB_ASSASSINO.png",
+    "assassino": "https://github.com/user-attachments/assets/cbc6a4a3-26c6-46fe-b03f-4b594b5c3b47",
     "ladrao_de_sombras": "LINK_GITHUB_LADRAO_SOMBRAS.png",
     "ninja": "LINK_GITHUB_NINJA.png",
     "mestre_das_laminas": "LINK_GITHUB_MESTRE_LAMINAS.png",
@@ -341,6 +341,12 @@ CLASS_AVATARS = {
     "druida": "LINK_GITHUB_DRUIDA.png",
     "sacerdote": "LINK_GITHUB_SACERDOTE.png"
 }
+
+def get_class_avatar(class_key: str) -> str:
+    """Retorna o link da imagem da classe, com fallback para a imagem de aprendiz."""
+    if not class_key:
+        return CLASS_AVATARS["aprendiz"]
+    return CLASS_AVATARS.get(class_key.lower(), CLASS_AVATARS["aprendiz"])
 
 def get_primary_damage_profile(player_class: str) -> dict:
     pc = (player_class or "").lower()
