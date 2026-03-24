@@ -75,7 +75,8 @@
 
 /* Barra de Progresso do Auto-Hunt */
 .ah-progress-bg {
-    width: 100%; height: 12px;
+    width: 100%; 
+    height: 12px;
     background: #020617;
     border: 1px solid #1e293b;
     border-radius: 6px;
@@ -83,6 +84,7 @@
     overflow: hidden;
     position: relative;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+    box-sizing: border-box; /* <-- A TRAVA MÁGICA AQUI */
 }
 .ah-progress-fill {
     height: 100%;

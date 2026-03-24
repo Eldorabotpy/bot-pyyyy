@@ -406,9 +406,9 @@ function mostrarTelaAutoHunt(dataFim, quantidade, regiaoChave) {
                     ⚔️ <span class="neon-text" style="font-size: 0.8em; font-weight: 900; letter-spacing: 2px; vertical-align: middle;">AUTO-HUNT</span> 🛡️
                 </div>
                 
-                <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid #1a2e1d; padding: 15px; border-radius: 8px; display: inline-block; width: 100%; max-width: 320px; margin-bottom: 25px;">
+                <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid #1a2e1d; padding: 15px; border-radius: 8px; display: inline-block; width: 100%; max-width: 320px; margin-bottom: 25px; box-sizing: border-box;">
                     <p style="margin: 0 0 12px 0; color: #cbd5e1; font-weight: 700; font-size: 0.95em; text-transform: uppercase;">
-                        Estado: <span class="neon-text">Em Caça</span> <span class="combat-pulse">❤️‍🔥</span>
+                        Estado: <span class="neon-text">Em Caça</span> <span class="combat-pulse">❤️🔥</span>
                     </p>
                     <p style="margin: 0 0 12px 0; color: #cbd5e1; font-weight: 700; font-size: 0.95em; text-transform: uppercase;">
                         Tempo Restante: <strong id="timer-autohunt" class="neon-text" style="font-family: monospace; font-size: 1.2em;">--:--</strong>
