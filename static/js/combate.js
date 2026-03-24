@@ -651,3 +651,4 @@ function sairDaArena() {
     }
     carregarReino(); 
 }
+
