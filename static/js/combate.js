@@ -438,13 +438,54 @@ async function iniciarCacadaApp() {
     }
 }
 
+// Abre a tela de magias bonitinha e proporcional
+function abrirMenuMagias(skillsDoJogador) {
+    document.getElementById('menu-botoes').style.display = 'none';
+    let painel = document.getElementById('combat-log-box').parentElement;
+    
+    // Se o menu já existe, remove para recriar
+    let menuAntigo = document.getElementById('menu-magias');
+    if(menuAntigo) menuAntigo.remove();
+
+    // Aqui usamos o grid exato para os botões ficarem com larguras e alturas iguais
+    let htmlMagias = `<div id="menu-magias" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">`;
+    
+    // Cria os botões das skills
+    skillsDoJogador.forEach(skill => {
+        // CORREÇÃO DEFINITIVA: Usando aspas e replaceAll para não quebrar o JavaScript
+        let nomeLimpo = skill.nome.replaceAll("", "ç").replaceAll("Ã§", "ç").replaceAll("Ã", "ã"); 
+        
+        htmlMagias += `
+            <button class="modern-font modern-btn btn-mag" style="flex-direction: column; align-items: flex-start; padding: 10px;" onclick="executarAcaoTurno('magia', '${skill.id}')">
+                <div style="font-size: 1em; font-weight: 800; color: #f8fafc; margin-bottom: 3px; display: flex; align-items: center; gap: 5px;">✨ ${nomeLimpo}</div>
+                <div style="font-size: 0.75em; color: #94a3b8; font-weight: 600;">Custo: ${skill.mp_custo} MP</div>
+            </button>
+        `;
+    });
+
+    // Botão de voltar que ocupa a linha toda (grid-column: span 2)
+    htmlMagias += `
+        <button class="modern-font modern-btn btn-run" style="grid-column: span 2; justify-content: center;" onclick="voltarParaAcoesPrincipais()">⬅️ Voltar</button>
+    </div>`;
+
+    painel.insertAdjacentHTML('beforeend', htmlMagias);
+}
+
+function voltarParaAcoesPrincipais() {
+    let menuMagias = document.getElementById('menu-magias');
+    if(menuMagias) menuMagias.style.display = 'none';
+    document.getElementById('menu-botoes').style.display = 'grid';
+}
 // ==========================================
 // NOVA FUNÇÃO: EXECUTA A AÇÃO NO BACKEND
 // ==========================================
-async function executarAcaoTurno(tipoAcao) {
+async function executarAcaoTurno(tipoAcao, skillId = null) {
     document.getElementById('menu-botoes').style.display = 'none';
+    const menuMagias = document.getElementById('menu-magias');
+    if (menuMagias) menuMagias.style.display = 'none'; // Esconde menu de magias se estiver aberto
+    
     const logBox = document.getElementById('combat-log-box');
-    logBox.innerHTML = "CALCULANDO...";
+    logBox.innerHTML = "<span style='color: #f1c40f;'>Conjurando magia...</span>";
     
     const charId = localStorage.getItem("jogadorEldoraID");
 
@@ -452,8 +493,16 @@ async function executarAcaoTurno(tipoAcao) {
         const res = await fetch('/api/combate/acao', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: charId, acao: tipoAcao })
+            body: JSON.stringify({ user_id: charId, acao: tipoAcao, skill_id: skillId }) // Envia a skill!
         });
+
+        if (!res.ok) {
+            // Se o servidor der crash, mostra no console para podermos investigar
+            const erroTexto = await res.text();
+            console.error("Erro fatal do Python:", erroTexto);
+            throw new Error("O servidor Python quebrou ao processar o turno.");
+        }
+
         const turno = await res.json();
 
         if (turno.erro) {
@@ -471,7 +520,8 @@ async function executarAcaoTurno(tipoAcao) {
         animarAcoesDaRodada(turno);
 
     } catch(e) {
-        exibirAlertaCustom("Erro", "Conexão perdida.", false);
+        console.error(e);
+        exibirAlertaCustom("Erro de Conexão", "Veja o terminal do Python para mais detalhes.", false);
         sairDaArena();
     }
 }

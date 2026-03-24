@@ -533,7 +533,8 @@ def api_combate_acao():
     user_id = dados.get("user_id")
     acao = dados.get("acao") 
     target_id = dados.get("target_id", None) 
-
+    skill_id = dados.get("skill_id")
+    
     try:
         busca_id = ObjectId(user_id)
         pdata = users_collection.find_one({"_id": busca_id})
@@ -560,12 +561,12 @@ def api_combate_acao():
             users_collection.replace_one({"_id": busca_id}, pdata)
             return jsonify({"fugiu": True, "log": [{"autor": "system", "texto": "🏃 Você fugiu da batalha!"}]})
 
-        elif acao == "atacar":
+        elif acao == "atacar" or acao == "magia":
             res_p = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata=pdata,
                 attacker_stats=cache["player_stats"],
                 target_stats=cache["monster_stats"],
-                skill_id=None,
+                skill_id=skill_id if acao == "magia" else None, # <-- PASSA A MAGIA PARA A ENGINE
                 attacker_current_hp=cache["player_hp"]
             ))
             dano_p = res_p.get("total_damage", 0)
