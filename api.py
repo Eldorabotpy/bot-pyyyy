@@ -37,6 +37,10 @@ def enviar_mensagem_telegram(chat_id, texto, destino=None):
 # ==========================================
 # ROTA PRINCIPAL E LOGIN
 # ==========================================
+@app.route('/ping')
+def ping_server():
+    return "Eldora Resiste!", 200
+    
 @app.route('/')
 def home():
     return render_template('index.html')
