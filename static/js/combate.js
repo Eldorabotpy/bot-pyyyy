@@ -75,6 +75,35 @@ function tocarSFX(url) {
     sfx.play().catch(e => console.log("Áudio bloqueado:", e));
 }
 
+// ==========================================
+// FUNÇÕES DE ANIMAÇÃO E EFEITOS (UTILITIES)
+// ==========================================
+function animarCorteVisual(alvoId, cor_brilho) {
+    const alvo = document.getElementById(alvoId);
+    if (!alvo) return;
+
+    const corte = document.createElement('div');
+    corte.className = 'slash-effect';
+    corte.style.boxShadow = `0 0 10px #fff, 0 0 20px ${cor_brilho}`;
+    
+    // Centraliza o corte no meio do sprite do monstro/jogador
+    corte.style.left = (alvo.offsetLeft + alvo.offsetWidth / 2) + 'px';
+    corte.style.top = (alvo.offsetTop + alvo.offsetHeight / 2) + 'px';
+
+    alvo.parentElement.appendChild(corte);
+    
+    // Remove a div da tela após a animação acabar (300ms)
+    setTimeout(() => corte.remove(), 300);
+}
+
+// Por precaução, garanta que a função de som também está aí!
+function tocarSFX(url) {
+    if (!url || url.includes("LINK_")) return;
+    let sfx = new Audio(url);
+    sfx.volume = 0.6;
+    sfx.play().catch(e => console.log("Áudio bloqueado:", e));
+}
+
 function animarEfeitoVisual(alvoId, tipoEfeito = 'corte', corExtra = '#fff') {
     const alvo = document.getElementById(alvoId);
     if (!alvo) return;
