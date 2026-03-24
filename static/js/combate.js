@@ -452,8 +452,8 @@ function abrirMenuMagias(skillsDoJogador) {
     
     // Cria os botões das skills
     skillsDoJogador.forEach(skill => {
-        // CORREÇÃO DEFINITIVA: Usando aspas e replaceAll para não quebrar o JavaScript
-        let nomeLimpo = skill.nome.replaceAll("", "ç").replaceAll("Ã§", "ç").replaceAll("Ã", "ã"); 
+        // O losango com interrogação pega exatamente aquele erro de UTF-8 do banco
+        let nomeLimpo = skill.nome.replaceAll("", "ç").replaceAll("Ã§", "ç").replaceAll("Ã", "ã");
         
         htmlMagias += `
             <button class="modern-font modern-btn btn-mag" style="flex-direction: column; align-items: flex-start; padding: 10px;" onclick="executarAcaoTurno('magia', '${skill.id}')">

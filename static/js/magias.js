@@ -85,12 +85,9 @@ function voltarMenuCombate() {
 }
 
 function executarMagiaTurno(magiaId, custoMp) {
-    // Aqui nós vamos conectar com a lógica de combate depois
-    // Validaremos se o player tem MP suficiente, etc.
-    console.log(`Lançando magia ${magiaId} gastando ${custoMp} MP!`);
-    
-    // Volta os botões ao normal após lançar a magia
+    // Esconde o menu de magias e volta pra tela de combate
     voltarMenuCombate();
     
-    // Aqui chamaremos algo como: executarAcaoTurno('magia', magiaId);
+    // AGORA SIM: Dispara a magia lá pro Python!
+    executarAcaoTurno('magia', magiaId);
 }
