@@ -645,6 +645,123 @@ def api_combate_acao():
         traceback.print_exc()
         return jsonify({"erro": str(e)})
 
+# ==========================================
+# ROTAS: AUTO-HUNT (WEB APP)
+# ==========================================
+@app.route('/api/autohunt/iniciar', methods=['POST'])
+def api_autohunt_iniciar():
+    dados = request.json
+    user_id = dados.get("user_id")
+    quantidade = int(dados.get("quantidade", 10))
+
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        if not pdata: return jsonify({"erro": "Personagem não encontrado"})
+
+        tier = str(pdata.get("premium_tier", "free")).lower()
+        limites = {"free": 0, "premium": 10, "vip": 25, "lenda": 35, "admin": 100}
+        limite_permitido = limites.get(tier, 0)
+
+        if limite_permitido <= 0:
+            return jsonify({"erro": "🔒 O Auto-Hunt é exclusivo para jogadores Premium, VIP ou Lenda!"})
+
+        if quantidade > limite_permitido:
+            return jsonify({"erro": f"Seu plano permite no máximo {limite_permitido}x por vez."})
+
+        energia_atual = int(pdata.get("energy", 0))
+        if energia_atual < quantidade:
+            return jsonify({"erro": f"Você precisa de {quantidade}⚡, mas tem {energia_atual}⚡."})
+
+        # Desconta energia e calcula o tempo (30 seg por monstro)
+        tempo_segundos = quantidade * 30
+        finish_time = datetime.now(timezone.utc) + timedelta(seconds=tempo_segundos)
+        regiao = pdata.get("current_location", "pradaria_inicial")
+
+        users_collection.update_one(
+            {"_id": busca_id},
+            {"$inc": {"energy": -quantidade},
+             "$set": {
+                 "player_state": {
+                     "action": "auto_hunting",
+                     "finish_time": finish_time.isoformat(),
+                     "details": {"hunt_count": quantidade, "region": regiao}
+                 }
+             }}
+        )
+
+        return jsonify({"sucesso": True, "finish_time": finish_time.isoformat()})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/autohunt/finalizar', methods=['POST'])
+def api_autohunt_finalizar():
+    import random
+    from handlers.hunt_handler import _pick_monster_template, _build_combat_details_from_template
+    from modules.combat import rewards
+    from modules.game_data import items as items_data
+
+    dados = request.json
+    user_id = dados.get("user_id")
+
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        
+        estado = pdata.get("player_state", {})
+        if estado.get("action") != "auto_hunting":
+            return jsonify({"erro": "Você não está em uma caçada automática."})
+
+        quantidade = int(estado.get("details", {}).get("hunt_count", 1))
+        regiao = estado.get("details", {}).get("region", "pradaria_inicial")
+        player_lvl = int(pdata.get("level", 1))
+
+        total_xp = 0
+        total_gold = 0
+        todos_itens = []
+        nomes_itens_formatados = []
+
+        # Roda um loop rápido calculando apenas as vitórias/loots
+        for _ in range(quantidade):
+            tpl = _pick_monster_template(regiao, player_lvl)
+            monster_stats = _build_combat_details_from_template(tpl, player_lvl)
+            
+            # Simulando vitória (No Auto-Hunt original, consideramos win rate alto)
+            xp, gold, items_ids = rewards.calculate_victory_rewards(pdata, monster_stats)
+            total_xp += xp
+            total_gold += gold
+            todos_itens.extend(items_ids)
+
+        pdata["xp"] = pdata.get("xp", 0) + total_xp
+        pdata["gold"] = pdata.get("gold", 0) + total_gold
+        
+        if "inventory" not in pdata: pdata["inventory"] = {}
+        for item_id in todos_itens:
+            if item_id not in pdata["inventory"]:
+                pdata["inventory"][item_id] = {"base_id": item_id, "quantity": 0}
+            pdata["inventory"][item_id]["quantity"] += 1
+            n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
+            nomes_itens_formatados.append(n_item)
+
+        # Reseta o estado
+        pdata["player_state"] = {"action": "idle"}
+        users_collection.replace_one({"_id": busca_id}, pdata)
+
+        return jsonify({
+            "sucesso": True,
+            "xp": total_xp,
+            "gold": total_gold,
+            "items": nomes_itens_formatados
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+    
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

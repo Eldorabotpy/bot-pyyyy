@@ -128,7 +128,12 @@ async function carregarReino() {
             abrirMapaEldora();
             return;
         }
-
+        
+        if (p.estado.action === 'auto_hunting') {
+            mostrarTelaAutoHunt(new Date(p.estado.finish_time), p.estado.details.hunt_count);
+            return;
+        }
+        
         if (p.local_atual === "reino_eldora") {
             renderizarCidade(conteudo, p);
         } else {
@@ -199,9 +204,9 @@ function renderizarSelva(conteudo, p) {
         </div>
 
         <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-            <button onclick="exibirAlertaCustom('Premium', 'Auto-Caça funciona apenas no chat do Telegram.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 10x</button>
-            <button onclick="exibirAlertaCustom('Premium', 'Auto-Caça funciona apenas no chat do Telegram.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 25x</button>
-            <button onclick="exibirAlertaCustom('Premium', 'Auto-Caça funciona apenas no chat do Telegram.', false)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3498db; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 35x</button>
+            <button onclick="acionarAutoHuntApp(10)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #3b82f6; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 10x</button>
+            <button onclick="acionarAutoHuntApp(25)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #8b5cf6; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 25x</button>
+            <button onclick="acionarAutoHuntApp(35)" style="flex: 1; background: #1e293b; border: 1px solid #334155; border-bottom: 2px solid #f59e0b; padding: 8px; border-radius: 6px; color: #cbd5e1; font-weight: bold; font-size: 0.9em; cursor: pointer;">⏱️ 35x</button>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
@@ -331,6 +336,115 @@ async function iniciarViagemServidor(destino) {
         }
     } catch(e) {
         exibirAlertaCustom("Erro Obscuro", "Não foi possível conjurar a magia de viagem.", false);
+    }
+}
+
+let _intervaloAutoHunt = null;
+
+async function acionarAutoHuntApp(quantidade) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    exibirAlertaCustom("Preparando...", "Calculando rotas e empunhando armas...", true);
+
+    try {
+        const res = await fetch('/api/autohunt/iniciar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId, quantidade: quantidade })
+        });
+        const dados = await res.json();
+        
+        if (dados.erro) {
+            exibirAlertaCustom("Aviso", dados.erro, false);
+            return;
+        }
+
+        // Se deu certo, fecha o alerta e mostra a tela de timer
+        document.getElementById('modal-alerta')?.remove();
+        mostrarTelaAutoHunt(new Date(dados.finish_time), quantidade);
+
+    } catch (e) {
+        exibirAlertaCustom("Erro", "Falha de conexão com os servidores.", false);
+    }
+}
+
+function mostrarTelaAutoHunt(dataFim, quantidade) {
+    const conteudo = document.getElementById('aba-reino');
+    
+    conteudo.innerHTML = `
+        <div style="background: linear-gradient(180deg, #0f172a, #020617); border: 2px solid #3b82f6; border-radius: 12px; padding: 40px 20px; text-align: center; margin-top: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.6);">
+            <div style="font-size: 3.5em; animation: pulseRing 2s infinite; margin-bottom: 10px;">⚔️</div>
+            <h2 style="color: #60a5fa; margin: 0 0 10px 0; text-transform: uppercase;">Caçada Automática</h2>
+            <p style="color: #94a3b8; font-size: 1em; margin: 0 0 25px 0;">Massacrando ${quantidade || 'vários'} inimigos...</p>
+            
+            <div style="background: #020617; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; display: inline-block; min-width: 150px;">
+                <span style="font-size: 0.75em; color: #64748b; text-transform: uppercase; font-weight: bold;">Tempo Restante</span><br>
+                <strong id="timer-autohunt" style="font-size: 2.5em; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.3); font-family: monospace;">--:--</strong>
+            </div>
+            
+            <p style="color: #ef4444; font-size: 0.8em; margin-top: 25px; font-weight: 600;">⚠️ Não feche esta tela, ou volte depois para resgatar o loot!</p>
+        </div>
+    `;
+
+    if (_intervaloAutoHunt) clearInterval(_intervaloAutoHunt);
+    
+    _intervaloAutoHunt = setInterval(() => {
+        const timerVisor = document.getElementById("timer-autohunt");
+        if(!timerVisor) { clearInterval(_intervaloAutoHunt); return; }
+
+        const diffMS = dataFim - new Date();
+
+        if (diffMS <= 0) {
+            clearInterval(_intervaloAutoHunt);
+            timerVisor.innerHTML = "00:00";
+            timerVisor.style.color = "#2ecc71";
+            finalizarAutoHuntApp(); // CHAMA O LOOT!
+            return;
+        }
+
+        const m = Math.floor((diffMS / 1000) / 60).toString().padStart(2, '0');
+        const s = Math.floor((diffMS / 1000) % 60).toString().padStart(2, '0');
+        timerVisor.innerHTML = `${m}:${s}`;
+    }, 1000);
+}
+
+async function finalizarAutoHuntApp() {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    document.getElementById("timer-autohunt").innerHTML = "Coletando...";
+    
+    try {
+        const res = await fetch('/api/autohunt/finalizar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId })
+        });
+        const dados = await res.json();
+
+        if (dados.erro) {
+            exibirAlertaCustom("Aviso", dados.erro, false);
+            carregarReino();
+            return;
+        }
+
+        // Monta os itens saqueados bonitinhos
+        let itensSaqueados = dados.items.length > 0 ? dados.items.join(', ') : 'Nenhum item dropado.';
+
+        const relatorioHtml = `
+            <div style="text-align: left;">
+                <p style="color: #e2e8f0; margin-bottom: 10px;">A carnificina terminou! Aqui está o que você conseguiu:</p>
+                <div style="background: #020617; padding: 10px; border-radius: 6px; border: 1px solid #334155;">
+                    <span style="color: #2ecc71; display: block; margin-bottom: 5px;">✨ <b>XP Ganho:</b> +${dados.xp}</span>
+                    <span style="color: #f1c40f; display: block; margin-bottom: 5px;">💰 <b>Ouro:</b> +${dados.gold}</span>
+                    <span style="color: #9b59b6; display: block;">🎒 <b>Loot:</b> ${itensSaqueados}</span>
+                </div>
+            </div>
+        `;
+
+        exibirAlertaCustom("Relatório da Caçada", relatorioHtml, true);
+        carregarReino(); // Volta para a selva
+
+    } catch (e) {
+        exibirAlertaCustom("Erro", "Os monstros roubaram seu loot no caminho de volta.", false);
+        carregarReino();
     }
 }
 
