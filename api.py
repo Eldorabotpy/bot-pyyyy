@@ -178,10 +178,14 @@ def ranking_guildas():
     except Exception as e: return jsonify([])
 
 # ==========================================
-# ROTA DE PERFIL
+# ROTA DE PERFIL COMPLETO (ATUALIZADA)
 # ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
+    from modules.game_data import items as items_data
+    from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
+    from modules.game_data.attributes import STAT_EMOJI
+
     try:
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
         usuario = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
@@ -192,6 +196,52 @@ def obter_perfil(user_id):
             classe_bd = usuario.get("class")
             classe_str = str(classe_bd) if classe_bd else "aprendiz"
             
+            # 1. PROCESSA OS STATUS (Lê do total_stats ou base_stats)
+            stats_atuais = usuario.get("total_stats", usuario.get("base_stats", {}))
+            status_formatados = {}
+            for stat in ["attack", "defense", "initiative", "luck", "magic_attack"]:
+                val = stats_atuais.get(stat, 0)
+                # Traduz para o frontend
+                nome_pt = {"attack": "Ataque", "defense": "Defesa", "initiative": "Agilidade", "luck": "Sorte", "magic_attack": "Magia"}[stat]
+                emoji = {"attack": "⚔️", "defense": "🛡️", "initiative": "🏃", "luck": "🍀", "magic_attack": "🔮"}[stat]
+                status_formatados[stat] = {"nome": nome_pt, "emoji": emoji, "valor": val}
+
+            # 2. PROCESSA O INVENTÁRIO
+            inventario_cru = usuario.get("inventory", {})
+            inventario_formatado = []
+            for item_id, qtd_ou_dict in inventario_cru.items():
+                if isinstance(qtd_ou_dict, dict):
+                    base_id = qtd_ou_dict.get("base_id", item_id)
+                    qtd = 1
+                else:
+                    base_id = item_id
+                    qtd = qtd_ou_dict
+                
+                if qtd > 0:
+                    info_item = items_data.ITEMS_DATA.get(base_id, {})
+                    nome_item = info_item.get("display_name", base_id.replace("_", " ").title())
+                    emoji_item = info_item.get("emoji", "📦")
+                    inventario_formatado.append({"id": item_id, "nome": nome_item, "emoji": emoji_item, "qtd": qtd})
+            
+            # Ordena inventário por quantidade (maior primeiro)
+            inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
+
+            # 3. PROCESSA EQUIPAMENTOS
+            equip_cru = usuario.get("equipment", {})
+            equip_formatado = []
+            for slot in SLOT_ORDER:
+                item_uid = equip_cru.get(slot)
+                emoji_slot = SLOT_EMOJI.get(slot, "🔲")
+                
+                if item_uid and item_uid in inventario_cru:
+                    obj_item = inventario_cru[item_uid]
+                    base_id = obj_item.get("base_id", item_uid) if isinstance(obj_item, dict) else item_uid
+                    info_item = items_data.ITEMS_DATA.get(base_id, {})
+                    nome_equip = info_item.get("display_name", base_id.replace("_", " ").title())
+                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": nome_equip, "vazio": False})
+                else:
+                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": "Vazio", "vazio": True})
+
             return jsonify({
                 "nome": usuario.get("character_name", "Aventureiro"), 
                 "level": lvl, 
@@ -204,11 +254,17 @@ def obter_perfil(user_id):
                 "hp_max": usuario.get("max_hp", 0), 
                 "energy": usuario.get("energy", 0),
                 "pontos_livres": usuario.get("stat_points", 0), 
-                "avatar": f"{request.host_url}static/classes/{classe_str.lower()}.png"
+                "avatar": f"{request.host_url}static/classes/{classe_str.lower()}.png",
+                # NOVOS DADOS ENVIADOS!
+                "status": status_formatados,
+                "inventario": inventario_formatado,
+                "equipamentos": equip_formatado
             })
             
         return jsonify({"erro": "Personagem não encontrado no banco."}), 404
     except Exception as e: 
+        import traceback
+        traceback.print_exc()
         return jsonify({"erro": str(e)}), 400
 
 @app.route('/api/personagem/<personagem_id>')
