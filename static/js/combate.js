@@ -357,7 +357,7 @@ async function iniciarCacadaApp() {
 
                 <div id="menu-botoes" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <button class="modern-font modern-btn btn-atk" onclick="executarAcaoTurno('atacar')"><span>⚔️</span> Atacar</button>
-                    <button class="modern-font modern-btn btn-mag" onclick="exibirAlertaCustom('Aviso', 'Magias em breve!', false)"><span>✨</span> Magias</button>
+                    <button class="modern-font modern-btn btn-mag" onclick="abrirMenuMagias()"><span style="font-size: 1.2em;">✨</span> Magias</button>
                     <button class="modern-font modern-btn btn-bag" onclick="exibirAlertaCustom('Aviso', 'Mochila em breve!', false)"><span>🎒</span> Mochila</button>
                     <button class="modern-font modern-btn btn-run" onclick="executarAcaoTurno('fugir')"><span>🏃</span> Fugir</button>
                 </div>

@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 # Importa as conexões oficiais do seu bot
 from modules.player.core import users_collection
 from modules.database import clans_col
-
+from modules.game_data.skills import SKILL_DATA, get_skill_data_with_rarity
 app = Flask(__name__)
 CORS(app) 
 
@@ -40,7 +40,7 @@ def enviar_mensagem_telegram(chat_id, texto, destino=None):
 @app.route('/ping')
 def ping_server():
     return "Eldora Resiste!", 200
-    
+
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -231,6 +231,73 @@ def obter_personagem_info(personagem_id):
         })
     except Exception as e: return jsonify({"erro": str(e)}), 500    
 
+# ==========================================
+# ROTA: BUSCAR MAGIAS EQUIPADAS DO JOGADOR
+# ==========================================
+@app.route('/api/personagem/<user_id>/magias_equipadas')
+def obter_magias_equipadas(user_id):
+    try:
+        # Busca o jogador no banco de dados
+        jogador = users_collection.find_one({"_id": int(user_id)})
+        if not jogador:
+            return jsonify([])
+
+        # Onde o jogador guarda as skills? Geralmente em 'equipped_skills' ou 'skills'
+        skills_equipadas = jogador.get("equipped_skills", [])
+        
+        # Se você ainda não tem um sistema de 'equipar', e quiser testar 
+        # com TODAS as skills que ele possui, use esta linha em vez da de cima:
+        # skills_equipadas = list(jogador.get("skills", {}).keys())
+        
+        cooldowns_atuais = jogador.get("cooldowns", {})
+        
+        magias_formatadas = []
+
+        # Para cada skill que o jogador tem...
+        for skill_id in skills_equipadas:
+            # Puxamos os dados completos da skill considerando a raridade que o player tem
+            dados_skill = get_skill_data_with_rarity(jogador, skill_id)
+            
+            if not dados_skill:
+                continue
+                
+            # Filtramos para mostrar apenas habilidades ATIVAS (que gastam turno/mana)
+            # ou de SUPORTE (curas/buffs)
+            tipo_skill = dados_skill.get("type", "passive")
+            if tipo_skill not in ["active", "support"]:
+                continue
+
+            # Escolher um ícone baseado no tipo ou nome da magia
+            icone = "✨"
+            nome_display = dados_skill.get("display_name", skill_id)
+            if "Cura" in nome_display or "Luz" in nome_display or "Sagrada" in nome_display:
+                icone = "💖"
+            elif "Fogo" in nome_display or "Chama" in nome_display:
+                icone = "🔥"
+            elif "Corte" in nome_display or "Golpe" in nome_display or "Lâmina" in nome_display:
+                icone = "⚔️"
+            elif "Defesa" in nome_display or "Escudo" in nome_display:
+                icone = "🛡️"
+            
+            turnos_espera = int(cooldowns_atuais.get(skill_id, 0))
+            
+            # Monta o objeto que o JavaScript vai receber
+            magia = {
+                "id": skill_id,
+                "nome": nome_display,
+                "icone": icone,
+                "custo_mp": dados_skill.get("mana_cost", 0), # Pega o custo de mana do skills.py
+                "tipo": tipo_skill,
+                "cooldown_atual": turnos_espera
+            }
+            magias_formatadas.append(magia)
+
+        return jsonify(magias_formatadas)
+
+    except Exception as e:
+        print(f"Erro ao buscar magias: {e}")
+        return jsonify([])
+    
 # ==========================================
 # ROTA: CAÇAR (ROTA CLÁSSICA RESTAURADA)
 # ==========================================
