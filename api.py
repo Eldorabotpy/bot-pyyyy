@@ -237,56 +237,56 @@ def obter_personagem_info(personagem_id):
 @app.route('/api/personagem/<user_id>/magias_equipadas')
 def obter_magias_equipadas(user_id):
     try:
-        # Busca o jogador no banco de dados
-        jogador = users_collection.find_one({"_id": int(user_id)})
+        from bson.objectid import ObjectId
+        
+        # 1. Tenta buscar pelo ObjectId (padrão do MongoDB)
+        try:
+            jogador = users_collection.find_one({"_id": ObjectId(user_id)})
+        except:
+            # Se falhar, tenta buscar como número inteiro (Telegram ID)
+            jogador = users_collection.find_one({"_id": int(user_id)})
+            if not jogador:
+                jogador = users_collection.find_one({"telegram_id": int(user_id)})
+
         if not jogador:
+            print(f"Jogador {user_id} não encontrado na rota de magias!")
             return jsonify([])
 
-        # Onde o jogador guarda as skills? Geralmente em 'equipped_skills' ou 'skills'
         skills_equipadas = jogador.get("equipped_skills", [])
-        
-        # Se você ainda não tem um sistema de 'equipar', e quiser testar 
-        # com TODAS as skills que ele possui, use esta linha em vez da de cima:
-        # skills_equipadas = list(jogador.get("skills", {}).keys())
-        
         cooldowns_atuais = jogador.get("cooldowns", {})
-        
         magias_formatadas = []
 
-        # Para cada skill que o jogador tem...
         for skill_id in skills_equipadas:
-            # Puxamos os dados completos da skill considerando a raridade que o player tem
             dados_skill = get_skill_data_with_rarity(jogador, skill_id)
-            
             if not dados_skill:
                 continue
                 
-            # Filtramos para mostrar apenas habilidades ATIVAS (que gastam turno/mana)
-            # ou de SUPORTE (curas/buffs)
+            # Filtramos para mostrar apenas habilidades ATIVAS ou de SUPORTE
             tipo_skill = dados_skill.get("type", "passive")
             if tipo_skill not in ["active", "support"]:
                 continue
 
-            # Escolher um ícone baseado no tipo ou nome da magia
+            # Define o ícone
             icone = "✨"
             nome_display = dados_skill.get("display_name", skill_id)
             if "Cura" in nome_display or "Luz" in nome_display or "Sagrada" in nome_display:
                 icone = "💖"
             elif "Fogo" in nome_display or "Chama" in nome_display:
                 icone = "🔥"
-            elif "Corte" in nome_display or "Golpe" in nome_display or "Lâmina" in nome_display:
+            elif "Corte" in nome_display or "Golpe" in nome_display or "Lâmina" in nome_display or "Guilhotina" in nome_display:
                 icone = "⚔️"
-            elif "Defesa" in nome_display or "Escudo" in nome_display:
+            elif "Defesa" in nome_display or "Escudo" in nome_display or "Couraça" in nome_display:
                 icone = "🛡️"
-            
+            elif "Sombra" in nome_display or "Furtivo" in nome_display or "Veneno" in nome_display or "Sorrateiro" in nome_display:
+                icone = "🌑"
+
             turnos_espera = int(cooldowns_atuais.get(skill_id, 0))
-            
-            # Monta o objeto que o JavaScript vai receber
+
             magia = {
                 "id": skill_id,
                 "nome": nome_display,
                 "icone": icone,
-                "custo_mp": dados_skill.get("mana_cost", 0), # Pega o custo de mana do skills.py
+                "custo_mp": dados_skill.get("mana_cost", 0),
                 "tipo": tipo_skill,
                 "cooldown_atual": turnos_espera
             }
