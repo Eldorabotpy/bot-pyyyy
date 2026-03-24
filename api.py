@@ -239,46 +239,49 @@ def obter_magias_equipadas(user_id):
     try:
         from bson.objectid import ObjectId
         
-        # 1. Tenta buscar pelo ObjectId (padrão do MongoDB)
+        # 1. Busca o jogador de forma blindada
         try:
             jogador = users_collection.find_one({"_id": ObjectId(user_id)})
         except:
-            # Se falhar, tenta buscar como número inteiro (Telegram ID)
-            jogador = users_collection.find_one({"_id": int(user_id)})
+            jogador = users_collection.find_one({"telegram_id": int(user_id)})
             if not jogador:
-                jogador = users_collection.find_one({"telegram_id": int(user_id)})
+                jogador = users_collection.find_one({"_id": int(user_id)})
 
         if not jogador:
-            print(f"Jogador {user_id} não encontrado na rota de magias!")
-            return jsonify([])
+            return jsonify([{"id": "erro", "nome": "Erro: Jogador não achado no BD", "icone": "❌", "custo_mp": 0, "tipo": "active", "cooldown_atual": 0}])
 
+        # 2. Pega as magias do BD
         skills_equipadas = jogador.get("equipped_skills", [])
-        cooldowns_atuais = jogador.get("cooldowns", {})
+        if not skills_equipadas:
+            return jsonify([]) # Aqui o grimório está vazio de verdade
+
+        cooldowns_atuais = jogador.get("cooldowns") or {}
         magias_formatadas = []
 
+        # 3. IMPORTANTE: Importando direto aqui dentro para não dar erro de caminho
+        from modules.game_data.skills import get_skill_data_with_rarity
+
         for skill_id in skills_equipadas:
+            # Puxa os dados
             dados_skill = get_skill_data_with_rarity(jogador, skill_id)
             if not dados_skill:
                 continue
                 
-            # Filtramos para mostrar apenas habilidades ATIVAS ou de SUPORTE
+            # Só mostra magias ativas ou suportes
             tipo_skill = dados_skill.get("type", "passive")
             if tipo_skill not in ["active", "support"]:
                 continue
 
-            # Define o ícone
-            icone = "✨"
             nome_display = dados_skill.get("display_name", skill_id)
-            if "Cura" in nome_display or "Luz" in nome_display or "Sagrada" in nome_display:
-                icone = "💖"
-            elif "Fogo" in nome_display or "Chama" in nome_display:
-                icone = "🔥"
-            elif "Corte" in nome_display or "Golpe" in nome_display or "Lâmina" in nome_display or "Guilhotina" in nome_display:
-                icone = "⚔️"
-            elif "Defesa" in nome_display or "Escudo" in nome_display or "Couraça" in nome_display:
-                icone = "🛡️"
-            elif "Sombra" in nome_display or "Furtivo" in nome_display or "Veneno" in nome_display or "Sorrateiro" in nome_display:
-                icone = "🌑"
+            
+            # Escolhendo o ícone combinando com o nome
+            icone = "✨"
+            if any(x in nome_display for x in ["Cura", "Luz", "Sagrada", "Restauradora"]): icone = "💖"
+            elif any(x in nome_display for x in ["Fogo", "Chama", "Magma", "Meteoro"]): icone = "🔥"
+            elif any(x in nome_display for x in ["Corte", "Golpe", "Lâmina", "Guilhotina"]): icone = "⚔️"
+            elif any(x in nome_display for x in ["Defesa", "Escudo", "Couraça"]): icone = "🛡️"
+            elif any(x in nome_display for x in ["Sombra", "Furtivo", "Veneno", "Sorrateiro"]): icone = "🌑"
+            elif any(x in nome_display for x in ["Flecha", "Tiro", "Mira"]): icone = "🏹"
 
             turnos_espera = int(cooldowns_atuais.get(skill_id, 0))
 
@@ -292,11 +295,23 @@ def obter_magias_equipadas(user_id):
             }
             magias_formatadas.append(magia)
 
+        # Se filtrou tudo e não sobrou nada
+        if len(magias_formatadas) == 0:
+            return jsonify([{"id": "erro", "nome": "Aviso: Suas skills são apenas PASSIVAS", "icone": "⚠️", "custo_mp": 0, "tipo": "active", "cooldown_atual": 0}])
+
         return jsonify(magias_formatadas)
 
     except Exception as e:
-        print(f"Erro ao buscar magias: {e}")
-        return jsonify([])
+        # SE O PYTHON TRAVAR, VAI MOSTRAR O ERRO NUM BOTÃO NA TELA!
+        print(f"Erro Fatal nas Magias: {e}")
+        return jsonify([{
+            "id": "erro_fatal", 
+            "nome": f"Erro Python: {str(e)}", 
+            "icone": "🐛", 
+            "custo_mp": 0, 
+            "tipo": "active", 
+            "cooldown_atual": 0
+        }])
     
 # ==========================================
 # ROTA: CAÇAR (ROTA CLÁSSICA RESTAURADA)
