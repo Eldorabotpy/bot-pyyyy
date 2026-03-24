@@ -703,6 +703,7 @@ def api_autohunt_finalizar():
     from handlers.hunt_handler import _pick_monster_template, _build_combat_details_from_template
     from modules.combat import rewards
     from modules.game_data import items as items_data
+    from datetime import datetime, timezone # <-- Garanta que isso está importado
 
     dados = request.json
     user_id = dados.get("user_id")
@@ -715,10 +716,20 @@ def api_autohunt_finalizar():
         if estado.get("action") != "auto_hunting":
             return jsonify({"erro": "Você não está em uma caçada automática."})
 
+        # 👇 NOVA TRAVA DE SEGURANÇA E RESTART 👇
+        finish_time_str = estado.get("finish_time")
+        if finish_time_str:
+            # Converte a string do banco de volta para formato de hora
+            finish_time = datetime.fromisoformat(finish_time_str.replace("Z", "+00:00"))
+            
+            # Se a hora atual for MENOR que a hora do fim, o cara tá tentando burlar!
+            if datetime.now(timezone.utc) < finish_time:
+                return jsonify({"erro": "A caçada ainda não terminou! Os monstros estão lutando."})
+        # 👆 ================================= 👆
+
         quantidade = int(estado.get("details", {}).get("hunt_count", 1))
         regiao = estado.get("details", {}).get("region", "pradaria_inicial")
         player_lvl = int(pdata.get("level", 1))
-
         total_xp = 0
         total_gold = 0
         todos_itens = []

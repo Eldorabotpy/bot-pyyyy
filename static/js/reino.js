@@ -124,15 +124,23 @@ async function carregarReino() {
         p.local_atual = p.local_atual || "reino_eldora";
         p.estado = p.estado || { action: "idle" };
 
+        // 1. Verifica se está viajando no mapa
         if (p.estado.action === 'travel') {
             abrirMapaEldora();
             return;
         }
-        
+
+        // 👇 ADICIONE ISTO AQUI: Verifica se a internet caiu no meio do Auto-Hunt 👇
         if (p.estado.action === 'auto_hunting') {
-            mostrarTelaAutoHunt(new Date(p.estado.finish_time), p.estado.details.hunt_count);
+            const dataFim = new Date(p.estado.finish_time);
+            const qtd = p.estado.details.hunt_count || 10;
+            const regiao = p.estado.details.region || p.local_atual;
+            
+            // Reabre a tela travada do cronômetro!
+            mostrarTelaAutoHunt(dataFim, qtd, regiao);
             return;
         }
+        // 👆 ================================================================ 👆
 
         if (p.local_atual === "reino_eldora") {
             renderizarCidade(conteudo, p);
@@ -371,55 +379,70 @@ async function acionarAutoHuntApp(quantidade) {
 }
 
 // NOVA TELA DE AUTO-HUNT COM O VISUAL DA SUA IMAGEM
+// NOVA TELA DE AUTO-HUNT COM ANIMAÇÕES EXTERNAS E BARRA DE PROGRESSO
 function mostrarTelaAutoHunt(dataFim, quantidade, regiaoChave) {
     const conteudo = document.getElementById('aba-reino');
     const nomeRegiao = NOMES_REGIOES[regiaoChave] || "Selva Fechada";
     
+    // Calcula o tempo total para a barra de progresso (30s por mob)
+    const tempoTotalMS = (quantidade * 30) * 1000;
+    
     conteudo.innerHTML = `
-        <div style="background: linear-gradient(180deg, #0b1c14 0%, #050d09 100%); border: 4px solid #3f4e38; border-radius: 12px; padding: 25px 15px; text-align: center; margin-top: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.8), inset 0 0 30px rgba(34, 197, 94, 0.1); position: relative; overflow: hidden;">
-            
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, rgba(34, 197, 94, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
+        <div class="autohunt-container">
+            <div class="autohunt-mist"></div>
+            <div class="firefly ff-1"></div>
+            <div class="firefly ff-2"></div>
+            <div class="firefly ff-3"></div>
+            <div class="firefly ff-4"></div>
 
-            <h2 style="color: #e2e8f0; margin: 0 0 15px 0; font-size: 1.1em; text-transform: uppercase; letter-spacing: 1px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); position: relative;">
-                MUNDO DE ELDORA - ${nomeRegiao}
-            </h2>
-            
-            <hr style="border-color: #243621; margin-bottom: 20px; position: relative;">
-
-            <div style="font-size: 2em; margin-bottom: 15px; text-shadow: 0 0 15px rgba(34, 197, 94, 0.6); position: relative;">
-                ⚔️ <span style="font-size: 0.8em; color: #f8fafc; font-weight: 900; letter-spacing: 2px; vertical-align: middle;">AUTO-HUNT</span> 🛡️
-            </div>
-            
-            <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid #1a2e1d; padding: 15px; border-radius: 8px; display: inline-block; width: 100%; max-width: 320px; margin-bottom: 25px; position: relative;">
-                <p style="margin: 0 0 12px 0; color: #cbd5e1; font-weight: 700; font-size: 0.95em; text-transform: uppercase;">
-                    Estado: <span style="color: #4ade80; text-shadow: 0 0 5px rgba(74, 222, 128, 0.5);">Em Caça</span>
-                </p>
-                <p style="margin: 0 0 12px 0; color: #cbd5e1; font-weight: 700; font-size: 0.95em; text-transform: uppercase;">
-                    Tempo Restante: <strong id="timer-autohunt" style="color: #4ade80; font-family: monospace; font-size: 1.2em; text-shadow: 0 0 8px rgba(74, 222, 128, 0.6);">--:--</strong>
-                </p>
-                <p style="margin: 0; color: #cbd5e1; font-weight: 700; font-size: 0.95em; text-transform: uppercase;">
-                    Matando <span style="color: #4ade80;">${quantidade || 'Vários'}</span> Monstros
-                </p>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 12px; position: relative;">
-                <button onclick="exibirAlertaCustom('Em breve', 'O sistema de pular tempo usando Gemas será liberado em breve!', false)" style="background: linear-gradient(180deg, #166534 0%, #14532d 100%); border: 2px solid #22c55e; padding: 12px; border-radius: 8px; color: #f0fdf4; font-weight: 800; font-size: 0.85em; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                    Concluir Caça Manualmente<br>
-                    <span style="font-size: 0.8em; color: #86efac; font-weight: normal;">(Pagar Taxa)</span>
-                </button>
+            <div class="autohunt-content">
+                <h2 style="color: #e2e8f0; margin: 0 0 15px 0; font-size: 1.1em; text-transform: uppercase; letter-spacing: 1px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                    MUNDO DE ELDORA<br><span style="font-size: 0.8em; color: #94a3b8;">${nomeRegiao}</span>
+                </h2>
                 
-                <button onclick="exibirAlertaCustom('Aviso', 'O botão de cancelar será ativado na próxima atualização.', false)" style="background: linear-gradient(180deg, #451a03 0%, #290f02 100%); border: 2px solid #b45309; padding: 12px; border-radius: 8px; color: #ffedd5; font-weight: 800; font-size: 0.9em; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                    Cancelar Caça
-                </button>
+                <hr style="border-color: #243621; margin-bottom: 20px;">
+
+                <div style="font-size: 2em; margin-bottom: 15px;">
+                    ⚔️ <span class="neon-text" style="font-size: 0.8em; font-weight: 900; letter-spacing: 2px; vertical-align: middle;">AUTO-HUNT</span> 🛡️
+                </div>
+                
+                <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid #1a2e1d; padding: 15px; border-radius: 8px; display: inline-block; width: 100%; max-width: 320px; margin-bottom: 25px;">
+                    <p style="margin: 0 0 12px 0; color: #cbd5e1; font-weight: 700; font-size: 0.95em; text-transform: uppercase;">
+                        Estado: <span class="neon-text">Em Caça</span> <span class="combat-pulse">❤️‍🔥</span>
+                    </p>
+                    <p style="margin: 0 0 12px 0; color: #cbd5e1; font-weight: 700; font-size: 0.95em; text-transform: uppercase;">
+                        Tempo Restante: <strong id="timer-autohunt" class="neon-text" style="font-family: monospace; font-size: 1.2em;">--:--</strong>
+                    </p>
+                    <p style="margin: 0; color: #cbd5e1; font-weight: 700; font-size: 0.9em; text-transform: uppercase;">
+                        Matando ${quantidade || 'Vários'} Monstros
+                    </p>
+                    
+                    <div class="ah-progress-bg">
+                        <div id="ah-barra" class="ah-progress-fill"></div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button onclick="exibirAlertaCustom('Em breve', 'O sistema de pular tempo usando Gemas será liberado em breve!', false)" style="background: linear-gradient(180deg, #166534 0%, #14532d 100%); border: 2px solid #22c55e; padding: 12px; border-radius: 8px; color: #f0fdf4; font-weight: 800; font-size: 0.85em; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                        Concluir Caça Manualmente<br>
+                        <span style="font-size: 0.8em; color: #86efac; font-weight: normal;">(Pagar Taxa)</span>
+                    </button>
+                    
+                    <button onclick="exibirAlertaCustom('Aviso', 'O botão de cancelar será ativado na próxima atualização.', false)" style="background: linear-gradient(180deg, #451a03 0%, #290f02 100%); border: 2px solid #b45309; padding: 12px; border-radius: 8px; color: #ffedd5; font-weight: 800; font-size: 0.9em; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                        Cancelar Caça
+                    </button>
+                </div>
             </div>
         </div>
     `;
 
-    // Lógica do Cronômetro
+    // Lógica do Cronômetro e da Barra de Progresso
     if (_intervaloAutoHunt) clearInterval(_intervaloAutoHunt);
     
     _intervaloAutoHunt = setInterval(() => {
         const timerVisor = document.getElementById("timer-autohunt");
+        const barraVisor = document.getElementById("ah-barra");
+        
         if(!timerVisor) { clearInterval(_intervaloAutoHunt); return; }
 
         const diffMS = dataFim - new Date();
@@ -427,14 +450,23 @@ function mostrarTelaAutoHunt(dataFim, quantidade, regiaoChave) {
         if (diffMS <= 0) {
             clearInterval(_intervaloAutoHunt);
             timerVisor.innerHTML = "00:00";
-            timerVisor.style.color = "#2ecc71";
+            if(barraVisor) barraVisor.style.width = "100%";
             finalizarAutoHuntApp(); 
             return;
         }
 
+        // Atualiza os Textos
         const m = Math.floor((diffMS / 1000) / 60).toString().padStart(2, '0');
         const s = Math.floor((diffMS / 1000) % 60).toString().padStart(2, '0');
         timerVisor.innerHTML = `${m}:${s}`;
+        
+        // Atualiza a Barra Verde de Progresso
+        if(barraVisor) {
+            const progressoAtual = Math.max(0, tempoTotalMS - diffMS);
+            let porcentagem = (progressoAtual / tempoTotalMS) * 100;
+            barraVisor.style.width = `${porcentagem}%`;
+        }
+
     }, 1000);
 }
 
