@@ -477,15 +477,15 @@ function voltarParaAcoesPrincipais() {
     document.getElementById('menu-botoes').style.display = 'grid';
 }
 // ==========================================
-// NOVA FUNÇÃO: EXECUTA A AÇÃO NO BACKEND
+// NOVA FUNÇÃO: EXECUTA A AÇÃO NO BACKEND (COM DEBUG AVANÇADO)
 // ==========================================
 async function executarAcaoTurno(tipoAcao, skillId = null) {
     document.getElementById('menu-botoes').style.display = 'none';
     const menuMagias = document.getElementById('menu-magias');
-    if (menuMagias) menuMagias.style.display = 'none'; // Esconde menu de magias se estiver aberto
+    if (menuMagias) menuMagias.style.display = 'none'; 
     
     const logBox = document.getElementById('combat-log-box');
-    logBox.innerHTML = "<span style='color: #f1c40f;'>Conjurando magia...</span>";
+    logBox.innerHTML = "<span style='color: #f1c40f;'>Calculando turno...</span>";
     
     const charId = localStorage.getItem("jogadorEldoraID");
 
@@ -493,20 +493,21 @@ async function executarAcaoTurno(tipoAcao, skillId = null) {
         const res = await fetch('/api/combate/acao', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: charId, acao: tipoAcao, skill_id: skillId }) // Envia a skill!
+            body: JSON.stringify({ user_id: charId, acao: tipoAcao, skill_id: skillId }) 
         });
 
+        // SE O PYTHON CRASHAR (ERRO 500), ELE ENTRA AQUI!
         if (!res.ok) {
-            // Se o servidor der crash, mostra no console para podermos investigar
             const erroTexto = await res.text();
-            console.error("Erro fatal do Python:", erroTexto);
-            throw new Error("O servidor Python quebrou ao processar o turno.");
+            // Pega um pedaço do erro pra mostrar na tela
+            const resumo = erroTexto.substring(0, 150).replace(/<[^>]*>?/gm, ''); 
+            throw new Error(`Crash no Servidor (Status ${res.status}): ${resumo}`);
         }
 
         const turno = await res.json();
 
         if (turno.erro) {
-            exibirAlertaCustom("Erro", turno.erro, false);
+            exibirAlertaCustom("Aviso do Jogo", turno.erro, false);
             sairDaArena();
             return;
         }
@@ -520,8 +521,8 @@ async function executarAcaoTurno(tipoAcao, skillId = null) {
         animarAcoesDaRodada(turno);
 
     } catch(e) {
-        console.error(e);
-        exibirAlertaCustom("Erro de Conexão", "Veja o terminal do Python para mais detalhes.", false);
+        // AGORA O ERRO APARECE DIRETO NO SEU CELULAR!
+        exibirAlertaCustom("🚨 Falha Crítica", `<b>Motivo:</b> ${e.message}<br><br>Verifique a aba 'Logs' no painel do Render.com!`, false);
         sairDaArena();
     }
 }
