@@ -480,7 +480,8 @@ function abrirMenuMagias(skillsDoJogador) {
     let htmlMagias = `<div id="menu-magias" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">`;
     
     skillsDoJogador.forEach(skill => {
-        let nomeLimpo = skill.nome.replace(/&ccedil;/g, "ç").replace(/&acirc;/g, "â");
+        // Tente usar skill.display_name em vez de skill.nome
+        let nomeLimpo = skill.display_name || skill.nome;
         
         // Botão mais fino (padding 6px) e texto menor
         htmlMagias += `
