@@ -437,8 +437,9 @@ async function iniciarCacadaApp() {
 
             <div style="background: #020617; border: 1px solid #334155; border-radius: 0 0 12px 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px;" class="modern-font">
                 
-                <div id="combat-log-box" style="font-size: 0.9em; font-weight: 600; color: #cbd5e1; line-height: 1.3; height: 42px; overflow: hidden; background: #0f172a; padding: 6px 10px; border-radius: 6px; border: 1px solid #1e293b; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-                    <span style="color: #ef4444;">Um ${est.mob_nome} selvagem apareceu!</span><br>O que você vai fazer?
+                <div id="combat-log-box" style="font-size: 0.9em; font-weight: 600; color: #cbd5e1; line-height: 1.3; min-height: 55px; display: flex; flex-direction: column; justify-content: center; background: #0f172a; padding: 10px; border-radius: 6px; border: 1px solid #1e293b; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
+                    <span style="color: #ef4444;">Um ${est.mob_nome} selvagem apareceu!</span>
+                    <span style="margin-top: 4px;">O que você vai fazer?</span>
                 </div>
 
                 <div id="menu-botoes" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -557,7 +558,7 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
 // ==========================================
 // NOVA FUNÇÃO: LÊ O QUE O PYTHON MANDOU E ANIMA
 // ==========================================
-function animarAcoesDaRodada(turnoInfo) {
+function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) { // <-- Parâmetros adicionados!
     const logBox = document.getElementById('combat-log-box');
     const elemSpriteMob = document.getElementById('sprite-mob');
     const elemSpritePlayer = document.getElementById('sprite-player');
@@ -589,8 +590,25 @@ function animarAcoesDaRodada(turnoInfo) {
             db.mobHpAtual -= acao.dano;
             atualizarVisualBarra('bar-hp-mob', db.mobHpAtual, db.mobHpMax);
             
-            tocarSFX(acao.texto.includes("CRÍTICO") ? AUDIO_ASSETS.som_critico : AUDIO_ASSETS.som_espada);
-            animarCorteVisual('sprite-mob', acao.texto.includes("CRÍTICO") ? '#f1c40f' : '#e74c3c');
+            let ehCritico = acao.texto.includes("CRÍTICO");
+            tocarSFX(ehCritico ? AUDIO_ASSETS.som_critico : AUDIO_ASSETS.som_espada);
+
+            // ===============================================
+            // SISTEMA INTELIGENTE DE ANIMAÇÃO DE MAGIAS
+            // ===============================================
+            let corEfeito = ehCritico ? '#f1c40f' : '#e74c3c';
+            let tipoVisual = 'corte'; // Padrão se for ataque normal
+
+            if (tipoAcao === 'magia' && skillNome) {
+                let nomeLower = skillNome.toLowerCase();
+                if (nomeLower.includes('fogo') || nomeLower.includes('chama') || nomeLower.includes('explosão')) tipoVisual = 'fogo';
+                else if (nomeLower.includes('cura') || nomeLower.includes('luz') || nomeLower.includes('sagrada') || nomeLower.includes('restauradora')) tipoVisual = 'cura';
+                else if (nomeLower.includes('sombra') || nomeLower.includes('furtivo') || nomeLower.includes('veneno')) tipoVisual = 'trevas';
+                else if (nomeLower.includes('impacto') || nomeLower.includes('tiro') || nomeLower.includes('flecha')) tipoVisual = 'impacto';
+            }
+
+            animarEfeitoVisual('sprite-mob', tipoVisual, corEfeito);
+            // ===============================================
 
             elemSpritePlayer.style.transform = "translate(15px, -15px)";
             setTimeout(() => { elemSpritePlayer.style.transform = "translate(0, 0)"; }, 150);
@@ -601,7 +619,7 @@ function animarAcoesDaRodada(turnoInfo) {
             atualizarVisualBarra('bar-hp-player', db.playerHpAtual, db.playerHpMax);
 
             tocarSFX(AUDIO_ASSETS.som_monstro);
-            animarCorteVisual('sprite-player', '#9b59b6');
+            animarEfeitoVisual('sprite-player', 'corte', '#9b59b6');
             flash.style.opacity = "1";
             elemSpriteMob.style.transform = "translate(-15px, 15px)";
             setTimeout(() => { elemSpriteMob.style.transform = "translate(0, 0)"; flash.style.opacity = "0"; }, 150);
