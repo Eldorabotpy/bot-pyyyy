@@ -464,6 +464,10 @@ function mostrarTelaAutoHunt(dataFim, quantidade, regiaoChave) {
         if(barraVisor) {
             const progressoAtual = Math.max(0, tempoTotalMS - diffMS);
             let porcentagem = (progressoAtual / tempoTotalMS) * 100;
+            
+            // 👇 TRAVA DE SEGURANÇA: Nunca deixa a barra passar do limite! 👇
+            if (porcentagem > 100) porcentagem = 100; 
+            
             barraVisor.style.width = `${porcentagem}%`;
         }
 

@@ -585,14 +585,25 @@ def api_combate_acao():
             pdata["xp"] = pdata.get("xp", 0) + xp
             pdata["gold"] = pdata.get("gold", 0) + gold
             
-            items_names = []
+            # ======= CORREÇÃO DO INVENTÁRIO (COMBATE MANUAL) =======
+            items_names = [] # <-- A LISTA PRECISA SER CRIADA AQUI PARA NÃO DAR ERRO!
             if "inventory" not in pdata: pdata["inventory"] = {}
+        
             for item_id in items_ids:
+                # 1. Se o jogador não tem o item ainda, cria com zero
                 if item_id not in pdata["inventory"]:
-                    pdata["inventory"][item_id] = {"base_id": item_id, "quantity": 0}
-                pdata["inventory"][item_id]["quantity"] += 1
+                    pdata["inventory"][item_id] = 0
+            
+                # 2. Verifica como o item está salvo no seu banco (Inteiro ou Dicionário)
+                if isinstance(pdata["inventory"][item_id], dict):
+                    pdata["inventory"][item_id]["quantity"] = pdata["inventory"][item_id].get("quantity", 0) + 1
+                else:
+                    pdata["inventory"][item_id] += 1
+                
+                # Formata o nome para mostrar na tela
                 n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
                 items_names.append(n_item)
+            # =======================================================
 
             recompensas_finais = {"xp": xp, "gold": gold, "items": items_names}
             pdata.pop("battle_cache", None)
@@ -749,13 +760,24 @@ def api_autohunt_finalizar():
         pdata["xp"] = pdata.get("xp", 0) + total_xp
         pdata["gold"] = pdata.get("gold", 0) + total_gold
         
+        # ======= CORREÇÃO DO INVENTÁRIO (AUTO-HUNT) =======
         if "inventory" not in pdata: pdata["inventory"] = {}
+        
         for item_id in todos_itens:
+            # 1. Se o jogador não tem o item ainda, cria com zero
             if item_id not in pdata["inventory"]:
-                pdata["inventory"][item_id] = {"base_id": item_id, "quantity": 0}
-            pdata["inventory"][item_id]["quantity"] += 1
+                pdata["inventory"][item_id] = 0
+            
+            # 2. Verifica como o item está salvo no seu banco (Inteiro ou Dicionário)
+            if isinstance(pdata["inventory"][item_id], dict):
+                pdata["inventory"][item_id]["quantity"] = pdata["inventory"][item_id].get("quantity", 0) + 1
+            else:
+                pdata["inventory"][item_id] += 1
+                
+            # Formata o nome para mostrar na tela
             n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
-            nomes_itens_formatados.append(n_item)
+            nomes_itens_formatados.append(n_item) # <-- Agora usa o nome correto da variável!
+        # ==================================================
 
         # Reseta o estado
         pdata["player_state"] = {"action": "idle"}

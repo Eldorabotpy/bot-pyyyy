@@ -469,7 +469,6 @@ async function iniciarCacadaApp() {
 }
 
 // Abre a tela de magias bonitinha e proporcional
-// Abre a tela de magias bonitinha e compacta
 function abrirMenuMagias(skillsDoJogador) {
     document.getElementById('menu-botoes').style.display = 'none';
     let painel = document.getElementById('combat-log-box').parentElement;
@@ -477,24 +476,23 @@ function abrirMenuMagias(skillsDoJogador) {
     let menuAntigo = document.getElementById('menu-magias');
     if(menuAntigo) menuAntigo.remove();
 
-    // Diminuí o gap (espaço entre botões) para 8px
     let htmlMagias = `<div id="menu-magias" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">`;
     
     skillsDoJogador.forEach(skill => {
-        // Tente usar skill.display_name em vez de skill.nome
         let nomeLimpo = skill.display_name || skill.nome;
         
-        // Botão mais fino (padding 6px) e texto menor
+        // Adicionado: overflow: hidden e word-break para textos gigantes não esticarem o botão
         htmlMagias += `
-            <button class="modern-font modern-btn btn-mag" style="flex-direction: column; justify-content: center; padding: 6px; min-height: 55px; border-radius: 8px;" onclick="executarAcaoTurno('magia', '${skill.id}', '${nomeLimpo}')">
-                <div style="font-size: 0.85em; font-weight: 800; color: #f8fafc; margin-bottom: 2px; text-align: center; white-space: normal; line-height: 1.1;">✨ ${nomeLimpo}</div>
+            <button class="modern-font modern-btn btn-mag" style="flex-direction: column; justify-content: center; padding: 6px; min-height: 55px; border-radius: 8px; overflow: hidden;" onclick="executarAcaoTurno('magia', '${skill.id}', '${nomeLimpo}')">
+                <div style="font-size: 0.85em; font-weight: 800; color: #f8fafc; margin-bottom: 2px; text-align: center; white-space: normal; word-break: break-word; line-height: 1.1; width: 100%;">${nomeLimpo}</div>
                 <div style="font-size: 0.7em; color: #a78bfa; font-weight: 600;">MP: ${skill.mp_custo}</div>
             </button>
         `;
     });
 
+    // O segredo: "grid-column: 1 / -1" força o botão a pegar a linha toda embaixo!
     htmlMagias += `
-        <button class="modern-font modern-btn btn-run" style="grid-column: span 2; justify-content: center; padding: 8px; min-height: 40px;" onclick="voltarParaAcoesPrincipais()">⬅️ Voltar</button>
+        <button class="modern-font modern-btn btn-run" style="grid-column: 1 / -1; justify-content: center; padding: 8px; min-height: 40px;" onclick="voltarParaAcoesPrincipais()">⬅️ Voltar</button>
     </div>`;
 
     painel.insertAdjacentHTML('beforeend', htmlMagias);
