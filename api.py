@@ -238,9 +238,10 @@ def obter_perfil(user_id):
                     base_id = obj_item.get("base_id", item_uid) if isinstance(obj_item, dict) else item_uid
                     info_item = items_data.ITEMS_DATA.get(base_id, {})
                     nome_equip = info_item.get("display_name", base_id.replace("_", " ").title())
-                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": nome_equip, "vazio": False})
+                    icon_equip = info_item.get("icon_url", info_item.get("emoji", "📦")) # <-- Pega a URL ou o Emoji
+                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": nome_equip, "icon": icon_equip, "vazio": False})
                 else:
-                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": "Vazio", "vazio": True})
+                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": "Vazio", "icon": "🔲", "vazio": True})
 
             return jsonify({
                 "nome": usuario.get("character_name", "Aventureiro"), 

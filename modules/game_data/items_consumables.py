@@ -10,8 +10,9 @@ CONSUMABLES_DATA = {
     },
     "pocao_cura_leve": {
         "display_name": "Poção de Cura Leve", "emoji": "❤️", "type": "potion",
-        "category": "consumivel", "description": "Recupera 50 HP.",
-        "stackable": True, 
+        "category": "consumivel", "description": "Uma pequena e simples poção de cura 50 HP.",
+        "stackable": True,
+        "icon_url": "/static/items/potion_red_small.png", 
         "effects": {"heal": 50}
     },
     "pocao_cura_media": {
