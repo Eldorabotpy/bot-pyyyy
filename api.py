@@ -180,15 +180,23 @@ def ranking_guildas():
 # ==========================================
 # ROTA DE PERFIL COMPLETO (ATUALIZADA)
 # ==========================================
+# ==========================================
+# ROTA DE PERFIL COMPLETO (BLINDADA)
+# ==========================================
 @app.route('/perfil/<user_id>')
 def obter_perfil(user_id):
-    from modules.game_data import items as items_data
-    from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
-    from modules.game_data.attributes import STAT_EMOJI
-    from modules.game_data.classes import get_class_avatar
-    
     try:
+        # 1. Colocamos as importações DENTRO do Try para evitar crash de inicialização
+        from modules.game_data import items as items_data
+        from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
+        from modules.game_data.attributes import STAT_EMOJI
+        from modules.game_data.classes import get_class_avatar
+
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
+        
+        # Importe a coleção diretamente aqui se não estiver no topo do arquivo
+        from modules.player.core import users_collection 
+        
         usuario = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
         
         if usuario:
@@ -197,18 +205,18 @@ def obter_perfil(user_id):
             classe_bd = usuario.get("class")
             classe_str = str(classe_bd) if classe_bd else "aprendiz"
             
-            # 1. PROCESSA OS STATUS (Lê do total_stats ou base_stats)
-            stats_atuais = usuario.get("total_stats", usuario.get("base_stats", {}))
+            # 2. STATUS (Blindado contra NoneType)
+            # Se 'total_stats' for None, ele tenta 'base_stats', se for None, vira um dicionário vazio {}
+            stats_atuais = usuario.get("total_stats") or usuario.get("base_stats") or {}
             status_formatados = {}
             for stat in ["attack", "defense", "initiative", "luck", "magic_attack"]:
                 val = stats_atuais.get(stat, 0)
-                # Traduz para o frontend
                 nome_pt = {"attack": "Ataque", "defense": "Defesa", "initiative": "Agilidade", "luck": "Sorte", "magic_attack": "Magia"}[stat]
                 emoji = {"attack": "⚔️", "defense": "🛡️", "initiative": "🏃", "luck": "🍀", "magic_attack": "🔮"}[stat]
                 status_formatados[stat] = {"nome": nome_pt, "emoji": emoji, "valor": val}
 
-            # 2. PROCESSA O INVENTÁRIO
-            inventario_cru = usuario.get("inventory", {})
+            # 3. INVENTÁRIO (Blindado contra NoneType)
+            inventario_cru = usuario.get("inventory") or {}
             inventario_formatado = []
             for item_id, qtd_ou_dict in inventario_cru.items():
                 if isinstance(qtd_ou_dict, dict):
@@ -224,11 +232,10 @@ def obter_perfil(user_id):
                     emoji_item = info_item.get("emoji", "📦")
                     inventario_formatado.append({"id": item_id, "nome": nome_item, "emoji": emoji_item, "qtd": qtd})
             
-            # Ordena inventário por quantidade (maior primeiro)
             inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 
-            # 3. PROCESSA EQUIPAMENTOS
-            equip_cru = usuario.get("equipment", {})
+            # 4. EQUIPAMENTOS (Blindado contra NoneType)
+            equip_cru = usuario.get("equipment") or {}
             equip_formatado = []
             for slot in SLOT_ORDER:
                 item_uid = equip_cru.get(slot)
@@ -239,7 +246,7 @@ def obter_perfil(user_id):
                     base_id = obj_item.get("base_id", item_uid) if isinstance(obj_item, dict) else item_uid
                     info_item = items_data.ITEMS_DATA.get(base_id, {})
                     nome_equip = info_item.get("display_name", base_id.replace("_", " ").title())
-                    icon_equip = info_item.get("icon_url", info_item.get("emoji", "📦")) # <-- Pega a URL ou o Emoji
+                    icon_equip = info_item.get("icon_url", info_item.get("emoji", "📦")) 
                     equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": nome_equip, "icon": icon_equip, "vazio": False})
                 else:
                     equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": "Vazio", "icon": "🔲", "vazio": True})
@@ -257,17 +264,18 @@ def obter_perfil(user_id):
                 "energy": usuario.get("energy", 0),
                 "pontos_livres": usuario.get("stat_points", 0), 
                 "avatar": get_class_avatar(classe_str),
-                # NOVOS DADOS ENVIADOS!
                 "status": status_formatados,
                 "inventario": inventario_formatado,
                 "equipamentos": equip_formatado
             })
             
         return jsonify({"erro": "Personagem não encontrado no banco."}), 404
+
     except Exception as e: 
         import traceback
         traceback.print_exc()
-        return jsonify({"erro": str(e)}), 400
+        # SE DER ERRO AQUI, O JAVASCRIPT VAI MOSTRAR O MOTIVO NA TELA!
+        return jsonify({"erro": f"Erro interno Python: {str(e)}"}), 400
 
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
