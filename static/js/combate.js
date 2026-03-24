@@ -75,19 +75,45 @@ function tocarSFX(url) {
     sfx.play().catch(e => console.log("Áudio bloqueado:", e));
 }
 
-function animarCorteVisual(alvoId, cor_brilho) {
+function animarEfeitoVisual(alvoId, tipoEfeito = 'corte', corExtra = '#fff') {
     const alvo = document.getElementById(alvoId);
     if (!alvo) return;
 
-    const corte = document.createElement('div');
-    corte.className = 'slash-effect';
-    corte.style.boxShadow = `0 0 10px #fff, 0 0 20px ${cor_brilho}`;
+    const efeito = document.createElement('div');
     
-    corte.style.left = (alvo.offsetLeft + alvo.offsetWidth / 2) + 'px';
-    corte.style.top = (alvo.offsetTop + alvo.offsetHeight / 2) + 'px';
+    // Define a classe CSS baseada no tipo pedido
+    switch(tipoEfeito) {
+        case 'impacto':
+            efeito.className = 'impact-effect';
+            efeito.style.borderColor = corExtra;
+            break;
+        case 'fogo':
+            efeito.className = 'fire-effect';
+            // A cor de fogo já é definida nos keyframes, mas podemos adicionar um brilho
+            efeito.style.boxShadow = `0 0 20px ${corExtra}`;
+            break;
+        case 'cura':
+            efeito.className = 'heal-effect';
+            efeito.style.background = `radial-gradient(circle, ${corExtra} 0%, transparent 70%)`;
+            break;
+        case 'trevas':
+        case 'veneno':
+            efeito.className = 'dark-effect';
+            efeito.style.background = corExtra; // ex: roxo escuro ou verde musgo
+            break;
+        case 'corte':
+        default:
+            efeito.className = 'slash-effect';
+            efeito.style.boxShadow = `0 0 10px #fff, 0 0 20px ${corExtra}`;
+            break;
+    }
+    
+    // Centraliza em cima do sprite alvo
+    efeito.style.left = (alvo.offsetLeft + alvo.offsetWidth / 2) + 'px';
+    efeito.style.top = (alvo.offsetTop + alvo.offsetHeight / 2) + 'px';
 
-    alvo.parentElement.appendChild(corte);
-    setTimeout(() => corte.remove(), 300);
+    alvo.parentElement.appendChild(efeito);
+    setTimeout(() => efeito.remove(), 600); // 600ms é tempo suficiente pra todas as animações
 }
 
 function atualizarVisualBarra(elementId, atual, maximo, isMana=false) {
