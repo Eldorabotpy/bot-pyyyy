@@ -252,12 +252,43 @@ async function iniciarCacadaApp() {
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
                 
+                /* Efeito 1: Corte Padrão (Você já tem, só para referência) */
                 @keyframes animCorte {
                     0% { width: 0px; opacity: 1; transform: translate(-50%, -50%) rotate(45deg); }
                     50% { width: 120px; opacity: 1; transform: translate(-50%, -50%) rotate(45deg); }
                     100% { width: 160px; opacity: 0; transform: translate(-50%, -50%) rotate(45deg); }
                 }
                 .slash-effect { position: absolute; height: 4px; background: #fff; border-radius: 50%; z-index: 30; pointer-events: none; animation: animCorte 0.3s ease-out forwards; }
+
+                /* Efeito 2: Impacto/Tiro (Caçador, Monge) */
+                @keyframes animImpacto {
+                    0% { width: 10px; height: 10px; opacity: 1; transform: translate(-50%, -50%); }
+                    100% { width: 60px; height: 60px; opacity: 0; transform: translate(-50%, -50%); border-radius: 50%; }
+                }
+                .impact-effect { position: absolute; background: transparent; border: 4px solid #fff; z-index: 30; pointer-events: none; animation: animImpacto 0.3s ease-out forwards; }
+
+                /* Efeito 3: Magia de Fogo/Explosão (Mago) */
+                @keyframes animExplosao {
+                    0% { width: 20px; height: 20px; opacity: 1; transform: translate(-50%, -50%) scale(0.5); background: #f39c12; }
+                    50% { background: #e74c3c; }
+                    100% { width: 100px; height: 100px; opacity: 0; transform: translate(-50%, -50%) scale(1.5); background: #c0392b; border-radius: 50%; }
+                }
+                .fire-effect { position: absolute; filter: blur(4px); z-index: 30; pointer-events: none; animation: animExplosao 0.4s ease-out forwards; }
+
+                /* Efeito 4: Cura e Buffs (Curandeiro, Bardo) */
+                @keyframes animCura {
+                    0% { transform: translate(-50%, -20%) scale(0.8); opacity: 1; }
+                    100% { transform: translate(-50%, -100%) scale(1.5); opacity: 0; }
+                }
+                .heal-effect { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, rgba(46,204,113,0.8) 0%, transparent 70%); border-radius: 50%; z-index: 30; pointer-events: none; animation: animCura 0.6s ease-out forwards; mix-blend-mode: screen; }
+
+                /* Efeito 5: Trevas/Veneno/Debuff */
+                @keyframes animTrevas {
+                    0% { width: 40px; height: 40px; opacity: 0; transform: translate(-50%, -50%) rotate(0deg); }
+                    50% { opacity: 0.8; }
+                    100% { width: 90px; height: 90px; opacity: 0; transform: translate(-50%, -50%) rotate(90deg); border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
+                }
+                .dark-effect { position: absolute; background: rgba(142, 68, 173, 0.7); filter: blur(5px); z-index: 30; pointer-events: none; animation: animTrevas 0.6s ease-out forwards; }
                 
                 .modern-font { font-family: 'Poppins', sans-serif; }
                 
