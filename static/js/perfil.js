@@ -130,20 +130,20 @@ async function carregarMeuPerfil() {
         }
         htmlStatus += `</div>`;
 
-        // --- ABA DE EQUIPAMENTOS (VISUAL RPG 2.0) ---
-        // Layout clássico: 5 na esquerda, 5 na direita. O centro fica 100% livre!
+        // --- ABA DE EQUIPAMENTOS (VISUAL RPG - CORRIGIDO) ---
+        // Slots colados nas bordas (12% e 88%) para liberar o meio
         const POSICOES_SLOTS = {
-            'elmo':     { top: '12%', left: '18%', transform: 'translate(-50%, -50%)' },
-            'arma':     { top: '31%', left: '18%', transform: 'translate(-50%, -50%)' },
-            'armadura': { top: '50%', left: '18%', transform: 'translate(-50%, -50%)' },
-            'luvas':    { top: '69%', left: '18%', transform: 'translate(-50%, -50%)' },
-            'tool':     { top: '88%', left: '18%', transform: 'translate(-50%, -50%)' },
+            'elmo':     { top: '12%', left: '12%', transform: 'translate(-50%, -50%)' },
+            'arma':     { top: '31%', left: '12%', transform: 'translate(-50%, -50%)' },
+            'armadura': { top: '50%', left: '12%', transform: 'translate(-50%, -50%)' },
+            'luvas':    { top: '69%', left: '12%', transform: 'translate(-50%, -50%)' },
+            'tool':     { top: '88%', left: '12%', transform: 'translate(-50%, -50%)' },
             
-            'colar':    { top: '12%', left: '82%', transform: 'translate(-50%, -50%)' },
-            'brinco':   { top: '31%', left: '82%', transform: 'translate(-50%, -50%)' },
-            'calca':    { top: '50%', left: '82%', transform: 'translate(-50%, -50%)' },
-            'anel':     { top: '69%', left: '82%', transform: 'translate(-50%, -50%)' },
-            'botas':    { top: '88%', left: '82%', transform: 'translate(-50%, -50%)' }
+            'colar':    { top: '12%', left: '88%', transform: 'translate(-50%, -50%)' },
+            'brinco':   { top: '31%', left: '88%', transform: 'translate(-50%, -50%)' },
+            'calca':    { top: '50%', left: '88%', transform: 'translate(-50%, -50%)' },
+            'anel':     { top: '69%', left: '88%', transform: 'translate(-50%, -50%)' },
+            'botas':    { top: '88%', left: '88%', transform: 'translate(-50%, -50%)' }
         };
 
         let htmlSlots = '';
@@ -172,19 +172,24 @@ async function carregarMeuPerfil() {
                 </div>`;
         });
 
-        // Fundo escuro e imagem do personagem protegida contra erros (onerror)
+        // ESTRUTURA DE CAMADAS (Z-INDEX)
         const htmlEquips = `
             <div style="position: relative; width: 100%; height: 420px; margin-top: 15px; 
-                        background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); 
+                        background: #020617; 
                         border-radius: 12px; border: 2px solid #334155; overflow: hidden;
-                        box-shadow: inset 0 0 30px rgba(0,0,0,0.8);">
+                        box-shadow: inset 0 0 30px rgba(0,0,0,0.9);">
                 
                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                            width: 60%; height: 95%; z-index: 0; display: flex; justify-content: center; align-items: center;">
-                    <img id="avatar-equip-tab" src="${avatarLink}" onerror="this.src='https://i.ibb.co/3s6D5dC/char-aprendiz.png'" alt="Avatar" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 10px rgba(0,0,0,0.8)); pointer-events: none;">
+                            width: 100%; height: 100%; z-index: 0; pointer-events: none;">
+                    <img src="COLE_O_LINK_DA_IMAGEM_AZUL_AQUI.jpg" onerror="this.style.display='none'" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.85;">
                 </div>
 
-                <div style="position: relative; width: 100%; height: 100%; z-index: 1;">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                            width: 50%; height: 95%; z-index: 1; display: flex; justify-content: center; align-items: center;">
+                    <img id="avatar-equip-tab" src="${avatarLink}" onerror="this.src='https://i.ibb.co/3s6D5dC/char-aprendiz.png'" alt="Avatar" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.9)); pointer-events: none;">
+                </div>
+
+                <div style="position: relative; width: 100%; height: 100%; z-index: 2;">
                     ${htmlSlots}
                 </div>
             </div>
