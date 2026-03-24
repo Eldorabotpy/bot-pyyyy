@@ -130,36 +130,35 @@ async function carregarMeuPerfil() {
         }
         htmlStatus += `</div>`;
 
-        // --- ABA DE EQUIPAMENTOS (VISUAL RPG) ---
-        // Ajustamos as posições para combinar com os slots oficiais do Mundo de Eldora
+        // --- ABA DE EQUIPAMENTOS (VISUAL RPG 2.0) ---
+        // Layout clássico: 5 na esquerda, 5 na direita. O centro fica 100% livre!
         const POSICOES_SLOTS = {
-            'elmo': { top: '3%', left: '50%', transform: 'translateX(-50%)' },
-            'colar': { top: '16%', left: '75%', transform: 'translateX(-50%)' },
-            'armadura': { top: '30%', left: '50%', transform: 'translateX(-50%)' },
-            'calca': { top: '55%', left: '50%', transform: 'translateX(-50%)' },
-            'botas': { top: '80%', left: '50%', transform: 'translateX(-50%)' },
-            'arma': { top: '30%', left: '20%', transform: 'translateX(-50%)' },
-            'luvas': { top: '55%', left: '20%', transform: 'translateX(-50%)' },
-            'anel': { top: '55%', left: '80%', transform: 'translateX(-50%)' },
-            'brinco': { top: '16%', left: '25%', transform: 'translateX(-50%)' },
-            'tool': { top: '80%', left: '20%', transform: 'translateX(-50%)' }
+            'elmo':     { top: '12%', left: '18%', transform: 'translate(-50%, -50%)' },
+            'arma':     { top: '31%', left: '18%', transform: 'translate(-50%, -50%)' },
+            'armadura': { top: '50%', left: '18%', transform: 'translate(-50%, -50%)' },
+            'luvas':    { top: '69%', left: '18%', transform: 'translate(-50%, -50%)' },
+            'tool':     { top: '88%', left: '18%', transform: 'translate(-50%, -50%)' },
+            
+            'colar':    { top: '12%', left: '82%', transform: 'translate(-50%, -50%)' },
+            'brinco':   { top: '31%', left: '82%', transform: 'translate(-50%, -50%)' },
+            'calca':    { top: '50%', left: '82%', transform: 'translate(-50%, -50%)' },
+            'anel':     { top: '69%', left: '82%', transform: 'translate(-50%, -50%)' },
+            'botas':    { top: '88%', left: '82%', transform: 'translate(-50%, -50%)' }
         };
 
         let htmlSlots = '';
         p.equipamentos.forEach(eq => {
             const pos = POSICOES_SLOTS[eq.slot] || { top: '50%', left: '50%' };
             const corBorda = eq.vazio ? "#334155" : "#f59e0b";
-            const corFundo = eq.vazio ? "rgba(0,0,0,0.6)" : "rgba(245, 158, 11, 0.15)";
+            const corFundo = eq.vazio ? "rgba(15, 23, 42, 0.8)" : "rgba(245, 158, 11, 0.15)";
             
             let visualItem = '';
             if (eq.vazio) {
-                visualItem = `<span style="font-size: 1.2em; opacity: 0.4;">${eq.emoji}</span>`;
+                visualItem = `<span style="font-size: 1.4em; opacity: 0.3;">${eq.emoji}</span>`;
             } else if (eq.icon && eq.icon.length > 5 && eq.icon.includes('.')) { 
-                // Se for um link de imagem (.png, .gif)
-                visualItem = `<img src="${eq.icon}" alt="${eq.nome}" style="width: 80%; height: 80%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));">`;
+                visualItem = `<img src="${eq.icon}" alt="${eq.nome}" style="width: 85%; height: 85%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(255,255,255,0.4));">`;
             } else { 
-                // Se for emoji
-                visualItem = `<span style="font-size: 1.6em; text-shadow: 0 0 10px rgba(255,255,255,0.5);">${eq.icon || eq.emoji}</span>`;
+                visualItem = `<span style="font-size: 1.8em; text-shadow: 0 0 10px rgba(255,255,255,0.5);">${eq.icon || eq.emoji}</span>`;
             }
 
             htmlSlots += `
@@ -167,21 +166,22 @@ async function carregarMeuPerfil() {
                      style="position: absolute; ${Object.entries(pos).map(([k, v]) => `${k}:${v};`).join('')} 
                             width: 50px; height: 50px; background: ${corFundo}; border: 2px solid ${corBorda}; 
                             border-radius: 8px; display: flex; justify-content: center; align-items: center; 
-                            cursor: ${eq.vazio ? 'default' : 'pointer'}; box-shadow: 0 4px 8px rgba(0,0,0,0.8); 
-                            backdrop-filter: blur(2px);">
+                            cursor: ${eq.vazio ? 'default' : 'pointer'}; box-shadow: 0 4px 8px rgba(0,0,0,0.6); 
+                            backdrop-filter: blur(4px);">
                     ${visualItem}
                 </div>`;
         });
 
+        // Fundo escuro e imagem do personagem protegida contra erros (onerror)
         const htmlEquips = `
             <div style="position: relative; width: 100%; height: 420px; margin-top: 15px; 
-                        background: url('https://i.ibb.co/3W68FmS/paper-parchment.png') no-repeat center; 
-                        background-size: cover; border-radius: 12px; border: 2px solid #3f4e38; overflow: hidden;
+                        background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); 
+                        border-radius: 12px; border: 2px solid #334155; overflow: hidden;
                         box-shadow: inset 0 0 30px rgba(0,0,0,0.8);">
                 
                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                            width: 100%; height: 100%; max-width: 250px; z-index: 0; display: flex; justify-content: center; align-items: center;">
-                    <img id="avatar-equip-tab" src="${avatarLink}" alt="${p.classe}" style="width: 100%; max-height: 90%; object-fit: contain; filter: drop-shadow(0px 10px 10px rgba(0,0,0,0.8)); pointer-events: none;">
+                            width: 60%; height: 95%; z-index: 0; display: flex; justify-content: center; align-items: center;">
+                    <img id="avatar-equip-tab" src="${avatarLink}" onerror="this.src='https://i.ibb.co/3s6D5dC/char-aprendiz.png'" alt="Avatar" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 10px rgba(0,0,0,0.8)); pointer-events: none;">
                 </div>
 
                 <div style="position: relative; width: 100%; height: 100%; z-index: 1;">

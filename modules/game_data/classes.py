@@ -287,6 +287,61 @@ CLASS_DMG_EMOJI = {
     "curandeiro": "🩹",
 }
 
+# ============================================================================
+# AVATARES PNG DAS CLASSES (PARA O WEB APP)
+# ============================================================================
+# Cole aqui os links das imagens com fundo transparente (PNG) hospedadas no GitHub.
+CLASS_AVATARS = {
+    "aprendiz": "https://i.ibb.co/3s6D5dC/char-aprendiz.png", # Imagem base
+    "aventureiro": "LINK_GITHUB_AVENTUREIRO.png",
+    
+    "guerreiro": "LINK_GITHUB_GUERREIRO.png",
+    "cavaleiro": "LINK_GITHUB_CAVALEIRO.png",
+    "gladiador": "LINK_GITHUB_GLADIADOR.png",
+    "templario": "LINK_GITHUB_TEMPLARIO.png",
+    "guardiao_divino": "LINK_GITHUB_GUARDIAO.png",
+    
+    "berserker": "LINK_GITHUB_BERSERKER.png",
+    "barbaro": "LINK_GITHUB_BARBARO.png",
+    "juggernaut": "LINK_GITHUB_JUGGERNAUT.png",
+    "ira_primordial": "LINK_GITHUB_IRA.png",
+    
+    "cacador": "LINK_GITHUB_CACADOR.png",
+    "patrulheiro": "LINK_GITHUB_PATRULHEIRO.png",
+    "franco_atirador": "LINK_GITHUB_FRANCO.png",
+    "olho_de_aguia": "LINK_GITHUB_AGUIA.png",
+    
+    "monge": "LINK_GITHUB_MONGE.png",
+    "guardiao_do_templo": "LINK_GITHUB_GUAR_TEMPLO.png",
+    "punho_elemental": "LINK_GITHUB_PUNHO.png",
+    "ascendente": "LINK_GITHUB_ASCENDENTE.png",
+    
+    "mago": "LINK_GITHUB_MAGO.png",
+    "feiticeiro": "LINK_GITHUB_FEITICEIRO.png",
+    "elementalista": "LINK_GITHUB_ELEMENTALISTA.png",
+    "arquimago": "LINK_GITHUB_ARQUIMAGO.png",
+    
+    "bardo": "LINK_GITHUB_BARDO.png",
+    "menestrel": "LINK_GITHUB_MENESTREL.png",
+    "encantador": "LINK_GITHUB_ENCANTADOR.png",
+    "maestro": "LINK_GITHUB_MAESTRO.png",
+    
+    "assassino": "LINK_GITHUB_ASSASSINO.png",
+    "ladrao_de_sombras": "LINK_GITHUB_LADRAO_SOMBRAS.png",
+    "ninja": "LINK_GITHUB_NINJA.png",
+    "mestre_das_laminas": "LINK_GITHUB_MESTRE_LAMINAS.png",
+    
+    "samurai": "LINK_GITHUB_SAMURAI.png",
+    "kensei": "LINK_GITHUB_KENSEI.png",
+    "ronin": "LINK_GITHUB_RONIN.png",
+    "shogun": "LINK_GITHUB_SHOGUN.png",
+    
+    "curandeiro": "LINK_GITHUB_CURANDEIRO.png",
+    "clerigo": "LINK_GITHUB_CLERIGO.png",
+    "druida": "LINK_GITHUB_DRUIDA.png",
+    "sacerdote": "LINK_GITHUB_SACERDOTE.png"
+}
+
 def get_primary_damage_profile(player_class: str) -> dict:
     pc = (player_class or "").lower()
     return CLASS_PRIMARY_DAMAGE.get(

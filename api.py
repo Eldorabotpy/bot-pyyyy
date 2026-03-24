@@ -185,7 +185,8 @@ def obter_perfil(user_id):
     from modules.game_data import items as items_data
     from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
     from modules.game_data.attributes import STAT_EMOJI
-
+    from modules.game_data.classes import get_class_avatar
+    
     try:
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
         usuario = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
@@ -255,7 +256,7 @@ def obter_perfil(user_id):
                 "hp_max": usuario.get("max_hp", 0), 
                 "energy": usuario.get("energy", 0),
                 "pontos_livres": usuario.get("stat_points", 0), 
-                "avatar": f"{request.host_url}static/classes/{classe_str.lower()}.png",
+                "avatar": get_class_avatar(classe_str),
                 # NOVOS DADOS ENVIADOS!
                 "status": status_formatados,
                 "inventario": inventario_formatado,
