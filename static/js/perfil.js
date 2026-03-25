@@ -318,21 +318,20 @@ window.distribuirPonto = async function(stat) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: charId, stat: stat })
         });
+        
+        // Se a rota não existir (Render não atualizou), o JSON vai falhar
+        if (!res.ok) throw new Error("O servidor retornou erro " + res.status);
+        
         const data = await res.json();
         
         if(data.sucesso) {
-            // Recarrega o perfil para atualizar o número na hora sem piscar a tela!
             carregarMeuPerfil(); 
         } else {
-            // Se o jogador tentar burlar e upar sem pontos
-            if (typeof exibirAlertaCustom === "function") {
-                exibirAlertaCustom("Aviso", data.erro, false);
-            } else {
-                alert(data.erro);
-            }
+            alert("Aviso: " + data.erro);
         }
     } catch(e) {
-        console.error(e);
+        // AGORA ELE VAI GRITAR O ERRO NA TELA
+        alert("⚠️ O Servidor ainda está reiniciando ou a rota não existe! Detalhe: " + e.message);
     }
 }
 
@@ -357,7 +356,10 @@ window.desequiparItem = async function(slot) {
                 alert(data.erro);
             }
         }
-    } catch(e) { console.error(e); }
+    } catch(e) {
+        // AGORA ELE VAI GRITAR O ERRO NA TELA
+        alert("⚠️ O Servidor ainda está reiniciando ou a rota não existe! Detalhe: " + e.message);
+    }
 }
 
 window.usarOuEquiparItem = async function(itemId) {
@@ -383,5 +385,8 @@ window.usarOuEquiparItem = async function(itemId) {
                 alert(data.erro);
             }
         }
-    } catch(e) { console.error(e); }
+    } catch(e) {
+        // AGORA ELE VAI GRITAR O ERRO NA TELA
+        alert("⚠️ O Servidor ainda está reiniciando ou a rota não existe! Detalhe: " + e.message);
+    }
 }
