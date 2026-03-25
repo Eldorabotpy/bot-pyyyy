@@ -1,5 +1,6 @@
 import os
 import requests
+import asyncio
 from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from bson.objectid import ObjectId
@@ -12,6 +13,18 @@ from modules.game_data.skills import SKILL_DATA, get_skill_data_with_rarity
 app = Flask(__name__)
 CORS(app) 
 
+
+def _run_async(coro):
+    """Ferramenta que força funções do Telegram a rodarem com segurança no Flask"""
+    try:
+        return asyncio.run(coro)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        res = loop.run_until_complete(coro)
+        loop.close()
+        return res
+    
 # ==========================================
 # FUNÇÃO PARA SINCRONIZAR COM O CHAT DO TELEGRAM
 # ==========================================
@@ -181,15 +194,19 @@ def ranking_guildas():
 # ROTA DE PERFIL COMPLETO (ATUALIZADA: STATUS REAIS, MP E PROFISSÃO)
 # ==========================================
 @app.route('/perfil/<user_id>')
-async def obter_perfil(user_id):
+def obter_perfil(user_id):
     try:
+        from bson import ObjectId
+        from modules.player.core import users_collection 
         from modules import player_manager
         from modules.game_data import items as items_data
         from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
         from modules.game_data.classes import get_class_avatar
 
-        # 1. Busca Segura do Jogador
-        pdata = await player_manager.get_player_data(user_id)
+        # 1. Busca Segura
+        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
+        pdata = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
+        
         if not pdata:
             return jsonify({"erro": "Personagem não encontrado."}), 404
         
@@ -197,9 +214,12 @@ async def obter_perfil(user_id):
         xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
         classe_str = str(pdata.get("class", "aprendiz"))
         
-        # 2. PUXA OS STATUS TOTAIS REAIS (IDÊNTICO AO TELEGRAM)
-        totals = await player_manager.get_player_total_stats(pdata)
+        # 2. PUXA OS STATUS REAIS USANDO O NOSSO TRADUTOR (_run_async)
+        totals = _run_async(player_manager.get_player_total_stats(pdata))
+        esquiva = int(_run_async(player_manager.get_player_dodge_chance(pdata)) * 100)
+        atk_duplo = int(_run_async(player_manager.get_player_double_attack_chance(pdata)) * 100)
         
+        # STATUS
         status_formatados = {}
         for stat in ["attack", "defense", "initiative", "luck"]:
             val = int(totals.get(stat, 0))
@@ -207,10 +227,7 @@ async def obter_perfil(user_id):
             emoji = {"attack": "⚔️", "defense": "🛡️", "initiative": "🏃", "luck": "🍀"}[stat]
             status_formatados[stat] = {"nome": nome_pt, "emoji": emoji, "valor": val}
 
-        # 3. CHANCES SECUNDÁRIAS E PROFISSÃO
-        esquiva = int((await player_manager.get_player_dodge_chance(pdata)) * 100)
-        atk_duplo = int((await player_manager.get_player_double_attack_chance(pdata)) * 100)
-        
+        # PROFISSÃO
         prof_nome, prof_lvl = "Nenhuma", 0
         prof_raw = pdata.get("profession")
         if prof_raw:
@@ -224,7 +241,7 @@ async def obter_perfil(user_id):
             else:
                 prof_nome, prof_lvl = str(prof_raw).capitalize(), 1
 
-        # 4. INVENTÁRIO
+        # INVENTÁRIO
         inventario_cru = pdata.get("inventory") or {}
         inventario_formatado = []
         for item_id, qtd_ou_dict in inventario_cru.items():
@@ -236,7 +253,7 @@ async def obter_perfil(user_id):
                 inventario_formatado.append({"id": item_id, "nome": nome_item, "emoji": info_item.get("emoji", "📦"), "qtd": qtd})
         inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 
-        # 5. EQUIPAMENTOS
+        # EQUIPAMENTOS
         equip_cru = pdata.get("equipment") or {}
         equip_formatado = []
         for slot in SLOT_ORDER:
@@ -280,7 +297,7 @@ async def obter_perfil(user_id):
         import traceback
         traceback.print_exc()
         return jsonify({"erro": f"Erro interno Python: {str(e)}"}), 400
-    
+        
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
     try:
@@ -871,14 +888,19 @@ def api_autohunt_finalizar():
 from flask import request
 
 @app.route('/api/personagem/distribuir_ponto', methods=['POST'])
-async def api_distribuir_ponto():
+def api_distribuir_ponto():
     try:
         data = request.json
         user_id = data.get("user_id")
         stat = data.get("stat")
 
+        from bson import ObjectId
+        from modules.player.core import users_collection
         from modules import player_manager
-        pdata = await player_manager.get_player_data(user_id)
+
+        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
+        pdata = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
+        
         if not pdata: return jsonify({"erro": "Personagem não encontrado."}), 404
 
         pontos_livres = int(pdata.get("stat_points", 0))
@@ -889,28 +911,29 @@ async def api_distribuir_ponto():
         pdata["base_stats"] = base_stats
         pdata["stat_points"] = pontos_livres - 1
 
-        await player_manager.save_player_data(user_id, pdata)
-        return jsonify({"sucesso": True, "msg": f"Ponto adicionado!"})
+        # Salvar usando nosso tradutor
+        _run_async(player_manager.save_player_data(user_id, pdata))
+        return jsonify({"sucesso": True, "msg": "Ponto adicionado!"})
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/personagem/equipar', methods=['POST'])
-async def api_equipar_item():
+def api_equipar_item():
     try:
         data = request.json
         from modules.player.inventory import equip_unique_item_for_user
-        sucesso, msg = await equip_unique_item_for_user(data.get("user_id"), data.get("item_id"))
+        sucesso, msg = _run_async(equip_unique_item_for_user(data.get("user_id"), data.get("item_id")))
         if sucesso: return jsonify({"sucesso": True, "msg": msg})
         return jsonify({"erro": msg}), 400
     except Exception as e: return jsonify({"erro": str(e)}), 500
 
 
 @app.route('/api/personagem/desequipar', methods=['POST'])
-async def api_desequipar_item():
+def api_desequipar_item():
     try:
         data = request.json
         from modules.player.inventory import unequip_item_for_user
-        sucesso, msg = await unequip_item_for_user(data.get("user_id"), data.get("slot"))
+        sucesso, msg = _run_async(unequip_item_for_user(data.get("user_id"), data.get("slot")))
         if sucesso: return jsonify({"sucesso": True, "msg": msg})
         return jsonify({"erro": msg}), 400
     except Exception as e: return jsonify({"erro": str(e)}), 500
