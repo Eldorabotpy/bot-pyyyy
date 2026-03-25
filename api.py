@@ -178,105 +178,109 @@ def ranking_guildas():
     except Exception as e: return jsonify([])
 
 # ==========================================
-# ROTA DE PERFIL COMPLETO (ATUALIZADA)
-# ==========================================
-# ==========================================
-# ROTA DE PERFIL COMPLETO (BLINDADA)
+# ROTA DE PERFIL COMPLETO (ATUALIZADA: STATUS REAIS, MP E PROFISSÃO)
 # ==========================================
 @app.route('/perfil/<user_id>')
-def obter_perfil(user_id):
+async def obter_perfil(user_id):
     try:
-        # 1. Colocamos as importações DENTRO do Try para evitar crash de inicialização
+        from modules import player_manager
         from modules.game_data import items as items_data
         from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
-        from modules.game_data.attributes import STAT_EMOJI
         from modules.game_data.classes import get_class_avatar
 
-        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
+        # 1. Busca Segura do Jogador
+        pdata = await player_manager.get_player_data(user_id)
+        if not pdata:
+            return jsonify({"erro": "Personagem não encontrado."}), 404
         
-        # Importe a coleção diretamente aqui se não estiver no topo do arquivo
-        from modules.player.core import users_collection 
+        lvl = int(pdata.get("level", 1))
+        xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
+        classe_str = str(pdata.get("class", "aprendiz"))
         
-        usuario = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
+        # 2. PUXA OS STATUS TOTAIS REAIS (IDÊNTICO AO TELEGRAM)
+        totals = await player_manager.get_player_total_stats(pdata)
         
-        if usuario:
-            lvl = int(usuario.get("level", 1))
-            xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
-            classe_bd = usuario.get("class")
-            classe_str = str(classe_bd) if classe_bd else "aprendiz"
-            
-            # 2. STATUS (Blindado contra NoneType)
-            # Se 'total_stats' for None, ele tenta 'base_stats', se for None, vira um dicionário vazio {}
-            stats_atuais = usuario.get("total_stats") or usuario.get("base_stats") or {}
-            status_formatados = {}
-            for stat in ["attack", "defense", "initiative", "luck", "magic_attack"]:
-                val = stats_atuais.get(stat, 0)
-                nome_pt = {"attack": "Ataque", "defense": "Defesa", "initiative": "Agilidade", "luck": "Sorte", "magic_attack": "Magia"}[stat]
-                emoji = {"attack": "⚔️", "defense": "🛡️", "initiative": "🏃", "luck": "🍀", "magic_attack": "🔮"}[stat]
-                status_formatados[stat] = {"nome": nome_pt, "emoji": emoji, "valor": val}
+        status_formatados = {}
+        for stat in ["attack", "defense", "initiative", "luck"]:
+            val = int(totals.get(stat, 0))
+            nome_pt = {"attack": "Ataque", "defense": "Defesa", "initiative": "Agilidade", "luck": "Sorte"}[stat]
+            emoji = {"attack": "⚔️", "defense": "🛡️", "initiative": "🏃", "luck": "🍀"}[stat]
+            status_formatados[stat] = {"nome": nome_pt, "emoji": emoji, "valor": val}
 
-            # 3. INVENTÁRIO (Blindado contra NoneType)
-            inventario_cru = usuario.get("inventory") or {}
-            inventario_formatado = []
-            for item_id, qtd_ou_dict in inventario_cru.items():
-                if isinstance(qtd_ou_dict, dict):
-                    base_id = qtd_ou_dict.get("base_id", item_id)
-                    qtd = 1
+        # 3. CHANCES SECUNDÁRIAS E PROFISSÃO
+        esquiva = int((await player_manager.get_player_dodge_chance(pdata)) * 100)
+        atk_duplo = int((await player_manager.get_player_double_attack_chance(pdata)) * 100)
+        
+        prof_nome, prof_lvl = "Nenhuma", 0
+        prof_raw = pdata.get("profession")
+        if prof_raw:
+            if isinstance(prof_raw, dict):
+                if "type" in prof_raw:
+                    prof_nome, prof_lvl = str(prof_raw.get("type")).capitalize(), int(prof_raw.get("level", 1))
                 else:
-                    base_id = item_id
-                    qtd = qtd_ou_dict
-                
-                if qtd > 0:
-                    info_item = items_data.ITEMS_DATA.get(base_id, {})
-                    nome_item = info_item.get("display_name", base_id.replace("_", " ").title())
-                    emoji_item = info_item.get("emoji", "📦")
-                    inventario_formatado.append({"id": item_id, "nome": nome_item, "emoji": emoji_item, "qtd": qtd})
-            
-            inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
+                    p_key = list(prof_raw.keys())[0]
+                    prof_nome = str(p_key).capitalize()
+                    prof_lvl = int(prof_raw[p_key].get("level", 1)) if isinstance(prof_raw[p_key], dict) else 1
+            else:
+                prof_nome, prof_lvl = str(prof_raw).capitalize(), 1
 
-            # 4. EQUIPAMENTOS (Blindado contra NoneType)
-            equip_cru = usuario.get("equipment") or {}
-            equip_formatado = []
-            for slot in SLOT_ORDER:
-                item_uid = equip_cru.get(slot)
-                emoji_slot = SLOT_EMOJI.get(slot, "🔲")
-                
-                if item_uid and item_uid in inventario_cru:
-                    obj_item = inventario_cru[item_uid]
-                    base_id = obj_item.get("base_id", item_uid) if isinstance(obj_item, dict) else item_uid
-                    info_item = items_data.ITEMS_DATA.get(base_id, {})
-                    nome_equip = info_item.get("display_name", base_id.replace("_", " ").title())
-                    icon_equip = info_item.get("icon_url", info_item.get("emoji", "📦")) 
-                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": nome_equip, "icon": icon_equip, "vazio": False})
-                else:
-                    equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": "Vazio", "icon": "🔲", "vazio": True})
+        # 4. INVENTÁRIO
+        inventario_cru = pdata.get("inventory") or {}
+        inventario_formatado = []
+        for item_id, qtd_ou_dict in inventario_cru.items():
+            qtd = qtd_ou_dict.get("quantity", 1) if isinstance(qtd_ou_dict, dict) else qtd_ou_dict
+            if qtd > 0:
+                base_id = qtd_ou_dict.get("base_id", item_id) if isinstance(qtd_ou_dict, dict) else item_id
+                info_item = items_data.ITEMS_DATA.get(base_id, {})
+                nome_item = info_item.get("display_name", base_id.replace("_", " ").title())
+                inventario_formatado.append({"id": item_id, "nome": nome_item, "emoji": info_item.get("emoji", "📦"), "qtd": qtd})
+        inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 
-            return jsonify({
-                "nome": usuario.get("character_name", "Aventureiro"), 
-                "level": lvl, 
-                "gold": usuario.get("gold", 0), 
-                "gems": usuario.get("gems", 0),
-                "classe": classe_str.capitalize(), 
-                "xp": int(usuario.get("xp", 0)), 
-                "xp_max": xp_visual_max,
-                "hp_atual": usuario.get("current_hp", 0), 
-                "hp_max": usuario.get("max_hp", 0), 
-                "energy": usuario.get("energy", 0),
-                "pontos_livres": usuario.get("stat_points", 0), 
-                "avatar": get_class_avatar(classe_str),
-                "status": status_formatados,
-                "inventario": inventario_formatado,
-                "equipamentos": equip_formatado
-            })
-            
-        return jsonify({"erro": "Personagem não encontrado no banco."}), 404
+        # 5. EQUIPAMENTOS
+        equip_cru = pdata.get("equipment") or {}
+        equip_formatado = []
+        for slot in SLOT_ORDER:
+            item_uid = equip_cru.get(slot)
+            emoji_slot = SLOT_EMOJI.get(slot, "🔲")
+            if item_uid and item_uid in inventario_cru:
+                obj_item = inventario_cru[item_uid]
+                base_id = obj_item.get("base_id", item_uid) if isinstance(obj_item, dict) else item_uid
+                info_item = items_data.ITEMS_DATA.get(base_id, {})
+                nome_equip = info_item.get("display_name", base_id.replace("_", " ").title())
+                icon_equip = info_item.get("icon_url", info_item.get("emoji", "📦")) 
+                equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": nome_equip, "icon": icon_equip, "vazio": False})
+            else:
+                equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": "Vazio", "icon": "🔲", "vazio": True})
+
+        return jsonify({
+            "nome": pdata.get("character_name", "Aventureiro"), 
+            "level": lvl, 
+            "gold": pdata.get("gold", 0), 
+            "gems": pdata.get("gems", 0),
+            "classe": classe_str.capitalize(), 
+            "xp": int(pdata.get("xp", 0)), 
+            "xp_max": xp_visual_max,
+            "hp_atual": pdata.get("current_hp", totals.get("max_hp", 0)), 
+            "hp_max": totals.get("max_hp", 0), 
+            "mp_atual": pdata.get("current_mp", totals.get("max_mana", 0)),
+            "mp_max": totals.get("max_mana", 0),
+            "energy": pdata.get("energy", 0),
+            "pontos_livres": pdata.get("stat_points", 0), 
+            "avatar": get_class_avatar(classe_str),
+            "status": status_formatados,
+            "inventario": inventario_formatado,
+            "equipamentos": equip_formatado,
+            "esquiva": esquiva,
+            "atk_duplo": atk_duplo,
+            "prof_nome": prof_nome,
+            "prof_lvl": prof_lvl
+        })
 
     except Exception as e: 
         import traceback
         traceback.print_exc()
-        # SE DER ERRO AQUI, O JAVASCRIPT VAI MOSTRAR O MOTIVO NA TELA!
         return jsonify({"erro": f"Erro interno Python: {str(e)}"}), 400
-
+    
 @app.route('/api/personagem/<personagem_id>')
 def obter_personagem_info(personagem_id):
     try:
@@ -862,60 +866,54 @@ def api_autohunt_finalizar():
         return jsonify({"erro": str(e)}), 500
  
 # ==========================================
-# ROTAS DO WEB APP (ATRIBUTOS E EQUIPAMENTOS)
+# ROTAS DE AÇÕES DOS BOTÕES (BLINDADAS)
 # ==========================================
+from flask import request
 
 @app.route('/api/personagem/distribuir_ponto', methods=['POST'])
 async def api_distribuir_ponto():
-    data = request.json
-    user_id = data.get("user_id")
-    stat = data.get("stat")
+    try:
+        data = request.json
+        user_id = data.get("user_id")
+        stat = data.get("stat")
 
-    from modules import player_manager
-    pdata = await player_manager.get_player_data(user_id)
-    if not pdata: 
-        return jsonify({"erro": "Personagem não encontrado."}), 404
+        from modules import player_manager
+        pdata = await player_manager.get_player_data(user_id)
+        if not pdata: return jsonify({"erro": "Personagem não encontrado."}), 404
 
-    pontos_livres = int(pdata.get("stat_points", 0))
-    if pontos_livres <= 0:
-        return jsonify({"erro": "Não tens pontos disponíveis!"}), 400
+        pontos_livres = int(pdata.get("stat_points", 0))
+        if pontos_livres <= 0: return jsonify({"erro": "Não tens pontos disponíveis!"}), 400
 
-    # Adiciona o ponto no status escolhido
-    invested = pdata.get("invested", {})
-    invested[stat] = int(invested.get(stat, 0)) + 1
-    pdata["invested"] = invested
-    pdata["stat_points"] = pontos_livres - 1
+        base_stats = pdata.get("base_stats", {})
+        base_stats[stat] = int(base_stats.get(stat, 0)) + 1
+        pdata["base_stats"] = base_stats
+        pdata["stat_points"] = pontos_livres - 1
 
-    await player_manager.save_player_data(user_id, pdata)
-    return jsonify({"sucesso": True, "msg": f"Ponto adicionado em {stat}!"})
-
+        await player_manager.save_player_data(user_id, pdata)
+        return jsonify({"sucesso": True, "msg": f"Ponto adicionado!"})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/personagem/equipar', methods=['POST'])
 async def api_equipar_item():
-    data = request.json
-    user_id = data.get("user_id")
-    item_id = data.get("item_id")
-
-    from modules.player.inventory import equip_unique_item_for_user
-    sucesso, msg = await equip_unique_item_for_user(user_id, item_id)
-    
-    if sucesso:
-        return jsonify({"sucesso": True, "msg": msg})
-    return jsonify({"erro": msg}), 400
+    try:
+        data = request.json
+        from modules.player.inventory import equip_unique_item_for_user
+        sucesso, msg = await equip_unique_item_for_user(data.get("user_id"), data.get("item_id"))
+        if sucesso: return jsonify({"sucesso": True, "msg": msg})
+        return jsonify({"erro": msg}), 400
+    except Exception as e: return jsonify({"erro": str(e)}), 500
 
 
 @app.route('/api/personagem/desequipar', methods=['POST'])
 async def api_desequipar_item():
-    data = request.json
-    user_id = data.get("user_id")
-    slot = data.get("slot")
-
-    from modules.player.inventory import unequip_item_for_user
-    sucesso, msg = await unequip_item_for_user(user_id, slot)
-    
-    if sucesso:
-        return jsonify({"sucesso": True, "msg": msg})
-    return jsonify({"erro": msg}), 400
+    try:
+        data = request.json
+        from modules.player.inventory import unequip_item_for_user
+        sucesso, msg = await unequip_item_for_user(data.get("user_id"), data.get("slot"))
+        if sucesso: return jsonify({"sucesso": True, "msg": msg})
+        return jsonify({"erro": msg}), 400
+    except Exception as e: return jsonify({"erro": str(e)}), 500
     
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

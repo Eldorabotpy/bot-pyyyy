@@ -128,7 +128,19 @@ async function carregarMeuPerfil() {
                     </div>
                 </div>`;
         }
-        htmlStatus += `</div>`;
+        htmlStatus += `</div>
+            <div style="margin-top: 15px; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
+                <div style="color: #94a3b8; font-size: 0.7em; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">🎲 Chances Secundárias</div>
+                <div style="display: flex; justify-content: space-around; font-size: 0.9em;">
+                    <div><span style="font-size: 1.2em;">💨</span> Esquiva: <strong style="color: #38bdf8;">${p.esquiva}%</strong></div>
+                    <div><span style="font-size: 1.2em;">⚔️</span> Atk Duplo: <strong style="color: #f87171;">${p.atk_duplo}%</strong></div>
+                </div>
+            </div>
+            <div style="margin-top: 10px; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
+                <div style="color: #94a3b8; font-size: 0.7em; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">💼 Profissão</div>
+                <div style="font-size: 0.95em; color: #fff;">${p.prof_nome} <span style="color: #fbbf24;">(Nível ${p.prof_lvl})</span></div>
+            </div>
+        `;
 
         // --- ABA DE EQUIPAMENTOS (VISUAL RPG - CORRIGIDO) ---
         // Slots colados nas bordas (12% e 88%) para liberar o meio
@@ -225,17 +237,17 @@ async function carregarMeuPerfil() {
                     <span style="color: #e74c3c; font-size: 0.7em; font-weight: bold;">❤️ HP</span>
                     <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.hp_atual} <span style="font-size:0.7em; color:#7f1d1d;">/ ${p.hp_max}</span></div>
                 </div>
-                <div style="background: #1e1e1e; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #3498db; display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-                    <span style="color: #3498db; font-size: 0.7em; font-weight: bold;">⚡ ENERGIA</span>
-                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.energy}</div>
+                <div style="background: #1e1e1e; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #3b82f6; display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
+                    <span style="color: #3b82f6; font-size: 0.7em; font-weight: bold;">💧 MP</span>
+                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.mp_atual} <span style="font-size:0.7em; color:#1e3a8a;">/ ${p.mp_max}</span></div>
                 </div>
                 <div style="background: #1e1e1e; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #f1c40f; display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
                     <span style="color: #f1c40f; font-size: 0.7em; font-weight: bold;">💰 OURO</span>
                     <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.gold.toLocaleString('pt-BR')}</div>
                 </div>
-                <div style="background: #1e1e1e; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #00f2fe; display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-                    <span style="color: #00f2fe; font-size: 0.7em; font-weight: bold;">💎 GEMAS</span>
-                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.gems.toLocaleString('pt-BR')}</div>
+                <div style="background: #1e1e1e; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #3498db; display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
+                    <span style="color: #3498db; font-size: 0.7em; font-weight: bold;">⚡ ENE</span>
+                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.energy}</div>
                 </div>
             </div>
 
@@ -268,8 +280,6 @@ async function carregarMeuPerfil() {
 
         document.getElementById('perfil-carregando').style.display = 'none';
         conteudo.style.display = 'block';
-
-        // Salva a URL do Avatar globalmente para podermos puxar quando clicar na aba Equipamentos
         window._avatarAtualEldora = avatarLink;
 
     } catch (erro) {
@@ -314,79 +324,47 @@ window.distribuirPonto = async function(stat) {
     const charId = localStorage.getItem("jogadorEldoraID");
     try {
         const res = await fetch('/api/personagem/distribuir_ponto', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: charId, stat: stat })
         });
-        
-        // Se a rota não existir (Render não atualizou), o JSON vai falhar
-        if (!res.ok) throw new Error("O servidor retornou erro " + res.status);
-        
+        if (!res.ok) throw new Error("Falha no Python. O servidor ainda está a reiniciar?");
         const data = await res.json();
         
-        if(data.sucesso) {
-            carregarMeuPerfil(); 
-        } else {
-            alert("Aviso: " + data.erro);
-        }
-    } catch(e) {
-        // AGORA ELE VAI GRITAR O ERRO NA TELA
-        alert("⚠️ O Servidor ainda está reiniciando ou a rota não existe! Detalhe: " + e.message);
-    }
+        if(data.sucesso) { carregarMeuPerfil(); } 
+        else { alert("Aviso: " + data.erro); }
+    } catch(e) { alert("⚠️ ERRO: " + e.message); }
 }
 
 window.desequiparItem = async function(slot) {
     const charId = localStorage.getItem("jogadorEldoraID");
     try {
         const res = await fetch('/api/personagem/desequipar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: charId, slot: slot })
         });
+        if (!res.ok) throw new Error("Erro no servidor");
         const data = await res.json();
         
         if(data.sucesso) {
             carregarMeuPerfil();
-            // Dá um tempo curtinho para a tela recarregar e força a ficar na aba de Equipamentos
             setTimeout(() => alternarAbaPerfil('equips'), 200); 
-        } else {
-            if (typeof exibirAlertaCustom === "function") {
-                exibirAlertaCustom("Aviso", data.erro, false);
-            } else {
-                alert(data.erro);
-            }
-        }
-    } catch(e) {
-        // AGORA ELE VAI GRITAR O ERRO NA TELA
-        alert("⚠️ O Servidor ainda está reiniciando ou a rota não existe! Detalhe: " + e.message);
-    }
+        } else { alert("Aviso: " + data.erro); }
+    } catch(e) { alert("⚠️ ERRO: " + e.message); }
 }
 
 window.usarOuEquiparItem = async function(itemId) {
     const charId = localStorage.getItem("jogadorEldoraID");
-    
     try {
         const res = await fetch('/api/personagem/equipar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: charId, item_id: itemId })
         });
+        if (!res.ok) throw new Error("Erro no servidor");
         const data = await res.json();
         
         if(data.sucesso) {
             carregarMeuPerfil();
-            // Troca automaticamente para a aba de Equipamentos para o jogador ver a arma equipada!
             setTimeout(() => alternarAbaPerfil('equips'), 300);
-        } else {
-            // Se tentar equipar algo que não é equipável (ex: minério, poção)
-            if (typeof exibirAlertaCustom === "function") {
-                exibirAlertaCustom("Aviso", data.erro, false);
-            } else {
-                alert(data.erro);
-            }
-        }
-    } catch(e) {
-        // AGORA ELE VAI GRITAR O ERRO NA TELA
-        alert("⚠️ O Servidor ainda está reiniciando ou a rota não existe! Detalhe: " + e.message);
-    }
+        } else { alert("Aviso: " + data.erro); }
+    } catch(e) { alert("⚠️ ERRO: " + e.message); }
 }
