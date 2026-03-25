@@ -181,12 +181,12 @@ async function carregarMeuPerfil() {
                 
                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                             width: 100%; height: 100%; z-index: 0; pointer-events: none;">
-                    <img src="COLE_O_LINK_DA_IMAGEM_AZUL_AQUI.jpg" onerror="this.style.display='none'" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.85;">
+                    <img src="https://github.com/user-attachments/assets/9a7300d0-63af-47bb-9f52-1fd99c40ed90" onerror="this.style.display='none'" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.85;">
                 </div>
 
                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
                             width: 50%; height: 95%; z-index: 1; display: flex; justify-content: center; align-items: center;">
-                    <img id="avatar-equip-tab" src="${avatarLink}" onerror="this.src='https://i.ibb.co/3s6D5dC/char-aprendiz.png'" alt="Avatar" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.9)); pointer-events: none;">
+                    <img id="avatar-equip-tab" src="${avatarLink}" onerror="this.src='https://github.com/user-attachments/assets/b0f8f158-3d54-46ef-b1df-9bbd9300609f'" alt="Avatar" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.9)); pointer-events: none;">
                 </div>
 
                 <div style="position: relative; width: 100%; height: 100%; z-index: 2;">
