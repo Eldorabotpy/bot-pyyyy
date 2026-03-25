@@ -321,14 +321,18 @@ window.distribuirPonto = async function(stat) {
         const data = await res.json();
         
         if(data.sucesso) {
-            // Recarrega o perfil para atualizar o número na hora!
+            // Recarrega o perfil para atualizar o número na hora sem piscar a tela!
             carregarMeuPerfil(); 
         } else {
-            exibirAlertaCustom("Aviso", data.erro, false);
+            // Se o jogador tentar burlar e upar sem pontos
+            if (typeof exibirAlertaCustom === "function") {
+                exibirAlertaCustom("Aviso", data.erro, false);
+            } else {
+                alert(data.erro);
+            }
         }
     } catch(e) {
         console.error(e);
-        exibirAlertaCustom("Erro", "Falha ao conectar com o servidor.", false);
     }
 }
 
@@ -344,9 +348,14 @@ window.desequiparItem = async function(slot) {
         
         if(data.sucesso) {
             carregarMeuPerfil();
-            setTimeout(() => alternarAbaPerfil('equips'), 200); // Força a ficar na aba de equips
+            // Dá um tempo curtinho para a tela recarregar e força a ficar na aba de Equipamentos
+            setTimeout(() => alternarAbaPerfil('equips'), 200); 
         } else {
-            exibirAlertaCustom("Aviso", data.erro, false);
+            if (typeof exibirAlertaCustom === "function") {
+                exibirAlertaCustom("Aviso", data.erro, false);
+            } else {
+                alert(data.erro);
+            }
         }
     } catch(e) { console.error(e); }
 }
@@ -354,8 +363,6 @@ window.desequiparItem = async function(slot) {
 window.usarOuEquiparItem = async function(itemId) {
     const charId = localStorage.getItem("jogadorEldoraID");
     
-    // No futuro, podemos abrir um modal aqui (Equipar / Usar / Vender).
-    // Por enquanto, o clique vai tentar equipar a arma/armadura diretamente!
     try {
         const res = await fetch('/api/personagem/equipar', {
             method: 'POST',
@@ -366,11 +373,15 @@ window.usarOuEquiparItem = async function(itemId) {
         
         if(data.sucesso) {
             carregarMeuPerfil();
-            // Troca automaticamente para a aba de Equipamentos para o jogador ver o item equipado!
+            // Troca automaticamente para a aba de Equipamentos para o jogador ver a arma equipada!
             setTimeout(() => alternarAbaPerfil('equips'), 300);
         } else {
-            // Se clicar numa poção ou item não equipável, o Python vai enviar um erro e mostramos aqui
-            exibirAlertaCustom("Inválido", data.erro, false);
+            // Se tentar equipar algo que não é equipável (ex: minério, poção)
+            if (typeof exibirAlertaCustom === "function") {
+                exibirAlertaCustom("Aviso", data.erro, false);
+            } else {
+                alert(data.erro);
+            }
         }
     } catch(e) { console.error(e); }
 }
