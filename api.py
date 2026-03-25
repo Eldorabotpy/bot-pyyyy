@@ -241,7 +241,7 @@ def obter_perfil(user_id):
             else:
                 prof_nome, prof_lvl = str(prof_raw).capitalize(), 1
 
-        # INVENTÁRIO
+        # 4. INVENTÁRIO (COM DESCRIÇÃO E TIPO PARA O MODAL)
         inventario_cru = pdata.get("inventory") or {}
         inventario_formatado = []
         for item_id, qtd_ou_dict in inventario_cru.items():
@@ -250,10 +250,24 @@ def obter_perfil(user_id):
                 base_id = qtd_ou_dict.get("base_id", item_id) if isinstance(qtd_ou_dict, dict) else item_id
                 info_item = items_data.ITEMS_DATA.get(base_id, {})
                 nome_item = info_item.get("display_name", base_id.replace("_", " ").title())
-                inventario_formatado.append({"id": item_id, "nome": nome_item, "emoji": info_item.get("emoji", "📦"), "qtd": qtd})
+                
+                # Novos dados para a Caixa Flutuante
+                tipo_item = info_item.get("type", "material")
+                desc_item = info_item.get("description", "Um item misterioso do mundo de Eldora.")
+                raridade_item = info_item.get("rarity", "comum")
+
+                inventario_formatado.append({
+                    "id": item_id, 
+                    "nome": nome_item, 
+                    "emoji": info_item.get("emoji", "📦"), 
+                    "qtd": qtd,
+                    "tipo": tipo_item,
+                    "desc": desc_item,
+                    "raridade": raridade_item
+                })
         inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 
-        # EQUIPAMENTOS
+        # 5. EQUIPAMENTOS (COM DESCRIÇÃO PARA O MODAL)
         equip_cru = pdata.get("equipment") or {}
         equip_formatado = []
         for slot in SLOT_ORDER:
@@ -265,9 +279,22 @@ def obter_perfil(user_id):
                 info_item = items_data.ITEMS_DATA.get(base_id, {})
                 nome_equip = info_item.get("display_name", base_id.replace("_", " ").title())
                 icon_equip = info_item.get("icon_url", info_item.get("emoji", "📦")) 
-                equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": nome_equip, "icon": icon_equip, "vazio": False})
+                
+                # Novos dados
+                tipo_item = info_item.get("type", "equipamento")
+                desc_item = info_item.get("description", "Equipamento em uso.")
+                raridade_item = info_item.get("rarity", "comum")
+
+                equip_formatado.append({
+                    "slot": slot, "uid": item_uid, "emoji": emoji_slot, "nome": nome_equip, 
+                    "icon": icon_equip, "vazio": False,
+                    "tipo": tipo_item, "desc": desc_item, "raridade": raridade_item
+                })
             else:
-                equip_formatado.append({"slot": slot, "emoji": emoji_slot, "nome": "Vazio", "icon": "🔲", "vazio": True})
+                equip_formatado.append({
+                    "slot": slot, "emoji": emoji_slot, "nome": "Vazio", "icon": "🔲", 
+                    "vazio": True, "desc": "Espaço vazio.", "tipo": "vazio", "raridade": ""
+                })
 
         return jsonify({
             "nome": pdata.get("character_name", "Aventureiro"), 
