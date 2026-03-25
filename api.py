@@ -860,6 +860,62 @@ def api_autohunt_finalizar():
         import traceback
         traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
+ 
+# ==========================================
+# ROTAS DO WEB APP (ATRIBUTOS E EQUIPAMENTOS)
+# ==========================================
+
+@app.route('/api/personagem/distribuir_ponto', methods=['POST'])
+async def api_distribuir_ponto():
+    data = request.json
+    user_id = data.get("user_id")
+    stat = data.get("stat")
+
+    from modules import player_manager
+    pdata = await player_manager.get_player_data(user_id)
+    if not pdata: 
+        return jsonify({"erro": "Personagem não encontrado."}), 404
+
+    pontos_livres = int(pdata.get("stat_points", 0))
+    if pontos_livres <= 0:
+        return jsonify({"erro": "Não tens pontos disponíveis!"}), 400
+
+    # Adiciona o ponto no status escolhido
+    invested = pdata.get("invested", {})
+    invested[stat] = int(invested.get(stat, 0)) + 1
+    pdata["invested"] = invested
+    pdata["stat_points"] = pontos_livres - 1
+
+    await player_manager.save_player_data(user_id, pdata)
+    return jsonify({"sucesso": True, "msg": f"Ponto adicionado em {stat}!"})
+
+
+@app.route('/api/personagem/equipar', methods=['POST'])
+async def api_equipar_item():
+    data = request.json
+    user_id = data.get("user_id")
+    item_id = data.get("item_id")
+
+    from modules.player.inventory import equip_unique_item_for_user
+    sucesso, msg = await equip_unique_item_for_user(user_id, item_id)
+    
+    if sucesso:
+        return jsonify({"sucesso": True, "msg": msg})
+    return jsonify({"erro": msg}), 400
+
+
+@app.route('/api/personagem/desequipar', methods=['POST'])
+async def api_desequipar_item():
+    data = request.json
+    user_id = data.get("user_id")
+    slot = data.get("slot")
+
+    from modules.player.inventory import unequip_item_for_user
+    sucesso, msg = await unequip_item_for_user(user_id, slot)
+    
+    if sucesso:
+        return jsonify({"sucesso": True, "msg": msg})
+    return jsonify({"erro": msg}), 400
     
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

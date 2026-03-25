@@ -307,16 +307,70 @@ window.alternarAbaPerfil = function(abaID) {
 }
 
 // ==========================================
-// FUNÇÕES PLACEHOLDERS (Próximo Passo)
+// SISTEMA DE INTERAÇÃO (Atributos e Equipamentos)
 // ==========================================
-window.distribuirPonto = function(stat) {
-    exibirAlertaCustom("Aguarde...", `A rota mágica para upar o atributo <b>${stat.toUpperCase()}</b> será conjurada na nossa próxima lição!`, true);
+
+window.distribuirPonto = async function(stat) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    try {
+        const res = await fetch('/api/personagem/distribuir_ponto', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId, stat: stat })
+        });
+        const data = await res.json();
+        
+        if(data.sucesso) {
+            // Recarrega o perfil para atualizar o número na hora!
+            carregarMeuPerfil(); 
+        } else {
+            exibirAlertaCustom("Aviso", data.erro, false);
+        }
+    } catch(e) {
+        console.error(e);
+        exibirAlertaCustom("Erro", "Falha ao conectar com o servidor.", false);
+    }
 }
 
-window.desequiparItem = function(slot) {
-    exibirAlertaCustom("Aguarde...", `Em breve poderás remover itens do slot de <b>${slot}</b>.`, false);
+window.desequiparItem = async function(slot) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    try {
+        const res = await fetch('/api/personagem/desequipar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId, slot: slot })
+        });
+        const data = await res.json();
+        
+        if(data.sucesso) {
+            carregarMeuPerfil();
+            setTimeout(() => alternarAbaPerfil('equips'), 200); // Força a ficar na aba de equips
+        } else {
+            exibirAlertaCustom("Aviso", data.erro, false);
+        }
+    } catch(e) { console.error(e); }
 }
 
-window.usarOuEquiparItem = function(itemId) {
-    exibirAlertaCustom("Aguarde...", `O menu detalhado do item abrirá aqui para usar ou equipar a tua arma!`, true);
+window.usarOuEquiparItem = async function(itemId) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    
+    // No futuro, podemos abrir um modal aqui (Equipar / Usar / Vender).
+    // Por enquanto, o clique vai tentar equipar a arma/armadura diretamente!
+    try {
+        const res = await fetch('/api/personagem/equipar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId, item_id: itemId })
+        });
+        const data = await res.json();
+        
+        if(data.sucesso) {
+            carregarMeuPerfil();
+            // Troca automaticamente para a aba de Equipamentos para o jogador ver o item equipado!
+            setTimeout(() => alternarAbaPerfil('equips'), 300);
+        } else {
+            // Se clicar numa poção ou item não equipável, o Python vai enviar um erro e mostramos aqui
+            exibirAlertaCustom("Inválido", data.erro, false);
+        }
+    } catch(e) { console.error(e); }
 }
