@@ -299,7 +299,8 @@ async function iniciarCacadaApp() {
             playerMpMax: est.player_stats.max_mana,
             mobHpMax: est.monster_stats.max_hp,
             mobHpAtual: est.monster_hp,
-            playerHpAtual: est.player_hp
+            playerHpAtual: est.player_hp,
+            playerMpAtual: est.player_mp // <--- ADICIONA ESTA LINHA AQUI!
         };
 
         // --- NOVO VISUAL DA ARENA (SLIM E ELEGANTE COMPLETO) ---
@@ -556,13 +557,20 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
 // ==========================================
 // NOVA FUNÇÃO: LÊ O QUE O PYTHON MANDOU E ANIMA
 // ==========================================
-function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) { // <-- Parâmetros adicionados!
+function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) { 
     const logBox = document.getElementById('combat-log-box');
     const elemSpriteMob = document.getElementById('sprite-mob');
     const elemSpritePlayer = document.getElementById('sprite-player');
     const flash = document.getElementById('damage-flash');
     let db = window.dadosCombateAtual;
     let indexAcao = 0;
+
+    // ======= CORREÇÃO DA MANA =======
+    // Atualiza a barra azul no ecrã logo no início do turno
+    if (turnoInfo.player_mp !== undefined) {
+        db.playerMpAtual = turnoInfo.player_mp;
+        atualizarVisualBarra('bar-mp-player', db.playerMpAtual, db.playerMpMax, true);
+    }
 
     function lerProximoLog() {
         if (indexAcao >= turnoInfo.log.length) {

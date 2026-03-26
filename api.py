@@ -505,6 +505,7 @@ def api_combate_iniciar():
 # ROTA: AÇÃO DO TURNO (NOVO SISTEMA)
 # ==========================================
 @app.route('/api/combate/acao', methods=['POST'])
+@app.route('/api/combate/acao', methods=['POST'])
 def api_combate_acao():
     import asyncio
     from modules.combat import combat_engine, rewards
@@ -535,33 +536,34 @@ def api_combate_acao():
 
         log_turno = []
         
-        # ======= CORREÇÃO 1: FUGA SALVANDO HP E MP GASTOS =======
         if acao == "fugir":
             pdata.pop("battle_cache", None)
             pdata["player_state"] = {"action": "idle"}
-            
-            # Salva o HP e MP exatos de quando o jogador fugiu
             pdata["current_hp"] = max(0, cache.get("player_hp", 0))
             pdata["current_mp"] = max(0, cache.get("player_mp", 0))
-            
             _run_async(player_manager.save_player_data(busca_id, pdata))
             return jsonify({"fugiu": True, "log": [{"autor": "system", "texto": "🏃 Você fugiu da batalha!"}]})
 
         elif acao == "atacar" or acao == "magia":
+            
+            # --- CORREÇÃO 1: PROTEÇÃO ANTI-CRASH (KEYERROR) ---
+            # Tenta pegar do cache. Se não tiver (lutas velhas), puxa do personagem.
+            mana_atual = cache.get("player_mp", pdata.get("current_mp", 0))
+
             res_p = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata=pdata,
                 attacker_stats=cache["player_stats"],
                 target_stats=cache["monster_stats"],
                 skill_id=skill_id if acao == "magia" else None, 
-                attacker_current_hp=cache["player_hp"],
-                attacker_current_mp=cache["player_mp"] # <--- SÓ ADICIONAR ESTA LINHA!
+                attacker_current_hp=cache.get("player_hp", 0),
+                attacker_current_mp=mana_atual # <--- Passa com segurança!
             ))
             
             # Atualiza o HP do monstro com o dano
             dano_p = res_p.get("total_damage", 0)
             cache["monster_hp"] -= dano_p
             
-            # Se a engine retornar o MP gasto, podemos atualizar no cache (Opcional/Garantia)
+            # --- CORREÇÃO 2: ATUALIZA O CACHE DE MANA ---
             if "attacker_mp_left" in res_p:
                 cache["player_mp"] = res_p["attacker_mp_left"]
             
@@ -578,7 +580,6 @@ def api_combate_acao():
             pdata["xp"] = pdata.get("xp", 0) + xp
             pdata["gold"] = pdata.get("gold", 0) + gold
             
-            # ======= CORREÇÃO DO INVENTÁRIO (COMBATE MANUAL) =======
             items_names = []
             if "inventory" not in pdata: pdata["inventory"] = {}
         
@@ -593,7 +594,6 @@ def api_combate_acao():
                 
                 n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
                 items_names.append(n_item)
-            # =======================================================
 
             recompensas_finais = {"xp": xp, "gold": gold, "items": items_names}
             pdata.pop("battle_cache", None)
@@ -601,7 +601,7 @@ def api_combate_acao():
             log_turno.append({"autor": "system", "texto": f"🏆 {cache['mob_nome']} foi derrotado!"})
             
         else:
-            # Turno do Monstro
+            # Turno do monstro só acontece se a luta não acabou
             res_m = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata={}, 
                 attacker_stats=cache["monster_stats"],
@@ -626,28 +626,25 @@ def api_combate_acao():
                 pdata.pop("battle_cache", None)
                 pdata["player_state"] = {"action": "idle"}
 
-        # ======= CORREÇÃO 2: LÓGICA DE FIM DE TURNO (RESTAURAR HP/MP) =======
         if not vitoria and not derrota:
-            # A LUTA CONTINUA: Apenas atualiza o cache e salva os danos do turno
             cache["turno"] += 1
             pdata["battle_cache"] = cache
             pdata["current_hp"] = max(0, cache.get("player_hp", 0))
             pdata["current_mp"] = max(0, cache.get("player_mp", 0))
         else:
-            # A LUTA ACABOU (Ganhou ou Perdeu): Restaura tudo pro máximo
             max_hp = cache.get("player_stats", {}).get("max_hp", 100)
             max_mp = cache.get("player_stats", {}).get("max_mana", 50)
             
             pdata["current_hp"] = max_hp
             pdata["current_mp"] = max_mp
 
-        # Usa o player_manager de forma segura!
         _run_async(player_manager.save_player_data(busca_id, pdata))
 
         return jsonify({
             "sucesso": True,
             "log": log_turno,
             "player_hp": cache.get("player_hp", 0),
+            "player_mp": cache.get("player_mp", pdata.get("current_mp", 0)), # <--- CORREÇÃO 3: Envia a mana pro seu JavaScript
             "monster_hp": cache.get("monster_hp", 0),
             "vitoria": vitoria,
             "derrota": derrota,
