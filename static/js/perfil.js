@@ -58,7 +58,6 @@ async function carregarMeuPerfil() {
     }
 
     try {
-        // SISTEMA ANTI-CACHE ATIVADO
         const resposta = await fetch(`/perfil/${charId}?t=${new Date().getTime()}`, { cache: 'no-store' });
         const p = await resposta.json();
         if (p.erro) { document.getElementById('perfil-msg-carregando').innerText = "⚠️ " + p.erro; return; }
@@ -94,7 +93,7 @@ async function carregarMeuPerfil() {
                 <div style="font-size: 0.95em; color: #fff;">${p.prof_nome || 'Nenhuma'} <span style="color: #fbbf24;">(Nível ${p.prof_lvl || 1})</span></div>
             </div>`;
 
-        // --- ABA DE EQUIPAMENTOS ---
+        // --- ABA DE EQUIPAMENTOS (COM FALLBACK DE IMAGEM) ---
         const POSICOES_SLOTS = {
             'elmo':     { top: '12%', left: '12%', transform: 'translate(-50%, -50%)' },
             'arma':     { top: '31%', left: '12%', transform: 'translate(-50%, -50%)' },
@@ -113,9 +112,10 @@ async function carregarMeuPerfil() {
             const pos = POSICOES_SLOTS[eq.slot] || { top: '50%', left: '50%' };
             const corBorda = eq.vazio ? "#334155" : "#f59e0b";
             const corFundo = eq.vazio ? "rgba(15, 23, 42, 0.8)" : "rgba(245, 158, 11, 0.15)";
+            
+            // Tenta imagem .webp, se falhar vira o emoji
             let visualItem = eq.vazio ? `<span style="font-size: 1.4em; opacity: 0.3;">${eq.emoji}</span>` : 
-                             (eq.icon.length > 5 && eq.icon.includes('.')) ? `<img src="${eq.icon}" style="width: 85%; height: 85%; object-fit: contain;">` : 
-                             `<span style="font-size: 1.8em;">${eq.icon || eq.emoji}</span>`;
+                             `<img src="/static/items/${eq.base_id}.webp" onerror="this.onerror=null; this.outerHTML='<span style=\\'font-size: 1.8em;\\'>${eq.icon || eq.emoji}</span>';" style="max-width: 85%; max-height: 85%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">`;
 
             htmlSlots += `
                 <div onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}" 
@@ -157,7 +157,7 @@ async function carregarMeuPerfil() {
                 <div style="background: linear-gradient(135deg, #1e293b, #0f172a); width: 85%; max-width: 350px; border-radius: 12px; border: 2px solid #f39c12; padding: 25px 20px; text-align: center; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.9);">
                     <span onclick="fecharModalItem()" style="position: absolute; top: 10px; right: 15px; font-size: 1.5em; color: #94a3b8; cursor: pointer;">&times;</span>
                     
-                    <div id="modal-item-icon" style="font-size: 3.5em; margin-bottom: 5px; text-shadow: 0 0 15px rgba(255,255,255,0.2);">📦</div>
+                    <div id="modal-item-icon" style="margin-bottom: 10px; display: flex; justify-content: center; align-items: center; min-height: 60px;">📦</div>
                     <h3 id="modal-item-nome" style="margin: 0 0 5px 0; color: #fff; font-size: 1.2em;">Nome</h3>
                     <span id="modal-item-raridade" style="font-size: 0.7em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: #334155; font-weight: bold;">Comum</span>
                     
@@ -235,6 +235,9 @@ window.alternarAbaPerfil = function(abaID) {
     }
 }
 
+// ==========================================
+// FILTROS DA MOCHILA (COM FALLBACK DE IMAGEM)
+// ==========================================
 window.filtrarMochila = function(filtro) {
     if(!window.perfilDadosGlobais) return;
 
@@ -263,8 +266,10 @@ window.filtrarMochila = function(filtro) {
         itensFiltrados.forEach(item => {
             html += `
                 <div onclick="abrirModalItem('${item.id}', 'mochila')" style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 5px; text-align: center; cursor: pointer; position: relative; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-                    <span style="position: absolute; top: -5px; right: -5px; background: #3b82f6; color: white; font-size: 0.65em; padding: 2px 5px; border-radius: 10px; font-weight: bold;">x${item.qtd}</span>
-                    <div style="font-size: 1.8em; margin-bottom: 5px;">${item.emoji}</div>
+                    <span style="position: absolute; top: -5px; right: -5px; background: #3b82f6; color: white; font-size: 0.65em; padding: 2px 5px; border-radius: 10px; font-weight: bold; z-index: 5;">x${item.qtd}</span>
+                    <div style="height: 35px; margin-bottom: 5px; display: flex; justify-content: center; align-items: center;">
+                        <img src="/static/items/${item.base_id}.webp" onerror="this.onerror=null; this.outerHTML='<span style=\\'font-size: 1.8em;\\'>${item.emoji}</span>';" style="max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
+                    </div>
                     <div style="color: #cbd5e1; font-size: 0.6em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold;">${item.nome}</div>
                 </div>`;
         });
@@ -273,7 +278,7 @@ window.filtrarMochila = function(filtro) {
 }
 
 // ==========================================
-// FUNÇÕES DO MODAL E DOS BOTÕES
+// MODAL DE DETALHES (COM FALLBACK DE IMAGEM)
 // ==========================================
 window.abrirModalItem = function(idAlvo, origem) {
     if(!window.perfilDadosGlobais) return;
@@ -291,8 +296,13 @@ window.abrirModalItem = function(idAlvo, origem) {
     const refinoTxt = (itemData.refino && itemData.refino > 0) ? ` [+${itemData.refino}]` : '';
     document.getElementById('modal-item-nome').innerText = itemData.nome + refinoTxt;
     
-    // 2. ÍCONE E DESCRIÇÃO
-    document.getElementById('modal-item-icon').innerHTML = itemData.emoji || itemData.icon || "📦";
+    // 2. ÍCONE COM WEBP OU EMOJI
+    document.getElementById('modal-item-icon').innerHTML = `
+        <img src="/static/items/${itemData.base_id}.webp" 
+             onerror="this.onerror=null; this.outerHTML='<span style=\\'font-size: 3.5em; text-shadow: 0 0 15px rgba(255,255,255,0.2);\\'>${itemData.emoji || itemData.icon || '📦'}</span>';" 
+             style="max-width: 80px; max-height: 80px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8));">
+    `;
+
     document.getElementById('modal-item-desc').innerText = itemData.desc || "Sem descrição.";
     
     // 3. RARIDADE

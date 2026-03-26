@@ -67,7 +67,7 @@ def obter_perfil(user_id):
             else:
                 prof_nome, prof_lvl = str(prof_raw).capitalize(), 1
 
-        # 4. INVENTÁRIO (COM STATUS REAIS DA FORJA)
+        # 4. INVENTÁRIO (COM BASE_ID PARA IMAGENS)
         inventario_cru = pdata.get("inventory") or {}
         inventario_formatado = []
         for item_id, qtd_ou_dict in inventario_cru.items():
@@ -83,15 +83,20 @@ def obter_perfil(user_id):
                 status_item = obj_item.get("enchantments") or obj_item.get("attributes") or info_item.get("stats", {})
 
                 inventario_formatado.append({
-                    "id": item_id, "nome": nome_item, "emoji": info_item.get("emoji", "📦"), 
-                    "qtd": qtd, "tipo": info_item.get("type", "material"),
-                    "desc": info_item.get("description", "Um item de Eldora."),
+                    "id": item_id, 
+                    "base_id": base_id, # <--- ADICIONADO PARA AS IMAGENS WEBP
+                    "nome": nome_item, 
+                    "emoji": info_item.get("emoji", "📦"), 
+                    "qtd": qtd,
+                    "tipo": info_item.get("type", "material"),
+                    "desc": info_item.get("description", "Um item do mundo de Eldora."),
                     "raridade": obj_item.get("rarity", info_item.get("rarity", "comum")),
-                    "refino": refino, "stats": status_item
+                    "refino": refino,
+                    "stats": status_item
                 })
         inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 
-        # 5. EQUIPAMENTOS (COM STATUS REAIS DA FORJA)
+        # 5. EQUIPAMENTOS (COM BASE_ID PARA IMAGENS)
         equip_cru = pdata.get("equipment") or {}
         equip_formatado = []
         for slot in SLOT_ORDER:
@@ -110,10 +115,12 @@ def obter_perfil(user_id):
                 equip_formatado.append({
                     "slot": slot, "uid": item_uid, "emoji": emoji_slot, "nome": nome_equip, 
                     "icon": icon_equip, "vazio": False,
+                    "base_id": base_id, # <--- ADICIONADO AQUI TAMBÉM
                     "tipo": info_item.get("type", "equipamento"), 
                     "desc": info_item.get("description", "Equipamento em uso."), 
                     "raridade": obj_item.get("rarity", info_item.get("rarity", "comum")),
-                    "refino": refino, "stats": status_item
+                    "refino": refino,
+                    "stats": status_item
                 })
             else:
                 equip_formatado.append({
