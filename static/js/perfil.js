@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURAÇÕES GERAIS E DADOS (perfil.js)
 // ==========================================
-window.perfilDadosGlobais = null; // A variável agora usa 'window.' para o inventario_modal.js conseguir ler!
+window.perfilDadosGlobais = null; 
 
 const CLASSES_INFO = {
     'aprendiz': { nome: 'Aventureiro', emoji: '🎒', base: 'aprendiz' },
@@ -58,11 +58,12 @@ async function carregarMeuPerfil() {
     }
 
     try {
+        // SISTEMA ANTI-CACHE ATIVADO
         const resposta = await fetch(`/perfil/${charId}?t=${new Date().getTime()}`, { cache: 'no-store' });
         const p = await resposta.json();
         if (p.erro) { document.getElementById('perfil-msg-carregando').innerText = "⚠️ " + p.erro; return; }
 
-        window.perfilDadosGlobais = p; // <--- DADOS SALVOS NA WINDOW PARA O MODAL LER
+        window.perfilDadosGlobais = p; 
         
         const classeKey = (p.classe || "aprendiz").toLowerCase();
         const infoClasse = CLASSES_INFO[classeKey] || CLASSES_INFO['aprendiz'];
@@ -150,10 +151,30 @@ async function carregarMeuPerfil() {
             <p style="text-align:center; font-size:0.7em; color:#64748b; margin-top:10px;">Clique num item para interagir</p>
         `;
 
+        // HTML DO MODAL FLUTUANTE INJETADO DIRETAMENTE
+        const modalHtml = `
+            <div id="modal-item" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center; backdrop-filter: blur(3px);">
+                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); width: 85%; max-width: 350px; border-radius: 12px; border: 2px solid #f39c12; padding: 25px 20px; text-align: center; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.9);">
+                    <span onclick="fecharModalItem()" style="position: absolute; top: 10px; right: 15px; font-size: 1.5em; color: #94a3b8; cursor: pointer;">&times;</span>
+                    
+                    <div id="modal-item-icon" style="font-size: 3.5em; margin-bottom: 5px; text-shadow: 0 0 15px rgba(255,255,255,0.2);">📦</div>
+                    <h3 id="modal-item-nome" style="margin: 0 0 5px 0; color: #fff; font-size: 1.2em;">Nome</h3>
+                    <span id="modal-item-raridade" style="font-size: 0.7em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: #334155; font-weight: bold;">Comum</span>
+                    
+                    <div id="modal-item-stats" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 15px;"></div>
+
+                    <p id="modal-item-desc" style="color: #94a3b8; font-size: 0.85em; margin: 15px 0; line-height: 1.4; min-height: 40px; border-top: 1px solid #334155; padding-top: 10px;">Descrição do item.</p>
+                    
+                    <div id="modal-item-acoes" style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;"></div>
+                </div>
+            </div>
+        `;
+
         // ==========================================
-        // MONTAGEM DA TELA (SEM O MODAL ANTIGO)
+        // MONTAGEM DA TELA 
         // ==========================================
         conteudo.innerHTML = `
+            ${modalHtml}
             <div style="background: linear-gradient(135deg, #0f172a, #020617); padding: 15px; border-radius: 12px; border: 1px solid #f39c12; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
                 <h2 style="margin: 0 0 5px 0; color: #f39c12; font-size: 1.5em; text-shadow: 2px 2px 4px #000; text-transform: uppercase; letter-spacing: 1px;">${p.nome}</h2>
                 <span style="background: #f39c12; color: #000; padding: 2px 10px; border-radius: 5px; font-weight: 900; font-size: 0.75em; text-transform: uppercase;">${infoClasse.emoji} ${infoClasse.nome}</span>
@@ -187,7 +208,6 @@ async function carregarMeuPerfil() {
         conteudo.style.display = 'block';
         window._avatarAtualEldora = avatarLink;
 
-        // Renderiza a mochila com filtro padrão
         filtrarMochila('todos');
 
     } catch (erro) {
@@ -215,9 +235,6 @@ window.alternarAbaPerfil = function(abaID) {
     }
 }
 
-// ==========================================
-// FILTROS DA MOCHILA (Utiliza a variável global segura)
-// ==========================================
 window.filtrarMochila = function(filtro) {
     if(!window.perfilDadosGlobais) return;
 
@@ -253,4 +270,107 @@ window.filtrarMochila = function(filtro) {
         });
     }
     container.innerHTML = html;
+}
+
+// ==========================================
+// FUNÇÕES DO MODAL E DOS BOTÕES
+// ==========================================
+window.abrirModalItem = function(idAlvo, origem) {
+    if(!window.perfilDadosGlobais) return;
+    let itemData = null;
+
+    if (origem === 'mochila') {
+        itemData = window.perfilDadosGlobais.inventario.find(i => i.id === idAlvo);
+    } else if (origem === 'equipado') {
+        itemData = window.perfilDadosGlobais.equipamentos.find(e => e.slot === idAlvo);
+    }
+
+    if (!itemData || itemData.vazio) return;
+
+    // 1. NOME COM REFINO
+    const refinoTxt = (itemData.refino && itemData.refino > 0) ? ` [+${itemData.refino}]` : '';
+    document.getElementById('modal-item-nome').innerText = itemData.nome + refinoTxt;
+    
+    // 2. ÍCONE E DESCRIÇÃO
+    document.getElementById('modal-item-icon').innerHTML = itemData.emoji || itemData.icon || "📦";
+    document.getElementById('modal-item-desc').innerText = itemData.desc || "Sem descrição.";
+    
+    // 3. RARIDADE
+    const rari = document.getElementById('modal-item-raridade');
+    rari.innerText = itemData.raridade || "Comum";
+    const coresRaridade = {'comum': '#94a3b8', 'incomum': '#22c55e', 'bom': '#22c55e', 'raro': '#3b82f6', 'epico': '#a855f7', 'lendario': '#eab308', 'unico': '#ef4444', 'mitico': '#00f2fe'};
+    rari.style.color = coresRaridade[(itemData.raridade||'comum').toLowerCase()] || '#cbd5e1';
+
+    // 4. TRADUTOR DE STATUS
+    let statsHtml = '';
+    const mapEmojis = {
+        'vida': '❤️', 'hp': '❤️', 'defesa': '🛡️', 'defense': '🛡️',
+        'sorte': '🍀', 'luck': '🍀', 'agilidade': '🏃', 'initiative': '🏃',
+        'forca': '💪', 'inteligencia': '🧠', 'furia': '🔥', 'precisao': '🎯',
+        'letalidade': '💀', 'carisma': '😎', 'foco': '🧘', 'bushido': '🥷',
+        'dmg': '⚔️', 'attack': '⚔️'
+    };
+
+    if (itemData.stats && Object.keys(itemData.stats).length > 0) {
+        for (const [key, valObj] of Object.entries(itemData.stats)) {
+            let val = (typeof valObj === 'object' && valObj !== null) ? valObj.value : valObj;
+            if (key.toLowerCase() === 'dmg' && Object.keys(itemData.stats).length > 1) continue;
+            const emoji = mapEmojis[key.toLowerCase()] || '✨';
+            const nomeStat = key.replace('_', ' ').toUpperCase();
+            statsHtml += `<span style="background: #020617; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; color: #fff; border: 1px solid #3f3f46; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">${emoji} ${nomeStat}: +${val}</span>`;
+        }
+    } else if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento'].includes(itemData.tipo)) {
+        statsHtml = `<span style="color: #64748b; font-size: 0.8em;">Sem atributos base</span>`;
+    }
+    document.getElementById('modal-item-stats').innerHTML = statsHtml;
+
+    // 5. BOTÕES DE AÇÃO
+    let botoesHtml = '';
+    if (origem === 'mochila') {
+        const t = (itemData.tipo || "").toLowerCase();
+        if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento'].includes(t)) {
+            botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" style="flex:1; padding:10px; background:#10b981; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Equipar</button>`;
+        } else if (['potion', 'consumable', 'scroll'].includes(t)) {
+            botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" style="flex:1; padding:10px; background:#3b82f6; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Usar</button>`;
+        }
+    } else if (origem === 'equipado') {
+        botoesHtml = `<button onclick="desequiparItem('${itemData.slot}')" style="flex:1; padding:10px; background:#ef4444; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Remover</button>`;
+    }
+    botoesHtml += `<button onclick="fecharModalItem()" style="flex:1; padding:10px; background:#334155; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Fechar</button>`;
+    
+    document.getElementById('modal-item-acoes').innerHTML = botoesHtml;
+    document.getElementById('modal-item').style.display = 'flex';
+}
+
+window.fecharModalItem = function() {
+    document.getElementById('modal-item').style.display = 'none';
+}
+
+window.distribuirPonto = async function(stat) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    try {
+        const res = await fetch('/api/personagem/distribuir_ponto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, stat: stat }) });
+        const data = await res.json();
+        if(data.sucesso) carregarMeuPerfil(); else alert("Aviso: " + data.erro);
+    } catch(e) { alert("⚠️ ERRO: " + e.message); }
+}
+
+window.desequiparItem = async function(slot) {
+    fecharModalItem();
+    const charId = localStorage.getItem("jogadorEldoraID");
+    try {
+        const res = await fetch('/api/personagem/desequipar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, slot: slot }) });
+        const data = await res.json();
+        if(data.sucesso) { carregarMeuPerfil(); setTimeout(() => alternarAbaPerfil('equips'), 200); } else { alert("Aviso: " + data.erro); }
+    } catch(e) { alert("⚠️ ERRO: " + e.message); }
+}
+
+window.usarOuEquiparItem = async function(itemId) {
+    fecharModalItem();
+    const charId = localStorage.getItem("jogadorEldoraID");
+    try {
+        const res = await fetch('/api/personagem/equipar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, item_id: itemId }) });
+        const data = await res.json();
+        if(data.sucesso) { carregarMeuPerfil(); setTimeout(() => alternarAbaPerfil('equips'), 300); } else { alert("Aviso: " + data.erro); }
+    } catch(e) { alert("⚠️ ERRO: " + e.message); }
 }
