@@ -5,7 +5,7 @@ from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from bson.objectid import ObjectId
 from datetime import datetime, timezone, timedelta
-
+from modules import player_manager
 # Importa as conexões oficiais do seu bot
 from modules.player.core import users_collection
 from modules.database import clans_col
@@ -392,7 +392,7 @@ def api_cacar():
             rewards.process_defeat(pdata, monster_stats)
 
         pdata["current_hp"] = max(0, p_hp)
-        users_collection.replace_one({"_id": busca_id}, pdata)
+        _run_async(player_manager.save_player_data(busca_id, pdata)) # <--- USE ISSO
 
         return jsonify({
             "sucesso": True,
@@ -468,7 +468,7 @@ def api_combate_iniciar():
         
         pdata["battle_cache"] = battle_cache
         pdata["player_state"] = {"action": "in_combat"}
-        users_collection.replace_one({"_id": busca_id}, pdata)
+        _run_async(player_manager.save_player_data(busca_id, pdata)) # <--- USE ISSO
 
         estado_frontend = {
             "player_hp": battle_cache["player_hp"],
@@ -535,10 +535,16 @@ def api_combate_acao():
 
         log_turno = []
         
+        # ======= CORREÇÃO 1: FUGA SALVANDO HP E MP GASTOS =======
         if acao == "fugir":
             pdata.pop("battle_cache", None)
             pdata["player_state"] = {"action": "idle"}
-            users_collection.replace_one({"_id": busca_id}, pdata)
+            
+            # Salva o HP e MP exatos de quando o jogador fugiu
+            pdata["current_hp"] = max(0, cache.get("player_hp", 0))
+            pdata["current_mp"] = max(0, cache.get("player_mp", 0))
+            
+            _run_async(player_manager.save_player_data(busca_id, pdata))
             return jsonify({"fugiu": True, "log": [{"autor": "system", "texto": "🏃 Você fugiu da batalha!"}]})
 
         elif acao == "atacar" or acao == "magia":
@@ -546,11 +552,18 @@ def api_combate_acao():
                 attacker_pdata=pdata,
                 attacker_stats=cache["player_stats"],
                 target_stats=cache["monster_stats"],
-                skill_id=skill_id if acao == "magia" else None, # <-- PASSA A MAGIA PARA A ENGINE
-                attacker_current_hp=cache["player_hp"]
+                skill_id=skill_id if acao == "magia" else None, 
+                attacker_current_hp=cache["player_hp"],
+                attacker_current_mp=cache["player_mp"] # <--- SÓ ADICIONAR ESTA LINHA!
             ))
+            
+            # Atualiza o HP do monstro com o dano
             dano_p = res_p.get("total_damage", 0)
             cache["monster_hp"] -= dano_p
+            
+            # Se a engine retornar o MP gasto, podemos atualizar no cache (Opcional/Garantia)
+            if "attacker_mp_left" in res_p:
+                cache["player_mp"] = res_p["attacker_mp_left"]
             
             for msg in res_p.get("log_messages", []):
                 log_turno.append({"autor": "player", "dano": dano_p, "texto": f"🧑‍🚀 {msg}"})
@@ -566,21 +579,18 @@ def api_combate_acao():
             pdata["gold"] = pdata.get("gold", 0) + gold
             
             # ======= CORREÇÃO DO INVENTÁRIO (COMBATE MANUAL) =======
-            items_names = [] # <-- A LISTA PRECISA SER CRIADA AQUI PARA NÃO DAR ERRO!
+            items_names = []
             if "inventory" not in pdata: pdata["inventory"] = {}
         
             for item_id in items_ids:
-                # 1. Se o jogador não tem o item ainda, cria com zero
                 if item_id not in pdata["inventory"]:
                     pdata["inventory"][item_id] = 0
             
-                # 2. Verifica como o item está salvo no seu banco (Inteiro ou Dicionário)
                 if isinstance(pdata["inventory"][item_id], dict):
                     pdata["inventory"][item_id]["quantity"] = pdata["inventory"][item_id].get("quantity", 0) + 1
                 else:
                     pdata["inventory"][item_id] += 1
                 
-                # Formata o nome para mostrar na tela
                 n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
                 items_names.append(n_item)
             # =======================================================
@@ -589,7 +599,9 @@ def api_combate_acao():
             pdata.pop("battle_cache", None)
             pdata["player_state"] = {"action": "idle"}
             log_turno.append({"autor": "system", "texto": f"🏆 {cache['mob_nome']} foi derrotado!"})
+            
         else:
+            # Turno do Monstro
             res_m = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata={}, 
                 attacker_stats=cache["monster_stats"],
@@ -614,12 +626,23 @@ def api_combate_acao():
                 pdata.pop("battle_cache", None)
                 pdata["player_state"] = {"action": "idle"}
 
+        # ======= CORREÇÃO 2: LÓGICA DE FIM DE TURNO (RESTAURAR HP/MP) =======
         if not vitoria and not derrota:
+            # A LUTA CONTINUA: Apenas atualiza o cache e salva os danos do turno
             cache["turno"] += 1
             pdata["battle_cache"] = cache
+            pdata["current_hp"] = max(0, cache.get("player_hp", 0))
+            pdata["current_mp"] = max(0, cache.get("player_mp", 0))
+        else:
+            # A LUTA ACABOU (Ganhou ou Perdeu): Restaura tudo pro máximo
+            max_hp = cache.get("player_stats", {}).get("max_hp", 100)
+            max_mp = cache.get("player_stats", {}).get("max_mana", 50)
             
-        pdata["current_hp"] = max(0, cache.get("player_hp", 0))
-        users_collection.replace_one({"_id": busca_id}, pdata)
+            pdata["current_hp"] = max_hp
+            pdata["current_mp"] = max_mp
+
+        # Usa o player_manager de forma segura!
+        _run_async(player_manager.save_player_data(busca_id, pdata))
 
         return jsonify({
             "sucesso": True,
@@ -635,7 +658,7 @@ def api_combate_acao():
         import traceback
         traceback.print_exc()
         return jsonify({"erro": str(e)})
-
+    
 # ==========================================
 # ROTAS: AUTO-HUNT (WEB APP)
 # ==========================================
@@ -758,10 +781,9 @@ def api_autohunt_finalizar():
             n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
             nomes_itens_formatados.append(n_item) # <-- Agora usa o nome correto da variável!
         # ==================================================
-
         # Reseta o estado
         pdata["player_state"] = {"action": "idle"}
-        users_collection.replace_one({"_id": busca_id}, pdata)
+        _run_async(player_manager.save_player_data(busca_id, pdata)) # <--- USE ISSO
 
         return jsonify({
             "sucesso": True,

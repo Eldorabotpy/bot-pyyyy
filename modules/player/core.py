@@ -1,9 +1,10 @@
 # modules/player/core.py
-# (VERSÃO CORRIGIDA: Reintroduz suporte a Legado para Migração)
+# (VERSÃO CORRIGIDA: Reintroduz suporte a Legado para Migração + Cache com TTL)
 
 import logging
 import asyncio
 import certifi
+import time
 from typing import Optional, Dict, Any, Union
 from bson import ObjectId
 from pymongo import MongoClient
@@ -30,7 +31,10 @@ except Exception as e:
 
 # --- 2. SISTEMA DE CACHE ---
 _player_cache: Dict[str, Dict[str, Any]] = {}
+_player_cache_time: Dict[str, float] = {} # <--- NOVO: Guarda a hora exata do último cache
 _player_cache_lock: asyncio.Lock = asyncio.Lock()
+
+CACHE_TTL = 30 # <--- O bot vai buscar dados frescos do Web App a cada 30 segundos
 
 def _get_cache_key(user_id: Union[str, ObjectId]) -> str:
     return str(user_id)
@@ -55,7 +59,13 @@ async def get_player_data(user_id: Union[str, ObjectId]) -> Optional[Dict[str, A
     # 1. Cache
     async with _player_cache_lock:
         if cache_key in _player_cache:
-            return dict(_player_cache[cache_key])
+            last_saved = _player_cache_time.get(cache_key, 0)
+            if time.time() - last_saved < CACHE_TTL:
+                return dict(_player_cache[cache_key]) # Cache ainda tá fresco, usa ele!
+            else:
+                del _player_cache[cache_key]
+                if cache_key in _player_cache_time:
+                    del _player_cache_time[cache_key]
 
     # 2. Banco (Users Collection)
     doc = None
@@ -78,6 +88,7 @@ async def get_player_data(user_id: Union[str, ObjectId]) -> Optional[Dict[str, A
     if doc:
         async with _player_cache_lock:
             _player_cache[cache_key] = dict(doc)
+            _player_cache_time[cache_key] = time.time() # <--- CORREÇÃO: Registra o tempo do cache
         return dict(doc)
         
     return None
@@ -96,6 +107,7 @@ async def save_player_data(user_id: Union[str, ObjectId], data: Dict[str, Any]) 
     # 1. Atualiza Cache
     async with _player_cache_lock:
         _player_cache[cache_key] = dict(data)
+        _player_cache_time[cache_key] = time.time() # <--- CORREÇÃO: Renova o tempo de vida do cache
 
     # 2. Persiste no Banco
     try:
@@ -146,7 +158,10 @@ async def clear_player_cache(user_id: Union[str, ObjectId]):
     async with _player_cache_lock:
         if cache_key in _player_cache:
             del _player_cache[cache_key]
+        if cache_key in _player_cache_time: # <--- Adicionado limpeza de tempo
+            del _player_cache_time[cache_key]
 
 def clear_all_player_cache():
     _player_cache.clear()
+    _player_cache_time.clear() # <--- Adicionado limpeza de tempo global
     logger.info("🧹 Cache de jogadores limpo.")

@@ -38,11 +38,13 @@ async def processar_acao_combate(
     target_stats: dict,
     skill_id: str | None,
     attacker_current_hp: int = 9999,
+    attacker_current_mp: int = 9999,
     passive_overrides: dict | None = None,
 ) -> dict:
     # --- 1. PREPARAÇÃO (CANÔNICO) ---
     canon = None
     canon_effects: dict = {}
+    attacker_mp_left = attacker_current_mp
 
     if skill_id:
         rarity = (
@@ -58,7 +60,24 @@ async def processar_acao_combate(
             rarity=rarity,
         )
         canon_effects = (canon or {}).get("effects", {}) or {}
-
+        
+        # ======= LÓGICA DE CONSUMO DE MANA =======
+        base_skill = SKILL_DATA.get(skill_id, {})
+        mana_cost = int(base_skill.get("mana_cost", base_skill.get("mp_cost", 0)))
+        
+        if attacker_mp_left < mana_cost:
+            # Caso não tenha mana suficiente, o feitiço falha
+            return {
+                "total_damage": 0,
+                "log_messages": ["⚠️ 𝗠𝗮𝗻𝗮 𝗶𝗻𝘀𝘂𝗳𝗶𝗰𝗶𝗲𝗻𝘁𝗲! O feitiço falhou e você perdeu o turno."],
+                "num_hits": 0,
+                "attacker_mp_left": attacker_mp_left
+            }
+        
+        # Desconta a mana usada
+        attacker_mp_left -= mana_cost
+        # =========================================
+        
     attacker_stats_modified = attacker_stats.copy()
     target_stats_modified = target_stats.copy()
     log_messages: list[str] = []
@@ -131,13 +150,6 @@ async def processar_acao_combate(
     roll_opts = {}
     roll_opts["damage_multiplier"] = float(dmg_mult)
     # --- 6.1 OVERRIDES DE PASSIVAS (handler -> engine) ---
-    # Formato esperado em passive_overrides:
-    # {
-    #   "damage_mult_add": 0.50,        # +50% dano => multiplier *= (1+0.50)
-    #   "bonus_crit_chance_add": 0.25,  # +25% chance crit
-    #   "armor_pen_add": 0.50,          # +50% pen (somado ao total_pen)
-    #   "cannot_be_dodged": True,       # (opcional)
-    # }
     po = passive_overrides or {}
 
     # dano: +X% (aditivo) aplicado como multiplicativo
@@ -155,23 +167,18 @@ async def processar_acao_combate(
         roll_opts["cannot_be_dodged"] = True
 
     if bonus_crit > 0:
-        # seu motor de crit já reconhece "bonus_crit_chance" em alguns lugares do projeto
         roll_opts["bonus_crit_chance"] = float(bonus_crit)
     
     # Acerto garantido (não pode ser esquivado) - canônico
     cannot_dodge = bool(damage_def.get("cannot_dodge", False)) if damage_def else False
     if cannot_dodge:
-        roll_opts["cannot_be_dodged"] = True  # padrão compatível com seu projeto
+        roll_opts["cannot_be_dodged"] = True
 
     # (opcional para o futuro) tipo de dano
     if damage_def and damage_def.get("type") == "magic":
         roll_opts["is_magic"] = True
 
-    # Berserk / low hp do atacante (mantido do seu código legado)
-    # (se você quiser converter isso para canônico depois, a gente faz, mas não quebra agora)
-    # OBS: aqui depende do seu legado "low_hp_dmg_boost" (se existir em alguma skill antiga)
-    # Como estamos no canônico, só mantemos se alguém ainda passar isso em algum ponto.
-    # Se quiser remover, pode.
+    # Berserk / low hp do atacante
     if "low_hp_dmg_boost" in canon_effects:
         max_hp = attacker_stats.get("max_hp", 1) or 1
         if (attacker_current_hp / max_hp) < 0.3:
@@ -179,8 +186,7 @@ async def processar_acao_combate(
             roll_opts["damage_multiplier"] += bonus
             log_messages.append("🩸 𝙁𝙪́𝙧𝙞𝙖 𝘼𝙩𝙞𝙫𝙖𝙙𝙖!")
 
-    # Execução (bônus por alvo com HP baixo) — canônico
-    # Só aplica se o target_stats tiver hp/max_hp (monstros normalmente têm)
+    # Execução (bônus por alvo com HP baixo)
     if exec_def:
         try:
             t_hp = float(target_stats_modified.get("hp", 0) or 0)
@@ -227,4 +233,5 @@ async def processar_acao_combate(
         "total_damage": total_damage,
         "log_messages": log_messages,
         "num_hits": int(num_attacks),
+        "attacker_mp_left": attacker_mp_left # <--- DEVOLVE A MANA RESTANTE!
     }
