@@ -22,6 +22,7 @@ MATERIALS_DATA = {
         "description": "Minério metálico que pode ser fundido.",
         "stackable": True, 
         "media_key": "imagem_minerio_de_ferro",
+        "icon_url": "https://github.com/user-attachments/assets/05750a8a-6804-47f6-b6fe-beddcaa20dff",
     },
     "minerio_de_estanho": {
         "display_name": "Minério de Estanho", "emoji": "⛓️⚪️",
