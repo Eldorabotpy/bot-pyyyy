@@ -60,7 +60,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         missing_keys = {
             "inventory": {}, "equipment": {}, "equipped_items": {}, 
             "skills": [], "equipped_skills": [], "invested": {},
-            "profession": None, "guild": None
+            "profession": {}, "guild": None # <-- Mudado de None para {}
         }
         
         for key, default_value in missing_keys.items():

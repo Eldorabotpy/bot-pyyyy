@@ -7,6 +7,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Arma letal do Conjunto Sorrateiro do Assassino.",
         "media_key": "item_adaga_sorrateira_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "mascara_sorrateira_assassino": {
@@ -14,6 +15,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Máscara leve e intimidadora do Conjunto Sorrateiro.",
         "media_key": "item_mascara_sorrateira_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "couraca_sorrateira_assassino": {
@@ -21,6 +23,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Proteção ágil feita para furtividade.",
         "media_key": "item_couraca_sorrateira_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"] 
     },
     "calcas_sorrateiras_assassino": {
@@ -28,6 +31,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Calças leves que permitem movimentos rápidos.",
         "media_key": "item_calcas_sorrateira_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "botas_sorrateiras_assassino": {
@@ -35,6 +39,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas reforçadas para movimentação silenciosa.",
         "media_key": "item_bota_sorrateira_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "luvas_sorrateiras_assassino": {
@@ -42,6 +47,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Luvas leves que aumentam a destreza do assassino.",
         "media_key": "item_luvas_sorrateiras_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "anel_sorrateiro_assassino": {
@@ -49,6 +55,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel sombrio que amplifica a furtividade.",
         "media_key": "item_anel_sorrateiro_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "colar_sorrateiro_assassino": {
@@ -56,6 +63,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar que envolve o portador em uma aura de sombras.",
         "media_key": "item_colar_sorrateiro_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "brinco_sorrateiro_assassino": {
@@ -63,6 +71,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que protege contra olhares indiscretos.",
         "media_key": "item_brinco_sorrateiro_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     # --ASSASSINO T2--#
@@ -71,6 +80,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Lâmina leve e mortal, envolta em brumas etéreas.",
         "media_key": "item_adaga_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "mascara_sombra_assassino": {
@@ -78,6 +88,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Máscara de couro escuro, oculta intenções.",
         "media_key": "item_mascara_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "couraca_sombra_assassino": {
@@ -85,6 +96,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Proteção flexível adequada ao silêncio mortal.",
         "media_key": "item_couraca_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "calcas_sombra_assassino": {
@@ -92,6 +104,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Tecidos silenciosos que não traem seus passos.",
         "media_key": "item_calcas_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "botas_sombra_assassino": {
@@ -99,6 +112,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Passos que desaparecem no escuro.",
         "media_key": "item_botas_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "luvas_sombra_assassino": {
@@ -106,6 +120,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Empunhadura firme sem um ruído.",
         "media_key": "item_luvas_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "anel_sombra_assassino": {
@@ -113,6 +128,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Eco espectral preso em metal frio.",
         "media_key": "item_anel_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "colar_sombra_assassino": {
@@ -120,6 +136,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Sussurros que guiam o golpe perfeito.",
         "media_key": "item_colar_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     "brinco_sombra_assassino": {
@@ -127,6 +144,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Lâmina na escuridão, sinal na penumbra.",
         "media_key": "item_brinco_sombra_assassino",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["assassino"]
     },
     # — Bardo T1#
@@ -135,6 +153,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Instrumento encantado que ecoa notas de coragem.",
         "media_key": "item_alaude_simples_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "chapeu_elegante_bardo": {
@@ -142,13 +161,14 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Chapéu com pena vistosa, marca de um verdadeiro trovador.",
         "media_key": "item_chapeu_elegante_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "colete_viajante_bardo": {
         "display_name": "Colete de Viajante do Bardo", "emoji": "👕",
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Colete leve para longas jornadas de espetáculo.",
-        "media_key": "item_colete_viajante_bardo",
+        "media_key": "item_colete_viajante_bardo","icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "calcas_linho_bardo": {
@@ -156,6 +176,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Linho confortável para passos inspirados.",
         "media_key": "item_calcas_linho_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "botas_macias_bardo": {
@@ -163,6 +184,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas silenciosas para palcos e tavernas.",
         "media_key": "item_botas_macias_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "luvas_sem_dedos_bardo": {
@@ -170,6 +192,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Luvas que não atrapalham a performance.",
         "media_key": "item_luvas_sem_dedos_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "anel_melodico_bardo": {
@@ -177,6 +200,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel que ressoa com harmonias arcanas.",
         "media_key": "item_anel_melodico_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "colar_melodico_bardo": {
@@ -184,6 +208,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar que amplia a projeção da voz.",
         "media_key": "item_colar_melodico_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "brinco_melodico_bardo": {
@@ -191,6 +216,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que harmoniza frequências sônicas.",
         "media_key": "item_brinco_melodico_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     # — BARDO T2#
@@ -201,6 +227,7 @@ EQUIPMENTS_DATA = {
         "description": "Instrumento magistral de madeira rúnica e prata, ressoa magia melódica.",
         "stackable": False,
         "media_key": "item_alaude_ornamentado_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "chapeu_emplumado_bardo": {
@@ -209,6 +236,7 @@ EQUIPMENTS_DATA = {
         "description": "Chapéu elegante adornado com plumas, favorito dos virtuoses itinerantes.",
         "stackable": False,
         "media_key": "item_chapeu_emplumado_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "casaco_veludo_bardo": {
@@ -217,6 +245,7 @@ EQUIPMENTS_DATA = {
         "description": "Casaco de veludo rúnico com costuras em prata, feito para grandes palcos.",
         "stackable": False,
         "media_key": "item_casaco_veludo_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "calcas_veludo_bardo": {
@@ -225,6 +254,7 @@ EQUIPMENTS_DATA = {
         "description": "Calças confortáveis de veludo rúnico, leves para performances ágeis.",
         "stackable": False,
         "media_key": "item_calca_veludo_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "botas_veludo_bardo": {
@@ -233,6 +263,7 @@ EQUIPMENTS_DATA = {
         "description": "Botas macias com reforço discreto, perfeitas para longas turnês.",
         "stackable": False,
         "media_key": "item_botas_veludo_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "luvas_veludo_bardo": {
@@ -241,6 +272,7 @@ EQUIPMENTS_DATA = {
         "description": "Luvas finas que preservam a destreza dos dedilhados mais intrincados.",
         "stackable": False,
         "media_key": "item_luvas_veludo_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "anel_prata_bardo": {
@@ -249,6 +281,7 @@ EQUIPMENTS_DATA = {
         "description": "Anel de prata lapidado, amplifica a presença cênica do músico.",
         "stackable": False,
         "media_key": "item_anel_prata_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "colar_prata_bardo": {
@@ -257,6 +290,7 @@ EQUIPMENTS_DATA = {
         "description": "Colar de prata com gemas, vibra em harmonia com canções arcanas.",
         "stackable": False,
         "media_key": "item_colar_prata_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     "brinco_prata_bardo": {
@@ -265,6 +299,7 @@ EQUIPMENTS_DATA = {
         "description": "Brincos de prata finamente trabalhados, sussurram notas inspiradoras.",
         "stackable": False,
         "media_key": "item_brinco_prata_bardo",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["bardo"]
     },
     # — Berserker T1#
@@ -273,6 +308,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Machado pesado que canaliza a fúria do guerreiro.",
         "media_key": "item_machado_rustico_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "elmo_chifres_berserker": {
@@ -280,6 +316,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Elmo intimidador adornado com chifres.",
         "media_key": "item_elmo_chifres_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "peitoral_placas_berserker": {
@@ -287,6 +324,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Placas robustas para aguentar a linha de frente.",
         "media_key": "item_peitoral_placas_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "calcas_placas_berserker": {
@@ -294,6 +332,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Proteção de pernas reforçada para combate cerrado.",
         "media_key": "item_calcas_placas_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "botas_couro_berserker": {
@@ -301,6 +340,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas resistentes para avançar sem medo.",
         "media_key": "item_botas_couro_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "luvas_couro_berserker": {
@@ -308,6 +348,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Luvas firmes para golpes devastadores.",
         "media_key": "item_luvas_couro_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "anel_osso_berserker": {
@@ -315,6 +356,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel tribal feito de ossos de caça.",
         "media_key": "item_anel_osso_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "colar_presas_berserker": {
@@ -322,6 +364,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar adornado com presas de feras.",
         "media_key": "item_colar_presas_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "brinco_osso_berserker": {
@@ -329,6 +372,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que simboliza ferocidade em batalha.",
         "media_key": "item_brinco_osso_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     # — BERSERKER T2#
@@ -338,6 +382,7 @@ EQUIPMENTS_DATA = {
         "description": "Machado brutal de aço, banhado em sangue regenerativo.",
         "stackable": False,
         "media_key": "item_machado_aco_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "elmo_troll_berserker": {
@@ -346,6 +391,7 @@ EQUIPMENTS_DATA = {
         "description": "Elmo reforçado com pele de troll, transmite ferocidade.",
         "stackable": False,
         "media_key": "item_elmo_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "peitoral_troll_berserker": {
@@ -354,6 +400,7 @@ EQUIPMENTS_DATA = {
         "description": "Placas de aço e pele de troll que regeneram lentamente.",
         "stackable": False,
         "media_key": "item_peitoral_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "calcas_troll_berserker": {
@@ -362,6 +409,7 @@ EQUIPMENTS_DATA = {
         "description": "Proteção robusta, dá vigor nas batalhas prolongadas.",
         "stackable": False,
         "media_key": "item_calcas_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "botas_troll_berserker": {
@@ -370,6 +418,7 @@ EQUIPMENTS_DATA = {
         "description": "Botas pesadas com couro regenerativo de troll.",
         "stackable": False,
         "media_key": "item_botas_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "luvas_troll_berserker": {
@@ -378,6 +427,7 @@ EQUIPMENTS_DATA = {
         "description": "Luvas reforçadas que aumentam o impacto dos golpes.",
         "stackable": False,
         "media_key": "item_luvas_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "anel_troll_berserker": {
@@ -386,6 +436,7 @@ EQUIPMENTS_DATA = {
         "description": "Forjado com garras de troll, vibra com fúria selvagem.",
         "stackable": False,
         "media_key": "item_anel_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "colar_troll_berserker": {
@@ -394,6 +445,7 @@ EQUIPMENTS_DATA = {
         "description": "Colar tribal, pulsando com energia sanguínea.",
         "stackable": False,
         "media_key": "item_colar_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     "brinco_troll_berserker": {
@@ -402,6 +454,7 @@ EQUIPMENTS_DATA = {
         "description": "Brinco artesanal, ecoa a fúria dos trolls.",
         "stackable": False,
         "media_key": "item_brinco_troll_berserker",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["berserker"]
     },
     # — CAÇADOR T1#
@@ -411,6 +464,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Arco leve e preciso usado pelos batedores.",
         "media_key": "item_arco_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "capuz_batedor_cacador": {
@@ -418,6 +472,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Capuz de couro para camuflagem e proteção.",
         "media_key": "item_capuz_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "peitoral_batedor_cacador": {
@@ -425,6 +480,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Peitoral leve que não restringe os movimentos.",
         "media_key": "item_peitoral_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "calcas_batedor_cacador": {
@@ -432,6 +488,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Calças reforçadas para longas perseguições.",
         "media_key": "item_caulcas_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "botas_batedor_cacador": {
@@ -439,6 +496,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas leves que favorecem a mobilidade.",
         "media_key": "item_botas_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "luvas_batedor_cacador": {
@@ -446,6 +504,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Luvas que garantem firmeza ao empunhar o arco.",
         "media_key": "item_luvas_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "anel_batedor_cacador": {
@@ -453,6 +512,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel que inspira foco na caçada.",
         "media_key": "item_anel_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "colar_batedor_cacador": {
@@ -460,6 +520,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar adornado com lembranças de grandes caçadas.",
         "media_key": "item_colar_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     "brinco_batedor_cacador": {
@@ -467,6 +528,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que aguça os sentidos durante a vigia.",
         "media_key": "item_brinco_batedor_cacador",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["cacador"]
     },
     # — CAÇADOR T2#
@@ -478,6 +540,7 @@ EQUIPMENTS_DATA = {
     "description": "Arco de alta precisão usado por patrulheiros experientes.",
     "stackable": False,
     "media_key": "item_arco_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "capuz_patrulheiro_cacador": {
@@ -488,6 +551,7 @@ EQUIPMENTS_DATA = {
     "description": "Capuz reforçado para proteger caçadores nas emboscadas.",
     "stackable": False,
     "media_key": "item_capuz_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "peitoral_patrulheiro_cacador": {
@@ -498,6 +562,7 @@ EQUIPMENTS_DATA = {
     "description": "Proteção robusta de couro reforçado para longas caçadas.",
     "stackable": False,
     "media_key": "item_peitoral_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "calcas_patrulheiro_cacador": {
@@ -508,6 +573,7 @@ EQUIPMENTS_DATA = {
     "description": "Calças resistentes, ideais para movimentação rápida na floresta.",
     "stackable": False,
     "media_key": "item_calcas_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "botas_patrulheiro_cacador": {
@@ -518,6 +584,7 @@ EQUIPMENTS_DATA = {
     "description": "Botas firmes que garantem passos silenciosos e estáveis.",
     "stackable": False,
     "media_key": "item_botas_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "luvas_patrulheiro_cacador": {
@@ -528,6 +595,7 @@ EQUIPMENTS_DATA = {
     "description": "Luvas reforçadas para melhor precisão e agilidade no arco.",
     "stackable": False,
     "media_key": "item_luvas_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "anel_patrulheiro_cacador": {
@@ -538,6 +606,7 @@ EQUIPMENTS_DATA = {
     "description": "Anel mágico que aprimora a mira e a percepção do caçador.",
     "stackable": False,
     "media_key": "item_anel_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "colar_patrulheiro_cacador": {
@@ -548,6 +617,7 @@ EQUIPMENTS_DATA = {
     "description": "Colar encantado que conecta o caçador aos instintos da natureza.",
     "stackable": False,
     "media_key": "item_colar_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
 },
 "brinco_patrulheiro_cacador": {
@@ -558,6 +628,7 @@ EQUIPMENTS_DATA = {
     "description": "Brinco talismânico que aumenta a atenção e reflexos do caçador.",
     "stackable": False,
     "media_key": "item_brinco_patrulheiro_cacador",
+    "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     "class_req": ["cacador"]
     },
     #— Guerreiro T1
@@ -566,6 +637,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Espada confiável forjada em ferro temperado.",
         "media_key": "item_espada_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "elmo_ferro_guerreiro": {
@@ -573,6 +645,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Proteção robusta para a cabeça.",
         "media_key": "item_elmo_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "peitoral_ferro_guerreiro": {
@@ -580,6 +653,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Peitoral de placas para combates intensos.",
         "media_key": "item_peitoral_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "calcas_ferro_guerreiro": {
@@ -587,6 +661,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Calças reforçadas para proteção das pernas.",
         "media_key": "item_calcas_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "botas_ferro_guerreiro": {
@@ -594,6 +669,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas que suportam marchas e batalha.",
         "media_key": "item_botas_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "luvas_ferro_guerreiro": {
@@ -601,6 +677,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Luvas que firmam o golpe.",
         "media_key": "item_luvas_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "anel_ferro_guerreiro": {
@@ -608,6 +685,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel simples que inspira bravura.",
         "media_key": "item_anel_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "colar_ferro_guerreiro": {
@@ -615,6 +693,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar que simboliza determinação.",
         "media_key": "item_colar_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "brinco_ferro_guerreiro": {
@@ -622,6 +701,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que reforça o espírito combativo.",
         "media_key": "item_brinco_ferro_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     #— GUERREIRO T2
@@ -633,6 +713,7 @@ EQUIPMENTS_DATA = {
         "description": "Lâmina de aço balanceada para combate pesado.",
         "stackable": False,
         "media_key": "item_espada_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "elmo_aco_guerreiro": {
@@ -643,6 +724,7 @@ EQUIPMENTS_DATA = {
         "description": "Elmo robusto forjado em aço.",
         "stackable": False,
         "media_key": "item_elmo_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "peitoral_aco_guerreiro": {
@@ -653,6 +735,7 @@ EQUIPMENTS_DATA = {
         "description": "Armadura de aço que protege o torso.",
         "stackable": False,
         "media_key": "item_peitoral_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "calcas_aco_guerreiro": {
@@ -663,6 +746,7 @@ EQUIPMENTS_DATA = {
         "description": "Calças reforçadas com placas metálicas.",
         "stackable": False,
         "media_key": "item_calcas_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "botas_aco_guerreiro": {
@@ -673,6 +757,7 @@ EQUIPMENTS_DATA = {
         "description": "Botas pesadas que garantem firmeza no combate.",
         "stackable": False,
         "media_key": "item_botas_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
         
@@ -684,6 +769,7 @@ EQUIPMENTS_DATA = {
         "description": "Luvas protegidas para golpes e empunhadura segura.",
         "stackable": False,
         "media_key": "item_luvas_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "anel_aco_guerreiro": {
@@ -694,6 +780,7 @@ EQUIPMENTS_DATA = {
         "description": "Anel de aço imbuído de poder marcial.",
         "stackable": False,
         "media_key": "item_anel_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "colar_aco_guerreiro": {
@@ -704,6 +791,7 @@ EQUIPMENTS_DATA = {
         "description": "Colar robusto que inspira coragem.",
         "stackable": False,
         "media_key": "item_colar_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     "brinco_aco_guerreiro": {
@@ -714,6 +802,7 @@ EQUIPMENTS_DATA = {
         "description": "Brinco que simboliza honra em batalha.",
         "stackable": False,
         "media_key": "item_brinco_aco_guerreiro",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["guerreiro"]
     },
     # — Mago T1
@@ -722,6 +811,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Cajado básico que canaliza energias arcanas.",
         "media_key": "item_cajado_aprendiz_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "chapeu_seda_mago": {
@@ -729,6 +819,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Chapéu leve, tradicional entre aprendizes.",
         "media_key": "item_chapel_seda_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "tunica_seda_mago": {
@@ -736,6 +827,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Veste encantada para estudos arcanos.",
         "media_key": "item_tunica_seda_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "calcas_seda_mago": {
@@ -743,6 +835,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Calças confortáveis que não restringem movimentos.",
         "media_key": "item_calcas_seda_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "botas_seda_mago": {
@@ -750,6 +843,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Botas leves feitas para longas jornadas.",
         "media_key": "item_botas_seda_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "luvas_seda_mago": {
@@ -757,6 +851,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Luvas que ajudam no controle dos feitiços.",
         "media_key": "item_luvas_seda_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "anel_gema_mago": {
@@ -764,6 +859,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel engastado que amplifica o foco arcano.",
         "media_key": "item_anel_gema_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "colar_gema_mago": {
@@ -771,6 +867,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar que pulsa com energia latente.",
         "media_key": "item_colar_gema_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "brinco_gema_mago": {
@@ -778,6 +875,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que sussurra segredos arcanos.",
         "media_key": "item_brinco_gema_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     # -- Mago T2
@@ -788,6 +886,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma",
         "class_req": ["mago"],
         "media_key": "item_cajado_arcano_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "chapeu_veludo_mago": {
@@ -796,6 +895,7 @@ EQUIPMENTS_DATA = {
         "type": "equipamento",
         "slot": "elmo",
         "media_key": "item_chapel_veludo_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "tunica_veludo_mago": {
@@ -804,6 +904,7 @@ EQUIPMENTS_DATA = {
         "type": "equipamento",
         "slot": "armadura",
         "media_key": "item_tunica_veludo_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "calcas_veludo_mago": {
@@ -812,6 +913,7 @@ EQUIPMENTS_DATA = {
         "type": "equipamento",
         "slot": "calca",
         "media_key": "item_calca_veludo_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "botas_veludo_mago": {
@@ -820,6 +922,7 @@ EQUIPMENTS_DATA = {
         "type": "equipamento",
         "slot": "botas",
         "media_key": "item_botas_veludo_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "luvas_veludo_mago": {
@@ -828,6 +931,7 @@ EQUIPMENTS_DATA = {
         "type": "equipamento",
         "slot": "luvas",
         "media_key": "item_luvas_veludo_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "anel_runico_mago": {
@@ -836,6 +940,7 @@ EQUIPMENTS_DATA = {
         "type": "equipamento",
         "slot": "anel",
         "media_key": "item_anel_runico_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "colar_runico_mago": {
@@ -844,6 +949,7 @@ EQUIPMENTS_DATA = {
         "type": "equipamento",
         "slot": "colar",
         "media_key": "item_colar_runico_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "brinco_runico_mago": {
@@ -853,6 +959,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco",
         "class_req": ["mago"],
         "media_key": "item_brinco_runico_mago",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
     
     },
     # — Monge T1
@@ -861,6 +968,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Manoplas simples usadas por monges em treinamento.",
         "media_key": "item_manoplas_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "bandana_iniciado_monge": {
@@ -868,6 +976,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Bandana leve que ajuda na concentração.",
         "media_key": "item_bandana_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
 
     },
@@ -876,6 +985,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Roupa tradicional de treinamento monástico.",
         "media_key": "item_gi_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "calcas_iniciado_monge": {
@@ -883,6 +993,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Calças leves para liberdade de movimento.",
         "media_key": "item_calcas_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "sandalias_iniciado_monge": {
@@ -890,6 +1001,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Sandálias tradicionais, leves e práticas.",
         "media_key": "item_sandalias_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "faixas_iniciado_monge": {
@@ -897,6 +1009,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Faixas de tecido usadas para proteger as mãos.",
         "media_key": "item_faixas_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "anel_iniciado_monge": {
@@ -904,6 +1017,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Anel simples usado em rituais de foco espiritual.",
         "media_key": "item_anel_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "colar_iniciado_monge": {
@@ -911,6 +1025,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "equipamento", "category": "acessorio",
         "description": "Colar com contas que auxiliam na meditação.",
         "media_key": "item_colar_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     "brinco_iniciado_monge": {
@@ -918,6 +1033,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Brinco que simboliza disciplina e equilíbrio.",
         "media_key": "item_brinco_iniciado_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["mago"]
     },
     # - MONGE T2
@@ -926,6 +1042,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "arma",
         "description": "Manoplas reforçadas que concentram a força física e espiritual do mestre monge.",
         "media_key": "item_manoplas_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -934,6 +1051,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "armadura",
         "description": "Faixa sagrada que auxilia na clareza mental durante as batalhas.",
         "media_key": "item_manoplas_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]  
         
     },
@@ -942,6 +1060,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "armadura",
         "description": "Traje cerimonial que amplia a resistência e a conexão espiritual do monge.",
         "media_key": "item_gi_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -950,6 +1069,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "armadura",
         "description": "Calças leves que permitem movimentos ágeis sem perder a proteção.",
         "media_key": "item_calcas_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -958,6 +1078,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "armadura",
         "description": "Sandálias ritualísticas que mantêm o equilíbrio do corpo e da mente.",
         "media_key": "item_sandalias_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -966,6 +1087,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "armadura",
         "description": "Faixas encantadas que potencializam os golpes de punho.",
         "media_key": "item_faixas_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -974,6 +1096,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "acessorio",
         "description": "Anel sagrado que simboliza a disciplina e aumenta o foco espiritual.",
         "media_key": "item_anel_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -982,6 +1105,7 @@ EQUIPMENTS_DATA = {
         "slot": "colar", "type": "acessorio",
         "description": "Colar de contas antigas, usado em meditações profundas para canalizar energia.",
         "media_key": "item_colar_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -990,6 +1114,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "acessorio",
         "description": "Brinco talismânico que protege contra más influências espirituais.",
         "media_key": "item_brincos_mestre_monge",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["monge"]
         
     },
@@ -1001,6 +1126,7 @@ EQUIPMENTS_DATA = {
         "slot": "arma", "type": "equipamento", "category": "arma",
         "description": "Lâmina laminada e flexível, símbolo do clã.",
         "media_key": "item_katana_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
 
     },
@@ -1009,6 +1135,7 @@ EQUIPMENTS_DATA = {
         "slot": "elmo", "type": "equipamento", "category": "armadura",
         "description": "Elmo tradicional com placas sobrepostas.",
         "media_key": "item_kabuto_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
 
     },
@@ -1017,6 +1144,7 @@ EQUIPMENTS_DATA = {
         "slot": "armadura", "type": "equipamento", "category": "armadura",
         "description": "Peitoral em múltiplas lamelas de metal.",
         "media_key": "item_do_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
 
     },
@@ -1025,6 +1153,7 @@ EQUIPMENTS_DATA = {
         "slot": "calca", "type": "equipamento", "category": "armadura",
         "description": "Proteções de coxa em placas flexíveis.",
         "media_key": "item_haidate_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
 
     },
@@ -1033,6 +1162,7 @@ EQUIPMENTS_DATA = {
         "slot": "botas", "type": "equipamento", "category": "armadura",
         "description": "Grevas laminadas para mobilidade e defesa.",
         "media_key": "item_suneate_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "kote_laminado_samurai": {
@@ -1040,6 +1170,7 @@ EQUIPMENTS_DATA = {
         "slot": "luvas", "type": "equipamento", "category": "armadura",
         "description": "Braçais com placas entrelaçadas.",
         "media_key": "item_kote_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "anel_laminado_samurai": {
@@ -1047,6 +1178,7 @@ EQUIPMENTS_DATA = {
         "slot": "anel", "type": "equipamento", "category": "acessorio",
         "description": "Símbolo de lealdade ao clã.",
         "media_key": "item_anel_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "colar_laminado_samurai": {
@@ -1061,6 +1193,7 @@ EQUIPMENTS_DATA = {
         "slot": "brinco", "type": "equipamento", "category": "acessorio",
         "description": "Peça discreta, mas cheia de tradição.",
         "media_key": "item_brinco_laminada_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
 # --- RESULTADOS DE CRAFT: SAMURAI T2 (display no inventário/market) ---
@@ -1072,6 +1205,7 @@ EQUIPMENTS_DATA = {
         "description": "Uma lâmina de aço damasco, forjada para a perfeição.",
         "stackable": False,
         "media_key": "item_katana_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
 
@@ -1081,6 +1215,7 @@ EQUIPMENTS_DATA = {
         "description": "Elmo laminado de aço damasco.",
         "stackable": False,
         "media_key": "item_kabuto_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "do_damasco_samurai": {
@@ -1089,6 +1224,7 @@ EQUIPMENTS_DATA = {
         "description": "Peitoral laminado de aço damasco.",
         "stackable": False,
         "media_key": "item_do_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "haidate_damasco_samurai": {
@@ -1097,6 +1233,7 @@ EQUIPMENTS_DATA = {
         "description": "Grevas laminadas para proteção das pernas.",
         "stackable": False,
         "media_key": "item_haidate_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "suneate_damasco_samurai": {
@@ -1105,6 +1242,7 @@ EQUIPMENTS_DATA = {
         "description": "Proteções das canelas em aço damasco.",
         "stackable": False,
         "media_key": "item_suneate_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "kote_damasco_samurai": {
@@ -1113,6 +1251,7 @@ EQUIPMENTS_DATA = {
         "description": "Braçadeiras/luvas reforçadas para o samurai.",
         "stackable": False,
         "media_key": "item_kote_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     
@@ -1122,6 +1261,7 @@ EQUIPMENTS_DATA = {
         "description": "Anel de honra forjado em aço damasco.",
         "stackable": False,
         "media_key": "item_anel_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "colar_damasco_samurai": {
@@ -1130,6 +1270,7 @@ EQUIPMENTS_DATA = {
         "description": "Colar que simboliza a disciplina do clã.",
         "stackable": False,
         "media_key": "item_colar_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
     "brinco_damasco_samurai": {
@@ -1138,6 +1279,7 @@ EQUIPMENTS_DATA = {
         "description": "Brinco forjado com laminações delicadas.",
         "stackable": False,
         "media_key": "item_brinco_damasco_samurai",
+        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
 }

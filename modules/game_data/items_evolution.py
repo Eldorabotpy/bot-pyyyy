@@ -26,21 +26,66 @@ for cls, emo in _EVOLUTION_EMBLEMS.items():
 # 2. MATERIAIS ESPECÍFICOS DE CLASSE (BÁSICOS)
 # ==============================================================================
 _SPECIFIC_MATS = [
-    ("lamina_afiada", "Lâmina Afiada", "🗡️", "Lâmina perfeitamente balanceada."),
-    ("poeira_sombria", "Poeira Sombria", "🌫️", "Restos de uma sombra materializada."),
-    ("aco_sombrio", "Aço Sombrio", "⚫", "Metal que não reflete luz."),
-    ("corda_encantada", "Corda Encantada", "🪕", "Corda de instrumento que nunca quebra."),
-    ("partitura_antiga", "Partitura Antiga", "🎼", "Músicas de uma era esquecida."),
-    ("cristal_sonoro", "Cristal Sonoro", "💎", "Ressoa com magia musical."),
-    ("aco_tamahagane", "Aço Tamahagane", "⚔️", "Aço lendário dobrado mil vezes."),
-    ("tomo_bushido", "Tomo do Bushido", "📜", "Ensinamentos sobre honra e espada."),
-    ("placa_forjada", "Placa Forjada", "🛡️", "Metal reforçado para armaduras pesadas."),
-    ("lente_infalivel", "Lente Infalível", "🧐", "Permite ver detalhes a quilômetros."),
-    ("arco_fantasma", "Arco Fantasma", "🏹", "Um arco translúcido e etéreo."),
-    ("pergaminho_celestial", "Pergaminho Celestial", "📜", "Escrituras divinas."),
-    ("foco_cristalino", "Foco Cristalino", "🔮", "Amplifica magia elemental."),
-    ("coracao_do_colosso", "Coração do Colosso", "🗿", "Núcleo de pedra pulsante."),
-    ("coracao_da_furia", "Coração da Fúria", "❤️‍🔥", "Órgão que queima eternamente.")
+    ("lamina_afiada", 
+        "Lâmina Afiada", "🗡️", 
+        "Lâmina perfeitamente balanceada.",
+        ),
+    ("poeira_sombria",
+        "Poeira Sombria", "🌫️", 
+        "Restos de uma sombra materializada."
+        ),
+    ("aco_sombrio", 
+        "Aço Sombrio", "⚫", 
+        "Metal que não reflete luz."
+        ),
+    ("corda_encantada", 
+        "Corda Encantada", "🪕", 
+        "Corda de instrumento que nunca quebra."
+        ),
+    ("partitura_antiga", 
+        "Partitura Antiga", "🎼", 
+        "Músicas de uma era esquecida."
+        ),
+    ("cristal_sonoro", 
+        "Cristal Sonoro", "💎", 
+        "Ressoa com magia musical."
+        ),
+    ("aco_tamahagane", 
+        "Aço Tamahagane", "⚔️", 
+        "Aço lendário dobrado mil vezes."
+        ),
+    ("tomo_bushido", 
+        "Tomo do Bushido", "📜", 
+        "Ensinamentos sobre honra e espada."
+        ),
+    ("placa_forjada", 
+        "Placa Forjada", "🛡️", 
+        "Metal reforçado para armaduras pesadas."
+        ),
+    ("lente_infalivel", 
+        "Lente Infalível", "🧐", 
+        "Permite ver detalhes a quilômetros."
+        ),
+    ("arco_fantasma", 
+        "Arco Fantasma", "🏹", 
+        "Um arco translúcido e etéreo."
+        ),
+    ("pergaminho_celestial", 
+        "Pergaminho Celestial", "📜", 
+        "Escrituras divinas."
+        ),
+    ("foco_cristalino", 
+        "Foco Cristalino", "🔮", 
+        "Amplifica magia elemental."
+        ),
+    ("coracao_do_colosso", 
+        "Coração do Colosso", "🗿", 
+        "Núcleo de pedra pulsante."
+        ),
+    ("coracao_da_furia", 
+        "Coração da Fúria", "❤️‍🔥", 
+        "Órgão que queima eternamente."
+        )
 ]
 
 for mid, mname, memo, mdesc in _SPECIFIC_MATS:
@@ -59,8 +104,16 @@ for mid, mname, memo, mdesc in _SPECIFIC_MATS:
 # ==============================================================================
 _ESSENCES_DATA = [
     # Guerreiro / Paladino
-    ("essencia_guardia", "Essência do Guardião", "🛡️", "Energia condensada de proteção inabalável."),
-    ("essencia_luz", "Essência da Luz", "✨", "Brilho sagrado usado por paladinos e clérigos."),
+    ("essencia_guardia", 
+        "Essência do Guardião", "🛡️", 
+        "Energia condensada de proteção inabalável."
+        
+        ),
+    ("essencia_luz", 
+        "Essência da Luz", "✨", 
+        "Brilho sagrado usado por paladinos e clérigos."
+        
+        ),
     # Berserker
     ("essencia_furia", "Essência da Fúria", "🔥", "A manifestação física da raiva incontrolável."),
     # Caçador

@@ -711,7 +711,7 @@ async def send_region_menu(
     res_id = region_info.get("resource")
     if res_id:
         req_prof = game_data.get_profession_for_resource(res_id)
-        p_prof_data = player_data.get("profession", {})
+        p_prof_data = player_data.get("profession", {}) or {} # <-- Adicionado o 'or {}'
         my_prof = p_prof_data.get("key") or p_prof_data.get("type")
         if not req_prof or (my_prof and my_prof == req_prof):
             item_info = (game_data.ITEMS_DATA or {}).get(res_id, {})
