@@ -1,7 +1,7 @@
 // ==========================================
-// CONFIGURAÇÕES GERAIS
+// CONFIGURAÇÕES GERAIS E DADOS (perfil.js)
 // ==========================================
-let perfilDadosGlobais = null; // Guarda os dados para usarmos no Modal
+window.perfilDadosGlobais = null; // A variável agora usa 'window.' para o inventario_modal.js conseguir ler!
 
 const CLASSES_INFO = {
     'aprendiz': { nome: 'Aventureiro', emoji: '🎒', base: 'aprendiz' },
@@ -62,7 +62,8 @@ async function carregarMeuPerfil() {
         const p = await resposta.json();
         if (p.erro) { document.getElementById('perfil-msg-carregando').innerText = "⚠️ " + p.erro; return; }
 
-        perfilDadosGlobais = p; // Salva globalmente
+        window.perfilDadosGlobais = p; // <--- DADOS SALVOS NA WINDOW PARA O MODAL LER
+        
         const classeKey = (p.classe || "aprendiz").toLowerCase();
         const infoClasse = CLASSES_INFO[classeKey] || CLASSES_INFO['aprendiz'];
         const avatarLink = p.avatar || 'https://github.com/user-attachments/assets/9a7300d0-63af-47bb-9f52-1fd99c40ed90';
@@ -115,7 +116,6 @@ async function carregarMeuPerfil() {
                              (eq.icon.length > 5 && eq.icon.includes('.')) ? `<img src="${eq.icon}" style="width: 85%; height: 85%; object-fit: contain;">` : 
                              `<span style="font-size: 1.8em;">${eq.icon || eq.emoji}</span>`;
 
-            // AGORA ABRE O MODAL AO INVÉS DE DESEQUIPAR DIRETO
             htmlSlots += `
                 <div onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}" 
                      style="position: absolute; ${Object.entries(pos).map(([k, v]) => `${k}:${v};`).join('')} 
@@ -137,7 +137,7 @@ async function carregarMeuPerfil() {
                 <div style="position: relative; width: 100%; height: 100%; z-index: 2;">${htmlSlots}</div>
             </div><p style="text-align:center; font-size:0.7em; color:#64748b; margin-top:8px;">Clique num equipamento para ver os detalhes.</p>`;
 
-        // --- ABA DE INVENTÁRIO (AGORA COM SUB-ABAS) ---
+        // --- ABA DE INVENTÁRIO ---
         let htmlInv = `
             <div style="display: flex; gap: 5px; margin-top: 15px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;">
                 <button onclick="filtrarMochila('todos')" id="btn-filtro-todos" style="flex: 1; padding: 6px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Todos</button>
@@ -151,24 +151,9 @@ async function carregarMeuPerfil() {
         `;
 
         // ==========================================
-        // MONTAGEM DA TELA (INCLUINDO A CAIXA FLUTUANTE INVISÍVEL)
+        // MONTAGEM DA TELA (SEM O MODAL ANTIGO)
         // ==========================================
-        const modalHtml = `
-            <div id="modal-item" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
-                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); width: 85%; max-width: 350px; border-radius: 12px; border: 2px solid #f39c12; padding: 25px 20px; text-align: center; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.9);">
-                    <span onclick="fecharModalItem()" style="position: absolute; top: 10px; right: 15px; font-size: 1.5em; color: #94a3b8; cursor: pointer;">&times;</span>
-                    <div id="modal-item-icon" style="font-size: 3.5em; margin-bottom: 10px; text-shadow: 0 0 15px rgba(255,255,255,0.2);">📦</div>
-                    <h3 id="modal-item-nome" style="margin: 0 0 5px 0; color: #fff; font-size: 1.3em;">Nome</h3>
-                    <span id="modal-item-raridade" style="font-size: 0.7em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: #334155; color: #cbd5e1; font-weight: bold;">Comum</span>
-                    <p id="modal-item-desc" style="color: #94a3b8; font-size: 0.9em; margin: 15px 0; line-height: 1.4; min-height: 40px;">Descrição do item.</p>
-                    <div id="modal-item-acoes" style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                        </div>
-                </div>
-            </div>
-        `;
-
         conteudo.innerHTML = `
-            ${modalHtml}
             <div style="background: linear-gradient(135deg, #0f172a, #020617); padding: 15px; border-radius: 12px; border: 1px solid #f39c12; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
                 <h2 style="margin: 0 0 5px 0; color: #f39c12; font-size: 1.5em; text-shadow: 2px 2px 4px #000; text-transform: uppercase; letter-spacing: 1px;">${p.nome}</h2>
                 <span style="background: #f39c12; color: #000; padding: 2px 10px; border-radius: 5px; font-weight: 900; font-size: 0.75em; text-transform: uppercase;">${infoClasse.emoji} ${infoClasse.nome}</span>
@@ -231,10 +216,10 @@ window.alternarAbaPerfil = function(abaID) {
 }
 
 // ==========================================
-// FILTROS DA MOCHILA
+// FILTROS DA MOCHILA (Utiliza a variável global segura)
 // ==========================================
 window.filtrarMochila = function(filtro) {
-    if(!perfilDadosGlobais) return;
+    if(!window.perfilDadosGlobais) return;
 
     ['todos', 'equips', 'materiais', 'usaveis'].forEach(f => {
         document.getElementById(`btn-filtro-${f}`).style.background = '#1e293b';
@@ -246,7 +231,7 @@ window.filtrarMochila = function(filtro) {
     const container = document.getElementById('grid-mochila');
     let html = '';
     
-    const itensFiltrados = perfilDadosGlobais.inventario.filter(i => {
+    const itensFiltrados = window.perfilDadosGlobais.inventario.filter(i => {
         const t = (i.tipo || "").toLowerCase();
         if(filtro === 'todos') return true;
         if(filtro === 'equips') return ['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento'].includes(t);
@@ -268,85 +253,4 @@ window.filtrarMochila = function(filtro) {
         });
     }
     container.innerHTML = html;
-}
-
-// ==========================================
-// CAIXA FLUTUANTE (MODAL) E AÇÕES
-// ==========================================
-window.abrirModalItem = function(idAlvo, origem) {
-    if(!perfilDadosGlobais) return;
-    let itemData = null;
-
-    if (origem === 'mochila') {
-        itemData = perfilDadosGlobais.inventario.find(i => i.id === idAlvo);
-    } else if (origem === 'equipado') {
-        itemData = perfilDadosGlobais.equipamentos.find(e => e.slot === idAlvo);
-    }
-
-    if (!itemData || itemData.vazio) return;
-
-    // Preenche o Modal
-    document.getElementById('modal-item-icon').innerText = itemData.emoji || itemData.icon || "📦";
-    document.getElementById('modal-item-nome').innerText = itemData.nome;
-    document.getElementById('modal-item-desc').innerText = itemData.desc || "Sem descrição.";
-    
-    const rari = document.getElementById('modal-item-raridade');
-    rari.innerText = itemData.raridade || "Comum";
-    // Cores de raridade
-    const coresRaridade = {'comum': '#94a3b8', 'incomum': '#22c55e', 'raro': '#3b82f6', 'epico': '#a855f7', 'lendario': '#eab308'};
-    rari.style.color = coresRaridade[(itemData.raridade||'comum').toLowerCase()] || '#cbd5e1';
-
-    // Cria os Botões de Ação
-    let botoesHtml = '';
-    if (origem === 'mochila') {
-        const t = (itemData.tipo || "").toLowerCase();
-        if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento'].includes(t)) {
-            botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" style="flex:1; padding:10px; background:#10b981; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Equipar</button>`;
-        } else if (['potion', 'consumable'].includes(t)) {
-            botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" style="flex:1; padding:10px; background:#3b82f6; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Usar</button>`;
-        }
-    } else if (origem === 'equipado') {
-        botoesHtml = `<button onclick="desequiparItem('${itemData.slot}')" style="flex:1; padding:10px; background:#ef4444; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Remover</button>`;
-    }
-    
-    botoesHtml += `<button onclick="fecharModalItem()" style="flex:1; padding:10px; background:#334155; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Cancelar</button>`;
-    
-    document.getElementById('modal-item-acoes').innerHTML = botoesHtml;
-    document.getElementById('modal-item').style.display = 'flex'; // Mostra o Modal
-}
-
-window.fecharModalItem = function() {
-    document.getElementById('modal-item').style.display = 'none';
-}
-
-// ==========================================
-// AÇÕES DO BACKEND
-// ==========================================
-window.distribuirPonto = async function(stat) {
-    const charId = localStorage.getItem("jogadorEldoraID");
-    try {
-        const res = await fetch('/api/personagem/distribuir_ponto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, stat: stat }) });
-        const data = await res.json();
-        if(data.sucesso) carregarMeuPerfil(); else alert("Aviso: " + data.erro);
-    } catch(e) { alert("⚠️ ERRO: " + e.message); }
-}
-
-window.desequiparItem = async function(slot) {
-    fecharModalItem();
-    const charId = localStorage.getItem("jogadorEldoraID");
-    try {
-        const res = await fetch('/api/personagem/desequipar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, slot: slot }) });
-        const data = await res.json();
-        if(data.sucesso) { carregarMeuPerfil(); setTimeout(() => alternarAbaPerfil('equips'), 200); } else { alert("Aviso: " + data.erro); }
-    } catch(e) { alert("⚠️ ERRO: " + e.message); }
-}
-
-window.usarOuEquiparItem = async function(itemId) {
-    fecharModalItem();
-    const charId = localStorage.getItem("jogadorEldoraID");
-    try {
-        const res = await fetch('/api/personagem/equipar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, item_id: itemId }) });
-        const data = await res.json();
-        if(data.sucesso) { carregarMeuPerfil(); setTimeout(() => alternarAbaPerfil('equips'), 300); } else { alert("Aviso: " + data.erro); }
-    } catch(e) { alert("⚠️ ERRO: " + e.message); }
 }
