@@ -58,7 +58,7 @@ async function carregarMeuPerfil() {
     }
 
     try {
-        const resposta = await fetch(`/perfil/${charId}`);
+        const resposta = await fetch(`/perfil/${charId}?t=${new Date().getTime()}`, { cache: 'no-store' });
         const p = await resposta.json();
         if (p.erro) { document.getElementById('perfil-msg-carregando').innerText = "⚠️ " + p.erro; return; }
 
