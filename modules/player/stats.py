@@ -508,8 +508,15 @@ def check_and_apply_level_up(player_data: dict) -> tuple[int, int, str]:
 
 def needs_class_choice(player_data: dict) -> bool:
     lvl = _ival(player_data.get("level"), 1)
-    already_has_class = bool(player_data.get("class"))
+    
+    # Pega a classe atual (se não tiver, fica vazio)
+    current_class = str(player_data.get("class", "")).lower().strip()
+    
+    # Considera que o jogador JÁ TEM classe apenas se a classe for diferente de vazio, aventureiro ou aprendiz
+    already_has_class = current_class not in ["", "none", "aventureiro", "aprendiz"]
+    
     already_offered = bool(player_data.get("class_choice_offered"))
+    
     return (lvl >= 5) and (not already_has_class) and (not already_offered)
 
 async def mark_class_choice_offered(user_id: Union[str, int]):
