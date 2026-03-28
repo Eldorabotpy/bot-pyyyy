@@ -526,34 +526,93 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
 // combate.js - Função da Animação
 
 function rodarAnimacaoLevelUp(novoNivel) {
-    console.log("🌟 Iniciando animação de Level Up para o nível: " + novoNivel);
+    console.log("🌟 Iniciando ANIMAÇÃO ÉPICA de Level Up!");
 
-    // 1. Cria e toca o Flash de Luz
-    const flash = document.createElement('div');
-    flash.className = 'flash-level-up';
-    document.body.appendChild(flash);
-    setTimeout(() => flash.remove(), 600); // Remove após a animação CSS
+    // 1. Encontra o container do avatar do jogador (onde a mágica acontece)
+    // ADAPTAR: Se o seu seletor for diferente de '.player-avatar', mude aqui.
+    // O container PRECISA ter 'position: relative' no CSS.
+    const playerContainer = document.querySelector('.player-avatar');
+    if (!playerContainer) {
+        console.error("Erro: Container '.player-avatar' não encontrado para a animação.");
+        return;
+    }
 
-    // 2. Cria e anima o texto "LEVEL UP!" sobre a área do jogador
-    // (Ajuste o seletor '.player-avatar' para o container do seu personagem no HTML)
-    const playerContainer = document.querySelector('.player-avatar') || document.body;
-    const texto = document.createElement('div');
-    texto.className = 'level-up-text';
-    texto.innerHTML = `LEVEL UP!<br><span style="font-size:16px; color:white;">Nível ${novoNivel}</span>`;
-    playerContainer.appendChild(texto);
-    setTimeout(() => texto.remove(), 2500); // Remove após a animação CSS
+    // Limpa animações anteriores se houver
+    const oldContainer = playerContainer.querySelector('.level-up-epic-container');
+    if (oldContainer) oldContainer.remove();
 
-    // 3. Opcional: Tocar um som de vitória
-    // if (window.audio_manager) window.audio_manager.play('level_up_sound');
+    // 2. Cria o container principal da animação
+    const epicContainer = document.createElement('div');
+    epicContainer.className = 'level-up-epic-container';
+    playerContainer.appendChild(epicContainer);
 
-    // 4. Atualiza o número do nível na UI (ajuste o seletor ID se necessário)
+    // 3. Ativa o Screenshake no corpo da batalha (Impacto Inicial)
+    const battleBody = document.querySelector('.battle-body') || document.body;
+    battleBody.classList.add('shake-screen');
+    setTimeout(() => battleBody.classList.remove('shake-screen'), 400);
+
+    // 4. Cria o Feixe de Luz (Beam)
+    const beam = document.createElement('div');
+    beam.className = 'level-up-beam';
+    epicContainer.appendChild(beam);
+
+    // 5. Cria o Texto Impactante (Slam Text)
+    const textSlam = document.createElement('div');
+    textSlam.className = 'level-up-slam-text';
+    textSlam.innerHTML = `LEVEL UP!<br><span class="level-up-subtext">Nível ${novoNivel}</span>`;
+    epicContainer.appendChild(textSlam);
+
+    // 6. Tocar Som de Vitória Épico (Se tiver sistema de áudio)
+    // if (window.audio) window.audio.play('se_levelup_epic');
+
+    // 7. Gerador de Partículas (Explosão)
+    // Pequeno delay para coincidir com o "Slam" do texto
+    setTimeout(() => {
+        const numeroParticulas = 30; // Quantidade de brilho
+        
+        for (let i = 0; i < numeroParticulas; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'level-up-particle';
+            
+            // Define variáveis CSS randomicas para a animação keyframes (--dx, --dy, --rot)
+            // Faz as partículas voarem para cima e para os lados
+            const dx = (Math.random() - 0.5) * 200; // -100px a 100px
+            const dy = (Math.random() * -150) - 50;  // -50px a -200px (sempre pra cima)
+            const rot = (Math.random() - 0.5) * 720; // Rotação louca
+
+            particle.style.setProperty('--dx', `${dx}px`);
+            particle.style.setProperty('--dy', `${dy}px`);
+            particle.style.setProperty('--rot', `${rot}deg`);
+            
+            // Posição inicial (centro do personagem)
+            particle.style.left = '50%';
+            particle.style.top = '50%';
+
+            epicContainer.appendChild(particle);
+            
+            // Limpeza individual da partícula
+            setTimeout(() => particle.remove(), 1500);
+        }
+    }, 400); // Coincide com o impacto do texto
+
+    // 8. Atualiza o número do nível na UI do HUD
     const levelElement = document.getElementById('player_level');
     if (levelElement) {
-        levelElement.textContent = novoNivel;
-        // Adiciona um pequeno pulo no número
-        levelElement.style.animation = 'pulse 0.5s'; 
-        setTimeout(() => levelElement.style.animation = '', 500);
+        setTimeout(() => {
+            levelElement.textContent = novoNivel;
+            levelElement.style.color = '#ffeb3b'; // Dourado temporário
+            levelElement.style.transform = 'scale(1.5)';
+            levelElement.style.transition = 'all 0.3s ease';
+            
+            setTimeout(() => {
+                levelElement.style.transform = 'scale(1)';
+                levelElement.style.color = ''; // Volta ao normal
+            }, 500);
+        }, 300); // Atualiza quando o feixe de luz está forte
     }
+
+    // 9. Limpeza Final do container épico
+    setTimeout(() => epicContainer.remove(), 3000);
 }
 
 function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) { 
@@ -655,19 +714,20 @@ function finalizarAnimacaoCombate(dados) {
         );
 
         // =========================================================================
-        // 👇 👇 👇👇 NOVO: SISTEMA DE ANIMAÇÃO DE LEVEL UP 👇👇👇👇👇
+        // 👇👇👇 SISTEMA DE ANIMAÇÃO ÉPICA DE LEVEL UP 👇👇👇
         // =========================================================================
         // Verificamos se o backend avisou que o personagem upou nesta vitória
         if (dados.recompensas && dados.recompensas.subiu_nivel) {
-            console.log("🌟 Executando animação de Level Up para o nível: " + dados.recompensas.novo_nivel);
+            console.log("🌟 Executando animação ÉPICA de Level Up para o nível: " + dados.recompensas.novo_nivel);
             
-            // Pequeno delay (800ms) para a animação rodar logo após o alerta de vitória
+            // Delay de 600ms: Dá o tempo exato para o jogador ler o XP antes da explosão de luz
             setTimeout(() => {
-                // Chamamos a função que cria o texto e o flash (que criamos no passo anterior)
                 if (typeof rodarAnimacaoLevelUp === 'function') {
                     rodarAnimacaoLevelUp(dados.recompensas.novo_nivel);
+                } else {
+                    console.error("Função rodarAnimacaoLevelUp não encontrada!");
                 }
-            }, 800); 
+            }, 600); 
         }
         // =========================================================================
 

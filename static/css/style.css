@@ -181,45 +181,111 @@ th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: 
     100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
 }
 
-/* style.css - Animação de Level Up */
+/* style.css - ANIMAÇÃO ÉPICA DE LEVEL UP */
 
-/* 1. O Flash de Luz na tela inteira */
-.flash-level-up {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background-color: white;
-    opacity: 0;
-    z-index: 9999; /* Por cima de tudo */
-    pointer-events: none; /* Não atrapalha cliques */
-    animation: flashAnimation 0.6s ease-out;
-}
-
-@keyframes flashAnimation {
-    0% { opacity: 0; }
-    20% { opacity: 0.8; } /* Brilho máximo rápido */
-    100% { opacity: 0; }
-}
-
-/* 2. O Texto "LEVEL UP!" flutuante */
-.level-up-text {
+/* Container principal sobre o jogador (Garanta que o container do player tenha position: relative) */
+.level-up-epic-container {
     position: absolute;
-    top: 40%; /* Começa perto do centro do personagem */
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-family: 'Press Start 2P', cursive; /* Use sua fonte pixelada */
-    font-size: 24px;
-    color: #ffeb3b; /* Amarelo Ouro */
-    text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
-    z-index: 10000;
+    top: 0; left: 0; width: 100%; height: 100%;
     pointer-events: none;
-    white-space: nowrap;
-    animation: levelUpFloat 2.5s ease-out forwards;
+    z-index: 10000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 
-@keyframes levelUpFloat {
-    0% { top: 40%; opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-    10% { top: 35%; opacity: 1; transform: translate(-50%, -50%) scale(1.2); } /* "Pula" na tela */
-    20% { top: 35%; transform: translate(-50%, -50%) scale(1); }
-    80% { top: 25%; opacity: 1; } /* Sobe devagar segurando a opacidade */
-    100% { top: 20%; opacity: 0; transform: translate(-50%, -50%); } /* Some no topo */
+/* 1. O Feixe de Luz Dourada (Beam) */
+.level-up-beam {
+    position: absolute;
+    top: -150%; /* Começa bem acima */
+    width: 80px; height: 300%;
+    background: linear-gradient(to bottom, rgba(255, 235, 59, 0) 0%, rgba(255, 235, 59, 0.8) 50%, rgba(255, 235, 59, 0) 100%);
+    filter: blur(5px);
+    box-shadow: 0 0 30px #ffeb3b, 0 0 60px #fff;
+    opacity: 0;
+    animation: beamDescend 1.2s ease-out forwards;
+}
+
+@keyframes beamDescend {
+    0% { top: -150%; opacity: 0; transform: scaleX(0.2); }
+    20% { opacity: 1; transform: scaleX(1); }
+    40% { top: -50%; opacity: 1; }
+    80% { top: -20%; opacity: 0.5; transform: scaleX(1); }
+    100% { top: 0%; opacity: 0; transform: scaleX(0); }
+}
+
+/* 2. O Texto Dourado e Impactante */
+.level-up-slam-text {
+    font-family: 'Press Start 2P', cursive; /* Sua fonte pixelada */
+    font-size: 28px;
+    color: #fff;
+    text-transform: uppercase;
+    /* Efeito de brilho dourado intenso */
+    text-shadow: 
+        0 0 5px #fff,
+        0 0 10px #ffeb3b,
+        0 0 20px #ffeb3b,
+        2px 2px 0px #000; /* Borda pixelada preta */
+    
+    letter-spacing: 2px;
+    position: relative;
+    opacity: 0;
+    animation: textSlamEpic 2.5s ease-out forwards;
+    animation-delay: 0.3s; /* Espera o beam começar */
+}
+
+.level-up-subtext {
+    font-size: 16px;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+    display: block; margin-top: 10px;
+}
+
+@keyframes textSlamEpic {
+    0% { transform: scale(5); opacity: 0; filter: blur(10px); }
+    10% { transform: scale(1); opacity: 1; filter: blur(0px); } /* Impacto (Slam) */
+    15% { transform: scale(1.1); } /* Pequeno bounce */
+    20% { transform: scale(1); }
+    80% { opacity: 1; transform: translateY(-20px); } /* Flutua pra cima */
+    100% { opacity: 0; transform: translateY(-40px); } /* Some */
+}
+
+/* 3. As Partículas de Luz */
+.level-up-particle {
+    position: absolute;
+    width: 6px; height: 6px;
+    background-color: #fff;
+    box-shadow: 0 0 5px #ffeb3b, 0 0 10px #fff;
+    border-radius: 1px; /* Pixel square */
+    opacity: 0;
+    pointer-events: none;
+    animation: particleFly 1.5s ease-out forwards;
+}
+
+@keyframes particleFly {
+    0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; }
+    10% { opacity: 1; }
+    100% { 
+        /* O JS vai definir as variáveis --dx e --dy randomicamente */
+        transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0); 
+        opacity: 0; 
+    }
+}
+
+/* 4. Screenshake no container da batalha */
+.shake-screen {
+    animation: shake 0.4s ic;
+    animation-iteration-count: 1;
+}
+
+@keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
 }
