@@ -488,10 +488,8 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
             body: JSON.stringify({ user_id: charId, acao: tipoAcao, skill_id: skillId })
         });
 
-        // SE O PYTHON CRASHAR (ERRO 500), ELE ENTRA AQUI!
         if (!res.ok) {
             const erroTexto = await res.text();
-            // Pega um pedaço do erro pra mostrar na tela
             const resumo = erroTexto.substring(0, 150).replace(/<[^>]*>?/gm, ''); 
             throw new Error(`Crash no Servidor (Status ${res.status}): ${resumo}`);
         }
@@ -510,11 +508,11 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
             return;
         }
 
-        animarAcoesDaRodada(turno, tipoAcao, skillNome);
+        // 👇 CORREÇÃO: Enviamos o skillId E o skillNome para não ter erro
+        animarAcoesDaRodada(turno, tipoAcao, skillId, skillNome);
 
     } catch(e) {
-        // AGORA O ERRO APARECE DIRETO NO SEU CELULAR!
-        exibirAlertaCustom("🚨 Falha Crítica", `<b>Motivo:</b> ${e.message}<br><br>Verifique a aba 'Logs' no painel do Render.com!`, false);
+        exibirAlertaCustom("🚨 Falha Crítica", `<b>Motivo:</b> ${e.message}`, false);
         sairDaArena();
     }
 }
@@ -523,14 +521,12 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
 // NOVA FUNÇÃO: LÊ O QUE O PYTHON MANDOU E ANIMA
 // ==========================================
 
-// combate.js - Função da Animação
+// combate.js - Função da Animação ÉPICA
 
 function rodarAnimacaoLevelUp(novoNivel) {
     console.log("🌟 Iniciando ANIMAÇÃO ÉPICA de Level Up!");
 
-    // 1. Encontra o container do avatar do jogador (onde a mágica acontece)
-    // ADAPTAR: Se o seu seletor for diferente de '.player-avatar', mude aqui.
-    // O container PRECISA ter 'position: relative' no CSS.
+    // 1. Encontra o container do avatar do jogador
     const playerContainer = document.querySelector('.player-avatar');
     if (!playerContainer) {
         console.error("Erro: Container '.player-avatar' não encontrado para a animação.");
@@ -562,11 +558,7 @@ function rodarAnimacaoLevelUp(novoNivel) {
     textSlam.innerHTML = `LEVEL UP!<br><span class="level-up-subtext">Nível ${novoNivel}</span>`;
     epicContainer.appendChild(textSlam);
 
-    // 6. Tocar Som de Vitória Épico (Se tiver sistema de áudio)
-    // if (window.audio) window.audio.play('se_levelup_epic');
-
-    // 7. Gerador de Partículas (Explosão)
-    // Pequeno delay para coincidir com o "Slam" do texto
+    // 6. Gerador de Partículas (Explosão)
     setTimeout(() => {
         const numeroParticulas = 30; // Quantidade de brilho
         
@@ -574,8 +566,6 @@ function rodarAnimacaoLevelUp(novoNivel) {
             const particle = document.createElement('div');
             particle.className = 'level-up-particle';
             
-            // Define variáveis CSS randomicas para a animação keyframes (--dx, --dy, --rot)
-            // Faz as partículas voarem para cima e para os lados
             const dx = (Math.random() - 0.5) * 200; // -100px a 100px
             const dy = (Math.random() * -150) - 50;  // -50px a -200px (sempre pra cima)
             const rot = (Math.random() - 0.5) * 720; // Rotação louca
@@ -584,38 +574,36 @@ function rodarAnimacaoLevelUp(novoNivel) {
             particle.style.setProperty('--dy', `${dy}px`);
             particle.style.setProperty('--rot', `${rot}deg`);
             
-            // Posição inicial (centro do personagem)
             particle.style.left = '50%';
             particle.style.top = '50%';
 
             epicContainer.appendChild(particle);
             
-            // Limpeza individual da partícula
             setTimeout(() => particle.remove(), 1500);
         }
     }, 400); // Coincide com o impacto do texto
 
-    // 8. Atualiza o número do nível na UI do HUD
+    // 7. Atualiza o número do nível na UI do HUD
     const levelElement = document.getElementById('player_level');
     if (levelElement) {
         setTimeout(() => {
             levelElement.textContent = novoNivel;
-            levelElement.style.color = '#ffeb3b'; // Dourado temporário
+            levelElement.style.color = '#ffeb3b'; 
             levelElement.style.transform = 'scale(1.5)';
             levelElement.style.transition = 'all 0.3s ease';
             
             setTimeout(() => {
                 levelElement.style.transform = 'scale(1)';
-                levelElement.style.color = ''; // Volta ao normal
+                levelElement.style.color = '';
             }, 500);
-        }, 300); // Atualiza quando o feixe de luz está forte
+        }, 300);
     }
 
-    // 9. Limpeza Final do container épico
+    // 8. Limpeza Final do container épico
     setTimeout(() => epicContainer.remove(), 3000);
 }
 
-function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) { 
+function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) { 
     const logBox = document.getElementById('combat-log-box');
     const elemSpriteMob = document.getElementById('sprite-mob');
     const elemSpritePlayer = document.getElementById('sprite-player');
@@ -623,8 +611,6 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) {
     let db = window.dadosCombateAtual;
     let indexAcao = 0;
 
-    // ======= CORREÇÃO DA MANA =======
-    // Atualiza a barra azul no ecrã logo no início do turno
     if (turnoInfo.player_mp !== undefined) {
         db.playerMpAtual = turnoInfo.player_mp;
         atualizarVisualBarra('bar-mp-player', db.playerMpAtual, db.playerMpMax, true);
@@ -658,17 +644,27 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) {
             tocarSFX(ehCritico ? AUDIO_ASSETS.som_critico : AUDIO_ASSETS.som_espada);
 
             // ===============================================
-            // SISTEMA INTELIGENTE DE ANIMAÇÃO DE MAGIAS
+            // SISTEMA BLINDADO DE ANIMAÇÃO DE MAGIAS
             // ===============================================
             let corEfeito = ehCritico ? '#f1c40f' : '#e74c3c';
-            let tipoVisual = 'corte'; // Padrão se for ataque normal
+            let tipoVisual = 'corte'; // Padrão
 
-            if (tipoAcao === 'magia' && skillNome) {
-                let nomeLower = skillNome.toLowerCase();
-                if (nomeLower.includes('fogo') || nomeLower.includes('chama') || nomeLower.includes('explosão')) tipoVisual = 'fogo';
-                else if (nomeLower.includes('cura') || nomeLower.includes('luz') || nomeLower.includes('sagrada') || nomeLower.includes('restauradora')) tipoVisual = 'cura';
-                else if (nomeLower.includes('sombra') || nomeLower.includes('furtivo') || nomeLower.includes('veneno')) tipoVisual = 'trevas';
-                else if (nomeLower.includes('impacto') || nomeLower.includes('tiro') || nomeLower.includes('flecha')) tipoVisual = 'impacto';
+            if (tipoAcao === 'magia') {
+                // Junta o ID (ex: mago_bola_de_fogo) e o Nome para NUNCA falhar!
+                let identificadorMagia = ((skillNome || "") + " " + (skillId || "")).toLowerCase();
+                
+                if (identificadorMagia.includes('fogo') || identificadorMagia.includes('chama') || identificadorMagia.includes('explosão')) {
+                    tipoVisual = 'fogo';
+                    corEfeito = '#ff9f43'; // Fogo brilhante
+                } else if (identificadorMagia.includes('cura') || identificadorMagia.includes('luz') || identificadorMagia.includes('sagrada')) {
+                    tipoVisual = 'cura';
+                    corEfeito = '#1dd1a1'; // Verde cura
+                } else if (identificadorMagia.includes('sombra') || identificadorMagia.includes('veneno') || identificadorMagia.includes('trevas')) {
+                    tipoVisual = 'trevas';
+                    corEfeito = '#5f27cd'; // Roxo escuro
+                } else if (identificadorMagia.includes('impacto') || identificadorMagia.includes('tiro') || identificadorMagia.includes('flecha')) {
+                    tipoVisual = 'impacto';
+                }
             }
 
             animarEfeitoVisual('sprite-mob', tipoVisual, corEfeito);
@@ -724,8 +720,6 @@ function finalizarAnimacaoCombate(dados) {
             setTimeout(() => {
                 if (typeof rodarAnimacaoLevelUp === 'function') {
                     rodarAnimacaoLevelUp(dados.recompensas.novo_nivel);
-                } else {
-                    console.error("Função rodarAnimacaoLevelUp não encontrada!");
                 }
             }, 600); 
         }
