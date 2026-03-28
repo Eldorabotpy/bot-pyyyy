@@ -173,27 +173,35 @@ def api_distribuir_ponto():
     try:
         data = request.json
         user_id = data.get("user_id")
-        stat = data.get("stat")
+        stat = data.get("stat") # ex: "attack", "defense", "hp"
 
         from modules.player.core import users_collection
         from modules import player_manager
+        from bson import ObjectId
 
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
-        pdata = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
+        pdata = users_collection.find_one({"_id": busca_id})
         
-        if not pdata: return jsonify({"erro": "Personagem não encontrado."}), 404
+        if not pdata: 
+            return jsonify({"erro": "Personagem não encontrado."}), 404
 
         pontos_livres = int(pdata.get("stat_points", 0))
-        if pontos_livres <= 0: return jsonify({"erro": "Não tens pontos disponíveis!"}), 400
+        if pontos_livres <= 0: 
+            return jsonify({"erro": "Não tens pontos disponíveis!"}), 400
 
-        base_stats = pdata.get("base_stats", {})
-        base_stats[stat] = int(base_stats.get(stat, 0)) + 1
-        pdata["base_stats"] = base_stats
+        # 👇 CORREÇÃO: Salva os pontos manuais na chave 'invested', e não 'base_stats'
+        invested = pdata.get("invested", {})
+        invested[stat] = int(invested.get(stat, 0)) + 1
+        
+        pdata["invested"] = invested
         pdata["stat_points"] = pontos_livres - 1
 
         _run_async(player_manager.save_player_data(user_id, pdata))
-        return jsonify({"sucesso": True, "msg": "Ponto adicionado!"})
+        return jsonify({"sucesso": True, "msg": "Ponto adicionado com sucesso!"})
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
 
 @webapp_bp.route('/api/personagem/equipar', methods=['POST'])
