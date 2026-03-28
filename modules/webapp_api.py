@@ -39,7 +39,14 @@ def obter_perfil(user_id):
             return jsonify({"erro": "Personagem não encontrado."}), 404
         
         lvl = int(pdata.get("level", 1))
-        xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
+        
+        # 👇 CORREÇÃO: Usa a função oficial de XP do jogo em vez da fórmula antiga
+        from modules import game_data
+        try:
+            xp_visual_max = int(game_data.get_xp_for_next_combat_level(lvl))
+        except:
+            xp_visual_max = int(200 + (100 * (lvl - 1))) # Fallback básico de segurança
+            
         classe_str = str(pdata.get("class", "aprendiz"))
         
         # 2. CALCULA STATUS TOTAIS (Considerando Equipamentos e Passivas)

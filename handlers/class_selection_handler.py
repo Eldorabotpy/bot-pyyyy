@@ -117,14 +117,18 @@ def _load_classes_list() -> list[dict]:
 # Elegibilidade (Síncrono)
 # =========================
 def _eligible_for_class(player_data: dict) -> bool:
-    """Pode escolher classe se nível ≥ 5 e ainda não tiver classe.""" 
+    """Pode escolher classe se nível ≥ 5 e ainda não tiver classe definitiva.""" 
     if not player_data:
         return False
     try:
         lvl = int(player_data.get("level", 1))
     except Exception:
         lvl = 1
-    return (lvl >= 5) and not bool(player_data.get("class")) 
+        
+    current_class = str(player_data.get("class", "")).lower().strip()
+    already_has_class = current_class not in ["", "none", "aventureiro", "aprendiz"]
+    
+    return (lvl >= 5) and not already_has_class
 
 # =========================
 # Tela: Lista de Classes
@@ -148,9 +152,12 @@ async def show_class_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     player_data = await player_manager.get_player_data(user_id)
+    
+    current_class = str(player_data.get("class", "")).lower().strip() if player_data else ""
+    already_has_class = current_class not in ["", "none", "aventureiro", "aprendiz"]
 
-    if player_data and player_data.get("class"):
-        text = f"Você já escolheu sua classe: <b>{player_data.get('class')}</b>."
+    if player_data and already_has_class:
+        text = f"Você já escolheu sua classe: <b>{player_data.get('class').capitalize()}</b>."
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="profile")]])
         if query:
             await query.edit_message_text(text=text, parse_mode="HTML", reply_markup=kb)
@@ -210,8 +217,11 @@ async def show_class_details(update: Update, context: ContextTypes.DEFAULT_TYPE,
         return
 
     player_data = await player_manager.get_player_data(user_id)
+    
+    current_class = str(player_data.get("class", "")).lower().strip() if player_data else ""
+    already_has_class = current_class not in ["", "none", "aventureiro", "aprendiz"]
 
-    if player_data and player_data.get("class"):
+    if player_data and already_has_class:
         await query.answer("Você já escolheu sua classe.", show_alert=True)
         return
 
@@ -332,7 +342,10 @@ async def confirm_class_choice(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_message(chat_id=update.effective_chat.id, text="Classe inválida.")
         return
 
-    if player_data.get('class') is not None:
+    current_class = str(player_data.get("class", "")).lower().strip()
+    already_has_class = current_class not in ["", "none", "aventureiro", "aprendiz"]
+
+    if already_has_class:
         if query:
             await query.answer("Você já escolheu sua classe!", show_alert=True)
         return
