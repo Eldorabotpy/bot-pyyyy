@@ -526,81 +526,91 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
 function rodarAnimacaoLevelUp(novoNivel) {
     console.log("🌟 Iniciando ANIMAÇÃO ÉPICA de Level Up!");
 
-    // 1. Encontra o container do avatar do jogador
-    const playerContainer = document.querySelector('.player-avatar');
-    if (!playerContainer) {
-        console.error("Erro: Container '.player-avatar' não encontrado para a animação.");
-        return;
-    }
+    // 1. Localiza o personagem pelo ID correto do seu HTML
+    const spritePlayer = document.getElementById('sprite-player');
+    const containerAlvo = spritePlayer ? spritePlayer.parentElement : (document.getElementById('arena-box') || document.body);
+    
+    containerAlvo.style.position = 'relative';
 
-    // Limpa animações anteriores se houver
-    const oldContainer = playerContainer.querySelector('.level-up-epic-container');
+    // Limpa sobras para não acumular lixo na memória
+    const oldContainer = containerAlvo.querySelector('.level-up-epic-container');
     if (oldContainer) oldContainer.remove();
 
-    // 2. Cria o container principal da animação
+    // 2. Cria o palco da animação
     const epicContainer = document.createElement('div');
     epicContainer.className = 'level-up-epic-container';
-    playerContainer.appendChild(epicContainer);
+    containerAlvo.appendChild(epicContainer);
 
-    // 3. Ativa o Screenshake no corpo da batalha (Impacto Inicial)
-    const battleBody = document.querySelector('.battle-body') || document.body;
-    battleBody.classList.add('shake-screen');
-    setTimeout(() => battleBody.classList.remove('shake-screen'), 400);
+    // 3. Treme a tela (Screenshake)
+    const arena = document.getElementById('arena-box') || document.body;
+    arena.classList.add('shake-screen');
+    setTimeout(() => arena.classList.remove('shake-screen'), 400);
 
-    // 4. Cria o Feixe de Luz (Beam)
+    // 4. Pilar de Luz e Texto
     const beam = document.createElement('div');
     beam.className = 'level-up-beam';
     epicContainer.appendChild(beam);
 
-    // 5. Cria o Texto Impactante (Slam Text)
     const textSlam = document.createElement('div');
     textSlam.className = 'level-up-slam-text';
     textSlam.innerHTML = `LEVEL UP!<br><span class="level-up-subtext">Nível ${novoNivel}</span>`;
     epicContainer.appendChild(textSlam);
 
-    // 6. Gerador de Partículas (Explosão)
+    // 5. Explosão de Partículas Douradas
     setTimeout(() => {
-        const numeroParticulas = 30; // Quantidade de brilho
-        
-        for (let i = 0; i < numeroParticulas; i++) {
+        for (let i = 0; i < 30; i++) {
             const particle = document.createElement('div');
             particle.className = 'level-up-particle';
-            
-            const dx = (Math.random() - 0.5) * 200; // -100px a 100px
-            const dy = (Math.random() * -150) - 50;  // -50px a -200px (sempre pra cima)
-            const rot = (Math.random() - 0.5) * 720; // Rotação louca
+            const dx = (Math.random() - 0.5) * 200;
+            const dy = (Math.random() * -150) - 50;
+            const rot = (Math.random() - 0.5) * 720;
 
             particle.style.setProperty('--dx', `${dx}px`);
             particle.style.setProperty('--dy', `${dy}px`);
             particle.style.setProperty('--rot', `${rot}deg`);
-            
             particle.style.left = '50%';
             particle.style.top = '50%';
 
             epicContainer.appendChild(particle);
-            
             setTimeout(() => particle.remove(), 1500);
         }
-    }, 400); // Coincide com o impacto do texto
+    }, 400); 
 
-    // 7. Atualiza o número do nível na UI do HUD
+    // 6. Atualiza o nível visualmente no HUD
     const levelElement = document.getElementById('player_level');
-    if (levelElement) {
-        setTimeout(() => {
-            levelElement.textContent = novoNivel;
-            levelElement.style.color = '#ffeb3b'; 
-            levelElement.style.transform = 'scale(1.5)';
-            levelElement.style.transition = 'all 0.3s ease';
-            
-            setTimeout(() => {
-                levelElement.style.transform = 'scale(1)';
-                levelElement.style.color = '';
-            }, 500);
-        }, 300);
-    }
+    if (levelElement) levelElement.textContent = novoNivel;
 
-    // 8. Limpeza Final do container épico
+    // 7. FECHAMENTO DA FUNÇÃO (O que estava faltando!)
     setTimeout(() => epicContainer.remove(), 3000);
+}
+
+function finalizarAnimacaoCombate(dados) {
+    document.getElementById('combat-log-box').innerHTML = dados.vitoria ? "O INIMIGO FOI DERROTADO!" : "VOCÊ DESMAIOU...";
+    document.getElementById('botoes-fim-batalha').style.display = "flex";
+    
+    if (dados.vitoria) {
+        let lootTexto = (dados.recompensas && dados.recompensas.items && dados.recompensas.items.length > 0) 
+            ? `<br><br>📦 Saqueou: ${dados.recompensas.items.join(', ')}` 
+            : "";
+            
+        exibirAlertaCustom(
+            "Vitória!", 
+            `✨ +${dados.recompensas.xp} XP<br>💰 +${dados.recompensas.gold} Ouro${lootTexto}`, 
+            true
+        );
+
+        // Gatilho sem o Alert de Debug (Já que confirmamos que funciona!)
+        if (dados.recompensas && dados.recompensas.subiu_nivel) {
+            setTimeout(() => {
+                if (typeof rodarAnimacaoLevelUp === 'function') {
+                    rodarAnimacaoLevelUp(dados.recompensas.novo_nivel);
+                }
+            }, 600); 
+        }
+
+    } else {
+        exibirAlertaCustom("Derrota", "Você desmaiou em combate e foi resgatado...", false);
+    }
 }
 
 function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) { 
@@ -702,31 +712,22 @@ function finalizarAnimacaoCombate(dados) {
             ? `<br><br>📦 Saqueou: ${dados.recompensas.items.join(', ')}` 
             : "";
             
-        // 1. Exibe o alerta padrão de vitória com XP e Ouro
         exibirAlertaCustom(
             "Vitória!", 
             `✨ +${dados.recompensas.xp} XP<br>💰 +${dados.recompensas.gold} Ouro${lootTexto}`, 
             true
         );
 
-        // =========================================================================
-        // 👇👇👇 SISTEMA DE ANIMAÇÃO ÉPICA DE LEVEL UP 👇👇👇
+        // Gatilho da Animação Épica de Level Up
         if (dados.recompensas && dados.recompensas.subiu_nivel) {
-            
-            // TIRA-TEIMA: Se essa caixa feia do navegador aparecer, o JS reconheceu!
-            alert("DEBUG: O JAVASCRIPT SABE QUE VOCÊ UPOU PARA O NÍVEL " + dados.recompensas.novo_nivel);
-            
             console.log("🌟 Executando animação ÉPICA de Level Up!");
             
             setTimeout(() => {
                 if (typeof rodarAnimacaoLevelUp === 'function') {
                     rodarAnimacaoLevelUp(dados.recompensas.novo_nivel);
-                } else {
-                    alert("DEBUG ERRO: A função rodarAnimacaoLevelUp não existe ou está no lugar errado!");
                 }
             }, 600); 
         }
-        // =========================================================================
 
     } else {
         exibirAlertaCustom("Derrota", "Você desmaiou em combate e foi resgatado...", false);
