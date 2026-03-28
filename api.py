@@ -549,6 +549,7 @@ def api_combate_acao():
         
         if acao == "fugir":
             pdata.pop("battle_cache", None)
+            pdata.pop("cooldowns", None) # Limpa cooldowns se fugir
             pdata["player_state"] = {"action": "idle"}
             pdata["current_hp"] = max(0, cache.get("player_hp", 0))
             pdata["current_mp"] = max(0, cache.get("player_mp", 0))
@@ -560,11 +561,11 @@ def api_combate_acao():
             mana_atual = cache.get("player_mp", pdata.get("current_mp", 0))
 
             # ==========================================================
-            # CORREÇÃO: GASTO DE MANA E COOLDOWN OFICIAL
+            # 1. GASTO DE MANA E COOLDOWN OFICIAL
             # ==========================================================
             if acao == "magia" and skill_id:
                 from modules.game_data.skills import get_skill_data_with_rarity
-                from modules.cooldowns import aplicar_cooldown # Puxa o seu relógio oficial
+                from modules.cooldowns import aplicar_cooldown
                 
                 skill_info = get_skill_data_with_rarity(pdata, skill_id)
                 custo_mp = int(skill_info.get("mana_cost", 0))
@@ -572,13 +573,12 @@ def api_combate_acao():
                 if mana_atual < custo_mp:
                     return jsonify({"erro": "Mana insuficiente para esta magia!"})
                 
-                # Desconta a mana
                 mana_atual -= custo_mp
                 cache["player_mp"] = mana_atual
                 
-                # Ativa o Cooldown da magia perfeitamente!
                 raridade_skill = skill_info.get("rarity", "comum")
-                pdata = aplicar_cooldown(pdata, skill_id, raridade_skill)
+                if "cooldowns" not in pdata: pdata["cooldowns"] = {}
+                aplicar_cooldown(pdata, skill_id, raridade_skill)
 
             res_p = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata=pdata,
@@ -598,16 +598,39 @@ def api_combate_acao():
             for msg in res_p.get("log_messages", []):
                 log_turno.append({"autor": "player", "dano": dano_p, "texto": f"🧑‍🚀 {msg}"})
 
+        # ==========================================================
+        # 2. VERIFICAÇÃO DE VITÓRIA (ÚNICO BLOCO IF)
+        # ==========================================================
         vitoria = cache["monster_hp"] <= 0
         derrota = False
         recompensas_finais = {}
 
         if vitoria:
             from modules.game_data import items as items_data
+            from modules import game_data # Motor de XP
+            
             xp, gold, items_ids = rewards.calculate_victory_rewards(pdata, cache["monster_stats"])
             pdata["xp"] = pdata.get("xp", 0) + xp
             pdata["gold"] = pdata.get("gold", 0) + gold
             
+            # --- SISTEMA DE LEVEL UP AUTOMÁTICO ---
+            subiu_nivel = False
+            while True:
+                lvl_atual = pdata.get("level", 1)
+                try:
+                    xp_necessaria = game_data.get_xp_for_next_combat_level(lvl_atual)
+                except:
+                    xp_necessaria = int(200 + (100 * (lvl_atual - 1)))
+                    
+                if pdata["xp"] >= xp_necessaria:
+                    pdata["xp"] -= xp_necessaria
+                    pdata["level"] = lvl_atual + 1
+                    pdata["stat_points"] = pdata.get("stat_points", 0) + 3 # Dando 3 pontos (ajuste se precisar)
+                    subiu_nivel = True
+                else:
+                    break
+            
+            # --- GESTÃO DE INVENTÁRIO ---
             items_names = []
             if "inventory" not in pdata: pdata["inventory"] = {}
         
@@ -623,15 +646,23 @@ def api_combate_acao():
                 items_names.append(n_item)
 
             recompensas_finais = {"xp": xp, "gold": gold, "items": items_names}
-            pdata.pop("battle_cache", None)
-            pdata["player_state"] = {"action": "idle"}
             
-            # Limpa os cooldowns ao final da luta
+            # Limpa cache e cooldowns
+            pdata.pop("battle_cache", None)
             pdata.pop("cooldowns", None)
+            pdata["player_state"] = {"action": "idle"}
             
             log_turno.append({"autor": "system", "texto": f"🏆 {cache['mob_nome']} foi derrotado!"})
             
+            if subiu_nivel:
+                log_turno.append({"autor": "system", "texto": f"🌟 PARABÉNS! Você alcançou o Nível {pdata['level']}!"})
+                recompensas_finais["subiu_nivel"] = True 
+                recompensas_finais["novo_nivel"] = pdata['level']
+                
         else:
+            # ==========================================================
+            # 3. TURNO DO MONSTRO E DERROTA
+            # ==========================================================
             res_m = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata={}, 
                 attacker_stats=cache["monster_stats"],
@@ -657,21 +688,23 @@ def api_combate_acao():
                 pdata.pop("cooldowns", None)
                 pdata["player_state"] = {"action": "idle"}
 
+        # ==========================================================
+        # 4. TRANSIÇÃO DE TURNO (SE NINGUÉM MORREU)
+        # ==========================================================
         if not vitoria and not derrota:
             cache["turno"] += 1
             pdata["battle_cache"] = cache
             pdata["current_hp"] = max(0, cache.get("player_hp", 0))
             pdata["current_mp"] = max(0, cache.get("player_mp", 0))
             
-            # ==========================================================
-            # CORREÇÃO: AVANÇA O RELÓGIO DOS COOLDOWNS NO FIM DO TURNO
-            # ==========================================================
+            # Avança o relógio dos cooldowns
             if "cooldowns" in pdata:
                 novos_cds = {}
                 for sk, cd in pdata["cooldowns"].items():
                     if cd > 1: novos_cds[sk] = cd - 1
                 pdata["cooldowns"] = novos_cds
         else:
+            # Luta acabou, restaura a vida/mana para o máximo
             max_hp = cache.get("player_stats", {}).get("max_hp", 100)
             max_mp = cache.get("player_stats", {}).get("max_mana", 50)
             pdata["current_hp"] = max_hp

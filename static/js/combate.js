@@ -522,6 +522,40 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
 // ==========================================
 // NOVA FUNÇÃO: LÊ O QUE O PYTHON MANDOU E ANIMA
 // ==========================================
+
+// combate.js - Função da Animação
+
+function rodarAnimacaoLevelUp(novoNivel) {
+    console.log("🌟 Iniciando animação de Level Up para o nível: " + novoNivel);
+
+    // 1. Cria e toca o Flash de Luz
+    const flash = document.createElement('div');
+    flash.className = 'flash-level-up';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 600); // Remove após a animação CSS
+
+    // 2. Cria e anima o texto "LEVEL UP!" sobre a área do jogador
+    // (Ajuste o seletor '.player-avatar' para o container do seu personagem no HTML)
+    const playerContainer = document.querySelector('.player-avatar') || document.body;
+    const texto = document.createElement('div');
+    texto.className = 'level-up-text';
+    texto.innerHTML = `LEVEL UP!<br><span style="font-size:16px; color:white;">Nível ${novoNivel}</span>`;
+    playerContainer.appendChild(texto);
+    setTimeout(() => texto.remove(), 2500); // Remove após a animação CSS
+
+    // 3. Opcional: Tocar um som de vitória
+    // if (window.audio_manager) window.audio_manager.play('level_up_sound');
+
+    // 4. Atualiza o número do nível na UI (ajuste o seletor ID se necessário)
+    const levelElement = document.getElementById('player_level');
+    if (levelElement) {
+        levelElement.textContent = novoNivel;
+        // Adiciona um pequeno pulo no número
+        levelElement.style.animation = 'pulse 0.5s'; 
+        setTimeout(() => levelElement.style.animation = '', 500);
+    }
+}
+
 function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) { 
     const logBox = document.getElementById('combat-log-box');
     const elemSpriteMob = document.getElementById('sprite-mob');
@@ -602,13 +636,41 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillNome) {
     lerProximoLog();
 }
 
+// combate.js - Versão Atualizada com Level Up
+
 function finalizarAnimacaoCombate(dados) {
     document.getElementById('combat-log-box').innerHTML = dados.vitoria ? "O INIMIGO FOI DERROTADO!" : "VOCÊ DESMAIOU...";
     document.getElementById('botoes-fim-batalha').style.display = "flex";
     
     if (dados.vitoria) {
-        let lootTexto = dados.recompensas.items.length > 0 ? `<br><br>📦 Saqueou: ${dados.recompensas.items.join(', ')}` : "";
-        exibirAlertaCustom("Vitória!", `✨ +${dados.recompensas.xp} XP<br>💰 +${dados.recompensas.gold} Ouro${lootTexto}`, true);
+        let lootTexto = (dados.recompensas && dados.recompensas.items && dados.recompensas.items.length > 0) 
+            ? `<br><br>📦 Saqueou: ${dados.recompensas.items.join(', ')}` 
+            : "";
+            
+        // 1. Exibe o alerta padrão de vitória com XP e Ouro
+        exibirAlertaCustom(
+            "Vitória!", 
+            `✨ +${dados.recompensas.xp} XP<br>💰 +${dados.recompensas.gold} Ouro${lootTexto}`, 
+            true
+        );
+
+        // =========================================================================
+        // 👇 👇 👇👇 NOVO: SISTEMA DE ANIMAÇÃO DE LEVEL UP 👇👇👇👇👇
+        // =========================================================================
+        // Verificamos se o backend avisou que o personagem upou nesta vitória
+        if (dados.recompensas && dados.recompensas.subiu_nivel) {
+            console.log("🌟 Executando animação de Level Up para o nível: " + dados.recompensas.novo_nivel);
+            
+            // Pequeno delay (800ms) para a animação rodar logo após o alerta de vitória
+            setTimeout(() => {
+                // Chamamos a função que cria o texto e o flash (que criamos no passo anterior)
+                if (typeof rodarAnimacaoLevelUp === 'function') {
+                    rodarAnimacaoLevelUp(dados.recompensas.novo_nivel);
+                }
+            }, 800); 
+        }
+        // =========================================================================
+
     } else {
         exibirAlertaCustom("Derrota", "Você desmaiou em combate e foi resgatado...", false);
     }
