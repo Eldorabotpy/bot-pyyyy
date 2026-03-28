@@ -786,7 +786,7 @@ def api_autohunt_finalizar():
     from handlers.hunt_handler import _pick_monster_template, _build_combat_details_from_template
     from modules.combat import rewards
     from modules.game_data import items as items_data
-    from datetime import datetime, timezone # <-- Garanta que isso está importado
+    from datetime import datetime, timezone
 
     dados = request.json
     user_id = dados.get("user_id")
@@ -799,16 +799,11 @@ def api_autohunt_finalizar():
         if estado.get("action") != "auto_hunting":
             return jsonify({"erro": "Você não está em uma caçada automática."})
 
-        # 👇 NOVA TRAVA DE SEGURANÇA E RESTART 👇
         finish_time_str = estado.get("finish_time")
         if finish_time_str:
-            # Converte a string do banco de volta para formato de hora
             finish_time = datetime.fromisoformat(finish_time_str.replace("Z", "+00:00"))
-            
-            # Se a hora atual for MENOR que a hora do fim, o cara tá tentando burlar!
             if datetime.now(timezone.utc) < finish_time:
                 return jsonify({"erro": "A caçada ainda não terminou! Os monstros estão lutando."})
-        # 👆 ================================= 👆
 
         quantidade = int(estado.get("details", {}).get("hunt_count", 1))
         regiao = estado.get("details", {}).get("region", "pradaria_inicial")
@@ -818,12 +813,9 @@ def api_autohunt_finalizar():
         todos_itens = []
         nomes_itens_formatados = []
 
-        # Roda um loop rápido calculando apenas as vitórias/loots
         for _ in range(quantidade):
             tpl = _pick_monster_template(regiao, player_lvl)
             monster_stats = _build_combat_details_from_template(tpl, player_lvl)
-            
-            # Simulando vitória (No Auto-Hunt original, consideramos win rate alto)
             xp, gold, items_ids = rewards.calculate_victory_rewards(pdata, monster_stats)
             total_xp += xp
             total_gold += gold
@@ -832,33 +824,49 @@ def api_autohunt_finalizar():
         pdata["xp"] = pdata.get("xp", 0) + total_xp
         pdata["gold"] = pdata.get("gold", 0) + total_gold
         
-        # ======= CORREÇÃO DO INVENTÁRIO (AUTO-HUNT) =======
-        if "inventory" not in pdata: pdata["inventory"] = {}
+        # ==========================================================
+        # 👇 SISTEMA DE LEVEL UP NO AUTO-HUNT 👇
+        # ==========================================================
+        from modules import game_data
+        subiu_nivel = False
         
+        while True:
+            lvl_atual = pdata.get("level", 1)
+            try:
+                xp_necessaria = game_data.get_xp_for_next_combat_level(lvl_atual)
+            except:
+                xp_necessaria = int(200 + (100 * (lvl_atual - 1)))
+                
+            if pdata["xp"] >= xp_necessaria:
+                pdata["xp"] -= xp_necessaria
+                pdata["level"] = lvl_atual + 1
+                pdata["stat_points"] = pdata.get("stat_points", 0) + 3 
+                subiu_nivel = True
+            else:
+                break
+        # ==========================================================
+        
+        if "inventory" not in pdata: pdata["inventory"] = {}
         for item_id in todos_itens:
-            # 1. Se o jogador não tem o item ainda, cria com zero
-            if item_id not in pdata["inventory"]:
-                pdata["inventory"][item_id] = 0
-            
-            # 2. Verifica como o item está salvo no seu banco (Inteiro ou Dicionário)
+            if item_id not in pdata["inventory"]: pdata["inventory"][item_id] = 0
             if isinstance(pdata["inventory"][item_id], dict):
                 pdata["inventory"][item_id]["quantity"] = pdata["inventory"][item_id].get("quantity", 0) + 1
             else:
                 pdata["inventory"][item_id] += 1
                 
-            # Formata o nome para mostrar na tela
             n_item = items_data.ITEMS_DATA.get(item_id, {}).get("display_name", item_id) if hasattr(items_data, 'ITEMS_DATA') else item_id
-            nomes_itens_formatados.append(n_item) # <-- Agora usa o nome correto da variável!
-        # ==================================================
-        # Reseta o estado
+            nomes_itens_formatados.append(n_item)
+
         pdata["player_state"] = {"action": "idle"}
-        _run_async(player_manager.save_player_data(busca_id, pdata)) # <--- USE ISSO
+        _run_async(player_manager.save_player_data(busca_id, pdata)) 
 
         return jsonify({
             "sucesso": True,
             "xp": total_xp,
             "gold": total_gold,
-            "items": nomes_itens_formatados
+            "items": nomes_itens_formatados,
+            "subiu_nivel": subiu_nivel,
+            "novo_nivel": pdata.get("level")
         })
 
     except Exception as e:
