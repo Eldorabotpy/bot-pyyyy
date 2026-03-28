@@ -557,9 +557,28 @@ def api_combate_acao():
 
         elif acao == "atacar" or acao == "magia":
             
-            # --- CORREÇÃO 1: PROTEÇÃO ANTI-CRASH (KEYERROR) ---
-            # Tenta pegar do cache. Se não tiver (lutas velhas), puxa do personagem.
             mana_atual = cache.get("player_mp", pdata.get("current_mp", 0))
+
+            # ==========================================================
+            # CORREÇÃO: GASTO DE MANA E ATIVAÇÃO DO COOLDOWN
+            # ==========================================================
+            if acao == "magia" and skill_id:
+                from modules.game_data.skills import get_skill_data_with_rarity
+                skill_info = get_skill_data_with_rarity(pdata, skill_id)
+                custo_mp = int(skill_info.get("mana_cost", 0))
+                
+                if mana_atual < custo_mp:
+                    return jsonify({"erro": "Mana insuficiente para esta magia!"})
+                
+                # Desconta a mana
+                mana_atual -= custo_mp
+                cache["player_mp"] = mana_atual
+                
+                # Ativa o Cooldown da magia
+                tempo_cd = int(skill_info.get("cooldown", 0))
+                if tempo_cd > 0:
+                    if "cooldowns" not in pdata: pdata["cooldowns"] = {}
+                    pdata["cooldowns"][skill_id] = tempo_cd
 
             res_p = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata=pdata,
@@ -567,14 +586,12 @@ def api_combate_acao():
                 target_stats=cache["monster_stats"],
                 skill_id=skill_id if acao == "magia" else None, 
                 attacker_current_hp=cache.get("player_hp", 0),
-                attacker_current_mp=mana_atual # <--- Passa com segurança!
+                attacker_current_mp=mana_atual 
             ))
             
-            # Atualiza o HP do monstro com o dano
             dano_p = res_p.get("total_damage", 0)
             cache["monster_hp"] -= dano_p
             
-            # --- CORREÇÃO 2: ATUALIZA O CACHE DE MANA ---
             if "attacker_mp_left" in res_p:
                 cache["player_mp"] = res_p["attacker_mp_left"]
             
@@ -595,8 +612,7 @@ def api_combate_acao():
             if "inventory" not in pdata: pdata["inventory"] = {}
         
             for item_id in items_ids:
-                if item_id not in pdata["inventory"]:
-                    pdata["inventory"][item_id] = 0
+                if item_id not in pdata["inventory"]: pdata["inventory"][item_id] = 0
             
                 if isinstance(pdata["inventory"][item_id], dict):
                     pdata["inventory"][item_id]["quantity"] = pdata["inventory"][item_id].get("quantity", 0) + 1
@@ -609,10 +625,13 @@ def api_combate_acao():
             recompensas_finais = {"xp": xp, "gold": gold, "items": items_names}
             pdata.pop("battle_cache", None)
             pdata["player_state"] = {"action": "idle"}
+            
+            # Limpa os cooldowns ao final da luta
+            pdata.pop("cooldowns", None)
+            
             log_turno.append({"autor": "system", "texto": f"🏆 {cache['mob_nome']} foi derrotado!"})
             
         else:
-            # Turno do monstro só acontece se a luta não acabou
             res_m = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata={}, 
                 attacker_stats=cache["monster_stats"],
@@ -635,6 +654,7 @@ def api_combate_acao():
                 enviar_mensagem_telegram(chat_id, f"💀 <b>[App de Eldora]</b> {msg_derrota}")
                 
                 pdata.pop("battle_cache", None)
+                pdata.pop("cooldowns", None)
                 pdata["player_state"] = {"action": "idle"}
 
         if not vitoria and not derrota:
@@ -642,10 +662,18 @@ def api_combate_acao():
             pdata["battle_cache"] = cache
             pdata["current_hp"] = max(0, cache.get("player_hp", 0))
             pdata["current_mp"] = max(0, cache.get("player_mp", 0))
+            
+            # ==========================================================
+            # CORREÇÃO: AVANÇA O RELÓGIO DOS COOLDOWNS NO FIM DO TURNO
+            # ==========================================================
+            if "cooldowns" in pdata:
+                novos_cds = {}
+                for sk, cd in pdata["cooldowns"].items():
+                    if cd > 1: novos_cds[sk] = cd - 1
+                pdata["cooldowns"] = novos_cds
         else:
             max_hp = cache.get("player_stats", {}).get("max_hp", 100)
             max_mp = cache.get("player_stats", {}).get("max_mana", 50)
-            
             pdata["current_hp"] = max_hp
             pdata["current_mp"] = max_mp
 
@@ -655,7 +683,7 @@ def api_combate_acao():
             "sucesso": True,
             "log": log_turno,
             "player_hp": cache.get("player_hp", 0),
-            "player_mp": cache.get("player_mp", pdata.get("current_mp", 0)), # <--- CORREÇÃO 3: Envia a mana pro seu JavaScript
+            "player_mp": cache.get("player_mp", pdata.get("current_mp", 0)), 
             "monster_hp": cache.get("monster_hp", 0),
             "vitoria": vitoria,
             "derrota": derrota,
