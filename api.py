@@ -560,10 +560,12 @@ def api_combate_acao():
             mana_atual = cache.get("player_mp", pdata.get("current_mp", 0))
 
             # ==========================================================
-            # CORREÇÃO: GASTO DE MANA E ATIVAÇÃO DO COOLDOWN
+            # CORREÇÃO: GASTO DE MANA E COOLDOWN OFICIAL
             # ==========================================================
             if acao == "magia" and skill_id:
                 from modules.game_data.skills import get_skill_data_with_rarity
+                from modules.cooldowns import aplicar_cooldown # Puxa o seu relógio oficial
+                
                 skill_info = get_skill_data_with_rarity(pdata, skill_id)
                 custo_mp = int(skill_info.get("mana_cost", 0))
                 
@@ -574,11 +576,9 @@ def api_combate_acao():
                 mana_atual -= custo_mp
                 cache["player_mp"] = mana_atual
                 
-                # Ativa o Cooldown da magia
-                tempo_cd = int(skill_info.get("cooldown", 0))
-                if tempo_cd > 0:
-                    if "cooldowns" not in pdata: pdata["cooldowns"] = {}
-                    pdata["cooldowns"][skill_id] = tempo_cd
+                # Ativa o Cooldown da magia perfeitamente!
+                raridade_skill = skill_info.get("rarity", "comum")
+                pdata = aplicar_cooldown(pdata, skill_id, raridade_skill)
 
             res_p = rodar_engine(combat_engine.processar_acao_combate(
                 attacker_pdata=pdata,
