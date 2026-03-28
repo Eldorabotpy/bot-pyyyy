@@ -521,67 +521,49 @@ async function executarAcaoTurno(tipoAcao, skillId = null, skillNome = null) {
 // NOVA FUNÇÃO: LÊ O QUE O PYTHON MANDOU E ANIMA
 // ==========================================
 
-// combate.js - Função da Animação ÉPICA
-
+// combate.js - Animação Level Up Moderna (Estilo Card)
 function rodarAnimacaoLevelUp(novoNivel) {
-    console.log("🌟 Iniciando ANIMAÇÃO ÉPICA de Level Up!");
+    console.log("🌟 Iniciando NOVA ANIMAÇÃO de Level Up Premium!");
 
-    // 1. Localiza o personagem pelo ID correto do seu HTML
-    const spritePlayer = document.getElementById('sprite-player');
-    const containerAlvo = spritePlayer ? spritePlayer.parentElement : (document.getElementById('arena-box') || document.body);
+    const containerAlvo = document.getElementById('arena-box') || document.body;
     
-    containerAlvo.style.position = 'relative';
+    // Limpa se já existir uma tocando
+    const oldOverlay = containerAlvo.querySelector('.level-up-overlay');
+    if (oldOverlay) oldOverlay.remove();
 
-    // Limpa sobras para não acumular lixo na memória
-    const oldContainer = containerAlvo.querySelector('.level-up-epic-container');
-    if (oldContainer) oldContainer.remove();
+    // 1. Cria a camada escura de fundo
+    const overlay = document.createElement('div');
+    overlay.className = 'level-up-overlay';
 
-    // 2. Cria o palco da animação
-    const epicContainer = document.createElement('div');
-    epicContainer.className = 'level-up-epic-container';
-    containerAlvo.appendChild(epicContainer);
+    // 2. Cria o Card
+    const card = document.createElement('div');
+    card.className = 'level-up-card';
 
-    // 3. Treme a tela (Screenshake)
-    const arena = document.getElementById('arena-box') || document.body;
-    arena.classList.add('shake-screen');
-    setTimeout(() => arena.classList.remove('shake-screen'), 400);
+    // 3. Monta o HTML interno com a referência visual
+    card.innerHTML = `
+        <h2 class="level-up-title">LEVEL UP!</h2>
+        <div class="level-up-number-container">
+            <div class="level-up-number">${novoNivel}</div>
+        </div>
+        <p class="level-up-subtitle">VOCÊ FICOU MAIS FORTE!</p>
+    `;
 
-    // 4. Pilar de Luz e Texto
-    const beam = document.createElement('div');
-    beam.className = 'level-up-beam';
-    epicContainer.appendChild(beam);
+    overlay.appendChild(card);
+    containerAlvo.appendChild(overlay);
 
-    const textSlam = document.createElement('div');
-    textSlam.className = 'level-up-slam-text';
-    textSlam.innerHTML = `LEVEL UP!<br><span class="level-up-subtext">Nível ${novoNivel}</span>`;
-    epicContainer.appendChild(textSlam);
+    // 4. Atualiza o nível no HUD em tempo real
+    const levelElements = document.querySelectorAll('.hud-level');
+    if (levelElements.length > 1) {
+        // O índice 1 geralmente é o do jogador, se ele for o HUD de baixo
+        levelElements[1].textContent = `LV.${novoNivel}`;
+    }
 
-    // 5. Explosão de Partículas Douradas
+    // 5. Some e limpa o HTML depois de 3.5 segundos para não travar a tela
     setTimeout(() => {
-        for (let i = 0; i < 30; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'level-up-particle';
-            const dx = (Math.random() - 0.5) * 200;
-            const dy = (Math.random() * -150) - 50;
-            const rot = (Math.random() - 0.5) * 720;
-
-            particle.style.setProperty('--dx', `${dx}px`);
-            particle.style.setProperty('--dy', `${dy}px`);
-            particle.style.setProperty('--rot', `${rot}deg`);
-            particle.style.left = '50%';
-            particle.style.top = '50%';
-
-            epicContainer.appendChild(particle);
-            setTimeout(() => particle.remove(), 1500);
-        }
-    }, 400); 
-
-    // 6. Atualiza o nível visualmente no HUD
-    const levelElement = document.getElementById('player_level');
-    if (levelElement) levelElement.textContent = novoNivel;
-
-    // 7. FECHAMENTO DA FUNÇÃO (O que estava faltando!)
-    setTimeout(() => epicContainer.remove(), 3000);
+        overlay.style.opacity = "0";
+        overlay.style.transition = "opacity 0.4s ease";
+        setTimeout(() => overlay.remove(), 400);
+    }, 3500);
 }
 
 function finalizarAnimacaoCombate(dados) {
