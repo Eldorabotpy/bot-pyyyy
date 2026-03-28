@@ -21,6 +21,7 @@ def _run_async(coro):
 # ==========================================
 # ROTA DE PERFIL COMPLETO (TRANSFERIDA DO API.PY)
 # ==========================================
+
 @webapp_bp.route('/perfil/<user_id>')
 def obter_perfil(user_id):
     try:
@@ -30,7 +31,7 @@ def obter_perfil(user_id):
         from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
         from modules.game_data.classes import get_class_avatar
 
-        # 1. Busca Segura
+        # 1. Busca Segura do Personagem
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
         pdata = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
         
@@ -41,11 +42,23 @@ def obter_perfil(user_id):
         xp_visual_max = int(200 + (100 * (lvl - 1)) + (40 * (lvl - 1) * (lvl - 1))) 
         classe_str = str(pdata.get("class", "aprendiz"))
         
-        # 2. PUXA OS STATUS
+        # 2. CALCULA STATUS TOTAIS (Considerando Equipamentos e Passivas)
         totals = _run_async(player_manager.get_player_total_stats(pdata))
         esquiva = int(_run_async(player_manager.get_player_dodge_chance(pdata)) * 100)
         atk_duplo = int(_run_async(player_manager.get_player_double_attack_chance(pdata)) * 100)
         
+        # Definição correta de Máximos baseados nos itens equipados
+        hp_max = int(totals.get("max_hp", 100))
+        mp_max = int(totals.get("max_mana", 50))
+        
+        # Correção: Garante que o HP/MP atual não seja maior que o novo máximo e nem nulo
+        hp_atual = int(pdata.get("current_hp", hp_max))
+        mp_atual = int(pdata.get("current_mp", mp_max))
+        
+        if hp_atual > hp_max: hp_atual = hp_max
+        if mp_atual > mp_max: mp_atual = mp_max
+
+        # 3. Formatação de Status para exibição na UI
         status_formatados = {}
         for stat in ["attack", "defense", "initiative", "luck"]:
             val = int(totals.get(stat, 0))
@@ -53,7 +66,7 @@ def obter_perfil(user_id):
             emoji = {"attack": "⚔️", "defense": "🛡️", "initiative": "🏃", "luck": "🍀"}[stat]
             status_formatados[stat] = {"nome": nome_pt, "emoji": emoji, "valor": val}
 
-        # PROFISSÃO
+        # 4. Processamento de Profissão
         prof_nome, prof_lvl = "Nenhuma", 0
         prof_raw = pdata.get("profession")
         if prof_raw:
@@ -67,7 +80,7 @@ def obter_perfil(user_id):
             else:
                 prof_nome, prof_lvl = str(prof_raw).capitalize(), 1
 
-        # 4. INVENTÁRIO (COM BASE_ID PARA IMAGENS)
+        # 5. Inventário formatado com Base_ID para imagens WebP
         inventario_cru = pdata.get("inventory") or {}
         inventario_formatado = []
         for item_id, qtd_ou_dict in inventario_cru.items():
@@ -84,7 +97,7 @@ def obter_perfil(user_id):
 
                 inventario_formatado.append({
                     "id": item_id, 
-                    "base_id": base_id, # <--- ADICIONADO PARA AS IMAGENS WEBP
+                    "base_id": base_id, 
                     "nome": nome_item, 
                     "emoji": info_item.get("emoji", "📦"), 
                     "qtd": qtd,
@@ -96,7 +109,7 @@ def obter_perfil(user_id):
                 })
         inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 
-        # 5. EQUIPAMENTOS (COM BASE_ID PARA IMAGENS)
+        # 6. Equipamentos formatados para o Boneco de Neve/UI
         equip_cru = pdata.get("equipment") or {}
         equip_formatado = []
         for slot in SLOT_ORDER:
@@ -115,7 +128,7 @@ def obter_perfil(user_id):
                 equip_formatado.append({
                     "slot": slot, "uid": item_uid, "emoji": emoji_slot, "nome": nome_equip, 
                     "icon": icon_equip, "vazio": False,
-                    "base_id": base_id, # <--- ADICIONADO AQUI TAMBÉM
+                    "base_id": base_id, 
                     "tipo": info_item.get("type", "equipamento"), 
                     "desc": info_item.get("description", "Equipamento em uso."), 
                     "raridade": obj_item.get("rarity", info_item.get("rarity", "comum")),
@@ -128,12 +141,13 @@ def obter_perfil(user_id):
                     "vazio": True, "desc": "Espaço vazio.", "tipo": "vazio", "raridade": "", "refino": 0, "stats": {}
                 })
 
+        # Retorno unificado para o Frontend (Perfil e Combate)
         return jsonify({
             "nome": pdata.get("character_name", "Aventureiro"), 
             "level": lvl, "gold": pdata.get("gold", 0), "gems": pdata.get("gems", 0),
             "classe": classe_str.capitalize(), "xp": int(pdata.get("xp", 0)), "xp_max": xp_visual_max,
-            "hp_atual": pdata.get("current_hp", totals.get("max_hp", 0)), "hp_max": totals.get("max_hp", 0), 
-            "mp_atual": pdata.get("current_mp", totals.get("max_mana", 0)), "mp_max": totals.get("max_mana", 0),
+            "hp_atual": hp_atual, "hp_max": hp_max, 
+            "mp_atual": mp_atual, "mp_max": mp_max,
             "energy": pdata.get("energy", 0), "pontos_livres": pdata.get("stat_points", 0), 
             "avatar": get_class_avatar(classe_str), "status": status_formatados,
             "inventario": inventario_formatado, "equipamentos": equip_formatado,

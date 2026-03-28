@@ -435,7 +435,18 @@ def api_combate_iniciar():
         pdata = users_collection.find_one({"_id": busca_id})
         if not pdata: return jsonify({"erro": "Personagem não encontrado"})
 
-        hp_atual = int(pdata.get("current_hp", pdata.get("max_hp", 100)))
+        # =======================================================
+        # 1. A MÁGICA: RECALCULA TUDO USANDO O MOTOR DO BOT
+        # =======================================================
+        total_stats = _run_async(player_manager.get_player_total_stats(pdata))
+        
+        hp_max_real = int(total_stats.get("max_hp", 100))
+        mp_max_real = int(total_stats.get("max_mana", 50))
+        
+        # Garante que o HP/MP atual não ultrapasse o máximo real
+        hp_atual = min(int(pdata.get("current_hp", hp_max_real)), hp_max_real)
+        mp_atual = min(int(pdata.get("current_mp", mp_max_real)), mp_max_real)
+
         if hp_atual <= 0: return jsonify({"erro": "Você está morto! Descanse ou use uma poção."})
         if pdata.get("energy", 0) < 1: return jsonify({"erro": "Sem energia suficiente (⚡)."})
 
@@ -450,15 +461,14 @@ def api_combate_iniciar():
         monster_stats = _build_combat_details_from_template(tpl, player_lvl)
         mob_img = tpl.get("image_url", f"/static/monsters/{tpl.get('id')}.jpg")
 
-        player_stats = pdata.get("total_stats", pdata.copy())
-        player_stats.pop("_id", None)
-        if "max_hp" not in player_stats: player_stats["max_hp"] = pdata.get("max_hp", 100)
-
+        # =======================================================
+        # 2. CRIA O CACHE COM OS DADOS PERFEITOS
+        # =======================================================
         battle_cache = {
-            "player_stats": player_stats,
+            "player_stats": total_stats, # Usa os status calculados!
             "monster_stats": monster_stats,
             "player_hp": hp_atual,
-            "player_mp": pdata.get("current_mp", player_stats.get("max_mana", 50)),
+            "player_mp": mp_atual,
             "monster_hp": monster_stats.get("max_hp"),
             "regiao": regiao,
             "mob_img": mob_img,
@@ -468,23 +478,24 @@ def api_combate_iniciar():
         
         pdata["battle_cache"] = battle_cache
         pdata["player_state"] = {"action": "in_combat"}
-        _run_async(player_manager.save_player_data(busca_id, pdata)) # <--- USE ISSO
+        pdata["current_hp"] = hp_atual
+        pdata["current_mp"] = mp_atual
+        
+        _run_async(player_manager.save_player_data(busca_id, pdata)) 
 
+        # =======================================================
+        # 3. ENVIA PARA O JAVASCRIPT
+        # =======================================================
         estado_frontend = {
-            "player_hp": battle_cache["player_hp"],
-            "player_mp": battle_cache["player_mp"],
+            "player_hp": hp_atual,
+            "player_mp": mp_atual,
             "monster_hp": battle_cache["monster_hp"],
             "regiao": battle_cache["regiao"],
             "mob_img": battle_cache["mob_img"],
             "mob_nome": battle_cache["mob_nome"],
-            # 👇 ADICIONE ESTAS DUAS LINHAS 👇
             "player_level": player_lvl,
             "monster_level": monster_stats.get("level", player_lvl), 
-            # 👆 ========================== 👆
-            "player_stats": {
-                "max_hp": player_stats.get("max_hp", 100),
-                "max_mana": player_stats.get("max_mana", 50)
-            },
+            "player_stats": total_stats, # JavaScript recebe tudo certinho
             "monster_stats": {
                 "max_hp": monster_stats.get("max_hp", 100)
             }
@@ -504,7 +515,7 @@ def api_combate_iniciar():
 # ==========================================
 # ROTA: AÇÃO DO TURNO (NOVO SISTEMA)
 # ==========================================
-@app.route('/api/combate/acao', methods=['POST'])
+
 @app.route('/api/combate/acao', methods=['POST'])
 def api_combate_acao():
     import asyncio
