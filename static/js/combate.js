@@ -711,15 +711,18 @@ function finalizarAnimacaoCombate(dados) {
 
         // =========================================================================
         // 👇👇👇 SISTEMA DE ANIMAÇÃO ÉPICA DE LEVEL UP 👇👇👇
-        // =========================================================================
-        // Verificamos se o backend avisou que o personagem upou nesta vitória
         if (dados.recompensas && dados.recompensas.subiu_nivel) {
-            console.log("🌟 Executando animação ÉPICA de Level Up para o nível: " + dados.recompensas.novo_nivel);
             
-            // Delay de 600ms: Dá o tempo exato para o jogador ler o XP antes da explosão de luz
+            // TIRA-TEIMA: Se essa caixa feia do navegador aparecer, o JS reconheceu!
+            alert("DEBUG: O JAVASCRIPT SABE QUE VOCÊ UPOU PARA O NÍVEL " + dados.recompensas.novo_nivel);
+            
+            console.log("🌟 Executando animação ÉPICA de Level Up!");
+            
             setTimeout(() => {
                 if (typeof rodarAnimacaoLevelUp === 'function') {
                     rodarAnimacaoLevelUp(dados.recompensas.novo_nivel);
+                } else {
+                    alert("DEBUG ERRO: A função rodarAnimacaoLevelUp não existe ou está no lugar errado!");
                 }
             }, 600); 
         }
