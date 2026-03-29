@@ -1,14 +1,16 @@
 # handlers/skin_handler.py
-# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO)
+# (VERSÃO FINAL: AUTH UNIFICADA + ID SEGURO + RENDERIZAÇÃO DE GÊNERO/HÍBRIDA)
 
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from telegram.error import BadRequest
+
 from modules.player import stats as player_stats
-from modules import player_manager, game_data
-from modules.game_data.skins import SKIN_CATALOG
-from modules.auth_utils import get_current_player_id  # <--- ÚNICA FONTE DE VERDADE
+from modules import player_manager, game_data, file_id_manager
+from modules.game_data.skins import SKIN_CATALOG, get_skin_avatar
+from modules.game_data.classes import get_class_avatar
+from modules.auth_utils import get_current_player_id
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +37,51 @@ async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         player_class_key = player_stats._get_class_key_normalized(player_data)
     except Exception:
-        player_class_key = (player_data.get("class") or "").lower() # Fallback
+        player_class_key = (player_data.get("class") or "").lower()
     
     if not player_class_key:
-        await query.answer("Você precisa de ter uma classe para mudar de aparência!", show_alert=True)
+        await query.answer("Você precisa ter uma classe para mudar de aparência!", show_alert=True)
         return
 
     unlocked_skins = player_data.get("unlocked_skins", [])
-    equipped_skin = player_data.get("equipped_skin") # Pode ser None
+    equipped_skin = player_data.get("equipped_skin")
+    player_gender = player_data.get("gender", "masculino")
+    gender_suffix = "_female" if player_gender == "feminino" else "_male"
     
-    caption = "🎨 **Mudar Aparência**\n\nSelecione uma aparência que já desbloqueou para a equipar."
+    # ==========================================
+    # LÓGICA DE BUSCA DA IMAGEM (HÍBRIDA)
+    # ==========================================
+    file_data = None
+    avatar_url = None
+
+    if equipped_skin and equipped_skin in SKIN_CATALOG:
+        skin_info = SKIN_CATALOG[equipped_skin]
+        base_file_name = skin_info.get("media_key")
+        
+        # 1. Tenta pegar a imagem da skin no Telegram com sufixo de gênero
+        if base_file_name:
+            file_data = file_id_manager.get_file_data(f"{base_file_name}{gender_suffix}")
+            # Fallback sem gênero
+            if not file_data:
+                file_data = file_id_manager.get_file_data(base_file_name)
+        
+        # 2. Fallback Web App (GitHub) para Skins
+        if not file_data:
+            avatar_url = get_skin_avatar(equipped_skin, player_gender)
+    else:
+        # 3. Tenta pegar a imagem PADRÃO da classe no Telegram
+        file_data = file_id_manager.get_file_data(f"classe_{player_class_key}_media{gender_suffix}")
+        if not file_data:
+            file_data = file_id_manager.get_file_data(f"classe_{player_class_key}_media")
+        
+        # 4. Fallback Web App (GitHub) para Classes
+        if not file_data:
+            avatar_url = get_class_avatar(player_class_key, player_gender)
+
+    # ==========================================
+    # MONTAGEM DO MENU E BOTÕES
+    # ==========================================
+    caption = "🎨 <b>Mudar Aparência</b>\n\nSelecione uma aparência que já desbloqueou para a equipar."
     keyboard = []
     
     available_skins = {
@@ -52,15 +89,10 @@ async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data.get('class') == player_class_key and skin_id in unlocked_skins
     }
     
-    # Adiciona o botão "Aparência Padrão"
     if equipped_skin is None:
-        keyboard.append([
-            InlineKeyboardButton("✅ Aparência Padrão (Equipada)", callback_data="noop_skin_equipped")
-        ])
+        keyboard.append([InlineKeyboardButton("✅ Aparência Padrão (Equipada)", callback_data="noop_skin_equipped")])
     else:
-        keyboard.append([
-            InlineKeyboardButton("🎨 Usar Aparência Padrão", callback_data="unequip_skin")
-        ])
+        keyboard.append([InlineKeyboardButton("🎨 Usar Aparência Padrão", callback_data="unequip_skin")])
 
     if not available_skins:
         caption += "\n\nVocê ainda não desbloqueou nenhuma aparência para a sua classe."
@@ -75,23 +107,39 @@ async def show_skin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
 
     keyboard.append([InlineKeyboardButton("⬅️ Voltar ao Perfil", callback_data="profile")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
+    # ==========================================
+    # ATUALIZAÇÃO DA MENSAGEM COM A FOTO NOVA
+    # ==========================================
     try:
-        await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-    except BadRequest as e: 
-        logger.warning(f"Falha ao editar caption em show_skin_menu (provavelmente era texto): {e}")
-        try:
-            await query.edit_message_text(text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-        except Exception as e_text:
-            logger.error(f"Falha crítica ao editar menu de skin: {e_text}")
-    except Exception as e_geral:
-        logger.error(f"Erro inesperado em show_skin_menu: {e_geral}", exc_info=True)
-
+        # Se achou no Telegram:
+        if file_data and file_data.get("id"):
+            media = InputMediaPhoto(media=file_data["id"], caption=caption, parse_mode="HTML")
+            await query.edit_message_media(media=media, reply_markup=reply_markup)
+        
+        # Se achou no GitHub:
+        elif avatar_url and avatar_url.startswith("http"):
+            media = InputMediaPhoto(media=avatar_url, caption=caption, parse_mode="HTML")
+            await query.edit_message_media(media=media, reply_markup=reply_markup)
+        
+        # Se não achou nada, edita só o texto:
+        else:
+            await query.edit_message_caption(caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+            
+    except BadRequest as e:
+        # O Telegram dá erro se tentarmos trocar a foto pela MESMA foto (ex: clicou na skin que já estava). 
+        # Ignoramos esse erro específico silenciosamente.
+        if "Message is not modified" not in str(e):
+            logger.warning(f"Falha ao editar media em show_skin_menu: {e}")
+            try:
+                await query.edit_message_text(text=caption, reply_markup=reply_markup, parse_mode="HTML")
+            except Exception:
+                pass
 
 async def equip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
-    # 🔒 SEGURANÇA: ID via Auth Central
     user_id = get_current_player_id(update, context)
     if not user_id:
         await query.answer("Sessão inválida.", show_alert=True)
@@ -119,14 +167,15 @@ async def equip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     player_data["equipped_skin"] = skin_id_to_equip
     
     await player_manager.save_player_data(user_id, player_data)
-    await query.answer("Aparência equipada com sucesso!", show_alert=True)
-    await show_skin_menu(update, context) # Recarrega o menu
+    await query.answer("Aparência equipada com sucesso!", show_alert=False)
+    
+    # Chama o menu de novo para ele trocar a imagem instantaneamente!
+    await show_skin_menu(update, context)
 
 
 async def unequip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
-    # 🔒 SEGURANÇA: ID via Auth Central
     user_id = get_current_player_id(update, context)
     if not user_id:
         await query.answer("Sessão inválida.", show_alert=True)
@@ -144,16 +193,15 @@ async def unequip_skin_callback(update: Update, context: ContextTypes.DEFAULT_TY
     player_data["equipped_skin"] = None
     
     await player_manager.save_player_data(user_id, player_data)
+    await query.answer("Aparência padrão restaurada!", show_alert=False)
     
-    await query.answer("Aparência padrão restaurada!", show_alert=True)
-    
-    await show_skin_menu(update, context) # Recarrega o menu
+    # Atualiza a imagem de volta para o padrão
+    await show_skin_menu(update, context)
 
 async def noop_skin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Callback para o botão "Padrão (Equipada)" que não faz nada."""
     await update.callback_query.answer("Você já está usando a aparência padrão.")
 
-# --- REGISTO DOS HANDLERS (Atualizado) ---
+# --- REGISTO DOS HANDLERS ---
 skin_menu_handler = CallbackQueryHandler(show_skin_menu, pattern=r"^skin_menu$")
 equip_skin_handler = CallbackQueryHandler(equip_skin_callback, pattern=r"^equip_skin:.*$")
 unequip_skin_handler = CallbackQueryHandler(unequip_skin_callback, pattern=r"^unequip_skin$")

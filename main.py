@@ -245,7 +245,7 @@ if __name__ == "__main__":
     # Fallbacks
     application.add_handler(CommandHandler("logout", logout_command))
     application.add_handler(CallbackQueryHandler(logout_callback, pattern="^logout_btn$"))
-    application.add_handler(start_command_handler)
+    #application.add_handler(start_command_handler)
     application.add_handlers(guide_handlers)
     
     # Debug opcional

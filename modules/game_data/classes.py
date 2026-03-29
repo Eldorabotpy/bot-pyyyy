@@ -292,61 +292,196 @@ CLASS_DMG_EMOJI = {
 # ============================================================================
 # Cole aqui os links das imagens com fundo transparente (PNG) hospedadas no GitHub.
 CLASS_AVATARS = {
-    "aprendiz": "https://github.com/user-attachments/assets/b0f8f158-3d54-46ef-b1df-9bbd9300609f", # Imagem base
-    "aventureiro": "LINK_GITHUB_AVENTUREIRO.png",
+    "aprendiz": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "aventureiro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "guerreiro": "LINK_GITHUB_GUERREIRO.png",
-    "cavaleiro": "LINK_GITHUB_CAVALEIRO.png",
-    "gladiador": "LINK_GITHUB_GLADIADOR.png",
-    "templario": "LINK_GITHUB_TEMPLARIO.png",
-    "guardiao_divino": "LINK_GITHUB_GUARDIAO.png",
+    "guerreiro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "cavaleiro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "gladiador": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "templario": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "guardiao_divino": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "berserker": "LINK_GITHUB_BERSERKER.png",
-    "barbaro": "LINK_GITHUB_BARBARO.png",
-    "juggernaut": "LINK_GITHUB_JUGGERNAUT.png",
-    "ira_primordial": "LINK_GITHUB_IRA.png",
+    "berserker": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "barbaro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "juggernaut": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "ira_primordial": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "cacador": "LINK_GITHUB_CACADOR.png",
-    "patrulheiro": "LINK_GITHUB_PATRULHEIRO.png",
-    "franco_atirador": "LINK_GITHUB_FRANCO.png",
-    "olho_de_aguia": "LINK_GITHUB_AGUIA.png",
+    "cacador": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "patrulheiro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "franco_atirador": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "olho_de_aguia": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "monge": "LINK_GITHUB_MONGE.png",
-    "guardiao_do_templo": "LINK_GITHUB_GUAR_TEMPLO.png",
-    "punho_elemental": "LINK_GITHUB_PUNHO.png",
-    "ascendente": "LINK_GITHUB_ASCENDENTE.png",
+    "monge": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "guardiao_do_templo": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "punho_elemental": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "ascendente": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "mago": "LINK_GITHUB_MAGO.png",
-    "feiticeiro": "LINK_GITHUB_FEITICEIRO.png",
-    "elementalista": "LINK_GITHUB_ELEMENTALISTA.png",
-    "arquimago": "LINK_GITHUB_ARQUIMAGO.png",
+    "mago": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "feiticeiro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "elementalista": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "arquimago": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "bardo": "LINK_GITHUB_BARDO.png",
-    "menestrel": "LINK_GITHUB_MENESTREL.png",
-    "encantador": "LINK_GITHUB_ENCANTADOR.png",
-    "maestro": "LINK_GITHUB_MAESTRO.png",
+    "bardo": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "menestrel": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "encantador": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "maestro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "assassino": "https://github.com/user-attachments/assets/cbc6a4a3-26c6-46fe-b03f-4b594b5c3b47",
-    "ladrao_de_sombras": "https://github.com/user-attachments/assets/26418b8d-5814-4d74-aaa1-0e27fe310778",
-    "ninja": "https://github.com/user-attachments/assets/d6b0cd6c-263e-4300-9b55-bb4e1345f614",
-    "mestre_das_laminas": "https://github.com/user-attachments/assets/d8932eee-f2bc-42e5-a477-4a0e2bcfa441",
+    "assassino": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "ladrao_de_sombras": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "ninja": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "mestre_das_laminas": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "samurai": "LINK_GITHUB_SAMURAI.png",
-    "kensei": "LINK_GITHUB_KENSEI.png",
-    "ronin": "LINK_GITHUB_RONIN.png",
-    "shogun": "LINK_GITHUB_SHOGUN.png",
+    "samurai": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "kensei": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "ronin": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "shogun": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
     
-    "curandeiro": "LINK_GITHUB_CURANDEIRO.png",
-    "clerigo": "LINK_GITHUB_CLERIGO.png",
-    "druida": "LINK_GITHUB_DRUIDA.png",
-    "sacerdote": "LINK_GITHUB_SACERDOTE.png"
+    "curandeiro": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "clerigo": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "druida": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
+    "sacerdote": {
+        "masculino": "https://github.com/seulink/aventureiro_masculino.png",
+        "feminino": "https://github.com/seulink/aventureiro_feminino.png"
+    },
 }
 
-def get_class_avatar(class_key: str) -> str:
-    """Retorna o link da imagem da classe, com fallback para a imagem de aprendiz."""
-    if not class_key:
-        return CLASS_AVATARS["aprendiz"]
-    return CLASS_AVATARS.get(class_key.lower(), CLASS_AVATARS["aprendiz"])
+def get_class_avatar(class_key: str, gender: str = "masculino") -> str:
+    """Retorna o link da imagem da classe baseada no gênero, com fallback para aventureiro."""
+    
+    # Se a classe vier vazia, nula, ou for termos iniciais, vira aventureiro
+    if not class_key or class_key.lower() in ["", "none", "aprendiz"]:
+        class_key = "aventureiro"
+        
+    ckey = class_key.lower()
+    gen = gender.lower()
+
+    # Se o gênero vier zoado, assume masculino como padrão de segurança
+    if gen not in ["masculino", "feminino"]:
+        gen = "masculino"
+
+    # Busca a classe no dicionário
+    class_data = CLASS_AVATARS.get(ckey)
+
+    # Se a classe não for encontrada por algum motivo, devolve o aventureiro
+    if not class_data:
+        return CLASS_AVATARS.get("aventureiro", {}).get(gen, "")
+
+    # Retorna o link específico do gênero
+    return class_data.get(gen, "")
 
 def get_primary_damage_profile(player_class: str) -> dict:
     pc = (player_class or "").lower()

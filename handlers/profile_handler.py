@@ -42,33 +42,68 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
     except Exception:
         player_base_class = cls
 
+    # --- 1. IDENTIFICAÇÃO DE GÊNERO ---
+    player_gender = player_data.get("gender", "masculino")
+    gender_suffix = "_female" if player_gender == "feminino" else "_male"
+
     purpose = (purpose or "").strip().lower()
-    candidates = []
     equipped_skin_id = player_data.get("equipped_skin")
 
+    # --- 2. TENTA CARREGAR SKIN EQUIPADA (HÍBRIDA) ---
     if equipped_skin_id and equipped_skin_id in SKIN_CATALOG:
         skin_info = SKIN_CATALOG[equipped_skin_id]
         if skin_info.get('class') == player_base_class:
-            candidates.append(skin_info['media_key'])
+            base_media_key = skin_info.get('media_key')
+            
+            # 2.1 Tenta Mídia Telegram Específica (Gênero)
+            if base_media_key:
+                fd = file_ids.get_file_data(f"{base_media_key}{gender_suffix}")
+                if fd and fd.get("id"): return fd
+                
+                # 2.2 Tenta Mídia Telegram Genérica
+                fd = file_ids.get_file_data(base_media_key)
+                if fd and fd.get("id"): return fd
+            
+            # 2.3 Fallback: Tenta Avatar GitHub
+            from modules.game_data.skins import get_skin_avatar
+            avatar_url = get_skin_avatar(equipped_skin_id, player_gender)
+            if avatar_url:
+                return {"id": avatar_url, "type": "photo"} # Simula estrutura do file_data para o Telegram aceitar URL
 
+    # --- 3. TENTA CARREGAR CLASSE PADRÃO (HÍBRIDA) ---
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(cls) or {}
+    
+    # 3.1 Tenta buscar as chaves cadastradas no CLASSES_DATA
+    candidates = []
     for k in ("profile_file_id_key", "profile_media_key", "file_id_name", "status_file_id_key", "file_id_key"):
         if cls_cfg and cls_cfg.get(k):
             candidates.append(cls_cfg[k])
+            
+    # 3.2 Adiciona suposições de nomes de arquivo nativos
     if cls:
         candidates += [
             f"classe_{cls}_media", f"class_{cls}_media", f"{cls}_media",
-            f"perfil_video_{cls}", f"personagem_video_{cls}", f"profile_video_{cls}",
-            f"{purpose}_video_{cls}", f"{purpose}_{cls}",
-            f"{cls}_{purpose}_video", f"{cls}_{purpose}",
+            f"perfil_video_{cls}", f"personagem_video_{cls}"
         ]
-    candidates += ["perfil_video", "personagem_video", "profile_video", "perfil_foto", "profile_photo"]
-    
-    for key in [k for k in candidates if k and "abertura" not in k.lower()]:
+        
+    # 3.3 Roda a busca no Telegram (Com e sem sufixo)
+    for key in candidates:
+        if not key: continue
+        # Tenta com gênero
+        fd = file_ids.get_file_data(f"{key}{gender_suffix}")
+        if fd and fd.get("id"): return fd
+        # Tenta sem gênero
         fd = file_ids.get_file_data(key)
-        if fd and fd.get("id"):
-            return fd
+        if fd and fd.get("id"): return fd
+
+    # --- 4. FALLBACK FINAL: Avatar Genérico (GitHub) da Classe ---
+    from modules.game_data.classes import get_class_avatar
+    avatar_url = get_class_avatar(player_base_class, player_gender)
+    if avatar_url:
+        return {"id": avatar_url, "type": "photo"} # Simula estrutura para o Telegram enviar via link
+
+    # Se nada der certo, retorna None e o perfil vai só com texto
     return None
 
 def _bar(current: int, total: int, blocks: int = 10, filled_char: str = '🟧', empty_char: str = '⬜️') -> str:

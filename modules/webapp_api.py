@@ -48,6 +48,7 @@ def obter_perfil(user_id):
             xp_visual_max = int(200 + (100 * (lvl - 1))) # Fallback básico de segurança
             
         classe_str = str(pdata.get("class", "aprendiz"))
+        genero_str = str(pdata.get("gender", "masculino"))
         
         # 2. CALCULA STATUS TOTAIS (Considerando Equipamentos e Passivas)
         totals = _run_async(player_manager.get_player_total_stats(pdata))
@@ -156,7 +157,8 @@ def obter_perfil(user_id):
             "hp_atual": hp_atual, "hp_max": hp_max, 
             "mp_atual": mp_atual, "mp_max": mp_max,
             "energy": pdata.get("energy", 0), "pontos_livres": pdata.get("stat_points", 0), 
-            "avatar": get_class_avatar(classe_str), "status": status_formatados,
+            "avatar": get_class_avatar(classe_str, genero_str), # <--- MUDE AQUI!
+            "status": status_formatados,
             "inventario": inventario_formatado, "equipamentos": equip_formatado,
             "esquiva": esquiva, "atk_duplo": atk_duplo, "prof_nome": prof_nome, "prof_lvl": prof_lvl
         })

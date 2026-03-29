@@ -504,7 +504,8 @@ def api_combate_iniciar():
         return jsonify({
             "sucesso": True,
             "estado": estado_frontend,
-            "classe_player": str(pdata.get("class", "aventureiro")).lower()
+            "classe_player": str(pdata.get("class", "aventureiro")).lower(),
+            "genero_player": str(pdata.get("gender", "masculino")).lower() # <--- ADICIONE A VÍRGULA NA LINHA DE CIMA E COLOQUE ESSA AQUI!
         })
 
     except Exception as e:

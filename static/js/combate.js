@@ -10,16 +10,47 @@ const FUNDOS_ARENAS = {
 
 // 👇 AQUI FICAM AS 10 IMAGENS BASE DE COSTAS (PNG Transparente) 👇
 const SPRITES_COSTA = {
-    "aventureiro": "https://github.com/user-attachments/assets/6621c6b9-691f-45dd-b738-7915bb576f53", // Skin de quem tá sem classe
-    "guerreiro": "LINK_GITHUB_GUERREIRO_COSTA.png",
-    "berserker": "LINK_GITHUB_BERSERKER_COSTA.png",
-    "cacador": "LINK_GITHUB_CACADOR_COSTA.png",
-    "monge": "LINK_GITHUB_MONGE_COSTA.png",
-    "mago": "LINK_GITHUB_MAGO_COSTA.png",
-    "bardo": "LINK_GITHUB_BARDO_COSTA.png",
-    "assassino": "LINK_GITHUB_ASSASSINO_COSTA.png",
-    "samurai": "LINK_GITHUB_SAMURAI_COSTA.png",
-    "curandeiro": "LINK_GITHUB_CURANDEIRO_COSTA.png"
+    "aventureiro": {
+        "masculino": "https://github.com/user-attachments/assets/f870b026-e544-43f4-8395-0112277b24f1", // Skin de quem tá sem classe
+        "feminino": "https://github.com/user-attachments/assets/c405a107-9d5e-4f34-8daa-9660b29e591c"
+    },
+    "guerreiro": {
+        "mascolino": "https://github.com/user-attachments/assets/1c0045ea-d8fc-4958-86a4-ecef1507f25e",
+        "feminino" : "https://github.com/user-attachments/assets/d5cfde65-f28f-4a13-9c1e-525adc3b51b2"
+    },
+    "berserker": { 
+        "masculino": "https://github.com/user-attachments/assets/88e6ee39-1f4f-4886-a31c-65e4fc53b7ba",
+        "feminino": "https://github.com/user-attachments/assets/ec261bd5-e23e-4390-b0a7-e411095b46b0"
+    },    
+    "cacador": {
+        "masculino": "https://github.com/user-attachments/assets/6998b293-a7fd-444f-b358-831c44eb3d8f",
+        "feminino": "https://github.com/user-attachments/assets/03e162e6-1869-4eeb-ab6d-1a902b74f582"
+    },
+    "monge": { 
+        "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
+        "feminino": "https://github.com/user-attachments/assets/3bb88286-d446-48ee-9d95-c53482e5553a"
+    },    
+    "mago": {
+        "masculino":"https://github.com/user-attachments/assets/61b246e8-1eaf-4dd3-85e5-267ca6fe0058",
+        "feminino": "https://github.com/user-attachments/assets/d8749759-d43f-4eda-8520-c9610a635b72"
+    },
+    "bardo": {
+        "masculino":"https://github.com/user-attachments/assets/75788d0e-5be2-43d0-870b-f7aee5e04483",
+        "feminino": "https://github.com/user-attachments/assets/6fc004aa-b451-4d25-a110-493f0f26f585"
+    },
+    "assassino": {
+        "masculino":"https://github.com/user-attachments/assets/c02fa401-7b6d-48aa-8892-fe85398a36ec",
+        "feminino": "https://github.com/user-attachments/assets/d1a69fdc-de8f-4982-8ac5-83963040b4d4"
+    },
+    "samurai": {
+        "masculino":"https://github.com/user-attachments/assets/3f61b608-fc17-4b81-ad7f-8d11d7a46e52",
+        "feminino": "https://github.com/user-attachments/assets/eb54a42c-0608-402e-950c-7f8f771700a7"
+    },
+    "curandeiro": {
+        "masculino":"https://github.com/user-attachments/assets/61b246e8-1eaf-4dd3-85e5-267ca6fe0058",
+        "feminino": "https://github.com/user-attachments/assets/1d9e6bb2-0fe4-40cd-8583-4dd17bbe48ed"
+    },
+
 };
 
 // Dicionário para descobrir a base de qualquer evolução
@@ -290,7 +321,19 @@ async function iniciarCacadaApp() {
 
         const est = dados.estado;
         const bgArena = FUNDOS_ARENAS[est.regiao] || "https://placehold.co/600x400/111/222?text=Arena+Desconhecida";
-        const urlSpritePlayer = SPRITES_COSTA[dados.classe_player] || SPRITES_COSTA["aventureiro"];
+        // 1. Descobre a classe base (ex: Se for "Gladiador", ele entende que a base é "guerreiro")
+        const classeBase = MAPA_CLASSES_BASE[dados.classe_player] || "aventureiro";
+        
+        // 2. Pega o gênero que o Python mandou
+        const genero = dados.genero_player || "masculino";
+        
+        // 3. Busca a imagem exata. Se falhar, usa o aventureiro padrão como salva-vidas
+        let urlSpritePlayer = "";
+        if (SPRITES_COSTA[classeBase] && SPRITES_COSTA[classeBase][genero]) {
+            urlSpritePlayer = SPRITES_COSTA[classeBase][genero];
+        } else {
+            urlSpritePlayer = SPRITES_COSTA["aventureiro"]["masculino"];
+        }
         
         // Salvando estado para as animações de barra
         window.dadosCombateAtual = {

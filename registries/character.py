@@ -5,7 +5,12 @@ import logging
 from telegram.ext import Application, BaseHandler 
 
 # 1. Do fluxo de início
-from handlers.start_handler import start_command_handler
+# 1. Do fluxo de início
+from handlers.start_handler import (
+    start_command_handler,
+    gender_handler,
+    name_input_handler
+)
 
 # 2. Do Status e Perfil
 from handlers.status_handler import (
@@ -94,6 +99,8 @@ def register_character_handlers(application: Application):
         
         # O novo /menu (start_command_handler)
         start_command_handler,
+        gender_handler,
+        name_input_handler,
         
         # Status
         status_command_handler,
