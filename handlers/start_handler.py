@@ -38,8 +38,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 3. TRIAGEM: É NOVATO OU VETERANO?
     # =======================================================
     if player_data:
-        # Descobre se é veterano (tem nível maior que 1 ou ouro/itens)
-        is_veteran = player_data.get("level", 1) > 1 or player_data.get("gold", 0) > 0
+        # 👇 CORREÇÃO AQUI: Checa se tem Nível > 1 ou se já ganhou algum XP!
+        is_veteran = player_data.get("level", 1) > 1 or player_data.get("xp", 0) > 0
         
         # Se NÃO TEM gênero, precisamos agir:
         if not player_data.get("gender"):
@@ -48,7 +48,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 player_data["gender"] = "masculino"
                 await player_manager.save_player_data(session_id, player_data)
             else:
-                # Se for novato de verdade, mostra os botões!
+                # Se for novato de verdade (0 XP e lvl 1), mostra os botões!
                 keyboard = [
                     [
                         InlineKeyboardButton("Masculino ♂️", callback_data="set_gender_masculino"),
