@@ -969,7 +969,7 @@ EQUIPMENTS_DATA = {
         "description": "Manoplas simples usadas por monges em treinamento.",
         "media_key": "item_manoplas_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "bandana_iniciado_monge": {
         "display_name": "Bandana de Iniciado", "emoji": "🪖",
@@ -977,7 +977,7 @@ EQUIPMENTS_DATA = {
         "description": "Bandana leve que ajuda na concentração.",
         "media_key": "item_bandana_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
 
     },
     "gi_iniciado_monge": {
@@ -986,7 +986,7 @@ EQUIPMENTS_DATA = {
         "description": "Roupa tradicional de treinamento monástico.",
         "media_key": "item_gi_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "calcas_iniciado_monge": {
         "display_name": "Calças de Iniciado", "emoji": "👖",
@@ -994,7 +994,7 @@ EQUIPMENTS_DATA = {
         "description": "Calças leves para liberdade de movimento.",
         "media_key": "item_calcas_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "sandalias_iniciado_monge": {
         "display_name": "Sandálias de Iniciado", "emoji": "🥾",
@@ -1002,7 +1002,7 @@ EQUIPMENTS_DATA = {
         "description": "Sandálias tradicionais, leves e práticas.",
         "media_key": "item_sandalias_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "faixas_iniciado_monge": {
         "display_name": "Faixas de Mão de Iniciado", "emoji": "🧤",
@@ -1010,7 +1010,7 @@ EQUIPMENTS_DATA = {
         "description": "Faixas de tecido usadas para proteger as mãos.",
         "media_key": "item_faixas_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "anel_iniciado_monge": {
         "display_name": "Anel de Iniciado", "emoji": "💍",
@@ -1018,7 +1018,7 @@ EQUIPMENTS_DATA = {
         "description": "Anel simples usado em rituais de foco espiritual.",
         "media_key": "item_anel_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "colar_iniciado_monge": {
         "display_name": "Colar de Iniciado", "emoji": "📿",
@@ -1026,7 +1026,7 @@ EQUIPMENTS_DATA = {
         "description": "Colar com contas que auxiliam na meditação.",
         "media_key": "item_colar_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     "brinco_iniciado_monge": {
         "display_name": "Brinco de Iniciado", "emoji": "🧿",
@@ -1034,7 +1034,7 @@ EQUIPMENTS_DATA = {
         "description": "Brinco que simboliza disciplina e equilíbrio.",
         "media_key": "item_brinco_iniciado_monge",
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "class_req": ["mago"]
+        "class_req": ["monge"]
     },
     # - MONGE T2
     "manoplas_mestre_monge": {

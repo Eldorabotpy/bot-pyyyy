@@ -34,24 +34,37 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. Verifica os dados do jogador com a função CORRETA
     player_data = await player_manager.get_player_data(session_id)
 
-    # 3. SE O JOGADOR ACABOU DE CRIAR A CONTA (Não tem gênero definido)
-    if player_data and not player_data.get("gender"):
-        keyboard = [
-            [
-                InlineKeyboardButton("Masculino ♂️", callback_data="set_gender_masculino"),
-                InlineKeyboardButton("Feminino ♀️", callback_data="set_gender_feminino")
-            ],
-            [InlineKeyboardButton("Não-binário ⚧️", callback_data="set_gender_nao_binario")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+    # =======================================================
+    # 3. TRIAGEM: É NOVATO OU VETERANO?
+    # =======================================================
+    if player_data:
+        # Descobre se é veterano (tem nível maior que 1 ou ouro/itens)
+        is_veteran = player_data.get("level", 1) > 1 or player_data.get("gold", 0) > 0
         
-        await update.message.reply_text(
-            "✨ *Bem-vindo ao Mundo de Eldora!*\n\n"
-            "Sua jornada está prestes a começar, mas antes, como você se identifica?",
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
+        # Se NÃO TEM gênero, precisamos agir:
+        if not player_data.get("gender"):
+            if is_veteran:
+                # Se for veterano, salva como masculino por padrão e deixa passar!
+                player_data["gender"] = "masculino"
+                await player_manager.save_player_data(session_id, player_data)
+            else:
+                # Se for novato de verdade, mostra os botões!
+                keyboard = [
+                    [
+                        InlineKeyboardButton("Masculino ♂️", callback_data="set_gender_masculino"),
+                        InlineKeyboardButton("Feminino ♀️", callback_data="set_gender_feminino")
+                    ],
+                    [InlineKeyboardButton("Não-binário ⚧️", callback_data="set_gender_nao_binario")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    "✨ *Bem-vindo ao Mundo de Eldora!*\n\n"
+                    "Sua jornada está prestes a começar, mas antes, como você se identifica?",
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
 
     # 4. SE O JOGADOR EXISTE E JÁ TEM GÊNERO: Segue com a lógica original de reparo e login
     try:
