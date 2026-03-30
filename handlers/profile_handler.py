@@ -537,7 +537,38 @@ async def mudar_nome_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         await player_manager.save_player_data(user_id, player_data)
         await update.message.reply_text(f"✅ Sucesso! O teu nome foi alterado para <b>{novo_nome}</b>.\nUsa /personagem para ver!", parse_mode="HTML")
+
+async def mudar_genero_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 1. Pega a sessão
+    from modules.auth_utils import get_current_player_id
+    from modules import player_manager
+    user_id = get_current_player_id(update, context)
+    
+    if not user_id:
+        await update.message.reply_text("⚠️ Precisas de entrar na tua conta primeiro.")
+        return
+
+    # 2. Verifica o que ele digitou
+    if not context.args or context.args[0].lower() not in ["masculino", "feminino"]:
+        await update.message.reply_text(
+            "⚠️ <b>Como usar:</b>\nDigite <code>/genero masculino</code> ou <code>/genero feminino</code>", 
+            parse_mode="HTML"
+        )
+        return
+
+    novo_genero = context.args[0].lower()
+
+    # 3. Salva no banco de dados
+    player_data = await player_manager.get_player_data(user_id)
+    if player_data:
+        player_data["gender"] = novo_genero
+        await player_manager.save_player_data(user_id, player_data)
         
+        emoji = "♂️" if novo_genero == "masculino" else "♀️"
+        await update.message.reply_text(f"✅ Gênero atualizado para {novo_genero.capitalize()} {emoji}!\nUse /personagem para ver a nova arte.")
+
+# Não esqueça de registrar o handler no final do arquivo:
+#         
 # ====================================================================
 # EXPORTAÇÕES
 # ====================================================================
@@ -549,3 +580,4 @@ equip_skill_handler = CallbackQueryHandler(equip_skill_callback, pattern=r'^equi
 unequip_skill_handler = CallbackQueryHandler(unequip_skill_callback, pattern=r'^unequip_skill:')
 noop_handler = CallbackQueryHandler(noop_callback, pattern=r'^noop$')
 cmd_nome_handler = CommandHandler("nome", mudar_nome_command)
+cmd_genero_handler = CommandHandler("genero", mudar_genero_command)

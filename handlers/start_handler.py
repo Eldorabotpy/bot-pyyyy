@@ -15,7 +15,7 @@ from modules.player.account_lock import check_account_lock
 
 logger = logging.getLogger(__name__)
 
-@requires_login
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
