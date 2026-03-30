@@ -301,17 +301,17 @@ CLASS_AVATARS_BOT = {
 }
 CLASS_AVATARS_WEB = {
     "aprendiz": {
-        "masculino": "https://github.com/user-attachments/assets/1c6ceff0-cb86-431c-a97f-7e7a0a016410",
-        "feminino": "https://github.com/user-attachments/assets/9e817891-2ed2-40f7-ba51-e2f0bb618c95"
+        "masculino": "https://github.com/user-attachments/assets/51919153-c779-4778-92f5-c73a66d0fec6",
+        "feminino": "https://github.com/user-attachments/assets/a33e78ea-359d-4ed5-9f85-2b672cf482d9"
     },
     "aventureiro": {
-        "masculino": "https://github.com/user-attachments/assets/1c6ceff0-cb86-431c-a97f-7e7a0a016410",
-        "feminino": "https://github.com/user-attachments/assets/9e817891-2ed2-40f7-ba51-e2f0bb618c95"
+        "masculino": "https://github.com/user-attachments/assets/51919153-c779-4778-92f5-c73a66d0fec6",
+        "feminino": "https://github.com/user-attachments/assets/a33e78ea-359d-4ed5-9f85-2b672cf482d9"
     },
     
     "guerreiro": {
-        "masculino": "https://github.com/user-attachments/assets/4662d025-505b-4816-8df7-9db66412467a",
-        "feminino": "https://github.com/user-attachments/assets/97249aea-f6dc-4ce9-84f3-432b6146d63b"
+        "masculino": "https://github.com/user-attachments/assets/47eacac6-48d1-4cc8-8485-ef250c80d318",
+        "feminino": "https://github.com/user-attachments/assets/2dafb991-9beb-448e-b076-71a270676489"
     },
     "cavaleiro": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
@@ -331,8 +331,8 @@ CLASS_AVATARS_WEB = {
     },
     
     "berserker": {
-        "masculino": "https://github.com/user-attachments/assets/321666e0-7f41-4d6a-b760-92e94cd62bd9",
-        "feminino": "https://github.com/user-attachments/assets/402104bc-a2ea-4477-b641-c6eab30520ae"
+        "masculino": "https://github.com/user-attachments/assets/2282f708-0871-4186-bd34-caa11f5eb698",
+        "feminino": "https://github.com/user-attachments/assets/66649cb3-c119-4430-9e29-7a76e5d7a103"
     },
     "barbaro": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
@@ -348,8 +348,8 @@ CLASS_AVATARS_WEB = {
     },
     
     "cacador": {
-        "masculino": "https://github.com/user-attachments/assets/5c3ac838-5962-4b20-a47f-9888e92db8a8",
-        "feminino": "https://github.com/user-attachments/assets/10fb4d6d-5b9c-4f26-baa1-39132ed82dc8"
+        "masculino": "https://github.com/user-attachments/assets/e3b557ba-7e06-441e-94a4-c29537f929b3",
+        "feminino": "https://github.com/user-attachments/assets/8170e975-12a2-4aa5-9e53-e3c404c09dc2"
     },
     "patrulheiro": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
@@ -365,8 +365,8 @@ CLASS_AVATARS_WEB = {
     },
     
     "monge": {
-        "masculino": "https://github.com/user-attachments/assets/eace58a1-a49f-45d2-a7ef-eb1775ac0c00",
-        "feminino": "https://github.com/user-attachments/assets/f8063071-2097-41f2-9c99-8a522bc06650"
+        "masculino": "https://github.com/user-attachments/assets/ed65c93c-6ed5-4a87-bba8-6ca8c0276dfd",
+        "feminino": "https://github.com/user-attachments/assets/45098f38-a35a-4491-9364-476d25013ab7"
     },
     "guardiao_do_templo": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
@@ -382,8 +382,8 @@ CLASS_AVATARS_WEB = {
     },
     
     "mago": {
-        "masculino": "https://github.com/user-attachments/assets/807fc25d-0e25-4f9c-8af3-e4e3f5b741d1",
-        "feminino": "https://github.com/user-attachments/assets/3e7bdd09-984e-4ecc-aa4f-874d6f58bff2"
+        "masculino": "https://github.com/user-attachments/assets/0acf0255-e003-4dc2-86ec-26513a574c7c",
+        "feminino": "https://github.com/user-attachments/assets/9ca00492-0551-45af-b4fd-0b40e963b695"
     },
     "feiticeiro": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
@@ -399,8 +399,8 @@ CLASS_AVATARS_WEB = {
     },
     
     "bardo": {
-        "masculino": "https://github.com/user-attachments/assets/84825dae-0a66-4435-825e-661b1f51e924",
-        "feminino": "https://github.com/user-attachments/assets/67025149-f9fa-47ea-a4ae-3be21bd537df"
+        "masculino": "https://github.com/user-attachments/assets/cc8446ff-dd44-4f7a-8b36-e140c337b977",
+        "feminino": "https://github.com/user-attachments/assets/3aeef591-9f0d-48fa-8a2a-445df928486d"
     },
     "menestrel": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
@@ -433,8 +433,8 @@ CLASS_AVATARS_WEB = {
     },
     
     "samurai": {
-        "masculino": "https://github.com/user-attachments/assets/fe03e623-dbe5-4bc8-bd35-73fe169ccd75",
-        "feminino": "https://github.com/user-attachments/assets/579e9e6a-1e79-41d0-9277-883ece55c8df"
+        "masculino": "https://github.com/user-attachments/assets/cbe4a404-74d7-41b3-a84b-666c49a325b3",
+        "feminino": "https://github.com/user-attachments/assets/94f59145-94cd-4ca6-87d9-9411d4064a30"
     },
     "kensei": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
@@ -450,8 +450,8 @@ CLASS_AVATARS_WEB = {
     },
     
     "curandeiro": {
-        "masculino": "https://github.com/user-attachments/assets/b1b8af66-417b-47b8-b994-6ece16d2354a",
-        "feminino": "https://github.com/user-attachments/assets/19f32053-34a3-483c-b22a-97cebf842665"
+        "masculino": "https://github.com/user-attachments/assets/17c4a3b8-dd81-4834-8e41-23f4433357e4",
+        "feminino": "https://github.com/user-attachments/assets/53e498e6-7770-4782-92a1-5eb542a9fc5e"
     },
     "clerigo": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",
