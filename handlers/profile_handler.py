@@ -376,7 +376,14 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     loc_key = player_data.get('current_location', 'reino_eldora')
     loc_name = (game_data.REGIONS_DATA or {}).get(loc_key, {}).get('display_name', 'Desconhecido')
-    
+    # --- Lógica de Género ---
+    genero_raw = player_data.get("gender", "masculino") # Fallback para veteranos
+    genero_map = {
+        "masculino": "♂️ Masculino",
+        "feminino": "♀️ Feminino",
+        "nao_binario": "⚧️ Não-binário"
+    }
+    genero_display = genero_map.get(genero_raw, "❓ Desconhecido")
     cls_key = (player_data.get("class") or "no_class").lower()
     cls_cfg = (game_data.CLASSES_DATA or {}).get(cls_key, {})
     cls_name = cls_cfg.get("display_name", cls_key.title())
@@ -434,6 +441,7 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👤 <b>PERFIL DE {char_name.upper()}</b>{premium_txt}\n"
         f"──────────────────────\n"
         f"🛡 <b>Classe:</b> {cls_emoji} {cls_name}\n"
+        f"⚧️ <b>Género:</b> {genero_display}\n"
         f"📍 <b>Local:</b> {loc_name}\n\n"
         
         f"📊 <b>BARRAS VITAIS</b>\n"
