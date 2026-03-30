@@ -7,6 +7,80 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <link rel="stylesheet" href="/static/css/style.css?v=2">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap');
+
+        /* Garante que o conteúdo não fique escondido atrás do menu */
+        body { padding-bottom: 75px !important; }
+
+        /* Substituindo o NAV antigo pelo estilo metálico moderno */
+        nav {
+            position: fixed !important; 
+            bottom: 0 !important; 
+            left: 0 !important; 
+            width: 100% !important; 
+            height: 65px !important;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(10, 15, 25, 1) 100%) !important;
+            border-top: 3px solid #f39c12 !important; 
+            border-style: ridge !important;
+            display: flex !important; 
+            justify-content: space-around !important; 
+            align-items: center !important;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.8), 0 0 10px rgba(243, 156, 18, 0.3) !important;
+            z-index: 9999 !important;
+            padding: 0 5px !important; 
+            box-sizing: border-box !important;
+        }
+
+        /* Estilizando os botões para parecerem os itens da outra tela */
+        nav button {
+            background: none !important; 
+            border: none !important; 
+            outline: none !important;
+            display: flex !important; 
+            flex-direction: column !important; 
+            align-items: center !important; 
+            justify-content: center !important;
+            width: 20% !important; 
+            height: 100% !important;
+            cursor: pointer !important;
+            transition: 0.2s !important;
+            padding: 0 !important; 
+            margin: 0 !important;
+        }
+        
+        nav button:active { transform: translateY(-3px) !important; }
+
+        .nav-icon-emoji {
+            font-size: 1.5em !important; 
+            margin-bottom: 2px !important;
+            line-height: 1 !important;
+            filter: drop-shadow(0 0 3px rgba(243, 156, 18, 0.3)) !important;
+            transition: 0.2s !important;
+            font-style: normal !important;
+        }
+
+        .nav-text {
+            font-family: 'Cinzel', serif !important;
+            font-size: 0.65em !important;
+            color: #bdc3c7 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+            transition: 0.2s !important;
+            font-weight: bold !important;
+        }
+
+        /* EFEITOS DO BOTÃO ATIVO (Brilha Dourado) */
+        nav button.active .nav-icon-emoji { 
+            filter: drop-shadow(0 0 8px #f39c12) !important; 
+            transform: scale(1.15) !important;
+        }
+        nav button.active .nav-text { 
+            color: #f39c12 !important; 
+            text-shadow: 0 0 5px #f39c12 !important; 
+        }
+    </style>
 </head>
 <body>
 
@@ -125,11 +199,25 @@
     </div>
     
     <nav>
-        <button id="btn-home" class="active" onclick="mudarAba('home')"><i>🏠</i><span>Início</span></button>
-        <button id="btn-reino" onclick="mudarAba('reino')"><i>🏰</i><span>Reino</span></button>
-        <button id="btn-ranking" onclick="mudarAba('ranking')"><i>🏆</i><span>Ranking</span></button>
-        <button id="btn-wiki" onclick="mudarAba('wiki')"><i>📖</i><span>Wiki</span></button>
-        <button id="btn-perfil" onclick="mudarAba('perfil')"><i>👤</i><span>Perfil</span></button>
+        <button id="btn-home" class="active" onclick="mudarAba('home')">
+            <i class="nav-icon-emoji">🏠</i><span class="nav-text">Início</span>
+        </button>
+        
+        <button id="btn-reino" onclick="mudarAba('reino')">
+            <i class="nav-icon-emoji">🏰</i><span class="nav-text">Reino</span>
+        </button>
+        
+        <button id="btn-ranking" onclick="mudarAba('ranking')">
+            <i class="nav-icon-emoji">🏆</i><span class="nav-text">Ranking</span>
+        </button>
+        
+        <button id="btn-wiki" onclick="mudarAba('wiki')">
+            <i class="nav-icon-emoji">📖</i><span class="nav-text">Wiki</span>
+        </button>
+        
+        <button id="btn-perfil" onclick="mudarAba('perfil')">
+            <i class="nav-icon-emoji">👤</i><span class="nav-text">Perfil</span>
+        </button>
     </nav>
     
     <script src="/static/js/combate.js?v=10"></script>
