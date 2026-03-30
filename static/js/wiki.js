@@ -45,7 +45,14 @@ function abrirDetalhesClasse(idClasse) {
     if (cls.evolucoes && cls.evolucoes.length > 0) {
         htmlEvolucoes = '<h4 style="color: #f39c12; margin-top: 20px; border-bottom: 1px solid #333; padding-bottom: 5px;">Caminhos de Evolução</h4>';
         cls.evolucoes.forEach(evo => {
-            htmlEvolucoes += `<div style="background: #1a1a1a; padding: 10px; border-radius: 5px; margin-bottom: 8px; border-left: 3px solid #666;"><strong style="color: #fff; font-size: 0.9em;">Tier ${evo.tier} - ${evo.nome}</strong><p style="margin: 5px 0 0 0; font-size: 0.8em; color: #aaa;">${evo.descricao}</p></div>`;
+            // Adicionado cursor:pointer, hover, onclick e a setinha de "Ver Requisitos"
+            htmlEvolucoes += `<div onclick="abrirDetalhesEvolucao('${cls.id}', '${evo.id}')" style="background: #1a1a1a; padding: 10px; border-radius: 5px; margin-bottom: 8px; border-left: 3px solid #3498db; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9em;">Tier ${evo.tier} - ${evo.emoji} ${evo.nome}</strong>
+                    <span style="font-size: 0.8em; color: #3498db; font-weight: bold;">Ver Requisitos ➔</span>
+                </div>
+                <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #aaa;">${evo.descricao}</p>
+            </div>`;
         });
     }
     
@@ -65,6 +72,57 @@ function abrirDetalhesClasse(idClasse) {
                 <span>❤️ <b>HP:</b> ${cls.hp}</span><span>⚔️ <b>ATQ:</b> ${cls.ataque}</span><span>🛡️ <b>DEF:</b> ${cls.defesa}</span>
             </div>
             ${htmlEvolucoes}
+        </div>
+    </div>`;
+}
+
+window.abrirDetalhesEvolucao = function(idClasseBase, idEvolucao) {
+    // Procura a classe e depois a evolução específica na memória
+    const cls = window.dadosEldoraClasses.find(c => c.id === idClasseBase);
+    if (!cls) return;
+    const evo = cls.evolucoes.find(e => e.id === idEvolucao);
+    if (!evo) return;
+
+    const conteudo = document.getElementById('conteudo-wiki');
+    
+    // Monta a lista de requisitos (Custos)
+    let htmlRequisitos = '';
+    if (evo.custos && evo.custos.length > 0) {
+        htmlRequisitos = `<div style="display: grid; gap: 8px; margin-top: 10px;">`;
+        evo.custos.forEach(req => {
+            htmlRequisitos += `<div style="background: #1e1e1e; padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #e74c3c;">
+                <span style="color: #ddd;">${req.emoji} ${req.nome}</span>
+                <span style="color: #e74c3c; font-weight: bold; background: #111; padding: 2px 8px; border-radius: 4px;">x${req.qtd}</span>
+            </div>`;
+        });
+        htmlRequisitos += `</div>`;
+    } else {
+        htmlRequisitos = `<p style="color: #888; font-size: 0.9em;">Nenhum requisito especial ou custo desconhecido.</p>`;
+    }
+
+    // A imagem da evolução (com o fallback do emoji se a foto não existir)
+    let mediaTagGrande = `<img src="${evo.imagem}" onerror="this.src='https://placehold.co/300x400/2c3e50/3498db?text=${evo.emoji}'" style="width: 100%; border-radius: 8px; border: 2px solid #1a1a1a; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">`;
+
+    // Desenha a tela toda!
+    conteudo.innerHTML = `<button onclick="abrirDetalhesClasse('${idClasseBase}')" style="background: none; border: none; color: #3498db; font-size: 1em; cursor: pointer; margin-bottom: 15px; padding: 0; display: flex; align-items: center; gap: 5px;">⬅️ Voltar para ${cls.nome}</button>
+    
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; background: #252525; padding: 20px; border-radius: 8px; border-top: 4px solid #3498db;">
+        <div style="flex: 1; min-width: 150px;">
+            ${mediaTagGrande}
+        </div>
+        <div style="flex: 2; min-width: 200px;">
+            <h2 style="margin: 0 0 5px 0; color: #3498db; font-size: 1.8em;">${evo.emoji} ${evo.nome}</h2>
+            <span style="background: #111; padding: 4px 10px; border-radius: 4px; font-size: 0.8em; color: #ccc;">Evolução Tier ${evo.tier}</span>
+            
+            <p style="font-size: 0.95em; color: #ddd; line-height: 1.4; margin: 15px 0;">${evo.descricao}</p>
+            
+            <h4 style="color: #aaa; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 10px;">Atributos Base (Multiplicadores)</h4>
+            <div style="display: flex; gap: 15px; background: #1a1a1a; padding: 12px; border-radius: 8px; justify-content: space-around; font-size: 0.85em; color: #ccc; margin-bottom: 20px;">
+                <span>❤️ <b>HP:</b> ${evo.hp}</span><span>⚔️ <b>ATQ:</b> ${evo.ataque}</span><span>🛡️ <b>DEF:</b> ${evo.defesa}</span>
+            </div>
+            
+            <h4 style="color: #aaa; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 10px;">Custo de Ascensão (Total)</h4>
+            ${htmlRequisitos}
         </div>
     </div>`;
 }

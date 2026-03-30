@@ -241,27 +241,54 @@ def wiki_classes():
     try:
         from modules.game_data.classes import CLASSES_DATA, get_class_avatar
         from modules.game_data.class_evolution import EVOLUTIONS
+        from modules.game_data import items as items_data # Importa os itens para puxar emojis
         
-        # 1. Pegamos apenas as classes "Base" (Tier 1) do seu classes.py
         classes_base = {k: v for k, v in CLASSES_DATA.items() if v.get('tier', 1) == 1}
         lista_final = []
 
         for class_id, dados in classes_base.items():
-            # 2. Puxa as evoluções direto da árvore oficial do class_evolution.py
             evolucoes_brutas = EVOLUTIONS.get(class_id, [])
             evolucoes_formatadas = []
             
             for evo in evolucoes_brutas:
+                target_id = evo.get("to")
+                target_data = CLASSES_DATA.get(target_id, {})
+                
+                # 1. Soma todos os custos de todos os nodes de ascensão
+                custo_total = {}
+                for node in evo.get("ascension_path", []):
+                    for item_req, qtd_req in node.get("cost", {}).items():
+                        custo_total[item_req] = custo_total.get(item_req, 0) + qtd_req
+                
+                # 2. Formata os custos com nomes bonitos e emojis
+                custos_formatados = []
+                for item_req, qtd_req in custo_total.items():
+                    if item_req == "gold":
+                        custos_formatados.append({"nome": "Ouro", "emoji": "💰", "qtd": qtd_req})
+                    elif item_req == "gems":
+                        custos_formatados.append({"nome": "Diamantes", "emoji": "💎", "qtd": qtd_req})
+                    else:
+                        info_item = items_data.ITEMS_DATA.get(item_req, {})
+                        nome_item = info_item.get("display_name", item_req.replace("_", " ").title())
+                        emoji_item = info_item.get("emoji", "📦")
+                        custos_formatados.append({"nome": nome_item, "emoji": emoji_item, "qtd": qtd_req})
+
+                # 3. Adiciona a evolução com a própria imagem e status dela!
                 evolucoes_formatadas.append({
+                    "id": target_id,
                     "tier": evo.get("tier_num"),
                     "nome": evo.get("display_name"),
-                    "descricao": evo.get("desc")
+                    "descricao": evo.get("desc"),
+                    "emoji": target_data.get("emoji", "❓"),
+                    "imagem": get_class_avatar(target_id, plataforma="web"), # Imagem da evolução!
+                    "hp": target_data.get("stat_modifiers", {}).get("hp", 0),
+                    "ataque": target_data.get("stat_modifiers", {}).get("attack", 0),
+                    "defesa": target_data.get("stat_modifiers", {}).get("defense", 0),
+                    "custos": custos_formatados # <--- OS REQUISITOS VÃO AQUI
                 })
             
-            # Ordena por Tier para aparecer certinho na Wiki (T2, T3, T4...)
             evolucoes_formatadas.sort(key=lambda x: x['tier'])
 
-            # 3. Monta o objeto exato que o seu wiki.js está esperando
             mod = dados.get('stat_modifiers', {})
             lista_final.append({
                 "id": class_id,
@@ -271,7 +298,7 @@ def wiki_classes():
                 "hp": mod.get('hp', 0),
                 "ataque": mod.get('attack', 0),
                 "defesa": mod.get('defense', 0),
-                "imagem": get_class_avatar(class_id), # Puxa o link PNG do GitHub que arrumamos!
+                "imagem": get_class_avatar(class_id, plataforma="web"),
                 "total_evolucoes": len(evolucoes_formatadas),
                 "evolucoes": evolucoes_formatadas
             })
