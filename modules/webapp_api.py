@@ -30,7 +30,8 @@ def obter_perfil(user_id):
         from modules.game_data import items as items_data
         from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
         from modules.game_data.classes import get_class_avatar
-
+        from modules.game_data.skins import get_skin_avatar
+        
         # 1. Busca Segura do Personagem
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
         pdata = users_collection.find_one({"$or": [{"_id": busca_id}, {"last_chat_id": busca_id}, {"telegram_id_owner": busca_id}, {"telegram_id": busca_id}]})
@@ -149,6 +150,20 @@ def obter_perfil(user_id):
                     "vazio": True, "desc": "Espaço vazio.", "tipo": "vazio", "raridade": "", "refino": 0, "stats": {}
                 })
 
+        # ==========================================
+        # LÓGICA DO AVATAR (PRIORIZA A SKIN)
+        # ==========================================
+        avatar_final = ""
+        skin_equipada = pdata.get("equipped_skin")
+        
+        # 1. Se tem skin equipada, tenta puxar o link da skin
+        if skin_equipada:
+            avatar_final = get_skin_avatar(skin_equipada, genero_str)
+            
+        # 2. Se não tem skin (ou se o link não foi encontrado), puxa a classe padrão
+        if not avatar_final:
+            avatar_final = get_class_avatar(classe_str, genero_str)
+
         # Retorno unificado para o Frontend (Perfil e Combate)
         return jsonify({
             "nome": pdata.get("character_name", "Aventureiro"), 
@@ -157,13 +172,14 @@ def obter_perfil(user_id):
             "hp_atual": hp_atual, "hp_max": hp_max, 
             "mp_atual": mp_atual, "mp_max": mp_max,
             "energy": pdata.get("energy", 0), "pontos_livres": pdata.get("stat_points", 0), 
-            "avatar": get_class_avatar(classe_str, genero_str), # <--- MUDE AQUI!
+            "avatar": avatar_final, # <--- AQUI ELE MANDA A SKIN OU A CLASSE!
             "status": status_formatados,
             "inventario": inventario_formatado, "equipamentos": equip_formatado,
             "esquiva": esquiva, "atk_duplo": atk_duplo, "prof_nome": prof_nome, "prof_lvl": prof_lvl
         })
 
     except Exception as e: 
+        import traceback
         traceback.print_exc()
         return jsonify({"erro": f"Erro interno Python: {str(e)}"}), 400
 

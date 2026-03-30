@@ -484,8 +484,19 @@ def api_combate_iniciar():
         _run_async(player_manager.save_player_data(busca_id, pdata)) 
 
         # =======================================================
-        # 3. ENVIA PARA O JAVASCRIPT
+        # 3. ENVIA PARA O JAVASCRIPT (COM LÓGICA DE SKIN)
         # =======================================================
+        from modules.game_data.skins import get_skin_avatar
+        
+        classe_str = str(pdata.get("class", "aventureiro")).lower()
+        genero_str = str(pdata.get("gender", "masculino")).lower()
+        skin_equipada = pdata.get("equipped_skin")
+        
+        avatar_skin_combate = ""
+        # Tenta puxar a imagem da skin se ela estiver equipada
+        if skin_equipada:
+            avatar_skin_combate = get_skin_avatar(skin_equipada, genero_str)
+
         estado_frontend = {
             "player_hp": hp_atual,
             "player_mp": mp_atual,
@@ -504,8 +515,9 @@ def api_combate_iniciar():
         return jsonify({
             "sucesso": True,
             "estado": estado_frontend,
-            "classe_player": str(pdata.get("class", "aventureiro")).lower(),
-            "genero_player": str(pdata.get("gender", "masculino")).lower() # <--- ADICIONE A VÍRGULA NA LINHA DE CIMA E COLOQUE ESSA AQUI!
+            "classe_player": classe_str,
+            "genero_player": genero_str,
+            "avatar_combate": avatar_skin_combate # <--- MANDA A SKIN AQUI
         })
 
     except Exception as e:

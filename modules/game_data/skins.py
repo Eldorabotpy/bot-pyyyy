@@ -205,22 +205,271 @@ SKIN_AVATARS = {
         'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
         'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
     },
-    'sombra_de_krampus': {
-        'male': 'LINK_GITHUB_KRAMPUS_MASCULINO.png',
-        'female': 'LINK_GITHUB_KRAMPUS_FEMININO.png'
+    'guerreiro_armadura_negra': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
     },
-    # ... Adicione as URLs do GitHub para todas as skins aqui ...
+    'guerreiro_armadura_jade': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'    },
+    'guerreiro_placas_douradas': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Mago ---
+    'mago_traje_arcano': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'mago_arquimago_caos': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Assassino ---
+    'assassino_manto_espectral': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+
+    # --- Caçador ---
+    'cacador_patrulheiro_elfico': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'cacador_cacador_dragoes': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    
+    # --- Berserker ---
+    'berserker_pele_urso': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+     'berserker_infernal': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Monge ---
+    'monge_quimono_dragao': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'monge_aspecto_asura': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+
+    # --- Bardo ---
+    'bardo_traje_maestro': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'bardo_requiem_sombrio': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Samurai ---
+    'samurai_armadura_shogun': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'samurai_armadura_demoniaca': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'samurai_encarnacao_sangrenta': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'   },
+    'samurai_guardiao_celestial': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'samurai_chama_aniquiladora': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'sombra_de_krampus': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'santo_da_nevasca': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'aprendiz_do_santo': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'discipulo_de_nicolau': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'oni_de_natal': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'lamina_da_estrela_guia': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'patrulheiro_do_polo_norte': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'esmagador_de_chamines': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'maestro_da_noite_feliz': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
 }
 
+SKIN_AVATARS_COSTA = {
+    'guerreiro_armadura_negra': {
+        'male': 'LINK_GITHUB_ARMADURA_NEGRA_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_NEGRA_FEMININA.png'
+    },
+    'guerreiro_armadura_jade': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'guerreiro_armadura_negra': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'guerreiro_armadura_jade': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'    },
+    'guerreiro_placas_douradas': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Mago ---
+    'mago_traje_arcano': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'mago_arquimago_caos': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Assassino ---
+    'assassino_manto_espectral': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+
+    # --- Caçador ---
+    'cacador_patrulheiro_elfico': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'cacador_cacador_dragoes': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    
+    # --- Berserker ---
+    'berserker_pele_urso': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+     'berserker_infernal': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Monge ---
+    'monge_quimono_dragao': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'monge_aspecto_asura': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+
+    # --- Bardo ---
+    'bardo_traje_maestro': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'bardo_requiem_sombrio': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    # --- Samurai ---
+    'samurai_armadura_shogun': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'samurai_armadura_demoniaca': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'samurai_encarnacao_sangrenta': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'   },
+    'samurai_guardiao_celestial': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'samurai_chama_aniquiladora': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'sombra_de_krampus': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'santo_da_nevasca': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'aprendiz_do_santo': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'discipulo_de_nicolau': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'oni_de_natal': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'lamina_da_estrela_guia': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'patrulheiro_do_polo_norte': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'esmagador_de_chamines': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+    'maestro_da_noite_feliz': {
+        'male': 'LINK_GITHUB_ARMADURA_JADE_MASCULINA.png',
+        'female': 'LINK_GITHUB_ARMADURA_JADE_FEMININA.png'
+    },
+}
+
+
+
 def get_skin_avatar(skin_id: str, gender: str = "masculino") -> str:
-    """Retorna o link da imagem da skin no GitHub, com fallback para o gênero masculino."""
-    if not skin_id:
-        return ""
-        
+    """Usa o SKIN_AVATARS normal (De frente)"""
+    if not skin_id: return ""
     avatar_data = SKIN_AVATARS.get(skin_id, {})
-    
-    # Mapeamento seguro de gênero
     safe_gender = "female" if gender == "feminino" else "male"
-    
-    # Tenta pegar a feminina, se não tiver, pega a masculina (ou string vazia)
+    return avatar_data.get(safe_gender, avatar_data.get("male", ""))
+
+def get_skin_avatar_costas(skin_id: str, gender: str = "masculino") -> str:
+    """Usa o SKIN_AVATARS_COSTA (De costas para a Arena)"""
+    if not skin_id: return ""
+    avatar_data = SKIN_AVATARS_COSTA.get(skin_id, {})
+    safe_gender = "female" if gender == "feminino" else "male"
     return avatar_data.get(safe_gender, avatar_data.get("male", ""))

@@ -130,7 +130,7 @@ async function carregarMeuPerfil() {
         const htmlEquips = `
             <div style="position: relative; width: 100%; height: 420px; margin-top: 15px; background: #020617; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.9);">
                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; z-index: 0; pointer-events: none;">
-                    <img src="https://github.com/user-attachments/assets/9a7300d0-63af-47bb-9f52-1fd99c40ed90" onerror="this.style.display='none'" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.85;">
+                    <img src="https://github.com/user-attachments/assets/b66baf34-94c9-40e3-94f4-f783b2afae19" onerror="this.style.display='none'" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.85;">
                 </div>
                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50%; height: 95%; z-index: 1; display: flex; justify-content: center; align-items: center;">
                     <img id="avatar-equip-tab" src="${avatarLink}" onerror="this.src='https://github.com/user-attachments/assets/b0f8f158-3d54-46ef-b1df-9bbd9300609f'" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.9)); pointer-events: none;">

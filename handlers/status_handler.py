@@ -41,6 +41,9 @@ def _get_class_media(player_data: dict, purpose: str = "status"):
     base_cls_key = raw_cls.lower()
     cls_slug = _slugify(base_cls_key)
     
+    # 1. Pega o gênero do jogador
+    player_gender = player_data.get("gender", "masculino")
+    
     classes_data = getattr(game_data, "CLASSES_DATA", {}) or {}
     cls_cfg = classes_data.get(raw_cls) or classes_data.get(base_cls_key) or {}
     
@@ -56,13 +59,31 @@ def _get_class_media(player_data: dict, purpose: str = "status"):
     
     unique_candidates = list(filter(None, dict.fromkeys(candidates)))
     
+    # 2. Tenta buscar no file_ids (Mantido para compatibilidade se você tiver vídeos)
     for key in unique_candidates:
+        # Tenta a chave com o sufixo de gênero (ex: classe_guerreiro_media_female)
+        try:
+            fd = file_ids.get_file_data(f"{key}_{player_gender}")
+            if fd and fd.get("id"): return fd
+        except Exception: pass
+        
+        # Tenta a chave pura
         try:
             fd = file_ids.get_file_data(key)
-            if fd and fd.get("id"):
-                return fd
-        except Exception:
-            pass
+            if fd and fd.get("id"): return fd
+        except Exception: pass
+
+    # 3. FALLBACK FINAL: Puxa a imagem com cenário do GitHub
+    try:
+        from modules.game_data.classes import get_class_avatar
+        # Passamos a classe, o gênero e avisamos que é para o "bot" (com fundo)
+        avatar_url = get_class_avatar(cls_slug, player_gender, plataforma="bot")
+        
+        if avatar_url:
+            return {"id": avatar_url, "type": "photo"}
+    except Exception as e:
+        pass
+
     return None
 
 # ==============================================================================

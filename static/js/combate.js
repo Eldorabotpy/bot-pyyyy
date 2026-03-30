@@ -328,11 +328,19 @@ async function iniciarCacadaApp() {
         const genero = dados.genero_player || "masculino";
         
         // 3. Busca a imagem exata. Se falhar, usa o aventureiro padrão como salva-vidas
-        let urlSpritePlayer = "";
-        if (SPRITES_COSTA[classeBase] && SPRITES_COSTA[classeBase][genero]) {
-            urlSpritePlayer = SPRITES_COSTA[classeBase][genero];
-        } else {
-            urlSpritePlayer = SPRITES_COSTA["aventureiro"]["masculino"];
+        // 1. Tenta puxar a Skin que veio do Python primeiro!
+        let urlSpritePlayer = dados.avatar_combate; 
+
+        // 2. Se a variável estiver vazia (jogador sem skin), faz a lógica antiga de classes
+        if (!urlSpritePlayer || urlSpritePlayer === "") {
+            const classeBase = MAPA_CLASSES_BASE[dados.classe_player] || "aventureiro";
+            const genero = dados.genero_player || "masculino";
+            
+            if (SPRITES_COSTA[classeBase] && SPRITES_COSTA[classeBase][genero]) {
+                urlSpritePlayer = SPRITES_COSTA[classeBase][genero];
+            } else {
+                urlSpritePlayer = SPRITES_COSTA["aventureiro"]["masculino"];
+            }
         }
         
         // Salvando estado para as animações de barra

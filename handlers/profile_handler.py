@@ -99,7 +99,7 @@ def _get_class_media(player_data: dict, purpose: str = "personagem"):
 
     # --- 4. FALLBACK FINAL: Avatar Genérico (GitHub) da Classe ---
     from modules.game_data.classes import get_class_avatar
-    avatar_url = get_class_avatar(player_base_class, player_gender)
+    avatar_url = get_class_avatar(player_base_class, player_gender, plataforma="bot")
     if avatar_url:
         return {"id": avatar_url, "type": "photo"} # Simula estrutura para o Telegram enviar via link
 
