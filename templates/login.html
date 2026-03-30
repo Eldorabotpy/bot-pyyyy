@@ -30,17 +30,12 @@
         }
 
         .login-box {
-            /* Textura de metal escuro */
             background: rgba(10, 15, 25, 0.95); 
-            
-            /* Bordas ornamentadas com brilho dourado */
             border: 3px solid #f39c12; 
             border-style: ridge; 
             border-radius: 15px;
-            
             padding: 25px 15px 15px 15px; 
             width: 100%; text-align: center;
-            
             box-shadow: 0 0 30px rgba(243, 156, 18, 0.5), inset 0 0 15px #000;
             backdrop-filter: blur(8px);
             display: flex; flex-direction: column; align-items: center;
@@ -48,7 +43,6 @@
             position: relative;
         }
 
-        /* LOGO LEVITANDO */
         @keyframes levitacao_magica {
             0% { transform: translateY(0px); box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000; }
             50% { transform: translateY(-8px); box-shadow: 0 0 30px #f39c12, inset 0 0 20px #000; }
@@ -67,7 +61,6 @@
             z-index: 2;
         }
 
-        /* TÍTULO ESTILIZADO */
         h2 { 
             font-family: 'Cinzel', serif;
             color: #f39c12; margin: 0 0 15px 0; 
@@ -76,7 +69,6 @@
             text-shadow: 2px 2px 5px #000, 0 0 10px #f39c12;
         }
         
-        /* ÁREA DE ROLAGEM */
         #area-personagens { 
             width: 100%; display: flex; flex-direction: column; gap: 12px; 
             max-height: 280px; overflow-y: auto; padding-right: 5px; 
@@ -88,7 +80,7 @@
         #area-personagens::-webkit-scrollbar-thumb { background: #f39c12; border-radius: 5px; }
 
         /* ==========================================
-           2. O NOVO CARTÃO DO PERSONAGEM (btn-char)
+           2. O NOVO CARTÃO DO PERSONAGEM
            ========================================== */
         .btn-char {
             width: 100%; height: 60px;
@@ -103,7 +95,6 @@
         
         .btn-char:active { transform: scale(0.97); border-color: #f39c12; box-shadow: 0 0 15px #f39c12; }
 
-        /* Nicho do Sprite à Esquerda */
         .char-card-sprite-container {
             width: 60px; height: 60px; 
             background: rgba(0,0,0,0.5);
@@ -119,7 +110,6 @@
             filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5));
         }
 
-        /* Informações do Personagem no Centro */
         .char-card-info { 
             flex-grow: 1; text-align: left; 
             padding: 0 15px; 
@@ -139,7 +129,6 @@
             font-family: 'Metamorphous', serif;
         }
 
-        /* Ícone de Batalha à Direita */
         .char-card-icon-right {
             width: 40px; text-align: center;
             font-size: 1.3em;
@@ -148,7 +137,6 @@
             filter: drop-shadow(0 0 5px #f39c12);
         }
 
-        /* BOTÃO DE CRIAR */
         .btn-new {
             width: 100%; padding: 12px; margin-top: 10px;
             font-family: 'Cinzel', serif;
@@ -162,7 +150,7 @@
         .btn-new:active { transform: scale(0.97); }
 
         /* ==========================================
-           3. O NOVO RODAPÉ FIXO
+           3. O NOVO RODAPÉ FIXO (COM EMOJIS)
            ========================================== */
         .footer-nav {
             position: fixed; bottom: 0; left: 0; width: 100%; height: 65px;
@@ -176,7 +164,8 @@
 
         .nav-item {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-decoration: none;
+            text-decoration: none; /* Remove o sublinhado */
+            color: inherit; /* Remove a cor azul de link */
             width: 23%; height: 100%;
             cursor: pointer;
             transition: 0.2s;
@@ -184,12 +173,13 @@
         
         .nav-item:active { transform: translateY(-3px); }
 
-        /* ÍCONES GRÁFICOS */
-        .nav-icon {
-            width: 28px; height: 28px; 
-            object-fit: contain;
+        /* NOVO: Classe para Emojis no lugar de Imagens */
+        .nav-icon-emoji {
+            font-size: 1.6em; /* Tamanho do Emoji */
             margin-bottom: 2px;
-            filter: drop-shadow(0 0 3px rgba(243, 156, 18, 0.5));
+            line-height: 1;
+            filter: drop-shadow(0 0 3px rgba(243, 156, 18, 0.3));
+            transition: 0.2s;
         }
 
         .nav-text {
@@ -201,8 +191,15 @@
             transition: 0.2s;
         }
 
-        .nav-item.active .nav-icon { filter: drop-shadow(0 0 10px #f39c12); }
-        .nav-item.active .nav-text { color: #f39c12; text-shadow: 0 0 5px #f39c12; }
+        /* Efeitos quando o botão está ativo */
+        .nav-item.active .nav-icon-emoji { 
+            filter: drop-shadow(0 0 8px #f39c12); 
+            transform: scale(1.1);
+        }
+        .nav-item.active .nav-text { 
+            color: #f39c12; 
+            text-shadow: 0 0 5px #f39c12; 
+        }
 
     </style>
 </head>
@@ -221,19 +218,19 @@
 
     <footer class="footer-nav">
         <a href="javascript:void(0)" class="nav-item active">
-            <img src="https://github.com/user-attachments/assets/1368ff61-75fb-493f-8461-8938b8130f14" class="nav-icon" alt="Início">
+            <div class="nav-icon-emoji">🏠</div>
             <span class="nav-text">Início</span>
         </a>
         <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
-            <img src="https://github.com/user-attachments/assets/fa855a9b-007d-4191-bb27-995166296316" class="nav-icon" alt="Perfil">
+            <div class="nav-icon-emoji">👤</div>
             <span class="nav-text">Perfil</span>
         </a>
         <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
-            <img src="https://github.com/user-attachments/assets/5c33f271-8b92-48a5-83e8-e5a9601d5114" class="nav-icon" alt="Luta">
+            <div class="nav-icon-emoji">⚔️</div>
             <span class="nav-text">Luta</span>
         </a>
         <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
-            <img src="https://github.com/user-attachments/assets/a2322a31-9721-4f16-832f-b3a620d44093" class="nav-icon" alt="Mais">
+            <div class="nav-icon-emoji">🎒</div>
             <span class="nav-text">Mais</span>
         </a>
     </footer>
@@ -243,7 +240,7 @@
         window.Telegram.WebApp.expand();
 
         // ==========================================
-        // SISTEMA DE ÁUDIO CORRIGIDO (Via JavaScript)
+        // SISTEMA DE ÁUDIO CORRIGIDO PARA MOBILE
         // ==========================================
         const bgMusic = new Audio("https://github.com/user-attachments/files/26343101/freesound_community-clouds-67847.mp3");
         bgMusic.loop = true;
@@ -255,66 +252,73 @@
             clickSound.currentTime = 0; 
             let playPromise = clickSound.play();
             if (playPromise !== undefined) {
-                playPromise.catch(e => console.log("Som de clique bloqueado pelo navegador.", e));
+                playPromise.catch(e => console.log("Som de clique bloqueado.", e));
             }
         };
 
-        // Regra de Ouro do Navegador: A música de fundo só pode tocar se o jogador interagir com a tela primeiro.
-        document.addEventListener('click', function() {
+        // Inicia música no primeiro toque
+        function iniciarMusicaFundo() {
             if (bgMusic.paused) {
                 let playPromise = bgMusic.play();
                 if (playPromise !== undefined) {
-                    playPromise.catch(e => console.log("Música de fundo bloqueada. O arquivo pode estar indisponível ou forçando download.", e));
+                    playPromise.then(() => {
+                        document.removeEventListener('click', iniciarMusicaFundo);
+                        document.removeEventListener('touchstart', iniciarMusicaFundo);
+                    }).catch(e => console.log("Música bloqueada pelo navegador.", e));
                 }
             }
-        }, { once: true }); // Executa só no primeiro toque na tela
+        }
+
+        document.addEventListener('click', iniciarMusicaFundo);
+        document.addEventListener('touchstart', iniciarMusicaFundo, {passive: true});
 
 
         // ==========================================
-        // MAPA DE SPRITES (As mesmas usadas na Arena)
+        // MAPA DE SPRITES
         // ==========================================
         const SPRITES_COSTA = {
-    "aventureiro": {
-        "masculino": "https://github.com/user-attachments/assets/f870b026-e544-43f4-8395-0112277b24f1", // Skin de quem tá sem classe
-        "feminino": "https://github.com/user-attachments/assets/c405a107-9d5e-4f34-8daa-9660b29e591c"
-    },
-    "guerreiro": {
-        "mascolino": "https://github.com/user-attachments/assets/1c0045ea-d8fc-4958-86a4-ecef1507f25e",
-        "feminino" : "https://github.com/user-attachments/assets/d5cfde65-f28f-4a13-9c1e-525adc3b51b2"
-    },
-    "berserker": { 
-        "masculino": "https://github.com/user-attachments/assets/88e6ee39-1f4f-4886-a31c-65e4fc53b7ba",
-        "feminino": "https://github.com/user-attachments/assets/ec261bd5-e23e-4390-b0a7-e411095b46b0"
-    },    
-    "cacador": {
-        "masculino": "https://github.com/user-attachments/assets/6998b293-a7fd-444f-b358-831c44eb3d8f",
-        "feminino": "https://github.com/user-attachments/assets/03e162e6-1869-4eeb-ab6d-1a902b74f582"
-    },
-    "monge": { 
-        "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
-        "feminino": "https://github.com/user-attachments/assets/3bb88286-d446-48ee-9d95-c53482e5553a"
-    },    
-    "mago": {
-        "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
-        "feminino": "https://github.com/user-attachments/assets/d8749759-d43f-4eda-8520-c9610a635b72"
-    },
-    "bardo": {
-        "masculino":"https://github.com/user-attachments/assets/75788d0e-5be2-43d0-870b-f7aee5e04483",
-        "feminino": "https://github.com/user-attachments/assets/6fc004aa-b451-4d25-a110-493f0f26f585"
-    },
-    "assassino": {
-        "masculino":"https://github.com/user-attachments/assets/c02fa401-7b6d-48aa-8892-fe85398a36ec",
-        "feminino": "https://github.com/user-attachments/assets/d1a69fdc-de8f-4982-8ac5-83963040b4d4"
-    },
-    "samurai": {
-        "masculino":"https://github.com/user-attachments/assets/3f61b608-fc17-4b81-ad7f-8d11d7a46e52",
-        "feminino": "https://github.com/user-attachments/assets/eb54a42c-0608-402e-950c-7f8f771700a7"
-    },
-    "curandeiro": {
-        "masculino":"https://github.com/user-attachments/assets/61b246e8-1eaf-4dd3-85e5-267ca6fe0058",
-        "feminino": "https://github.com/user-attachments/assets/1d9e6bb2-0fe4-40cd-8583-4dd17bbe48ed"
-    },
-}    
+        "aventureiro": {
+            "masculino": "https://github.com/user-attachments/assets/f870b026-e544-43f4-8395-0112277b24f1", // Skin de quem tá sem classe
+            "feminino": "https://github.com/user-attachments/assets/c405a107-9d5e-4f34-8daa-9660b29e591c"
+        },
+        "guerreiro": {
+            "mascolino": "https://github.com/user-attachments/assets/1c0045ea-d8fc-4958-86a4-ecef1507f25e",
+            "feminino" : "https://github.com/user-attachments/assets/d5cfde65-f28f-4a13-9c1e-525adc3b51b2"
+        },
+        "berserker": { 
+            "masculino": "https://github.com/user-attachments/assets/88e6ee39-1f4f-4886-a31c-65e4fc53b7ba",
+            "feminino": "https://github.com/user-attachments/assets/ec261bd5-e23e-4390-b0a7-e411095b46b0"
+        },    
+        "cacador": {
+            "masculino": "https://github.com/user-attachments/assets/6998b293-a7fd-444f-b358-831c44eb3d8f",
+            "feminino": "https://github.com/user-attachments/assets/03e162e6-1869-4eeb-ab6d-1a902b74f582"
+        },
+        "monge": { 
+            "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
+            "feminino": "https://github.com/user-attachments/assets/3bb88286-d446-48ee-9d95-c53482e5553a"
+        },    
+        "mago": {
+            "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
+            "feminino": "https://github.com/user-attachments/assets/d8749759-d43f-4eda-8520-c9610a635b72"
+        },
+        "bardo": {
+            "masculino":"https://github.com/user-attachments/assets/75788d0e-5be2-43d0-870b-f7aee5e04483",
+            "feminino": "https://github.com/user-attachments/assets/6fc004aa-b451-4d25-a110-493f0f26f585"
+        },
+        "assassino": {
+            "masculino":"https://github.com/user-attachments/assets/c02fa401-7b6d-48aa-8892-fe85398a36ec",
+            "feminino": "https://github.com/user-attachments/assets/d1a69fdc-de8f-4982-8ac5-83963040b4d4"
+        },
+        "samurai": {
+            "masculino":"https://github.com/user-attachments/assets/3f61b608-fc17-4b81-ad7f-8d11d7a46e52",
+            "feminino": "https://github.com/user-attachments/assets/eb54a42c-0608-402e-950c-7f8f771700a7"
+        },
+        "curandeiro": {
+            "masculino":"https://github.com/user-attachments/assets/61b246e8-1eaf-4dd3-85e5-267ca6fe0058",
+            "feminino": "https://github.com/user-attachments/assets/1d9e6bb2-0fe4-40cd-8583-4dd17bbe48ed"
+        },
+
+    };   
 
         const MAPA_CLASSES_BASE = {
             'aventureiro': 'aventureiro', 'aprendiz': 'aventureiro',
@@ -346,7 +350,6 @@
                 }
 
                 const personagens = await resposta.json();
-
                 let htmlBotoes = '';
 
                 if (personagens.length > 0) {
@@ -355,7 +358,6 @@
                         let classSlug = rawClass.replace(/_/g, ' ');
                         let genero = (p.gender || "masculino").toLowerCase();
                         
-                        // Lógica de mapeamento da sprite idêntica à da arena
                         let classeBase = MAPA_CLASSES_BASE[rawClass] || "aventureiro";
                         let spriteUrl = "";
                         if (SPRITES_COSTA[classeBase] && SPRITES_COSTA[classeBase][genero]) {
@@ -364,7 +366,6 @@
                             spriteUrl = SPRITES_COSTA["aventureiro"]["masculino"];
                         }
 
-                        // O NOVO CARTÃO DO HERÓI
                         htmlBotoes += `
                         <button class="btn-char" onclick="playClick(); entrarNoJogo('${p.id}', '${p.nome}')">
                             <div class="char-card-sprite-container">
@@ -385,7 +386,6 @@
 
                 htmlBotoes += `<button class="btn-new" onclick="playClick(); mostrarForm()">➕ Criar Personagem</button>`;
                 
-                // Formulário de Criação Oculto
                 htmlBotoes += `
                 <div id="form-criar" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.6); border: 1px solid #f39c12; border-radius: 8px; text-align: left;">
                     <input type="text" id="novo-nome" placeholder="Nome do Herói" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: 'Cinzel', serif; font-weight: bold; background: rgba(255,255,255,0.9);">
@@ -407,10 +407,14 @@
             }
         }
 
+        // FUNÇÃO DE ENTRAR COM DELAY PARA O SOM TOCAR
         function entrarNoJogo(objectId, nome) {
             localStorage.setItem("jogadorEldoraID", objectId);
             localStorage.setItem("jogadorEldoraNome", nome);
-            window.location.href = "/"; 
+            
+            setTimeout(() => {
+                window.location.href = "/"; 
+            }, 400); 
         }
 
         window.mostrarForm = function() {
