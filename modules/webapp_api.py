@@ -183,6 +183,59 @@ def obter_perfil(user_id):
         traceback.print_exc()
         return jsonify({"erro": f"Erro interno Python: {str(e)}"}), 400
 
+@webapp_bp.route('/api/portal/criar_personagem', methods=['POST'])
+def api_criar_personagem():
+    try:
+        from modules.player.core import users_collection
+        from datetime import datetime, timezone
+        
+        data = request.json
+        tg_id = data.get("tg_id")
+        nome = data.get("nome", "").strip()
+        genero = data.get("genero", "masculino")
+
+        if not tg_id or not nome:
+            return jsonify({"erro": "Nome e ID são obrigatórios."}), 400
+
+        nome_norm = nome.lower()
+        
+        # 1. Checa se o nome já existe no jogo inteiro
+        if users_collection.find_one({"name_normalized": nome_norm}):
+            return jsonify({"erro": "Este nome já está em uso por outro jogador!"}), 400
+
+        # 2. Cria o esqueleto do personagem nível 1
+        novo_personagem = {
+            "telegram_id": int(tg_id),
+            "username": data.get("tg_username", ""),
+            "name": nome,
+            "character_name": nome,
+            "name_normalized": nome_norm,
+            "gender": genero,
+            "class": "aventureiro",
+            "class_key": "aventureiro",
+            "level": 1,
+            "xp": 0,
+            "gold": 100, # Moedas iniciais
+            "gems": 0,
+            "current_location": "reino_eldora",
+            "hp": 50, "max_hp": 50, "current_hp": 50,
+            "mana": 50, "max_mana": 50, "current_mp": 50,
+            "energy": 20, "max_energy": 20,
+            "inventory": {}, "equipment": {}, "equipped_items": {},
+            "skills": [], "equipped_skills": [], "invested": {},
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        # 3. Salva no banco
+        resultado = users_collection.insert_one(novo_personagem)
+
+        return jsonify({"sucesso": True, "novo_id": str(resultado.inserted_id)})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+    
 # ==========================================
 # ROTAS DE AÇÕES DOS BOTÕES (TRANSFERIDAS)
 # ==========================================

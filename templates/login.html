@@ -8,10 +8,7 @@
     <style>
         body {
             margin: 0; padding: 0;
-            
-            /* O SEU LINK DE FUNDO MANTIDO */
             background-image: url('https://github.com/user-attachments/assets/ea06a84b-c8fc-45d7-977f-c5a55f808815'); 
-            
             background-size: cover; background-position: center;
             height: 100vh; display: flex; justify-content: center; align-items: center;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -20,42 +17,44 @@
         .login-box {
             background: rgba(15, 23, 42, 0.92); 
             border: 2px solid #f39c12; border-radius: 12px;
-            
-            /* Diminuindo o padding (espaço em branco) geral da caixa e a largura */
             padding: 20px 15px 15px 15px; 
             width: 80%; max-width: 300px; text-align: center;
-            
             box-shadow: 0 0 25px rgba(243, 156, 18, 0.4); backdrop-filter: blur(8px);
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* EFEITO DA LOGO: Menor e mais ajustada */
+        /* ==========================================
+           1. ANIMAÇÃO DE LEVITAÇÃO DA LOGO
+           ========================================== */
+        @keyframes levitacao_magica {
+            0% { transform: translateY(0px); box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000; }
+            50% { transform: translateY(-8px); box-shadow: 0 0 30px #f39c12, inset 0 0 20px #000; }
+            100% { transform: translateY(0px); box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000; }
+        }
+
         .logo-eldora {
             width: 90px; height: 90px;
             margin-top: -60px; 
             border-radius: 50%;
             border: 3px solid #f39c12;
-            box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000;
             background: #000;
             margin-bottom: 10px;
             object-fit: cover;
+            /* Aplica a animação: 3 segundos, contínua e suave */
+            animation: levitacao_magica 3s ease-in-out infinite;
         }
 
-        /* Título um pouco mais compacto */
         h2 { color: #f39c12; margin: 0 0 15px 0; font-size: 1.1em; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 5px rgba(0,0,0,0.8); }
         
-        /* O SEGREDO MÁGICO: Limitando a altura e ativando a barra de rolagem! */
         #area-personagens { 
             width: 100%; display: flex; flex-direction: column; gap: 8px; 
-            max-height: 220px; overflow-y: auto; padding-right: 5px; 
+            max-height: 280px; overflow-y: auto; padding-right: 5px; 
         }
 
-        /* Estilizando a barrinha de rolagem pra não ficar aquela padrão feia do Windows/Android */
         #area-personagens::-webkit-scrollbar { width: 4px; }
         #area-personagens::-webkit-scrollbar-track { background: transparent; }
         #area-personagens::-webkit-scrollbar-thumb { background: #f39c12; border-radius: 4px; }
 
-        /* Botões mais finos e curtos */
         .btn-char {
             width: 100%; padding: 8px 12px;
             background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
@@ -76,12 +75,19 @@
             border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
             flex-shrink: 0;
         }
+        .btn-new:active { transform: scale(0.96); }
     </style>
 </head>
 <body>
 
+    <audio id="bg-music" loop>
+        <source src="https://github.com/user-attachments/files/26343101/freesound_community-clouds-67847.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="click-sound">
+        <source src="https://github.com/user-attachments/files/26343084/dragon-studio-clicking-433009.mp3" type="audio/mpeg">
+    </audio>
+
     <div class="login-box">
-        
         <img src="https://github.com/user-attachments/assets/0f2990de-2b0f-4d3d-90ae-060713ef5abb" class="logo-eldora" alt="Logo Eldora">
         
         <h2>Portal de Acesso</h2>
@@ -94,6 +100,27 @@
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
 
+        // ==========================================
+        // 3. CONTROLE DE SOM E MÚSICA
+        // ==========================================
+        const bgMusic = document.getElementById('bg-music');
+        const clickSound = document.getElementById('click-sound');
+
+        // Função para tocar o som de clique
+        window.playClick = function() {
+            clickSound.currentTime = 0; // Reseta o som para poder clicar rápido
+            clickSound.play().catch(e => console.log("Áudio bloqueado:", e));
+        };
+
+        // Inicia a música de fundo no primeiro clique na tela (regra dos navegadores)
+        document.body.addEventListener('click', function() {
+            if (bgMusic.paused) {
+                bgMusic.volume = 0.3; // Volume da música em 30% para não estourar os ouvidos
+                bgMusic.play().catch(e => console.log("Música bloqueada:", e));
+            }
+        }, { once: true }); // Executa apenas uma vez
+
+
         async function buscarPersonagens() {
             const area = document.getElementById('area-personagens');
             let tgUser = window.Telegram.WebApp.initDataUnsafe.user;
@@ -105,14 +132,9 @@
 
             try {
                 const resposta = await fetch(`/api/meus_personagens/${tgUser.id}`);
-                
-                // 🛡️ TRAVA DE SEGURANÇA (O DEDO-DURO)
-                if (!resposta.ok) {
-                    throw new Error(`O servidor retornou Erro ${resposta.status}`);
-                }
+                if (!resposta.ok) throw new Error(`O servidor retornou Erro ${resposta.status}`);
 
                 const personagens = await resposta.json();
-
                 let htmlBotoes = '';
 
                 if (personagens.length > 0) {
@@ -122,8 +144,9 @@
                             classeNome = 'Aventureiro';
                         }
                         
+                        // Adicionando o playClick() no botão do personagem
                         htmlBotoes += `
-                        <button class="btn-char" onclick="entrarNoJogo('${p.id}', '${p.nome}')">
+                        <button class="btn-char" onclick="playClick(); entrarNoJogo('${p.id}', '${p.nome}')">
                             <div class="btn-char-info">
                                 <strong>${p.nome}</strong>
                                 <span>${classeNome.replace(/_/g, ' ')} - Nv. ${p.level}</span>
@@ -135,11 +158,26 @@
                     htmlBotoes += '<p style="color: #aaa; font-size: 0.85em; margin-bottom: 15px;">Nenhum herói encontrado nesta conta.</p>';
                 }
 
-                htmlBotoes += `<button class="btn-new" onclick="alert('A criação de novos personagens estará disponível na próxima atualização!')">➕ Criar Personagem</button>`;
+                // Adicionando o playClick() no botão de Criar Personagem
+                htmlBotoes += `<button class="btn-new" onclick="playClick(); mostrarForm()">➕ Criar Personagem</button>`;
+                
+                htmlBotoes += `
+                <div id="form-criar" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.6); border: 1px solid #f39c12; border-radius: 8px; text-align: left;">
+                    <input type="text" id="novo-nome" placeholder="Nome do Herói" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: inherit; font-weight: bold;">
+                    
+                    <select id="novo-genero" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: inherit; font-weight: bold;">
+                        <option value="masculino">Masculino ♂️</option>
+                        <option value="feminino">Feminino ♀️</option>
+                        <option value="nao_binario">Não-binário ⚧️</option>
+                    </select>
+                    
+                    <button onclick="playClick(); enviarNovoPersonagem()" style="width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 5px;">✅ Confirmar</button>
+                    <button onclick="playClick(); esconderForm()" style="width: 100%; padding: 10px; background: #c0392b; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">❌ Cancelar</button>
+                </div>`;
+
                 area.innerHTML = htmlBotoes;
 
             } catch (erro) {
-                // 🚨 MOSTRA O ERRO EXATO NA TELA
                 area.innerHTML = `<p style="color: #e74c3c; font-size: 0.9em; font-weight: bold;">Erro Real: ${erro.message}<br><span style="font-size:0.8em; color:#aaa;">Verifique o terminal do Python!</span></p>`;
             }
         }
@@ -149,6 +187,60 @@
             localStorage.setItem("jogadorEldoraNome", nome);
             window.location.href = "/"; 
         }
+
+        window.mostrarForm = function() {
+            document.getElementById('form-criar').style.display = 'block';
+            document.getElementById('area-personagens').scrollTop = document.getElementById('area-personagens').scrollHeight;
+        };
+
+        window.esconderForm = function() {
+            document.getElementById('form-criar').style.display = 'none';
+        };
+
+        window.enviarNovoPersonagem = async function() {
+            const nome = document.getElementById('novo-nome').value;
+            const genero = document.getElementById('novo-genero').value;
+            
+            const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+            const tgId = tgUser?.id;
+
+            if (!nome || nome.trim() === "") {
+                alert("⚠️ Digite o nome do seu herói!");
+                return;
+            }
+
+            try {
+                const btn = document.querySelector("#form-criar button");
+                btn.innerText = "⏳ Criando...";
+                btn.disabled = true;
+
+                const res = await fetch('/api/portal/criar_personagem', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tg_id: tgId,
+                        tg_username: tgUser?.username || "",
+                        nome: nome,
+                        genero: genero
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.sucesso) {
+                    alert("✨ Herói criado com sucesso!");
+                    buscarPersonagens(); 
+                } else {
+                    alert("❌ Erro: " + data.erro);
+                    btn.innerText = "✅ Confirmar";
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert("⚠️ Erro de conexão: " + e.message);
+                document.querySelector("#form-criar button").innerText = "✅ Confirmar";
+                document.querySelector("#form-criar button").disabled = false;
+            }
+        };
 
         buscarPersonagens();
     </script>
