@@ -8,6 +8,7 @@ MATERIALS_DATA = {
         "description": "Metal condutor básico.", 
         "stackable": True,
         "media_key": "imagem_minerio_de_cpbre",
+        "icon_url": "",
     },
     "minerio_de_ouro": {
         "display_name": "Minério de Ouro", "emoji": "⛓️🟡",
@@ -15,6 +16,7 @@ MATERIALS_DATA = {
         "description": "Metal precioso e brilhante.", 
         "stackable": True,
         "media_key": "imagem_minerio_de_ouro",
+        "icon_url": "",
     },
     "minerio_de_ferro": {
         "display_name": "Minério de Ferro", "emoji": "⛓️⚫️",
@@ -22,20 +24,22 @@ MATERIALS_DATA = {
         "description": "Minério metálico que pode ser fundido.",
         "stackable": True, 
         "media_key": "imagem_minerio_de_ferro",
-        "icon_url": "https://github.com/user-attachments/assets/05750a8a-6804-47f6-b6fe-beddcaa20dff",
+        "icon_url": "",
     },
     "minerio_de_estanho": {
         "display_name": "Minério de Estanho", "emoji": "⛓️⚪️",
         "type": "material_bruto", "category": "cacada",
         "description": "Metal macio, excelente para ligas.",
         "stackable": True, 
-        "media_key": "item_minerio_de_stanho"
+        "media_key": "item_minerio_de_stanho",
+        "icon_url": "",
     },
     "minerio_de_prata": {
         "display_name": "Minério de Prata", "emoji": "⛓️🔘",
         "type": "material_bruto", "category": "coletavel",
         "description": "Minério metálico que pode ser fundido.",
         "stackable": True, "media_key": "imagem_minerio_de_prata",
+        "icon_url": "",
     },
     "carvao": {
         "display_name": "Carvão Mineral", "emoji": "⚫",
@@ -43,6 +47,7 @@ MATERIALS_DATA = {
         "description": "Combustível essencial para forjas.", 
         "stackable": True,
         "media_key": "imagem_carvao",
+        "icon_url": "",
     },
     "cristal_bruto": {
         "display_name": "Cristal Bruto", "emoji": "💎",
@@ -50,12 +55,14 @@ MATERIALS_DATA = {
         "description": "Cristal com potencial mágico não lapidado.", 
         "stackable": True,
         "media_key": "imagem_cristal_bruto",
+        "icon_url": "",
     },
     "pedra": {
         "display_name": "Pedra", "emoji": "🪨", 
         "type": "material_bruto", "category": "coletavel", 
         "stackable": True, 
         "media_key": "item_pedra",
+        "icon_url": "",
     },
     # --- MADEIRAS E PLANTAS ---
     "madeira": {
@@ -63,6 +70,7 @@ MATERIALS_DATA = {
         "type": "material_bruto", "category": "coletavel", 
         "stackable": True, 
         "media_key": "item_madeira",
+        "icon_url": "",
     },
     "madeira_de_carvalho": {
         "display_name": "Tora de Carvalho", "emoji": "🪵🟤",
@@ -70,6 +78,7 @@ MATERIALS_DATA = {
         "description": "Madeira dura e resistente.", 
         "stackable": True,
         "media_key": "imagem_madeira_de_carvalho",
+        "icon_url": "",
     },
     "madeira_rara": {
         "display_name": "Madeira Rara", "emoji": "🪵☦️",
@@ -77,6 +86,7 @@ MATERIALS_DATA = {
         "description": "Madeira de árvore antiga, resistente.",
         "stackable": True, 
         "media_key": "item_madeira_rara",
+        "icon_url": "",
     },
     "casca_rigida": {
         "display_name": "Casca Rígida", "emoji": "🛡️",
@@ -84,6 +94,7 @@ MATERIALS_DATA = {
         "description": "Casca de árvore grossa para curtição.", 
         "stackable": True,
         "media_key": "imagem_minerio_de_ferro",
+        "icon_url": "",
     },
     "raiz_sangrenta": {
         "display_name": "Raiz Sangrenta", "emoji": "🥕",
@@ -91,6 +102,7 @@ MATERIALS_DATA = {
         "description": "Raiz vermelha para poções.", 
         "stackable": True,
         "media_key": "imagem_minerio_de_ferro",
+        "icon_url": "",
     },
     "linho": {
         "display_name": "Linho", "emoji": "🌿",
@@ -98,6 +110,7 @@ MATERIALS_DATA = {
         "description": "Fibras vegetais base para tecelagem.",
         "stackable": True, 
         "media_key": "imagem_linho",
+        "icon_url": "",
     },
     "flor_da_lua": {
         "display_name": "Flor da Lua", "emoji": "🌷",
@@ -105,12 +118,14 @@ MATERIALS_DATA = {
         "description": "Brilha levemente à noite.", 
         "stackable": True,
         "media_key": "imagem_flor_da_lua",
+        "icon_url": "",
     },
     "cogumelo_azul": {
         "display_name": "Cogumelo Azul", "emoji": "🍄🟦",
         "type": "reagent", "category": "coletavel",
         "description": "Fungo raro.", "stackable": True,
         "media_key": "imagem_cogumelo_azul",
+        "icon_url": "",
     },
     # --- DROPS DE MONSTROS ---
     "pena": {
@@ -119,6 +134,7 @@ MATERIALS_DATA = {
         "description": "Pena leve.", 
         "stackable": True, 
         "media_key": "imagem_pena",
+        "icon_url": "",
     },
     "sangue": {
         "display_name": "Sangue", "emoji": "🩸",
@@ -126,171 +142,198 @@ MATERIALS_DATA = {
         "description": "Amostra de sangue.", 
         "stackable": True, 
         "media_key": "imagem_sangue",
+        "icon_url": "",
     },
     "pano_simples": {
         "display_name": "Pedaço de Pano", "emoji": "🧣",
         "type": "material_monstro", "category": "cacada",
         "description": "Retalho comum.", 
         "stackable": True, 
-        "media_key": "item_pano_simples"
+        "media_key": "item_pano_simples",
+        "icon_url": "",
     },
     "couro_de_lobo": {
         "display_name": "Couro de Lobo", "emoji": "🐺",
         "type": "material_monstro", "category": "cacada",
         "description": "Pele de lobo comum.", 
         "stackable": True, 
-        "media_key": "item_couro_de_lobo"
+        "media_key": "item_couro_de_lobo",
+        "icon_url": "",
     },
     "couro_de_lobo_alfa": {
         "display_name": "Couro de Lobo Alfa", "emoji": "🟤🐺",
         "type": "material_monstro", "category": "cacada",
         "description": "Pele espessa e rara.", 
         "stackable": True, 
-        "media_key": "item_couro_de_lobo_alfa"
+        "media_key": "item_couro_de_lobo_alfa",
+        "icon_url": "",
     },
     "presa_de_javali": {
         "display_name": "Presa de Javali", "emoji": "🦷",
         "type": "material_monstro", "category": "cacada",
         "description": "Presas afiadas.", 
         "stackable": True, 
-        "media_key": "item_presa_de_javali"
+        "media_key": "item_presa_de_javali",
+        "icon_url": "",
     },
     "asa_de_morcego": {
         "display_name": "Asa de Morcego", "emoji": "🦇",
         "type": "material_monstro", "category": "cacada",
         "description": "Asas membranosas.", 
         "stackable": True, 
-        "media_key": "item_asa_de_morcego"
+        "media_key": "item_asa_de_morcego",
+        "icon_url": "",
     },
     "pele_de_troll": {
         "display_name": "Pele de Troll", "emoji": "🧌",
         "type": "material_monstro", "category": "cacada",
         "description": "Couro grosso regenerativo.", 
         "stackable": True, 
-        "media_key": "item_pele_de_troll"
+        "media_key": "item_pele_de_troll",
+        "icon_url": "",
     },
     "ectoplasma": {
         "display_name": "Ectoplasma", "emoji": "👻",
         "type": "material_monstro", "category": "cacada",
         "description": "Resíduo etéreo.", 
         "stackable": True, 
-        "media_key": "item_ectoplasma"
+        "media_key": "item_ectoplasma",
+        "icon_url": "",
     },
     "esporo_de_cogumelo": {
         "display_name": "Esporo de Cogumelo", "emoji": "🍄",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_esporo_de_cogumelo"
+        "media_key": "item_esporo_de_cogumelo",
+        "icon_url": "",
     },
     "seiva_de_ent": {
         "display_name": "Seiva de Ent", "emoji": "🌳",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_seiva_de_ent"
+        "media_key": "item_seiva_de_ent",
+        "icon_url": "",
     },
     "carapaca_de_pedra": {
         "display_name": "Carapaça de Pedra", "emoji": "🪨",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_carapaca_de_pedra"
+        "media_key": "item_carapaca_de_pedra",
+        "icon_url": "",
     },
     "escama_de_salamandra": {
         "display_name": "Escama de Salamandra", "emoji": "🦎",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_escama_de_salamandra"
+        "media_key": "item_escama_de_salamandra",
+        "icon_url": "",
     },
     "engrenagem_usada": {
         "display_name": "Engrenagem Usada", "emoji": "⚙️",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_engrenagem_usada"
+        "media_key": "item_engrenagem_usada",
+        "icon_url": "",
     },
     "martelo_enferrujado": {
         "display_name": "Martelo Enferrujado", "emoji": "🔨🔸",
         "type": "sucata", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_martelo_enferrujado"
+        "media_key": "item_martelo_enferrujado",
+        "icon_url": "",
     },
     "dente_afiado": {
         "display_name": "Dente Afiado", "emoji": "🦷",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_dente_afiado"
+        "media_key": "item_dente_afiado",
+        "icon_url": "",
     },
     "dente_afiado_superior": {
         "display_name": "Dente Afiado Superior", "emoji": "🦷",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_dente_afiado_superior"
+        "media_key": "item_dente_afiado_superior",
+        "icon_url": "",
     },
     "fragmento_gargula": {
         "display_name": "Fragmento de Gárgula", "emoji": "🪨",
         "type": "material_monstro", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_fragmento_gargula"
+        "media_key": "item_fragmento_gargula",
+        "icon_url": "",
     },
     # --- REAGENTE E MATERIAIS MÁGICOS ---
     "poeira_magica": {
         "display_name": "Poeira Mágica", "emoji": "✨",
         "type": "material_magico", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_poeira_magica"
+        "media_key": "item_poeira_magica",
+        "icon_url": "",
     },
     "ambar_seiva": {
         "display_name": "Âmbar Fossilizado", "emoji": "🔸",
         "type": "reagent", "category": "coletavel", 
         "stackable": True,
         "media_key": "imagem_ambar_seiva",
+        "icon_url": "",
     },
     "nucleo_de_golem": {
         "display_name": "Núcleo de Golem", "emoji": "🧿",
         "type": "material_magico", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_nucleo_de_golem"
+        "media_key": "item_nucleo_de_golem",
+        "icon_url": "",
     },
     "coracao_de_magma": {
         "display_name": "Coração de Magma", "emoji": "❤️‍🔥",
         "type": "material_magico", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_coracao_de_magma"
+        "media_key": "item_coracao_de_magma",
+        "icon_url": "",
     },
     "nucleo_de_magma": {
         "display_name": "Núcleo de Magma", "emoji": "🪔",
         "type": "material_magico", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_nucleo_de_magma"
+        "media_key": "item_nucleo_de_magma",
+        "icon_url": "",
     },
     "olho_de_basilisco": {
         "display_name": "Olho de Basilisco", "emoji": "👁️",
         "type": "material_magico", 
         "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_olho_de_basilisco"
+        "media_key": "item_olho_de_basilisco",
+        "icon_url": "",
     },
     "essencia_de_fogo": {
         "display_name": "Essência de Fogo", "emoji": "♨️",
         "type": "material_magico", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_essencia_de_fogo"
+        "media_key": "item_essencia_de_fogo",
+        "icon_url": "",
     },
     "semente_encantada": {
         "display_name": "Semente Encantada", "emoji": "🌱✨",
         "type": "material_magico", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_semente_encantada"
+        "media_key": "item_semente_encantada",
+        "icon_url": "",
     },
     "joia_da_criacao": {
         "display_name": "Joia da Criação", "emoji": "🔷",
         "type": "material_magico", "category": "consumivel", 
         "stackable": True, 
-        "media_key": "item_joia_da_criacao"
+        "media_key": "item_joia_da_criacao",
+        "icon_url": "",
     },
     "nucleo_de_energia_instavel": {
         "display_name": "Núcleo de Energia Instável", "emoji": "💥",
         "type": "material_magico", "category": "especial", 
         "stackable": True, 
-        "media_key": "item_nucleo_de_energia_instavel"
+        "media_key": "item_nucleo_de_energia_instavel",
+        "icon_url": "",
     },
 
     # --- REFINADOS E MANUFATURADOS ---
@@ -298,85 +341,99 @@ MATERIALS_DATA = {
         "display_name": "Barra de Ferro", "emoji": "🧱",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, "media_key": 
-        "item_barra_de_ferro"
+        "item_barra_de_ferro",
+        "icon_url": "",
     },
     "barra_de_aco": {
         "display_name": "Barra de Aço", "emoji": "🧱⛓️",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_barra_de_aco"
+        "media_key": "item_barra_de_aco",
+        "icon_url": "",
     },
     "barra_de_prata": {
         "display_name": "Barra de Prata", "emoji": "🧱🥈",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_barra_de_prata" 
+        "media_key": "item_barra_de_prata",
+        "icon_url": "", 
     },
     "barra_bronze": {
         "display_name": "Barra de Bronze", "emoji": "🧱🟤",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_barra_de_bronze"
+        "media_key": "item_barra_de_bronze",
+        "icon_url": "",
     },
     "couro_curtido": {
         "display_name": "Couro Curtido", "emoji": "🐑",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_couro_curtido"
+        "media_key": "item_couro_curtido",
+        "icon_url": "",
     },
     "couro_reforcado": {
         "display_name": "Couro Reforçado", "emoji": "🐂",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_couro_reforcado"
+        "media_key": "item_couro_reforcado",
+        "icon_url": "",
     },
     "couro_escamoso": {
         "display_name": "Couro Escamoso", "emoji": "🐊",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_couro_escamoso"
+        "media_key": "item_couro_escamoso",
+        "icon_url": "",
     },
     "rolo_de_pano_simples": {
         "display_name": "Rolo de Pano Simples", "emoji": "🪢",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_rolo_de_pano_simples"
+        "media_key": "item_rolo_de_pano_simples",
+        "icon_url": "",
     },
     "veludo_runico": {
         "display_name": "Veludo Rúnico", "emoji": "🧵",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_veludo_runico"
+        "media_key": "item_veludo_runico",
+        "icon_url": "",
     },
     "rolo_seda_sombria": {
         "display_name": "Rolo de Seda Sombria", "emoji": "🌑🧵",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_rolo_seda_sombria"
+        "media_key": "item_rolo_seda_sombria",
+        "icon_url": "",
     },
     "gema_bruta": {
         "display_name": "Gema Bruta", "emoji": "💎",
         "type": "material_bruto", "category": "cacada", 
         "stackable": True, 
-        "media_key": "item_gema_bruta"
+        "media_key": "item_gema_bruta",
+        "icon_url": "",
     },
     "gema_polida": { 
         "display_name": "Gema Polida", "emoji": "🔷",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_gema_polida"
+        "media_key": "item_gema_polida",
+        "icon_url": "",
     },
     "fio_de_prata": {
         "display_name": "Fio de Prata", "emoji": "🪡",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_fio_de_prata"
+        "media_key": "item_fio_de_prata",
+        "icon_url": "",
     },
     "membrana_de_couro_fino": {
         "display_name": "Membrana de couro fino", "emoji": "🟤🦇",
         "type": "material_refinado", "category": "coletavel", 
         "stackable": True, 
-        "media_key": "item_membrana_de_couro_fino"
+        "media_key": "item_membrana_de_couro_fino",
+        "icon_url": "",
     },
     "gema_de_polimento": {
         "display_name": "Gema de Polimento", "emoji": "💎✨",
@@ -385,7 +442,8 @@ MATERIALS_DATA = {
         "stackable": True,
         "value": 0, # Valor 0 (Premium/Gemas)
         "premium": True,
-        "media_key": "item_gema_polimento"
+        "media_key": "item_gema_polimento",
+        "icon_url": "",
     },
 
     # --- NOVOS RECURSOS DE LENHADOR (Madeiras Nobres) ---
@@ -395,7 +453,8 @@ MATERIALS_DATA = {
         "tier": 3, "profession": "lenhador",
         "description": "Madeira nobre de cor avermelhada.",
         "stackable": True, "value": 80,
-        "media_key": "item_madeira_mogno"
+        "media_key": "item_madeira_mogno",
+        "icon_url": "",
     },
     "madeira_elfica": {
         "display_name": "Madeira Élfica", "emoji": "🪵🍃",
@@ -403,7 +462,8 @@ MATERIALS_DATA = {
         "tier": 4, "profession": "lenhador",
         "description": "Leve como pluma, dura como aço.",
         "stackable": True, "value": 350,
-        "media_key": "item_madeira_elfica"
+        "media_key": "item_madeira_elfica",
+        "icon_url": "",
     },
     "raiz_do_mundo": {
         "display_name": "Fragmento de Yggdrasil", "emoji": "🪵🌌",
@@ -411,7 +471,8 @@ MATERIALS_DATA = {
         "tier": 5, "profession": "lenhador",
         "description": "Um pedaço da árvore que sustenta os mundos.",
         "stackable": True, "value": 1500,
-        "media_key": "item_raiz_do_mundo"
+        "media_key": "item_raiz_do_mundo",
+        "icon_url": "",
     },
 
     # --- NOVOS RECURSOS DE MINERADOR (Minérios Raros) ---
@@ -421,7 +482,8 @@ MATERIALS_DATA = {
         "tier": 4, "profession": "minerador",
         "description": "Pedra pulsante de energia mágica.",
         "stackable": True, "value": 400,
-        "media_key": "item_cristal_mana"
+        "media_key": "item_cristal_mana",
+        "icon_url": "",
     },
     "obsidiana_ancestral": {
         "display_name": "Obsidiana Ancestral", "emoji": "⚫🔥",
@@ -429,7 +491,8 @@ MATERIALS_DATA = {
         "tier": 5, "profession": "minerador",
         "description": "Minério forjado no núcleo do planeta.",
         "stackable": True, "value": 1800,
-        "media_key": "item_obsidiana_ancestral"
+        "media_key": "item_obsidiana_ancestral",
+        "icon_url": "",
     },
 
     # --- NOVOS RECURSOS DE COLHEDOR (Plantas Exóticas) ---
@@ -439,7 +502,8 @@ MATERIALS_DATA = {
         "tier": 2, "profession": "colhedor",
         "description": "Folha básica para poções de vida.",
         "stackable": True, "value": 15,
-        "media_key": "item_erva_cura"
+        "media_key": "item_erva_cura",
+        "icon_url": "",
     },
     "raiz_solar": {
         "display_name": "Raiz Solar", "emoji": "🥕☀️",
@@ -447,7 +511,8 @@ MATERIALS_DATA = {
         "tier": 4, "profession": "colhedor",
         "description": "Quente ao toque, brilha no escuro.",
         "stackable": True, "value": 300,
-        "media_key": "item_raiz_solar"
+        "media_key": "item_raiz_solar",
+        "icon_url": "",
     },
     "fruta_imortalidade": {
         "display_name": "Pêssego Dourado", "emoji": "🍑✨",
@@ -455,7 +520,8 @@ MATERIALS_DATA = {
         "tier": 5, "profession": "colhedor",
         "description": "Diz a lenda que concede vida eterna.",
         "stackable": True, "value": 1200,
-        "media_key": "item_fruta_imortalidade"
+        "media_key": "item_fruta_imortalidade",
+        "icon_url": "",
     },
 
     # --- NOVOS RECURSOS DE ESFOLADOR (Peles de Monstros) ---
@@ -465,7 +531,8 @@ MATERIALS_DATA = {
         "tier": 3, "profession": "esfolador",
         "description": "Material duro e flexível.",
         "stackable": True, "value": 90,
-        "media_key": "item_escama_serpente"
+        "media_key": "item_escama_serpente",
+        "icon_url": "",
     },
     "couro_dragao": {
         "display_name": "Couro de Dragão", "emoji": "🐉🔴",
@@ -473,7 +540,8 @@ MATERIALS_DATA = {
         "tier": 4, "profession": "esfolador",
         "description": "Imune ao fogo comum.",
         "stackable": True, "value": 450,
-        "media_key": "item_couro_dragao"
+        "media_key": "item_couro_dragao",
+        "icon_url": "",
     },
     "essencia_vital": {
         "display_name": "Essência Vital", "emoji": "❤️💎",
@@ -481,7 +549,8 @@ MATERIALS_DATA = {
         "tier": 5, "profession": "esfolador",
         "description": "A própria alma da criatura solidificada.",
         "stackable": True, "value": 2000,
-        "media_key": "item_essencia_vital"
+        "media_key": "item_essencia_vital",
+        "icon_url": "",
     },
 
     # --- NOVOS RECURSOS DE ALQUIMISTA (Fluidos e Energias) ---
@@ -491,7 +560,8 @@ MATERIALS_DATA = {
         "tier": 1, "profession": "alquimista",
         "description": "Água cristalina de nascente.",
         "stackable": True, "value": 5,
-        "media_key": "item_agua_pura"
+        "media_key": "item_agua_pura",
+        "icon_url": "",
     },
     "gas_venenoso": {
         "display_name": "Gás do Pântano", "emoji": "☁️🤢",
@@ -499,7 +569,8 @@ MATERIALS_DATA = {
         "tier": 3, "profession": "alquimista",
         "description": "Tóxico, coletado com extrator.",
         "stackable": True, "value": 85,
-        "media_key": "item_gas_venenoso"
+        "media_key": "item_gas_venenoso",
+        "icon_url": "",
     },
     "luz_estelar": {
         "display_name": "Luz Estelar Líquida", "emoji": "🌟💧",
@@ -507,7 +578,8 @@ MATERIALS_DATA = {
         "tier": 5, "profession": "alquimista",
         "description": "Um pedaço do céu em um frasco.",
         "stackable": True, "value": 1600,
-        "media_key": "item_luz_estelar"
+        "media_key": "item_luz_estelar",
+        "icon_url": "",
     },    
 
     # =========================
@@ -522,7 +594,8 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 4,
     "profession": "lenhador",
-    "description": "Um tronco ancestral, denso e resistente. Usado em tábuas avançadas."
+    "description": "Um tronco ancestral, denso e resistente. Usado em tábuas avançadas.",
+    "icon_url": "",
 },
 
 "pedra_vulcanica": {
@@ -533,6 +606,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 3,
     "profession": "minerador",
+    "icon_url": "",
     "description": "Rocha quente e rica em minerais. Usada em ligas especiais."
 },
 
@@ -544,6 +618,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 2,
     "profession": "colhedor",
+    "icon_url": "",
     "description": "Fibra de linho de alta qualidade. Ideal para tecidos superiores."
 },
 
@@ -555,6 +630,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 3,
     "profession": "colhedor",
+    "icon_url": "",
     "description": "Fibra robusta usada para reforçar tecidos e equipamentos leves."
 },
 
@@ -566,6 +642,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 4,
     "profession": "colhedor",
+    "icon_url": "",
     "description": "Fibra rara e sedosa para tecidos avançados e especiais."
 },
 
@@ -577,6 +654,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 2,
     "profession": "esfolador",
+    "icon_url": "",
     "description": "Pena grande e resistente, valorizada por artesãos."
 },
 
@@ -588,6 +666,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 3,
     "profession": "esfolador",
+    "icon_url": "",
     "description": "Couro raro de criatura alada, usado em armaduras leves superiores."
 },
 
@@ -599,6 +678,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 4,
     "profession": "esfolador",
+    "icon_url": "",
     "description": "Garras afiadas usadas em receitas especiais e itens raros."
 },
 
@@ -610,6 +690,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 5,
     "profession": "esfolador",
+    "icon_url": "",
     "description": "Uma pluma raríssima com energia mística. Material épico."
 },
 
@@ -621,6 +702,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 2,
     "profession": "alquimista",
+    "icon_url": "",
     "description": "Substância corrosiva do pântano, usada em venenos e reagentes."
 },
 
@@ -632,6 +714,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 3,
     "profession": "alquimista",
+    "icon_url": "",
     "description": "Sangue raro com propriedades regenerativas. Muito valioso."
 },
 
@@ -643,6 +726,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 5,
     "profession": "alquimista",
+    "icon_url": "",
     "description": "Essência sombria concentrada. Usada em receitas épicas."
 },
 
@@ -654,6 +738,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 2,
     "profession": "minerador",
+    "icon_url": "",
     "description": "Resíduo metálico de forjas antigas. Pode ser usado em ligas e refino."
 },
 
@@ -665,6 +750,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 4,
     "profession": "minerador",
+    "icon_url": "",
     "description": "Fragmento incandescente usado em ligas e processos avançados."
 },
 
@@ -676,6 +762,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 5,
     "profession": "minerador",
+    "icon_url": "",
     "description": "Núcleo elemental extremamente raro. Material épico de refino."
 },
 
@@ -687,6 +774,7 @@ MATERIALS_DATA = {
     "stackable": True,
     "tier": 3,
     "profession": "alquimista",
+    "icon_url": "",
     "description": "Cinzas carregadas de energia elemental. Reagente versátil."
 },
     # --- MINÉRIOS RAROS (T4 / T5) ---
@@ -696,6 +784,7 @@ MATERIALS_DATA = {
         "tier": 4, "profession": "minerador",
         "description": "Minério raro, leve e extremamente resistente.",
         "stackable": True,
+        "icon_url": "",
         "media_key": "item_minerio_de_mithril"
     },
     "minerio_de_adamantio": {
@@ -704,6 +793,7 @@ MATERIALS_DATA = {
         "tier": 5, "profession": "minerador",
         "description": "Minério lendário quase indestrutível.",
         "stackable": True,
+        "icon_url": "",
         "media_key": "item_minerio_de_adamantio"
     },
 
@@ -714,6 +804,7 @@ MATERIALS_DATA = {
         "tier": 4,
         "description": "Barra refinada de mithril, usada em equipamentos avançados.",
         "stackable": True,
+        "icon_url": "",
         "media_key": "item_barra_de_mithril"
     },
     "barra_de_adamantio": {
@@ -722,6 +813,7 @@ MATERIALS_DATA = {
         "tier": 5,
         "description": "Barra lendária de adamantio, base de itens épicos.",
         "stackable": True,
+        "icon_url": "",
         "media_key": "item_barra_de_adamantio"
     },
 

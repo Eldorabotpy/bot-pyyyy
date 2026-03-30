@@ -237,28 +237,98 @@ function abrirDetalhesMonstro(mob_id) {
     conteudo.innerHTML = html;
 }
 
+// Variáveis globais para guardar o estado das abas
+window.dadosEldoraItens = [];
+window.abaAtualItens = 'equipamentos';
+window.subAbaAtualItens = 'guerreiro'; // Padrão ao abrir
+
 async function carregarItens() {
     const conteudo = document.getElementById('conteudo-wiki');
-    conteudo.innerHTML = '<p style="text-align: center; color: #888;">Abrindo os baús... ⚔️</p>';
+    conteudo.innerHTML = '<p style="text-align: center; color: #888;">Abrindo os baús e armarias... ⚔️</p>';
     try {
-        const resposta = await fetch(`/wiki/itens?v=${Date.now()}`);
-        const itens = await resposta.json();
+        // Se a lista estiver vazia, baixa do Python. Se já baixou, reaproveita!
+        if (window.dadosEldoraItens.length === 0) {
+            const resposta = await fetch(`/wiki/itens?v=${Date.now()}`);
+            window.dadosEldoraItens = await resposta.json();
+        }
+        // Desenha a tela
+        renderizarMenuItens();
+    } catch (erro) { 
+        conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao carregar itens.</p>'; 
+    }
+}
+
+// Nova função que desenha os botões e filtra os itens!
+window.renderizarMenuItens = function(aba = null, sub = null) {
+    if (aba) window.abaAtualItens = aba;
+    if (sub) window.subAbaAtualItens = sub;
+
+    const conteudo = document.getElementById('conteudo-wiki');
+    
+    // 1. AS ABAS PRINCIPAIS
+    const abasPrin = [
+        { id: 'equipamentos', nome: '⚔️ Equipamentos' },
+        { id: 'materiais', nome: '🦇 Drops (Caçada)' },
+        { id: 'coleta', nome: '🪓 Coleta' },
+        { id: 'refino', nome: '🔥 Refino & Runas' },
+        { id: 'consumiveis', nome: '🧪 Poções' }
+    ];
+
+    let html = `<div style="text-align: center; margin-bottom: 15px;"><h2 style="color: #9b59b6; margin:0;">📚 Arsenal e Itens</h2></div>`;
+    
+    html += `<div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; justify-content: center;">`;
+    abasPrin.forEach(a => {
+        const corBg = window.abaAtualItens === a.id ? '#9b59b6' : '#1e1e1e';
+        html += `<button onclick="renderizarMenuItens('${a.id}', null)" style="padding: 8px 12px; background: ${corBg}; color: white; border: 1px solid #333; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8em; transition: 0.2s;">${a.nome}</button>`;
+    });
+    html += `</div>`;
+
+    // 2. AS SUB-ABAS (SÓ APARECEM SE "EQUIPAMENTOS" ESTIVER SELECIONADO)
+    if (window.abaAtualItens === 'equipamentos') {
+        const classes = ['guerreiro', 'mago', 'cacador', 'assassino', 'monge', 'berserker', 'samurai', 'bardo', 'curandeiro', 'geral'];
         
-        let html = `<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #9b59b6;">⚔️ Arsenal e Itens</h2></div>`;
+        // Garante que uma sub-aba padrão esteja selecionada
+        if (!window.subAbaAtualItens || !classes.includes(window.subAbaAtualItens)) window.subAbaAtualItens = 'guerreiro';
         
-        itens.forEach(item => {
-            html += `<div style="background: #252525; margin-bottom: 10px; padding: 12px; border-radius: 8px; border-left: 4px solid #9b59b6; display: flex; gap: 12px; align-items: center;">
-                <img src="${item.imagem}" onerror="this.src='https://placehold.co/60x60/2c3e50/9b59b6?text=📦'" style="width: 60px; height: 60px; border-radius: 8px; object-fit: contain; background: #111;">
+        html += `<div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 20px; justify-content: center; background: #111; padding: 10px; border-radius: 8px; border: 1px solid #333;">`;
+        classes.forEach(c => {
+            const corBg = window.subAbaAtualItens === c ? '#f39c12' : '#252525';
+            const corTxt = window.subAbaAtualItens === c ? '#000' : '#aaa';
+            html += `<button onclick="renderizarMenuItens('equipamentos', '${c}')" style="padding: 5px 10px; background: ${corBg}; color: ${corTxt}; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75em; text-transform: capitalize; font-weight: bold;">${c}</button>`;
+        });
+        html += `</div>`;
+    } else {
+        // Se mudou de aba principal, reseta o filtro secundário para mostrar tudo da aba
+        window.subAbaAtualItens = null;
+    }
+
+    // 3. FILTRANDO A LISTA DE ITENS
+    const itensFiltrados = window.dadosEldoraItens.filter(i => {
+        if (i.wiki_tab !== window.abaAtualItens) return false;
+        if (window.abaAtualItens === 'equipamentos' && i.wiki_sub !== window.subAbaAtualItens) return false;
+        return true;
+    });
+
+    // 4. DESENHANDO OS ITENS FILTRADOS
+    html += `<div style="display: grid; gap: 10px;">`;
+    if (itensFiltrados.length === 0) {
+        html += `<p style="text-align: center; color: #666; padding: 20px; background: #1a1a1a; border-radius: 8px;">Nenhum item encontrado nesta categoria.</p>`;
+    } else {
+        itensFiltrados.forEach(item => {
+            html += `<div style="background: #252525; padding: 12px; border-radius: 8px; border-left: 4px solid #9b59b6; display: flex; gap: 12px; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <img src="${item.imagem}" onerror="this.src='https://placehold.co/60x60/2c3e50/9b59b6?text=${item.emoji}'" style="width: 60px; height: 60px; border-radius: 8px; object-fit: contain; background: #111; border: 1px solid #333;">
                 <div style="flex: 1;">
                     <div style="display: flex; justify-content: space-between;">
                         <h3 style="margin: 0 0 3px 0; color: #9b59b6; font-size: 1em;">${item.nome}</h3>
                         <span style="font-size: 0.7em; color: #f1c40f;">💰 ${item.preco}</span>
                     </div>
                     <p style="margin: 0 0 5px 0; font-size: 0.75em; color: #aaa;">${item.descricao}</p>
-                    <span style="font-size: 0.65em; background: #1a1a1a; padding: 2px 6px; border-radius: 3px; color: #ccc;">${item.raridade}</span>
+                    <span style="font-size: 0.65em; background: #1a1a1a; padding: 2px 6px; border-radius: 3px; color: #ccc; text-transform: uppercase;">${item.raridade}</span>
                 </div>
             </div>`;
         });
-        conteudo.innerHTML = html;
-    } catch (erro) { conteudo.innerHTML = '<p style="color: red; text-align: center;">Erro ao carregar itens.</p>'; }
+    }
+    html += `</div>`;
+    
+    conteudo.innerHTML = html;
 }

@@ -232,7 +232,218 @@ def api_equipar_item():
         return jsonify({"erro": msg}), 400
     except Exception as e: return jsonify({"erro": str(e)}), 500
 
+# ==========================================
+# ROTAS DA WIKI (Adicione no webapp_api.py)
+# ==========================================
 
+@webapp_bp.route('/wiki/classes')
+def wiki_classes():
+    try:
+        from modules.game_data.classes import CLASSES_DATA, get_class_avatar
+        from modules.game_data.class_evolution import EVOLUTIONS
+        
+        # 1. Pegamos apenas as classes "Base" (Tier 1) do seu classes.py
+        classes_base = {k: v for k, v in CLASSES_DATA.items() if v.get('tier', 1) == 1}
+        lista_final = []
+
+        for class_id, dados in classes_base.items():
+            # 2. Puxa as evoluções direto da árvore oficial do class_evolution.py
+            evolucoes_brutas = EVOLUTIONS.get(class_id, [])
+            evolucoes_formatadas = []
+            
+            for evo in evolucoes_brutas:
+                evolucoes_formatadas.append({
+                    "tier": evo.get("tier_num"),
+                    "nome": evo.get("display_name"),
+                    "descricao": evo.get("desc")
+                })
+            
+            # Ordena por Tier para aparecer certinho na Wiki (T2, T3, T4...)
+            evolucoes_formatadas.sort(key=lambda x: x['tier'])
+
+            # 3. Monta o objeto exato que o seu wiki.js está esperando
+            mod = dados.get('stat_modifiers', {})
+            lista_final.append({
+                "id": class_id,
+                "nome": dados.get('display_name'),
+                "emoji": dados.get('emoji', '❓'),
+                "descricao": dados.get('description'),
+                "hp": mod.get('hp', 0),
+                "ataque": mod.get('attack', 0),
+                "defesa": mod.get('defense', 0),
+                "imagem": get_class_avatar(class_id), # Puxa o link PNG do GitHub que arrumamos!
+                "total_evolucoes": len(evolucoes_formatadas),
+                "evolucoes": evolucoes_formatadas
+            })
+
+        return jsonify(lista_final)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+    
+@webapp_bp.route('/wiki/monstros')
+def wiki_monstros():
+    try:
+        from modules.game_data.monsters import MONSTERS_DATA
+        from modules.game_data import items as items_data
+        
+        lista_final = []
+        
+        # Mapeamento de nomes bonitos para as regiões (IDs do dicionário)
+        NOMES_REGIOES = {
+            "pradaria_inicial": "Pradaria Inicial",
+            "floresta_sombria": "Floresta Sombria",
+            "pedreira_granito": "Pedreira de Granito",
+            "_evolution_trials": "Provações de Evolução",
+            # Adicione as outras regiões aqui...
+        }
+
+        for regiao_id, monstros in MONSTERS_DATA.items():
+            regiao_nome = NOMES_REGIOES.get(regiao_id, regiao_id.replace("_", " ").title())
+            
+            # Define se é evento (Trials ou regiões especiais)
+            is_evento = regiao_id.startswith("_") or "evento" in regiao_id.lower()
+            
+            for mob in monstros:
+                # 1. Formata a tabela de loot (Drops)
+                loot_formatado = []
+                for drop in mob.get("loot_table", []):
+                    item_id = drop.get("item_id")
+                    # Busca o nome real do item no seu motor de itens
+                    info_item = items_data.ITEMS_DATA.get(item_id, {})
+                    nome_exibicao = info_item.get("display_name", item_id.replace("_", " ").title())
+                    
+                    loot_formatado.append({
+                        "nome": nome_exibicao,
+                        "chance": drop.get("drop_chance", 0)
+                    })
+
+                # 2. Monta o objeto que o wiki.js espera
+                lista_final.append({
+                    "id": mob.get("id"),
+                    "nome": mob.get("name"),
+                    "level": mob.get("level", 1), # Se não tiver level fixo, pegamos o base
+                    "hp": mob.get("hp", 0),
+                    "ataque": mob.get("attack", 0),
+                    "defesa": mob.get("defense", 0),
+                    "xp": mob.get("xp_reward", 0),
+                    "gold": mob.get("gold_drop", 0),
+                    "loot": loot_formatado,
+                    "imagem": mob.get("image_url") or mob.get("media_key") or "/static/mobs/placeholder.png",
+                    "regiao_id": regiao_id,
+                    "regiao_nome": regiao_nome,
+                    "is_evento": is_evento,
+                    "nivel_regiao": mob.get("level", 0) # Usado para ordenar as regiões por dificuldade
+                })
+                
+        return jsonify(lista_final)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500    
+
+# ==========================================
+# ROTA DA WIKI: ITENS (COM ABAS INTELIGENTES)
+# ==========================================
+@webapp_bp.route('/wiki/itens')
+def wiki_itens():
+    try:
+        from modules.game_data import items as items_data
+        
+        lista_itens = []
+        for item_id, dados in items_data.ITEMS_DATA.items():
+            if dados.get("hidden", False): continue
+                
+            tipo = str(dados.get("type", "")).lower()
+            categoria = str(dados.get("category", "")).lower()
+            
+            # --- LÓGICA DE ETIQUETAS (TABS) ---
+            wiki_tab = "materiais" # Padrão (Cai na aba Caçada/Drops)
+            wiki_sub = "geral"
+            
+            if tipo == "equipamento":
+                wiki_tab = "equipamentos"
+                # Pega a classe que pode usar o item
+                classes_req = dados.get("class_req", [])
+                wiki_sub = classes_req[0] if classes_req else "geral"
+                
+            elif tipo == "tool":
+                wiki_tab = "coleta"
+                wiki_sub = "ferramenta"
+                
+            elif tipo == "material_bruto" or categoria == "coletavel":
+                wiki_tab = "coleta"
+                wiki_sub = "bruto"
+                
+            elif tipo in ["material_refinado", "material_runico", "runa"]:
+                wiki_tab = "refino"
+                wiki_sub = tipo
+                
+            elif tipo in ["potion", "consumable", "reagent"]:
+                wiki_tab = "consumiveis"
+                wiki_sub = "geral"
+
+            preco_venda = dados.get("value") or dados.get("price") or 10
+            
+            lista_itens.append({
+                "id": item_id,
+                "nome": dados.get("display_name", item_id.replace("_", " ").title()),
+                "descricao": dados.get("description", "Um misterioso item de Eldora."),
+                "raridade": str(dados.get("rarity", "comum")).capitalize(),
+                "preco": preco_venda,
+                "emoji": dados.get("emoji", "📦"),
+                "imagem": f"/static/items/{item_id}.webp",
+                "wiki_tab": wiki_tab, # A aba principal
+                "wiki_sub": wiki_sub  # A sub-aba (ex: guerreiro, mago)
+            })
+            
+        lista_itens.sort(key=lambda x: x["nome"])
+        return jsonify(lista_itens)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+
+# ==========================================
+# ROTA DA WIKI: REGIÕES E MAPAS
+# ==========================================
+@webapp_bp.route('/wiki/regioes')
+def wiki_regioes():
+    try:
+        from modules.game_data.regions import REGIONS_DATA
+        
+        lista_regioes = []
+        for regiao_id, dados in REGIONS_DATA.items():
+            
+            # Pega o nível mínimo da tupla level_range (ex: (15, 35) -> pega o 15)
+            # Se a região não tiver level_range (como o Reino de Eldora), assume level 1
+            level_range = dados.get("level_range", (1, 99))
+            level_min = level_range[0] if isinstance(level_range, tuple) else 1
+            
+            lista_regioes.append({
+                "id": regiao_id,
+                "nome": dados.get("display_name", regiao_id.replace("_", " ").title()),
+                "emoji": dados.get("emoji", "🗺️"),
+                "descricao": dados.get("description", "Uma região inexplorada de Eldora."),
+                "level_min": level_min,
+                # O wiki.js vai tentar carregar essa imagem jpg. Se falhar, mostra o emoji!
+                "imagem": f"/static/regions/{regiao_id}.jpg" 
+            })
+            
+        # Ordena a lista do mapa por nível de dificuldade (do mais fácil pro mais difícil)
+        lista_regioes.sort(key=lambda x: x["level_min"])
+        
+        return jsonify(lista_regioes)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+    
 @webapp_bp.route('/api/personagem/desequipar', methods=['POST'])
 def api_desequipar_item():
     try:
