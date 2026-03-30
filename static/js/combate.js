@@ -31,7 +31,7 @@ const SPRITES_COSTA = {
         "feminino": "https://github.com/user-attachments/assets/3bb88286-d446-48ee-9d95-c53482e5553a"
     },    
     "mago": {
-        "masculino":"https://github.com/user-attachments/assets/61b246e8-1eaf-4dd3-85e5-267ca6fe0058",
+        "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
         "feminino": "https://github.com/user-attachments/assets/d8749759-d43f-4eda-8520-c9610a635b72"
     },
     "bardo": {

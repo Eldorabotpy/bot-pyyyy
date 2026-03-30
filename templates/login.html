@@ -6,26 +6,49 @@
     <title>Mundo de Eldora - Portal</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        /* FONTE ESTILIZADA DE FANTASIA */
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Metamorphous&display=swap');
+
         body {
             margin: 0; padding: 0;
             background-image: url('https://github.com/user-attachments/assets/ea06a84b-c8fc-45d7-977f-c5a55f808815'); 
             background-size: cover; background-position: center;
             height: 100vh; display: flex; justify-content: center; align-items: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .login-box {
-            background: rgba(15, 23, 42, 0.92); 
-            border: 2px solid #f39c12; border-radius: 12px;
-            padding: 20px 15px 15px 15px; 
-            width: 80%; max-width: 300px; text-align: center;
-            box-shadow: 0 0 25px rgba(243, 156, 18, 0.4); backdrop-filter: blur(8px);
-            display: flex; flex-direction: column; align-items: center;
+            font-family: 'Metamorphous', 'Segoe UI', serif;
+            color: #ecf0f1;
+            /* Garante espaço pro rodapé */
+            padding-bottom: 70px; 
+            box-sizing: border-box;
         }
 
         /* ==========================================
-           1. ANIMAÇÃO DE LEVITAÇÃO DA LOGO
+           1. LAYOUT GERAL E CONTAINER MODERNO
            ========================================== */
+        .portal-main-container {
+            display: flex; flex-direction: column; align-items: center;
+            width: 90%; max-width: 360px;
+        }
+
+        .login-box {
+            /* Textura de metal escuro */
+            background: rgba(10, 15, 25, 0.95); 
+            
+            /* Bordas ornamentadas com brilho dourado */
+            border: 3px solid #f39c12; 
+            border-style: ridge; 
+            border-radius: 15px;
+            
+            padding: 25px 15px 15px 15px; 
+            width: 100%; text-align: center;
+            
+            box-shadow: 0 0 30px rgba(243, 156, 18, 0.5), inset 0 0 15px #000;
+            backdrop-filter: blur(8px);
+            display: flex; flex-direction: column; align-items: center;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* LOGO LEVITANDO */
         @keyframes levitacao_magica {
             0% { transform: translateY(0px); box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000; }
             50% { transform: translateY(-8px); box-shadow: 0 0 30px #f39c12, inset 0 0 20px #000; }
@@ -33,146 +56,348 @@
         }
 
         .logo-eldora {
-            width: 90px; height: 90px;
-            margin-top: -60px; 
+            width: 95px; height: 95px;
+            margin-top: -70px; 
             border-radius: 50%;
-            border: 3px solid #f39c12;
+            border: 4px solid #f39c12;
             background: #000;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             object-fit: cover;
-            /* Aplica a animação: 3 segundos, contínua e suave */
             animation: levitacao_magica 3s ease-in-out infinite;
+            z-index: 2;
         }
 
-        h2 { color: #f39c12; margin: 0 0 15px 0; font-size: 1.1em; letter-spacing: 2px; text-transform: uppercase; text-shadow: 1px 1px 5px rgba(0,0,0,0.8); }
+        /* TÍTULO ESTILIZADO */
+        h2 { 
+            font-family: 'Cinzel', serif;
+            color: #f39c12; margin: 0 0 15px 0; 
+            font-size: 1.25em; letter-spacing: 3px; 
+            text-transform: uppercase; 
+            text-shadow: 2px 2px 5px #000, 0 0 10px #f39c12;
+        }
         
+        /* ÁREA DE ROLAGEM */
         #area-personagens { 
-            width: 100%; display: flex; flex-direction: column; gap: 8px; 
+            width: 100%; display: flex; flex-direction: column; gap: 12px; 
             max-height: 280px; overflow-y: auto; padding-right: 5px; 
+            box-sizing: border-box;
         }
 
-        #area-personagens::-webkit-scrollbar { width: 4px; }
-        #area-personagens::-webkit-scrollbar-track { background: transparent; }
-        #area-personagens::-webkit-scrollbar-thumb { background: #f39c12; border-radius: 4px; }
+        #area-personagens::-webkit-scrollbar { width: 5px; }
+        #area-personagens::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 5px;}
+        #area-personagens::-webkit-scrollbar-thumb { background: #f39c12; border-radius: 5px; }
 
+        /* ==========================================
+           2. O NOVO CARTÃO DO PERSONAGEM (btn-char)
+           ========================================== */
         .btn-char {
-            width: 100%; padding: 8px 12px;
-            background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
-            border: 1px solid #3b82f6; border-left: 4px solid #3b82f6; 
-            color: white; border-radius: 6px; cursor: pointer;
-            display: flex; justify-content: space-between; align-items: center; 
+            width: 100%; height: 60px;
+            background: linear-gradient(90deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 2px solid #3b82f6; 
+            color: white; border-radius: 8px; cursor: pointer;
+            display: flex; align-items: center; 
             transition: 0.2s; box-sizing: border-box; flex-shrink: 0;
+            padding: 0; overflow: hidden; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset 0 0 10px rgba(59, 130, 246, 0.3);
         }
-        .btn-char:active { transform: scale(0.96); border-color: #f39c12; }
-        .btn-char-info { text-align: left; display: flex; flex-direction: column; }
-        .btn-char strong { color: #f39c12; font-size: 0.9em; margin-bottom: 2px; }
-        .btn-char span { font-size: 0.7em; color: #94a3b8; text-transform: capitalize; }
+        
+        .btn-char:active { transform: scale(0.97); border-color: #f39c12; box-shadow: 0 0 15px #f39c12; }
 
-        .btn-new {
-            width: 100%; padding: 10px; margin-top: 5px;
-            background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
-            border: 1px solid #2ecc71; color: white; font-weight: bold; font-size: 0.85em;
-            border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+        /* Nicho do Sprite à Esquerda */
+        .char-card-sprite-container {
+            width: 60px; height: 60px; 
+            background: rgba(0,0,0,0.5);
+            border-right: 2px solid #3b82f6;
+            display: flex; justify-content: center; align-items: center;
             flex-shrink: 0;
+            position: relative;
         }
-        .btn-new:active { transform: scale(0.96); }
+        
+        .char-card-sprite {
+            width: 50px; height: 50px; 
+            object-fit: contain;
+            filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5));
+        }
+
+        /* Informações do Personagem no Centro */
+        .char-card-info { 
+            flex-grow: 1; text-align: left; 
+            padding: 0 15px; 
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        
+        .char-card-info strong { 
+            font-family: 'Cinzel', serif;
+            color: #ecf0f1; font-size: 1em; margin-bottom: 1px; 
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 3px #000;
+        }
+        
+        .char-card-info span { 
+            font-size: 0.75em; color: #94a3b8; 
+            text-transform: capitalize; 
+            font-family: 'Metamorphous', serif;
+        }
+
+        /* Ícone de Batalha à Direita */
+        .char-card-icon-right {
+            width: 40px; text-align: center;
+            font-size: 1.3em;
+            color: #f39c12;
+            padding-right: 5px;
+            filter: drop-shadow(0 0 5px #f39c12);
+        }
+
+        /* BOTÃO DE CRIAR */
+        .btn-new {
+            width: 100%; padding: 12px; margin-top: 10px;
+            font-family: 'Cinzel', serif;
+            background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
+            border: 2px solid #2ecc71; color: white; font-weight: bold; font-size: 0.9em;
+            border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-shadow: 1px 1px 3px #000;
+        }
+        .btn-new:active { transform: scale(0.97); }
+
+        /* ==========================================
+           3. O NOVO RODAPÉ FIXO
+           ========================================== */
+        .footer-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 65px;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(10, 15, 25, 1) 100%);
+            border-top: 3px solid #f39c12; border-style: ridge;
+            display: flex; justify-content: space-around; align-items: center;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.8), 0 0 10px rgba(243, 156, 18, 0.3);
+            z-index: 10;
+            padding: 0 10px; box-sizing: border-box;
+        }
+
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-decoration: none;
+            width: 23%; height: 100%;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        
+        .nav-item:active { transform: translateY(-3px); }
+
+        /* ÍCONES GRÁFICOS */
+        .nav-icon {
+            width: 28px; height: 28px; 
+            object-fit: contain;
+            margin-bottom: 2px;
+            filter: drop-shadow(0 0 3px rgba(243, 156, 18, 0.5));
+        }
+
+        .nav-text {
+            font-family: 'Cinzel', serif;
+            font-size: 0.65em;
+            color: #bdc3c7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: 0.2s;
+        }
+
+        .nav-item.active .nav-icon { filter: drop-shadow(0 0 10px #f39c12); }
+        .nav-item.active .nav-text { color: #f39c12; text-shadow: 0 0 5px #f39c12; }
+
     </style>
 </head>
 <body>
 
-    <audio id="bg-music" loop>
-        <source src="https://github.com/user-attachments/files/26343101/freesound_community-clouds-67847.mp3" type="audio/mpeg">
-    </audio>
-    <audio id="click-sound">
-        <source src="https://github.com/user-attachments/files/26343084/dragon-studio-clicking-433009.mp3" type="audio/mpeg">
-    </audio>
-
-    <div class="login-box">
-        <img src="https://github.com/user-attachments/assets/0f2990de-2b0f-4d3d-90ae-060713ef5abb" class="logo-eldora" alt="Logo Eldora">
-        
-        <h2>Portal de Acesso</h2>
-        <div id="area-personagens">
-            <div style="color: #aaa; font-size: 0.9em;">Invocando registros mágicos... ⏳</div>
+    <div class="portal-main-container">
+        <div class="login-box">
+            <img src="https://github.com/user-attachments/assets/0f2990de-2b0f-4d3d-90ae-060713ef5abb" class="logo-eldora" alt="Logo Eldora">
+            
+            <h2>Portal de Acesso</h2>
+            <div id="area-personagens">
+                <div style="color: #aaa; font-size: 0.9em; font-family: serif;">Invocando registros mágicos... ⏳</div>
+            </div>
         </div>
     </div>
+
+    <footer class="footer-nav">
+        <a href="javascript:void(0)" class="nav-item active">
+            <img src="https://github.com/user-attachments/assets/1368ff61-75fb-493f-8461-8938b8130f14" class="nav-icon" alt="Início">
+            <span class="nav-text">Início</span>
+        </a>
+        <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
+            <img src="https://github.com/user-attachments/assets/fa855a9b-007d-4191-bb27-995166296316" class="nav-icon" alt="Perfil">
+            <span class="nav-text">Perfil</span>
+        </a>
+        <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
+            <img src="https://github.com/user-attachments/assets/5c33f271-8b92-48a5-83e8-e5a9601d5114" class="nav-icon" alt="Luta">
+            <span class="nav-text">Luta</span>
+        </a>
+        <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
+            <img src="https://github.com/user-attachments/assets/a2322a31-9721-4f16-832f-b3a620d44093" class="nav-icon" alt="Mais">
+            <span class="nav-text">Mais</span>
+        </a>
+    </footer>
 
     <script>
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
 
         // ==========================================
-        // 3. CONTROLE DE SOM E MÚSICA
+        // SISTEMA DE ÁUDIO CORRIGIDO (Via JavaScript)
         // ==========================================
-        const bgMusic = document.getElementById('bg-music');
-        const clickSound = document.getElementById('click-sound');
+        const bgMusic = new Audio("https://github.com/user-attachments/files/26343101/freesound_community-clouds-67847.mp3");
+        bgMusic.loop = true;
+        bgMusic.volume = 0.3;
 
-        // Função para tocar o som de clique
+        const clickSound = new Audio("https://github.com/user-attachments/files/26343084/dragon-studio-clicking-433009.mp3");
+
         window.playClick = function() {
-            clickSound.currentTime = 0; // Reseta o som para poder clicar rápido
-            clickSound.play().catch(e => console.log("Áudio bloqueado:", e));
+            clickSound.currentTime = 0; 
+            let playPromise = clickSound.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => console.log("Som de clique bloqueado pelo navegador.", e));
+            }
         };
 
-        // Inicia a música de fundo no primeiro clique na tela (regra dos navegadores)
-        document.body.addEventListener('click', function() {
+        // Regra de Ouro do Navegador: A música de fundo só pode tocar se o jogador interagir com a tela primeiro.
+        document.addEventListener('click', function() {
             if (bgMusic.paused) {
-                bgMusic.volume = 0.3; // Volume da música em 30% para não estourar os ouvidos
-                bgMusic.play().catch(e => console.log("Música bloqueada:", e));
+                let playPromise = bgMusic.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => console.log("Música de fundo bloqueada. O arquivo pode estar indisponível ou forçando download.", e));
+                }
             }
-        }, { once: true }); // Executa apenas uma vez
+        }, { once: true }); // Executa só no primeiro toque na tela
 
+
+        // ==========================================
+        // MAPA DE SPRITES (As mesmas usadas na Arena)
+        // ==========================================
+        const SPRITES_COSTA = {
+    "aventureiro": {
+        "masculino": "https://github.com/user-attachments/assets/f870b026-e544-43f4-8395-0112277b24f1", // Skin de quem tá sem classe
+        "feminino": "https://github.com/user-attachments/assets/c405a107-9d5e-4f34-8daa-9660b29e591c"
+    },
+    "guerreiro": {
+        "mascolino": "https://github.com/user-attachments/assets/1c0045ea-d8fc-4958-86a4-ecef1507f25e",
+        "feminino" : "https://github.com/user-attachments/assets/d5cfde65-f28f-4a13-9c1e-525adc3b51b2"
+    },
+    "berserker": { 
+        "masculino": "https://github.com/user-attachments/assets/88e6ee39-1f4f-4886-a31c-65e4fc53b7ba",
+        "feminino": "https://github.com/user-attachments/assets/ec261bd5-e23e-4390-b0a7-e411095b46b0"
+    },    
+    "cacador": {
+        "masculino": "https://github.com/user-attachments/assets/6998b293-a7fd-444f-b358-831c44eb3d8f",
+        "feminino": "https://github.com/user-attachments/assets/03e162e6-1869-4eeb-ab6d-1a902b74f582"
+    },
+    "monge": { 
+        "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
+        "feminino": "https://github.com/user-attachments/assets/3bb88286-d446-48ee-9d95-c53482e5553a"
+    },    
+    "mago": {
+        "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
+        "feminino": "https://github.com/user-attachments/assets/d8749759-d43f-4eda-8520-c9610a635b72"
+    },
+    "bardo": {
+        "masculino":"https://github.com/user-attachments/assets/75788d0e-5be2-43d0-870b-f7aee5e04483",
+        "feminino": "https://github.com/user-attachments/assets/6fc004aa-b451-4d25-a110-493f0f26f585"
+    },
+    "assassino": {
+        "masculino":"https://github.com/user-attachments/assets/c02fa401-7b6d-48aa-8892-fe85398a36ec",
+        "feminino": "https://github.com/user-attachments/assets/d1a69fdc-de8f-4982-8ac5-83963040b4d4"
+    },
+    "samurai": {
+        "masculino":"https://github.com/user-attachments/assets/3f61b608-fc17-4b81-ad7f-8d11d7a46e52",
+        "feminino": "https://github.com/user-attachments/assets/eb54a42c-0608-402e-950c-7f8f771700a7"
+    },
+    "curandeiro": {
+        "masculino":"https://github.com/user-attachments/assets/61b246e8-1eaf-4dd3-85e5-267ca6fe0058",
+        "feminino": "https://github.com/user-attachments/assets/1d9e6bb2-0fe4-40cd-8583-4dd17bbe48ed"
+    },
+}    
+
+        const MAPA_CLASSES_BASE = {
+            'aventureiro': 'aventureiro', 'aprendiz': 'aventureiro',
+            'guerreiro': 'guerreiro', 'cavaleiro': 'guerreiro', 'gladiador': 'guerreiro', 'templario': 'guerreiro', 'guardiao_divino': 'guerreiro',
+            'berserker': 'berserker', 'barbaro': 'berserker', 'juggernaut': 'berserker', 'ira_primordial': 'berserker',
+            'cacador': 'cacador', 'patrulheiro': 'cacador', 'franco_atirador': 'cacador', 'olho_de_aguia': 'cacador',
+            'monge': 'monge', 'guardiao_do_templo': 'monge', 'punho_elemental': 'monge', 'ascendente': 'monge',
+            'mago': 'mago', 'feiticeiro': 'mago', 'elementalista': 'mago', 'arquimago': 'mago',
+            'bardo': 'bardo', 'menestrel': 'bardo', 'encantador': 'bardo', 'maestro': 'bardo',
+            'assassino': 'assassino', 'ladrao_de_sombras': 'assassino', 'ninja': 'assassino', 'mestre_das_laminas': 'assassino',
+            'samurai': 'samurai', 'kensei': 'samurai', 'ronin': 'samurai', 'shogun': 'samurai',
+            'curandeiro': 'curandeiro', 'clerigo': 'curandeiro', 'druida': 'curandeiro', 'sacerdote': 'curandeiro'
+        };
 
         async function buscarPersonagens() {
             const area = document.getElementById('area-personagens');
             let tgUser = window.Telegram.WebApp.initDataUnsafe.user;
             
             if (!tgUser) {
-                area.innerHTML = '<p style="color: #e74c3c; font-size: 0.9em;">Erro: Abra o jogo por dentro do Telegram!</p>';
+                area.innerHTML = '<p style="color: #e74c3c; font-size: 0.9em; font-family:serif;">Erro: Abra o jogo por dentro do Telegram!</p>';
                 return;
             }
 
             try {
                 const resposta = await fetch(`/api/meus_personagens/${tgUser.id}`);
-                if (!resposta.ok) throw new Error(`O servidor retornou Erro ${resposta.status}`);
+                
+                if (!resposta.ok) {
+                    throw new Error(`O servidor retornou Erro ${resposta.status}`);
+                }
 
                 const personagens = await resposta.json();
+
                 let htmlBotoes = '';
 
                 if (personagens.length > 0) {
                     personagens.forEach(p => {
-                        let classeNome = p.classe;
-                        if (!classeNome || classeNome === 'None' || classeNome === 'null') {
-                            classeNome = 'Aventureiro';
-                        }
+                        let rawClass = (p.classe || "aventureiro").toLowerCase();
+                        let classSlug = rawClass.replace(/_/g, ' ');
+                        let genero = (p.gender || "masculino").toLowerCase();
                         
-                        // Adicionando o playClick() no botão do personagem
+                        // Lógica de mapeamento da sprite idêntica à da arena
+                        let classeBase = MAPA_CLASSES_BASE[rawClass] || "aventureiro";
+                        let spriteUrl = "";
+                        if (SPRITES_COSTA[classeBase] && SPRITES_COSTA[classeBase][genero]) {
+                            spriteUrl = SPRITES_COSTA[classeBase][genero];
+                        } else {
+                            spriteUrl = SPRITES_COSTA["aventureiro"]["masculino"];
+                        }
+
+                        // O NOVO CARTÃO DO HERÓI
                         htmlBotoes += `
                         <button class="btn-char" onclick="playClick(); entrarNoJogo('${p.id}', '${p.nome}')">
-                            <div class="btn-char-info">
-                                <strong>${p.nome}</strong>
-                                <span>${classeNome.replace(/_/g, ' ')} - Nv. ${p.level}</span>
+                            <div class="char-card-sprite-container">
+                                <img src="${spriteUrl}" class="char-card-sprite" alt="${classSlug}">
                             </div>
-                            <span style="font-size: 1.2em;">⚔️</span>
+                            <div class="char-card-info">
+                                <strong>${p.nome}</strong>
+                                <span>${classSlug} - Nv. ${p.level}</span>
+                            </div>
+                            <div class="char-card-icon-right">
+                                ⚔️
+                            </div>
                         </button>`;
                     });
                 } else {
-                    htmlBotoes += '<p style="color: #aaa; font-size: 0.85em; margin-bottom: 15px;">Nenhum herói encontrado nesta conta.</p>';
+                    htmlBotoes += '<p style="color: #bdc3c7; font-size: 0.85em; margin-bottom: 15px; font-family: serif;">Nenhum herói encontrado nesta conta.</p>';
                 }
 
-                // Adicionando o playClick() no botão de Criar Personagem
                 htmlBotoes += `<button class="btn-new" onclick="playClick(); mostrarForm()">➕ Criar Personagem</button>`;
                 
+                // Formulário de Criação Oculto
                 htmlBotoes += `
                 <div id="form-criar" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.6); border: 1px solid #f39c12; border-radius: 8px; text-align: left;">
-                    <input type="text" id="novo-nome" placeholder="Nome do Herói" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: inherit; font-weight: bold;">
+                    <input type="text" id="novo-nome" placeholder="Nome do Herói" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: 'Cinzel', serif; font-weight: bold; background: rgba(255,255,255,0.9);">
                     
-                    <select id="novo-genero" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: inherit; font-weight: bold;">
+                    <select id="novo-genero" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: 'Cinzel', serif; font-weight: bold; background: rgba(255,255,255,0.9);">
                         <option value="masculino">Masculino ♂️</option>
                         <option value="feminino">Feminino ♀️</option>
                         <option value="nao_binario">Não-binário ⚧️</option>
                     </select>
                     
-                    <button onclick="playClick(); enviarNovoPersonagem()" style="width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 5px;">✅ Confirmar</button>
-                    <button onclick="playClick(); esconderForm()" style="width: 100%; padding: 10px; background: #c0392b; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">❌ Cancelar</button>
+                    <button onclick="playClick(); enviarNovoPersonagem()" style="width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px; font-weight: bold; font-family: 'Cinzel', serif; cursor: pointer; margin-bottom: 5px;">✅ Confirmar</button>
+                    <button onclick="playClick(); esconderForm()" style="width: 100%; padding: 10px; background: #c0392b; color: white; border: none; border-radius: 5px; font-weight: bold; font-family: 'Cinzel', serif; cursor: pointer;">❌ Cancelar</button>
                 </div>`;
 
                 area.innerHTML = htmlBotoes;
