@@ -23,11 +23,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session_id = context.user_data.get("logged_player_id")
     tg_id = update.effective_user.id
     
-    # Verifica se o jogador já existe no banco de dados
-    player_data = await player_manager.get_player_by_id(session_id)
+    # 1. BLOQUEIO DE SEGURANÇA: Se não estiver logado, pede para logar
+    if not session_id:
+        await update.message.reply_text(
+            "🔒 <b>Acesso Restrito</b>\nVocê precisa entrar na sua conta para jogar.\n\nPor favor, use o comando /login para se identificar ou se registrar.", 
+            parse_mode="HTML"
+        )
+        return
+    
+    # 2. Verifica os dados do jogador com a função CORRETA
+    player_data = await player_manager.get_player_data(session_id)
 
-    # SE O JOGADOR NÃO EXISTE: Inicia fluxo de escolha de gênero
-    if not player_data:
+    # 3. SE O JOGADOR ACABOU DE CRIAR A CONTA (Não tem gênero definido)
+    if player_data and not player_data.get("gender"):
         keyboard = [
             [
                 InlineKeyboardButton("Masculino ♂️", callback_data="set_gender_masculino"),
@@ -45,7 +53,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # SE O JOGADOR EXISTE: Segue com a lógica original de reparo e login
+    # 4. SE O JOGADOR EXISTE E JÁ TEM GÊNERO: Segue com a lógica original de reparo e login
     try:
         user_name = update.effective_user.first_name or "Aventureiro"
         tg_username = update.effective_user.username or ""
@@ -69,7 +77,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 needs_repair = True
                 
         if needs_repair:
-            await player_manager.save_player_data(player_data["_id"], player_data)
+            await player_manager.save_player_data(session_id, player_data)
 
     except Exception as e:
         logger.error(f"Erro ao processar dados em /start: {e}")
@@ -82,8 +90,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(lock_msg, parse_mode=ParseMode.HTML)
         return
 
+    # Carrega a tela do jogo!
     await resume_game_state(update, context, player_data)
-
+    
 async def gender_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Manipula o clique no botão de gênero."""
     query = update.callback_query
