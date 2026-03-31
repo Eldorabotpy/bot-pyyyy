@@ -300,7 +300,7 @@ async def cmd_war_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 # ==============================================================================
-# 🛡️ KINGDOM DEFENSE (EVENTO) — SEM DAR TICKETS AUTOMATICAMENTE
+# 🛡️ KINGDOM DEFENSE (EVENTO)
 # ==============================================================================
 async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     if not event_manager:
@@ -316,8 +316,9 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"[KD] Evento já ativo ou erro: {result['error']}")
             return
 
-        # ❌ Removido: não distribui ticket automaticamente.
-        # O jogador pega no menu Eventos (claim diário).
+        # 👇 A MÁGICA AQUI: Avisa o WebApp pelo MongoDB que o evento começou!
+        if db is not None:
+            db["server_state"].update_one({"_id": "eventos_ativos"}, {"$set": {"defesa_reino": True}}, upsert=True)
 
         group_msg = (
             "🔥 <b>INVASÃO EM ANDAMENTO!</b> 🔥\n\n"
@@ -350,7 +351,6 @@ async def start_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erro ao iniciar Kingdom Defense: {e}")
 
-
 async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     if not event_manager:
         return
@@ -359,6 +359,10 @@ async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await event_manager.end_event()
+        
+        # 👇 A MÁGICA AQUI: Avisa o WebApp pelo MongoDB que a Invasão acabou!
+        if db is not None:
+            db["server_state"].update_one({"_id": "eventos_ativos"}, {"$set": {"defesa_reino": False}}, upsert=True)
 
         end_msg = (
             "🏁 <b>FIM DA INVASÃO!</b> 🏁\n\n"
@@ -382,9 +386,8 @@ async def end_kingdom_defense_event(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erro ao finalizar Kingdom Defense: {e}")
 
-
 # ==============================================================================
-# 👹 WORLD BOSS (mantido)
+# 👹 WORLD BOSS
 # ==============================================================================
 async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
     if world_boss_manager is None:
@@ -397,6 +400,15 @@ async def start_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
 
     if result.get("success"):
         location_key = result.get('location', 'desconhecido')
+        
+        # 👇 A MÁGICA AQUI: Avisa o WebApp que o Boss acordou e ONDE ele está!
+        if db is not None:
+            db["server_state"].update_one(
+                {"_id": "eventos_ativos"}, 
+                {"$set": {"world_boss": True, "boss_location": location_key}}, 
+                upsert=True
+            )
+
         region_info = (game_data.REGIONS_DATA.get(location_key) or {})
         location_display = region_info.get("display_name", location_key.replace("_", " ").title())
 
@@ -427,8 +439,12 @@ async def end_world_boss_job(context: ContextTypes.DEFAULT_TYPE):
         return
     logger.info("👹 [JOB] Boss Time Out.")
     battle_results = world_boss_manager.end_event(reason="Tempo esgotado")
+    
+    # 👇 A MÁGICA AQUI: Avisa o WebApp pelo MongoDB que o Boss foi dormir!
+    if db is not None:
+        db["server_state"].update_one({"_id": "eventos_ativos"}, {"$set": {"world_boss": False}}, upsert=True)
+        
     await distribute_loot_and_announce(context, battle_results)
-
 
 # ==============================================================================
 # ⚔️ PVP / TEMPORADA (mantido)

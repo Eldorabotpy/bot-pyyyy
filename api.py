@@ -939,14 +939,18 @@ def api_eventos_ativos(user_id):
 
         eventos = []
 
-        is_defense_active = getattr(event_manager, "is_active", False) if event_manager else False
-        is_boss_active = getattr(world_boss_manager, "is_active", False) if world_boss_manager else False
+        # 👇 O PULO DO GATO: Lendo o quadro de avisos do MongoDB!
+        db = users_collection.database
+        estado_servidor = db["server_state"].find_one({"_id": "eventos_ativos"}) or {}
+        
+        is_defense_active = estado_servidor.get("defesa_reino", False)
+        is_boss_active = estado_servidor.get("world_boss", False)
+        local_boss = estado_servidor.get("boss_location", "desconhecido")
 
         # ==========================================
-        # 1. DEFESA DO REINO (REESCRITO: SEMPRE VISÍVEL)
+        # 1. DEFESA DO REINO
         # ==========================================
         if is_defense_active:
-            # Se o jogador ESTÁ no reino, mostra botões de ação
             if local_atual == "reino_eldora":
                 if not pegou_tickets_hoje:
                     btn_texto, btn_acao = "COLETAR ENTRADAS 🎟️", "coletarTicketsEvento()"
@@ -958,7 +962,6 @@ def api_eventos_ativos(user_id):
                     btn_texto, btn_acao = "SEM TICKETS ❌", "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
                     btn_estilo = "background: #334155; border-color: #1e293b; color: #94a3b8; cursor: not-allowed;"
             else:
-                # Se o jogador ESTÁ LONGE, manda ele viajar
                 btn_texto, btn_acao = "VIAJAR AO REINO 🏰", "mudarAba('reino')"
                 btn_estilo = "background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); border-color: #3b82f6;"
 
@@ -973,12 +976,11 @@ def api_eventos_ativos(user_id):
                 "btn_estilo": btn_estilo
             })
         else:
-            # MODO INATIVO: Mostra os horários reais do config.py
             eventos.append({
                 "id": "defesa_reino",
                 "nome": "🛡️ Defesa do Reino",
                 "descricao": "Os portões estão seguros.",
-                "tempo_texto": "⏰ 09h, 12h, 18h10 e 22h", # Horários do config.py
+                "tempo_texto": "⏰ 09h, 12h, 18h10 e 22h",
                 "cor": "#475569",
                 "botao_texto": "AGUARDANDO",
                 "funcao_click": "exibirAlertaCustom('Aviso', 'A Invasão ainda não começou! Volte às 09h, 12h, 18h10 ou 22h.', false)",
@@ -986,10 +988,9 @@ def api_eventos_ativos(user_id):
             })
 
         # ==========================================
-        # 2. WORLD BOSS (SEMPRE VISÍVEL)
+        # 2. WORLD BOSS
         # ==========================================
         if is_boss_active:
-            local_boss = getattr(world_boss_manager, "current_location", "desconhecido")
             if local_atual == local_boss:
                 btn_texto, btn_acao = "ATACAR BOSS ⚔️", f"mudarAba('{local_boss}')"
                 btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #8b5cf6;"
@@ -1012,7 +1013,7 @@ def api_eventos_ativos(user_id):
                 "id": "world_boss",
                 "nome": "👹 World Boss",
                 "descricao": "A fera está dormindo.",
-                "tempo_texto": "⏰ 08h, 14h, 19h e 23h", # Horários do config.py
+                "tempo_texto": "⏰ 08h, 14h, 19h e 23h",
                 "cor": "#475569",
                 "botao_texto": "DORMINDO",
                 "funcao_click": "exibirAlertaCustom('Aviso', 'O World Boss desperta às 08h, 14h, 19h e 23h.', false)",
