@@ -55,14 +55,54 @@ async function carregarInicio() {
             }
         } catch(e) { }
 
-let html = `
+        // 👇 A MÁGICA ENTRA AQUI! BUSCANDO EVENTOS DO PYTHON 👇
+        let htmlEventos = '';
+        try {
+            const resEventos = await fetch(`/api/eventos_ativos/${charId}`);
+            const eventosAtivos = await resEventos.json();
+
+            // SÓ MONTA O PAINEL SE TIVER EVENTO ROLANDO!
+            if (eventosAtivos.length > 0) {
+                let linhasEventos = eventosAtivos.map(evento => `
+                    <div style="background: #020617; padding: 12px; border-radius: 8px; border-left: 3px solid ${evento.cor}; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong style="color: ${evento.cor}; font-size: 1em; display: block; margin-bottom: 4px;">${evento.nome}</strong>
+                            <span style="color: #94a3b8; font-size: 0.8em;">${evento.descricao}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="color: #ef4444; font-size: 0.75em; font-weight: bold; display: block; margin-bottom: 6px;">${evento.tempo_texto}</span>
+                            <button onclick="${evento.funcao_click}" style="${evento.btn_estilo} color: #f8fafc; border-width: 1px; border-style: solid; padding: 6px 12px; border-radius: 6px; font-size: 0.75em; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s;">
+                                ${evento.botao_texto}
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                htmlEventos = `
+                <div style="background: #0f172a; border: 1px solid #1e293b; border-top: 3px solid #ef4444; border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.6); position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 12px;">
+                        <h3 style="margin: 0; color: #f8fafc; font-size: 1.2em; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 1px;">
+                            <span style="font-size: 1.1em; filter: drop-shadow(0 0 5px rgba(239,68,68,0.5));">🔥</span> Eventos em Ação
+                        </h3>
+                        <span style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 4px 10px; border-radius: 20px; font-size: 0.70em; font-weight: bold; letter-spacing: 1px; animation: blinker 1.5s linear infinite;">AO VIVO</span>
+                    </div>
+                    ${linhasEventos}
+                </div>
+                `;
+            }
+        } catch(e) {
+            console.log("Erro ao buscar eventos ou nenhum ativo.");
+        }
+        // 👆 FIM DA MÁGICA DOS EVENTOS 👆
+
+        let html = `
         <div class="home-banner">
             <img src="/static/capa_eldora.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Eldora'">
         </div>
 
         ${tickerHtml}
 
-        <div style="background: #0f172a; border: 1px solid #1e293b; border-top: 3px solid #f39c12; border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.6); position: relative;">
+        ${htmlEventos} <div style="background: #0f172a; border: 1px solid #1e293b; border-top: 3px solid #f39c12; border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.6); position: relative;">
             
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 12px;">
                 <h3 style="margin: 0; color: #f8fafc; font-size: 1.3em; display: flex; align-items: center; gap: 8px;">
@@ -91,39 +131,6 @@ let html = `
                 <span style="width: 1px; background: #334155;"></span>
                 <span style="color: #38bdf8; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">💎 ${p.diamantes.toLocaleString('pt-BR')}</span>
             </div>
-        </div>
-
-        <div style="background: #0f172a; border: 1px solid #1e293b; border-top: 3px solid #ef4444; border-radius: 12px; padding: 18px; margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.6); position: relative;">
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 12px;">
-                <h3 style="margin: 0; color: #f8fafc; font-size: 1.2em; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 1px;">
-                    <span style="font-size: 1.1em; filter: drop-shadow(0 0 5px rgba(239,68,68,0.5));">🔥</span> Eventos em Ação
-                </h3>
-                <span style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 4px 10px; border-radius: 20px; font-size: 0.70em; font-weight: bold; letter-spacing: 1px; animation: blinker 1.5s linear infinite;">AO VIVO</span>
-            </div>
-            
-            <div style="background: #020617; padding: 12px; border-radius: 8px; border-left: 3px solid #f59e0b; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong style="color: #f1c40f; font-size: 1em; display: block; margin-bottom: 4px;">🛡️ Defesa do Reino</strong>
-                    <span style="color: #94a3b8; font-size: 0.8em;">Invasão nos portões!</span>
-                </div>
-                <div style="text-align: right;">
-                    <span style="color: #ef4444; font-size: 0.75em; font-weight: bold; display: block; margin-bottom: 6px;">Termina em 25m</span>
-                    <button onclick="exibirAlertaCustom('Aviso', 'Aba de Eventos em Breve!', false)" style="background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); color: #f8fafc; border: 1px solid #334155; padding: 6px 12px; border-radius: 6px; font-size: 0.75em; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">ENTRAR ⚔️</button>
-                </div>
-            </div>
-
-            <div style="background: #020617; padding: 12px; border-radius: 8px; border-left: 3px solid #8b5cf6; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong style="color: #a78bfa; font-size: 1em; display: block; margin-bottom: 4px;">👹 World Boss</strong>
-                    <span style="color: #94a3b8; font-size: 0.8em;">O monstro despertou!</span>
-                </div>
-                <div style="text-align: right;">
-                    <span style="color: #ef4444; font-size: 0.75em; font-weight: bold; display: block; margin-bottom: 6px;">Termina em 50m</span>
-                    <button onclick="exibirAlertaCustom('Aviso', 'Aba do Boss em Breve!', false)" style="background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); color: #f8fafc; border: 1px solid #334155; padding: 6px 12px; border-radius: 6px; font-size: 0.75em; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">ATACAR ⚔️</button>
-                </div>
-            </div>
-
         </div>
         `;
         

@@ -954,6 +954,7 @@ def api_eventos_ativos(user_id):
                 "id": "defesa_reino",
                 "nome": "🛡️ Defesa do Reino",
                 "descricao": "Invasão nos portões!",
+                "tempo_texto": "🔥 Aberto Agora!", # <--- Faltou adicionar esta linha!
                 "cor": "#f59e0b",
                 "botao_texto": btn_texto,
                 "funcao_click": btn_acao,
@@ -976,6 +977,7 @@ def api_eventos_ativos(user_id):
                 "id": "world_boss",
                 "nome": "👹 World Boss",
                 "descricao": "O monstro despertou!",
+                "tempo_texto": "🔥 O bicho tá solto!", # <--- Faltou adicionar esta linha também!
                 "cor": "#8b5cf6",
                 "botao_texto": btn_texto,
                 "funcao_click": btn_acao,
