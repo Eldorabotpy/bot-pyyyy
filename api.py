@@ -921,11 +921,14 @@ def api_eventos_ativos(user_id):
         local_atual = pdata.get("current_location", "reino_eldora")
         inventario = pdata.get("inventory", {})
         
-        # Garante que lê a quantidade de tickets independente de ser Dict ou Int
         ticket_item = inventario.get("ticket_defesa_reino", 0)
         tickets_defesa = ticket_item.get("quantity", 0) if isinstance(ticket_item, dict) else ticket_item
         
-        tz = ZoneInfo(JOB_TIMEZONE)
+        # 👇 CORREÇÃO: Proteção contra crash de Fuso Horário (Igual ao seu jobs.py)
+        try:
+            tz = ZoneInfo(JOB_TIMEZONE)
+        except Exception:
+            tz = timezone.utc
         today = datetime.now(tz).date().isoformat()
         
         daily_claims = pdata.get("daily_claims", {})
@@ -934,8 +937,14 @@ def api_eventos_ativos(user_id):
 
         eventos = []
 
-        # 1. Defesa do Reino
+        # 👇 LOGS PARA O TERMINAL (Pra gente descobrir o culpado da memória)
         is_defense_active = getattr(event_manager, "is_active", False) if event_manager else False
+        is_boss_active = getattr(world_boss_manager, "is_active", False) if world_boss_manager else False
+        
+        print(f"[DEBUG WEBAPP] Defesa do Reino Ativa? {is_defense_active}")
+        print(f"[DEBUG WEBAPP] World Boss Ativo? {is_boss_active}")
+
+        # 1. Defesa do Reino
         if local_atual == "reino_eldora" and is_defense_active:
             if not pegou_tickets_hoje:
                 btn_texto = "COLETAR ENTRADAS 🎟️"
@@ -954,7 +963,7 @@ def api_eventos_ativos(user_id):
                 "id": "defesa_reino",
                 "nome": "🛡️ Defesa do Reino",
                 "descricao": "Invasão nos portões!",
-                "tempo_texto": "🔥 Aberto Agora!", # <--- Faltou adicionar esta linha!
+                "tempo_texto": "🔥 Aberto Agora!",
                 "cor": "#f59e0b",
                 "botao_texto": btn_texto,
                 "funcao_click": btn_acao,
@@ -962,7 +971,7 @@ def api_eventos_ativos(user_id):
             })
 
         # 2. World Boss
-        if world_boss_manager and world_boss_manager.is_active:
+        if is_boss_active:
             local_boss = getattr(world_boss_manager, "current_location", "desconhecido")
             if local_atual == local_boss:
                 btn_texto = "ATACAR BOSS ⚔️"
@@ -977,7 +986,7 @@ def api_eventos_ativos(user_id):
                 "id": "world_boss",
                 "nome": "👹 World Boss",
                 "descricao": "O monstro despertou!",
-                "tempo_texto": "🔥 O bicho tá solto!", # <--- Faltou adicionar esta linha também!
+                "tempo_texto": "🔥 O bicho tá solto!",
                 "cor": "#8b5cf6",
                 "botao_texto": btn_texto,
                 "funcao_click": btn_acao,
