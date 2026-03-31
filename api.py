@@ -939,7 +939,6 @@ def api_eventos_ativos(user_id):
 
         eventos = []
 
-        # 👇 O PULO DO GATO: Lendo o quadro de avisos do MongoDB!
         db = users_collection.database
         estado_servidor = db["server_state"].find_one({"_id": "eventos_ativos"}) or {}
         
@@ -948,47 +947,60 @@ def api_eventos_ativos(user_id):
         local_boss = estado_servidor.get("boss_location", "desconhecido")
 
         # ==========================================
-        # 1. DEFESA DO REINO
+        # 1. DEFESA DO REINO (LÓGICA CORRIGIDA)
         # ==========================================
-        if is_defense_active:
-            if local_atual == "reino_eldora":
-                if not pegou_tickets_hoje:
-                    btn_texto, btn_acao = "COLETAR ENTRADAS 🎟️", "coletarTicketsEvento()"
-                    btn_estilo = "background: linear-gradient(180deg, #d35400 0%, #a84200 100%); border-color: #f39c12;"
-                elif tickets_defesa > 0:
-                    btn_texto, btn_acao = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️", "mudarAba('reino')"
-                    btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #ef4444;"
-                else:
-                    btn_texto, btn_acao = "SEM TICKETS ❌", "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
-                    btn_estilo = "background: #334155; border-color: #1e293b; color: #94a3b8; cursor: not-allowed;"
-            else:
-                btn_texto, btn_acao = "VIAJAR AO REINO 🏰", "mudarAba('reino')"
-                btn_estilo = "background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); border-color: #3b82f6;"
-
+        if not pegou_tickets_hoje:
+            # Se ainda não pegou os tickets, o botão DEVE ser o de coletar, ativo ou não!
             eventos.append({
                 "id": "defesa_reino",
                 "nome": "🛡️ Defesa do Reino",
-                "descricao": "Invasão nos portões!",
-                "tempo_texto": "🔥 Aberto Agora!",
+                "descricao": "Pegue seus tickets diários!",
+                "tempo_texto": "🎁 Disponível",
                 "cor": "#f59e0b",
-                "botao_texto": btn_texto,
-                "funcao_click": btn_acao,
-                "btn_estilo": btn_estilo
+                "botao_texto": "COLETAR ENTRADAS 🎟️",
+                "funcao_click": "coletarTicketsEvento()",
+                "btn_estilo": "background: linear-gradient(180deg, #d35400 0%, #a84200 100%); border-color: #f39c12;"
             })
         else:
-            eventos.append({
-                "id": "defesa_reino",
-                "nome": "🛡️ Defesa do Reino",
-                "descricao": "Os portões estão seguros.",
-                "tempo_texto": "⏰ 09h, 12h, 18h10 e 22h",
-                "cor": "#475569",
-                "botao_texto": "AGUARDANDO",
-                "funcao_click": "exibirAlertaCustom('Aviso', 'A Invasão ainda não começou! Volte às 09h, 12h, 18h10 ou 22h.', false)",
-                "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
-            })
+            # Já pegou os tickets. Vamos ver se o evento tá rolando.
+            if is_defense_active:
+                if local_atual == "reino_eldora":
+                    if tickets_defesa > 0:
+                        btn_texto, btn_acao = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️", "mudarAba('reino')"
+                        btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #ef4444;"
+                    else:
+                        btn_texto, btn_acao = "SEM TICKETS ❌", "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
+                        btn_estilo = "background: #334155; border-color: #1e293b; color: #94a3b8; cursor: not-allowed;"
+                else:
+                    btn_texto, btn_acao = "VIAJAR AO REINO 🏰", "mudarAba('reino')"
+                    btn_estilo = "background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); border-color: #3b82f6;"
+
+                eventos.append({
+                    "id": "defesa_reino",
+                    "nome": "🛡️ Defesa do Reino",
+                    "descricao": "Invasão nos portões!",
+                    "tempo_texto": "🔥 Aberto Agora!",
+                    "cor": "#f59e0b",
+                    "botao_texto": btn_texto,
+                    "funcao_click": btn_acao,
+                    "btn_estilo": btn_estilo
+                })
+            else:
+                # Evento inativo, mas o jogador já tem os tickets guardados na mochila
+                qtd_txt = f" ({tickets_defesa} 🎟️)" if tickets_defesa > 0 else ""
+                eventos.append({
+                    "id": "defesa_reino",
+                    "nome": "🛡️ Defesa do Reino",
+                    "descricao": "Os portões estão seguros.",
+                    "tempo_texto": "⏰ 09h, 12h, 18h10 e 22h",
+                    "cor": "#475569",
+                    "botao_texto": f"AGUARDANDO{qtd_txt}",
+                    "funcao_click": "exibirAlertaCustom('Aviso', 'A Invasão ainda não começou! Volte às 09h, 12h, 18h10 ou 22h.', false)",
+                    "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
+                })
 
         # ==========================================
-        # 2. WORLD BOSS
+        # 2. WORLD BOSS (MANTIDO)
         # ==========================================
         if is_boss_active:
             if local_atual == local_boss:
