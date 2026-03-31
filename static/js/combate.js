@@ -15,7 +15,7 @@ const SPRITES_COSTA = {
         "feminino": "https://github.com/user-attachments/assets/c405a107-9d5e-4f34-8daa-9660b29e591c"
     },
     "guerreiro": {
-        "mascolino": "https://github.com/user-attachments/assets/1c0045ea-d8fc-4958-86a4-ecef1507f25e",
+        "masculino": "https://github.com/user-attachments/assets/1c0045ea-d8fc-4958-86a4-ecef1507f25e",
         "feminino" : "https://github.com/user-attachments/assets/d5cfde65-f28f-4a13-9c1e-525adc3b51b2"
     },
     "berserker": { 
