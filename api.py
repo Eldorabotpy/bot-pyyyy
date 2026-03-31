@@ -1090,7 +1090,78 @@ def api_coletar_entradas():
         traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
 
-    
+# ==========================================
+# ROTA: INICIAR DEFESA DO REINO (WEB APP)
+# ==========================================
+@app.route('/api/defesa_reino/iniciar', methods=['POST'])
+def api_defesa_reino_iniciar():
+    dados = request.json
+    user_id = dados.get("user_id")
+
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        if not pdata: return jsonify({"erro": "Personagem não encontrado"})
+
+        # 1. Verifica se o jogador tem o ticket na mochila
+        inventario = pdata.get("inventory", {})
+        ticket_item = inventario.get("ticket_defesa_reino", 0)
+        tickets = ticket_item.get("quantity", 0) if isinstance(ticket_item, dict) else ticket_item
+
+        if tickets <= 0:
+            return jsonify({"erro": "Você não tem Tickets de Defesa do Reino! Colete no menu inicial."})
+
+        # 2. Verifica se o evento está rolando
+        if not event_manager.is_active:
+            return jsonify({"erro": "Os portões estão seguros. O evento não está ativo no momento."})
+
+        # 3. Desconta o ticket do inventário do jogador e salva
+        if isinstance(inventario.get("ticket_defesa_reino"), dict):
+            pdata["inventory"]["ticket_defesa_reino"]["quantity"] -= 1
+        else:
+            pdata["inventory"]["ticket_defesa_reino"] -= 1
+
+        _run_async(player_manager.save_player_data(busca_id, pdata))
+
+        # 4. Tenta colocar o jogador na batalha (Usa _run_async pq o motor é do bot Telegram)
+        status = _run_async(event_manager.add_player_to_event(str(busca_id), pdata))
+
+        # 5. Retorna os dados para o JavaScript renderizar a tela
+        if status == "active":
+            # Puxa os dados atualizados do cache de batalha
+            bdata = event_manager.get_battle_data(str(busca_id))
+            is_boss = bdata["current_mob"].get("is_boss", False)
+            
+            mob_hp = event_manager.boss_global_hp if is_boss else bdata["current_mob"]["hp"]
+            mob_max_hp = event_manager.boss_max_hp if is_boss else bdata["current_mob"]["max_hp"]
+
+            return jsonify({
+                "sucesso": True,
+                "status": "active",
+                "player_hp": bdata.get("player_hp"),
+                "player_mp": bdata.get("player_mp"),
+                "player_max_hp": bdata.get("player_max_hp"),
+                "player_max_mp": bdata.get("player_max_mp"),
+                "mob_nome": bdata["current_mob"]["name"],
+                "mob_hp": mob_hp,
+                "mob_max_hp": mob_max_hp,
+                "wave": bdata.get("current_wave", 1),
+                "is_boss": is_boss
+            })
+            
+        elif status == "waiting":
+            # Se a arena estiver lotada, ele vai para a fila
+            fila_texto = event_manager.get_queue_status_text()
+            return jsonify({"sucesso": True, "status": "waiting", "fila": fila_texto})
+            
+        else:
+            return jsonify({"erro": "Você já está na batalha ou houve um erro de conexão."})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": f"Falha crítica: {str(e)}"}), 500
+        
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

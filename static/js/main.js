@@ -142,6 +142,91 @@ async function carregarInicio() {
 }
 
 // ==========================================
+// FUNÇÃO: CARREGAR ARENA DA DEFESA DO REINO
+// ==========================================
+async function carregarReino() {
+    const conteudo = document.getElementById('aba-reino');
+    const charId = localStorage.getItem("jogadorEldoraID");
+
+    if (!charId) return;
+
+    // Tela de loading imersiva
+    conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 40px; font-size: 1.1em;">Viajando para os portões do Reino de Eldora... 🏰⏳</p>';
+
+    try {
+        const res = await fetch('/api/defesa_reino/iniciar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId })
+        });
+
+        const dados = await res.json();
+
+        // Se deu erro (sem ticket, evento fechado)
+        if (dados.erro) {
+            conteudo.innerHTML = `
+            <div style="text-align: center; padding: 50px 20px;">
+                <h3 style="color: #ef4444; font-size: 1.5em; margin-bottom: 10px;">🛡️ Portões Fechados</h3>
+                <p style="color: #94a3b8; font-size: 1.1em;">${dados.erro}</p>
+                <button onclick="mudarAba('home')" style="margin-top: 20px; padding: 12px 25px; background: #334155; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s;">Voltar para o Início</button>
+            </div>`;
+            return;
+        }
+
+        // Se a arena atingiu o limite (max_concurrent_fighters)
+        if (dados.status === "waiting") {
+             conteudo.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <h3 style="color: #f59e0b; font-size: 1.4em;">⛺ Fila de Reforços</h3>
+                <p style="color: #94a3b8; white-space: pre-wrap; margin: 20px 0;">${dados.fila}</p>
+                <button onclick="carregarReino()" style="padding: 12px 25px; background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">🔄 Atualizar Fila</button>
+            </div>`;
+            return;
+        }
+
+        // Se entrou na batalha com sucesso
+        if (dados.status === "active") {
+            const ehChefeHtml = dados.is_boss ? '<h3 style="color: #ef4444; text-align: center; animation: blinker 1.5s linear infinite; margin-top: -10px; margin-bottom: 20px;">🚨 CHEFE DA INVASÃO APARECEU 🚨</h3>' : '';
+
+            conteudo.innerHTML = `
+            <div style="background: #0f172a; padding: 25px; border-radius: 12px; border: 1px solid #1e293b; box-shadow: 0 10px 25px rgba(0,0,0,0.8);">
+                <h2 style="color: #f8fafc; text-align: center; margin-top: 0; letter-spacing: 2px;">🌊 ONDA ${dados.wave} 🌊</h2>
+                ${ehChefeHtml}
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0; background: #020617; padding: 15px; border-radius: 10px; border: 1px solid #334155;">
+                    <div style="text-align: center; width: 40%;">
+                        <h4 style="color: #38bdf8; margin: 0 0 10px 0; font-size: 1.1em;">Você</h4>
+                        <div style="color: #fca5a5; font-weight: bold; margin-bottom: 5px;">❤️ HP: ${dados.player_hp} / ${dados.player_max_hp}</div>
+                        <div style="color: #93c5fd; font-weight: bold;">💙 MP: ${dados.player_mp} / ${dados.player_max_mp}</div>
+                    </div>
+
+                    <div style="font-size: 1.6em; font-weight: 900; color: #475569; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">VS</div>
+
+                    <div style="text-align: center; width: 40%;">
+                        <h4 style="color: #ef4444; margin: 0 0 10px 0; font-size: 1.1em;">${dados.mob_nome}</h4>
+                        <div style="color: #fca5a5; font-weight: bold;">❤️ HP: ${dados.mob_hp.toLocaleString('pt-BR')} / ${dados.mob_max_hp.toLocaleString('pt-BR')}</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px;">
+                    <button id="btn-atacar-reino" onclick="alert('Implementaremos o Ataque na Fase 2!')" style="background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%); color: white; border: 1px solid #ef4444; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;">💥 ATACAR</button>
+                    <button onclick="alert('Implementaremos as Magias na Fase 2!')" style="background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); color: white; border: 1px solid #3b82f6; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;">✨ MAGIAS</button>
+                </div>
+
+                <div id="log-defesa" style="background: #020617; padding: 15px; border-radius: 8px; margin-top: 25px; font-family: monospace; color: #a3e635; height: 120px; overflow-y: auto; border-left: 3px solid #65a30d;">
+                    > O campo de batalha está um caos!<br>> O que você vai fazer?
+                </div>
+            </div>
+            `;
+        }
+
+    } catch (erro) {
+        console.error("Erro no Carregar Reino:", erro);
+        conteudo.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 30px;">Ocorreu um erro ao conectar com o campo de batalha. Verifique o console.</p>';
+    }
+}
+
+// ==========================================
 // FUNÇÃO PARA COLETAR TICKETS DE EVENTOS
 // ==========================================
 async function coletarTicketsEvento() {
