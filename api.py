@@ -924,10 +924,13 @@ def api_eventos_ativos(user_id):
         ticket_item = inventario.get("ticket_defesa_reino", 0)
         tickets_defesa = ticket_item.get("quantity", 0) if isinstance(ticket_item, dict) else ticket_item
         
-        # 👇 CORREÇÃO: Proteção contra crash de Fuso Horário (Igual ao seu jobs.py)
+        # Proteção contra crash de Fuso Horário
         try:
+            from zoneinfo import ZoneInfo
+            from config import JOB_TIMEZONE
             tz = ZoneInfo(JOB_TIMEZONE)
         except Exception:
+            from datetime import timezone
             tz = timezone.utc
         today = datetime.now(tz).date().isoformat()
         
@@ -937,40 +940,55 @@ def api_eventos_ativos(user_id):
 
         eventos = []
 
-        # 👇 LOGS PARA O TERMINAL (Pra gente descobrir o culpado da memória)
         is_defense_active = getattr(event_manager, "is_active", False) if event_manager else False
         is_boss_active = getattr(world_boss_manager, "is_active", False) if world_boss_manager else False
-        
-        print(f"[DEBUG WEBAPP] Defesa do Reino Ativa? {is_defense_active}")
-        print(f"[DEBUG WEBAPP] World Boss Ativo? {is_boss_active}")
 
-        # 1. Defesa do Reino
-        if local_atual == "reino_eldora" and is_defense_active:
-            if not pegou_tickets_hoje:
-                btn_texto = "COLETAR ENTRADAS 🎟️"
-                btn_acao = "coletarTicketsEvento()"
-                btn_estilo = "background: linear-gradient(180deg, #d35400 0%, #a84200 100%); border-color: #f39c12;"
-            elif tickets_defesa > 0:
-                btn_texto = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️"
-                btn_acao = "mudarAba('reino')"
-                btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #ef4444;"
+        # ==========================================
+        # 1. DEFESA DO REINO
+        # (Aparece se estiver no Reino. Se ativo = Laranja, Inativo = Cinza)
+        # ==========================================
+        if local_atual == "reino_eldora":
+            if is_defense_active:
+                if not pegou_tickets_hoje:
+                    btn_texto = "COLETAR ENTRADAS 🎟️"
+                    btn_acao = "coletarTicketsEvento()"
+                    btn_estilo = "background: linear-gradient(180deg, #d35400 0%, #a84200 100%); border-color: #f39c12;"
+                elif tickets_defesa > 0:
+                    btn_texto = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️"
+                    btn_acao = "mudarAba('reino')"
+                    btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #ef4444;"
+                else:
+                    btn_texto = "SEM TICKETS ❌"
+                    btn_acao = "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
+                    btn_estilo = "background: #334155; border-color: #1e293b; color: #94a3b8; cursor: not-allowed;"
+
+                eventos.append({
+                    "id": "defesa_reino",
+                    "nome": "🛡️ Defesa do Reino",
+                    "descricao": "Invasão nos portões!",
+                    "tempo_texto": "🔥 Aberto Agora!",
+                    "cor": "#f59e0b", # Dourado
+                    "botao_texto": btn_texto,
+                    "funcao_click": btn_acao,
+                    "btn_estilo": btn_estilo
+                })
             else:
-                btn_texto = "SEM TICKETS ❌"
-                btn_acao = "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
-                btn_estilo = "background: #334155; border-color: #1e293b; color: #94a3b8; cursor: not-allowed;"
+                # MODO INATIVO: Mostra os horários
+                eventos.append({
+                    "id": "defesa_reino",
+                    "nome": "🛡️ Defesa do Reino",
+                    "descricao": "Os portões estão seguros.",
+                    "tempo_texto": "⏰ Todo dia às 15h e 21h",
+                    "cor": "#475569", # Cinza escuro
+                    "botao_texto": "AGUARDANDO",
+                    "funcao_click": "exibirAlertaCustom('Aviso', 'A Invasão ainda não começou! Volte nos horários marcados.', false)",
+                    "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
+                })
 
-            eventos.append({
-                "id": "defesa_reino",
-                "nome": "🛡️ Defesa do Reino",
-                "descricao": "Invasão nos portões!",
-                "tempo_texto": "🔥 Aberto Agora!",
-                "cor": "#f59e0b",
-                "botao_texto": btn_texto,
-                "funcao_click": btn_acao,
-                "btn_estilo": btn_estilo
-            })
-
-        # 2. World Boss
+        # ==========================================
+        # 2. WORLD BOSS
+        # (Mostra em qualquer lugar do mapa)
+        # ==========================================
         if is_boss_active:
             local_boss = getattr(world_boss_manager, "current_location", "desconhecido")
             if local_atual == local_boss:
@@ -987,10 +1005,22 @@ def api_eventos_ativos(user_id):
                 "nome": "👹 World Boss",
                 "descricao": "O monstro despertou!",
                 "tempo_texto": "🔥 O bicho tá solto!",
-                "cor": "#8b5cf6",
+                "cor": "#8b5cf6", # Roxo
                 "botao_texto": btn_texto,
                 "funcao_click": btn_acao,
                 "btn_estilo": btn_estilo
+            })
+        else:
+            # MODO INATIVO: Mostra os horários
+            eventos.append({
+                "id": "world_boss",
+                "nome": "👹 World Boss",
+                "descricao": "A fera está dormindo.",
+                "tempo_texto": "⏰ Todo dia às 12h e 20h",
+                "cor": "#475569", # Cinza escuro
+                "botao_texto": "DORMINDO",
+                "funcao_click": "exibirAlertaCustom('Aviso', 'O World Boss está dormindo agora. Ele surge às 12h e 20h.', false)",
+                "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
             })
 
         return jsonify(eventos)
