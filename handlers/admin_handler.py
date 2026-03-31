@@ -1209,7 +1209,6 @@ all_admin_handlers = [
     grant_skin_conv_handler,
     player_management_conv_handler,
     account_lock_conv_handler,
-    account_lock_conv_handler,
     admin_help_handler,
     delete_player_conv_handler,
     hard_respec_all_handler,
