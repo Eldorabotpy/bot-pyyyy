@@ -732,6 +732,30 @@ test_event_conv_handler = ConversationHandler(
     per_message=False
 )
 
+async def ligar_evento_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_admin(update): 
+        return
+        
+    if event_manager is None:
+        await update.message.reply_text("⚠️ Erro: Motor do evento não encontrado.")
+        return
+
+    # 1. Liga o evento no motor Python
+    result = await event_manager.start_event()
+    msg = result.get("success") or result.get("error") or "Erro desconhecido"
+    
+    # 2. Avisa o MongoDB para o site enxergar e mudar o botão para vermelho!
+    try:
+        users_collection.database["server_state"].update_one(
+            {"_id": "eventos_ativos"},
+            {"$set": {"defesa_reino": True}},
+            upsert=True
+        )
+    except Exception as e:
+        await update.message.reply_text(f"Erro ao avisar o BD: {e}")
+        
+    await update.message.reply_text(f"🏰 <b>Status do Evento:</b> {msg}\n\nO WebApp já pode ser atualizado!", parse_mode=HTML)
+    
 # --- Delete Player ---
 async def _delete_entry_point(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not await ensure_admin(update): 
@@ -1154,7 +1178,7 @@ admin_force_end_handler = CallbackQueryHandler(_handle_force_end_event, pattern=
 admin_force_ticket_handler = CallbackQueryHandler(_handle_force_ticket, pattern="^admin_event_force_ticket$")
 admin_force_ticket_job_handler = CallbackQueryHandler(_handle_force_ticket_job, pattern="^admin_force_ticket_job$")
 admin_help_handler = CallbackQueryHandler(_handle_admin_help, pattern="^admin_help$")
-
+ligar_evento_handler = CommandHandler("ligar_evento", ligar_evento_command, filters=filters.User(ADMIN_LIST))
 all_admin_handlers = [
     admin_command_handler,
     delete_player_handler,
@@ -1195,5 +1219,6 @@ all_admin_handlers = [
     fix_clan_conv_handler,
     debug_skill_handler,
     clean_market_handler,
-    fix_premium_handler
+    fix_premium_handler,
+    ligar_evento_handler,
 ]
