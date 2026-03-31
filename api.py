@@ -924,7 +924,6 @@ def api_eventos_ativos(user_id):
         ticket_item = inventario.get("ticket_defesa_reino", 0)
         tickets_defesa = ticket_item.get("quantity", 0) if isinstance(ticket_item, dict) else ticket_item
         
-        # Proteção contra crash de Fuso Horário
         try:
             from zoneinfo import ZoneInfo
             from config import JOB_TIMEZONE
@@ -944,60 +943,58 @@ def api_eventos_ativos(user_id):
         is_boss_active = getattr(world_boss_manager, "is_active", False) if world_boss_manager else False
 
         # ==========================================
-        # 1. DEFESA DO REINO
-        # (Aparece se estiver no Reino. Se ativo = Laranja, Inativo = Cinza)
+        # 1. DEFESA DO REINO (REESCRITO: SEMPRE VISÍVEL)
         # ==========================================
-        if local_atual == "reino_eldora":
-            if is_defense_active:
+        if is_defense_active:
+            # Se o jogador ESTÁ no reino, mostra botões de ação
+            if local_atual == "reino_eldora":
                 if not pegou_tickets_hoje:
-                    btn_texto = "COLETAR ENTRADAS 🎟️"
-                    btn_acao = "coletarTicketsEvento()"
+                    btn_texto, btn_acao = "COLETAR ENTRADAS 🎟️", "coletarTicketsEvento()"
                     btn_estilo = "background: linear-gradient(180deg, #d35400 0%, #a84200 100%); border-color: #f39c12;"
                 elif tickets_defesa > 0:
-                    btn_texto = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️"
-                    btn_acao = "mudarAba('reino')"
+                    btn_texto, btn_acao = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️", "mudarAba('reino')"
                     btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #ef4444;"
                 else:
-                    btn_texto = "SEM TICKETS ❌"
-                    btn_acao = "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
+                    btn_texto, btn_acao = "SEM TICKETS ❌", "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
                     btn_estilo = "background: #334155; border-color: #1e293b; color: #94a3b8; cursor: not-allowed;"
-
-                eventos.append({
-                    "id": "defesa_reino",
-                    "nome": "🛡️ Defesa do Reino",
-                    "descricao": "Invasão nos portões!",
-                    "tempo_texto": "🔥 Aberto Agora!",
-                    "cor": "#f59e0b", # Dourado
-                    "botao_texto": btn_texto,
-                    "funcao_click": btn_acao,
-                    "btn_estilo": btn_estilo
-                })
             else:
-                # MODO INATIVO: Mostra os horários
-                eventos.append({
-                    "id": "defesa_reino",
-                    "nome": "🛡️ Defesa do Reino",
-                    "descricao": "Os portões estão seguros.",
-                    "tempo_texto": "⏰ 09h, 12h, 18h10 e 22h", # <--- AQUI!
-                    "cor": "#475569", # Cinza escuro
-                    "botao_texto": "AGUARDANDO",
-                    "funcao_click": "exibirAlertaCustom('Aviso', 'A Invasão ainda não começou! Volte nos horários marcados.', false)",
-                    "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
-                })
+                # Se o jogador ESTÁ LONGE, manda ele viajar
+                btn_texto, btn_acao = "VIAJAR AO REINO 🏰", "mudarAba('reino')"
+                btn_estilo = "background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); border-color: #3b82f6;"
+
+            eventos.append({
+                "id": "defesa_reino",
+                "nome": "🛡️ Defesa do Reino",
+                "descricao": "Invasão nos portões!",
+                "tempo_texto": "🔥 Aberto Agora!",
+                "cor": "#f59e0b",
+                "botao_texto": btn_texto,
+                "funcao_click": btn_acao,
+                "btn_estilo": btn_estilo
+            })
+        else:
+            # MODO INATIVO: Mostra os horários reais do config.py
+            eventos.append({
+                "id": "defesa_reino",
+                "nome": "🛡️ Defesa do Reino",
+                "descricao": "Os portões estão seguros.",
+                "tempo_texto": "⏰ 09h, 12h, 18h10 e 22h", # Horários do config.py
+                "cor": "#475569",
+                "botao_texto": "AGUARDANDO",
+                "funcao_click": "exibirAlertaCustom('Aviso', 'A Invasão ainda não começou! Volte às 09h, 12h, 18h10 ou 22h.', false)",
+                "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
+            })
 
         # ==========================================
-        # 2. WORLD BOSS
-        # (Mostra em qualquer lugar do mapa)
+        # 2. WORLD BOSS (SEMPRE VISÍVEL)
         # ==========================================
         if is_boss_active:
             local_boss = getattr(world_boss_manager, "current_location", "desconhecido")
             if local_atual == local_boss:
-                btn_texto = "ATACAR BOSS ⚔️"
-                btn_acao = f"mudarAba('{local_boss}')"
+                btn_texto, btn_acao = "ATACAR BOSS ⚔️", f"mudarAba('{local_boss}')"
                 btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #8b5cf6;"
             else:
-                btn_texto = "VIAJAR ATÉ LÁ 🗺️"
-                btn_acao = "mudarAba('mapa')"
+                btn_texto, btn_acao = "VIAJAR ATÉ LÁ 🗺️", "mudarAba('mapa')"
                 btn_estilo = "background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); border-color: #3b82f6;"
 
             eventos.append({
@@ -1005,21 +1002,20 @@ def api_eventos_ativos(user_id):
                 "nome": "👹 World Boss",
                 "descricao": "O monstro despertou!",
                 "tempo_texto": "🔥 O bicho tá solto!",
-                "cor": "#8b5cf6", # Roxo
+                "cor": "#8b5cf6",
                 "botao_texto": btn_texto,
                 "funcao_click": btn_acao,
                 "btn_estilo": btn_estilo
             })
         else:
-            # MODO INATIVO: Mostra os horários
             eventos.append({
                 "id": "world_boss",
                 "nome": "👹 World Boss",
                 "descricao": "A fera está dormindo.",
-                "tempo_texto": "⏰ 08h, 14h, 19h e 23h", # <--- AQUI TAMBÉM!
-                "cor": "#475569", # Cinza escuro
+                "tempo_texto": "⏰ 08h, 14h, 19h e 23h", # Horários do config.py
+                "cor": "#475569",
                 "botao_texto": "DORMINDO",
-                "funcao_click": "exibirAlertaCustom('Aviso', 'O World Boss surge às 08h, 14h, 19h e 23h.', false)",
+                "funcao_click": "exibirAlertaCustom('Aviso', 'O World Boss desperta às 08h, 14h, 19h e 23h.', false)",
                 "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
             })
 
