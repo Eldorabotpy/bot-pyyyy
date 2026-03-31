@@ -978,7 +978,7 @@ def api_eventos_ativos(user_id):
                     "id": "defesa_reino",
                     "nome": "🛡️ Defesa do Reino",
                     "descricao": "Os portões estão seguros.",
-                    "tempo_texto": "⏰ Todo dia às 15h e 21h",
+                    "tempo_texto": "⏰ 09h, 12h, 18h10 e 22h", # <--- AQUI!
                     "cor": "#475569", # Cinza escuro
                     "botao_texto": "AGUARDANDO",
                     "funcao_click": "exibirAlertaCustom('Aviso', 'A Invasão ainda não começou! Volte nos horários marcados.', false)",
@@ -1016,10 +1016,10 @@ def api_eventos_ativos(user_id):
                 "id": "world_boss",
                 "nome": "👹 World Boss",
                 "descricao": "A fera está dormindo.",
-                "tempo_texto": "⏰ Todo dia às 12h e 20h",
+                "tempo_texto": "⏰ 08h, 14h, 19h e 23h", # <--- AQUI TAMBÉM!
                 "cor": "#475569", # Cinza escuro
                 "botao_texto": "DORMINDO",
-                "funcao_click": "exibirAlertaCustom('Aviso', 'O World Boss está dormindo agora. Ele surge às 12h e 20h.', false)",
+                "funcao_click": "exibirAlertaCustom('Aviso', 'O World Boss surge às 08h, 14h, 19h e 23h.', false)",
                 "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
             })
 
