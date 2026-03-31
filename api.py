@@ -969,7 +969,7 @@ def api_eventos_ativos(user_id):
             if is_defense_active:
                 if local_atual == "reino_eldora":
                     if tickets_defesa > 0:
-                        btn_texto, btn_acao = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️", "mudarAba('reino')"
+                        btn_texto, btn_acao = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️", "abrirArenaDefesa()"
                         btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #ef4444;"
                     else:
                         btn_texto, btn_acao = "SEM TICKETS ❌", "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"

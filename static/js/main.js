@@ -142,16 +142,23 @@ async function carregarInicio() {
 }
 
 // ==========================================
-// FUNÇÃO: CARREGAR ARENA DA DEFESA DO REINO
+// FUNÇÃO EXCLUSIVA DA ARENA DE DEFESA
 // ==========================================
-async function carregarReino() {
-    const conteudo = document.getElementById('aba-reino');
+async function abrirArenaDefesa() {
     const charId = localStorage.getItem("jogadorEldoraID");
-
     if (!charId) return;
 
+    // Força o site a mudar visualmente para a aba do reino 
+    // (para não sobrepor a tela inicial)
+    document.querySelectorAll('.tab-content').forEach(aba => aba.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`aba-reino`).classList.add('active');
+    document.getElementById(`btn-reino`).classList.add('active');
+
+    const conteudo = document.getElementById('aba-reino');
+
     // Tela de loading imersiva
-    conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 40px; font-size: 1.1em;">Viajando para os portões do Reino de Eldora... 🏰⏳</p>';
+    conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 40px; font-size: 1.1em;">Viajando para os portões da Arena... 🏰⏳</p>';
 
     try {
         const res = await fetch('/api/defesa_reino/iniciar', {
@@ -162,13 +169,13 @@ async function carregarReino() {
 
         const dados = await res.json();
 
-        // Se deu erro (sem ticket, evento fechado)
+        // Se der erro de ticket ou evento fechado
         if (dados.erro) {
             conteudo.innerHTML = `
             <div style="text-align: center; padding: 50px 20px;">
                 <h3 style="color: #ef4444; font-size: 1.5em; margin-bottom: 10px;">🛡️ Portões Fechados</h3>
                 <p style="color: #94a3b8; font-size: 1.1em;">${dados.erro}</p>
-                <button onclick="mudarAba('home')" style="margin-top: 20px; padding: 12px 25px; background: #334155; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s;">Voltar para o Início</button>
+                <button onclick="carregarReino()" style="margin-top: 20px; padding: 12px 25px; background: #334155; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s;">Voltar para o Centro do Reino</button>
             </div>`;
             return;
         }
