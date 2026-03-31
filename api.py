@@ -14,6 +14,9 @@ app = Flask(__name__)
 CORS(app) 
 from modules.webapp_api import webapp_bp
 app.register_blueprint(webapp_bp)
+# Registra as rotas da Defesa do Reino separadamente
+from kingdom_defense.routes_api import kd_api_bp
+app.register_blueprint(kd_api_bp)
 
 def _run_async(coro):
     """Ferramenta que força funções do Telegram a rodarem com segurança no Flask"""
