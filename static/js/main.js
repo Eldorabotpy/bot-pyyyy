@@ -134,6 +134,39 @@ let html = `
     }
 }
 
+// ==========================================
+// FUNÇÃO PARA COLETAR TICKETS DE EVENTOS
+// ==========================================
+async function coletarTicketsEvento() {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    
+    // Mostra um alertinha de carregamento (opcional, mas legal)
+    exibirAlertaCustom("Aguarde...", "Canalizando energia dos deuses de Eldora... ⏳", false);
+
+    try {
+        const res = await fetch('/api/coletar_entradas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId })
+        });
+        
+        const dados = await res.json();
+
+        if (dados.sucesso) {
+            // Mostra o que ele ganhou!
+            exibirAlertaCustom("Sucesso!", dados.mensagem, true);
+            
+            // 🔥 O PULO DO GATO: Recarrega a tela de Início para o botão 
+            // mudar automaticamente de "COLETAR" para "ENTRAR"!
+            carregarInicio(); 
+        } else {
+            exibirAlertaCustom("Aviso", dados.erro, false);
+        }
+    } catch(e) {
+        exibirAlertaCustom("Erro", "A conexão com os deuses falhou.", false);
+    }
+}
+
 function sairDoJogo() {
     if(confirm("Tem certeza que deseja fechar o grimório e trocar de personagem?")) {
         localStorage.removeItem("jogadorEldoraID");

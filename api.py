@@ -897,6 +897,150 @@ def api_equipar_item():
         return jsonify({"erro": msg}), 400
     except Exception as e: return jsonify({"erro": str(e)}), 500
 
+# ==========================================
+# ROTAS DE EVENTOS E TICKETS (WEB APP)
+# ==========================================
+try:
+    from kingdom_defense.engine import event_manager
+except ImportError:
+    event_manager = None
+
+from modules.world_boss.engine import world_boss_manager
+from config import JOB_TIMEZONE
+from zoneinfo import ZoneInfo
+
+@app.route('/api/eventos_ativos/<user_id>', methods=['GET'])
+def api_eventos_ativos(user_id):
+    try:
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        
+        if not pdata:
+            return jsonify([])
+
+        local_atual = pdata.get("current_location", "reino_eldora")
+        inventario = pdata.get("inventory", {})
+        
+        # Garante que lê a quantidade de tickets independente de ser Dict ou Int
+        ticket_item = inventario.get("ticket_defesa_reino", 0)
+        tickets_defesa = ticket_item.get("quantity", 0) if isinstance(ticket_item, dict) else ticket_item
+        
+        tz = ZoneInfo(JOB_TIMEZONE)
+        today = datetime.now(tz).date().isoformat()
+        
+        daily_claims = pdata.get("daily_claims", {})
+        last_claim = str(daily_claims.get("daily_event_entries_claim_date") or pdata.get("daily_event_entries_claim_date") or "")
+        pegou_tickets_hoje = (last_claim == today)
+
+        eventos = []
+
+        # 1. Defesa do Reino
+        is_defense_active = getattr(event_manager, "is_active", False) if event_manager else False
+        if local_atual == "reino_eldora" and is_defense_active:
+            if not pegou_tickets_hoje:
+                btn_texto = "COLETAR ENTRADAS 🎟️"
+                btn_acao = "coletarTicketsEvento()"
+                btn_estilo = "background: linear-gradient(180deg, #d35400 0%, #a84200 100%); border-color: #f39c12;"
+            elif tickets_defesa > 0:
+                btn_texto = f"ENTRAR ({tickets_defesa} 🎟️) ⚔️"
+                btn_acao = "mudarAba('reino')"
+                btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #ef4444;"
+            else:
+                btn_texto = "SEM TICKETS ❌"
+                btn_acao = "exibirAlertaCustom('Aviso', 'Você já gastou todas as suas entradas hoje!', false)"
+                btn_estilo = "background: #334155; border-color: #1e293b; color: #94a3b8; cursor: not-allowed;"
+
+            eventos.append({
+                "id": "defesa_reino",
+                "nome": "🛡️ Defesa do Reino",
+                "descricao": "Invasão nos portões!",
+                "cor": "#f59e0b",
+                "botao_texto": btn_texto,
+                "funcao_click": btn_acao,
+                "btn_estilo": btn_estilo
+            })
+
+        # 2. World Boss
+        if world_boss_manager and world_boss_manager.is_active:
+            local_boss = getattr(world_boss_manager, "current_location", "desconhecido")
+            if local_atual == local_boss:
+                btn_texto = "ATACAR BOSS ⚔️"
+                btn_acao = f"mudarAba('{local_boss}')"
+                btn_estilo = "background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-color: #8b5cf6;"
+            else:
+                btn_texto = "VIAJAR ATÉ LÁ 🗺️"
+                btn_acao = "mudarAba('mapa')"
+                btn_estilo = "background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); border-color: #3b82f6;"
+
+            eventos.append({
+                "id": "world_boss",
+                "nome": "👹 World Boss",
+                "descricao": "O monstro despertou!",
+                "cor": "#8b5cf6",
+                "botao_texto": btn_texto,
+                "funcao_click": btn_acao,
+                "btn_estilo": btn_estilo
+            })
+
+        return jsonify(eventos)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify([])
+
+@app.route('/api/coletar_entradas', methods=['POST'])
+def api_coletar_entradas():
+    try:
+        dados = request.json
+        user_id = dados.get("user_id")
+        
+        if not user_id:
+            return jsonify({"erro": "Sessão inválida"}), 400
+            
+        busca_id = ObjectId(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        if not pdata:
+            return jsonify({"erro": "Jogador não encontrado"}), 404
+
+        tz = ZoneInfo(JOB_TIMEZONE)
+        today = datetime.now(tz).date().isoformat()
+
+        daily_claims = pdata.get("daily_claims", {})
+        last_claim = str(daily_claims.get("daily_event_entries_claim_date") or pdata.get("daily_event_entries_claim_date") or "")
+
+        if last_claim == today:
+            return jsonify({"erro": "Você já reivindicou as entradas de hoje. Volte amanhã!"}), 400
+
+        # Adiciona os itens diretamente
+        DAILY_REWARDS = {"ticket_defesa_reino": 4, "ticket_arena": 10, "cristal_de_abertura": 4}
+        if "inventory" not in pdata: pdata["inventory"] = {}
+        
+        for item_id, qty in DAILY_REWARDS.items():
+            if item_id not in pdata["inventory"]: pdata["inventory"][item_id] = 0
+            if isinstance(pdata["inventory"][item_id], dict):
+                pdata["inventory"][item_id]["quantity"] = pdata["inventory"][item_id].get("quantity", 0) + qty
+            else:
+                pdata["inventory"][item_id] += qty
+
+        # Salva a trava dupla para não dar erro no job
+        if "daily_claims" not in pdata: pdata["daily_claims"] = {}
+        pdata["daily_claims"]["daily_event_entries_claim_date"] = today
+        pdata["daily_event_entries_claim_date"] = today
+
+        _run_async(player_manager.save_player_data(busca_id, pdata))
+        
+        return jsonify({
+            "sucesso": True, 
+            "mensagem": f"🎟️ Entradas Reivindicadas!\n\n🛡️ Defesa: +4\n⚔️ Arena: +10\n🔹 Cristais: +4"
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+
+    
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
