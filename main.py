@@ -1576,7 +1576,8 @@ def run_bot():
             application.run_polling(
                 drop_pending_updates=True,
                 close_loop=False,
-                bootstrap_retries=5
+                bootstrap_retries=5,
+                stop_signals=None
             )
 
             # Se terminou normalmente, não reinicia.
