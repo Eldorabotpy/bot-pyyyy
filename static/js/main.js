@@ -14,7 +14,7 @@ function mudarAba(nomeDaAba) {
 }
 
 async function carregarInicio() {
-    const conteudo = document.getElementById('aba-home'); 
+    const conteudo = document.getElementById('aba-inicio'); 
     const charId = localStorage.getItem("jogadorEldoraID");
 
     if (!charId) {
@@ -30,7 +30,7 @@ async function carregarInicio() {
     conteudo.innerHTML = '<p style="text-align: center; color: #888; padding: 30px;">Sincronizando com os deuses de Eldora... ⏳</p>';
 
     try {
-        const resposta = await fetch(`/api/personagem/${charId}`);
+        const resposta = await fetch(`/perfil/${charId}?t=${new Date().getTime()}`);
         const p = await resposta.json();
 
         if (p.erro) {
@@ -118,20 +118,21 @@ async function carregarInicio() {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
                 <div style="background: #020617; padding: 10px; border-radius: 8px; border-left: 3px solid #ef4444; position: relative; overflow: hidden;">
                     <span style="color: #64748b; font-size: 0.75em; font-weight: bold; text-transform: uppercase;">Vida</span><br>
-                    <strong style="color: #fca5a5; font-size: 1.1em; text-shadow: 0 0 8px rgba(239,68,68,0.3);">${p.hp} <span style="font-size: 0.8em; color: #7f1d1d;">/ ${p.max_hp}</span></strong>
+                    <strong style="color: #fca5a5; font-size: 1.1em; text-shadow: 0 0 8px rgba(239,68,68,0.3);">${p.hp_atual} <span style="font-size: 0.8em; color: #7f1d1d;">/ ${p.hp_max}</span></strong>
                 </div>
                 <div style="background: #020617; padding: 10px; border-radius: 8px; border-left: 3px solid #3b82f6; position: relative; overflow: hidden;">
                     <span style="color: #64748b; font-size: 0.75em; font-weight: bold; text-transform: uppercase;">Mana</span><br>
-                    <strong style="color: #93c5fd; font-size: 1.1em; text-shadow: 0 0 8px rgba(59,130,246,0.3);">${p.mp} <span style="font-size: 0.8em; color: #1e3a8a;">/ ${p.max_mp}</span></strong>
+                    <strong style="color: #93c5fd; font-size: 1.1em; text-shadow: 0 0 8px rgba(59,130,246,0.3);">${p.mp_atual} <span style="font-size: 0.8em; color: #1e3a8a;">/ ${p.mp_max}</span></strong>
                 </div>
             </div>
 
             <div style="display: flex; justify-content: space-around; background: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b;">
-                <span style="color: #f1c40f; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">💰 ${p.ouro.toLocaleString('pt-BR')}</span>
+                <span style="color: #f1c40f; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">💰 ${(p.gold || 0).toLocaleString('pt-BR')}</span>
                 <span style="width: 1px; background: #334155;"></span>
-                <span style="color: #38bdf8; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">💎 ${p.diamantes.toLocaleString('pt-BR')}</span>
+                <span style="color: #38bdf8; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 5px;">
+                    💎 ${(p.gems || 0).toLocaleString('pt-BR')}
+                </span>
             </div>
-        </div>
         `;
         
         conteudo.innerHTML = html;
@@ -266,12 +267,62 @@ async function coletarTicketsEvento() {
     }
 }
 
+window.exibirAlertaCustom = function(mensagem, tipo = 'info') {
+    const alertaAntigo = document.getElementById('eldora-alerta-bg');
+    if (alertaAntigo) alertaAntigo.remove();
+
+    let corDestaque = '#3b82f6'; let icone = '📜'; let tituloTexto = 'MENSAGEM DO REINO';
+    if (tipo === 'erro') { corDestaque = '#ef4444'; icone = '❌'; tituloTexto = 'ALERTA CRÍTICO'; }
+    else if (tipo === 'sucesso') { corDestaque = '#2ecc71'; icone = '✨'; tituloTexto = 'VITÓRIA'; }
+    else if (tipo === 'aviso') { corDestaque = '#f59e0b'; icone = '⚠️'; tituloTexto = 'ATENÇÃO'; }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'eldora-alerta-bg';
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 99999; opacity: 0; transition: opacity 0.3s ease;`;
+
+    const caixa = document.createElement('div');
+    caixa.style.cssText = `background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border: 2px solid ${corDestaque}; border-radius: 12px; padding: 25px 35px; text-align: center; min-width: 320px; max-width: 80%; box-shadow: 0 15px 35px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5); transform: scale(0.7) translateY(20px); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); font-family: 'Cinzel', serif; color: #f8fafc;`;
+
+    caixa.innerHTML = `<h3 style="margin: 0 0 15px 0; color: ${corDestaque}; font-size: 1.3em; text-shadow: 0 2px 4px #000; letter-spacing: 1px;">${icone} ${tituloTexto}</h3><p style="margin: 0 0 25px 0; font-size: 1em; line-height: 1.6; color: #e2e8f0; font-family: Arial, sans-serif;">${mensagem}</p>`;
+
+    const btn = document.createElement('button');
+    btn.innerText = 'ENTENDIDO';
+    btn.style.cssText = `background: #020617; border: 1px solid ${corDestaque}; color: #fff; padding: 10px 25px; font-family: 'Cinzel', serif; font-weight: 900; letter-spacing: 1px; border-radius: 6px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.4);`;
+    btn.onmouseover = () => { btn.style.background = corDestaque; btn.style.transform = 'scale(1.05)'; };
+    btn.onmouseout = () => { btn.style.background = '#020617'; btn.style.transform = 'scale(1)'; };
+    btn.onclick = () => { overlay.style.opacity = '0'; caixa.style.transform = 'scale(0.7) translateY(20px)'; setTimeout(() => overlay.remove(), 300); };
+
+    caixa.appendChild(btn); overlay.appendChild(caixa); document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; caixa.style.transform = 'scale(1) translateY(0)'; });
+};
+
+// ==========================================
+// SAÍDA DO JOGO (MODAL ÉPICO)
+// ==========================================
 function sairDoJogo() {
-    if(confirm("Tem certeza que deseja fechar o grimório e trocar de personagem?")) {
-        localStorage.removeItem("jogadorEldoraID");
-        localStorage.removeItem("jogadorEldoraNome");
-        window.location.href = "/login";
+    let modalSair = document.getElementById('modal-sair-jogo');
+    if (!modalSair) {
+        const html = `
+            <div id="modal-sair-jogo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:20000; justify-content:center; align-items:center; backdrop-filter: blur(4px);">
+                <div style="background: linear-gradient(135deg, #1a120b, #0a0704); width: 85%; max-width: 320px; border-radius: 12px; border: 2px solid #c0392b; padding: 25px 20px; text-align: center; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.9);">
+                    <div style="font-size: 3.5em; margin-bottom: 10px; text-shadow: 0 0 15px rgba(231, 76, 60, 0.6);">🚪</div>
+                    <h3 style="margin: 0 0 10px 0; color: #e74c3c; font-size: 1.4em; font-family: 'Cinzel', serif; text-transform: uppercase;">Abandonar o Reino?</h3>
+                    <p style="color: #b0a084; font-size: 0.95em; margin-bottom: 25px; line-height: 1.4;">Tem certeza que deseja fechar o seu grimório e retornar ao portal das almas para trocar de personagem?</p>
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button onclick="confirmarSaida()" style="flex: 1; padding: 12px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); color: white; border: 1px solid #e74c3c; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; box-shadow: 0 4px 6px rgba(0,0,0,0.5); text-transform: uppercase;">Partir</button>
+                        <button onclick="document.getElementById('modal-sair-jogo').style.display='none'" style="flex: 1; padding: 12px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); color: white; border: 1px solid #475569; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; box-shadow: 0 4px 6px rgba(0,0,0,0.5); text-transform: uppercase;">Ficar</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+        modalSair = document.getElementById('modal-sair-jogo');
     }
+    modalSair.style.display = 'flex';
 }
 
-carregarInicio();
+window.confirmarSaida = function() {
+    localStorage.removeItem("jogadorEldoraID");
+    localStorage.removeItem("jogadorEldoraNome");
+    window.location.href = "/login";
+};
+

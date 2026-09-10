@@ -1,0 +1,334 @@
+/* --- TELA DE PERFIL MODERNA - MUNDO DE ELDORA --- */
+
+.modal-moderno {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px); /* Efeito de desfoque de fundo profissional */
+    z-index: 10000;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    animation: fadeInModal 0.3s ease-out;
+}
+
+.perfil-container-moderno {
+    background: linear-gradient(145deg, #0f172a, #1e293b);
+    border: 2px solid rgba(78, 78, 239, 0.4);
+    border-radius: 16px;
+    width: 80%;
+    max-width: 320px;
+    max-height: 75vh;
+    overflow-y: auto;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(78, 78, 239, 0.1);
+    position: relative;
+    color: #f8fafc;
+    font-family: 'Cinzel', serif;
+}
+
+/* Cabeçalho do Perfil */
+.perfil-header {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: sticky;
+    top: 0;
+    background: inherit;
+    z-index: 10;
+}
+
+.perfil-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+    letter-spacing: 2px;
+}
+
+/* Secções de Escolha */
+.secao-cosmetico {
+    padding: 12px 15px; /* 👈 Antes era 20px. Isso tira o espaço vazio em excesso */
+}
+
+.secao-cosmetico label {
+    display: block;
+    margin-bottom: 15px;
+    font-size: 13px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Grid de Avatares */
+.grid-selecao {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.card-opcao {
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.card-opcao img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    margin-bottom: 8px;
+    filter: grayscale(0.4);
+    transition: 0.3s;
+}
+
+.card-opcao span {
+    font-size: 9px;
+    display: block;
+    color: #cbd5e1;
+}
+
+/* Estado Selecionado (Ouro) */
+.card-opcao.selecionado {
+    background: rgba(255, 215, 0, 0.05);
+    border-color: #ffd700;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+    transform: translateY(-5px);
+}
+
+.card-opcao.selecionado img {
+    filter: grayscale(0);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+/* Banners (Gradientes Modernos) */
+.card-opcao-banner {
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: 0.3s;
+    font-size: 10px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.card-opcao-banner.selecionado {
+    border-color: #fff;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+    transform: scale(1.02);
+}
+
+/* Botão de Ação */
+.btn-salvar-moderno {
+    width: 100%;
+    padding: 18px;
+    background: linear-gradient(to bottom, #ffd700, #b8860b);
+    border: none;
+    color: #000;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: 0.3s;
+    border-radius: 0 0 18px 18px;
+}
+
+.btn-salvar-moderno:hover {
+    filter: brightness(1.2);
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================
+   MODAL DE DETALHES DE ITENS (GLASSMORPHISM)
+   ========================================== */
+
+/* O fundo com efeito de vidro temperado */
+.item-modal-glass {
+    background: rgba(15, 23, 42, 0.85); /* Fundo escuro azulado/ardósia */
+    backdrop-filter: blur(10px); /* O efeito de desfoque (vidro) */
+    -webkit-backdrop-filter: blur(10px);
+    width: 90%;
+    max-width: 320px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    animation: modalAparecer 0.3s ease-out;
+}
+
+@keyframes modalAparecer {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Cabeçalho que recebe o brilho da cor da raridade */
+.item-glow-header {
+    padding: 25px 20px 15px;
+    text-align: center;
+    position: relative;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.item-glow-header h3 {
+    margin: 10px 0 5px 0;
+    font-family: 'Cinzel', serif;
+    font-size: 1.2em;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
+    text-transform: uppercase;
+}
+
+/* Botão de Fechar 'X' */
+.btn-close-item {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 2em;
+    cursor: pointer;
+    line-height: 0.5;
+    transition: color 0.2s;
+}
+
+.btn-close-item:hover {
+    color: #f8fafc;
+}
+
+/* Moldura do Ícone do Item */
+.item-icon-frame {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid; /* A cor é injetada via JS pela raridade */
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.item-icon-frame img {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+}
+
+/* Tag de Raridade */
+.rarity-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.7em;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 5px;
+}
+
+/* Container dos Atributos */
+.item-stats-container {
+    padding: 15px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Linha individual de cada atributo */
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85em;
+    color: #cbd5e1;
+    border-left: 2px solid #475569;
+}
+
+.stat-value {
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+/* Texto de Descrição (Lore) */
+.item-description {
+    padding: 0 20px 15px;
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.8em;
+    font-style: italic;
+    text-align: center;
+    line-height: 1.5;
+}
+
+/* Rodapé com os Botões de Ação */
+.item-actions-footer {
+    padding: 15px 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    gap: 10px;
+}
+
+/* Estilos Genéricos de Botão no Modal */
+.item-actions-footer button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-family: 'Cinzel', serif;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    font-size: 0.9em;
+    color: white;
+}
+
+.item-actions-footer button:active {
+    transform: scale(0.95);
+}
+
+/* Cores Específicas dos Botões */
+.btn-action-primary {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    border-color: #3b82f6;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+}
+
+.btn-action-danger {
+    background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
+    border-color: #ef4444;
+    box-shadow: 0 4px 10px rgba(220, 38, 38, 0.3);
+}
+
+.btn-action-hp {
+    background: linear-gradient(180deg, #e11d48 0%, #be123c 100%);
+    border-color: #f43f5e;
+}
+
+.btn-action-mp {
+    background: linear-gradient(180deg, #0ea5e9 0%, #0369a1 100%);
+    border-color: #38bdf8;
+}
+

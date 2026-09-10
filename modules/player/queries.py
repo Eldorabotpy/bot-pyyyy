@@ -165,10 +165,18 @@ async def create_new_player(user_id: Union[str, ObjectId], character_name: str =
 
         "stats": {"hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5, "mana": 50},
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
-        
-        # 🎯 CORREÇÃO: Estruturas que quebram o perfil se não existirem
+        "party_id": None, # ID do grupo atual (se houver)
+        "party_role": None, # 'leader' ou 'member'
         "inventory": {}, 
         "equipment": {}, 
+        "quests": {
+            # 👇 A nova missão que aponta o caminho!
+            "q0_boas_vindas": {
+                "status": "notificada",
+                "titulo": "O Decreto do Despertar",
+                "desc": "Bem-vindo a Eldora! Apresente-se ao Capitão Varek na capital para receber suas ordens."
+            }
+        },    
         "equipped_items": {}, 
         "skills": [], 
         "equipped_skills": [], 

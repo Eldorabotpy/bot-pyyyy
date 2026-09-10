@@ -6,17 +6,17 @@ REFINING_RECIPES = {
     # ======================
     #
     "ref_couro_curtido_rapido": {
-        "display_name": "🐑🐾 Curtição de Couro (Rápida)",
+        "display_name": " Curtição de Couro (Rápida)",
         "profession": ["curtidor", "ferreiro", "armeiro",],
         "level_req": 1,
-        "time_seconds": 6 * 60,
+        "time_seconds": 1 * 60,
         "inputs": {"couro_de_lobo": 2},
         "outputs": {"couro_curtido": 1},
         "xp_gain": 5
     },
 
     "ref_couro_reforcado": {
-        "display_name": "🐺🔥 Curtimento de Couro Reforçado",
+        "display_name": " Curtimento de Couro Reforçado",
         "profession": ["curtidor"],
         "level_req": 5,
         "time_seconds": 15 * 60,
@@ -25,7 +25,7 @@ REFINING_RECIPES = {
         "xp_gain": 20
     },
     "ref_pele_troll_tratada": {
-        "display_name": "👹🐊 Tratamento de Pele de Troll",
+        "display_name": " Tratamento de Pele de Troll",
         "profession": ["curtidor"],
         "level_req": 10,
         "time_seconds": 30 * 60,
@@ -34,7 +34,7 @@ REFINING_RECIPES = {
         "xp_gain": 50
     },
     "ref_membrana_fina": {
-        "display_name": "🦇 Secagem de Asa de Morcego",
+        "display_name": "Secagem de Asa de Morcego",
         "profession": ["curtidor"],
         "level_req": 8,
         "time_seconds": 10 * 60,
@@ -44,7 +44,7 @@ REFINING_RECIPES = {
     },
     
     "ref_afiar_presas": {
-        "display_name": "🦷 Afiação de Presas",
+        "display_name": "Afiação de Presas",
         "profession": ["curtidor"],
         "level_req": 5,
         "time_seconds": 8 * 60, # 8 minutos
@@ -54,7 +54,7 @@ REFINING_RECIPES = {
     },
 
     "ref_dente_superior": {
-        "display_name": "🦷✨ Polimento de Dente Superior",
+        "display_name": " Polimento de Dente Superior",
         "profession": ["curtidor"],
         "level_req": 18,
         "time_seconds": 20 * 60, # 20 minutos
@@ -67,7 +67,7 @@ REFINING_RECIPES = {
     # Joalheria / Lapidação
     # ======================
     "ref_gema_polida": {
-        "display_name": "🔷 Gema Polida",
+        "display_name": " Gema Polida",
         "profession": ["joalheiro", ],
         "level_req": 10,
         "time_seconds": 25 * 60,
@@ -75,17 +75,8 @@ REFINING_RECIPES = {
         "outputs": {"gema_polida": 1},
         "xp_gain": 40 
     },
-    "ref_gema_lapidada": {
-        "display_name": "💎⚒️ Lapidação de Gema",
-        "profession": ["joalheiro", ],
-        "level_req": 15,
-        "time_seconds": 25 * 60,
-        "inputs": {"gema_bruta": 1, "fragmento_gargula": 3},
-        "outputs": {"gema_lapidada_comum": 1},
-        "xp_gain": 40
-    },
     "ref_ponta_afiada": {
-        "display_name": "🐗🦷 Polimento de Presa",
+        "display_name": " Polimento de Presa",
         "profession": ["joalheiro", ],
         "level_req": 5,
         "time_seconds": 8 * 60,
@@ -94,7 +85,7 @@ REFINING_RECIPES = {
         "xp_gain": 8
     },
     "ref_lente_petrificante": {
-        "display_name": "👁️🐍 Cristalização de Olho de Basilisco",
+        "display_name": " Cristalização de Olho de Basilisco",
         "profession": ["joalheiro", ],
         "level_req": 25,
         "time_seconds": 60 * 60,  # 1h
@@ -107,7 +98,7 @@ REFINING_RECIPES = {
     # Metalurgia / Mineralogia
     # ======================
     "ref_bronze": {
-        "display_name": "🟤〰️ Liga de Bronze",
+        "display_name": "Liga de Bronze",
         "profession": ["fundidor", "ferreiro", "armeiro"],
         "level_req": 1,
         "time_seconds": 8 * 60,
@@ -116,7 +107,7 @@ REFINING_RECIPES = {
         "xp_gain": 3
     },
     "ref_placa_de_pedra": {
-        "display_name": "🪨 Polimento de Carapaça",
+        "display_name": "Polimento de Carapaça",
         "profession": ["fundidor", "ferreiro", "armeiro", ],
         "level_req": 18,
         "time_seconds": 22 * 60,
@@ -125,7 +116,7 @@ REFINING_RECIPES = {
         "xp_gain": 35
     },
     "ref_nucleo_energia": {
-        "display_name": "🌑🪨 Ativação de Núcleo de Golem",
+        "display_name": " Ativação de Núcleo de Golem",
         "profession": ["fundidor", "ferreiro", "armeiro", ],        "level_req": 22,
         "time_seconds": 40 * 60,
         "inputs": {"nucleo_de_golem": 1, "pedra_vulcanica": 10},
@@ -133,7 +124,7 @@ REFINING_RECIPES = {
         "xp_gain": 70
     },
     "ref_placa_draconica": {
-        "display_name": "🐉💠 Forja de Escama de Dragão",
+        "display_name": " Forja de Escama de Dragão",
         "profession": ["fundidor", "ferreiro", "armeiro", ],        "level_req": 30,
         "time_seconds": 120 * 60,  # 2h
         "inputs": {"escama_de_dragao": 1, "coracao_de_magma": 1},
@@ -145,7 +136,7 @@ REFINING_RECIPES = {
     # Alquimia / Essências
     # ======================
     "ref_essencia_espiritual": {
-        "display_name": "👻 Condensação de Ectoplasma",
+        "display_name": " Condensação de Ectoplasma",
         "profession": ["curtidor", "ferreiro", "armeiro", "alfaiate", "joalheiro", "fundidor"],
         "level_req": 13,
         "time_seconds": 18 * 60,
@@ -154,7 +145,7 @@ REFINING_RECIPES = {
         "xp_gain": 25
     },
     "ref_essencia_fungica": {
-        "display_name": "🍄 Cultivo de Esporos",
+        "display_name": " Cultivo de Esporos",
         "profession": ["curtidor", "ferreiro", "armeiro", "alfaiate", "joalheiro", "fundidor"],
         "level_req": 3,
         "time_seconds": 12 * 60,
@@ -163,7 +154,7 @@ REFINING_RECIPES = {
         "xp_gain": 10
     },
     "ref_essencia_draconica_pura": {
-        "display_name": "🐉 Purificação de Coração de Dragão",
+        "display_name": " Purificação de Coração de Dragão",
         "profession": ["curtidor", "ferreiro", "armeiro", "alfaiate", "joalheiro", "fundidor"],
         "level_req": 30,
         "time_seconds": 18 * 60,
@@ -175,17 +166,27 @@ REFINING_RECIPES = {
     # ======================
     # Tecelagem / Madeira
     # ======================
+        "ref_pano_simples": {
+        "display_name": "Tecelagem de Pano Simples",
+        "profession": ["alfaiate"],
+        "level_req": 1,
+        "time_seconds": 3 * 60,
+        "inputs": {"linho": 2},
+        "outputs": {"pano_simples": 1},
+        "xp_gain": 5
+    },
+
     "ref_rolo_pano": {
-        "display_name": "🧶 Tecelagem de Pano",
+        "display_name": " Tecelagem de Pano",
         "profession": ["alfaiate", ],
         "level_req": 2,
         "time_seconds": 6 * 60,
-        "inputs": {"pano_simples": 5},
+        "inputs": {"pano_simples": 4},
         "outputs": {"rolo_de_pano_simples": 1},
         "xp_gain": 6
     },
-    "ref_tabua_madeira_rara": {
-        "display_name": "🪵 Serragem de Madeira Rara",
+    "ref_tabua_de_madeira_rara": {
+        "display_name": " Serragem de Madeira Rara",
         "profession": ["curtidor", "ferreiro", "armeiro", "alfaiate", "joalheiro", "fundidor"],
         "level_req": 9,
         "time_seconds": 14 * 60,
@@ -194,7 +195,7 @@ REFINING_RECIPES = {
         "xp_gain": 18
     },
     "ref_barra_de_ferro": {
-        "display_name": "⛏️ Fundição de Ferro",
+        "display_name": "Fundição de Ferro",
         "profession": ["ferreiro", "armeiro", "fundidor"],
         "level_req": 1,
         "time_seconds": 6 * 60,
@@ -208,7 +209,7 @@ REFINING_RECIPES = {
     # --- METALURGIA (Ferreiro / Fundidor / Joalheiro) ---
     #V
     "ref_aco_temperado": {
-        "display_name": "⚔️ Fundição de Aço",
+        "display_name": "Fundição de Aço",
         "profession": ["ferreiro", "armeiro", "fundidor"],
         "level_req": 12,
         "time_seconds": 15 * 60,
@@ -217,7 +218,7 @@ REFINING_RECIPES = {
         "xp_gain": 25
     },
     "ref_prata_pura": {
-        "display_name": "🥈 Fundição de Prata",
+        "display_name": " Fundição de Prata",
         "profession": ["ferreiro", "armeiro", "fundidor"],
         "level_req": 10,
         "time_seconds": 12 * 60,
@@ -226,7 +227,7 @@ REFINING_RECIPES = {
         "xp_gain": 20
     },
     "ref_fio_de_prata": {
-        "display_name": "🪡 Fio de Prata",
+        "display_name": "Fio de Prata",
         "profession": ["ferreiro", "armeiro", "joalheiro", "fundidor"],
         "level_req": 11,
         "time_seconds": 10 * 60,
@@ -237,7 +238,7 @@ REFINING_RECIPES = {
 
     # --- ALFAIATARIA (Tecidos Avançados) ---
     "ref_veludo_runico": {
-        "display_name": "✨ Tecelagem de Veludo Rúnico",
+        "display_name": " Tecelagem de Veludo Rúnico",
         "profession": ["alfaiate"],
         "level_req": 15,
         "time_seconds": 20 * 60,
@@ -246,7 +247,7 @@ REFINING_RECIPES = {
         "xp_gain": 30
     },
     "ref_seda_sombria": {
-        "display_name": "🌑 Tecelagem de Seda Sombria",
+        "display_name": " Tecelagem de Seda Sombria",
         "profession": ["alfaiate"],
         "level_req": 18,
         "time_seconds": 25 * 60,
@@ -257,7 +258,7 @@ REFINING_RECIPES = {
 
     # --- CURTUME (Couros Especiais) ---
     "ref_couro_escamoso": {
-        "display_name": "🦎 Tratamento de Couro Escamoso",
+        "display_name": "Tratamento de Couro Escamoso",
         "profession": ["curtidor"],
         "level_req": 14,
         "time_seconds": 18 * 60,
@@ -267,7 +268,7 @@ REFINING_RECIPES = {
     },
     # Receita alternativa para Couro Reforçado (mais acessível que a de Lobo Alfa)
     "ref_couro_reforcado_comum": {
-        "display_name": "🛡️ Couro Reforçado (Básico)",
+        "display_name": "Couro Reforçado (Básico)",
         "profession": ["curtidor"],
         "level_req": 12,
         "time_seconds": 20 * 60,
@@ -278,7 +279,7 @@ REFINING_RECIPES = {
 
     # --- CARPINTARIA (Madeiras Mágicas) ---
     "ref_tabua_ancestral": {
-        "display_name": "🌳 Corte de Tábua Ancestral",
+        "display_name": "Corte de Tábua Ancestral",
         "profession": ["curtidor", "ferreiro", "armeiro", "alfaiate", "joalheiro", "fundidor"],
         "level_req": 20,
         "time_seconds": 30 * 60,
@@ -287,7 +288,7 @@ REFINING_RECIPES = {
         "xp_gain": 50
     },
     "ref_tabua_carvalho": {
-        "display_name": "🪵 Tábua de Carvalho",
+        "display_name": "Tábua de Carvalho",
         "profession": ["curtidor", "ferreiro", "armeiro"], # Profissões que usam madeira
         "level_req": 5,
         "time_seconds": 10 * 60,
@@ -296,7 +297,7 @@ REFINING_RECIPES = {
         "xp_gain": 12
     },
     "ref_tabua_mogno": {
-        "display_name": "🪵🔴 Tábua de Mogno",
+        "display_name": "Tábua de Mogno",
         "profession": ["curtidor", "ferreiro", "armeiro"],
         "level_req": 15,
         "time_seconds": 25 * 60,
@@ -308,7 +309,7 @@ REFINING_RECIPES = {
     # --- METAIS (Adicionais) ---
     # Você já tem Bronze, Ferro, Aço e Prata. Vamos adicionar Ouro se for usar.
     "ref_barra_ouro": {
-        "display_name": "🟡 Fundição de Ouro",
+        "display_name": "Fundição de Ouro",
         "profession": ["fundidor", "joalheiro", "ferreiro"],
         "level_req": 20,
         "time_seconds": 30 * 60,
@@ -320,7 +321,7 @@ REFINING_RECIPES = {
     # --- TECIDOS (Amarras) ---
     # Você já tem Rolo de Pano e Seda. Vamos adicionar Corda Resistente.
     "ref_corda_linho": {
-        "display_name": "🪢 Corda de Linho",
+        "display_name": "Corda de Linho",
         "profession": ["alfaiate", "curtidor"],
         "level_req": 3,
         "time_seconds": 5 * 60,
@@ -332,7 +333,7 @@ REFINING_RECIPES = {
         # --- METAIS RAROS (MITHRIL / ADAMANTIO) ---
 
     "ref_barra_de_mithril": {
-        "display_name": "🔷 Fundição de Mithril",
+        "display_name": "Fundição de Mithril",
         "profession": ["fundidor", "ferreiro", "armeiro"],
         "level_req": 45,
         "time_seconds": 60 * 60,  # 1h
@@ -347,7 +348,7 @@ REFINING_RECIPES = {
     },
 
     "ref_barra_de_adamantio": {
-        "display_name": "🔴 Fundição de Adamantio",
+        "display_name": "Fundição de Adamantio",
         "profession": ["fundidor", "ferreiro", "armeiro"],
         "level_req": 70,
         "time_seconds": 120 * 60,  # 2h

@@ -3,31 +3,31 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 # ---- Regras base de status ----
-# Observações:
-# - HP agora rende +3 por ponto (antes era 12).
-# - Softcap = ponto a partir do qual entra DR (diminuição de retorno).
-# - dr_factor = multiplicador aplicado aos pontos ACIMA do softcap.
-# - hardcap = limite superior em "pontos efetivos" (antes de multiplicar por per_point).
+# REGRA OFICIAL DA TELA DE ATRIBUTOS:
+# - Cada clique no botão + gasta exatamente 1 ponto livre.
+# - Cada clique adiciona exatamente +1 investimento visível no atributo.
+# - Sem custo progressivo, sem ganho fracionado e sem hardcap silencioso.
+#
+# Motivo: a tela só possui Ataque, Defesa, Agilidade e Sorte.
+# A regra antiga tinha custo 2/3, ganho fracionado e hardcap; isso podia consumir
+# vários pontos sem o número subir na tela, principalmente em Sorte/Agilidade.
 STAT_RULES: Dict[str, dict] = {
-    "hp":         {"per_point": 3.0,  "softcap": 50, "dr_factor": 0.6, "hardcap": 120},
-    "attack":     {"per_point": 1.8,  "softcap": 40, "dr_factor": 0.7, "hardcap": 100},
-    "defense":    {"per_point": 1.6,  "softcap": 40, "dr_factor": 0.7, "hardcap": 100},
-    "initiative": {"per_point": 0.8,  "softcap": 35, "dr_factor": 0.7, "hardcap": 90},
-    "luck":       {"per_point": 0.5,  "softcap": 30, "dr_factor": 0.6, "hardcap": 80},
+    "hp":         {"per_point": 1.0, "softcap": 999999, "dr_factor": 1.0, "hardcap": 999999},
+    "attack":     {"per_point": 1.0, "softcap": 999999, "dr_factor": 1.0, "hardcap": 999999},
+    "defense":    {"per_point": 1.0, "softcap": 999999, "dr_factor": 1.0, "hardcap": 999999},
+    "initiative": {"per_point": 1.0, "softcap": 999999, "dr_factor": 1.0, "hardcap": 999999},
+    "luck":       {"per_point": 1.0, "softcap": 999999, "dr_factor": 1.0, "hardcap": 999999},
 }
 
-# Custo por ponto no MESMO status (degraus por total já investido naquele status)
+# Mantido por compatibilidade com outras partes do código, mas o custo real agora é sempre 1.
 COST_STEPS: Tuple[Tuple[int, int], ...] = (
-    (25, 1),   # 0..24 -> próximo ponto custa 1
-    (50, 2),   # 25..49 -> custa 2
-    (9999, 3)  # 50+ -> custa 3
+    (999999, 1),
 )
 
-# Mapeamento dos pesos (afinidade de classe) para custo/efeito/exibição
-# p_norm = (peso - min) / (max - min)  => 0..1
-COST_MIN, COST_MAX = 0.8, 1.2           # favorecido => mais barato
-EFFECT_MIN, EFFECT_MAX = 0.90, 1.10     # favorecido => rende ~+10%
-DISPLAY_MIN, DISPLAY_MAX = 0.90, 1.10   # apenas visual
+# Afinidade continua existindo apenas para exibição futura, não para custo/ganho de ponto.
+COST_MIN, COST_MAX = 1.0, 1.0
+EFFECT_MIN, EFFECT_MAX = 1.0, 1.0
+DISPLAY_MIN, DISPLAY_MAX = 0.90, 1.10
 
 def _get_class_weights(class_key: str) -> Dict[str, float]:
     """
@@ -79,43 +79,19 @@ def class_affinity_factors(class_key: str, stat: str) -> Tuple[float, float, flo
 
 def point_cost_for(stat: str, already_invested_in_stat: int, class_key: str) -> int:
     """
-    Custo do PRÓXIMO ponto nesse stat: degrau base + afinidade da classe (exceto HP).
+    Custo oficial da UI de atributos: sempre 1 ponto livre por clique.
     """
-    base_cost = 1
-    for limit, cost in COST_STEPS:
-        if already_invested_in_stat < limit:
-            base_cost = cost
-            break
-
-    cost_mult, _, _ = class_affinity_factors(class_key, stat)
-    final_cost = max(1, int(round(base_cost * cost_mult)))
-    return final_cost
+    return 1
 
 def effect_from_points(stat: str, points_in_stat: int, class_key: str) -> float:
     """
-    Efeito BRUTO acumulado dos pontos para um stat:
-      - aplica softcap/DR
-      - aplica afinidade (exceto em HP)
-      - clamp em hardcap (em “pontos efetivos” × per_point)
+    Efeito oficial da UI de atributos: 1 investimento = +1 atributo.
+    Retorna o valor acumulado inteiro para impedir gasto sem aumento visual.
     """
-    rules = STAT_RULES[stat]
-    per = float(rules["per_point"])
-    sc = int(rules["softcap"])
-    dr = float(rules["dr_factor"])
-    cap = int(rules["hardcap"])
-
-    under = min(points_in_stat, sc)
-    over  = max(0, points_in_stat - sc)
-
-    total = under * per + over * per * dr
-
-    # Afinidade só para ATK/DEF/INI/SRT (hp fica neutro)
-    _, effect_mult, _ = class_affinity_factors(class_key, stat)
-    total *= effect_mult
-
-    # Hardcap em pontos efetivos
-    max_total = cap * per
-    return min(total, max_total)
+    try:
+        return max(0, int(points_in_stat or 0))
+    except Exception:
+        return 0
 
 # ----- Utilitário para UI (opcional) -----
 def ui_display_modifiers(class_key: str) -> Dict[str, float]:

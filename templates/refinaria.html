@@ -1,0 +1,226 @@
+<div id="refinaria-container" class="eldora-modal" style="display:none;">
+    <div class="refinaria-modern-wrapper">
+        <div class="refinaria-top-bar">
+            <span class="refinaria-title">🔥 BANCADA DE REFINO 🔥</span>
+            <button class="forja-close" onclick="fecharUIRefinaria()">×</button>
+        </div>
+
+        <div id="abas-profissoes-refinaria" class="forja-nav-tabs">
+            </div>
+
+        <div class="forja-main-content">
+            <div class="forja-sidebar" id="painel-lista-forja" style="height: 100% !important; max-width: 100% !important; border: none !important;">
+                <div id="lista-receitas-refinaria" class="recipe-scroll-list"></div>
+            </div>
+
+            <div class="forja-details-view" id="painel-detalhes-forja" style="display: none !important;">
+                
+                <div id="detalhe-vazio-refinaria" class="view-placeholder">
+                    
+                    <div class="icon-pulse">⚖️</div>
+                    <p>Selecione um material para refinar</p>
+                </div>
+
+                <div id="detalhe-receita-refinaria" style="display:none;" class="active-recipe-view">
+                    <div class="item-header-display">
+                        <div class="item-image-frame refinaria-frame">
+                            <img id="img-resultado-refinaria" src="" alt="">
+                        </div>
+                        <h2 id="nome-resultado-refinaria">---</h2>
+        
+                        <div id="prof-progresso-container" style="margin: 5px auto; width: 80%; background: #000; border: 1px solid #431407; border-radius: 4px; overflow: hidden; height: 12px;">
+                            <div id="prof-barra-xp" style="width: 0%; height: 100%; background: #ea580c;"></div>
+                        </div>
+                        <small id="prof-texto-xp" style="font-size: 0.75em; color: #94a3b8;"></small>
+                        <div class="recipe-tags">
+                            <span>Nível Necessário: <b id="nvl-req-refinaria">1</b></span>
+                            <span>⏳ <b id="tempo-unitario">0</b>s / un</span>
+                        </div>
+                    </div>
+
+                    <div class="quantidade-container">
+                        <span class="section-label" style="text-align: center;">Quantidade</span>
+                        <div class="qtd-controles">
+                            <button class="btn-qtd" onclick="RefinariaUI.alterarQtd(-1)">-</button>
+                            <input type="number" id="input-qtd-refino" value="1" min="1" onchange="RefinariaUI.atualizarPorInput()">
+                            <button class="btn-qtd" onclick="RefinariaUI.alterarQtd(1)">+</button>
+                            <button class="btn-qtd max-btn" onclick="RefinariaUI.setQtdMax()">MAX</button>
+                        </div>
+                        <div class="tempo-total-preview">Tempo Total: <span id="tempo-total-refino">0s</span></div>
+                    </div>
+
+                    <div class="requirements-container">
+                        <span class="section-label">Materiais Necessários (Total)</span>
+                        <div id="lista-materiais-refinaria" class="materials-grid"></div>
+                    </div>
+
+                    <button id="btn-iniciar-refino" class="btn-forge-action btn-refine" onclick="tentarIniciarRefino()">
+                        INICIAR REFINO
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* CSS PROFISSIONAL - REFINARIA PREMIUM */
+.eldora-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 9999999; 
+    display: flex; justify-content: center; align-items: center;
+    backdrop-filter: blur(6px); 
+}
+
+.refinaria-modern-wrapper {
+    width: 95%; max-width: 850px; 
+    height: 85vh; max-height: 800px;
+    background: rgba(15, 10, 10, 0.98); /* Fundo levemente mais avermelhado */
+    border: 1px solid #ea580c; border-radius: 16px;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 0 50px rgba(234, 88, 12, 0.15); 
+}
+
+/* --- TOPO E ABAS --- */
+.refinaria-top-bar { 
+    display: flex; justify-content: space-between; align-items: center; 
+    padding: 15px 20px; background: #0f0502; border-bottom: 1px solid #431407; 
+}
+.refinaria-title { color: #ea580c; font-weight: bold; letter-spacing: 2px; font-family: 'Cinzel', serif; font-size: 1.1em; }
+.forja-close { background: none; border: none; color: #94a3b8; font-size: 1.5em; cursor: pointer; transition: 0.2s; }
+.forja-close:hover { color: #ef4444; }
+
+.forja-nav-tabs { 
+    display: flex; gap: 10px; padding: 10px 20px; 
+    background: #0a0f19; overflow-x: auto; scrollbar-width: none; 
+}
+.forja-nav-tabs::-webkit-scrollbar { display: none; }
+
+.aba-forja-btn { 
+    background: #1e293b; border: 1px solid #334155; color: #94a3b8; 
+    padding: 8px 18px; border-radius: 20px; cursor: pointer; transition: 0.3s; 
+    font-weight: bold; white-space: nowrap;
+}
+.aba-forja-btn.active { background: #ea580c; color: #fff; border-color: #fb923c; box-shadow: 0 0 10px rgba(234, 88, 12, 0.5); }
+
+/* --- CONTEÚDO PRINCIPAL (SPLIT TELA) --- */
+.forja-main-content { display: flex; flex: 1; overflow: hidden; }
+
+/* Lista da Esquerda */
+.forja-sidebar { 
+    width: 35%; min-width: 240px; max-width: 300px; 
+    border-right: 1px solid #431407; background: rgba(0,0,0,0.2); 
+    display: flex; flex-direction: column;
+}
+.recipe-scroll-list { flex: 1; overflow-y: auto; padding: 10px; }
+
+.recipe-card {
+    display: flex; align-items: center; gap: 12px; padding: 10px;
+    background: rgba(30, 41, 59, 0.4); border: 1px solid #334155;
+    border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: 0.2s;
+}
+.recipe-card:hover, .recipe-card.active { background: rgba(234, 88, 12, 0.1); border-color: #ea580c; transform: translateX(5px); }
+.card-icon { width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 4px #000); }
+.recipe-name { font-size: 0.95em; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Detalhes da Direita */
+.forja-details-view { 
+    flex: 1; padding: 20px; display: flex; flex-direction: column; 
+    background: #0f0502; overflow-y: auto;
+}
+
+.view-placeholder { margin: auto; text-align: center; color: #64748b; }
+.view-placeholder .icon-pulse { font-size: 3em; margin-bottom: 15px; opacity: 0.5; }
+
+.active-recipe-view { display: flex; flex-direction: column; height: 100%; }
+.item-header-display { text-align: center; margin-bottom: 15px; }
+
+.refinaria-frame { 
+    width: 90px; height: 90px; margin: 0 auto 10px; 
+    background: #020617; border: 2px solid #ea580c; border-radius: 15px; 
+    display: flex; align-items: center; justify-content: center; 
+    box-shadow: 0 0 20px rgba(234, 88, 12, 0.2), inset 0 0 15px #000; 
+}
+#img-resultado-refinaria { width: 80%; height: 80%; object-fit: contain; }
+#nome-resultado-refinaria { color: #fdba74; font-size: 1.2em; margin-bottom: 8px; text-shadow: 1px 1px 2px #000; }
+
+.recipe-tags { display: flex; justify-content: center; gap: 15px; font-size: 0.85em; color: #cbd5e1; }
+.recipe-tags span { background: #1e293b; padding: 4px 10px; border-radius: 6px; }
+
+/* --- CONTROLE DE QUANTIDADE (EXCLUSIVO REFINO) --- */
+.quantidade-container { 
+    margin-bottom: 15px; background: rgba(234, 88, 12, 0.05); 
+    padding: 12px; border-radius: 8px; border: 1px solid #431407; 
+}
+.qtd-controles { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.btn-qtd { 
+    background: #1e293b; border: 1px solid #475569; color: #fff; 
+    width: 35px; height: 35px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; 
+}
+.btn-qtd:hover { background: #ea580c; border-color: #fb923c; }
+.btn-qtd.max-btn { width: auto; padding: 0 15px; font-size: 0.85em; background: #431407; color: #fdba74; border-color: #9a3412; }
+#input-qtd-refino { 
+    width: 60px; height: 35px; text-align: center; background: #0f172a; 
+    border: 1px solid #475569; color: #fff; border-radius: 6px; font-weight: bold; 
+}
+.tempo-total-preview { text-align: center; font-size: 0.85em; color: #94a3b8; }
+
+/* --- MATERIAIS --- */
+.requirements-container { margin-bottom: 15px; flex: 1; }
+.section-label { color: #94a3b8; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
+
+.materials-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.mat-pill { 
+    background: #1e293b; border: 1px solid #334155; padding: 8px 10px; 
+    border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.mat-pill.missing { border-color: #7f1d1d; background: rgba(127, 29, 29, 0.2); }
+.mat-info { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+.mat-info span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85em; }
+
+/* Botão Final */
+.btn-refine { 
+    width: 100%; padding: 15px; background: linear-gradient(180deg, #ea580c, #9a3412); 
+    border: none; border-radius: 8px; color: #fff; font-weight: bold; cursor: pointer; 
+    font-size: 1.1em; text-shadow: 1px 1px 2px #000; transition: 0.2s; margin-top: auto;
+}
+.btn-refine:hover:not(:disabled) { background: linear-gradient(180deg, #f97316, #c2410c); transform: translateY(-2px); }
+.btn-refine:disabled { filter: grayscale(1); opacity: 0.5; cursor: not-allowed; }
+
+/* =========================================
+   🌟 MÁGICA DA LISTA EXPANDIDA (MODO VAZIO)
+   ========================================= */
+.forja-main-content.esconder-detalhes .forja-sidebar {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    border: none !important;
+}
+.forja-main-content.esconder-detalhes .forja-details-view {
+    display: none !important;
+}
+/* =========================================
+   📱 RESPONSIVIDADE PARA CELULAR (O SEGREDO)
+   ========================================= */
+@media (max-width: 768px) {
+    .forja-main-content { 
+        flex-direction: column; /* Empilha: Lista em cima, Detalhes embaixo */
+    }
+    .forja-sidebar { 
+        width: 100%; max-width: none; 
+        height: 35%; /* Lista menor para sobrar espaço pros controles */
+        border-right: none; border-bottom: 2px solid #ea580c; 
+    }
+    .forja-details-view { 
+        height: 65%; padding: 12px; 
+    }
+    .refinaria-frame { width: 70px; height: 70px; margin-bottom: 5px; }
+    #nome-resultado-refinaria { font-size: 1.1em; }
+    
+    .quantidade-container { padding: 8px; margin-bottom: 10px; }
+    .materials-grid { grid-template-columns: 1fr; /* 1 coluna no mobile para não espremer */ }
+    .btn-refine { padding: 12px; font-size: 1em; }
+}
+
+
+</style>

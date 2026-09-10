@@ -4,230 +4,1182 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mundo de Eldora - App</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js" crossorigin="anonymous"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/loja_aventureiro.css">
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/joystick.css') }}">
+    <link rel="stylesheet" href="/static/css/style.css?v=302">
+    <link rel="stylesheet" href="/static/css/perfil.css">
+    <link rel="stylesheet" href="/static/css/perfil_moderno.css?v=1">
+    <link rel="stylesheet" href="/static/css/ui_game.css">
+    <link rel="stylesheet" href="/static/css/estilos_combate.css?v=111">
+    <link rel="stylesheet" href="/static/css/arena_pvp.css">
+    <link rel="stylesheet" href="/static/css/social.css?v=999">
+    <link rel="stylesheet" href="/static/css/missoes.css?v9">
+    <link rel="stylesheet" href="/static/css/loja_reino.css?v=1">
+    <link rel="stylesheet" href="/static/css/guild_missions.css?v=1">
+    <link rel="stylesheet" href="/static/css/loja_premium.css?v=1">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap');
+        /* =====================================================
+           ⚔️ MENU LATERAL COMPACTO — ELDORA
+           ===================================================== */
 
-        /* Garante que o conteúdo não fique escondido atrás do menu */
-        body { padding-bottom: 75px !important; }
+        #side-menu.eldora-menu {
+            width: min(278px, 84vw);
+            max-width: 278px;
 
-        /* Substituindo o NAV antigo pelo estilo metálico moderno */
-        nav {
-            position: fixed !important; 
-            bottom: 0 !important; 
-            left: 0 !important; 
-            width: 100% !important; 
-            height: 65px !important;
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(10, 15, 25, 1) 100%) !important;
-            border-top: 3px solid #f39c12 !important; 
-            border-style: ridge !important;
-            display: flex !important; 
-            justify-content: space-around !important; 
-            align-items: center !important;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.8), 0 0 10px rgba(243, 156, 18, 0.3) !important;
-            z-index: 9999 !important;
-            padding: 0 5px !important; 
-            box-sizing: border-box !important;
+            padding: 0;
+
+            background:
+                radial-gradient(
+                    circle at 20% 0%,
+                    rgba(216, 184, 90, 0.08),
+                    transparent 180px
+                ),
+                linear-gradient(
+                    180deg,
+                    #0d1421 0%,
+                    #070b12 100%
+                );
+
+            border-right:
+                1px solid
+                rgba(216, 184, 90, 0.36);
+
+            box-shadow:
+                18px 0 45px
+                rgba(0, 0, 0, 0.55);
+
+            overflow-y: auto;
+            overscroll-behavior: contain;
         }
 
-        /* Estilizando os botões para parecerem os itens da outra tela */
-        nav button {
-            background: none !important; 
-            border: none !important; 
-            outline: none !important;
-            display: flex !important; 
-            flex-direction: column !important; 
-            align-items: center !important; 
-            justify-content: center !important;
-            width: 20% !important; 
-            height: 100% !important;
-            cursor: pointer !important;
-            transition: 0.2s !important;
-            padding: 0 !important; 
-            margin: 0 !important;
-        }
-        
-        nav button:active { transform: translateY(-3px) !important; }
 
-        .nav-icon-emoji {
-            font-size: 1.5em !important; 
-            margin-bottom: 2px !important;
-            line-height: 1 !important;
-            filter: drop-shadow(0 0 3px rgba(243, 156, 18, 0.3)) !important;
-            transition: 0.2s !important;
-            font-style: normal !important;
+        /* =====================================================
+           CABEÇALHO
+           ===================================================== */
+
+        #side-menu .eldora-menu-header {
+            min-height: 64px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+ 
+            padding: 10px 12px;
+
+            border-bottom:
+                1px solid
+                rgba(216, 184, 90, 0.22);
+
+            background:
+                rgba(15, 23, 38, 0.94);
         }
 
-        .nav-text {
-            font-family: 'Cinzel', serif !important;
-            font-size: 0.65em !important;
-            color: #bdc3c7 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 1px !important;
-            transition: 0.2s !important;
-            font-weight: bold !important;
+
+        #side-menu .eldora-menu-identidade {
+            min-width: 0;
+ 
+            display: flex;
+            align-items: center;
+ 
+            gap: 9px;
         }
 
-        /* EFEITOS DO BOTÃO ATIVO (Brilha Dourado) */
-        nav button.active .nav-icon-emoji { 
-            filter: drop-shadow(0 0 8px #f39c12) !important; 
-            transform: scale(1.15) !important;
+
+        #side-menu .eldora-menu-brasao {
+            width: 36px;
+            height: 36px;
+
+            flex: 0 0 36px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border:
+                1px solid
+                rgba(216, 184, 90, 0.32);
+
+            border-radius: 10px;
+
+            background:
+                rgba(216, 184, 90, 0.08);
+
+            font-size: 17px;
         }
-        nav button.active .nav-text { 
-            color: #f39c12 !important; 
-            text-shadow: 0 0 5px #f39c12 !important; 
+
+
+        #side-menu .eldora-menu-titulo {
+            color: #f4dc91;
+ 
+            font-family:
+                "Cinzel",
+                serif;
+
+            font-size: 0.80rem;
+            font-weight: 900;
+
+            letter-spacing: 0.7px;
+        }
+
+
+        #side-menu .eldora-menu-subtitulo {
+            margin-top: 2px;
+  
+            color: #718096;
+
+            font-size: 0.61rem;
+            font-weight: 700;
+        }
+
+
+        #side-menu .eldora-menu-fechar {
+            width: 34px;
+            height: 34px;
+
+            flex: 0 0 34px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            margin: 0;
+            padding: 0;
+
+            color: #94a3b8;
+
+            background:
+                rgba(30, 41, 59, 0.55);
+ 
+            border:
+                1px solid
+                rgba(148, 163, 184, 0.18);
+
+            border-radius: 9px;
+
+            font-size: 14px;
+
+            cursor: pointer;
+        }
+
+
+        #side-menu .eldora-menu-fechar:active {
+            transform: scale(0.92);
+        }
+
+
+        /* =====================================================
+           CONTEÚDO
+           ===================================================== */
+
+        #side-menu .eldora-menu-itens {
+            display: flex;
+            flex-direction: column;
+
+            gap: 5px;
+
+            padding:
+                9px 10px 14px;
+        }
+
+
+        #side-menu .eldora-menu-grupo {
+            margin:
+                8px 4px 3px;
+
+            color: #627086;
+
+            font-size: 0.56rem;
+            font-weight: 900;
+
+            letter-spacing: 1.15px;
+
+            text-transform: uppercase;
+        }
+
+
+        /* =====================================================
+           BOTÕES
+           ===================================================== */
+
+        #side-menu .eldora-menu-btn {
+            position: relative;
+
+            width: 100%;
+            min-height: 46px;
+
+            display: grid;
+
+            grid-template-columns:
+                34px
+                minmax(0, 1fr)
+                auto;
+
+            align-items: center;
+ 
+            gap: 8px;
+  
+            margin: 0;
+            padding: 6px 9px;
+
+            color: #cbd5e1;
+
+            background:
+                linear-gradient(
+                    180deg,
+                    rgba(25, 35, 52, 0.86),
+                    rgba(15, 23, 36, 0.92)
+                );
+
+            border:
+                1px solid
+                rgba(148, 163, 184, 0.18);
+
+            border-radius: 10px;
+
+            box-shadow:
+                inset 0 1px 0
+                rgba(255, 255, 255, 0.025);
+
+            font-family:
+                Arial,
+                sans-serif;
+
+            cursor: pointer;
+
+            transition:
+                transform 0.14s ease,
+                border-color 0.14s ease,
+                background 0.14s ease;
+        }
+
+
+        #side-menu .eldora-menu-btn .texto {
+            min-width: 0;
+ 
+            color: inherit;
+  
+            font-size: 0.76rem;
+            font-weight: 800;
+
+            letter-spacing: 0.1px;
+
+            text-align: left;
+
+            white-space: nowrap;
+        }
+
+
+        #side-menu .eldora-menu-icone {
+            width: 30px;
+            height: 30px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background:
+                rgba(2, 6, 13, 0.40);
+    
+            border:
+                1px solid
+                rgba(148, 163, 184, 0.13);
+
+            border-radius: 8px;
+ 
+            font-size: 15px;
+        }
+
+
+        #side-menu .eldora-menu-btn:hover {
+            border-color:
+                rgba(216, 184, 90, 0.33);
+
+            background:
+                rgba(31, 43, 63, 0.95);
+        }
+
+
+        #side-menu .eldora-menu-btn:active {
+            transform: scale(0.985);
+        }
+
+
+        /* =====================================================
+           ITEM ATIVO
+           ===================================================== */
+
+        #side-menu .eldora-menu-btn.active {
+            color: #fff5d1;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(139, 108, 36, 0.30),
+                    rgba(28, 34, 46, 0.94)
+                );
+
+            border-color:
+                rgba(216, 184, 90, 0.62);
+
+            box-shadow:
+                inset 3px 0 0 #d8b85a,
+                inset 0 1px 0
+                rgba(255, 255, 255, 0.04);
+        }
+
+
+        #side-menu
+        .eldora-menu-btn.active
+        .eldora-menu-icone {
+            color: #f4dc91;
+
+            background:
+                rgba(216, 184, 90, 0.12);
+
+            border-color:
+                rgba(216, 184, 90, 0.28);
+        }
+
+        /* =====================================================
+           📜 CENTRAL DE ELDORA
+            ===================================================== */
+
+        #side-menu .eldora-menu-central {
+            position: relative;
+            overflow: hidden;
+
+            min-height: 52px;
+
+            margin-bottom: 5px;
+
+            color: #fff4cc;
+
+            background:
+                radial-gradient(
+                    circle at 15% 50%,
+                    rgba(216, 184, 90, 0.20),
+                    transparent 90px
+                ),
+                linear-gradient(
+                    135deg,
+                    rgba(101, 72, 24, 0.96),
+                    rgba(39, 29, 21, 0.98)
+                );
+
+            border-color:
+                rgba(244, 220, 145, 0.58);
+
+            box-shadow:
+                inset 0 1px 0
+                rgba(255, 255, 255, 0.07),
+
+                0 5px 16px
+                rgba(0, 0, 0, 0.22),
+
+                0 0 18px
+                rgba(216, 184, 90, 0.06);
+        }
+
+
+        #side-menu .eldora-menu-central::before {
+            content: "";
+
+            position: absolute;
+
+            top: -80%;
+            left: -35%;
+
+            width: 30%;
+            height: 260%;
+
+            pointer-events: none;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255, 246, 204, 0.16),
+                    transparent
+                );
+
+            transform:
+                rotate(18deg);
+
+            animation:
+                eldoraCentralBrilho
+                5.5s ease-in-out infinite;
+        }
+
+
+        #side-menu .eldora-menu-central:hover {
+            border-color:
+                rgba(244, 220, 145, 0.88);
+
+            background:
+                radial-gradient(
+                    circle at 15% 50%,
+                    rgba(216, 184, 90, 0.27),
+                    transparent 100px
+                ),
+                linear-gradient(
+                    135deg,
+                    rgba(121, 87, 31, 0.98),
+                    rgba(47, 34, 22, 0.98)
+                );
+        }
+
+
+        #side-menu .eldora-central-icone {
+            color: #f8dfa0;
+
+            background:
+                rgba(216, 184, 90, 0.13);
+
+            border-color:
+                rgba(244, 220, 145, 0.28);
+
+            box-shadow:
+                0 0 12px
+                rgba(216, 184, 90, 0.10);
+        }
+
+
+        @keyframes eldoraCentralBrilho {
+
+            0%,
+            65% {
+                left: -35%;
+                opacity: 0;
+            }
+
+            74% {
+                opacity: 1;
+            }
+
+            88% {
+                left: 120%;
+                opacity: 0;
+            }
+
+            100% {
+                left: 120%;
+                opacity: 0;
+            }
+        }
+        /* =====================================================
+           LOJA
+           ===================================================== */
+
+        #side-menu .eldora-menu-loja {
+            border-color:
+                rgba(147, 51, 234, 0.25);
+        }
+
+
+        #side-menu .eldora-menu-em-breve {
+            padding: 3px 5px;
+ 
+            color: #c4b5fd;
+
+            background:
+                rgba(109, 40, 217, 0.16);
+
+            border:
+                1px solid
+                rgba(167, 139, 250, 0.22);
+
+            border-radius: 5px;
+
+            font-size: 0.47rem;
+            font-weight: 900;
+ 
+            letter-spacing: 0.4px;
+        }
+
+
+        #side-menu
+        .eldora-menu-btn:disabled {
+            opacity: 0.66;
+
+            cursor: default;
+        }
+
+
+        /* =====================================================
+           SAÍDA
+           ===================================================== */
+
+        #side-menu .eldora-menu-sair {
+            color: #fca5a5;
+
+            background:
+                rgba(69, 10, 10, 0.18);
+ 
+            border-color:
+                rgba(248, 113, 113, 0.19);
+        }
+
+
+        #side-menu
+        .eldora-menu-sair
+        .eldora-menu-icone {
+            background:
+                rgba(127, 29, 29, 0.15);
+        }
+
+
+        /* Remove divisores antigos se alguma regra
+           externa ainda tentar exibi-los. */
+        #side-menu .menu-divider {
+            display: none !important;
+        }
+
+
+        /* =====================================================
+           MOBILE PEQUENO
+           ===================================================== */
+
+        @media (max-width: 390px) {
+ 
+            #side-menu.eldora-menu {
+                width: min(264px, 86vw);
+            }
+
+            #side-menu .eldora-menu-btn {
+                min-height: 43px;
+            }
+
+            #side-menu
+            .eldora-menu-btn
+            .texto {
+                font-size: 0.72rem;
+            }
         }
     </style>
 </head>
 <body>
 
+    <!-- ========================================= -->
+    <!-- TELA DE CARREGAMENTO ÉPICA                -->
+    <!-- ========================================= -->
+    <style>
+        #tela-carregamento {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/carregamento.jpg') center/cover no-repeat;
+            z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 60px;
+            transition: opacity 10s ease;
+        }
+        .loading-texto {
+            color: #d4af37; font-family: 'Cinzel', serif; font-size: 1.2em; font-weight: bold;
+            text-shadow: 2px 2px 4px #000; margin-bottom: 12px; letter-spacing: 1px;
+        }
+        .loading-barra-container {
+            width: 80%; max-width: 400px; height: 24px; background: rgba(10, 5, 20, 0.9);
+            border: 2px solid #334155; border-radius: 12px; overflow: hidden;
+            position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.8);
+        }
+        .loading-barra-preenchimento {
+            width: 0%; height: 100%;
+            background: linear-gradient(90deg, #9b59b6, #d4af37); /* Degradê Lilás e Dourado */
+            transition: width 0.10s ease;
+        }
+        #loading-porcentagem {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center; color: #fff;
+            font-size: 0.85em; font-weight: 900; font-family: 'Arial', sans-serif;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+        }
+    </style>
+
+    <div id="tela-carregamento">
+        <div class="loading-texto" id="loading-msg">Despertando Herói...</div>
+        <div class="loading-barra-container">
+            <div class="loading-barra-preenchimento" id="loading-barra"></div>
+            <div id="loading-porcentagem">0%</div>
+        </div>
+    </div>
+
+    <div style="font-family: 'Cinzel', serif; position: absolute; left: -9999px; visibility: hidden;">Carrega a fonte!</div>
+    
     <header><h1>🏰 𝐑𝐞𝐢𝐧𝐨 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 🏰</h1></header>
 
-    <div id="aba-home" class="tab-content active"></div>
+    <button id="btn-abrir-menu" onclick="abrirMenu()">
+        <img src="/static/assets/sprites/ui/botao_menu.png" alt="Menu" onerror="this.src='https://img.icons8.com/color/48/settings.png'">
+    </button>
 
-    <div id="aba-reino" class="tab-content"></div>
-    <div id="aba-combate" class="tab-content" style="padding: 10px;"></div>
+    <div id="menu-overlay" onclick="fecharMenu()"></div>
+
+    <nav id="side-menu" class="menu-rpg eldora-menu">
+
+        <!-- CABEÇALHO -->
+        <div class="eldora-menu-header">
+
+            <div class="eldora-menu-identidade">
+                <div class="eldora-menu-brasao">
+                    ⚔️
+                </div>
+
+                <div>
+                    <div class="eldora-menu-titulo">
+                        MENU DO HERÓI
+                    </div>
+
+                    <div class="eldora-menu-subtitulo">
+                        Mundo de Eldora
+                    </div>
+                </div>
+            </div>
+
+            <button
+                id="btn-fechar-menu"
+                class="eldora-menu-fechar"
+                onclick="fecharMenu()"
+                aria-label="Fechar menu"
+            >
+                ✕
+            </button>
+
+        </div>
+
+
+        <div class="menu-itens eldora-menu-itens">
+
+            <!-- ========================================= -->
+            <!-- 📜 CENTRAL DE ELDORA                      -->
+            <!-- ========================================= -->
+
+            <button
+                type="button"
+                id="nav-btn-central-eldora"
+                class="menu-btn eldora-menu-btn eldora-menu-central"
+                onclick="fecharMenu(); abrirCentralEldora();"
+            >
+                <span class="eldora-menu-icone eldora-central-icone">
+                    📜
+                </span>
+
+                <span class="texto">
+                    Central de Eldora
+                </span>
+
+                <span
+                    id="central-eldora-badge"
+                    class="eldora-menu-em-breve"
+                >
+                    NOVO
+                </span>
+            </button>
+
+
+            <!-- JORNADA -->
+            <div class="eldora-menu-grupo">
+                JORNADA
+            </div>
+
+
+            <button
+                onclick="showTab('aba-reino'); fecharMenu();"
+                class="menu-btn eldora-menu-btn active"
+                id="nav-btn-reino"
+            >
+                <span class="eldora-menu-icone">
+                    🗺️
+                </span>
+
+                <span class="texto">
+                    Explorar Reino
+                </span>
+            </button>
+
+
+            <button
+                onclick="showTab('aba-perfil'); fecharMenu();"
+                class="menu-btn eldora-menu-btn"
+                id="nav-btn-perfil"
+            >
+                <span class="eldora-menu-icone">
+                    🎒
+                </span>
+
+                <span class="texto">
+                    Mochila & Perfil
+                </span>
+            </button>
+
+
+            <button
+                onclick="fecharMenu()"
+                class="menu-btn eldora-menu-btn"
+            >
+                <span class="eldora-menu-icone">
+                    ⚔️
+                </span>
+
+                <span class="texto">
+                    Dungeons
+                </span>
+            </button>
+
+
+            <button
+                onclick="fecharMenu(); abrirTelaCla();"
+                class="menu-btn eldora-menu-btn"
+                id="nav-btn-cla"
+            >
+                <span class="eldora-menu-icone">
+                    🛡️
+                </span>
+
+                <span class="texto">
+                    Clã
+                </span>
+            </button>
+
+
+            <!-- COMÉRCIO -->
+            <div class="eldora-menu-grupo">
+                COMÉRCIO
+            </div>
+
+
+            <button
+                type="button"
+                class="menu-btn eldora-menu-btn eldora-menu-loja"
+                id="nav-btn-loja-eldora"
+                onclick="abrirLojaPremium()"
+            >
+                <span class="eldora-menu-icone">
+                    💎
+                </span>
+
+                <span class="texto">
+                    Loja de Eldora
+                </span>
+
+                <span class="eldora-menu-em-breve">
+                    NOVA
+                </span>
+            </button>
+
+            <!-- SISTEMA -->
+            <div class="eldora-menu-grupo">
+                SISTEMA
+            </div>
+
+
+            <button
+                onclick="AudioManager.toggleMute()"
+                class="menu-btn eldora-menu-btn"
+                id="btn-mute-global"
+            >
+                <span
+                    class="eldora-menu-icone"
+                    id="som-icon"
+                >
+                    🔊
+                </span>
+ 
+                <span class="texto">
+                    Som
+                </span>
+            </button>
+
+
+            <button
+                onclick="window.location.href='/login'"
+                class="menu-btn eldora-menu-btn eldora-menu-sair"
+            >
+                <span class="eldora-menu-icone">
+                    🚪
+                </span>
+
+                <span class="texto">
+                    Trocar Herói
+                </span>
+            </button>
+  
+        </div>
+
+    </nav>
+
+    <div id="aba-reino" class="tab-content active">
     
-    <script src="/static/js/caca.js?v=1"></script>
+        <div id="game-container"></div>
+        
+        {% include 'combate.html' %}
+        {% include 'arena_pvp.html' %}
+        {% include 'arena_raid.html' %}
+        {% include 'batalha_pve.html' %}
+        {% include 'dimensional_boss.html' %}
+        {% include 'loja_aventureiro.html' %} 
+        {% include 'joystick.html' %} 
 
-    <div id="aba-ranking" class="tab-content">
-        <div id="container-menu-ranking">
-            <div class="home-banner"><img src="/static/banner_competicoes.jpg" onerror="this.src='https://placehold.co/600x200/111/333?text=Competições+do+Reino'"></div>
-            <div class="welcome-card"><p>Escolha uma categoria abaixo para ver quem são os heróis que estão gravando seus nomes na história de Eldora.</p></div>
-            <div id="menu-ranking">
-                <button class="game-menu-btn" onclick="abrirTabelaRanking('level', '👑 Heróis Lendários')">
-                    <div class="btn-icon">👑</div><div class="btn-text"><span class="btn-title">Ranking de Nível</span><span class="btn-subtitle">Os guerreiros mais experientes</span></div><div class="btn-arrow">➔</div>
-                </button>
-                <button class="game-menu-btn" onclick="abrirTabelaRanking('ouro', '💰 Os Mais Ricos')">
-                    <div class="btn-icon">💰</div><div class="btn-text"><span class="btn-title">Cofres Reais</span><span class="btn-subtitle">Jogadores com mais ouro</span></div><div class="btn-arrow">➔</div>
-                </button>
-                <button class="game-menu-btn" onclick="abrirTabelaRanking('pvp', '⚔️ Mestres da Arena')">
-                    <div class="btn-icon">⚔️</div><div class="btn-text"><span class="btn-title">Arena PvP</span><span class="btn-subtitle">Os campeões de combate</span></div><div class="btn-arrow">➔</div>
-                </button>
-                <button class="game-menu-btn" onclick="abrirTabelaRanking('guildas', '🏰 Supremacia de Guildas')">
-                    <div class="btn-icon">🏰</div><div class="btn-text"><span class="btn-title">Guildas</span><span class="btn-subtitle">Clãs mais poderosos</span></div><div class="btn-arrow">➔</div>
-                </button>
-            </div>
-        </div>
-
-        <div id="conteudo-ranking" style="display: none;">
-            <button onclick="voltarParaMenuRanking()" style="background: none; border: none; color: #f39c12; font-size: 1em; cursor: pointer; margin-bottom: 15px; display: flex; align-items: center; gap: 5px;">⬅️ Voltar</button>
-            <div style="position: relative; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.8); background: #000; border: 1px solid #333;">
-                <img id="img-banner-ranking" src="" onerror="this.src='https://placehold.co/800x300/111/333?text=Reino+de+Eldora'" style="width: 100%; height: 160px; object-fit: cover; display: block;">
-                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.95) 100%);"></div>
-                <div style="position: absolute; bottom: 15px; width: 100%; text-align: center;">
-                    <h2 id="titulo-tabela-ranking" style="margin: 0; font-size: 1.6em; text-shadow: 2px 2px 8px #000; color: #f39c12; text-transform: uppercase; letter-spacing: 2px; font-weight: 800;">...</h2>
-                    <p id="desc-tabela-ranking" style="margin: 5px 0 0 0; color: #ffffff; font-size: 0.9em; text-shadow: 1px 1px 4px #000; font-weight: 400; opacity: 0.9;"></p>
-                </div>
-            </div>
-            <table>
-                <thead><tr><th style="width: 15%;">#</th><th>Jogador</th><th style="text-align: right;">Status</th></tr></thead>
-                <tbody id="corpo-tabela-ranking"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="aba-wiki" class="tab-content">
-        <h2 style="text-align: center; font-size: 1.1em; color: #f39c12;">📖 Enciclopédia</h2>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <button onclick="carregarRegioes()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">🗺️ Regiões</button>
-            <button onclick="carregarMonstros()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">👹 Monstros</button>
-            <button onclick="carregarClasses()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">🎭 Classes</button>
-            <button onclick="carregarItens()" style="padding: 15px; background: #252525; color: white; border: 1px solid #f39c12; border-radius: 8px; cursor: pointer;">⚔️ Itens</button>
-        </div>
-        <div id="conteudo-wiki" style="margin-top: 25px; text-align: left;"></div>
-    </div>
-
-    <div id="aba-perfil" class="tab-content">
-        <div id="perfil-carregando" style="text-align: center; padding: 50px;">
-            <p id="perfil-msg-carregando">Consultando os registros reais... 📜</p>
-        </div>
-
-        <div id="perfil-dados" style="display: none;">
-            <div style="background: linear-gradient(135deg, #2c3e50, #1a1a1a); padding: 20px; border-radius: 15px; border: 2px solid #f39c12; text-align: center; margin-bottom: 20px;">
-                <img id="perf-avatar" src="" onerror="this.src='https://placehold.co/100x100/111/f39c12?text=?'" style="width: 110px; height: 110px; border-radius: 10px; border: 2px solid #f39c12; margin-bottom: 10px; object-fit: cover; object-position: top;">
-                <h2 id="perf-nome" style="margin: 0; color: #f39c12; font-size: 1.6em; text-shadow: 2px 2px 4px #000;">...</h2>
-                <span id="perf-classe" style="background: #f39c12; color: #000; padding: 3px 12px; border-radius: 5px; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">...</span>
+        <div id="hud-moderno" onclick="if(typeof toggleMenuStatus === 'function') toggleMenuStatus()">
+            <svg class="hud-svg-aneis" viewBox="0 0 160 160">
+                <circle id="fundo-hp" class="anel-barra" cx="80" cy="80" r="62" fill="none" />
+                <circle id="fundo-mp" class="anel-barra" cx="80" cy="80" r="52" fill="none" />
+                <circle id="fundo-xp" class="anel-barra" cx="80" cy="80" r="74" fill="none" />
+    
+                <circle id="barra-hp-css" class="anel-barra" cx="80" cy="80" r="62" fill="none" style="stroke-dashoffset: 390; stroke-dasharray: 390;" />
+                <circle id="barra-mp-css" class="anel-barra" cx="80" cy="80" r="52" fill="none" style="stroke-dashoffset: 326; stroke-dasharray: 326;" />
+                <circle id="barra-xp-css" class="anel-barra" cx="80" cy="80" r="74" fill="none" style="stroke-dashoffset: 465; stroke-dasharray: 465;" />
+            </svg>
+            
+            <div class="hud-mascara-avatar">
+                <img id="hud-img-avatar" src="https://placehold.co/80" alt="Avatar">
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                <div style="background: #1e1e1e; padding: 10px; border-radius: 8px; border: 1px solid #c0392b;">
-                    <span style="color: #e74c3c; font-size: 0.7em; font-weight: bold;">❤️ HP</span>
-                    <div style="font-size: 1em; color: #fff;" id="perf-hp-texto">0/0</div>
-                </div>
-                <div style="background: #1e1e1e; padding: 10px; border-radius: 8px; border: 1px solid #2980b9;">
-                    <span style="color: #3498db; font-size: 0.7em; font-weight: bold;">⚡ ENERGIA</span>
-                    <div style="font-size: 1em; color: #fff;" id="perf-energia">0</div>
-                </div>
-            </div>
+            <div id="label-hp" class="hud-info-box">HP: 0%</div>
+            <div id="label-mp" class="hud-info-box">MP: 0%</div>
+            <div id="label-xp" class="hud-info-box">XP: 0%</div>
+        </div>
+    
+        <div id="online-counter">
+            <div class="dot-green"></div>
+            <span id="online-count-text">Sincronizando...</span>
+        </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                <div style="background: #252525; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #333;">
-                    <span style="color: #aaa; font-size: 0.7em; display: block;">OURO</span>
-                    <strong id="perf-ouro" style="color: #ffd700; font-size: 1.2em;">0</strong>
+        <button id="btn-chat-mapa" class="btn-social-mapa" style="transition: transform 0.2s;" onclick="document.getElementById('hub-social').style.display='flex'; document.querySelectorAll('.btn-passe-mapa, .btn-social-mapa').forEach(b => b.style.display='none'); let badge = document.getElementById('badge-chat-mapa'); if(badge) badge.remove(); window.totalNotificacoesMapa = 0;">
+            <img src="/static/assets/sprites/ui/icone_chat.png" alt="Chat">
+        </button>
+        
+        <div id="hub-social" class="modal-moderno" style="display: none;">
+            <div class="perfil-container-moderno social-container">
+                <div class="social-header">
+                    <h2 style="margin: 0; font-size: 1.2em; color: #f1c40f;">🍻 Taverna de Eldora</h2>
+                    <button class="btn-fechar-social" onclick="const inputChat=document.getElementById('input-chat'); if(inputChat) inputChat.blur(); document.getElementById('hub-social').style.display='none'; document.querySelectorAll('.btn-passe-mapa, .btn-social-mapa').forEach(b => b.style.display='flex');">X</button>
                 </div>
-                <div style="background: #252525; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #333;">
-                    <span style="color: #aaa; font-size: 0.7em; display: block;">GEMAS</span>
-                    <strong id="perf-gems" style="color: #00f2fe; font-size: 1.2em;">0</strong>
-                </div>
-            </div>
-
-            <div style="background: #252525; padding: 15px; border-radius: 10px; border: 1px solid #333; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 5px;">
-                    <span style="color: #aaa;">Experiência (Nível <span id="perf-lvl">0</span>)</span>
-                    <span id="perf-xp-texto" style="color: #fff;">0 / 0</span>
-                </div>
-                <div style="width: 100%; height: 8px; background: #111; border-radius: 4px; overflow: hidden;">
-                    <div id="perf-xp-barra" style="width: 0%; height: 100%; background: linear-gradient(90deg, #8e44ad, #9b59b6); transition: 0.8s;"></div>
-                </div>
-            </div>
             
-            <div id="card-pontos" style="background: #1e1e1e; padding: 10px; border-radius: 8px; border-left: 4px solid #f1c40f; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: #ccc; font-size: 0.85em;">🎯 Pontos Disponíveis:</span>
-                <strong id="perf-pontos" style="color: #f1c40f; font-size: 1.1em;">0</strong>
+                <div class="social-abas">
+                    <button class="aba-soc active" onclick="mudarAbaSocial('chat', this)">Chat</button>
+                    <button class="aba-soc" onclick="mudarAbaSocial('amigos', this)">Amigos</button>
+                    <button class="aba-soc" onclick="mudarAbaSocial('grupo', this)">Grupo</button>
+                    <button class="aba-soc" onclick="mudarAbaSocial('guilda', this)">Guilda</button>
+                </div>
+
+                <div id="conteudo-social" class="social-content">
+                    <div id="chat-box" class="chat-historico">
+                        <p style="color: #64748b; text-align: center; font-size: 0.8em;">Bem-vindo ao chat global!</p>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="input-chat" placeholder="Fale com o reino...">
+                        <button onclick="enviarMensagemChat()">Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🔍 MINI-MENU FLUTUANTE (Inspeção de Jogador) -->
+        <div id="menu-inspecao" class="menu-flutuante" style="display: none;">
+            <!-- 🌟 CABEÇALHO COM BOTÃO DE FECHAR 🌟 -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ca8a04; padding-bottom: 8px; margin-bottom: 5px;">
+                <strong id="inspecao-nome" style="color: #facc15; font-family: 'Cinzel', serif; font-size: 1.1em; letter-spacing: 1px;">Herói</strong>
+                <span onclick="document.getElementById('menu-inspecao').style.display='none'" style="color: #ef4444; cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 0 5px; transition: 0.2s;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#ef4444'">X</span>
             </div>
 
-            <button class="game-menu-btn" style="padding: 10px; margin-top: 15px;"><div class="btn-icon">🎒</div><div class="btn-text"><span class="btn-title" style="font-size: 0.9em;">Ver Inventário</span></div></button>
-            
-            <button onclick="sairDoJogo()" style="width: 100%; padding: 12px; margin-top: 10px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); border: 1px solid #e74c3c; color: white; border-radius: 8px; font-weight: bold; font-size: 1em; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px;">
-                🚪 Trocar Personagem
+            <!-- BOTÕES DE AÇÃO -->
+            <button onclick="window.acaoInspecao('perfil')">🕵️ Ver Perfil</button>
+            <button onclick="window.acaoInspecao('sussurrar')">💬 Mensagem Direta</button>
+            <button onclick="window.acaoInspecao('amigo')">🤝 Add Amigo</button>
+            <button onclick="window.acaoInspecao('grupo')">⚔️ Convidar p/ Grupo</button>
+            <button onclick="acaoInspecao('desafiar')" class="btn-desafio-pvp">⚔️ Duelar ⚔️</button>
+            <!-- BOTÃO CANCELAR NO FINAL (Opcional, mas muito bom para mobile) -->
+            <button onclick="document.getElementById('menu-inspecao').style.display='none'" style="color: #94a3b8; border-top: 1px solid #334155; margin-top: 5px; padding-top: 10px; text-align: center; font-size: 0.9em;">
+                Cancelar
             </button>
         </div>
+        
+        {% include 'expressoes.html' %}
+        {% include 'loja_reino.html' %}
+        {% include 'loja_premium.html' %}
+        {% include 'forja.html' %}
+        {% include 'refinaria.html' %}
+        {% include 'mercado.html' %}
+        {% include 'central_eldora.html' %}
+        {% include 'cla.html' %}
+        {% include 'guild_missions.html' %} 
+
+        
+        <div class="btn-passe-mapa" title="Passe de Temporada" onclick="window.location.href='/passe'" style="z-index: 10 !important;">
+            <img src="https://github.com/user-attachments/assets/d53445cd-a675-4f6b-bf3f-b8135653f0bb" alt="Passe">
+        </div>
     </div>
     
-    <nav>
-        <button id="btn-home" class="active" onclick="mudarAba('home')">
-            <i class="nav-icon-emoji">🏠</i><span class="nav-text">Início</span>
-        </button>
-        
-        <button id="btn-reino" onclick="mudarAba('reino')">
-            <i class="nav-icon-emoji">🏰</i><span class="nav-text">Reino</span>
-        </button>
-        
-        <button id="btn-ranking" onclick="mudarAba('ranking')">
-            <i class="nav-icon-emoji">🏆</i><span class="nav-text">Ranking</span>
-        </button>
-        
-        <button id="btn-wiki" onclick="mudarAba('wiki')">
-            <i class="nav-icon-emoji">📖</i><span class="nav-text">Wiki</span>
-        </button>
-        
-        <button id="btn-perfil" onclick="mudarAba('perfil')">
-            <i class="nav-icon-emoji">👤</i><span class="nav-text">Perfil</span>
-        </button>
-    </nav>
-    
-    <script src="/static/js/combate.js?v=10"></script>
-    <script src="/static/js/magias.js?v=2"></script>
-    <script src="/static/js/reino.js?v=6"></script>
-    <script src="/static/js/main.js?v=6"></script>
-    <script src="/static/js/perfil.js?v=6"></script>
-    <script src="/static/js/ranking.js?v=6"></script>
-    <script src="/static/js/wiki.js?v=6"></script>
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
-    <link rel="stylesheet" href="/static/css/efeitos_autohunt.css?v=1">
+    <div id="aba-perfil" class="tab-content" style="background: transparent;">
+
+        <div style="position: absolute; top: 75px; right: 8px; z-index: 30;">
+            <button onclick="if(window.abrirCodiceHunter) window.abrirCodiceHunter()" 
+                    style="background: #2b1d12; border: 2px solid #d4af37; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: transform 0.2s;"
+                    onmouseover="this.style.transform='scale(1.1)'" 
+                    onmouseout="this.style.transform='scale(1)'"
+                    title="Códice do Caçador">
+                📖
+            </button>
+        </div>
+
+        <div id="conteudo-perfil-wrapper">
+            <div id="perfil-carregando">
+                <p id="perfil-msg-carregando" style="text-align: center; color: #888; padding: 30px;">
+                    Sincronizando com Eldora... ⏳
+                </p>
+            </div>
+            <div id="perfil-dados" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div id="modal-editar-perfil" class="modal-moderno" style="display:none; z-index: 10001;"></div>
+
+    <div id="modal-ver-perfil" class="modal-moderno" style="display:none; z-index: 10070;">
+        <div class="perfil-container-moderno" style="max-width: 320px; text-align: center; position: relative; padding: 15px;">
+            <button onclick="document.getElementById('modal-ver-perfil').style.display='none'" style="position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #ef4444; font-size: 1.2em; font-weight: bold; cursor: pointer; z-index: 10;">X</button>
+            <div id="conteudo-ver-perfil"></div>
+        </div> 
+    </div>
+    <script src="/static/js/audio_manager.js?v=1"></script>
+    <script src="/static/js/forja.js"></script>
+    <script src="/static/js/refinaria.js?v=2"></script>
+    <script src="/static/js/npc_missoes_ui.js"></script>
+    <script src="/static/js/profissao_ui.js"></script>
+    <script src="/static/js/hud_core.js?v=aqui112"></script>
+    <script src="/static/js/perfil_visual.js?v=1112"></script>
+    <script src="/static/js/perfil.js?v=1112"></script>
+    <script src="/static/js/bestiario.js?v=1"></script>
+    <script src="/static/js/mapa_hud.js?v=19"></script>
+    <script src="/static/js/hud_invasao.js"></script>
+    <script src="/static/js/mapa_invasao.js?v=1"></script>
+    <script src="/static/js/mapa_interativo.js?v=12"></script>
+    <script src="/static/js/mapa_multiplayer.js?v=24"></script>
+    <script src="/static/js/mercado.js?v=1252"></script>
+    <script src="/static/js/central_eldora.js?v=2"></script>
+    <script src="/static/js/cla.js?v=8"></script>
+    <script src="/static/js/guild_missions.js?v=1"></script>
+    <script src="/static/js/loja_aventureiro.js?v=3"></script>
+    <script src="/static/js/loja_reino.js?v=1"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="/static/js/loja_premium.js?v=4"></script>
+    <script src="/static/js/npcs_engine.js?v=13"></script>
+    <script src="/static/js/mapa_cacada.js?v=243"></script> 
+    <script src="/static/js/combate.js?v=2"></script>
+    <script src="/static/js/arena_pvp.js?v=1"></script>
+    <script src="/static/js/batalha_pve.js?v=1"></script>
+    <script src="/static/js/dimensional_boss.js?v=15"></script>
+    <script src="{{ url_for('static', filename='js/joystick.js') }}"></script>
+    <!-- 🌀 SISTEMA DE PORTAIS -->
+    <script src="/static/js/portal_manager.js?v=1"></script>
+    <script src="/static/js/mapa.js?v=9913"></script>
+
+    <script>
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+
+        // ==========================================
+        // 1. SISTEMA DA BARRA DE PROGRESSO
+        // ==========================================
+        window.atualizarCarregamento = function(porcentagem, mensagem) {
+            const barra = document.getElementById('loading-barra');
+            const txtPorcentagem = document.getElementById('loading-porcentagem');
+            const msgTexto = document.getElementById('loading-msg');
+            
+            if (barra) barra.style.width = porcentagem + '%';
+            if (txtPorcentagem) txtPorcentagem.innerText = porcentagem + '%';
+            if (msgTexto && mensagem) msgTexto.innerText = mensagem;
+        };
+
+        // O Phaser (Motor do Jogo) vai chamar essa função quando renderizar tudo!
+        window.finalizarCarregamento = function() {
+            window.atualizarCarregamento(100, "Portal Aberto!");
+            setTimeout(() => {
+                const telaLoad = document.getElementById('tela-carregamento');
+                if (telaLoad) {
+                    telaLoad.style.opacity = '0'; // Efeito de sumir
+                    setTimeout(() => telaLoad.style.display = 'none', 800); // Apaga do HTML
+                }
+            }, 500); // Fica meio segundo no 100% pro jogador ver
+        };
+
+        // ==========================================
+        // 2. TRAVA DE SEGURANÇA
+        // ==========================================
+        window.verificarAcessoEldora = async function() {
+            window.atualizarCarregamento(10, "Lendo memórias do jogador...");
+
+            const charId = localStorage.getItem("jogadorEldoraID");
+            
+            if (!charId || charId === "undefined" || charId === "null") {
+                window.location.replace('/login');
+                return false; 
+            }
+
+            try {
+                window.atualizarCarregamento(30, "Consultando os Deuses de Eldora...");
+                const res = await fetch(`/perfil/${charId}?t=${new Date().getTime()}`);
+
+                if (res.status === 404) {
+                    console.error("🚨 404: Personagem não encontrado!");
+                    localStorage.removeItem("jogadorEldoraID");
+                    localStorage.removeItem("jogadorEldoraNome");
+                    window.location.replace('/login');
+                    return false;
+                }
+
+                // Paramos em 50%! O resto do carregamento será feito pelo Mapa.js
+                window.atualizarCarregamento(50, "Iniciando Motor Gráfico...");
+                return true;
+
+            } catch (e) {
+                console.error("Falha de conexão:", e);
+                window.atualizarCarregamento(50, "Modo de recuperação ativado...");
+                return true; 
+            }
+        };
+
+        function abrirMenu() {
+            // Se alguma tela/modal estiver aberta, o menu não abre por cima.
+            if (document.body.classList.contains('ui-modal-aberta')) {
+                return;
+            }
+
+            document.body.classList.add('menu-aberto');
+            document.getElementById('side-menu').classList.add('aberto');
+            document.getElementById('menu-overlay').classList.add('ativo');
+        }
+
+        function fecharMenu() {
+            document.body.classList.remove('menu-aberto');
+            document.getElementById('side-menu').classList.remove('aberto');
+            document.getElementById('menu-overlay').classList.remove('ativo');
+       }
+
+        window.ocultarMenuGlobalEldora = function() {
+            fecharMenu();
+            document.body.classList.add('ui-modal-aberta');
+        };
+
+        window.mostrarMenuGlobalEldora = function() {
+            document.body.classList.remove('ui-modal-aberta');
+        };
+
+        function showTab(tabId) {
+            const idCache = localStorage.getItem("jogadorEldoraID");
+            if (!idCache || idCache === "undefined" || idCache === "null") {
+                window.location.replace('/login');
+                return;
+            }
+
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#side-menu button').forEach(btn => btn.classList.remove('active'));
+            
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+
+            if (tabId === 'aba-reino') document.getElementById('nav-btn-reino')?.classList.add('active');
+            if (tabId === 'aba-perfil') document.getElementById('nav-btn-perfil')?.classList.add('active');
+
+            const btnMissoes = document.getElementById('btn-quest-log') || document.querySelector('[onclick*="toggleDiarioQuests"]');
+            if (btnMissoes) {
+                if (tabId === 'aba-reino') {
+                    btnMissoes.style.display = 'flex'; 
+                } else {
+                    btnMissoes.style.display = 'none'; 
+                }
+            }
+
+            if (tabId === 'aba-reino') {
+
+                setTimeout(() => {
+
+                    if (!window.jogoEldora) {
+
+                        const skin =
+                            window.perfilDadosGlobais?.skin_mapa ||
+                            window.minhaSkinAtual ||
+                            localStorage.getItem("skinEquipada") ||
+                            "aventureiro";
+
+                        let savedX = parseInt(
+                            localStorage.getItem("eldora_lastX")
+                        );
+
+                        let savedY = parseInt(
+                            localStorage.getItem("eldora_lastY")
+                        );
+
+                        let savedRegiao =
+                            localStorage.getItem("eldora_lastRegiao");
+
+                        let spawnX = savedX || (27 * 32);
+                        let spawnY = savedY || (29 * 32);
+                        let regiao = savedRegiao || 'capital_eldora';
+
+                        if (typeof iniciarMapa === 'function') {
+                            iniciarMapa(
+                                regiao,
+                                skin,
+                                spawnX,
+                                spawnY
+                            );
+                        }
+                    }
+
+                }, 50);
+            }
+
+            if (tabId === 'aba-perfil' && typeof carregarMeuPerfil === 'function') carregarMeuPerfil();
+        }
+
+        window.onload = async () => {
+
+            const sessaoValida = await window.verificarAcessoEldora();
+
+            if (!sessaoValida) return;
+
+            // ==========================================
+            // 🛡️ PRIMEIRO CARREGA O HERÓI COMPLETAMENTE
+            // ==========================================
+            if (typeof carregarMeuPerfil === 'function') {
+                try {
+
+                    await carregarMeuPerfil();
+
+                    console.log(
+                        "✅ Perfil carregado antes do mapa.",
+                        localStorage.getItem("skinEquipada")
+                    );
+
+                } catch (erro) {
+
+                    console.error(
+                        "❌ Erro ao carregar perfil antes do mapa:",
+                        erro
+                    );
+                }
+            }
+
+            // ==========================================
+            // 🌍 SÓ AGORA CRIA O MAPA
+            // ==========================================
+            showTab('aba-reino');
+        };
+    </script>
+
 </body>
 </html>

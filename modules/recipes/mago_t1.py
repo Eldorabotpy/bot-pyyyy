@@ -1,19 +1,12 @@
 # modules/recipes/mago_t1.py
 # -*- coding: utf-8 -*-
-# =========================================
-# TIER 1 — Receitas do Mago (nível prof. 5+)
-# =========================================
+from __future__ import annotations
+from typing import Dict, Any
 
-# Padrão de raridade T1 (comum, bom, raro, épico, lendário)
-RARITY_T1 = {
-    "comum": 0.90,     # Aumentei para 90% (mais lixo)
-    "bom": 0.09,       # Diminuí para 9%
-    "raro": 0.009,     # 0.9%
-    "epico": 0.0009,   # 0.09%
-    "lendario": 0.0001 # 0.01% (Extremamente raro)
-}
+# TIER 1: RECEITAS 
+# ============================================================================
 
-RECIPES = {
+RECIPES: Dict[str, Dict[str, Any]] = {
     # ---------- Arma (Armeiro) ----------
     "work_cajado_aprendiz_mago": {
         "display_name": "Cajado de Aprendiz",
@@ -23,11 +16,10 @@ RECIPES = {
         "time_seconds": 480,  # 8 minutos
         "xp_gain": 25,
         # T1 usa madeira comum (padronizado com outros T1)
-        "inputs": {"madeira": 12, "gema_bruta": 2, "nucleo_forja_fraco": 1},
+        "inputs": {"madeira": 12, "gema_bruta": 2, "nucleo_de_forja": 1},
         "result_base_id": "cajado_aprendiz_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
         "damage_info": {"type": "arcano", "min_damage": 15, "max_damage": 20},
     },
@@ -40,11 +32,10 @@ RECIPES = {
         "level_req": 5,
         "time_seconds": 300,  # 5 minutos
         "xp_gain": 20,
-        "inputs": {"linho": 10, "pano_simples": 5, "nucleo_forja_fraco": 1},
+        "inputs": {"linho": 10, "pano_simples": 5, "nucleo_de_forja": 1},
         "result_base_id": "chapeu_seda_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
     "work_tunica_seda_mago": {
@@ -54,11 +45,10 @@ RECIPES = {
         "level_req": 7,
         "time_seconds": 600,  # 10 minutos
         "xp_gain": 35,
-        "inputs": {"linho": 20, "pano_simples": 10, "nucleo_forja_fraco": 1},
+        "inputs": {"linho": 20, "pano_simples": 10, "nucleo_de_forja": 1},
         "result_base_id": "tunica_seda_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
     "work_calcas_seda_mago": {
@@ -68,11 +58,10 @@ RECIPES = {
         "level_req": 6,
         "time_seconds": 420,  # 7 minutos
         "xp_gain": 30,
-        "inputs": {"linho": 15, "pano_simples": 8, "nucleo_forja_fraco": 1},
+        "inputs": {"linho": 15, "pano_simples": 8, "nucleo_de_forja": 1},
         "result_base_id": "calcas_seda_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
     "work_botas_seda_mago": {
@@ -82,11 +71,10 @@ RECIPES = {
         "level_req": 5,
         "time_seconds": 240,  # 4 minutos
         "xp_gain": 15,
-        "inputs": {"linho": 8, "pano_simples": 3, "nucleo_forja_fraco": 1},
+        "inputs": {"linho": 8, "pano_simples": 3, "nucleo_de_forja": 1},
         "result_base_id": "botas_seda_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
     "work_luvas_seda_mago": {
@@ -96,11 +84,10 @@ RECIPES = {
         "level_req": 5,
         "time_seconds": 240,  # 4 minutos
         "xp_gain": 15,
-        "inputs": {"linho": 8, "pano_simples": 3, "nucleo_forja_fraco": 1},
+        "inputs": {"linho": 8, "pano_simples": 3, "nucleo_de_forja": 1},
         "result_base_id": "luvas_seda_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
 
@@ -112,11 +99,10 @@ RECIPES = {
         "level_req": 5,
         "time_seconds": 360,  # 6 minutos
         "xp_gain": 40,
-        "inputs": {"fio_de_prata": 3, "gema_bruta": 2, "nucleo_forja_fraco": 1},
+        "inputs": {"fio_de_prata": 3, "gema_bruta": 2, "nucleo_de_forja": 1},
         "result_base_id": "anel_gema_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
     "work_colar_gema_mago": {
@@ -126,11 +112,10 @@ RECIPES = {
         "level_req": 9,
         "time_seconds": 450,  # 7.5 minutos
         "xp_gain": 50,
-        "inputs": {"fio_de_prata": 4, "gema_bruta": 3, "nucleo_forja_fraco": 1},
+        "inputs": {"fio_de_prata": 4, "gema_bruta": 3, "nucleo_de_forja": 1},
         "result_base_id": "colar_gema_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
     "work_brinco_gema_mago": {
@@ -140,11 +125,10 @@ RECIPES = {
         "level_req": 7,
         "time_seconds": 300,  # 5 minutos
         "xp_gain": 35,
-        "inputs": {"fio_de_prata": 2, "gema_bruta": 1, "nucleo_forja_fraco": 1},
+        "inputs": {"fio_de_prata": 2, "gema_bruta": 1, "nucleo_de_forja": 1},
         "result_base_id": "brinco_gema_mago",
         "unique": True,
         "class_req": ["mago"],
-        "rarity_chances": dict(RARITY_T1),
         "affix_pools_to_use": ["mago", "geral"],
     },
 }

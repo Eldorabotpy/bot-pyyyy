@@ -70,13 +70,23 @@ def get_crit_params(stats: dict) -> dict:
 def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) -> tuple[int, bool, bool]:
     """
     Rola o dano aplicando crítico, mega crítico, sorte excedente
-    e agora SUPORTE A ESQUIVA + ACERTO GARANTIDO.
+    e agora SUPORTE A ESQUIVA, ACERTO GARANTIDO E DANO MÁGICO.
     """
     if options is None:
         options = {}
 
-    raw_attack = int(attacker_stats.get('attack', 0))
-    target_defense = int(target_stats.get('defense', 0))
+    # ==========================================
+    # 1. IDENTIFICAÇÃO DO ATRIBUTO (A CORREÇÃO)
+    # ==========================================
+    is_magic = options.get("is_magic", False)
+
+    if is_magic or options.get("damage_type") == "magic":
+        # Tenta puxar o 'magic_attack' novo. Se não achar, usa a 'inteligencia' velha!
+        base_atk = float(attacker_stats.get("magic_attack", attacker_stats.get("inteligencia", 0)))
+    else:
+        base_atk = float(attacker_stats.get("attack", 0))
+
+    target_defense = float(target_stats.get("defense", 0))
 
     # ==========================
     # ESQUIVA DO ALVO (TARGET EVADE)
@@ -84,12 +94,65 @@ def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) 
     cannot_be_dodged = bool(options.get("cannot_be_dodged", False))
 
     if not cannot_be_dodged:
-        target_ini = float(target_stats.get("initiative", 0) or 0)
-        attacker_acc = float(attacker_stats.get("accuracy_flat", 0) or 0)
+        target_ini = float(
+            target_stats.get(
+                "initiative",
+                0
+            )
+            or 0
+        )
 
-        # Chance base de esquiva (máx 25%)
-        evade_chance = min(0.25, (target_ini * 0.25) / 100.0)
-        evade_chance = max(0.0, evade_chance - attacker_acc)
+
+        attacker_acc = float(
+            attacker_stats.get(
+                "accuracy_flat",
+                0.0
+            )
+            or 0.0
+        )
+
+
+        dodge_flat = float(
+            target_stats.get(
+                "dodge_chance_flat",
+                0.0
+            )
+            or 0.0
+        )
+
+
+        # Chance natural por iniciativa.
+        # Mantemos a fórmula atual do
+        # combat_engine: máximo natural 25%.
+        evade_base = min(
+            0.25,
+            (
+                target_ini *
+                0.25
+            )
+            /
+            100.0,
+        )
+
+
+        # Bônus direto de equipamento/passiva.
+        # O limite total segue o helper oficial
+        # existente em stats.py: 75%.
+        evade_chance = min(
+            0.75,
+            evade_base
+            +
+            dodge_flat,
+        )
+
+
+        # Precisão do atacante reduz esquiva.
+        evade_chance = max(
+            0.0,
+            evade_chance
+            -
+            attacker_acc,
+        )
 
         if random.random() < evade_chance:
             # Esquivou completamente
@@ -114,7 +177,9 @@ def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) 
 
     if is_crit:
         if random.random() * 100.0 <= float(params.get("mega_chance", 0.0)):
-            crit_mult, is_mega = float(params.get("mega_mult", 2.0)), True
+            crit_mult, is_mega = float(params.get("mega_chance", 2.0)), True # Garantia de fallback
+            if "mega_mult" in params:
+                 crit_mult = float(params.get("mega_mult", 2.0))
         else:
             crit_mult = float(params.get("mult", 1.6))
 
@@ -124,14 +189,14 @@ def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) 
     # ==========================
     # CÁLCULO FINAL DE DANO
     # ==========================
-    attack_with_skill = float(raw_attack) * skill_mult
+    attack_with_skill = base_atk * skill_mult
     boosted_attack = math.ceil(attack_with_skill * crit_mult)
 
-    damage_type = options.get("damage_type", "physical")
-
-    if damage_type == "magic":
-        final_damage = max(int(params.get("min_damage", 1)), boosted_attack)
+    if is_magic or options.get("damage_type") == "magic":
+        # Magia ignora a defesa física básica nesta fórmula (já foi mitigada no combat_engine)
+        final_damage = max(int(params.get("min_damage", 1)), int(boosted_attack))
     else:
-        final_damage = max(int(params.get("min_damage", 1)), boosted_attack - target_defense)
+        # Ataque Físico normal bate de frente com a armadura do monstro
+        final_damage = max(int(params.get("min_damage", 1)), int(boosted_attack - target_defense))
 
-    return final_damage, is_crit, is_mega
+    return int(final_damage), is_crit, is_mega

@@ -176,10 +176,10 @@ def spend_energy(player_data: dict, amount: int) -> bool:
 
             async def _bg_mission():
                 try:
-                    from modules import mission_manager
+                    from modules import missoes
                     # ✅ 100% ObjectId
                     if real_id:
-                        await mission_manager.update_mission_progress(real_id, "spend_energy", "any", amount)
+                        await missoes.update_mission_progress(real_id, "spend_energy", "any", amount)
                 except Exception:
                     pass
 

@@ -10,6 +10,8 @@ SKILL_DATA = {
 
     "evo_knight_aegis": {
         "display_name": "Égide do Cavaleiro",
+        "icon": "knight_aegis",
+        "anim_effect": "brilho_dourado_escudo",
         "type": "passive",
         "description": "Sua dedicação à defesa aumenta seu HP máximo e sua Defesa Física.",
         "allowed_classes": ["guerreiro"],
@@ -35,6 +37,8 @@ SKILL_DATA = {
     "evo_templar_divine_light": {
         "display_name": "Luz Divina do Templário",
         "type": "support",  # <--- Focamos no Suporte para garantir a Cura/Buff
+        "icon": "templar_divine_light",
+        "anim_effect": "pilar_luz_sagrada",
         "description": "Invoca a Luz Divina, curando aliados e punindo inimigos com poder sagrado.",
         "allowed_classes": ["guerreiro"],
         "rarity_effects": {
@@ -94,6 +98,7 @@ SKILL_DATA = {
     "evo_divine_guardian_fortress": {
         "display_name": "Fortaleza do Guardião Divino",
         "type": "passive",
+        "icon": "divine_guardian_fortress",
         "description": "Sua fé e aço se unem, tornando-o uma fortaleza impenetrável.",
         "allowed_classes": ["guerreiro"],
         "rarity_effects": {
@@ -121,6 +126,7 @@ SKILL_DATA = {
     "evo_aegis_avatar_incarnate": {
         "display_name": "Encarnação da Égide",
         "type": "support",  # <--- Ativa o sistema de logs de grupo
+        "icon": "aegis_avatar_incarnate",
         "description": "Torna-se a proteção divina, refletindo dano e recusando a morte.",
         "allowed_classes": ["guerreiro"],
         "rarity_effects": {
@@ -168,6 +174,7 @@ SKILL_DATA = {
 
     "evo_divine_legend_miracle": {
         "display_name": "Milagre da Lenda Divina",
+        "icon": "divine_legend_miraclee",
         "type": "passive",  # <--- Aura processada pelo stats.py
         "description": "Sua presença lendária inspira milagres, protegendo todo o grupo da morte.",
         "allowed_classes": ["guerreiro"],
@@ -226,6 +233,7 @@ SKILL_DATA = {
 
     "evo_barbarian_wrath": {
         "display_name": "Ira do Bárbaro",
+        "icon": "barbarian_wrath",
         "type": "passive",
         "description": "A fúria alimenta seus golpes, aumentando seu ataque e tenacidade.",
         "allowed_classes": ["berserker"],
@@ -249,6 +257,7 @@ SKILL_DATA = {
 
     "evo_savage_reckless_blows": {
         "display_name": "Golpes Impiedosos do Selvagem",
+        "icon": "savage_reckless_blows",
         "type": "active", # Buff
         "description": "Abraça a fúria total, sacrificando sua defesa por um poder de ataque avassalador.",
         "allowed_classes": ["berserker"],
@@ -279,6 +288,7 @@ SKILL_DATA = {
 
     "evo_primal_wrath_armorbreaker": {
         "display_name": "Quebra-Armadura da Ira Primordial",
+        "icon": "primal_wrath_armorbreaker",
         "type": "passive",
         "description": "A encarnação da raiva. Seus golpes são tão poderosos que ignoram defesas.",
         "allowed_classes": ["berserker"],
@@ -303,6 +313,7 @@ SKILL_DATA = {
 
     "evo_calamity_shatter_earth": {
         "display_name": "Ruína da Calamidade",
+        "icon": "calamity_shatter_earth",
         "type": "active", # Ataque AoE
         "description": "Um desastre natural ambulante. Bate no chão com fúria apocalíptica, destruindo tudo.",
         "allowed_classes": ["berserker"],
@@ -333,6 +344,7 @@ SKILL_DATA = {
 
     "evo_wrath_god_undying_rage": {
         "display_name": "Fúria Imortal do Deus da Ira",
+        "icon": "wrath_god_undying_rage",
         "type": "passive",
         "description": "A fúria de um deus o impede de morrer, desencadeando um poder inimaginável no limiar da morte.",
         "allowed_classes": ["berserker"],
@@ -2652,6 +2664,8 @@ SKILL_DATA = {
 
     "guerreiro_corte_perfurante": {
         "display_name": "𝐂𝐨𝐫𝐭𝐞 𝐏𝐞𝐫𝐟𝐮𝐫𝐚𝐧𝐭𝐞", 
+        "icon": "guerreiro_corte_perfurante",
+        "anim_effect": "corte_perfurante",
         "type": "active", 
         "description": "Um golpe focado que perfura a armadura, reduzindo a defesa inimiga.",
         "allowed_classes": ["guerreiro"],
@@ -2719,6 +2733,8 @@ SKILL_DATA = {
     },
     "monge_rajada_de_punhos": {
         "display_name": "𝐑𝐚𝐣𝐚𝐝𝐚 𝐝𝐞 𝐏𝐮𝐧𝐡𝐨𝐬", "type": "active", 
+        "icon": "monge_rajada_de_punhos",
+        "anim_effect": "rajada_de_punhos",
         "description": "Ataca rapidamente, golpeando o inimigo várias vezes.",
         "allowed_classes": ["monge"],
         "rarity_effects": {
@@ -2741,6 +2757,8 @@ SKILL_DATA = {
     },
     "mago_bola_de_fogo": {
         "display_name": "𝐁𝐨𝐥𝐚 𝐝𝐞 𝐅𝐨𝐠𝐨", "type": "active", 
+        "icon": "mago_bola_de_fogo",
+        "anim_effect": "bola_de_fogo",
         "description": "Um feitiço de alvo único que causa alto dano de fogo (Mágico).",
         "allowed_classes": ["mago"],
         "rarity_effects": {

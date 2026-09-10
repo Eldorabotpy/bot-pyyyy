@@ -6,472 +6,448 @@
     <title>Mundo de Eldora - Portal</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* FONTE ESTILIZADA DE FANTASIA */
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Metamorphous&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap');
 
         body {
             margin: 0; padding: 0;
-            background-image: url('https://github.com/user-attachments/assets/ea06a84b-c8fc-45d7-977f-c5a55f808815'); 
-            background-size: cover; background-position: center;
+            background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/fundo_login.jpg') center/cover no-repeat;
+            background-color: #0a0514;
             height: 100vh; display: flex; justify-content: center; align-items: center;
-            font-family: 'Metamorphous', 'Segoe UI', serif;
+            font-family: 'Cinzel', serif;
             color: #ecf0f1;
-            /* Garante espaço pro rodapé */
-            padding-bottom: 70px; 
-            box-sizing: border-box;
+            
+            /* 👇 A MÁGICA ESTÁ AQUI: Troque hidden por auto 👇 */
+            overflow-y: auto; 
         }
 
-        /* ==========================================
-           1. LAYOUT GERAL E CONTAINER MODERNO
-           ========================================== */
         .portal-main-container {
+            width: 90%; max-width: 340px;
             display: flex; flex-direction: column; align-items: center;
-            width: 90%; max-width: 360px;
-        }
-
-        .login-box {
-            background: rgba(10, 15, 25, 0.95); 
-            border: 3px solid #f39c12; 
-            border-style: ridge; 
-            border-radius: 15px;
-            padding: 25px 15px 15px 15px; 
-            width: 100%; text-align: center;
-            box-shadow: 0 0 30px rgba(243, 156, 18, 0.5), inset 0 0 15px #000;
-            backdrop-filter: blur(8px);
-            display: flex; flex-direction: column; align-items: center;
-            box-sizing: border-box;
-            position: relative;
-        }
-
-        @keyframes levitacao_magica {
-            0% { transform: translateY(0px); box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000; }
-            50% { transform: translateY(-8px); box-shadow: 0 0 30px #f39c12, inset 0 0 20px #000; }
-            100% { transform: translateY(0px); box-shadow: 0 0 15px #f39c12, inset 0 0 10px #000; }
+            z-index: 2;
+            margin: 20px 0; /* Impede que corte em telas pequenas do PC */
         }
 
         .logo-eldora {
-            width: 95px; height: 95px;
-            margin-top: -70px; 
-            border-radius: 50%;
-            border: 4px solid #f39c12;
-            background: #000;
-            margin-bottom: 15px;
-            object-fit: cover;
-            animation: levitacao_magica 3s ease-in-out infinite;
-            z-index: 2;
+            width: 100px; height: 100px;
+            background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/logo_eldora.png') center/contain no-repeat;
+            margin-bottom: -15px;
+            z-index: 10;
         }
 
-        h2 { 
-            font-family: 'Cinzel', serif;
-            color: #f39c12; margin: 0 0 15px 0; 
-            font-size: 1.25em; letter-spacing: 3px; 
-            text-transform: uppercase; 
-            text-shadow: 2px 2px 5px #000, 0 0 10px #f39c12;
-        }
-        
-        #area-personagens { 
-            width: 100%; display: flex; flex-direction: column; gap: 12px; 
-            max-height: 280px; overflow-y: auto; padding-right: 5px; 
+        .login-box {
+            width: 100%;
+            max-width: 380px; 
+            min-height: 520px;
+            background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/rHCxs.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            padding: 110px 60px 50px 60px; 
             box-sizing: border-box;
+            display: flex; flex-direction: column; align-items: center;
         }
 
-        #area-personagens::-webkit-scrollbar { width: 5px; }
-        #area-personagens::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 5px;}
-        #area-personagens::-webkit-scrollbar-thumb { background: #f39c12; border-radius: 5px; }
+        .input-container { width: 100%; margin-bottom: 8px; text-align: left; }
+        .input-container label { font-size: 0.65em; color: #d4af37; margin-left: 5px; display: block; margin-bottom: 3px; letter-spacing: 1px; }
 
-        /* ==========================================
-           2. O NOVO CARTÃO DO PERSONAGEM
-           ========================================== */
-        .btn-char {
-            width: 100%; height: 60px;
-            background: linear-gradient(90deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
-            border: 2px solid #3b82f6; 
-            color: white; border-radius: 8px; cursor: pointer;
-            display: flex; align-items: center; 
-            transition: 0.2s; box-sizing: border-box; flex-shrink: 0;
-            padding: 0; overflow: hidden; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset 0 0 10px rgba(59, 130, 246, 0.3);
-        }
-        
-        .btn-char:active { transform: scale(0.97); border-color: #f39c12; box-shadow: 0 0 15px #f39c12; }
-
-        .char-card-sprite-container {
-            width: 60px; height: 60px; 
-            background: rgba(0,0,0,0.5);
-            border-right: 2px solid #3b82f6;
-            display: flex; justify-content: center; align-items: center;
-            flex-shrink: 0;
-            position: relative;
-        }
-        
-        .char-card-sprite {
-            width: 50px; height: 50px; 
-            object-fit: contain;
-            filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5));
-        }
-
-        .char-card-info { 
-            flex-grow: 1; text-align: left; 
-            padding: 0 15px; 
-            display: flex; flex-direction: column; justify-content: center;
-        }
-        
-        .char-card-info strong { 
-            font-family: 'Cinzel', serif;
-            color: #ecf0f1; font-size: 1em; margin-bottom: 1px; 
-            letter-spacing: 1px;
-            text-shadow: 1px 1px 3px #000;
-        }
-        
-        .char-card-info span { 
-            font-size: 0.75em; color: #94a3b8; 
-            text-transform: capitalize; 
-            font-family: 'Metamorphous', serif;
-        }
-
-        .char-card-icon-right {
-            width: 40px; text-align: center;
-            font-size: 1.3em;
-            color: #f39c12;
-            padding-right: 5px;
-            filter: drop-shadow(0 0 5px #f39c12);
+        .input-container input, .input-container select {
+            width: 100%; height: 40px;
+            background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/log_senha.png') center/100% 100% no-repeat;
+            background-color: transparent; border: none; outline: none; padding: 0 15px; box-sizing: border-box;
+            color: #d4af37; font-family: 'Georgia', serif; font-size: 1em; font-weight: bold;
         }
 
         .btn-new {
-            width: 100%; padding: 12px; margin-top: 10px;
+            width: 90%; height: 42px; margin: 10px auto 0 auto;
+            background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/botao_dourado.png') center/100% 100% no-repeat;
+            background-color: transparent; border: none; color: #3b2400; font-weight: 900; font-size: 0.85em;
+            cursor: pointer; text-transform: uppercase; display: flex; justify-content: center; align-items: center;
             font-family: 'Cinzel', serif;
-            background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
-            border: 2px solid #2ecc71; color: white; font-weight: bold; font-size: 0.9em;
-            border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
-            flex-shrink: 0;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            text-shadow: 1px 1px 3px #000;
-        }
-        .btn-new:active { transform: scale(0.97); }
-
-        /* ==========================================
-           3. O NOVO RODAPÉ FIXO (COM EMOJIS)
-           ========================================== */
-        .footer-nav {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 65px;
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(10, 15, 25, 1) 100%);
-            border-top: 3px solid #f39c12; border-style: ridge;
-            display: flex; justify-content: space-around; align-items: center;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.8), 0 0 10px rgba(243, 156, 18, 0.3);
-            z-index: 10;
-            padding: 0 10px; box-sizing: border-box;
-        }
-
-        .nav-item {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-decoration: none; /* Remove o sublinhado */
-            color: inherit; /* Remove a cor azul de link */
-            width: 23%; height: 100%;
-            cursor: pointer;
-            transition: 0.2s;
         }
         
-        .nav-item:active { transform: translateY(-3px); }
+        .btn-new:active { transform: scale(0.96); filter: brightness(0.9); }
 
-        /* NOVO: Classe para Emojis no lugar de Imagens */
-        .nav-icon-emoji {
-            font-size: 1.6em; /* Tamanho do Emoji */
-            margin-bottom: 2px;
-            line-height: 1;
-            filter: drop-shadow(0 0 3px rgba(243, 156, 18, 0.3));
-            transition: 0.2s;
+        .btn-personagem {
+            width: 100%; height: 45px; margin-bottom: 10px;
+            background: rgba(26, 11, 46, 0.8); border: 1px solid #d4af37; color: #ecf0f1;
+            font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer; border-radius: 5px;
+        }
+        .btn-personagem:hover { background: rgba(212, 175, 55, 0.2); }
+
+        .texto-rodape { margin-top: 15px; font-size: 0.9em; color: #ecf0f1; text-align: center; font-family: 'Segoe UI', sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
+        .texto-rodape span { color: #d4af37; cursor: pointer; font-weight: bold; }
+    
+        /* NOTIFICAÇÃO ESTILIZADA */
+        #custom-alert {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); z-index: 9999; justify-content: center; align-items: center;
+        }
+        .alert-box {
+            width: 80%; max-width: 300px; background: #1a0b2e; border: 2px solid #d4af37;
+            border-radius: 10px; padding: 25px; text-align: center; box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+        }
+        .alert-title { color: #d4af37; font-family: 'Cinzel', serif; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
+        .alert-message { color: #ecf0f1; font-family: 'Georgia', serif; font-size: 0.95em; margin-bottom: 20px; line-height: 1.4; }
+        .btn-alert {
+            width: 100px; height: 35px; background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/botao_dourado.png') center/100% 100% no-repeat;
+            border: none; color: #3b2400; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif;
+        }
+        
+        #lista-personagens { 
+            width: 100%; max-height: 280px; overflow-y: auto; 
+            margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;
+        }
+        #lista-personagens::-webkit-scrollbar { width: 6px; }
+        #lista-personagens::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 10px; }
+        #lista-personagens::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 10px; }
+    
+        .card-heroi {
+            width: 100%; background: linear-gradient(90deg, rgba(26, 11, 46, 0.9), rgba(10, 5, 20, 0.9));
+            border: 1px solid #d4af37; border-radius: 8px; padding: 10px; box-sizing: border-box;
+            display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+    
+        .card-heroi:hover { background: linear-gradient(90deg, rgba(46, 20, 80, 0.9), rgba(26, 11, 46, 0.9)); transform: scale(1.02); }
+        .card-heroi:active { transform: scale(0.98); }
+
+        .card-heroi-avatar {
+            width: 50px; height: 50px; border-radius: 8px; border: 2px solid #b8860b;
+            background: #000; object-fit: cover; flex-shrink: 0;
         }
 
-        .nav-text {
-            font-family: 'Cinzel', serif;
-            font-size: 0.65em;
-            color: #bdc3c7;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: 0.2s;
-        }
-
-        /* Efeitos quando o botão está ativo */
-        .nav-item.active .nav-icon-emoji { 
-            filter: drop-shadow(0 0 8px #f39c12); 
-            transform: scale(1.1);
-        }
-        .nav-item.active .nav-text { 
-            color: #f39c12; 
-            text-shadow: 0 0 5px #f39c12; 
-        }
+        .card-heroi-info { display: flex; flex-direction: column; align-items: flex-start; flex-grow: 1; }
+        .card-heroi-nome { color: #fff; font-family: 'Cinzel', serif; font-size: 1.1em; font-weight: bold; text-shadow: 1px 1px 2px #000; margin-bottom: 3px; }
+        
+        .card-heroi-detalhes { display: flex; align-items: center; gap: 8px; font-family: 'Georgia', serif; font-size: 0.75em; color: #cbd5e1; }
+        .badge-nivel { background: #d4af37; color: #3b2400; padding: 2px 6px; border-radius: 4px; font-weight: 900; }
 
     </style>
+    
 </head>
 <body>
-
-    <div class="portal-main-container">
-        <div class="login-box">
-            <img src="https://github.com/user-attachments/assets/0f2990de-2b0f-4d3d-90ae-060713ef5abb" class="logo-eldora" alt="Logo Eldora">
-            
-            <h2>Portal de Acesso</h2>
-            <div id="area-personagens">
-                <div style="color: #aaa; font-size: 0.9em; font-family: serif;">Invocando registros mágicos... ⏳</div>
-            </div>
+    
+    <body>
+    <!-- TELA DE CARREGAMENTO -->
+    
+    <!-- MODAL DE ALERTA -->
+    <div id="custom-alert">
+        <div class="alert-box">
+            <div class="alert-title" id="alert-title">AVISO</div>
+            <div class="alert-message" id="alert-message">Mensagem...</div>
+            <button class="btn-alert" onclick="fecharAlerta()">OK</button>
         </div>
     </div>
 
-    <footer class="footer-nav">
-        <a href="javascript:void(0)" class="nav-item active">
-            <div class="nav-icon-emoji">🏠</div>
-            <span class="nav-text">Início</span>
-        </a>
-        <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
-            <div class="nav-icon-emoji">👤</div>
-            <span class="nav-text">Perfil</span>
-        </a>
-        <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
-            <div class="nav-icon-emoji">⚔️</div>
-            <span class="nav-text">Luta</span>
-        </a>
-        <a href="javascript:void(0)" onclick="window.location.href='/'" class="nav-item">
-            <div class="nav-icon-emoji">🎒</div>
-            <span class="nav-text">Mais</span>
-        </a>
-    </footer>
+    <div class="portal-main-container">
+        <div class="logo-eldora"></div>
+        <div class="login-box">
+            <div class="titulo-secao" id="titulo-caixa" style="margin-bottom: 10px; color: #d4af37; font-size: 0.9em; font-weight: bold;">ENTRAR NO REINO</div>
+            
+            <!-- ETAPA 1: TELA LOGIN DA CONTA MESTRA -->
+            <div id="tela-login" style="width: 100%;">
+                <div class="input-container"><label>CONTA (USUÁRIO)</label><input type="text" id="login-username" placeholder="Sua conta..."></div>
+                <div class="input-container"><label>SENHA DA CONTA</label><input type="password" id="login-password" placeholder="••••••••"></div>
+                <button class="btn-new" onclick="playClick(); realizarLogin()" id="btn-logar">ACESSAR CONTA</button>
+            </div>
+            
+            <!-- ETAPA 1.5: TELA DE CRIAR CONTA MESTRA -->
+            <div id="tela-registro-conta" style="display: none; width: 100%;">
+                <div class="input-container"><label>NOVO USUÁRIO</label><input type="text" id="reg-conta-user" placeholder="Sua conta..."></div>
+                <div class="input-container"><label>CRIAR SENHA</label><input type="password" id="reg-conta-pass" placeholder="Mínimo 6 caracteres"></div>
+                <button class="btn-new" onclick="playClick(); criarContaMestra()" id="btn-criar-conta">CRIAR CONTA</button>
+                <div style="text-align: center; margin-top: 10px;">
+                    <span onclick="playClick(); alternarParaLogin()" style="color: #ecf0f1; font-size: 0.8em; cursor: pointer; text-decoration: underline;">Voltar ao Login</span>
+                </div>
+            </div>
+
+            <!-- ETAPA 2: TELA DE SELEÇÃO DE PERSONAGENS (LOBBY) -->
+            <div id="tela-selecao" style="display: none; width: 100%; text-align: center;">
+                <div style="font-size: 0.7em; color: #ecf0f1; margin-bottom: 10px;">Selecione seu herói:</div>
+                <div id="lista-personagens">
+                    <!-- Os botões dos personagens aparecerão aqui via JavaScript -->
+                </div>
+                <button class="btn-new" onclick="playClick(); mostrarCriacao()" style="margin-top: 5px;">+ CRIAR NOVO HERÓI</button>
+            </div>
+
+            <!-- ETAPA 3: TELA DE CRIAÇÃO (APENAS NOME E GÊNERO) -->
+            <div id="tela-criacao" style="display: none; width: 100%;">
+                <div class="input-container"><label>NOME DO NOVO HERÓI</label><input type="text" id="reg-heroiname" placeholder="Nome desejado..."></div>
+                <div class="input-container">
+                    <label>GÊNERO</label>
+                    <select id="reg-genero">
+                        <option value="masculino" style="background: #1a0b2e;">Masculino ♂️</option>
+                        <option value="feminino" style="background: #1a0b2e;">Feminino ♀️</option>
+                    </select>
+                </div>
+                <button class="btn-new" onclick="playClick(); confirmarCriacao()" id="btn-criar">FORJAR DESTINO</button>
+                <div style="text-align: center; margin-top: 10px;">
+                    <span onclick="playClick(); voltarParaSelecao()" style="color: #ecf0f1; font-size: 0.8em; cursor: pointer; text-decoration: underline;">Voltar</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="texto-rodape" id="rodape-dinamico">
+            Nova Conta? <span onclick="playClick(); alternarParaRegistroConta()">Criar Conta.</span>
+        </div>
+    </div>
 
     <script>
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
 
-        // ==========================================
-        // SISTEMA DE ÁUDIO CORRIGIDO PARA MOBILE
-        // ==========================================
-        const bgMusic = new Audio("https://github.com/user-attachments/files/26343101/freesound_community-clouds-67847.mp3");
-        bgMusic.loop = true;
-        bgMusic.volume = 0.3;
-
         const clickSound = new Audio("https://github.com/user-attachments/files/26343084/dragon-studio-clicking-433009.mp3");
+        window.playClick = function() { clickSound.currentTime = 0; clickSound.play().catch(e => {}); };
 
-        window.playClick = function() {
-            clickSound.currentTime = 0; 
-            let playPromise = clickSound.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(e => console.log("Som de clique bloqueado.", e));
-            }
+        // --- MOTOR DE NOTIFICAÇÃO ---
+        window.mostrarAviso = function(titulo, mensagem) {
+            document.getElementById('alert-title').innerText = titulo;
+            document.getElementById('alert-message').innerText = mensagem;
+            document.getElementById('custom-alert').style.display = 'flex';
         };
 
-        // Inicia música no primeiro toque
-        function iniciarMusicaFundo() {
-            if (bgMusic.paused) {
-                let playPromise = bgMusic.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        document.removeEventListener('click', iniciarMusicaFundo);
-                        document.removeEventListener('touchstart', iniciarMusicaFundo);
-                    }).catch(e => console.log("Música bloqueada pelo navegador.", e));
-                }
-            }
-        }
-
-        document.addEventListener('click', iniciarMusicaFundo);
-        document.addEventListener('touchstart', iniciarMusicaFundo, {passive: true});
-
-
-        // ==========================================
-        // MAPA DE SPRITES
-        // ==========================================
-        const SPRITES_COSTA = {
-        "aventureiro": {
-            "masculino": "https://github.com/user-attachments/assets/f870b026-e544-43f4-8395-0112277b24f1", // Skin de quem tá sem classe
-            "feminino": "https://github.com/user-attachments/assets/c405a107-9d5e-4f34-8daa-9660b29e591c"
-        },
-        "guerreiro": {
-            "mascolino": "https://github.com/user-attachments/assets/1c0045ea-d8fc-4958-86a4-ecef1507f25e",
-            "feminino" : "https://github.com/user-attachments/assets/d5cfde65-f28f-4a13-9c1e-525adc3b51b2"
-        },
-        "berserker": { 
-            "masculino": "https://github.com/user-attachments/assets/88e6ee39-1f4f-4886-a31c-65e4fc53b7ba",
-            "feminino": "https://github.com/user-attachments/assets/ec261bd5-e23e-4390-b0a7-e411095b46b0"
-        },    
-        "cacador": {
-            "masculino": "https://github.com/user-attachments/assets/6998b293-a7fd-444f-b358-831c44eb3d8f",
-            "feminino": "https://github.com/user-attachments/assets/03e162e6-1869-4eeb-ab6d-1a902b74f582"
-        },
-        "monge": { 
-            "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
-            "feminino": "https://github.com/user-attachments/assets/3bb88286-d446-48ee-9d95-c53482e5553a"
-        },    
-        "mago": {
-            "masculino":"https://github.com/user-attachments/assets/8577461c-ba7d-44dc-8249-a40b44cccf96",
-            "feminino": "https://github.com/user-attachments/assets/d8749759-d43f-4eda-8520-c9610a635b72"
-        },
-        "bardo": {
-            "masculino":"https://github.com/user-attachments/assets/75788d0e-5be2-43d0-870b-f7aee5e04483",
-            "feminino": "https://github.com/user-attachments/assets/6fc004aa-b451-4d25-a110-493f0f26f585"
-        },
-        "assassino": {
-            "masculino":"https://github.com/user-attachments/assets/c02fa401-7b6d-48aa-8892-fe85398a36ec",
-            "feminino": "https://github.com/user-attachments/assets/d1a69fdc-de8f-4982-8ac5-83963040b4d4"
-        },
-        "samurai": {
-            "masculino":"https://github.com/user-attachments/assets/3f61b608-fc17-4b81-ad7f-8d11d7a46e52",
-            "feminino": "https://github.com/user-attachments/assets/eb54a42c-0608-402e-950c-7f8f771700a7"
-        },
-        "curandeiro": {
-            "masculino":"https://github.com/user-attachments/assets/61b246e8-1eaf-4dd3-85e5-267ca6fe0058",
-            "feminino": "https://github.com/user-attachments/assets/1d9e6bb2-0fe4-40cd-8583-4dd17bbe48ed"
-        },
-
-    };   
-
-        const MAPA_CLASSES_BASE = {
-            'aventureiro': 'aventureiro', 'aprendiz': 'aventureiro',
-            'guerreiro': 'guerreiro', 'cavaleiro': 'guerreiro', 'gladiador': 'guerreiro', 'templario': 'guerreiro', 'guardiao_divino': 'guerreiro',
-            'berserker': 'berserker', 'barbaro': 'berserker', 'juggernaut': 'berserker', 'ira_primordial': 'berserker',
-            'cacador': 'cacador', 'patrulheiro': 'cacador', 'franco_atirador': 'cacador', 'olho_de_aguia': 'cacador',
-            'monge': 'monge', 'guardiao_do_templo': 'monge', 'punho_elemental': 'monge', 'ascendente': 'monge',
-            'mago': 'mago', 'feiticeiro': 'mago', 'elementalista': 'mago', 'arquimago': 'mago',
-            'bardo': 'bardo', 'menestrel': 'bardo', 'encantador': 'bardo', 'maestro': 'bardo',
-            'assassino': 'assassino', 'ladrao_de_sombras': 'assassino', 'ninja': 'assassino', 'mestre_das_laminas': 'assassino',
-            'samurai': 'samurai', 'kensei': 'samurai', 'ronin': 'samurai', 'shogun': 'samurai',
-            'curandeiro': 'curandeiro', 'clerigo': 'curandeiro', 'druida': 'curandeiro', 'sacerdote': 'curandeiro'
+        window.fecharAlerta = function() {
+            document.getElementById('custom-alert').style.display = 'none';
         };
 
-        async function buscarPersonagens() {
-            const area = document.getElementById('area-personagens');
-            let tgUser = window.Telegram.WebApp.initDataUnsafe.user;
-            
-            if (!tgUser) {
-                area.innerHTML = '<p style="color: #e74c3c; font-size: 0.9em; font-family:serif;">Erro: Abra o jogo por dentro do Telegram!</p>';
-                return;
-            }
+        // Variável global para guardar o Token/Sessão da conta mestra
+        let contaAtiva = null;
+        
+        // AÇÃO: O JOGADOR CLICOU NO PERSONAGEM PARA JOGAR
+        window.entrarNoMapaComPersonagem = function(id, nome, genero) {
+            try {
+                if (typeof playClick === "function") playClick();
+            } catch(e) {}
+
+            const titulo = document.getElementById('titulo-caixa');
+            if (titulo) titulo.innerText = "ENTRANDO NO REINO... ⏳";
 
             try {
-                const resposta = await fetch(`/api/meus_personagens/${tgUser.id}`);
-                
-                if (!resposta.ok) {
-                    throw new Error(`O servidor retornou Erro ${resposta.status}`);
+                // Limpa o cache se for um boneco diferente
+                const idAntigo = localStorage.getItem("jogadorEldoraID");
+                if (idAntigo && idAntigo !== String(id)) {
+                    localStorage.removeItem("eldora_lastX");
+                    localStorage.removeItem("eldora_lastY");
+                    localStorage.removeItem("eldora_lastRegiao");
                 }
 
-                const personagens = await resposta.json();
-                let htmlBotoes = '';
-
-                if (personagens.length > 0) {
-                    personagens.forEach(p => {
-                        let rawClass = (p.classe || "aventureiro").toLowerCase();
-                        let classSlug = rawClass.replace(/_/g, ' ');
-                        let genero = (p.gender || "masculino").toLowerCase();
-                        
-                        let classeBase = MAPA_CLASSES_BASE[rawClass] || "aventureiro";
-                        let spriteUrl = "";
-                        if (SPRITES_COSTA[classeBase] && SPRITES_COSTA[classeBase][genero]) {
-                            spriteUrl = SPRITES_COSTA[classeBase][genero];
-                        } else {
-                            spriteUrl = SPRITES_COSTA["aventureiro"]["masculino"];
-                        }
-
-                        htmlBotoes += `
-                        <button class="btn-char" onclick="playClick(); entrarNoJogo('${p.id}', '${p.nome}')">
-                            <div class="char-card-sprite-container">
-                                <img src="${spriteUrl}" class="char-card-sprite" alt="${classSlug}">
-                            </div>
-                            <div class="char-card-info">
-                                <strong>${p.nome}</strong>
-                                <span>${classSlug} - Nv. ${p.level}</span>
-                            </div>
-                            <div class="char-card-icon-right">
-                                ⚔️
-                            </div>
-                        </button>`;
-                    });
-                } else {
-                    htmlBotoes += '<p style="color: #bdc3c7; font-size: 0.85em; margin-bottom: 15px; font-family: serif;">Nenhum herói encontrado nesta conta.</p>';
-                }
-
-                htmlBotoes += `<button class="btn-new" onclick="playClick(); mostrarForm()">➕ Criar Personagem</button>`;
+                // Salva os dados do boneco escolhido
+                localStorage.setItem("jogadorEldoraID", String(id));
+                localStorage.setItem("jogadorEldoraNome", String(nome));
+                localStorage.setItem("generoEscolhido", String(genero) || 'masculino');
                 
-                htmlBotoes += `
-                <div id="form-criar" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.6); border: 1px solid #f39c12; border-radius: 8px; text-align: left;">
-                    <input type="text" id="novo-nome" placeholder="Nome do Herói" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: 'Cinzel', serif; font-weight: bold; background: rgba(255,255,255,0.9);">
-                    
-                    <select id="novo-genero" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; font-family: 'Cinzel', serif; font-weight: bold; background: rgba(255,255,255,0.9);">
-                        <option value="masculino">Masculino ♂️</option>
-                        <option value="feminino">Feminino ♀️</option>
-                        <option value="nao_binario">Não-binário ⚧️</option>
-                    </select>
-                    
-                    <button onclick="playClick(); enviarNovoPersonagem()" style="width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px; font-weight: bold; font-family: 'Cinzel', serif; cursor: pointer; margin-bottom: 5px;">✅ Confirmar</button>
-                    <button onclick="playClick(); esconderForm()" style="width: 100%; padding: 10px; background: #c0392b; color: white; border: none; border-radius: 5px; font-weight: bold; font-family: 'Cinzel', serif; cursor: pointer;">❌ Cancelar</button>
-                </div>`;
-
-                area.innerHTML = htmlBotoes;
+                // Força a ida pro mapa!
+                window.location.href = '/'; 
 
             } catch (erro) {
-                area.innerHTML = `<p style="color: #e74c3c; font-size: 0.9em; font-weight: bold;">Erro Real: ${erro.message}<br><span style="font-size:0.8em; color:#aaa;">Verifique o terminal do Python!</span></p>`;
+                alert("⚠️ Erro no navegador: " + erro.message);
             }
-        }
-
-        // FUNÇÃO DE ENTRAR COM DELAY PARA O SOM TOCAR
-        function entrarNoJogo(objectId, nome) {
-            localStorage.setItem("jogadorEldoraID", objectId);
-            localStorage.setItem("jogadorEldoraNome", nome);
-            
-            setTimeout(() => {
-                window.location.href = "/"; 
-            }, 400); 
-        }
-
-        window.mostrarForm = function() {
-            document.getElementById('form-criar').style.display = 'block';
-            document.getElementById('area-personagens').scrollTop = document.getElementById('area-personagens').scrollHeight;
         };
 
-        window.esconderForm = function() {
-            document.getElementById('form-criar').style.display = 'none';
-        };
+        // ETAPA 1: FAZER LOGIN NA CONTA MESTRA
+        window.realizarLogin = async function() {
+            const user = document.getElementById('login-username').value;
+            const pass = document.getElementById('login-password').value;
+            if (!user || !pass) return mostrarAviso("AVISO", "⚠️ Preencha usuário e senha da conta!");
 
-        window.enviarNovoPersonagem = async function() {
-            const nome = document.getElementById('novo-nome').value;
-            const genero = document.getElementById('novo-genero').value;
-            
-            const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
-            const tgId = tgUser?.id;
-
-            if (!nome || nome.trim() === "") {
-                alert("⚠️ Digite o nome do seu herói!");
-                return;
-            }
+            const btn = document.getElementById('btn-logar');
+            btn.innerText = "Sincronizando..."; btn.disabled = true;
 
             try {
-                const btn = document.querySelector("#form-criar button");
-                btn.innerText = "⏳ Criando...";
-                btn.disabled = true;
+                // Aqui você mantém a sua rota de login do backend. 
+                // O backend deve retornar que o login foi sucesso e (idealmente) a lista de personagens dessa conta.
+                const res = await fetch('/api/portal/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                
+                if (data.sucesso) {
+                    contaAtiva = user; // Salva quem está logado
+                    document.getElementById('tela-login').style.display = 'none';
+                    document.getElementById('rodape-dinamico').style.display = 'none';
+                    
+                    // Vai para a etapa 2: Mostrar os personagens
+                    buscarPersonagens(data.personagens || []); 
+                } else {
+                    mostrarAviso("ACESSO NEGADO", "❌ " + data.erro);
+                    btn.innerText = "ACESSAR CONTA"; btn.disabled = false;
+                }
+            } catch (e) {
+                mostrarAviso("ERRO", "⚠️ Falha na conexão com o Reino.");
+                btn.innerText = "ACESSAR CONTA"; btn.disabled = false;
+            }
+        };
 
+        // ETAPA 2: MOSTRAR LISTA DE PERSONAGENS
+        // ETAPA 2: MOSTRAR LISTA DE PERSONAGENS COM AVATAR E LEVEL
+        window.buscarPersonagens = function(listaPersonagens) {
+            document.getElementById('titulo-caixa').innerText = "SELECIONE SEU DESTINO";
+            document.getElementById('tela-selecao').style.display = 'block';
+            
+            const divLista = document.getElementById('lista-personagens');
+            divLista.innerHTML = "";
+
+            if (!listaPersonagens || listaPersonagens.length === 0) {
+                divLista.innerHTML = "<div style='color:#ecf0f1; font-size: 0.8em; padding: 20px 0;'>Nenhum herói encontrado nesta conta.<br>Forje seu destino criando um novo!</div>";
+            } else {
+                const LINK_BASE_GITHUB = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/";
+                
+                listaPersonagens.forEach(p => {
+                    // 1. Tratamento de Nível e Classe (com proteções contra valores vazios)
+                    const nivel = p.level || p.nivel || 1;
+                    const classeName = p.classe || "Aventureiro";
+                    
+                    // 2. Lógica do Avatar (Baseada no perfil.js e perfil_visual.js)
+                    let generoCurto = (p.genero && p.genero.toLowerCase() === 'feminino') ? 'f' : 'm';
+                    let imgUrl = '';
+                    let avatarId = p.avatar_customizado || p.avatar;
+
+                    if (avatarId && avatarId.startsWith('http')) {
+                        // Se o banco salvou um link direto
+                        imgUrl = avatarId;
+                    } else if (avatarId && avatarId !== 'padrao') {
+                        // Se tem um avatar específico customizado
+                        imgUrl = `${LINK_BASE_GITHUB}${avatarId}.png`;
+                        // Se for um ID que começa com "avatar_", remove para não duplicar se a regra mudar
+                        if (!imgUrl.includes("avatar_avatar_")) {
+                           imgUrl = imgUrl.replace("avatares/", "avatares/avatar_"); 
+                        }
+                    } else {
+                        // Avatar Padrão baseado na classe e gênero
+                        let classeId = classeName.toLowerCase().replace(" ", "_");
+                        imgUrl = `${LINK_BASE_GITHUB}avatar_${classeId}_${generoCurto}.png`;
+                    }
+
+                    // Fallback de erro da imagem (Se falhar, carrega o padrão masculino ou feminino)
+                    const fallbackImg = `${LINK_BASE_GITHUB}avatar_padrao_${generoCurto}.png`;
+
+                    // 3. Constrói o HTML do Card
+                    let divCard = document.createElement('div');
+                    divCard.className = 'card-heroi';
+                    divCard.onclick = () => entrarNoMapaComPersonagem(p.id, p.nome, p.genero);
+                    
+                    divCard.innerHTML = `
+                        <img src="${imgUrl}" class="card-heroi-avatar" onerror="this.onerror=null; this.src='${fallbackImg}';">
+                        <div class="card-heroi-info">
+                            <div class="card-heroi-nome">${p.nome}</div>
+                            <div class="card-heroi-detalhes">
+                                <span class="badge-nivel">Nv. ${nivel}</span>
+                                <span>${classeName}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    divLista.appendChild(divCard);
+                });
+            }
+        };
+
+        // NAVEGAÇÃO: IR PARA TELA DE CRIAR NOVO
+        window.mostrarCriacao = function() {
+            document.getElementById('tela-selecao').style.display = 'none';
+            document.getElementById('tela-criacao').style.display = 'block';
+            document.getElementById('titulo-caixa').innerText = "CRIAR NOVO HERÓI";
+        };
+
+        // NAVEGAÇÃO: VOLTAR PARA SELEÇÃO
+        window.voltarParaSelecao = function() {
+            document.getElementById('tela-criacao').style.display = 'none';
+            document.getElementById('tela-selecao').style.display = 'block';
+            document.getElementById('titulo-caixa').innerText = "SEUS HERÓIS";
+        };
+
+        // ETAPA 3: CRIAR NOVO PERSONAGEM NA CONTA
+        window.confirmarCriacao = async function() {
+            const nome = document.getElementById('reg-heroiname').value;
+            const genero = document.getElementById('reg-genero').value;
+            
+            if (!nome) return mostrarAviso("AVISO", "⚠️ Dê um nome ao seu herói.");
+
+            const btn = document.getElementById('btn-criar');
+            btn.innerText = "Forjando..."; btn.disabled = true;
+
+            try {
+                // Note que aqui não enviamos mais "senha". Enviamos a conta ativa à qual o personagem pertence.
                 const res = await fetch('/api/portal/criar_personagem', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        tg_id: tgId,
-                        tg_username: tgUser?.username || "",
-                        nome: nome,
+                        conta: contaAtiva,
+                        nome: nome, 
                         genero: genero
                     })
                 });
-                
                 const data = await res.json();
                 
                 if (data.sucesso) {
-                    alert("✨ Herói criado com sucesso!");
-                    buscarPersonagens(); 
+                    mostrarAviso("HERÓI FORJADO", "✨ " + nome + " está pronto para a aventura!");
+                    document.getElementById('reg-heroiname').value = ''; // limpa o campo
+                    
+                    // Volta pra tela de seleção passando a nova lista atualizada vinda do servidor
+                    document.getElementById('tela-criacao').style.display = 'none';
+                    buscarPersonagens(data.nova_lista_personagens || []);
                 } else {
-                    alert("❌ Erro: " + data.erro);
-                    btn.innerText = "✅ Confirmar";
-                    btn.disabled = false;
+                    mostrarAviso("ERRO", "❌ " + data.erro);
                 }
             } catch (e) {
-                alert("⚠️ Erro de conexão: " + e.message);
-                document.querySelector("#form-criar button").innerText = "✅ Confirmar";
-                document.querySelector("#form-criar button").disabled = false;
+                mostrarAviso("ERRO", "⚠️ Falha ao criar herói.");
             }
+            btn.innerText = "FORJAR DESTINO"; btn.disabled = false;
+        };
+        // NAVEGAÇÃO: IR PARA TELA DE REGISTRAR CONTA
+        window.alternarParaRegistroConta = function() {
+            document.getElementById('tela-login').style.display = 'none';
+            document.getElementById('tela-registro-conta').style.display = 'block';
+            document.getElementById('rodape-dinamico').style.display = 'none';
+            document.getElementById('titulo-caixa').innerText = "NOVA CONTA MESTRA";
         };
 
-        buscarPersonagens();
+        // NAVEGAÇÃO: VOLTAR PARA O LOGIN
+        window.alternarParaLogin = function() {
+            document.getElementById('tela-registro-conta').style.display = 'none';
+            document.getElementById('tela-login').style.display = 'block';
+            document.getElementById('rodape-dinamico').style.display = 'block';
+            document.getElementById('titulo-caixa').innerText = "ENTRAR NO REINO";
+        };
+
+        // AÇÃO: ENVIAR DADOS DE NOVA CONTA PRO SERVIDOR
+        window.criarContaMestra = async function() {
+            const user = document.getElementById('reg-conta-user').value;
+            const pass = document.getElementById('reg-conta-pass').value;
+            
+            if (!user || pass.length < 6) return mostrarAviso("AVISO", "⚠️ Preencha usuário e senha (mín. 6 chars).");
+
+            const btn = document.getElementById('btn-criar-conta');
+            btn.innerText = "Forjando..."; btn.disabled = true;
+
+            try {
+                // Nova rota no seu backend para salvar a conta mestra
+                const res = await fetch('/api/portal/criar_conta', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tg_id: window.Telegram.WebApp.initDataUnsafe?.user?.id || 12345, 
+                        username: user, 
+                        password: pass
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.sucesso) {
+                    mostrarAviso("CONTA CRIADA", "✨ Sua Conta Mestra foi forjada! Faça o login agora.");
+                    document.getElementById('reg-conta-user').value = '';
+                    document.getElementById('reg-conta-pass').value = '';
+                    alternarParaLogin();
+                } else {
+                    mostrarAviso("ERRO", "❌ " + data.erro);
+                }
+            } catch (e) {
+                mostrarAviso("ERRO", "⚠️ Falha ao criar conta.");
+            }
+            btn.innerText = "CRIAR CONTA"; btn.disabled = false;
+        };
     </script>
 </body>
 </html>

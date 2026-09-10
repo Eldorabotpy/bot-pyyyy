@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 
-# RARIDADE TIER 2 (comum, bom, raro, epico, lendario)
-RARITY_T2 = {
-    "comum": 0.90,     # Aumentei para 90% (mais lixo)
-    "bom": 0.09,       # Diminuí para 9%
-    "raro": 0.009,     # 0.9%
-    "epico": 0.0009,   # 0.09%
-    "lendario": 0.0001 # 0.01% (Extremamente raro)
-}
+from __future__ import annotations
+from typing import Dict, Any
 
-# TIER 2: RECEITAS DO CONJUNTO ORNAMENTADO DO BARDO (Nível de Profissão 20+)
+# TIER 2: RECEITAS 
 # ============================================================================
 
-RECIPES = {
+RECIPES: Dict[str, Dict[str, Any]] = {
     # --- Instrumento Magistral (Armeiro/Artífice) ---
     "work_alaude_ornamentado_bardo": {
         "display_name": "Alaúde Ornamentado do Bardo",
@@ -21,11 +15,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 2400,
         "xp_gain": 120,
-        "inputs": {"madeira_rara": 15, "seiva_de_ent": 4, "fio_de_prata": 5, "nucleo_forja_comum": 1},
+        "inputs": {"madeira_rara": 15, "seiva_de_ent": 4, "fio_de_prata": 5, "nucleo_de_forja": 1},
         "result_base_id": "alaude_ornamentado_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
         "damage_info": {"type": "sonico", "min_damage": 30, "max_damage": 40},
     },
@@ -38,11 +31,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 1200,
         "xp_gain": 80,
-        "inputs": {"veludo_runico": 12, "fio_de_prata": 5, "pena": 25, "nucleo_forja_comum": 1},
+        "inputs": {"veludo_runico": 12, "fio_de_prata": 5, "pena": 25, "nucleo_de_forja": 1},
         "result_base_id": "chapeu_emplumado_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
     "work_casaco_veludo_bardo": {
@@ -52,11 +44,10 @@ RECIPES = {
         "level_req": 22,
         "time_seconds": 2400,
         "xp_gain": 150,
-        "inputs": {"veludo_runico": 25, "fio_de_prata": 10, "gema_bruta": 5, "nucleo_forja_comum": 1},
+        "inputs": {"veludo_runico": 25, "fio_de_prata": 10, "gema_bruta": 5, "nucleo_de_forja": 1},
         "result_base_id": "casaco_veludo_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
     "work_calcas_veludo_bardo": {
@@ -66,11 +57,10 @@ RECIPES = {
         "level_req": 21,
         "time_seconds": 1500,
         "xp_gain": 120,
-        "inputs": {"veludo_runico": 18, "fio_de_prata": 8, "nucleo_forja_comum": 1},
+        "inputs": {"veludo_runico": 18, "fio_de_prata": 8, "nucleo_de_forja": 1},
         "result_base_id": "calcas_veludo_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
     "work_botas_veludo_bardo": {
@@ -80,11 +70,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 900,
         "xp_gain": 70,
-        "inputs": {"veludo_runico": 10, "couro_reforcado": 4, "nucleo_forja_comum": 1},
+        "inputs": {"veludo_runico": 10, "couro_reforcado": 4, "nucleo_de_forja": 1},
         "result_base_id": "botas_veludo_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
     "work_luvas_veludo_bardo": {
@@ -94,11 +83,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 900,
         "xp_gain": 70,
-        "inputs": {"veludo_runico": 10, "couro_reforcado": 4, "nucleo_forja_comum": 1},
+        "inputs": {"veludo_runico": 10, "couro_reforcado": 4, "nucleo_de_forja": 1},
         "result_base_id": "luvas_veludo_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
 
@@ -110,11 +98,10 @@ RECIPES = {
         "level_req": 23,
         "time_seconds": 1380,
         "xp_gain": 115,
-        "inputs": {"barra_de_prata": 4, "gema_polida": 2, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_prata": 4, "gema_polida": 2, "nucleo_de_forja": 1},
         "result_base_id": "anel_prata_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
     "work_colar_prata_bardo": {
@@ -124,11 +111,10 @@ RECIPES = {
         "level_req": 24,
         "time_seconds": 1560,
         "xp_gain": 140,
-        "inputs": {"barra_de_prata": 3, "gema_polida": 3, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_prata": 3, "gema_polida": 3, "nucleo_de_forja": 1},
         "result_base_id": "colar_prata_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
     "work_brinco_prata_bardo": {
@@ -138,11 +124,10 @@ RECIPES = {
         "level_req": 23,
         "time_seconds": 1200,
         "xp_gain": 100,
-        "inputs": {"barra_de_prata": 2, "gema_polida": 1, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_prata": 2, "gema_polida": 1, "nucleo_de_forja": 1},
         "result_base_id": "brinco_prata_bardo",
         "unique": True,
         "class_req": ["bardo"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["bardo", "geral"],
     },
 }

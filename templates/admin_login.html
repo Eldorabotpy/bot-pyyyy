@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Eldora - Acesso GM
+    </title>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        body {
+            min-height: 100vh;
+
+            margin: 0;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            padding: 20px;
+
+            background:
+                radial-gradient(
+                    circle at top,
+                    #172554,
+                    #020617 70%
+                );
+
+            color: #ffffff;
+
+            font-family:
+                Arial,
+                sans-serif;
+        }
+
+
+        .login-gm {
+            width: min(
+                360px,
+                100%
+            );
+
+            padding: 25px;
+
+            background:
+                #0f172a;
+
+            border:
+                1px solid
+                #334155;
+
+            border-radius:
+                14px;
+
+            box-shadow:
+                0 20px 60px
+                rgba(
+                    0,
+                    0,
+                    0,
+                    0.55
+                );
+        }
+
+
+        h1 {
+            margin:
+                0 0 6px;
+
+            color:
+                #facc15;
+
+            font-size:
+                1.25rem;
+        }
+
+
+        p {
+            margin:
+                0 0 20px;
+
+            color:
+                #94a3b8;
+
+            font-size:
+                0.82rem;
+        }
+
+
+        label {
+            display: block;
+
+            margin:
+                12px 0 5px;
+
+            color:
+                #cbd5e1;
+
+            font-size:
+                0.75rem;
+
+            font-weight:
+                800;
+        }
+
+
+        input {
+            width: 100%;
+
+            padding:
+                11px;
+
+            color:
+                white;
+
+            background:
+                #020617;
+
+            border:
+                1px solid
+                #334155;
+
+            border-radius:
+                7px;
+
+            outline:
+                none;
+        }
+
+
+        button {
+            width: 100%;
+
+            margin-top:
+                18px;
+
+            padding:
+                11px;
+
+            color:
+                #0f172a;
+
+            background:
+                #facc15;
+
+            border:
+                none;
+
+            border-radius:
+                7px;
+
+            font-weight:
+                900;
+
+            cursor:
+                pointer;
+        }
+
+
+        .erro {
+            margin-top:
+                13px;
+
+            padding:
+                9px;
+
+            color:
+                #fecaca;
+
+            background:
+                rgba(
+                    127,
+                    29,
+                    29,
+                    0.35
+                );
+
+            border:
+                1px solid
+                rgba(
+                    248,
+                    113,
+                    113,
+                    0.3
+                );
+
+            border-radius:
+                7px;
+
+            font-size:
+                0.72rem;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <form
+        class="login-gm"
+        method="POST"
+    >
+
+        <h1>
+            🛡️ Painel Game Master
+        </h1>
+
+        <p>
+            Área administrativa de Eldora
+        </p>
+
+
+        <label>
+            Usuário
+        </label>
+
+        <input
+            type="text"
+            name="usuario"
+            autocomplete="username"
+            required
+        >
+
+
+        <label>
+            Senha
+        </label>
+
+        <input
+            type="password"
+            name="senha"
+            autocomplete="current-password"
+            required
+        >
+
+
+        <button
+            type="submit"
+        >
+            ENTRAR
+        </button>
+
+
+        {% if erro %}
+
+            <div class="erro">
+                {{ erro }}
+            </div>
+
+        {% endif %}
+
+    </form>
+
+</body>
+
+</html>

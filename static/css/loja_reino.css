@@ -1,0 +1,31 @@
+/* static/css/loja_reino.css */
+#modal-loja-reino .container-premium {
+    background: linear-gradient(145deg, #1e1b4b, #312e81); /* Roxo Real profundo */
+    border: 2px solid #fbbf24; /* Ouro vivo */
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(0,0,0,0.8);
+}
+
+#modal-loja-reino .card-item-gema {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #4f46e5;
+    border-radius: 8px;
+    padding: 12px;
+    transition: transform 0.2s;
+}
+
+#modal-loja-reino .card-item-gema:hover {
+    border-color: #fbbf24;
+    transform: scale(1.02);
+}
+
+#modal-loja-reino .btn-comprar-gema {
+    background: linear-gradient(180deg, #d946ef, #9333ea);
+    border: 1px solid #7e22ce;
+    color: white;
+    text-shadow: 0 1px 2px black;
+    padding: 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+}

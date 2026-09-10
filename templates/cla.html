@@ -1,0 +1,2544 @@
+<!-- ========================================= -->
+<!-- 🛡️ SISTEMA DE CLÃS - MUNDO DE ELDORA     -->
+<!-- ========================================= -->
+
+<style>
+    /* =======================================================
+       🛡️ CLÃS DE ELDORA — INTERFACE MODERNA
+       ======================================================= */
+
+    #cla-modal {
+        --cla-fundo: #080d16;
+        --cla-superficie: #101827;
+        --cla-superficie-2: #162033;
+        --cla-superficie-3: #1d293d;
+
+        --cla-borda: rgba(148, 163, 184, 0.22);
+        --cla-borda-forte: rgba(148, 163, 184, 0.38);
+
+        --cla-dourado: #d8b85a;
+        --cla-dourado-claro: #f4dc91;
+        --cla-dourado-escuro: #8b6c24;
+
+        --cla-texto: #f4f7fb;
+        --cla-texto-2: #c5ceda;
+        --cla-texto-3: #8491a3;
+
+        --cla-verde: #4ade80;
+        --cla-vermelho: #f87171;
+        --cla-azul: #60a5fa;
+
+        position: fixed;
+        inset: 0;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+
+        background:
+            radial-gradient(
+                circle at 50% 0%,
+                rgba(216, 184, 90, 0.10),
+                transparent 38%
+            ),
+            rgba(2, 6, 13, 0.82);
+
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    #cla-modal *,
+    #cla-modal *::before,
+    #cla-modal *::after {
+        box-sizing: border-box;
+    }
+
+    #cla-modal button,
+    #cla-modal input,
+    #cla-modal textarea,
+    #cla-modal select {
+        font: inherit;
+    }
+
+
+    /* =======================================================
+       PAINEL PRINCIPAL
+       ======================================================= */
+
+    .cla-painel {
+        width: min(760px, calc(100vw - 20px));
+        height: min(860px, calc(100vh - 20px));
+
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+
+        color: var(--cla-texto);
+        font-family: Arial, sans-serif;
+
+        background:
+            radial-gradient(
+                circle at 15% 0%,
+                rgba(216, 184, 90, 0.08),
+                transparent 230px
+            ),
+            linear-gradient(
+                180deg,
+                #0d1421 0%,
+                var(--cla-fundo) 100%
+            );
+
+        border: 1px solid rgba(216, 184, 90, 0.58);
+        border-radius: 22px;
+
+        box-shadow:
+            0 30px 90px rgba(0, 0, 0, 0.78),
+            0 0 0 1px rgba(255, 255, 255, 0.025),
+            0 0 34px rgba(216, 184, 90, 0.08);
+    }
+
+
+    /* =======================================================
+       CABEÇALHO
+       ======================================================= */
+
+    .cla-cabecalho {
+        position: relative;
+        min-height: 76px;
+        flex-shrink: 0;
+
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+
+        padding: 13px 16px;
+
+        background:
+            linear-gradient(
+                115deg,
+                rgba(24, 32, 48, 0.98),
+                rgba(11, 17, 28, 0.98)
+            );
+
+        border-bottom: 1px solid rgba(216, 184, 90, 0.34);
+    }
+
+    .cla-cabecalho::after {
+        content: "";
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: -1px;
+        height: 1px;
+
+        background:
+            linear-gradient(
+                90deg,
+                transparent,
+                var(--cla-dourado),
+                transparent
+            );
+
+        opacity: 0.55;
+    }
+
+    .cla-cabecalho-identidade {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .cla-cabecalho-icone {
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        border: 1px solid rgba(216, 184, 90, 0.35);
+        border-radius: 14px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(216, 184, 90, 0.16),
+                rgba(216, 184, 90, 0.04)
+            );
+
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+        font-size: 22px;
+    }
+
+    .cla-cabecalho-titulo {
+        margin: 0;
+
+        color: var(--cla-dourado-claro);
+        font-family: "Cinzel", serif;
+        font-size: 1.03rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+
+    .cla-cabecalho-subtitulo {
+        display: block;
+        margin-top: 3px;
+
+        color: var(--cla-texto-3);
+        font-size: 0.72rem;
+        line-height: 1.3;
+    }
+
+    .cla-btn-fechar {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        border: 1px solid rgba(248, 113, 113, 0.30);
+        border-radius: 13px;
+
+        background: rgba(127, 29, 29, 0.16);
+        color: #fca5a5;
+
+        font-size: 16px;
+        font-weight: 900;
+        cursor: pointer;
+
+        transition:
+            transform 0.16s ease,
+            background 0.16s ease,
+            border-color 0.16s ease;
+    }
+
+    .cla-btn-fechar:hover {
+        background: rgba(127, 29, 29, 0.33);
+        border-color: rgba(248, 113, 113, 0.60);
+    }
+
+    .cla-btn-fechar:active {
+        transform: scale(0.92);
+    }
+
+
+    /* =======================================================
+       CONTEÚDO E ROLAGEM
+       ======================================================= */
+
+    .cla-conteudo {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+
+        padding: 16px;
+
+        scrollbar-width: thin;
+        scrollbar-color:
+            rgba(216, 184, 90, 0.48)
+            transparent;
+    }
+
+    .cla-conteudo::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .cla-conteudo::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .cla-conteudo::-webkit-scrollbar-thumb {
+        background: rgba(216, 184, 90, 0.42);
+        border-radius: 20px;
+    }
+
+
+    /* =======================================================
+       BLOCOS
+       ======================================================= */
+
+    .cla-bloco {
+        position: relative;
+
+        margin-bottom: 13px;
+        padding: 16px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(20, 29, 44, 0.96),
+                rgba(12, 19, 31, 0.96)
+            );
+
+        border: 1px solid var(--cla-borda);
+        border-radius: 17px;
+
+        box-shadow:
+            0 8px 22px rgba(0, 0, 0, 0.18),
+            inset 0 1px 0 rgba(255, 255, 255, 0.025);
+    }
+
+    .cla-titulo-bloco {
+        margin: 0 0 8px;
+
+        color: var(--cla-texto);
+        font-family: "Cinzel", serif;
+        font-size: 0.93rem;
+        font-weight: 800;
+        line-height: 1.35;
+    }
+
+    .cla-subtitulo-bloco {
+        margin: 0;
+        color: var(--cla-texto-3);
+        font-size: 0.79rem;
+        line-height: 1.45;
+    }
+
+
+    /* =======================================================
+       BOAS-VINDAS — JOGADOR SEM CLÃ
+       ======================================================= */
+
+    .cla-boas-vindas {
+        overflow: hidden;
+
+        background:
+            radial-gradient(
+                circle at 100% 0%,
+                rgba(216, 184, 90, 0.16),
+                transparent 190px
+            ),
+            linear-gradient(
+                145deg,
+                rgba(28, 38, 56, 0.98),
+                rgba(13, 20, 32, 0.98)
+            );
+    }
+
+    .cla-boas-vindas::after {
+        content: "";
+        position: absolute;
+        top: -70px;
+        right: -70px;
+
+        width: 180px;
+        height: 180px;
+
+        border: 1px solid rgba(216, 184, 90, 0.08);
+        border-radius: 50%;
+    }
+
+    .cla-boas-vindas-topo {
+        position: relative;
+        z-index: 1;
+
+        display: flex;
+        align-items: center;
+        gap: 13px;
+    }
+
+    .cla-boas-vindas-icone {
+        width: 52px;
+        height: 52px;
+        flex: 0 0 52px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        border: 1px solid rgba(216, 184, 90, 0.30);
+        border-radius: 16px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(216, 184, 90, 0.17),
+                rgba(216, 184, 90, 0.035)
+            );
+
+        font-size: 25px;
+    }
+
+    .cla-eyebrow {
+        display: block;
+        margin-bottom: 3px;
+
+        color: var(--cla-dourado);
+        font-size: 0.64rem;
+        font-weight: 900;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+    }
+    
+    .cla-grade-logos {
+        display: grid;
+        grid-template-columns:
+            repeat(auto-fill, minmax(82px, 1fr));
+        gap: 10px;
+    }
+
+    .cla-logo-opcao {
+        min-width: 0;
+        padding: 7px;
+
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 13px;
+
+        background: rgba(4, 9, 18, 0.66);
+        color: #cbd5e1;
+
+        cursor: pointer;
+        transition:
+            transform 0.16s ease,
+            border-color 0.16s ease,
+            background 0.16s ease;
+    }
+
+    .cla-logo-opcao img {
+        width: 100%;
+        aspect-ratio: 1;
+        display: block;
+
+        object-fit: contain;
+
+        border-radius: 9px;
+    }
+
+    .cla-logo-opcao span {
+        display: block;
+        overflow: hidden;
+
+        margin-top: 6px;
+
+        font-size: 0.66rem;
+        font-weight: 700;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .cla-logo-opcao.active {
+        border-color: #d8b85a;
+        background: rgba(139, 108, 36, 0.24);
+
+        box-shadow:
+            0 0 0 2px rgba(216, 184, 90, 0.12);
+    }
+
+    .cla-logo-opcao:active {
+        transform: scale(0.96);
+    }
+
+    /* =======================================================
+       BOTÕES
+       ======================================================= */
+
+    .cla-acoes-iniciais {
+        position: relative;
+        z-index: 1;
+
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+
+        margin-top: 16px;
+    }
+
+    .cla-acoes-iniciais .cla-btn:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .cla-btn {
+        min-height: 44px;
+        padding: 10px 13px;
+
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+
+        border: 1px solid rgba(216, 184, 90, 0.48);
+        border-radius: 11px;
+
+        background:
+            linear-gradient(
+                180deg,
+                #8b6b22,
+                #5f4513
+            );
+
+        color: #fff7dc;
+        font-size: 0.83rem;
+        font-weight: 800;
+        text-align: center;
+
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.10),
+            0 5px 13px rgba(0, 0, 0, 0.20);
+
+        cursor: pointer;
+
+        transition:
+            transform 0.15s ease,
+            filter 0.15s ease,
+            border-color 0.15s ease;
+    }
+
+    .cla-btn:hover {
+        filter: brightness(1.10);
+        border-color: rgba(244, 220, 145, 0.72);
+    }
+
+    .cla-btn:active {
+        transform: scale(0.97);
+    }
+
+    .cla-btn:disabled {
+        opacity: 0.48;
+        cursor: not-allowed;
+        filter: grayscale(0.35);
+    }
+
+    .cla-btn-secundario {
+        border-color: rgba(148, 163, 184, 0.29);
+
+        background:
+            linear-gradient(
+                180deg,
+                #27364d,
+                #182235
+            );
+
+        color: #e4eaf2;
+    }
+
+    .cla-btn-perigo {
+        border-color: rgba(248, 113, 113, 0.42);
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(153, 27, 27, 0.95),
+                rgba(75, 13, 13, 0.98)
+            );
+
+        color: #fee2e2;
+    }
+
+
+    /* =======================================================
+       CAMPOS
+       ======================================================= */
+
+    .cla-campo {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        margin-bottom: 12px;
+    }
+
+    .cla-campo label {
+        color: var(--cla-texto-2);
+        font-size: 0.76rem;
+        font-weight: 800;
+    }
+
+    .cla-campo input,
+    .cla-campo textarea,
+    .cla-campo select {
+        width: 100%;
+        min-height: 44px;
+
+        padding: 10px 12px;
+
+        border: 1px solid var(--cla-borda-forte);
+        border-radius: 11px;
+
+        background: rgba(4, 9, 18, 0.80);
+        color: var(--cla-texto);
+
+        outline: none;
+
+        transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease,
+            background 0.18s ease;
+    }
+
+    .cla-campo input::placeholder,
+    .cla-campo textarea::placeholder {
+        color: #667388;
+    }
+
+    .cla-campo input:focus,
+    .cla-campo textarea:focus,
+    .cla-campo select:focus {
+        border-color: rgba(216, 184, 90, 0.82);
+        background: rgba(6, 12, 23, 0.95);
+
+        box-shadow:
+            0 0 0 3px rgba(216, 184, 90, 0.10);
+    }
+
+    .cla-campo textarea {
+        min-height: 92px;
+        resize: vertical;
+    }
+
+
+    /* =======================================================
+       LISTAS E CARDS
+       ======================================================= */
+
+    .cla-lista {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+    }
+
+    .cla-item-lista {
+        padding: 13px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(27, 39, 58, 0.93),
+                rgba(17, 25, 39, 0.93)
+            );
+
+        border: 1px solid var(--cla-borda);
+        border-radius: 14px;
+
+        box-shadow:
+            0 6px 16px rgba(0, 0, 0, 0.17),
+            inset 0 1px 0 rgba(255, 255, 255, 0.025);
+
+        transition:
+            transform 0.16s ease,
+            border-color 0.16s ease;
+    }
+
+    .cla-item-lista:hover {
+        border-color: rgba(216, 184, 90, 0.30);
+        transform: translateY(-1px);
+    }
+
+    .cla-card-publico-topo {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .cla-card-publico-identidade {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .cla-card-publico-nome {
+        color: var(--cla-texto);
+        font-family: "Cinzel", serif;
+        font-size: 0.91rem;
+        font-weight: 900;
+        line-height: 1.35;
+    }
+
+    .cla-card-publico-tag {
+        margin-left: 5px;
+        color: var(--cla-dourado);
+        font-size: 0.73rem;
+        font-weight: 800;
+    }
+
+    .cla-card-publico-descricao {
+        margin-top: 6px;
+
+        color: var(--cla-texto-2);
+        font-size: 0.80rem;
+        line-height: 1.42;
+    }
+
+    .cla-card-publico-dados {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+
+        margin-top: 10px;
+    }
+
+    .cla-card-publico-selo {
+        padding: 4px 7px;
+
+        color: #aeb9c8;
+        font-size: 0.68rem;
+        font-weight: 700;
+
+        background: rgba(4, 9, 18, 0.58);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 7px;
+    }
+
+    .cla-card-publico-selo.vaga {
+        color: #bbf7d0;
+        background: rgba(20, 83, 45, 0.23);
+        border-color: rgba(74, 222, 128, 0.28);
+    }
+
+    .cla-card-publico-icone {
+        width: 43px;
+        height: 43px;
+        flex: 0 0 43px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(96, 165, 250, 0.17),
+                rgba(96, 165, 250, 0.04)
+            );
+
+        border: 1px solid rgba(96, 165, 250, 0.28);
+        border-radius: 14px;
+
+        font-size: 21px;
+    }
+
+
+    /* =======================================================
+       RESUMO DO CLÃ
+       ======================================================= */
+
+    .cla-resumo {
+        display: grid;
+        grid-template-columns:
+            repeat(4, minmax(0, 1fr));
+
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .cla-status-card {
+        min-width: 0;
+        padding: 11px 7px;
+
+        text-align: center;
+        color: var(--cla-texto-3);
+        font-size: 0.69rem;
+        font-weight: 700;
+
+        background: rgba(4, 9, 18, 0.48);
+        border: 1px solid var(--cla-borda);
+        border-radius: 11px;
+    }
+
+    .cla-status-card strong {
+        display: block;
+        overflow: hidden;
+
+        margin-top: 5px;
+
+        color: var(--cla-texto);
+        font-size: 0.92rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+
+    /* =======================================================
+       ABAS
+       ======================================================= */
+
+    .cla-abas {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+
+        margin: 0 0 12px;
+        padding: 10px 0;
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(8, 13, 22, 0.99),
+                rgba(8, 13, 22, 0.96)
+            );
+
+        box-shadow:
+            0 9px 14px rgba(8, 13, 22, 0.92);
+
+        scrollbar-width: none;
+    }
+
+    .cla-abas::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .cla-tab-conteudo {
+        scroll-margin-top: 64px;
+    }
+    
+    .cla-aba-btn {
+        min-width: 104px;
+        min-height: 39px;
+        flex: 0 0 auto;
+
+        padding: 8px 11px;
+
+        color: var(--cla-texto-3);
+        font-size: 0.75rem;
+        font-weight: 800;
+
+        background: rgba(18, 28, 44, 0.82);
+        border: 1px solid var(--cla-borda);
+        border-radius: 10px;
+
+        cursor: pointer;
+
+        transition:
+            background 0.16s ease,
+            color 0.16s ease,
+            border-color 0.16s ease;
+    }
+
+    .cla-aba-btn.active {
+        color: #fff5d1;
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(139, 108, 36, 0.95),
+                rgba(92, 67, 17, 0.95)
+            );
+
+        border-color: rgba(216, 184, 90, 0.68);
+    }
+
+
+    /* =======================================================
+       AVISOS, CARREGAMENTO E ÁREA PERIGOSA
+       ======================================================= */
+
+    .cla-vazio,
+    .cla-carregando {
+        padding: 34px 14px;
+
+        color: var(--cla-texto-3);
+        font-size: 0.82rem;
+        text-align: center;
+    }
+
+    .cla-mensagem {
+        display: none;
+        position: sticky;
+        top: 0;
+        z-index: 60;
+        margin-bottom: 12px;
+        padding: 11px 13px;
+
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 11px;
+
+        text-align: center;
+        font-size: 0.79rem;
+        font-weight: 800;
+    }
+    
+    /* =======================================================
+       ⚙️ CONFIGURAÇÕES DO CLÃ
+       ======================================================= */
+
+    #cla-tab-configuracoes select {
+        cursor: pointer;
+    }
+
+    #cla-tab-configuracoes option {
+        background: #101827;
+        color: #f4f7fb;
+    }
+
+    #cla-tab-configuracoes textarea {
+        line-height: 1.45;
+    }
+
+    #cla-config-nivel-minimo {
+        font-weight: 800;
+    }
+
+    #cla-btn-salvar-configuracoes {
+        margin-top: 5px;
+    }
+
+    #cla-area-acoes-perigosas {
+        margin-top: 22px;
+
+        background: rgba(69, 10, 10, 0.10);
+        border-color: rgba(248, 113, 113, 0.20);
+    }
+
+    /* =======================================================
+        🎖️ CARGOS DO CLÃ
+       ======================================================= */
+
+    .cla-cargos-resumo {
+        display: grid;
+        grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .cla-cargos-resumo-item {
+        min-width: 0;
+        padding: 10px 7px;
+
+        text-align: center;
+
+        background:
+            rgba(4, 9, 18, 0.52);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.20);
+
+        border-radius: 11px;
+    }
+
+    .cla-cargos-resumo-item span {
+        display: block;
+
+        color: var(--cla-texto-3);
+        font-size: 0.66rem;
+        font-weight: 700;
+    }
+
+    .cla-cargos-resumo-item strong {
+        display: block;
+
+        margin-top: 4px;
+ 
+        color: var(--cla-texto);
+        font-size: 0.88rem;
+    }
+
+
+    .cla-cargo-card {
+        padding: 13px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(27, 39, 58, 0.93),
+                rgba(17, 25, 39, 0.93)
+            );
+
+        border:
+            1px solid var(--cla-borda);
+
+        border-radius: 14px;
+    }
+
+    .cla-cargo-card + .cla-cargo-card {
+        margin-top: 9px;
+    }
+
+    .cla-cargo-card-topo {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+
+        gap: 10px;
+    }
+
+    .cla-cargo-card-nome {
+        color: var(--cla-dourado-claro);
+
+        font-family: "Cinzel", serif;
+        font-size: 0.90rem;
+        font-weight: 900;
+    }
+
+    .cla-cargo-card-ordem {
+        margin-top: 4px;
+
+        color: var(--cla-texto-3);
+        font-size: 0.69rem;
+    }
+
+    .cla-cargo-selo {
+        padding: 4px 7px;
+
+        color: #cbd5e1;
+        font-size: 0.64rem;
+        font-weight: 800;
+
+        background:
+            rgba(4, 9, 18, 0.60);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.20);
+
+        border-radius: 7px;
+    }
+
+    .cla-cargo-selo.sistema {
+        color: #bfdbfe;
+
+        background:
+            rgba(30, 64, 175, 0.18);
+
+        border-color:
+            rgba(96, 165, 250, 0.28);
+    }
+
+    .cla-cargo-selo.personalizado {
+        color: #fde68a;
+
+        background:
+            rgba(146, 64, 14, 0.18);
+
+        border-color:
+            rgba(216, 184, 90, 0.28);
+    }
+
+
+    .cla-cargo-permissoes {
+        display: flex;
+        flex-wrap: wrap;
+
+        gap: 5px;
+
+        margin-top: 10px;
+    }
+
+    .cla-cargo-permissao {
+        padding: 4px 7px;
+
+        color: #bbf7d0;
+        font-size: 0.65rem;
+        font-weight: 700;
+
+        background:
+            rgba(20, 83, 45, 0.20);
+
+        border:
+            1px solid
+            rgba(74, 222, 128, 0.25);
+
+        border-radius: 7px;
+    }
+
+
+    #cla-area-gerenciar-cargos {
+        margin-top: 16px;
+        padding-top: 16px;
+
+        border-top:
+            1px solid
+           rgba(148, 163, 184, 0.20);
+    }
+
+
+    .cla-cargo-grade-permissoes {
+        display: grid;
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+        gap: 8px;
+    }
+
+    .cla-cargo-permissao-opcao {
+        min-width: 0;
+
+        display: flex;
+        align-items: center;
+
+        gap: 9px;
+ 
+        padding: 10px;
+
+        color: var(--cla-texto-2);
+
+        background:
+            rgba(4, 9, 18, 0.52);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.20);
+
+        border-radius: 10px;
+
+        cursor: pointer;
+    }
+
+    .cla-cargo-permissao-opcao input {
+        width: 17px;
+        height: 17px;
+
+        flex: 0 0 17px;
+
+        accent-color: #d8b85a;
+    }
+
+    .cla-cargo-permissao-opcao span {
+        min-width: 0;
+
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+
+    .cla-cargo-form-acoes {
+        display: grid;
+
+        grid-template-columns:
+            minmax(0, 1fr)
+            minmax(0, 1fr);
+
+        gap: 8px;
+
+        margin-top: 13px;
+    }
+
+
+    @media (max-width: 520px) {
+        .cla-cargos-resumo {
+            grid-template-columns: 1fr;
+        }
+
+        .cla-cargo-grade-permissoes {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* =======================================================
+       RESPONSIVO
+       ======================================================= */
+
+    @media (max-width: 640px) {
+        #cla-modal {
+            padding: 6px;
+        }
+
+        .cla-painel {
+            width: calc(100vw - 12px);
+            height: calc(100dvh - 12px);
+            max-height: none;
+
+            border-radius: 17px;
+        }
+
+        .cla-cabecalho {
+            min-height: 69px;
+            padding: 11px 13px;
+        }
+
+        .cla-cabecalho-icone {
+            width: 40px;
+            height: 40px;
+            flex-basis: 40px;
+
+            border-radius: 12px;
+            font-size: 20px;
+        }
+
+        .cla-cabecalho-titulo {
+            font-size: 0.91rem;
+        }
+
+        .cla-cabecalho-subtitulo {
+            font-size: 0.66rem;
+        }
+
+        .cla-conteudo {
+            padding: 11px;
+        }
+
+        .cla-bloco {
+            padding: 13px;
+            border-radius: 14px;
+        }
+
+        .cla-resumo {
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+        }
+
+        .cla-boas-vindas-topo {
+            align-items: flex-start;
+        }
+    }
+
+    @media (max-width: 370px) {
+        .cla-acoes-iniciais {
+            grid-template-columns: 1fr;
+        }
+
+        .cla-acoes-iniciais .cla-btn:last-child {
+            grid-column: auto;
+        }
+
+        .cla-cabecalho-subtitulo {
+            display: none;
+        }
+    }
+</style>
+
+
+<div
+    id="cla-modal"
+    class="modal-moderno"
+    style="display: none; z-index: 10050;"
+>
+    <div class="cla-painel">
+
+        <!-- CABEÇALHO -->
+        <div class="cla-cabecalho">
+            <div class="cla-cabecalho-identidade">
+                <div class="cla-cabecalho-icone">
+                    🛡️
+                </div>
+
+                <div>
+                    <h2 class="cla-cabecalho-titulo">
+                        Central de Clãs
+                    </h2>
+
+                    <span class="cla-cabecalho-subtitulo">
+                        Alianças, prestígio e progresso em Eldora
+                    </span>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="cla-btn-fechar"
+                onclick="fecharTelaCla()"
+                aria-label="Fechar tela de clãs"
+                title="Fechar"
+            >
+                ✕
+            </button>
+        </div>
+
+        <div
+            id="cla-conteudo-scroll"
+            class="cla-conteudo"
+        >
+
+            <!-- MENSAGENS -->
+            <div
+                id="cla-mensagem"
+                class="cla-mensagem"
+            ></div>
+
+            <!-- CARREGAMENTO -->
+            <div
+                id="cla-carregando"
+                class="cla-carregando"
+            >
+                <div style="font-size: 34px; margin-bottom: 10px;">
+                    🛡️
+                </div>
+
+                Consultando os registros dos clãs...
+            </div>
+
+
+            <!-- ========================================= -->
+            <!-- JOGADOR SEM CLÃ                           -->
+            <!-- ========================================= -->
+
+            <div
+                id="cla-sem-clan"
+                style="display: none;"
+            >
+                <div class="cla-bloco cla-boas-vindas">
+                    <div class="cla-boas-vindas-topo">
+                        <div class="cla-boas-vindas-icone">
+                            🏰
+                        </div>
+
+                        <div>
+                            <span class="cla-eyebrow">
+                                Sua jornada coletiva começa aqui
+                            </span>
+
+                            <h3 class="cla-titulo-bloco">
+                                Encontre uma bandeira para defender
+                            </h3>
+
+                            <p class="cla-subtitulo-bloco">
+                                Crie sua própria organização, encontre aliados
+                                ou aceite um convite enviado por outro clã.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="cla-acoes-iniciais">
+                        <button
+                            type="button"
+                            id="cla-btn-mostrar-criacao"
+                            class="cla-btn"
+                        >
+                            🏰 Criar clã
+                        </button>
+
+                        <button
+                            type="button"
+                            id="cla-btn-listar-publicos"
+                            class="cla-btn cla-btn-secundario"
+                        >
+                            🔍 Explorar clãs
+                        </button>
+
+                        <button
+                            type="button"
+                            id="cla-btn-ver-convites"
+                            class="cla-btn cla-btn-secundario"
+        >
+                            ✉️ Convites recebidos
+                        </button>
+                    </div>
+                </div>
+
+
+                <!-- FORMULÁRIO DE CRIAÇÃO -->
+                <div
+                    id="cla-area-criacao"
+                    class="cla-bloco"
+                    style="display: none;"
+                >
+                    <h3 class="cla-titulo-bloco">
+                        Fundar um novo clã
+                    </h3>
+
+                    <form id="cla-form-criar">
+
+                        <div class="cla-campo">
+                            <label for="cla-criar-nome">
+                                Nome do clã
+                            </label>
+
+                            <input
+                                id="cla-criar-nome"
+                                name="nome"
+                                type="text"
+                                minlength="3"
+                                maxlength="30"
+                                placeholder="Ex.: Guardiões de Eldora"
+                                required
+                            >
+                        </div>
+
+                        <div class="cla-campo">
+                            <label for="cla-criar-tag">
+                                Tag
+                            </label>
+
+                            <input
+                                id="cla-criar-tag"
+                                name="tag"
+                                type="text"
+                                minlength="2"
+                                maxlength="5"
+                                placeholder="Ex.: GDE"
+                                required
+                            >
+                        </div>
+
+                        <div class="cla-campo">
+                            <label for="cla-criar-descricao">
+                                Descrição
+                            </label>
+
+                            <textarea
+                                id="cla-criar-descricao"
+                                name="descricao"
+                                maxlength="300"
+                                placeholder="Conte a história e os objetivos do clã."
+                            ></textarea>
+                        </div>
+
+
+                        <!-- ========================================= -->
+                        <!-- 🪙 CUSTO DA FUNDAÇÃO                      -->
+                        <!-- ========================================= -->
+
+                        <div
+                            style="
+                                margin-bottom: 13px;
+                                padding: 11px 12px;
+
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                                gap: 10px;
+
+                                background:
+                                    rgba(216, 184, 90, 0.08);
+
+                                border:
+                                    1px solid
+                                    rgba(216, 184, 90, 0.26);
+
+                                border-radius: 11px;
+                            "
+                        >
+                            <div>
+                                <div
+                                    style="
+                                        color: #c5ceda;
+                                        font-size: 0.71rem;
+                                        font-weight: 800;
+                                    "
+                                >
+                                    Custo de fundação
+                                </div>
+
+                                <div
+                                    style="
+                                        margin-top: 3px;
+                                        color: #8491a3;
+                                        font-size: 0.66rem;
+                                    "
+                                >
+                                    Esta quantia não entra no tesouro.
+                                </div>
+                            </div>
+
+                            <strong
+                                id="cla-custo-criacao"
+                                style="
+                                    flex: 0 0 auto;
+                                    color: #f4dc91;
+                                    font-size: 0.88rem;
+                                "
+                            >
+                                5.000 🪙
+                            </strong>
+                        </div>
+
+
+                        <button
+                            type="submit"
+                            id="cla-btn-criar"
+                            class="cla-btn"
+                            style="width: 100%;"
+                        >
+                            🛡️ Fundar clã — 5.000 🪙
+                        </button>
+                    </form>
+                </div>
+
+
+                <!-- LISTA PÚBLICA -->
+                <div
+                    id="cla-area-lista-publica"
+                    class="cla-bloco"
+                    style="display: none;"
+                >
+                    <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        gap: 12px;
+                        margin-bottom: 13px;
+                    ">
+                        <div>
+                            <span class="cla-eyebrow">
+                                Organizações do reino
+                            </span>
+
+                            <h3
+                                class="cla-titulo-bloco"
+                                style="margin-bottom: 3px;"
+                            >
+                                Explore os clãs de Eldora
+                            </h3>
+
+                            <p class="cla-subtitulo-bloco">
+            Consulte membros, nível e disponibilidade.
+                            </p>
+                        </div>
+
+                        <div class="cla-card-publico-icone">
+                            🧭
+                        </div>
+                    </div>
+
+                    <div class="cla-campo">
+                        <input
+                            id="cla-busca-publica"
+                            type="text"
+                            placeholder="Buscar por nome ou tag..."
+                        >
+                    </div>
+
+                    <div
+                        id="cla-lista-publica"
+                        class="cla-lista"
+                    ></div>
+                </div>
+
+
+                <!-- CONVITES -->
+                <div
+                    id="cla-area-convites"
+                    class="cla-bloco"
+                    style="display: none;"
+                >
+                    <h3 class="cla-titulo-bloco">
+                        Convites recebidos
+                    </h3>
+
+                    <div
+                        id="cla-lista-convites"
+                        class="cla-lista"
+                    ></div>
+                </div>
+            </div>
+
+
+            <!-- ========================================= -->
+            <!-- JOGADOR COM CLÃ                           -->
+            <!-- ========================================= -->
+
+            <div
+                id="cla-com-clan"
+                style="display: none;"
+            >
+                <div class="cla-bloco">
+                    <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        gap: 10px;
+                    ">
+                        <div>
+                            <h3
+                                id="cla-nome"
+                                class="cla-titulo-bloco"
+                                style="font-size: 1.15rem;"
+                            >
+                                Nome do Clã
+                            </h3>
+
+                            <div style="color: #94a3b8;">
+                                [<span id="cla-tag">TAG</span>]
+                            </div>
+
+                            <p
+                                id="cla-descricao"
+                                style="color: #cbd5e1;"
+                            >
+                                Descrição do clã.
+                            </p>
+                        </div>
+
+                        <div style="
+                            min-width: 76px;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            gap: 5px;
+                        ">
+                            <div
+                                id="cla-logo-container"
+                                style="
+                                    width: 58px;
+                                    height: 58px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    overflow: hidden;
+                                    border-radius: 16px;
+                                    border: 1px solid rgba(216, 184, 90, 0.42);
+                                    background: rgba(4, 9, 18, 0.72);
+                                    box-shadow:
+                                        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                                        0 6px 16px rgba(0, 0, 0, 0.25);
+                                "
+                            >
+                                <img
+                                    id="cla-logo"
+                                    src=""
+                                    alt="Brasão do clã"
+                                    style="
+                                        width: 100%;
+                                        height: 100%;
+                                        object-fit: contain;
+                                        padding: 4px;
+                                        display: none;
+                                    "
+                                >
+
+                                <span
+                                    id="cla-logo-fallback"
+                                    style="font-size: 27px;"
+                                >
+                                    🛡️
+                                </span>
+                            </div>
+
+                            <strong id="cla-nivel">
+                                Nv. 1
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div class="cla-resumo">
+                        <div class="cla-status-card">
+                            Membros
+                            <strong id="cla-total-membros">
+                                1 / 10
+                            </strong>
+                        </div>
+
+                        <div class="cla-status-card">
+                            XP
+                            <strong id="cla-xp">
+                                0
+                            </strong>
+                        </div>
+
+                        <div class="cla-status-card">
+                            Tesouro
+                            <strong id="cla-tesouro">
+                                0 🪙
+                            </strong>
+                        </div>
+
+                        <div class="cla-status-card">
+                            Seu cargo
+                            <strong id="cla-meu-cargo">
+                                Membro
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- ABAS INTERNAS -->
+                <div
+                    id="cla-abas"
+                    class="cla-abas"
+                >
+                    <button
+                        type="button"
+                        class="cla-aba-btn active"
+                        data-cla-tab="visao-geral"
+                    >
+                        Visão geral
+                    </button>
+
+                    <button
+                        type="button"
+                        class="cla-aba-btn"
+                        data-cla-tab="membros"
+                    >
+                        Membros
+                    </button>
+                    
+                    <button
+                        type="button"
+                        id="cla-aba-cargos-btn"
+                        class="cla-aba-btn"
+                        data-cla-tab="cargos"
+                    >
+                        🎖️ Cargos
+                    </button>
+
+                    <button
+                        type="button"
+                        id="cla-aba-convites-btn"
+                        class="cla-aba-btn"
+                        data-cla-tab="convites"
+                    >
+                        Convites
+                    </button>
+
+                    <button
+                        type="button"
+                        class="cla-aba-btn"
+                        data-cla-tab="tesouro"
+                    >
+                        Tesouro
+                    </button>
+
+                    <button
+                        type="button"
+                        class="cla-aba-btn"
+                        data-cla-tab="melhorias"
+                    >
+                        Melhorias
+                    </button>
+
+                    <button
+                        type="button"
+                        id="cla-aba-configuracoes-btn"
+                        class="cla-aba-btn"
+                        data-cla-tab="configuracoes"
+                        style="display: none;"
+                    >
+                        Configurações
+                    </button>
+                </div>
+
+
+                <!-- VISÃO GERAL -->
+                <div
+                    id="cla-tab-visao-geral"
+                    class="cla-bloco cla-tab-conteudo"
+                >
+                    <h3 class="cla-titulo-bloco">
+                        Atividades do clã
+                    </h3>
+
+                    <div
+                        id="cla-lista-atividades"
+                        class="cla-lista"
+                    >
+                        <div class="cla-vazio">
+                            Nenhuma atividade registrada.
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- MEMBROS -->
+                <div
+                    id="cla-tab-membros"
+                    class="cla-bloco cla-tab-conteudo"
+                    style="display: none;"
+                >
+                    <h3 class="cla-titulo-bloco">
+                        Membros
+                    </h3>
+
+                    <div
+                        id="cla-lista-membros"
+                        class="cla-lista"
+                    ></div>
+                </div>
+                
+                <!-- ========================================= -->
+                <!-- 🎖️ CARGOS DO CLÃ                          -->
+                <!-- ========================================= -->
+
+                <div
+                    id="cla-tab-cargos"
+                    class="cla-bloco cla-tab-conteudo"
+                    style="display: none;"
+                >
+                    <span class="cla-eyebrow">
+                        Estrutura e autoridade
+                    </span>
+
+                    <h3 class="cla-titulo-bloco">
+                        🎖️ Cargos do clã
+                    </h3>
+
+                    <p
+                        class="cla-subtitulo-bloco"
+                        style="margin-bottom: 14px;"
+                    >
+                        Consulte a hierarquia do clã e as permissões
+                        concedidas a cada cargo.
+                    </p>
+
+
+                    <!-- RESUMO -->
+                    <div class="cla-cargos-resumo">
+
+                        <div class="cla-cargos-resumo-item">
+                            <span>
+                                Seu cargo
+                            </span>
+
+                            <strong id="cla-cargos-meu-cargo">
+                                Membro
+                            </strong>
+                        </div>
+
+
+                        <div class="cla-cargos-resumo-item">
+                            <span>
+                                Personalizados
+                            </span>
+
+                            <strong id="cla-cargos-total">
+                                0
+                            </strong>
+                        </div>
+
+
+                        <div class="cla-cargos-resumo-item">
+                            <span>
+                                Limite
+                            </span>
+
+                            <strong id="cla-cargos-limite">
+                                0
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <!-- LISTAGEM -->
+                    <div
+                        id="cla-lista-cargos"
+                        class="cla-lista"
+                    >
+                        <div class="cla-vazio">
+                            Carregando cargos...
+                        </div>
+                    </div>
+
+
+                    <!-- ===================================== -->
+                    <!-- 👑 GERENCIAMENTO — SOMENTE LÍDER      -->
+                    <!-- ===================================== -->
+
+                    <div
+                        id="cla-area-gerenciar-cargos"
+                        style="display: none;"
+                    >
+
+                        <span class="cla-eyebrow">
+                            Administração
+                        </span>
+
+                        <h4
+                            id="cla-cargo-form-titulo"
+                            class="cla-titulo-bloco"
+                        >
+                            ➕ Criar novo cargo
+                        </h4>
+
+                        <p
+                            class="cla-subtitulo-bloco"
+                            style="margin-bottom: 14px;"
+                        >
+                            Defina o nome, a posição na hierarquia
+                            e as permissões administrativas.
+                        </p>
+
+
+                        <!-- ID DO CARGO EM EDIÇÃO -->
+                        <input
+                            id="cla-cargo-id-edicao"
+                            type="hidden"
+                            value=""
+                        >
+
+
+                        <!-- NOME -->
+                        <div class="cla-campo">
+                           <label for="cla-cargo-nome">
+                                Nome do cargo
+                            </label>
+
+                            <input
+                                id="cla-cargo-nome"
+                                type="text"
+                                minlength="2"
+                                maxlength="24"
+                                placeholder="Ex.: Capitão"
+                            >
+                        </div>
+
+
+                        <!-- HIERARQUIA -->
+                        <div class="cla-campo">
+                            <label for="cla-cargo-ordem">
+                                Hierarquia
+                            </label>
+
+                            <input
+                                id="cla-cargo-ordem"
+                                type="number"
+                                min="20"
+                                max="80"
+                                step="1"
+                                value="50"
+                            >
+
+                            <div style="
+                                color: var(--cla-texto-3);
+                                font-size: 0.68rem;
+                                line-height: 1.4;
+                            ">
+                                Quanto maior o número, maior a autoridade.
+                                Cargos personalizados podem usar valores de
+                                20 a 80.
+                            </div>
+                        </div>
+
+
+                        <!-- PERMISSÕES -->
+                        <div style="margin-top: 15px;">
+                            <label style="
+                                display: block;
+                                margin-bottom: 8px;
+                                color: var(--cla-texto-2);
+                                font-size: 0.76rem;
+                                font-weight: 800;
+                            ">
+                                Permissões
+                            </label>
+
+                            <div
+                                id="cla-cargo-permissoes"
+                                class="cla-cargo-grade-permissoes"
+                            >
+                                <div class="cla-vazio">
+                                    Carregando permissões...
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <!-- AÇÕES -->
+                        <div class="cla-cargo-form-acoes">
+
+                            <button
+                                type="button"
+                                id="cla-btn-salvar-cargo"
+                                class="cla-btn"
+                            >
+                                ➕ Criar cargo
+                            </button>
+
+
+                            <button
+                                type="button"
+                                id="cla-btn-cancelar-cargo"
+                                class="cla-btn cla-btn-secundario"
+                                style="display: none;"
+                            >
+                                Cancelar edição
+                            </button>
+
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- RECRUTAMENTO -->
+                <div
+                    id="cla-tab-convites"
+                    class="cla-bloco cla-tab-conteudo"
+                    style="display: none;"
+                >
+                    <div
+                        id="cla-area-convidar-herois"
+                    >
+                        <h3 class="cla-titulo-bloco">
+                            ✉️ Convidar heróis
+                        </h3>
+
+                        <p
+                            class="cla-subtitulo-bloco"
+                            style="margin-bottom: 12px;"
+                        >
+                            Procure um aventureiro e envie
+                            um convite para o clã.
+                        </p>
+
+                        <div class="cla-campo">
+                            <input
+                                id="cla-buscar-jogador"
+                                type="text"
+                                placeholder="Digite o nome do herói..."
+                            >
+                        </div>
+
+                        <button
+                            type="button"
+                            id="cla-btn-buscar-jogador"
+                            class="cla-btn"
+                            style="width: 100%;"
+                        >
+                            🔍 Buscar jogador
+                        </button>
+
+                        <div
+                            id="cla-resultado-jogadores"
+                            class="cla-lista"
+                            style="margin-top: 12px;"
+                        ></div>
+                    </div>
+                </div>
+
+                <!-- TESOURO -->
+                <div
+                    id="cla-tab-tesouro"
+                    class="cla-bloco cla-tab-conteudo"
+                    style="display: none;"
+                >
+                    <h3 class="cla-titulo-bloco">
+                        💰 Tesouro do clã
+                    </h3>
+
+                    <p
+                        class="cla-subtitulo-bloco"
+                        style="margin-bottom: 14px;"
+                    >
+                        Recursos coletivos usados para melhorias
+                        e atividades do clã.
+                    </p>
+
+
+                    <!-- SALDO -->
+                    <div
+                        style="
+                            padding: 13px;
+                            margin-bottom: 16px;
+
+                            border:
+                                1px solid
+                                rgba(216, 184, 90, 0.28);
+
+                            border-radius: 12px;
+
+                            background:
+                                rgba(216, 184, 90, 0.07);
+
+                            text-align: center;
+                        "
+                    >
+                        <div
+                            style="
+                                color: #8491a3;
+                                font-size: 0.70rem;
+                                font-weight: 800;
+                                text-transform: uppercase;
+                                letter-spacing: 0.8px;
+                            "
+                        >
+                            Saldo disponível
+                        </div>
+
+                        <div
+                            id="cla-tesouro-saldo"
+                            style="
+                                margin-top: 5px;
+
+                                color: #f4dc91;
+                                font-size: 1.15rem;
+                                font-weight: 900;
+                            "
+                        >
+                            0 🪙
+                        </div>
+                    </div>
+
+                    <!-- =============================================== -->
+                    <!-- 💼 LICENÇA DA TESOURARIA -->
+                    <!-- =============================================== -->
+
+                    <div
+                        id="cla-area-licenca-tesouraria"
+                        style="
+                            margin-bottom: 18px;
+                            padding: 13px;
+
+                            background:
+                                linear-gradient(
+                                    145deg,
+                                    rgba(30, 41, 59, 0.90),
+                                    rgba(15, 23, 42, 0.90)
+                                );
+
+                            border:
+                                1px solid
+                                rgba(216, 184, 90, 0.24);
+
+                            border-radius: 12px;
+                        "
+                    >
+                        <div style="
+                            display:flex;
+                            justify-content:space-between;
+                            gap:10px;
+                            align-items:flex-start;
+                        ">
+                            <div>
+                                <strong style="
+                                    color:#f4dc91;
+                                    font-size:0.84rem;
+                                ">
+                                    💼 Licença da Tesouraria
+                                </strong>
+                    
+                                <div
+                                    id="cla-tesouraria-status"
+                                    style="
+                                        margin-top:5px;
+                                        color:#94a3b8;
+                                        font-size:0.72rem;
+                                        line-height:1.45;
+                                    "
+                                >
+                                    Verificando licença...
+                                </div>
+                            </div>
+                    
+                            <span
+                                id="cla-tesouraria-selo"
+                                style="
+                                    flex:0 0 auto;
+                                    padding:4px 7px;
+                                    border-radius:7px;
+                                    background:rgba(127,29,29,.22);
+                                    border:1px solid rgba(248,113,113,.25);
+                                    color:#fecaca;
+                                    font-size:.64rem;
+                                    font-weight:900;
+                                "
+                            >
+                                INATIVA
+                            </span>
+                        </div>
+                    
+                    
+                        <div
+                            id="cla-tesouraria-compra-info"
+                            style="
+                                margin-top:10px;
+                                color:#cbd5e1;
+                                font-size:0.72rem;
+                                line-height:1.55;
+                            "
+                        >
+                            💎 100 Gemas · ⏳ 30 dias
+                        </div>
+                    
+                    
+                        <button
+                            type="button"
+                            id="cla-btn-comprar-tesouraria"
+                            class="cla-btn"
+                            style="
+                                display:none;
+                                width:100%;
+                                margin-top:11px;
+                            "
+                        >
+                            💎 Ativar por 100 Gemas
+                        </button>
+                    </div>
+
+                    <!-- =============================================== -->
+                    <!-- 🪙 DOAÇÃO — TODOS OS MEMBROS -->
+                    <!-- =============================================== -->
+
+                    <div>
+                        <h4
+                            class="cla-titulo-bloco"
+                            style="
+                                margin-bottom: 4px;
+                                font-size: 0.82rem;
+                            "
+                        >
+                            🪙 Doar para o clã
+                        </h4>
+
+                        <p
+                            class="cla-subtitulo-bloco"
+                            style="margin-bottom: 12px;"
+                        >
+                            Todo membro pode contribuir com ouro
+                            para o tesouro.
+                        </p>
+
+
+                        <div class="cla-campo">
+                            <label for="cla-doacao-ouro">
+                                Quantidade de ouro
+                            </label>
+
+                            <input
+                                id="cla-doacao-ouro"
+                                type="number"
+                                min="1"
+                                step="1"
+                                inputmode="numeric"
+                                placeholder="Ex.: 1000"
+                            >
+                        </div>
+
+
+                        <button
+                            type="button"
+                            id="cla-btn-doar-ouro"
+                            class="cla-btn"
+                            style="width: 100%;"
+                        >
+                            🪙 Doar ouro
+                        </button>
+                    </div>
+
+
+                    <!-- =============================================== -->
+                    <!-- 💼 ADMINISTRAÇÃO DO TESOURO -->
+                    <!-- =============================================== -->
+
+                    <div
+                        id="cla-area-administrar-tesouro"
+                        style="
+                            display: none;
+
+                            margin-top: 20px;
+                            padding-top: 18px;
+
+                            border-top:
+                                1px solid
+                                rgba(148, 163, 184, 0.20);
+                        "
+                    >
+                        <h4
+                            class="cla-titulo-bloco"
+                            style="
+                                margin-bottom: 4px;
+                                color: #f4dc91;
+                            "
+                        >
+                            💼 Administração do tesouro
+                        </h4>
+
+                        <p
+                            class="cla-subtitulo-bloco"
+                            style="margin-bottom: 14px;"
+                        >
+                            Envie ouro do tesouro para um membro
+                            do clã.
+                        </p>
+
+
+                        <!-- DESTINATÁRIO -->
+                        <div class="cla-campo">
+                            <label for="cla-tesouro-destinatario">
+                                Membro que receberá
+                            </label>
+
+                            <select
+                                id="cla-tesouro-destinatario"
+                            >
+                                <option value="">
+                                    Selecione um membro
+                                </option>
+                            </select>
+                        </div>
+
+
+                        <!-- QUANTIDADE -->
+                        <div class="cla-campo">
+                            <label for="cla-tesouro-quantidade">
+                                Quantidade de ouro
+                            </label>
+
+                            <input
+                                id="cla-tesouro-quantidade"
+                                type="number"
+                                min="1"
+                                step="1"
+                                inputmode="numeric"
+                                placeholder="Ex.: 500"
+                            >
+                        </div>
+
+
+                        <!-- BOTÃO -->
+                        <button
+                            type="button"
+                            id="cla-btn-enviar-ouro-tesouro"
+                            class="cla-btn"
+                            style="width: 100%;"
+                        >
+                            💰 Enviar ouro
+                        </button>
+
+
+                        <div
+                            style="
+                                margin-top: 10px;
+
+                                color: #8491a3;
+                                font-size: 0.68rem;
+                                line-height: 1.45;
+                                text-align: center;
+                            "
+                        >
+                            Esta área é exibida somente para cargos
+                            autorizados a administrar o tesouro.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MELHORIAS -->
+                <div
+                    id="cla-tab-melhorias"
+                    class="cla-bloco cla-tab-conteudo"
+                    style="display: none;"
+                >
+                    <h3 class="cla-titulo-bloco">
+                        Melhorias do clã
+                    </h3>
+
+                    <p
+                        class="cla-subtitulo-bloco"
+                        style="margin-bottom: 16px;"
+                    >
+                        Evolua o clã, aumente sua capacidade e altere seu brasão.
+                    </p>
+
+                    <!-- BRASÃO -->
+                    <div
+                        id="cla-gerenciar-logo"
+                        style="
+                            display: none;
+                            margin-bottom: 18px;
+                            padding-bottom: 18px;
+                            border-bottom:
+                            1px solid rgba(148, 163, 184, 0.20);
+                        "
+                    >
+                        <h4
+                            class="cla-titulo-bloco"
+                            style="margin-bottom: 4px;"
+                        >
+                            🎨 Brasão do clã
+                        </h4>
+
+                        <p
+                            class="cla-subtitulo-bloco"
+                            style="margin-bottom: 12px;"
+                        >
+                            Escolha a imagem que representará o seu clã.
+                        </p>
+
+                        <div
+                            id="cla-logo-grade"
+                            class="cla-grade-logos"
+                        >
+                            <div class="cla-vazio">
+                                Carregando brasões...
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            id="cla-btn-salvar-logo"
+                            class="cla-btn"
+                            style="
+                                width: 100%;
+                                margin-top: 12px;
+                            "
+                            disabled
+                        >
+                            💾 Salvar novo brasão
+                        </button>
+                    </div>
+
+                    <!-- EVOLUÇÃO -->
+                    <div>
+                        <h4
+                            class="cla-titulo-bloco"
+                            style="margin-bottom: 4px;"
+                        >
+                            ⬆️ Evolução do clã
+                        </h4>
+
+                        <p
+                            class="cla-subtitulo-bloco"
+                            style="margin-bottom: 12px;"
+                        >
+                            Use XP e ouro do tesouro para aumentar o nível
+                            e a quantidade máxima de membros.
+                        </p>
+
+                        <div
+                            id="cla-dados-melhoria"
+                            style="
+                                padding: 12px;
+                                background: rgba(4, 9, 18, 0.48);
+                                border: 1px solid rgba(148, 163, 184, 0.20);
+                                border-radius: 12px;
+                            "
+                        >
+                            Carregando requisitos...
+                        </div>
+
+                        <button
+                            type="button"
+                            id="cla-btn-melhorar"
+                            class="cla-btn"
+                            style="
+                                width: 100%;
+                                margin-top: 12px;
+                            "
+                        >
+                            ⬆️ Melhorar clã
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- CONFIGURAÇÕES -->
+                <div
+                    id="cla-tab-configuracoes"
+                    class="cla-bloco cla-tab-conteudo"
+                    style="display: none;"
+                >
+                    <h3 class="cla-titulo-bloco">
+                        ⚙️ Configurações do clã
+                    </h3>
+
+                    <p
+                        class="cla-subtitulo-bloco"
+                        style="margin-bottom: 16px;"
+                    >
+                        Controle a apresentação e a política de recrutamento.
+                    </p>
+
+                    <!-- DESCRIÇÃO -->
+                    <div class="cla-campo">
+                        <label for="cla-config-descricao">
+                            Descrição do clã
+                        </label>
+
+                        <textarea
+                            id="cla-config-descricao"
+                            maxlength="300"
+                            placeholder="Escreva os objetivos e a história do clã."
+                        ></textarea>
+
+                        <div
+                            style="
+                                color: var(--cla-texto-3);
+                                font-size: 0.68rem;
+                                text-align: right;
+                            "
+                        >
+                            Máximo de 300 caracteres
+                        </div>
+                    </div>
+
+                    <!-- RECRUTAMENTO -->
+                    <div class="cla-campo">
+                        <label for="cla-config-tipo-entrada">
+                            Política de recrutamento
+                        </label>
+
+                        <select id="cla-config-tipo-entrada">
+                            <option value="solicitacao">
+                                Aceitar solicitações
+                            </option>
+
+                            <option value="convite">
+                                Somente por convite
+                            </option>
+
+                            <option value="fechado">
+                                Recrutamento fechado
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- EXPLICAÇÃO DA POLÍTICA -->
+                    <div
+                        id="cla-config-explicacao-entrada"
+                        style="
+                            margin: -2px 0 14px;
+                            padding: 10px 11px;
+                            color: var(--cla-texto-3);
+                            font-size: 0.74rem;
+                            line-height: 1.42;
+                            background: rgba(4, 9, 18, 0.48);
+                            border: 1px solid rgba(148, 163, 184, 0.18);
+                            border-radius: 10px;
+                        "
+                    >
+                        Somente jogadores convidados poderão entrar no clã.
+                    </div>
+
+                    <!-- NÍVEL MÍNIMO -->
+                    <div class="cla-campo">
+                        <label for="cla-config-nivel-minimo">
+                            Nível mínimo para recrutamento
+                        </label>
+
+                        <input
+                            id="cla-config-nivel-minimo"
+                            type="number"
+                            min="1"
+                            max="999"
+                            step="1"
+                            value="1"
+                        >
+                    </div>
+
+                    <button
+                        type="button"
+                        id="cla-btn-salvar-configuracoes"
+                        class="cla-btn"
+                        style="width: 100%;"
+                    >
+                        💾 Salvar configurações
+                    </button>
+                </div>
+
+                <!-- SAÍDA / DISSOLUÇÃO -->
+                <div
+                    id="cla-area-acoes-perigosas"
+                    class="cla-bloco"
+                >
+                    <button
+                        type="button"
+                        id="cla-btn-sair"
+                        class="cla-btn cla-btn-perigo"
+                        style="width: 100%;"
+                    >
+                        🚪 Sair do clã
+                    </button>
+
+                    <button
+                        type="button"
+                        id="cla-btn-dissolver"
+                        class="cla-btn cla-btn-perigo"
+                        style="
+                            display: none;
+                            width: 100%;
+                            margin-top: 8px;
+                        "
+                    >
+                        💀 Dissolver clã
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

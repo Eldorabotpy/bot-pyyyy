@@ -1,17 +1,12 @@
 # modules/recipes/berserker_t2.py
 # =========================================
-# TIER 2 — Conjunto de Pele de Troll do Berserker (Profissão 20+)
-# =========================================
+from __future__ import annotations
+from typing import Dict, Any
 
-RARITY_T2 = {
-    "comum": 0.90,     # Aumentei para 90% (mais lixo)
-    "bom": 0.09,       # Diminuí para 9%
-    "raro": 0.009,     # 0.9%
-    "epico": 0.0009,   # 0.09%
-    "lendario": 0.0001 # 0.01% (Extremamente raro)
-}
+# TIER 2: RECEITAS 
+# ============================================================================
 
-RECIPES = {
+RECIPES: Dict[str, Dict[str, Any]] = {
     # ---------- Arma (Armeiro) ----------
     "work_machado_aco_berserker": {
         "display_name": "Machado de Aço do Berserker",
@@ -20,11 +15,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 2100,  # 35 minutos
         "xp_gain": 110,
-        "inputs": {"barra_de_aco": 12, "pele_de_troll": 2, "sangue_regenerativo": 1, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 12, "pele_de_troll": 2, "sangue_regenerativo": 1, "nucleo_de_forja": 1},
         "result_base_id": "machado_aco_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
         "damage_info": {"type": "cortante", "min_damage": 30, "max_damage": 60},
     },
@@ -37,11 +31,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 1200,  # 20 minutos
         "xp_gain": 85,
-        "inputs": {"barra_de_aco": 6, "pele_de_troll": 3, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 6, "pele_de_troll": 3, "nucleo_de_forja": 1},
         "result_base_id": "elmo_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
     "work_peitoral_troll_berserker": {
@@ -51,11 +44,10 @@ RECIPES = {
         "level_req": 22,
         "time_seconds": 2700,  # 45 minutos
         "xp_gain": 160,
-        "inputs": {"barra_de_aco": 10, "pele_de_troll": 5, "sangue_regenerativo": 3, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 10, "pele_de_troll": 5, "sangue_regenerativo": 3, "nucleo_de_forja": 1},
         "result_base_id": "peitoral_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
     "work_calcas_troll_berserker": {
@@ -65,11 +57,10 @@ RECIPES = {
         "level_req": 21,
         "time_seconds": 1620,  # 27 minutos
         "xp_gain": 125,
-        "inputs": {"barra_de_aco": 8, "pele_de_troll": 4, "sangue_regenerativo": 1, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 8, "pele_de_troll": 4, "sangue_regenerativo": 1, "nucleo_de_forja": 1},
         "result_base_id": "calcas_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
     "work_botas_troll_berserker": {
@@ -79,11 +70,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 960,  # 16 minutos
         "xp_gain": 75,
-        "inputs": {"barra_de_aco": 4, "pele_de_troll": 2, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 4, "pele_de_troll": 2, "nucleo_de_forja": 1},
         "result_base_id": "botas_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
     "work_luvas_troll_berserker": {
@@ -93,11 +83,10 @@ RECIPES = {
         "level_req": 20,
         "time_seconds": 960,  # 16 minutos
         "xp_gain": 75,
-        "inputs": {"barra_de_aco": 4, "pele_de_troll": 2, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 4, "pele_de_troll": 2, "nucleo_de_forja": 1},
         "result_base_id": "luvas_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
 
@@ -109,11 +98,10 @@ RECIPES = {
         "level_req": 23,
         "time_seconds": 1380,  # ~23 minutos
         "xp_gain": 115,
-        "inputs": {"pele_de_troll": 1, "dente_afiado_superior": 1, "gema_polida": 1, "nucleo_forja_comum": 1},
+        "inputs": {"pele_de_troll": 1, "dente_afiado_superior": 1, "gema_polida": 1, "nucleo_de_forja": 1},
         "result_base_id": "anel_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
     "work_colar_troll_berserker": {
@@ -123,11 +111,10 @@ RECIPES = {
         "level_req": 24,
         "time_seconds": 1560,  # 26 minutos
         "xp_gain": 140,
-        "inputs": {"pele_de_troll": 2, "sangue_regenerativo": 1, "gema_polida": 2, "nucleo_forja_comum": 1},
+        "inputs": {"pele_de_troll": 2, "sangue_regenerativo": 1, "gema_polida": 2, "nucleo_de_forja": 1},
         "result_base_id": "colar_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
     "work_brinco_troll_berserker": {
@@ -137,11 +124,10 @@ RECIPES = {
         "level_req": 23,
         "time_seconds": 1200,  # 20 minutos
         "xp_gain": 100,
-        "inputs": {"pele_de_troll": 1, "dente_afiado_superior": 1, "nucleo_forja_comum": 1},
+        "inputs": {"pele_de_troll": 1, "dente_afiado_superior": 1, "nucleo_de_forja": 1},
         "result_base_id": "brinco_troll_berserker",
         "unique": True,
         "class_req": ["berserker"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["berserker", "geral"],
     },
 }

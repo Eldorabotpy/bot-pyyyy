@@ -1,0 +1,325 @@
+<!-- templates/dimensional_boss.html -->
+
+<div id="tela-dimensional-boss" style="
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:300000;
+    background:rgba(2,6,23,.92);
+    color:#fff;
+    font-family:Arial, sans-serif;
+    overflow:hidden;
+    pointer-events:auto;
+">
+    <style>
+        #tela-dimensional-boss * {
+            box-sizing: border-box;
+        }
+
+        .dimensional-card {
+            background: rgba(8, 15, 30, .96);
+            border: 1px solid #24334d;
+            border-radius: 10px;
+            padding: 7px;
+            box-shadow: 0 4px 12px rgba(0,0,0,.35);
+        }
+
+        .dimensional-card-eu {
+            border-color: #38bdf8 !important;
+        }
+
+        .dimensional-card-alvo {
+            border-color: #facc15 !important;
+            background: rgba(76,29,149,.92) !important;
+        }
+
+        .dimensional-mini-bar {
+            height: 7px;
+            background: #020617;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .dimensional-btn {
+            border: 1px solid #475569;
+            border-radius: 10px;
+            padding: 10px 8px;
+            font-weight: 900;
+            font-family: Cinzel, Arial, sans-serif;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(180deg, rgba(30,41,59,.96), rgba(15,23,42,.96));
+            box-shadow: 0 4px 10px rgba(0,0,0,.45);
+        }
+
+        .dimensional-btn:hover {
+            filter: brightness(1.14);
+        }
+
+        .dimensional-btn-atacar {
+            border-color: #ef4444;
+        }
+
+        .dimensional-btn-skill {
+            border-color: #8b5cf6;
+        }
+
+        .dimensional-log-line {
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(148,163,184,.10);
+        }
+
+        @media (max-width: 430px) {
+            #dimensional-box {
+                width: 100vw !important;
+                height: calc(100vh - 30px) !important;
+                border-radius: 0 !important;
+                border-left: 0 !important;
+                border-right: 0 !important;
+            }
+
+            #dimensional-palco {
+                min-height: 178px !important;
+            }
+
+            #dimensional-sprite-heroi {
+                height: 92px !important;
+                left: 18px !important;
+                bottom: 14px !important;
+            }
+
+            #dimensional-sprite-inimigo {
+                right: 10px !important;
+                bottom: 12px !important;
+                transform: scale(1.05) scaleX(-1) !important;
+            }
+        }
+    </style>
+
+    <div id="dimensional-box" style="
+        width:min(100vw, 430px);
+        height:calc(100vh - 28px);
+        margin:0 auto;
+        background:linear-gradient(180deg, #0f172a 0%, #020617 100%);
+        border:1px solid #7c3aed;
+        border-radius:14px;
+        overflow:hidden;
+        display:flex;
+        flex-direction:column;
+        box-shadow:0 20px 60px rgba(0,0,0,.85);
+    ">
+        <div style="
+            padding:8px 10px;
+            background:linear-gradient(90deg, rgba(76,29,149,.95), rgba(15,23,42,.98));
+            border-bottom:1px solid #a78bfa;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:8px;
+            flex:0 0 auto;
+        ">
+            <div style="min-width:0;">
+                <div id="dimensional-titulo" style="
+                    color:#facc15;
+                    font-family:'Cinzel',serif;
+                    font-size:15px;
+                    font-weight:900;
+                    white-space:nowrap;
+                    overflow:hidden;
+                    text-overflow:ellipsis;
+                ">🌌 Fenda Dimensional</div>
+
+                <div id="dimensional-subtitulo" style="
+                    color:#cbd5e1;
+                    font-size:11px;
+                    margin-top:1px;
+                    white-space:nowrap;
+                    overflow:hidden;
+                    text-overflow:ellipsis;
+                ">Aguardando evento...</div>
+            </div>
+
+            <button onclick="window.fecharTelaBossDimensional()" style="
+                flex:0 0 auto;
+                background:#1e293b;
+                color:#e2e8f0;
+                border:1px solid #64748b;
+                border-radius:9px;
+                padding:8px 10px;
+                font-weight:900;
+                cursor:pointer;
+            ">SAIR</button>
+        </div>
+
+        <div id="dimensional-palco" style="
+            position:relative;
+            margin:8px;
+            min-height:190px;
+            flex:0 0 auto;
+            border:1px solid #334155;
+            border-radius:14px;
+            overflow:hidden;
+            background-image:url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/fundos/floresta.png');
+            background-size:cover;
+            background-position:center;
+            box-shadow:inset 0 0 65px rgba(0,0,0,.78);
+        ">
+            <div style="
+                position:absolute;
+                inset:0;
+                background:
+                    radial-gradient(circle at 76% 56%, rgba(124,58,237,.28), transparent 35%),
+                    linear-gradient(180deg, rgba(2,6,23,.08), rgba(2,6,23,.72));
+                pointer-events:none;
+            "></div>
+
+            <div id="dimensional-aviso-turno" style="
+                position:absolute;
+                top:8px;
+                left:50%;
+                transform:translateX(-50%);
+                z-index:20;
+                padding:6px 12px;
+                background:rgba(2,6,23,.82);
+                border:1px solid #facc15;
+                border-radius:999px;
+                color:#facc15;
+                font-size:12px;
+                font-weight:900;
+                text-align:center;
+                box-shadow:0 0 15px rgba(0,0,0,.55);
+                white-space:nowrap;
+            ">Aguardando...</div>
+
+            <img id="dimensional-sprite-heroi" src="" style="
+                position:absolute;
+                left:22px;
+                bottom:16px;
+                height:100px;
+                z-index:8;
+                filter:drop-shadow(0 10px 8px rgba(0,0,0,.85));
+            ">
+
+            <div style="
+                position:absolute;
+                left:50%;
+                top:50%;
+                transform:translate(-50%, -50%);
+                z-index:7;
+                font-family:'Cinzel',serif;
+                font-weight:900;
+                font-size:26px;
+                color:#facc15;
+                text-shadow:0 3px 5px #000;
+                opacity:.8;
+            ">VS</div>
+
+            <img id="dimensional-sprite-inimigo" src="" style="
+                position:absolute;
+                right:14px;
+                bottom:12px;
+                height:132px;
+                max-width:155px;
+                z-index:8;
+                object-fit:contain;
+                filter:drop-shadow(0 10px 8px rgba(0,0,0,.9));
+                transform:scaleX(-1);
+                transform-origin:center bottom;
+            ">
+
+            <div id="dimensional-alvo-nome" style="
+                position:absolute;
+                right:10px;
+                bottom:6px;
+                z-index:12;
+                max-width:190px;
+                background:rgba(2,6,23,.78);
+                border:1px solid rgba(250,204,21,.45);
+                border-radius:8px;
+                padding:4px 7px;
+                color:#facc15;
+                font-size:11px;
+                font-weight:900;
+                text-align:right;
+                white-space:nowrap;
+                overflow:hidden;
+                text-overflow:ellipsis;
+            ">Alvo</div>
+        </div>
+
+        <div style="
+            padding:0 8px;
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:7px;
+            flex:0 0 auto;
+            min-height:128px;
+        ">
+            <div style="
+                min-width:0;
+                background:rgba(15,23,42,.72);
+                border:1px solid #24334d;
+                border-radius:12px;
+                padding:7px;
+                overflow:hidden;
+            ">
+                <div style="font-family:'Cinzel',serif;color:#60a5fa;font-size:12px;font-weight:900;margin-bottom:5px;">
+                    🛡️ Heróis <span id="dimensional-contador" style="color:#facc15;">0/20</span>
+                </div>
+                <div id="dimensional-lista-jogadores" style="
+                    display:flex;
+                    flex-direction:column;
+                    gap:5px;
+                    max-height:96px;
+                    overflow-y:auto;
+                    padding-right:2px;
+                "></div>
+            </div>
+
+            <div style="
+                min-width:0;
+                background:rgba(15,23,42,.72);
+                border:1px solid #24334d;
+                border-radius:12px;
+                padding:7px;
+                overflow:hidden;
+            ">
+                <div style="font-family:'Cinzel',serif;color:#f87171;font-size:12px;font-weight:900;margin-bottom:5px;">
+                    👹 Inimigos
+                </div>
+                <div id="dimensional-lista-inimigos" style="
+                    display:flex;
+                    flex-direction:column;
+                    gap:5px;
+                    max-height:96px;
+                    overflow-y:auto;
+                    padding-right:2px;
+                "></div>
+            </div>
+        </div>
+
+        <div id="dimensional-log" style="
+            margin:8px;
+            flex:1 1 auto;
+            min-height:72px;
+            max-height:115px;
+            background:rgba(2,6,23,.92);
+            border:1px solid #24334d;
+            border-radius:12px;
+            padding:6px;
+            overflow-y:auto;
+            font-size:12px;
+            line-height:1.35;
+            color:#cbd5e1;
+        "></div>
+
+        <div id="dimensional-acoes" style="
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:8px;
+            padding:0 8px 8px 8px;
+            flex:0 0 auto;
+        "></div>
+    </div>
+</div>

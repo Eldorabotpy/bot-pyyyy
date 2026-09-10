@@ -1,0 +1,73 @@
+<div id="tela-combate-global" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; background-color: #020617; z-index: 99999;">
+    
+    <div id="combate-loading" class="loading-container">
+        <div class="loader-wrapper">
+            <div class="loading-ring"></div>
+            <div class="loading-icon">⚔️</div>
+        </div>
+        <h3 class="loading-title">Rastreando Inimigo</h3>
+    </div>
+
+    <div id="combate-arena" style="display: none; flex-direction: column; width: 100%; height: 100%;">
+        
+        <div id="arena-box" class="modern-font" style="height: 320px; width: 100%; border-radius: 12px 12px 0 0; border: 1px solid #334155; position: relative; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">
+            
+            <div id="arena-background" style="position: absolute; width: 100%; height: 100%; background-size: cover; background-position: center; pointer-events: none;"></div>
+
+            <div id="boss-bar-container" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 60%; z-index: 100; pointer-events: none;">
+                
+                <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 2px;">
+                    <span id="hud-nome-mob" style="color: #fff; font-weight: 800; font-size: 0.75em; text-transform: uppercase; text-shadow: 0 2px 4px #000;">Monstro</span>
+                    <span id="hud-lvl-mob" style="color: #ef4444; font-weight: 800; font-size: 0.65em;">LV.??</span>
+                </div>
+                <div style="position: relative; height: 8px; background: rgba(2, 6, 23, 0.8); border: 1.5px solid #451a1a; border-radius: 10px; overflow: hidden;">
+                    <div id="bar-hp-mob" style="width: 100%; height: 100%; background: linear-gradient(90deg, #b91c1c, #ef4444); transition: width 0.4s ease-out;"></div>
+                </div>
+                <div id="val-hp-mob" style="text-align: center; color: #fca5a5; font-size: 0.5em; font-weight: 900; margin-top: 1px;">0/0</div>
+            </div>
+            <div id="grupo-combate-container" style="display:none; position:absolute; top:45px; left:8px; z-index:20; flex-direction:column; gap:5px; max-width:180px;">
+            </div>
+            <div id="hud-jogador" style="position: absolute; bottom: 8px; right: 8px; width: 140px; background: rgba(15, 23, 42, 0.9); border: 1px solid #334155; border-radius: 8px; padding: 6px; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="color: #fff; font-size: 0.7em; font-weight: 800; letter-spacing: 0.5px;">VOCÊ</span>
+                    <span id="hud-lvl-player" style="color: #3b82f6; font-size: 0.6em; font-weight: 800;">LV.??</span>
+                </div>
+                
+                <div style="position: relative; height: 12px; background: #020617; border-radius: 3px; border: 1px solid #1e293b; overflow: hidden; margin-bottom: 4px;">
+                    <div id="bar-hp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #059669, #10b981); transition: width 0.3s;"></div>
+                    <span id="val-hp-player" style="position: absolute; width: 100%; text-align: center; font-size: 0.55em; top: 0; font-weight: 900; color: #fff; text-shadow: 1px 1px #000; line-height: 11px;">0/0</span>
+                </div>
+                
+                <div style="position: relative; height: 10px; background: #020617; border-radius: 3px; border: 1px solid #1e293b; overflow: hidden;">
+                    <div id="bar-mp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6); transition: width 0.3s;"></div>
+                    <span id="val-mp-player" style="position: absolute; width: 100%; text-align: center; font-size: 0.5em; top: 0; font-weight: 900; color: #fff; text-shadow: 1px 1px #000; line-height: 9px;">0/0</span>
+                </div>
+            </div>
+
+            <img id="sprite-player" src="" style="position: absolute; bottom: 10px; left: 10px; height: 110px; z-index: 5; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6));">
+            <img id="sprite-mob" src="" style="position: absolute; bottom: 60px; right: 20px; height: 100px; z-index: 4; transition: transform 0.1s;">
+            
+            <div id="damage-flash" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(231, 76, 60, 0.3); opacity: 0; pointer-events: none; z-index: 20;"></div>
+        </div>
+
+        <div style="background: #020617; border: 1px solid #334155; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <div id="combat-log-box" style="font-size: 0.85em; color: #cbd5e1; min-height: 50px; background: #0f172a; padding: 8px; border-radius: 6px; border: 1px solid #1e293b;">
+                <span id="log-texto-1" style="color: #ef4444; font-weight: bold;">Iniciando combate...</span>
+                <span id="log-texto-2" style="display: block; margin-top: 2px;"></span>
+            </div>
+
+            <div id="menu-botoes" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <button class="modern-btn btn-atk" onclick="executarAcaoTurno('atacar')">⚔️ Atacar</button>
+                <button class="modern-btn btn-mag" onclick="abrirMenuMagias()">✨ Magias</button>
+                
+               <button class="modern-btn btn-bag" onclick="abrirMenuItens()">🎒 Item</button>
+                
+                <button class="modern-btn btn-run" onclick="executarAcaoTurno('fugir')">💨 Fugir</button>
+            </div>
+            
+            <div id="botoes-fim-batalha" style="display: none;">
+                <button class="modern-btn" onclick="sairDaArena()" style="width: 100%; background: #1e293b;">⬅️ Voltar ao Mapa</button>
+            </div>
+        </div>
+    </div>
+</div>

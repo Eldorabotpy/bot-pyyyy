@@ -68,19 +68,30 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) ->
 
 def remove_item_from_inventory(player_data: dict, item_id: str, quantity: int = 1) -> bool:
     inventory = player_data.get("inventory", {})
-    if item_id not in inventory: return False
+    if item_id not in inventory: 
+        return False
     
     current = inventory[item_id]
     
-    # Se for item único (dict), remove direto (quantidade irrelevante, remove 1 unidade lógica)
+    # SE FOR DICIONÁRIO (Seu caso atual para materiais)
     if isinstance(current, dict):
-        del inventory[item_id]
+        current_qty = int(current.get("quantity", 0))
+        if current_qty < quantity: 
+            return False
+        
+        new_qty = current_qty - quantity
+        if new_qty <= 0:
+            del inventory[item_id] # Remove se zerar
+        else:
+            inventory[item_id]["quantity"] = new_qty # ✅ CORREÇÃO: Atualiza apenas a quantidade
+        
         player_data["inventory"] = inventory
         return True
         
     # Se for item empilhável (int)
     current_qty = int(current)
-    if current_qty < quantity: return False
+    if current_qty < quantity: 
+        return False
     
     new_qty = current_qty - quantity
     if new_qty <= 0:
@@ -148,93 +159,171 @@ def add_unique_item(player_data: dict, unique_id_or_item: Union[str, dict], item
 # ⚔️ LÓGICA DE EQUIPAMENTOS (FIX: APENAS STR ID)
 # ==============================================================================
 
+async def _recalcular_status_e_salvar(user_id: str, pdata: dict) -> dict:
+    """Recalcula status oficiais, salva o documento inteiro e limpa cache."""
+    from modules import player_manager
+    from modules.player.combat_stats import get_combat_stats, aplicar_combat_stats_no_player
+    from modules.player.core import clear_player_cache
+
+    stats = await get_combat_stats(pdata)
+    pdata = aplicar_combat_stats_no_player(pdata, stats)
+
+    await player_manager.save_player_data(user_id, pdata)
+
+    try:
+        await clear_player_cache(user_id)
+        if pdata.get("_id"):
+            await clear_player_cache(pdata.get("_id"))
+    except Exception:
+        pass
+
+    return stats
+
+
 async def equip_unique_item_for_user(user_id: str, unique_id: str, slot_from_item: str = None) -> Tuple[bool, str]:
     """
-    Equipa um item.
-    user_id DEVE ser a string do ObjectId da collection 'users'.
+    Equipa item único e sincroniza status oficiais.
+    user_id DEVE ser ObjectId string da collection users.
     """
     from modules import player_manager
-    from modules.player.stats import get_player_total_stats
-    
+
+    user_id = str(user_id or "").strip()
+    unique_id = str(unique_id or "").strip()
+
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata: return False, "Jogador não encontrado."
-    
+    if not pdata:
+        return False, "Jogador não encontrado."
+
     inventory = pdata.get("inventory", {})
+    if not isinstance(inventory, dict):
+        inventory = {}
+
     item = inventory.get(unique_id)
-    
     if not item or not isinstance(item, dict):
         return False, "Item não encontrado no inventário ou inválido."
 
-    # 1. Determina o slot correto
+    base_id = item.get("base_id") or unique_id
+    info = (game_data.ITEMS_DATA or {}).get(base_id) or (game_data.ITEM_BASES or {}).get(base_id, {}) or {}
+
     if not slot_from_item:
-        base_id = item.get("base_id")
-        # Busca metadados estáticos do jogo
-        info = (game_data.ITEMS_DATA or {}).get(base_id) or (game_data.ITEM_BASES or {}).get(base_id, {})
-        slot_from_item = info.get("slot")
-        
+        slot_from_item = item.get("slot") or info.get("slot")
+
     if not slot_from_item:
         return False, "Este item não pode ser equipado (sem slot definido)."
 
-    slot_key = slot_from_item.lower()
+    slot_key = str(slot_from_item).strip().lower()
 
-    # 2. Verifica Requisitos de Classe
-    req_class = item.get("required_class")
-    if req_class and str(req_class).lower() != "any":
-        p_class = str(pdata.get("class") or "aventureiro").lower()
-        if str(req_class).lower() != p_class:
-             return False, f"Classe requerida: {str(req_class).capitalize()}"
+    # Requisito de classe: aceita required_class, class_req e lista.
+    req_class = item.get("required_class") or info.get("required_class") or item.get("class_req") or info.get("class_req")
+    if req_class:
+        p_class = str(pdata.get("class") or pdata.get("class_key") or "aventureiro").lower()
+        if isinstance(req_class, (list, tuple, set)):
+            permitidas = [str(x).lower() for x in req_class]
+            if "any" not in permitidas and p_class not in permitidas:
+                return False, f"Classe requerida: {', '.join(permitidas)}"
+        elif str(req_class).lower() != "any" and str(req_class).lower() != p_class:
+            return False, f"Classe requerida: {str(req_class).capitalize()}"
 
-    # 3. Atualiza Equipamento
     equipment = pdata.get("equipment", {})
-    if not isinstance(equipment, dict): equipment = {}
-    
-    # Se já tiver algo equipado, o sistema de inventário apenas troca os ponteiros
-    equipment[slot_key] = unique_id
+    if not isinstance(equipment, dict):
+        equipment = {}
+
+    # Ferramentas ficam em equipment_tools por profissão.
+    if slot_key == "tool":
+        equipment_tools = pdata.get("equipment_tools", {})
+        if not isinstance(equipment_tools, dict):
+            equipment_tools = {}
+
+        tool_type = str(
+            info.get("tool_type") or item.get("tool_type") or ""
+        ).strip().lower()
+
+        if not tool_type:
+            return False, "Ferramenta sem tipo de profissão."
+
+        # Migra slot antigo, se existir.
+        legacy_uid = equipment.get("tool")
+        if legacy_uid and legacy_uid in inventory:
+            legacy_item = inventory.get(legacy_uid)
+            if isinstance(legacy_item, dict):
+                legacy_base = legacy_item.get("base_id") or legacy_uid
+                legacy_info = (game_data.ITEMS_DATA or {}).get(legacy_base) or (game_data.ITEM_BASES or {}).get(legacy_base, {}) or {}
+                legacy_type = str(legacy_info.get("tool_type") or legacy_item.get("tool_type") or "").strip().lower()
+                if legacy_type and legacy_type not in equipment_tools:
+                    equipment_tools[legacy_type] = legacy_uid
+
+        equipment.pop("tool", None)
+        equipment_tools[tool_type] = unique_id
+        pdata["equipment_tools"] = equipment_tools
+    else:
+        equipment[slot_key] = unique_id
+
     pdata["equipment"] = equipment
-    
-    # 4. Recalcula Status Imediatamente (Para persistir Max HP/MP corretos)
-    totals = await get_player_total_stats(pdata)
-    for stat in ['attack', 'defense', 'initiative', 'luck', 'max_hp', 'max_mana']:
-        if stat in totals:
-            pdata[stat] = totals.get(stat)
-    
-    # Ajusta HP/MP atual para não ultrapassar o novo máximo
-    pdata['current_hp'] = min(pdata.get('current_hp', 1), pdata.get('max_hp', 50))
-    
-    # 5. Salva
-    await player_manager.save_player_data(user_id, pdata)
-    
+
+    stats = await _recalcular_status_e_salvar(user_id, pdata)
+
+    print(
+        f"✅ [EQUIPAR] {pdata.get('character_name', user_id)} slot={slot_key} item={base_id} "
+        f"ATK={stats.get('attack')} DEF={stats.get('defense')} HP={stats.get('max_hp')} MP={stats.get('max_mana')}"
+    )
+
     return True, f"✅ Item equipado em: <b>{slot_key.capitalize()}</b>."
+
 
 async def unequip_item_for_user(user_id: str, slot: str) -> Tuple[bool, str]:
     """
-    Desequipa um item.
-    user_id DEVE ser a string do ObjectId da collection 'users'.
+    Desequipa item e sincroniza status oficiais.
+    user_id DEVE ser ObjectId string da collection users.
     """
     from modules import player_manager
-    from modules.player.stats import get_player_total_stats
-    
+
+    user_id = str(user_id or "").strip()
+    slot = str(slot or "").strip().lower()
+
     pdata = await player_manager.get_player_data(user_id)
-    if not pdata: return False, "Erro de dados."
-    
+    if not pdata:
+        return False, "Erro de dados."
+
     equipment = pdata.get("equipment", {})
-    if not isinstance(equipment, dict) or not equipment.get(slot):
+    if not isinstance(equipment, dict):
+        equipment = {}
+
+    equipment_tools = pdata.get("equipment_tools", {})
+    if not isinstance(equipment_tools, dict):
+        equipment_tools = {}
+
+    removeu = False
+
+    if slot.startswith("tool_"):
+        prof_key = slot.replace("tool_", "", 1)
+        if equipment_tools.get(prof_key):
+            equipment_tools.pop(prof_key, None)
+            removeu = True
+    elif slot == "tool":
+        if equipment.get("tool"):
+            equipment.pop("tool", None)
+            removeu = True
+        elif equipment_tools:
+            # fallback: remove a primeira ferramenta encontrada.
+            first_key = next(iter(equipment_tools.keys()))
+            equipment_tools.pop(first_key, None)
+            removeu = True
+    else:
+        if equipment.get(slot):
+            equipment[slot] = None
+            removeu = True
+
+    if not removeu:
         return False, "Nada para desequipar neste slot."
-        
-    # 1. Remove a referência do slot
-    equipment[slot] = None
+
     pdata["equipment"] = equipment
-    
-    # 2. Recalcula Status
-    totals = await get_player_total_stats(pdata)
-    for stat in ['attack', 'defense', 'initiative', 'luck', 'max_hp', 'max_mana']:
-        if stat in totals:
-            pdata[stat] = totals[stat]
-    
-    # Ajusta HP atual
-    pdata['current_hp'] = min(pdata.get('current_hp', 1), pdata.get('max_hp', 50))
-    
-    # 3. Salva
-    await player_manager.save_player_data(user_id, pdata)
-    
+    pdata["equipment_tools"] = equipment_tools
+
+    stats = await _recalcular_status_e_salvar(user_id, pdata)
+
+    print(
+        f"✅ [DESEQUIPAR] {pdata.get('character_name', user_id)} slot={slot} "
+        f"ATK={stats.get('attack')} DEF={stats.get('defense')} HP={stats.get('max_hp')} MP={stats.get('max_mana')}"
+    )
+
     return True, f"Item desequipado de {slot.capitalize()}."

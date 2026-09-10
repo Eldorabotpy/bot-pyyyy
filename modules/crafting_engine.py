@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import random
 from typing import Any, Dict, Tuple, List
+REPEAT_ATTR_CHANCE = 0.10
 from typing import Any, Dict, Tuple, List, Union
 # Módulos do projeto (Removemos game_data daqui de cima para evitar o ciclo)
 from modules import player_manager
@@ -140,46 +141,86 @@ async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
     }
 
 async def start_craft(user_id: str, recipe_id: str):
-    """
-    Inicia o processo de crafting.
-    user_id: DEVE ser a String do ObjectId (sessão).
-    """
-    # 1. Busca os dados usando o ID String
     pdata = await player_manager.get_player_data(user_id)
-    
     rec = get_recipe(recipe_id)
-    if not pdata or not rec:
-        return "Receita de forja inválida."
-    
+    if not pdata or not rec: return "Receita de forja inválida."
     rec = dict(rec)
     
-    # 2. Validação de Profissão
-    prof = _as_dict(pdata.get("profession"))
-    if prof.get("type") != rec.get("profession") or int(prof.get("level", 1)) < int(rec.get("level_req", 1)):
-        return "Nível ou tipo de profissão insuficiente para esta receita."
+    # 1. Validação de Profissão Inteligente
+    req_prof = rec.get("profession")
+    req_lvl = int(rec.get("level_req", 1))
     
-    # 3. Validação de Materiais
+    learned = pdata.get("learned_professions", {})
+    my_lvl = 0
+    if req_prof in learned:
+        my_lvl = int(learned[req_prof].get("level", 1))
+    else:
+        legacy = _as_dict(pdata.get("profession"))
+        if legacy.get("type") == req_prof or legacy.get("key") == req_prof:
+            my_lvl = int(legacy.get("level", 1))
+            
+    if my_lvl < req_lvl: 
+        return f"Requer {str(req_prof).capitalize()} Nível {req_lvl}."
+    
+    # 2. Validação de Materiais
     inputs = _as_dict(rec.get("inputs"))
     if not _has_materials(pdata, inputs):
         return "Materiais insuficientes."
-    
-    # 4. Consumo e Cálculo de Tempo
-    duration = await _seconds_with_perks(pdata, int(rec.get("time_seconds", 60)))
-    _consume_materials(pdata, inputs)
 
-    finish = datetime.now(timezone.utc) + timedelta(seconds=duration)
+    # 2.5. Validação e gasto de durabilidade da ferramenta
+    # Import lazy para evitar ciclo de importação.
+    try:
+        from modules import profession_engine
+
+        tool_result = profession_engine.validate_and_consume_tool_for_recipe(
+            player_data=pdata,
+            recipe=rec,
+            action_name="forjar"
+        )
+
+        if not tool_result.get("ok"):
+            return tool_result.get("error", "Ferramenta inválida para forjar.")
+
+    except Exception as e:
+        return f"Erro ao validar ferramenta: {str(e)}"
     
-    # 5. Atualiza Estado do Jogador
+    # 3. Tempo com bônus de profissão + ferramenta
+    from modules import profession_engine
+
+    base_time = int(rec.get("time_seconds", 60))
+
+    tempo_calc = profession_engine.calculate_profession_work_duration(
+        player_data=pdata,
+        base_seconds=base_time,
+        profession_key=req_prof,
+        apply_perks=True
+    )
+
+    duration = int(tempo_calc.get("duration_seconds", base_time))
+    _consume_materials(pdata, inputs)
+    
+    finish = datetime.now(timezone.utc) + timedelta(seconds=duration)
     pdata["player_state"] = {
         "action": "crafting",
         "finish_time": finish.isoformat(),
-        "details": {"recipe_id": recipe_id}
+        "details": {
+            "recipe_id": recipe_id,
+            "prof_used": req_prof,
+            "work_speed": tempo_calc,
+            "tool_uid": tool_result.get("tool_uid"),
+            "tool_type": tool_result.get("tool_type"),
+            "tool_broke": tool_result.get("tool_broke", False)
+        }
     }
     
-    # Salva usando o user_id (String)
     await player_manager.save_player_data(user_id, pdata)
-    
-    return {"duration_seconds": duration, "finish_time": finish.isoformat()}
+    return {
+        "duration_seconds": duration,
+        "finish_time": finish.isoformat(),
+        "work_speed": tempo_calc,
+        "tool_broke": tool_result.get("tool_broke", False),
+        "tool_message": tool_result.get("message", "")
+    }
 
 # =========================
 # Mapeamento/seleção de atributos
@@ -313,76 +354,183 @@ def _secondary_attr_pool(recipe: dict, player_class: str | None) -> List[str]:
     return out
 
 def _pick_attribute_keys_for_item(rarity: str, primary_key: str, recipe: dict, player_class: str | None) -> List[str]:
+    """
+    Escolhe os atributos do item conforme a raridade.
+
+    Regra:
+    - O primeiro atributo continua sendo o principal atual do sistema.
+    - Cada atributo extra tem REPEAT_ATTR_CHANCE de repetir algum atributo já sorteado.
+    - Se não repetir, tenta pegar um atributo novo.
+    - Se acabar a lista de atributos novos, repete algum já existente.
+    """
     target = max(1, _rarity_target_attr_count(rarity))
-    prim_norm = _attr_to_enchant_key(primary_key)
-    
-    if target == 1:
-        return [primary_key]
+    primary_norm = _attr_to_enchant_key(primary_key)
+
+    out: List[str] = [primary_norm]
+
+    if target <= 1:
+        return out
 
     candidates = _secondary_attr_pool(recipe, player_class)
-    random.shuffle(candidates)
+    candidates = [_attr_to_enchant_key(c) for c in candidates if c]
 
-    out = [primary_key]
-    seen = {prim_norm, "dmg"}
-    
-    for c in candidates:
-        ck = _attr_to_enchant_key(c)
-        if ck in seen:
+    # Fallback seguro caso a pool venha pequena ou vazia
+    fallback_stats = ["vida", "defesa", "iniciativa", "sorte", "agilidade"]
+    for fb in fallback_stats:
+        fb_norm = _attr_to_enchant_key(fb)
+        if fb_norm not in candidates:
+            candidates.append(fb_norm)
+
+    while len(out) < target:
+        deve_repetir = random.random() < REPEAT_ATTR_CHANCE
+
+        if deve_repetir and out:
+            escolhido = random.choice(out)
+            out.append(escolhido)
             continue
-        seen.add(ck)
-        out.append(ck)
-        if len(out) >= target:
-            break
-            
-    if len(out) < target:
-        fallback_stats = ["hp", "defense", "initiative", "luck"]
-        for fb in fallback_stats:
-            if fb not in seen:
-                seen.add(fb)
-                out.append(fb)
-                if len(out) >= target:
-                    break
+
+        usados = set(out)
+        disponiveis = [c for c in candidates if c not in usados]
+
+        if disponiveis:
+            escolhido = random.choice(disponiveis)
+        else:
+            escolhido = random.choice(out)
+
+        out.append(escolhido)
 
     return out[:target]
-
 
 # =========================
 # Raridade / meta de dano
 # =========================
 
 def _roll_rarity(player_data: dict, recipe: dict) -> str:
-    prof = _as_dict(player_data.get("profession"))
-    prof_level = int(prof.get("level", 1))
-    level_req = int(recipe.get("level_req", 1))
-    level_diff = max(0, prof_level - level_req)
-
+    # Apenas pega as chances originais e brutas da receita, sem importar o nível do jogador!
     base_chances = dict(recipe.get("rarity_chances", {"comum": 1.0}))
-    bonus_per_level = 0.005
-
-    def _add_bonus(k: str, v: float) -> float:
-        return max(0.0, v + (level_diff * bonus_per_level)) if k in ("bom", "raro", "epico", "lendario") else max(0.0, v)
-
-    adjusted = {k: _add_bonus(k, float(v)) for k, v in base_chances.items()}
-    total = sum(adjusted.values()) or 1.0
-    norm = {k: v / total for k, v in adjusted.items()}
+    
+    total = sum(base_chances.values()) or 1.0
+    norm = {k: float(v) / total for k, v in base_chances.items()}
 
     order = ["lendario", "epico", "raro", "bom", "comum"]
     roll = random.random()
     acc = 0.0
+    
     for r in order:
         acc += norm.get(r, 0.0)
         if roll < acc:
             return r
+            
     return "comum"
 
 # =========================
 # Aplicação de atributos (= upgrade_level)
 # =========================
 
-def _apply_attr_with_upgrade(item: dict, attr_key: str, upgrade_level: int, source: str) -> None:
-    ench = item.setdefault("enchantments", {})
-    ench[attr_key] = {"value": int(upgrade_level), "source": source}
+REPEAT_ATTR_CHANCE = 0.10  # 10% de chance do atributo extra repetir um atributo já sorteado
 
+
+def _next_enchantment_key(ench: dict, stat_key: str) -> str:
+    """
+    Cria uma chave única para permitir atributo repetido.
+
+    Exemplo:
+    primeira força  -> forca
+    segunda força   -> forca_2
+    terceira força  -> forca_3
+    """
+    base = _attr_to_enchant_key(stat_key)
+
+    if base not in ench:
+        return base
+
+    idx = 2
+    while f"{base}_{idx}" in ench:
+        idx += 1
+
+    return f"{base}_{idx}"
+
+
+def _apply_attr_with_upgrade(item: dict, attr_key: str, upgrade_level: int, source: str) -> None:
+    """
+    Aplica um atributo no item sem juntar atributos repetidos.
+
+    Exemplo:
+    se cair força duas vezes, salva assim:
+
+    enchantments["forca"] = {"stat": "forca", "value": 1}
+    enchantments["forca_2"] = {"stat": "forca", "value": 1}
+
+    Assim o jogador vê:
+    💪 +1, 💪 +1
+
+    E ao melhorar para +2:
+    💪 +2, 💪 +2
+    """
+    ench = item.setdefault("enchantments", {})
+
+    stat_key = _attr_to_enchant_key(attr_key)
+    entry_key = _next_enchantment_key(ench, stat_key)
+
+    ench[entry_key] = {
+        "stat": stat_key,
+        "value": int(upgrade_level),
+        "source": source
+    }
+
+
+def _real_enchantment_stat(entry_key: str, entry_data: dict) -> str:
+    """
+    Descobre o atributo real de uma entrada.
+
+    forca    -> forca
+    forca_2  -> forca
+    sorte_3  -> sorte
+    """
+    if isinstance(entry_data, dict) and entry_data.get("stat"):
+        return _attr_to_enchant_key(entry_data.get("stat"))
+
+    key = str(entry_key or "")
+
+    if "_" in key:
+        base, suffix = key.rsplit("_", 1)
+        if suffix.isdigit():
+            return _attr_to_enchant_key(base)
+
+    return _attr_to_enchant_key(key)
+
+
+def sync_enchantments_to_upgrade_level(item: dict) -> dict:
+    """
+    Atualiza todos os atributos visíveis para o nível atual do item.
+
+    Exemplo:
+    upgrade_level = 2
+
+    forca   vira +2
+    forca_2 vira +2
+    sorte   vira +2
+
+    Não transforma em forca +4.
+    Mantém separado.
+    """
+    try:
+        upg = int(item.get("upgrade_level", 1))
+    except Exception:
+        upg = 1
+
+    ench = item.get("enchantments")
+    if not isinstance(ench, dict):
+        return item
+
+    for entry_key, entry_data in list(ench.items()):
+        if not isinstance(entry_data, dict):
+            continue
+
+        entry_data["stat"] = _real_enchantment_stat(entry_key, entry_data)
+        entry_data["value"] = upg
+
+    return item
 
 # =========================
 # Criação do item
@@ -476,12 +624,22 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     # BLOCO MIRROR_DMG: Garante que a chave 'dmg' existe (se for arma) e tem o mesmo valor do upgrade.
     if mirror_dmg:
         has_dmg = False
-        for k in new_item["enchantments"]:
-            if k == "dmg": has_dmg = True
-        
+        for k, v in new_item["enchantments"].items():
+            if k == "dmg":
+                has_dmg = True
+                break
+            if isinstance(v, dict) and v.get("stat") == "dmg":
+                has_dmg = True
+                break
+
         if not has_dmg:
-             # O atributo DMG é adicionado em segundo plano, não como o PRIMÁRIO VISÍVEL na lista de afixos.
-             new_item["enchantments"]["dmg"] = {"value": upg, "source": "primary_mirror"}
+            # O atributo DMG fica em segundo plano para o cálculo de arma.
+            # Ele não deve aparecer como atributo visual principal.
+            new_item["enchantments"]["dmg"] = {
+                "stat": "dmg",
+                "value": upg,
+                "source": "primary_mirror"
+            }
 
     dn = info.get("display_name") or info.get("nome_exibicao") or info.get("name") or base_id.replace("_", " ").title()
     if dn:
@@ -504,57 +662,43 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
 # =========================
 
 async def finish_craft(user_id: str):
-    """
-    Finaliza o crafting.
-    user_id: DEVE ser a String do ObjectId (sessão).
-    """
-    # Usa Lazy Import se necessário para evitar ciclo, ou import direto se já estiver no topo
-    try:
-        from modules import game_data
-        gd = game_data
-    except ImportError:
-        gd = None
-
     pdata = await player_manager.get_player_data(user_id)
     pstate = _as_dict(pdata.get("player_state")) if pdata else {}
-    
-    if not pdata or pstate.get("action") != "crafting":
-        return "Nenhuma forja em andamento."
+    if not pdata or pstate.get("action") != "crafting": return "Nenhuma forja em andamento."
 
     rid = _as_dict(pstate.get("details")).get("recipe_id")
+    prof_used = _as_dict(pstate.get("details")).get("prof_used")
     rec = get_recipe(rid)
     
     if not rec:
-        # Se a receita sumiu, destrava o jogador
         pdata["player_state"] = {"action": "idle"}
         await player_manager.save_player_data(user_id, pdata)
         return "Receita não encontrada ao concluir."
 
     rec = dict(rec)
-
-    # Criação do Item
-    # (Certifique-se que _create_dynamic_unique_item está definida no arquivo)
     novo_item_criado = _create_dynamic_unique_item(pdata, rec)
     player_manager.add_unique_item(pdata, novo_item_criado)
 
-    # XP de Profissão
-    prof = _as_dict(pdata.get("profession"))
-    if prof.get("type") == rec.get("profession"):
-        prof["xp"] = int(prof.get("xp", 0)) + int(rec.get("xp_gain", 1))
-        cur = int(prof.get("level", 1))
-        
-        # Lógica de Level Up
-        if gd:
+    # 4. Distribuição de XP Inteligente
+    xp_gain = int(rec.get("xp_gain", 10))
+    if prof_used:
+        learned = pdata.get("learned_professions", {})
+        if prof_used in learned:
+            prof_data = learned[prof_used]
+            prof_data["xp"] = int(prof_data.get("xp", 0)) + xp_gain
+            
+            # Level up manual
             while True:
-                try: need = int(gd.get_xp_for_next_collection_level(cur))
-                except Exception: need = 0
-                if need <= 0 or prof["xp"] < need: break
-                prof["xp"] -= need; cur += 1; prof["level"] = cur
-        
-        pdata["profession"] = prof
+                lvl = int(prof_data.get("level", 1))
+                need = 40 + (25 * (lvl - 1)) + (8 * ((lvl - 1) ** 2))
+                if prof_data["xp"] >= need:
+                    prof_data["xp"] -= need
+                    prof_data["level"] = lvl + 1
+                else:
+                    break
+            learned[prof_used] = prof_data
+            pdata["learned_professions"] = learned
 
-    # Finaliza e Salva
     pdata["player_state"] = {"action": "idle"}
     await player_manager.save_player_data(user_id, pdata)
-
-    return {"status": "success", "item_criado": novo_item_criado}
+    return {"status": "success", "item_criado": novo_item_criado, "xp_ganho": xp_gain}

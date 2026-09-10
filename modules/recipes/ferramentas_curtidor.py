@@ -1,6 +1,12 @@
 # modules/recipes/ferramentas_curtidor.py
 
-RECIPES = {
+from __future__ import annotations
+from typing import Dict, Any
+
+
+# ============================================================================
+
+RECIPES: Dict[str, Dict[str, Any]] = {
 
     "craft_ferramentas_curtidor_t1": {
         "display_name": "Montar Raspador do Curtidor Iniciante",
@@ -8,7 +14,7 @@ RECIPES = {
         "required_tool_type": "ferreiro",
         "required_tool_tier": 1,
         "level_req": 9,
-        "materials": {"barra_de_ferro": 6, "madeira": 6, "nucleo_forja_fraco": 1},
+        "materials": {"barra_de_ferro": 6, "madeira": 6, "nucleo_de_forja": 1},
         "result_base_id": "ferramentas_curtidor_t1",
         "xp_gain": 15
     },
@@ -19,7 +25,7 @@ RECIPES = {
         "required_tool_type": "ferreiro",
         "required_tool_tier": 1,
         "level_req": 21,
-        "materials": {"barra_de_ferro": 14, "madeira": 8, "nucleo_forja_fraco": 1},
+        "materials": {"barra_de_ferro": 14, "madeira": 8, "nucleo_de_forja": 1},
         "result_base_id": "ferramentas_curtidor_t2",
         "xp_gain": 26
     },
@@ -30,7 +36,7 @@ RECIPES = {
         "required_tool_type": "ferreiro",
         "required_tool_tier": 2,
         "level_req": 42,
-        "materials": {"barra_de_aco": 14, "madeira": 10, "nucleo_forja_fraco": 1},
+        "materials": {"barra_de_aco": 14, "madeira": 10, "nucleo_de_forja": 1},
         "result_base_id": "ferramentas_curtidor_t3",
         "xp_gain": 44
     },
@@ -41,7 +47,7 @@ RECIPES = {
         "required_tool_type": "ferreiro",
         "required_tool_tier": 3,
         "level_req": 63,
-        "materials": {"mithril": 18, "madeira": 12, "nucleo_forja_fraco": 1},
+        "materials": {"mithril": 18, "madeira": 12, "nucleo_de_forja": 1},
         "result_base_id": "ferramentas_curtidor_t4",
         "xp_gain": 64
     },
@@ -52,7 +58,7 @@ RECIPES = {
         "required_tool_type": "ferreiro",
         "required_tool_tier": 4,
         "level_req": 88,
-        "materials": {"adamantio": 20, "madeira": 14, "nucleo_forja_fraco": 1},
+        "materials": {"adamantio": 20, "madeira": 14, "nucleo_de_forja": 1},
         "result_base_id": "ferramentas_curtidor_t5",
         "xp_gain": 90
     },

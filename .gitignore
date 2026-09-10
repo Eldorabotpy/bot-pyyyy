@@ -23,3 +23,11 @@ Thumbs.db
 
 # Banco de Dados Local (Mongita - Testes Seguros)
 .local_db_data/
+# Cloudflare local
+cloudflared
+cloudflared.exe
+config.yml
+
+# Chaves privadas
+*.key
+*.pem

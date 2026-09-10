@@ -1,0 +1,64 @@
+<div id="tela-pve-global" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; background-color: #020617; z-index: 99999;">
+    
+    <div id="pve-arena" style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+        
+        <div id="pve-arena-box" class="modern-font" style="height: 350px; width: 100%; border-radius: 12px 12px 0 0; border: 1px solid #ca8a04; position: relative; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">
+            
+            <div id="pve-arena-background" style="position: absolute; width: 100%; height: 100%; background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/bg/floresta_combate.png') center/cover; pointer-events: none;"></div>
+
+            <!-- HUD do Monstro -->
+            <div id="hud-monstro-pve" style="position: absolute; top: 10px; right: 10px; width: 160px; background: rgba(15, 23, 42, 0.9); border: 1px solid #ef4444; border-radius: 8px; padding: 6px; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span id="nome-monstro-pve" style="color: #ef4444; font-size: 0.7em; font-weight: 800; letter-spacing: 0.5px;">MONSTRO</span>
+                    <span id="lvl-monstro-pve" style="color: #fca5a5; font-size: 0.6em; font-weight: 800;">LV.??</span>
+                </div>
+                
+                <div style="position: relative; height: 14px; background: #020617; border-radius: 3px; border: 1px solid #1e293b; overflow: hidden;">
+                    <div id="bar-hp-monstro-pve" style="width: 100%; height: 100%; background: linear-gradient(90deg, #b91c1c, #ef4444); transition: width 0.3s;"></div>
+                    <span id="val-hp-monstro-pve" style="position: absolute; width: 100%; text-align: center; font-size: 0.6em; top: 0; font-weight: 900; color: #fff; text-shadow: 1px 1px #000; line-height: 14px;">0/0</span>
+                </div>
+            </div>
+
+            <!-- Container para o Grupo de Jogadores -->
+            <div id="pve-grupo-container" style="position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 10;">
+                <!-- Os jogadores serão inseridos aqui dinamicamente pelo JS -->
+            </div>
+
+            <img id="sprite-monstro-pve" class="flip-horizontal" src="" style="position: absolute; top: 100px; right: 30px; height: 130px; z-index: 4; transition: transform 0.1s; filter: drop-shadow(-2px 4px 6px rgba(0,0,0,0.6));">
+            
+            <div id="pve-damage-flash" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(231, 76, 60, 0.3); opacity: 0; pointer-events: none; z-index: 20;"></div>
+            
+        </div>
+
+        <div style="background: #020617; border: 1px solid #334155; padding: 10px; display: flex; flex-direction: column; gap: 8px; flex: 1;">
+            
+            <!-- Log de Batalha -->
+            <div id="pve-log-box" style="font-size: 0.85em; color: #cbd5e1; height: 100px; background: #0f172a; padding: 8px; border-radius: 6px; border: 1px solid #1e293b; overflow-y: auto;">
+                <div id="pve-log-content"></div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div id="pve-menu-botoes" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <button class="modern-btn btn-atk" onclick="executarAcaoPvE('ataque_basico')">⚔️ Atacar</button>
+                <button class="modern-btn btn-mag" onclick="abrirMenuMagiasPvE()">✨ Habilidades</button>
+                <button class="modern-btn btn-bag" onclick="abrirMenuItensPvE()" style="grid-column: span 2;">🎒 Inventário</button>
+            </div>
+
+            <div id="pve-botoes-fim-batalha" style="display: none;">
+                <button class="modern-btn" onclick="sairDaArenaPvE()" style="width: 100%; background: #1e293b;">⬅️ Voltar ao Mapa</button>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- Modal Habilidades PvE -->
+<div id="modal-magias-pve" class="modal-moderno" style="display: none; z-index: 100000;">
+    <div class="perfil-container-moderno" style="max-width: 300px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; color: #3b82f6;">✨ Suas Magias</h3>
+            <button onclick="document.getElementById('modal-magias-pve').style.display='none'" style="background:none; border:none; color:#ef4444; font-size:1.2em; font-weight:bold;">X</button>
+        </div>
+        <div id="lista-magias-pve" style="display: flex; flex-direction: column; gap: 5px; max-height: 250px; overflow-y: auto;"></div>
+    </div>
+</div>

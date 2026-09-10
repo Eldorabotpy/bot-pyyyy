@@ -4,17 +4,11 @@
 # TIER 2: CONJUNTO DE AÇO DO GUERREIRO (Profissão 20+)
 # ======================================================
 
+from __future__ import annotations
 from typing import Dict, Any
-from modules.crafting_registry import register_recipe
 
-# Padrão de raridade T2 (comum, bom, raro, épico, lendário)
-RARITY_T2 = {
-    "comum": 0.90,     # Aumentei para 90% (mais lixo)
-    "bom": 0.09,       # Diminuí para 9%
-    "raro": 0.009,     # 0.9%
-    "epico": 0.0009,   # 0.09%
-    "lendario": 0.0001 # 0.01% (Extremamente raro)
-}
+# TIER 2: RECEITAS 
+# ============================================================================
 
 RECIPES: Dict[str, Dict[str, Any]] = {
     # ---------- Arma ----------
@@ -25,11 +19,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 20,
         "time_seconds": 1800,  # 30 minutos
         "xp_gain": 100,
-        "inputs": {"barra_de_aco": 10, "couro_reforcado": 4, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 10, "couro_reforcado": 4, "nucleo_de_forja": 1},
         "result_base_id": "espada_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
         "damage_info": {"type": "cortante", "min_damage": 35, "max_damage": 50},
     },
@@ -42,11 +35,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 20,
         "time_seconds": 1200,  # 20 minutos
         "xp_gain": 80,
-        "inputs": {"barra_de_aco": 7, "couro_reforcado": 2, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 7, "couro_reforcado": 2, "nucleo_de_forja": 1},
         "result_base_id": "elmo_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
     "work_peitoral_aco_guerreiro": {
@@ -56,11 +48,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 22,  # peça principal
         "time_seconds": 2400,  # 40 minutos
         "xp_gain": 150,
-        "inputs": {"barra_de_aco": 15, "couro_reforcado": 6, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 15, "couro_reforcado": 6, "nucleo_de_forja": 1},
         "result_base_id": "peitoral_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
     "work_calcas_aco_guerreiro": {
@@ -70,11 +61,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 21,
         "time_seconds": 1500,  # 25 minutos
         "xp_gain": 120,
-        "inputs": {"barra_de_aco": 10, "couro_reforcado": 4, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 10, "couro_reforcado": 4, "nucleo_de_forja": 1},
         "result_base_id": "calcas_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
     "work_botas_aco_guerreiro": {
@@ -84,11 +74,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 20,
         "time_seconds": 900,  # 15 minutos
         "xp_gain": 70,
-        "inputs": {"barra_de_aco": 5, "couro_reforcado": 3, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 5, "couro_reforcado": 3, "nucleo_de_forja": 1},
         "result_base_id": "botas_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
     "work_luvas_aco_guerreiro": {
@@ -98,11 +87,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 20,
         "time_seconds": 900,  # 15 minutos
         "xp_gain": 70,
-        "inputs": {"barra_de_aco": 5, "couro_reforcado": 3, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 5, "couro_reforcado": 3, "nucleo_de_forja": 1},
         "result_base_id": "luvas_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
 
@@ -114,11 +102,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 23,
         "time_seconds": 1380,  # ~23 minutos
         "xp_gain": 115,
-        "inputs": {"barra_de_aco": 4, "gema_polida": 1, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 4, "gema_polida": 1, "nucleo_de_forja": 1},
         "result_base_id": "anel_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
     "work_colar_aco_guerreiro": {
@@ -128,11 +115,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 24,
         "time_seconds": 1560,  # 26 minutos
         "xp_gain": 140,
-        "inputs": {"barra_de_aco": 3, "gema_polida": 2, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 3, "gema_polida": 2, "nucleo_de_forja": 1},
         "result_base_id": "colar_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
     "work_brinco_aco_guerreiro": {
@@ -142,16 +128,10 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "level_req": 23,
         "time_seconds": 1200,  # 20 minutos
         "xp_gain": 100,
-        "inputs": {"barra_de_aco": 2, "gema_polida": 1, "nucleo_forja_comum": 1},
+        "inputs": {"barra_de_aco": 2, "gema_polida": 1, "nucleo_de_forja": 1},
         "result_base_id": "brinco_aco_guerreiro",
         "unique": True,
         "class_req": ["guerreiro"],
-        "rarity_chances": dict(RARITY_T2),
         "affix_pools_to_use": ["guerreiro", "geral"],
     },
 }
-
-def register() -> None:
-    """Registra todas as receitas deste módulo no registry central."""
-    for rid, data in RECIPES.items():
-        register_recipe(rid, data)

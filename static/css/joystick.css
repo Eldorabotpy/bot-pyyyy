@@ -1,0 +1,275 @@
+/* static/css/joystick.css */
+/* ========================================== */
+/* BLINDAGEM MOBILE: TIRA SELEÇÃO E PISCAR AZUL */
+/* ========================================== */
+body, button, div, span, img, a {
+    -webkit-tap-highlight-color: transparent !important; /* Remove o quadrado azul ao clicar */
+    -webkit-touch-callout: none !important; /* Tira o menu de "copiar/salvar" ao segurar o dedo */
+    -webkit-user-select: none !important; /* Safari e Chrome Mobile */
+    -moz-user-select: none !important; /* Firefox */
+    -ms-user-select: none !important; /* Edge */
+    user-select: none !important; /* Impede de selecionar texto e ícones */
+}
+
+/* Exceção: Permite que o jogador ainda consiga selecionar e digitar no chat e nos menus com Input */
+input, textarea {
+    -webkit-user-select: auto !important;
+    -moz-user-select: auto !important;
+    -ms-user-select: auto !important;
+    user-select: auto !important;
+}
+/* --- 1. O BOTÃO DO ÍCONE (🎮) --- */
+#eldora-hub-toggle {
+    position: fixed;
+    top: 22px;
+    right: 16px; /* Mantém no topo para não vazar o chat/inventário */
+    z-index: 10001; /* Fica acima de tudo */
+    background: rgba(15, 23, 42, 0.8);
+    border: 2px solid #ca8b04c2;
+    color: #facc15;
+    padding: 2px 30px 2px 16px;
+    border-radius: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    transition: 0.2s;
+    font-family: 'Cinzel', serif; /* Estilo Eldora */
+}
+#eldora-hub-toggle:hover { 
+    background: #ca8a04; 
+    color: #000; 
+    transform: scale(1.05); 
+}
+
+/* --- 2. O HUB/MENU DE CONFIGURAÇÕES (Estilo Painel Eldora) --- */
+.hud-panel {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    width: 250px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.99));
+    border: 2px solid #ca8a04;
+    border-radius: 16px;
+    z-index: 10000;
+    color: white;
+    font-family: 'Cinzel', serif;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.oculta-hub { 
+    opacity: 0; 
+    pointer-events: none; 
+    transform: translateY(-10px); 
+}
+
+.hub-header {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    padding: 10px 15px; 
+    border-bottom: 1px dashed rgba(202, 138, 4, 0.4);
+}
+.hub-title { 
+    color: #facc15; 
+    font-weight: bold; 
+    font-size: 1.1em; 
+    letter-spacing: 1px; 
+}
+.btn-fechar-hub { 
+    background: transparent; 
+    border: none; 
+    color: #94a3b8; 
+    font-size: 1.5em; 
+    cursor: pointer; 
+    padding: 0;
+}
+.btn-fechar-hub:hover { 
+    color: #ef4444; 
+}
+
+/* --- Estilização básica das configurações no menu --- */
+.hub-content { 
+    padding: 15px; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 18px; 
+}
+
+.hub-setting {
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    font-size: 0.9em; 
+    color: #cbd5e1;
+}
+
+.hub-setting > label:first-child { 
+    flex: 1; 
+    text-align: left;
+    margin-right: 15px;
+    white-space: nowrap; /* Impede que o texto quebre para a linha de baixo */
+}
+
+.hub-setting input[type="range"] { 
+    width: 85px; 
+    flex-shrink: 0; /* Impede que o slider seja "amassado" pelo texto */
+    accent-color: #ca8a04; 
+    cursor: pointer; 
+}
+
+
+/* --- 3. O CONTÊINER DO ANALÓGICO E A BLINDAGEM CONTRA VAZAMENTO --- */
+
+#joystick-blindagem-externa {
+    position: fixed;
+    bottom: 30px; 
+    left: 30px;
+    z-index: 9999; 
+    pointer-events: auto; 
+    border-radius: 50%; 
+    background: transparent; 
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.oculta-joystick { 
+    opacity: 0 !important; 
+    pointer-events: none !important; 
+}
+
+/* O Container agora é um analógico real */
+#joystick-container {
+    width: 150px;
+    height: 150px;
+
+    position: relative;
+
+    background:
+        radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.62), rgba(15, 23, 42, 0.42) 58%, rgba(2, 6, 23, 0.25) 100%);
+
+    border: 2px solid rgba(202, 138, 4, 0.28);
+    border-radius: 50%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    transform-origin: bottom left;
+
+    box-shadow:
+        0 10px 20px rgba(0,0,0,0.55),
+        inset 0 0 18px rgba(0,0,0,0.72);
+
+    backdrop-filter: blur(3px);
+
+    touch-action: none;
+    overflow: visible;
+}
+
+#joystick-container::before {
+    content: "";
+    position: absolute;
+    inset: 18px;
+    border-radius: 50%;
+    border: 1px solid rgba(250, 204, 21, 0.18);
+    box-shadow: inset 0 0 14px rgba(250, 204, 21, 0.08);
+    pointer-events: none;
+}
+
+#joystick-container::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(250, 204, 21, 0.18);
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.15);
+    pointer-events: none;
+}
+
+.joy-base-visual {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.joy-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+
+    width: 58px;
+    height: 58px;
+
+    transform: translate(-50%, -50%);
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(circle at 35% 30%, rgba(255,255,255,0.25), transparent 26%),
+        linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.96));
+
+    border: 1.5px solid rgba(250, 204, 21, 0.72);
+
+    box-shadow:
+        0 6px 12px rgba(0,0,0,0.60),
+        inset 1px 1px 3px rgba(255,255,255,0.16),
+        inset -2px -2px 6px rgba(0,0,0,0.50);
+
+    pointer-events: none;
+    transition: transform 0.06s linear;
+}
+
+#joystick-container.joy-ativo {
+    border-color: rgba(250, 204, 21, 0.50);
+    box-shadow:
+        0 10px 22px rgba(0,0,0,0.62),
+        0 0 14px rgba(250, 204, 21, 0.10),
+        inset 0 0 18px rgba(0,0,0,0.72);
+}
+
+#joystick-container.joy-ativo .joy-knob {
+    transition: none;
+    border-color: rgba(250, 204, 21, 0.95);
+    box-shadow:
+        0 6px 12px rgba(0,0,0,0.65),
+        0 0 10px rgba(250, 204, 21, 0.20),
+        inset 1px 1px 3px rgba(255,255,255,0.16),
+        inset -2px -2px 6px rgba(0,0,0,0.50);
+}
+
+/* 👇 Switch Toggle (liga/desliga) 👇 */
+.switch { 
+    position: relative; 
+    display: inline-block; 
+    width: 44px; 
+    height: 24px; 
+    flex-shrink: 0; 
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider-round {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #334155; border-radius: 24px; transition: .3s;
+    border: 1px solid rgba(202, 138, 4, 0.3);
+}
+.slider-round:before {
+    position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px;
+    background-color: #e2e8f0; border-radius: 50%; transition: .3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+input:checked + .slider-round { 
+    background-color: #ca8a04; 
+    border-color: #facc15; 
+}
+input:checked + .slider-round:before { 
+    transform: translateX(20px); 
+    background-color: #fff; 
+}
+
+/* @media para PC */
+@media (min-width: 768px) {
+    #joystick-blindagem-externa:not(.eldora-config-carregada) {
+        display: none !important;
+    }
+}

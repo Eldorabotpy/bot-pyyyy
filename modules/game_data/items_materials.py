@@ -2,12 +2,20 @@
 
 MATERIALS_DATA = {
     # --- MINÉRIO E PEDRAS ---
+    "selo_de_maestria": {
+        "display_name": "Selo de Maestria",
+        "type": "material", 
+        "rarity": "lendario",
+        "emoji": "🏅",
+        "desc": "A marca definitiva da perfeição. Este selo dourado prova que domina o seu ofício, permitindo-lhe assinar o Tratado das Guildas e aprender novos caminhos.",
+        "icon": "materiais/selo_maestria.png" # 👈 Aponta para a pasta correta!
+    },
     "minerio_de_cobre": {
         "display_name": "Minério de Cobre", "emoji": "⛓️🟠",
         "type": "material_bruto", "category": "coletavel",
         "description": "Metal condutor básico.", 
         "stackable": True,
-        "media_key": "imagem_minerio_de_cpbre",
+        "media_key": "imagem_minerio_de_cobre",
         "icon_url": "",
     },
     "minerio_de_ouro": {
@@ -57,6 +65,15 @@ MATERIALS_DATA = {
         "media_key": "imagem_cristal_bruto",
         "icon_url": "",
     },
+    "gema_lapidada_comum": {
+        "display_name": "Gema Lapidada Comum", "emoji": "💎",
+        "type": "material_bruto", "category": "coletavel",
+        "description": "Cristal com potencial mágico não lapidado.", 
+        "stackable": True,
+        "media_key": "imagem_cristal_bruto",
+        "icon_url": "",
+    },
+
     "pedra": {
         "display_name": "Pedra", "emoji": "🪨", 
         "type": "material_bruto", "category": "coletavel", 
@@ -176,6 +193,63 @@ MATERIALS_DATA = {
         "media_key": "item_presa_de_javali",
         "icon_url": "",
     },
+
+    "ponta_de_osso_afiada": {
+        "display_name": "Ponta de Osso Afiada", "emoji": "🦷",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Presas afiadas.", 
+        "stackable": True, 
+        "media_key": "item_presa_de_javali",
+        "icon_url": "",
+    },
+    "lente_petrificante": {
+        "display_name": "Lente Petrificante", "emoji": "🔬",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Lente com propriedades mágicas.", 
+        "stackable": True, 
+        "media_key": "item_lente_petrificante",
+        "icon_url": "",
+    },
+    "placa_de_pedra_polida": {
+        "display_name": "Placa de Pedra Polida", "emoji": "🪨",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Placa de pedra com acabamento refinado.", 
+        "stackable": True, 
+        "media_key": "item_placa_de_pedra_polida",
+        "icon_url": "",
+    },
+    "placa_draconica_negra": {
+        "display_name": "Placa Dracônica Negra", "emoji": "🪨",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Placa de pedra com acabamento refinado.", 
+        "stackable": True, 
+        "media_key": "item_placa_draconica_negra",
+        "icon_url": "",
+    },
+    "essencia_espiritual": {
+        "display_name": "Essência Espiritual", "emoji": "👻",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Resíduo etéreo.", 
+        "stackable": True, 
+        "media_key": "item_essencia_espiritual",
+        "icon_url": "",
+    },
+    "essencia_fungica": {
+        "display_name": "Essência Fúngica", "emoji": "🍄",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Resíduo etéreo.", 
+        "stackable": True, 
+        "media_key": "item_essencia_fungica",
+        "icon_url": "",
+    },
+    "essencia_draconica_pura": {
+        "display_name": "Essência Dracônica Pura", "emoji": "🐉",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Resíduo etéreo.", 
+        "stackable": True, 
+        "media_key": "item_essencia_draconica_pura",
+        "icon_url": "",
+    },
     "asa_de_morcego": {
         "display_name": "Asa de Morcego", "emoji": "🦇",
         "type": "material_monstro", "category": "cacada",
@@ -191,6 +265,55 @@ MATERIALS_DATA = {
         "stackable": True, 
         "media_key": "item_pele_de_troll",
         "icon_url": "",
+    },
+    "pele_troll_regenerativa": {
+        "display_name": "Pele de Troll Regenerativa", "emoji": "🧌",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Couro grosso regenerativo.", 
+        "stackable": True, 
+        "media_key": "item_pele_de_troll",
+    },
+    "tabua_de_madeira_rara": {
+        "display_name": "Tabua de Madeira Rara", "emoji": "🪵",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Madeira rara e resistente.", 
+        "stackable": True, 
+        "media_key": "item_tabua_de_madeira_rara",
+    },
+    "tabua_ancestral": {
+        "display_name": "Tabua Ancestral", "emoji": "🪵",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Madeira rara e resistente.", 
+        "stackable": True, 
+        "media_key": "item_tabua_ancestral",
+    },
+    "tabua_de_carvalho": {
+        "display_name": "Tabua de Carvalho", "emoji": "🪵",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Madeira rara e resistente.", 
+        "stackable": True, 
+        "media_key": "item_tabua_de_carvalho",
+    },
+    "tabua_de_mogno": {
+        "display_name": "Tabua de Mogno", "emoji": "🪵",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Madeira rara e resistente.", 
+        "stackable": True, 
+        "media_key": "item_tabua_de_mogno",
+    },
+    "barra_de_ouro": {
+        "display_name": "Barra de Ouro", "emoji": "�",
+        "type": "material_monstro", "category": "cacada",
+        "description": "material precioso e resistente.", 
+        "stackable": True, 
+        "media_key": "item_barra_de_ouro",
+    },
+    "corda_de_linho": {
+        "display_name": "Corda de Linho", "emoji": "🧵",
+        "type": "material_monstro", "category": "cacada",
+        "description": "Material resistente para cordas.", 
+        "stackable": True, 
+        "media_key": "item_corda_de_linho",
     },
     "ectoplasma": {
         "display_name": "Ectoplasma", "emoji": "👻",
@@ -777,45 +900,45 @@ MATERIALS_DATA = {
     "icon_url": "",
     "description": "Cinzas carregadas de energia elemental. Reagente versátil."
 },
-    # --- MINÉRIOS RAROS (T4 / T5) ---
-    "minerio_de_mithril": {
-        "display_name": "Minério de Mithril", "emoji": "⛓️🔷",
-        "type": "material_bruto", "category": "coletavel",
-        "tier": 4, "profession": "minerador",
-        "description": "Minério raro, leve e extremamente resistente.",
-        "stackable": True,
-        "icon_url": "",
-        "media_key": "item_minerio_de_mithril"
-    },
-    "minerio_de_adamantio": {
-        "display_name": "Minério de Adamantio", "emoji": "⛓️🔴",
-        "type": "material_bruto", "category": "coletavel",
-        "tier": 5, "profession": "minerador",
-        "description": "Minério lendário quase indestrutível.",
-        "stackable": True,
-        "icon_url": "",
-        "media_key": "item_minerio_de_adamantio"
-    },
+ # --- MINÉRIOS RAROS (T4 / T5) ---
+"minerio_de_mithril": {
+    "display_name": "Minério de Mithril", "emoji": "⛓️🔷",
+    "type": "material_bruto", "category": "coletavel",
+    "tier": 4, "profession": "minerador",
+    "description": "Minério raro, leve e extremamente resistente.",
+    "stackable": True,
+    "icon_url": "",
+    "media_key": "item_minerio_de_mithril"
+},
+"minerio_de_adamantio": {
+    "display_name": "Minério de Adamantio", "emoji": "⛓️🔴",
+    "type": "material_bruto", "category": "coletavel",
+    "tier": 5, "profession": "minerador",
+    "description": "Minério lendário quase indestrutível.",
+    "stackable": True,
+    "icon_url": "",
+    "media_key": "item_minerio_de_adamantio"
+},
 
-    # --- BARRAS REFINADAS (MITHRIL / ADAMANTIO) ---
-    "barra_de_mithril": {
-        "display_name": "Barra de Mithril", "emoji": "🧱🔷",
-        "type": "material_refinado", "category": "coletavel",
-        "tier": 4,
-        "description": "Barra refinada de mithril, usada em equipamentos avançados.",
-        "stackable": True,
-        "icon_url": "",
-        "media_key": "item_barra_de_mithril"
-    },
-    "barra_de_adamantio": {
-        "display_name": "Barra de Adamantio", "emoji": "🧱🔴",
-        "type": "material_refinado", "category": "coletavel",
-        "tier": 5,
-        "description": "Barra lendária de adamantio, base de itens épicos.",
-        "stackable": True,
-        "icon_url": "",
-        "media_key": "item_barra_de_adamantio"
-    },
+# --- BARRAS REFINADAS (MITHRIL / ADAMANTIO) ---
+"barra_de_mithril": {
+    "display_name": "Barra de Mithril", "emoji": "🧱🔷",
+    "type": "material_refinado", "category": "coletavel",
+    "tier": 4,
+    "description": "Barra refinada de mithril, usada em equipamentos avançados.",
+    "stackable": True,
+    "icon_url": "",
+    "media_key": "item_barra_de_mithril"
+},
+"barra_de_adamantio": {
+    "display_name": "Barra de Adamantio", "emoji": "🧱🔴",
+    "type": "material_refinado", "category": "coletavel",
+    "tier": 5,
+    "description": "Barra lendária de adamantio, base de itens épicos.",
+    "stackable": True,
+    "icon_url": "",
+    "media_key": "item_barra_de_adamantio"
+}, 
 
 
 }

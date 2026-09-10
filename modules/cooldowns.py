@@ -71,15 +71,12 @@ def aplicar_cooldown(player, skill_id, raridade="comum"):
     if tempo_recarga is None:
         tempo_recarga = skill_info.get('effects', {}).get('cooldown_turns', 0)
 
-    # 🔥 A MÁGICA FICA AQUI: Só aplica se realmente tiver cooldown!
-    try:
-        tempo_recarga = int(tempo_recarga)
-    except (ValueError, TypeError):
-        tempo_recarga = 0
-
-    if tempo_recarga > 0:
-        if "cooldowns" not in player:
-            player["cooldowns"] = {}
-        player["cooldowns"][skill_id] = tempo_recarga
-
+    # 👇 A CORREÇÃO DE OURO: GRAVAR O BLOQUEIO NA MEMÓRIA DO JOGADOR 👇
+    if "cooldowns" not in player:
+        player["cooldowns"] = {}
+        
+    # Só adiciona o bloqueio se realmente houver um tempo configurado
+    if tempo_recarga and int(tempo_recarga) > 0:
+        player["cooldowns"][skill_id] = int(tempo_recarga)
+        
     return player

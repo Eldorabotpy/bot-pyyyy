@@ -1,58 +1,193 @@
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--tg-theme-bg-color, #121212); color: var(--tg-theme-text-color, #e0e0e0); margin: 0; padding: 0; padding-bottom: 70px; }
+/* ==========================================
+   BLINDAGEM MOBILE: TIRA SELEÇÃO E PISCAR AZUL
+   ========================================== */
+body, button, div, span, img, a {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+}
+
+/* Exceção: Permite digitar no chat e menus */
+input, textarea {
+    -webkit-user-select: auto !important;
+    -moz-user-select: auto !important;
+    -ms-user-select: auto !important;
+    user-select: auto !important;
+}
+
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--tg-theme-bg-color, #121212); color: var(--tg-theme-text-color, #e0e0e0); margin: 0; padding: 0; padding-bottom: 0 !important; }
 header { background-color: var(--tg-theme-secondary-bg-color, #1a1a1a); padding: 12px; text-align: center; border-bottom: 2px solid #f39c12; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 header h1 { margin: 0; font-size: 1.1em; color: #f39c12; text-transform: uppercase; letter-spacing: 2px; }
-.tab-content { display: none; padding: 20px; animation: fadeIn 0.3s; }
+/* Removemos os 90px de baixo */
+.tab-content { display: none; padding: 20px 20px 20px 20px; animation: fadeIn 0.3s; }
 .tab-content.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 /* =========================================
-   BARRA DE NAVEGAÇÃO INFERIOR (PROFISSIONAL)
+   MENU LATERAL FLUTUANTE (SIDEBAR)
    ========================================= */
-nav { 
+/* NOVO BOTÃO DE MENU (TOPO DIREITO COM IMAGEM) */
+#btn-abrir-menu { 
     position: fixed; 
-    bottom: 0; 
-    left: 0; 
-    width: 100%; 
-    background-color: #0f172a; /* Azul escuro muito elegante */
-    display: flex; 
-    justify-content: space-around; 
-    border-top: 1px solid #1e293b; 
-    padding: 8px 0 6px 0; /* Mais fina */
-    z-index: 1000; 
-    box-shadow: 0 -4px 15px rgba(0,0,0,0.6); 
-}
-nav button { 
-    background: none; 
-    border: none; 
-    color: #64748b; 
-    font-size: 0.75em; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
+    top: 15px; /* 👈 A MÁGICA AQUI: Mudámos de "bottom" para "top" */
+    right: 8px; 
+    width: 40px; /* Tamanho da tua imagem */
+    height: 50px; 
+    z-index: 80; 
     cursor: pointer; 
-    width: 20%; 
-    transition: 0.2s; 
-    font-weight: 500;
-}
-nav button i { 
-    font-size: 1.3em; /* Ícones menores e mais contidos */
-    margin-bottom: 4px; 
-    filter: grayscale(100%) opacity(0.6); /* Ícone inativo sem cor/mais apagado */
-    transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-nav button.active { 
-    color: #f39c12; /* Texto ativo Dourado */
-}
-nav button.active i { 
-    filter: grayscale(0%) opacity(1); /* Traz a cor total de volta ao ativar */
-    transform: scale(1.15) translateY(-2px); /* Efeito de 'pular' levemente */
+    transition: 0.2s ease-in-out; 
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8)); /* Sombra bonita no PNG */
+    
+    /* Removemos fundos e bordas porque a tua imagem PNG já vai ter a arte toda! */
+    background: transparent; 
+    border: none; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
 }
 
+#btn-abrir-menu img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+#btn-abrir-menu:active { 
+    transform: scale(0.85); /* Dá o efeito de "apertar" */
+}
+
+#menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.7); backdrop-filter: blur(3px); z-index: 9999; display: none; opacity: 0; transition: opacity 0.3s; }
+#menu-overlay.ativo { display: block; opacity: 1; }
+
+/* =========================================
+   🏰 MENU LATERAL FLUTUANTE - RPG ÉPICO 🏰
+   ========================================= */
+
+nav#side-menu { 
+    position: fixed !important; 
+    top: 0 !important; 
+    right: -100% !important; 
+    width: 300px !important; 
+    height: 100vh !important; 
+    background: linear-gradient(180deg, #1c140a 0%, #0a0603 100%) !important;
+    border-left: 8px solid #d4af37 !important; 
+    box-shadow: -12px 0 35px rgba(0,0,0,0.95), inset 10px 0 20px rgba(0,0,0,0.8) !important; 
+    display: flex !important; 
+    flex-direction: column !important; 
+    z-index: 10000 !important; 
+    transition: right 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) !important; 
+    padding: 0 !important; 
+    box-sizing: border-box !important;
+    font-family: 'Cinzel', serif !important;
+}
+
+nav#side-menu.aberto { 
+    right: 0 !important; 
+}
+
+/* Cabeçalho do Menu */
+.menu-header {
+    padding: 25px 20px 18px;
+    text-align: center;
+    border-bottom: 4px solid #8b5a2b;
+    background: linear-gradient(to bottom, rgba(30,20,10,0.9), transparent);
+}
+
+.menu-title {
+    color: #f0d080;
+    font-size: 1.5em;
+    letter-spacing: 4px;
+    text-shadow: 0 0 15px #d4af37;
+    margin: 0;
+    font-weight: 900;
+}
+
+/* Botão Fechar */
+#btn-fechar-menu { 
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none !important; 
+    border: none !important; 
+    color: #d4af37 !important; 
+    font-size: 2.8em !important; 
+    cursor: pointer; 
+    text-shadow: 2px 2px 6px #000;
+    z-index: 10;
+}
+#btn-fechar-menu:active { transform: scale(0.85); color: #ffd700 !important; }
+
+/* Container dos itens */
+.menu-itens {
+    padding: 15px 12px;
+    flex: 1;
+}
+
+/* Botões do Menu */
+nav#side-menu button { 
+    background: rgba(35, 25, 15, 0.92) !important; 
+    border: 3px solid #5c4033 !important; 
+    border-radius: 8px !important;
+    margin: 8px 0 !important;
+    padding: 16px 18px !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    color: #e8d5a3 !important;
+    font-size: 1.12em !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.6) !important;
+}
+
+nav#side-menu button:hover {
+    background: rgba(55, 40, 25, 0.95) !important;
+    border-color: #d4af37 !important;
+    transform: translateX(10px);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.5) !important;
+}
+
+nav#side-menu button.active {
+    background: linear-gradient(90deg, #3f2a1f, #6b4e3a) !important;
+    border-color: #ffd700 !important;
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.7) !important;
+}
+
+/* Ícones e texto */
+nav#side-menu button .nav-icon-emoji {
+    font-size: 1.75em !important;
+    width: 40px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+}
+
+nav#side-menu button .nav-text {
+    color: #e8d5a3 !important;
+    font-weight: bold !important;
+    letter-spacing: 1.5px;
+}
+
+nav#side-menu button.active .nav-text {
+    color: #ffd700 !important;
+    text-shadow: 0 0 10px #d4af37;
+}
+
+/* Divisor */
+.menu-divider {
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #8b5a2b, transparent);
+    margin: 18px 20px;
+}
+/* =========================================
+   RESTO DAS CONFIGURAÇÕES
+   ========================================= */
 .home-banner { width: 100%; border-radius: 10px; overflow: hidden; border: 2px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.6); margin-bottom: 20px; background: #000; }
 .home-banner img { width: 100%; display: block; object-fit: cover; }
 .welcome-card { background: #1e1e1e; padding: 15px; border-radius: 8px; border-left: 4px solid #f39c12; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 .welcome-card p { margin: 0; color: #ccc; font-size: 0.9em; line-height: 1.5; text-align: center; }
-
 .game-menu-btn { display: flex; align-items: center; background: #252525; border: 1px solid #333; padding: 15px; border-radius: 10px; margin-bottom: 12px; width: 100%; text-align: left; cursor: pointer; box-sizing: border-box; transition: all 0.2s; }
 .game-menu-btn:active { transform: scale(0.97); background: #2a2a2a; border-color: #f39c12; }
 .game-menu-btn .btn-icon { font-size: 2em; margin-right: 15px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); }
@@ -60,232 +195,186 @@ nav button.active i {
 .game-menu-btn .btn-title { color: #f39c12; font-weight: bold; font-size: 1.1em; margin-bottom: 3px; }
 .game-menu-btn .btn-subtitle { color: #888; font-size: 0.8em; }
 .game-menu-btn .btn-arrow { color: #555; font-size: 1.2em; font-weight: bold; }
-
 table { width: 100%; border-collapse: separate; border-spacing: 0 5px; background-color: transparent; }
 th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: left; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px; border-bottom: 2px solid #444; }
-
 .rank-row { background-image: url('/static/rankings/textura_tabela.jpg'); background-size: cover; color: #2c3e50; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 .rank-row td { padding: 12px; font-size: 0.9em; font-weight: 500; }
-
 .rank-1 { background-image: none !important; background-color: #f1c40f !important; color: #000 !important; font-weight: 800 !important; } 
 .rank-2 { background-image: none !important; background-color: #bdc3c7 !important; color: #000 !important; font-weight: 800 !important; } 
 .rank-3 { background-image: none !important; background-color: #e67e22 !important; color: #000 !important; font-weight: 800 !important; }
 
-/* =========================================
-   LETREIRO DE NOTIFICAÇÕES (TICKER NEON)
-   ========================================= */
-.premium-ticker-container {
-    width: 100%;
-    overflow: hidden;
-    /* Fundo com gradiente animado (Dourado escuro para Azul escuro) */
-    background: linear-gradient(90deg, #2b1800, #0f172a, #2b1800);
-    background-size: 200% 200%;
-    border: 1px solid #f39c12; /* Borda dourada completa */
-    border-radius: 8px;
-    margin-bottom: 20px;
-    padding: 8px 0;
-    /* Super brilho dourado externo e interno (Efeito Neon) */
-    box-shadow: 0 0 15px rgba(243, 156, 18, 0.5), inset 0 0 10px rgba(243, 156, 18, 0.2);
-    position: relative;
-    animation: shimmerFundo 6s ease infinite; /* Anima o fundo */
-}
+/* Animações e Cards */
+.premium-ticker-container { width: 100%; overflow: hidden; background: linear-gradient(90deg, #2b1800, #0f172a, #2b1800); background-size: 200% 200%; border: 1px solid #f39c12; border-radius: 8px; margin-bottom: 20px; padding: 8px 0; box-shadow: 0 0 15px rgba(243, 156, 18, 0.5), inset 0 0 10px rgba(243, 156, 18, 0.2); position: relative; animation: shimmerFundo 6s ease infinite; }
+@keyframes shimmerFundo { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.premium-ticker-text { display: inline-block; white-space: nowrap; color: #fff; font-size: 0.9em; font-weight: 600; text-shadow: 0 0 6px rgba(243, 156, 18, 0.9); padding-left: 100%; animation: ticker 22s linear infinite; }
+@keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
 
-@keyframes shimmerFundo {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
+#hud-status-flutuante { position: absolute; top: 120px; left: 40px; width: 260px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(5px); border: 2px solid #f39c12; border-radius: 12px; padding: 15px; z-index: 9998; box-shadow: 0 4px 15px rgba(0,0,0,0.8); color: white; display: none; animation: fadeIn 0.2s; }
+.hud-status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+.hud-status-header h3 { margin: 0; color: #0bee44; font-family: 'Cinzel', serif; font-size: 1.1em; text-transform: uppercase; }
+.btn-fechar-hud { background: none; border: none; color: #e74c3c; font-weight: bold; cursor: pointer; font-size: 1.2em; transition: 0.2s; }
+.btn-fechar-hud:active { transform: scale(0.8); }
 
-.premium-ticker-text {
-    display: inline-block;
-    white-space: nowrap;
-    color: #fff;
-    font-size: 0.9em;
-    font-weight: 600;
-    text-shadow: 0 0 6px rgba(243, 156, 18, 0.9); /* Brilho dourado no texto inteiro */
-    padding-left: 100%;
-    animation: ticker 22s linear infinite; /* Um pouquinho mais rápido */
-}
+.hud-bar-container { position: relative; margin-bottom: 10px; }
+.hud-bar-bg { width: 100%; height: 16px; background: #000; border: 1px solid #333; border-radius: 8px; overflow: hidden; box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); }
+.hud-bar-fill { height: 100%; width: 0%; transition: width 0.3s ease-out; }
+.hud-bar-fill.hp { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+.hud-bar-fill.mp { background: linear-gradient(90deg, #2980b9, #3498db); }
+.hud-bar-fill.xp { background: linear-gradient(90deg, #8e44ad, #9b59b6); }
+.hud-bar-container span { position: absolute; top: 0; left: 0; width: 100%; text-align: center; font-size: 0.7em; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: none; line-height: 16px; }
 
-@keyframes ticker {
-    0% { transform: translate3d(0, 0, 0); }
-    100% { transform: translate3d(-100%, 0, 0); }
-}
+.hud-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.hud-grid-pocoes { display: flex; justify-content: center; gap: 15px; }
+.hud-slot { width: 45px; height: 45px; background: rgba(0,0,0,0.6); border: 1px solid #334155; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 1.4em; cursor: pointer; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+.hud-slot img { max-width: 90%; max-height: 90%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.8)); }
 
 /* =========================================
-   PINOS DO MAPA INTERATIVO (REINO)
+   CONTADOR ONLINE (PÍLULA)
    ========================================= */
-.map-container {
-    position: relative;
-    width: 100%;
-    border: 2px solid #f39c12;
-    border-radius: 12px;
-    overflow: hidden;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.8);
-}
-
-.map-pin {
+#online-counter {
     position: absolute;
-    width: 22px; 
-    height: 22px;
-    background: rgba(231, 76, 60, 0.9); /* Vermelho (Bloqueado) */
-    border: 2px solid #fff;
-    border-radius: 50%;
-    transform: translate(-50%, -50%); /* Centraliza exato na coordenada */
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.8);
-    transition: 0.3s;
-    z-index: 10;
-}
-
-.map-pin-label {
-    position: absolute;
-    transform: translate(-50%, -150%);
-    background: rgba(0,0,0,0.8);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.65em;
-    font-weight: bold;
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: 0.3s;
-}
-
-.map-pin:active, .map-pin:hover .map-pin-label {
-    opacity: 1; /* Mostra o nome ao segurar o dedo/mouse */
-}
-
-/* Local Atual (Dourado) */
-.map-pin.current {
-    background: #f1c40f;
-    border-color: #000;
-    width: 26px; height: 26px;
-    cursor: default;
-    z-index: 15;
-}
-
-/* Locais Permitidos (Verde Piscante) */
-.map-pin.accessible {
-    background: #2ecc71;
-    cursor: pointer;
-    animation: pulsePin 1.5s infinite;
-    z-index: 20;
-}
-
-@keyframes pulsePin {
-    0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.8); }
-    70% { box-shadow: 0 0 0 12px rgba(46, 204, 113, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
-}
-
-/* =========================================
-   ANIMAÇÃO MODERNA DE LEVEL UP (CARD PREMIUM)
-   ========================================= */
-
-.level-up-overlay {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.7); /* Fundo escuro */
-    backdrop-filter: blur(3px); /* Deixa a arena borrada no fundo */
-    z-index: 10000;
+    top: 20px; /* Alinhado com o centro do teu avatar */
+    left: 150px; /* Fica exatamente ao lado do avatar */
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(4px);
+    border: 2px solid #1af506;
+    border-radius: 10px; /* Isto faz o formato de Pílula! */
+    padding: 2px 10px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    animation: fadeInOverlay 0.3s ease-out forwards;
+    gap: 8px;
+    z-index: 9997; /* Fica acima do mapa */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+    transition: all 0.3s ease;
 }
 
-.level-up-card {
-    background: radial-gradient(circle at center, #232c3b 0%, #151b29 100%); /* Fundo azul escuro idêntico à foto */
-    border: 2px solid #f1c40f; /* Borda dourada */
-    border-radius: 12px;
-    padding: 30px 50px;
-    text-align: center;
-    box-shadow: 0 0 20px rgba(243, 156, 18, 0.5), inset 0 0 10px rgba(0, 0, 0, 0.8);
-    transform: scale(0.5);
-    opacity: 0;
-    animation: popUpCard 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-    position: relative;
-    overflow: hidden;
+/* A bolinha verde com brilho */
+.dot-green {
+    width: 10px;
+    height: 10px;
+    background-color: #08f313;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #2ecc71, 0 0 15px #0af81e;
+    animation: pulse-green 2s infinite; /* Chama a animação abaixo */
 }
 
-/* Brilho que vem de baixo (Efeito de luz de "palco" no número) */
-.level-up-card::after {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 10%; right: 10%;
-    height: 80px;
-    background: radial-gradient(ellipse at bottom, rgba(241, 196, 15, 0.3) 0%, transparent 70%);
+/* Animação de radar/piscar da bolinha */
+@keyframes pulse-green {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(80, 240, 6, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(46, 204, 113, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
+
+#online-count-text {
+    color: #ecf0f1;
+    font-family: 'Cinzel', serif;
+    font-size: 0.5em;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-shadow: 1px 1px 2px #000;
+    text-transform: uppercase;
+}
+
+/* ==========================================
+   ⚔️ HUD DA INVASÃO (TOPO DA TELA) ⚔️
+   ========================================== */
+#hud-invasao {
+    display: none !important;
+}
+.invasao-header { font-size: 15px; font-weight: bold; color: #f39c12; margin-bottom: 2px; letter-spacing: 1px; }
+.invasao-onda { font-size: 13px; color: #e74c3c; margin-bottom: 8px; text-transform: uppercase; font-weight: bold; }
+.invasao-stats { display: flex; width: 100%; justify-content: space-around; }
+.stat-box { display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.6); padding: 4px 15px; border-radius: 6px; border: 1px solid #333; }
+.stat-label { font-size: 10px; color: #94a3b8; font-weight: bold; }
+.stat-value { font-size: 18px; font-weight: bold; color: #fff; }
+#invasao-tempo { color: #2ecc71; }
+#invasao-tempo.urgente { color: #e74c3c; animation: piscar-perigo 1s infinite; }
+@keyframes piscar-perigo { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+#invasao-tempo.urgente {
+    color: #ff0000;
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* ==========================================
+   RODAPÉ FIXO (Copiado do Login para funcionar no Jogo)
+   ========================================== */
+.footer-nav {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 65px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(10, 15, 25, 1) 100%);
+    border-top: 3px solid #f39c12; border-style: ridge;
+    display: flex; justify-content: space-around; align-items: center;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.8), 0 0 10px rgba(243, 156, 18, 0.3);
+    z-index: 9999; /* Fica SEMPRE acima de tudo */
+    padding: 0 10px; box-sizing: border-box;
+}
+
+.nav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-decoration: none; color: inherit; width: 23%; height: 100%; cursor: pointer; transition: 0.2s;
+}
+
+.nav-icon-emoji {
+    font-size: 1.6em; margin-bottom: 2px; line-height: 1;
+    filter: drop-shadow(0 0 3px rgba(243, 156, 18, 0.3)); transition: 0.2s;
+}
+
+.nav-text {
+    font-family: 'Cinzel', serif; font-size: 0.65em; color: #bdc3c7;
+    text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;
+}
+
+.nav-item.active .nav-icon-emoji { filter: drop-shadow(0 0 8px #f39c12); transform: scale(1.1); }
+.nav-item.active .nav-text { color: #f39c12; text-shadow: 0 0 5px #f39c12; }
+
+
+/* 🛡️ FORÇA OS BOTÕES DO MAPA PARA O FUNDO 🛡️ */
+.btn-passe-mapa, .btn-social-mapa {
+    z-index: 10 !important;
+    -webkit-transform: translateZ(0) !important;
+    transform: translateZ(0) !important;
+}
+
+/* =========================================================
+   CONTROLE GLOBAL DO BOTÃO DE MENU
+   O botão só aparece no mapa limpo.
+   ========================================================= */
+
+body.ui-modal-aberta #btn-abrir-menu,
+body.ui-modal-aberta .btn-passe-mapa,
+body.ui-modal-aberta .btn-social-mapa {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+body.ui-modal-aberta #menu-overlay,
+body.ui-modal-aberta #side-menu {
     pointer-events: none;
 }
 
-.level-up-title {
-    font-family: 'Georgia', serif; 
-    font-size: 26px;
-    font-weight: 900;
-    color: #f39c12;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    /* Efeito 3D no texto "LEVEL UP!" */
-    text-shadow: 1px 1px 0 #d35400, 2px 2px 0 #a84200, 0 0 15px rgba(243, 156, 18, 0.6);
-    margin: 0 0 15px 0;
+body.menu-aberto #menu-overlay,
+body.menu-aberto #side-menu {
+    pointer-events: auto;
 }
 
-.level-up-number-container {
-    position: relative;
-    display: inline-block;
-    margin: 10px 0 25px 0;
-}
-
-.level-up-number {
-    position: relative;
-    font-family: 'Georgia', serif; 
-    font-size: 70px; /* Bem grande, como na imagem */
-    font-weight: bold;
-    color: #ffffff;
-    z-index: 2;
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 0 0 40px rgba(241, 196, 15, 0.6);
-    line-height: 1;
-}
-
-.level-up-subtitle {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    font-size: 11px;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    margin: 0;
-    font-weight: 600;
-    opacity: 0;
-    animation: fadeInText 0.5s ease-out 0.6s forwards; /* Aparece com atraso dramático */
-}
-
-/* --- KEYFRAMES --- */
-@keyframes fadeInOverlay { 
-    from { opacity: 0; } 
-    to { opacity: 1; } 
-}
-
-@keyframes popUpCard { 
-    0% { transform: scale(0.6); opacity: 0; } 
-    70% { transform: scale(1.05); opacity: 1; } 
-    100% { transform: scale(1); opacity: 1; } 
-}
-
-@keyframes fadeInText { 
-    from { opacity: 0; transform: translateY(10px); } 
-    to { opacity: 1; transform: translateY(0); } 
-}
-
-/* =========================================
-   ANIMAÇÕES DE EVENTOS (NOVO)
-   ========================================= */
-.piscar {
-    animation: blinker 1.5s linear infinite;
-}
-
-@keyframes blinker {
-    50% { opacity: 0.3; }
+/* =========================================================
+   COMBATE ABERTO: nenhuma UI do mapa aparece por cima
+   ========================================================= */
+body.combate-aberto #btn-abrir-menu,
+body.combate-aberto .btn-passe-mapa,
+body.combate-aberto .btn-social-mapa,
+body.combate-aberto #online-counter,
+body.combate-aberto #hud-moderno,
+body.combate-aberto #eldora-party-hud {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }

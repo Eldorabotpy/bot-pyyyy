@@ -1,0 +1,3519 @@
+<!-- =========================================================
+     📜 CENTRAL DE ELDORA
+     ========================================================= -->
+
+<style>
+    #central-eldora-modal {
+        --ce-bg: #070b12;
+        --ce-surface: #101827;
+        --ce-surface-2: #172235;
+        --ce-border: rgba(148, 163, 184, 0.20);
+
+        --ce-gold: #d8b85a;
+        --ce-gold-light: #f4dc91;
+        --ce-text: #f4f7fb;
+        --ce-text-2: #c5ceda;
+        --ce-text-3: #7f8da0;
+
+        position: fixed;
+        inset: 0;
+        z-index: 10060;
+
+        display: none;
+        align-items: center;
+        justify-content: center;
+
+        padding: 9px;
+
+        background:
+            rgba(2, 6, 13, 0.86);
+
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    #central-eldora-modal *,
+    #central-eldora-modal *::before,
+    #central-eldora-modal *::after {
+        box-sizing: border-box;
+    }
+
+
+    /* =====================================================
+       PAINEL
+       ===================================================== */
+
+    .central-eldora-painel {
+        width: min(
+            820px,
+            calc(100vw - 18px)
+        );
+
+        height: min(
+            900px,
+            calc(100dvh - 18px)
+        );
+
+        display: flex;
+        flex-direction: column;
+
+        overflow: hidden;
+
+        color: var(--ce-text);
+
+        background:
+            radial-gradient(
+                circle at 50% -10%,
+                rgba(216, 184, 90, 0.11),
+                transparent 300px
+            ),
+            linear-gradient(
+                180deg,
+                #0d1421,
+                #070b12
+            );
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.50);
+
+        border-radius: 22px;
+
+        box-shadow:
+            0 30px 100px
+            rgba(0, 0, 0, 0.82),
+
+            0 0 45px
+            rgba(216, 184, 90, 0.07);
+
+        animation:
+            centralEldoraEntrada
+            0.24s ease-out;
+    }
+
+
+    @keyframes centralEldoraEntrada {
+        from {
+            opacity: 0;
+            transform:
+                translateY(10px)
+                scale(0.985);
+        }
+
+        to {
+            opacity: 1;
+            transform:
+                translateY(0)
+                scale(1);
+        }
+    }
+
+
+    /* =====================================================
+       CABEÇALHO
+       ===================================================== */
+
+    .central-eldora-header {
+        min-height: 70px;
+        flex: 0 0 auto;
+
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        gap: 12px;
+
+        padding: 12px 15px;
+
+        background:
+            linear-gradient(
+                115deg,
+                rgba(28, 37, 54, 0.98),
+                rgba(10, 16, 27, 0.98)
+            );
+
+        border-bottom:
+            1px solid
+            rgba(216, 184, 90, 0.30);
+    }
+
+
+    .central-eldora-identidade {
+        min-width: 0;
+
+        display: flex;
+        align-items: center;
+
+        gap: 11px;
+    }
+
+
+    .central-eldora-brasao {
+        width: 43px;
+        height: 43px;
+
+        flex: 0 0 43px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.35);
+
+        border-radius: 13px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(216, 184, 90, 0.17),
+                rgba(216, 184, 90, 0.04)
+            );
+
+        font-size: 21px;
+    }
+
+
+    .central-eldora-titulo {
+        margin: 0;
+
+        color:
+            var(--ce-gold-light);
+
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 1rem;
+        font-weight: 900;
+
+        letter-spacing: 0.7px;
+    }
+
+
+    .central-eldora-subtitulo {
+        margin-top: 3px;
+
+        color:
+            var(--ce-text-3);
+
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+
+
+    .central-eldora-fechar {
+        width: 39px;
+        height: 39px;
+
+        flex: 0 0 39px;
+
+        border:
+            1px solid
+            rgba(248, 113, 113, 0.27);
+
+        border-radius: 12px;
+
+        background:
+            rgba(127, 29, 29, 0.16);
+
+        color: #fca5a5;
+
+        font-weight: 900;
+        cursor: pointer;
+
+        transition:
+            0.16s ease;
+    }
+
+
+    .central-eldora-fechar:hover {
+        background:
+            rgba(127, 29, 29, 0.32);
+    }
+
+
+    .central-eldora-fechar:active {
+        transform: scale(0.92);
+    }
+
+
+    /* =====================================================
+       ÁREA DE ROLAGEM
+       ===================================================== */
+
+    .central-eldora-scroll {
+        flex: 1;
+        min-height: 0;
+
+        overflow-y: auto;
+        overscroll-behavior: contain;
+
+        scrollbar-width: thin;
+
+        scrollbar-color:
+            rgba(216, 184, 90, 0.42)
+            transparent;
+    }
+
+
+    .central-eldora-scroll::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .central-eldora-scroll::-webkit-scrollbar-thumb {
+        background:
+            rgba(216, 184, 90, 0.40);
+
+        border-radius: 20px;
+    }
+
+
+    /* =====================================================
+       HERO
+       ===================================================== */
+
+    .central-eldora-hero {
+        position: relative;
+
+        min-height: 230px;
+
+        overflow: hidden;
+
+        border-bottom:
+            1px solid
+            rgba(216, 184, 90, 0.24);
+
+        background:
+            #101827;
+    }
+
+
+    .central-eldora-hero-imagem {
+        position: absolute;
+        inset: 0;
+
+        width: 100%;
+        height: 100%;
+
+        object-fit: cover;
+
+        opacity: 0.72;
+
+        transform: scale(1.015);
+
+        animation:
+            centralHeroRespirar
+            12s ease-in-out infinite alternate;
+        transition:
+            opacity 0.22s ease;    
+    }
+
+
+    @keyframes centralHeroRespirar {
+        from {
+            transform: scale(1.015);
+        }
+
+        to {
+            transform: scale(1.06);
+        }
+    }
+
+
+    .central-eldora-hero::after {
+        content: "";
+
+        position: absolute;
+        inset: 0;
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(4, 8, 14, 0.12),
+                rgba(4, 8, 14, 0.30) 45%,
+                rgba(7, 11, 18, 0.97)
+            );
+    }
+
+
+    .central-eldora-hero-conteudo {
+        position: relative;
+        z-index: 5;
+
+        min-height: 230px;
+
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+
+        padding: 22px 20px;
+    }
+
+
+    .central-eldora-eyebrow {
+        margin-bottom: 5px;
+
+        color:
+            var(--ce-gold);
+
+        font-size: 0.60rem;
+        font-weight: 900;
+
+        letter-spacing: 1.7px;
+
+        text-transform: uppercase;
+    }
+
+
+    .central-eldora-hero-titulo {
+        max-width: 520px;
+
+        margin: 0;
+
+        color: #fff6d5;
+
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 1.42rem;
+        font-weight: 900;
+
+        line-height: 1.25;
+
+        text-shadow:
+            0 3px 12px
+            rgba(0, 0, 0, 0.85);
+    }
+
+
+    .central-eldora-hero-texto {
+        max-width: 540px;
+
+        margin: 7px 0 0;
+
+        color: #c9d2de;
+
+        font-size: 0.77rem;
+        line-height: 1.48;
+    }
+
+
+    /* =====================================================
+       PARTÍCULAS
+       ===================================================== */
+
+    .central-eldora-particula {
+        position: absolute;
+        z-index: 4;
+
+        width: 4px;
+        height: 4px;
+
+        border-radius: 50%;
+
+        background:
+            #f4dc91;
+
+        box-shadow:
+            0 0 9px
+            rgba(244, 220, 145, 0.85);
+
+        opacity: 0;
+
+        animation:
+            centralParticula
+            5s linear infinite;
+    }
+
+
+    .central-eldora-particula.p1 {
+        left: 18%;
+        bottom: 20px;
+    }
+
+    .central-eldora-particula.p2 {
+        left: 55%;
+        bottom: 34px;
+
+        animation-delay:
+            1.8s;
+    }
+
+    .central-eldora-particula.p3 {
+        left: 82%;
+        bottom: 15px;
+
+        animation-delay:
+            3.2s;
+    }
+
+
+    @keyframes centralParticula {
+        0% {
+            opacity: 0;
+            transform:
+                translateY(0)
+                scale(0.6);
+        }
+
+        20% {
+            opacity: 0.9;
+        }
+
+        100% {
+            opacity: 0;
+            transform:
+                translateY(-115px)
+                scale(1.2);
+        }
+    }
+
+
+    /* =====================================================
+       ABAS
+       ===================================================== */
+
+    .central-eldora-abas {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+
+        display: flex;
+
+        gap: 6px;
+
+        overflow-x: auto;
+
+        padding: 10px 12px;
+
+        background:
+            rgba(7, 11, 18, 0.97);
+
+        border-bottom:
+            1px solid
+            rgba(148, 163, 184, 0.13);
+
+        box-shadow:
+            0 8px 18px
+            rgba(0, 0, 0, 0.35);
+
+        scrollbar-width: none;
+    }
+
+
+    .central-eldora-abas::-webkit-scrollbar {
+        display: none;
+    }
+
+
+    .central-eldora-aba-btn {
+        min-width: 120px;
+        min-height: 42px;
+
+        flex: 0 0 auto;
+
+        padding: 8px 11px;
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.20);
+
+        border-radius: 10px;
+
+        background:
+            rgba(20, 30, 46, 0.86);
+
+        color:
+            #8997aa;
+
+        font-size: 0.72rem;
+        font-weight: 800;
+
+        cursor: pointer;
+
+        transition:
+            transform 0.15s ease,
+            border-color 0.15s ease,
+            background 0.15s ease,
+            color 0.15s ease;
+    }
+
+
+    .central-eldora-aba-btn:hover {
+        color: #e6edf5;
+
+        border-color:
+            rgba(216, 184, 90, 0.35);
+    }
+
+
+    .central-eldora-aba-btn:active {
+        transform: scale(0.97);
+    }
+
+
+    .central-eldora-aba-btn.active {
+        color: #fff4c7;
+
+        border-color:
+            rgba(216, 184, 90, 0.65);
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(139, 108, 36, 0.82),
+                rgba(79, 58, 19, 0.88)
+            );
+    }
+
+
+    /* =====================================================
+       CONTEÚDO DAS ABAS
+       ===================================================== */
+
+    .central-eldora-conteudo {
+        padding: 15px;
+    }
+
+
+    .central-eldora-tab {
+        display: none;
+
+        animation:
+            centralTabEntrada
+            0.20s ease;
+    }
+
+
+    .central-eldora-tab.active {
+        display: block;
+    }
+
+
+    @keyframes centralTabEntrada {
+        from {
+            opacity: 0;
+            transform:
+                translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform:
+                translateY(0);
+        }
+    }
+
+
+    .central-titulo-secao {
+        margin:
+            0 0 5px;
+
+        color:
+            var(--ce-gold-light);
+
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 0.94rem;
+    }
+
+
+    .central-texto-secao {
+        margin:
+            0 0 14px;
+
+        color:
+            var(--ce-text-3);
+
+        font-size: 0.76rem;
+        line-height: 1.45;
+    }
+
+
+    /* =====================================================
+       CARDS
+       ===================================================== */
+
+    .central-grade {
+        display: grid;
+
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+
+        gap: 10px;
+    }
+
+
+    .central-card {
+        position: relative;
+
+        min-width: 0;
+
+        padding: 14px;
+
+        overflow: hidden;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(26, 38, 57, 0.94),
+                rgba(14, 22, 35, 0.96)
+            );
+
+        border:
+            1px solid
+            var(--ce-border);
+
+        border-radius: 14px;
+
+        box-shadow:
+            0 7px 18px
+            rgba(0, 0, 0, 0.18);
+
+        transition:
+            transform 0.16s ease,
+            border-color 0.16s ease;
+    }
+
+
+    .central-card:hover {
+        transform:
+            translateY(-2px);
+
+        border-color:
+            rgba(216, 184, 90, 0.30);
+    }
+
+
+    .central-card-icone {
+        width: 40px;
+        height: 40px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        margin-bottom: 9px;
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.24);
+
+        border-radius: 11px;
+
+        background:
+            rgba(216, 184, 90, 0.08);
+
+        font-size: 19px;
+    }
+
+
+    .central-card h4 {
+        margin: 0;
+
+        color:
+            #e9eef5;
+
+        font-size: 0.82rem;
+    }
+
+
+    .central-card p {
+        margin:
+            6px 0 0;
+
+        color:
+            #8491a3;
+
+        font-size: 0.70rem;
+        line-height: 1.42;
+    }
+
+
+    /* =====================================================
+       GUERRA
+       ===================================================== */
+
+    .central-guerra-banner {
+        position: relative;
+
+        overflow: hidden;
+
+        margin-bottom: 12px;
+        padding: 16px;
+
+        background:
+            radial-gradient(
+                circle at 100% 0%,
+                rgba(239, 68, 68, 0.14),
+                transparent 160px
+            ),
+            linear-gradient(
+                145deg,
+                rgba(57, 27, 29, 0.90),
+                rgba(22, 20, 28, 0.96)
+            );
+
+        border:
+            1px solid
+            rgba(248, 113, 113, 0.25);
+
+        border-radius: 15px;
+    }
+
+
+    .central-guerra-status {
+        display: inline-flex;
+        align-items: center;
+
+        gap: 6px;
+
+        margin-bottom: 8px;
+        padding: 4px 8px;
+
+        color: #fecaca;
+
+        background:
+            rgba(127, 29, 29, 0.25);
+
+        border:
+            1px solid
+            rgba(248, 113, 113, 0.25);
+
+        border-radius: 8px;
+
+        font-size: 0.60rem;
+        font-weight: 900;
+
+        letter-spacing: 0.7px;
+    }
+
+
+    .central-guerra-etapas {
+        display: grid;
+
+        grid-template-columns:
+            repeat(
+                4,
+                minmax(0, 1fr)
+            );
+
+        gap: 7px;
+
+        margin-top: 13px;
+    }
+
+
+    .central-guerra-etapa {
+        padding: 9px 5px;
+
+        text-align: center;
+
+        color:
+            var(--ce-text-3);
+
+        background:
+            rgba(2, 6, 13, 0.32);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.15);
+
+        border-radius: 9px;
+
+        font-size: 0.62rem;
+    }
+
+
+    .central-guerra-etapa strong {
+        display: block;
+
+        margin-bottom: 3px;
+
+        color: #d6dde7;
+    }
+
+
+    .central-btn {
+        width: 100%;
+        min-height: 43px;
+
+        margin-top: 12px;
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.48);
+
+        border-radius: 10px;
+
+        background:
+            linear-gradient(
+                180deg,
+                #8b6b22,
+                #5f4513
+            );
+
+        color: #fff6d5;
+
+        font-size: 0.76rem;
+        font-weight: 900;
+
+        cursor: pointer;
+    }
+
+
+    .central-btn:disabled {
+        opacity: 0.48;
+        cursor: default;
+    }
+    
+    /* =====================================================
+        ⚔️ GUERRA DE CLÃS — ESTADO DINÂMICO
+        ===================================================== */
+
+    .central-guerra-titulo-principal {
+        margin: 0;
+
+        color: #fff1d0;
+
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 1rem;
+    }
+
+
+    .central-guerra-mensagem {
+        margin:
+            7px 0 0;
+
+        color:
+            #aeb9c8;
+
+        font-size: 0.72rem;
+        line-height: 1.48;
+    }
+
+
+    .central-guerra-status.status-aberta {
+        color: #bbf7d0;
+
+        background:
+            rgba(22, 101, 52, 0.24);
+
+        border-color:
+            rgba(74, 222, 128, 0.28);
+    }
+
+
+    .central-guerra-status.status-inscrito {
+        color: #fde68a;
+
+        background:
+            rgba(161, 98, 7, 0.22);
+
+        border-color:
+            rgba(250, 204, 21, 0.32);
+    }
+
+
+    .central-guerra-status.status-fechada {
+        color: #fecaca;
+
+        background:
+            rgba(127, 29, 29, 0.23);
+
+        border-color:
+            rgba(248, 113, 113, 0.26);
+    }
+
+    /* =====================================================
+       👥 PARTICIPAÇÃO NA GUERRA
+       ===================================================== */
+
+    .central-guerra-participacao {
+        margin-top: 12px;
+        padding: 12px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(17, 27, 43, 0.90),
+                rgba(8, 14, 24, 0.94)
+            );
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.19);
+
+        border-radius: 12px;
+    }
+
+
+    .central-guerra-participacao-topo {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+
+        gap: 10px;
+
+        margin-bottom: 10px;
+    }
+
+
+    .central-guerra-participacao-titulo {
+        margin: 2px 0 0;
+
+        color: #edf2f7;
+  
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 0.80rem;
+    }
+
+
+    .central-guerra-participantes-badge {
+        flex: 0 0 auto;
+
+        padding: 5px 8px;
+ 
+        color: #fde9a9;
+
+        background:
+            rgba(216, 184, 90, 0.10);
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.22);
+
+        border-radius: 8px;
+
+        font-size: 0.60rem;
+        font-weight: 900;
+    }
+
+
+    /* =====================================================
+       INFORMAÇÕES
+       ===================================================== */
+
+    .central-guerra-participacao-grid {
+        display: grid;
+
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(0, 1fr)
+            );
+
+        gap: 6px;
+    }
+
+
+    .central-guerra-participacao-card {
+        min-width: 0;
+
+        padding: 9px 5px;
+ 
+        text-align: center;
+
+        background:
+            rgba(2, 6, 13, 0.34);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.13);
+
+        border-radius: 9px;
+    }
+
+
+    .central-guerra-participacao-card span {
+        display: block;
+
+        margin-bottom: 5px;
+  
+        color:
+            var(--ce-text-3);
+
+        font-size: 0.52rem;
+        font-weight: 800;
+    }
+
+
+    .central-guerra-participacao-card strong {
+        display: block;
+
+        overflow: hidden;
+
+        color: #f1f5f9;
+
+        font-size: 0.66rem;
+        font-weight: 900;
+
+        text-overflow: ellipsis;
+    }
+
+
+    /* =====================================================
+       PROGRESSO DA FORMAÇÃO
+       ===================================================== */
+
+    .central-guerra-progresso-area {
+        margin-top: 10px;
+    }
+
+
+    .central-guerra-progresso-info {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        gap: 8px;
+
+        margin-bottom: 5px;
+
+        color:
+            #8996a8;
+
+        font-size: 0.57rem;
+        font-weight: 800;
+    }
+
+
+    .central-guerra-progresso-barra {
+        width: 100%;
+        height: 7px;
+
+        overflow: hidden;
+
+        background:
+            rgba(2, 6, 13, 0.72);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.14);
+
+        border-radius: 999px;
+    }
+
+
+    .central-guerra-progresso-preenchimento {
+        width: 0%;
+        height: 100%;
+
+        background:
+            linear-gradient(
+                90deg,
+                #7b5d1d,
+                #d8b85a,
+                #f4dc91
+            );
+
+        border-radius: inherit;
+
+        box-shadow:
+            0 0 10px
+            rgba(216, 184, 90, 0.25);
+
+        transition:
+            width 0.35s ease;
+    }
+
+
+    /* =====================================================
+       MINHA PARTICIPAÇÃO
+       ===================================================== */
+
+    .central-guerra-minha-participacao {
+        display: none;
+
+        margin-top: 10px;
+        padding: 9px;
+
+        border-radius: 9px;
+
+        font-size: 0.64rem;
+        font-weight: 800;
+
+        text-align: center;
+  
+        line-height: 1.4;
+    }
+
+
+    .central-guerra-minha-participacao.inscrito {
+        display: block;
+
+        color: #d9f99d;
+
+        background:
+            rgba(54, 83, 20, 0.20);
+
+        border:
+            1px solid
+            rgba(163, 230, 53, 0.23);
+    }
+
+
+    .central-guerra-minha-participacao.nao-inscrito {
+        display: block;
+
+        color: #cbd5e1;
+
+        background:
+            rgba(30, 41, 59, 0.45);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.14);
+    }
+
+
+    /* =====================================================
+        BOTÕES
+       ===================================================== */
+
+    .central-btn-participar {
+        background:
+            linear-gradient(
+                180deg,
+                #8b6b22,
+                #5d4313
+            );
+    }
+
+
+    .central-btn-sair {
+        margin-top: 8px;
+ 
+        color: #fecaca;
+
+        background:
+            linear-gradient(
+                180deg,
+                rgba(127, 29, 29, 0.66),
+                rgba(69, 10, 10, 0.75)
+            );
+
+        border-color:
+            rgba(248, 113, 113, 0.27);
+    }
+
+
+    .central-btn-sair:hover {
+        background:
+            linear-gradient(
+                180deg,
+                rgba(153, 27, 27, 0.75),
+                rgba(90, 12, 12, 0.82)
+            );
+    }
+
+    /* =====================================================
+       👑 ESCALAÇÃO DA GUERRA
+       ===================================================== */
+
+    .central-guerra-escalacao {
+        margin-top: 12px;
+        padding: 12px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(30, 27, 18, 0.94),
+                rgba(10, 15, 24, 0.97)
+            );
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.28);
+
+        border-radius: 12px;
+    }
+
+
+    .central-guerra-escalacao-topo {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+
+        gap: 10px;
+
+        margin-bottom: 8px;
+    }
+
+
+    .central-guerra-escalacao-titulo {
+        margin: 2px 0 0;
+
+        color: #f5e7b3;
+
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 0.80rem;
+    }
+
+
+    .central-guerra-escalacao-contador {
+        flex: 0 0 auto;
+
+        padding: 5px 9px;
+
+        color: #fff2b3;
+
+        background:
+            rgba(216, 184, 90, 0.11);
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.25);
+
+        border-radius: 8px;
+
+        font-size: 0.62rem;
+        font-weight: 900;
+    }
+
+
+    .central-guerra-escalacao-mensagem {
+        margin-bottom: 9px;
+
+        color: #9caabd;
+
+        font-size: 0.65rem;
+        line-height: 1.45;
+    }
+
+
+    .central-guerra-escalacao-lista {
+        display: flex;
+        flex-direction: column;
+
+        gap: 6px;
+    }
+
+
+    .central-guerra-jogador {
+        width: 100%;
+
+        display: grid;
+
+        grid-template-columns:
+            32px
+            minmax(0, 1fr)
+            auto;
+
+        align-items: center;
+
+        gap: 8px;
+
+        padding: 8px;
+
+        color: inherit;
+
+        background:
+            rgba(8, 14, 23, 0.82);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.15);
+
+        border-radius: 9px;
+
+        text-align: left;
+    }
+
+
+    button.central-guerra-jogador {
+        cursor: pointer;
+    }
+
+
+    button.central-guerra-jogador:hover {
+        border-color:
+            rgba(216, 184, 90, 0.35);
+    }
+
+
+    .central-guerra-jogador.selecionado {
+        background:
+            rgba(113, 83, 21, 0.26);
+
+        border-color:
+            rgba(244, 220, 145, 0.55);
+    }
+
+
+    .central-guerra-jogador-check {
+        width: 29px;
+        height: 29px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        color: #8290a3;
+
+        background:
+            rgba(2, 6, 13, 0.60);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.18);
+
+        border-radius: 7px;
+
+        font-size: 0.72rem;
+        font-weight: 900;
+    }
+
+
+    .central-guerra-jogador.selecionado
+    .central-guerra-jogador-check {
+        color: #fff3bd;
+
+        background:
+            rgba(161, 98, 7, 0.34);
+
+        border-color:
+            rgba(250, 204, 21, 0.40);
+    }
+
+
+    .central-guerra-jogador-info {
+        min-width: 0;
+    }
+
+
+    .central-guerra-jogador-nome {
+        overflow: hidden;
+
+        color: #edf2f7;
+
+        font-size: 0.68rem;
+        font-weight: 900;
+
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+
+    .central-guerra-jogador-detalhe {
+        margin-top: 3px;
+
+        color: #7f8da0;
+
+        font-size: 0.56rem;
+    }
+
+
+    .central-guerra-jogador-funcao {
+        padding: 4px 6px;
+
+        border-radius: 7px;
+
+        font-size: 0.52rem;
+        font-weight: 900;
+    }
+
+
+    .central-guerra-jogador-funcao.titular {
+        color: #d9f99d;
+
+        background:
+            rgba(54, 83, 20, 0.26);
+
+        border:
+            1px solid
+            rgba(163, 230, 53, 0.22);
+    }
+
+
+    .central-guerra-jogador-funcao.reserva {
+        color: #bae6fd;
+
+        background:
+            rgba(3, 105, 161, 0.20);
+
+        border:
+            1px solid
+            rgba(56, 189, 248, 0.20);
+    }
+
+
+    .central-guerra-escalacao-subtitulo {
+        margin:
+            10px 0 6px;
+
+        color: #d8b85a;
+
+        font-size: 0.58rem;
+        font-weight: 900;
+
+        letter-spacing: 0.8px;
+
+        text-transform: uppercase;
+    }
+
+
+    .central-guerra-escalacao-feedback {
+        margin-top: 8px;
+        padding: 7px;
+
+        color: #fecaca;
+
+        background:
+            rgba(127, 29, 29, 0.16);
+
+        border:
+            1px solid
+            rgba(248, 113, 113, 0.20);
+
+        border-radius: 8px;
+
+        font-size: 0.60rem;
+
+        text-align: center;
+    }
+
+
+    .central-btn-confirmar-escalacao {
+        margin-top: 9px;
+
+        background:
+            linear-gradient(
+                180deg,
+                #a17b27,
+                #654813
+            );
+    }
+    
+    @media (max-width: 430px) {
+
+        .central-guerra-participacao {
+            padding: 10px 8px;
+        }
+
+
+        .central-guerra-participacao-grid {
+            gap: 4px;
+        }
+
+
+        .central-guerra-participacao-card {
+            padding:
+                8px 3px;
+        }
+
+
+        .central-guerra-participacao-card span {
+            font-size:
+                0.48rem;
+        }
+
+
+        .central-guerra-participacao-card strong {
+            font-size:
+                0.60rem;
+       }
+    }
+
+    /* =====================================================
+       RESUMO DO CLÃ
+       ===================================================== */
+
+    .central-guerra-resumo {
+        display: grid;
+
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(0, 1fr)
+            );
+
+        gap: 7px;
+
+        margin-top: 12px;
+    }
+
+
+    .central-guerra-resumo-card {
+        min-width: 0;
+
+        padding: 9px 7px;
+
+        background:
+            rgba(2, 6, 13, 0.30);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.14);
+
+        border-radius: 9px;
+
+        text-align: center;
+    }
+
+
+    .central-guerra-resumo-card span {
+        display: block;
+
+        margin-bottom: 4px;
+
+        color:
+            var(--ce-text-3);
+
+        font-size: 0.56rem;
+        font-weight: 800;
+    }
+
+
+    .central-guerra-resumo-card strong {
+        display: block;
+
+        overflow: hidden;
+    
+        color: #e7edf5;
+
+        font-size: 0.67rem;
+        font-weight: 900;
+
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+
+    /* =====================================================
+       AVISOS DA GUERRA
+       ===================================================== */
+
+    .central-guerra-aviso {
+        margin-top: 11px;
+        padding: 10px;
+
+        color: #cbd5e1;
+
+        background:
+            rgba(15, 23, 42, 0.52);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.17);
+
+        border-radius: 10px;
+
+        font-size: 0.68rem;
+        line-height: 1.45;
+
+        text-align: center;
+    }
+
+
+    .central-guerra-aviso.sucesso {
+        color: #d9f99d;
+
+        background:
+            rgba(54, 83, 20, 0.20);
+
+        border-color:
+            rgba(163, 230, 53, 0.25);
+    }
+
+
+    .central-guerra-aviso.erro {
+        color: #fecaca;
+
+        background:
+            rgba(127, 29, 29, 0.18);
+
+        border-color:
+            rgba(248, 113, 113, 0.24);
+    }
+
+
+    @media (max-width: 430px) {
+
+        .central-guerra-resumo {
+            grid-template-columns:
+                repeat(
+                    3,
+                    minmax(0, 1fr)
+                );
+
+            gap: 5px;
+        }
+
+
+        .central-guerra-resumo-card {
+            padding:
+                8px 4px;
+        }
+
+
+        .central-guerra-resumo-card strong {
+            font-size:
+                0.61rem;
+        }
+    }
+
+    /*  =====================================================
+        🏆 CENTRAL - RANKINGS
+        ===================================================== */
+
+    .central-ranking-opcao {
+        width: 100%;
+
+        display: block;
+
+        text-align: left;
+
+        color: inherit;
+
+        font: inherit;
+
+        cursor: pointer;
+    }
+
+    .central-ranking-opcao:hover {
+        border-color:
+            rgba(216, 184, 90, 0.48);
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(37, 49, 68, 0.96),
+                rgba(17, 25, 39, 0.98)
+            );
+    }
+
+    .central-card-seta {
+        position: absolute;
+
+        top: 14px;
+        right: 15px;
+
+        color:
+            rgba(244, 220, 145, 0.70);
+
+        font-size: 1.35rem;
+        font-weight: 900;
+
+        transition:
+            transform 0.16s ease,
+            color 0.16s ease;
+    }
+
+    .central-ranking-opcao:hover
+    .central-card-seta {
+        color:
+            #f4dc91;
+
+        transform:
+            translateX(3px);
+    }
+
+    /* =====================================================
+       DETALHE
+       ===================================================== */
+
+    .central-ranking-detalhe {
+        animation:
+            centralTabEntrada
+            0.20s ease;
+    }
+
+
+    .central-ranking-voltar {
+        min-height: 36px;
+
+        margin-bottom: 13px;
+        padding: 7px 10px;
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.20);
+
+        border-radius: 9px;
+
+        background:
+            rgba(20, 30, 46, 0.82);
+
+        color:
+            #b9c4d2;
+
+        font-size: 0.68rem;
+        font-weight: 800;
+
+        cursor: pointer;
+    }
+
+    .central-ranking-voltar:hover {
+        color:
+            #fff2c2;
+
+        border-color:
+            rgba(216, 184, 90, 0.36);
+    }
+
+    .central-ranking-detalhe-topo {
+        display: flex;
+
+        align-items: flex-start;
+        justify-content: space-between;
+
+        gap: 12px;
+
+        margin-bottom: 13px;
+    }
+
+    .central-ranking-atualizar {
+        width: 38px;
+        height: 38px;
+
+        flex: 0 0 38px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 0;
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.28);
+
+        border-radius: 10px;
+
+        background:
+            rgba(216, 184, 90, 0.08);
+
+        color:
+            #f4dc91;
+
+        font-size: 18px;
+        font-weight: 900;
+
+        cursor: pointer;
+
+        transition:
+            transform 0.18s ease,
+            background 0.18s ease;
+    }
+
+    .central-ranking-atualizar:hover {
+        background:
+            rgba(216, 184, 90, 0.15);
+    }
+
+    .central-ranking-atualizar:active {
+        transform:
+            rotate(45deg)
+            scale(0.94);
+    }
+
+    /* =====================================================
+        LISTAGEM
+        ===================================================== */
+
+    .central-ranking-lista {
+        display: flex;
+        flex-direction: column;
+
+        gap: 8px;
+    }
+
+    .central-ranking-carregando,
+    .central-ranking-vazio {
+        padding: 28px 12px;
+
+        color:
+            var(--ce-text-3);
+
+        font-size: 0.72rem;
+        line-height: 1.5;
+
+        text-align: center;
+
+        background:
+            rgba(15, 23, 36, 0.42);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.12);
+
+        border-radius: 12px;
+    }
+
+    .central-ranking-linha {
+        min-width: 0;
+
+        display: grid;
+ 
+        grid-template-columns:
+            42px
+            48px
+            minmax(0, 1fr)
+            auto;
+
+        align-items: center;
+
+        gap: 9px;
+
+        padding: 10px;
+
+        background:
+            linear-gradient(
+                145deg,
+                rgba(25, 37, 56, 0.95),
+                rgba(13, 21, 34, 0.97)
+            );
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.17);
+
+        border-radius: 12px;
+
+        transition:
+            transform 0.15s ease,
+            border-color 0.15s ease;
+    }
+
+    .central-ranking-linha:hover {
+        transform:
+            translateY(-1px);
+        border-color:
+            rgba(216, 184, 90, 0.28);
+    }
+
+    /* TOP 3 */
+
+    .central-ranking-linha.top-1 {
+        border-color:
+            rgba(250, 204, 21, 0.47);
+        background:
+            linear-gradient(
+                145deg,
+                rgba(91, 66, 17, 0.43),
+                rgba(19, 22, 29, 0.97)
+            );
+    }
+
+    .central-ranking-linha.top-2 {
+        border-color:
+            rgba(203, 213, 225, 0.34);
+    }
+
+    .central-ranking-linha.top-3 {
+        border-color:
+            rgba(217, 119, 6, 0.36);
+    }
+
+    .central-ranking-posicao {
+        color:
+            #94a3b8;
+
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 0.76rem;
+        font-weight: 900;
+
+        text-align: center;
+    }
+
+    .central-ranking-linha.top-1
+    .central-ranking-posicao {
+        color: #fde047;
+    }
+
+    .central-ranking-linha.top-2
+    .central-ranking-posicao {
+        color: #e2e8f0; 
+    }
+
+    .central-ranking-linha.top-3
+    .central-ranking-posicao {
+        color: #f59e0b;
+    }
+
+    /* BRASÃO */
+
+    .central-ranking-logo {
+        width: 44px;
+        height: 44px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        overflow: hidden;
+
+        background:
+            rgba(2, 6, 13, 0.48);
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.20);
+        border-radius: 11px;
+        font-size: 20px;
+    }
+
+    .central-ranking-logo img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        padding: 3px;
+    }
+
+    /* IDENTIDADE */
+
+    .central-ranking-identidade {
+        min-width: 0;
+    }
+
+    .central-ranking-nome {
+        overflow: hidden;
+
+        color:
+            #edf2f7;
+
+        font-family:
+            "Cinzel",
+            serif;
+
+        font-size: 0.75rem;
+        font-weight: 900;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .central-ranking-tag {
+        margin-left: 4px;
+
+        color:
+            var(--ce-gold);
+
+        font-family:
+            Arial,
+            sans-serif;
+        font-size: 0.60rem;
+    }
+
+    .central-ranking-info {
+        margin-top: 4px;
+        color:
+            var(--ce-text-3);
+        font-size: 0.61rem;
+        line-height: 1.35;
+    }
+
+    .central-ranking-nivel {
+        min-width: 53px;
+        padding: 6px;
+        color:
+            #fff1bd;
+        background:
+            rgba(216, 184, 90, 0.09);
+
+        border:
+            1px solid
+            rgba(216, 184, 90, 0.18);
+        border-radius: 8px;
+        font-size: 0.62rem;
+        font-weight: 900;
+
+        text-align: center;
+    }
+
+
+    /* =====================================================
+        PLACEHOLDER DE RANKING FUTURO
+        ===================================================== */
+
+    .central-ranking-futuro {
+        padding: 20px 15px;
+
+        text-align: center;
+
+        background:
+            radial-gradient(
+                circle at 50% 0%,
+                rgba(216, 184, 90, 0.08),
+                transparent 120px
+            ),
+            rgba(15, 23, 36, 0.55);
+
+        border:
+            1px solid
+            rgba(148, 163, 184, 0.16);
+
+        border-radius: 13px;
+    }
+
+
+    .central-ranking-futuro-icone {
+        margin-bottom: 8px;
+
+        font-size: 27px;
+    }
+
+
+    .central-ranking-futuro strong {
+        display: block;
+
+        color:
+            #e8edf5;
+
+        font-size: 0.78rem;
+    }
+
+
+    .central-ranking-futuro p {
+        margin:
+            6px 0 0;
+
+        color:
+            var(--ce-text-3);
+
+        font-size: 0.68rem;
+        line-height: 1.45;
+    }
+
+
+    @media (max-width: 430px) {
+
+        .central-ranking-linha {
+            grid-template-columns:
+                31px
+                41px
+                minmax(0, 1fr)
+                auto;
+
+            gap: 7px;
+
+            padding: 8px 7px;
+        }
+
+
+        .central-ranking-logo {
+            width: 39px;
+            height: 39px;
+        }
+
+
+        .central-ranking-nome {
+            font-size: 0.68rem;
+        }
+
+
+        .central-ranking-info {
+            font-size: 0.56rem;
+        }
+
+
+        .central-ranking-nivel {
+            min-width: 47px;
+
+            padding:
+                5px 3px;
+
+            font-size:
+                0.57rem;
+        }
+    }
+
+    /* =====================================================
+       RESPONSIVO
+       ===================================================== */
+
+    @media (max-width: 600px) {
+
+        .central-eldora-painel {
+            width:
+                calc(100vw - 12px);
+
+            height:
+                calc(100dvh - 12px);
+
+            border-radius: 17px;
+        }
+
+
+        .central-eldora-hero {
+            min-height: 205px;
+        }
+
+
+        .central-eldora-hero-conteudo {
+            min-height: 205px;
+
+            padding:
+                18px 15px;
+        }
+
+
+        .central-eldora-hero-titulo {
+            font-size: 1.15rem;
+        }
+
+
+        .central-grade {
+            grid-template-columns:
+                1fr;
+        }
+
+
+        .central-guerra-etapas {
+            grid-template-columns:
+                repeat(
+                    2,
+                    minmax(0, 1fr)
+                );
+        }
+
+
+        .central-eldora-conteudo {
+            padding: 12px;
+        }
+    }
+
+
+    @media (
+        prefers-reduced-motion:
+        reduce
+    ) {
+        #central-eldora-modal * {
+            animation:
+                none !important;
+
+            transition:
+                none !important;
+        }
+    }
+</style>
+
+
+<div
+    id="central-eldora-modal"
+    aria-hidden="true"
+>
+    <div
+        class="central-eldora-painel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="central-eldora-titulo"
+    >
+
+        <!-- CABEÇALHO -->
+        <div class="central-eldora-header">
+
+            <div class="central-eldora-identidade">
+
+                <div class="central-eldora-brasao">
+                    📜
+                </div>
+
+                <div>
+                    <h2
+                        id="central-eldora-titulo"
+                        class="central-eldora-titulo"
+                    >
+                        Central de Eldora
+                    </h2>
+
+                    <div
+                        class="central-eldora-subtitulo"
+                    >
+                        Conhecimento, notícias e glória do reino
+                    </div>
+                </div>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="central-eldora-fechar"
+                onclick="fecharCentralEldora()"
+                title="Fechar"
+                aria-label="Fechar Central de Eldora"
+            >
+                ✕
+            </button>
+
+        </div>
+
+
+        <div
+            id="central-eldora-scroll"
+            class="central-eldora-scroll"
+        >
+
+            <!-- HERO -->
+            <section class="central-eldora-hero">
+
+                <img
+                    id="central-eldora-hero-imagem"
+                    class="central-eldora-hero-imagem"
+                    src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/central_eldora/baner_site.png"
+                    alt="Central de Eldora"
+                >
+
+                <span
+                    class="central-eldora-particula p1"
+                ></span>
+
+                <span
+                    class="central-eldora-particula p2"
+                ></span>
+
+                <span
+                    class="central-eldora-particula p3"
+                ></span>
+
+
+                <div
+                    class="central-eldora-hero-conteudo"
+                >
+                    <span
+                        id="central-eldora-hero-eyebrow"
+                        class="central-eldora-eyebrow"
+                    >
+                        Arquivos reais de Eldora
+                    </span>
+
+                    <h3
+                        id="central-eldora-hero-titulo"
+                        class="central-eldora-hero-titulo"
+                    >
+                        As Crônicas do Reino estão abertas
+                    </h3>
+
+                    <p
+                        id="central-eldora-hero-texto"
+                        class="central-eldora-hero-texto"
+                    >
+                        Consulte novidades, conhecimento,
+                        rankings, eventos e os grandes
+                        conflitos que moldam a história
+                        de Eldora.
+                    </p>
+                </div>
+
+            </section>
+
+
+            <!-- ABAS -->
+            <nav
+                class="central-eldora-abas"
+                aria-label="Seções da Central de Eldora"
+            >
+
+                <button
+                    type="button"
+                    class="central-eldora-aba-btn active"
+                    data-central-tab="atualizacoes"
+                >
+                    📰 Atualizações
+                </button>
+
+                <button
+                    type="button"
+                    class="central-eldora-aba-btn"
+                    data-central-tab="enciclopedia"
+                >
+                    📚 Enciclopédia
+                </button>
+
+                <button
+                    type="button"
+                    class="central-eldora-aba-btn"
+                    data-central-tab="rankings"
+                >
+                    🏆 Rankings
+                </button>
+
+                <button
+                    type="button"
+                    class="central-eldora-aba-btn"
+                    data-central-tab="guerra"
+                >
+                    ⚔️ Guerra
+                </button>
+
+                <button
+                    type="button"
+                    class="central-eldora-aba-btn"
+                    data-central-tab="pvp"
+                >
+                    🥊 PvP
+                </button>
+
+                <button
+                    type="button"
+                    class="central-eldora-aba-btn"
+                    data-central-tab="eventos"
+                >
+                    📅 Eventos
+                </button>
+
+            </nav>
+
+
+            <main class="central-eldora-conteudo">
+
+                <!-- ===================================== -->
+                <!-- 📰 ATUALIZAÇÕES                       -->
+                <!-- ===================================== -->
+
+                <section
+                    id="central-tab-atualizacoes"
+                    class="central-eldora-tab active"
+                >
+                    <h3 class="central-titulo-secao">
+                        📰 Atualizações de Eldora
+                    </h3>
+
+                    <p class="central-texto-secao">
+                        Notícias oficiais, melhorias e novos
+                        sistemas adicionados ao jogo.
+                    </p>
+
+
+                    <div class="central-grade">
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                📜
+                            </div>
+
+                            <h4>
+                                Central de Eldora
+                            </h4>
+
+                            <p>
+                                Um novo ponto de informação
+                                para acompanhar tudo que
+                                acontece no reino.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                ⚔️
+                            </div>
+
+                            <h4>
+                                Guerra de Clãs
+                            </h4>
+
+                            <p>
+                                O sistema de guerras semanais
+                                entre clãs está sendo preparado.
+                            </p>
+                        </article>
+
+                    </div>
+                </section>
+
+
+                <!-- ===================================== -->
+                <!-- 📚 ENCICLOPÉDIA                       -->
+                <!-- ===================================== -->
+
+                <section
+                    id="central-tab-enciclopedia"
+                    class="central-eldora-tab"
+                >
+                    <h3 class="central-titulo-secao">
+                        📚 Enciclopédia de Eldora
+                    </h3>
+
+                    <p class="central-texto-secao">
+                        O grande arquivo de conhecimento
+                        do mundo de Eldora.
+                    </p>
+
+
+                    <div class="central-grade">
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🌍
+                            </div>
+
+                            <h4>Mundo</h4>
+
+                            <p>
+                                Regiões, cidades, mapas
+                                e locais importantes.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🧙
+                            </div>
+
+                            <h4>Classes</h4>
+
+                            <p>
+                                Classes, atributos,
+                                especialidades e habilidades.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                ⚔️
+                            </div>
+
+                            <h4>Combate</h4>
+
+                            <p>
+                                Turnos, atributos, skills
+                                e sistemas de batalha.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🛠️
+                            </div>
+
+                            <h4>Profissões</h4>
+
+                            <p>
+                                Coleta, fabricação,
+                                evolução e ferramentas.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🛡️
+                            </div>
+
+                            <h4>Clãs</h4>
+
+                            <p>
+                                Estrutura, cargos,
+                                evolução e guerras.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🌌
+                            </div>
+
+                            <h4>Eventos</h4>
+
+                            <p>
+                                Invasões, fendas e
+                                acontecimentos especiais.
+                            </p>
+                        </article>
+
+                    </div>
+                </section>
+
+
+                <!-- ===================================== -->
+                <!-- 🏆 RANKINGS                           -->
+                <!-- ===================================== -->
+
+                <section
+                    id="central-tab-rankings"
+                    class="central-eldora-tab"
+                >
+                    <!-- ===================================== -->
+                    <!-- MENU DOS RANKINGS                    -->
+                    <!-- ===================================== -->
+
+                    <div id="central-rankings-menu">
+
+                        <h3 class="central-titulo-secao">
+                            🏆 Rankings de Eldora
+                        </h3>
+
+                        <p class="central-texto-secao">
+                            Consulte as classificações oficiais
+                            dos aventureiros e organizações
+                            do reino.
+                        </p>
+
+
+                        <div class="central-grade">
+
+                            <button
+                                type="button"
+                                class="
+                                    central-card
+                                    central-ranking-opcao
+                                "
+                                data-ranking-central="clans"
+                            >
+                                <div class="central-card-icone">
+                                    🛡️
+                                </div>
+
+                                <h4>
+                                    Ranking de Clãs
+                                </h4>
+
+                                <p>
+                                    Nível, experiência,
+                                    membros e progresso.
+                                </p>
+
+                                <span class="central-card-seta">
+                                    ›
+                                </span>
+                            </button>
+
+
+                            <button
+                                type="button"
+                                class="
+                                    central-card
+                                    central-ranking-opcao
+                                "
+                                data-ranking-central="guerra"
+                            >
+                                <div class="central-card-icone">
+                                    ⚔️
+                                </div>
+                
+                                <h4>
+                                    Ranking de Guerra
+                                </h4>
+                
+                                <p>
+                                    Pontos de Guerra,
+                                    vitórias e temporadas.
+                                </p>
+                
+                                <span class="central-card-seta">
+                                    ›
+                                </span>
+                            </button>
+
+
+                            <button
+                                type="button"
+                                class="
+                                    central-card
+                                    central-ranking-opcao
+                                "
+                                data-ranking-central="pvp"
+                            >
+                                <div class="central-card-icone">
+                                    🥊
+                                </div>
+                
+                                <h4>
+                                    Ranking PvP
+                                </h4>
+                
+                                <p>
+                                    Os maiores combatentes
+                                    de Eldora.
+                                </p>
+                
+                                <span class="central-card-seta">
+                                    ›
+                                </span>
+                            </button>
+                
+                        </div>
+
+                    </div>
+
+
+                    <!-- ===================================== -->
+                    <!-- DETALHE DE UM RANKING                -->
+                    <!-- ===================================== -->
+
+                    <div
+                        id="central-ranking-detalhe"
+                        class="central-ranking-detalhe"
+                        style="display: none;"
+                    >
+
+                        <button
+                            type="button"
+                            id="central-ranking-voltar"
+                            class="central-ranking-voltar"
+                        >
+                            ← Voltar aos Rankings
+                        </button>
+
+
+                        <div class="central-ranking-detalhe-topo">
+
+                            <div>
+                                <span
+                                    id="central-ranking-eyebrow"
+                                    class="central-eldora-eyebrow"
+                                >
+                                    Classificação oficial
+                                </span>
+                
+                                <h3
+                                    id="central-ranking-titulo"
+                                    class="central-titulo-secao"
+                                >
+                                    Ranking
+                                </h3>
+                
+                                <p
+                                    id="central-ranking-descricao"
+                                    class="central-texto-secao"
+                                    style="margin-bottom: 0;"
+                                >
+                                    Classificação de Eldora.
+                                </p>
+                            </div>
+
+
+                            <button
+                                type="button"
+                                id="central-ranking-atualizar"
+                                class="central-ranking-atualizar"
+                                title="Atualizar classificação"
+                            >
+                                ↻
+                            </button>
+
+                        </div>
+
+
+                        <div
+                            id="central-ranking-conteudo"
+                            class="central-ranking-lista"
+                        >
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+                <!-- ===================================== -->
+                <!-- ⚔️ GUERRA DE CLÃS                    -->
+                <!-- ===================================== -->
+
+                <section
+                    id="central-tab-guerra"
+                    class="central-eldora-tab"
+                >
+                    <h3 class="central-titulo-secao">
+                        ⚔️ Guerra de Clãs
+                    </h3>
+
+                    <p class="central-texto-secao">
+                        A competição semanal entre as
+                        grandes bandeiras de Eldora.
+                    </p>
+
+
+                    <div class="central-guerra-banner">
+
+                        <!-- STATUS -->
+                        <div
+                            id="central-guerra-status"
+                            class="central-guerra-status"
+                        >
+                            ⏳ CONSULTANDO O REINO...
+                        </div>
+
+
+                        <h3
+                            class="central-guerra-titulo-principal"
+                        >
+                            Guerra Semanal de Clãs
+                        </h3>
+                
+                
+                        <p
+                            id="central-guerra-mensagem"
+                            class="central-guerra-mensagem"
+                        >
+                            Consultando os registros da
+                            Guerra de Clãs...
+                        </p>
+
+
+                        <!-- ================================= -->
+                        <!-- CALENDÁRIO                        -->
+                        <!-- ================================= -->
+
+                        <div class="central-guerra-etapas">
+
+                            <div class="central-guerra-etapa">
+                                <strong>
+                                    📝 Inscrição
+                                </strong>
+
+                                <span
+                                    id="central-guerra-data-inscricao"
+                                >
+                                    Seg → Qui
+                                </span>
+                            </div>
+
+
+                            <div class="central-guerra-etapa">
+                                <strong>
+                                    🔒 Escalação
+                                </strong>
+                
+                                <span
+                                    id="central-guerra-data-escalacao"
+                                >
+                                    Sexta
+                                </span>
+                            </div>
+
+
+                            <div class="central-guerra-etapa">
+                                <strong>
+                                    ⚖️ Pareamento
+                                </strong>
+                
+                                <span
+                                    id="central-guerra-data-pareamento"
+                                >
+                                    Sexta
+                                </span>
+                            </div>
+                
+                
+                            <div class="central-guerra-etapa">
+                                <strong>
+                                    ⚔️ Guerra
+                                </strong>
+                
+                                <span
+                                    id="central-guerra-data-batalha"
+                                >
+                                    Fim de semana
+                                </span>
+                            </div>
+                
+                        </div>
+
+
+                        <!-- ================================= -->
+                        <!-- DADOS DO CLÃ                      -->
+                        <!-- ================================= -->
+
+                        <div
+                            id="central-guerra-resumo"
+                            class="central-guerra-resumo"
+                            style="display: none;"
+                        >
+
+                            <div class="central-guerra-resumo-card">
+                                <span>
+                                    🛡️ Clã
+                                </span>
+                
+                                <strong
+                                    id="central-guerra-clan-nome"
+                                >
+                                    —
+                                </strong>
+                            </div>
+                
+                
+                            <div class="central-guerra-resumo-card">
+                                <span>
+                                    🏰 Nível
+                                </span>
+                
+                                <strong
+                                    id="central-guerra-clan-nivel"
+                                >
+                                    —
+                                </strong>
+                            </div>
+
+
+                            <div class="central-guerra-resumo-card">
+                                <span>
+                                    ⚔️ Limite
+                                </span>
+                
+                                <strong
+                                    id="central-guerra-categoria"
+                                >
+                                    —
+                                </strong>
+                            </div>
+                
+                        </div>
+
+                        <!-- ================================= -->
+                        <!-- ⚔️ CONFRONTO DA SEMANA            -->
+                        <!-- ================================= -->
+
+                        <div
+                            id="central-guerra-confronto"
+                            class="central-guerra-participacao"
+                            style="display: none;"
+                        >
+
+                            <div class="central-guerra-participacao-topo">
+
+                                <div>
+                                    <span class="central-eldora-eyebrow">
+                                        Confronto oficial
+                                    </span>
+
+                                    <h4 class="central-guerra-participacao-titulo">
+                                        ⚔️ Batalha da Semana
+                                    </h4>
+                                </div>
+
+                                <div
+                                    id="central-guerra-confronto-status"
+                                    class="central-guerra-participantes-badge"
+                                >
+                                    —
+                                </div>
+
+                            </div>
+
+
+                            <div class="central-guerra-participacao-grid">
+
+                                <div class="central-guerra-participacao-card">
+                                    <span>
+                                        🛡️ Seu clã
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-confronto-clan"
+                                    >
+                                        —
+                                    </strong>
+                                </div>
+
+
+                                <div class="central-guerra-participacao-card">
+                                    <span>
+                                        ⚔️ Confronto
+                                    </span>
+
+                                    <strong>
+                                        VS
+                                    </strong>
+                                </div>
+
+
+                                <div class="central-guerra-participacao-card">
+                                    <span>
+                                        🛡️ Adversário
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-confronto-adversario"
+                                    >
+                                        —
+                                    </strong>
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                class="central-guerra-participacao-grid"
+                                style="margin-top: 6px;"
+                            >
+
+                                <div class="central-guerra-participacao-card">
+                                    <span>
+                                        ⚔️ Categoria
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-confronto-categoria"
+                                    >
+                                        —
+                                    </strong>
+                                </div>
+
+
+                                <div class="central-guerra-participacao-card">
+                                    <span>
+                                        🏰 Frentes
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-confronto-frentes"
+                                    >
+                                        —
+                                    </strong>
+                                </div>
+
+
+                                <div class="central-guerra-participacao-card">
+                                    <span>
+                                        📅 Estado
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-confronto-fase"
+                                    >
+                                        —
+                                    </strong>
+                                </div>
+
+                            </div>
+
+
+                            <!-- ================================= -->
+                            <!-- 👤 MINHA POSIÇÃO NO CONFRONTO     -->
+                            <!-- ================================= -->
+
+                            <div
+                                id="central-guerra-minha-situacao"
+                                class="central-guerra-minha-participacao"
+                            >
+                            </div>
+
+
+                            <!-- ================================= -->
+                            <!-- ⚔️ ENTRADA NA FRENTE              -->
+                            <!-- ================================= -->
+
+                            <button
+                                type="button"
+                                id="central-guerra-btn-entrar"
+                                class="central-btn"
+                                style="display: none;"
+                            >
+                                ⚔️ Entrar na Guerra
+                            </button>
+
+                            <!-- ================================= -->
+                            <!-- 🏰 LOBBY DA FRENTE                 -->
+                            <!-- ================================= -->
+
+                            <div
+                                id="central-guerra-lobby"
+                                style="
+                                    display:none;
+                                    margin-top:12px;
+                                    padding:10px;
+                                    background:rgba(2,6,13,0.34);
+                                    border:1px solid rgba(216,184,90,0.20);
+                                    border-radius:10px;
+                                "
+                            >
+
+                                <div
+                                    style="
+                                        display:flex;
+                                        justify-content:space-between;
+                                        align-items:center;
+                                        gap:8px;
+                                        margin-bottom:9px;
+                                    "
+                                >
+
+                                    <strong
+                                        id="central-guerra-lobby-titulo"
+                                        style="
+                                            color:#f4dc91;
+                                            font-size:0.70rem;
+                                        "
+                                    >
+                                        🏰 Lobby da Frente
+                                    </strong>
+
+
+                                    <span
+                                        id="central-guerra-lobby-contador"
+                                        class="central-guerra-participantes-badge"
+                                    >
+                                        0/10
+                                    </span>
+
+                                </div>
+
+
+                                <div
+                                    id="central-guerra-lobby-clan-a"
+                                    class="central-guerra-escalacao-lista"
+                                >
+                                </div>
+
+
+                                <div
+                                    style="
+                                        margin:10px 0 6px;
+                                        color:#d8b85a;
+                                        font-size:0.58rem;
+                                        font-weight:900;
+                                        text-align:center;
+                                    "
+                                >
+                                    ⚔️ VS
+                                </div>
+
+
+                                <div
+                                    id="central-guerra-lobby-clan-b"
+                                    class="central-guerra-escalacao-lista"
+                                >
+                                </div>
+
+
+                                <!-- ============================= -->
+                                <!-- ✅ ESTADO PRONTO              -->
+                                <!-- ============================= -->
+
+                                <div
+                                    id="central-guerra-lobby-prontos"
+                                    style="
+                                        margin-top:10px;
+                                        padding:8px;
+                                        color:#cbd5e1;
+                                        background:rgba(15,23,42,0.55);
+                                        border:1px solid rgba(148,163,184,0.18);
+                                        border-radius:8px;
+                                        font-size:0.62rem;
+                                        font-weight:900;
+                                        text-align:center;
+                                    "
+                                >
+                                    ✅ Prontos: 0/10
+                                </div>
+
+                                <!-- ============================= -->
+                                <!-- ⚡ ORDEM DE INICIATIVA        -->
+                                <!-- ============================= -->
+
+                                <div
+                                    id="central-guerra-ordem-turnos"
+                                    style="
+                                        display:none;
+                                        margin-top:10px;
+                                        padding:9px;
+                                        background:rgba(8,14,23,0.82);
+                                        border:1px solid rgba(216,184,90,0.20);
+                                        border-radius:9px;
+                                    "
+                                >
+                                </div>
+                                
+                                <button
+                                    type="button"
+                                    id="central-guerra-btn-pronto"
+                                    class="central-btn"
+                                    style="display:none;"
+                                >
+                                    ✅ Estou PRONTO
+                                </button>
+
+
+                                <div
+                                    id="central-guerra-lobby-feedback"
+                                    style="
+                                        display:none;
+                                        margin-top:8px;
+                                        padding:7px;
+                                        color:#fecaca;
+                                        background:rgba(127,29,29,0.18);
+                                        border:1px solid rgba(248,113,113,0.22);
+                                        border-radius:8px;
+                                        font-size:0.60rem;
+                                        text-align:center;
+                                    "
+                                >
+                                </div>
+
+                            </div>                            
+                        </div>
+                                                
+                        <!-- ================================= -->
+                        <!-- 👥 PARTICIPAÇÃO DOS GUERREIROS    -->
+                        <!-- ================================= -->
+
+                        <div
+                            id="central-guerra-participacao"
+                            class="central-guerra-participacao"
+                            style="display: none;"
+                        >
+
+                            <div class="central-guerra-participacao-topo">
+
+                                <div>
+                                    <span class="central-eldora-eyebrow">
+                                        Guerreiros da semana
+                                    </span>
+
+                                    <h4 class="central-guerra-participacao-titulo">
+                                        ⚔️ Formação do Clã
+                                    </h4>
+                                </div>
+
+
+                                <div
+                                    id="central-guerra-participantes-badge"
+                                    class="central-guerra-participantes-badge"
+                                >
+                                    0 inscritos
+                                </div>
+                        
+                            </div>
+
+
+                            <div class="central-guerra-participacao-grid">
+
+                                <div class="central-guerra-participacao-card">
+
+                                    <span>
+                                        👥 Guerreiros
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-participantes-total"
+                                    >
+                                        0
+                                    </strong>
+
+                                </div>
+
+
+                                <div class="central-guerra-participacao-card">
+
+                                    <span>
+                                        ⚔️ Categoria atual
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-categoria-efetiva"
+                                    >
+                                        —
+                                    </strong>
+
+                                </div>
+
+
+                                <div class="central-guerra-participacao-card">
+
+                                    <span>
+                                        🎯 Próxima formação
+                                    </span>
+
+                                    <strong
+                                        id="central-guerra-proxima-meta"
+                                    >
+                                        —
+                                    </strong>
+
+                                </div>
+
+                            </div>
+
+
+                            <!-- BARRA DE PROGRESSO -->
+
+                            <div class="central-guerra-progresso-area">
+
+                                <div class="central-guerra-progresso-info">
+
+                                    <span
+                                        id="central-guerra-progresso-texto"
+                                    >
+                                        Aguardando guerreiros...
+                                    </span>
+                        
+                                    <span
+                                        id="central-guerra-progresso-numero"
+                                    >
+                                        0/5
+                                    </span>
+                        
+                                </div>
+                        
+                        
+                                <div class="central-guerra-progresso-barra">
+                        
+                                    <div
+                                        id="central-guerra-progresso-preenchimento"
+                                        class="central-guerra-progresso-preenchimento"
+                                    >
+                                    </div>
+                        
+                                </div>
+                        
+                            </div>
+                        
+                        
+                            <!-- ESTADO DO PRÓPRIO JOGADOR -->
+                        
+                            <div
+                                id="central-guerra-minha-participacao"
+                                class="central-guerra-minha-participacao"
+                            >
+                            </div>
+                        
+                        
+                            <!-- QUERO PARTICIPAR -->
+                        
+                            <button
+                                type="button"
+                                id="central-guerra-btn-participar"
+                                class="central-btn central-btn-participar"
+                                style="display: none;"
+                            >
+                                ⚔️ Quero Participar da Guerra
+                            </button>
+
+
+                            <!-- SAIR -->
+
+                            <button
+                                type="button"
+                                id="central-guerra-btn-sair"
+                                class="central-btn central-btn-sair"
+                                style="display: none;"
+                            >
+                                ✕ Sair da Inscrição
+                            </button>
+
+                        </div>
+
+                        <!-- ================================= -->
+                        <!-- 👑 ESCALAÇÃO DO CLÃ               -->
+                        <!-- ================================= -->
+
+                        <div
+                            id="central-guerra-escalacao"
+                            class="central-guerra-escalacao"
+                            style="display: none;"
+                        >
+
+                            <div class="central-guerra-escalacao-topo">
+
+                                <div>
+                                    <span class="central-eldora-eyebrow">
+                                        Conselho de Guerra
+                                    </span>
+
+                                    <h4 class="central-guerra-escalacao-titulo">
+                                        👑 Escalação Oficial
+                                    </h4>
+                                </div>
+
+
+                                <div
+                                    id="central-guerra-escalacao-contador"
+                                    class="central-guerra-escalacao-contador"
+                                >
+                                    0/5
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="central-guerra-escalacao-mensagem"
+                                class="central-guerra-escalacao-mensagem"
+                            >
+                            </div>
+
+
+                            <div
+                                id="central-guerra-escalacao-lista"
+                                class="central-guerra-escalacao-lista"
+                            >
+                            </div>
+
+
+                            <div
+                                id="central-guerra-escalacao-feedback"
+                                class="central-guerra-escalacao-feedback"
+                                style="display: none;"
+                            >
+                            </div>
+
+
+                            <button
+                                type="button"
+                                id="central-guerra-btn-confirmar-escalacao"
+                                class="
+                                    central-btn
+                                    central-btn-confirmar-escalacao
+                                "
+                                style="display: none;"
+                            >
+                                🔒 Confirmar Escalação
+                            </button>
+
+                        </div>
+
+                        <!-- ================================= -->
+                        <!-- AVISO                             -->
+                        <!-- ================================= -->
+                
+                        <div
+                            id="central-guerra-aviso"
+                            class="central-guerra-aviso"
+                            style="display: none;"
+                        >
+                        </div>
+                
+                
+                        <!-- ================================= -->
+                        <!-- BOTÃO PRINCIPAL                   -->
+                        <!-- ================================= -->
+                
+                        <button
+                            type="button"
+                            id="central-guerra-btn-inscrever"
+                            class="central-btn"
+                            style="display: none;"
+                        >
+                            ⚔️ Inscrever Clã na Guerra
+                        </button>
+                
+                    </div>
+
+                </section>
+
+
+                <!-- ===================================== -->
+                <!-- 🥊 PVP                                -->
+                <!-- ===================================== -->
+
+                <section
+                    id="central-tab-pvp"
+                    class="central-eldora-tab"
+                >
+                    <h3 class="central-titulo-secao">
+                        🥊 PvP de Eldora
+                    </h3>
+
+                    <p class="central-texto-secao">
+                        Informações, classificações e
+                        temporadas competitivas.
+                    </p>
+
+
+                    <div class="central-grade">
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                📖
+                            </div>
+
+                            <h4>Regras</h4>
+
+                            <p>
+                                Funcionamento oficial
+                                dos confrontos PvP.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🏆
+                            </div>
+
+                            <h4>Temporadas</h4>
+
+                            <p>
+                                Ranking e histórico
+                                competitivo.
+                            </p>
+                        </article>
+
+                    </div>
+                </section>
+
+
+                <!-- ===================================== -->
+                <!-- 📅 EVENTOS                            -->
+                <!-- ===================================== -->
+
+                <section
+                    id="central-tab-eventos"
+                    class="central-eldora-tab"
+                >
+                    <h3 class="central-titulo-secao">
+                        📅 Eventos do Reino
+                    </h3>
+
+                    <p class="central-texto-secao">
+                        Grandes acontecimentos e ameaças
+                        que surgem pelo mundo.
+                    </p>
+
+
+                    <div class="central-grade">
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🔥
+                            </div>
+
+                            <h4>Invasão do Reino</h4>
+
+                            <p>
+                                Defenda Eldora das forças
+                                invasoras.
+                            </p>
+                        </article>
+
+
+                        <article class="central-card">
+                            <div class="central-card-icone">
+                                🌌
+                            </div>
+
+                            <h4>Fenda Dimensional</h4>
+
+                            <p>
+                                Enfrente ameaças vindas
+                                além das fronteiras do mundo.
+                            </p>
+                        </article>
+
+                    </div>
+                </section>
+
+            </main>
+
+        </div>
+
+    </div>
+</div>

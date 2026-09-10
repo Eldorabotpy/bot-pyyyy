@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Visualizador</title>
+
+<style>
+    body {
+        background: #222;
+        color: white;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 30px;
+    }
+
+    canvas {
+        background: #d8c7a5;
+        border: 2px solid #555;
+        image-rendering: pixelated;
+
+        /* Tamanho de exibição */
+        width: 256px;
+        height: 256px;
+    }
+
+    .controles {
+        margin-top: 20px;
+    }
+
+    button {
+        padding: 10px 18px;
+        margin: 5px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+    input {
+        margin-bottom: 20px;
+    }
+</style>
+</head>
+
+<body>
+
+<h2>Visualizador </h2>
+
+<p>Selecione sua sprite sheet:</p>
+
+<input type="file" id="arquivo" accept="image/png,image/jpeg">
+
+<br>
+
+<canvas id="canvas" width="128" height="128"></canvas>
+
+<div class="controles">
+    <button onclick="mudarDirecao(0)">↓ Frente / Baixo</button>
+    <button onclick="mudarDirecao(1)">← Esquerda</button>
+    <button onclick="mudarDirecao(2)">→ Direita</button>
+    <button onclick="mudarDirecao(3)">↑ Costas / Cima</button>
+</div>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const arquivo = document.getElementById("arquivo");
+
+const imagem = new Image();
+
+let frameLargura = 128;
+let frameAltura = 128;
+
+let linhaAtual = 0;
+
+// Caminhada:
+// Frame 1 → Parado → Frame 3 → Parado
+const sequencia = [0, 1, 2, 1];
+
+let indiceAnimacao = 0;
+
+
+// ========================================
+// CARREGAR SPRITE SHEET
+// ========================================
+
+arquivo.addEventListener("change", function(event) {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+
+    imagem.onload = function() {
+
+        // Detecta automaticamente os frames
+        // Sprite Sheet = 3 colunas x 4 linhas
+
+        frameLargura = imagem.width / 3;
+        frameAltura = imagem.height / 4;
+
+        canvas.width = frameLargura;
+        canvas.height = frameAltura;
+
+        desenharFrame();
+
+        console.log(
+            "Sprite Sheet:",
+            imagem.width + "x" + imagem.height
+        );
+
+        console.log(
+            "Cada frame:",
+            frameLargura + "x" + frameAltura
+        );
+    };
+
+    imagem.src = url;
+
+});
+
+
+// ========================================
+// MUDAR DIREÇÃO
+// ========================================
+
+function mudarDirecao(linha) {
+
+    linhaAtual = linha;
+    indiceAnimacao = 0;
+
+}
+
+
+// ========================================
+// DESENHAR FRAME
+// ========================================
+
+function desenharFrame() {
+
+    if (!imagem.complete || !imagem.src)
+        return;
+
+    const coluna = sequencia[indiceAnimacao];
+
+    const origemX = coluna * frameLargura;
+    const origemY = linhaAtual * frameAltura;
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    ctx.drawImage(
+        imagem,
+
+        origemX,
+        origemY,
+        frameLargura,
+        frameAltura,
+
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+}
+
+
+// ========================================
+// LOOP DA ANIMAÇÃO
+// ========================================
+
+setInterval(function() {
+
+    if (!imagem.src)
+        return;
+
+    indiceAnimacao++;
+
+    if (indiceAnimacao >= sequencia.length) {
+        indiceAnimacao = 0;
+    }
+
+    desenharFrame();
+
+}, 180);
+
+</script>
+
+</body>
+</html>

@@ -25,7 +25,7 @@ PROFESSIONS_DATA = {
         'category': 'gathering',
         'resources': {
             'pedra': 'pedra', # O recurso 'pedra' dá o item 'pedra'
-            'ferro': 'ferro'  # O recurso 'ferro' dá o item 'ferro'
+            'ferro': 'minerio_de_ferro'  # O recurso 'minerio_de_ferro' dá o item 'minerio_de_ferro'
         }
     },
     'colhedor': {

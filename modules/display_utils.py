@@ -81,10 +81,33 @@ def _upgrade_level(item: Dict[str, Any]) -> int:
     except Exception:
         return 1
 
+def _base_attr_key(key: str) -> str:
+    """
+    Remove sufixo de atributo repetido.
+
+    Ex:
+    forca    -> forca
+    forca_2  -> forca
+    sorte_3  -> sorte
+    crit_chance_flat -> crit_chance_flat
+    """
+    k = str(key or "").strip()
+
+    if "_" in k:
+        base, suffix = k.rsplit("_", 1)
+        if suffix.isdigit():
+            return base
+
+    return k
+
+
 def _attr_icon_for(key: str) -> str:
     """Mapeia chaves internas para os ícones configurados."""
     if not key:
         return "✨"
+
+    raw = _base_attr_key(str(key))
+
     alias = {
         "hp": "vida",
         "defense": "defesa",
@@ -92,7 +115,8 @@ def _attr_icon_for(key: str) -> str:
         "luck": "sorte",
         "dmg": "forca",  # fallback visual
     }
-    k = alias.get(key, key)
+
+    k = alias.get(raw, raw)
     return ATTRIBUTE_ICONS.get(k, "✨")
 
 def _detect_item_class_key(item: Dict[str, Any]) -> str | None:
@@ -105,59 +129,118 @@ def _detect_item_class_key(item: Dict[str, Any]) -> str | None:
             return ckey
     return None
 
-def _find_primary(item: Dict[str, Any]) -> tuple[str | None, int]:
-    ench = item.get("enchantments") or {}
-    if isinstance(ench, dict):
-        # 1) 'primary' / 'primary_mirror'
-        for k, v in ench.items():
-            if not isinstance(v, dict): continue
-            src = str(v.get("source", ""))
-            if not src.startswith("primary"): continue
-            
-            try: val = int(v.get("value", 0))
-            except Exception: val = 0
+def _real_enchantment_stat(entry_key: str, entry_data: dict) -> str:
+    """
+    Descobre qual é o atributo real.
 
-            if k == "dmg":
-                ckey = _detect_item_class_key(item)
-                if ckey:
-                    stat_key = get_primary_damage_profile(ckey).get("stat_key") or "dmg"
-                else:
-                    stat_key = "dmg"
-                return stat_key, val
+    Ex:
+    key forca       -> stat forca
+    key forca_2     -> stat forca
+    key sorte_3     -> stat sorte
+    key dmg         -> stat dmg
 
-            return k, val
+    Se existir entry_data["stat"], usa ele.
+    """
+    if isinstance(entry_data, dict) and entry_data.get("stat"):
+        return _base_attr_key(str(entry_data.get("stat")))
 
-        # 2) tenta pelo stat primário da classe
-        ckey = _detect_item_class_key(item)
-        if ckey:
-            stat_key = get_primary_damage_profile(ckey).get("stat_key")
-            if stat_key and stat_key in ench and isinstance(ench.get(stat_key), dict):
-                try: return stat_key, int(ench[stat_key].get("value", 0))
-                except Exception: return stat_key, 0
+    return _base_attr_key(str(entry_key or ""))
 
-        # 3) fallback: maior valor não-'dmg'
-        best = None
-        for k, v in ench.items():
-            if k == "dmg" or not isinstance(v, dict): continue
-            try: val = int(v.get("value", 0))
-            except Exception: val = 0
-            if best is None or val > best[1]:
-                best = (k, val)
-        if best: return best
 
-    return (None, 0)
+def _is_hidden_primary_mirror(entry_key: str, entry_data: dict) -> bool:
+    """
+    O crafting_engine cria dmg como primary_mirror em segundo plano.
+    Esse dmg é para cálculo, não para aparecer duplicado na tela.
+    """
+    if not isinstance(entry_data, dict):
+        return False
 
-def _collect_affixes(item: Dict[str, Any], exclude_key: str | None) -> list[tuple[str, int]]:
-    out: list[tuple[str, int]] = []
+    source = str(entry_data.get("source", ""))
+    stat = _real_enchantment_stat(entry_key, entry_data)
+
+    return stat == "dmg" and source == "primary_mirror"
+
+
+def _collect_visible_stats(item: Dict[str, Any]) -> list[tuple[str, int, str, str]]:
+    """
+    Coleta atributos visíveis preservando repetidos.
+
+    Retorna:
+    [
+        ("forca", 1, "primary", "forca"),
+        ("forca", 1, "affix", "forca_2"),
+        ("sorte", 1, "affix", "sorte"),
+    ]
+
+    Assim a tela mostra:
+    💪 +1, 💪 +1, 🍀 +1
+    """
+    out: list[tuple[str, int, str, str]] = []
+
     ench = item.get("enchantments") or {}
     if not isinstance(ench, dict):
         return out
-    for k, v in ench.items():
-        if k in ("dmg", exclude_key): continue
-        if isinstance(v, dict) and str(v.get("source")) == "affix":
-            try: out.append((k, int(v.get("value", 0))))
-            except Exception: out.append((k, 0))
-    out.sort(key=lambda t: (t[0], -t[1]))
+
+    for idx, (entry_key, entry_data) in enumerate(ench.items()):
+        if not isinstance(entry_data, dict):
+            continue
+
+        if _is_hidden_primary_mirror(entry_key, entry_data):
+            continue
+
+        stat = _real_enchantment_stat(entry_key, entry_data)
+        source = str(entry_data.get("source", ""))
+
+        try:
+            value = int(entry_data.get("value", 0))
+        except Exception:
+            value = 0
+
+        out.append((stat, value, source, str(entry_key)))
+
+    # Primário primeiro, depois os demais, mantendo a ordem original.
+    out.sort(key=lambda t: (0 if str(t[2]).startswith("primary") else 1))
+
+    return out
+
+def _find_primary(item: Dict[str, Any]) -> tuple[str | None, int]:
+    """
+    Mantido por compatibilidade.
+    Procura o primeiro atributo primário visível.
+    """
+    stats = _collect_visible_stats(item)
+
+    for stat, value, source, _entry_key in stats:
+        if str(source).startswith("primary"):
+            return stat, value
+
+    if stats:
+        stat, value, _source, _entry_key = stats[0]
+        return stat, value
+
+    return (None, 0)
+
+
+def _collect_affixes(item: Dict[str, Any], exclude_key: str | None = None) -> list[tuple[str, int]]:
+    """
+    Mantido por compatibilidade.
+
+    Agora atributos repetidos aparecem separados.
+    Ex:
+    forca +1
+    forca_2 +1
+
+    retorna:
+    [("forca", 1), ("forca", 1)]
+    """
+    out: list[tuple[str, int]] = []
+
+    for stat, value, source, _entry_key in _collect_visible_stats(item):
+        if str(source).startswith("primary"):
+            continue
+
+        out.append((stat, value))
+
     return out
 
 def _socket_dots(item: Dict[str, Any]) -> str:
@@ -182,8 +265,10 @@ def _socket_dots(item: Dict[str, Any]) -> str:
 
 def formatar_item_para_exibicao(item: Dict[str, Any]) -> str:
     """
-    Ex.: 『[20/20] 🥷⚔️ Katana Laminada [1][Bom]: 🥷 +1, 🍀 +1 』 (⚪)
-    Inclui as bolinhas de runas no final.
+    Ex.:
+    『[20/20] ⚔️ Espada de Ferro do Guerreiro [1][Bom]: 💪 +1, 💪 +1 』 (⚪)
+
+    Mantém atributos repetidos separados.
     """
     dur = _durability_str(item)
     class_emo = _class_emoji_from_req(item)
@@ -192,20 +277,21 @@ def formatar_item_para_exibicao(item: Dict[str, Any]) -> str:
     upg = _upgrade_level(item)
     rarity = _rarity_title(item.get("rarity", "comum"))
 
-    pkey, pval = _find_primary(item)
-    prim_icon = _attr_icon_for(pkey)
+    visible_stats = _collect_visible_stats(item)
 
-    affixes = _collect_affixes(item, exclude_key=pkey)
-    parts = [f"{prim_icon} +{int(pval or 0)}"]
-    for ak, av in affixes:
-        parts.append(f"{_attr_icon_for(ak)} +{int(av or 0)}")
-    stats_text = ", ".join(parts)
+    parts = []
+    for stat, value, _source, _entry_key in visible_stats:
+        parts.append(f"{_attr_icon_for(stat)} +{int(value or 0)}")
+
+    if parts:
+        stats_text = ", ".join(parts)
+    else:
+        stats_text = "✨ +0"
 
     emoji_block = item_emo
     if class_emo and class_emo != item_emo:
         emoji_block = f"{class_emo}{item_emo}"
 
-    # Pega as bolinhas de socket
     socket_indicator = _socket_dots(item)
 
     return f"『{dur} {emoji_block} {name} [{upg}][{rarity}]: {stats_text} 』{socket_indicator}"

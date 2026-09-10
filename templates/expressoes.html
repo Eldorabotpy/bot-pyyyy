@@ -1,0 +1,39 @@
+<!-- /templates/expressoes.html -->
+
+<!-- 💬 BOTAO DE EXPRESSÕES DO MAPA -->
+<button id="btn-expressoes" class="btn-social-mapa" style="top: 220px;" onclick="window.toggleMenuExpressoes()" title="Expressões do Mapa">
+    <img src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/ui/emoji.png" alt="Expressões">
+</button>
+
+<!-- 🎭 MENU DE EXPRESSÕES (Com escudo anti-clique fantasma) -->
+<div id="menu-expressoes" class="menu-flutuante" 
+     style="display: none; position: fixed; top: 185px; right: 65px; width: 240px; box-sizing: border-box; z-index: 10050; pointer-events: auto;"
+     onmousedown="event.stopPropagation();" ontouchstart="event.stopPropagation();" onpointerdown="event.stopPropagation();" onclick="event.stopPropagation();">
+    
+    <!-- Cabeçalho -->
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ca8a04; padding-bottom: 8px; margin-bottom: 10px;">
+        <strong style="color: #facc15; font-family: 'Cinzel', serif; font-size: 1em; letter-spacing: 1px;">Expressões</strong>
+        <span onclick="window.toggleMenuExpressoes()" style="color: #ef4444; cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 0 5px; transition: 0.2s;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#ef4444'">X</span>
+    </div>
+
+    <!-- 1. Balão de Texto Rápido (Arrumado para não vazar) -->
+    <div style="display: flex; gap: 6px; margin-bottom: 12px; width: 100%; box-sizing: border-box;">
+        <input type="text" id="input-balao-mapa" placeholder="Falar no mapa..." maxlength="80"
+                style="flex: 1; min-width: 0; background: #000; border: 1px solid #3f3f46; color: #e4e4e7; border-radius: 4px; padding: 8px; font-size: 0.85em; box-sizing: border-box; pointer-events: auto; position: relative; z-index: 10001;"
+                onpointerdown="event.stopPropagation(); setTimeout(() => this.focus(), 30);"
+                onmousedown="event.stopPropagation(); setTimeout(() => this.focus(), 30);"
+                ontouchstart="event.stopPropagation(); setTimeout(() => this.focus(), 30);"
+                onclick="event.stopPropagation(); this.focus();"
+                onkeydown="if(event.key === 'Enter') { event.preventDefault(); window.enviarBalaoMapa(); }">
+        
+        <button onclick="window.enviarBalaoMapa()" 
+                style="background: linear-gradient(180deg, #ca8a04, #854d0e); border: 1px solid #713f12; color: white; font-weight: bold; font-size: 0.8em; border-radius: 4px; padding: 0 12px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.6); flex-shrink: 0;">Gritar</button>
+    </div>
+
+    <div style="font-size: 0.7em; color: #64748b; text-transform: uppercase; font-weight: bold; margin-bottom: 6px;">Seus Emojis Animados:</div>
+
+    <!-- 2. Grid de Emojis Dinâmico -->
+    <div id="grid-emojis-dinamico" class="grid-emojis-mapa">
+        <!-- O JavaScript vai injetar os botões aqui! -->
+    </div>
+</div>

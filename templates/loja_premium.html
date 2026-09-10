@@ -1,0 +1,362 @@
+<!-- =========================================================
+     💎 MUNDO DE ELDORA - LOJA PREMIUM
+     ========================================================= -->
+
+<div
+    id="loja-premium-modal"
+    class="loja-premium-overlay"
+    style="display: none;"
+>
+    <div class="loja-premium-container">
+
+        <!-- =================================================
+             CABEÇALHO
+             ================================================= -->
+
+        <div class="loja-premium-header">
+
+            <div>
+                <div class="loja-premium-titulo">
+                    💎 LOJA DE ELDORA
+                </div>
+
+                <div class="loja-premium-subtitulo">
+                    Gemas e serviços especiais
+                </div>
+            </div>
+
+
+            <button
+                type="button"
+                id="loja-premium-fechar"
+                class="loja-premium-fechar"
+                aria-label="Fechar loja"
+            >
+                ✕
+            </button>
+
+        </div>
+
+
+        <!-- =================================================
+             SALDO
+             ================================================= -->
+
+        <div class="loja-premium-saldo-card">
+
+            <div>
+                <div class="loja-premium-saldo-label">
+                    SEU SALDO
+                </div>
+
+                <div
+                    id="loja-premium-jogador"
+                    class="loja-premium-jogador"
+                >
+                    Aventureiro
+                </div>
+            </div>
+
+
+            <div class="loja-premium-saldo">
+
+                <span>💎</span>
+
+                <strong
+                    id="loja-premium-saldo"
+                >
+                    0
+                </strong>
+
+                <small>
+                    Gemas
+                </small>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             ABAS
+             ================================================= -->
+
+        <div class="loja-premium-abas">
+
+            <button
+                type="button"
+                class="loja-premium-aba active"
+                data-loja-premium-aba="pacotes"
+            >
+                💎 Gemas
+            </button>
+
+
+            <button
+                type="button"
+                class="loja-premium-aba"
+                data-loja-premium-aba="pedidos"
+            >
+                📜 Meus pedidos
+            </button>
+
+        </div>
+
+
+        <!-- =================================================
+             ÁREA COM ROLAGEM
+             ================================================= -->
+
+        <div class="loja-premium-scroll">
+
+
+            <!-- =============================================
+                 PACOTES
+                 ============================================= -->
+
+            <section
+                id="loja-premium-aba-pacotes"
+                class="loja-premium-conteudo active"
+            >
+
+                <div class="loja-premium-secao-topo">
+
+                    <h3>
+                        Escolha seu pacote
+                    </h3>
+
+                    <p>
+                        Use suas Gemas em recursos e
+                        serviços especiais de Eldora.
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="loja-premium-carregando"
+                    class="loja-premium-vazio"
+                >
+                    ✨ Consultando o Tesouro Real...
+                </div>
+
+
+                <div
+                    id="loja-premium-pacotes"
+                    class="loja-premium-grade"
+                ></div>
+
+            </section>
+
+
+            <!-- =============================================
+                 PEDIDOS
+                 ============================================= -->
+
+            <section
+                id="loja-premium-aba-pedidos"
+                class="loja-premium-conteudo"
+            >
+
+                <div class="loja-premium-secao-topo">
+
+                    <h3>
+                        Meus pedidos
+                    </h3>
+
+                    <p>
+                        Consulte suas compras recentes
+                        na Loja de Eldora.
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="loja-premium-pedidos"
+                    class="loja-premium-pedidos"
+                >
+                    <div class="loja-premium-vazio">
+                        Nenhum pedido carregado.
+                    </div>
+                </div>
+
+            </section>
+            <!-- =============================================
+                 CHECKOUT PIX
+                 ============================================= -->
+
+            <section
+                id="loja-premium-aba-checkout"
+                class="loja-premium-conteudo"
+            >
+
+                <div class="loja-premium-checkout-topo">
+
+                    <button
+                        type="button"
+                        id="loja-premium-voltar-checkout"
+                        class="loja-premium-voltar"
+                    >
+                        ← Voltar
+                    </button>
+
+                    <div class="loja-premium-checkout-titulo">
+                        💠 PAGAMENTO PIX
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="loja-premium-checkout-carregando"
+                    class="loja-premium-vazio"
+                    style="display:none;"
+                >
+                    ✨ Preparando seu Pix...
+                </div>
+
+
+                <div
+                    id="loja-premium-checkout-conteudo"
+                    style="display:none;"
+                >
+
+                    <div class="loja-premium-checkout-resumo">
+
+                        <div>
+                            Pedido
+                            <strong id="loja-premium-checkout-pedido">
+                                -
+                            </strong>
+                        </div>
+
+                        <div>
+                            💎
+                            <strong id="loja-premium-checkout-gemas">
+                                0
+                            </strong>
+                            Gemas
+                        </div>
+
+                        <div class="loja-premium-checkout-valor">
+                            <strong id="loja-premium-checkout-valor">
+                                R$ 0,00
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="loja-premium-checkout-instrucao">
+                        Escaneie o QR Code ou copie o código Pix.
+                    </div>
+
+
+                    <div class="loja-premium-qrcode-box">
+
+                        <div
+                            id="loja-premium-qrcode"
+                        ></div>
+
+                    </div>
+
+
+                    <div class="loja-premium-pix-label">
+                        PIX COPIA E COLA
+                    </div>
+
+
+                    <textarea
+                        id="loja-premium-pix-codigo"
+                        class="loja-premium-pix-codigo"
+                        readonly
+                    ></textarea>
+
+
+                    <button
+                        type="button"
+                        id="loja-premium-copiar-pix"
+                        class="loja-premium-copiar-pix"
+                    >
+                        📋 COPIAR CÓDIGO PIX
+                    </button>
+
+
+                    <div class="loja-premium-pix-aviso">
+                        Após pagar, envie o comprovante para análise.
+                        As Gemas só serão entregues após a confirmação.
+                    </div>
+
+                    <button
+                        type="button"
+                        id="loja-premium-ja-paguei"
+                        class="loja-premium-ja-paguei"
+                    >
+                        ✅ JÁ FIZ O PAGAMENTO
+                    </button>
+
+                    <div
+                        id="loja-premium-comprovante-area"
+                        class="loja-premium-comprovante-area"
+                        style="display:none;"
+                    >
+
+                        <div class="loja-premium-comprovante-titulo">
+                            📎 Enviar comprovante
+                        </div>
+
+                        <label
+                            class="loja-premium-comprovante-seletor"
+                            for="loja-premium-comprovante-arquivo"
+                        >
+                            📁 Selecionar arquivo
+                        </label>
+
+                        <input
+                            type="file"
+                            id="loja-premium-comprovante-arquivo"
+                            accept="image/jpeg,image/png,image/webp,application/pdf"
+                            style="display:none;"
+                        >
+
+                        <div
+                            id="loja-premium-comprovante-nome"
+                            class="loja-premium-comprovante-nome"
+                        >
+                            Nenhum arquivo selecionado
+                        </div>
+
+                        <div class="loja-premium-comprovante-limite">
+                            JPG, PNG, WEBP ou PDF • máximo 5 MB
+                        </div>
+
+                        <button
+                            type="button"
+                            id="loja-premium-enviar-comprovante"
+                            class="loja-premium-enviar-comprovante"
+                        >
+                            📤 ENVIAR PARA ANÁLISE
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+
+        <!-- =================================================
+             MENSAGEM
+             ================================================= -->
+
+        <div
+            id="loja-premium-mensagem"
+            class="loja-premium-mensagem"
+            style="display: none;"
+        ></div>
+
+    </div>
+</div>

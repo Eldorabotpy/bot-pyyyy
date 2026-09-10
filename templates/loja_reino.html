@@ -1,0 +1,28 @@
+<!-- templates/loja_reino.html -->
+<div id="modal-loja-reino" class="modal-moderno" style="display: none; z-index: 10006;">
+    <div class="perfil-container-moderno container-premium" style="max-width: 380px; width: 90%; text-align: center; position: relative; padding: 20px; border-radius: 12px;">
+        
+        <button onclick="window.fecharLojaReino()" style="position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #fbbf24; font-size: 1.2em; font-weight: bold; cursor: pointer;">X</button>
+        
+        <h2 style="color: #fbbf24; font-family: 'Cinzel', serif; margin-top: 0;">👑 Tesouro do Rei</h2>
+        <p style="color: #c7d2fe; font-size: 0.85em; margin-bottom: 20px;">Apenas pedras preciosas são aceitas aqui.</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            
+            <div class="card-item-gema">
+                <span style="font-size: 2.5em;">📜</span>
+                <h4 style="color: #f8fafc; margin: 8px 0 2px 0; font-size: 0.9em;">Pergaminho de XP</h4>
+                <p style="color: #fbbf24; font-weight: bold; margin: 0 0 10px 0; font-size: 1em;">15 💎</p>
+                <button onclick="window.comprarItemGema('pocao_xp_boost')" class="btn-comprar-gema">Adquirir</button>
+            </div>
+
+            <div class="card-item-gema">
+                <span style="font-size: 2.5em;">🧰</span>
+                <h4 style="color: #f8fafc; margin: 8px 0 2px 0; font-size: 0.9em;">Baú Lendário</h4>
+                <p style="color: #fbbf24; font-weight: bold; margin: 0 0 10px 0; font-size: 1em;">50 💎</p>
+                <button onclick="window.comprarItemGema('bau_lendario')" class="btn-comprar-gema">Adquirir</button>
+            </div>
+
+        </div>
+    </div>
+</div>

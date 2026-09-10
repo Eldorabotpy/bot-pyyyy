@@ -1,0 +1,37 @@
+/* arena_pvp.css */
+
+/* Inverte a imagem do oponente para que ele olhe para o seu herói */
+.flip-horizontal {
+    transform: scaleX(-1);
+}
+
+/* O brilho do vencedor */
+.pvp-winner-glow {
+    animation: golden-glow 2s infinite alternate;
+}
+
+@keyframes golden-glow {
+    from { filter: drop-shadow(0 0 10px #facc15); }
+    to { filter: drop-shadow(0 0 25px #ca8a04); }
+}
+
+/* Tremores específicos do PvP (mais intensos) */
+.pvp-shake-hard {
+    animation: pvp-shake-hard 0.4s;
+    border: 2px solid #ef4444 !important;
+    box-shadow: inset 0 0 50px rgba(239, 68, 68, 0.8) !important;
+}
+
+@keyframes pvp-shake-hard {
+    0% { transform: translate(2px, 2px) rotate(0deg); }
+    10% { transform: translate(-2px, -3px) rotate(-1deg); }
+    20% { transform: translate(-4px, 0px) rotate(1deg); }
+    30% { transform: translate(4px, 3px) rotate(0deg); }
+    40% { transform: translate(2px, -2px) rotate(1deg); }
+    50% { transform: translate(-2px, 3px) rotate(-1deg); }
+    60% { transform: translate(-4px, 2px) rotate(0deg); }
+    70% { transform: translate(4px, 2px) rotate(-1deg); }
+    80% { transform: translate(-2px, -2px) rotate(1deg); }
+    90% { transform: translate(2px, 3px) rotate(0deg); }
+    100% { transform: translate(2px, -3px) rotate(-1deg); }
+}

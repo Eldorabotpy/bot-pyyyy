@@ -1,6 +1,12 @@
 # modules/recipes/coleta_t5.py
 
-RECIPES = {
+from __future__ import annotations
+from typing import Dict, Any
+
+# TIER 5: RECEITAS 
+# ============================================================================
+
+RECIPES: Dict[str, Dict[str, Any]] = {
     # ==========================
     # 🪓 LENHADOR TIER 5 (Adamantio/Dragão)
     # ==========================
@@ -17,7 +23,7 @@ RECIPES = {
             "raiz_do_mundo": 1,         # Madeira Lendária
             "essencia_draconica_pura": 1, # Refinado (Coração + Sangue)
             "barra_de_adamantio": 3,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 20000,
         "craft_time": 600,              # 10 minutos
@@ -40,7 +46,7 @@ RECIPES = {
             "raiz_do_mundo": 1,
             "nucleo_de_energia_instavel": 3,
             "barra_de_adamantio": 3,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 22000,
         "craft_time": 600,
@@ -63,7 +69,7 @@ RECIPES = {
             "essencia_vital": 2,        # Drop raro T5
             "lente_petrificante": 1,     # Olho de Basilisco Refinado (para o gume eterno)
             "barra_de_adamantio": 3,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 18000,
         "craft_time": 550,
@@ -86,7 +92,7 @@ RECIPES = {
             "dente_afiado_superior": 5, # Refinado T4
             "essencia_draconica_pura": 2,
             "barra_de_adamantio": 3,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 19000,
         "craft_time": 500,
@@ -109,7 +115,7 @@ RECIPES = {
             "essencia_sombra": 5,
             "luz_estelar": 1,            # O núcleo
             "barra_de_adamantio": 3,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 25000,
         "craft_time": 700,

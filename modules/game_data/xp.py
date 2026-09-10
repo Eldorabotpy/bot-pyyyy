@@ -1,5 +1,5 @@
 # modules/game_data/xp.py
-# (VERSÃO CORRIGIDA: Unificação de stat_points + Migração Automática)
+# (VERSÃO CORRIGIDA: Unificação de stat_points + Migração Automática + Sincronização de Maestrias)
 
 from __future__ import annotations
 from typing import Dict, Optional, Tuple, Union
@@ -133,9 +133,21 @@ def add_combat_xp_inplace(player_data: dict, amount: int) -> Dict[str, int]:
     
     if amount <= 0: return {}
 
+    # Adiciona o XP para o Nível de Combate do jogador
     player_data["xp"] = int(player_data.get("xp", 0)) + amount
-    return _apply_level_ups_inplace(player_data)
 
+    # 👇 A MÁGICA: INTEGRAÇÃO COM O PASSE DE BATALHA 👇
+    try:
+        from modules.game_data.season_pass import adicionar_xp_passe
+        # Envia a mesma quantidade de XP que o jogador ganhou para o Passe!
+        # Como está dentro desta função, se o jogador tiver VIP, o bônus de XP VIP 
+        # também se aplicará ao Passe automaticamente!
+        adicionar_xp_passe(player_data, amount)
+    except Exception as e:
+        logger.error(f"Erro ao adicionar XP no passe: {e}")
+    # 👆 FIM DA INTEGRAÇÃO 👆
+
+    return _apply_level_ups_inplace(player_data)
 # ================================
 # API Pública (Async + Premium Check)
 # ================================
@@ -176,7 +188,7 @@ async def add_combat_xp(user_id, amount: int) -> Dict[str, int]:
     return result
 
 # ================================
-# XP DE PROFISSÃO (Coleta)
+# XP DE PROFISSÃO (Coleta e Refino)
 # ================================
 
 PROF_MAX_LEVEL = 50
@@ -196,8 +208,7 @@ def add_profession_xp_inplace(
     expected_type: str | None = None,
 ) -> dict:
     """
-    Soma XP na profissão ativa (player_data["profession"])
-    expected_type: garante que a XP vai para a profissão correta (lenhador, minerador, etc.)
+    Soma XP e Sincroniza a Profissão Ativa com a Mochila de Profissões (learned_professions).
     """
     if not isinstance(player_data, dict):
         return {}
@@ -209,15 +220,29 @@ def add_profession_xp_inplace(
     if amount <= 0:
         return {"xp_added": 0}
 
-    prof = player_data.setdefault("profession", {}) or {}
+    expected = str(expected_type or "").strip().lower()
 
-    prof_type = (prof.get("type") or "").strip().lower()
-    if expected_type and prof_type != expected_type.strip().lower():
-        # job duplicado ou profissão trocada no meio
+    # 1. Puxa a mochila nova
+    learned = player_data.get("learned_professions", {})
+
+    # Define qual profissão vai receber o XP
+    if expected and expected in learned:
+        prof_target = learned[expected]
+    else:
+        # Fallback para o legado
+        prof_target = player_data.get("profession", {})
+
+    if not prof_target:
+        return {"xp_added": 0, "ignored": True}
+        
+    tipo = str(prof_target.get("type") or prof_target.get("key") or expected).lower()
+    
+    # Proteção para garantir que a XP não vá para a profissão errada
+    if expected and tipo != expected:
         return {"xp_added": 0, "ignored": True}
 
-    level = int(prof.get("level", 1) or 1)
-    xp = int(prof.get("xp", 0) or 0)
+    level = int(prof_target.get("level", 1) or 1)
+    xp = int(prof_target.get("xp", 0) or 0)
 
     xp += amount
 
@@ -237,9 +262,20 @@ def add_profession_xp_inplace(
 
     new_level = level + levels_gained
 
-    prof["level"] = new_level
-    prof["xp"] = xp
-    player_data["profession"] = prof
+    prof_target["level"] = new_level
+    prof_target["xp"] = xp
+    
+    # 4. 🛡️ SINCRONIZAÇÃO ABSOLUTA: Salva nos dois lugares!
+    if tipo:
+        learned[tipo] = prof_target
+    player_data["learned_professions"] = learned
+
+    # Atualiza o campo legado para não quebrar compatibilidade
+    legacy = player_data.get("profession", {})
+    if legacy and str(legacy.get("type", "")).lower() == tipo:
+        player_data["profession"] = prof_target
+    elif not legacy:
+        player_data["profession"] = prof_target
 
     return {
         "xp_added": amount,
@@ -248,5 +284,5 @@ def add_profession_xp_inplace(
         "levels_gained": levels_gained,
         "current_xp": xp,
         "next_level_xp": get_xp_for_next_profession_level(new_level),
-        "profession_type": prof_type,
+        "profession_type": tipo,
     }

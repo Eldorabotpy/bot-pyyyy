@@ -1,6 +1,11 @@
 # modules/recipes/coleta_t1.py
+from __future__ import annotations
+from typing import Dict, Any
 
-RECIPES = {
+# TIER 1: RECEITAS 
+# ============================================================================
+
+RECIPES: Dict[str, Dict[str, Any]] = {
     # ==========================
     # 🪓 LENHADOR TIER 1 (Pedra)
     # ==========================
@@ -10,13 +15,13 @@ RECIPES = {
         "type": "tool",
         "sub_type": "lenhador",
         "tier": 1,
-        "profession_req": None,     # Qualquer um pode fazer
+        "profession_req": "ferreiro",     # Qualquer um pode fazer
         "level_req": 1,
         "ingredients": {
             "pedra": 3,             # Cabeça do machado
             "madeira": 2,           # Cabo
             "linho": 1,              # Amarra (dropa de plantas ou monstros iniciais)
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 50,
         "craft_time": 20,           # Rápido
@@ -32,13 +37,13 @@ RECIPES = {
         "type": "tool",
         "sub_type": "minerador",
         "tier": 1,
-        "profession_req": None,
+        "profession_req": "ferreiro",
         "level_req": 1,
         "ingredients": {
             "pedra": 4,
             "madeira": 2,
             "linho": 1,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 50,
         "craft_time": 20,
@@ -54,12 +59,12 @@ RECIPES = {
         "type": "tool",
         "sub_type": "colhedor",
         "tier": 1,
-        "profession_req": None,
+        "profession_req": "ferreiro",
         "level_req": 1,
         "ingredients": {
             "pedra": 2,             # Lâmina lascada
             "madeira": 3,            # Cabo longo
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 40,
         "craft_time": 15,
@@ -75,13 +80,13 @@ RECIPES = {
         "type": "tool",
         "sub_type": "esfolador",
         "tier": 1,
-        "profession_req": None,
+        "profession_req": "ferreiro",
         "level_req": 1,
         "ingredients": {
             "pedra": 1,
             "madeira": 1,
             "pano_simples": 1,       # Dropa de monstros T1 (Ex: Goblins/Bandidos)
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 40,
         "craft_time": 15,
@@ -97,12 +102,12 @@ RECIPES = {
         "type": "tool",
         "sub_type": "alquimista",
         "tier": 1,
-        "profession_req": None,
+        "profession_req": "joalheiro",
         "level_req": 1,
         "ingredients": {
             "pedra": 3,             # Simbolizando areia/sílica
             "carvao": 1,
-            "nucleo_forja_fraco": 1                          # Combustível para derreter
+            "nucleo_de_forja": 1                          # Combustível para derreter
         },
         "gold_cost": 30,
         "craft_time": 30,

@@ -1,0 +1,205 @@
+<!-- =========================================================
+     🏰 GUILDA DOS AVENTUREIROS
+========================================================= -->
+
+<div id="guild-missions-container"
+     class="guild-overlay"
+     style="display:none;">
+
+    <div class="guild-modal">
+
+        <!-- FECHAR -->
+        <button
+            type="button"
+            class="guild-fechar"
+            onclick="window.fecharGuildaMissoes()"
+        >
+            ✕
+        </button>
+
+
+        <!-- =============================================
+             ATENDENTE
+        ============================================== -->
+
+        <div
+            id="guild-atendente-area"
+                class="guild-atendente-area"
+        >
+
+            <img
+                id="guild-atendente-img"
+                class="guild-atendente-img"
+                src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/npcs/atendente_guilda.png"
+                alt="Lyria - Escrivã da Guilda"
+            >
+
+            <div class="guild-dialogo">
+
+                <div class="guild-dialogo-nome">
+                    Lyria — Escrivã da Guilda
+                </div>
+
+                <div id="guild-dialogo-texto">
+                    Saudações, aventureiro. A Guilda sempre tem novos contratos para mãos corajosas.
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =============================================
+             CABEÇALHO
+        ============================================== -->
+
+        <div
+            id="guild-titulo-principal"
+            class="guild-titulo"
+        >
+            ⚔️ GUILDA DOS AVENTUREIROS
+        </div>
+
+        <div
+            id="guild-pontos-area"
+            class="guild-pontos"
+        >
+            🏅
+            <span id="guild-pontos-label">
+                Pontos pessoais:
+            </span>
+
+            <strong id="guild-pontos-total">
+                0
+            </strong>
+        </div>
+
+        <!-- =============================================
+             ESCOPO DOS CONTRATOS
+        ============================================== -->
+
+        <div
+            id="guild-escopo-area"
+            class="guild-abas"
+            style="
+                grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            "
+        >
+
+            <button
+                id="guild-escopo-individual"
+                class="guild-aba ativa"
+                onclick="
+                    window.mudarEscopoGuilda(
+                        'individual'
+                    )
+                "
+            >
+                📜 Meus contratos
+            </button>
+
+            <button
+                id="guild-escopo-coletivo"
+                class="guild-aba"
+                onclick="
+                    window.mudarEscopoGuilda(
+                        'coletivo'
+                    )
+                "
+            >
+                🏰 Contratos do Clã
+            </button>
+
+        </div>
+
+        <!-- =============================================
+             ABAS
+        ============================================== -->
+
+        <div
+            id="guild-abas-area"
+            class="guild-abas"
+            >
+
+            <button
+                id="guild-aba-disponiveis"
+                class="guild-aba ativa"
+                onclick="window.mudarAbaGuildaMissoes('disponiveis')"
+            >
+                📜 Contratos
+            </button>
+
+            <button
+                id="guild-aba-ativas"
+                class="guild-aba"
+                onclick="window.mudarAbaGuildaMissoes('ativas')"
+            >
+                ⚔️ Em andamento
+            </button>
+
+            <button
+                id="guild-aba-concluidas"
+                class="guild-aba"
+                onclick="window.mudarAbaGuildaMissoes('concluidas')"
+            >
+                ✅ Histórico
+            </button>
+
+        </div>
+
+
+        <!-- =============================================
+             FILTROS
+        ============================================== -->
+
+        <div
+            id="guild-filtros-area"
+            class="guild-filtros"
+        >
+
+            <button
+                class="guild-filtro ativo"
+                data-guild-filtro="todos"
+                onclick="window.filtrarGuildaMissoes('todos', this)"
+            >
+                Todos
+            </button>
+
+            <button
+                class="guild-filtro"
+                data-guild-filtro="pessoal"
+                onclick="window.filtrarGuildaMissoes('pessoal', this)"
+            >
+                👤 Pessoal
+            </button>
+
+            <button
+                class="guild-filtro"
+                data-guild-filtro="cla"
+                onclick="window.filtrarGuildaMissoes('cla', this)"
+            >
+                🛡️ Clã
+            </button>
+
+        </div>
+
+
+        <!-- =============================================
+             CONTEÚDO
+        ============================================== -->
+
+        <div
+            id="guild-missoes-lista"
+            class="guild-missoes-lista"
+        >
+
+            <div class="guild-carregando">
+                Consultando os contratos da Guilda...
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

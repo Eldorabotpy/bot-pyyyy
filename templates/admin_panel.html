@@ -1,0 +1,2911 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eldora - Painel GM</title>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; }
+        .card { background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #334155; }
+        
+        /* Cabeçalho de Navegação com Botão de Voltar */
+        .nav-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; 
+        }
+
+        button { background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        
+        .btn-voltar { background: #475569; border: 1px solid #64748b; font-size: 0.85em; transition: 0.2s; font-family: 'Cinzel', serif; }
+        .btn-voltar:hover { background: #64748b; transform: translateX(-3px); }
+
+        input { padding: 10px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: white; width: 150px; font-weight: bold; }
+        h1 { margin: 0; font-size: 1.5em; }
+        /* ==========================================================
+            💎 LOJA PREMIUM
+           ========================================================== */
+
+        .premium-admin-card {
+            border-left: 4px solid #8b5cf6;
+        }
+
+
+        .premium-admin-topo {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+
+            margin-bottom: 15px;
+        }
+
+
+        .premium-admin-topo h3 {
+            margin: 0;
+
+            color: #ddd6fe;
+        }
+
+
+        .premium-contador {
+            min-width: 30px;
+
+            padding: 5px 9px;
+
+            color: #fff;
+
+            background: #7c3aed;
+
+            border-radius: 999px;
+
+            text-align: center;
+
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+
+        .premium-filtros {
+            display: flex;
+            flex-wrap: wrap;
+
+            gap: 7px;
+
+            margin-bottom: 15px;
+        }
+
+
+        .premium-filtro {
+            background: #334155;
+
+            font-size: 0.75rem;
+        }
+
+
+        .premium-filtro.ativo {
+            background: #7c3aed;
+        }
+
+
+        .premium-pedidos {
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(280px, 1fr)
+                );
+
+            gap: 10px;
+        }
+
+
+        .premium-pedido {
+            padding: 13px;
+
+            background: #0f172a;
+
+            border:
+                1px solid #334155;
+
+            border-radius: 9px;
+        }
+
+
+        .premium-pedido-codigo {
+            color: #fde68a;
+
+            font-size: 0.9rem;
+            font-weight: 900;
+        }
+
+
+        .premium-pedido-player {
+            margin-top: 7px;
+
+            color: #e2e8f0;
+
+            font-weight: bold;
+        }
+
+
+        .premium-pedido-info {
+            margin-top: 5px;
+
+            color: #94a3b8;
+
+            font-size: 0.78rem;
+
+            line-height: 1.5;
+        }
+
+
+        .premium-status {
+            display: inline-block;
+
+            margin-top: 8px;
+            padding: 4px 7px;
+
+            border-radius: 5px;
+
+            font-size: 0.69rem;
+            font-weight: bold;
+        }
+
+
+        .premium-status.analise {
+            color: #bae6fd;
+            background: #0c4a6e;
+        }
+
+
+        .premium-status.aprovado {
+            color: #bbf7d0;
+            background: #14532d;
+        }
+
+
+        .premium-status.recusado {
+            color: #fecaca;
+            background: #7f1d1d;
+        }
+
+
+        .premium-acoes {
+            display: flex;
+            flex-wrap: wrap;
+
+            gap: 6px;
+
+            margin-top: 12px;
+        }
+
+
+        .btn-comprovante {
+            background: #475569;
+        }
+
+
+        .btn-aprovar {
+            background: #15803d;
+        }
+
+
+        .btn-recusar {
+            background: #b91c1c;
+        }
+
+
+        .premium-vazio {
+            padding: 20px;
+
+            color: #64748b;
+
+            text-align: center;
+        }
+        /* ==========================================================
+            🛡️ MODAL DE CONFIRMAÇÃO GM
+           ========================================================== */
+
+        .gm-modal-overlay {
+            position: fixed;
+            inset: 0;
+
+            z-index: 99999;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            padding: 18px;
+
+            background:
+                rgba(2, 6, 23, 0.86);
+
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+
+        .gm-modal-card {
+            width: min(
+                390px,
+                100%
+            );
+
+            padding: 22px;
+
+            background:
+                linear-gradient(
+                    160deg,
+                    #172033,
+                    #0b1220
+                );
+
+            border:
+                1px solid
+                #334155;
+
+            border-radius: 14px;
+
+            box-shadow:
+                0 25px 70px
+                rgba(0, 0, 0, 0.70);
+
+            text-align: center;
+        }
+
+
+        .gm-modal-icon {
+            width: 48px;
+            height: 48px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            margin:
+                0 auto 12px;
+
+            background:
+                rgba(250, 204, 21, 0.10);
+
+            border:
+                1px solid
+                rgba(250, 204, 21, 0.24);
+
+            border-radius: 12px;
+
+            font-size: 24px;
+        }
+
+
+        .gm-modal-card h3 {
+            margin: 0;
+
+            color: #fde68a;
+
+            font-size: 1rem;
+        }
+
+
+        .gm-modal-card p {
+            margin:
+                10px 0 0;
+
+            color: #a8b3c5;
+
+            font-size: 0.80rem;
+            line-height: 1.45;
+        }
+
+
+        .gm-modal-alerta {
+            margin-top: 13px;
+            padding: 9px;
+
+            color: #fcd34d;
+
+            background:
+                rgba(120, 53, 15, 0.18);
+
+            border:
+                1px solid
+                rgba(245, 158, 11, 0.22);
+
+            border-radius: 8px;
+
+            font-size: 0.70rem;
+        }
+
+
+        .gm-modal-textarea {
+            width: 100%;
+            min-height: 82px;
+
+            box-sizing: border-box;
+
+            margin-top: 13px;
+            padding: 10px;
+
+            resize: vertical;
+
+            color: white;
+
+            background:
+                #020617;
+
+            border:
+                1px solid
+                #334155;
+
+            border-radius: 8px;
+
+            outline: none;
+
+            font-family: inherit;
+        }
+
+
+        .gm-modal-acoes {
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr;
+
+            gap: 8px;
+
+            margin-top: 17px;
+        }
+
+
+        .gm-modal-cancelar {
+            background: #334155;
+        }
+
+
+        .gm-modal-confirmar {
+            background: #15803d;
+        }
+
+
+        .gm-modal-confirmar.recusar {
+            background: #b91c1c;
+        }
+
+        /* ==========================================================
+            🖼️ VISUALIZADOR DE COMPROVANTE
+           ========================================================== */
+
+        .comprovante-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            padding: 16px;
+
+            background: rgba(2, 6, 23, 0.92);
+
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+        }
+
+        .comprovante-modal-card {
+            width: min(680px, 100%);
+            max-height: calc(100vh - 30px);
+
+            display: flex;
+            flex-direction: column;
+
+            overflow: hidden;
+
+            background:
+                linear-gradient(
+                    160deg,
+                    #172033,
+                    #080d18
+                );
+
+            border:
+                1px solid #334155;
+
+            border-radius: 14px;
+
+            box-shadow:
+                0 25px 80px
+                rgba(0, 0, 0, 0.75);
+        }
+
+                .comprovante-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+
+            padding: 13px 15px;
+
+            border-bottom:
+                1px solid #334155;
+        }
+
+        .comprovante-modal-header h3 {
+            margin: 0;
+
+            color: #fde68a;
+
+            font-size: 0.95rem;
+        }
+
+        .comprovante-modal-fechar {
+            width: 34px;
+            height: 34px;
+
+            padding: 0;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background: #334155;
+
+            border-radius: 8px;
+
+            font-size: 16px;
+        }
+
+        .comprovante-modal-corpo {
+            min-height: 200px;
+            max-height: calc(100vh - 120px);
+
+            overflow: auto;
+
+            padding: 12px;
+
+            text-align: center;
+        }
+
+        .comprovante-modal-imagem {
+            display: block;
+
+            max-width: 100%;
+            height: auto;
+
+            margin: auto;
+
+            border-radius: 8px;
+        }
+
+        .comprovante-modal-pdf {
+            width: 100%;
+            height: 70vh;
+
+            border: none;
+            border-radius: 8px;
+
+            background: white;
+        }
+
+        .comprovante-carregando {
+            padding: 40px 15px;
+
+            color: #94a3b8;
+
+            font-size: 0.8rem;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="nav-header">
+        <h1>🛡️ Painel do Game Master</h1>
+        <button class="btn-voltar" onclick="window.location.href='/'">⬅️ VOLTAR AO JOGO</button>
+    </div>
+    <!-- =====================================================
+         🛠️ FERRAMENTAS DO REINO
+         ===================================================== -->
+
+    <div
+        class="card"
+        style="
+            border-left: 4px solid #f59e0b;
+            background:
+                linear-gradient(
+                    145deg,
+                    #202336,
+                    #111827
+                );
+        "
+    >
+
+        <h3
+            style="
+                margin-top: 0;
+                color: #fde68a;
+            "
+        >
+            🛠️ Ferramentas do Reino
+        </h3>
+
+        <p
+            style="
+                color:#94a3b8;
+                font-size:0.82rem;
+            "
+        >
+            Controles administrativos para
+            testes e manutenção do servidor.
+        </p>
+
+        <div
+            style="
+                display:grid;
+                grid-template-columns:
+                    repeat(
+                        auto-fit,
+                        minmax(210px, 1fr)
+                    );
+                gap:8px;
+            "
+        >
+
+            <button
+                type="button"
+                onclick="iniciarInvasaoGM()"
+                style="
+                    background:#b91c1c;
+                    padding:13px;
+                "
+            >
+                ⚔️ INICIAR INVASÃO AGORA
+            </button>
+
+            <button
+                type="button"
+                onclick="limparPartiesGM()"
+                style="
+                    background:#7c3aed;
+                    padding:13px;
+                "
+            >
+                🧹 LIMPAR PARTIES FANTASMAS
+            </button>
+
+        </div>
+
+        <div
+            id="ferramentas-reino-status"
+            style="
+                display:none;
+                margin-top:12px;
+                padding:10px;
+                border:1px solid #334155;
+                border-radius:8px;
+                background:#0f172a;
+                color:#cbd5e1;
+                font-size:0.8rem;
+            "
+        >
+        </div>
+
+    </div>
+    
+    <!-- =====================================================
+         ⚔️ GUERRA DE CLÃS — CONTROLE GM
+         ===================================================== -->
+
+    <div
+        class="card"
+        style="
+            border-left: 4px solid #d8b85a;
+            background:
+                linear-gradient(
+                    145deg,
+                    #202336,
+                    #111827
+                );
+        "
+    >
+
+        <h3
+            style="
+                margin-top: 0;
+                color: #fde68a;
+            "
+        >
+            ⚔️ Controle da Guerra de Clãs
+        </h3>
+
+
+        <p
+            style="
+                color:#94a3b8;
+                font-size:0.82rem;
+            "
+        >
+            Controle temporariamente as fases
+            da Guerra Semanal para testes.
+        </p>
+
+
+        <div
+            id="guerra-gm-status"
+            style="
+                margin: 12px 0;
+                padding: 10px;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                background:#0f172a;
+                color:#cbd5e1;
+                font-size:0.8rem;
+                line-height:1.6;
+            "
+        >
+            ⏳ Consultando Guerra...
+        </div>
+
+
+        <div
+            style="
+                display:grid;
+                grid-template-columns:
+                    repeat(
+                        auto-fit,
+                        minmax(150px, 1fr)
+                    );
+                gap:7px;
+            "
+        >
+
+            <button
+                type="button"
+                onclick="forcarFaseGuerraGM('inscricoes')"
+                style="background:#15803d;"
+            >
+                📝 Inscrições
+            </button>
+
+
+            <button
+                type="button"
+                onclick="forcarFaseGuerraGM('escalacao')"
+                style="background:#a16207;"
+            >
+                🔒 Escalação
+            </button>
+
+
+            <button
+                type="button"
+                onclick="forcarFaseGuerraGM('pareamento')"
+                style="background:#7c3aed;"
+            >
+                ⚖️ Pareamento
+            </button>
+
+
+            <button
+                type="button"
+                onclick="forcarFaseGuerraGM('agendada')"
+                style="background:#0369a1;"
+            >
+                📅 Agendada
+            </button>
+
+
+            <button
+                type="button"
+                onclick="forcarFaseGuerraGM('em_andamento')"
+                style="background:#b91c1c;"
+            >
+                ⚔️ Em andamento
+            </button>
+
+
+            <button
+                type="button"
+                onclick="forcarFaseGuerraGM('finalizada')"
+                style="background:#334155;"
+            >
+                🏆 Finalizada
+            </button>
+
+        </div>
+
+
+        <div
+            style="
+                display:grid;
+                grid-template-columns:
+                    repeat(
+                        auto-fit,
+                        minmax(210px, 1fr)
+                    );
+                gap:8px;
+                margin-top:12px;
+            "
+        >
+
+            <button
+                type="button"
+                onclick="destravarEscalacoesGuerraGM()"
+                style="background:#92400e;"
+            >
+                🔓 Destravar Escalações
+            </button>
+
+
+            <button
+                type="button"
+                onclick="voltarCalendarioRealGuerraGM()"
+                style="background:#475569;"
+            >
+                🌐 Usar Calendário Real
+            </button>
+
+        </div>
+
+
+        <!-- ===============================================
+             ⚖️ EXECUTAR O PAREAMENTO REAL
+             =============================================== -->
+
+        <button
+            type="button"
+            onclick="executarPareamentoGuerraGM()"
+            style="
+                background:#7c3aed;
+                width:100%;
+                margin-top:12px;
+                padding:13px;
+            "
+        >
+            ⚖️ EXECUTAR PAREAMENTO AGORA
+        </button>
+
+        <!-- ===============================================
+             🔄 REINICIAR BATALHA DA FRENTE
+             =============================================== -->
+
+        <div
+            style="
+                margin-top:14px;
+                padding:12px;
+
+                background:#0f172a;
+
+                border:
+                    1px solid #7f1d1d;
+
+                border-radius:9px;
+            "
+        >
+
+            <div
+                style="
+                    margin-bottom:8px;
+
+                    color:#fca5a5;
+
+                    font-size:0.8rem;
+                    font-weight:bold;
+                "
+            >
+                🧪 Reiniciar batalha para testes
+            </div>
+
+
+            <div
+                style="
+                    margin-bottom:8px;
+
+                    color:#94a3b8;
+
+                    font-size:0.72rem;
+                    line-height:1.4;
+                "
+            >
+                Informe qualquer personagem
+                TITULAR da frente que deseja
+                reiniciar.
+
+                A escalação, lobby e jogadores
+                PRONTOS serão preservados.
+            </div>
+
+
+            <input
+                type="text"
+
+                id="guerra-reset-personagem"
+
+                placeholder="Ex.: Pedroca"
+
+                style="
+                    width:100%;
+                    box-sizing:border-box;
+                    margin-bottom:8px;
+                "
+            >
+
+
+            <button
+                type="button"
+
+                onclick="reiniciarBatalhaFrenteGuerraGM()"
+
+                style="
+                    width:100%;
+
+                    background:#b91c1c;
+
+                    padding:12px;
+                "
+            >
+                🔄 REINICIAR BATALHA DA FRENTE
+            </button>
+
+        </div>        
+    </div>
+
+    <div class="card">
+        <h3>👤 Nome do Personagem:</h3>
+        <input type="text" id="player_name" value="eu aqui" style="width: 250px; color: #f1c40f;">
+    </div>
+
+    <div class="card" style="border-left: 4px solid #0ea5e9;">
+        <h3>💎 Gerenciar Gemas (Diamantes)</h3>
+        <input type="number" id="gems_qty" value="100">
+        <button style="background: #0ea5e9;" onclick="executar('/admin/add_gems/', 'gems_qty')">Adicionar Gemas</button>
+    </div>
+    
+    <div
+        class="card premium-admin-card"
+    >
+
+        <div class="premium-admin-topo">
+
+            <h3>
+                💎 Pedidos da Loja Premium
+            </h3>
+
+            <span
+                id="premium-contador"
+                class="premium-contador"
+            >
+                0
+            </span>
+
+        </div>
+
+
+        <div class="premium-filtros">
+  
+            <button
+                type="button"
+                class="premium-filtro ativo"
+                data-status=""
+                onclick="carregarPedidosPremium('', this)"
+            >
+                🔎 Pendentes
+            </button>
+
+
+            <button
+                type="button"
+                class="premium-filtro"
+                data-status="aprovado"
+                onclick="carregarPedidosPremium('aprovado', this)"
+            >
+                ✅ Aprovados
+            </button>
+
+
+            <button
+                type="button"
+                class="premium-filtro"
+                data-status="recusado"
+                onclick="carregarPedidosPremium('recusado', this)"
+            >
+                ❌ Recusados
+            </button>
+
+        </div>
+
+
+        <div
+            id="premium-pedidos"
+            class="premium-pedidos"
+        >
+
+            <div class="premium-vazio">
+                Carregando pedidos...
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card" style="border-left: 4px solid #f59e0b;">
+        <h3>✨ Gerenciar XP do Passe</h3>
+        <input type="number" id="xp_qty" value="500">
+        <button style="background: #f59e0b;" onclick="executar('/admin/add_xp/', 'xp_qty')">Adicionar XP</button>
+    </div>
+
+    <div class="card" style="border-left: 4px solid #ef4444;">
+        <h3>🔄 Reset de Temporada</h3>
+        <button style="background: #ef4444;" onclick="executar('/admin/reset_passe/', null)">REINICIAR PASSE (LIMPAR TUDO)</button>
+    </div>
+    <div class="card" style="border-left: 4px solid #991b1b; background: #450a0a; margin-top: 30px;">
+        <h3 style="color: #fca5a5;">🚨 FIM DE TEMPORADA (RESET GLOBAL)</h3>
+        <p style="font-size: 0.85em; color: #fecaca; margin-bottom: 15px;">
+            Atenção Mestre: Isto vai zerar o Passe de Batalha (Nível, XP e Premium) de <b>TODOS OS JOGADORES</b> do servidor simultaneamente!
+        </p>
+        <button style="background: #dc2626; width: 100%; font-size: 1.1em; padding: 15px;" onclick="resetarServidorInteiro()">
+            ⚠️ APAGAR TUDO E INICIAR NOVA TEMPORADA ⚠️
+        </button>
+    </div>
+    <!-- ========================================================
+         🛡️ CONFIRMAÇÃO PERSONALIZADA GM
+         ======================================================== -->
+
+    <div
+        id="gm-modal-overlay"
+        class="gm-modal-overlay"
+        style="display:none;"
+    >
+
+        <div class="gm-modal-card">
+
+            <div
+                id="gm-modal-icon"
+                class="gm-modal-icon"
+            >
+                ✅
+            </div>
+
+
+            <h3 id="gm-modal-titulo">
+                Confirmar ação
+            </h3>
+
+
+            <p id="gm-modal-texto">
+                Deseja continuar?
+            </p>
+
+
+            <div
+                id="gm-modal-alerta"
+                class="gm-modal-alerta"
+            >
+            </div>
+
+
+            <textarea
+                id="gm-modal-motivo"
+                class="gm-modal-textarea"
+                placeholder="Informe o motivo da recusa..."
+                style="display:none;"
+            ></textarea>
+
+
+            <div class="gm-modal-acoes">
+
+                <button
+                    type="button"
+                    class="gm-modal-cancelar"
+                    onclick="fecharModalGM(false)"
+                >
+                    CANCELAR
+                </button>
+
+
+                <button
+                    type="button"
+                    id="gm-modal-confirmar"
+                    class="gm-modal-confirmar"
+                    onclick="fecharModalGM(true)"
+                >
+                    CONFIRMAR
+                </button>
+
+            </div>
+    
+        </div>
+
+    </div>
+    
+    <!-- ========================================================
+         🖼️ VISUALIZADOR DE COMPROVANTE
+         ======================================================== -->
+
+    <div
+        id="comprovante-modal"
+        class="comprovante-modal-overlay"
+        style="display:none;"
+    >
+
+        <div class="comprovante-modal-card">
+
+            <div class="comprovante-modal-header">
+
+                <h3 id="comprovante-modal-titulo">
+                    🖼️ Comprovante
+                </h3>
+
+
+                <button
+                    type="button"
+                    class="comprovante-modal-fechar"
+                    onclick="fecharComprovantePremium()"
+                >
+                    ✕
+                </button>
+
+            </div>
+
+
+            <div
+                id="comprovante-modal-corpo"
+                class="comprovante-modal-corpo"
+            >
+
+                <div class="comprovante-carregando">
+                    Carregando comprovante...
+                </div>
+
+            </div>
+ 
+        </div>
+
+    </div>
+    
+    <script>
+        // FUNÇÃO DE SEGURANÇA PARA O RESET GLOBAL
+        function resetarServidorInteiro() {
+            // Trava 1: Alerta visual
+            if(confirm("🚨 ALERTA VERMELHO! 🚨\n\nTens a certeza absoluta de que queres zerar o Passe de TODOS OS JOGADORES do servidor? Esta ação não pode ser desfeita!")) {
+                
+                // Trava 2: Digitar palavra de confirmação
+                let pass = prompt("Para confirmar o apocalipse, escreve a palavra: RESET");
+                
+                if (pass === "RESET") {
+                    fetch('/admin/reset_global_passe')
+                        .then(r => r.json())
+                        .then(data => alert(data.msg))
+                        .catch(e => alert("Erro crítico na comunicação com a base de dados!"));
+                } else {
+                    alert("Ação cancelada. A palavra não confere.");
+                }
+            }
+        }
+        
+        function executar(rotaBase, inputId) {
+            // Agora ele pega o NOME que você digitar na caixinha
+            const nomeHeroi = document.getElementById('player_name').value.trim();
+            
+            if (!nomeHeroi) {
+                alert("Por favor, digite o nome do personagem!");
+                return;
+            }
+
+            let url = `${rotaBase}${encodeURIComponent(nomeHeroi)}`;
+            
+            if (inputId) {
+                const qty = document.getElementById(inputId).value;
+                url += `/${qty}`;
+            }
+            
+            fetch(url)
+                .then(r => r.json())
+                .then(data => alert(data.msg))
+                .catch(e => alert("Erro ao conectar com o servidor!"));
+        }
+
+        // ============================================================
+        // 💎 LOJA PREMIUM - ADMIN
+        // ============================================================
+
+        function escaparHtmlAdmin(
+            valor
+        ) {
+
+            return String(
+                valor ?? ""
+            )
+            .replaceAll(
+                "&",
+                "&amp;"
+            )
+            .replaceAll(
+                "<",
+                "&lt;"
+            )
+            .replaceAll(
+                ">",
+                "&gt;"
+            )
+            .replaceAll(
+                '"',
+                "&quot;"
+            )
+            .replaceAll(
+                "'",
+                "&#039;"
+            );
+        }
+
+
+        function formatarDataAdmin(
+            valor
+        ) {
+
+            if (!valor) {
+                return "-";
+            }
+
+
+            try {
+
+                return new Date(
+                    valor
+                ).toLocaleString(
+                    "pt-BR"
+                );
+
+            } catch {
+
+                return valor;
+            }
+        }
+
+
+        async function carregarPedidosPremium(
+            status = "",
+            botao = null
+        ) {
+
+            const area =
+                document.getElementById(
+                    "premium-pedidos"
+                );
+
+
+            const contador =
+                document.getElementById(
+                    "premium-contador"
+                );
+
+
+            if (!area) {
+                return;
+            }
+
+
+            document
+                .querySelectorAll(
+                    ".premium-filtro"
+                )
+                .forEach(
+                    item => {
+
+                        item.classList.remove(
+                            "ativo"
+                        );
+                    }
+                );
+
+
+            if (botao) {
+
+                botao.classList.add(
+                    "ativo"
+                );
+            }
+
+
+            area.innerHTML = `
+                <div class="premium-vazio">
+                    Consultando pedidos...
+                </div>
+            `;
+
+
+            try {
+
+                let url =
+                    "/admin/api/premium/pedidos";
+
+
+                if (status) {
+
+                    url +=
+                        `?status=${encodeURIComponent(status)}`;
+                }
+
+
+                const resposta =
+                    await fetch(
+                        url,
+                        {
+                            cache:
+                                "no-store",
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    || !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        || "Erro ao carregar pedidos."
+                    );
+                }
+
+
+                const pedidos =
+                    dados.pedidos || [];
+
+
+                if (contador) {
+
+                    contador.textContent =
+                        pedidos.length;
+                }
+
+
+                if (
+                    pedidos.length
+                    === 0
+                ) {
+
+                    area.innerHTML = `
+                        <div class="premium-vazio">
+                            Nenhum pedido nesta categoria.
+                                </div>
+                    `;
+
+                    return;
+                }
+
+
+                area.innerHTML =
+                    pedidos.map(
+                        pedido => {
+
+                            const codigo =
+                                escaparHtmlAdmin(
+                                    pedido.codigo
+                                );
+
+
+                            const nome =
+                                escaparHtmlAdmin(
+                                    pedido.personagem_nome
+                                );
+
+
+                            const statusPedido =
+                                pedido.status;
+
+
+                            let statusHtml = "";
+
+
+                            if (
+                                statusPedido
+                                === "aprovado"
+                            ) {
+
+                                statusHtml = `
+                                    <span
+                                        class="premium-status aprovado"
+                                    >
+                                        ✅ Aprovado
+                                    </span>
+                                `;
+
+                            } else if (
+                                statusPedido
+                                === "recusado"
+                            ) {
+
+                                statusHtml = `
+                                    <span
+                                        class="premium-status recusado"
+                                    >
+                                        ❌ Recusado
+                                    </span>
+                                `;
+
+                            } else if (
+                                statusPedido
+                                === "processando_aprovacao"
+                            ) {
+
+                                statusHtml = `
+                                    <span
+                                        class="premium-status analise"
+                                    >
+                                        ⚙️ Processando aprovação
+                                    </span>
+                                `;
+
+                            } else {
+
+                                statusHtml = `
+                                    <span
+                                        class="premium-status analise"
+                                    >
+                                        🔎 Em análise
+                                    </span>
+                                `;
+                            }
+
+
+                            let acoes = "";
+
+
+                            if (
+                                pedido.tem_comprovante
+                            ) {
+
+                                acoes += `
+                                    <button
+                                        type="button"
+                                        class="btn-comprovante"
+                                        onclick="abrirComprovantePremium('${codigo}')"
+                                    >
+                                        🖼️ Ver comprovante
+                                    </button>
+                                `;
+                            }
+
+
+                            if (
+                                statusPedido
+                                === "em_analise"
+                            ) {
+
+                                acoes += `
+                                    <button
+                                        type="button"
+                                        class="btn-aprovar"
+                                        onclick="aprovarPedidoPremium('${codigo}')"
+                                    >
+                                        ✅ Aprovar
+                                    </button>
+
+
+                                    <button
+                                        type="button"
+                                        class="btn-recusar"
+                                        onclick="recusarPedidoPremium('${codigo}')"
+                                    >
+                                        ❌ Recusar
+                                    </button>
+                                `;
+                            }
+
+
+                            return `
+                                <div
+                                    class="premium-pedido"
+                                >
+
+                                    <div
+                                        class="premium-pedido-codigo"
+                                    >
+                                        ${codigo}
+                                    </div>
+
+        
+                                    <div
+                                        class="premium-pedido-player"
+                                    >
+                                        👤 ${nome}
+                                    </div>
+
+
+                                    <div
+                                        class="premium-pedido-info"
+                                    >
+                                        💎
+                                        ${Number(
+                                            pedido.gemas || 0
+                                        ).toLocaleString(
+                                            "pt-BR"
+                                        )}
+                                        Gemas
+
+                                        <br>
+
+                                        💵
+                                        ${escaparHtmlAdmin(
+                                            pedido.valor_formatado
+                                        )}
+
+                                        <br>
+
+                                        🕒
+                                        ${escaparHtmlAdmin(
+                                            formatarDataAdmin(
+                                                pedido.atualizado_em
+                                            )
+                                        )}
+                                    </div>
+
+
+                                    ${statusHtml}
+
+
+                                    <div
+                                        class="premium-acoes"
+                                    >
+                                        ${acoes}
+                                    </div>
+
+                                </div>
+                            `;
+                        }
+                    )
+                    .join("");
+
+
+            } catch (erro) {
+
+                console.error(
+                    erro
+                );
+
+
+                area.innerHTML = `
+                    <div class="premium-vazio">
+                        ❌ ${escaparHtmlAdmin(
+                            erro.message
+                        )}
+                    </div>
+                `;
+            }
+        }
+
+
+        // ============================================================
+        // 🖼️ COMPROVANTE
+        // ============================================================
+
+        let comprovanteObjectUrl = null;
+
+
+        async function abrirComprovantePremium(
+            codigo
+        ) {
+
+            const modal =
+                document.getElementById(
+                    "comprovante-modal"
+                );
+
+
+            const corpo =
+                document.getElementById(
+                    "comprovante-modal-corpo"
+                );
+
+
+            const titulo =
+                document.getElementById(
+                    "comprovante-modal-titulo"
+                );
+
+
+            if (
+                !modal ||
+                !corpo
+            ) {
+                return;
+            }
+
+
+            titulo.textContent =
+                `🖼️ Comprovante ${codigo}`;
+
+
+            corpo.innerHTML = `
+                <div class="comprovante-carregando">
+                    ✨ Carregando comprovante...
+                </div>
+            `;
+
+
+            modal.style.display =
+                "flex";
+
+
+            try {
+
+                const resposta = await fetch(
+                    `/admin/api/premium/comprovante/${encodeURIComponent(codigo)}`,
+                    {
+                        method:
+                            "GET",
+
+                        credentials:
+                            "same-origin",
+
+                        cache:
+                            "no-store",
+                    }
+                );
+
+
+                if (!resposta.ok) {
+
+                    let mensagem =
+                        "Não foi possível abrir o comprovante.";
+
+
+                    try {
+
+                        const erro =
+                            await resposta.json();
+
+
+                        mensagem =
+                            erro.error
+                            || mensagem;
+
+                    } catch {
+                    }
+
+
+                    throw new Error(
+                        mensagem
+                    );
+                }
+
+
+                const blob =
+                    await resposta.blob();
+
+
+                if (
+                    comprovanteObjectUrl
+                ) {
+
+                    URL.revokeObjectURL(
+                        comprovanteObjectUrl
+                    );
+                }
+
+
+                comprovanteObjectUrl =
+                    URL.createObjectURL(
+                        blob
+                    );
+
+
+                const tipo =
+                    String(
+                        blob.type || ""
+                    ).toLowerCase();
+
+
+                if (
+                    tipo.startsWith(
+                        "image/"
+                    )
+                ) {
+
+                    corpo.innerHTML = `
+                        <img
+                            src="${comprovanteObjectUrl}"
+                            class="comprovante-modal-imagem"
+                            alt="Comprovante ${escaparHtmlAdmin(codigo)}"
+                        >
+                    `;
+
+                } else if (
+                    tipo === "application/pdf"
+                ) {
+
+                    corpo.innerHTML = `
+                        <iframe
+                            src="${comprovanteObjectUrl}"
+                            class="comprovante-modal-pdf"
+                            title="Comprovante ${escaparHtmlAdmin(codigo)}"
+                        ></iframe>
+                    `;
+
+                } else {
+
+                    corpo.innerHTML = `
+                        <div class="comprovante-carregando">
+                            ❌ Formato de comprovante não suportado para visualização.
+                        </div>
+                    `;
+                }
+
+
+            } catch (erro) {
+
+                console.error(
+                    "❌ [COMPROVANTE ADMIN]",
+                    erro
+                );
+
+
+                corpo.innerHTML = `
+                    <div
+                        class="comprovante-carregando"
+                        style="color:#fecaca;"
+                    >
+                        ❌ ${escaparHtmlAdmin(
+                            erro.message
+                        )}
+                    </div>
+                `;
+            }
+        }
+
+
+        function fecharComprovantePremium() {
+
+            const modal =
+                document.getElementById(
+                    "comprovante-modal"
+                );
+
+
+            const corpo =
+                document.getElementById(
+                    "comprovante-modal-corpo"
+                );
+
+
+            if (modal) {
+
+                modal.style.display =
+                    "none";
+            }
+
+
+            if (corpo) {
+
+                corpo.innerHTML = "";
+            }
+
+
+            if (
+                comprovanteObjectUrl
+            ) {
+
+                URL.revokeObjectURL(
+                    comprovanteObjectUrl
+                );
+
+                comprovanteObjectUrl =
+                    null;
+            }
+        }
+
+        // ============================================================
+        // 🛡️ MODAL PERSONALIZADO GM
+        // ============================================================
+
+        let resolverModalGM = null;
+        let tipoModalGM = "aprovar";
+
+
+        function abrirModalGM({
+            tipo = "aprovar",
+            titulo = "",
+            texto = "",
+            alerta = "",
+        }) {
+
+            tipoModalGM = tipo;
+
+
+            const overlay =
+                document.getElementById(
+                    "gm-modal-overlay"
+                );
+
+
+            const icon =
+                document.getElementById(
+                    "gm-modal-icon"
+                );
+
+
+            const campoTitulo =
+                document.getElementById(
+                    "gm-modal-titulo"
+                );
+
+
+            const campoTexto =
+                document.getElementById(
+                    "gm-modal-texto"
+                );
+
+
+            const campoAlerta =
+                document.getElementById(
+                    "gm-modal-alerta"
+                );
+
+
+            const motivo =
+                document.getElementById(
+                    "gm-modal-motivo"
+                );
+
+
+            const confirmar =
+                document.getElementById(
+                    "gm-modal-confirmar"
+                );
+
+
+            campoTitulo.textContent =
+                titulo;
+
+
+            campoTexto.textContent =
+                texto;
+
+
+            campoAlerta.textContent =
+                alerta;
+
+
+            motivo.value = "";
+
+
+            if (tipo === "recusar") {
+
+                icon.textContent = "❌";
+
+                motivo.style.display =
+                    "block";
+
+                confirmar.textContent =
+                    "RECUSAR";
+
+                confirmar.classList.add(
+                    "recusar"
+                );
+
+            } else {
+
+                icon.textContent = "✅";
+
+                motivo.style.display =
+                    "none";
+
+                confirmar.textContent =
+                    "APROVAR";
+
+                confirmar.classList.remove(
+                    "recusar"
+                );
+            }
+
+
+            overlay.style.display =
+                "flex";
+
+
+            return new Promise(
+                resolve => {
+
+                    resolverModalGM =
+                        resolve;
+                }
+            );
+        }
+
+
+        function fecharModalGM(
+            confirmado
+        ) {
+
+            const overlay =
+                document.getElementById(
+                    "gm-modal-overlay"
+                );
+
+
+            const motivo =
+                document.getElementById(
+                    "gm-modal-motivo"
+                );
+
+
+            if (
+                confirmado
+                && tipoModalGM === "recusar"
+            ) {
+
+                const texto =
+                    motivo.value.trim();
+
+
+                if (!texto) {
+
+                    motivo.focus();
+
+                    return;
+                }
+
+
+                overlay.style.display =
+                    "none";
+
+
+                if (resolverModalGM) {
+
+                    resolverModalGM(
+                        texto
+                    );
+
+                    resolverModalGM = null;
+                }
+
+
+                return;
+            }
+
+
+            overlay.style.display =
+                "none";
+
+
+            if (resolverModalGM) {
+
+                resolverModalGM(
+                    confirmado
+                    ? true
+                    : null
+                );
+
+                resolverModalGM = null;
+            }
+        }
+
+        // ============================================================
+        // ✅ APROVAR
+        // ============================================================
+
+        async function aprovarPedidoPremium(
+            codigo
+        ) {
+
+            const confirmar =
+                await abrirModalGM({
+                    tipo:
+                        "aprovar",
+
+                    titulo:
+                        `Aprovar ${codigo}?`,
+
+                    texto:
+                        "Confirme somente após verificar o comprovante enviado pelo jogador.",
+
+                    alerta:
+                        "💎 As Gemas serão creditadas imediatamente após a aprovação.",
+                });
+
+
+            if (!confirmar) {
+                return;
+            }
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/premium/aprovar",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    codigo_pedido:
+                                        codigo,
+                                }),
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    || !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        || "Falha na aprovação."
+                    );
+                }
+
+
+                alert(
+                    `${dados.message}\n\nSaldo atual: ${dados.novo_saldo_gemas} Gemas`
+                );
+
+
+                carregarPedidosPremium(
+                    ""
+                );
+
+
+            } catch (erro) {
+
+                alert(
+                    `Erro: ${erro.message}`
+                );
+            }
+        }
+
+
+        // ============================================================
+        // ❌ RECUSAR
+        // ============================================================
+
+        async function recusarPedidoPremium(
+            codigo
+        ) {
+
+            const motivo =
+                await abrirModalGM({
+                    tipo:
+                        "recusar",
+
+                    titulo:
+                        `Recusar ${codigo}?`,
+
+                    texto:
+                        "Informe o motivo da recusa para registrar no pedido.",
+
+                    alerta:
+                        "❌ Nenhuma Gema será creditada ao jogador.",
+                });
+
+
+            if (
+                motivo === null
+            ) {
+                return;
+            }
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/premium/recusar",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    codigo_pedido:
+                                        codigo,
+
+                                    motivo:
+                                        motivo,
+                                }),
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    || !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        || "Falha ao recusar pedido."
+                    );
+                }
+
+
+                alert(
+                    dados.message
+                );
+
+
+                carregarPedidosPremium(
+                    ""
+                );
+
+
+            } catch (erro) {
+
+                alert(
+                    `Erro: ${erro.message}`
+                );
+            }
+        }
+
+        // ============================================================
+        // ⚔️ GUERRA DE CLÃS — CONTROLE GM
+        // ============================================================
+
+        function nomeFaseGuerraGM(
+            fase
+        ) {
+
+            const nomes = {
+
+                inscricoes:
+                    "📝 Inscrições",
+
+                escalacao:
+                    "🔒 Escalação",
+
+                pareamento:
+                    "⚖️ Pareamento",
+
+                agendada:
+                    "📅 Agendada",
+
+                em_andamento:
+                    "⚔️ Em andamento",
+
+                finalizada:
+                    "🏆 Finalizada",
+            };
+
+
+            return (
+                nomes[fase]
+                ||
+                fase
+                ||
+                "—"
+            );
+        }
+
+
+        async function carregarControleGuerraGM() {
+
+            const area =
+                document.getElementById(
+                    "guerra-gm-status"
+                );
+
+
+            if (!area) {
+                return;
+            }
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/guerra/teste/estado",
+                        {
+                            cache:
+                                "no-store"
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    ||
+                    !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        ||
+                        "Erro ao consultar Guerra."
+                    );
+                }
+
+
+                const calendario =
+                    dados.calendario ||
+                    {};
+
+
+                const modoTeste =
+                    Boolean(
+                        calendario.modo_teste
+                    );
+
+
+                area.innerHTML = `
+
+                    <strong>
+                        ${
+                            modoTeste
+                                ? "🧪 MODO DE TESTE ATIVO"
+                                : "🌐 CALENDÁRIO REAL"
+                        }
+                    </strong>
+
+                    <br>
+
+                    Fase utilizada:
+                    <b>
+                        ${
+                            escaparHtmlAdmin(
+                                nomeFaseGuerraGM(
+                                    calendario.fase
+                                )
+                            )
+                        }
+                    </b>
+
+                    <br>
+
+                    Fase real:
+                    <span
+                        style="
+                            color:#94a3b8;
+                        "
+                    >
+                        ${
+                            escaparHtmlAdmin(
+                                nomeFaseGuerraGM(
+                                    calendario.fase_real
+                                )
+                            )
+                        }
+                    </span>
+
+                    ${
+                        modoTeste
+                            ? `
+                                <br>
+                                <span
+                                    style="
+                                        color:#fde68a;
+                                    "
+                                >
+                                    ⚠️ O relógio oficial está
+                                    temporariamente ignorado.
+                                </span>
+                            `
+                            : ""
+                    }
+                `;
+
+
+            } catch (
+                erro
+            ) {
+
+                area.innerHTML =
+                    `
+                        ❌ ${
+                            escaparHtmlAdmin(
+                                erro.message
+                            )
+                        }
+                    `;
+            }
+        }
+
+
+        async function forcarFaseGuerraGM(
+            fase
+        ) {
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/guerra/teste/fase",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    fase:
+                                        fase
+                                })
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    ||
+                    !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        ||
+                        "Não foi possível alterar a fase."
+                    );
+                }
+
+
+                await carregarControleGuerraGM();
+
+
+            } catch (
+                erro
+            ) {
+
+                alert(
+                    "Erro: "
+                    + erro.message
+                );
+            }
+        }
+
+
+        async function voltarCalendarioRealGuerraGM() {
+
+            if (
+                !confirm(
+                    "Voltar a Guerra para o calendário real?"
+                )
+            ) {
+                return;
+            }
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/guerra/teste/calendario-real",
+                        {
+                            method:
+                                "POST"
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    ||
+                    !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        ||
+                        "Não foi possível restaurar "
+                        + "o calendário."
+                    );
+                }
+
+
+                await carregarControleGuerraGM();
+
+
+            } catch (
+                erro
+            ) {
+
+                alert(
+                    "Erro: "
+                    + erro.message
+                );
+            }
+        }
+
+
+        async function destravarEscalacoesGuerraGM() {
+
+            if (
+                !confirm(
+                    "Destravar todas as escalações "
+                    + "da semana atual?\n\n"
+                    + "Os inscritos serão preservados."
+                )
+            ) {
+                return;
+            }
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/guerra/teste/destravar-escalacoes",
+                        {
+                            method:
+                                "POST"
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    ||
+                    !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        ||
+                        "Falha ao destravar."
+                    );
+                }
+
+
+                alert(
+                    dados.message
+                );
+
+
+                await carregarControleGuerraGM();
+
+
+            } catch (
+                erro
+            ) {
+
+                alert(
+                    "Erro: "
+                    + erro.message
+                );
+            }
+        }
+
+                // ============================================================
+        // 🔄 REINICIAR BATALHA DE UMA FRENTE
+        // ============================================================
+
+        async function reiniciarBatalhaFrenteGuerraGM() {
+
+            const campo =
+                document.getElementById(
+                    "guerra-reset-personagem"
+                );
+
+
+            const nome =
+                String(
+                    campo?.value ||
+                    ""
+                ).trim();
+
+
+            if (!nome) {
+
+                alert(
+                    "Informe um personagem "
+                    + "titular da frente."
+                );
+
+                return;
+            }
+
+
+            const confirmar =
+                confirm(
+                    "Reiniciar a batalha da frente "
+                    + "onde "
+                    + nome
+                    + " está escalado?\n\n"
+                    + "HP, MP, cooldowns, turnos e "
+                    + "log serão reiniciados.\n\n"
+                    + "Escalação, lobby e PRONTOS "
+                    + "serão preservados."
+                );
+
+
+            if (!confirmar) {
+
+                return;
+            }
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/guerra/teste/reiniciar-frente",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+
+                                    nome_personagem:
+                                        nome
+                                })
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    ||
+                    !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        ||
+                        "Não foi possível "
+                        + "reiniciar a frente."
+                    );
+                }
+
+
+                alert(
+                    "✅ "
+                    + dados.message
+                );
+
+
+                await carregarControleGuerraGM();
+
+
+            } catch (
+                erro
+            ) {
+
+                console.error(
+                    "❌ [GM GUERRA RESET]",
+                    erro
+                );
+
+
+                alert(
+                    "Erro:\n"
+                    + erro.message
+                );
+            }
+        }
+        
+        // ============================================================
+        // ⚖️ EXECUTAR PAREAMENTO DA GUERRA
+        // ============================================================
+
+        async function executarPareamentoGuerraGM() {
+
+            const confirmar =
+                confirm(
+                    "Executar agora o pareamento "
+                    + "dos clãs com escalação confirmada?\n\n"
+                    + "Somente clãs da mesma categoria "
+                    + "serão confrontados."
+                );
+
+
+            if (!confirmar) {
+                return;
+            }
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/admin/api/guerra/teste/parear",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            }
+                        }
+                    );
+
+
+                const dados =
+                    await resposta.json();
+
+
+                if (
+                    !resposta.ok
+                    ||
+                    !dados.success
+                ) {
+
+                    throw new Error(
+                        dados.error
+                        ||
+                        "Não foi possível executar "
+                        + "o pareamento."
+                    );
+                }
+
+
+                let texto =
+                    "⚖️ PAREAMENTO PROCESSADO\n\n";
+
+
+                texto +=
+                    "Confrontos criados: "
+                    + Number(
+                        dados.guerras_criadas_total ||
+                        0
+                    );
+
+
+                // =============================================
+                // ⚔️ GUERRAS CRIADAS
+                // =============================================
+
+                if (
+                    Array.isArray(
+                        dados.guerras
+                    )
+                    &&
+                    dados.guerras.length
+                ) {
+
+                    texto +=
+                        "\n\n⚔️ CONFRONTOS:\n";
+
+
+                    dados.guerras.forEach(
+                        guerra => {
+
+                            texto +=
+                                "\n"
+                                + String(
+                                    guerra.clan_a ||
+                                    "Clã A"
+                                )
+                                + "  VS  "
+                                + String(
+                                    guerra.clan_b ||
+                                    "Clã B"
+                                );
+
+                            texto +=
+                                "\nCategoria: "
+                                + Number(
+                                    guerra.categoria ||
+                                    5
+                                )
+                                + "x"
+                                + Number(
+                                    guerra.categoria ||
+                                    5
+                                );
+
+                            texto +=
+                                "\nFrentes: "
+                                + Number(
+                                    guerra.frentes ||
+                                    0
+                                );
+
+                            texto +=
+                                "\n";
+                        }
+                    );
+                }
+
+
+                // =============================================
+                // 🕐 SEM ADVERSÁRIO
+                // =============================================
+
+                if (
+                    Array.isArray(
+                        dados.aguardando_adversario
+                    )
+                    &&
+                    dados.aguardando_adversario.length
+                ) {
+
+                    texto +=
+                        "\n🕐 AGUARDANDO ADVERSÁRIO:\n";
+
+
+                    dados
+                        .aguardando_adversario
+                        .forEach(
+                            clan => {
+
+                                texto +=
+                                    "\n"
+                                    + String(
+                                        clan.nome ||
+                                        "Clã"
+                                    )
+                                    + " — "
+                                    + Number(
+                                        clan.categoria ||
+                                        5
+                                    )
+                                    + "x"
+                                    + Number(
+                                        clan.categoria ||
+                                        5
+                                    );
+                            }
+                        );
+                }
+
+
+                // =============================================
+                // ⚠️ IGNORADOS
+                // =============================================
+
+                if (
+                    Array.isArray(
+                        dados.ignorados
+                    )
+                    &&
+                    dados.ignorados.length
+                ) {
+
+                    texto +=
+                        "\n\n⚠️ CLÃS IGNORADOS:\n";
+
+
+                    dados.ignorados.forEach(
+                        item => {
+
+                            texto +=
+                                "\n"
+                                + String(
+                                    item.clan_id ||
+                                    "?"
+                                )
+                                + " — "
+                                + String(
+                                    item.motivo ||
+                                    "motivo desconhecido"
+                                );
+                        }
+                    );
+                }
+
+
+                alert(
+                    texto
+                );
+
+
+                await carregarControleGuerraGM();
+
+
+            } catch (
+                erro
+            ) {
+
+                console.error(
+                    "❌ [GM GUERRA] Pareamento:",
+                    erro
+                );
+
+
+                alert(
+                    "Erro no pareamento:\n"
+                    + erro.message
+                );
+            }
+        }
+                
+        // ============================================================
+        // 🚀 CARREGAMENTO INICIAL
+        // ============================================================
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            () => {
+
+                carregarPedidosPremium(
+                    ""
+                );
+
+
+                carregarControleGuerraGM();
+
+            }
+        );
+        
+        // ============================================================
+        // 🛠️ FERRAMENTAS DO REINO
+        // ============================================================
+
+        function mostrarStatusFerramentaGM(mensagem, erro = false) {
+
+            const area = document.getElementById(
+                "ferramentas-reino-status"
+            );
+
+            if (!area) {
+                return;
+            }
+
+            area.style.display = "block";
+
+            area.style.color = erro
+                ? "#fecaca"
+                : "#bbf7d0";
+
+            area.textContent = mensagem;
+        }
+
+
+        // ============================================================
+        // ⚔️ INICIAR INVASÃO
+        // ============================================================
+
+        async function iniciarInvasaoGM() {
+
+            const confirmar = confirm(
+                "⚔️ Iniciar a Invasão do Reino agora?\n\n"
+                + "O evento será disparado manualmente."
+            );
+
+            if (!confirmar) {
+                return;
+            }
+
+            try {
+
+                const resposta = await fetch(
+                    "/admin/api/invasao/iniciar",
+                    {
+                        method: "POST",
+                        credentials: "same-origin"
+                    }
+                );
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok || !dados.success) {
+                    throw new Error(
+                        dados.error
+                        || "Não foi possível iniciar a invasão."
+                    );
+                }
+
+                mostrarStatusFerramentaGM(
+                    dados.message
+                    || "⚔️ Invasão iniciada."
+                );
+
+            } catch (erro) {
+
+                console.error(
+                    "Erro ao iniciar invasão:",
+                    erro
+                );
+
+                mostrarStatusFerramentaGM(
+                    "❌ " + erro.message,
+                    true
+                );
+            }
+        }
+
+
+        // ============================================================
+        // 🧹 LIMPAR PARTIES
+        // ============================================================
+
+        async function limparPartiesGM() {
+
+            const confirmar = confirm(
+                "🧹 Limpar TODAS as parties existentes?\n\n"        
+                + "Use somente para manutenção ou testes."
+            );
+
+            if (!confirmar) {
+                return;
+            }
+
+            try {
+
+                const resposta = await fetch(
+                    "/admin/api/parties/resetar",
+                    {
+                        method: "POST",
+                        credentials: "same-origin"
+                    }
+                );
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok || !dados.success) {
+                    throw new Error(
+                        dados.error
+                        || "Não foi possível limpar as parties."
+                    );
+                }
+
+                mostrarStatusFerramentaGM(
+                    dados.message
+                    || "🧹 Parties removidas."
+                );
+
+            } catch (erro) {
+
+                console.error(
+                    "Erro ao limpar parties:",
+                    erro
+                );
+
+                mostrarStatusFerramentaGM(
+                    "❌ " + erro.message,
+                    true
+                );
+            }
+        }
+        
+    </script>
+</body>
+</html>

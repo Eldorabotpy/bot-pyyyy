@@ -1,6 +1,12 @@
 # modules/recipes/coleta_t2.py
 
-RECIPES = {
+from __future__ import annotations
+from typing import Dict, Any
+
+# TIER 2: RECEITAS 
+# ============================================================================
+
+RECIPES: Dict[str, Dict[str, Any]] = {
     # ==========================
     # 🪓 FERRAMENTAS DE LENHADOR (Tier 2 - Ferro)
     # ==========================
@@ -16,7 +22,7 @@ RECIPES = {
             "barra_de_ferro": 4,        # Exige muito minério processado
             "tabua_de_carvalho": 2,     # Madeira refinada (não bruta)
             "couro_curtido": 2,          # Para a empunhadura
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 450,
         "craft_time": 60,               # 1 minuto
@@ -38,7 +44,7 @@ RECIPES = {
             "barra_de_ferro": 5,
             "tabua_de_carvalho": 2,
             "corda_de_linho": 1,         # Para fixar a cabeça ao cabo
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 500,
         "craft_time": 60,
@@ -60,7 +66,7 @@ RECIPES = {
             "barra_de_ferro": 3,
             "tabua_de_carvalho": 3,     # Cabo longo gasta mais madeira
             "corda_de_linho": 2,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 400,
         "craft_time": 50,
@@ -82,7 +88,7 @@ RECIPES = {
             "barra_de_ferro": 2,
             "couro_curtido": 3,         # Bainha e cabo de couro
             "dente_afiado": 2,           # Uso criativo de drop de monstro
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 350,
         "craft_time": 45,
@@ -98,13 +104,13 @@ RECIPES = {
         "type": "tool",
         "sub_type": "alquimista",
         "tier": 2,
-        "profession_req": "artesao", # Ou oleiro, se tiver
+        "profession_req": "joalheiro", # Ou oleiro, se tiver
         "level_req": 5,
         "ingredients": {
             "placa_de_pedra_polida": 2, # Requer processar pedra
             "oleo_mineral": 1,          # Para impermeabilizar
             "carvao": 2,                 # Para queimar a cerâmica
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "gold_cost": 300,
         "craft_time": 40,

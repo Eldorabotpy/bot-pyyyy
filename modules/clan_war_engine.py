@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, List
 from modules import player_manager
 from datetime import timedelta
 # Para resolver nomes dos clãs no ranking
-from modules import clan_manager 
+from modules.clan import clan_manager
 from bson import ObjectId
 from modules.database import db
 
@@ -151,9 +151,13 @@ async def get_region_leaderboard(region_key: str) -> List[Dict[str, Any]]:
         clan_name = f"Clã {c_id}"
         try:
             if clan_manager:
-                c_data = await clan_manager.get_clan(c_id)
+                c_data = clan_manager.obter_cla_por_id(c_id)
+
                 if c_data:
-                    clan_name = c_data.get("display_name", clan_name)
+                    clan_name = c_data.get(
+                        "nome",
+                        clan_name
+                    )
         except:
             pass
             

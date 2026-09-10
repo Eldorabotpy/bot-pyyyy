@@ -43,14 +43,38 @@ async def try_craft(user_id: str, player_data: dict, recipe_id: str) -> dict:
     # ----------------------------
     # 1) Trava de Profissão
     # ----------------------------
-    my_prof_data = player_data.get("profession", {}) or {}
-    my_prof = my_prof_data.get("key") or my_prof_data.get("type")
+    # ----------------------------
+    # 1) Trava de Profissão (Suporte a Multi-Profissões)
+    # ----------------------------
     req_prof = recipe.get("profession_req")
 
-    if req_prof and req_prof != my_prof:
-        return {"success": False, "error": f"Requer profissão: {str(req_prof).capitalize()}"}
+    if req_prof:
+        # 1. Pega a profissão antiga (para compatibilidade com jogadores que ainda não atualizaram)
+        my_prof_data = player_data.get("profession", {}) or {}
+        legacy_prof = my_prof_data.get("key") or my_prof_data.get("type")
 
-    # ----------------------------
+        # 2. Pega o novo campo que guardará VÁRIAS profissões no banco de dados
+        learned_professions = player_data.get("learned_professions", [])
+        
+        # 3. Cria uma lista unindo tudo o que o jogador sabe fazer
+        minhas_profissoes = set()
+        
+        # Se for um Dicionário (ex: {"ferreiro": {...}, "colhedor": {...}})
+        if isinstance(learned_professions, dict):
+            minhas_profissoes.update(learned_professions.keys())
+        # Se for uma Lista (ex: ["ferreiro", "colhedor"])
+        elif isinstance(learned_professions, list):
+            minhas_profissoes.update(learned_professions)
+            
+        # Adiciona a profissão antiga na lista, se existir
+        if legacy_prof:
+            minhas_profissoes.add(legacy_prof)
+
+        # 4. Verifica se a profissão exigida está entre as que ele já aprendeu!
+        if req_prof not in minhas_profissoes:
+            return {"success": False, "error": f"Requer profissão: {str(req_prof).capitalize()}"}
+ 
+     # ----------------------------
     # 2) Trava de FERRAMENTA DE CRIAÇÃO (Modelo A)
     #   - Qualquer tier serve; exige apenas tipo correto e durabilidade > 0
     # ----------------------------
@@ -163,9 +187,9 @@ RARITY_CAPS_FALLBACK = {
 }
 
 # Itens de aprimoramento
-JOIA_FORJA_ID    = "joia_da_forja"
-SIGILO_ID        = "sigilo_protecao"
-PARCHMENT_ID     = "pergaminho_durabilidade"
+JOIA_FORJA_ID    = "pedra_de_aprimoramento"
+SIGILO_ID        = "sigilo_de_protecao"
+PARCHMENT_ID     = "pergaminho_de_reparo"
 
 # Regras de chance (ajustadas)
 BASE_SUCCESS_BY_TARGET = {
@@ -188,11 +212,35 @@ MAX_CHANCE = 0.95
 # Inventário util
 # =========================
 def _inv_qty(pdata: dict, item_id: str) -> int:
+    """
+    Conta item no inventário por:
+    - chave direta: inventory["pergaminho_durabilidade"] = 3
+    - item empilhado por UID: inventory["uuid"] = {"base_id": "pergaminho_durabilidade", "quantity": 3}
+    """
     inv = (pdata or {}).get("inventory", {}) or {}
-    val = inv.get(item_id, 0)
-    if isinstance(val, dict): return 0
-    try: return int(val)
-    except Exception: return 0
+    total = 0
+
+    if not isinstance(inv, dict):
+        return 0
+
+    for uid, val in inv.items():
+        if isinstance(val, dict):
+            base = val.get("base_id", uid)
+
+            if base == item_id:
+                try:
+                    total += int(val.get("quantity", val.get("qtd", 1)) or 0)
+                except Exception:
+                    total += 1
+
+        else:
+            if uid == item_id:
+                try:
+                    total += int(val or 0)
+                except Exception:
+                    pass
+
+    return total
 
 def _consume_costs(pdata: dict, costs: Dict[str, int]) -> None:
     for k, need in (costs or {}).items():
@@ -221,28 +269,84 @@ def _get_item_info(base_id: str) -> dict:
 # =========================
 # Ferramentas de Coleta
 # =========================
-def _get_equipped_tool(player_data: dict) -> tuple[str | None, dict | None, dict | None]:
+def _norm_tool_key(value) -> str:
+    txt = str(value or "").strip().lower()
+    txt = (
+        txt.replace("á", "a")
+           .replace("à", "a")
+           .replace("ã", "a")
+           .replace("â", "a")
+           .replace("é", "e")
+           .replace("ê", "e")
+           .replace("í", "i")
+           .replace("ó", "o")
+           .replace("ô", "o")
+           .replace("õ", "o")
+           .replace("ú", "u")
+           .replace("ç", "c")
+    )
+    return txt
+
+def _get_equipped_tool(player_data: dict, required_tool_type: str | None = None) -> tuple[str | None, dict | None, dict | None]:
     """
     Retorna (unique_id, instância, item_base) da ferramenta equipada.
+
+    Novo sistema:
+        player_data["equipment_tools"]["ferreiro"] = uid_do_martelo
+
+    Compatibilidade antiga:
+        player_data["equipment"]["tool"] = uid_da_ferramenta
     """
     equip = player_data.get("equipment", {}) or {}
+    equip_tools = player_data.get("equipment_tools", {}) or {}
     inv = player_data.get("inventory", {}) or {}
 
+    if not isinstance(equip, dict):
+        equip = {}
+
+    if not isinstance(equip_tools, dict):
+        equip_tools = {}
+
+    required_tool_type = _norm_tool_key(required_tool_type)
+
+    # 1. Novo sistema: busca direto pela profissão/ferramenta necessária
+    if required_tool_type:
+        uid = equip_tools.get(required_tool_type)
+        if uid:
+            inst = inv.get(uid)
+            if isinstance(inst, dict):
+                base_id = inst.get("base_id")
+                info = _get_item_info(base_id)
+                if info:
+                    return uid, inst, info
+
+    # 2. Fallback antigo: slot único "tool"
     uid = equip.get("tool")
-    if not uid:
-        return None, None, None
+    if uid:
+        inst = inv.get(uid)
+        if isinstance(inst, dict):
+            base_id = inst.get("base_id")
+            info = _get_item_info(base_id)
 
-    inst = inv.get(uid)
-    if not isinstance(inst, dict):
-        return None, None, None
+            if info:
+                if required_tool_type:
+                    tool_type = _norm_tool_key(info.get("tool_type"))
+                    if tool_type == required_tool_type:
+                        return uid, inst, info
+                else:
+                    return uid, inst, info
 
-    base_id = inst.get("base_id")
-    info = _get_item_info(base_id)
-    if not info:
-        return None, None, None
+    # 3. Se não pediu tipo específico, pega qualquer ferramenta nova equipada
+    if not required_tool_type:
+        for uid in equip_tools.values():
+            inst = inv.get(uid)
+            if isinstance(inst, dict):
+                base_id = inst.get("base_id")
+                info = _get_item_info(base_id)
+                if info:
+                    return uid, inst, info
 
-    return uid, inst, info
-
+    return None, None, None
 
 def _consume_tool_durability(tool_inst: dict, amount: int = 1) -> bool:
     """
@@ -258,32 +362,538 @@ def _consume_tool_durability(tool_inst: dict, amount: int = 1) -> bool:
     _set_dur(tool_inst, cur, mx)
     return True
 
-def validate_and_prepare_gather(player_data: dict) -> dict:
+def _norm_prof_speed_key(value) -> str:
+    txt = str(value or "").strip().lower()
+    txt = (
+        txt.replace("á", "a")
+           .replace("à", "a")
+           .replace("ã", "a")
+           .replace("â", "a")
+           .replace("é", "e")
+           .replace("ê", "e")
+           .replace("í", "i")
+           .replace("ó", "o")
+           .replace("ô", "o")
+           .replace("õ", "o")
+           .replace("ú", "u")
+           .replace("ç", "c")
+    )
+    return txt
+
+
+def get_profession_level_for_speed(player_data: dict, profession_key: str) -> int:
     """
-    Valida se o jogador pode coletar:
-    - tem profissão
-    - tem ferramenta equipada
-    - ferramenta é compatível
-    - tem durabilidade
+    Pega o nível da profissão, considerando:
+    - learned_professions novo
+    - profession antigo
     """
-    prof = player_data.get("profession", {}) or {}
-    prof_key = prof.get("key") or prof.get("type")
+    prof_key = _norm_prof_speed_key(profession_key)
+    if not prof_key:
+        return 1
+
+    learned = player_data.get("learned_professions", {}) or {}
+
+    if isinstance(learned, dict):
+        prof_data = learned.get(prof_key)
+        if isinstance(prof_data, dict):
+            try:
+                return max(1, int(prof_data.get("level", 1) or 1))
+            except Exception:
+                return 1
+
+    elif isinstance(learned, list):
+        if prof_key in [_norm_prof_speed_key(p) for p in learned]:
+            return 1
+
+    legacy = player_data.get("profession", {}) or {}
+    if isinstance(legacy, dict):
+        legacy_key = _norm_prof_speed_key(legacy.get("key") or legacy.get("type"))
+        if legacy_key == prof_key:
+            try:
+                return max(1, int(legacy.get("level", 1) or 1))
+            except Exception:
+                return 1
+
+    return 1
+
+
+def get_equipped_tool_for_speed(player_data: dict, profession_key: str):
+    """
+    Procura a ferramenta equipada para a profissão.
+
+    Novo sistema:
+        equipment_tools["ferreiro"]
+
+    Compatibilidade:
+        equipment["tool"]
+    """
+    prof_key = _norm_prof_speed_key(profession_key)
+
+    inv = player_data.get("inventory", {}) or {}
+    equip = player_data.get("equipment", {}) or {}
+    equip_tools = player_data.get("equipment_tools", {}) or {}
+
+    if not isinstance(inv, dict):
+        inv = {}
+    if not isinstance(equip, dict):
+        equip = {}
+    if not isinstance(equip_tools, dict):
+        equip_tools = {}
+
+    # 1. Novo sistema: ferramenta por profissão
+    uid = equip_tools.get(prof_key)
+    if uid:
+        inst = inv.get(uid)
+        if isinstance(inst, dict):
+            info = _get_item_info(inst.get("base_id"))
+            if info:
+                return uid, inst, info
+
+    # 2. Compatibilidade: slot antigo único
+    uid = equip.get("tool")
+    if uid:
+        inst = inv.get(uid)
+        if isinstance(inst, dict):
+            info = _get_item_info(inst.get("base_id"))
+            tool_type = _norm_prof_speed_key(info.get("tool_type") or inst.get("tool_type"))
+
+            if not prof_key or tool_type == prof_key:
+                return uid, inst, info
+
+    return None, None, None
+
+
+def get_profession_key_from_recipe_for_speed(recipe: dict, fallback: str = "ferreiro") -> str:
+    if not isinstance(recipe, dict):
+        return _norm_prof_speed_key(fallback)
+
+    raw = (
+        recipe.get("profession")
+        or recipe.get("profession_req")
+        or recipe.get("required_tool_type")
+        or recipe.get("tool_type")
+        or fallback
+    )
+
+    if isinstance(raw, (list, tuple)) and raw:
+        raw = raw[0]
+
+    return _norm_prof_speed_key(raw)
+
+
+def get_profession_key_from_item_for_speed(item_inst: dict, fallback: str = "ferreiro") -> str:
+    """
+    Descobre a profissão do item pela receita original.
+    Serve para melhorar e desmontar.
+    """
+    if not isinstance(item_inst, dict):
+        return _norm_prof_speed_key(fallback)
+
+    recipe = None
+
+    recipe_id = item_inst.get("crafted_recipe_id")
+    base_id = item_inst.get("base_id")
+
+    if recipe_id:
+        recipe = crafting_registry.get_recipe(recipe_id)
+
+    if not recipe and base_id:
+        recipe = crafting_registry.get_recipe_by_item_id(base_id)
+
+    if recipe:
+        return get_profession_key_from_recipe_for_speed(recipe, fallback)
+
+    return _norm_prof_speed_key(fallback)
+
+
+def calculate_profession_work_duration(
+    player_data: dict,
+    base_seconds: int,
+    profession_key: str,
+    apply_perks: bool = True
+) -> dict:
+    """
+    Calcula tempo final de trabalho.
+
+    Fórmula:
+    - profissão: 0.5% por nível, máximo 25%
+    - tier ferramenta: T1 0%, T2 5%, T3 10%, T4 15%, T5 20%
+    - upgrade ferramenta: 1% por upgrade_level, máximo 10%
+    - redução total máxima: 50%
+    """
+    base_seconds = max(1, int(base_seconds or 1))
+    prof_key = _norm_prof_speed_key(profession_key)
+
+    prof_level = get_profession_level_for_speed(player_data, prof_key)
+
+    # Profissão: 0.5% por nível, máximo 25%
+    profession_bonus = min(0.25, prof_level * 0.005)
+
+    tool_uid, tool_inst, tool_info = get_equipped_tool_for_speed(player_data, prof_key)
+
+    tool_tier = 1
+    tool_upgrade = 0
+    tier_bonus = 0.0
+    upgrade_bonus = 0.0
+
+    if isinstance(tool_info, dict) and isinstance(tool_inst, dict):
+        try:
+            tool_tier = max(1, int(tool_info.get("tier", tool_inst.get("tier", 1)) or 1))
+        except Exception:
+            tool_tier = 1
+
+        try:
+            tool_upgrade = max(0, int(tool_inst.get("upgrade_level", tool_inst.get("refino", 0)) or 0))
+        except Exception:
+            tool_upgrade = 0
+
+        # T1 0%, T2 5%, T3 10%, T4 15%, T5 20%
+        tier_bonus = min(0.20, max(0, tool_tier - 1) * 0.05)
+
+        # +1% por melhoria, máximo 10%
+        upgrade_bonus = min(0.10, tool_upgrade * 0.01)
+
+    total_reduction = min(0.50, profession_bonus + tier_bonus + upgrade_bonus)
+
+    after_reduction = max(1, int(base_seconds * (1.0 - total_reduction)))
+
+    perk_multiplier = 1.0
+
+    if apply_perks:
+        try:
+            craft_mult_raw = player_manager.get_perk_value(player_data, "craft_speed_multiplier", None)
+
+            if craft_mult_raw is None:
+                perk_multiplier = float(player_manager.get_perk_value(player_data, "refine_speed_multiplier", 1.0))
+            else:
+                perk_multiplier = float(craft_mult_raw)
+
+            perk_multiplier = max(0.25, min(4.0, perk_multiplier))
+        except Exception:
+            perk_multiplier = 1.0
+
+    final_seconds = max(1, int(after_reduction / perk_multiplier))
+
+    return {
+        "duration_seconds": final_seconds,
+        "base_seconds": base_seconds,
+        "profession_key": prof_key,
+        "profession_level": prof_level,
+        "profession_bonus": round(profession_bonus, 4),
+        "tool_uid": tool_uid,
+        "tool_tier": tool_tier,
+        "tool_upgrade": tool_upgrade,
+        "tier_bonus": round(tier_bonus, 4),
+        "upgrade_bonus": round(upgrade_bonus, 4),
+        "total_reduction": round(total_reduction, 4),
+        "perk_multiplier": round(perk_multiplier, 4)
+    }
+
+def _norm_tool_key(value) -> str:
+    txt = str(value or "").strip().lower()
+    txt = (
+        txt.replace("á", "a")
+           .replace("à", "a")
+           .replace("ã", "a")
+           .replace("â", "a")
+           .replace("é", "e")
+           .replace("ê", "e")
+           .replace("í", "i")
+           .replace("ó", "o")
+           .replace("ô", "o")
+           .replace("õ", "o")
+           .replace("ú", "u")
+           .replace("ç", "c")
+    )
+    return txt
+
+
+def _recipe_required_tool_type(recipe: dict, fallback: str = "ferreiro") -> str:
+    """
+    Descobre qual ferramenta a receita exige.
+
+    Prioridade:
+    1. required_tool_type
+    2. tool_type
+    3. profession
+    4. profession_req
+    5. fallback
+    """
+    if not isinstance(recipe, dict):
+        return _norm_tool_key(fallback)
+
+    raw = (
+        recipe.get("required_tool_type")
+        or recipe.get("tool_type")
+        or recipe.get("profession")
+        or recipe.get("profession_req")
+        or fallback
+    )
+
+    if isinstance(raw, (list, tuple)) and raw:
+        raw = raw[0]
+
+    return _norm_tool_key(raw)
+
+
+def _recipe_required_tool_tier(recipe: dict) -> int:
+    """
+    Descobre tier mínimo da ferramenta.
+
+    Se a receita não informar tier, usa 1.
+    """
+    if not isinstance(recipe, dict):
+        return 1
+
+    for key in ("required_tool_tier", "tool_tier_req", "min_tool_tier"):
+        if recipe.get(key) is not None:
+            try:
+                return max(1, int(recipe.get(key)))
+            except Exception:
+                return 1
+
+    return 1
+
+
+def validate_and_consume_profession_tool(
+    player_data: dict,
+    required_tool_type: str,
+    min_tier: int = 1,
+    durability_cost: int = 1,
+    action_name: str = "ação"
+) -> dict:
+    """
+    Valida e gasta durabilidade da ferramenta equipada.
+
+    Usado por:
+    - forjar
+    - desmontar
+    - melhorar
+
+    Retorno:
+    {
+        "ok": True/False,
+        "error": "...",
+        "tool_uid": "...",
+        "tool_broke": True/False,
+        "message": "..."
+    }
+    """
+    required_tool_type = _norm_tool_key(required_tool_type)
+    min_tier = max(1, int(min_tier or 1))
+    durability_cost = max(1, int(durability_cost or 1))
+
+    uid, tool_inst, tool_info = _get_equipped_tool(player_data, required_tool_type)
+
+    if not tool_inst or not tool_info:
+        return {
+            "ok": False,
+            "error": f"Você precisa equipar uma ferramenta de {required_tool_type} para {action_name}."
+        }
+
+    tool_type = _norm_tool_key(tool_info.get("tool_type"))
+    if tool_type != required_tool_type:
+        return {
+            "ok": False,
+            "error": f"Ferramenta incompatível. Requer {required_tool_type}, mas você equipou {tool_type or 'desconhecida'}."
+        }
+
+    tool_tier = int(tool_info.get("tier", 1) or 1)
+    if tool_tier < min_tier:
+        return {
+            "ok": False,
+            "error": f"Ferramenta fraca demais. Requer tier {min_tier}."
+        }
+
+    cur, mx = _dur_tuple(tool_inst.get("durability"))
+    if cur <= 0:
+        return {
+            "ok": False,
+            "error": "Sua ferramenta está quebrada."
+        }
+
+    tool_broke = not _consume_tool_durability(tool_inst, durability_cost)
+
+    msg = ""
+    if tool_broke:
+        msg = " Sua ferramenta quebrou."
+
+    return {
+        "ok": True,
+        "tool_uid": uid,
+        "tool_type": required_tool_type,
+        "tool_tier": tool_tier,
+        "tool_broke": tool_broke,
+        "message": msg
+    }
+
+
+def validate_and_consume_tool_for_recipe(
+    player_data: dict,
+    recipe: dict,
+    action_name: str = "forjar"
+) -> dict:
+    """
+    Usa a receita para decidir qual ferramenta gastar.
+    """
+    required_tool_type = _recipe_required_tool_type(recipe, "ferreiro")
+    min_tier = _recipe_required_tool_tier(recipe)
+
+    try:
+        durability_cost = int(recipe.get("tool_durability_cost", 1) or 1)
+    except Exception:
+        durability_cost = 1
+
+    return validate_and_consume_profession_tool(
+        player_data=player_data,
+        required_tool_type=required_tool_type,
+        min_tier=min_tier,
+        durability_cost=durability_cost,
+        action_name=action_name
+    )
+
+
+def validate_and_consume_tool_for_item(
+    player_data: dict,
+    item_obj: dict,
+    fallback_tool_type: str = "ferreiro",
+    action_name: str = "melhorar"
+) -> dict:
+    """
+    Usa o item para achar a receita original e decidir qual ferramenta gastar.
+    """
+    recipe = None
+
+    if isinstance(item_obj, dict):
+        recipe_id = item_obj.get("crafted_recipe_id")
+        base_id = item_obj.get("base_id")
+
+        if recipe_id:
+            recipe = crafting_registry.get_recipe(recipe_id)
+
+        if not recipe and base_id:
+            recipe = crafting_registry.get_recipe_by_item_id(base_id)
+
+    if recipe:
+        return validate_and_consume_tool_for_recipe(
+            player_data=player_data,
+            recipe=recipe,
+            action_name=action_name
+        )
+
+    return validate_and_consume_profession_tool(
+        player_data=player_data,
+        required_tool_type=fallback_tool_type,
+        min_tier=1,
+        durability_cost=1,
+        action_name=action_name
+    )
+
+def validate_and_prepare_gather(player_data: dict, recurso_tipo: str | None = None, required_tool_type: str | None = None) -> dict:
+    """
+    Valida se o jogador pode coletar.
+
+    Corrigido para:
+    - aceitar multi-profissões em learned_professions
+    - aceitar profession.key ou profession.type
+    - escolher profissão pela coleta clicada
+    - usar ferramenta correta em equipment_tools
+    """
+
+    def _norm_prof(valor):
+        return _norm_tool_key(valor)
+
+    MAPA_RECURSO_PROFISSAO = {
+        "madeira": "lenhador",
+        "pedra": "minerador",
+        "minerio_de_ferro": "minerador",
+        "linho": "colhedor",
+        "pena": "esfolador",
+        "sangue": "alquimista",
+    }
+
+    prof_key = (
+        required_tool_type
+        or MAPA_RECURSO_PROFISSAO.get(_norm_prof(recurso_tipo))
+    )
+
+    prof_key = _norm_prof(prof_key)
 
     if not prof_key:
-        return {"ok": False, "error": "Você não possui uma profissão ativa."}
+        prof = player_data.get("profession", {}) or {}
 
-    uid, tool_inst, tool_info = _get_equipped_tool(player_data)
-    if not tool_inst:
-        return {"ok": False, "error": "Você precisa equipar uma ferramenta de coleta."}
+        if isinstance(prof, dict):
+            prof_key = _norm_prof(prof.get("key") or prof.get("type"))
+        elif isinstance(prof, str):
+            prof_key = _norm_prof(prof)
 
-    tool_type = tool_info.get("tool_type")
+    if not prof_key:
+        return {"ok": False, "error": "Você não possui uma profissão válida para coletar."}
+
+    profissoes = set()
+
+    prof_atual = player_data.get("profession", {}) or {}
+
+    if isinstance(prof_atual, dict):
+        if prof_atual.get("key"):
+            profissoes.add(_norm_prof(prof_atual.get("key")))
+        if prof_atual.get("type"):
+            profissoes.add(_norm_prof(prof_atual.get("type")))
+
+        for k in prof_atual.keys():
+            profissoes.add(_norm_prof(k))
+
+    elif isinstance(prof_atual, str):
+        profissoes.add(_norm_prof(prof_atual))
+
+    learned = player_data.get("learned_professions", {}) or {}
+
+    if isinstance(learned, dict):
+        for k, v in learned.items():
+            profissoes.add(_norm_prof(k))
+
+            if isinstance(v, dict):
+                if v.get("key"):
+                    profissoes.add(_norm_prof(v.get("key")))
+                if v.get("type"):
+                    profissoes.add(_norm_prof(v.get("type")))
+            elif isinstance(v, str):
+                profissoes.add(_norm_prof(v))
+
+    elif isinstance(learned, list):
+        for p in learned:
+            if isinstance(p, str):
+                profissoes.add(_norm_prof(p))
+            elif isinstance(p, dict):
+                if p.get("key"):
+                    profissoes.add(_norm_prof(p.get("key")))
+                if p.get("type"):
+                    profissoes.add(_norm_prof(p.get("type")))
+
+    if prof_key not in profissoes:
+        return {
+            "ok": False,
+            "error": f"Requer profissão: {prof_key.capitalize()}."
+        }
+
+    uid, tool_inst, tool_info = _get_equipped_tool(player_data, prof_key)
+
+    if not tool_inst or not tool_info:
+        return {
+            "ok": False,
+            "error": f"Você precisa equipar uma ferramenta de {prof_key}."
+        }
+
+    tool_type = _norm_tool_key(tool_info.get("tool_type") or tool_inst.get("tool_type"))
+
     if tool_type != prof_key:
         return {
             "ok": False,
-            "error": f"Ferramenta incompatível com a profissão ({prof_key})."
+            "error": f"Ferramenta incompatível. Requer {prof_key}, mas você equipou {tool_type or 'desconhecida'}."
         }
 
     cur, _ = _dur_tuple(tool_inst.get("durability"))
+
     if cur <= 0:
         return {"ok": False, "error": "Sua ferramenta está quebrada."}
 
@@ -451,19 +1061,28 @@ def _set_dur(item: dict, cur: int, mx: int) -> None:
     item["durability"] = [int(max(0, min(cur, mx))), int(mx)]
 
 # ==================================================================
-# 3. REPARO E REPARO EM MASSA (As funções que faltavam!)
+# 3. REPARO E REPARO EM MASSA
 # ==================================================================
 
 async def restore_durability(player_data: dict, unique_id: str) -> dict:
     inv = player_data.get('inventory', {}) or {}
     item = inv.get(unique_id)
+    
     if not isinstance(item, dict) or not item.get('base_id'):
         return {"error": "Item inválido para restaurar."}
-    if _inv_qty(player_data, PARCHMENT_ID) <= 0:
-        return {"error": "Você precisa de 1x Pergaminho de Durabilidade."}
+        
+    # 👇 MÁGICA AQUI: O código agora aceita os dois IDs!
+    pergaminho_usado = None
+    if _inv_qty(player_data, "pergaminho_de_reparo") > 0:
+        pergaminho_usado = "pergaminho_de_reparo"
+    elif _inv_qty(player_data, "pergaminho_durabilidade") > 0:
+        pergaminho_usado = "pergaminho_durabilidade"
+        
+    if not pergaminho_usado:
+        return {"error": "Você precisa de 1x Pergaminho de Reparo."}
 
-    # Consome 1 pergaminho e restaura totalmente (20/20)
-    player_manager.remove_item_from_inventory(player_data, PARCHMENT_ID, 1)
+    # Consome 1 pergaminho e restaura totalmente
+    player_manager.remove_item_from_inventory(player_data, pergaminho_usado, 1)
     
     # Pega durabilidade máxima real
     info = _get_item_info(item.get("base_id"))
@@ -474,47 +1093,54 @@ async def restore_durability(player_data: dict, unique_id: str) -> dict:
 
     _set_dur(item, max_d, max_d)
     
-    # O handler que chama isso vai salvar o player_data, mas por segurança salvamos aqui se tivermos user_id?
-    # Como a função antiga não recebia user_id, assumimos que quem chama (handler) salva.
-    # Mas se precisar salvar aqui, precisaríamos passar user_id. 
-    # Mantendo compatibilidade com chamada antiga: Retorna status.
     return {"status": "ok", "durability": item['durability']}
 
 async def restore_all_equipped_durability(player_data: dict) -> dict:
     """
     Restaura TODOS os itens equipados consumindo APENAS 1 Pergaminho.
-    - Só gasta o pergaminho se houver ao menos 1 item com durabilidade < max
-    - Suporta formatos de durabilidade: [cur,max], (cur,max), {"current","max"}
-    """
 
+    Corrige ferramentas de:
+    - combate/equipamentos normais em equipment
+    - crafting/coleta em equipment_tools
+    - referências salvas como UID
+    - referências salvas como base_id
+    - referências salvas como objeto
+    """
     inv = player_data.get("inventory", {}) or {}
     equip = player_data.get("equipment", {}) or {}
+    equip_tools = player_data.get("equipment_tools", {}) or {}
 
-    # -------- helpers locais (blindados) --------
-    def _dur_tuple(raw):
+    if not isinstance(inv, dict):
+        inv = {}
+
+    if not isinstance(equip, dict):
+        equip = {}
+
+    if not isinstance(equip_tools, dict):
+        equip_tools = {}
+
+    def _dur_tuple_local(raw):
         cur, mx = 0, 0
+
         if isinstance(raw, (list, tuple)) and len(raw) >= 2:
             try:
                 cur, mx = int(raw[0]), int(raw[1])
             except Exception:
                 cur, mx = 0, 0
+
         elif isinstance(raw, dict):
             try:
-                cur = int(raw.get("current", 0))
-                mx = int(raw.get("max", 0))
+                cur = int(raw.get("current", raw.get("cur", 0)))
+                mx = int(raw.get("max", raw.get("mx", 0)))
             except Exception:
                 cur, mx = 0, 0
+
         mx = max(0, mx)
         cur = max(0, min(cur, mx)) if mx > 0 else max(0, cur)
+
         return cur, mx
 
-    def _max_from_info(info: dict, fallback_max: int) -> int:
-        """
-        Extrai max de ITEMS_DATA:
-          - durability: [cur,max] ou (cur,max)
-          - durability: int (assume max=int)
-          - durability: {"max": x} (se existir)
-        """
+    def _max_from_info_local(info: dict, fallback_max: int) -> int:
         if not isinstance(info, dict):
             return int(fallback_max or 0)
 
@@ -537,38 +1163,112 @@ async def restore_all_equipped_durability(player_data: dict) -> dict:
 
         return int(fallback_max or 0)
 
-    def _set_dur(item: dict, cur: int, mx: int) -> None:
+    def _set_dur_local(item: dict, cur: int, mx: int) -> None:
         item["durability"] = [int(max(0, min(cur, mx))), int(max(0, mx))]
 
-    def _get_item_info(base_id: str) -> dict:
-        return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
+    def _get_item_info_local(base_id: str) -> dict:
+        try:
+            return _get_item_info(base_id) or {}
+        except Exception:
+            return (getattr(game_data, "ITEMS_DATA", {}) or {}).get(base_id, {}) or {}
 
-    # -------- valida pergaminho --------
-    if _inv_qty(player_data, PARCHMENT_ID) <= 0:
-        return {"error": "Você precisa de 1x Pergaminho de Durabilidade."}
+    def _extrair_ids_equipados(valor, saida: set):
+        """
+        Aceita:
+        - string UID
+        - string base_id
+        - dict com uid/id/item_id/unique_id/base_id
+        - dict aninhado
+        """
+        if not valor:
+            return
 
-    # -------- pega itens equipados únicos --------
-    equipped_uids = {uid for uid in (equip or {}).values() if uid}
-    items_to_repair = []
-    for uid in equipped_uids:
-        inst = inv.get(uid)
+        if isinstance(valor, str):
+            saida.add(valor)
+            return
+
+        if isinstance(valor, dict):
+            for chave in ("uid", "id", "item_id", "unique_id", "base_id"):
+                if valor.get(chave):
+                    saida.add(str(valor.get(chave)))
+
+            for subvalor in valor.values():
+                if isinstance(subvalor, (dict, str)):
+                    _extrair_ids_equipados(subvalor, saida)
+
+    def _resolver_instancia_por_id(possivel_id: str):
+        """
+        Tenta achar no inventário:
+        1. por UID direto
+        2. por base_id
+        """
+        if not possivel_id:
+            return None, None
+
+        # 1. UID direto
+        inst = inv.get(possivel_id)
         if isinstance(inst, dict):
-            items_to_repair.append(uid)
+            return possivel_id, inst
 
-    if not items_to_repair:
+        # 2. Busca por base_id
+        for uid_real, obj in inv.items():
+            if not isinstance(obj, dict):
+                continue
+
+            base = str(obj.get("base_id", uid_real))
+            if base == str(possivel_id):
+                return uid_real, obj
+
+        return None, None
+
+    # 1. Verifica pergaminho.
+    pergaminho_usado = None
+
+    if _inv_qty(player_data, "pergaminho_de_reparo") > 0:
+        pergaminho_usado = "pergaminho_de_reparo"
+    elif _inv_qty(player_data, "pergaminho_durabilidade") > 0:
+        pergaminho_usado = "pergaminho_durabilidade"
+
+    if not pergaminho_usado:
+        return {"error": "Você precisa de 1x Pergaminho de Reparo."}
+
+    # 2. Junta referências equipadas.
+    ids_equipados = set()
+
+    for valor in equip.values():
+        _extrair_ids_equipados(valor, ids_equipados)
+
+    for valor in equip_tools.values():
+        _extrair_ids_equipados(valor, ids_equipados)
+
+    if not ids_equipados:
         return {"error": "Nenhum equipamento equipado para restaurar."}
 
-    # -------- descobre quem realmente precisa reparar --------
+    # 3. Resolve para itens reais no inventário.
+    itens_equipados = {}
+
+    for possivel_id in ids_equipados:
+        uid_real, inst = _resolver_instancia_por_id(possivel_id)
+
+        if uid_real and isinstance(inst, dict):
+            itens_equipados[uid_real] = inst
+
+    if not itens_equipados:
+        return {"error": "Nenhum equipamento equipado foi encontrado no inventário."}
+
+    # 4. Descobre quais precisam reparo.
     need_repair = []
-    for uid in items_to_repair:
-        inst = inv[uid]
-        cur, mx = _dur_tuple(inst.get("durability"))
+
+    for uid, inst in itens_equipados.items():
+        cur, mx = _dur_tuple_local(inst.get("durability"))
 
         base_id = inst.get("base_id")
-        info = _get_item_info(base_id)
-        real_max = _max_from_info(info, mx)
+        info = _get_item_info_local(base_id)
+        real_max = _max_from_info_local(info, mx)
 
-        # se ainda não tem max, não tenta reparar
+        if real_max <= 0 and mx > 0:
+            real_max = mx
+
         if real_max <= 0:
             continue
 
@@ -578,19 +1278,28 @@ async def restore_all_equipped_durability(player_data: dict) -> dict:
     if not need_repair:
         return {"error": "Todos os equipamentos equipados já estão com durabilidade máxima."}
 
-    # ✅ só aqui consome o pergaminho
-    player_manager.remove_item_from_inventory(player_data, PARCHMENT_ID, 1)
+    # 5. Consome 1 pergaminho.
+    player_manager.remove_item_from_inventory(player_data, pergaminho_usado, 1)
 
-    # -------- repara --------
+    # 6. Repara todos.
     count = 0
+
     for uid, real_max in need_repair:
         inst = inv.get(uid)
+
         if not isinstance(inst, dict):
             continue
-        _set_dur(inst, real_max, real_max)
+
+        _set_dur_local(inst, real_max, real_max)
         count += 1
 
-    return {"success": True, "count": count, "message": f"Reparados {count} itens!"}
+    player_data["inventory"] = inv
+
+    return {
+        "success": True,
+        "count": count,
+        "message": f"Uma luz dourada restaurou {count} equipamentos e ferramentas perfeitamente!"
+    }
 
 # =========================
 # Util XP

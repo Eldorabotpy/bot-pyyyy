@@ -4,132 +4,107 @@
 CONSUMABLES_DATA = {
     # --- POÇÕES & ALIMENTOS ---
     "frasco_com_agua": {
-        "display_name": "Frasco com Água", "emoji": "💧", "type": "reagent",
+        "display_name": "Frasco com Água", "emoji": "💧", 
+        "type": "reagent",
         "description": "A base para a maioria das poções.",
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp", 
         "stackable": True
     },
     "pocao_cura_leve": {
-        "display_name": "Poção de Cura Leve", "emoji": "❤️", "type": "potion",
-        "category": "consumivel", "description": "Uma pequena e simples poção de cura 50 HP.",
+        "display_name": "Poção de Cura P", "emoji": "❤️", 
+        "type": "consumivel",
+        "category": "consumivel", "description": "Uma pequena e simples poção de cura 100 HP.",
         "stackable": True,
-        "icon_url": "/static/items/potion_red_small.png", 
-        "effects": {"heal": 50}
+        "effects": {"heal": 100},
+        "price": 100
     },
     "pocao_cura_media": {
-        "display_name": "Poção de Cura Média", "emoji": "❤️‍🩹", "type": "potion",
-        "category": "consumivel", "description": "Recupera 150 HP.",
+        "display_name": "Poção de Cura M", "emoji": "❤️‍🩹", 
+        "type": "consumivel",
+        "category": "consumivel", "description": "Recupera 300 HP.",
         "stackable": True, 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "effects": {"heal": 150}
+        "effects": {"heal": 300},
+        "price": 300
     },
-    "pocao_energia_fraca": {
-        "display_name": "Poção de Energia Fraca", "emoji": "⚡️", "type": "potion",
-        "category": "consumivel", "description": "Recupera 10 Energia.",
+    "pocao_cura_grande": {
+        "display_name": "Poção de Cura G", "emoji": "❤️", 
+        "type": "consumivel",
+        "category": "consumivel", "description": "Uma grande poção de cura 1000 HP.",
         "stackable": True, 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "effects": {"add_energy": 10}
+        "effects": {"heal": 1000},
+        "price": 1000
     },
-    "frasco_sabedoria": {
-        "display_name": "Frasco de Sabedoria", "emoji": "🧠", "type": "potion",
-        "category": "consumivel", "description": "Concede 500 XP.",
+    "pocao_mana_leve": {
+        "display_name": "Poção de Mana Pequena", "emoji": "💧", 
+        "type": "consumivel",
+        "category": "consumivel", "description": "Uma pequena e simples poção de Mana 100 MP.",
+        "stackable": True,
+        "effects": {"mana": 100},
+        "price": 100  
+    },
+    "pocao_mana_media": {
+        "display_name": "Poção de Mana M", "emoji": "💧", 
+        "type": "consumivel",
+        "category": "consumivel", "description": "Recupera 300 MP.",
         "stackable": True, 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "effects": {"add_xp": 500}
+        "effects": {"mana": 300},
+        "price": 300
     },
-    "seiva_escura": {
-        "display_name": "Seiva Escura", "emoji": "🩸", 
-        "type": "consumivel", "category": "buff",
-        "description": "+10 Vida Máxima por 60 min.", "stackable": True,
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "on_use": {"effect_id": "buff_hp_flat", 
-                   "duration_sec": 3600}
+    "pocao_mana_grande": {
+        "display_name": "Poção de Mana G", "emoji": "💧", 
+        "type": "consumivel",
+        "category": "consumivel", "description": "Uma grande poção de mana 1000 MP.",
+        "stackable": True,
+        "effects": {"mana": 1000},
+        "price": 1000
     },
-
-    # --- TICKETS E ACESSOS (BLOQUEADOS NO MERCADO) ---
     "fragmento_bravura": {
         "display_name": "Fragmento de Bravura", "emoji": "🏅", 
         "type": "especial", "category": "evento", 
         "description": "Obtido ao defender o reino.", 
         "stackable": True,
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "tradable": False # 🔴 BLOQUEADO
     },
-    "ticket_defesa_reino": {
-        "display_name": "Ticket de Defesa", "emoji": "🎟️", 
-        "type": "event_ticket", "category": "evento", 
-        "description": "Entrada para Defesa do Reino.", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "stackable": True,
-        "tradable": False # 🔴 BLOQUEADO
-    },
-    "ticket_arena": {
+    "ticket_de_arena": {
         "display_name": "Entrada da Arena", "emoji": "🎟️", 
         "type": "event_ticket", "category": "evento", 
         "description": "Entrada extra para Arena PvP.", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "stackable": True,
         "on_use": {"effect": "add_pvp_entries", "value": 1},
         "tradable": False # 🔴 BLOQUEADO
     },
-    "chave_da_catacumba": {
-        "display_name": "Chave da Catacumba", "emoji": "🗝", 
-        "type": "especial", "category": "especial", 
-        "description": "Abre a Catacumba do Reino.", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "stackable": True,
-        "tradable": False # 🔴 BLOQUEADO
-    },
-    "cristal_de_abertura": {
-        "display_name": "Cristal de Abertura", "emoji": "🔹", 
-        "type": "especial", "category": "especial", 
-        "description": "Chave arcana para Dungeons.", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "stackable": True,
-        "tradable": False # 🔴 BLOQUEADO
-    },
 
     # --- ESPECIAIS / UTILITÁRIOS ---
-    "pedra_do_aprimoramento": {
+    "pedra_de_aprimoramento": {
         "display_name": "Pedra de Aprimoramento", "emoji": "✨", 
         "type": "consumivel", "category": "consumivel", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "stackable": True, "value": 300
+        "stackable": True, "price": 300
     },
-    "pergaminho_durabilidade": {
-        "display_name": "Pergaminho de Durabilidade", "emoji": "📜", 
+    "pergaminho_de_reparo": {
+        "display_name": "Pergaminho de Reparo", "emoji": "📜", 
         "description": "Restaura a durabilidade de todos os seus equipamentos.",
-        "type": "consumivel", "category": "consumivel", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "stackable": True, "value": 150
+        "type": "consumivel", 
+        "category": "consumivel", 
+        "stackable": True, "price": 1000
     },
-    "nucleo_forja_comum": {
-        "display_name": "Núcleo de Forja Comum", "emoji": "🔥", 
-        "type": "material", "category": "consumivel", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "stackable": True, "value": 150
+    "nucleo_de_forja": {
+        "display_name": "Núcleo de Forja", "emoji": "🔥", 
+        "type": "consumivel", "category": "consumivel",
+        "stackable": True, "price": 150
     },
-    "nucleo_forja_fraco": {
-        "display_name": "Núcleo de Forja Fraco", "emoji": "🔥", 
-        "type": "material", "category": "consumivel", 
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
-        "stackable": True, "value": 40
-    },
-    "sigilo_protecao": {
+
+    "sigilo_de_protecao": {
         "display_name": "Sigilo de Proteção",
         "emoji": "🛡️", 
-        "type": "consumable",
+        "type": "consumivel",
         "stackable": True, 
         "description": "Um selo mágico imbuído com energia defensiva. Concede proteção temporária ou é usado em receitas de aprimoramento.",
-        "category": "material",
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
+        "category": "consumivel",
         "tradable": False # 🔴 BLOQUEADO
     },
     "gems": {
         "display_name": "Diamante", "emoji": "💎", 
         "type": "currency", "stackable": True, 
         "description": "Moeda premium.",
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "tradable": False # 🔴 BLOQUEADO (Segurança extra)
     },
     
@@ -140,7 +115,6 @@ CONSUMABLES_DATA = {
         "type": "material",
         "description": "Um presente que caiu do trenó. O Noel troca por recompensas.",
         "stackable": True,
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "category": "evento"
     },
     
@@ -149,7 +123,6 @@ CONSUMABLES_DATA = {
         "emoji": "🎁🌟",
         "type": "material",
         "description": "Um presente raro e brilhante! Troque por visuais exclusivos.",
-        "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "stackable": True,
         "category": "evento"
     },

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passe de Temporada - Eldora</title>
+    <link rel="stylesheet" href="/static/css/season_pass.css?v=6">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="pass-container">
+        <div class="pass-header">
+            <div class="pass-header-bg"></div>
+
+            <img src="https://github.com/user-attachments/assets/e8c99a23-26c2-4deb-870e-b097951fb94b" class="pass-emblem-overlay anime-pulse" alt="Emblema Mágico">
+
+            <div class="pass-header-content">
+                <h1>PASSE DE BATALHA</h1>
+                <div id="display-nivel-atual" class="level-badge">NÍVEL 1</div>
+            </div>
+        </div>
+
+        <div class="pass-progress-container">
+            <div id="barra-progresso" class="pass-progress-bar"></div>
+            <span id="texto-xp" class="pass-xp-text">0 / 100 XP</span>
+        </div>
+
+        <div class="pass-status-bar">
+            <span id="status-premium">Status: <b style="color: #7f8c8d;">GRÁTIS</b></span>
+            <button id="btn-comprar-premium" class="btn-premium">ATIVAR PREMIUM 💎</button>
+        </div>
+
+        <button onclick="coletarTudoLiberado()" class="btn-coletar-tudo">
+            🎒 COLETAR TUDO
+        </button>
+
+        <div class="pass-rewards-list" id="lista-recompensas">
+            </div>
+        
+        <button class="btn-fechar" onclick="window.history.back()">VOLTAR AO MAPA</button>
+    </div>
+
+    <script src="/static/js/season_pass.js?v=99"></script>
+</body>
+</html>

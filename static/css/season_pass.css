@@ -1,0 +1,289 @@
+/* ==========================================
+   PASSE DE TEMPORADA - TRIPLE A (VERSÃO MOBILE DEFINITIVA)
+   ========================================== */
+body {
+    background-color: #000000d5;
+    margin: 0;
+    padding: 0;
+    /* A trava do celular: */
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; justify-content: center; align-items: center;
+    font-family: 'Arial', sans-serif;
+}
+
+.pass-container {
+    background: linear-gradient(180deg, rgba(20, 25, 35, 0.98) 0%, rgba(10, 15, 20, 0.98) 100%);
+    border: 2px solid #5a4a29;
+    border-radius: 12px;
+    padding: 12px;
+    width: 95%; 
+    height: 96%; /* Respeita a tela do celular */
+    max-height: 850px;
+    color: white;
+    font-family: 'Cinzel', serif;
+    box-shadow: 0 0 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(212, 175, 55, 0.05);
+    display: flex; flex-direction: column; box-sizing: border-box;
+}
+
+/* ==========================================
+   CABEÇALHO ÉPICO (COM IMAGEM E ANIMAÇÃO)
+   ========================================== */
+.pass-header {
+    position: relative; 
+    text-align: center;
+    padding: 100px 10px 45px 10px; /* Altura ideal para ver a arte */
+    border-radius: 8px; 
+    background: transparent; 
+    margin-bottom: 10px;
+    border: 2px solid #fa700000; 
+    box-shadow: inset 0 -40px 30px -10px rgba(0, 0, 0, 0);
+    flex-shrink: 0;
+}
+
+/* A Imagem do Panda Brilhando */
+.pass-header-bg {
+    position: absolute; inset: 0;
+    background-image: url('https://github.com/user-attachments/assets/793f8d7d-3cb1-47b3-a2ff-1f37e5bf5be8'); 
+    background-size: cover; background-position: center;
+    opacity: 1; /* Cor 100% viva */
+    z-index: 1; border-radius: 6px;
+}
+
+/* O Emblema Pulsante */
+.pass-emblem-overlay {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); 
+    width: 200px; height: auto;
+    opacity: 0.2; pointer-events: none; z-index: 2; 
+}
+
+/* O Texto com Sombra Forte para Leitura */
+.pass-header-content {
+    position: relative; z-index: 3; color: #fff;
+    text-shadow: 5px 5px 5px #000, -2px -2px 2px #000, 0 0 15px #000; 
+}
+
+.pass-header h1 {
+    font-size: 1rem; margin: 0 0 5px 0; letter-spacing: 2px;
+    color: #fff8e7; text-shadow: 3px 3px 6px #000, 0 0 20px #000;
+}
+
+.level-badge {
+    position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
+    font-size: 0.4rem; font-weight: bold; color: #ffd900;
+    background: linear-gradient(180deg, #3a2e12, #1a1405);
+    padding: 5px 25px; border-radius: 20px;
+    border: 2px solid #d4af37; box-shadow: 0 4px 10px rgba(0,0,0,0.8);
+    white-space: nowrap;
+}
+
+/* ✨ ANIMAÇÃO DE PULSO ✨ */
+@keyframes pulseGlow {
+    0% { opacity: 0.15; transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 0px #d4af37); }
+    50% { opacity: 0.4; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 20px #d4af37); }
+    100% { opacity: 0.15; transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 0px #d4af37); }
+}
+.anime-pulse { animation: pulseGlow 4s infinite ease-in-out; }
+
+/* ==========================================
+   BARRAS E STATUS
+   ========================================== */
+.pass-progress-container {
+    background: #0f131a; height: 22px; border-radius: 12px;
+    border: 2px solid #d4af37; position: relative; margin-bottom: 30px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); flex-shrink: 0;
+}
+
+.pass-progress-bar {
+    background: linear-gradient(90deg, #d35400, #f39c12, #f1c40f);
+    height: 100%; width: 0%; transition: width 0.8s;
+    border-radius: 10px; box-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+}
+
+.pass-xp-text {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    text-align: center; line-height: 22px; font-size: 0.8rem; font-weight: bold;
+    text-shadow: 1px 1px 2px black; font-family: 'Arial', sans-serif; color: #fff;
+}
+
+.pass-status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 5px; padding: 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+}
+
+/* ==========================================
+   BOTÕES COM EFEITO 3D RPG
+   ========================================== */
+.btn-premium {
+    background: linear-gradient(180deg, #3498db, #2980b9);
+    border: none; border-bottom: 4px solid #1c5986;
+    color: white; padding: 8px 15px; border-radius: 6px; 
+    font-weight: bold; cursor: pointer; text-transform: uppercase; 
+    font-family: 'Cinzel', serif; font-size: 0.8rem;
+}
+.btn-premium:active { transform: translateY(4px); border-bottom: 0px solid #1c5986; }
+
+.btn-fechar {
+    width: 100%; padding: 14px; 
+    background: linear-gradient(180deg, #4b5563, #374151);
+    color: #e5e7eb; border: none; border-bottom: 4px solid #1f2937;
+    font-family: 'Cinzel', serif; font-weight: bold; font-size: 1rem;
+    cursor: pointer; border-radius: 8px; margin-top: 10px; flex-shrink: 0;
+    text-shadow: 1px 1px 2px #000; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+}
+.btn-fechar:active { transform: translateY(4px); border-bottom: 0px solid #1f2937; }
+
+/* ==========================================
+   LISTA DE RECOMPENSAS (ESTILO RADAR / 3 COLUNAS)
+   ========================================== */
+.pass-rewards-list {
+    display: flex; flex-direction: column; gap: 15px;
+    overflow-y: auto; padding-right: 6px; 
+    flex-grow: 1; margin-top: 10px;
+}
+
+/* Scrollbar Bonita */
+.pass-rewards-list::-webkit-scrollbar { width: 4px; }
+.pass-rewards-list::-webkit-scrollbar-track { background: transparent; }
+.pass-rewards-list::-webkit-scrollbar-thumb { background: #5a4a29; border-radius: 4px; }
+
+/* A Linha principal agora usa Grid (3 colunas) */
+.reward-row {
+    display: grid; 
+    grid-template-columns: 1fr 40px 1fr; /* Esquerda, Meio, Direita */
+    gap: 10px; 
+    align-items: center; 
+    position: relative;
+}
+
+/* A Linha Vertical que liga os níveis por trás */
+.reward-row::before {
+    content: ''; position: absolute;
+    top: -25px; bottom: -25px; left: 50%;
+    transform: translateX(-50%); width: 4px;
+    background: #2c3545; z-index: 0;
+}
+
+/* O Centro (Nível) */
+.reward-level-center {
+    display: flex; justify-content: center; align-items: center; z-index: 1;
+}
+
+/* O Losango do Nível */
+.level-diamond {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, #3a4a63, #1e2532);
+    border: 2px solid #8e9bb0;
+    transform: rotate(45deg); /* Roda o quadrado para virar losango */
+    display: flex; justify-content: center; align-items: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.6);
+}
+
+/* Se completou o nível, o losango fica Verde */
+.reward-row.completed .level-diamond {
+    border-color: #2ecc71; background: linear-gradient(135deg, #27ae60, #1e3226);
+    box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+}
+
+.level-diamond span {
+    transform: rotate(-45deg); /* Desvira o número para ele ficar reto */
+    font-weight: bold; font-size: 1.1rem; color: #fff;
+    font-family: 'Cinzel', serif;
+}
+
+/* As Caixas de Recompensa */
+.reward-box {
+    padding: 12px 5px; border-radius: 8px; text-align: center;
+    font-size: 0.75rem; font-family: 'Arial', sans-serif; font-weight: bold;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.4); 
+    display: flex; flex-direction: column; justify-content: center;
+    min-height: 55px; z-index: 1; position: relative;
+}
+
+/* Lado Esquerdo (Grátis) - Tom Azul Metálico Escuro */
+.reward-free { 
+    background: linear-gradient(180deg, #344055, #222a38); 
+    border: 2px solid #4a5a75; color: #ecf0f1; 
+}
+
+/* Lado Direito (Premium) - Tom Roxo Vivo */
+.reward-premium { 
+    background: linear-gradient(180deg, #6c3483, #4a235a); 
+    border: 2px solid #9b59b6; color: #f5eef8; 
+}
+
+/* O Cadeado no canto da caixa */
+.reward-premium.locked::after { 
+    content: "🔒"; position: absolute; right: -5px; bottom: -5px; 
+    font-size: 1.1rem; background: #111; border-radius: 50%; padding: 3px;
+    border: 1px solid #555;
+}
+
+.reward-box small { 
+    display: block; font-size: 0.6rem; margin-bottom: 4px; 
+    color: #f39c12; text-transform: uppercase; letter-spacing: 1px; 
+}
+
+/* ==========================================
+   MODAIS DE ALERTA E COMPRA DO PASSE
+   ========================================== */
+.modal-passe-overlay {
+    display: none; 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.85); z-index: 20000; 
+    justify-content: center; align-items: center; 
+    backdrop-filter: blur(4px);
+}
+
+.modal-passe-box {
+    background: linear-gradient(135deg, #1a120b, #0a0704); 
+    width: 85%; max-width: 320px; 
+    border-radius: 12px; border: 2px solid #3498db; 
+    padding: 25px 20px; text-align: center; 
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.9);
+}
+
+.modal-passe-icon { font-size: 3.5em; margin-bottom: 10px; }
+.modal-passe-title { margin: 0 0 10px 0; font-size: 1.4em; font-family: 'Cinzel', serif; text-transform: uppercase; }
+.modal-passe-msg { color: #b0a084; font-size: 0.95em; margin-bottom: 25px; line-height: 1.4; }
+
+.modal-passe-botoes { display: flex; gap: 10px; }
+
+/* Botões Customizados */
+.btn-passe-comprar { 
+    flex: 1; padding: 12px; background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%); 
+    color: white; border: 1px solid #2ecc71; border-radius: 6px; font-weight: bold; 
+    cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
+}
+.btn-passe-cancelar { 
+    flex: 1; padding: 12px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); 
+    color: white; border: 1px solid #e74c3c; border-radius: 6px; font-weight: bold; 
+    cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
+}
+.btn-passe-continuar { 
+    width: 100%; padding: 12px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); 
+    color: white; border: 1px solid #475569; border-radius: 6px; font-weight: bold; 
+    cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; 
+}
+
+.btn-coletar-tudo {
+    background: linear-gradient(135deg, #27ae60, #2ecc71);
+    color: rgb(252, 248, 4);
+    border: 2px solid #fc9a09;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    font-size: 0.8em;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+    margin: 10px auto;
+    display: block;
+    transition: transform 0.2s;
+}
+
+.btn-coletar-tudo:active {
+    transform: scale(0.95);
+}

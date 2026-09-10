@@ -1,0 +1,118 @@
+/* Loja Premium - Tenda do Merlin (100% Responsiva) */
+#menu-loja-aventureiro {
+    position: fixed;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    
+    /* 👇 MÁGICA DA RESPONSIVIDADE MOBILE 👇 */
+    width: 90%; 
+    max-width: 300px; 
+    max-height: 90vh; /* Garante que nunca passa da altura do ecrã */
+    display: flex;
+    flex-direction: column; /* Organiza o cabeçalho e a lista em coluna */
+    
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.98));
+    border: 2px solid #ca8a04; 
+    border-radius: 16px; 
+    z-index: 10000;
+    padding: 20px;
+    color: white;
+    font-family: 'Cinzel', serif;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 15px rgba(202, 138, 4, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.loja-header {
+    text-align: center;
+    margin-bottom: 15px;
+    position: relative;
+    border-bottom: 1px dashed rgba(202, 138, 4, 0.4);
+    padding-bottom: 10px;
+    flex-shrink: 0; /* Impede que o cabeçalho seja esmagado em ecrãs pequenos */
+}
+
+.loja-header h2 { color: #facc15; margin: 0; font-size: 1.5em; text-shadow: 0 2px 4px rgba(0,0,0,0.8); letter-spacing: 1px; }
+.loja-header p { color: #94a3b8; font-size: 0.8em; margin-top: 5px; font-style: italic; }
+
+.btn-fechar-loja {
+    position: absolute; top: -10px; right: -10px;
+    background: #7f1d1d; border: 2px solid #ef4444; color: white;
+    width: 30px; height: 30px; border-radius: 50%;
+    font-size: 1.2em; font-weight: bold; cursor: pointer;
+    display: flex; justify-content: center; align-items: center;
+    transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+.btn-fechar-loja:hover { background: #ef4444; transform: scale(1.1); }
+
+.loja-lista-scroll {
+    display: flex; flex-direction: column; gap: 12px;
+    overflow-y: auto; padding-right: 5px;
+    
+    /* 👇 MÁGICA DA LISTA RESPONSIVA 👇 */
+    max-height: 55vh; /* A lista ocupa apenas a área livre */
+}
+.loja-lista-scroll::-webkit-scrollbar { width: 6px; }
+.loja-lista-scroll::-webkit-scrollbar-thumb { background: #ca8a04; border-radius: 4px; }
+
+/* O Card do Item (Agora clicável para ver a descrição) */
+.loja-item-card {
+    display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(90deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.4));
+    padding: 12px; border-radius: 12px;
+    border: 1px solid #334155; border-left: 4px solid #ca8a04;
+    transition: 0.3s; cursor: pointer;
+}
+.loja-item-card:hover {
+    background: linear-gradient(90deg, rgba(51, 65, 85, 0.8), rgba(30, 41, 59, 0.6));
+    border-color: #facc15; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    transform: translateY(-2px);
+}
+
+/* 👇 CORREÇÃO: Flex = 1 e min-width = 0 para a caixa não vazar a tela 👇 */
+.loja-item-info { 
+    display: flex; 
+    align-items: center; 
+    gap: 12px; 
+    pointer-events: none; 
+    flex: 1; 
+    min-width: 0; 
+}
+
+/* 👇 CORREÇÃO: Contêiner do texto protegido com limites 👇 */
+.loja-item-info > div {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.loja-item-img {
+    width: 48px; height: 48px; object-fit: contain;
+    background: transparent; /* FUNDO PRETO REMOVIDO */
+    border: none; /* Borda da imagem removida */
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
+}
+
+/* 👇 CORREÇÃO: Corte com os três pontinhos (...) para textos gigantes 👇 */
+.loja-item-nome { 
+    font-weight: bold; 
+    font-size: 0.95em; 
+    display: block; 
+    text-shadow: 1px 1px 2px #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; 
+}
+
+.loja-item-preco { font-size: 0.85em; color: #facc15; margin-top: 5px; font-weight: bold; display: block; }
+
+/* 👇 CORREÇÃO: flex-shrink: 0 para blindar o botão e não deixar esmagar 👇 */
+.btn-comprar-loja {
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+    color: white; border: 1px solid #22c55e; padding: 8px 14px;
+    border-radius: 8px; cursor: pointer; font-weight: bold;
+    font-family: 'Cinzel', serif; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    text-transform: uppercase; font-size: 0.8em; transition: 0.2s;
+    flex-shrink: 0; 
+    margin-left: 10px;
+}
+.btn-comprar-loja:hover { filter: brightness(1.2); }
+.btn-comprar-loja:active { transform: scale(0.95); }

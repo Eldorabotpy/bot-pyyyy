@@ -1,0 +1,37 @@
+<button id="eldora-hub-toggle" onclick="alternarHubControles()">🎮</button>
+
+<div id="eldora-controles-hub" class="hud-panel oculta-hub">
+    <div class="hub-header">
+        <span class="hub-title">Ajustes HUD</span>
+        <button class="btn-fechar-hub" onclick="alternarHubControles()">×</button>
+    </div>
+    
+    <div class="hub-content">
+        <div class="hub-setting">
+            <label>Mostrar Analógico</label>
+            <label class="switch">
+                <input type="checkbox" id="check-visibilidade" onchange="alternarVisibilidadeJoystick()">
+                <span class="slider-round"></span>
+            </label>
+        </div>
+
+        <div class="hub-setting">
+            <label>Transparência</label>
+            <input type="range" id="slider-opacidade" min="0" max="100" value="70" oninput="ajustarOpacidadeJoystick()">
+        </div>
+
+        <div class="hub-setting">
+            <label>Tamanho</label>
+            <input type="range" id="slider-tamanho" min="50" max="150" value="100" oninput="ajustarTamanhoJoystick()">
+        </div>
+    </div>
+</div>
+
+<div id="joystick-blindagem-externa" class="oculta-joystick">
+    <div id="joystick-container">
+        <div class="joy-btn joy-up" ontouchstart="startMove('up')" ontouchend="stopMove('up')" onmousedown="startMove('up')" onmouseup="stopMove('up')">↑</div>
+        <div class="joy-btn joy-left" ontouchstart="startMove('left')" ontouchend="stopMove('left')" onmousedown="startMove('left')" onmouseup="stopMove('left')">←</div>
+        <div class="joy-btn joy-right" ontouchstart="startMove('right')" ontouchend="stopMove('right')" onmousedown="startMove('right')" onmouseup="stopMove('right')">→</div>
+        <div class="joy-btn joy-down" ontouchstart="startMove('down')" ontouchend="stopMove('down')" onmousedown="startMove('down')" onmouseup="stopMove('down')">↓</div>
+    </div>
+</div>

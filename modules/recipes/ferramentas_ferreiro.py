@@ -1,4 +1,10 @@
-RECIPES = {
+from __future__ import annotations
+from typing import Dict, Any
+
+
+# ============================================================================
+
+RECIPES: Dict[str, Dict[str, Any]] = {
 
     "craft_martelo_ferreiro_t1": {
         "display_name": "Forjar Martelo do Aprendiz Ferreiro",
@@ -9,7 +15,7 @@ RECIPES = {
             "madeira": 6,
             "pedra": 8,
             "barra_de_ferro": 2,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "result_base_id": "martelo_ferreiro_t1",
         "xp_gain": 12
@@ -23,7 +29,7 @@ RECIPES = {
         "materials": {
             "madeira_de_carvalho": 4,
             "barra_de_ferro": 4,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "result_base_id": "martelo_ferreiro_t2",
         "xp_gain": 24
@@ -37,7 +43,7 @@ RECIPES = {
         "materials": {
             "madeira_rara": 4,
             "barra_de_aco": 5,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "result_base_id": "martelo_ferreiro_t3",
         "xp_gain": 42
@@ -51,7 +57,7 @@ RECIPES = {
         "materials": {
             "madeira_elfica": 3,
             "barra_de_prata": 6,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "result_base_id": "martelo_ferreiro_t4",
         "xp_gain": 65
@@ -65,7 +71,7 @@ RECIPES = {
         "materials": {
             "raiz_do_mundo": 10,
             "barra_de_adamantio": 12,
-            "nucleo_forja_fraco": 1
+            "nucleo_de_forja": 1
         },
         "result_base_id": "martelo_ferreiro_t5",
         "xp_gain": 100

@@ -1,0 +1,152 @@
+/* ==========================================
+   MUNDO DE ELDORA - PERFIL & ITENS (perfil.css)
+   ========================================== */
+
+/* CABEÇALHO DO PERFIL */
+.perfil-header-card { 
+    position: relative; padding: 30px 20px; border-radius: 16px; 
+    border: 1px solid rgba(243, 156, 18, 0.4); text-align: center; margin-bottom: 20px; 
+    background-size: cover; background-position: center; overflow: hidden; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5); 
+}
+.perfil-header-overlay { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+    background: linear-gradient(to bottom, rgba(15, 23, 42, 0.3), rgba(15, 23, 42, 0.95)); z-index: 1; 
+}
+.perfil-header-content { position: relative; z-index: 2; }
+.btn-editar-perfil { 
+    background: rgba(255, 255, 255, 0.1); color: #f8fafc; border: 1px solid rgba(255,255,255,0.2); 
+    padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 0.75em; 
+    text-transform: uppercase; cursor: pointer; margin-top: 15px; 
+    backdrop-filter: blur(4px); transition: 0.2s; 
+}
+.btn-editar-perfil:active { transform: scale(0.95); background: rgba(255, 255, 255, 0.2); }
+
+/* ==========================================
+   TELA DE EDIÇÃO DE PERFIL (MODERNA)
+   ========================================== */
+.perfil-container-moderno {
+    background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;
+    padding: 25px; width: 90%; max-width: 400px; color: #f8fafc;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.perfil-header h2 { margin: 0 0 5px 0; font-family: 'Cinzel', serif; color: #f39c12; font-size: 1.4em; }
+.perfil-header p { margin: 0 0 20px 0; font-size: 0.8em; color: #94a3b8; }
+.secao-cosmetico { margin-bottom: 20px; }
+.secao-cosmetico label { display: block; font-size: 0.7em; font-weight: bold; color: #cbd5e1; margin-bottom: 10px; letter-spacing: 1px; }
+
+/* Grid Avatares */
+.grid-selecao { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.card-opcao { 
+    background: rgba(0,0,0,0.4); border: 1px solid #334155; border-radius: 10px; 
+    padding: 10px; text-align: center; cursor: pointer; transition: 0.2s; 
+}
+.card-opcao img { width: 40px; height: 40px; border-radius: 50%; margin-bottom: 5px; }
+.card-opcao span { display: block; font-size: 0.7em; color: #94a3b8; font-weight: bold; }
+.card-opcao.selecionado { border-color: #3b82f6; background: rgba(59, 130, 246, 0.15); box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); }
+.card-opcao.selecionado span { color: #3b82f6; }
+
+/* Grid Banners */
+.card-opcao-banner { 
+    padding: 15px 10px; border-radius: 10px; font-size: 0.75em; font-weight: bold; 
+    text-align: center; cursor: pointer; border: 2px solid transparent; 
+    color: rgba(255,255,255,0.7); transition: 0.2s; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); 
+}
+.card-opcao-banner.selecionado { border-color: #f39c12; color: #fff; transform: scale(1.02); box-shadow: 0 0 15px rgba(243, 156, 18, 0.4); }
+
+.btn-salvar-moderno { 
+    flex: 2; background: linear-gradient(180deg, #2ecc71, #27ae60); color: white; 
+    border: none; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; 
+    text-shadow: 1px 1px 2px #000; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.4); 
+}
+.btn-salvar-moderno:active, .btn-cancelar-moderno:active { transform: scale(0.95); }
+
+/* ==========================================
+   💎 MODAL DE ITENS: GLASSMORPHISM AAA 💎
+   ========================================== */
+.item-modal-glass {
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 25px 20px;
+    width: 85%;
+    max-width: 320px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: #f8fafc;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalPop {
+    0% { transform: scale(0.9); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.item-glow-header {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    position: relative; padding-bottom: 15px; 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-close-item {
+    position: absolute; top: -15px; right: -5px;
+    background: transparent; border: none; color: rgba(255,255,255,0.4); 
+    font-size: 1.8em; cursor: pointer; transition: 0.2s;
+}
+.btn-close-item:hover { color: #fff; transform: scale(1.1) rotate(90deg); }
+
+.item-icon-frame {
+    width: 75px; height: 75px; border-radius: 14px; 
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+    border: 2px solid; display: flex; justify-content: center; align-items: center;
+    margin-bottom: 12px;
+}
+.item-icon-frame img { max-width: 85%; max-height: 85%; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.9)); }
+
+.item-glow-header h3 { 
+    margin: 0 0 8px 0; font-family: 'Cinzel', serif; font-size: 1.3em; 
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8); letter-spacing: 0.5px;
+}
+
+.rarity-tag { 
+    padding: 4px 12px; border-radius: 20px; font-size: 0.65em; font-weight: 900; 
+    text-transform: uppercase; letter-spacing: 1.5px; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+/* Atributos do Item */
+.item-stats-container { display: flex; flex-direction: column; gap: 6px; }
+.stat-row { 
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0, 0, 0, 0.3); padding: 8px 15px; border-radius: 8px; 
+    border-left: 3px solid rgba(255,255,255,0.2); font-size: 0.85em;
+    color: #cbd5e1;
+}
+.stat-value { font-weight: 900; color: #fff; font-size: 1.1em; text-shadow: 1px 1px 2px #000; }
+.no-stats { display: block; text-align: center; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; }
+
+/* Descrição e Botões */
+.item-description { 
+    font-size: 0.8em; color: #94a3b8; font-style: italic; text-align: center; 
+    line-height: 1.5; margin: 5px 0; padding: 0 10px;
+}
+
+.item-actions-footer { display: flex; gap: 10px; justify-content: center; margin-top: 5px; }
+
+.item-actions-footer button {
+    flex: 1; padding: 12px 5px; border: none; border-radius: 10px; font-weight: bold; 
+    cursor: pointer; text-transform: uppercase; font-family: 'Cinzel', serif; 
+    font-size: 0.85em; transition: 0.2s; box-shadow: 0 5px 15px rgba(0,0,0,0.4); 
+    color: white; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+}
+.item-actions-footer button:active { transform: translateY(2px); box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+
+.btn-action-primary { background: linear-gradient(180deg, #10b981, #059669); border-top: 1px solid #34d399; }
+.btn-action-hp { background: linear-gradient(180deg, #ef4444, #b91c1c); border-top: 1px solid #f87171; }
+.btn-action-mp { background: linear-gradient(180deg, #3b82f6, #1d4ed8); border-top: 1px solid #60a5fa; }
+.btn-action-danger { background: linear-gradient(180deg, #334155, #0f172a); border-top: 1px solid #475569; }

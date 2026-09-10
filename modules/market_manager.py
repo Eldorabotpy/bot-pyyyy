@@ -6,7 +6,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple, Union
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument
 from bson import ObjectId # Importante
 
 from modules import player_manager
@@ -86,7 +86,8 @@ def create_listing(
     region_key: Optional[str] = None,
     target_buyer_id: Optional[Union[int, str]] = None,
     target_buyer_name: Optional[str] = None,
-    seller_name: Optional[str] = None
+    seller_name: Optional[str] = None,
+    currency: str = "ouro" # 👈 1. ADICIONE O PARÂMETRO AQUI
 ) -> dict:
     if market_col is None: raise MarketError("Banco de dados offline.")
     
@@ -116,6 +117,7 @@ def create_listing(
         "item": item_payload,
         "unit_price": int(unit_price),
         "quantity": int(quantity),
+        "currency": currency, # 👈 2. ADICIONE AQUI PARA SALVAR NO BANCO
         "created_at": _now_iso(),
         "region_key": region_key,
         "active": True,
@@ -216,98 +218,176 @@ def delete_listing(listing_id: Union[int, str, ObjectId]):
 
 async def purchase_listing(
     *,
-    buyer_id: Union[int, str], 
-    listing_id: Union[int, str, ObjectId], # Aceita qualquer tipo
-    quantity: int = 1, 
+    buyer_id: Union[int, str],
+    listing_id: Union[int, str, ObjectId],
+    quantity: int = 1,
     context=None
 ) -> Tuple[dict, int]:
-    
+
     from modules.player import inventory as inv_module
 
-    # --- Validações ---
+    try:
+        quantity = int(quantity or 1)
+    except Exception:
+        quantity = 0
+
+    if quantity <= 0:
+        raise InvalidPurchase("Quantidade inválida.")
+
     listing = get_listing(listing_id)
-    if not listing: raise ListingNotFound("Anúncio não encontrado.")
-    if not listing.get("active"): raise ListingInactive("Anúncio inativo ou já vendido.")
-    
-    seller_id = listing["seller_id"] 
+
+    if not listing:
+        raise ListingNotFound("Anúncio não encontrado.")
+
+    if not listing.get("active"):
+        raise ListingInactive("Anúncio inativo ou já vendido.")
+
+    seller_id = listing["seller_id"]
     buyer_id_str = str(buyer_id)
     seller_id_str = str(seller_id)
 
-    if seller_id_str == buyer_id_str: 
+    if seller_id_str == buyer_id_str:
         raise InvalidPurchase("Você não pode comprar seu próprio item.")
 
     target = listing.get("target_buyer_id")
-    if target is not None:
-        if str(target) != buyer_id_str:
-            raise PermissionDenied(f"🔒 Item reservado para: {listing.get('target_buyer_name')}")
+    if target is not None and str(target) != buyer_id_str:
+        raise PermissionDenied(f"🔒 Item reservado para: {listing.get('target_buyer_name')}")
 
-    available = int(listing.get("quantity", 0))
+    available = int(listing.get("quantity", 0) or 0)
     if quantity > available:
         raise InsufficientQuantity(f"Estoque insuficiente ({available} disponíveis).")
 
-    # --- Cálculos ---
-    item_payload = listing.get("item", {})
-    unit_price = int(listing["unit_price"])
+    item_payload = listing.get("item", {}) or {}
+    unit_price = int(listing.get("unit_price", 0) or 0)
     total_price = unit_price * quantity
 
-    # --- A. PROCESSAMENTO DO COMPRADOR ---
+    moeda = str(listing.get("currency", "ouro") or "ouro").lower()
+    campo_moeda = "gems" if moeda in ["gema", "gemas"] else "gold"
+    simbolo = "💎" if campo_moeda == "gems" else "🪙"
+
     buyer_data = await player_manager.get_player_data(buyer_id)
-    if not buyer_data: raise ValueError("Comprador não encontrado.")
+    if not buyer_data:
+        raise ValueError("Comprador não encontrado.")
 
-    buyer_gold = int(buyer_data.get("gold", 0))
-    if buyer_gold < total_price:
-        raise ValueError(f"Saldo insuficiente. Necessário: {total_price:,} 🪙")
+    buyer_balance = int(buyer_data.get(campo_moeda, 0) or 0)
 
-    # 1. Remove o Ouro
-    buyer_data["gold"] = buyer_gold - total_price
+    if buyer_balance < total_price:
+        raise ValueError(f"Saldo insuficiente. Necessário: {total_price:,} {simbolo}")
 
-    # 2. Adiciona o Item
-    item_type = item_payload.get("type")
-    
-    if item_type == "stack":
-        base_id = item_payload.get("base_id")
-        stack_size = int(item_payload.get("qty", 1))
-        total_items_to_give = quantity * stack_size
-        inv_module.add_item_to_inventory(buyer_data, base_id, total_items_to_give)
-        
-    elif item_type == "unique":
-        base_item_data = item_payload.get("item", {}).copy()
-        for _ in range(quantity):
-            inv_module.add_unique_item(buyer_data, base_item_data)
+    # =========================================================
+    # TRAVA ANTI-FRAUDE / ANTI-CLIQUE DUPLO
+    # Reserva o estoque direto no MongoDB antes de entregar item.
+    # Se outro jogador comprar ao mesmo tempo, só um passa.
+    # =========================================================
+    reserved_listing = market_col.find_one_and_update(
+        {
+            "_id": listing["_id"],
+            "active": True,
+            "quantity": {"$gte": quantity}
+        },
+        {
+            "$inc": {"quantity": -quantity}
+        },
+        return_document=ReturnDocument.AFTER
+    )
 
-    # 3. SALVA O COMPRADOR
-    await player_manager.save_player_data(buyer_id, buyer_data)
+    if not reserved_listing:
+        raise ListingInactive("Este anúncio acabou de ser comprado por outro jogador.")
 
-    # --- B. ATUALIZAÇÃO DO ANÚNCIO (Usando _id) ---
-    new_qty = available - quantity
-    update_doc = {"quantity": new_qty}
-    if new_qty <= 0: update_doc["active"] = False
-    
-    # IMPORTANTE: Usa o _id do documento recuperado
-    market_col.update_one({"_id": listing["_id"]}, {"$set": update_doc})
-    
-    # --- C. PAGAMENTO AO VENDEDOR ---
+    comprador_salvo = False
+
+    try:
+        # 1. Cobra comprador
+        buyer_data[campo_moeda] = buyer_balance - total_price
+
+        # 2. Entrega item exatamente conforme o anúncio
+        item_type = item_payload.get("type")
+
+        if item_type == "stack":
+            base_id = item_payload.get("base_id")
+            stack_size = int(item_payload.get("qty", 1) or 1)
+            total_items_to_give = quantity * stack_size
+
+            if not base_id or total_items_to_give <= 0:
+                raise InvalidPurchase("Item empilhável inválido no anúncio.")
+
+            inv_module.add_item_to_inventory(buyer_data, base_id, total_items_to_give)
+
+        elif item_type == "unique":
+            base_item_data = item_payload.get("item", {})
+
+            if not isinstance(base_item_data, dict) or not base_item_data:
+                raise InvalidPurchase("Item único inválido no anúncio.")
+
+            for _ in range(quantity):
+                inv_module.add_unique_item(buyer_data, base_item_data.copy())
+
+        else:
+            raise InvalidPurchase("Tipo de anúncio inválido.")
+
+        await player_manager.save_player_data(buyer_id, buyer_data)
+        comprador_salvo = True
+
+    except Exception:
+        # Se falhou antes de salvar o comprador, devolve o estoque ao anúncio.
+        if not comprador_salvo:
+            market_col.update_one(
+                {"_id": listing["_id"]},
+                {
+                    "$inc": {"quantity": quantity},
+                    "$set": {"active": True}
+                }
+            )
+        raise
+
+    # 3. Fecha anúncio se zerou
+    new_qty = int(reserved_listing.get("quantity", 0) or 0)
+
+    if new_qty <= 0:
+        market_col.update_one(
+            {"_id": listing["_id"]},
+            {
+                "$set": {
+                    "active": False,
+                    "sold_at": _now_iso()
+                }
+            }
+        )
+
+    # 4. Taxa real da Coroa: 10%
+    taxa_reino = int(total_price * 0.10)
+    valor_vendedor = max(0, total_price - taxa_reino)
+
+    # 5. Paga vendedor já descontando taxa
     try:
         seller_data = await player_manager.get_player_data(seller_id)
+
         if seller_data:
-            current_seller_gold = int(seller_data.get("gold", 0))
-            seller_data["gold"] = current_seller_gold + total_price
+            current_seller_balance = int(seller_data.get(campo_moeda, 0) or 0)
+            seller_data[campo_moeda] = current_seller_balance + valor_vendedor
             await player_manager.save_player_data(seller_id, seller_data)
         else:
-            # Fallback para Legacy
             if isinstance(seller_id, int) or (isinstance(seller_id, str) and seller_id.isdigit()):
-                db["players"].update_one({"_id": int(seller_id)}, {"$inc": {"gold": total_price}})
+                db["players"].update_one(
+                    {"_id": int(seller_id)},
+                    {"$inc": {campo_moeda: valor_vendedor}}
+                )
             else:
-                from bson import ObjectId
-                q_id = ObjectId(seller_id) if ObjectId.is_valid(seller_id) else seller_id
-                db["users"].update_one({"_id": q_id}, {"$inc": {"gold": total_price}})
-            
+                q_id = ObjectId(seller_id) if ObjectId.is_valid(str(seller_id)) else seller_id
+                db["users"].update_one(
+                    {"_id": q_id},
+                    {"$inc": {campo_moeda: valor_vendedor}}
+                )
+
     except Exception as e:
         log.error(f"🔥 [MARKET] Erro pagando vendedor {seller_id}: {e}")
 
     listing["quantity"] = new_qty
-    listing["active"] = (new_qty > 0)
-    
+    listing["active"] = new_qty > 0
+    listing["tax"] = taxa_reino
+    listing["seller_amount"] = valor_vendedor
+    listing["currency"] = moeda
+
     return listing, total_price
 
 # =========================

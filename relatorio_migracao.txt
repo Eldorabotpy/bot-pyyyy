@@ -1,140 +1,35 @@
+RELATÓRIO DE MIGRAÇÃO - 98.8% CONCLUÍDO
+Gerado em: 2026-06-29 18:30:50
+============================================================
+
+Arquivo: .\modules\events\catacumbas\combat_handler.py
+Prioridade: 4 | Status: ⚠️ MISTO
+Encontrado: update.effective_user.id
+------------------------------------------------------------
+Arquivo: .\modules\events\catacumbas\entry_handler.py
+Prioridade: 4 | Status: ⚠️ MISTO
+Encontrado: players_col.find, update.effective_user.id
+------------------------------------------------------------
 
 ==================================================
 📂 ESTRUTURA DO PROJETO (Arquivos .py)
 ==================================================
 
 📁 RAIZ (Projeto)/
-│   📄 api.py
-│   📄 audit_daily_cristal.py
 │   📄 config.py
-│   📄 debug_check_cristal.py
-│   📄 debug_payment.py
-│   📄 destravar_jogador.py
-│   📄 fix_clan_leaders.py
-│   📄 fix_duplicate_vips.py
-│   📄 fix_mongo_tomos.py
-│   📄 fix_professions.py
-│   📄 fix_skins.py
+│   📄 eventos_invasao.py
 │   📄 gerente_migracao.py
-│   📄 inspect_mongo.py
-│   📄 limpar_cache.py
-│   📄 limpar_webhook.py
-│   📄 listar_arquivos.py
+│   📄 limpar_inventarios.py
 │   📄 main.py
-│   📄 migrar_jogadores.py
-│   📄 repair_daily_cristal_today.py
-│   📄 run_daily_cristal_now.py
-│   📄 teste_ranking.py
-│   📁 assets/
+│   📄 start_handler.py
 │   📁 data/
 │   │   📁 clans/
 │   📁 dungeons/
 │   📁 game_logic/
 │   │   📄 __init__.py
-│   📁 handlers/
-│   │   📄 admin_handler.py
-│   │   📄 admin_media_handler.py
-│   │   📄 adventurer_market_handler.py
-│   │   📄 auth_handler.py
-│   │   📄 autohunt_handler.py
-│   │   📄 character_handler.py
-│   │   📄 chat_handler.py
-│   │   📄 christmas_shop.py
-│   │   📄 class_evolution_handler.py
-│   │   📄 class_gate.py
-│   │   📄 class_selection_handler.py
-│   │   📄 converter_handler.py
-│   │   📄 crafting_handler.py
-│   │   📄 enhance_handler.py
-│   │   📄 equipment_handler.py
-│   │   📄 evolution_handler.py
-│   │   📄 forge_handler.py
-│   │   📄 gem_market_handler.py
-│   │   📄 gem_shop_handler.py
-│   │   📄 guide_handler.py
-│   │   📄 guild_menu_handler.py
-│   │   📄 hunt_handler.py
-│   │   📄 inventory_handler.py
-│   │   📄 jobs.py
-│   │   📄 job_handler.py
-│   │   📄 kingdom_shop_handler.py
-│   │   📄 market_browse.py
-│   │   📄 market_sell.py
-│   │   📄 menu_handler.py
-│   │   📄 npc_handler.py
-│   │   📄 potion_handler.py
-│   │   📄 profession_handler.py
-│   │   📄 profile_handler.py
-│   │   📄 refining_handler.py
-│   │   📄 region_handler.py
-│   │   📄 runes_handler.py
-│   │   📄 skill_upgrade_handler.py
-│   │   📄 skin_handler.py
-│   │   📄 start_handler.py
-│   │   📄 status_handler.py
-│   │   📄 utils.py
-│   │   📄 utils_timed.py
-│   │   📄 work_handler.py
-│   │   📄 __init__.py
-│   │   📁 admin/
-│   │   │   📄 admin_commands.py
-│   │   │   📄 admin_tools.py
-│   │   │   📄 clan_war_admin.py
-│   │   │   📄 debug_skill.py
-│   │   │   📄 file_id_conv.py
-│   │   │   📄 force_daily.py
-│   │   │   📄 generate_equip.py
-│   │   │   📄 grant_item.py
-│   │   │   📄 grant_skill.py
-│   │   │   📄 grant_skin.py
-│   │   │   📄 media_capture.py
-│   │   │   📄 media_handler.py
-│   │   │   📄 player_edit_panel.py
-│   │   │   📄 player_management_handler.py
-│   │   │   📄 premium_panel.py
-│   │   │   📄 pvp_panel_handler.py
-│   │   │   📄 reset_panel.py
-│   │   │   📄 sell_gems.py
-│   │   │   📄 utils.py
-│   │   │   📄 __init__.py
-│   │   📁 combat/
-│   │   │   📄 main_handler.py
-│   │   │   📄 potion_handler.py
-│   │   │   📄 skill_handler.py
-│   │   📁 events/
-│   │   │   📄 party_actions.py
-│   │   │   📄 party_conversation.py
-│   │   │   📄 party_handler.py
-│   │   │   📄 __init__.py
-│   │   📁 guild/
-│   │   │   📄 bank.py
-│   │   │   📄 creation_search.py
-│   │   │   📄 dashboard.py
-│   │   │   📄 management.py
-│   │   │   📄 missions.py
-│   │   │   📄 upgrades.py
-│   │   │   📄 war.py
-│   │   │   📄 __init__.py
-│   │   📁 menu/
-│   │   │   📄 events.py
-│   │   │   📄 forge.py
-│   │   │   📄 kingdom.py
-│   │   │   📄 region.py
-│   │   │   📄 __init__.py
-│   │   📁 world_boss/
-│   │   │   📄 handler.py
-│   │   │   📄 __init__.py
-│   📁 kingdom_defense/
-│   │   📄 data.py
-│   │   📄 engine.py
-│   │   📄 handler.py
-│   │   📄 leaderboard.py
-│   │   📄 __init__.py
 │   📁 modules/
 │   │   📄 auth_utils.py
-│   │   📄 auto_hunt_engine.py
 │   │   📄 balance.py
-│   │   📄 chat_responses.py
 │   │   📄 clan_manager.py
 │   │   📄 clan_war_engine.py
 │   │   📄 class_evolution_service.py
@@ -147,28 +42,31 @@
 │   │   📄 dungeon_definitions.py
 │   │   📄 dungeon_loot.py
 │   │   📄 dungeon_manager.py
-│   │   📄 evolution_battle.py
-│   │   📄 file_ids.py
 │   │   📄 gem_market_manager.py
 │   │   📄 guild_system.py
 │   │   📄 items_api.py
 │   │   📄 item_factory.py
 │   │   📄 market_manager.py
 │   │   📄 market_utils.py
-│   │   📄 mission_manager.py
-│   │   📄 party_manager.py
+│   │   📄 missoes.py
+│   │   📄 mob_engine.py
 │   │   📄 player_manager.py
 │   │   📄 profession_engine.py
 │   │   📄 rarities.py
 │   │   📄 recovery_manager.py
 │   │   📄 refining_engine.py
+│   │   📄 season_manager.py
 │   │   📄 sessions.py
 │   │   📄 stats_engine.py
+│   │   📄 webapp_api.py
 │   │   📄 __init__.py
 │   │   📁 combat/
+│   │   │   📄 battle_manager.py
 │   │   │   📄 combat_engine.py
+│   │   │   📄 combat_raid_engine.py
 │   │   │   📄 criticals.py
 │   │   │   📄 durability.py
+│   │   │   📄 group_combat_manager.py
 │   │   │   📄 party_engine.py
 │   │   │   📄 rewards.py
 │   │   📁 dungeons/
@@ -184,8 +82,9 @@
 │   │   │   📄 models.py
 │   │   │   📄 registry.py
 │   │   📁 events/
-│   │   │   📄 event_menu.py
-│   │   │   📄 __init__.py
+│   │   │   📄 dimensional_boss_engine.py
+│   │   │   📄 dimensional_boss_manager.py
+│   │   │   📄 dimensional_boss_registry.py
 │   │   │   📁 catacumbas/
 │   │   │   │   📄 combat_handler.py
 │   │   │   │   📄 config.py
@@ -199,6 +98,8 @@
 │   │   │   📄 classes.py
 │   │   │   📄 class_evolution.py
 │   │   │   📄 constants.py
+│   │   │   📄 cosmetics.py
+│   │   │   📄 data.py
 │   │   │   📄 encounters.py
 │   │   │   📄 equipment.py
 │   │   │   📄 guild_missions.py
@@ -210,10 +111,10 @@
 │   │   │   📄 items_runes.py
 │   │   │   📄 items_tools.py
 │   │   │   📄 loot_tables.py
+│   │   │   📄 map_spawns.py
 │   │   │   📄 market.py
 │   │   │   📄 missions.py
 │   │   │   📄 monsters.py
-│   │   │   📄 monsters_data.py
 │   │   │   📄 npc_trades.py
 │   │   │   📄 premium.py
 │   │   │   📄 professions.py
@@ -221,6 +122,7 @@
 │   │   │   📄 refining.py
 │   │   │   📄 regions.py
 │   │   │   📄 runes_data.py
+│   │   │   📄 season_pass.py
 │   │   │   📄 skills.py
 │   │   │   📄 skins.py
 │   │   │   📄 utils.py
@@ -238,6 +140,7 @@
 │   │   📁 player/
 │   │   │   📄 account_lock.py
 │   │   │   📄 actions.py
+│   │   │   📄 combat_stats.py
 │   │   │   📄 core.py
 │   │   │   📄 inventory.py
 │   │   │   📄 premium.py
@@ -277,9 +180,6 @@
 │   │   │   📄 skill_effects_adapter.py
 │   │   📁 ui/
 │   │   │   📄 text_utils.py
-│   │   📁 world_boss/
-│   │   │   📄 engine.py
-│   📁 parties/
 │   📁 pvp/
 │   │   📄 pvp_battle.py
 │   │   📄 pvp_config.py
@@ -290,33 +190,47 @@
 │   │   📄 tournament_system.py
 │   │   📄 ui.py
 │   │   📄 __init__.py
-│   📁 registries/
+│   📁 rotas/
 │   │   📄 admin.py
 │   │   📄 character.py
-│   │   📄 class_evolution.py
-│   │   📄 combat.py
-│   │   📄 crafting.py
-│   │   📄 events.py
-│   │   📄 guild.py
-│   │   📄 market.py
-│   │   📄 regions.py
-│   │   📄 startup.py
+│   │   📄 loja_reino.py
+│   │   📄 npc.py
+│   │   📄 passe.py
 │   │   📄 __init__.py
 │   📁 static/
-│   │   📁 classes/
+│   │   📁 assets/
+│   │   │   📁 classes_costa/
+│   │   │   📁 fundos/
+│   │   │   📁 sprites/
+│   │   │   │   📁 ui/
 │   │   📁 css/
+│   │   📁 images/
+│   │   │   📁 sprites/
+│   │   │   │   📁 npas/
+│   │   │   📁 tilesets/
+│   │   │   │   📁 adit/
+│   │   │   │   │   📁 Farm RPG FREE 16x16 - Tiny Asset Pack/
+│   │   │   │   │   │   📁 Farm Animals/
+│   │   │   │   │   │   📁 Objects/
+│   │   │   │   │   │   📁 Tileset/
+│   │   │   │   │   📁 Pipoya RPG World Tileset 48x48 40x40 32x32 for Tiled1.5/
+│   │   │   │   │   │   📁 32x32/
+│   │   │   │   │   │   📁 40x40/
+│   │   │   │   │   │   📁 48x48/
+│   │   │   │   │   📁 Pixel Art Top Down - Basic v1.2.3/
+│   │   │   │   │   │   📁 Texture/
+│   │   │   │   │   │   │   📁 Extra/
+│   │   │   │   │   📁 sprites/
+│   │   │   │   │   📁 Sprout Lands - Sprites - Basic pack/
+│   │   │   │   │   │   📁 Characters/
+│   │   │   │   │   │   📁 Objects/
+│   │   │   │   │   │   📁 Sprout Lands color pallet/
+│   │   │   │   │   │   📁 Tilesets/
+│   │   │   │   │   📁 Unorganized Parts/
 │   │   📁 items/
 │   │   📁 js/
 │   │   📁 monsters/
 │   │   📁 rankings/
 │   │   📁 regions/
+│   │   📁 tilesets/
 │   📁 templates/
-│   📁 tools/
-│   │   📄 debug_market_item.py
-│   │   📄 find_legacy_usage.py
-│   │   📄 hard_respec_all.py
-│   │   📄 migrate_market.py
-│   │   📄 normalize_file_ids.py
-│   📁 ui/
-│   │   📄 ui_renderer.py
-│   │   📄 __init__.py

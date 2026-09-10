@@ -1,0 +1,184 @@
+/* =========================================================
+   MERCADO REAL — RESPONSIVO / MOBILE / VISUAL PREMIUM
+   ========================================================= */
+
+#ui-mercado {
+    padding: 10px !important;
+    box-sizing: border-box !important;
+}
+
+/* Caixa principal do mercado */
+#ui-mercado > div {
+    width: min(94vw, 520px) !important;
+    max-width: 520px !important;
+    max-height: 88vh !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+}
+
+/* Header */
+#ui-mercado h2 {
+    font-size: clamp(1.1rem, 4vw, 1.5rem) !important;
+}
+
+/* Abas */
+#ui-mercado .tab-mercado {
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    font-size: clamp(0.72rem, 3vw, 0.9rem) !important;
+}
+
+/* Área interna scrollável */
+#ui-mercado .conteudo-mercado {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Lista de anúncios */
+#lista-ouro,
+#lista-gemas {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Dropdown de venda */
+#btn-dropdown-venda {
+    min-height: 58px !important;
+}
+
+#dropdown-venda-selecionado {
+    min-width: 0 !important;
+}
+
+#lista-dropdown-venda {
+    max-height: min(230px, 42vh) !important;
+}
+
+/* Preview do item selecionado para venda */
+#preview-item-venda-mercado {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Inputs da aba vender */
+#aba-vender input,
+#aba-vender select {
+    font-size: 16px !important; /* impede zoom automático no celular */
+}
+
+/* Modal de detalhes do mercado */
+#modal-detalhes-mercado {
+    padding: 10px !important;
+    box-sizing: border-box !important;
+}
+
+#modal-detalhes-mercado > div {
+    width: min(94vw, 390px) !important;
+    max-height: 88vh !important;
+}
+
+/* Cards criados pelo JS */
+#lista-ouro > div,
+#lista-gemas > div {
+    min-height: 74px !important;
+}
+
+/* Botões */
+#ui-mercado button,
+#modal-detalhes-mercado button {
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* =========================================================
+   MOBILE PEQUENO
+   ========================================================= */
+
+@media (max-width: 420px) {
+    #ui-mercado {
+        padding: 6px !important;
+        align-items: center !important;
+    }
+
+    #ui-mercado > div {
+        width: 96vw !important;
+        max-height: 92vh !important;
+        border-radius: 14px !important;
+    }
+
+    #ui-mercado > div > div:first-child {
+        padding: 14px 42px 14px 14px !important;
+    }
+
+    #ui-mercado h2 {
+        font-size: 1.05rem !important;
+    }
+
+    #ui-mercado .tab-mercado {
+        padding: 11px 3px !important;
+        font-size: 0.72rem !important;
+        letter-spacing: 0 !important;
+    }
+
+    #ui-mercado > div > div:nth-child(3) {
+        padding: 12px !important;
+    }
+
+    /* Aba vender: campos em coluna no celular pequeno */
+    #aba-vender > div:nth-of-type(2) {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    #lista-dropdown-venda {
+        top: 78px !important;
+        max-height: 38vh !important;
+    }
+
+    #preview-item-venda-mercado {
+        padding: 9px !important;
+    }
+
+    /* Cards do mercado no mobile */
+    #lista-ouro > div,
+    #lista-gemas > div {
+        padding: 9px !important;
+        gap: 8px !important;
+        border-radius: 10px !important;
+    }
+
+    #lista-ouro > div img,
+    #lista-gemas > div img {
+        max-width: 36px !important;
+        max-height: 36px !important;
+    }
+
+    #modal-detalhes-mercado {
+        align-items: center !important;
+    }
+
+    #modal-detalhes-mercado > div {
+        width: 96vw !important;
+        max-height: 90vh !important;
+        border-radius: 14px !important;
+    }
+}
+
+/* =========================================================
+   MOBILE MUITO BAIXO
+   ========================================================= */
+
+@media (max-height: 650px) {
+    #ui-mercado > div {
+        max-height: 94vh !important;
+    }
+
+    #modal-detalhes-mercado > div {
+        max-height: 94vh !important;
+    }
+
+    #modal-detalhes-mercado img#modal-img-mercado-detalhe {
+        max-width: 72px !important;
+        max-height: 72px !important;
+    }
+}

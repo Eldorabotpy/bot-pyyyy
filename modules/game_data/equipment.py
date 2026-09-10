@@ -14,7 +14,7 @@ SLOT_EMOJI = {
 }
 
 # Ordem canônica usada nos handlers/menus
-SLOT_ORDER = ["tool", "arma", "elmo", "armadura", "calca", "luvas", "botas", "colar", "anel", "brinco"]
+SLOT_ORDER = ["arma", "elmo", "armadura", "calca", "luvas", "botas", "colar", "anel", "brinco"]
 
 # Regras por slot (stats primários)
 # - "class_attribute": usa o atributo primário da CLASSE (vide CLASS_PRIMARY_ATTRIBUTE em classes.py)
@@ -33,7 +33,18 @@ ITEM_SLOTS = {
 }
 
 SLOT_LABELS = {
-    "tool": "Ferramenta"
+    "tool": "Ferramenta",
+    "tool_lenhador": "Ferramenta de Lenhador",
+    "tool_minerador": "Ferramenta de Minerador",
+    "tool_colhedor": "Ferramenta de Colhedor",
+    "tool_esfolador": "Ferramenta de Esfolador",
+    "tool_alquimista": "Ferramenta de Alquimista",
+    "tool_ferreiro": "Ferramenta de Ferreiro",
+    "tool_armeiro": "Ferramenta de Armeiro",
+    "tool_alfaiate": "Ferramenta de Alfaiate",
+    "tool_joalheiro": "Ferramenta de Joalheiro",
+    "tool_curtidor": "Ferramenta de Curtidor",
+    "tool_fundidor": "Ferramenta de Fundidor",
 }
 
 # ============================================================================

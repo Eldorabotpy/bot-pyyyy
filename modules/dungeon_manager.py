@@ -11,7 +11,7 @@ import asyncio # <<< ADICIONADO para to_thread
 
 from modules.game_data.clans import CLAN_PRESTIGE_LEVELS, CLAN_CONFIG
 from modules.game_data.guild_missions import GUILD_MISSIONS_CATALOG 
-from modules import player_manager, game_data, clan_manager, dungeon_definitions, party_manager
+from modules import player_manager, game_data, dungeon_definitions, party_manager
 
 logger = logging.getLogger(__name__) # Adiciona logger
 

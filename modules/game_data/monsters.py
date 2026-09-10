@@ -314,7 +314,7 @@ MONSTERS_DATA = {
 
         {
             "id": "ond1_rei_slime",
-            "name": "Rei Slime",
+            "name": "Rei Slime Corrompido",
             "is_boss": True,
             "hp": 1150, "attack": 20, "defense": 8, "initiative": 5, "luck": 10,
             "special_attack": {
@@ -398,19 +398,19 @@ MONSTERS_DATA = {
         #0nda 3===================
         {
             "id": "onda3_goblin_catador",
-            "name": "Goblin Catador",
+            "name": "Goblin Sucateiro",
             "hp": 135, "attack": 8, "defense": 4, "initiative": 12, "luck": 8,
             "media_key": "onda3_goblin_catador_media"
         },
         {
             "id": "onda3_goblin_fura_pe",
-            "name": "Goblin Fura-Pé",
+            "name": "Goblin Crava-Pés",
             "hp": 140, "attack": 10, "defense": 5, "initiative": 8, "luck": 5,
             "media_key": "onda3_goblin_fura_pe_media"
         },
         {
             "id": "onda3_atirador_goblin",
-            "name": "Atirador Goblin",
+            "name": "Goblin Flecheiro",
             "hp": 150, "attack": 12, "defense": 3, "initiative": 15, "luck": 10,
             "media_key": "onda3_goblin_atirador_media"
         },
@@ -418,19 +418,19 @@ MONSTERS_DATA = {
         # --- Incomuns ---
         {
             "id": "onda3_brutamontes_goblin",
-            "name": "Brutamontes Goblin",
+            "name": "Goblin Esmaga-Ossos",
             "hp": 180, "attack": 15, "defense": 10, "initiative": 4, "luck": 3,
             "media_key": "onda3_goblin_brutamontes_media"
         },
         {
             "id": "onda3_goblin_xama",
-            "name": "Goblin Xamã",
+            "name": "Xamã da Lua Torta",
             "hp": 190, "attack": 18, "defense": 5, "initiative": 10, "luck": 15,
             "media_key": "onda3_goblin_xama_media"
         },
         {
             "id": "onda3_goblin_ardilheiro",
-            "name": "Goblin Ardilheiro",
+            "name": "Goblin Velhaco",
             "hp": 195, "attack": 9, "defense": 6, "initiative": 22, "luck": 20,
             "media_key": "onda3_goblin_ardilheiro_media"
         },
@@ -438,13 +438,13 @@ MONSTERS_DATA = {
         # --- Raros ---
         {
             "id": "onda3_montador_de_lobo",
-            "name": "Montador de Lobo Goblin",
+            "name": "Cavaleiro do Lobo",
             "hp": 200, "attack": 20, "defense": 12, "initiative": 30, "luck": 12,
             "media_key": "onda3_goblin_montador_lobo_media"
         },
         {
             "id": "onda3_goblin_bombardeiro",
-            "name": "Goblin Bombardeiro",
+            "name": "Goblin Estopim",
             "hp": 240, "attack": 25, "defense": 4, "initiative": 18, "luck": 10,
             "media_key": "onda3_goblin_bombardeiro_media"
         },
@@ -452,13 +452,13 @@ MONSTERS_DATA = {
         # --- Chefe / Elite ---
         {
             "id": "onda3_chefe_goblin",
-            "name": "Chefe Goblin",
+            "name": "Senhor da Toca",
             "hp": 250, "attack": 22, "defense": 18, "initiative": 15, "luck": 15,
             "media_key": "onda3_goblin_chefe_media"
         },
         {
             "id": "onda3_rei_goblin",
-            "name": "Rei Goblin",
+            "name": "Rei Gorlak, Senhor da Horda",
             "is_boss": True,
             "hp": 1500, "attack": 60, "defense": 25, "initiative": 20, "luck": 20,
             "special_attack": {
@@ -546,6 +546,63 @@ MONSTERS_DATA = {
         },
 
     ],
+    "capital_eldora": [
+        {
+            "id": "slime_verde",
+            "name": "Slime Verde",
+            "hp": 25, "attack": 3, "defense": 2, "initiative": 3, "luck": 2,
+            "min_level": 1, "max_level": 5,
+            "skills": ["gosma_pegajosa", "investida_brutal"],
+            "xp_reward": 10, "gold_drop": 5,
+            "ambush_chance": 1.25,
+            "loot_table": [{"item_id": "geleia_slime", "drop_chance": 10}],
+        },
+        {
+            "id": "pequeno_slime",
+            "name": "Pequeno Slime",
+            "min_level": 1, "max_level": 5,
+            "skills": ["gosma_pegajosa", "investida_brutal"],
+            "hp": 15, "attack": 2, "defense": 1, "initiative": 5, "luck": 1,
+            "xp_reward": 10, "gold_drop": 5,
+            "loot_table": [{"item_id": "frasco_com_agua", "drop_chance": 10}],
+        },
+        {
+            "id": "slime_escuridao",
+            "name": "Slime da Escuridão", # Raro, muito defensivo
+            "min_level": 1, "max_level": 5,
+            "skills": ["gosma_pegajosa", "investida_brutal"],
+            "hp": 60, "attack": 3, "defense": 5, "initiative": 1, "luck": 5,
+            "xp_reward": 15, "gold_drop": 5,
+            "ambush_chance": 1.25,
+            "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
+            
+        },
+        {
+            "id": "slime_terra",
+            "name": "Slime Terra",
+            "min_level": 1, "max_level": 5,
+            "skills": ["terremoto_local", "investida_brutal"],
+            "hp": 50, "attack": 4, "defense": 3, "initiative": 1, "luck": 3,
+            "xp_reward": 10, "gold_drop": 8,
+            "ambush_chance": 1.25,
+            "loot_table": [{"item_id": "raiz_da_fortuna", "drop_chance": 10}],  
+        },
+        {
+            "id": "goblin_batedor",
+            "name": "Goblin Batedor",
+            "min_level": 5, "max_level": 10,
+            "skills": ["golpe_sujo", "golpe_de_escudo"],
+            "hp": 40, "attack": 15, "defense": 1, "initiative": 2, "luck": 5,
+            "xp_reward": 20, "ambush_chance": 1.25,
+            "file_id_name": "goblin_batedor_media",
+            "gold_drop": 10,
+            "loot_table": [
+                {"item_id": "pano_simples", "drop_chance": 30}
+            ],
+        },
+        
+    ],
+
     "pradaria_inicial": [
         # --- Comuns ---
         {
@@ -554,10 +611,9 @@ MONSTERS_DATA = {
             "min_level": 1, "max_level": 5,
             "skills": ["gosma_pegajosa", "investida_brutal"],
             "hp": 15, "attack": 2, "defense": 1, "initiative": 5, "luck": 1,
-            "xp_reward": 10, "gold_drop": 2,
-            "loot_table": [{"item_id": "frasco_com_agua", "drop_chance": 10}],           
-            "media_key": "slime_pequeno_media",
-            "image_url": "https://github.com/user-attachments/assets/94dbce5a-9bec-411b-82cf-5f217786425e"
+            "xp_reward": 10, "gold_drop": 5,
+            "ambush_chance": 0.25,
+            "loot_table": [{"item_id": "frasco_com_agua", "drop_chance": 10}],
         },
         {
             "id": "slime_verde",
@@ -565,10 +621,9 @@ MONSTERS_DATA = {
             "hp": 25, "attack": 3, "defense": 2, "initiative": 3, "luck": 2,
             "min_level": 1, "max_level": 5,
             "skills": ["gosma_pegajosa", "investida_brutal"],
-            "xp_reward": 10, "gold_drop": 3,
+            "xp_reward": 10, "gold_drop": 5,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "geleia_slime", "drop_chance": 10}],
-            "media_key": "slime_verde_media",
-            "image_url": "https://github.com/user-attachments/assets/0a008654-41db-46d1-bc14-14709b5d23a7"
         },
         {
             "id": "slime_azul",
@@ -576,10 +631,10 @@ MONSTERS_DATA = {
             "min_level": 1, "max_level": 5,
             "skills": ["gosma_pegajosa", "investida_brutal"],
             "hp": 35, "attack": 2, "defense": 4, "initiative": 2, "luck": 2,
-            "xp_reward": 10, "gold_drop": 4,
+            "xp_reward": 10, "gold_drop": 5,
+            "ambush_chance": 0.75,
             "loot_table": [{"item_id": "cristal_mana_bruto", "drop_chance": 10}],
             "media_key": "slime_azul_media",
-            "image_url": "https://github.com/user-attachments/assets/ad4841cd-b836-48d4-8f55-1f569eb84ef3"
         },
         {
             "id": "slime_magma",
@@ -587,7 +642,8 @@ MONSTERS_DATA = {
             "min_level": 1, "max_level": 5,
             "skills": ["bola_de_fogo_menor", "investida_brutal"],
             "hp": 20, "attack": 5, "defense": 1, "initiative": 4, "luck": 2,
-            "xp_reward": 10, "gold_drop": 4,
+            "xp_reward": 10, "gold_drop": 5,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "pocao_cura_leve", "drop_chance": 2}],
             "media_key": "slime_magma_media",
             "image_url": "https://github.com/user-attachments/assets/f9df87ab-bd02-436e-b7d0-cc306a99cfab"
@@ -602,9 +658,8 @@ MONSTERS_DATA = {
             "skills": ["terremoto_local", "investida_brutal"],
             "hp": 50, "attack": 4, "defense": 3, "initiative": 1, "luck": 3,
             "xp_reward": 10, "gold_drop": 8,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "raiz_da_fortuna", "drop_chance": 10}],
-            "media_key": "slime_terra_media",
-            "image_url": "https://github.com/user-attachments/assets/dc4222a7-d290-4c4b-a0c7-ca5092e7b153"
         },
         {
             "id": "slime_venenoso",
@@ -613,9 +668,9 @@ MONSTERS_DATA = {
             "skills": ["ferrao_toxico", "investida_brutal"], 
             "hp": 25, "attack": 3, "defense": 2, "initiative": 12, "luck": 5,
             "xp_reward": 10, "gold_drop": 5,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
             "media_key": "slime_venenoso_media",
-            "image_url": "https://github.com/user-attachments/assets/6ccf9654-47c3-4e62-a133-282c09740af0"
         },
         {
             "id": "slime_eletrico",
@@ -623,10 +678,10 @@ MONSTERS_DATA = {
             "min_level": 1, "max_level": 5,
             "skills": ["gosma_pegajosa", "investida_brutal"],
             "hp": 30, "attack": 4, "defense": 3, "initiative": 4, "luck": 4,
-            "xp_reward": 10, "gold_drop": 6,
+            "xp_reward": 10, "gold_drop": 10,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_eletrico_media",
-            "image_url": "https://github.com/user-attachments/assets/a9f2e648-294c-4315-aa19-43a7955d5b64"
         },
         # --- Raros ---
         {
@@ -636,20 +691,20 @@ MONSTERS_DATA = {
             "skills": ["gosma_pegajosa", "investida_brutal"],
             "hp": 20, "attack": 1, "defense": 1, "initiative": 20, "luck": 10,
             "xp_reward": 10, "gold_drop": 5,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "essencia_purificadora", "drop_chance": 10}],
             "media_key": "slime_brilhante_media",
-            "image_url": "https://github.com/user-attachments/assets/fd3037ae-494d-4b25-9fe5-10119076c1d5"
         },
         {
             "id": "slime_escuridao",
             "name": "Slime da Escuridão", # Raro, muito defensivo
             "min_level": 1, "max_level": 5,
             "skills": ["gosma_pegajosa", "investida_brutal"],
-            "hp": 60, "attack": 3, "defense": 15, "initiative": 1, "luck": 5,
-            "xp_reward": 10, "gold_drop": 1,
+            "hp": 60, "attack": 3, "defense": 5, "initiative": 1, "luck": 5,
+            "xp_reward": 10, "gold_drop": 10,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "folha_sombria", "drop_chance": 10}],
-            "media_key": "slime_escuridao_media",
-            "image_url": "https://github.com/user-attachments/assets/8acb1a9b-9af9-4522-a509-2ec73c905b5e"
+            
         },
 
         # --- Mini-Chefe (Muito Raro) ---
@@ -659,10 +714,11 @@ MONSTERS_DATA = {
             "min_level": 1, "max_level": 5,
             "skills": ["esmagar", "investida_brutal"],
             "hp": 150, "attack": 10, "defense": 8, "initiative": 5, "luck": 10,
-            "xp_reward": 10, "gold_drop": 1,
+            "xp_reward": 30, "gold_drop": 20,
+            "ambush_chance": 1.25,
             "loot_table": [{"item_id": "po_de_iniciativa", "drop_chance": 5}],
             "media_key": "rei_slime_media",
-            "image_url": "https://github.com/user-attachments/assets/65bed98b-0df7-477a-a9ae-e4bc5ff8541c"
+            
         }
     ],
 
@@ -672,10 +728,10 @@ MONSTERS_DATA = {
             "name": "Goblin Batedor",
             "min_level": 5, "max_level": 10,
             "skills": ["golpe_sujo", "golpe_de_escudo"],
-            "hp": 40, "attack": 5, "defense": 1, "initiative": 8, "luck": 5,
-            "xp_reward": 13, "ambush_chance": 1.25,
+            "hp": 40, "attack": 15, "defense": 1, "initiative": 2, "luck": 5,
+            "xp_reward": 20, "ambush_chance": 1.25,
             "file_id_name": "goblin_batedor_media",
-            "gold_drop": 1,
+            "gold_drop": 10,
             "loot_table": [
                 {"item_id": "pano_simples", "drop_chance": 30}
             ],
@@ -686,9 +742,9 @@ MONSTERS_DATA = {
             "min_level": 5, "max_level": 10,
             "skills": ["mordida_feroz", "garras_dilacerantes"],
             "hp": 25, "attack": 4, "defense": 2, "initiative": 7, "luck": 3,
-            "xp_reward": 13, "ambush_chance": 0.0,
+            "xp_reward": 25, "ambush_chance": 1.0,
             "file_id_name": "lobo_magro_media",
-            "gold_drop": 1,
+            "gold_drop": 5,
             "loot_table": [
                 {"item_id": "couro_de_lobo", "drop_chance": 30}
             ],
@@ -699,9 +755,9 @@ MONSTERS_DATA = {
             "min_level": 5, "max_level": 10,
             "skills": ["drenar_vida", "gosma_pegajosa"],
             "hp": 30, "attack": 4, "defense": 4, "initiative": 2, "luck": 1,
-            "xp_reward": 13, "ambush_chance": 0.0,
+            "xp_reward": 20, "ambush_chance": 1.0,
             "file_id_name": "cogumelo_gigante_media",
-            "gold_drop": 1,
+            "gold_drop": 5,
             "loot_table": [
                 {"item_id": "esporo_de_cogumelo", "drop_chance": 30}
             ],
@@ -714,7 +770,7 @@ MONSTERS_DATA = {
             "hp": 35, "attack": 6, "defense": 3, "initiative": 5, "luck": 4,
             "xp_reward": 13, "ambush_chance": 0.0,
             "file_id_name": "javali_com_presas_media",
-            "gold_drop": 1,
+            "gold_drop": 5,
             "loot_table": [
                 {"item_id": "presa_de_javali", "drop_chance": 30}
             ],
