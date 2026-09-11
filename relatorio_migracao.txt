@@ -1,15 +1,7 @@
-RELATÓRIO DE MIGRAÇÃO - 98.8% CONCLUÍDO
-Gerado em: 2026-06-29 18:30:50
+RELATÓRIO DE MIGRAÇÃO - 99.2% CONCLUÍDO
+Gerado em: 2026-09-10 19:54:48
 ============================================================
 
-Arquivo: .\modules\events\catacumbas\combat_handler.py
-Prioridade: 4 | Status: ⚠️ MISTO
-Encontrado: update.effective_user.id
-------------------------------------------------------------
-Arquivo: .\modules\events\catacumbas\entry_handler.py
-Prioridade: 4 | Status: ⚠️ MISTO
-Encontrado: players_col.find, update.effective_user.id
-------------------------------------------------------------
 
 ==================================================
 📂 ESTRUTURA DO PROJETO (Arquivos .py)
@@ -30,7 +22,6 @@ Encontrado: players_col.find, update.effective_user.id
 │   📁 modules/
 │   │   📄 auth_utils.py
 │   │   📄 balance.py
-│   │   📄 clan_manager.py
 │   │   📄 clan_war_engine.py
 │   │   📄 class_evolution_service.py
 │   │   📄 cooldowns.py
@@ -51,6 +42,10 @@ Encontrado: players_col.find, update.effective_user.id
 │   │   📄 missoes.py
 │   │   📄 mob_engine.py
 │   │   📄 player_manager.py
+│   │   📄 premium_pix.py
+│   │   📄 premium_store_manager.py
+│   │   📄 premium_store_registry.py
+│   │   📄 premium_telegram.py
 │   │   📄 profession_engine.py
 │   │   📄 rarities.py
 │   │   📄 recovery_manager.py
@@ -60,6 +55,14 @@ Encontrado: players_col.find, update.effective_user.id
 │   │   📄 stats_engine.py
 │   │   📄 webapp_api.py
 │   │   📄 __init__.py
+│   │   📁 clan/
+│   │   │   📄 clan_logos.py
+│   │   │   📄 clan_manager.py
+│   │   │   📄 clan_registry.py
+│   │   │   📄 clan_war_battle_engine.py
+│   │   │   📄 clan_war_manager.py
+│   │   │   📄 clan_war_registry.py
+│   │   │   📄 __init__.py
 │   │   📁 combat/
 │   │   │   📄 battle_manager.py
 │   │   │   📄 combat_engine.py
@@ -128,6 +131,11 @@ Encontrado: players_col.find, update.effective_user.id
 │   │   │   📄 utils.py
 │   │   │   📄 worldmap.py
 │   │   │   📄 xp.py
+│   │   │   📄 __init__.py
+│   │   📁 guild_missions/
+│   │   │   📄 clan_guild_mission_manager.py
+│   │   │   📄 guild_mission_manager.py
+│   │   │   📄 guild_mission_registry.py
 │   │   │   📄 __init__.py
 │   │   📁 guild_war/
 │   │   │   📄 balance.py
@@ -205,32 +213,2544 @@ Encontrado: players_col.find, update.effective_user.id
 │   │   │   │   📁 ui/
 │   │   📁 css/
 │   │   📁 images/
-│   │   │   📁 sprites/
-│   │   │   │   📁 npas/
 │   │   │   📁 tilesets/
-│   │   │   │   📁 adit/
-│   │   │   │   │   📁 Farm RPG FREE 16x16 - Tiny Asset Pack/
-│   │   │   │   │   │   📁 Farm Animals/
-│   │   │   │   │   │   📁 Objects/
-│   │   │   │   │   │   📁 Tileset/
-│   │   │   │   │   📁 Pipoya RPG World Tileset 48x48 40x40 32x32 for Tiled1.5/
-│   │   │   │   │   │   📁 32x32/
-│   │   │   │   │   │   📁 40x40/
-│   │   │   │   │   │   📁 48x48/
-│   │   │   │   │   📁 Pixel Art Top Down - Basic v1.2.3/
-│   │   │   │   │   │   📁 Texture/
-│   │   │   │   │   │   │   📁 Extra/
-│   │   │   │   │   📁 sprites/
-│   │   │   │   │   📁 Sprout Lands - Sprites - Basic pack/
-│   │   │   │   │   │   📁 Characters/
-│   │   │   │   │   │   📁 Objects/
-│   │   │   │   │   │   📁 Sprout Lands color pallet/
-│   │   │   │   │   │   📁 Tilesets/
-│   │   │   │   │   📁 Unorganized Parts/
 │   │   📁 items/
 │   │   📁 js/
 │   │   📁 monsters/
 │   │   📁 rankings/
 │   │   📁 regions/
+│   │   📁 start/
 │   │   📁 tilesets/
 │   📁 templates/
+│   📁 venv_quebrado_backup/
+│   │   📁 Include/
+│   │   │   📁 site/
+│   │   │   │   📁 python3.14/
+│   │   │   │   │   📁 greenlet/
+│   │   📁 Lib/
+│   │   │   📁 site-packages/
+│   │   │   │   📄 nest_asyncio.py
+│   │   │   │   📄 six.py
+│   │   │   │   📄 typing_extensions.py
+│   │   │   │   📁 anyio/
+│   │   │   │   │   📄 from_thread.py
+│   │   │   │   │   📄 lowlevel.py
+│   │   │   │   │   📄 pytest_plugin.py
+│   │   │   │   │   📄 to_interpreter.py
+│   │   │   │   │   📄 to_process.py
+│   │   │   │   │   📄 to_thread.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 abc/
+│   │   │   │   │   │   📄 _eventloop.py
+│   │   │   │   │   │   📄 _resources.py
+│   │   │   │   │   │   📄 _sockets.py
+│   │   │   │   │   │   📄 _streams.py
+│   │   │   │   │   │   📄 _subprocesses.py
+│   │   │   │   │   │   📄 _tasks.py
+│   │   │   │   │   │   📄 _testing.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 streams/
+│   │   │   │   │   │   📄 buffered.py
+│   │   │   │   │   │   📄 file.py
+│   │   │   │   │   │   📄 memory.py
+│   │   │   │   │   │   📄 stapled.py
+│   │   │   │   │   │   📄 text.py
+│   │   │   │   │   │   📄 tls.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _backends/
+│   │   │   │   │   │   📄 _asyncio.py
+│   │   │   │   │   │   📄 _trio.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _core/
+│   │   │   │   │   │   📄 _asyncio_selector_thread.py
+│   │   │   │   │   │   📄 _contextmanagers.py
+│   │   │   │   │   │   📄 _eventloop.py
+│   │   │   │   │   │   📄 _exceptions.py
+│   │   │   │   │   │   📄 _fileio.py
+│   │   │   │   │   │   📄 _resources.py
+│   │   │   │   │   │   📄 _signals.py
+│   │   │   │   │   │   📄 _sockets.py
+│   │   │   │   │   │   📄 _streams.py
+│   │   │   │   │   │   📄 _subprocesses.py
+│   │   │   │   │   │   📄 _synchronization.py
+│   │   │   │   │   │   📄 _tasks.py
+│   │   │   │   │   │   📄 _tempfile.py
+│   │   │   │   │   │   📄 _testing.py
+│   │   │   │   │   │   📄 _typedattr.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 anyio-4.10.0.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 apscheduler/
+│   │   │   │   │   📄 events.py
+│   │   │   │   │   📄 job.py
+│   │   │   │   │   📄 util.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 executors/
+│   │   │   │   │   │   📄 asyncio.py
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 base_py3.py
+│   │   │   │   │   │   📄 debug.py
+│   │   │   │   │   │   📄 gevent.py
+│   │   │   │   │   │   📄 pool.py
+│   │   │   │   │   │   📄 tornado.py
+│   │   │   │   │   │   📄 twisted.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 jobstores/
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 memory.py
+│   │   │   │   │   │   📄 mongodb.py
+│   │   │   │   │   │   📄 redis.py
+│   │   │   │   │   │   📄 rethinkdb.py
+│   │   │   │   │   │   📄 sqlalchemy.py
+│   │   │   │   │   │   📄 zookeeper.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 schedulers/
+│   │   │   │   │   │   📄 asyncio.py
+│   │   │   │   │   │   📄 background.py
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 blocking.py
+│   │   │   │   │   │   📄 gevent.py
+│   │   │   │   │   │   📄 qt.py
+│   │   │   │   │   │   📄 tornado.py
+│   │   │   │   │   │   📄 twisted.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 triggers/
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 combining.py
+│   │   │   │   │   │   📄 date.py
+│   │   │   │   │   │   📄 interval.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 cron/
+│   │   │   │   │   │   │   📄 expressions.py
+│   │   │   │   │   │   │   📄 fields.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 APScheduler-3.10.4.dist-info/
+│   │   │   │   📁 bidict/
+│   │   │   │   │   📄 metadata.py
+│   │   │   │   │   📄 _abc.py
+│   │   │   │   │   📄 _base.py
+│   │   │   │   │   📄 _bidict.py
+│   │   │   │   │   📄 _dup.py
+│   │   │   │   │   📄 _exc.py
+│   │   │   │   │   📄 _frozen.py
+│   │   │   │   │   📄 _iter.py
+│   │   │   │   │   📄 _orderedbase.py
+│   │   │   │   │   📄 _orderedbidict.py
+│   │   │   │   │   📄 _typing.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 bidict-0.23.1.dist-info/
+│   │   │   │   📁 blinker/
+│   │   │   │   │   📄 base.py
+│   │   │   │   │   📄 _utilities.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 blinker-1.9.0.dist-info/
+│   │   │   │   📁 bson/
+│   │   │   │   │   📄 binary.py
+│   │   │   │   │   📄 code.py
+│   │   │   │   │   📄 codec_options.py
+│   │   │   │   │   📄 datetime_ms.py
+│   │   │   │   │   📄 dbref.py
+│   │   │   │   │   📄 decimal128.py
+│   │   │   │   │   📄 errors.py
+│   │   │   │   │   📄 int64.py
+│   │   │   │   │   📄 json_util.py
+│   │   │   │   │   📄 max_key.py
+│   │   │   │   │   📄 min_key.py
+│   │   │   │   │   📄 objectid.py
+│   │   │   │   │   📄 raw_bson.py
+│   │   │   │   │   📄 regex.py
+│   │   │   │   │   📄 son.py
+│   │   │   │   │   📄 timestamp.py
+│   │   │   │   │   📄 typings.py
+│   │   │   │   │   📄 tz_util.py
+│   │   │   │   │   📄 _helpers.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 certifi/
+│   │   │   │   │   📄 core.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   📁 certifi-2025.8.3.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 charset_normalizer/
+│   │   │   │   │   📄 api.py
+│   │   │   │   │   📄 cd.py
+│   │   │   │   │   📄 constant.py
+│   │   │   │   │   📄 legacy.py
+│   │   │   │   │   📄 md.py
+│   │   │   │   │   📄 models.py
+│   │   │   │   │   📄 utils.py
+│   │   │   │   │   📄 version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   │   📁 cli/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📄 __main__.py
+│   │   │   │   📁 charset_normalizer-3.4.3.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 click/
+│   │   │   │   │   📄 core.py
+│   │   │   │   │   📄 decorators.py
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 formatting.py
+│   │   │   │   │   📄 globals.py
+│   │   │   │   │   📄 parser.py
+│   │   │   │   │   📄 shell_completion.py
+│   │   │   │   │   📄 termui.py
+│   │   │   │   │   📄 testing.py
+│   │   │   │   │   📄 types.py
+│   │   │   │   │   📄 utils.py
+│   │   │   │   │   📄 _compat.py
+│   │   │   │   │   📄 _termui_impl.py
+│   │   │   │   │   📄 _textwrap.py
+│   │   │   │   │   📄 _utils.py
+│   │   │   │   │   📄 _winconsole.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 click-8.3.0.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 colorama/
+│   │   │   │   │   📄 ansi.py
+│   │   │   │   │   📄 ansitowin32.py
+│   │   │   │   │   📄 initialise.py
+│   │   │   │   │   📄 win32.py
+│   │   │   │   │   📄 winterm.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 tests/
+│   │   │   │   │   │   📄 ansitowin32_test.py
+│   │   │   │   │   │   📄 ansi_test.py
+│   │   │   │   │   │   📄 initialise_test.py
+│   │   │   │   │   │   📄 isatty_test.py
+│   │   │   │   │   │   📄 utils.py
+│   │   │   │   │   │   📄 winterm_test.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 colorama-0.4.6.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 dns/
+│   │   │   │   │   📄 asyncbackend.py
+│   │   │   │   │   📄 asyncquery.py
+│   │   │   │   │   📄 asyncresolver.py
+│   │   │   │   │   📄 btree.py
+│   │   │   │   │   📄 btreezone.py
+│   │   │   │   │   📄 dnssec.py
+│   │   │   │   │   📄 dnssectypes.py
+│   │   │   │   │   📄 e164.py
+│   │   │   │   │   📄 edns.py
+│   │   │   │   │   📄 entropy.py
+│   │   │   │   │   📄 enum.py
+│   │   │   │   │   📄 exception.py
+│   │   │   │   │   📄 flags.py
+│   │   │   │   │   📄 grange.py
+│   │   │   │   │   📄 immutable.py
+│   │   │   │   │   📄 inet.py
+│   │   │   │   │   📄 ipv4.py
+│   │   │   │   │   📄 ipv6.py
+│   │   │   │   │   📄 message.py
+│   │   │   │   │   📄 name.py
+│   │   │   │   │   📄 namedict.py
+│   │   │   │   │   📄 nameserver.py
+│   │   │   │   │   📄 node.py
+│   │   │   │   │   📄 opcode.py
+│   │   │   │   │   📄 query.py
+│   │   │   │   │   📄 rcode.py
+│   │   │   │   │   📄 rdata.py
+│   │   │   │   │   📄 rdataclass.py
+│   │   │   │   │   📄 rdataset.py
+│   │   │   │   │   📄 rdatatype.py
+│   │   │   │   │   📄 renderer.py
+│   │   │   │   │   📄 resolver.py
+│   │   │   │   │   📄 reversename.py
+│   │   │   │   │   📄 rrset.py
+│   │   │   │   │   📄 serial.py
+│   │   │   │   │   📄 set.py
+│   │   │   │   │   📄 tokenizer.py
+│   │   │   │   │   📄 transaction.py
+│   │   │   │   │   📄 tsig.py
+│   │   │   │   │   📄 tsigkeyring.py
+│   │   │   │   │   📄 ttl.py
+│   │   │   │   │   📄 update.py
+│   │   │   │   │   📄 version.py
+│   │   │   │   │   📄 versioned.py
+│   │   │   │   │   📄 win32util.py
+│   │   │   │   │   📄 wire.py
+│   │   │   │   │   📄 xfr.py
+│   │   │   │   │   📄 zone.py
+│   │   │   │   │   📄 zonefile.py
+│   │   │   │   │   📄 zonetypes.py
+│   │   │   │   │   📄 _asyncbackend.py
+│   │   │   │   │   📄 _asyncio_backend.py
+│   │   │   │   │   📄 _ddr.py
+│   │   │   │   │   📄 _features.py
+│   │   │   │   │   📄 _immutable_ctx.py
+│   │   │   │   │   📄 _no_ssl.py
+│   │   │   │   │   📄 _tls_util.py
+│   │   │   │   │   📄 _trio_backend.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 dnssecalgs/
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 cryptography.py
+│   │   │   │   │   │   📄 dsa.py
+│   │   │   │   │   │   📄 ecdsa.py
+│   │   │   │   │   │   📄 eddsa.py
+│   │   │   │   │   │   📄 rsa.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 quic/
+│   │   │   │   │   │   📄 _asyncio.py
+│   │   │   │   │   │   📄 _common.py
+│   │   │   │   │   │   📄 _sync.py
+│   │   │   │   │   │   📄 _trio.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 rdtypes/
+│   │   │   │   │   │   📄 dnskeybase.py
+│   │   │   │   │   │   📄 dsbase.py
+│   │   │   │   │   │   📄 euibase.py
+│   │   │   │   │   │   📄 mxbase.py
+│   │   │   │   │   │   📄 nsbase.py
+│   │   │   │   │   │   📄 svcbbase.py
+│   │   │   │   │   │   📄 tlsabase.py
+│   │   │   │   │   │   📄 txtbase.py
+│   │   │   │   │   │   📄 util.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 ANY/
+│   │   │   │   │   │   │   📄 AFSDB.py
+│   │   │   │   │   │   │   📄 AMTRELAY.py
+│   │   │   │   │   │   │   📄 AVC.py
+│   │   │   │   │   │   │   📄 CAA.py
+│   │   │   │   │   │   │   📄 CDNSKEY.py
+│   │   │   │   │   │   │   📄 CDS.py
+│   │   │   │   │   │   │   📄 CERT.py
+│   │   │   │   │   │   │   📄 CNAME.py
+│   │   │   │   │   │   │   📄 CSYNC.py
+│   │   │   │   │   │   │   📄 DLV.py
+│   │   │   │   │   │   │   📄 DNAME.py
+│   │   │   │   │   │   │   📄 DNSKEY.py
+│   │   │   │   │   │   │   📄 DS.py
+│   │   │   │   │   │   │   📄 DSYNC.py
+│   │   │   │   │   │   │   📄 EUI48.py
+│   │   │   │   │   │   │   📄 EUI64.py
+│   │   │   │   │   │   │   📄 GPOS.py
+│   │   │   │   │   │   │   📄 HINFO.py
+│   │   │   │   │   │   │   📄 HIP.py
+│   │   │   │   │   │   │   📄 ISDN.py
+│   │   │   │   │   │   │   📄 L32.py
+│   │   │   │   │   │   │   📄 L64.py
+│   │   │   │   │   │   │   📄 LOC.py
+│   │   │   │   │   │   │   📄 LP.py
+│   │   │   │   │   │   │   📄 MX.py
+│   │   │   │   │   │   │   📄 NID.py
+│   │   │   │   │   │   │   📄 NINFO.py
+│   │   │   │   │   │   │   📄 NS.py
+│   │   │   │   │   │   │   📄 NSEC.py
+│   │   │   │   │   │   │   📄 NSEC3.py
+│   │   │   │   │   │   │   📄 NSEC3PARAM.py
+│   │   │   │   │   │   │   📄 OPENPGPKEY.py
+│   │   │   │   │   │   │   📄 OPT.py
+│   │   │   │   │   │   │   📄 PTR.py
+│   │   │   │   │   │   │   📄 RESINFO.py
+│   │   │   │   │   │   │   📄 RP.py
+│   │   │   │   │   │   │   📄 RRSIG.py
+│   │   │   │   │   │   │   📄 RT.py
+│   │   │   │   │   │   │   📄 SMIMEA.py
+│   │   │   │   │   │   │   📄 SOA.py
+│   │   │   │   │   │   │   📄 SPF.py
+│   │   │   │   │   │   │   📄 SSHFP.py
+│   │   │   │   │   │   │   📄 TKEY.py
+│   │   │   │   │   │   │   📄 TLSA.py
+│   │   │   │   │   │   │   📄 TSIG.py
+│   │   │   │   │   │   │   📄 TXT.py
+│   │   │   │   │   │   │   📄 URI.py
+│   │   │   │   │   │   │   📄 WALLET.py
+│   │   │   │   │   │   │   📄 X25.py
+│   │   │   │   │   │   │   📄 ZONEMD.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 CH/
+│   │   │   │   │   │   │   📄 A.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 IN/
+│   │   │   │   │   │   │   📄 A.py
+│   │   │   │   │   │   │   📄 AAAA.py
+│   │   │   │   │   │   │   📄 APL.py
+│   │   │   │   │   │   │   📄 DHCID.py
+│   │   │   │   │   │   │   📄 HTTPS.py
+│   │   │   │   │   │   │   📄 IPSECKEY.py
+│   │   │   │   │   │   │   📄 KX.py
+│   │   │   │   │   │   │   📄 NAPTR.py
+│   │   │   │   │   │   │   📄 NSAP.py
+│   │   │   │   │   │   │   📄 NSAP_PTR.py
+│   │   │   │   │   │   │   📄 PX.py
+│   │   │   │   │   │   │   📄 SRV.py
+│   │   │   │   │   │   │   📄 SVCB.py
+│   │   │   │   │   │   │   📄 WKS.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 dnspython-2.8.0.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 dotenv/
+│   │   │   │   │   📄 cli.py
+│   │   │   │   │   📄 ipython.py
+│   │   │   │   │   📄 main.py
+│   │   │   │   │   📄 parser.py
+│   │   │   │   │   📄 variables.py
+│   │   │   │   │   📄 version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   📁 engineio/
+│   │   │   │   │   📄 async_client.py
+│   │   │   │   │   📄 async_server.py
+│   │   │   │   │   📄 async_socket.py
+│   │   │   │   │   📄 base_client.py
+│   │   │   │   │   📄 base_server.py
+│   │   │   │   │   📄 base_socket.py
+│   │   │   │   │   📄 client.py
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 json.py
+│   │   │   │   │   📄 middleware.py
+│   │   │   │   │   📄 packet.py
+│   │   │   │   │   📄 payload.py
+│   │   │   │   │   📄 server.py
+│   │   │   │   │   📄 socket.py
+│   │   │   │   │   📄 static_files.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 async_drivers/
+│   │   │   │   │   │   📄 aiohttp.py
+│   │   │   │   │   │   📄 asgi.py
+│   │   │   │   │   │   📄 eventlet.py
+│   │   │   │   │   │   📄 gevent.py
+│   │   │   │   │   │   📄 gevent_uwsgi.py
+│   │   │   │   │   │   📄 sanic.py
+│   │   │   │   │   │   📄 threading.py
+│   │   │   │   │   │   📄 tornado.py
+│   │   │   │   │   │   📄 _websocket_wsgi.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 eventlet/
+│   │   │   │   │   📄 asyncio.py
+│   │   │   │   │   📄 backdoor.py
+│   │   │   │   │   📄 convenience.py
+│   │   │   │   │   📄 corolocal.py
+│   │   │   │   │   📄 coros.py
+│   │   │   │   │   📄 dagpool.py
+│   │   │   │   │   📄 db_pool.py
+│   │   │   │   │   📄 debug.py
+│   │   │   │   │   📄 event.py
+│   │   │   │   │   📄 greenpool.py
+│   │   │   │   │   📄 greenthread.py
+│   │   │   │   │   📄 lock.py
+│   │   │   │   │   📄 patcher.py
+│   │   │   │   │   📄 pools.py
+│   │   │   │   │   📄 queue.py
+│   │   │   │   │   📄 semaphore.py
+│   │   │   │   │   📄 timeout.py
+│   │   │   │   │   📄 tpool.py
+│   │   │   │   │   📄 websocket.py
+│   │   │   │   │   📄 wsgi.py
+│   │   │   │   │   📄 _version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 green/
+│   │   │   │   │   │   📄 asynchat.py
+│   │   │   │   │   │   📄 asyncore.py
+│   │   │   │   │   │   📄 BaseHTTPServer.py
+│   │   │   │   │   │   📄 builtin.py
+│   │   │   │   │   │   📄 CGIHTTPServer.py
+│   │   │   │   │   │   📄 ftplib.py
+│   │   │   │   │   │   📄 httplib.py
+│   │   │   │   │   │   📄 MySQLdb.py
+│   │   │   │   │   │   📄 os.py
+│   │   │   │   │   │   📄 profile.py
+│   │   │   │   │   │   📄 Queue.py
+│   │   │   │   │   │   📄 select.py
+│   │   │   │   │   │   📄 selectors.py
+│   │   │   │   │   │   📄 SimpleHTTPServer.py
+│   │   │   │   │   │   📄 socket.py
+│   │   │   │   │   │   📄 SocketServer.py
+│   │   │   │   │   │   📄 ssl.py
+│   │   │   │   │   │   📄 subprocess.py
+│   │   │   │   │   │   📄 thread.py
+│   │   │   │   │   │   📄 threading.py
+│   │   │   │   │   │   📄 time.py
+│   │   │   │   │   │   📄 urllib2.py
+│   │   │   │   │   │   📄 zmq.py
+│   │   │   │   │   │   📄 _socket_nodns.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 http/
+│   │   │   │   │   │   │   📄 client.py
+│   │   │   │   │   │   │   📄 cookiejar.py
+│   │   │   │   │   │   │   📄 cookies.py
+│   │   │   │   │   │   │   📄 server.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 OpenSSL/
+│   │   │   │   │   │   │   📄 crypto.py
+│   │   │   │   │   │   │   📄 SSL.py
+│   │   │   │   │   │   │   📄 tsafe.py
+│   │   │   │   │   │   │   📄 version.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 urllib/
+│   │   │   │   │   │   │   📄 error.py
+│   │   │   │   │   │   │   📄 parse.py
+│   │   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 greenio/
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 py3.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 hubs/
+│   │   │   │   │   │   📄 asyncio.py
+│   │   │   │   │   │   📄 epolls.py
+│   │   │   │   │   │   📄 hub.py
+│   │   │   │   │   │   📄 kqueue.py
+│   │   │   │   │   │   📄 poll.py
+│   │   │   │   │   │   📄 pyevent.py
+│   │   │   │   │   │   📄 selects.py
+│   │   │   │   │   │   📄 timer.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 support/
+│   │   │   │   │   │   📄 greendns.py
+│   │   │   │   │   │   📄 greenlets.py
+│   │   │   │   │   │   📄 psycopg2_patcher.py
+│   │   │   │   │   │   📄 pylib.py
+│   │   │   │   │   │   📄 stacklesspypys.py
+│   │   │   │   │   │   📄 stacklesss.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 zipkin/
+│   │   │   │   │   │   📄 api.py
+│   │   │   │   │   │   📄 client.py
+│   │   │   │   │   │   📄 greenthread.py
+│   │   │   │   │   │   📄 http.py
+│   │   │   │   │   │   📄 log.py
+│   │   │   │   │   │   📄 patcher.py
+│   │   │   │   │   │   📄 wsgi.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 example/
+│   │   │   │   │   │   📁 _thrift/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 zipkinCore/
+│   │   │   │   │   │   │   │   📄 constants.py
+│   │   │   │   │   │   │   │   📄 ttypes.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 eventlet-0.39.0.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 flask/
+│   │   │   │   │   📄 app.py
+│   │   │   │   │   📄 blueprints.py
+│   │   │   │   │   📄 cli.py
+│   │   │   │   │   📄 config.py
+│   │   │   │   │   📄 ctx.py
+│   │   │   │   │   📄 debughelpers.py
+│   │   │   │   │   📄 globals.py
+│   │   │   │   │   📄 helpers.py
+│   │   │   │   │   📄 logging.py
+│   │   │   │   │   📄 sessions.py
+│   │   │   │   │   📄 signals.py
+│   │   │   │   │   📄 templating.py
+│   │   │   │   │   📄 testing.py
+│   │   │   │   │   📄 typing.py
+│   │   │   │   │   📄 views.py
+│   │   │   │   │   📄 wrappers.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   │   📁 json/
+│   │   │   │   │   │   📄 provider.py
+│   │   │   │   │   │   📄 tag.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 sansio/
+│   │   │   │   │   │   📄 app.py
+│   │   │   │   │   │   📄 blueprints.py
+│   │   │   │   │   │   📄 scaffold.py
+│   │   │   │   📁 flask-3.1.2.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 flask_cors/
+│   │   │   │   │   📄 core.py
+│   │   │   │   │   📄 decorator.py
+│   │   │   │   │   📄 extension.py
+│   │   │   │   │   📄 version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 Flask_Cors-4.0.0.dist-info/
+│   │   │   │   📁 flask_socketio/
+│   │   │   │   │   📄 namespace.py
+│   │   │   │   │   📄 test_client.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 Flask_SocketIO-5.5.0.dist-info/
+│   │   │   │   📁 greenlet/
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 platform/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 tests/
+│   │   │   │   │   │   📄 fail_clearing_run_switches.py
+│   │   │   │   │   │   📄 fail_cpp_exception.py
+│   │   │   │   │   │   📄 fail_c_stack_refs_suspended_gc.py
+│   │   │   │   │   │   📄 fail_initialstub_already_started.py
+│   │   │   │   │   │   📄 fail_issue_515_freethread_gc.py
+│   │   │   │   │   │   📄 fail_slp_switch.py
+│   │   │   │   │   │   📄 fail_switch_critical_section.py
+│   │   │   │   │   │   📄 fail_switch_three_greenlets.py
+│   │   │   │   │   │   📄 fail_switch_three_greenlets2.py
+│   │   │   │   │   │   📄 fail_switch_two_greenlets.py
+│   │   │   │   │   │   📄 leakcheck.py
+│   │   │   │   │   │   📄 test_contextvars.py
+│   │   │   │   │   │   📄 test_cpp.py
+│   │   │   │   │   │   📄 test_extension_interface.py
+│   │   │   │   │   │   📄 test_gc.py
+│   │   │   │   │   │   📄 test_generator.py
+│   │   │   │   │   │   📄 test_generator_nested.py
+│   │   │   │   │   │   📄 test_greenlet.py
+│   │   │   │   │   │   📄 test_greenlet_trash.py
+│   │   │   │   │   │   📄 test_interpreter_shutdown.py
+│   │   │   │   │   │   📄 test_leaks.py
+│   │   │   │   │   │   📄 test_stack_saved.py
+│   │   │   │   │   │   📄 test_throw.py
+│   │   │   │   │   │   📄 test_tracing.py
+│   │   │   │   │   │   📄 test_version.py
+│   │   │   │   │   │   📄 test_weakref.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 greenlet-3.5.5.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 gridfs/
+│   │   │   │   │   📄 errors.py
+│   │   │   │   │   📄 grid_file.py
+│   │   │   │   │   📄 grid_file_shared.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 asynchronous/
+│   │   │   │   │   │   📄 grid_file.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 synchronous/
+│   │   │   │   │   │   📄 grid_file.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 h11/
+│   │   │   │   │   📄 _abnf.py
+│   │   │   │   │   📄 _connection.py
+│   │   │   │   │   📄 _events.py
+│   │   │   │   │   📄 _headers.py
+│   │   │   │   │   📄 _readers.py
+│   │   │   │   │   📄 _receivebuffer.py
+│   │   │   │   │   📄 _state.py
+│   │   │   │   │   📄 _util.py
+│   │   │   │   │   📄 _version.py
+│   │   │   │   │   📄 _writers.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 h11-0.16.0.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 httpcore/
+│   │   │   │   │   📄 _api.py
+│   │   │   │   │   📄 _exceptions.py
+│   │   │   │   │   📄 _models.py
+│   │   │   │   │   📄 _ssl.py
+│   │   │   │   │   📄 _synchronization.py
+│   │   │   │   │   📄 _trace.py
+│   │   │   │   │   📄 _utils.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _async/
+│   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   📄 connection_pool.py
+│   │   │   │   │   │   📄 http11.py
+│   │   │   │   │   │   📄 http2.py
+│   │   │   │   │   │   📄 http_proxy.py
+│   │   │   │   │   │   📄 interfaces.py
+│   │   │   │   │   │   📄 socks_proxy.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _backends/
+│   │   │   │   │   │   📄 anyio.py
+│   │   │   │   │   │   📄 auto.py
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 mock.py
+│   │   │   │   │   │   📄 sync.py
+│   │   │   │   │   │   📄 trio.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _sync/
+│   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   📄 connection_pool.py
+│   │   │   │   │   │   📄 http11.py
+│   │   │   │   │   │   📄 http2.py
+│   │   │   │   │   │   📄 http_proxy.py
+│   │   │   │   │   │   📄 interfaces.py
+│   │   │   │   │   │   📄 socks_proxy.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 httpcore-1.0.9.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 httpx/
+│   │   │   │   │   📄 _api.py
+│   │   │   │   │   📄 _auth.py
+│   │   │   │   │   📄 _client.py
+│   │   │   │   │   📄 _config.py
+│   │   │   │   │   📄 _content.py
+│   │   │   │   │   📄 _decoders.py
+│   │   │   │   │   📄 _exceptions.py
+│   │   │   │   │   📄 _main.py
+│   │   │   │   │   📄 _models.py
+│   │   │   │   │   📄 _multipart.py
+│   │   │   │   │   📄 _status_codes.py
+│   │   │   │   │   📄 _types.py
+│   │   │   │   │   📄 _urlparse.py
+│   │   │   │   │   📄 _urls.py
+│   │   │   │   │   📄 _utils.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __version__.py
+│   │   │   │   │   📁 _transports/
+│   │   │   │   │   │   📄 asgi.py
+│   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   📄 default.py
+│   │   │   │   │   │   📄 mock.py
+│   │   │   │   │   │   📄 wsgi.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 httpx-0.28.1.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 idna/
+│   │   │   │   │   📄 codec.py
+│   │   │   │   │   📄 compat.py
+│   │   │   │   │   📄 core.py
+│   │   │   │   │   📄 idnadata.py
+│   │   │   │   │   📄 intranges.py
+│   │   │   │   │   📄 package_data.py
+│   │   │   │   │   📄 uts46data.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 idna-3.10.dist-info/
+│   │   │   │   📁 imageio/
+│   │   │   │   │   📄 freeze.py
+│   │   │   │   │   📄 testing.py
+│   │   │   │   │   📄 typing.py
+│   │   │   │   │   📄 v2.py
+│   │   │   │   │   📄 v3.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   │   📁 config/
+│   │   │   │   │   │   📄 extensions.py
+│   │   │   │   │   │   📄 plugins.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 core/
+│   │   │   │   │   │   📄 fetching.py
+│   │   │   │   │   │   📄 findlib.py
+│   │   │   │   │   │   📄 format.py
+│   │   │   │   │   │   📄 imopen.py
+│   │   │   │   │   │   📄 legacy_plugin_wrapper.py
+│   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   📄 util.py
+│   │   │   │   │   │   📄 v3_plugin_api.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 plugins/
+│   │   │   │   │   │   📄 bsdf.py
+│   │   │   │   │   │   📄 dicom.py
+│   │   │   │   │   │   📄 example.py
+│   │   │   │   │   │   📄 feisem.py
+│   │   │   │   │   │   📄 ffmpeg.py
+│   │   │   │   │   │   📄 fits.py
+│   │   │   │   │   │   📄 freeimage.py
+│   │   │   │   │   │   📄 freeimagemulti.py
+│   │   │   │   │   │   📄 gdal.py
+│   │   │   │   │   │   📄 grab.py
+│   │   │   │   │   │   📄 lytro.py
+│   │   │   │   │   │   📄 npz.py
+│   │   │   │   │   │   📄 opencv.py
+│   │   │   │   │   │   📄 pillow.py
+│   │   │   │   │   │   📄 pillowmulti.py
+│   │   │   │   │   │   📄 pillow_info.py
+│   │   │   │   │   │   📄 pillow_legacy.py
+│   │   │   │   │   │   📄 pyav.py
+│   │   │   │   │   │   📄 rawpy.py
+│   │   │   │   │   │   📄 simpleitk.py
+│   │   │   │   │   │   📄 spe.py
+│   │   │   │   │   │   📄 swf.py
+│   │   │   │   │   │   📄 tifffile.py
+│   │   │   │   │   │   📄 tifffile_v3.py
+│   │   │   │   │   │   📄 _bsdf.py
+│   │   │   │   │   │   📄 _dicom.py
+│   │   │   │   │   │   📄 _freeimage.py
+│   │   │   │   │   │   📄 _swf.py
+│   │   │   │   │   │   📄 _tifffile.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 imageio-2.37.4.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 imageio_ffmpeg/
+│   │   │   │   │   📄 _definitions.py
+│   │   │   │   │   📄 _io.py
+│   │   │   │   │   📄 _parsing.py
+│   │   │   │   │   📄 _utils.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 binaries/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 imageio_ffmpeg-0.6.0.dist-info/
+│   │   │   │   📁 itsdangerous/
+│   │   │   │   │   📄 encoding.py
+│   │   │   │   │   📄 exc.py
+│   │   │   │   │   📄 serializer.py
+│   │   │   │   │   📄 signer.py
+│   │   │   │   │   📄 timed.py
+│   │   │   │   │   📄 url_safe.py
+│   │   │   │   │   📄 _json.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 itsdangerous-2.2.0.dist-info/
+│   │   │   │   📁 jinja2/
+│   │   │   │   │   📄 async_utils.py
+│   │   │   │   │   📄 bccache.py
+│   │   │   │   │   📄 compiler.py
+│   │   │   │   │   📄 constants.py
+│   │   │   │   │   📄 debug.py
+│   │   │   │   │   📄 defaults.py
+│   │   │   │   │   📄 environment.py
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 ext.py
+│   │   │   │   │   📄 filters.py
+│   │   │   │   │   📄 idtracking.py
+│   │   │   │   │   📄 lexer.py
+│   │   │   │   │   📄 loaders.py
+│   │   │   │   │   📄 meta.py
+│   │   │   │   │   📄 nativetypes.py
+│   │   │   │   │   📄 nodes.py
+│   │   │   │   │   📄 optimizer.py
+│   │   │   │   │   📄 parser.py
+│   │   │   │   │   📄 runtime.py
+│   │   │   │   │   📄 sandbox.py
+│   │   │   │   │   📄 tests.py
+│   │   │   │   │   📄 utils.py
+│   │   │   │   │   📄 visitor.py
+│   │   │   │   │   📄 _identifier.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 jinja2-3.1.6.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 markupsafe/
+│   │   │   │   │   📄 _native.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 markupsafe-3.0.3.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 nest_asyncio-1.6.0.dist-info/
+│   │   │   │   📁 numpy/
+│   │   │   │   │   📄 conftest.py
+│   │   │   │   │   📄 dtypes.py
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 matlib.py
+│   │   │   │   │   📄 version.py
+│   │   │   │   │   📄 _array_api_info.py
+│   │   │   │   │   📄 _configtool.py
+│   │   │   │   │   📄 _distributor_init.py
+│   │   │   │   │   📄 _expired_attrs_2_0.py
+│   │   │   │   │   📄 _globals.py
+│   │   │   │   │   📄 _pytesttester.py
+│   │   │   │   │   📄 __config__.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 char/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 core/
+│   │   │   │   │   │   📄 arrayprint.py
+│   │   │   │   │   │   📄 defchararray.py
+│   │   │   │   │   │   📄 einsumfunc.py
+│   │   │   │   │   │   📄 fromnumeric.py
+│   │   │   │   │   │   📄 function_base.py
+│   │   │   │   │   │   📄 getlimits.py
+│   │   │   │   │   │   📄 multiarray.py
+│   │   │   │   │   │   📄 numeric.py
+│   │   │   │   │   │   📄 numerictypes.py
+│   │   │   │   │   │   📄 overrides.py
+│   │   │   │   │   │   📄 records.py
+│   │   │   │   │   │   📄 shape_base.py
+│   │   │   │   │   │   📄 umath.py
+│   │   │   │   │   │   📄 _dtype.py
+│   │   │   │   │   │   📄 _dtype_ctypes.py
+│   │   │   │   │   │   📄 _internal.py
+│   │   │   │   │   │   📄 _multiarray_umath.py
+│   │   │   │   │   │   📄 _utils.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 ctypeslib/
+│   │   │   │   │   │   📄 _ctypeslib.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 doc/
+│   │   │   │   │   │   📄 ufuncs.py
+│   │   │   │   │   📁 f2py/
+│   │   │   │   │   │   📄 auxfuncs.py
+│   │   │   │   │   │   📄 capi_maps.py
+│   │   │   │   │   │   📄 cb_rules.py
+│   │   │   │   │   │   📄 cfuncs.py
+│   │   │   │   │   │   📄 common_rules.py
+│   │   │   │   │   │   📄 crackfortran.py
+│   │   │   │   │   │   📄 diagnose.py
+│   │   │   │   │   │   📄 f2py2e.py
+│   │   │   │   │   │   📄 f90mod_rules.py
+│   │   │   │   │   │   📄 func2subr.py
+│   │   │   │   │   │   📄 rules.py
+│   │   │   │   │   │   📄 symbolic.py
+│   │   │   │   │   │   📄 use_rules.py
+│   │   │   │   │   │   📄 _isocbind.py
+│   │   │   │   │   │   📄 _src_pyf.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📄 __main__.py
+│   │   │   │   │   │   📄 __version__.py
+│   │   │   │   │   │   📁 src/
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_abstract_interface.py
+│   │   │   │   │   │   │   📄 test_array_from_pyobj.py
+│   │   │   │   │   │   │   📄 test_assumed_shape.py
+│   │   │   │   │   │   │   📄 test_block_docstring.py
+│   │   │   │   │   │   │   📄 test_callback.py
+│   │   │   │   │   │   │   📄 test_capi_maps.py
+│   │   │   │   │   │   │   📄 test_character.py
+│   │   │   │   │   │   │   📄 test_common.py
+│   │   │   │   │   │   │   📄 test_crackfortran.py
+│   │   │   │   │   │   │   📄 test_data.py
+│   │   │   │   │   │   │   📄 test_docs.py
+│   │   │   │   │   │   │   📄 test_f2cmap.py
+│   │   │   │   │   │   │   📄 test_f2py2e.py
+│   │   │   │   │   │   │   📄 test_inplace.py
+│   │   │   │   │   │   │   📄 test_isoc.py
+│   │   │   │   │   │   │   📄 test_kind.py
+│   │   │   │   │   │   │   📄 test_mixed.py
+│   │   │   │   │   │   │   📄 test_modules.py
+│   │   │   │   │   │   │   📄 test_parameter.py
+│   │   │   │   │   │   │   📄 test_pyf_src.py
+│   │   │   │   │   │   │   📄 test_quoted_character.py
+│   │   │   │   │   │   │   📄 test_regression.py
+│   │   │   │   │   │   │   📄 test_return_character.py
+│   │   │   │   │   │   │   📄 test_return_complex.py
+│   │   │   │   │   │   │   📄 test_return_integer.py
+│   │   │   │   │   │   │   📄 test_return_logical.py
+│   │   │   │   │   │   │   📄 test_return_real.py
+│   │   │   │   │   │   │   📄 test_routines.py
+│   │   │   │   │   │   │   📄 test_semicolon_split.py
+│   │   │   │   │   │   │   📄 test_size.py
+│   │   │   │   │   │   │   📄 test_string.py
+│   │   │   │   │   │   │   📄 test_symbolic.py
+│   │   │   │   │   │   │   📄 test_value_attrspec.py
+│   │   │   │   │   │   │   📄 util.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 src/
+│   │   │   │   │   │   │   │   📁 abstract_interface/
+│   │   │   │   │   │   │   │   📁 array_from_pyobj/
+│   │   │   │   │   │   │   │   📁 assumed_shape/
+│   │   │   │   │   │   │   │   📁 block_docstring/
+│   │   │   │   │   │   │   │   📁 callback/
+│   │   │   │   │   │   │   │   📁 cli/
+│   │   │   │   │   │   │   │   📁 common/
+│   │   │   │   │   │   │   │   📁 crackfortran/
+│   │   │   │   │   │   │   │   📁 f2cmap/
+│   │   │   │   │   │   │   │   📁 inplace/
+│   │   │   │   │   │   │   │   📁 isocintrin/
+│   │   │   │   │   │   │   │   📁 kind/
+│   │   │   │   │   │   │   │   📁 mixed/
+│   │   │   │   │   │   │   │   📁 modules/
+│   │   │   │   │   │   │   │   │   📁 gh25337/
+│   │   │   │   │   │   │   │   │   📁 gh26920/
+│   │   │   │   │   │   │   │   📁 negative_bounds/
+│   │   │   │   │   │   │   │   📁 parameter/
+│   │   │   │   │   │   │   │   📁 quoted_character/
+│   │   │   │   │   │   │   │   📁 regression/
+│   │   │   │   │   │   │   │   📁 return_character/
+│   │   │   │   │   │   │   │   📁 return_complex/
+│   │   │   │   │   │   │   │   📁 return_integer/
+│   │   │   │   │   │   │   │   📁 return_logical/
+│   │   │   │   │   │   │   │   📁 return_real/
+│   │   │   │   │   │   │   │   📁 routines/
+│   │   │   │   │   │   │   │   📁 size/
+│   │   │   │   │   │   │   │   📁 string/
+│   │   │   │   │   │   │   │   📁 value_attrspec/
+│   │   │   │   │   │   📁 _backends/
+│   │   │   │   │   │   │   📄 _backend.py
+│   │   │   │   │   │   │   📄 _meson.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 fft/
+│   │   │   │   │   │   📄 _helper.py
+│   │   │   │   │   │   📄 _pocketfft.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_helper.py
+│   │   │   │   │   │   │   📄 test_pocketfft.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 lib/
+│   │   │   │   │   │   📄 array_utils.py
+│   │   │   │   │   │   📄 format.py
+│   │   │   │   │   │   📄 introspect.py
+│   │   │   │   │   │   📄 mixins.py
+│   │   │   │   │   │   📄 npyio.py
+│   │   │   │   │   │   📄 recfunctions.py
+│   │   │   │   │   │   📄 scimath.py
+│   │   │   │   │   │   📄 stride_tricks.py
+│   │   │   │   │   │   📄 user_array.py
+│   │   │   │   │   │   📄 _arraypad_impl.py
+│   │   │   │   │   │   📄 _arraysetops_impl.py
+│   │   │   │   │   │   📄 _arrayterator_impl.py
+│   │   │   │   │   │   📄 _array_utils_impl.py
+│   │   │   │   │   │   📄 _datasource.py
+│   │   │   │   │   │   📄 _format_impl.py
+│   │   │   │   │   │   📄 _function_base_impl.py
+│   │   │   │   │   │   📄 _histograms_impl.py
+│   │   │   │   │   │   📄 _index_tricks_impl.py
+│   │   │   │   │   │   📄 _iotools.py
+│   │   │   │   │   │   📄 _nanfunctions_impl.py
+│   │   │   │   │   │   📄 _npyio_impl.py
+│   │   │   │   │   │   📄 _polynomial_impl.py
+│   │   │   │   │   │   📄 _scimath_impl.py
+│   │   │   │   │   │   📄 _shape_base_impl.py
+│   │   │   │   │   │   📄 _stride_tricks_impl.py
+│   │   │   │   │   │   📄 _twodim_base_impl.py
+│   │   │   │   │   │   📄 _type_check_impl.py
+│   │   │   │   │   │   📄 _ufunclike_impl.py
+│   │   │   │   │   │   📄 _user_array_impl.py
+│   │   │   │   │   │   📄 _utils_impl.py
+│   │   │   │   │   │   📄 _version.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_arraypad.py
+│   │   │   │   │   │   │   📄 test_arraysetops.py
+│   │   │   │   │   │   │   📄 test_arrayterator.py
+│   │   │   │   │   │   │   📄 test_array_utils.py
+│   │   │   │   │   │   │   📄 test_format.py
+│   │   │   │   │   │   │   📄 test_function_base.py
+│   │   │   │   │   │   │   📄 test_histograms.py
+│   │   │   │   │   │   │   📄 test_index_tricks.py
+│   │   │   │   │   │   │   📄 test_io.py
+│   │   │   │   │   │   │   📄 test_loadtxt.py
+│   │   │   │   │   │   │   📄 test_mixins.py
+│   │   │   │   │   │   │   📄 test_nanfunctions.py
+│   │   │   │   │   │   │   📄 test_packbits.py
+│   │   │   │   │   │   │   📄 test_polynomial.py
+│   │   │   │   │   │   │   📄 test_recfunctions.py
+│   │   │   │   │   │   │   📄 test_regression.py
+│   │   │   │   │   │   │   📄 test_shape_base.py
+│   │   │   │   │   │   │   📄 test_stride_tricks.py
+│   │   │   │   │   │   │   📄 test_twodim_base.py
+│   │   │   │   │   │   │   📄 test_type_check.py
+│   │   │   │   │   │   │   📄 test_ufunclike.py
+│   │   │   │   │   │   │   📄 test_utils.py
+│   │   │   │   │   │   │   📄 test__datasource.py
+│   │   │   │   │   │   │   📄 test__iotools.py
+│   │   │   │   │   │   │   📄 test__version.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 data/
+│   │   │   │   │   📁 linalg/
+│   │   │   │   │   │   📄 _linalg.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_deprecations.py
+│   │   │   │   │   │   │   📄 test_linalg.py
+│   │   │   │   │   │   │   📄 test_regression.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 ma/
+│   │   │   │   │   │   📄 core.py
+│   │   │   │   │   │   📄 extras.py
+│   │   │   │   │   │   📄 mrecords.py
+│   │   │   │   │   │   📄 testutils.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_arrayobject.py
+│   │   │   │   │   │   │   📄 test_core.py
+│   │   │   │   │   │   │   📄 test_deprecations.py
+│   │   │   │   │   │   │   📄 test_extras.py
+│   │   │   │   │   │   │   📄 test_mrecords.py
+│   │   │   │   │   │   │   📄 test_old_ma.py
+│   │   │   │   │   │   │   📄 test_regression.py
+│   │   │   │   │   │   │   📄 test_subclassing.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 matrixlib/
+│   │   │   │   │   │   📄 defmatrix.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_defmatrix.py
+│   │   │   │   │   │   │   📄 test_interaction.py
+│   │   │   │   │   │   │   📄 test_masked_matrix.py
+│   │   │   │   │   │   │   📄 test_matrix_linalg.py
+│   │   │   │   │   │   │   📄 test_multiarray.py
+│   │   │   │   │   │   │   📄 test_numeric.py
+│   │   │   │   │   │   │   📄 test_regression.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 polynomial/
+│   │   │   │   │   │   📄 chebyshev.py
+│   │   │   │   │   │   📄 hermite.py
+│   │   │   │   │   │   📄 hermite_e.py
+│   │   │   │   │   │   📄 laguerre.py
+│   │   │   │   │   │   📄 legendre.py
+│   │   │   │   │   │   📄 polynomial.py
+│   │   │   │   │   │   📄 polyutils.py
+│   │   │   │   │   │   📄 _polybase.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_chebyshev.py
+│   │   │   │   │   │   │   📄 test_classes.py
+│   │   │   │   │   │   │   📄 test_hermite.py
+│   │   │   │   │   │   │   📄 test_hermite_e.py
+│   │   │   │   │   │   │   📄 test_laguerre.py
+│   │   │   │   │   │   │   📄 test_legendre.py
+│   │   │   │   │   │   │   📄 test_polynomial.py
+│   │   │   │   │   │   │   📄 test_polyutils.py
+│   │   │   │   │   │   │   📄 test_printing.py
+│   │   │   │   │   │   │   📄 test_symbol.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 random/
+│   │   │   │   │   │   📄 _pickle.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 lib/
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_direct.py
+│   │   │   │   │   │   │   📄 test_extending.py
+│   │   │   │   │   │   │   📄 test_generator_mt19937.py
+│   │   │   │   │   │   │   📄 test_generator_mt19937_regressions.py
+│   │   │   │   │   │   │   📄 test_random.py
+│   │   │   │   │   │   │   📄 test_randomstate.py
+│   │   │   │   │   │   │   📄 test_randomstate_regression.py
+│   │   │   │   │   │   │   📄 test_regression.py
+│   │   │   │   │   │   │   📄 test_seed_sequence.py
+│   │   │   │   │   │   │   📄 test_smoke.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 data/
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 _examples/
+│   │   │   │   │   │   │   📁 cffi/
+│   │   │   │   │   │   │   │   📄 extending.py
+│   │   │   │   │   │   │   │   📄 parse.py
+│   │   │   │   │   │   │   📁 cython/
+│   │   │   │   │   │   │   📁 numba/
+│   │   │   │   │   │   │   │   📄 extending.py
+│   │   │   │   │   │   │   │   📄 extending_distributions.py
+│   │   │   │   │   📁 rec/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 strings/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 testing/
+│   │   │   │   │   │   📄 overrides.py
+│   │   │   │   │   │   📄 print_coercion_tables.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_utils.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 _private/
+│   │   │   │   │   │   │   📄 extbuild.py
+│   │   │   │   │   │   │   📄 utils.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 tests/
+│   │   │   │   │   │   📄 test_configtool.py
+│   │   │   │   │   │   📄 test_ctypeslib.py
+│   │   │   │   │   │   📄 test_lazyloading.py
+│   │   │   │   │   │   📄 test_matlib.py
+│   │   │   │   │   │   📄 test_numpy_config.py
+│   │   │   │   │   │   📄 test_numpy_version.py
+│   │   │   │   │   │   📄 test_public_api.py
+│   │   │   │   │   │   📄 test_reloading.py
+│   │   │   │   │   │   📄 test_scripts.py
+│   │   │   │   │   │   📄 test_warnings.py
+│   │   │   │   │   │   📄 test__all__.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 typing/
+│   │   │   │   │   │   📄 mypy_plugin.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_isfile.py
+│   │   │   │   │   │   │   📄 test_runtime.py
+│   │   │   │   │   │   │   📄 test_typing.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 data/
+│   │   │   │   │   │   │   │   📁 fail/
+│   │   │   │   │   │   │   │   📁 misc/
+│   │   │   │   │   │   │   │   📁 pass/
+│   │   │   │   │   │   │   │   │   📄 arithmetic.py
+│   │   │   │   │   │   │   │   │   📄 arrayprint.py
+│   │   │   │   │   │   │   │   │   📄 arrayterator.py
+│   │   │   │   │   │   │   │   │   📄 array_constructors.py
+│   │   │   │   │   │   │   │   │   📄 array_like.py
+│   │   │   │   │   │   │   │   │   📄 bitwise_ops.py
+│   │   │   │   │   │   │   │   │   📄 comparisons.py
+│   │   │   │   │   │   │   │   │   📄 dtype.py
+│   │   │   │   │   │   │   │   │   📄 einsumfunc.py
+│   │   │   │   │   │   │   │   │   📄 flatiter.py
+│   │   │   │   │   │   │   │   │   📄 fromnumeric.py
+│   │   │   │   │   │   │   │   │   📄 index_tricks.py
+│   │   │   │   │   │   │   │   │   📄 lib_user_array.py
+│   │   │   │   │   │   │   │   │   📄 lib_utils.py
+│   │   │   │   │   │   │   │   │   📄 lib_version.py
+│   │   │   │   │   │   │   │   │   📄 literal.py
+│   │   │   │   │   │   │   │   │   📄 ma.py
+│   │   │   │   │   │   │   │   │   📄 mod.py
+│   │   │   │   │   │   │   │   │   📄 modules.py
+│   │   │   │   │   │   │   │   │   📄 multiarray.py
+│   │   │   │   │   │   │   │   │   📄 ndarray_conversion.py
+│   │   │   │   │   │   │   │   │   📄 ndarray_misc.py
+│   │   │   │   │   │   │   │   │   📄 ndarray_shape_manipulation.py
+│   │   │   │   │   │   │   │   │   📄 nditer.py
+│   │   │   │   │   │   │   │   │   📄 numeric.py
+│   │   │   │   │   │   │   │   │   📄 numerictypes.py
+│   │   │   │   │   │   │   │   │   📄 random.py
+│   │   │   │   │   │   │   │   │   📄 recfunctions.py
+│   │   │   │   │   │   │   │   │   📄 scalars.py
+│   │   │   │   │   │   │   │   │   📄 shape.py
+│   │   │   │   │   │   │   │   │   📄 simple.py
+│   │   │   │   │   │   │   │   │   📄 ufunclike.py
+│   │   │   │   │   │   │   │   │   📄 ufuncs.py
+│   │   │   │   │   │   │   │   │   📄 ufunc_config.py
+│   │   │   │   │   │   │   │   │   📄 warnings_and_errors.py
+│   │   │   │   │   │   │   │   📁 reveal/
+│   │   │   │   │   📁 _core/
+│   │   │   │   │   │   📄 arrayprint.py
+│   │   │   │   │   │   📄 cversions.py
+│   │   │   │   │   │   📄 defchararray.py
+│   │   │   │   │   │   📄 einsumfunc.py
+│   │   │   │   │   │   📄 fromnumeric.py
+│   │   │   │   │   │   📄 function_base.py
+│   │   │   │   │   │   📄 getlimits.py
+│   │   │   │   │   │   📄 memmap.py
+│   │   │   │   │   │   📄 multiarray.py
+│   │   │   │   │   │   📄 numeric.py
+│   │   │   │   │   │   📄 numerictypes.py
+│   │   │   │   │   │   📄 overrides.py
+│   │   │   │   │   │   📄 printoptions.py
+│   │   │   │   │   │   📄 records.py
+│   │   │   │   │   │   📄 shape_base.py
+│   │   │   │   │   │   📄 strings.py
+│   │   │   │   │   │   📄 umath.py
+│   │   │   │   │   │   📄 _add_newdocs.py
+│   │   │   │   │   │   📄 _add_newdocs_scalars.py
+│   │   │   │   │   │   📄 _asarray.py
+│   │   │   │   │   │   📄 _dtype.py
+│   │   │   │   │   │   📄 _dtype_ctypes.py
+│   │   │   │   │   │   📄 _exceptions.py
+│   │   │   │   │   │   📄 _internal.py
+│   │   │   │   │   │   📄 _methods.py
+│   │   │   │   │   │   📄 _string_helpers.py
+│   │   │   │   │   │   📄 _type_aliases.py
+│   │   │   │   │   │   📄 _ufunc_config.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 include/
+│   │   │   │   │   │   │   📁 numpy/
+│   │   │   │   │   │   │   │   📁 random/
+│   │   │   │   │   │   📁 lib/
+│   │   │   │   │   │   │   📁 pkgconfig/
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 test_abc.py
+│   │   │   │   │   │   │   📄 test_api.py
+│   │   │   │   │   │   │   📄 test_argparse.py
+│   │   │   │   │   │   │   📄 test_arraymethod.py
+│   │   │   │   │   │   │   📄 test_arrayobject.py
+│   │   │   │   │   │   │   📄 test_arrayprint.py
+│   │   │   │   │   │   │   📄 test_array_api_info.py
+│   │   │   │   │   │   │   📄 test_array_coercion.py
+│   │   │   │   │   │   │   📄 test_array_interface.py
+│   │   │   │   │   │   │   📄 test_casting_floatingpoint_errors.py
+│   │   │   │   │   │   │   📄 test_casting_unittests.py
+│   │   │   │   │   │   │   📄 test_conversion_utils.py
+│   │   │   │   │   │   │   📄 test_cpu_dispatcher.py
+│   │   │   │   │   │   │   📄 test_cpu_features.py
+│   │   │   │   │   │   │   📄 test_custom_dtypes.py
+│   │   │   │   │   │   │   📄 test_cython.py
+│   │   │   │   │   │   │   📄 test_datetime.py
+│   │   │   │   │   │   │   📄 test_defchararray.py
+│   │   │   │   │   │   │   📄 test_deprecations.py
+│   │   │   │   │   │   │   📄 test_dlpack.py
+│   │   │   │   │   │   │   📄 test_dtype.py
+│   │   │   │   │   │   │   📄 test_einsum.py
+│   │   │   │   │   │   │   📄 test_errstate.py
+│   │   │   │   │   │   │   📄 test_extint128.py
+│   │   │   │   │   │   │   📄 test_finfo.py
+│   │   │   │   │   │   │   📄 test_function_base.py
+│   │   │   │   │   │   │   📄 test_getlimits.py
+│   │   │   │   │   │   │   📄 test_half.py
+│   │   │   │   │   │   │   📄 test_hashtable.py
+│   │   │   │   │   │   │   📄 test_indexerrors.py
+│   │   │   │   │   │   │   📄 test_indexing.py
+│   │   │   │   │   │   │   📄 test_item_selection.py
+│   │   │   │   │   │   │   📄 test_limited_api.py
+│   │   │   │   │   │   │   📄 test_longdouble.py
+│   │   │   │   │   │   │   📄 test_memmap.py
+│   │   │   │   │   │   │   📄 test_mem_overlap.py
+│   │   │   │   │   │   │   📄 test_mem_policy.py
+│   │   │   │   │   │   │   📄 test_multiarray.py
+│   │   │   │   │   │   │   📄 test_multiprocessing.py
+│   │   │   │   │   │   │   📄 test_multithreading.py
+│   │   │   │   │   │   │   📄 test_nditer.py
+│   │   │   │   │   │   │   📄 test_nep50_promotions.py
+│   │   │   │   │   │   │   📄 test_numeric.py
+│   │   │   │   │   │   │   📄 test_numerictypes.py
+│   │   │   │   │   │   │   📄 test_overrides.py
+│   │   │   │   │   │   │   📄 test_print.py
+│   │   │   │   │   │   │   📄 test_protocols.py
+│   │   │   │   │   │   │   📄 test_records.py
+│   │   │   │   │   │   │   📄 test_regression.py
+│   │   │   │   │   │   │   📄 test_scalarbuffer.py
+│   │   │   │   │   │   │   📄 test_scalarinherit.py
+│   │   │   │   │   │   │   📄 test_scalarmath.py
+│   │   │   │   │   │   │   📄 test_scalarprint.py
+│   │   │   │   │   │   │   📄 test_scalar_ctors.py
+│   │   │   │   │   │   │   📄 test_scalar_methods.py
+│   │   │   │   │   │   │   📄 test_shape_base.py
+│   │   │   │   │   │   │   📄 test_simd.py
+│   │   │   │   │   │   │   📄 test_simd_module.py
+│   │   │   │   │   │   │   📄 test_stringdtype.py
+│   │   │   │   │   │   │   📄 test_strings.py
+│   │   │   │   │   │   │   📄 test_ufunc.py
+│   │   │   │   │   │   │   📄 test_umath.py
+│   │   │   │   │   │   │   📄 test_umath_accuracy.py
+│   │   │   │   │   │   │   📄 test_umath_complex.py
+│   │   │   │   │   │   │   📄 test_unicode.py
+│   │   │   │   │   │   │   📄 test__exceptions.py
+│   │   │   │   │   │   │   📄 _locales.py
+│   │   │   │   │   │   │   📄 _natype.py
+│   │   │   │   │   │   │   📁 data/
+│   │   │   │   │   │   │   📁 examples/
+│   │   │   │   │   │   │   │   📁 cython/
+│   │   │   │   │   │   │   │   │   📄 setup.py
+│   │   │   │   │   │   │   │   📁 limited_api/
+│   │   │   │   │   │   │   │   │   📄 setup.py
+│   │   │   │   │   📁 _pyinstaller/
+│   │   │   │   │   │   📄 hook-numpy.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tests/
+│   │   │   │   │   │   │   📄 pyinstaller-smoke.py
+│   │   │   │   │   │   │   📄 test_pyinstaller.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _typing/
+│   │   │   │   │   │   📄 _add_docstring.py
+│   │   │   │   │   │   📄 _array_like.py
+│   │   │   │   │   │   📄 _char_codes.py
+│   │   │   │   │   │   📄 _dtype_like.py
+│   │   │   │   │   │   📄 _extended_precision.py
+│   │   │   │   │   │   📄 _nbit.py
+│   │   │   │   │   │   📄 _nbit_base.py
+│   │   │   │   │   │   📄 _nested_sequence.py
+│   │   │   │   │   │   📄 _scalars.py
+│   │   │   │   │   │   📄 _shape.py
+│   │   │   │   │   │   📄 _ufunc.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _utils/
+│   │   │   │   │   │   📄 _conversions.py
+│   │   │   │   │   │   📄 _inspect.py
+│   │   │   │   │   │   📄 _pep440.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 numpy-2.5.2.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   │   │   📁 numpy/
+│   │   │   │   │   │   │   📁 fft/
+│   │   │   │   │   │   │   │   📁 pocketfft/
+│   │   │   │   │   │   │   📁 linalg/
+│   │   │   │   │   │   │   │   📁 lapack_lite/
+│   │   │   │   │   │   │   📁 ma/
+│   │   │   │   │   │   │   📁 random/
+│   │   │   │   │   │   │   │   📁 src/
+│   │   │   │   │   │   │   │   │   📁 distributions/
+│   │   │   │   │   │   │   │   │   📁 mt19937/
+│   │   │   │   │   │   │   │   │   📁 pcg64/
+│   │   │   │   │   │   │   │   │   📁 philox/
+│   │   │   │   │   │   │   │   │   📁 sfc64/
+│   │   │   │   │   │   │   │   │   📁 splitmix64/
+│   │   │   │   │   │   │   📁 _core/
+│   │   │   │   │   │   │   │   📁 include/
+│   │   │   │   │   │   │   │   │   📁 numpy/
+│   │   │   │   │   │   │   │   │   │   📁 libdivide/
+│   │   │   │   │   │   │   │   📁 src/
+│   │   │   │   │   │   │   │   │   📁 common/
+│   │   │   │   │   │   │   │   │   │   📁 pythoncapi-compat/
+│   │   │   │   │   │   │   │   │   📁 highway/
+│   │   │   │   │   │   │   │   │   📁 multiarray/
+│   │   │   │   │   │   │   │   │   📁 npysort/
+│   │   │   │   │   │   │   │   │   │   📁 x86-simd-sort/
+│   │   │   │   │   │   │   │   │   📁 umath/
+│   │   │   │   │   │   │   │   │   │   📁 svml/
+│   │   │   │   📁 numpy.libs/
+│   │   │   │   📁 PIL/
+│   │   │   │   │   📄 AvifImagePlugin.py
+│   │   │   │   │   📄 BdfFontFile.py
+│   │   │   │   │   📄 BlpImagePlugin.py
+│   │   │   │   │   📄 BmpImagePlugin.py
+│   │   │   │   │   📄 BufrStubImagePlugin.py
+│   │   │   │   │   📄 ContainerIO.py
+│   │   │   │   │   📄 CurImagePlugin.py
+│   │   │   │   │   📄 DcxImagePlugin.py
+│   │   │   │   │   📄 DdsImagePlugin.py
+│   │   │   │   │   📄 EpsImagePlugin.py
+│   │   │   │   │   📄 ExifTags.py
+│   │   │   │   │   📄 features.py
+│   │   │   │   │   📄 FitsImagePlugin.py
+│   │   │   │   │   📄 FliImagePlugin.py
+│   │   │   │   │   📄 FontFile.py
+│   │   │   │   │   📄 FpxImagePlugin.py
+│   │   │   │   │   📄 FtexImagePlugin.py
+│   │   │   │   │   📄 GbrImagePlugin.py
+│   │   │   │   │   📄 GdImageFile.py
+│   │   │   │   │   📄 GifImagePlugin.py
+│   │   │   │   │   📄 GimpGradientFile.py
+│   │   │   │   │   📄 GimpPaletteFile.py
+│   │   │   │   │   📄 GribStubImagePlugin.py
+│   │   │   │   │   📄 Hdf5StubImagePlugin.py
+│   │   │   │   │   📄 IcnsImagePlugin.py
+│   │   │   │   │   📄 IcoImagePlugin.py
+│   │   │   │   │   📄 Image.py
+│   │   │   │   │   📄 ImageChops.py
+│   │   │   │   │   📄 ImageCms.py
+│   │   │   │   │   📄 ImageColor.py
+│   │   │   │   │   📄 ImageDraw.py
+│   │   │   │   │   📄 ImageDraw2.py
+│   │   │   │   │   📄 ImageEnhance.py
+│   │   │   │   │   📄 ImageFile.py
+│   │   │   │   │   📄 ImageFilter.py
+│   │   │   │   │   📄 ImageFont.py
+│   │   │   │   │   📄 ImageGrab.py
+│   │   │   │   │   📄 ImageMath.py
+│   │   │   │   │   📄 ImageMode.py
+│   │   │   │   │   📄 ImageMorph.py
+│   │   │   │   │   📄 ImageOps.py
+│   │   │   │   │   📄 ImagePalette.py
+│   │   │   │   │   📄 ImagePath.py
+│   │   │   │   │   📄 ImageQt.py
+│   │   │   │   │   📄 ImageSequence.py
+│   │   │   │   │   📄 ImageShow.py
+│   │   │   │   │   📄 ImageStat.py
+│   │   │   │   │   📄 ImageText.py
+│   │   │   │   │   📄 ImageTk.py
+│   │   │   │   │   📄 ImageTransform.py
+│   │   │   │   │   📄 ImageWin.py
+│   │   │   │   │   📄 ImImagePlugin.py
+│   │   │   │   │   📄 ImtImagePlugin.py
+│   │   │   │   │   📄 IptcImagePlugin.py
+│   │   │   │   │   📄 Jpeg2KImagePlugin.py
+│   │   │   │   │   📄 JpegImagePlugin.py
+│   │   │   │   │   📄 JpegPresets.py
+│   │   │   │   │   📄 McIdasImagePlugin.py
+│   │   │   │   │   📄 MicImagePlugin.py
+│   │   │   │   │   📄 MpegImagePlugin.py
+│   │   │   │   │   📄 MpoImagePlugin.py
+│   │   │   │   │   📄 MspImagePlugin.py
+│   │   │   │   │   📄 PaletteFile.py
+│   │   │   │   │   📄 PalmImagePlugin.py
+│   │   │   │   │   📄 PcdImagePlugin.py
+│   │   │   │   │   📄 PcfFontFile.py
+│   │   │   │   │   📄 PcxImagePlugin.py
+│   │   │   │   │   📄 PdfImagePlugin.py
+│   │   │   │   │   📄 PdfParser.py
+│   │   │   │   │   📄 PixarImagePlugin.py
+│   │   │   │   │   📄 PngImagePlugin.py
+│   │   │   │   │   📄 PpmImagePlugin.py
+│   │   │   │   │   📄 PsdImagePlugin.py
+│   │   │   │   │   📄 PSDraw.py
+│   │   │   │   │   📄 QoiImagePlugin.py
+│   │   │   │   │   📄 report.py
+│   │   │   │   │   📄 SgiImagePlugin.py
+│   │   │   │   │   📄 SpiderImagePlugin.py
+│   │   │   │   │   📄 SunImagePlugin.py
+│   │   │   │   │   📄 TarIO.py
+│   │   │   │   │   📄 TgaImagePlugin.py
+│   │   │   │   │   📄 TiffImagePlugin.py
+│   │   │   │   │   📄 TiffTags.py
+│   │   │   │   │   📄 WalImageFile.py
+│   │   │   │   │   📄 WebPImagePlugin.py
+│   │   │   │   │   📄 WmfImagePlugin.py
+│   │   │   │   │   📄 XbmImagePlugin.py
+│   │   │   │   │   📄 XpmImagePlugin.py
+│   │   │   │   │   📄 XVThumbImagePlugin.py
+│   │   │   │   │   📄 _binary.py
+│   │   │   │   │   📄 _deprecate.py
+│   │   │   │   │   📄 _tkinter_finder.py
+│   │   │   │   │   📄 _typing.py
+│   │   │   │   │   📄 _util.py
+│   │   │   │   │   📄 _version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   📁 pillow-12.3.0.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   │   📁 sboms/
+│   │   │   │   📁 pip/
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   │   📄 __pip-runner__.py
+│   │   │   │   │   📁 _internal/
+│   │   │   │   │   │   📄 cache.py
+│   │   │   │   │   │   📄 configuration.py
+│   │   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   │   📄 main.py
+│   │   │   │   │   │   📄 pyproject.py
+│   │   │   │   │   │   📄 self_outdated_check.py
+│   │   │   │   │   │   📄 wheel_builder.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 build_env/
+│   │   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   │   📄 installer.py
+│   │   │   │   │   │   │   📄 noop.py
+│   │   │   │   │   │   │   📄 venv.py
+│   │   │   │   │   │   │   📄 virtual.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 cli/
+│   │   │   │   │   │   │   📄 autocompletion.py
+│   │   │   │   │   │   │   📄 base_command.py
+│   │   │   │   │   │   │   📄 cmdoptions.py
+│   │   │   │   │   │   │   📄 command_context.py
+│   │   │   │   │   │   │   📄 index_command.py
+│   │   │   │   │   │   │   📄 main.py
+│   │   │   │   │   │   │   📄 main_parser.py
+│   │   │   │   │   │   │   📄 parser.py
+│   │   │   │   │   │   │   📄 progress_bars.py
+│   │   │   │   │   │   │   📄 req_command.py
+│   │   │   │   │   │   │   📄 spinners.py
+│   │   │   │   │   │   │   📄 status_codes.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 commands/
+│   │   │   │   │   │   │   📄 cache.py
+│   │   │   │   │   │   │   📄 check.py
+│   │   │   │   │   │   │   📄 completion.py
+│   │   │   │   │   │   │   📄 configuration.py
+│   │   │   │   │   │   │   📄 debug.py
+│   │   │   │   │   │   │   📄 download.py
+│   │   │   │   │   │   │   📄 freeze.py
+│   │   │   │   │   │   │   📄 hash.py
+│   │   │   │   │   │   │   📄 help.py
+│   │   │   │   │   │   │   📄 index.py
+│   │   │   │   │   │   │   📄 inspect.py
+│   │   │   │   │   │   │   📄 install.py
+│   │   │   │   │   │   │   📄 list.py
+│   │   │   │   │   │   │   📄 lock.py
+│   │   │   │   │   │   │   📄 search.py
+│   │   │   │   │   │   │   📄 show.py
+│   │   │   │   │   │   │   📄 uninstall.py
+│   │   │   │   │   │   │   📄 wheel.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 distributions/
+│   │   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   │   📄 installed.py
+│   │   │   │   │   │   │   📄 sdist.py
+│   │   │   │   │   │   │   📄 wheel.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 index/
+│   │   │   │   │   │   │   📄 collector.py
+│   │   │   │   │   │   │   📄 package_finder.py
+│   │   │   │   │   │   │   📄 sources.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 locations/
+│   │   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   │   📄 _distutils.py
+│   │   │   │   │   │   │   📄 _sysconfig.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 metadata/
+│   │   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   │   📄 pkg_resources.py
+│   │   │   │   │   │   │   📄 _json.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 importlib/
+│   │   │   │   │   │   │   │   📄 _compat.py
+│   │   │   │   │   │   │   │   📄 _dists.py
+│   │   │   │   │   │   │   │   📄 _envs.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 models/
+│   │   │   │   │   │   │   📄 candidate.py
+│   │   │   │   │   │   │   📄 direct_url.py
+│   │   │   │   │   │   │   📄 format_control.py
+│   │   │   │   │   │   │   📄 index.py
+│   │   │   │   │   │   │   📄 installation_report.py
+│   │   │   │   │   │   │   📄 link.py
+│   │   │   │   │   │   │   📄 release_control.py
+│   │   │   │   │   │   │   📄 scheme.py
+│   │   │   │   │   │   │   📄 search_scope.py
+│   │   │   │   │   │   │   📄 selection_prefs.py
+│   │   │   │   │   │   │   📄 target_python.py
+│   │   │   │   │   │   │   📄 wheel.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 network/
+│   │   │   │   │   │   │   📄 auth.py
+│   │   │   │   │   │   │   📄 cache.py
+│   │   │   │   │   │   │   📄 download.py
+│   │   │   │   │   │   │   📄 lazy_wheel.py
+│   │   │   │   │   │   │   📄 session.py
+│   │   │   │   │   │   │   📄 utils.py
+│   │   │   │   │   │   │   📄 xmlrpc.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 operations/
+│   │   │   │   │   │   │   📄 check.py
+│   │   │   │   │   │   │   📄 freeze.py
+│   │   │   │   │   │   │   📄 prepare.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 build/
+│   │   │   │   │   │   │   │   📄 build_tracker.py
+│   │   │   │   │   │   │   │   📄 metadata.py
+│   │   │   │   │   │   │   │   📄 metadata_editable.py
+│   │   │   │   │   │   │   │   📄 wheel.py
+│   │   │   │   │   │   │   │   📄 wheel_editable.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 install/
+│   │   │   │   │   │   │   │   📄 wheel.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 req/
+│   │   │   │   │   │   │   📄 constructors.py
+│   │   │   │   │   │   │   📄 pep723.py
+│   │   │   │   │   │   │   📄 req_dependency_group.py
+│   │   │   │   │   │   │   📄 req_file.py
+│   │   │   │   │   │   │   📄 req_install.py
+│   │   │   │   │   │   │   📄 req_set.py
+│   │   │   │   │   │   │   📄 req_uninstall.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 resolution/
+│   │   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 legacy/
+│   │   │   │   │   │   │   │   📄 resolver.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 resolvelib/
+│   │   │   │   │   │   │   │   📄 base.py
+│   │   │   │   │   │   │   │   📄 candidates.py
+│   │   │   │   │   │   │   │   📄 factory.py
+│   │   │   │   │   │   │   │   📄 found_candidates.py
+│   │   │   │   │   │   │   │   📄 provider.py
+│   │   │   │   │   │   │   │   📄 reporter.py
+│   │   │   │   │   │   │   │   📄 requirements.py
+│   │   │   │   │   │   │   │   📄 resolver.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 utils/
+│   │   │   │   │   │   │   📄 appdirs.py
+│   │   │   │   │   │   │   📄 compat.py
+│   │   │   │   │   │   │   📄 compatibility_tags.py
+│   │   │   │   │   │   │   📄 datetime.py
+│   │   │   │   │   │   │   📄 deprecation.py
+│   │   │   │   │   │   │   📄 direct_url_helpers.py
+│   │   │   │   │   │   │   📄 egg_link.py
+│   │   │   │   │   │   │   📄 entrypoints.py
+│   │   │   │   │   │   │   📄 filesystem.py
+│   │   │   │   │   │   │   📄 filetypes.py
+│   │   │   │   │   │   │   📄 glibc.py
+│   │   │   │   │   │   │   📄 hashes.py
+│   │   │   │   │   │   │   📄 logging.py
+│   │   │   │   │   │   │   📄 misc.py
+│   │   │   │   │   │   │   📄 packaging.py
+│   │   │   │   │   │   │   📄 pylock.py
+│   │   │   │   │   │   │   📄 retry.py
+│   │   │   │   │   │   │   📄 subprocess.py
+│   │   │   │   │   │   │   📄 temp_dir.py
+│   │   │   │   │   │   │   📄 unpacking.py
+│   │   │   │   │   │   │   📄 urls.py
+│   │   │   │   │   │   │   📄 virtualenv.py
+│   │   │   │   │   │   │   📄 wheel.py
+│   │   │   │   │   │   │   📄 _jaraco_text.py
+│   │   │   │   │   │   │   📄 _log.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 vcs/
+│   │   │   │   │   │   │   📄 bazaar.py
+│   │   │   │   │   │   │   📄 git.py
+│   │   │   │   │   │   │   📄 mercurial.py
+│   │   │   │   │   │   │   📄 subversion.py
+│   │   │   │   │   │   │   📄 versioncontrol.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _vendor/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 cachecontrol/
+│   │   │   │   │   │   │   📄 adapter.py
+│   │   │   │   │   │   │   📄 cache.py
+│   │   │   │   │   │   │   📄 controller.py
+│   │   │   │   │   │   │   📄 filewrapper.py
+│   │   │   │   │   │   │   📄 heuristics.py
+│   │   │   │   │   │   │   📄 serialize.py
+│   │   │   │   │   │   │   📄 wrapper.py
+│   │   │   │   │   │   │   📄 _cmd.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 caches/
+│   │   │   │   │   │   │   │   📄 file_cache.py
+│   │   │   │   │   │   │   │   📄 redis_cache.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 certifi/
+│   │   │   │   │   │   │   📄 core.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📄 __main__.py
+│   │   │   │   │   │   📁 distlib/
+│   │   │   │   │   │   │   📄 compat.py
+│   │   │   │   │   │   │   📄 resources.py
+│   │   │   │   │   │   │   📄 scripts.py
+│   │   │   │   │   │   │   📄 util.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 distro/
+│   │   │   │   │   │   │   📄 distro.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📄 __main__.py
+│   │   │   │   │   │   📁 idna/
+│   │   │   │   │   │   │   📄 cli.py
+│   │   │   │   │   │   │   📄 codec.py
+│   │   │   │   │   │   │   📄 compat.py
+│   │   │   │   │   │   │   📄 core.py
+│   │   │   │   │   │   │   📄 idnadata.py
+│   │   │   │   │   │   │   📄 intranges.py
+│   │   │   │   │   │   │   📄 package_data.py
+│   │   │   │   │   │   │   📄 uts46data.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📄 __main__.py
+│   │   │   │   │   │   📁 msgpack/
+│   │   │   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   │   │   📄 ext.py
+│   │   │   │   │   │   │   📄 fallback.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 packaging/
+│   │   │   │   │   │   │   📄 dependency_groups.py
+│   │   │   │   │   │   │   📄 direct_url.py
+│   │   │   │   │   │   │   📄 errors.py
+│   │   │   │   │   │   │   📄 markers.py
+│   │   │   │   │   │   │   📄 metadata.py
+│   │   │   │   │   │   │   📄 pylock.py
+│   │   │   │   │   │   │   📄 requirements.py
+│   │   │   │   │   │   │   📄 specifiers.py
+│   │   │   │   │   │   │   📄 tags.py
+│   │   │   │   │   │   │   📄 utils.py
+│   │   │   │   │   │   │   📄 version.py
+│   │   │   │   │   │   │   📄 _elffile.py
+│   │   │   │   │   │   │   📄 _manylinux.py
+│   │   │   │   │   │   │   📄 _musllinux.py
+│   │   │   │   │   │   │   📄 _parser.py
+│   │   │   │   │   │   │   📄 _structures.py
+│   │   │   │   │   │   │   📄 _tokenizer.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 licenses/
+│   │   │   │   │   │   │   │   📄 _spdx.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 pkg_resources/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 platformdirs/
+│   │   │   │   │   │   │   📄 android.py
+│   │   │   │   │   │   │   📄 api.py
+│   │   │   │   │   │   │   📄 macos.py
+│   │   │   │   │   │   │   📄 unix.py
+│   │   │   │   │   │   │   📄 version.py
+│   │   │   │   │   │   │   📄 windows.py
+│   │   │   │   │   │   │   📄 _xdg.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📄 __main__.py
+│   │   │   │   │   │   📁 pygments/
+│   │   │   │   │   │   │   📄 console.py
+│   │   │   │   │   │   │   📄 filter.py
+│   │   │   │   │   │   │   📄 formatter.py
+│   │   │   │   │   │   │   📄 lexer.py
+│   │   │   │   │   │   │   📄 modeline.py
+│   │   │   │   │   │   │   📄 plugin.py
+│   │   │   │   │   │   │   📄 regexopt.py
+│   │   │   │   │   │   │   📄 scanner.py
+│   │   │   │   │   │   │   📄 sphinxext.py
+│   │   │   │   │   │   │   📄 style.py
+│   │   │   │   │   │   │   📄 token.py
+│   │   │   │   │   │   │   📄 unistring.py
+│   │   │   │   │   │   │   📄 util.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📄 __main__.py
+│   │   │   │   │   │   │   📁 filters/
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 formatters/
+│   │   │   │   │   │   │   │   📄 _mapping.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 lexers/
+│   │   │   │   │   │   │   │   📄 python.py
+│   │   │   │   │   │   │   │   📄 _mapping.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 styles/
+│   │   │   │   │   │   │   │   📄 _mapping.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 pyproject_hooks/
+│   │   │   │   │   │   │   📄 _impl.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 _in_process/
+│   │   │   │   │   │   │   │   📄 _in_process.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 requests/
+│   │   │   │   │   │   │   📄 adapters.py
+│   │   │   │   │   │   │   📄 api.py
+│   │   │   │   │   │   │   📄 auth.py
+│   │   │   │   │   │   │   📄 certs.py
+│   │   │   │   │   │   │   📄 compat.py
+│   │   │   │   │   │   │   📄 cookies.py
+│   │   │   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   │   │   📄 help.py
+│   │   │   │   │   │   │   📄 hooks.py
+│   │   │   │   │   │   │   📄 models.py
+│   │   │   │   │   │   │   📄 packages.py
+│   │   │   │   │   │   │   📄 sessions.py
+│   │   │   │   │   │   │   📄 status_codes.py
+│   │   │   │   │   │   │   📄 structures.py
+│   │   │   │   │   │   │   📄 utils.py
+│   │   │   │   │   │   │   📄 _internal_utils.py
+│   │   │   │   │   │   │   📄 _types.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📄 __version__.py
+│   │   │   │   │   │   📁 resolvelib/
+│   │   │   │   │   │   │   📄 providers.py
+│   │   │   │   │   │   │   📄 reporters.py
+│   │   │   │   │   │   │   📄 structs.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 resolvers/
+│   │   │   │   │   │   │   │   📄 abstract.py
+│   │   │   │   │   │   │   │   📄 criterion.py
+│   │   │   │   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   │   │   │   📄 resolution.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 rich/
+│   │   │   │   │   │   │   📄 abc.py
+│   │   │   │   │   │   │   📄 align.py
+│   │   │   │   │   │   │   📄 ansi.py
+│   │   │   │   │   │   │   📄 bar.py
+│   │   │   │   │   │   │   📄 box.py
+│   │   │   │   │   │   │   📄 cells.py
+│   │   │   │   │   │   │   📄 color.py
+│   │   │   │   │   │   │   📄 color_triplet.py
+│   │   │   │   │   │   │   📄 columns.py
+│   │   │   │   │   │   │   📄 console.py
+│   │   │   │   │   │   │   📄 constrain.py
+│   │   │   │   │   │   │   📄 containers.py
+│   │   │   │   │   │   │   📄 control.py
+│   │   │   │   │   │   │   📄 default_styles.py
+│   │   │   │   │   │   │   📄 diagnose.py
+│   │   │   │   │   │   │   📄 emoji.py
+│   │   │   │   │   │   │   📄 errors.py
+│   │   │   │   │   │   │   📄 filesize.py
+│   │   │   │   │   │   │   📄 file_proxy.py
+│   │   │   │   │   │   │   📄 highlighter.py
+│   │   │   │   │   │   │   📄 json.py
+│   │   │   │   │   │   │   📄 jupyter.py
+│   │   │   │   │   │   │   📄 layout.py
+│   │   │   │   │   │   │   📄 live.py
+│   │   │   │   │   │   │   📄 live_render.py
+│   │   │   │   │   │   │   📄 logging.py
+│   │   │   │   │   │   │   📄 markup.py
+│   │   │   │   │   │   │   📄 measure.py
+│   │   │   │   │   │   │   📄 padding.py
+│   │   │   │   │   │   │   📄 pager.py
+│   │   │   │   │   │   │   📄 palette.py
+│   │   │   │   │   │   │   📄 panel.py
+│   │   │   │   │   │   │   📄 pretty.py
+│   │   │   │   │   │   │   📄 progress.py
+│   │   │   │   │   │   │   📄 progress_bar.py
+│   │   │   │   │   │   │   📄 prompt.py
+│   │   │   │   │   │   │   📄 protocol.py
+│   │   │   │   │   │   │   📄 region.py
+│   │   │   │   │   │   │   📄 repr.py
+│   │   │   │   │   │   │   📄 rule.py
+│   │   │   │   │   │   │   📄 scope.py
+│   │   │   │   │   │   │   📄 screen.py
+│   │   │   │   │   │   │   📄 segment.py
+│   │   │   │   │   │   │   📄 spinner.py
+│   │   │   │   │   │   │   📄 status.py
+│   │   │   │   │   │   │   📄 style.py
+│   │   │   │   │   │   │   📄 styled.py
+│   │   │   │   │   │   │   📄 syntax.py
+│   │   │   │   │   │   │   📄 table.py
+│   │   │   │   │   │   │   📄 terminal_theme.py
+│   │   │   │   │   │   │   📄 text.py
+│   │   │   │   │   │   │   📄 theme.py
+│   │   │   │   │   │   │   📄 themes.py
+│   │   │   │   │   │   │   📄 traceback.py
+│   │   │   │   │   │   │   📄 tree.py
+│   │   │   │   │   │   │   📄 _cell_widths.py
+│   │   │   │   │   │   │   📄 _emoji_codes.py
+│   │   │   │   │   │   │   📄 _emoji_replace.py
+│   │   │   │   │   │   │   📄 _export_format.py
+│   │   │   │   │   │   │   📄 _extension.py
+│   │   │   │   │   │   │   📄 _fileno.py
+│   │   │   │   │   │   │   📄 _inspect.py
+│   │   │   │   │   │   │   📄 _log_render.py
+│   │   │   │   │   │   │   📄 _loop.py
+│   │   │   │   │   │   │   📄 _null_file.py
+│   │   │   │   │   │   │   📄 _palettes.py
+│   │   │   │   │   │   │   📄 _pick.py
+│   │   │   │   │   │   │   📄 _ratio.py
+│   │   │   │   │   │   │   📄 _spinners.py
+│   │   │   │   │   │   │   📄 _stack.py
+│   │   │   │   │   │   │   📄 _timer.py
+│   │   │   │   │   │   │   📄 _win32_console.py
+│   │   │   │   │   │   │   📄 _windows.py
+│   │   │   │   │   │   │   📄 _windows_renderer.py
+│   │   │   │   │   │   │   📄 _wrap.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📄 __main__.py
+│   │   │   │   │   │   📁 tomli/
+│   │   │   │   │   │   │   📄 _parser.py
+│   │   │   │   │   │   │   📄 _re.py
+│   │   │   │   │   │   │   📄 _types.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 tomli_w/
+│   │   │   │   │   │   │   📄 _writer.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 truststore/
+│   │   │   │   │   │   │   📄 _api.py
+│   │   │   │   │   │   │   📄 _macos.py
+│   │   │   │   │   │   │   📄 _openssl.py
+│   │   │   │   │   │   │   📄 _ssl_constants.py
+│   │   │   │   │   │   │   📄 _windows.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 urllib3/
+│   │   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   │   📄 connectionpool.py
+│   │   │   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   │   │   📄 fields.py
+│   │   │   │   │   │   │   📄 filepost.py
+│   │   │   │   │   │   │   📄 poolmanager.py
+│   │   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   │   📄 _base_connection.py
+│   │   │   │   │   │   │   📄 _collections.py
+│   │   │   │   │   │   │   📄 _request_methods.py
+│   │   │   │   │   │   │   📄 _version.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 contrib/
+│   │   │   │   │   │   │   │   📄 pyopenssl.py
+│   │   │   │   │   │   │   │   📄 socks.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   │   📁 emscripten/
+│   │   │   │   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   │   │   │   📄 fetch.py
+│   │   │   │   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 http2/
+│   │   │   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   │   │   📄 probe.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 util/
+│   │   │   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   │   │   📄 proxy.py
+│   │   │   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   │   │   📄 retry.py
+│   │   │   │   │   │   │   │   📄 ssltransport.py
+│   │   │   │   │   │   │   │   📄 ssl_.py
+│   │   │   │   │   │   │   │   📄 ssl_match_hostname.py
+│   │   │   │   │   │   │   │   📄 timeout.py
+│   │   │   │   │   │   │   │   📄 url.py
+│   │   │   │   │   │   │   │   📄 util.py
+│   │   │   │   │   │   │   │   📄 wait.py
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 pip-26.2.1.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   │   │   📁 src/
+│   │   │   │   │   │   │   📁 pip/
+│   │   │   │   │   │   │   │   📁 _vendor/
+│   │   │   │   │   │   │   │   │   📁 cachecontrol/
+│   │   │   │   │   │   │   │   │   📁 certifi/
+│   │   │   │   │   │   │   │   │   📁 distlib/
+│   │   │   │   │   │   │   │   │   📁 distro/
+│   │   │   │   │   │   │   │   │   📁 idna/
+│   │   │   │   │   │   │   │   │   📁 msgpack/
+│   │   │   │   │   │   │   │   │   📁 packaging/
+│   │   │   │   │   │   │   │   │   📁 pkg_resources/
+│   │   │   │   │   │   │   │   │   📁 platformdirs/
+│   │   │   │   │   │   │   │   │   📁 pygments/
+│   │   │   │   │   │   │   │   │   📁 pyproject_hooks/
+│   │   │   │   │   │   │   │   │   📁 requests/
+│   │   │   │   │   │   │   │   │   📁 resolvelib/
+│   │   │   │   │   │   │   │   │   📁 rich/
+│   │   │   │   │   │   │   │   │   📁 tomli/
+│   │   │   │   │   │   │   │   │   📁 tomli_w/
+│   │   │   │   │   │   │   │   │   📁 truststore/
+│   │   │   │   │   │   │   │   │   📁 urllib3/
+│   │   │   │   📁 pymongo/
+│   │   │   │   │   📄 auth.py
+│   │   │   │   │   📄 auth_oidc.py
+│   │   │   │   │   📄 auth_oidc_shared.py
+│   │   │   │   │   📄 auth_shared.py
+│   │   │   │   │   📄 bulk_shared.py
+│   │   │   │   │   📄 change_stream.py
+│   │   │   │   │   📄 client_options.py
+│   │   │   │   │   📄 client_session.py
+│   │   │   │   │   📄 collation.py
+│   │   │   │   │   📄 collection.py
+│   │   │   │   │   📄 command_cursor.py
+│   │   │   │   │   📄 common.py
+│   │   │   │   │   📄 compression_support.py
+│   │   │   │   │   📄 cursor.py
+│   │   │   │   │   📄 cursor_shared.py
+│   │   │   │   │   📄 daemon.py
+│   │   │   │   │   📄 database.py
+│   │   │   │   │   📄 database_shared.py
+│   │   │   │   │   📄 driver_info.py
+│   │   │   │   │   📄 encryption.py
+│   │   │   │   │   📄 encryption_options.py
+│   │   │   │   │   📄 errors.py
+│   │   │   │   │   📄 event_loggers.py
+│   │   │   │   │   📄 hello.py
+│   │   │   │   │   📄 helpers_shared.py
+│   │   │   │   │   📄 lock.py
+│   │   │   │   │   📄 logger.py
+│   │   │   │   │   📄 max_staleness_selectors.py
+│   │   │   │   │   📄 message.py
+│   │   │   │   │   📄 mongo_client.py
+│   │   │   │   │   📄 monitoring.py
+│   │   │   │   │   📄 network_layer.py
+│   │   │   │   │   📄 ocsp_cache.py
+│   │   │   │   │   📄 ocsp_support.py
+│   │   │   │   │   📄 operations.py
+│   │   │   │   │   📄 periodic_executor.py
+│   │   │   │   │   📄 pool.py
+│   │   │   │   │   📄 pool_options.py
+│   │   │   │   │   📄 pool_shared.py
+│   │   │   │   │   📄 pyopenssl_context.py
+│   │   │   │   │   📄 read_concern.py
+│   │   │   │   │   📄 read_preferences.py
+│   │   │   │   │   📄 response.py
+│   │   │   │   │   📄 results.py
+│   │   │   │   │   📄 saslprep.py
+│   │   │   │   │   📄 server_api.py
+│   │   │   │   │   📄 server_description.py
+│   │   │   │   │   📄 server_selectors.py
+│   │   │   │   │   📄 server_type.py
+│   │   │   │   │   📄 socket_checker.py
+│   │   │   │   │   📄 ssl_context.py
+│   │   │   │   │   📄 ssl_support.py
+│   │   │   │   │   📄 topology_description.py
+│   │   │   │   │   📄 typings.py
+│   │   │   │   │   📄 uri_parser.py
+│   │   │   │   │   📄 uri_parser_shared.py
+│   │   │   │   │   📄 write_concern.py
+│   │   │   │   │   📄 _asyncio_lock.py
+│   │   │   │   │   📄 _asyncio_task.py
+│   │   │   │   │   📄 _azure_helpers.py
+│   │   │   │   │   📄 _client_bulk_shared.py
+│   │   │   │   │   📄 _csot.py
+│   │   │   │   │   📄 _gcp_helpers.py
+│   │   │   │   │   📄 _version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 asynchronous/
+│   │   │   │   │   │   📄 aggregation.py
+│   │   │   │   │   │   📄 auth.py
+│   │   │   │   │   │   📄 auth_aws.py
+│   │   │   │   │   │   📄 auth_oidc.py
+│   │   │   │   │   │   📄 bulk.py
+│   │   │   │   │   │   📄 change_stream.py
+│   │   │   │   │   │   📄 client_bulk.py
+│   │   │   │   │   │   📄 client_session.py
+│   │   │   │   │   │   📄 collection.py
+│   │   │   │   │   │   📄 command_cursor.py
+│   │   │   │   │   │   📄 cursor.py
+│   │   │   │   │   │   📄 database.py
+│   │   │   │   │   │   📄 encryption.py
+│   │   │   │   │   │   📄 helpers.py
+│   │   │   │   │   │   📄 mongo_client.py
+│   │   │   │   │   │   📄 monitor.py
+│   │   │   │   │   │   📄 network.py
+│   │   │   │   │   │   📄 pool.py
+│   │   │   │   │   │   📄 server.py
+│   │   │   │   │   │   📄 settings.py
+│   │   │   │   │   │   📄 srv_resolver.py
+│   │   │   │   │   │   📄 topology.py
+│   │   │   │   │   │   📄 uri_parser.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 synchronous/
+│   │   │   │   │   │   📄 aggregation.py
+│   │   │   │   │   │   📄 auth.py
+│   │   │   │   │   │   📄 auth_aws.py
+│   │   │   │   │   │   📄 auth_oidc.py
+│   │   │   │   │   │   📄 bulk.py
+│   │   │   │   │   │   📄 change_stream.py
+│   │   │   │   │   │   📄 client_bulk.py
+│   │   │   │   │   │   📄 client_session.py
+│   │   │   │   │   │   📄 collection.py
+│   │   │   │   │   │   📄 command_cursor.py
+│   │   │   │   │   │   📄 cursor.py
+│   │   │   │   │   │   📄 database.py
+│   │   │   │   │   │   📄 encryption.py
+│   │   │   │   │   │   📄 helpers.py
+│   │   │   │   │   │   📄 mongo_client.py
+│   │   │   │   │   │   📄 monitor.py
+│   │   │   │   │   │   📄 network.py
+│   │   │   │   │   │   📄 pool.py
+│   │   │   │   │   │   📄 server.py
+│   │   │   │   │   │   📄 settings.py
+│   │   │   │   │   │   📄 srv_resolver.py
+│   │   │   │   │   │   📄 topology.py
+│   │   │   │   │   │   📄 uri_parser.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 pymongo-4.15.1.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 python_dotenv-1.1.1.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 python_engineio-4.13.5.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 python_socketio-5.16.4.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 python_telegram_bot-22.8.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 pytz/
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 lazy.py
+│   │   │   │   │   📄 reference.py
+│   │   │   │   │   📄 tzfile.py
+│   │   │   │   │   📄 tzinfo.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 zoneinfo/
+│   │   │   │   │   │   📁 Africa/
+│   │   │   │   │   │   📁 America/
+│   │   │   │   │   │   │   📁 Argentina/
+│   │   │   │   │   │   │   📁 Indiana/
+│   │   │   │   │   │   │   📁 Kentucky/
+│   │   │   │   │   │   │   📁 North_Dakota/
+│   │   │   │   │   │   📁 Antarctica/
+│   │   │   │   │   │   📁 Arctic/
+│   │   │   │   │   │   📁 Asia/
+│   │   │   │   │   │   📁 Atlantic/
+│   │   │   │   │   │   📁 Australia/
+│   │   │   │   │   │   📁 Brazil/
+│   │   │   │   │   │   📁 Canada/
+│   │   │   │   │   │   📁 Chile/
+│   │   │   │   │   │   📁 Etc/
+│   │   │   │   │   │   📁 Europe/
+│   │   │   │   │   │   📁 Indian/
+│   │   │   │   │   │   📁 Mexico/
+│   │   │   │   │   │   📁 Pacific/
+│   │   │   │   │   │   📁 US/
+│   │   │   │   📁 pytz-2025.2.dist-info/
+│   │   │   │   📁 requests/
+│   │   │   │   │   📄 adapters.py
+│   │   │   │   │   📄 api.py
+│   │   │   │   │   📄 auth.py
+│   │   │   │   │   📄 certs.py
+│   │   │   │   │   📄 compat.py
+│   │   │   │   │   📄 cookies.py
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 help.py
+│   │   │   │   │   📄 hooks.py
+│   │   │   │   │   📄 models.py
+│   │   │   │   │   📄 packages.py
+│   │   │   │   │   📄 sessions.py
+│   │   │   │   │   📄 status_codes.py
+│   │   │   │   │   📄 structures.py
+│   │   │   │   │   📄 utils.py
+│   │   │   │   │   📄 _internal_utils.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __version__.py
+│   │   │   │   📁 requests-2.32.5.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 simple_websocket/
+│   │   │   │   │   📄 aiows.py
+│   │   │   │   │   📄 asgi.py
+│   │   │   │   │   📄 errors.py
+│   │   │   │   │   📄 ws.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 simple_websocket-1.1.0.dist-info/
+│   │   │   │   📁 six-1.17.0.dist-info/
+│   │   │   │   📁 sniffio/
+│   │   │   │   │   📄 _impl.py
+│   │   │   │   │   📄 _version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _tests/
+│   │   │   │   │   │   📄 test_sniffio.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 sniffio-1.3.1.dist-info/
+│   │   │   │   📁 socketio/
+│   │   │   │   │   📄 admin.py
+│   │   │   │   │   📄 asgi.py
+│   │   │   │   │   📄 async_admin.py
+│   │   │   │   │   📄 async_aiopika_manager.py
+│   │   │   │   │   📄 async_client.py
+│   │   │   │   │   📄 async_manager.py
+│   │   │   │   │   📄 async_namespace.py
+│   │   │   │   │   📄 async_pubsub_manager.py
+│   │   │   │   │   📄 async_redis_manager.py
+│   │   │   │   │   📄 async_server.py
+│   │   │   │   │   📄 async_simple_client.py
+│   │   │   │   │   📄 base_client.py
+│   │   │   │   │   📄 base_manager.py
+│   │   │   │   │   📄 base_namespace.py
+│   │   │   │   │   📄 base_server.py
+│   │   │   │   │   📄 client.py
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 kafka_manager.py
+│   │   │   │   │   📄 kombu_manager.py
+│   │   │   │   │   📄 manager.py
+│   │   │   │   │   📄 middleware.py
+│   │   │   │   │   📄 msgpack_packet.py
+│   │   │   │   │   📄 namespace.py
+│   │   │   │   │   📄 packet.py
+│   │   │   │   │   📄 pubsub_manager.py
+│   │   │   │   │   📄 redis_manager.py
+│   │   │   │   │   📄 server.py
+│   │   │   │   │   📄 simple_client.py
+│   │   │   │   │   📄 tornado.py
+│   │   │   │   │   📄 zmq_manager.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 telegram/
+│   │   │   │   │   📄 constants.py
+│   │   │   │   │   📄 error.py
+│   │   │   │   │   📄 helpers.py
+│   │   │   │   │   📄 warnings.py
+│   │   │   │   │   📄 _birthdate.py
+│   │   │   │   │   📄 _bot.py
+│   │   │   │   │   📄 _botaccesssettings.py
+│   │   │   │   │   📄 _botcommand.py
+│   │   │   │   │   📄 _botcommandscope.py
+│   │   │   │   │   📄 _botdescription.py
+│   │   │   │   │   📄 _botname.py
+│   │   │   │   │   📄 _business.py
+│   │   │   │   │   📄 _callbackquery.py
+│   │   │   │   │   📄 _chat.py
+│   │   │   │   │   📄 _chatadministratorrights.py
+│   │   │   │   │   📄 _chatbackground.py
+│   │   │   │   │   📄 _chatboost.py
+│   │   │   │   │   📄 _chatfullinfo.py
+│   │   │   │   │   📄 _chatinvitelink.py
+│   │   │   │   │   📄 _chatjoinrequest.py
+│   │   │   │   │   📄 _chatlocation.py
+│   │   │   │   │   📄 _chatmember.py
+│   │   │   │   │   📄 _chatmemberupdated.py
+│   │   │   │   │   📄 _chatowner.py
+│   │   │   │   │   📄 _chatpermissions.py
+│   │   │   │   │   📄 _checklists.py
+│   │   │   │   │   📄 _choseninlineresult.py
+│   │   │   │   │   📄 _copytextbutton.py
+│   │   │   │   │   📄 _dice.py
+│   │   │   │   │   📄 _directmessagepricechanged.py
+│   │   │   │   │   📄 _directmessagestopic.py
+│   │   │   │   │   📄 _forcereply.py
+│   │   │   │   │   📄 _forumtopic.py
+│   │   │   │   │   📄 _gifts.py
+│   │   │   │   │   📄 _giveaway.py
+│   │   │   │   │   📄 _inputchecklist.py
+│   │   │   │   │   📄 _keyboardbutton.py
+│   │   │   │   │   📄 _keyboardbuttonpolltype.py
+│   │   │   │   │   📄 _keyboardbuttonrequest.py
+│   │   │   │   │   📄 _linkpreviewoptions.py
+│   │   │   │   │   📄 _loginurl.py
+│   │   │   │   │   📄 _managedbot.py
+│   │   │   │   │   📄 _menubutton.py
+│   │   │   │   │   📄 _message.py
+│   │   │   │   │   📄 _messageautodeletetimerchanged.py
+│   │   │   │   │   📄 _messageentity.py
+│   │   │   │   │   📄 _messageid.py
+│   │   │   │   │   📄 _messageorigin.py
+│   │   │   │   │   📄 _messagereactionupdated.py
+│   │   │   │   │   📄 _ownedgift.py
+│   │   │   │   │   📄 _paidmedia.py
+│   │   │   │   │   📄 _paidmessagepricechanged.py
+│   │   │   │   │   📄 _poll.py
+│   │   │   │   │   📄 _preparedkeyboardbutton.py
+│   │   │   │   │   📄 _proximityalerttriggered.py
+│   │   │   │   │   📄 _reaction.py
+│   │   │   │   │   📄 _reply.py
+│   │   │   │   │   📄 _replykeyboardmarkup.py
+│   │   │   │   │   📄 _replykeyboardremove.py
+│   │   │   │   │   📄 _sentguestmessage.py
+│   │   │   │   │   📄 _sentwebappmessage.py
+│   │   │   │   │   📄 _shared.py
+│   │   │   │   │   📄 _story.py
+│   │   │   │   │   📄 _storyarea.py
+│   │   │   │   │   📄 _suggestedpost.py
+│   │   │   │   │   📄 _switchinlinequerychosenchat.py
+│   │   │   │   │   📄 _telegramobject.py
+│   │   │   │   │   📄 _uniquegift.py
+│   │   │   │   │   📄 _update.py
+│   │   │   │   │   📄 _user.py
+│   │   │   │   │   📄 _userprofileaudios.py
+│   │   │   │   │   📄 _userprofilephotos.py
+│   │   │   │   │   📄 _userrating.py
+│   │   │   │   │   📄 _version.py
+│   │   │   │   │   📄 _videochat.py
+│   │   │   │   │   📄 _webappdata.py
+│   │   │   │   │   📄 _webappinfo.py
+│   │   │   │   │   📄 _webhookinfo.py
+│   │   │   │   │   📄 _writeaccessallowed.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📄 __main__.py
+│   │   │   │   │   📁 ext/
+│   │   │   │   │   │   📄 filters.py
+│   │   │   │   │   │   📄 _aioratelimiter.py
+│   │   │   │   │   │   📄 _application.py
+│   │   │   │   │   │   📄 _applicationbuilder.py
+│   │   │   │   │   │   📄 _basepersistence.py
+│   │   │   │   │   │   📄 _baseratelimiter.py
+│   │   │   │   │   │   📄 _baseupdateprocessor.py
+│   │   │   │   │   │   📄 _callbackcontext.py
+│   │   │   │   │   │   📄 _callbackdatacache.py
+│   │   │   │   │   │   📄 _contexttypes.py
+│   │   │   │   │   │   📄 _defaults.py
+│   │   │   │   │   │   📄 _dictpersistence.py
+│   │   │   │   │   │   📄 _extbot.py
+│   │   │   │   │   │   📄 _jobqueue.py
+│   │   │   │   │   │   📄 _picklepersistence.py
+│   │   │   │   │   │   📄 _updater.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 _handlers/
+│   │   │   │   │   │   │   📄 basehandler.py
+│   │   │   │   │   │   │   📄 businessconnectionhandler.py
+│   │   │   │   │   │   │   📄 businessmessagesdeletedhandler.py
+│   │   │   │   │   │   │   📄 callbackqueryhandler.py
+│   │   │   │   │   │   │   📄 chatboosthandler.py
+│   │   │   │   │   │   │   📄 chatjoinrequesthandler.py
+│   │   │   │   │   │   │   📄 chatmemberhandler.py
+│   │   │   │   │   │   │   📄 choseninlineresulthandler.py
+│   │   │   │   │   │   │   📄 commandhandler.py
+│   │   │   │   │   │   │   📄 conversationhandler.py
+│   │   │   │   │   │   │   📄 inlinequeryhandler.py
+│   │   │   │   │   │   │   📄 managedbotupdatedhandler.py
+│   │   │   │   │   │   │   📄 messagehandler.py
+│   │   │   │   │   │   │   📄 messagereactionhandler.py
+│   │   │   │   │   │   │   📄 paidmediapurchasedhandler.py
+│   │   │   │   │   │   │   📄 pollanswerhandler.py
+│   │   │   │   │   │   │   📄 pollhandler.py
+│   │   │   │   │   │   │   📄 precheckoutqueryhandler.py
+│   │   │   │   │   │   │   📄 prefixhandler.py
+│   │   │   │   │   │   │   📄 shippingqueryhandler.py
+│   │   │   │   │   │   │   📄 stringcommandhandler.py
+│   │   │   │   │   │   │   📄 stringregexhandler.py
+│   │   │   │   │   │   │   📄 typehandler.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 _utils/
+│   │   │   │   │   │   │   📄 asyncio.py
+│   │   │   │   │   │   │   📄 networkloop.py
+│   │   │   │   │   │   │   📄 stack.py
+│   │   │   │   │   │   │   📄 trackingdict.py
+│   │   │   │   │   │   │   📄 types.py
+│   │   │   │   │   │   │   📄 webhookhandler.py
+│   │   │   │   │   │   │   📄 _update_parsing.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 request/
+│   │   │   │   │   │   📄 _baserequest.py
+│   │   │   │   │   │   📄 _httpxrequest.py
+│   │   │   │   │   │   📄 _requestdata.py
+│   │   │   │   │   │   📄 _requestparameter.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _files/
+│   │   │   │   │   │   📄 animation.py
+│   │   │   │   │   │   📄 audio.py
+│   │   │   │   │   │   📄 chatphoto.py
+│   │   │   │   │   │   📄 contact.py
+│   │   │   │   │   │   📄 document.py
+│   │   │   │   │   │   📄 file.py
+│   │   │   │   │   │   📄 inputfile.py
+│   │   │   │   │   │   📄 inputmedia.py
+│   │   │   │   │   │   📄 inputprofilephoto.py
+│   │   │   │   │   │   📄 inputsticker.py
+│   │   │   │   │   │   📄 inputstorycontent.py
+│   │   │   │   │   │   📄 livephoto.py
+│   │   │   │   │   │   📄 location.py
+│   │   │   │   │   │   📄 photosize.py
+│   │   │   │   │   │   📄 sticker.py
+│   │   │   │   │   │   📄 venue.py
+│   │   │   │   │   │   📄 video.py
+│   │   │   │   │   │   📄 videonote.py
+│   │   │   │   │   │   📄 videoquality.py
+│   │   │   │   │   │   📄 voice.py
+│   │   │   │   │   │   📄 _basemedium.py
+│   │   │   │   │   │   📄 _basethumbedmedium.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _games/
+│   │   │   │   │   │   📄 callbackgame.py
+│   │   │   │   │   │   📄 game.py
+│   │   │   │   │   │   📄 gamehighscore.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _inline/
+│   │   │   │   │   │   📄 inlinekeyboardbutton.py
+│   │   │   │   │   │   📄 inlinekeyboardmarkup.py
+│   │   │   │   │   │   📄 inlinequery.py
+│   │   │   │   │   │   📄 inlinequeryresult.py
+│   │   │   │   │   │   📄 inlinequeryresultarticle.py
+│   │   │   │   │   │   📄 inlinequeryresultaudio.py
+│   │   │   │   │   │   📄 inlinequeryresultcachedaudio.py
+│   │   │   │   │   │   📄 inlinequeryresultcacheddocument.py
+│   │   │   │   │   │   📄 inlinequeryresultcachedgif.py
+│   │   │   │   │   │   📄 inlinequeryresultcachedmpeg4gif.py
+│   │   │   │   │   │   📄 inlinequeryresultcachedphoto.py
+│   │   │   │   │   │   📄 inlinequeryresultcachedsticker.py
+│   │   │   │   │   │   📄 inlinequeryresultcachedvideo.py
+│   │   │   │   │   │   📄 inlinequeryresultcachedvoice.py
+│   │   │   │   │   │   📄 inlinequeryresultcontact.py
+│   │   │   │   │   │   📄 inlinequeryresultdocument.py
+│   │   │   │   │   │   📄 inlinequeryresultgame.py
+│   │   │   │   │   │   📄 inlinequeryresultgif.py
+│   │   │   │   │   │   📄 inlinequeryresultlocation.py
+│   │   │   │   │   │   📄 inlinequeryresultmpeg4gif.py
+│   │   │   │   │   │   📄 inlinequeryresultphoto.py
+│   │   │   │   │   │   📄 inlinequeryresultsbutton.py
+│   │   │   │   │   │   📄 inlinequeryresultvenue.py
+│   │   │   │   │   │   📄 inlinequeryresultvideo.py
+│   │   │   │   │   │   📄 inlinequeryresultvoice.py
+│   │   │   │   │   │   📄 inputcontactmessagecontent.py
+│   │   │   │   │   │   📄 inputinvoicemessagecontent.py
+│   │   │   │   │   │   📄 inputlocationmessagecontent.py
+│   │   │   │   │   │   📄 inputmessagecontent.py
+│   │   │   │   │   │   📄 inputtextmessagecontent.py
+│   │   │   │   │   │   📄 inputvenuemessagecontent.py
+│   │   │   │   │   │   📄 preparedinlinemessage.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _passport/
+│   │   │   │   │   │   📄 credentials.py
+│   │   │   │   │   │   📄 data.py
+│   │   │   │   │   │   📄 encryptedpassportelement.py
+│   │   │   │   │   │   📄 passportdata.py
+│   │   │   │   │   │   📄 passportelementerrors.py
+│   │   │   │   │   │   📄 passportfile.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _payment/
+│   │   │   │   │   │   📄 invoice.py
+│   │   │   │   │   │   📄 labeledprice.py
+│   │   │   │   │   │   📄 orderinfo.py
+│   │   │   │   │   │   📄 precheckoutquery.py
+│   │   │   │   │   │   📄 refundedpayment.py
+│   │   │   │   │   │   📄 shippingaddress.py
+│   │   │   │   │   │   📄 shippingoption.py
+│   │   │   │   │   │   📄 shippingquery.py
+│   │   │   │   │   │   📄 successfulpayment.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 stars/
+│   │   │   │   │   │   │   📄 affiliateinfo.py
+│   │   │   │   │   │   │   📄 revenuewithdrawalstate.py
+│   │   │   │   │   │   │   📄 staramount.py
+│   │   │   │   │   │   │   📄 startransactions.py
+│   │   │   │   │   │   │   📄 transactionpartner.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 _utils/
+│   │   │   │   │   │   📄 argumentparsing.py
+│   │   │   │   │   │   📄 datetime.py
+│   │   │   │   │   │   📄 defaultvalue.py
+│   │   │   │   │   │   📄 entities.py
+│   │   │   │   │   │   📄 enum.py
+│   │   │   │   │   │   📄 files.py
+│   │   │   │   │   │   📄 logging.py
+│   │   │   │   │   │   📄 markup.py
+│   │   │   │   │   │   📄 repr.py
+│   │   │   │   │   │   📄 strings.py
+│   │   │   │   │   │   📄 types.py
+│   │   │   │   │   │   📄 usernames.py
+│   │   │   │   │   │   📄 warnings.py
+│   │   │   │   │   │   📄 warnings_transition.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 typing_extensions-4.14.1.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 tzdata/
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 zoneinfo/
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Africa/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 America/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 Argentina/
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 Indiana/
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 Kentucky/
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   │   📁 North_Dakota/
+│   │   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Antarctica/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Arctic/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Asia/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Atlantic/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Australia/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Brazil/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Canada/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Chile/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Etc/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Europe/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Indian/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Mexico/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 Pacific/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 US/
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 tzdata-2025.2.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   │   │   📁 licenses/
+│   │   │   │   📁 tzlocal/
+│   │   │   │   │   📄 unix.py
+│   │   │   │   │   📄 utils.py
+│   │   │   │   │   📄 win32.py
+│   │   │   │   │   📄 windows_tz.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 tzlocal-5.3.1.dist-info/
+│   │   │   │   📁 urllib3/
+│   │   │   │   │   📄 connection.py
+│   │   │   │   │   📄 connectionpool.py
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 fields.py
+│   │   │   │   │   📄 filepost.py
+│   │   │   │   │   📄 poolmanager.py
+│   │   │   │   │   📄 response.py
+│   │   │   │   │   📄 _base_connection.py
+│   │   │   │   │   📄 _collections.py
+│   │   │   │   │   📄 _request_methods.py
+│   │   │   │   │   📄 _version.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 contrib/
+│   │   │   │   │   │   📄 pyopenssl.py
+│   │   │   │   │   │   📄 socks.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 emscripten/
+│   │   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   │   📄 fetch.py
+│   │   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 http2/
+│   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   📄 probe.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 util/
+│   │   │   │   │   │   📄 connection.py
+│   │   │   │   │   │   📄 proxy.py
+│   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   📄 retry.py
+│   │   │   │   │   │   📄 ssltransport.py
+│   │   │   │   │   │   📄 ssl_.py
+│   │   │   │   │   │   📄 ssl_match_hostname.py
+│   │   │   │   │   │   📄 timeout.py
+│   │   │   │   │   │   📄 url.py
+│   │   │   │   │   │   📄 util.py
+│   │   │   │   │   │   📄 wait.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 urllib3-2.5.0.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   │   │   📁 werkzeug/
+│   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   📄 formparser.py
+│   │   │   │   │   📄 http.py
+│   │   │   │   │   📄 local.py
+│   │   │   │   │   📄 security.py
+│   │   │   │   │   📄 serving.py
+│   │   │   │   │   📄 test.py
+│   │   │   │   │   📄 testapp.py
+│   │   │   │   │   📄 urls.py
+│   │   │   │   │   📄 user_agent.py
+│   │   │   │   │   📄 utils.py
+│   │   │   │   │   📄 wsgi.py
+│   │   │   │   │   📄 _internal.py
+│   │   │   │   │   📄 _reloader.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 datastructures/
+│   │   │   │   │   │   📄 accept.py
+│   │   │   │   │   │   📄 auth.py
+│   │   │   │   │   │   📄 cache_control.py
+│   │   │   │   │   │   📄 csp.py
+│   │   │   │   │   │   📄 etag.py
+│   │   │   │   │   │   📄 file_storage.py
+│   │   │   │   │   │   📄 headers.py
+│   │   │   │   │   │   📄 mixins.py
+│   │   │   │   │   │   📄 range.py
+│   │   │   │   │   │   📄 structures.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 debug/
+│   │   │   │   │   │   📄 console.py
+│   │   │   │   │   │   📄 repr.py
+│   │   │   │   │   │   📄 tbtools.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   │   📁 shared/
+│   │   │   │   │   📁 middleware/
+│   │   │   │   │   │   📄 dispatcher.py
+│   │   │   │   │   │   📄 http_proxy.py
+│   │   │   │   │   │   📄 lint.py
+│   │   │   │   │   │   📄 profiler.py
+│   │   │   │   │   │   📄 proxy_fix.py
+│   │   │   │   │   │   📄 shared_data.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 routing/
+│   │   │   │   │   │   📄 converters.py
+│   │   │   │   │   │   📄 exceptions.py
+│   │   │   │   │   │   📄 map.py
+│   │   │   │   │   │   📄 matcher.py
+│   │   │   │   │   │   📄 rules.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 sansio/
+│   │   │   │   │   │   📄 http.py
+│   │   │   │   │   │   📄 multipart.py
+│   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   📄 utils.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   │   📁 wrappers/
+│   │   │   │   │   │   📄 request.py
+│   │   │   │   │   │   📄 response.py
+│   │   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 werkzeug-3.1.3.dist-info/
+│   │   │   │   📁 wsproto/
+│   │   │   │   │   📄 connection.py
+│   │   │   │   │   📄 events.py
+│   │   │   │   │   📄 extensions.py
+│   │   │   │   │   📄 frame_protocol.py
+│   │   │   │   │   📄 handshake.py
+│   │   │   │   │   📄 typing.py
+│   │   │   │   │   📄 utilities.py
+│   │   │   │   │   📄 __init__.py
+│   │   │   │   📁 wsproto-1.3.2.dist-info/
+│   │   │   │   │   📁 licenses/
+│   │   📁 Scripts/

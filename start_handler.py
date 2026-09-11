@@ -9,7 +9,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ⚠️ ATENÇÃO: Atualize este link com o seu Cloudflare atual! (precisa ter https://)
-    url_do_jogo = "https://corp-arrangement-gradually-passed.trycloudflare.com"
+    url_do_jogo = "https://163-176-44-198.sslip.io"
 
     keyboard = [[
         InlineKeyboardButton(
