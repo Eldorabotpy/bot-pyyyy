@@ -1797,4 +1797,9 @@ if __name__ == "__main__":
     cron_invasao_thread.start()
     
     print("🚀 Servidor Web de Eldora rodando em http://localhost:5000")
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=5000,
+        allow_unsafe_werkzeug=True
+    )
