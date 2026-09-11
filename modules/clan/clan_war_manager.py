@@ -3319,6 +3319,602 @@ def _criar_frentes_guerra(
 
     return frentes
 
+# ============================================================
+# 🏆 CONSOLIDAR RESULTADO GERAL DA GUERRA
+# ============================================================
+
+def consolidar_resultado_guerra(
+    guerra_id,
+):
+    """
+    Recalcula o placar geral da Guerra
+    usando SOMENTE os resultados oficiais
+    já persistidos em cada frente.
+
+    Regras:
+    - atualiza o placar parcial;
+    - não encerra enquanto existir frente pendente;
+    - finaliza somente quando todas as frentes
+      possuem vencedor oficial;
+    - suporta empate;
+    - é idempotente.
+    """
+
+    guerra_id = _object_id(
+        guerra_id
+    )
+
+
+    if not guerra_id:
+
+        return {
+            "success": False,
+            "error":
+                "ID de Guerra inválido.",
+        }
+
+
+    # ========================================================
+    # ⚔️ ESTADO MAIS RECENTE DA GUERRA
+    # ========================================================
+
+    guerra = (
+        clan_wars_collection
+        .find_one({
+            "_id":
+                guerra_id,
+
+            "tipo_documento":
+                WAR_DOC_GUERRA,
+        })
+    )
+
+
+    if not guerra:
+
+        return {
+            "success": False,
+            "error":
+                "Guerra não encontrada.",
+        }
+
+
+    if (
+        guerra.get(
+            "status"
+        )
+        ==
+        GUERRA_STATUS_CANCELADA
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Esta Guerra foi cancelada.",
+        }
+
+
+    # ========================================================
+    # 🏰 IDENTIFICA CLÃ A E CLÃ B
+    # ========================================================
+
+    clans = (
+        guerra.get(
+            "clans",
+            []
+        )
+        or []
+    )
+
+
+    lado_a = next(
+        (
+            item
+
+            for item
+            in clans
+
+            if str(
+                item.get(
+                    "lado",
+                    ""
+                )
+            ).lower()
+            ==
+            "a"
+        ),
+        None,
+    )
+
+
+    lado_b = next(
+        (
+            item
+
+            for item
+            in clans
+
+            if str(
+                item.get(
+                    "lado",
+                    ""
+                )
+            ).lower()
+            ==
+            "b"
+        ),
+        None,
+    )
+
+
+    if (
+        not lado_a
+        or
+        not lado_b
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Os lados da Guerra são inválidos.",
+        }
+
+
+    clan_a_id = _object_id(
+        lado_a.get(
+            "clan_id"
+        )
+    )
+
+
+    clan_b_id = _object_id(
+        lado_b.get(
+            "clan_id"
+        )
+    )
+
+
+    if (
+        not clan_a_id
+        or
+        not clan_b_id
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Os IDs dos clãs são inválidos.",
+        }
+
+
+    # ========================================================
+    # ⚔️ FRENTES OFICIAIS
+    # ========================================================
+
+    frentes = list(
+        guerra.get(
+            "frentes",
+            []
+        )
+        or []
+    )
+
+
+    try:
+
+        frentes_total = int(
+            guerra.get(
+                "frentes_total",
+                len(
+                    frentes
+                )
+            )
+            or 0
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        frentes_total = 0
+
+
+    if (
+        frentes_total <= 0
+        or
+        len(
+            frentes
+        )
+        !=
+        frentes_total
+    ):
+
+        return {
+            "success": False,
+
+            "error":
+                (
+                    "A quantidade de frentes "
+                    "da Guerra é inconsistente."
+                ),
+        }
+
+
+    # ========================================================
+    # 🧮 CONTA SOMENTE RESULTADOS OFICIAIS
+    # ========================================================
+
+    frentes_clan_a = 0
+    frentes_clan_b = 0
+    frentes_finalizadas = 0
+
+
+    for frente in frentes:
+
+        if (
+            frente.get(
+                "status"
+            )
+            !=
+            GUERRA_STATUS_FINALIZADA
+        ):
+
+            continue
+
+
+        resultado_frente = (
+            frente.get(
+                "resultado",
+                {}
+            )
+            or {}
+        )
+
+
+        vencedor_frente = _object_id(
+            resultado_frente.get(
+                "vencedor_clan_id"
+            )
+        )
+
+
+        if (
+            vencedor_frente
+            ==
+            clan_a_id
+        ):
+
+            frentes_clan_a += 1
+            frentes_finalizadas += 1
+
+
+        elif (
+            vencedor_frente
+            ==
+            clan_b_id
+        ):
+
+            frentes_clan_b += 1
+            frentes_finalizadas += 1
+
+
+        else:
+
+            return {
+                "success": False,
+
+                "error":
+                    (
+                        "Existe uma frente finalizada "
+                        "sem vencedor oficial válido."
+                    ),
+
+                "frente_numero":
+                    frente.get(
+                        "numero"
+                    ),
+            }
+
+
+    agora = _agora()
+
+
+    # ========================================================
+    # 📊 PLACAR PARCIAL
+    #
+    # Uma chamada antiga nunca pode sobrescrever
+    # uma Guerra que já foi oficialmente finalizada.
+    # ========================================================
+
+    clan_wars_collection.update_one(
+
+        {
+            "_id":
+                guerra_id,
+
+            "status": {
+                "$nin": [
+                    GUERRA_STATUS_FINALIZADA,
+                    GUERRA_STATUS_CANCELADA,
+                ]
+            },
+        },
+
+        {
+            "$set": {
+
+                "resultado.frentes_clan_a":
+                    frentes_clan_a,
+
+                "resultado.frentes_clan_b":
+                    frentes_clan_b,
+
+                "atualizado_em":
+                    agora,
+            }
+        },
+    )
+
+
+    # ========================================================
+    # ⏳ AINDA EXISTEM FRENTES ABERTAS
+    # ========================================================
+
+    if (
+        frentes_finalizadas
+        <
+        frentes_total
+    ):
+
+        return {
+            "success": True,
+
+            "finalizada":
+                False,
+
+            "frentes_total":
+                frentes_total,
+
+            "frentes_finalizadas":
+                frentes_finalizadas,
+
+            "frentes_clan_a":
+                frentes_clan_a,
+
+            "frentes_clan_b":
+                frentes_clan_b,
+        }
+
+
+    # ========================================================
+    # 🏆 RESULTADO DEFINITIVO
+    # ========================================================
+
+    empate = (
+        frentes_clan_a
+        ==
+        frentes_clan_b
+    )
+
+
+    if empate:
+
+        vencedor_clan_id = None
+        perdedor_clan_id = None
+
+
+    elif (
+        frentes_clan_a
+        >
+        frentes_clan_b
+    ):
+
+        vencedor_clan_id = (
+            clan_a_id
+        )
+
+        perdedor_clan_id = (
+            clan_b_id
+        )
+
+
+    else:
+
+        vencedor_clan_id = (
+            clan_b_id
+        )
+
+        perdedor_clan_id = (
+            clan_a_id
+        )
+
+
+    nome_a = str(
+        lado_a.get(
+            "nome",
+            "Clã A"
+        )
+    )
+
+
+    nome_b = str(
+        lado_b.get(
+            "nome",
+            "Clã B"
+        )
+    )
+
+
+    # ========================================================
+    # 🔒 FINALIZAÇÃO ATÔMICA / IDPOTENTE
+    #
+    # Apenas uma chamada consegue mudar:
+    # em_andamento -> finalizada.
+    # ========================================================
+
+    resultado_finalizacao = (
+        clan_wars_collection
+        .update_one(
+
+            {
+                "_id":
+                    guerra_id,
+
+                "tipo_documento":
+                    WAR_DOC_GUERRA,
+
+                "status": {
+                    "$nin": [
+                        GUERRA_STATUS_FINALIZADA,
+                        GUERRA_STATUS_CANCELADA,
+                    ]
+                },
+            },
+
+            {
+                "$set": {
+
+                    "status":
+                        GUERRA_STATUS_FINALIZADA,
+
+                    "resultado.vencedor_clan_id":
+                        vencedor_clan_id,
+
+                    "resultado.perdedor_clan_id":
+                        perdedor_clan_id,
+
+                    "resultado.empate":
+                        empate,
+
+                    "resultado.frentes_clan_a":
+                        frentes_clan_a,
+
+                    "resultado.frentes_clan_b":
+                        frentes_clan_b,
+
+                    "resultado.finalizada_em":
+                        agora,
+
+                    "atualizado_em":
+                        agora,
+                },
+
+                "$push": {
+
+                    "historico": {
+
+                        "tipo":
+                            "guerra_finalizada",
+
+                        "mensagem":
+                            (
+                                f"Guerra finalizada: "
+                                f"{nome_a} "
+                                f"{frentes_clan_a} x "
+                                f"{frentes_clan_b} "
+                                f"{nome_b}."
+                            ),
+
+                        "autor":
+                            "sistema",
+
+                        "criado_em":
+                            agora,
+                    }
+                },
+            },
+        )
+    )
+
+
+    # ========================================================
+    # 📄 FINALIZA TAMBÉM AS DUAS INSCRIÇÕES
+    #
+    # Isso impede que a sincronização operacional
+    # volte a exibir as inscrições como em andamento.
+    # ========================================================
+
+    clan_wars_collection.update_many(
+
+        {
+            "tipo_documento":
+                WAR_DOC_INSCRICAO,
+
+            "semana_id":
+                guerra.get(
+                    "semana_id"
+                ),
+
+            "matchmaking.guerra_id":
+                guerra_id,
+
+            "status": {
+                "$ne":
+                    GUERRA_STATUS_CANCELADA
+            },
+        },
+
+        {
+            "$set": {
+
+                "status":
+                    GUERRA_STATUS_FINALIZADA,
+
+                "atualizado_em":
+                    agora,
+            }
+        },
+    )
+
+
+    return {
+        "success": True,
+
+        "finalizada":
+            True,
+
+        "finalizada_agora":
+            (
+                resultado_finalizacao
+                .modified_count
+                ==
+                1
+            ),
+
+        "empate":
+            empate,
+
+        "vencedor_clan_id":
+            (
+                str(
+                    vencedor_clan_id
+                )
+                if vencedor_clan_id
+                else None
+            ),
+
+        "perdedor_clan_id":
+            (
+                str(
+                    perdedor_clan_id
+                )
+                if perdedor_clan_id
+                else None
+            ),
+
+        "frentes_total":
+            frentes_total,
+
+        "frentes_finalizadas":
+            frentes_finalizadas,
+
+        "frentes_clan_a":
+            frentes_clan_a,
+
+        "frentes_clan_b":
+            frentes_clan_b,
+    }
 
 # ============================================================
 # 👤 PARTICIPAÇÃO DO JOGADOR NA SEMANA
