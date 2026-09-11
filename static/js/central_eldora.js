@@ -155,6 +155,9 @@
     let rankingClansCache =
         null;
 
+    let rankingGuerraCache =
+        null;
+
     let rankingAtualCentral =
         null;
     
@@ -812,43 +815,20 @@
 
             if (descricao) {
                 descricao.textContent =
-                    "Pontos de Guerra, vitórias, "
-                    + "derrotas e classificação "
-                    + "das temporadas.";
+                    "Classificação geral das "
+                    + "Guerras oficiais de Eldora.";
             }
 
 
             if (btnAtualizar) {
                 btnAtualizar.style.display =
-                    "none";
+                    "flex";
             }
 
 
-            conteudo.innerHTML = `
-                <div
-                    class="
-                        central-ranking-futuro
-                    "
-                >
-                    <div
-                        class="
-                            central-ranking-futuro-icone
-                        "
-                    >
-                        ⚔️
-                    </div>
-
-                    <strong>
-                        Ranking de Guerra em preparação
-                    </strong>
-
-                    <p>
-                        Este ranking será ativado junto
-                        com o sistema semanal de
-                        Guerra de Clãs.
-                    </p>
-                </div>
-            `;
+            await carregarRankingGuerra(
+                forcarAtualizacao
+            );
 
             return;
         }
@@ -1400,7 +1380,447 @@
                 )
                 .join("");
     }
-    
+
+    // ========================================================
+    // ⚔️ CARREGAR RANKING DA GUERRA
+    // ========================================================
+
+    async function carregarRankingGuerra(
+        forcar = false
+    ) {
+        const conteudo = elemento(
+            "central-ranking-conteudo"
+        );
+
+
+        if (!conteudo) {
+            return;
+        }
+
+
+        if (
+            rankingGuerraCache &&
+            !forcar
+        ) {
+
+            renderizarRankingGuerra(
+                rankingGuerraCache
+            );
+
+            return;
+        }
+
+
+        conteudo.innerHTML = `
+            <div
+                class="
+                    central-ranking-carregando
+                "
+            >
+                ⚔️ Consultando os registros
+                das Guerras de Clãs...
+            </div>
+        `;
+
+
+        try {
+
+            const resposta =
+                await fetch(
+                    (
+                        "/api/clan/guerra/ranking"
+                        + "?limite=100"
+                        + "&t="
+                        + Date.now()
+                    ),
+                    {
+                        method:
+                            "GET",
+
+                        cache:
+                            "no-store"
+                    }
+                );
+
+
+            const dados =
+                await resposta.json();
+
+
+            if (
+                !resposta.ok ||
+                dados.success === false
+            ) {
+
+                throw new Error(
+                    dados.error ||
+                    dados.erro ||
+                    "Não foi possível carregar "
+                    + "o Ranking de Guerra."
+                );
+            }
+
+
+            rankingGuerraCache = {
+                ranking:
+                    Array.isArray(
+                        dados.ranking
+                    )
+                        ? dados.ranking
+                        : [],
+
+                guerras_consideradas:
+                    Number(
+                        dados.guerras_consideradas ||
+                        0
+                    )
+            };
+
+
+            renderizarRankingGuerra(
+                rankingGuerraCache
+            );
+
+
+        } catch (
+            erro
+        ) {
+
+            console.error(
+                "❌ [CENTRAL] Ranking de Guerra:",
+                erro
+            );
+
+
+            conteudo.innerHTML = `
+                <div
+                    class="
+                        central-ranking-vazio
+                    "
+                >
+                    ⚠️ ${
+                        escaparHtmlCentral(
+                            erro.message ||
+                            "Erro ao carregar "
+                            + "Ranking de Guerra."
+                        )
+                    }
+                </div>
+            `;
+        }
+    }
+
+
+    // ========================================================
+    // ⚔️ RENDERIZAR RANKING DA GUERRA
+    // ========================================================
+
+    function renderizarRankingGuerra(
+        dados
+    ) {
+        const conteudo = elemento(
+            "central-ranking-conteudo"
+        );
+
+
+        if (!conteudo) {
+            return;
+        }
+
+
+        const ranking =
+            Array.isArray(
+                dados?.ranking
+            )
+                ? dados.ranking
+                : [];
+
+
+        if (!ranking.length) {
+
+            conteudo.innerHTML = `
+                <div
+                    class="
+                        central-ranking-vazio
+                    "
+                >
+                    ⚔️ Nenhuma Guerra oficial
+                    finalizada foi encontrada.
+                </div>
+            `;
+
+            return;
+        }
+
+
+        const guerrasTotal =
+            Number(
+                dados
+                    ?.guerras_consideradas ||
+                0
+            );
+
+
+        let html = `
+            <div
+                class="
+                    central-ranking-vazio
+                "
+                style="
+                    padding:10px;
+                    margin-bottom:2px;
+                "
+            >
+                ⚔️ ${
+                    guerrasTotal === 1
+                        ? "1 guerra oficial contabilizada"
+                        : `${guerrasTotal} guerras oficiais contabilizadas`
+                }
+            </div>
+        `;
+
+
+        html +=
+            ranking
+                .map(
+                    function (
+                        clan
+                    ) {
+
+                        const posicao =
+                            Number(
+                                clan.posicao ||
+                                0
+                            );
+
+
+                        let classeTop =
+                            "";
+
+
+                        let posicaoTexto =
+                            `${posicao}º`;
+
+
+                        if (
+                            posicao === 1
+                        ) {
+
+                            classeTop =
+                                "top-1";
+
+                            posicaoTexto =
+                                "🥇";
+
+                        } else if (
+                            posicao === 2
+                        ) {
+
+                            classeTop =
+                                "top-2";
+
+                            posicaoTexto =
+                                "🥈";
+
+                        } else if (
+                            posicao === 3
+                        ) {
+
+                            classeTop =
+                                "top-3";
+
+                            posicaoTexto =
+                                "🥉";
+                        }
+
+
+                        const nome =
+                            escaparHtmlCentral(
+                                clan.nome ||
+                                "Clã"
+                            );
+
+
+                        const tag =
+                            escaparHtmlCentral(
+                                clan.tag ||
+                                ""
+                            );
+
+
+                        const pontos =
+                            Number(
+                                clan.pontos ||
+                                0
+                            );
+
+
+                        const jogos =
+                            Number(
+                                clan.jogos ||
+                                0
+                            );
+
+
+                        const vitorias =
+                            Number(
+                                clan.vitorias ||
+                                0
+                            );
+
+
+                        const empates =
+                            Number(
+                                clan.empates ||
+                                0
+                            );
+
+
+                        const derrotas =
+                            Number(
+                                clan.derrotas ||
+                                0
+                            );
+
+
+                        const frentesVencidas =
+                            Number(
+                                clan.frentes_vencidas ||
+                                0
+                            );
+
+
+                        const frentesPerdidas =
+                            Number(
+                                clan.frentes_perdidas ||
+                                0
+                            );
+
+
+                        const saldo =
+                            Number(
+                                clan.saldo_frentes ||
+                                0
+                            );
+
+
+                        const saldoTexto =
+                            saldo > 0
+                                ? `+${saldo}`
+                                : String(
+                                    saldo
+                                );
+
+
+                        return `
+                            <div
+                                class="
+                                    central-ranking-linha
+                                    ${classeTop}
+                                "
+                            >
+
+                                <div
+                                    class="
+                                        central-ranking-posicao
+                                    "
+                                >
+                                    ${posicaoTexto}
+                                </div>
+
+
+                                <div
+                                    class="
+                                        central-ranking-logo
+                                    "
+                                >
+                                    ⚔️
+                                </div>
+
+
+                                <div
+                                    class="
+                                        central-ranking-identidade
+                                    "
+                                >
+
+                                    <div
+                                        class="
+                                            central-ranking-nome
+                                        "
+                                    >
+                                        ${nome}
+
+                                        ${
+                                            tag
+                                                ? `
+                                                    <span
+                                                        class="
+                                                            central-ranking-tag
+                                                        "
+                                                    >
+                                                        [${tag}]
+                                                    </span>
+                                                `
+                                                : ""
+                                        }
+                                    </div>
+
+
+                                    <div
+                                        class="
+                                            central-ranking-info
+                                        "
+                                    >
+                                        J ${jogos}
+                                        ·
+                                        V ${vitorias}
+                                        ·
+                                        E ${empates}
+                                        ·
+                                        D ${derrotas}
+
+                                        <br>
+
+                                        Frentes:
+                                        ${frentesVencidas}
+                                        x
+                                        ${frentesPerdidas}
+                                        ·
+                                        Saldo ${saldoTexto}
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="
+                                        central-ranking-nivel
+                                    "
+                                >
+                                    ${
+                                        formatarNumeroCentral(
+                                            pontos
+                                        )
+                                    }
+                                    ${
+                                        pontos === 1
+                                            ? "PT"
+                                            : "PTS"
+                                    }
+                                </div>
+
+                            </div>
+                        `;
+                    }
+                )
+                .join("");
+
+
+        conteudo.innerHTML =
+            html;
+    }
+
     // ========================================================
     // ⚔️ GUERRA DE CLÃS
     // ========================================================
@@ -7264,6 +7684,19 @@
                                 true
                             );
 
+                            return;
+                        }
+
+
+                        if (
+                            rankingAtualCentral
+                            === "guerra"
+                        ) {
+
+                            abrirRankingCentral(
+                                "guerra",
+                                true
+                            );
                         }
 
                     }
