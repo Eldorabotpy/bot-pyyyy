@@ -185,6 +185,76 @@ def _montar_campos_persistencia_batalha(
     return campos
 
 # ============================================================
+# 🏆 CONSOLIDAR GUERRA APÓS FINALIZAR FRENTE
+# ============================================================
+
+def _consolidar_guerra_apos_finalizar_frente(
+    guerra_id,
+):
+    """
+    Solicita ao gerenciador oficial da Guerra
+    que recalcule o placar geral depois que
+    uma frente foi persistida como finalizada.
+
+    Uma falha aqui NÃO desfaz o último ataque,
+    pois o resultado da frente já foi salvo.
+    """
+
+    try:
+
+        from modules.clan import (
+            clan_war_manager,
+        )
+
+
+        resultado = (
+            clan_war_manager
+            .consolidar_resultado_guerra(
+                guerra_id
+            )
+        )
+
+
+        if not resultado.get(
+            "success"
+        ):
+
+            print(
+                "⚠️ [GUERRA DE CLÃS] "
+                "A Frente terminou, mas o "
+                "resultado geral da Guerra "
+                "não pôde ser consolidado: "
+                +
+                str(
+                    resultado.get(
+                        "error",
+                        "erro desconhecido",
+                    )
+                )
+            )
+
+
+        return resultado
+
+
+    except Exception as erro:
+
+        print(
+            "⚠️ [GUERRA DE CLÃS] "
+            "Erro ao consolidar resultado "
+            "geral após finalizar Frente: "
+            f"{erro}"
+        )
+
+
+        return {
+            "success": False,
+            "error": str(
+                erro
+            ),
+        }
+    
+# ============================================================
 # ⚔️ HELPERS DE TURNO DA BATALHA
 # ============================================================
 
@@ -3079,7 +3149,21 @@ async def executar_ataque_basico(
                 True,
         }
 
+    # ========================================================
+    # 🏆 ATUALIZA RESULTADO GERAL DA GUERRA
+    # ========================================================
 
+    resultado_guerra = None
+
+
+    if batalha_finalizada:
+
+        resultado_guerra = (
+            _consolidar_guerra_apos_finalizar_frente(
+                guerra["_id"]
+            )
+        )
+        
     # ========================================================
     # 📤 RESPOSTA
     # ========================================================
@@ -4283,6 +4367,7 @@ async def executar_skill_ofensiva(
     )
 
 
+
     if (
         resultado_update.modified_count
         != 1
@@ -4299,7 +4384,20 @@ async def executar_skill_ofensiva(
             "recarregar":
                 True,
         }
+    # ========================================================
+    # 🏆 ATUALIZA RESULTADO GERAL DA GUERRA
+    # ========================================================
 
+    resultado_guerra = None
+
+
+    if batalha_finalizada:
+
+        resultado_guerra = (
+            _consolidar_guerra_apos_finalizar_frente(
+                guerra["_id"]
+            )
+        )
 
     return {
         "success": True,
