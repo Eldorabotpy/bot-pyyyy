@@ -1424,13 +1424,19 @@ def gm_reiniciar_batalha_frente(
         }
 
 
-    if (
+    status_guerra = str(
         guerra.get(
-            "status"
+            "status",
+            ""
         )
-        !=
-        GUERRA_STATUS_EM_ANDAMENTO
-    ):
+        or ""
+    ).strip()
+
+
+    if status_guerra not in {
+        GUERRA_STATUS_EM_ANDAMENTO,
+        GUERRA_STATUS_FINALIZADA,
+    }:
 
         return {
             "success": False,
@@ -1438,14 +1444,13 @@ def gm_reiniciar_batalha_frente(
             "error":
                 (
                     "A Guerra precisa estar "
-                    "em andamento para reiniciar "
-                    "uma batalha de teste."
+                    "em andamento ou finalizada "
+                    "para reiniciar uma batalha "
+                    "de teste."
                 ),
 
             "status":
-                guerra.get(
-                    "status"
-                ),
+                status_guerra,
         }
 
 
@@ -1569,6 +1574,35 @@ def gm_reiniciar_batalha_frente(
 
                 "$set": {
 
+                    # ========================================
+                    # ⚔️ REABRE A GUERRA PARA TESTE
+                    # ========================================
+
+                    "status":
+                        GUERRA_STATUS_EM_ANDAMENTO,
+
+                    "resultado.vencedor_clan_id":
+                        None,
+
+                    "resultado.perdedor_clan_id":
+                        None,
+
+                    "resultado.empate":
+                        False,
+
+                    "resultado.frentes_clan_a":
+                        0,
+
+                    "resultado.frentes_clan_b":
+                        0,
+
+                    "resultado.finalizada_em":
+                        None,
+
+                    # ========================================
+                    # 🔄 REINICIA SOMENTE ESTA FRENTE
+                    # ========================================
+
                     "frentes.$.status":
                         GUERRA_STATUS_EM_ANDAMENTO,
 
@@ -1628,6 +1662,39 @@ def gm_reiniciar_batalha_frente(
                 ),
         }
 
+    # ========================================================
+    # 📄 REABRE AS INSCRIÇÕES PARA O TESTE
+    # ========================================================
+
+    clan_wars_collection.update_many(
+
+        {
+            "tipo_documento":
+                WAR_DOC_INSCRICAO,
+
+            "semana_id":
+                semana_id,
+
+            "matchmaking.guerra_id":
+                guerra["_id"],
+
+            "status": {
+                "$ne":
+                    GUERRA_STATUS_CANCELADA
+            },
+        },
+
+        {
+            "$set": {
+
+                "status":
+                    GUERRA_STATUS_EM_ANDAMENTO,
+
+                "atualizado_em":
+                    agora,
+            }
+        },
+    )
 
     # ========================================================
     # ⚔️ CRIA NOVAMENTE A BATALHA
@@ -1673,7 +1740,39 @@ def gm_reiniciar_batalha_frente(
                 ),
         }
 
+    # ========================================================
+    # 📊 RECALCULA O PLACAR DAS OUTRAS FRENTES
+    # ========================================================
 
+    resultado_geral = (
+        consolidar_resultado_guerra(
+            guerra["_id"]
+        )
+    )
+
+
+    if not resultado_geral.get(
+        "success"
+    ):
+
+        return {
+            "success": False,
+
+            "error":
+                (
+                    "A batalha foi reiniciada, "
+                    "mas o placar geral não pôde "
+                    "ser recalculado: "
+                    +
+                    str(
+                        resultado_geral.get(
+                            "error",
+                            "erro desconhecido",
+                        )
+                    )
+                ),
+        }
+    
     return {
         "success": True,
 
