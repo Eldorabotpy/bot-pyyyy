@@ -412,6 +412,42 @@ CRITERIOS_DESEMPATE_GUERRA = (
     "dano_total",
 )
 
+# ============================================================
+# 🏆 PONTUAÇÃO DO RANKING DA GUERRA
+# ============================================================
+#
+# Estes pontos servem exclusivamente
+# para a classificação da Guerra de Clãs.
+#
+# NÃO alteram o rating de matchmaking.
+# ============================================================
+
+GUERRA_PONTOS_VITORIA = 3
+
+GUERRA_PONTOS_EMPATE = 1
+
+GUERRA_PONTOS_DERROTA = 0
+
+
+# ============================================================
+# 📊 ORDEM DE CLASSIFICAÇÃO DO RANKING
+# ============================================================
+#
+# 1. Pontos
+# 2. Frentes vencidas
+# 3. Saldo de frentes
+# 4. Rating de matchmaking
+#
+# O rating entra somente como último
+# critério de desempate.
+# ============================================================
+
+CRITERIOS_RANKING_GUERRA = (
+    "pontos",
+    "frentes_vencidas",
+    "saldo_frentes",
+    "rating",
+)
 
 # ============================================================
 # 📈 RATING

@@ -48,7 +48,13 @@ from .clan_war_registry import (
     GUERRA_SEMANAL_TIMEZONE,
     CALENDARIO_GUERRA_SEMANAL,
     GUERRA_MINIMO_JOGADORES_POR_CLA,
+
+    GUERRA_PONTOS_VITORIA,
+    GUERRA_PONTOS_EMPATE,
+    GUERRA_PONTOS_DERROTA,
+
     GUERRA_RATING_INICIAL,
+
     obter_categoria_efetiva,
     obter_categoria_maxima_por_nivel,
     obter_config_categoria,
@@ -3117,6 +3123,581 @@ def _obter_rating_guerra_cla(
         return int(
             GUERRA_RATING_INICIAL
         )
+
+# ============================================================
+# 🏆 RANKING DA GUERRA DE CLÃS
+# ============================================================
+
+def obter_ranking_guerra(
+    semana_id=None,
+    limite=100,
+):
+    """
+    Calcula o ranking diretamente das
+    Guerras oficiais já finalizadas.
+
+    semana_id:
+    - None = ranking geral;
+    - "2026-W37" = somente aquela semana.
+
+    Não grava pontos no documento do clã.
+    Portanto uma Guerra nunca é pontuada
+    duas vezes por chamadas repetidas.
+    """
+
+    try:
+        limite = int(
+            limite
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        limite = 100
+
+
+    limite = max(
+        1,
+        min(
+            limite,
+            200,
+        ),
+    )
+
+
+    filtro = {
+
+        "tipo_documento":
+            WAR_DOC_GUERRA,
+
+        "tipo_guerra":
+            GUERRA_TIPO_OFICIAL,
+
+        "status":
+            GUERRA_STATUS_FINALIZADA,
+
+        "resultado.finalizada_em": {
+            "$ne":
+                None,
+        },
+    }
+
+
+    semana_filtro = None
+
+
+    if semana_id is not None:
+
+        semana_filtro = str(
+            semana_id
+        ).strip()
+
+
+        if not semana_filtro:
+
+            return {
+                "success": False,
+                "error":
+                    "Semana inválida.",
+            }
+
+
+        filtro[
+            "semana_id"
+        ] = semana_filtro
+
+
+    guerras = list(
+        clan_wars_collection.find(
+            filtro,
+            {
+                "semana_id": 1,
+                "clans": 1,
+                "resultado": 1,
+            },
+        )
+    )
+
+
+    ranking_por_clan = {}
+
+    guerras_consideradas = 0
+    guerras_ignoradas = 0
+
+
+    def garantir_clan(
+        lado,
+    ):
+        clan_id = _object_id(
+            lado.get(
+                "clan_id"
+            )
+        )
+
+
+        if not clan_id:
+            return None
+
+
+        chave = str(
+            clan_id
+        )
+
+
+        if chave not in ranking_por_clan:
+
+            ranking_por_clan[
+                chave
+            ] = {
+
+                "clan_id":
+                    clan_id,
+
+                "nome":
+                    str(
+                        lado.get(
+                            "nome",
+                            "Clã",
+                        )
+                    ),
+
+                "tag":
+                    str(
+                        lado.get(
+                            "tag",
+                            "",
+                        )
+                    ),
+
+                "jogos":
+                    0,
+
+                "vitorias":
+                    0,
+
+                "empates":
+                    0,
+
+                "derrotas":
+                    0,
+
+                "frentes_vencidas":
+                    0,
+
+                "frentes_perdidas":
+                    0,
+
+                "saldo_frentes":
+                    0,
+
+                "pontos":
+                    0,
+
+                "rating":
+                    GUERRA_RATING_INICIAL,
+            }
+
+
+        return ranking_por_clan[
+            chave
+        ]
+
+
+    for guerra in guerras:
+
+        clans = (
+            guerra.get(
+                "clans",
+                []
+            )
+            or []
+        )
+
+
+        lado_a = next(
+            (
+                item
+
+                for item
+                in clans
+
+                if str(
+                    item.get(
+                        "lado",
+                        ""
+                    )
+                ).lower()
+                ==
+                "a"
+            ),
+
+            None,
+        )
+
+
+        lado_b = next(
+            (
+                item
+
+                for item
+                in clans
+
+                if str(
+                    item.get(
+                        "lado",
+                        ""
+                    )
+                ).lower()
+                ==
+                "b"
+            ),
+
+            None,
+        )
+
+
+        if (
+            not lado_a
+            or
+            not lado_b
+        ):
+
+            guerras_ignoradas += 1
+            continue
+
+
+        clan_a_id = _object_id(
+            lado_a.get(
+                "clan_id"
+            )
+        )
+
+
+        clan_b_id = _object_id(
+            lado_b.get(
+                "clan_id"
+            )
+        )
+
+
+        if (
+            not clan_a_id
+            or
+            not clan_b_id
+            or
+            clan_a_id
+            ==
+            clan_b_id
+        ):
+
+            guerras_ignoradas += 1
+            continue
+
+
+        resultado = (
+            guerra.get(
+                "resultado",
+                {}
+            )
+            or {}
+        )
+
+
+        try:
+
+            frentes_a = int(
+                resultado.get(
+                    "frentes_clan_a",
+                    0,
+                )
+                or 0
+            )
+
+
+            frentes_b = int(
+                resultado.get(
+                    "frentes_clan_b",
+                    0,
+                )
+                or 0
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            guerras_ignoradas += 1
+            continue
+
+
+        empate = bool(
+            resultado.get(
+                "empate",
+                False,
+            )
+        )
+
+
+        vencedor_id = _object_id(
+            resultado.get(
+                "vencedor_clan_id"
+            )
+        )
+
+
+        if not empate:
+
+            if vencedor_id not in {
+                clan_a_id,
+                clan_b_id,
+            }:
+
+                guerras_ignoradas += 1
+                continue
+
+
+        dados_a = garantir_clan(
+            lado_a
+        )
+
+
+        dados_b = garantir_clan(
+            lado_b
+        )
+
+
+        if (
+            not dados_a
+            or
+            not dados_b
+        ):
+
+            guerras_ignoradas += 1
+            continue
+
+
+        dados_a[
+            "jogos"
+        ] += 1
+
+
+        dados_b[
+            "jogos"
+        ] += 1
+
+
+        dados_a[
+            "frentes_vencidas"
+        ] += frentes_a
+
+
+        dados_a[
+            "frentes_perdidas"
+        ] += frentes_b
+
+
+        dados_b[
+            "frentes_vencidas"
+        ] += frentes_b
+
+
+        dados_b[
+            "frentes_perdidas"
+        ] += frentes_a
+
+
+        if empate:
+
+            dados_a[
+                "empates"
+            ] += 1
+
+
+            dados_b[
+                "empates"
+            ] += 1
+
+
+            dados_a[
+                "pontos"
+            ] += GUERRA_PONTOS_EMPATE
+
+
+            dados_b[
+                "pontos"
+            ] += GUERRA_PONTOS_EMPATE
+
+
+        elif (
+            vencedor_id
+            ==
+            clan_a_id
+        ):
+
+            dados_a[
+                "vitorias"
+            ] += 1
+
+
+            dados_b[
+                "derrotas"
+            ] += 1
+
+
+            dados_a[
+                "pontos"
+            ] += GUERRA_PONTOS_VITORIA
+
+
+            dados_b[
+                "pontos"
+            ] += GUERRA_PONTOS_DERROTA
+
+
+        else:
+
+            dados_b[
+                "vitorias"
+            ] += 1
+
+
+            dados_a[
+                "derrotas"
+            ] += 1
+
+
+            dados_b[
+                "pontos"
+            ] += GUERRA_PONTOS_VITORIA
+
+
+            dados_a[
+                "pontos"
+            ] += GUERRA_PONTOS_DERROTA
+
+
+        guerras_consideradas += 1
+
+
+    ranking = list(
+        ranking_por_clan.values()
+    )
+
+
+    for item in ranking:
+
+        item[
+            "saldo_frentes"
+        ] = (
+            item[
+                "frentes_vencidas"
+            ]
+            -
+            item[
+                "frentes_perdidas"
+            ]
+        )
+
+
+        item[
+            "rating"
+        ] = (
+            _obter_rating_guerra_cla(
+                item[
+                    "clan_id"
+                ]
+            )
+        )
+
+
+    ranking.sort(
+        key=lambda item: (
+
+            -int(
+                item.get(
+                    "pontos",
+                    0,
+                )
+            ),
+
+            -int(
+                item.get(
+                    "frentes_vencidas",
+                    0,
+                )
+            ),
+
+            -int(
+                item.get(
+                    "saldo_frentes",
+                    0,
+                )
+            ),
+
+            -int(
+                item.get(
+                    "rating",
+                    GUERRA_RATING_INICIAL,
+                )
+            ),
+
+            str(
+                item.get(
+                    "nome",
+                    ""
+                )
+            ).casefold(),
+        )
+    )
+
+
+    ranking = ranking[
+        :limite
+    ]
+
+
+    for indice, item in enumerate(
+        ranking,
+        start=1,
+    ):
+
+        item[
+            "posicao"
+        ] = indice
+
+
+        item[
+            "clan_id"
+        ] = str(
+            item[
+                "clan_id"
+            ]
+        )
+
+
+    return {
+        "success":
+            True,
+
+        "semana_id":
+            semana_filtro,
+
+        "guerras_consideradas":
+            guerras_consideradas,
+
+        "guerras_ignoradas":
+            guerras_ignoradas,
+
+        "total_clans":
+            len(
+                ranking
+            ),
+
+        "ranking":
+            ranking,
+    }
 
 # ============================================================
 # ⚔️ CRIAR FRENTES DA GUERRA
