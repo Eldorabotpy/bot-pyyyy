@@ -3720,6 +3720,72 @@ def api_clan_guerra_estado(user_id):
         }), 500
 
 # ============================================================
+# 🏆 GUERRA DE CLÃS — RANKING
+# ============================================================
+
+@webapp_bp.route(
+    '/api/clan/guerra/ranking',
+    methods=['GET']
+)
+def api_clan_guerra_ranking():
+    try:
+
+        from modules.clan import (
+            clan_war_manager,
+        )
+
+
+        semana_id = request.args.get(
+            "semana_id"
+        )
+
+
+        limite = request.args.get(
+            "limite",
+            100,
+        )
+
+
+        resultado = (
+            clan_war_manager
+            .obter_ranking_guerra(
+
+                semana_id=
+                    semana_id,
+
+                limite=
+                    limite,
+            )
+        )
+
+
+        return jsonify(
+            resultado
+        ), (
+            200
+            if resultado.get(
+                "success"
+            )
+            else 400
+        )
+
+
+    except Exception as e:
+
+        traceback.print_exc()
+
+
+        return jsonify({
+            "success": False,
+
+            "error": (
+                "Erro ao consultar o ranking "
+                "da Guerra de Clãs: "
+                f"{str(e)}"
+            ),
+        }), 500
+    
+# ============================================================
 # 🚪 GUERRA DE CLÃS — ENTRAR NO LOBBY DA FRENTE
 # ============================================================
 
