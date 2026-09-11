@@ -3270,6 +3270,14 @@ def obter_ranking_guerra(
                         )
                     ),
 
+                "logo_url":
+                    str(
+                        lado.get(
+                            "logo_url"
+                        )
+                        or ""
+                    ),
+
                 "jogos":
                     0,
 
