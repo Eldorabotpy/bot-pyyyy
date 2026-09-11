@@ -122,6 +122,131 @@
         .card-heroi-detalhes { display: flex; align-items: center; gap: 8px; font-family: 'Georgia', serif; font-size: 0.75em; color: #cbd5e1; }
         .badge-nivel { background: #d4af37; color: #3b2400; padding: 2px 6px; border-radius: 4px; font-weight: 900; }
 
+        /* =====================================================
+           CONTAS SALVAS / AUTOFILL
+           ===================================================== */
+
+        .input-container input:-webkit-autofill,
+        .input-container input:-webkit-autofill:hover,
+        .input-container input:-webkit-autofill:focus,
+        .input-container input:-webkit-autofill:active {
+            -webkit-text-fill-color: #d4af37 !important;
+            caret-color: #d4af37 !important;
+            -webkit-box-shadow: 0 0 0 1000px #180d25 inset !important;
+            box-shadow: 0 0 0 1000px #180d25 inset !important;
+            transition: background-color 9999s ease-out 0s;
+        }
+
+        #contas-salvas-box {
+            width: 100%;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        .contas-salvas-titulo {
+            color: #d4af37;
+            font-size: 0.62em;
+            letter-spacing: 1px;
+            margin: 0 0 5px 5px;
+        }
+
+        #lista-contas-salvas {
+            width: 100%;
+            max-height: 135px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding-right: 3px;
+            box-sizing: border-box;
+        }
+
+        #lista-contas-salvas::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        #lista-contas-salvas::-webkit-scrollbar-thumb {
+            background: #d4af37;
+            border-radius: 10px;
+        }
+
+        .conta-salva {
+            width: 100%;
+            min-height: 34px;
+            padding: 4px 7px 4px 10px;
+            box-sizing: border-box;
+
+            display: flex;
+            align-items: center;
+            gap: 7px;
+
+            background: rgba(15, 7, 27, 0.92);
+            border: 1px solid rgba(212, 175, 55, 0.55);
+            border-radius: 5px;
+
+            color: #ecf0f1;
+            cursor: pointer;
+        }
+
+        .conta-salva:hover {
+            background: rgba(212, 175, 55, 0.13);
+        }
+
+        .conta-salva-nome {
+            flex: 1;
+            min-width: 0;
+
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+
+            font-family: 'Georgia', serif;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .conta-salva-ultima {
+            padding: 2px 5px;
+            border-radius: 4px;
+
+            background: #d4af37;
+            color: #3b2400;
+
+            font-size: 0.48em;
+            font-weight: 900;
+        }
+
+        .conta-salva-remover {
+            width: 24px;
+            height: 24px;
+
+            padding: 0;
+            border: none;
+            border-radius: 4px;
+
+            background: rgba(120, 25, 25, 0.55);
+            color: #ffb4b4;
+
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .salvar-conta-opcao {
+            width: 100%;
+            margin: 4px 0 2px;
+
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            color: #c9c2d1;
+            font-family: 'Georgia', serif;
+            font-size: 0.72em;
+        }
+
+        .salvar-conta-opcao input {
+            accent-color: #d4af37;
+        }
     </style>
     
 </head>
@@ -146,8 +271,36 @@
             
             <!-- ETAPA 1: TELA LOGIN DA CONTA MESTRA -->
             <div id="tela-login" style="width: 100%;">
-                <div class="input-container"><label>CONTA (USUÁRIO)</label><input type="text" id="login-username" placeholder="Sua conta..."></div>
-                <div class="input-container"><label>SENHA DA CONTA</label><input type="password" id="login-password" placeholder="••••••••"></div>
+
+                <div id="contas-salvas-box">
+                    <div class="contas-salvas-titulo">CONTAS SALVAS</div>
+                    <div id="lista-contas-salvas"></div>
+                </div>
+
+                <div class="input-container">
+                    <label>CONTA (USUÁRIO)</label>
+                    <input
+                        type="text"
+                        id="login-username"
+                        placeholder="Sua conta..."
+                        autocomplete="username"
+                    >
+                </div>
+            
+                <div class="input-container">
+                    <label>SENHA DA CONTA</label>
+                    <input
+                        type="password"
+                        id="login-password"
+                        placeholder="••••••••"
+                        autocomplete="current-password"
+                    >
+                </div>
+
+                <label class="salvar-conta-opcao">
+                    <input type="checkbox" id="login-salvar-conta" checked>
+                    Salvar esta conta neste dispositivo
+                </label>
                 <button class="btn-new" onclick="playClick(); realizarLogin()" id="btn-logar">ACESSAR CONTA</button>
             </div>
             
@@ -212,7 +365,150 @@
 
         // Variável global para guardar o Token/Sessão da conta mestra
         let contaAtiva = null;
-        
+
+        // ==========================================
+        // 💾 CONTAS SALVAS PARA TESTES
+        // ==========================================
+
+        const CHAVE_CONTAS_SALVAS = "eldora_contas_salvas";
+        const CHAVE_ULTIMA_CONTA = "eldora_ultima_conta";
+
+        function obterContasSalvas() {
+            try {
+                const dados = JSON.parse(
+                    localStorage.getItem(CHAVE_CONTAS_SALVAS) || "[]"
+                );
+
+                return Array.isArray(dados) ? dados : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function salvarContaLocal(username, password) {
+            let contas = obterContasSalvas();
+
+            const existente = contas.find(
+                c => c.username.toLowerCase() === username.toLowerCase()
+            );
+
+            if (existente) {
+                existente.username = username;
+                existente.password = password;
+            } else {
+                contas.push({
+                    username: username,
+                    password: password
+                });
+            }
+
+            localStorage.setItem(
+                CHAVE_CONTAS_SALVAS,
+                JSON.stringify(contas)
+            );
+
+            localStorage.setItem(
+                CHAVE_ULTIMA_CONTA,
+                username
+            );
+
+            renderizarContasSalvas();
+        }
+
+        function removerContaSalva(username) {
+            let contas = obterContasSalvas();
+
+            contas = contas.filter(
+                c => c.username.toLowerCase() !== username.toLowerCase()
+            );
+
+            localStorage.setItem(
+                CHAVE_CONTAS_SALVAS,
+                JSON.stringify(contas)
+            );
+
+            if (
+                localStorage.getItem(CHAVE_ULTIMA_CONTA)?.toLowerCase() ===
+                username.toLowerCase()
+            ) {
+                localStorage.removeItem(CHAVE_ULTIMA_CONTA);
+            }
+
+            renderizarContasSalvas();
+        }
+
+        window.entrarComContaSalva = function(username, password) {
+            document.getElementById("login-username").value = username;
+            document.getElementById("login-password").value = password;
+
+            realizarLogin();
+        };
+
+        function renderizarContasSalvas() {
+            const box = document.getElementById("contas-salvas-box");
+            const lista = document.getElementById("lista-contas-salvas");
+
+            if (!box || !lista) return;
+
+            const contas = obterContasSalvas();
+            const ultima = localStorage.getItem(CHAVE_ULTIMA_CONTA);
+
+            lista.innerHTML = "";
+
+            if (contas.length === 0) {
+                box.style.display = "none";
+                return;
+            }
+
+            box.style.display = "block";
+
+            contas
+                .sort((a, b) => {
+                    if (a.username === ultima) return -1;
+                    if (b.username === ultima) return 1;
+
+                    return a.username.localeCompare(b.username);
+                })
+                .forEach(conta => {
+
+                    const item = document.createElement("div");
+                    item.className = "conta-salva";
+
+                    const nome = document.createElement("div");
+                    nome.className = "conta-salva-nome";
+                    nome.textContent = conta.username;
+
+                    item.appendChild(nome);
+
+                    if (conta.username === ultima) {
+                        const badge = document.createElement("span");
+                        badge.className = "conta-salva-ultima";
+                        badge.textContent = "ÚLTIMA";
+                        item.appendChild(badge);
+                    }
+
+                    const remover = document.createElement("button");
+                    remover.type = "button";
+                    remover.className = "conta-salva-remover";
+                    remover.textContent = "×";
+
+                    remover.onclick = function(event) {
+                        event.stopPropagation();
+                        removerContaSalva(conta.username);
+                    };
+
+                    item.onclick = function() {
+                        entrarComContaSalva(
+                            conta.username,
+                            conta.password
+                        );
+                    };
+
+                    item.appendChild(remover);
+                    lista.appendChild(item);
+                });
+        }
+
         // AÇÃO: O JOGADOR CLICOU NO PERSONAGEM PARA JOGAR
         window.entrarNoMapaComPersonagem = function(id, nome, genero) {
             try {
@@ -264,7 +560,22 @@
                 const data = await res.json();
                 
                 if (data.sucesso) {
-                    contaAtiva = user; // Salva quem está logado
+
+                    contaAtiva = user;
+
+                    const salvarConta =
+                        document.getElementById("login-salvar-conta")?.checked;
+
+                    if (salvarConta) {
+                        salvarContaLocal(user, pass);
+                    } else {
+                        localStorage.setItem(
+                            CHAVE_ULTIMA_CONTA,
+                            user
+                        );
+
+                        renderizarContasSalvas();
+                    }
                     document.getElementById('tela-login').style.display = 'none';
                     document.getElementById('rodape-dinamico').style.display = 'none';
                     
@@ -448,6 +759,35 @@
             }
             btn.innerText = "CRIAR CONTA"; btn.disabled = false;
         };
+
+                // ==========================================
+        // INICIALIZA CONTAS SALVAS
+        // ==========================================
+
+        document.addEventListener("DOMContentLoaded", function() {
+
+            renderizarContasSalvas();
+
+            const ultima =
+                localStorage.getItem(CHAVE_ULTIMA_CONTA);
+
+            if (!ultima) return;
+
+            const conta =
+                obterContasSalvas().find(
+                    c => c.username === ultima
+                );
+
+            if (!conta) return;
+
+            const campoUsuario =
+                document.getElementById("login-username");
+
+            if (campoUsuario) {
+                campoUsuario.value = conta.username;
+            }
+        });
+        
     </script>
 </body>
 </html>
