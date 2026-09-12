@@ -53,6 +53,8 @@ from .clan_war_registry import (
     GUERRA_PONTOS_EMPATE,
     GUERRA_PONTOS_DERROTA,
 
+    RECOMPENSAS_GUERRA,
+
     GUERRA_RATING_INICIAL,
 
     obter_categoria_efetiva,
@@ -3876,6 +3878,544 @@ def _criar_frentes_guerra(
 
 
     return frentes
+
+
+# ============================================================
+# 🎁 CALCULAR RECOMPENSAS DA GUERRA
+# ============================================================
+
+def calcular_recompensas_guerra(
+    guerra_id,
+):
+    """
+    Monta o plano oficial de recompensas
+    de uma Guerra já finalizada.
+
+    IMPORTANTE:
+    - NÃO altera MongoDB;
+    - NÃO entrega ouro;
+    - NÃO entrega Medalhas;
+    - NÃO entrega XP;
+    - usa a escalação preservada no
+      próprio documento da Guerra.
+    """
+
+    guerra_id = _object_id(
+        guerra_id
+    )
+
+
+    if not guerra_id:
+
+        return {
+            "success": False,
+            "error":
+                "ID de Guerra inválido.",
+        }
+
+
+    guerra = (
+        clan_wars_collection
+        .find_one({
+            "_id":
+                guerra_id,
+
+            "tipo_documento":
+                WAR_DOC_GUERRA,
+        })
+    )
+
+
+    if not guerra:
+
+        return {
+            "success": False,
+            "error":
+                "Guerra não encontrada.",
+        }
+
+
+    # ========================================================
+    # 🏆 SOMENTE GUERRA OFICIALMENTE FINALIZADA
+    # ========================================================
+
+    if (
+        guerra.get(
+            "status"
+        )
+        !=
+        GUERRA_STATUS_FINALIZADA
+    ):
+
+        return {
+            "success": False,
+            "error":
+                (
+                    "As recompensas só podem ser "
+                    "calculadas após a finalização "
+                    "oficial da Guerra."
+                ),
+        }
+
+
+    resultado = (
+        guerra.get(
+            "resultado",
+            {}
+        )
+        or {}
+    )
+
+
+    if not resultado.get(
+        "finalizada_em"
+    ):
+
+        return {
+            "success": False,
+            "error":
+                (
+                    "A Guerra ainda não possui "
+                    "finalização oficial registrada."
+                ),
+        }
+
+
+    # ========================================================
+    # 🏰 IDENTIFICA OS DOIS LADOS
+    # ========================================================
+
+    clans = (
+        guerra.get(
+            "clans",
+            []
+        )
+        or []
+    )
+
+
+    lado_a = next(
+        (
+            item
+
+            for item
+            in clans
+
+            if str(
+                item.get(
+                    "lado",
+                    ""
+                )
+            ).lower()
+            ==
+            "a"
+        ),
+        None,
+    )
+
+
+    lado_b = next(
+        (
+            item
+
+            for item
+            in clans
+
+            if str(
+                item.get(
+                    "lado",
+                    ""
+                )
+            ).lower()
+            ==
+            "b"
+        ),
+        None,
+    )
+
+
+    if (
+        not lado_a
+        or
+        not lado_b
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Os lados da Guerra são inválidos.",
+        }
+
+
+    clan_a_id = _object_id(
+        lado_a.get(
+            "clan_id"
+        )
+    )
+
+
+    clan_b_id = _object_id(
+        lado_b.get(
+            "clan_id"
+        )
+    )
+
+
+    if (
+        not clan_a_id
+        or
+        not clan_b_id
+        or
+        clan_a_id
+        ==
+        clan_b_id
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Os clãs da Guerra são inválidos.",
+        }
+
+
+    empate = bool(
+        resultado.get(
+            "empate",
+            False,
+        )
+    )
+
+
+    vencedor_clan_id = _object_id(
+        resultado.get(
+            "vencedor_clan_id"
+        )
+    )
+
+
+    if (
+        not empate
+        and
+        vencedor_clan_id
+        not in {
+            clan_a_id,
+            clan_b_id,
+        }
+    ):
+
+        return {
+            "success": False,
+            "error":
+                (
+                    "A Guerra finalizada não possui "
+                    "um vencedor válido."
+                ),
+        }
+
+
+    # ========================================================
+    # 🎁 MONTA RECOMPENSAS
+    # ========================================================
+
+    recompensas_clans = []
+
+    jogadores_processados = set()
+
+
+    for lado in (
+        lado_a,
+        lado_b,
+    ):
+
+        clan_id = _object_id(
+            lado.get(
+                "clan_id"
+            )
+        )
+
+
+        if empate:
+
+            resultado_clan = (
+                "empate"
+            )
+
+
+        elif (
+            clan_id
+            ==
+            vencedor_clan_id
+        ):
+
+            resultado_clan = (
+                "vitoria"
+            )
+
+
+        else:
+
+            resultado_clan = (
+                "derrota"
+            )
+
+
+        regra = (
+            RECOMPENSAS_GUERRA.get(
+                resultado_clan,
+                {}
+            )
+            or {}
+        )
+
+
+        regra_cla = (
+            regra.get(
+                "cla",
+                {}
+            )
+            or {}
+        )
+
+
+        escalacao = (
+            lado.get(
+                "escalacao",
+                {}
+            )
+            or {}
+        )
+
+
+        recompensas_jogadores = []
+
+
+        for (
+            papel,
+            chave_lista,
+        ) in (
+            (
+                "titular",
+                "jogadores",
+            ),
+            (
+                "reserva",
+                "reservas",
+            ),
+        ):
+
+            regra_jogador = (
+                regra.get(
+                    papel,
+                    {}
+                )
+                or {}
+            )
+
+
+            jogadores = (
+                escalacao.get(
+                    chave_lista,
+                    []
+                )
+                or []
+            )
+
+
+            for jogador in jogadores:
+
+                player_id = _object_id(
+                    jogador.get(
+                        "user_id"
+                    )
+                )
+
+
+                if not player_id:
+
+                    return {
+                        "success": False,
+
+                        "error":
+                            (
+                                "Existe jogador inválido "
+                                "na escalação oficial."
+                            ),
+
+                        "clan_id":
+                            str(
+                                clan_id
+                            ),
+                    }
+
+
+                if (
+                    player_id
+                    in jogadores_processados
+                ):
+
+                    return {
+                        "success": False,
+
+                        "error":
+                            (
+                                "Um mesmo jogador aparece "
+                                "mais de uma vez na "
+                                "escalação da Guerra."
+                            ),
+
+                        "user_id":
+                            str(
+                                player_id
+                            ),
+                    }
+
+
+                jogadores_processados.add(
+                    player_id
+                )
+
+
+                recompensas_jogadores.append({
+
+                    "user_id":
+                        str(
+                            player_id
+                        ),
+
+                    "nome":
+                        str(
+                            jogador.get(
+                                "nome",
+                                "Aventureiro",
+                            )
+                        ),
+
+                    "papel":
+                        papel,
+
+                    "ouro":
+                        int(
+                            regra_jogador.get(
+                                "ouro",
+                                0,
+                            )
+                            or 0
+                        ),
+
+                    "medalhas_cla":
+                        int(
+                            regra_jogador.get(
+                                "medalhas_cla",
+                                0,
+                            )
+                            or 0
+                        ),
+                })
+
+
+        recompensas_clans.append({
+
+            "clan_id":
+                str(
+                    clan_id
+                ),
+
+            "nome":
+                str(
+                    lado.get(
+                        "nome",
+                        "Clã",
+                    )
+                ),
+
+            "tag":
+                str(
+                    lado.get(
+                        "tag",
+                        "",
+                    )
+                ),
+
+            "resultado":
+                resultado_clan,
+
+            "ouro_cla":
+                int(
+                    regra_cla.get(
+                        "ouro",
+                        0,
+                    )
+                    or 0
+                ),
+
+            "xp_cla":
+                int(
+                    regra_cla.get(
+                        "xp",
+                        0,
+                    )
+                    or 0
+                ),
+
+            "titulares_total":
+                sum(
+                    1
+
+                    for item
+                    in recompensas_jogadores
+
+                    if item.get(
+                        "papel"
+                    )
+                    ==
+                    "titular"
+                ),
+
+            "reservas_total":
+                sum(
+                    1
+
+                    for item
+                    in recompensas_jogadores
+
+                    if item.get(
+                        "papel"
+                    )
+                    ==
+                    "reserva"
+                ),
+
+            "jogadores":
+                recompensas_jogadores,
+        })
+
+
+    return {
+        "success":
+            True,
+
+        "guerra_id":
+            str(
+                guerra_id
+            ),
+
+        "semana_id":
+            guerra.get(
+                "semana_id"
+            ),
+
+        "empate":
+            empate,
+
+        "clans":
+            recompensas_clans,
+
+        "jogadores_total":
+            len(
+                jogadores_processados
+            ),
+    }
+
 
 # ============================================================
 # 🏆 CONSOLIDAR RESULTADO GERAL DA GUERRA
