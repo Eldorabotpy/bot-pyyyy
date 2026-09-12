@@ -3730,6 +3730,134 @@ def api_clan_loja_catalogo(
             ),
 
         }), 500
+
+# ============================================================
+# 🛒 LOJA DO CLÃ — COMPRAR
+# ============================================================
+
+@webapp_bp.route(
+    '/api/clan/loja/comprar',
+    methods=['POST']
+)
+def api_clan_loja_comprar():
+    try:
+
+        from modules.clan import (
+            clan_shop,
+        )
+
+
+        dados = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+
+        user_id = dados.get(
+            "user_id"
+        )
+
+
+        resultado = (
+            clan_shop
+            .comprar_item_loja_cla(
+
+                user_id=
+                    user_id,
+
+                item_id=
+                    dados.get(
+                        "item_id"
+                    ),
+
+                quantidade=
+                    dados.get(
+                        "quantidade",
+                        1,
+                    ),
+            )
+        )
+
+
+        # ====================================================
+        # 🧹 LIMPA CACHE APÓS COMPRA REAL
+        # ====================================================
+
+        if resultado.get(
+            "success"
+        ):
+
+            try:
+                from modules.player.core import (
+                    clear_player_cache,
+                )
+
+
+                if ObjectId.is_valid(
+                    str(
+                        user_id
+                    )
+                ):
+
+                    player_id = ObjectId(
+                        str(
+                            user_id
+                        )
+                    )
+
+
+                    _run_async(
+                        clear_player_cache(
+                            player_id
+                        )
+                    )
+
+
+                    _run_async(
+                        clear_player_cache(
+                            str(
+                                player_id
+                            )
+                        )
+                    )
+
+
+            except Exception as erro_cache:
+
+                print(
+                    "⚠️ [LOJA DO CLÃ] "
+                    "Falha ao limpar cache:",
+                    erro_cache,
+                )
+
+
+        return jsonify(
+            resultado
+        ), (
+            200
+            if resultado.get(
+                "success"
+            )
+            else 400
+        )
+
+
+    except Exception as e:
+
+        traceback.print_exc()
+
+
+        return jsonify({
+            "success": False,
+
+            "error": (
+                "Erro ao realizar compra "
+                "na Loja do Clã: "
+                f"{str(e)}"
+            ),
+        }), 500
     
 # ============================================================
 # ⚔️ GUERRA DE CLÃS — ESTADO DA SEMANA
