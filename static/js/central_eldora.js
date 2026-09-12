@@ -1648,6 +1648,40 @@
                             );
 
 
+                        const logo =
+                            escaparHtmlCentral(
+                                clan.logo_url ||
+                                ""
+                            );
+
+
+                        const logoHtml =
+                            logo
+                                ? `
+                                    <img
+                                        src="${logo}"
+                                        alt="Brasão de ${nome}"
+                                        onerror="
+                                            this.style.display='none';
+                                            this.nextElementSibling.style.display='block';
+                                        "
+                                    >
+
+                                    <span
+                                        style="
+                                            display: none;
+                                        "
+                                    >
+                                        🛡️
+                                    </span>
+                                `
+                                : `
+                                    <span>
+                                        🛡️
+                                    </span>
+                                `;
+
+
                         const pontos =
                             Number(
                                 clan.pontos ||
@@ -1729,12 +1763,12 @@
                                 </div>
 
 
-                                <div
+                               <div
                                     class="
                                         central-ranking-logo
                                     "
                                 >
-                                    ⚔️
+                                    ${logoHtml}
                                 </div>
 
 
@@ -1772,22 +1806,42 @@
                                             central-ranking-info
                                         "
                                     >
-                                        J ${jogos}
+                                        ${
+                                            jogos === 1
+                                                ? "1 guerra"
+                                                : `${jogos} guerras`
+                                        }
                                         ·
-                                        V ${vitorias}
+                                        ${
+                                            empates === 1
+                                                ? "1 empate"
+                                                : `${empates} empates`
+                                       }
+
+                                        <br>
+
+                                        Vitórias:
+                                        ${vitorias}
                                         ·
-                                        E ${empates}
-                                        ·
-                                        D ${derrotas}
+                                        Derrotas:
+                                        ${derrotas}
 
                                         <br>
 
                                         Frentes:
                                         ${frentesVencidas}
-                                        x
-                                        ${frentesPerdidas}
+                                        ${
+                                            frentesVencidas === 1
+                                                ? "vencida"
+                                                : "vencidas"
+                                        }
                                         ·
-                                        Saldo ${saldoTexto}
+                                        ${frentesPerdidas}
+                                        ${
+                                            frentesPerdidas === 1
+                                                ? "perdida"
+                                                : "perdidas"
+                                        }
                                     </div>
 
                                 </div>
