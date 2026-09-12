@@ -46,6 +46,81 @@ def spend_gems(player_data: dict, amount: int) -> bool:
     return False
 
 # ==============================================================================
+# 🏅 MEDALHAS DE CLÃ
+# ==============================================================================
+
+def get_medalhas_cla(
+    player_data: dict,
+) -> int:
+    return int(
+        player_data.get(
+            "medalhas_cla",
+            0,
+        )
+        or 0
+    )
+
+
+def set_medalhas_cla(
+    player_data: dict,
+    value: int,
+) -> dict:
+
+    player_data[
+        "medalhas_cla"
+    ] = max(
+        0,
+        int(value),
+    )
+
+    return player_data
+
+
+def add_medalhas_cla(
+    player_data: dict,
+    amount: int,
+) -> dict:
+
+    return set_medalhas_cla(
+        player_data,
+        get_medalhas_cla(
+            player_data
+        )
+        +
+        int(amount),
+    )
+
+
+def spend_medalhas_cla(
+    player_data: dict,
+    amount: int,
+) -> bool:
+
+    amount = int(
+        amount
+    )
+
+    if amount <= 0:
+        return False
+
+
+    atual = get_medalhas_cla(
+        player_data
+    )
+
+
+    if atual < amount:
+        return False
+
+
+    set_medalhas_cla(
+        player_data,
+        atual - amount,
+    )
+
+    return True
+
+# ==============================================================================
 # GERENCIAMENTO DE ITENS (INVENTÁRIO)
 # ==============================================================================
 

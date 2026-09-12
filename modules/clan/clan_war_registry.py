@@ -449,6 +449,137 @@ CRITERIOS_RANKING_GUERRA = (
     "rating",
 )
 
+
+# ============================================================
+# 🏅 MOEDA DE CLÃ
+# ============================================================
+#
+# Moeda individual do jogador.
+#
+# Será obtida em atividades ligadas ao clã,
+# principalmente:
+#
+# - Guerra de Clãs;
+# - Missões de Clã;
+#
+# Futuramente será utilizada na Loja do Clã.
+# ============================================================
+
+MOEDA_CLA_ID = (
+    "medalhas_cla"
+)
+
+MOEDA_CLA_NOME = (
+    "Medalhas de Clã"
+)
+
+
+# ============================================================
+# 🎁 RECOMPENSAS DA GUERRA DE CLÃS
+# ============================================================
+#
+# TITULAR:
+# recebe a recompensa individual completa.
+#
+# RESERVA:
+# recebe recompensa individual reduzida.
+#
+# CLÃ:
+# recebe ouro no tesouro e XP de clã.
+#
+# Estas constantes apenas definem as regras.
+# A entrega será feita posteriormente pelo
+# clan_war_manager.py com proteção contra
+# recompensa duplicada.
+# ============================================================
+
+RECOMPENSAS_GUERRA = {
+
+    "vitoria": {
+
+        "titular": {
+            "ouro":
+                1500,
+
+            "medalhas_cla":
+                30,
+        },
+
+        "reserva": {
+            "ouro":
+                750,
+
+            "medalhas_cla":
+                15,
+        },
+
+        "cla": {
+            "ouro":
+                5000,
+
+            "xp":
+                1000,
+        },
+    },
+
+
+    "empate": {
+
+        "titular": {
+            "ouro":
+                1000,
+
+            "medalhas_cla":
+                20,
+        },
+
+        "reserva": {
+            "ouro":
+                500,
+
+            "medalhas_cla":
+                10,
+        },
+
+        "cla": {
+            "ouro":
+                3000,
+
+            "xp":
+                600,
+        },
+    },
+
+
+    "derrota": {
+
+        "titular": {
+            "ouro":
+                500,
+
+            "medalhas_cla":
+                10,
+        },
+
+        "reserva": {
+            "ouro":
+                250,
+
+            "medalhas_cla":
+                5,
+        },
+
+        "cla": {
+            "ouro":
+                500,
+
+            "xp":
+                300,
+        },
+    },
+}
+
+
 # ============================================================
 # 📈 RATING
 # ============================================================

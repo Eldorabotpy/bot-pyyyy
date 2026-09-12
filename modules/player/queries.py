@@ -154,7 +154,11 @@ async def create_new_player(user_id: Union[str, ObjectId], character_name: str =
         "class": "aventureiro",
         "class_key": "aventureiro",
         "current_location": "reino_eldora",
-        "level": 1, "xp": 0, "gold": 100, "gems": 0,
+        "level": 1,
+        "xp": 0,
+        "gold": 100,
+        "gems": 0,
+        "medalhas_cla": 0,
         "premium_tier": "free", "premium_expires_at": None,
         "created_at": now_iso,
         
@@ -167,7 +171,15 @@ async def create_new_player(user_id: Union[str, ObjectId], character_name: str =
         "base_stats": {"max_hp": 50, "attack": 5, "defense": 3, "initiative": 5, "luck": 5},
         "party_id": None, # ID do grupo atual (se houver)
         "party_role": None, # 'leader' ou 'member'
-        "inventory": {}, 
+        "inventory": {
+            "pocao_cura_leve": {
+                "base_id":
+                    "pocao_cura_leve",
+
+                "quantity":
+                    5,
+            },
+        }, 
         "equipment": {}, 
         "quests": {
             # 👇 A nova missão que aponta o caminho!
