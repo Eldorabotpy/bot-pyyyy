@@ -617,6 +617,319 @@ class MapaScene extends Phaser.Scene {
             );
         }
 
+        // ============================================================
+        // 🏰 CASA DO CLÃ
+        // 📍 Capital de Eldora - Tile 54,33
+        //
+        // O brasão NÃO é decidido pelo mapa.
+        // O backend informa qual é o clã atual do jogador
+        // e qual logo foi escolhida na configuração.
+        // ============================================================
+
+        if (
+            this.regiaoAtual ===
+            'capital_eldora'
+        ) {
+
+            const clanTileX = 54;
+            const clanTileY = 33;
+
+            const clanX =
+                clanTileX * 32;
+
+            const clanY =
+                clanTileY * 32;
+
+
+            // ==========================================
+            // 👤 PERSONAGEM ATUAL
+            // ==========================================
+
+            const jogadorId =
+                localStorage.getItem(
+                    "jogadorEldoraID"
+                );
+
+
+            if (jogadorId) {
+
+                fetch(
+                    `/api/clan/meu_clan/${encodeURIComponent(
+                        jogadorId
+                    )}?t=${Date.now()}`
+                )
+                .then(
+                    resposta => {
+
+                        if (!resposta.ok) {
+                            throw new Error(
+                                "Não foi possível consultar o clã."
+                            );
+                        }
+
+                        return resposta.json();
+                    }
+                )
+                .then(
+                    dados => {
+
+                        // ==================================
+                        // 🛡️ JOGADOR SEM CLÃ
+                        // ==================================
+
+                        if (
+                            !dados ||
+                            !dados.success ||
+                            !dados.possui_clan ||
+                            !dados.clan
+                        ) {
+
+                            this.criarPlaquinhaNome(
+                                clanX,
+                                clanY - 15,
+                                'Casa dos Clãs'
+                            );
+
+                            return;
+                        }
+
+
+                        const clan =
+                            dados.clan;
+
+
+                        const logoUrl =
+                            String(
+                                clan.logo_url ||
+                                ""
+                            ).trim();
+
+
+                        const logoId =
+                            String(
+                                clan.logo_id ||
+                                "padrao"
+                            )
+                            .replace(
+                                /[^a-zA-Z0-9_-]/g,
+                                "_"
+                            );
+
+
+                        const nomeClan =
+                            String(
+                                clan.nome ||
+                                "Clã"
+                            );
+
+
+                        const tagClan =
+                            String(
+                                clan.tag ||
+                                ""
+                            );
+
+
+                        // ==================================
+                        // 🏷️ NOME DO CLÃ NO PRÉDIO
+                        // ==================================
+
+                        const nomeExibicao =
+                            tagClan
+                                ? `${nomeClan} [${tagClan}]`
+                                : nomeClan;
+
+
+                        this.criarPlaquinhaNome(
+                            clanX,
+                            clanY - 15,
+                            nomeExibicao
+                        );
+
+
+                        // ==================================
+                        // SEM URL DE BRASÃO
+                        // ==================================
+
+                        if (!logoUrl) {
+
+                            console.warn(
+                                "⚠️ O clã não possui logo_url."
+                            );
+
+                            return;
+                        }
+
+
+                        // ==================================
+                        // 🖼️ TEXTURA ÚNICA POR BRASÃO
+                        // ==================================
+
+                        const textureKey =
+                            `icone_cla_${logoId}`;
+
+
+                        // ==================================
+                        // 🛡️ CRIA O ÍCONE
+                        // ==================================
+
+                        const criarIconeCla =
+                            () => {
+
+                                // Evita criar duas vezes
+                                // caso o loader emita mais de
+                                // um evento.
+                                if (
+                                    this.iconeClaMapa
+                                ) {
+                                    return;
+                                }
+
+
+                                const iconeCla =
+                                    this.add.image(
+                                        clanX,
+                                        clanY - 70,
+                                        textureKey
+                                    )
+                                    .setDepth(31)
+                                    .setDisplaySize(
+                                        46,
+                                        46
+                                    );
+
+
+                                this.iconeClaMapa =
+                                    iconeCla;
+
+
+                                // ==========================
+                                // ✨ FLUTUAÇÃO
+                                // ==========================
+
+                                this.tweens.add({
+
+                                    targets:
+                                        iconeCla,
+
+                                    y:
+                                        clanY - 78,
+
+                                    duration:
+                                        900,
+
+                                    yoyo:
+                                        true,
+
+                                    repeat:
+                                        -1,
+
+                                    ease:
+                                        'Sine.easeInOut'
+                                });
+
+
+                                // ==========================
+                                // ✨ PULSO SUAVE
+                                // ==========================
+
+                                this.tweens.add({
+
+                                    targets:
+                                        iconeCla,
+
+                                    scaleX:
+                                        1.08,
+
+                                    scaleY:
+                                        1.08,
+
+                                    duration:
+                                        900,
+
+                                    yoyo:
+                                        true,
+
+                                    repeat:
+                                        -1,
+
+                                    ease:
+                                        'Sine.easeInOut'
+                                });
+
+                            };
+
+
+                        // ==================================
+                        // ♻️ TEXTURA JÁ CARREGADA
+                        // ==================================
+
+                        if (
+                            this.textures.exists(
+                                textureKey
+                            )
+                        ) {
+
+                            criarIconeCla();
+
+                            return;
+                        }
+
+
+                        // ==================================
+                        // 📥 CARREGA A LOGO ESCOLHIDA
+                        // PELO LÍDER
+                        // ==================================
+
+                        this.load.image(
+                            textureKey,
+                            logoUrl
+                        );
+
+
+                        this.load.once(
+                            `filecomplete-image-${textureKey}`,
+                            criarIconeCla
+                        );
+
+
+                        this.load.once(
+                            'loaderror',
+                            arquivo => {
+
+                                if (
+                                    arquivo &&
+                                    arquivo.key ===
+                                    textureKey
+                                ) {
+
+                                    console.error(
+                                        "❌ Não foi possível carregar " +
+                                        "o brasão do clã:",
+                                        logoUrl
+                                    );
+                                }
+                            }
+                        );
+
+
+                        this.load.start();
+
+                    }
+                )
+                .catch(
+                    erro => {
+
+                        console.error(
+                            "❌ [CLÃ MAPA] " +
+                            "Falha ao carregar brasão:",
+                            erro
+                        );
+                    }
+                );
+            }
+        }
+
         if (this.spawnX && this.spawnY) {
 
             this.player.setPosition(
