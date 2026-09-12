@@ -1106,19 +1106,340 @@
     }
 
 
-    function postJson(url, dados) {
-        return requisicao(
-            url,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
-                body: JSON.stringify(dados)
-            }
+    // ========================================================
+    // 🏅 LOJA DO CLÃ
+    // ========================================================
+
+    async function carregarLojaCla() {
+        const saldo = elemento(
+            "cla-loja-saldo"
         );
+
+        const lista = elemento(
+            "cla-loja-lista"
+        );
+
+
+        if (
+            !saldo ||
+            !lista ||
+            !estadoCla.userId
+        ) {
+            return;
+        }
+
+
+        saldo.textContent =
+            "🏅 ...";
+
+
+        lista.innerHTML = `
+            <div class="cla-vazio">
+                Carregando Loja do Clã...
+            </div>
+        `;
+
+
+        try {
+
+            const dados = await requisicao(
+                `/api/clan/loja/${
+                    encodeURIComponent(
+                        estadoCla.userId
+                    )
+                }?t=${Date.now()}`
+            );
+
+
+            // ================================================
+            // 🏅 SALDO REAL
+            // ================================================
+
+            saldo.textContent =
+                `🏅 ${
+                    formatarNumero(
+                        dados.medalhas_cla
+                    )
+                }`;
+
+
+            // ================================================
+            // 📦 CATÁLOGO REAL
+            // ================================================
+
+            const itens = Array.isArray(
+                dados.itens
+            )
+                ? dados.itens
+                : [];
+
+
+            if (!itens.length) {
+
+                lista.innerHTML = `
+                    <div class="cla-vazio">
+                        Nenhum item disponível
+                        nesta semana.
+                    </div>
+                `;
+
+                return;
+            }
+
+
+            lista.innerHTML = itens
+                .map(
+                    function (item) {
+
+                        const itemId =
+                            escaparHtml(
+                                item.item_id ||
+                                ""
+                            );
+
+
+                        const nome =
+                            escaparHtml(
+                                item.nome ||
+                                item.item_id ||
+                                "Item"
+                            );
+
+
+                        const emoji =
+                            escaparHtml(
+                                item.emoji ||
+                                "📦"
+                            );
+
+
+                        const descricao =
+                            escaparHtml(
+                                item.descricao ||
+                                "Item especial da Loja do Clã."
+                            );
+
+
+                        const custo =
+                            Number(
+                                item.custo_medalhas ||
+                                0
+                            );
+
+
+                        const limite =
+                            Number(
+                                item.limite_semanal ||
+                                0
+                            );
+
+
+                        return `
+                            <div
+                                class="cla-item-lista"
+                                data-loja-item-id="${itemId}"
+                            >
+                                <div
+                                    style="
+                                        display: grid;
+
+                                        grid-template-columns:
+                                            48px
+                                            minmax(0, 1fr)
+                                            auto;
+
+                                        gap: 11px;
+
+                                        align-items:
+                                            center;
+                                    "
+                                >
+
+                                    <!-- ÍCONE -->
+                                    <div
+                                        style="
+                                            width: 48px;
+                                            height: 48px;
+
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+
+                                            border-radius:
+                                                13px;
+
+                                            border:
+                                                1px solid
+                                                rgba(
+                                                    216,
+                                                    184,
+                                                    90,
+                                                    0.28
+                                                );
+
+                                            background:
+                                                rgba(
+                                                    216,
+                                                    184,
+                                                    90,
+                                                    0.08
+                                                );
+
+                                            font-size:
+                                                24px;
+                                        "
+                                    >
+                                        ${emoji}
+                                    </div>
+
+
+                                    <!-- INFORMAÇÕES -->
+                                    <div
+                                        style="
+                                            min-width: 0;
+                                        "
+                                    >
+                                        <div
+                                            style="
+                                                color:
+                                                    #eef2f7;
+
+                                                font-size:
+                                                    0.82rem;
+
+                                                font-weight:
+                                                    900;
+                                            "
+                                        >
+                                            ${nome}
+                                        </div>
+
+
+                                        <div
+                                            style="
+                                                margin-top:
+                                                    3px;
+
+                                                color:
+                                                    #8f9bad;
+
+                                                font-size:
+                                                    0.68rem;
+
+                                                line-height:
+                                                    1.35;
+                                            "
+                                        >
+                                            ${descricao}
+                                        </div>
+
+
+                                        <div
+                                            style="
+                                                margin-top:
+                                                    6px;
+
+                                                color:
+                                                    #b5bfcc;
+
+                                                font-size:
+                                                    0.66rem;
+                                            "
+                                        >
+                                            Limite:
+                                            <strong>
+                                                ${formatarNumero(
+                                                    limite
+                                                )}
+                                            </strong>
+                                            por semana
+                                        </div>
+                                    </div>
+
+
+                                    <!-- PREÇO -->
+                                    <div
+                                        style="
+                                            min-width:
+                                                58px;
+
+                                            text-align:
+                                                center;
+
+                                            padding:
+                                                8px 7px;
+
+                                            border-radius:
+                                                10px;
+
+                                            border:
+                                                1px solid
+                                                rgba(
+                                                    216,
+                                                    184,
+                                                    90,
+                                                    0.30
+                                                );
+
+                                            background:
+                                                rgba(
+                                                    216,
+                                                    184,
+                                                    90,
+                                                    0.08
+                                                );
+
+                                            color:
+                                                #f4dc91;
+
+                                            font-size:
+                                                0.75rem;
+
+                                            font-weight:
+                                                900;
+                                        "
+                                    >
+                                        🏅
+                                        ${formatarNumero(
+                                            custo
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                )
+                .join("");
+
+
+        } catch (erro) {
+
+            console.error(
+                "❌ Erro ao carregar Loja do Clã:",
+                erro
+            );
+
+
+            saldo.textContent =
+                "🏅 --";
+
+
+            lista.innerHTML = `
+                <div class="cla-vazio">
+                    Não foi possível carregar
+                    a Loja do Clã.
+                </div>
+            `;
+
+
+            mostrarMensagem(
+                erro.message ||
+                "Erro ao carregar a Loja do Clã.",
+                "erro"
+            );
+        }
     }
+
 
     function resetarDadosCargos() {
         estadoCla.cargos = [];
@@ -6630,6 +6951,18 @@
         if (botao) {
             botao.classList.add("active");
         }
+
+
+        // ================================================
+        // 🏅 LOJA DO CLÃ
+        // ================================================
+
+        if (
+            aba === "loja"
+        ) {
+            carregarLojaCla();
+        }
+
 
         /*
          * Centraliza horizontalmente a aba ativa.
