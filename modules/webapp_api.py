@@ -3677,6 +3677,61 @@ def api_clan_meu_clan(user_id):
     })
 
 # ============================================================
+# 🏅 LOJA DO CLÃ — CATÁLOGO
+# ============================================================
+
+@webapp_bp.route(
+    '/api/clan/loja/<user_id>',
+    methods=['GET']
+)
+def api_clan_loja_catalogo(
+    user_id
+):
+    try:
+
+        from modules.clan import (
+            clan_shop,
+        )
+
+
+        resultado = (
+            clan_shop
+            .obter_catalogo_loja_cla(
+                user_id
+            )
+        )
+
+
+        return jsonify(
+            resultado
+        ), (
+            200
+            if resultado.get(
+                "success"
+            )
+            else 400
+        )
+
+
+    except Exception as e:
+
+        traceback.print_exc()
+
+
+        return jsonify({
+
+            "success":
+                False,
+
+            "error": (
+                "Erro ao carregar "
+                "a Loja do Clã: "
+                f"{str(e)}"
+            ),
+
+        }), 500
+    
+# ============================================================
 # ⚔️ GUERRA DE CLÃS — ESTADO DA SEMANA
 # ============================================================
 
