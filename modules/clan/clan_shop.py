@@ -45,6 +45,21 @@ CLAN_SHOP_ITEMS = {
         "custo_medalhas": 10,
         "limite_semanal": 5,
     },
+
+    "nucleo_de_forja": {
+        "custo_medalhas": 12,
+        "limite_semanal": 5,
+    },
+
+    "pergaminho_de_reparo": {
+        "custo_medalhas": 15,
+        "limite_semanal": 3,
+    },
+
+    "sigilo_de_protecao": {
+        "custo_medalhas": 30,
+        "limite_semanal": 2,
+    },
 }
 
 
@@ -365,6 +380,12 @@ def obter_catalogo_loja_cla(
                 item.get(
                     "emoji",
                     "📦",
+                ),
+
+            "icon_url":
+                item.get(
+                    "icon_url",
+                    ""
                 ),
 
             "descricao":

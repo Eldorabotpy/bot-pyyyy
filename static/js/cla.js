@@ -1213,6 +1213,13 @@
                             );
 
 
+                        const iconUrl =
+                            escaparHtml(
+                                item.icon_url ||
+                                ""
+                            );
+
+
                         const descricao =
                             escaparHtml(
                                 item.descricao ||
@@ -1285,11 +1292,28 @@
                                                     0.08
                                                 );
 
+                                            overflow: hidden;
+
                                             font-size:
                                                 24px;
                                         "
                                     >
-                                        ${emoji}
+                                        ${
+                                            iconUrl
+                                                ? `
+                                                    <img
+                                                        src="${iconUrl}"
+                                                        alt="${nome}"
+                                                        style="
+                                                            width: 32px;
+                                                            height: 32px;
+                                                            object-fit: contain;
+                                                            display: block;
+                                                        "
+                                                    >
+                                                `
+                                                : emoji
+                                        }
                                     </div>
 
 
