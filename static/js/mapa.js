@@ -811,7 +811,166 @@ class MapaScene extends Phaser.Scene {
                                 this.iconeClaMapa =
                                     iconeCla;
 
+                                // ==========================
+                                // 👆 ENTRADA DO CLÃ
+                                // ==========================
 
+                                iconeCla.setInteractive({
+                                    useHandCursor: true
+                                });
+
+
+                                iconeCla.on(
+                                    'pointerdown',
+                                    (
+                                        pointer,
+                                        localX,
+                                        localY,
+                                        event
+                                    ) => {
+
+                                        if (event) {
+                                            event.stopPropagation();
+                                        }
+
+
+                                        // Não permite abrir
+                                        // enquanto estiver coletando.
+                                        if (
+                                            this.player &&
+                                            this.player.isGathering
+                                        ) {
+                                            return;
+                                        }
+
+
+                                        const distancia =
+                                            Phaser.Math.Distance.Between(
+                                                this.player.x,
+                                                this.player.y,
+                                                clanX,
+                                                clanY
+                                            );
+
+
+                                        // ======================
+                                        // 🚶 AINDA ESTÁ LONGE
+                                        // ======================
+
+                                        if (
+                                            distancia >
+                                            110
+                                        ) {
+
+                                            this.target.set(
+                                                clanX,
+                                                clanY
+                                            );
+
+                                            this.isMoving =
+                                                true;
+
+
+                                            this.physics
+                                                .moveToObject(
+                                                    this.player,
+                                                    this.target,
+                                                    150
+                                                );
+
+
+                                            const aviso =
+                                                this.add.text(
+                                                    this.player.x,
+                                                    this.player.y - 50,
+                                                    "Indo ao Clã...",
+                                                    {
+                                                        fontSize:
+                                                            '12px',
+
+                                                        fontFamily:
+                                                            'Arial',
+
+                                                        color:
+                                                            '#facc15',
+
+                                                        fontStyle:
+                                                            'bold',
+
+                                                        stroke:
+                                                            '#000',
+
+                                                        strokeThickness:
+                                                            3
+                                                    }
+                                                )
+                                                .setOrigin(
+                                                    0.5,
+                                                    1
+                                                )
+                                                .setDepth(
+                                                    100
+                                                );
+
+
+                                            this.tweens.add({
+                                                targets:
+                                                    aviso,
+
+                                                y:
+                                                    aviso.y - 20,
+
+                                                alpha:
+                                                    0,
+
+                                                duration:
+                                                    1500,
+
+                                                onComplete:
+                                                    () => {
+                                                        aviso.destroy();
+                                                    }
+                                            });
+
+
+                                            return;
+                                        }
+
+
+                                        // ======================
+                                        // 🏰 ESTÁ PERTO
+                                        // ======================
+
+                                        if (
+                                            typeof this
+                                                .pararPersonagem
+                                            ===
+                                            'function'
+                                        ) {
+                                            this.pararPersonagem();
+                                        }
+
+
+                                        if (
+                                            typeof window
+                                                .abrirTelaCla
+                                            ===
+                                            'function'
+                                        ) {
+
+                                            window
+                                                .abrirTelaCla();
+
+                                        } else {
+
+                                            console.error(
+                                                "❌ abrirTelaCla() " +
+                                                "não foi encontrada."
+                                            );
+                                        }
+                                    }
+                                );
+                                
                                 // ==========================
                                 // ✨ FLUTUAÇÃO
                                 // ==========================
