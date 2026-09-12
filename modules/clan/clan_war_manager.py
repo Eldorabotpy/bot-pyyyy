@@ -4783,6 +4783,534 @@ def _creditar_recompensa_guerra_cla(
     }
 
 # ============================================================
+# 🎁 ENTREGAR RECOMPENSAS DA GUERRA
+# ============================================================
+
+def entregar_recompensas_guerra(
+    guerra_id,
+):
+    """
+    Entrega as recompensas oficiais de uma
+    Guerra já finalizada.
+
+    Segurança:
+    - calcula tudo a partir do snapshot da Guerra;
+    - cada jogador recebe apenas uma vez;
+    - cada clã recebe apenas uma vez;
+    - pode ser executada novamente após falha parcial;
+    - não duplica ouro, Medalhas ou XP.
+    """
+
+    guerra_id = _object_id(
+        guerra_id
+    )
+
+
+    if not guerra_id:
+
+        return {
+            "success": False,
+            "error":
+                "ID de Guerra inválido.",
+        }
+
+
+    # ========================================================
+    # 🎁 PLANO OFICIAL
+    # ========================================================
+
+    plano = (
+        calcular_recompensas_guerra(
+            guerra_id
+        )
+    )
+
+
+    if not plano.get(
+        "success"
+    ):
+
+        return plano
+
+
+    resultados_clans = []
+
+    erros = []
+
+
+    jogadores_creditados = 0
+    jogadores_ja_creditados = 0
+
+    clans_creditados = 0
+    clans_ja_creditados = 0
+
+
+    # ========================================================
+    # 🏰 PROCESSA CADA CLÃ
+    # ========================================================
+
+    for recompensa_cla in (
+        plano.get(
+            "clans",
+            []
+        )
+        or []
+    ):
+
+        clan_id = _object_id(
+            recompensa_cla.get(
+                "clan_id"
+            )
+        )
+
+
+        if not clan_id:
+
+            erros.append({
+                "tipo":
+                    "clan",
+
+                "clan_id":
+                    recompensa_cla.get(
+                        "clan_id"
+                    ),
+
+                "error":
+                    "ID de clã inválido.",
+            })
+
+            continue
+
+
+        resultado_cla = (
+            _creditar_recompensa_guerra_cla(
+
+                guerra_id=
+                    guerra_id,
+
+                clan_id=
+                    clan_id,
+
+                ouro=
+                    recompensa_cla.get(
+                        "ouro_cla",
+                        0,
+                    ),
+
+                xp=
+                    recompensa_cla.get(
+                        "xp_cla",
+                        0,
+                    ),
+            )
+        )
+
+
+        if resultado_cla.get(
+            "creditado"
+        ):
+
+            clans_creditados += 1
+
+
+        elif resultado_cla.get(
+            "ja_creditado"
+        ):
+
+            clans_ja_creditados += 1
+
+
+        elif not resultado_cla.get(
+            "success"
+        ):
+
+            erros.append({
+
+                "tipo":
+                    "clan",
+
+                "clan_id":
+                    str(
+                        clan_id
+                    ),
+
+                "nome":
+                    recompensa_cla.get(
+                        "nome"
+                    ),
+
+                "error":
+                    resultado_cla.get(
+                        "error",
+                        "Erro desconhecido.",
+                    ),
+            })
+
+
+        # ====================================================
+        # 👥 JOGADORES DO CLÃ
+        # ====================================================
+
+        jogadores_resultado = []
+
+
+        for recompensa_jogador in (
+            recompensa_cla.get(
+                "jogadores",
+                []
+            )
+            or []
+        ):
+
+            player_id = _object_id(
+                recompensa_jogador.get(
+                    "user_id"
+                )
+            )
+
+
+            if not player_id:
+
+                erro = {
+
+                    "tipo":
+                        "jogador",
+
+                    "user_id":
+                        recompensa_jogador.get(
+                            "user_id"
+                        ),
+
+                    "nome":
+                        recompensa_jogador.get(
+                            "nome"
+                        ),
+
+                    "error":
+                        "ID de jogador inválido.",
+                }
+
+
+                erros.append(
+                    erro
+                )
+
+
+                jogadores_resultado.append(
+                    erro
+                )
+
+                continue
+
+
+            resultado_jogador = (
+                _creditar_recompensa_guerra_jogador(
+
+                    guerra_id=
+                        guerra_id,
+
+                    player_id=
+                        player_id,
+
+                    ouro=
+                        recompensa_jogador.get(
+                            "ouro",
+                            0,
+                        ),
+
+                    medalhas_cla=
+                        recompensa_jogador.get(
+                            "medalhas_cla",
+                            0,
+                        ),
+                )
+            )
+
+
+            if resultado_jogador.get(
+                "creditado"
+            ):
+
+                jogadores_creditados += 1
+
+
+            elif resultado_jogador.get(
+                "ja_creditado"
+            ):
+
+                jogadores_ja_creditados += 1
+
+
+            elif not resultado_jogador.get(
+                "success"
+            ):
+
+                erros.append({
+
+                    "tipo":
+                        "jogador",
+
+                    "user_id":
+                        str(
+                            player_id
+                        ),
+
+                    "nome":
+                        recompensa_jogador.get(
+                            "nome"
+                        ),
+
+                    "error":
+                        resultado_jogador.get(
+                            "error",
+                            "Erro desconhecido.",
+                        ),
+                })
+
+
+            jogadores_resultado.append({
+
+                "user_id":
+                    str(
+                        player_id
+                    ),
+
+                "nome":
+                    recompensa_jogador.get(
+                        "nome"
+                    ),
+
+                "papel":
+                    recompensa_jogador.get(
+                        "papel"
+                    ),
+
+                "ouro":
+                    recompensa_jogador.get(
+                        "ouro",
+                        0,
+                    ),
+
+                "medalhas_cla":
+                    recompensa_jogador.get(
+                        "medalhas_cla",
+                        0,
+                    ),
+
+                "creditado":
+                    bool(
+                        resultado_jogador.get(
+                            "creditado"
+                        )
+                    ),
+
+                "ja_creditado":
+                    bool(
+                        resultado_jogador.get(
+                            "ja_creditado"
+                        )
+                    ),
+
+                "success":
+                    bool(
+                        resultado_jogador.get(
+                            "success"
+                        )
+                    ),
+            })
+
+
+        resultados_clans.append({
+
+            "clan_id":
+                str(
+                    clan_id
+                ),
+
+            "nome":
+                recompensa_cla.get(
+                    "nome"
+                ),
+
+            "resultado":
+                recompensa_cla.get(
+                    "resultado"
+                ),
+
+            "ouro_cla":
+                recompensa_cla.get(
+                    "ouro_cla",
+                    0,
+                ),
+
+            "xp_cla":
+                recompensa_cla.get(
+                    "xp_cla",
+                    0,
+                ),
+
+            "clan_creditado":
+                bool(
+                    resultado_cla.get(
+                        "creditado"
+                    )
+                ),
+
+            "clan_ja_creditado":
+                bool(
+                    resultado_cla.get(
+                        "ja_creditado"
+                    )
+                ),
+
+            "jogadores":
+                jogadores_resultado,
+        })
+
+
+    # ========================================================
+    # ✅ RESULTADO DA DISTRIBUIÇÃO
+    # ========================================================
+
+    sucesso_total = (
+        len(
+            erros
+        )
+        ==
+        0
+    )
+
+
+    agora = _agora()
+
+
+    # ========================================================
+    # 📜 REGISTRA ESTADO NA PRÓPRIA GUERRA
+    #
+    # Não é esta marca que impede duplicação.
+    # A proteção real continua nos jogadores e clãs.
+    # Ela serve para auditoria.
+    # ========================================================
+
+    if sucesso_total:
+
+        resultado_registro = (
+            clan_wars_collection
+            .update_one(
+
+                {
+                    "_id":
+                        guerra_id,
+
+                    "recompensas.entregues":
+                        {
+                            "$ne":
+                                True,
+                        },
+                },
+
+                {
+                    "$set": {
+
+                        "recompensas.entregues":
+                            True,
+
+                        "recompensas.entregues_em":
+                            agora,
+
+                        "recompensas.jogadores_total":
+                            plano.get(
+                                "jogadores_total",
+                                0,
+                            ),
+
+                        "recompensas.clans_total":
+                            len(
+                                plano.get(
+                                    "clans",
+                                    []
+                                )
+                                or []
+                            ),
+
+                        "atualizado_em":
+                            agora,
+                    },
+
+                    "$push": {
+
+                        "historico": {
+
+                            "tipo":
+                                "recompensas_guerra_entregues",
+
+                            "mensagem":
+                                (
+                                    "As recompensas da Guerra "
+                                    "foram processadas."
+                                ),
+
+                            "autor":
+                                "sistema",
+
+                            "criado_em":
+                                agora,
+                        }
+                    },
+                },
+            )
+        )
+
+
+        registro_novo = bool(
+            resultado_registro.modified_count
+            ==
+            1
+        )
+
+    else:
+
+        registro_novo = False
+
+
+    return {
+        "success":
+            sucesso_total,
+
+        "guerra_id":
+            str(
+                guerra_id
+            ),
+
+        "jogadores_creditados":
+            jogadores_creditados,
+
+        "jogadores_ja_creditados":
+            jogadores_ja_creditados,
+
+        "clans_creditados":
+            clans_creditados,
+
+        "clans_ja_creditados":
+            clans_ja_creditados,
+
+        "erros_total":
+            len(
+                erros
+            ),
+
+        "erros":
+            erros,
+
+        "registro_novo":
+            registro_novo,
+
+        "clans":
+            resultados_clans,
+    }
+
+
+# ============================================================
 # 🏆 CONSOLIDAR RESULTADO GERAL DA GUERRA
 # ============================================================
 
