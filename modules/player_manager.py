@@ -61,6 +61,10 @@ from .player.inventory import (
     set_gems,
     add_gems,
     spend_gems,
+    get_medalhas_cla,
+    set_medalhas_cla,
+    add_medalhas_cla,
+    spend_medalhas_cla,
     add_item_to_inventory,
     add_unique_item,
     remove_item_from_inventory,
@@ -210,6 +214,65 @@ async def safe_spend_gold(user_id: Union[str, ObjectId, None], amount: int) -> b
         await save_player_data(pdata.get("_id"), pdata)
         return True
     return False
+
+
+async def safe_add_medalhas_cla(
+    user_id: Union[str, ObjectId, None],
+    amount: int,
+) -> int:
+
+    pdata = await get_player_data(
+        user_id
+    )
+
+    if not pdata:
+        return 0
+
+
+    add_medalhas_cla(
+        pdata,
+        amount,
+    )
+
+
+    await save_player_data(
+        pdata.get("_id"),
+        pdata,
+    )
+
+
+    return get_medalhas_cla(
+        pdata
+    )
+
+
+async def safe_spend_medalhas_cla(
+    user_id: Union[str, ObjectId, None],
+    amount: int,
+) -> bool:
+
+    pdata = await get_player_data(
+        user_id
+    )
+
+    if not pdata:
+        return False
+
+
+    if not spend_medalhas_cla(
+        pdata,
+        amount,
+    ):
+        return False
+
+
+    await save_player_data(
+        pdata.get("_id"),
+        pdata,
+    )
+
+
+    return True
 
 
 async def safe_add_xp(user_id: Union[str, ObjectId, None], xp_amount: int) -> tuple[int, str]:
