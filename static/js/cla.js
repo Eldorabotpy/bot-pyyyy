@@ -679,6 +679,7 @@
         confirmarTexto = "Confirmar",
         cancelarTexto = "Cancelar",
         icone = "⚠️",
+        imagemUrl = "",
         perigo = false
     } = {}) {
         return new Promise(
@@ -719,7 +720,10 @@
 
                 const iconeSeguro =
                     escaparHtml(icone);
-
+                const imagemUrlSegura =
+                    escaparHtml(
+                        imagemUrl
+                    );
 
                 const fundoConfirmar =
                     perigo
@@ -792,8 +796,8 @@
                         "
                     >
                         <div style="
-                            width: 48px;
-                            height: 48px;
+                            width: 58px;
+                            height: 58px;
 
                             display: flex;
                             align-items: center;
@@ -823,7 +827,30 @@
 
                             font-size: 23px;
                         ">
-                            ${iconeSeguro}
+                            ${
+                                imagemUrlSegura
+                                    ? `
+                                        <img
+                                            src="${imagemUrlSegura}"
+                                            alt=""
+                                            style="
+                                                width: 44px;
+                                                height: 44px;
+                                                object-fit: contain;
+                                                display: block;
+                                            "
+                                            onerror="
+                                                this.style.display='none';
+                                                this.nextElementSibling.style.display='block';
+                                            "
+                                        >
+
+                                        <span style="display: none;">
+                                            ${iconeSeguro}
+                                        </span>
+                                    `
+                                    : iconeSeguro
+                            }
                         </div>
 
  
@@ -1427,6 +1454,7 @@
                                         "
                                         data-item-id="${itemId}"
                                         data-item-nome="${nome}"
+                                        data-item-icon="${iconUrl}"
                                         ${
                                             esgotado
                                                 ? "disabled"
@@ -1560,6 +1588,10 @@
             "este item"
         );
 
+        const imagemItem = String(
+            botao?.dataset?.itemIcon ||
+            ""
+        );
 
         const confirmou =
             await confirmarAcaoCla({
@@ -1576,7 +1608,10 @@
                     "Cancelar",
 
                 icone:
-                    "🛒"
+                    "📦",
+
+                imagemUrl:
+                    imagemItem
             });
 
 
@@ -7325,7 +7360,7 @@
                 );
             }
         );
-        
+
         elemento(
             "cla-btn-comprar-tesouraria"
         )?.addEventListener(
