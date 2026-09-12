@@ -5818,6 +5818,161 @@ def consolidar_resultado_guerra(
         )
     )
 
+    # ========================================================
+    # 🎁 RECOMPENSAS AUTOMÁTICAS
+    #
+    # Somente uma transição REAL:
+    #
+    # em_andamento -> finalizada
+    #
+    # pode tentar entregar recompensas.
+    #
+    # Guerras finalizadas em modo GM/teste
+    # nunca geram economia real.
+    # ========================================================
+
+    finalizada_agora = bool(
+        resultado_finalizacao
+        .modified_count
+        ==
+        1
+    )
+
+
+    resultado_recompensas = {
+        "processadas":
+            False,
+
+        "modo_teste":
+            False,
+    }
+
+
+    if finalizada_agora:
+
+        controle_teste = (
+            obter_controle_teste_guerra()
+        )
+
+
+        modo_teste_ativo = bool(
+
+            GUERRA_MODO_TESTE
+
+            or
+
+            controle_teste.get(
+                "modo_teste",
+                False,
+            )
+        )
+
+
+        if modo_teste_ativo:
+
+            resultado_recompensas = {
+
+                "processadas":
+                    False,
+
+                "modo_teste":
+                    True,
+
+                "message":
+                    (
+                        "Recompensas não foram "
+                        "entregues porque a Guerra "
+                        "foi finalizada em modo "
+                        "de teste GM."
+                    ),
+            }
+
+
+            print(
+                "🧪 [GUERRA DE CLÃS] "
+                "Recompensas bloqueadas "
+                "pelo modo de teste."
+            )
+
+
+        else:
+
+            entrega = (
+                entregar_recompensas_guerra(
+                    guerra_id
+                )
+            )
+
+
+            resultado_recompensas = {
+
+                "processadas":
+                    True,
+
+                "modo_teste":
+                    False,
+
+                "success":
+                    bool(
+                        entrega.get(
+                            "success"
+                        )
+                    ),
+
+                "jogadores_creditados":
+                    entrega.get(
+                        "jogadores_creditados",
+                        0,
+                    ),
+
+                "jogadores_ja_creditados":
+                    entrega.get(
+                        "jogadores_ja_creditados",
+                        0,
+                    ),
+
+                "clans_creditados":
+                    entrega.get(
+                        "clans_creditados",
+                        0,
+                    ),
+
+                "clans_ja_creditados":
+                    entrega.get(
+                        "clans_ja_creditados",
+                        0,
+                    ),
+
+                "erros_total":
+                    entrega.get(
+                        "erros_total",
+                        0,
+                    ),
+            }
+
+
+            if entrega.get(
+                "success"
+            ):
+
+                print(
+                    "🎁 [GUERRA DE CLÃS] "
+                    "Recompensas entregues: "
+                    f"{entrega.get('jogadores_creditados', 0)} "
+                    "jogadores e "
+                    f"{entrega.get('clans_creditados', 0)} "
+                    "clãs."
+                )
+
+            else:
+
+                print(
+                    "⚠️ [GUERRA DE CLÃS] "
+                    "A Guerra foi finalizada, "
+                    "mas houve erro ao processar "
+                    "alguma recompensa: "
+                    f"{entrega.get('erros', [])}"
+                )
 
     # ========================================================
     # 📄 FINALIZA TAMBÉM AS DUAS INSCRIÇÕES
@@ -5866,12 +6021,10 @@ def consolidar_resultado_guerra(
             True,
 
         "finalizada_agora":
-            (
-                resultado_finalizacao
-                .modified_count
-                ==
-                1
-            ),
+            finalizada_agora,
+
+        "recompensas":
+            resultado_recompensas,
 
         "empate":
             empate,
