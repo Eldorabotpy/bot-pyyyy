@@ -1241,6 +1241,24 @@
                             );
 
 
+                        const comprado =
+                            Number(
+                                item.comprado_semana ||
+                                0
+                            );
+
+
+                        const restante =
+                            Number(
+                                item.restante_semana ??
+                                0
+                            );
+
+
+                        const esgotado =
+                            restante <= 0;
+
+
                         return `
                             <div
                                 class="cla-item-lista"
@@ -1370,28 +1388,56 @@
                                                     0.66rem;
                                             "
                                         >
-                                            Limite:
+                                            Semana:
                                             <strong>
+                                                ${formatarNumero(
+                                                    comprado
+                                                )}
+                                                /
                                                 ${formatarNumero(
                                                     limite
                                                 )}
                                             </strong>
-                                            por semana
+
+                                            · Restam
+
+                                            <strong
+                                                style="
+                                                    color:
+                                                        ${
+                                                            esgotado
+                                                                ? "#f87171"
+                                                                : "#f4dc91"
+                                                        };
+                                                "
+                                            >
+                                                ${formatarNumero(
+                                                    restante
+                                                )}
+                                            </strong>
                                         </div>
                                     </div>
 
 
-                                    <!-- PREÇO -->
-                                    <div
+                                    <!-- COMPRAR -->
+                                    <button
+                                        type="button"
+                                        class="
+                                            cla-loja-comprar
+                                        "
+                                        data-item-id="${itemId}"
+                                        data-item-nome="${nome}"
+                                        ${
+                                            esgotado
+                                                ? "disabled"
+                                                : ""
+                                        }
                                         style="
                                             min-width:
-                                                58px;
-
-                                            text-align:
-                                                center;
+                                                66px;
 
                                             padding:
-                                                8px 7px;
+                                                7px 7px;
 
                                             border-radius:
                                                 10px;
@@ -1402,32 +1448,60 @@
                                                     216,
                                                     184,
                                                     90,
-                                                    0.30
+                                                    0.36
                                                 );
 
                                             background:
-                                                rgba(
-                                                    216,
-                                                    184,
-                                                    90,
-                                                    0.08
-                                                );
+                                                ${
+                                                    esgotado
+                                                        ? "rgba(71, 85, 105, 0.22)"
+                                                        : "rgba(216, 184, 90, 0.10)"
+                                                };
 
                                             color:
-                                                #f4dc91;
+                                                ${
+                                                    esgotado
+                                                        ? "#7f8da0"
+                                                        : "#f4dc91"
+                                                };
 
                                             font-size:
-                                                0.75rem;
+                                                0.70rem;
 
                                             font-weight:
                                                 900;
+
+                                            cursor:
+                                                ${
+                                                    esgotado
+                                                        ? "default"
+                                                        : "pointer"
+                                                };
                                         "
                                     >
-                                        🏅
-                                        ${formatarNumero(
-                                            custo
-                                        )}
-                                    </div>
+                                        <div>
+                                            🏅
+                                            ${formatarNumero(
+                                                custo
+                                            )}
+                                        </div>
+
+                                        <div
+                                            style="
+                                                margin-top:
+                                                    3px;
+
+                                                font-size:
+                                                    0.60rem;
+                                            "
+                                        >
+                                            ${
+                                                esgotado
+                                                    ? "ESGOTADO"
+                                                    : "COMPRAR"
+                                            }
+                                        </div>
+                                    </button>
                                 </div>
                             </div>
                         `;
@@ -1464,6 +1538,138 @@
         }
     }
 
+    // ========================================================
+    // 🛒 COMPRAR ITEM DA LOJA DO CLÃ
+    // ========================================================
+
+    async function comprarItemLojaCla(
+        itemId,
+        botao
+    ) {
+
+        if (
+            !itemId ||
+            !estadoCla.userId
+        ) {
+            return;
+        }
+
+
+        const nomeItem = String(
+            botao?.dataset?.itemNome ||
+            "este item"
+        );
+
+
+        const confirmou =
+            await confirmarAcaoCla({
+                titulo:
+                    "Comprar item",
+
+                mensagem:
+                    `Deseja comprar 1x ${nomeItem} com suas Medalhas de Clã?`,
+
+                confirmarTexto:
+                    "🏅 Comprar",
+
+                cancelarTexto:
+                    "Cancelar",
+
+                icone:
+                    "🛒"
+            });
+
+
+        if (!confirmou) {
+            return;
+        }
+
+
+        const htmlOriginal =
+            botao?.innerHTML ||
+            "";
+
+
+        if (botao) {
+            botao.disabled = true;
+
+            botao.innerHTML = `
+                <div>
+                    ⏳
+                </div>
+
+                <div
+                    style="
+                        margin-top: 3px;
+                        font-size: 0.60rem;
+                    "
+                >
+                    COMPRANDO
+                </div>
+            `;
+        }
+
+
+        try {
+
+            const dados = await requisicao(
+                "/api/clan/loja/comprar",
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            user_id:
+                                estadoCla.userId,
+
+                            item_id:
+                                itemId,
+
+                            quantidade:
+                                1
+                        })
+                }
+            );
+
+
+            mostrarMensagem(
+                dados.message ||
+                "Compra realizada com sucesso."
+            );
+
+
+            /*
+             * Recarrega do servidor:
+             * saldo, compras e limite semanal.
+             */
+            await carregarLojaCla();
+
+
+        } catch (erro) {
+
+            mostrarMensagem(
+                erro.message ||
+                "Não foi possível realizar a compra.",
+                "erro"
+            );
+
+
+            if (
+                botao &&
+                botao.isConnected
+            ) {
+                botao.disabled = false;
+                botao.innerHTML =
+                    htmlOriginal;
+            }
+        }
+    }
 
     function resetarDadosCargos() {
         estadoCla.cargos = [];
@@ -7089,6 +7295,37 @@
                 doarOuro
             );
 
+        // ====================================================
+        // 🛒 LOJA DO CLÃ
+        // ====================================================
+
+        elemento(
+            "cla-loja-lista"
+        )?.addEventListener(
+            "click",
+            function (evento) {
+
+                const botao =
+                    evento.target.closest(
+                        ".cla-loja-comprar"
+                    );
+
+
+                if (
+                    !botao ||
+                    botao.disabled
+                ) {
+                    return;
+                }
+
+
+                comprarItemLojaCla(
+                    botao.dataset.itemId,
+                    botao
+                );
+            }
+        );
+        
         elemento(
             "cla-btn-comprar-tesouraria"
         )?.addEventListener(

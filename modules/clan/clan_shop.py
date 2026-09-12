@@ -294,6 +294,7 @@ def obter_catalogo_loja_cla(
                 "character_name": 1,
                 "medalhas_cla": 1,
                 "clan_id": 1,
+                "loja_cla": 1,
             },
         )
     )
@@ -341,6 +342,57 @@ def obter_catalogo_loja_cla(
         )
     )
 
+    # ========================================================
+    # 📅 COMPRAS DA SEMANA ATUAL
+    # ========================================================
+
+    semana_id = (
+        _semana_id_atual()
+    )
+
+
+    loja_atual = (
+        jogador.get(
+            "loja_cla"
+        )
+    )
+
+
+    if not isinstance(
+        loja_atual,
+        dict,
+    ):
+        loja_atual = {}
+
+
+    if (
+        str(
+            loja_atual.get(
+                "semana_id",
+                ""
+            )
+        )
+        ==
+        semana_id
+    ):
+
+        compras_semana = (
+            loja_atual.get(
+                "compras",
+                {}
+            )
+        )
+
+
+        if not isinstance(
+            compras_semana,
+            dict,
+        ):
+            compras_semana = {}
+
+    else:
+
+        compras_semana = {}
 
     # ========================================================
     # 🛒 MONTA CATÁLOGO
@@ -364,6 +416,30 @@ def obter_catalogo_loja_cla(
         if not item:
             continue
 
+        limite_semanal = int(
+            configuracao.get(
+                "limite_semanal",
+                0,
+            )
+            or 0
+        )
+
+
+        comprado_semana = int(
+            compras_semana.get(
+                item_id,
+                0,
+            )
+            or 0
+        )
+
+
+        restante_semana = max(
+            0,
+            limite_semanal
+            -
+            comprado_semana,
+        )
 
         itens.append({
 
@@ -404,13 +480,13 @@ def obter_catalogo_loja_cla(
                 ),
 
             "limite_semanal":
-                int(
-                    configuracao.get(
-                        "limite_semanal",
-                        0,
-                    )
-                    or 0
-                ),
+                limite_semanal,
+
+            "comprado_semana":
+                comprado_semana,
+
+            "restante_semana":
+                restante_semana,
         })
 
 
@@ -423,6 +499,9 @@ def obter_catalogo_loja_cla(
             int(
                 saldo_medalhas
             ),
+
+        "semana_id":
+            semana_id,
 
         "clan": {
             "id":
