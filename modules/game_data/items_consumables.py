@@ -18,10 +18,17 @@ CONSUMABLES_DATA = {
         "price": 100
     },
     "pocao_cura_media": {
-        "display_name": "Poção de Cura M", "emoji": "❤️‍🩹", 
+        "display_name": "Poção de Cura M",
+        "emoji": "❤️‍🩹",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/pocao_cura_media.png"
+        ),
         "type": "consumivel",
-        "category": "consumivel", "description": "Recupera 300 HP.",
-        "stackable": True, 
+        "category": "consumivel",
+        "description": "Recupera 300 HP.",
+        "stackable": True,
         "effects": {"heal": 300},
         "price": 300
     },
@@ -42,10 +49,17 @@ CONSUMABLES_DATA = {
         "price": 100  
     },
     "pocao_mana_media": {
-        "display_name": "Poção de Mana M", "emoji": "💧", 
+        "display_name": "Poção de Mana M",
+        "emoji": "💧",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/pocao_mana_media.png"
+        ),
         "type": "consumivel",
-        "category": "consumivel", "description": "Recupera 300 MP.",
-        "stackable": True, 
+        "category": "consumivel",
+        "description": "Recupera 300 MP.",
+        "stackable": True,
         "effects": {"mana": 300},
         "price": 300
     },
@@ -75,31 +89,66 @@ CONSUMABLES_DATA = {
 
     # --- ESPECIAIS / UTILITÁRIOS ---
     "pedra_de_aprimoramento": {
-        "display_name": "Pedra de Aprimoramento", "emoji": "✨", 
-        "type": "consumivel", "category": "consumivel", 
-        "stackable": True, "price": 300
+        "display_name": "Pedra de Aprimoramento",
+        "emoji": "✨",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/pedra_de_aprimoramento.png"
+        ),
+        "type": "consumivel",
+        "category": "consumivel",
+        "stackable": True,
+        "price": 300
     },
     "pergaminho_de_reparo": {
-        "display_name": "Pergaminho de Reparo", "emoji": "📜", 
-        "description": "Restaura a durabilidade de todos os seus equipamentos.",
-        "type": "consumivel", 
-        "category": "consumivel", 
-        "stackable": True, "price": 1000
+        "display_name": "Pergaminho de Reparo",
+        "emoji": "📜",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/pergaminho_de_reparo.png"
+        ),
+        "description": (
+            "Restaura a durabilidade de todos "
+            "os seus equipamentos."
+        ),
+        "type": "consumivel",
+        "category": "consumivel",
+        "stackable": True,
+        "price": 1000
     },
     "nucleo_de_forja": {
-        "display_name": "Núcleo de Forja", "emoji": "🔥", 
-        "type": "consumivel", "category": "consumivel",
-        "stackable": True, "price": 150
+        "display_name": "Núcleo de Forja",
+        "emoji": "🔥",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/nucleo_de_forja.png"
+        ),
+        "type": "consumivel",
+        "category": "consumivel",
+        "stackable": True,
+        "price": 150
     },
 
     "sigilo_de_protecao": {
         "display_name": "Sigilo de Proteção",
-        "emoji": "🛡️", 
+        "emoji": "🛡️",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/sigilo_de_protecao.png"
+        ),
         "type": "consumivel",
-        "stackable": True, 
-        "description": "Um selo mágico imbuído com energia defensiva. Concede proteção temporária ou é usado em receitas de aprimoramento.",
+        "stackable": True,
+        "description": (
+            "Um selo mágico imbuído com energia defensiva. "
+            "Concede proteção temporária ou é usado em "
+            "receitas de aprimoramento."
+        ),
         "category": "consumivel",
-        "tradable": False # 🔴 BLOQUEADO
+        "tradable": False
     },
     "gems": {
         "display_name": "Diamante", "emoji": "💎", 
