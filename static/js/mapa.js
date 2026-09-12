@@ -799,6 +799,15 @@ class MapaScene extends Phaser.Scene {
                                     );
 
 
+                                // Guarda a escala REAL depois
+                                // de reduzir a imagem para 46x46.
+                                const escalaBaseX =
+                                    iconeCla.scaleX;
+
+                                const escalaBaseY =
+                                    iconeCla.scaleY;
+
+
                                 this.iconeClaMapa =
                                     iconeCla;
 
@@ -839,10 +848,10 @@ class MapaScene extends Phaser.Scene {
                                         iconeCla,
 
                                     scaleX:
-                                        1.08,
+                                        escalaBaseX * 1.08,
 
                                     scaleY:
-                                        1.08,
+                                        escalaBaseY * 1.08,
 
                                     duration:
                                         900,
