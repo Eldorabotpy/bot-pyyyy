@@ -4416,6 +4416,371 @@ def calcular_recompensas_guerra(
             ),
     }
 
+# ============================================================
+# 🔒 CRÉDITO IDEMPOTENTE — JOGADOR
+# ============================================================
+
+def _creditar_recompensa_guerra_jogador(
+    guerra_id,
+    player_id,
+    ouro,
+    medalhas_cla,
+):
+    """
+    Credita a recompensa individual apenas
+    uma vez para cada Guerra.
+
+    O $inc e o marcador da Guerra são gravados
+    na MESMA operação atômica do MongoDB.
+    """
+
+    guerra_id = _object_id(
+        guerra_id
+    )
+
+    player_id = _object_id(
+        player_id
+    )
+
+
+    if (
+        not guerra_id
+        or
+        not player_id
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Guerra ou jogador inválido.",
+        }
+
+
+    try:
+        ouro = max(
+            0,
+            int(
+                ouro
+                or 0
+            ),
+        )
+
+        medalhas_cla = max(
+            0,
+            int(
+                medalhas_cla
+                or 0
+            ),
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Recompensa individual inválida.",
+        }
+
+
+    resultado = (
+        users_collection
+        .update_one(
+
+            {
+                "_id":
+                    player_id,
+
+                "recompensas_guerra_ids": {
+                    "$ne":
+                        guerra_id,
+                },
+            },
+
+            {
+                "$inc": {
+                    "gold":
+                        ouro,
+
+                    "medalhas_cla":
+                        medalhas_cla,
+                },
+
+                "$addToSet": {
+                    "recompensas_guerra_ids":
+                        guerra_id,
+                },
+            },
+        )
+    )
+
+
+    if (
+        resultado.modified_count
+        ==
+        1
+    ):
+
+        # O clan_manager já possui um helper
+        # seguro para limpar cache síncrono
+        # ou assíncrono.
+        clan_manager._limpar_cache(
+            player_id
+        )
+
+
+        return {
+            "success": True,
+            "creditado": True,
+            "ja_creditado": False,
+        }
+
+
+    # ========================================================
+    # 🔎 DIFERENCIA:
+    # - jogador inexistente;
+    # - recompensa já entregue.
+    # ========================================================
+
+    jogador = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id
+            },
+            {
+                "recompensas_guerra_ids":
+                    1,
+            },
+        )
+    )
+
+
+    if not jogador:
+
+        return {
+            "success": False,
+            "error":
+                "Jogador não encontrado.",
+        }
+
+
+    guerras_recebidas = (
+        jogador.get(
+            "recompensas_guerra_ids",
+            []
+        )
+        or []
+    )
+
+
+    if (
+        guerra_id
+        in
+        guerras_recebidas
+    ):
+
+        return {
+            "success": True,
+            "creditado": False,
+            "ja_creditado": True,
+        }
+
+
+    return {
+        "success": False,
+        "error":
+            (
+                "Não foi possível creditar "
+                "a recompensa do jogador."
+            ),
+    }
+
+
+# ============================================================
+# 🔒 CRÉDITO IDEMPOTENTE — CLÃ
+# ============================================================
+
+def _creditar_recompensa_guerra_cla(
+    guerra_id,
+    clan_id,
+    ouro,
+    xp,
+):
+    """
+    Credita ouro e XP diretamente ao clã.
+
+    Não registra contribuição individual.
+    Cada Guerra só pode creditar o mesmo
+    clã uma única vez.
+    """
+
+    guerra_id = _object_id(
+        guerra_id
+    )
+
+    clan_id = _object_id(
+        clan_id
+    )
+
+
+    if (
+        not guerra_id
+        or
+        not clan_id
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Guerra ou clã inválido.",
+        }
+
+
+    try:
+        ouro = max(
+            0,
+            int(
+                ouro
+                or 0
+            ),
+        )
+
+        xp = max(
+            0,
+            int(
+                xp
+                or 0
+            ),
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        return {
+            "success": False,
+            "error":
+                "Recompensa do clã inválida.",
+        }
+
+
+    resultado = (
+        clan_manager
+        .clans_collection
+        .update_one(
+
+            {
+                "_id":
+                    clan_id,
+
+                "status":
+                    "ativo",
+
+                "recompensas_guerra_ids": {
+                    "$ne":
+                        guerra_id,
+                },
+            },
+
+            {
+                "$inc": {
+                    "tesouro.ouro":
+                        ouro,
+
+                    "xp":
+                        xp,
+                },
+
+                "$addToSet": {
+                    "recompensas_guerra_ids":
+                        guerra_id,
+                },
+
+                "$set": {
+                    "atualizado_em":
+                        _agora(),
+                },
+            },
+        )
+    )
+
+
+    if (
+        resultado.modified_count
+        ==
+        1
+    ):
+
+        return {
+            "success": True,
+            "creditado": True,
+            "ja_creditado": False,
+        }
+
+
+    cla = (
+        clan_manager
+        .clans_collection
+        .find_one(
+            {
+                "_id":
+                    clan_id
+            },
+            {
+                "status":
+                    1,
+
+                "recompensas_guerra_ids":
+                    1,
+            },
+        )
+    )
+
+
+    if not cla:
+
+        return {
+            "success": False,
+            "error":
+                "Clã não encontrado.",
+        }
+
+
+    guerras_recebidas = (
+        cla.get(
+            "recompensas_guerra_ids",
+            []
+        )
+        or []
+    )
+
+
+    if (
+        guerra_id
+        in
+        guerras_recebidas
+    ):
+
+        return {
+            "success": True,
+            "creditado": False,
+            "ja_creditado": True,
+        }
+
+
+    return {
+        "success": False,
+        "error":
+            (
+                "Não foi possível creditar "
+                "a recompensa do clã."
+            ),
+    }
 
 # ============================================================
 # 🏆 CONSOLIDAR RESULTADO GERAL DA GUERRA
