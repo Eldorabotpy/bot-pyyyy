@@ -3619,6 +3619,48 @@ def obter_ranking_guerra(
             )
         )
 
+        # ====================================================
+        # 🛡️ BRASÃO ATUAL DO CLÃ
+        #
+        # O documento da guerra preserva a logo histórica,
+        # mas o ranking deve exibir a identidade visual
+        # atual escolhida pelo clã.
+        # ====================================================
+
+        cla_atual = (
+            db["clans"]
+            .find_one({
+                "_id":
+                    item[
+                        "clan_id"
+                    ]
+            })
+            or {}
+        )
+
+
+        cla_serializado = (
+            clan_manager
+            .serializar_cla(
+                cla_atual
+            )
+            or {}
+        )
+
+
+        item[
+            "logo_url"
+        ] = str(
+            cla_serializado.get(
+                "logo_url"
+            )
+            or
+            item.get(
+                "logo_url"
+            )
+            or
+            ""
+        )
 
     ranking.sort(
         key=lambda item: (
