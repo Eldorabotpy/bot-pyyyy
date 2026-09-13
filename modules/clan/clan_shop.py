@@ -23,7 +23,10 @@ from modules.game_data.items_consumables import (
 from modules.clan import (
     clan_manager,
 )
-
+from modules.clan.clan_registry import (
+    CLAN_NIVEL_INICIAL,
+    obter_limite_loja_cla,
+)
 
 # ============================================================
 # 🛒 CATÁLOGO OFICIAL
@@ -110,7 +113,57 @@ def _semana_id_atual():
         obter_semana_id()
     ).strip()
 
+# ============================================================
+# 🏰 LIMITE DA LOJA PELO NÍVEL DO CLÃ
+# ============================================================
 
+def _obter_limite_semanal_item(
+    cla,
+    item_id,
+    configuracao,
+):
+    """
+    Retorna o limite semanal efetivo do item.
+
+    O nível do clã é a autoridade.
+    O limite salvo no catálogo da Loja fica
+    apenas como fallback de compatibilidade.
+    """
+
+    try:
+        nivel_cla = int(
+            cla.get(
+                "nivel",
+                CLAN_NIVEL_INICIAL,
+            )
+            or CLAN_NIVEL_INICIAL
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        nivel_cla = (
+            CLAN_NIVEL_INICIAL
+        )
+
+
+    limite_padrao = int(
+        configuracao.get(
+            "limite_semanal",
+            0,
+        )
+        or 0
+    )
+
+
+    return int(
+        obter_limite_loja_cla(
+            nivel_cla,
+            item_id,
+            limite_padrao,
+        )
+    )
 # ============================================================
 # 📦 ADICIONAR ITEM EMPILHÁVEL
 # ============================================================
@@ -416,12 +469,12 @@ def obter_catalogo_loja_cla(
         if not item:
             continue
 
-        limite_semanal = int(
-            configuracao.get(
-                "limite_semanal",
-                0,
+        limite_semanal = (
+            _obter_limite_semanal_item(
+                cla,
+                item_id,
+                configuracao,
             )
-            or 0
         )
 
 
@@ -675,12 +728,12 @@ def comprar_item_loja_cla(
     )
 
 
-    limite_semanal = int(
-        configuracao.get(
-            "limite_semanal",
-            0,
+    limite_semanal = (
+        _obter_limite_semanal_item(
+            cla,
+            item_id,
+            configuracao,
         )
-        or 0
     )
 
 
