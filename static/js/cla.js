@@ -89,6 +89,264 @@
         `;
     }
 
+    function montarBeneficiosEvolucaoCla(
+        melhoria
+    ) {
+        if (
+            !melhoria ||
+            typeof melhoria !== "object"
+        ) {
+            return "";
+        }
+
+
+        const linhas = [];
+
+
+        // ====================================================
+        // 👥 CAPACIDADE DE MEMBROS
+        // ====================================================
+
+        const capacidadeAtual = Number(
+            melhoria.capacidade_atual ||
+            0
+        );
+
+        const proximaCapacidade = Number(
+            melhoria.proxima_capacidade ||
+            0
+        );
+
+
+        if (
+            proximaCapacidade >
+            capacidadeAtual
+        ) {
+            linhas.push(`
+                <div>
+                    👥 Membros:
+                    <strong>
+                        ${formatarNumero(
+                            capacidadeAtual
+                        )}
+                    </strong>
+                    →
+                    <strong
+                        style="
+                            color: #f4dc91;
+                        "
+                    >
+                        ${formatarNumero(
+                            proximaCapacidade
+                        )}
+                    </strong>
+                </div>
+            `);
+        }
+
+
+        // ====================================================
+        // 🎖️ CARGOS PERSONALIZADOS
+        // ====================================================
+
+        const cargosAtual = Number(
+            melhoria.limite_cargos_atual ||
+            0
+        );
+
+        const cargosProximo = Number(
+            melhoria
+                .proximo_limite_cargos ||
+            0
+        );
+
+
+        if (
+            cargosProximo >
+            cargosAtual
+        ) {
+            linhas.push(`
+                <div>
+                    🎖️ Cargos personalizados:
+                    <strong>
+                        ${formatarNumero(
+                            cargosAtual
+                        )}
+                    </strong>
+                    →
+                    <strong
+                        style="
+                            color: #f4dc91;
+                        "
+                    >
+                        ${formatarNumero(
+                            cargosProximo
+                        )}
+                    </strong>
+                </div>
+            `);
+        }
+
+
+        // ====================================================
+        // 🎁 BENEFÍCIOS OFICIAIS DO BACKEND
+        // ====================================================
+
+        const beneficiosAtuais =
+            melhoria.beneficios_atuais ||
+            {};
+
+        const beneficiosProximos =
+            melhoria
+                .beneficios_proximo_nivel ||
+            {};
+
+
+        // ====================================================
+        // 💼 TESOURARIA
+        // ====================================================
+
+        const diasAtual = Number(
+            beneficiosAtuais
+                .tesouraria_dias ||
+            0
+        );
+
+        const diasProximo = Number(
+            beneficiosProximos
+                .tesouraria_dias ||
+            0
+        );
+
+
+        if (
+            diasProximo >
+            diasAtual
+        ) {
+            linhas.push(`
+                <div>
+                    💼 Licença da Tesouraria:
+                    <strong>
+                        ${formatarNumero(
+                            diasAtual
+                        )} dias
+                    </strong>
+                    →
+                    <strong
+                        style="
+                            color: #f4dc91;
+                        "
+                    >
+                        ${formatarNumero(
+                            diasProximo
+                        )} dias
+                    </strong>
+                </div>
+            `);
+        }
+
+
+        // ====================================================
+        // 🏅 LIMITES DA LOJA
+        // ====================================================
+
+        const limitesAtuais =
+            beneficiosAtuais
+                .limites_loja ||
+            {};
+
+        const limitesProximos =
+            beneficiosProximos
+                .limites_loja ||
+            {};
+
+
+        const nomesItens = {
+            pocao_cura_media:
+                "Poção de Cura M",
+
+            pocao_mana_media:
+                "Poção de Mana M",
+
+            pedra_de_aprimoramento:
+                "Pedra de Aprimoramento",
+
+            nucleo_de_forja:
+                "Núcleo de Forja",
+
+            pergaminho_de_reparo:
+                "Pergaminho de Reparo",
+
+            sigilo_de_protecao:
+                "Sigilo de Proteção"
+        };
+
+
+        Object.entries(
+            limitesProximos
+        ).forEach(
+            function ([
+                itemId,
+                limiteProximoValor
+            ]) {
+
+                const limiteAtual =
+                    Number(
+                        limitesAtuais[
+                            itemId
+                        ] ||
+                        0
+                    );
+
+                const limiteProximo =
+                    Number(
+                        limiteProximoValor ||
+                        0
+                    );
+
+
+                if (
+                    limiteProximo <=
+                    limiteAtual
+                ) {
+                    return;
+                }
+
+
+                const nome =
+                    nomesItens[itemId] ||
+                    itemId;
+
+
+                linhas.push(`
+                    <div>
+                        🏅 ${escaparHtml(
+                            nome
+                        )}:
+                        <strong>
+                            ${formatarNumero(
+                                limiteAtual
+                            )}
+                        </strong>
+                        →
+                        <strong
+                            style="
+                                color: #f4dc91;
+                            "
+                        >
+                            ${formatarNumero(
+                                limiteProximo
+                            )}/semana
+                        </strong>
+                    </div>
+                `);
+            }
+        );
+
+
+        return linhas.join("");
+    }
+
     function obterConfigCargo(cargoId) {
         const id = String(
             cargoId || ""
@@ -3614,6 +3872,10 @@
                         )
                     )
                     : 100;
+            const beneficiosEvolucaoHtml =
+                montarBeneficiosEvolucaoCla(
+                    melhoria
+                );
 
             if (areaMelhoria) {
                 areaMelhoria.innerHTML = `
@@ -3837,40 +4099,68 @@
                         </div>
                     </div>
         
-                    <!-- CAPACIDADE -->
+                    <!-- BENEFÍCIOS DA EVOLUÇÃO -->
                     <div style="
-                        padding-top: 12px;
-                        border-top:
+                        padding: 13px;
+
+                        border:
                             1px solid rgba(
-                                148,
-                                163,
+                                216,
                                 184,
-                                0.18
+                                90,
+                                0.24
                             );
-                        color: #cbd5e1;
-                        font-size: 0.77rem;
-                        line-height: 1.6;
+
+                        border-radius: 12px;
+
+                        background:
+                            rgba(
+                                216,
+                                184,
+                                90,
+                                0.06
+                            );
                     ">
-                        <div>
-                            Capacidade atual:
-                            <strong>
-                                ${formatarNumero(
-                                    melhoria
-                                        .capacidade_atual
-                                )} membros
-                            </strong>
+                        <div style="
+                            margin-bottom: 9px;
+
+                            color: #f4dc91;
+
+                            font-size: 0.77rem;
+                            font-weight: 900;
+                        ">
+                            🎁 Benefícios ao atingir
+                            Nv.
+                            ${formatarNumero(
+                                melhoria.nivel
+                            )}
                         </div>
-        
-                        <div>
-                            Próxima capacidade:
-                            <strong style="
-                                color: #f4dc91;
-                            ">
-                                ${formatarNumero(
-                                    melhoria
-                                        .proxima_capacidade
-                                )} membros
-                            </strong>
+
+
+                        <div style="
+                            display: flex;
+                            flex-direction: column;
+
+                            gap: 7px;
+
+                            color: #cbd5e1;
+
+                            font-size: 0.73rem;
+                            line-height: 1.45;
+                        ">
+                            ${
+                                beneficiosEvolucaoHtml ||
+                                `
+                                    <div
+                                        style="
+                                            color: #8491a3;
+                                        "
+                                    >
+                                        Nenhum benefício
+                                        adicional informado.
+                                    </div>
+                                `
+                            }
                         </div>
                     </div>
                 `;

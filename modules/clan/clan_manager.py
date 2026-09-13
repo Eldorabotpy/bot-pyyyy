@@ -44,6 +44,7 @@ from .clan_registry import (
     obter_capacidade,
     obter_proximo_nivel,
     obter_custo_evolucao,
+    obter_beneficios_nivel,
 
     obter_cargos_padrao,
     obter_config_cargo_padrao,
@@ -371,6 +372,24 @@ def serializar_cla(cla):
             CLAN_NIVEL_INICIAL,
         ) or CLAN_NIVEL_INICIAL
     )
+
+    # ========================================================
+    # 🎁 BENEFÍCIOS DO NÍVEL ATUAL
+    # ========================================================
+
+    beneficios_atuais = (
+        obter_beneficios_nivel(
+            nivel_atual
+        )
+    )
+
+
+    dados["beneficios_nivel"] = (
+        _json_seguro(
+            beneficios_atuais
+        )
+    )
+    
     # ========================================================
     # 🎖️ INFORMAÇÕES DOS CARGOS
     # ========================================================
@@ -443,6 +462,25 @@ def serializar_cla(cla):
             )
             or {}
         )
+        beneficios_proximo_nivel = (
+            obter_beneficios_nivel(
+                proximo_nivel
+            )
+        )
+
+
+        limite_cargos_atual = (
+            obter_limite_cargos_personalizados(
+                nivel_atual
+            )
+        )
+
+
+        proximo_limite_cargos = (
+            obter_limite_cargos_personalizados(
+                proximo_nivel
+            )
+        )
 
         xp_necessario = int(
             custo.get("xp", 0) or 0
@@ -488,6 +526,26 @@ def serializar_cla(cla):
 
             "proxima_capacidade":
                 proxima_capacidade,
+
+            "limite_cargos_atual":
+                int(
+                    limite_cargos_atual
+                ),
+
+            "proximo_limite_cargos":
+                int(
+                    proximo_limite_cargos
+                ),
+
+            "beneficios_atuais":
+                _json_seguro(
+                    beneficios_atuais
+                ),
+
+            "beneficios_proximo_nivel":
+                _json_seguro(
+                    beneficios_proximo_nivel
+                ),
 
             "pode_melhorar": (
                 xp_atual >= xp_necessario

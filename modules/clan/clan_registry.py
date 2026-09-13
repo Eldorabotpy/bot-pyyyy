@@ -15,48 +15,172 @@ CLAN_NIVEIS = {
         "capacidade": 10,
         "xp_evolucao": 2_000,
         "ouro_evolucao": 10_000,
+
+        "beneficios": {
+            "tesouraria_dias": 30,
+
+            "limites_loja": {
+                "pocao_cura_media": 10,
+                "pocao_mana_media": 10,
+                "pedra_de_aprimoramento": 5,
+                "nucleo_de_forja": 5,
+                "pergaminho_de_reparo": 3,
+                "sigilo_de_protecao": 2,
+            },
+        },
     },
+
     2: {
         "capacidade": 15,
         "xp_evolucao": 5_000,
         "ouro_evolucao": 25_000,
+
+        "beneficios": {
+            "tesouraria_dias": 30,
+
+            "limites_loja": {
+                "pocao_cura_media": 12,
+                "pocao_mana_media": 12,
+                "pedra_de_aprimoramento": 5,
+                "nucleo_de_forja": 5,
+                "pergaminho_de_reparo": 3,
+                "sigilo_de_protecao": 2,
+            },
+        },
     },
+
     3: {
         "capacidade": 20,
         "xp_evolucao": 10_000,
         "ouro_evolucao": 50_000,
+
+        "beneficios": {
+            "tesouraria_dias": 35,
+
+            "limites_loja": {
+                "pocao_cura_media": 12,
+                "pocao_mana_media": 12,
+                "pedra_de_aprimoramento": 6,
+                "nucleo_de_forja": 6,
+                "pergaminho_de_reparo": 3,
+                "sigilo_de_protecao": 2,
+            },
+        },
     },
+
     4: {
         "capacidade": 25,
         "xp_evolucao": 18_000,
         "ouro_evolucao": 90_000,
+
+        "beneficios": {
+            "tesouraria_dias": 35,
+
+            "limites_loja": {
+                "pocao_cura_media": 14,
+                "pocao_mana_media": 14,
+                "pedra_de_aprimoramento": 6,
+                "nucleo_de_forja": 6,
+                "pergaminho_de_reparo": 3,
+                "sigilo_de_protecao": 2,
+            },
+        },
     },
+
     5: {
         "capacidade": 30,
         "xp_evolucao": 30_000,
         "ouro_evolucao": 150_000,
+
+        "beneficios": {
+            "tesouraria_dias": 40,
+
+            "limites_loja": {
+                "pocao_cura_media": 14,
+                "pocao_mana_media": 14,
+                "pedra_de_aprimoramento": 7,
+                "nucleo_de_forja": 7,
+                "pergaminho_de_reparo": 4,
+                "sigilo_de_protecao": 2,
+            },
+        },
     },
+
     6: {
         "capacidade": 35,
         "xp_evolucao": 45_000,
         "ouro_evolucao": 240_000,
+
+        "beneficios": {
+            "tesouraria_dias": 40,
+
+            "limites_loja": {
+                "pocao_cura_media": 16,
+                "pocao_mana_media": 16,
+                "pedra_de_aprimoramento": 7,
+                "nucleo_de_forja": 7,
+                "pergaminho_de_reparo": 4,
+                "sigilo_de_protecao": 2,
+            },
+        },
     },
+
     7: {
         "capacidade": 40,
         "xp_evolucao": 65_000,
         "ouro_evolucao": 360_000,
+
+        "beneficios": {
+            "tesouraria_dias": 45,
+
+            "limites_loja": {
+                "pocao_cura_media": 16,
+                "pocao_mana_media": 16,
+                "pedra_de_aprimoramento": 8,
+                "nucleo_de_forja": 8,
+                "pergaminho_de_reparo": 4,
+                "sigilo_de_protecao": 3,
+            },
+        },
     },
+
     8: {
         "capacidade": 45,
         "xp_evolucao": 90_000,
         "ouro_evolucao": 500_000,
+
+        "beneficios": {
+            "tesouraria_dias": 45,
+
+            "limites_loja": {
+                "pocao_cura_media": 18,
+                "pocao_mana_media": 18,
+                "pedra_de_aprimoramento": 8,
+                "nucleo_de_forja": 8,
+                "pergaminho_de_reparo": 5,
+                "sigilo_de_protecao": 3,
+            },
+        },
     },
+
     9: {
         "capacidade": 50,
         "xp_evolucao": None,
         "ouro_evolucao": None,
-    },
 
+        "beneficios": {
+            "tesouraria_dias": 60,
+
+            "limites_loja": {
+                "pocao_cura_media": 20,
+                "pocao_mana_media": 20,
+                "pedra_de_aprimoramento": 10,
+                "nucleo_de_forja": 10,
+                "pergaminho_de_reparo": 5,
+                "sigilo_de_protecao": 4,
+            },
+        },
+    },
 }
 
 # ============================================================
@@ -457,6 +581,113 @@ def obter_custo_evolucao(nivel):
         "ouro": config.get("ouro_evolucao"),
     }
 
+def obter_beneficios_nivel(
+    nivel,
+):
+    """
+    Retorna os benefícios efetivos do nível
+    informado.
+
+    Sempre devolve uma cópia independente
+    para impedir alterações acidentais no
+    registro global.
+    """
+
+    config = obter_config_nivel(
+        nivel
+    )
+
+    beneficios = config.get(
+        "beneficios",
+        {},
+    ) or {}
+
+
+    limites_loja = beneficios.get(
+        "limites_loja",
+        {},
+    ) or {}
+
+
+    return {
+        "tesouraria_dias": int(
+            beneficios.get(
+                "tesouraria_dias",
+                30,
+            )
+            or 30
+        ),
+
+        "limites_loja": deepcopy(
+            limites_loja
+        ),
+    }
+
+
+def obter_limite_loja_cla(
+    nivel,
+    item_id,
+    limite_padrao=0,
+):
+    """
+    Retorna o limite semanal oficial de um
+    item da Loja do Clã para determinado nível.
+    """
+
+    item_id = str(
+        item_id or ""
+    ).strip()
+
+
+    beneficios = obter_beneficios_nivel(
+        nivel
+    )
+
+
+    limites = beneficios.get(
+        "limites_loja",
+        {},
+    ) or {}
+
+
+    try:
+        return int(
+            limites.get(
+                item_id,
+                limite_padrao,
+            )
+            or 0
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return int(
+            limite_padrao
+            or 0
+        )
+
+
+def obter_dias_tesouraria(
+    nivel,
+):
+    """
+    Retorna a duração oficial da licença da
+    Tesouraria para o nível do clã.
+    """
+
+    beneficios = obter_beneficios_nivel(
+        nivel
+    )
+
+    return int(
+        beneficios.get(
+            "tesouraria_dias",
+            30,
+        )
+        or 30
+    )
 
 def pode_evoluir_cla(nivel):
     return obter_proximo_nivel(nivel) is not None
