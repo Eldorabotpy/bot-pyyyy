@@ -368,6 +368,8 @@ GUILD_MISSIONS = {
             # Somente entregue quando voltar à Guilda.
             "xp_cla": 100,
 
+            "medalhas_cla": 6,
+
             "itens": [
                 {
                     "item_id": "nucleo_de_forja",
@@ -431,6 +433,8 @@ GUILD_MISSIONS = {
             "pontos_guilda": 20,
 
             "xp_cla": 250,
+
+            "medalhas_cla": 10,
 
             "itens": [
                 {
@@ -756,6 +760,8 @@ GUILD_MISSIONS = {
 
             "xp_cla": 120,
 
+            "medalhas_cla": 5,
+
             "itens": [
                 {
                     "item_id":
@@ -821,6 +827,8 @@ GUILD_MISSIONS = {
             "pontos_guilda": 15,
 
             "xp_cla": 200,
+
+            "medalhas_cla": 8,
 
             "itens": [
                 {
@@ -905,6 +913,12 @@ GUILD_MISSIONS = {
 
             "pontos_cla":
                 10,
+
+            "medalhas_cla_participante":
+                6,
+
+            "min_contribuicao_medalhas":
+                10,
         },
     }, 
     # ========================================================
@@ -974,6 +988,12 @@ GUILD_MISSIONS = {
                 75,
 
             "pontos_cla":
+                3,
+
+            "medalhas_cla_participante":
+                1,
+
+            "min_contribuicao_medalhas":
                 3,
         },
     },
@@ -1047,6 +1067,12 @@ GUILD_MISSIONS = {
 
             "pontos_cla":
                 4,
+
+            "medalhas_cla_participante":
+                2,
+
+            "min_contribuicao_medalhas":
+                4,
         },
     },
 
@@ -1119,6 +1145,12 @@ GUILD_MISSIONS = {
 
             "pontos_cla":
                 5,
+
+            "medalhas_cla_participante":
+                2,
+
+            "min_contribuicao_medalhas":
+                4,
         },
     },
 
@@ -1190,6 +1222,12 @@ GUILD_MISSIONS = {
                 500,
 
             "pontos_cla":
+                15,
+
+            "medalhas_cla_participante":
+                8,
+
+            "min_contribuicao_medalhas":
                 15,
         },
     },
@@ -1263,6 +1301,12 @@ GUILD_MISSIONS = {
 
             "pontos_cla":
                 14,
+
+            "medalhas_cla_participante":
+                10,
+
+            "min_contribuicao_medalhas":
+                10,
         },
     },       
 }

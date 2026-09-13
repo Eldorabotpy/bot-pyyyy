@@ -1445,7 +1445,28 @@
         return dados;
     }
 
+    function postJson(
+        url,
+        dados
+    ) {
+        return requisicao(
+            url,
+            {
+                method: "POST",
 
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body:
+                    JSON.stringify(
+                        dados
+                    )
+            }
+        );
+    }
+    
     // ========================================================
     // 🏅 LOJA DO CLÃ
     // ========================================================
