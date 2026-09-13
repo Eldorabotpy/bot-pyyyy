@@ -6841,10 +6841,15 @@
 
 
             if (infoCompra) {
-                infoCompra.textContent =
-                    "Os cargos autorizados podem administrar o tesouro.";
-            }
-
+                infoCompra.innerHTML = `
+                    💎 Licença ativa para este clã.
+                    <br>
+                    ⏳ Duração da licença no nível atual:
+                    <strong>${formatarNumero(duracaoTesouraria)} dia(s)</strong>
+                    <br>
+                    Os cargos autorizados podem administrar o tesouro.
+                    `;
+                }
 
             if (btnComprar) {
                 btnComprar.style.display =
