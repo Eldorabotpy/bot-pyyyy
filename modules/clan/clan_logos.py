@@ -45,8 +45,22 @@ CLAN_LOGOS = {
                 "nome": "Logo 8",
                 "arquivo": "logo_8.png",
             },  
-
-                                             
+    "logo_9": {
+                "nome": "Logo 9",
+                "arquivo": "logo_9.png",
+            },
+    "logo_10": {
+                "nome": "Logo 10",
+                "arquivo": "logo_10.png",
+            },
+    "logo_11": {
+                "nome": "Logo 11",
+                "arquivo": "logo_11.png",
+            },
+    "logo_12": {
+                "nome": "Logo 12",
+                "arquivo": "logo_12.png",
+            },                               
     # Adicione novas logos seguindo este padrão:
     #
     # "dragao_vermelho": {
