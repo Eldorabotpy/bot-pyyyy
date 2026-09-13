@@ -6166,6 +6166,158 @@ def api_guild_validar_catalogo():
         }), 500    
 
 # ============================================================
+# 🏪 LOJA DA GUILDA DOS AVENTUREIROS
+# ============================================================
+
+
+# ============================================================
+# 📦 CATÁLOGO DA LOJA
+# ============================================================
+
+@webapp_bp.route(
+    '/api/guild/loja/<user_id>',
+    methods=['GET']
+)
+def api_guild_loja_catalogo(
+    user_id
+):
+    try:
+
+        from modules.guild_missions import (
+            guild_shop_manager,
+        )
+
+
+        resultado = (
+            guild_shop_manager
+            .obter_catalogo_loja_guilda(
+                user_id
+            )
+        )
+
+
+        return jsonify(
+            resultado
+        ), (
+            200
+            if resultado.get(
+                "success"
+            )
+            else 400
+        )
+
+
+    except Exception as e:
+
+        traceback.print_exc()
+
+
+        return jsonify({
+            "success": False,
+
+            "error": (
+                "Erro ao carregar a Loja "
+                "da Guilda: "
+                f"{str(e)}"
+            ),
+        }), 500
+
+
+# ============================================================
+# 🛒 COMPRAR RECEITA
+# ============================================================
+
+@webapp_bp.route(
+    '/api/guild/loja/comprar',
+    methods=['POST']
+)
+def api_guild_loja_comprar():
+    try:
+
+        from modules.guild_missions import (
+            guild_shop_manager,
+        )
+
+
+        dados = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+
+        user_id = dados.get(
+            "user_id"
+        )
+
+
+        item_id = dados.get(
+            "item_id"
+        )
+
+
+        if not user_id:
+
+            return jsonify({
+                "success": False,
+                "error": (
+                    "ID do jogador "
+                    "não informado."
+                ),
+            }), 400
+
+
+        if not item_id:
+
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Produto não informado."
+                ),
+            }), 400
+
+
+        resultado = (
+            guild_shop_manager
+            .comprar_item_loja_guilda(
+
+                user_id=
+                    user_id,
+
+                item_id=
+                    item_id,
+            )
+        )
+
+
+        return jsonify(
+            resultado
+        ), (
+            200
+            if resultado.get(
+                "success"
+            )
+            else 400
+        )
+
+
+    except Exception as e:
+
+        traceback.print_exc()
+
+
+        return jsonify({
+            "success": False,
+
+            "error": (
+                "Erro ao realizar compra "
+                "na Loja da Guilda: "
+                f"{str(e)}"
+            ),
+        }), 500
+
+# ============================================================
 # 🏰 MISSÕES COLETIVAS DO CLÃ - GUILDA DOS AVENTUREIROS
 # ============================================================
 

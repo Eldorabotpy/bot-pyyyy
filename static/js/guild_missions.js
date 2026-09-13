@@ -8,6 +8,12 @@
 
         dados: null,
 
+        lojaDados: null,
+
+        secao: "contratos",
+
+        lojaCarregando: false,
+
         // individual = contratos do personagem
         // coletivo   = contratos pertencentes ao clã
         escopo: "individual",
@@ -136,6 +142,10 @@
     window.abrirGuildaMissoes = async function() {
 
         estadoGuilda.modo = "atendente";
+
+        estadoGuilda.secao = "contratos";
+        estadoGuilda.lojaDados = null;
+
         estadoGuilda.escopo = "individual";
         
         const container = document.getElementById(
@@ -161,7 +171,7 @@
         atualizarEscopoGuilda();
 
         configurarModoInterface();
-
+        tualizarSecaoGuilda();
         falarLyria(
             "Saudações, aventureiro. Estou verificando os contratos disponíveis."
         );
@@ -189,7 +199,7 @@
         }
 
         estadoGuilda.modo = "diario";
-
+        estadoGuilda.secao = "contratos";
         estadoGuilda.escopo = "individual";
 
         // Diário mostra somente o que foi aceito.
@@ -202,7 +212,7 @@
         container.style.display = "flex";
 
         configurarModoInterface();
-
+        atualizarSecaoGuilda();
         atualizarAbas();
         atualizarFiltros();
         atualizarEscopoGuilda();
@@ -310,8 +320,205 @@
 
         liberarMenuGlobal();
     };
+     
+    // ========================================================
+    // 🏪 SEÇÃO PRINCIPAL — CONTRATOS / LOJA
+    // ========================================================
+
+    function atualizarSecaoGuilda() {
+
+        const secaoArea =
+            document.getElementById(
+                "guild-secao-area"
+            );
+
+        const contratosBtn =
+            document.getElementById(
+                "guild-secao-contratos"
+            );
+
+        const lojaBtn =
+            document.getElementById(
+                "guild-secao-loja"
+            );
+
+        const escopoArea =
+            document.getElementById(
+                "guild-escopo-area"
+            );
+
+        const abasArea =
+            document.getElementById(
+                "guild-abas-area"
+            );
+
+        const filtrosArea =
+            document.getElementById(
+                "guild-filtros-area"
+            );
 
 
+        // Diário nunca mostra Loja.
+        if (
+            estadoGuilda.modo ===
+            "diario"
+        ) {
+
+            if (secaoArea) {
+                secaoArea.style.display =
+                    "none";
+            }
+
+            if (escopoArea) {
+                escopoArea.style.display =
+                    "none";
+            }
+
+            if (abasArea) {
+                abasArea.style.display =
+                    "none";
+            }
+
+            if (filtrosArea) {
+                filtrosArea.style.display =
+                    "none";
+            }
+
+            return;
+        }
+
+        if (secaoArea) {
+            secaoArea.style.display =
+                "grid";
+        }
+
+
+        if (contratosBtn) {
+            contratosBtn.classList.toggle(
+                "ativa",
+                estadoGuilda.secao ===
+                    "contratos"
+            );
+        }
+
+
+        if (lojaBtn) {
+            lojaBtn.classList.toggle(
+                "ativa",
+                estadoGuilda.secao ===
+                    "loja"
+            );
+        }
+
+
+        const mostrandoLoja =
+            estadoGuilda.secao ===
+            "loja";
+
+
+        if (escopoArea) {
+            escopoArea.style.display =
+                mostrandoLoja
+                    ? "none"
+                    : "grid";
+        }
+
+
+        if (abasArea) {
+            abasArea.style.display =
+                mostrandoLoja
+                    ? "none"
+                    : "grid";
+        }
+
+
+        if (filtrosArea) {
+
+            if (mostrandoLoja) {
+
+                filtrosArea.style.display =
+                    "none";
+
+            } else {
+ 
+                filtrosArea.style.display =
+                    estadoGuilda.escopo ===
+                        "coletivo"
+                        ? "none"
+                        : "flex";
+            }
+        }
+
+
+        atualizarPontos();
+    }
+
+
+    window.mudarSecaoGuilda =
+        async function(secao) {
+
+            if (
+                ![
+                    "contratos",
+                    "loja"
+                ].includes(secao)
+            ) {
+                return;
+            }
+
+
+            if (
+                estadoGuilda.modo ===
+                "diario"
+            ) {  
+                return;
+            }
+
+
+            if (
+                estadoGuilda.secao ===
+                secao
+            ) {
+                return;
+            }
+
+
+            estadoGuilda.secao =
+                secao;
+
+
+            atualizarSecaoGuilda();
+
+
+            if (
+                secao ===
+                "loja"
+            ) {
+
+                falarLyria(
+                    "Aqui você pode trocar seus Pontos da Guilda por receitas exclusivas conquistadas através da sua reputação."
+                );
+
+                await carregarLojaGuilda();
+
+                return;
+            }
+
+
+            // Voltou para Contratos.
+            if (estadoGuilda.dados) {
+
+                atualizarPontos();
+
+                renderizarGuildaMissoes();
+
+                atualizarFalaLyria();
+
+            } else {
+
+                await carregarGuildaMissoes();
+            }
+        };
     // ========================================================
     // 📡 CARREGAR DADOS
     // ========================================================
@@ -422,6 +629,522 @@
     window.recarregarGuildaMissoes =
         carregarGuildaMissoes;
 
+    // ========================================================
+    // 🏪 CARREGAR LOJA DA GUILDA
+    // ========================================================
+
+    async function carregarLojaGuilda() {
+
+        if (
+            estadoGuilda.lojaCarregando
+        ) {
+            return;
+        }
+
+
+        const userId =
+            obterUserId();
+
+
+        if (!userId) {
+
+            mostrarErro(
+                "Não consegui identificar seu herói."
+            );
+
+            return;
+        }
+
+
+        const lista =
+            document.getElementById(
+                "guild-missoes-lista"
+            );
+
+
+        estadoGuilda.lojaCarregando =
+            true;
+
+
+        if (lista) {
+
+            lista.innerHTML = `
+                <div class="guild-carregando">
+                    🏪 Lyria está organizando
+                    o catálogo da Guilda...
+                </div>
+            `;
+        }
+
+
+        try {
+
+            const resposta =
+                await fetch(
+                    "/api/guild/loja/"
+                    +
+                    encodeURIComponent(
+                        userId
+                    )
+                    +
+                    "?t="
+                    +
+                    Date.now(),
+                    {
+                        method: "GET",
+                        cache: "no-store"
+                    }
+                );
+
+
+            const dados =
+                await resposta.json();
+
+
+            if (!dados.success) {
+ 
+                throw new Error(
+                    dados.error ||
+                    "Não foi possível carregar a Loja da Guilda."
+                );
+            }
+
+
+            estadoGuilda.lojaDados =
+                dados;
+
+
+            atualizarPontos();
+  
+            renderizarLojaGuilda();
+
+
+        } catch (erro) {
+
+            console.error(
+                "❌ [LOJA GUILDA]",
+                erro
+            );
+
+
+            if (lista) {
+
+                lista.innerHTML = `
+                    <div class="guild-vazio">
+                        ❌ ${escaparHTML(
+                            erro.message ||
+                            "Loja indisponível."
+                        )}
+                    </div>
+                `;
+            }
+
+
+            falarLyria(
+                erro.message ||
+                "O catálogo da Guilda está indisponível."
+            );
+
+
+        } finally {
+
+            estadoGuilda.lojaCarregando =
+                false;
+        }
+    }
+
+
+    function renderizarLojaGuilda() {
+
+        const lista =
+            document.getElementById(
+                "guild-missoes-lista"
+            );
+
+
+        if (!lista) {
+            return;
+        }
+
+
+        const dados =
+            estadoGuilda.lojaDados ||
+            {};
+
+
+        const itens =
+            Array.isArray(
+                dados.itens
+            )
+                ? dados.itens
+                : [];
+
+
+        if (itens.length === 0) {
+
+            lista.innerHTML = `
+                <div class="guild-vazio">
+                    Nenhum produto está disponível
+                    na Loja da Guilda.
+                </div>
+            `;
+
+            return;
+        }
+
+
+        lista.innerHTML =
+            itens
+                .map(
+                    criarHTMLProdutoLojaGuilda
+                )
+                .join("");
+    }
+
+
+    function criarHTMLProdutoLojaGuilda(
+        produto
+    ) {
+
+        const itemId =
+            String(
+                produto.id ||
+                ""
+            );
+
+
+        const nome =
+            produto.nome ||
+            "Receita da Guilda";
+
+
+        const custo =
+            Number(
+                produto.custo_pontos ||
+                0
+            );
+
+
+        const reputacaoMinima =
+            Number(
+                produto.reputacao_minima ||
+                0
+            );
+
+
+        const rankMinimo =
+            String(
+                produto.rank_minimo ||
+                "novato"
+            );
+
+
+        const rankNome =
+            rankMinimo
+                .charAt(0)
+                .toUpperCase()
+            +
+            rankMinimo.slice(1);
+
+
+        let htmlBotao = "";
+
+
+        if (
+            produto.desbloqueado
+        ) {
+
+            htmlBotao = `
+                <button
+                    class="
+                        guild-btn
+                        guild-btn-desbloqueada
+                    "
+                    disabled
+                >
+                    ✅ DESBLOQUEADA
+                </button>
+            `;
+
+        } else if (
+            !produto.receita_valida
+        ) {
+
+            htmlBotao = `
+                <button
+                    class="
+                        guild-btn
+                        guild-btn-bloqueado
+                    "
+                    disabled
+                >
+                    INDISPONÍVEL
+                </button>
+            `;
+
+        } else if (
+            !produto.atende_reputacao
+        ) {
+
+            htmlBotao = `
+                <button
+                    class="
+                        guild-btn
+                        guild-btn-bloqueado
+                    "
+                    disabled
+                >
+                    🔒 REQUER ${escaparHTML(
+                        rankNome
+                    )}
+                </button>
+            `;
+
+        } else if (
+            !produto.saldo_suficiente
+        ) {
+
+            htmlBotao = `
+                <button
+                    class="
+                        guild-btn
+                        guild-btn-bloqueado
+                    "
+                    disabled
+                >
+                    🏅 FALTAM
+                    ${Number(
+                        produto.pontos_faltantes ||
+                        0
+                    ).toLocaleString("pt-BR")}
+                    PTS
+                </button>
+            `;
+
+        } else {
+
+            htmlBotao = `
+                <button
+                    class="
+                        guild-btn
+                        guild-btn-comprar-receita
+                    "
+                    onclick="
+                        window.comprarReceitaGuilda(
+                            '${escaparHTML(
+                                itemId
+                            )}',
+                            this
+                        )
+                    "
+                >
+                    🏅 COMPRAR — ${custo.toLocaleString(
+                        "pt-BR"
+                    )} PTS
+                </button>
+            `;
+        }
+
+
+        return `
+            <div
+                class="
+                    guild-card
+                    guild-loja-card
+                    ${
+                        produto.desbloqueado
+                            ? "desbloqueado"
+                            : ""
+                    }
+                "
+            >
+
+                <div class="guild-card-topo">
+
+                    <div>
+ 
+                        <div class="guild-card-nome">
+                            ${escaparHTML(
+                                nome
+                            )}
+                        </div>
+
+                        <div class="guild-card-regiao">
+                            🏪 Loja da Guilda
+                        </div>
+
+                    </div>
+  
+                </div>
+
+
+                <div class="guild-tags">
+   
+                    <span class="guild-tag">
+                        🏅 Rank
+                        ${escaparHTML(
+                            rankNome
+                        )}
+                    </span>
+    
+                    <span class="guild-tag">
+                        ⭐ Reputação
+                        ${reputacaoMinima.toLocaleString(
+                            "pt-BR"
+                        )}
+                    </span>
+
+                    <span class="guild-tag">
+                        💰 ${custo.toLocaleString(
+                            "pt-BR"
+                        )}
+                        Pontos
+                    </span>
+ 
+                </div>
+
+
+                <div class="guild-card-descricao">
+                    ${escaparHTML(
+                        produto.descricao ||
+                        ""
+                    )}
+                </div>
+
+
+                ${
+                    produto.desbloqueado
+                        ? `
+                            <div
+                                class="guild-loja-desbloqueada-aviso"
+                            >
+                                ✅ Receita aprendida permanentemente.
+                            </div>
+                        `
+                        : ""
+                }
+
+
+                <div class="guild-card-acoes">
+                    ${htmlBotao}
+                </div>
+
+            </div>
+        `;
+    }
+
+
+    // ========================================================
+    // 🛒 COMPRAR RECEITA DA GUILDA
+    // ========================================================
+
+    window.comprarReceitaGuilda =
+        async function(
+            itemId,
+            botao
+        ) {
+
+            const userId =
+                obterUserId();
+
+ 
+            if (
+                !userId ||
+                !itemId
+            ) {
+                return;
+            }
+
+
+            if (botao) {
+ 
+                botao.disabled =
+                    true;
+ 
+                botao.innerText =
+                    "COMPRANDO...";
+            }
+
+
+            falarLyria(
+                "Um momento. Vou registrar este conhecimento em seu nome."
+            );
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/api/guild/loja/comprar",
+                        {
+                            method: "POST",
+ 
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    user_id:
+                                        userId,
+  
+                                    item_id:
+                                        itemId
+                                })
+                        }
+                    );
+
+
+                const resultado =
+                    await resposta.json();
+
+
+                if (!resultado.success) {
+
+                    throw new Error(
+                        resultado.error ||
+                        "Não foi possível comprar esta receita."
+                    );
+                }
+
+
+                falarLyria(
+                    resultado.message ||
+                    "Receita desbloqueada permanentemente!"
+                );
+
+
+                await carregarLojaGuilda();
+
+
+            } catch (erro) {
+
+                console.error(
+                    "❌ [LOJA GUILDA] Compra:",
+                    erro
+                );
+
+
+                mostrarErro(
+                    erro.message
+                );
+
+
+                if (botao) {
+
+                    botao.disabled =
+                        false;
+
+                    botao.innerText =
+                        "🏅 COMPRAR";
+                }
+            }
+        };
+
+
+    window.recarregarLojaGuilda =
+        carregarLojaGuilda;
 
     // ========================================================
     // 🗣️ FALA DINÂMICA DA LYRIA
@@ -499,15 +1222,25 @@
 
 
         const dados =
-            estadoGuilda.dados ||
-            {};
-
+            estadoGuilda.secao ===
+                "loja"
+                ? (
+                    estadoGuilda.lojaDados ||
+                    {}
+                )
+                : (
+                    estadoGuilda.dados ||
+                    {}
+                );
 
         // ====================================================
         // 🏰 PONTOS COLETIVOS DO CLÃ
         // ====================================================
 
         if (
+            estadoGuilda.secao !==
+                "loja"
+            &&
             estadoGuilda.escopo ===
             "coletivo"
         ) {
@@ -557,6 +1290,7 @@
 
         const reputacao =
             Number(
+                dados.reputacao_total ??
                 dados.pontos_guilda_total ??
                 saldo
             );

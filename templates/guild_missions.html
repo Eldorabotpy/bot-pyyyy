@@ -73,6 +73,39 @@
                 0
             </strong>
         </div>
+        
+        <!-- =============================================
+            SEÇÃO PRINCIPAL
+        ============================================== -->
+
+        <div
+            id="guild-secao-area"
+            class="guild-abas guild-secao-principal"
+        >
+            <button
+                id="guild-secao-contratos"
+                class="guild-aba ativa"
+                onclick="
+                    window.mudarSecaoGuilda(
+                        'contratos'
+                    )
+                "
+            >
+                📜 Contratos
+            </button>
+
+            <button
+                id="guild-secao-loja"
+                class="guild-aba"
+                onclick="
+                    window.mudarSecaoGuilda(
+                        'loja'
+                    )
+                "
+            >
+                🏪 Loja da Guilda
+            </button>
+        </div>
 
         <!-- =============================================
              ESCOPO DOS CONTRATOS
