@@ -97,6 +97,257 @@ FREQUENCIAS_VALIDAS = {
 }
 
 # ============================================================
+# 🏅 RANKS DA GUILDA DOS AVENTUREIROS
+# ============================================================
+#
+# A reputação total do personagem nunca diminui.
+#
+# pontos_total
+#     -> determina o Rank da Guilda
+#
+# pontos
+#     -> será o saldo gastável na Loja da Guilda
+#
+# ============================================================
+
+GUILD_RANKS = (
+
+    {
+        "id": "novato",
+        "nome": "Novato",
+        "reputacao_minima": 0,
+    },
+
+    {
+        "id": "ferro",
+        "nome": "Ferro",
+        "reputacao_minima": 50,
+    },
+
+    {
+        "id": "bronze",
+        "nome": "Bronze",
+        "reputacao_minima": 150,
+    },
+
+    {
+        "id": "prata",
+        "nome": "Prata",
+        "reputacao_minima": 350,
+    },
+
+    {
+        "id": "ouro",
+        "nome": "Ouro",
+        "reputacao_minima": 700,
+    },
+
+    {
+        "id": "platina",
+        "nome": "Platina",
+        "reputacao_minima": 1200,
+    },
+
+    {
+        "id": "mestre",
+        "nome": "Mestre",
+        "reputacao_minima": 2000,
+    },
+
+    {
+        "id": "lendario",
+        "nome": "Lendário",
+        "reputacao_minima": 3500,
+    },
+)
+
+def obter_rank_guilda(
+    pontos_total,
+):
+    """
+    Retorna o Rank oficial da Guilda
+    a partir da reputação histórica.
+
+    Esta função NÃO usa o saldo gastável.
+    """
+
+    try:
+        pontos_total = max(
+            0,
+            int(
+                pontos_total
+                or 0
+            ),
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        pontos_total = 0
+
+
+    rank_atual = (
+        GUILD_RANKS[0]
+    )
+
+    proximo_rank = None
+
+
+    for indice, rank in enumerate(
+        GUILD_RANKS
+    ):
+
+        minimo = int(
+            rank.get(
+                "reputacao_minima",
+                0,
+            )
+            or 0
+        )
+
+
+        if pontos_total >= minimo:
+
+            rank_atual = rank
+
+            if (
+                indice + 1
+                <
+                len(
+                    GUILD_RANKS
+                )
+            ):
+                proximo_rank = (
+                    GUILD_RANKS[
+                        indice + 1
+                    ]
+                )
+
+            else:
+                proximo_rank = None
+
+            continue
+
+
+        break
+
+
+    minimo_atual = int(
+        rank_atual.get(
+            "reputacao_minima",
+            0,
+        )
+        or 0
+    )
+
+
+    if proximo_rank:
+
+        minimo_proximo = int(
+            proximo_rank.get(
+                "reputacao_minima",
+                0,
+            )
+            or 0
+        )
+
+
+        faltante = max(
+            0,
+            minimo_proximo
+            -
+            pontos_total,
+        )
+
+
+        tamanho_faixa = max(
+            1,
+            minimo_proximo
+            -
+            minimo_atual,
+        )
+
+
+        progresso_faixa = max(
+            0,
+            pontos_total
+            -
+            minimo_atual,
+        )
+
+
+        progresso_percentual = min(
+            100,
+            max(
+                0,
+                round(
+                    (
+                        progresso_faixa
+                        /
+                        tamanho_faixa
+                    )
+                    *
+                    100
+                ),
+            ),
+        )
+
+
+        proximo_dados = {
+            "id":
+                proximo_rank["id"],
+
+            "nome":
+                proximo_rank["nome"],
+
+            "reputacao_minima":
+                minimo_proximo,
+        }
+
+
+    else:
+
+        minimo_proximo = None
+
+        faltante = 0
+
+        progresso_percentual = 100
+
+        proximo_dados = None
+
+
+    return {
+
+        "id":
+            rank_atual["id"],
+
+        "nome":
+            rank_atual["nome"],
+
+        "reputacao_minima":
+            minimo_atual,
+
+        "reputacao_total":
+            pontos_total,
+
+        "proximo_rank":
+            proximo_dados,
+
+        "reputacao_proximo_rank":
+            minimo_proximo,
+
+        "reputacao_faltante":
+            faltante,
+
+        "progresso_percentual":
+            progresso_percentual,
+
+        "nivel_maximo":
+            proximo_rank is None,
+    }
+
+# ============================================================
 # NOMES DAS REGIÕES
 # ============================================================
 

@@ -58,6 +58,7 @@ from .guild_mission_registry import (
 
     obter_missao,
     listar_missoes_ativas,
+    obter_rank_guilda,
 )
 
 
@@ -158,6 +159,7 @@ def _serializar(valor):
 def _estado_padrao():
     return {
         "pontos": 0,
+        "pontos_total": 0,
         "ativas": {},
         "concluidas": {},
     }
@@ -184,11 +186,74 @@ def _obter_estado(jogador):
         estado["concluidas"] = {}
 
     try:
-        estado["pontos"] = int(
-            estado.get("pontos", 0) or 0
+        estado["pontos"] = max(
+            0,
+            int(
+                estado.get(
+                    "pontos",
+                    0,
+                )
+                or 0
+            ),
         )
+
     except Exception:
         estado["pontos"] = 0
+
+
+    # ========================================================
+    # 🏅 REPUTAÇÃO HISTÓRICA
+    # ========================================================
+    #
+    # Jogadores antigos possuíam apenas:
+    #
+    # guild_missions.pontos
+    #
+    # Na primeira leitura, usamos esse mesmo valor
+    # como reputação histórica inicial.
+    #
+    # Assim ninguém perde os pontos conquistados.
+    # ========================================================
+
+    if (
+        "pontos_total"
+        not in estado
+    ):
+        estado[
+            "pontos_total"
+        ] = estado["pontos"]
+
+    else:
+        try:
+            estado[
+                "pontos_total"
+            ] = max(
+                0,
+                int(
+                    estado.get(
+                        "pontos_total",
+                        0,
+                    )
+                    or 0
+                ),
+            )
+
+        except Exception:
+            estado[
+                "pontos_total"
+            ] = estado["pontos"]
+
+
+    # Segurança:
+    # reputação histórica nunca pode ficar
+    # abaixo do saldo legado já existente.
+    estado[
+        "pontos_total"
+    ] = max(
+        estado["pontos_total"],
+        estado["pontos"],
+    )
+
 
     return estado
 
@@ -413,19 +478,54 @@ def listar_missoes_jogador(user_id):
 
         concluidas.append(dados)
 
+    pontos_guilda = int(
+        estado.get(
+            "pontos",
+            0,
+        )
+        or 0
+    )
+
+
+    pontos_guilda_total = int(
+        estado.get(
+            "pontos_total",
+            pontos_guilda,
+        )
+        or 0
+    )
+
+
+    rank_guilda = (
+        obter_rank_guilda(
+            pontos_guilda_total
+        )
+    )
+
+
     return {
         "success": True,
 
-        "pontos_guilda": int(
-            estado.get("pontos", 0)
-            or 0
-        ),
+        # Saldo gastável.
+        "pontos_guilda":
+            pontos_guilda,
 
-        "ativas": ativas,
+        # Reputação histórica.
+        "pontos_guilda_total":
+            pontos_guilda_total,
 
-        "disponiveis": disponiveis,
+        # Rank oficial calculado pelo backend.
+        "rank_guilda":
+            rank_guilda,
 
-        "concluidas": concluidas,
+        "ativas":
+            ativas,
+
+        "disponiveis":
+            disponiveis,
+
+        "concluidas":
+            concluidas,
     }
 
 
@@ -1426,7 +1526,17 @@ def resgatar_recompensa(
         estado.get(
             "pontos",
             0,
-        ) or 0
+        )
+        or 0
+    ) + pontos
+
+
+    estado["pontos_total"] = int(
+        estado.get(
+            "pontos_total",
+            estado["pontos"] - pontos,
+        )
+        or 0
     ) + pontos
 
     agora = _agora()
@@ -1689,6 +1799,14 @@ def resgatar_recompensa(
                 mensagem_level,
         },
 
-        "pontos_guilda_total":
+        "pontos_guilda_saldo":
             estado["pontos"],
+
+        "pontos_guilda_total":
+            estado["pontos_total"],
+
+        "rank_guilda":
+            obter_rank_guilda(
+                estado["pontos_total"]
+            ),
     }

@@ -487,48 +487,434 @@
 
     function atualizarPontos() {
 
-        const pontos =
+        const area =
             document.getElementById(
-                "guild-pontos-total"
+                "guild-pontos-area"
             );
 
-        const label =
-            document.getElementById(
-                "guild-pontos-label"
-            );
 
-        if (!pontos) {
+        if (!area) {
             return;
         }
 
+
+        const dados =
+            estadoGuilda.dados ||
+            {};
+
+
+        // ====================================================
+        // 🏰 PONTOS COLETIVOS DO CLÃ
+        // ====================================================
 
         if (
             estadoGuilda.escopo ===
             "coletivo"
         ) {
 
-            pontos.innerText =
-                estadoGuilda.dados
-                    ?.pontos_cla || 0;
+            const pontosCla =
+                Number(
+                    dados.pontos_cla ||
+                    0
+                );
 
-            if (label) {
-                label.innerText =
-                    "Pontos do clã:";
-            }
+
+            area.innerHTML = `
+                <div
+                    style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 6px;
+                    "
+                >
+                    <span>
+                        🏰 Pontos do clã:
+                    </span>
+
+                    <strong>
+                        ${pontosCla.toLocaleString(
+                            "pt-BR"
+                        )}
+                    </strong>
+                </div>
+            `;
 
             return;
         }
 
 
-        pontos.innerText =
-            estadoGuilda.dados
-                ?.pontos_guilda || 0;
+        // ====================================================
+        // 🏅 PROGRESSÃO INDIVIDUAL DA GUILDA
+        // ====================================================
+
+        const saldo =
+            Number(
+                dados.pontos_guilda ||
+                0
+            );
 
 
-        if (label) {
-            label.innerText =
-                "Pontos pessoais:";
-        }
+        const reputacao =
+            Number(
+                dados.pontos_guilda_total ??
+                saldo
+            );
+
+
+        const rank =
+            (
+                dados.rank_guilda &&
+                typeof dados.rank_guilda ===
+                    "object"
+            )
+                ? dados.rank_guilda
+                : {};
+
+
+        const rankNome =
+            String(
+                rank.nome ||
+                "Novato"
+            );
+
+
+        const proximoRank =
+            (
+                rank.proximo_rank &&
+                typeof rank.proximo_rank ===
+                    "object"
+            )
+                ? rank.proximo_rank
+                : null;
+
+
+        const progresso =
+            Math.max(
+                0,
+                Math.min(
+                    100,
+                    Number(
+                        rank
+                            .progresso_percentual ||
+                        0
+                    )
+                )
+            );
+
+
+        const faltam =
+            Math.max(
+                0,
+                Number(
+                    rank
+                        .reputacao_faltante ||
+                    0
+                )
+            );
+
+
+        const nivelMaximo =
+            Boolean(
+                rank.nivel_maximo
+            );
+
+
+        area.innerHTML = `
+            <div
+                style="
+                    width: 100%;
+                    max-width: 350px;
+
+                    margin:
+                        4px auto 8px;
+
+                    padding:
+                        10px 12px;
+
+                    background:
+                        linear-gradient(
+                            145deg,
+                            rgba(
+                                216,
+                                184,
+                                90,
+                                0.10
+                            ),
+                            rgba(
+                                14,
+                                22,
+                                36,
+                                0.85
+                            )
+                        );
+
+                    border:
+                        1px solid
+                        rgba(
+                            216,
+                            184,
+                            90,
+                            0.28
+                        );
+
+                    border-radius:
+                        11px;
+                "
+            >
+
+                <!-- TOPO -->
+                <div
+                    style="
+                        display: flex;
+                        align-items: center;
+                        justify-content:
+                            space-between;
+
+                        gap: 10px;
+                    "
+                >
+
+                    <div
+                        style="
+                            text-align: left;
+                        "
+                    >
+                        <div
+                            style="
+                                color: #8f9bad;
+                                font-size: 0.61rem;
+                                font-weight: 700;
+                                text-transform:
+                                    uppercase;
+                            "
+                        >
+                            Rank da Guilda
+                        </div>
+
+                        <div
+                            style="
+                                margin-top: 2px;
+
+                                color: #f4dc91;
+
+                                font-family:
+                                    Cinzel,
+                                    serif;
+
+                                font-size:
+                                    0.88rem;
+
+                                font-weight:
+                                    900;
+                            "
+                        >
+                            🏅 ${escaparHTML(
+                                rankNome
+                            )}
+                        </div>
+                    </div>
+
+
+                    <div
+                        style="
+                            text-align: right;
+                        "
+                    >
+                        <div
+                            style="
+                                color: #8f9bad;
+                                font-size: 0.61rem;
+                                font-weight: 700;
+                                text-transform:
+                                    uppercase;
+                            "
+                        >
+                            Saldo
+                        </div>
+
+                        <strong
+                            style="
+                                display: block;
+                                margin-top: 2px;
+                                color: #ffffff;
+                                font-size: 0.85rem;
+                            "
+                        >
+                            ${saldo.toLocaleString(
+                                "pt-BR"
+                            )}
+                            pts
+                        </strong>
+                    </div>
+
+                </div>
+
+
+                <!-- REPUTAÇÃO -->
+                <div
+                    style="
+                        display: flex;
+                        align-items: center;
+                        justify-content:
+                            space-between;
+
+                        gap: 8px;
+
+                        margin-top:
+                            9px;
+
+                        color:
+                            #b9c3d0;
+
+                        font-size:
+                            0.66rem;
+                    "
+                >
+
+                    <span>
+                        Reputação:
+                        <strong
+                            style="
+                                color: #eef2f7;
+                            "
+                        >
+                            ${reputacao.toLocaleString(
+                                "pt-BR"
+                            )}
+                        </strong>
+                    </span>
+
+
+                    ${
+                        nivelMaximo
+                            ? `
+                                <span
+                                    style="
+                                        color:
+                                            #f4dc91;
+
+                                        font-weight:
+                                            800;
+                                    "
+                                >
+                                    Rank máximo
+                                </span>
+                            `
+                            : `
+                                <span>
+                                    Próximo:
+                                    <strong
+                                        style="
+                                            color:
+                                                #f4dc91;
+                                        "
+                                    >
+                                        ${escaparHTML(
+                                            proximoRank
+                                                ?.nome ||
+                                            ""
+                                        )}
+                                    </strong>
+                                </span>
+                            `
+                    }
+
+                </div>
+
+
+                <!-- BARRA -->
+                <div
+                    style="
+                        height: 7px;
+
+                        margin-top:
+                            7px;
+
+                        overflow:
+                            hidden;
+
+                        background:
+                            #070d17;
+
+                        border:
+                            1px solid
+                            rgba(
+                                216,
+                                184,
+                                90,
+                                0.18
+                            );
+
+                        border-radius:
+                            999px;
+                    "
+                >
+
+                    <div
+                        style="
+                            width:
+                                ${progresso}%;
+
+                            height:
+                                100%;
+
+                            background:
+                                linear-gradient(
+                                    90deg,
+                                    #8b6c24,
+                                    #e7c75f
+                                );
+
+                            border-radius:
+                                999px;
+                        "
+                    ></div>
+
+                </div>
+
+
+                <!-- RODAPÉ -->
+                <div
+                    style="
+                        margin-top:
+                            5px;
+
+                        color:
+                            #8491a3;
+
+                        font-size:
+                            0.61rem;
+
+                        text-align:
+                            right;
+                    "
+                >
+                    ${
+                        nivelMaximo
+                            ? `
+                                Progressão máxima
+                                alcançada
+                            `
+                            : `
+                                Faltam
+                                <strong
+                                    style="
+                                        color:
+                                            #cbd5e1;
+                                    "
+                                >
+                                    ${faltam.toLocaleString(
+                                        "pt-BR"
+                                    )}
+                                </strong>
+                                pontos de reputação
+                            `
+                    }
+                </div>
+
+            </div>
+        `;
     }
 
      
