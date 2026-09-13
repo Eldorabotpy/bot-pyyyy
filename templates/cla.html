@@ -830,6 +830,70 @@
         border-color: rgba(216, 184, 90, 0.68);
     }
 
+    /* =======================================================
+       🖼️ ABAS DO CLÃ COM IMAGEM
+       ======================================================= */
+
+    .cla-aba-btn.cla-aba-imagem {
+        width: 132px;
+        min-width: 132px;
+        height: 45px;
+        min-height: 45px;
+
+        padding: 0;
+
+        overflow: visible;
+
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+
+        box-shadow: none;
+    }
+
+    .cla-aba-btn.cla-aba-imagem img {
+        width: 100%;
+        height: 100%;
+
+        display: block;
+
+        object-fit: contain;
+
+        pointer-events: none;
+
+        transition:
+            transform 0.16s ease,
+            filter 0.16s ease,
+            opacity 0.16s ease;
+    }
+
+    .cla-aba-btn.cla-aba-imagem:not(.active) img {
+        opacity: 0.72;
+        filter:
+            brightness(0.78)
+            saturate(0.82);
+    }
+
+    .cla-aba-btn.cla-aba-imagem.active {
+        background: transparent;
+        border: 0;
+
+        box-shadow: none;
+    }
+
+    .cla-aba-btn.cla-aba-imagem.active img {
+        opacity: 1;
+
+        filter:
+            brightness(1.10)
+            saturate(1.08);
+
+        transform: translateY(-1px);
+    }
+
+    .cla-aba-btn.cla-aba-imagem:active img {
+        transform: scale(0.96);
+    }
 
     /* =======================================================
        AVISOS, CARREGAMENTO E ÁREA PERIGOSA
@@ -1646,27 +1710,42 @@
                 >
                     <button
                         type="button"
-                        class="cla-aba-btn active"
+                        class="cla-aba-btn cla-aba-imagem active"
                         data-cla-tab="visao-geral"
+                        aria-label="Geral"
+                        title="Geral"
                     >
-                        Visão geral
+                        <img
+                            src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/cla/abas/geral.png"
+                            alt="Geral"
+                        >
                     </button>
 
                     <button
                         type="button"
-                        class="cla-aba-btn"
+                        class="cla-aba-btn cla-aba-imagem"
                         data-cla-tab="membros"
+                        aria-label="Membros"
+                        title="Membros"
                     >
-                        Membros
+                        <img
+                            src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/cla/abas/membros.png"
+                            alt="Membros"
+                        >
                     </button>
                     
                     <button
                         type="button"
                         id="cla-aba-cargos-btn"
-                        class="cla-aba-btn"
+                        class="cla-aba-btn cla-aba-imagem"
                         data-cla-tab="cargos"
+                        aria-label="Cargos"
+                        title="Cargos"
                     >
-                        🎖️ Cargos
+                        <img
+                            src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/cla/abas/cargos.png"
+                            alt="Cargos"
+                        >
                     </button>
 
                     <button
@@ -1680,26 +1759,41 @@
 
                     <button
                         type="button"
-                        class="cla-aba-btn"
+                        class="cla-aba-btn cla-aba-imagem"
                         data-cla-tab="tesouro"
+                        aria-label="Tesouro"
+                        title="Tesouro"
                     >
-                        Tesouro
+                        <img
+                            src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/cla/abas/tesouro.png"
+                            alt="Tesouro"
+                        >
                     </button>
 
                     <button
                         type="button"
-                        class="cla-aba-btn"
+                        class="cla-aba-btn cla-aba-imagem"
                         data-cla-tab="loja"
+                        aria-label="Loja"
+                        title="Loja"
                     >
-                        🏅 Loja
+                        <img
+                            src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/cla/abas/loja.png"
+                            alt="Loja"
+                        >
                     </button>
 
                     <button
                         type="button"
-                        class="cla-aba-btn"
+                        class="cla-aba-btn cla-aba-imagem"
                         data-cla-tab="melhorias"
+                        aria-label="Melhorias"
+                        title="Melhorias"
                     >
-                        Melhorias
+                        <img
+                            src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/cla/abas/melhorias.png"
+                            alt="Melhorias"
+                        >
                     </button>
 
                     <button
