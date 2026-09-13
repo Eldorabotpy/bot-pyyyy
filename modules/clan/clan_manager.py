@@ -45,6 +45,7 @@ from .clan_registry import (
     obter_proximo_nivel,
     obter_custo_evolucao,
     obter_beneficios_nivel,
+    obter_dias_tesouraria,
 
     obter_cargos_padrao,
     obter_config_cargo_padrao,
@@ -72,7 +73,6 @@ CLAN_CUSTO_CRIACAO_OURO = 5000
 # ============================================================
 
 TESOURARIA_CUSTO_GEMAS = 100
-TESOURARIA_DIAS = 30
 
 # ============================================================
 # 🔧 HELPERS
@@ -104,6 +104,29 @@ def obter_estado_tesouraria(
     cla,
 ):
     agora = _agora()
+    try:
+        nivel_cla = int(
+            cla.get(
+                "nivel",
+                CLAN_NIVEL_INICIAL,
+            )
+            or CLAN_NIVEL_INICIAL
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        nivel_cla = (
+            CLAN_NIVEL_INICIAL
+        )
+
+
+    duracao_dias = int(
+        obter_dias_tesouraria(
+            nivel_cla
+        )
+    )    
 
     tesouraria = (
         cla.get(
@@ -157,7 +180,7 @@ def obter_estado_tesouraria(
             TESOURARIA_CUSTO_GEMAS,
 
         "duracao_dias":
-            TESOURARIA_DIAS,
+            duracao_dias,
 
         "ativada_em":
             _normalizar_datetime_utc(
@@ -5642,6 +5665,13 @@ def comprar_tesouraria(
         )
     )
 
+    duracao_dias = int(
+        estado_atual.get(
+            "duracao_dias",
+            30,
+        )
+        or 30
+    )
 
     # ========================================================
     # ✅ JÁ ESTÁ ATIVA
@@ -5877,7 +5907,7 @@ def comprar_tesouraria(
 
 
     # ========================================================
-    # 🗓️ ATIVA POR 30 DIAS
+    # 🗓️ ATIVA PELO PERÍODO DO NÍVEL DO CLÃ
     # ========================================================
 
     agora = _agora()
@@ -5886,7 +5916,7 @@ def comprar_tesouraria(
         agora
         +
         timedelta(
-            days=TESOURARIA_DIAS
+            days=duracao_dias
         )
     )
 
@@ -6116,7 +6146,7 @@ def comprar_tesouraria(
         mensagem=(
             f"{nome_lider} ativou a "
             f"Tesouraria do clã por "
-            f"{TESOURARIA_DIAS} dias."
+            f"{duracao_dias} dias."
         ),
 
         autor_id=
@@ -6130,7 +6160,7 @@ def comprar_tesouraria(
                 TESOURARIA_CUSTO_GEMAS,
 
             "duracao_dias":
-                TESOURARIA_DIAS,
+                duracao_dias,
 
             "ciclo":
                 proximo_ciclo,
@@ -6169,7 +6199,7 @@ def comprar_tesouraria(
 
         "message": (
             "Tesouraria ativada por "
-            f"{TESOURARIA_DIAS} dias!"
+            f"{duracao_dias} dias!"
         ),
 
         "gemas_gastas":
@@ -6409,6 +6439,13 @@ def enviar_ouro_tesouro(
         )
     )
 
+    duracao_tesouraria = int(
+        estado_tesouraria.get(
+            "duracao_dias",
+            30,
+        )
+        or 30
+    )
 
     if not estado_tesouraria.get(
         "ativa"
@@ -6419,7 +6456,7 @@ def enviar_ouro_tesouro(
             "error": (
                 "A Tesouraria do clã não está ativa. "
                 "O líder precisa adquirir a licença "
-                f"de {TESOURARIA_DIAS} dias."
+                f"de {duracao_tesouraria} dias."
             ),
         }
     

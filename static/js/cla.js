@@ -7053,6 +7053,11 @@
                 100
             );
 
+        const duracao =
+            Number(
+                tesouraria.duracao_dias ||
+                30
+            );
 
         const confirmou =
             await confirmarAcaoCla({
@@ -7062,7 +7067,9 @@
                 mensagem:
                     `Deseja gastar ${formatarNumero(
                         custo
-                    )} Gemas para liberar a administração do tesouro por 30 dias?`,
+                    )} Gemas para liberar a administração do tesouro por ${formatarNumero(
+                        duracao
+                    )} dias?`,
 
                 confirmarTexto:
                     `💎 Ativar por ${formatarNumero(
