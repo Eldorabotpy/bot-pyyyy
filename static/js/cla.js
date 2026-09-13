@@ -3050,6 +3050,30 @@
             comClan.style.display = "none";
         }
 
+        const cabecalhoLogo = elemento(
+            "cla-cabecalho-logo"
+        );
+
+        const cabecalhoLogoFallback = elemento(
+            "cla-cabecalho-logo-fallback"
+        );
+
+
+        if (cabecalhoLogo) {
+            cabecalhoLogo.removeAttribute(
+                "src"
+            );
+
+            cabecalhoLogo.style.display =
+                "none";
+        }
+
+
+        if (cabecalhoLogoFallback) {
+            cabecalhoLogoFallback.style.display =
+                "block";
+        }
+        
                 const custo = Number(
             estadoCla
                 .custoCriacaoOuro ||
@@ -3137,7 +3161,77 @@
             "cla-nivel",
             `Nv. ${Number(clan.nivel || 1)}`
         );
-        
+
+        // ====================================================
+        // 🛡️ BRASÃO NO CABEÇALHO
+        // ====================================================
+
+        const cabecalhoLogo = elemento(
+            "cla-cabecalho-logo"
+        );
+
+        const cabecalhoLogoFallback = elemento(
+            "cla-cabecalho-logo-fallback"
+        );
+
+
+        const cabecalhoLogoUrl = String(
+            clan.logo_url ||
+            ""
+        ).trim();
+
+
+        if (
+            cabecalhoLogo &&
+            cabecalhoLogoUrl
+        ) {
+
+            cabecalhoLogo.style.display =
+                "block";
+
+            cabecalhoLogo.src =
+                `${cabecalhoLogoUrl}?v=${Date.now()}`;
+
+
+            if (cabecalhoLogoFallback) {
+                cabecalhoLogoFallback.style.display =
+                    "none";
+            }
+
+
+            cabecalhoLogo.onerror =
+                function () {
+
+                    cabecalhoLogo.style.display =
+                        "none";
+
+
+                    if (
+                        cabecalhoLogoFallback
+                    ) {
+                        cabecalhoLogoFallback.style.display =
+                            "block";
+                    }
+                };
+
+        } else {
+
+            if (cabecalhoLogo) {
+                cabecalhoLogo.removeAttribute(
+                    "src"
+                );
+
+                cabecalhoLogo.style.display =
+                    "none";
+            }
+
+
+            if (cabecalhoLogoFallback) {
+                cabecalhoLogoFallback.style.display =
+                    "block";
+            }
+        }
+
         const logoImagem = elemento("cla-logo");
         const logoFallback = elemento(
             "cla-logo-fallback"
