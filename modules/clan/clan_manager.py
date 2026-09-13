@@ -609,6 +609,132 @@ def _cargo_no_cla(cla, player_id):
 
 CLAN_SCHEMA_VERSION = 2
 
+def _garantir_capacidade_cla(
+    cla,
+):
+    """
+    Mantém a capacidade de membros sincronizada
+    com o nível oficial definido no clan_registry.
+
+    Corrige automaticamente clãs antigos que ainda
+    possuam capacidade de uma regra anterior.
+    """
+
+    if not isinstance(
+        cla,
+        dict,
+    ):
+        return cla
+
+
+    clan_id = cla.get(
+        "_id"
+    )
+
+    if not clan_id:
+        return cla
+
+
+    try:
+        nivel = int(
+            cla.get(
+                "nivel",
+                CLAN_NIVEL_INICIAL,
+            )
+            or CLAN_NIVEL_INICIAL
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        nivel = (
+            CLAN_NIVEL_INICIAL
+        )
+
+
+    capacidade_oficial = int(
+        obter_capacidade(
+            nivel
+        )
+    )
+
+
+    try:
+        capacidade_salva = int(
+            cla.get(
+                "capacidade_membros",
+                0,
+            )
+            or 0
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        capacidade_salva = 0
+
+
+    if (
+        capacidade_salva
+        ==
+        capacidade_oficial
+    ):
+        return cla
+
+
+    # Atualiza imediatamente o objeto usado
+    # pela requisição atual.
+    cla[
+        "capacidade_membros"
+    ] = capacidade_oficial
+
+
+    try:
+
+        resultado = (
+            clans_collection.update_one(
+                {
+                    "_id":
+                        clan_id,
+                },
+                {
+                    "$set": {
+                        "capacidade_membros":
+                            capacidade_oficial,
+
+                        "atualizado_em":
+                            _agora(),
+                    }
+                },
+            )
+        )
+
+
+        if (
+            resultado.modified_count
+            == 1
+        ):
+            print(
+                "🛠️ [CLÃ] "
+                "Capacidade corrigida: "
+                f"{capacidade_salva} -> "
+                f"{capacidade_oficial} "
+                f"(Nv.{nivel})"
+            )
+
+
+    except Exception as erro:
+
+        print(
+            "⚠️ [CLÃ CAPACIDADE] "
+            "Não foi possível sincronizar "
+            f"o clã {clan_id}: {erro}"
+        )
+
+
+    return cla
 
 def _garantir_cargos_cla(
     cla,
@@ -632,6 +758,15 @@ def _garantir_cargos_cla(
 
     if not clan_id:
         return cla
+
+
+    # ========================================================
+    # 👥 SINCRONIZA CAPACIDADE PELO NÍVEL
+    # ========================================================
+
+    cla = _garantir_capacidade_cla(
+        cla
+    )
 
 
     cargos_atuais = cla.get(
