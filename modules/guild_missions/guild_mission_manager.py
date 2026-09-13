@@ -1295,6 +1295,23 @@ def resgatar_recompensa(
         ) or 0
     )
 
+    medalhas_cla = int(
+        recompensas.get(
+            "medalhas_cla",
+            0,
+        )
+        or 0
+    )
+
+
+    # Medalhas de Clã são recompensa
+    # exclusiva de contratos de clã.
+    if (
+        missao.get("tipo")
+        != TIPO_CLA
+    ):
+        medalhas_cla = 0
+
     # ========================================================
     # 💰 OURO
     # ========================================================
@@ -1391,6 +1408,17 @@ def resgatar_recompensa(
         })
 
     # ========================================================
+    # 🏅 MEDALHAS DE CLÃ
+    # ========================================================
+
+    if medalhas_cla > 0:
+
+        player_manager.add_medalhas_cla(
+            jogador,
+            medalhas_cla,
+        )
+
+    # ========================================================
     # 🏅 PONTOS PESSOAIS DA GUILDA
     # ========================================================
 
@@ -1438,6 +1466,9 @@ def resgatar_recompensa(
 
         "xp_cla_entregue":
             False,
+
+        "medalhas_cla":
+            medalhas_cla,
     }
 
     estado["ativas"].pop(
@@ -1460,6 +1491,13 @@ def resgatar_recompensa(
                 "gold",
                 0,
             ) or 0
+        ),
+        "medalhas_cla": int(
+            jogador.get(
+                "medalhas_cla",
+                0,
+            )
+            or 0
         ),
 
         "xp": int(
@@ -1615,6 +1653,9 @@ def resgatar_recompensa(
             "xp": xp,
 
             "gold": gold,
+
+            "medalhas_cla":
+                medalhas_cla,
 
             "pontos_guilda":
                 pontos,

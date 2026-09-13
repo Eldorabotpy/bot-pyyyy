@@ -10,6 +10,10 @@ from zoneinfo import ZoneInfo
 
 from bson import ObjectId
 
+from modules.player.core import (
+    users_collection,
+)
+
 from modules.clan import clan_manager
 
 from modules.clan.clan_registry import (
@@ -225,6 +229,184 @@ def _pode_gerenciar(
         )
     )
 
+# ============================================================
+# 🏅 CRÉDITO IDEMPOTENTE DE MEDALHAS
+# ============================================================
+
+def _creditar_medalhas_missao_cla(
+    player_id,
+    missao_id,
+    periodo,
+    quantidade,
+):
+    """
+    Entrega Medalhas de Clã ao participante
+    apenas uma vez por missão/período.
+
+    O marcador e o saldo são gravados na
+    mesma operação atômica.
+    """
+
+    player_id = _object_id(
+        player_id
+    )
+
+    missao_id = str(
+        missao_id or ""
+    ).strip()
+
+    periodo = str(
+        periodo or ""
+    ).strip()
+
+
+    try:
+        quantidade = max(
+            0,
+            int(
+                quantidade
+                or 0
+            ),
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        quantidade = 0
+
+
+    if (
+        not player_id
+        or
+        not missao_id
+        or
+        not periodo
+        or
+        quantidade <= 0
+    ):
+        return {
+            "success": False,
+            "error":
+                "Recompensa de Medalhas inválida.",
+        }
+
+
+    # Não inclui clan_id de propósito.
+    #
+    # Assim um jogador não consegue receber
+    # a mesma missão diária/semanal duas vezes
+    # trocando de clã durante o período.
+    recompensa_id = (
+        f"{missao_id}:"
+        f"{periodo}"
+    )
+
+
+    resultado = (
+        users_collection
+        .update_one(
+            {
+                "_id":
+                    player_id,
+
+                "recompensas_missoes_cla_ids": {
+                    "$ne":
+                        recompensa_id,
+                },
+            },
+            {
+                "$inc": {
+                    "medalhas_cla":
+                        quantidade,
+                },
+
+                "$addToSet": {
+                    "recompensas_missoes_cla_ids":
+                        recompensa_id,
+                },
+            },
+        )
+    )
+
+
+    if (
+        resultado.modified_count
+        == 1
+    ):
+
+        clan_manager._limpar_cache(
+            player_id
+        )
+
+        return {
+            "success": True,
+            "creditado": True,
+            "ja_creditado": False,
+            "ignorado": False,
+            "recompensa_id":
+                recompensa_id,
+        }
+
+
+    jogador = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "recompensas_missoes_cla_ids":
+                    1,
+            },
+        )
+    )
+
+
+    # Conta removida/inexistente não pode
+    # deixar a missão do clã travada para sempre.
+    if not jogador:
+        return {
+            "success": True,
+            "creditado": False,
+            "ja_creditado": False,
+            "ignorado": True,
+            "recompensa_id":
+                recompensa_id,
+        }
+
+
+    recebidas = (
+        jogador.get(
+            "recompensas_missoes_cla_ids",
+            [],
+        )
+        or []
+    )
+
+
+    if (
+        recompensa_id
+        in recebidas
+    ):
+        return {
+            "success": True,
+            "creditado": False,
+            "ja_creditado": True,
+            "ignorado": False,
+            "recompensa_id":
+                recompensa_id,
+        }
+
+
+    return {
+        "success": False,
+        "error": (
+            "Não foi possível entregar "
+            "as Medalhas ao participante."
+        ),
+    }
 
 # ============================================================
 # ⏰ PERÍODO DA MISSÃO
@@ -1851,6 +2033,281 @@ def resgatar_recompensa_cla(
         ) or 0
     )
 
+    medalhas_participante = max(
+        0,
+        int(
+            recompensas.get(
+                "medalhas_cla_participante",
+                0,
+            )
+            or 0
+        ),
+    )
+
+
+    min_contribuicao_medalhas = max(
+        1,
+        int(
+            recompensas.get(
+                "min_contribuicao_medalhas",
+                1,
+            )
+            or 1
+        ),
+    )
+
+    # ========================================================
+    # 🏅 MEDALHAS DOS PARTICIPANTES
+    # ========================================================
+
+    contribuicoes = (
+        estado_ativo.get(
+            "contribuicoes",
+            {},
+        )
+        or {}
+    )
+
+
+    periodo_missao = str(
+        estado_ativo.get(
+            "periodo"
+        )
+        or obter_periodo_missao(
+            missao
+        )
+    )
+
+
+    participantes_medalhas = []
+    erros_medalhas = []
+
+
+    if (
+        medalhas_participante > 0
+        and
+        isinstance(
+            contribuicoes,
+            dict,
+        )
+    ):
+
+        for (
+            membro_id,
+            info
+        ) in contribuicoes.items():
+
+            if isinstance(
+                info,
+                dict,
+            ):
+
+                try:
+                    contribuicao = int(
+                        info.get(
+                            "quantidade",
+                            0,
+                        )
+                        or 0
+                    )
+
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+                    contribuicao = 0
+
+
+                nome_membro = str(
+                    info.get(
+                        "nome",
+                        "Aventureiro",
+                    )
+                )
+
+            else:
+
+                try:
+                    contribuicao = int(
+                        info
+                        or 0
+                    )
+
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+                    contribuicao = 0
+
+
+                nome_membro = (
+                    "Aventureiro"
+                )
+
+
+            # Não participou o suficiente.
+            if (
+                contribuicao
+                <
+                min_contribuicao_medalhas
+            ):
+                continue
+
+
+            membro_object_id = (
+                _object_id(
+                    membro_id
+                )
+            )
+
+
+            if not membro_object_id:
+                continue
+
+
+            resultado_medalhas = (
+                _creditar_medalhas_missao_cla(
+                    player_id=
+                        membro_object_id,
+
+                    missao_id=
+                        missao_id,
+
+                    periodo=
+                        periodo_missao,
+
+                    quantidade=
+                        medalhas_participante,
+                )
+            )
+
+
+            if not resultado_medalhas.get(
+                "success"
+            ):
+
+                erros_medalhas.append({
+                    "user_id":
+                        str(
+                            membro_object_id
+                        ),
+
+                    "nome":
+                        nome_membro,
+
+                    "error":
+                        resultado_medalhas.get(
+                            "error",
+                            "Erro ao entregar Medalhas.",
+                        ),
+                })
+
+                continue
+
+
+            participantes_medalhas.append({
+
+                "user_id":
+                    str(
+                        membro_object_id
+                    ),
+
+                "nome":
+                    nome_membro,
+
+                "contribuicao":
+                    contribuicao,
+
+                "medalhas_cla":
+                    medalhas_participante,
+
+                "creditado":
+                    bool(
+                        resultado_medalhas.get(
+                            "creditado"
+                        )
+                    ),
+
+                "ja_creditado":
+                    bool(
+                        resultado_medalhas.get(
+                            "ja_creditado"
+                        )
+                    ),
+
+                "ignorado":
+                    bool(
+                        resultado_medalhas.get(
+                            "ignorado"
+                        )
+                    ),
+            })
+
+
+    # ========================================================
+    # ❌ FALHA PARCIAL
+    #
+    # Quem já recebeu fica protegido pelo marcador.
+    # A missão volta para PRONTA_ENTREGA e pode ser
+    # tentada novamente sem duplicar Medalhas.
+    # ========================================================
+
+    if erros_medalhas:
+
+        clan_manager.clans_collection.update_one(
+            {
+                "_id":
+                    cla["_id"],
+
+                f"{campo}.status":
+                    STATUS_ENTREGANDO,
+            },
+            {
+                "$set": {
+                    f"{campo}.status":
+                        STATUS_PRONTA_ENTREGA,
+
+                    "atualizado_em":
+                        _agora(),
+                }
+            },
+        )
+
+
+        return {
+            "success": False,
+
+            "error": (
+                "Não foi possível entregar "
+                "as Medalhas para todos os "
+                "participantes. Tente novamente."
+            ),
+
+            "erros_medalhas":
+                erros_medalhas,
+        }
+
+
+    participantes_validos_medalhas = [
+        item
+
+        for item
+        in participantes_medalhas
+
+        if not item.get(
+            "ignorado",
+            False,
+        )
+    ]
+
+
+    medalhas_cla_total = (
+        len(
+            participantes_validos_medalhas
+        )
+        *
+        medalhas_participante
+    )
 
     agora = _agora()
 
@@ -1916,6 +2373,18 @@ def resgatar_recompensa_cla(
 
         "pontos_cla":
             pontos_cla,
+
+        "medalhas_cla_participante":
+            medalhas_participante,
+
+        "min_contribuicao_medalhas":
+            min_contribuicao_medalhas,
+
+        "medalhas_cla_total":
+            medalhas_cla_total,
+
+        "participantes_medalhas":
+            participantes_medalhas,
     }
 
 
@@ -2044,6 +2513,13 @@ def resgatar_recompensa_cla(
 
                 "pontos_cla":
                     pontos_cla,
+                "medalhas_cla_total":
+                    medalhas_cla_total,
+
+                "participantes_medalhas":
+                    len(
+                        participantes_validos_medalhas
+                    ),                    
             },
         )
 
@@ -2078,5 +2554,17 @@ def resgatar_recompensa_cla(
 
             "pontos_cla":
                 pontos_cla,
+
+            "medalhas_cla_participante":
+                medalhas_participante,
+
+            "min_contribuicao_medalhas":
+                min_contribuicao_medalhas,
+
+            "medalhas_cla_total":
+                medalhas_cla_total,
+
+            "participantes_medalhas":
+                participantes_medalhas,
         },
     }

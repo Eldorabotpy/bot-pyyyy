@@ -23,6 +23,30 @@
         modo: "atendente"
     };
 
+    const MEDALHA_CLA_ICON_URL =
+        "https://raw.githubusercontent.com/"
+        + "Eldorabotpy/static-img/main/assets/"
+        + "moedas/medalha_cla.png";
+
+
+    function medalhaClaHTML(
+        tamanho = 16
+    ) {
+        return `
+            <img
+                src="${MEDALHA_CLA_ICON_URL}"
+                alt="Medalha de Clã"
+                style="
+                    width: ${tamanho}px;
+                    height: ${tamanho}px;
+                    object-fit: contain;
+                    display: inline-block;
+                    vertical-align: middle;
+                    flex: 0 0 auto;
+                "
+            >
+        `;
+    }
 
     // ========================================================
     // 🔧 HELPERS
@@ -1536,6 +1560,27 @@
                 recompensas.xp_cla || 0
             );
 
+        const medalhasCla =
+            Number(
+                recompensas
+                    .medalhas_cla || 0
+            );
+
+
+        const medalhasClaParticipante =
+            Number(
+                recompensas
+                    .medalhas_cla_participante ||
+                0
+            );
+
+
+        const minContribuicaoMedalhas =
+            Number(
+                recompensas
+                    .min_contribuicao_medalhas ||
+                0
+            );
 
         if (gold > 0) {
             partes.push(
@@ -1573,6 +1618,56 @@
             );
         }
 
+        if (medalhasCla > 0) {
+            partes.push(`
+                <span
+                    style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                    "
+                >
+                    ${medalhaClaHTML(16)}
+
+                    <span>
+                        ${medalhasCla}
+                        Medalhas de Clã
+                    </span>
+                </span>
+            `);
+        }
+
+        if (
+            medalhasClaParticipante > 0
+        ) {
+
+            partes.push(`
+                <span
+                    style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                    "
+                >
+                    ${medalhaClaHTML(16)}
+
+                    <span>
+                        ${medalhasClaParticipante}
+                        Medalhas por participante
+
+                        ${
+                            minContribuicaoMedalhas > 0
+                                ? `
+                                    · mínimo
+                                    ${minContribuicaoMedalhas}
+                                    contribuições
+                                `
+                                : ""
+                        }
+                    </span>
+                </span>
+            `);
+        }
 
         const itens =
             recompensas.itens || [];
@@ -1880,6 +1975,15 @@
                 }
                 if (
                     Number(
+                        r.medalhas_cla || 0
+                    ) > 0
+                ) {
+
+                    texto +=
+                        ` +${r.medalhas_cla} Medalhas de Clã.`;
+                }
+                if (
+                    Number(
                         r.xp_cla || 0
                     ) > 0
                 ) {
@@ -1910,6 +2014,38 @@
                         ` +${r.pontos_cla} pontos do clã.`;
                 }
 
+                const participantesMedalhas =
+                    Array.isArray(
+                        r.participantes_medalhas
+                    )
+                        ? r.participantes_medalhas
+                            .filter(
+                                participante =>
+                                    !participante
+                                        ?.ignorado
+                            )
+                            .length
+                        : 0;
+
+
+                if (
+                    Number(
+                        r.medalhas_cla_total || 0
+                    ) > 0
+                    &&
+                    Number(
+                        r.medalhas_cla_participante ||
+                        0
+                    ) > 0
+                ) {
+
+                    texto +=
+                        ` ${participantesMedalhas} participante(s) receberam `
+                        +
+                        `${r.medalhas_cla_participante} Medalhas de Clã cada `
+                        +
+                        `(${r.medalhas_cla_total} no total).`;
+                }
                 falarLyria(texto);
 
 
