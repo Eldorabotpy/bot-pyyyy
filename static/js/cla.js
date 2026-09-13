@@ -25,6 +25,11 @@
         logoSelecionada: null
     };
 
+    const MEDALHA_CLA_ICON_URL =
+        "https://raw.githubusercontent.com/"
+        + "Eldorabotpy/static-img/main/assets/"
+        + "moedas/medalha_cla.png";
+
     // ========================================================
     // 🔧 HELPERS
     // ========================================================
@@ -66,6 +71,23 @@
             .toLocaleString("pt-BR");
     }
 
+    function medalhaClaHtml(
+        tamanho = 18
+    ) {
+        return `
+            <img
+                src="${MEDALHA_CLA_ICON_URL}"
+                alt="Medalha de Clã"
+                style="
+                    width: ${tamanho}px;
+                    height: ${tamanho}px;
+                    object-fit: contain;
+                    display: inline-block;
+                    vertical-align: middle;
+                "
+            >
+        `;
+    }
 
     function obterConfigCargo(cargoId) {
         const id = String(
@@ -680,6 +702,7 @@
         cancelarTexto = "Cancelar",
         icone = "⚠️",
         imagemUrl = "",
+        confirmarImagemUrl = "",
         perigo = false
     } = {}) {
         return new Promise(
@@ -723,6 +746,11 @@
                 const imagemUrlSegura =
                     escaparHtml(
                         imagemUrl
+                    );
+
+                const confirmarImagemUrlSegura =
+                    escaparHtml(
+                        confirmarImagemUrl
                     );
 
                 const fundoConfirmar =
@@ -977,7 +1005,34 @@
                                         pointer;
                                 "
                             >
-                                ${confirmarSeguro}
+                                ${
+                                    confirmarImagemUrlSegura
+                                        ? `
+                                            <span
+                                                style="
+                                                    display: inline-flex;
+                                                    align-items: center;
+                                                    justify-content: center;
+                                                    gap: 7px;
+                                                "
+                                            >
+                                                <img
+                                                    src="${confirmarImagemUrlSegura}"
+                                                    alt=""
+                                                    style="
+                                                        width: 18px;
+                                                        height: 18px;
+                                                        object-fit: contain;
+                                                    "
+                                                >
+
+                                                <span>
+                                                    ${confirmarSeguro}
+                                                </span>
+                                            </span>
+                                        `
+                                        : confirmarSeguro
+                                }
                             </button>
                         </div>
                     </div>
@@ -1156,8 +1211,10 @@
         }
 
 
-        saldo.textContent =
-            "🏅 ...";
+        saldo.innerHTML = `
+            ${medalhaClaHtml(22)}
+            <span>...</span>
+        `;
 
 
         lista.innerHTML = `
@@ -1182,12 +1239,24 @@
             // 🏅 SALDO REAL
             // ================================================
 
-            saldo.textContent =
-                `🏅 ${
-                    formatarNumero(
-                        dados.medalhas_cla
-                    )
-                }`;
+            saldo.innerHTML = `
+                <span
+                    style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 7px;
+                    "
+                >
+                    ${medalhaClaHtml(24)}
+
+                    <strong>
+                        ${formatarNumero(
+                            dados.medalhas_cla
+                        )}
+                    </strong>
+                </span>
+            `;
 
 
             // ================================================
@@ -1507,11 +1576,21 @@
                                                 };
                                         "
                                     >
-                                        <div>
-                                            🏅
-                                            ${formatarNumero(
-                                                custo
-                                            )}
+                                        <div
+                                            style="
+                                                display: flex;
+                                                align-items: center;
+                                                justify-content: center;
+                                                gap: 4px;
+                                            "
+                                        >
+                                            ${medalhaClaHtml(15)}
+
+                                            <span>
+                                                ${formatarNumero(
+                                                    custo
+                                                )}
+                                            </span>
                                         </div>
 
                                         <div
@@ -1546,8 +1625,10 @@
             );
 
 
-            saldo.textContent =
-                "🏅 --";
+            saldo.innerHTML = `
+                ${medalhaClaHtml(22)}
+                <span>--</span>
+            `;
 
 
             lista.innerHTML = `
@@ -1602,7 +1683,10 @@
                     `Deseja comprar 1x ${nomeItem} com suas Medalhas de Clã?`,
 
                 confirmarTexto:
-                    "🏅 Comprar",
+                    "Comprar",
+
+                confirmarImagemUrl:
+                    MEDALHA_CLA_ICON_URL,
 
                 cancelarTexto:
                     "Cancelar",
@@ -3073,7 +3157,7 @@
             cabecalhoLogoFallback.style.display =
                 "block";
         }
-        
+
                 const custo = Number(
             estadoCla
                 .custoCriacaoOuro ||
