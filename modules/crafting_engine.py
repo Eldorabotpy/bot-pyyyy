@@ -117,22 +117,175 @@ def _is_weapon_slot(slot: str | None) -> bool:
     return s in {"arma", "weapon", "weap", "primary_weapon"}
 
 # =========================
+# Receitas desbloqueáveis
+# =========================
+
+def _recipe_unlock_id(
+    recipe: dict,
+) -> str | None:
+    """
+    Retorna o identificador de desbloqueio
+    exigido pela receita.
+
+    Receitas normais não possuem unlock_id
+    e continuam funcionando normalmente.
+    """
+
+    if not isinstance(
+        recipe,
+        dict,
+    ):
+        return None
+
+
+    unlock_id = str(
+        recipe.get(
+            "unlock_id",
+            "",
+        )
+        or ""
+    ).strip()
+
+
+    return (
+        unlock_id
+        if unlock_id
+        else None
+    )
+
+
+def _recipe_is_unlocked(
+    player_data: dict,
+    recipe: dict,
+) -> bool:
+    """
+    Confirma se o personagem possui o
+    desbloqueio permanente da receita.
+
+    Receita sem unlock_id:
+        sempre liberada.
+
+    Receita com unlock_id:
+        precisa existir em
+        guild_missions.receitas_desbloqueadas.
+    """
+
+    unlock_id = (
+        _recipe_unlock_id(
+            recipe
+        )
+    )
+
+
+    # Receita normal do jogo.
+    if not unlock_id:
+        return True
+
+
+    guild_missions = (
+        player_data.get(
+            "guild_missions",
+            {},
+        )
+        or {}
+    )
+
+
+    desbloqueadas = (
+        guild_missions.get(
+            "receitas_desbloqueadas",
+            [],
+        )
+        or []
+    )
+
+
+    if not isinstance(
+        desbloqueadas,
+        (
+            list,
+            tuple,
+            set,
+        ),
+    ):
+        return False
+
+
+    ids = {
+        str(item).strip()
+
+        for item
+        in desbloqueadas
+
+        if str(item).strip()
+    }
+
+
+    return (
+        unlock_id
+        in ids
+    )
+# =========================
 # Preview / Start
 # =========================
 
 async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
     rec = get_recipe(recipe_id)
+
     if not rec:
         return None
+
+
     rec = dict(rec)
-    inputs = _as_dict(rec.get("inputs"))
+
+
+    unlock_id = (
+        _recipe_unlock_id(
+            rec
+        )
+    )
+
+
+    desbloqueada = (
+        _recipe_is_unlocked(
+            player_data,
+            rec,
+        )
+    )
+
+
+    inputs = _as_dict(
+        rec.get("inputs")
+    )
     prof = _as_dict(player_data.get("profession"))
     ok_prof = (prof.get("type") == rec.get("profession")) and \
               (int(prof.get("level", 1)) >= int(rec.get("level_req", 1)))
     duration = await _seconds_with_perks(player_data, int(rec.get("time_seconds", 60)))
 
     return {
-        "can_craft": bool(ok_prof and _has_materials(player_data, inputs)),
+        "can_craft": bool(
+            desbloqueada
+            and
+            ok_prof
+            and
+            _has_materials(
+                player_data,
+                inputs,
+            )
+        ),
+
+        "requer_desbloqueio":
+            bool(
+                unlock_id
+            ),
+
+        "desbloqueada":
+            bool(
+                desbloqueada
+            ),
+
+        "unlock_id":
+            unlock_id,
         "duration_seconds": duration,
         "inputs": dict(inputs),
         "result_base_id": rec.get("result_base_id"),
@@ -141,11 +294,40 @@ async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
     }
 
 async def start_craft(user_id: str, recipe_id: str):
-    pdata = await player_manager.get_player_data(user_id)
-    rec = get_recipe(recipe_id)
-    if not pdata or not rec: return "Receita de forja inválida."
-    rec = dict(rec)
-    
+    pdata = await player_manager.get_player_data(
+        user_id
+    )
+
+    rec = get_recipe(
+        recipe_id
+    )
+
+
+    if not pdata or not rec:
+        return (
+            "Receita de forja inválida."
+        )
+
+
+    rec = dict(
+        rec
+    )
+
+
+    # ========================================================
+    # 🔒 RECEITA ESPECIAL DESBLOQUEÁVEL
+    # ========================================================
+
+    if not _recipe_is_unlocked(
+        pdata,
+        rec,
+    ):
+        return (
+            "Esta receita especial ainda "
+            "não foi desbloqueada."
+        )
+
+
     # 1. Validação de Profissão Inteligente
     req_prof = rec.get("profession")
     req_lvl = int(rec.get("level_req", 1))

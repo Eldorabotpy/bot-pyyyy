@@ -160,6 +160,7 @@ def _estado_padrao():
     return {
         "pontos": 0,
         "pontos_total": 0,
+        "receitas_desbloqueadas": [],
         "ativas": {},
         "concluidas": {},
     }
@@ -173,6 +174,17 @@ def _obter_estado(jogador):
     if not isinstance(estado, dict):
         estado = _estado_padrao()
 
+    else:
+        # Trabalha sobre uma cópia superficial.
+        #
+        # Assim normalizações como pontos_total
+        # não alteram silenciosamente o documento
+        # original carregado do Mongo antes da
+        # migração ser realmente persistida.
+        estado = dict(
+            estado
+        )
+
     if not isinstance(
         estado.get("ativas"),
         dict
@@ -184,6 +196,35 @@ def _obter_estado(jogador):
         dict
     ):
         estado["concluidas"] = {}
+
+    receitas_desbloqueadas = (
+        estado.get(
+            "receitas_desbloqueadas",
+            [],
+        )
+        or []
+    )
+
+
+    if not isinstance(
+        receitas_desbloqueadas,
+        list,
+    ):
+        receitas_desbloqueadas = []
+
+
+    estado[
+        "receitas_desbloqueadas"
+    ] = [
+        str(receita_id).strip()
+
+        for receita_id
+        in receitas_desbloqueadas
+
+        if str(
+            receita_id
+        ).strip()
+    ]
 
     try:
         estado["pontos"] = max(
@@ -257,6 +298,1018 @@ def _obter_estado(jogador):
 
     return estado
 
+def _garantir_reputacao_persistida(
+    jogador,
+    estado,
+):
+    """
+    Migra jogadores antigos que possuíam
+    somente guild_missions.pontos.
+
+    A migração é executada uma única vez:
+    cria guild_missions.pontos_total usando
+    o saldo legado já existente.
+    """
+
+    if not isinstance(
+        jogador,
+        dict,
+    ):
+        return False
+
+
+    player_id = jogador.get(
+        "_id"
+    )
+
+
+    if not player_id:
+        return False
+
+
+    guild_original = jogador.get(
+        "guild_missions"
+    )
+
+
+    # Se o campo já existe no Mongo,
+    # não há nada para migrar.
+    if (
+        isinstance(
+            guild_original,
+            dict,
+        )
+        and
+        "pontos_total"
+        in guild_original
+    ):
+        return False
+
+
+    pontos_total = int(
+        estado.get(
+            "pontos_total",
+            0,
+        )
+        or 0
+    )
+
+
+    resultado = (
+        users_collection
+        .update_one(
+            {
+                "_id":
+                    player_id,
+
+                "guild_missions.pontos_total": {
+                    "$exists":
+                        False,
+                },
+            },
+            {
+                "$set": {
+                    "guild_missions.pontos_total":
+                        pontos_total,
+                }
+            },
+        )
+    )
+
+
+    if (
+        resultado.modified_count
+        == 1
+    ):
+        print(
+            "🏅 [GUILDA] "
+            "Reputação histórica migrada: "
+            f"jogador={player_id} "
+            f"pontos_total={pontos_total}"
+        )
+
+        _limpar_cache(
+            player_id
+        )
+
+        return True
+
+
+    return False
+
+# ============================================================
+# 🏅 PONTOS DA GUILDA - ADICIONAR
+# ============================================================
+
+def adicionar_pontos_guilda(
+    user_id,
+    quantidade,
+):
+    """
+    Adiciona Pontos da Guilda ao personagem.
+
+    Aumenta simultaneamente:
+    - saldo gastável
+    - reputação histórica
+
+    A reputação é usada para determinar o Rank.
+    """
+
+    player_id = _object_id(
+        user_id
+    )
+
+
+    try:
+        quantidade = int(
+            quantidade
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        quantidade = 0
+
+
+    if (
+        not player_id
+        or quantidade <= 0
+    ):
+        return {
+            "success": False,
+            "error":
+                "Quantidade de pontos inválida.",
+        }
+
+
+    jogador = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "guild_missions":
+                    1,
+            },
+        )
+    )
+
+
+    if not jogador:
+        return {
+            "success": False,
+            "error":
+                "Herói não encontrado.",
+        }
+
+
+    estado = _obter_estado(
+        jogador
+    )
+
+
+    # Jogadores antigos precisam possuir
+    # pontos_total antes de usarmos $inc.
+    _garantir_reputacao_persistida(
+        jogador,
+        estado,
+    )
+
+
+    resultado = (
+        users_collection
+        .update_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "$inc": {
+
+                    "guild_missions.pontos":
+                        quantidade,
+
+                    "guild_missions.pontos_total":
+                        quantidade,
+                }
+            },
+        )
+    )
+
+
+    if (
+        resultado.modified_count
+        != 1
+    ):
+        return {
+            "success": False,
+            "error": (
+                "Não foi possível adicionar "
+                "os Pontos da Guilda."
+            ),
+        }
+
+
+    _limpar_cache(
+        player_id
+    )
+
+
+    jogador_final = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "guild_missions":
+                    1,
+            },
+        )
+        or {}
+    )
+
+
+    estado_final = (
+        _obter_estado(
+            jogador_final
+        )
+    )
+
+
+    saldo = int(
+        estado_final.get(
+            "pontos",
+            0,
+        )
+        or 0
+    )
+
+
+    reputacao_total = int(
+        estado_final.get(
+            "pontos_total",
+            saldo,
+        )
+        or 0
+    )
+
+
+    return {
+        "success": True,
+
+        "pontos_adicionados":
+            quantidade,
+
+        "saldo":
+            saldo,
+
+        "reputacao_total":
+            reputacao_total,
+
+        "rank_guilda":
+            obter_rank_guilda(
+                reputacao_total
+            ),
+    }
+
+
+# ============================================================
+# 🛒 PONTOS DA GUILDA - GASTAR
+# ============================================================
+
+def gastar_pontos_guilda(
+    user_id,
+    quantidade,
+):
+    """
+    Gasta somente o saldo disponível.
+
+    A reputação histórica NÃO diminui,
+    portanto o Rank da Guilda nunca cai
+    por causa de uma compra.
+    """
+
+    player_id = _object_id(
+        user_id
+    )
+
+
+    try:
+        quantidade = int(
+            quantidade
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        quantidade = 0
+
+
+    if (
+        not player_id
+        or quantidade <= 0
+    ):
+        return {
+            "success": False,
+            "error":
+                "Quantidade de pontos inválida.",
+        }
+
+
+    jogador = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "guild_missions":
+                    1,
+            },
+        )
+    )
+
+
+    if not jogador:
+        return {
+            "success": False,
+            "error":
+                "Herói não encontrado.",
+        }
+
+
+    estado = _obter_estado(
+        jogador
+    )
+
+
+    _garantir_reputacao_persistida(
+        jogador,
+        estado,
+    )
+
+
+    saldo_atual = int(
+        estado.get(
+            "pontos",
+            0,
+        )
+        or 0
+    )
+
+
+    if (
+        saldo_atual
+        <
+        quantidade
+    ):
+        return {
+            "success": False,
+
+            "error":
+                "Pontos da Guilda insuficientes.",
+
+            "saldo":
+                saldo_atual,
+
+            "necessario":
+                quantidade,
+        }
+
+
+    # ========================================================
+    # 🔒 GASTO ATÔMICO
+    # ========================================================
+
+    resultado = (
+        users_collection
+        .update_one(
+            {
+                "_id":
+                    player_id,
+
+                "guild_missions.pontos": {
+                    "$gte":
+                        quantidade,
+                },
+            },
+            {
+                "$inc": {
+                    "guild_missions.pontos":
+                        -quantidade,
+                }
+            },
+        )
+    )
+
+
+    if (
+        resultado.modified_count
+        != 1
+    ):
+
+        jogador_atual = (
+            users_collection
+            .find_one(
+                {
+                    "_id":
+                        player_id,
+                },
+                {
+                    "guild_missions":
+                        1,
+                },
+            )
+            or {}
+        )
+
+
+        estado_atual = (
+            _obter_estado(
+                jogador_atual
+            )
+        )
+
+
+        saldo_atualizado = int(
+            estado_atual.get(
+                "pontos",
+                0,
+            )
+            or 0
+        )
+
+
+        if (
+            saldo_atualizado
+            <
+            quantidade
+        ):
+            return {
+                "success": False,
+
+                "error":
+                    "Pontos da Guilda insuficientes.",
+
+                "saldo":
+                    saldo_atualizado,
+
+                "necessario":
+                    quantidade,
+            }
+
+
+        return {
+            "success": False,
+            "error": (
+                "Não foi possível gastar "
+                "os Pontos da Guilda."
+            ),
+        }
+
+
+    _limpar_cache(
+        player_id
+    )
+
+
+    jogador_final = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "guild_missions":
+                    1,
+            },
+        )
+        or {}
+    )
+
+
+    estado_final = (
+        _obter_estado(
+            jogador_final
+        )
+    )
+
+
+    saldo_final = int(
+        estado_final.get(
+            "pontos",
+            0,
+        )
+        or 0
+    )
+
+
+    reputacao_total = int(
+        estado_final.get(
+            "pontos_total",
+            0,
+        )
+        or 0
+    )
+
+
+    return {
+        "success": True,
+
+        "pontos_gastos":
+            quantidade,
+
+        "saldo":
+            saldo_final,
+
+        "reputacao_total":
+            reputacao_total,
+
+        "rank_guilda":
+            obter_rank_guilda(
+                reputacao_total
+            ),
+    }
+
+# ============================================================
+# 📜 DESBLOQUEAR RECEITA DA GUILDA
+# ============================================================
+
+def desbloquear_receita_guilda(
+    user_id,
+    unlock_id,
+    custo_pontos,
+    reputacao_minima=0,
+):
+    """
+    Compra permanentemente uma receita especial.
+
+    Operação atômica:
+    - desconta somente o saldo de Pontos da Guilda
+    - adiciona o unlock_id
+    - NÃO reduz reputação histórica
+    - impede compra duplicada
+    """
+
+    player_id = _object_id(
+        user_id
+    )
+
+
+    unlock_id = str(
+        unlock_id or ""
+    ).strip()
+
+
+    try:
+        custo_pontos = int(
+            custo_pontos
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        custo_pontos = 0
+
+
+    try:
+        reputacao_minima = max(
+            0,
+            int(
+                reputacao_minima
+                or 0
+            ),
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        reputacao_minima = 0
+
+
+    if not player_id:
+        return {
+            "success": False,
+            "error":
+                "ID de jogador inválido.",
+        }
+
+
+    if not unlock_id:
+        return {
+            "success": False,
+            "error":
+                "Receita inválida.",
+        }
+
+
+    if custo_pontos <= 0:
+        return {
+            "success": False,
+            "error":
+                "Custo da receita inválido.",
+        }
+
+
+    jogador = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "guild_missions":
+                    1,
+            },
+        )
+    )
+
+
+    if not jogador:
+        return {
+            "success": False,
+            "error":
+                "Herói não encontrado.",
+        }
+
+
+    estado = _obter_estado(
+        jogador
+    )
+
+
+    # Jogador legado precisa possuir
+    # pontos_total antes da compra.
+    _garantir_reputacao_persistida(
+        jogador,
+        estado,
+    )
+
+
+    saldo_atual = int(
+        estado.get(
+            "pontos",
+            0,
+        )
+        or 0
+    )
+
+
+    reputacao_total = int(
+        estado.get(
+            "pontos_total",
+            saldo_atual,
+        )
+        or 0
+    )
+
+
+    desbloqueadas = set(
+        estado.get(
+            "receitas_desbloqueadas",
+            [],
+        )
+        or []
+    )
+
+
+    # ========================================================
+    # ✅ JÁ APRENDEU
+    # ========================================================
+
+    if unlock_id in desbloqueadas:
+
+        return {
+            "success": False,
+
+            "error":
+                "Você já desbloqueou esta receita.",
+
+            "ja_desbloqueada":
+                True,
+
+            "saldo":
+                saldo_atual,
+
+            "reputacao_total":
+                reputacao_total,
+        }
+
+
+    # ========================================================
+    # 🏅 REPUTAÇÃO MÍNIMA
+    # ========================================================
+
+    if (
+        reputacao_total
+        <
+        reputacao_minima
+    ):
+
+        return {
+            "success": False,
+
+            "error": (
+                "Sua reputação na Guilda "
+                "ainda não é suficiente."
+            ),
+
+            "reputacao_total":
+                reputacao_total,
+
+            "reputacao_minima":
+                reputacao_minima,
+
+            "saldo":
+                saldo_atual,
+        }
+
+
+    # ========================================================
+    # 💰 SALDO
+    # ========================================================
+
+    if saldo_atual < custo_pontos:
+
+        return {
+            "success": False,
+
+            "error":
+                "Pontos da Guilda insuficientes.",
+
+            "saldo":
+                saldo_atual,
+
+            "necessario":
+                custo_pontos,
+
+            "reputacao_total":
+                reputacao_total,
+        }
+
+
+    # ========================================================
+    # 🔒 COMPRA ATÔMICA
+    # ========================================================
+    #
+    # A mesma atualização:
+    #
+    # - confirma saldo suficiente
+    # - confirma reputação
+    # - confirma que ainda não possui a receita
+    # - desconta os Pontos
+    # - registra o desbloqueio
+    #
+    # Duas compras simultâneas não podem cobrar duas vezes.
+    # ========================================================
+
+    resultado = (
+        users_collection
+        .update_one(
+            {
+                "_id":
+                    player_id,
+
+                "guild_missions.pontos": {
+                    "$gte":
+                        custo_pontos,
+                },
+
+                "guild_missions.pontos_total": {
+                    "$gte":
+                        reputacao_minima,
+                },
+
+                "guild_missions.receitas_desbloqueadas": {
+                    "$ne":
+                        unlock_id,
+                },
+            },
+            {
+                "$inc": {
+                    "guild_missions.pontos":
+                        -custo_pontos,
+                },
+
+                "$addToSet": {
+                    (
+                        "guild_missions."
+                        "receitas_desbloqueadas"
+                    ):
+                        unlock_id,
+                },
+            },
+        )
+    )
+
+
+    if (
+        resultado.modified_count
+        != 1
+    ):
+
+        jogador_atual = (
+            users_collection
+            .find_one(
+                {
+                    "_id":
+                        player_id,
+                },
+                {
+                    "guild_missions":
+                        1,
+                },
+            )
+            or {}
+        )
+
+
+        estado_atual = _obter_estado(
+            jogador_atual
+        )
+
+
+        saldo_agora = int(
+            estado_atual.get(
+                "pontos",
+                0,
+            )
+            or 0
+        )
+
+
+        reputacao_agora = int(
+            estado_atual.get(
+                "pontos_total",
+                saldo_agora,
+            )
+            or 0
+        )
+
+
+        desbloqueadas_agora = set(
+            estado_atual.get(
+                "receitas_desbloqueadas",
+                [],
+            )
+            or []
+        )
+
+
+        if (
+            unlock_id
+            in desbloqueadas_agora
+        ):
+            return {
+                "success": False,
+
+                "error":
+                    "Você já desbloqueou esta receita.",
+
+                "ja_desbloqueada":
+                    True,
+
+                "saldo":
+                    saldo_agora,
+
+                "reputacao_total":
+                    reputacao_agora,
+            }
+
+
+        if (
+            reputacao_agora
+            <
+            reputacao_minima
+        ):
+            return {
+                "success": False,
+
+                "error": (
+                    "Sua reputação na Guilda "
+                    "ainda não é suficiente."
+                ),
+
+                "saldo":
+                    saldo_agora,
+
+                "reputacao_total":
+                    reputacao_agora,
+
+                "reputacao_minima":
+                    reputacao_minima,
+            }
+
+
+        if (
+            saldo_agora
+            <
+            custo_pontos
+        ):
+            return {
+                "success": False,
+
+                "error":
+                    "Pontos da Guilda insuficientes.",
+
+                "saldo":
+                    saldo_agora,
+
+                "necessario":
+                    custo_pontos,
+
+                "reputacao_total":
+                    reputacao_agora,
+            }
+
+
+        return {
+            "success": False,
+            "error": (
+                "Não foi possível desbloquear "
+                "a receita."
+            ),
+        }
+
+
+    _limpar_cache(
+        player_id
+    )
+
+
+    jogador_final = (
+        users_collection
+        .find_one(
+            {
+                "_id":
+                    player_id,
+            },
+            {
+                "guild_missions":
+                    1,
+            },
+        )
+        or {}
+    )
+
+
+    estado_final = _obter_estado(
+        jogador_final
+    )
+
+
+    saldo_final = int(
+        estado_final.get(
+            "pontos",
+            0,
+        )
+        or 0
+    )
+
+
+    reputacao_final = int(
+        estado_final.get(
+            "pontos_total",
+            0,
+        )
+        or 0
+    )
+
+
+    return {
+        "success": True,
+
+        "message":
+            "Receita desbloqueada permanentemente!",
+
+        "unlock_id":
+            unlock_id,
+
+        "pontos_gastos":
+            custo_pontos,
+
+        "saldo":
+            saldo_final,
+
+        "reputacao_total":
+            reputacao_final,
+
+        "rank_guilda":
+            obter_rank_guilda(
+                reputacao_final
+            ),
+    }
 
 def _formatar_missao(
     missao,
@@ -346,7 +1399,20 @@ def listar_missoes_jogador(user_id):
             "error": "Herói não encontrado.",
         }
 
-    estado = _obter_estado(jogador)
+    estado = _obter_estado(
+        jogador
+    )
+
+
+    # ========================================================
+    # 🏅 MIGRA REPUTAÇÃO DOS JOGADORES ANTIGOS
+    # ========================================================
+
+    _garantir_reputacao_persistida(
+        jogador,
+        estado,
+    )
+
 
     nivel = int(
         jogador.get("level", 1) or 1

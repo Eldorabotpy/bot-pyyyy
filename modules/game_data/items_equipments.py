@@ -1282,4 +1282,87 @@ EQUIPMENTS_DATA = {
         "icon_url": "https://raw.githubusercontent.com/SeuUsuario/SeuRepositorio/main/potion_red_small.webp",
         "class_req": ["samurai"]
     },
+    # ============================================================
+    # 🏅 CONJUNTO DO AVENTUREIRO — GUILDA DOS AVENTUREIROS
+    # ============================================================
+
+    "botas_aventureiro_guilda": {
+        "display_name": "Botas do Aventureiro",
+        "emoji": "🥾",
+        "slot": "botas",
+        "type": "equipamento",
+        "category": "armadura",
+        "description": (
+            "Botas concedidas aos aventureiros que conquistam "
+            "prestígio dentro da Guilda dos Aventureiros."
+        ),
+        "stackable": False,
+        "tradable": False,
+        "media_key": "item_botas_aventureiro_guilda",
+        "icon_url": "",
+    },
+
+    "luvas_aventureiro_guilda": {
+        "display_name": "Luvas do Aventureiro",
+        "emoji": "🧤",
+        "slot": "luvas",
+        "type": "equipamento",
+        "category": "armadura",
+        "description": (
+            "Luvas reforçadas reservadas aos aventureiros "
+            "reconhecidos pela Guilda."
+        ),
+        "stackable": False,
+        "tradable": False,
+        "media_key": "item_luvas_aventureiro_guilda",
+        "icon_url": "",
+    },
+
+    "calcas_aventureiro_guilda": {
+        "display_name": "Calças do Aventureiro",
+        "emoji": "👖",
+        "slot": "calca",
+        "type": "equipamento",
+        "category": "armadura",
+        "description": (
+            "Proteção resistente criada para aventureiros "
+            "que enfrentam contratos cada vez mais perigosos."
+        ),
+        "stackable": False,
+        "tradable": False,
+        "media_key": "item_calcas_aventureiro_guilda",
+        "icon_url": "",
+    },
+
+    "couraca_aventureiro_guilda": {
+        "display_name": "Couraça do Aventureiro",
+        "emoji": "👕",
+        "slot": "armadura",
+        "type": "equipamento",
+        "category": "armadura",
+        "description": (
+            "Couraça especial produzida para aventureiros "
+            "de alta reputação dentro da Guilda."
+        ),
+        "stackable": False,
+        "tradable": False,
+        "media_key": "item_couraca_aventureiro_guilda",
+        "icon_url": "",
+    },
+
+    "elmo_aventureiro_guilda": {
+        "display_name": "Elmo do Aventureiro",
+        "emoji": "🪖",
+        "slot": "elmo",
+        "type": "equipamento",
+        "category": "armadura",
+        "description": (
+            "Elmo reservado aos aventureiros veteranos "
+            "reconhecidos pela Guilda dos Aventureiros."
+        ),
+        "stackable": False,
+        "tradable": False,
+        "media_key": "item_elmo_aventureiro_guilda",
+        "icon_url": "",
+    },
 }
