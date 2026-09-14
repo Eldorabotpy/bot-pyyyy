@@ -493,6 +493,7 @@ function aplicarImagemMaterialForja(imgEl, matId) {
 }
 const ForjaEngine = {
     receitas: {},
+    unlocksGuilda: new Set(),
     profSelecionada: null,
     receitaSelecionada: null,
     itemDesmontarSelecionado: null,
@@ -501,14 +502,83 @@ const ForjaEngine = {
 
     async iniciar() {
         try {
-            const res = await fetch('/api/crafting/recipes');
-            this.receitas = await res.json();
+            const charId = localStorage.getItem("jogadorEldoraID");
+
+            const resReceitas = await fetch(
+                '/api/crafting/recipes',
+                {
+                    cache: 'no-store'
+                }
+            );
+
+            this.receitas = await resReceitas.json();
+            this.unlocksGuilda = new Set();
+
+            if (charId) {
+                try {
+                    const resLoja = await fetch(
+                        `/api/guild/loja/${encodeURIComponent(charId)}?t=${Date.now()}`,
+                        {
+                            method: 'GET',
+                            cache: 'no-store'
+                        }
+                    );
+
+                    const dadosLoja = await resLoja.json();
+
+                    if (dadosLoja.success) {
+                        const desbloqueios = Array.isArray(
+                            dadosLoja.receitas_desbloqueadas
+                        )
+                            ? dadosLoja.receitas_desbloqueadas
+                            : [];
+
+                        this.unlocksGuilda = new Set(
+                            desbloqueios
+                                .map(id => String(id || "").trim())
+                                .filter(Boolean)
+                        );
+                    }
+
+                } catch (erroLoja) {
+                    console.warn(
+                        "⚠️ Não foi possível consultar os desbloqueios da Guilda:",
+                        erroLoja
+                    );
+                }
+            }
+
             this.definirAbaInicial();
-            ForjaUI.renderizarTudo(); 
-        } catch (e) { console.error("Erro fatal ao carregar Forja:", e); }
+            ForjaUI.renderizarTudo();
+
+        } catch (e) {
+            console.error(
+                "Erro fatal ao carregar Forja:",
+                e
+            );
+        }
+    },
+
+    receitaGuildaEstaDesbloqueada(receita) {
+        if (!receita || typeof receita !== "object") {
+            return true;
+        }
+
+        const unlockId = String(
+            receita.unlock_id || ""
+        ).trim();
+
+        if (!unlockId) {
+            return true;
+        }
+
+        return this.unlocksGuilda.has(
+            unlockId
+        );
     },
 
     definirAbaInicial() {
+
         const profs = this.getProfissoesJogador();
         if (profs.length > 0 && !this.profSelecionada) {
             this.profSelecionada = profs[0];
@@ -618,18 +688,33 @@ const ForjaEngine = {
     verificarPermissaoDeCraft(receita) {
         const p = window.perfilDadosGlobais;
         const inv = p.inventario || p.inventory || [];
+        const desbloqueada = this.receitaGuildaEstaDesbloqueada(receita);
+
         let statusMateriais = [];
-        let podeCriar = true;
+        let podeCriar = desbloqueada;
 
         let ingredientes = receita.inputs || receita.ingredients || receita.materials || {};
 
         for (const [mat_id, qtd_req] of Object.entries(ingredientes)) {
             const itemInv = inv.find(i => i.base_id === mat_id);
             const qtdTenho = itemInv ? (itemInv.qtd || itemInv.quantity || 0) : 0;
-            if (qtdTenho < qtd_req) podeCriar = false;
-            statusMateriais.push({ id: mat_id, tenho: qtdTenho, precisa: qtd_req });
+
+            if (qtdTenho < qtd_req) {
+                podeCriar = false;
+            }
+
+            statusMateriais.push({
+                id: mat_id,
+                tenho: qtdTenho,
+                precisa: qtd_req
+            });
         }
-        return { podeCriar, statusMateriais };
+
+        return {
+            podeCriar,
+            statusMateriais,
+            desbloqueada
+        };
     },
 
     mudarAba(prof) {
@@ -727,6 +812,29 @@ window.tentarIniciarForja = async function() {
     
     // MODO FORJA NORMAL
     if (!ForjaEngine.receitaSelecionada) return;
+
+    const receitaAtual =
+        ForjaEngine.receitas[
+            ForjaEngine.receitaSelecionada
+        ];
+
+    if (
+        receitaAtual &&
+        !ForjaEngine.receitaGuildaEstaDesbloqueada(
+            receitaAtual
+        )
+    ) {
+        if (window.alertaEldora) {
+            window.alertaEldora(
+                "Receita Bloqueada",
+                "Desbloqueie esta receita na Loja da Guilda dos Aventureiros.",
+                "erro"
+            );
+        }
+
+        return;
+    }
+
     btn.disabled = true;
     btn.innerText = "AQUECENDO FORJA...";
     try {
@@ -872,12 +980,66 @@ const ForjaUI = {
             const imgPath1 = `${GITHUB_BASE_ITENS}${info.pasta}/${info.outputId}.png`; 
             const imgPath2 = `${GITHUB_BASE_ITENS}${info.pasta}/${info.idReceita}.png`; 
 
+            const bloqueadaGuilda =
+                Boolean(r.unlock_id) &&
+                !ForjaEngine.receitaGuildaEstaDesbloqueada(r);
+
             const card = document.createElement('div');
-            card.className = `recipe-card ${ForjaEngine.receitaSelecionada === id ? 'active' : ''}`;
-            card.innerHTML = `<img src="${imgPath1}" class="card-icon" onerror="if(this.getAttribute('data-tried') !== 'true') { this.setAttribute('data-tried', 'true'); this.src='${imgPath2}'; } else { this.src='/static/assets/box.png'; }">
-                              <span class="recipe-name">${r.display_name}</span>`;
-            
+
+            card.className =
+                `recipe-card ${ForjaEngine.receitaSelecionada === id ? 'active' : ''}`;
+
+            card.style.position = 'relative';
+
+            if (bloqueadaGuilda) {
+                card.style.opacity = '0.68';
+                card.style.borderColor = '#92400e';
+            }
+
+            card.innerHTML = `
+                <img
+                    src="${imgPath1}"
+                    class="card-icon"
+                    onerror="
+                        if(this.getAttribute('data-tried') !== 'true') {
+                            this.setAttribute('data-tried', 'true');
+                            this.src='${imgPath2}';
+                        } else {
+                            this.src='/static/assets/box.png';
+                        }
+                    "
+                >
+
+                <span class="recipe-name">
+                    ${r.display_name}
+                </span>
+
+                ${
+                    bloqueadaGuilda
+                        ? `
+                            <span
+                                style="
+                                    position: absolute;
+                                    top: 4px;
+                                    right: 4px;
+                                    padding: 2px 5px;
+                                    border: 1px solid #92400e;
+                                    border-radius: 6px;
+                                    background: rgba(69, 26, 3, 0.95);
+                                    color: #fed7aa;
+                                    font-size: 9px;
+                                    font-weight: 900;
+                                "
+                            >
+                                🔒
+                            </span>
+                        `
+                        : ""
+                }
+            `;
+
             card.onclick = () => {
+
                 document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => el.classList.remove('active'));
                 card.classList.add('active');
                 ForjaEngine.receitaSelecionada = id;
@@ -1139,8 +1301,39 @@ const ForjaUI = {
         
         const verificacao = ForjaEngine.verificarPermissaoDeCraft(receita);
         const grid = document.getElementById('lista-materiais');
+
         grid.innerHTML = '';
+
+        if (!verificacao.desbloqueada) {
+            const aviso = document.createElement('div');
+
+            aviso.style.cssText = `
+                grid-column: 1 / -1;
+                width: 100%;
+                box-sizing: border-box;
+                padding: 10px;
+                margin-bottom: 6px;
+                border: 1px solid #92400e;
+                border-radius: 9px;
+                background: rgba(69, 26, 3, 0.35);
+                color: #fed7aa;
+                font-size: 11px;
+                line-height: 1.4;
+                text-align: center;
+            `;
+
+            aviso.innerHTML = `
+                <strong>🔒 Receita exclusiva da Guilda</strong>
+                <br>
+                Desbloqueie esta receita na
+                <strong>Loja da Guilda dos Aventureiros</strong>.
+            `;
+
+            grid.appendChild(aviso);
+        }
+
         verificacao.statusMateriais.forEach(mat => {
+
             const pill = document.createElement('div');
             pill.className = `mat-pill ${mat.tenho < mat.precisa ? 'missing' : ''}`;
             pill.innerHTML = `
@@ -1156,6 +1349,14 @@ const ForjaUI = {
         });
 
         const btn = document.getElementById('btn-iniciar-forja');
+
+        if (!verificacao.desbloqueada) {
+            btn.disabled = true;
+            btn.innerText = "🔒 DESBLOQUEIE NA GUILDA";
+            btn.style.background = "linear-gradient(180deg, #475569, #1e293b)";
+            return;
+        }
+
         btn.disabled = !verificacao.podeCriar;
         btn.innerText = "INICIAR FORJA";
         btn.style.background = "linear-gradient(180deg, #ca8a04, #a16207)";
