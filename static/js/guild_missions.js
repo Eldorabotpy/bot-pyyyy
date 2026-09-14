@@ -591,6 +591,28 @@
 
             estadoGuilda.dados = dados;
 
+            const possuiMissaoPronta =
+                Array.isArray(dados.ativas)
+                &&
+                dados.ativas.some(
+                    missao =>
+                        missao.status ===
+                        "pronta_entrega"
+                );
+
+            if (
+                estadoGuilda.modo === "atendente"
+                &&
+                estadoGuilda.secao !== "loja"
+                &&
+                estadoGuilda.escopo === "individual"
+                &&
+                possuiMissaoPronta
+            ) {
+                estadoGuilda.aba = "ativas";
+                atualizarAbas();
+            }
+
             atualizarPontos();
 
             renderizarGuildaMissoes();
