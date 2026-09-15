@@ -2690,6 +2690,8 @@ SKILL_DATA = {
     "berserker_golpe_selvagem": {
         "display_name": "𝐆𝐨𝐥𝐩𝐞 𝐒𝐞𝐥𝐯𝐚𝐠𝐞𝐦", "type": "active", 
         "description": "Um ataque poderoso que causa mais dano quanto menos vida você tiver.",
+        "anim_effect": "golpe_selvagem",
+        "icon": "berserker_golpe_selvagem",
         "allowed_classes": ["berserker"],
         "rarity_effects": {
             "comum": {
@@ -2712,6 +2714,8 @@ SKILL_DATA = {
     "cacador_flecha_precisa": {
         "display_name": "𝐅𝐥𝐞𝐜𝐡𝐚 𝐏𝐫𝐞𝐜𝐢𝐬𝐚", "type": "active", 
         "description": "Um tiro certeiro com chance de acerto crítico bônus.",
+        "anim_effect": "flecha_precisa",
+        "icon": "cacador_flecha_precisa",
         "allowed_classes": ["cacador"],
         "rarity_effects": {
             "comum": {
@@ -2784,6 +2788,8 @@ SKILL_DATA = {
         "display_name": "𝐌𝐞𝐥𝐨𝐝𝐢𝐚 𝐑𝐞𝐬𝐭𝐚𝐮𝐫𝐚𝐝𝐨𝐫𝐚",
         "type": "support",  # <--- Essencial para ativar o sistema de grupo
         "description": "Uma melodia suave que cura todos os aliados.",
+        "anim_effect": "melodia_restauradora",
+        "icon": "bardo_melodia_restauradora",
         "allowed_classes": ["bardo"],
         "rarity_effects": {
             "comum": {
@@ -2825,6 +2831,8 @@ SKILL_DATA = {
     "assassino_ataque_furtivo": {
         "display_name": "𝐀𝐭𝐚𝐪𝐮𝐞 𝐅𝐮𝐫𝐭𝐢𝐯𝐨", "type": "active", 
         "description": "Um golpe letal que ignora parte da defesa do inimigo.",
+        "anim_effect": "ataque_furtivo",
+        "icon": "assassino_ataque_furtivo",
         "allowed_classes": ["assassino"],
         "rarity_effects": {
             "comum": {
@@ -2847,6 +2855,8 @@ SKILL_DATA = {
     "samurai_corte_iaijutsu": {
         "display_name": "𝐂𝐨𝐫𝐭𝐞 𝐈𝐚𝐢𝐣𝐮𝐭𝐬𝐮", "type": "active", 
         "description": "Um saque rápido e mortal com a katana.",
+        "anim_effect": "corte_iaijutsu",
+        "icon": "samurai_corte_iaijutsu",
         "allowed_classes": ["samurai"],
         "rarity_effects": {
             "comum": {
