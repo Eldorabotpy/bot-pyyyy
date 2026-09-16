@@ -1164,9 +1164,21 @@ def obter_perfil(user_id):
         # --- 🎭 COSMÉTICOS (A PARTE CORRIGIDA) ---
         b_id = pdata.get("banner_customizado", "padrao")
         a_id = pdata.get("avatar_customizado", "padrao")
-        skin_equipada = pdata.get("equipped_skin", "aventureiro_masculino")
-        
-        letra_gen = genero_str.lower()[0] if len(genero_str) > 0 else "m"
+        letra_gen = (
+            "f"
+            if genero_str.lower() == "feminino"
+            else "m"
+        )
+
+        skin_equipada = pdata.get("equipped_skin")
+
+        if not skin_equipada or skin_equipada == "padrao":
+            classe_skin = classe_str.lower()
+
+            if classe_skin in ["aprendiz", "aventureiro"]:
+                classe_skin = "aventureiro"
+
+            skin_equipada = f"{classe_skin}_{letra_gen}"
         tem_passe = pdata.get("premium_tier", "free") != "free"
         
         # --- MÚLTIPLAS PROFISSÕES & BÔNUS ---
