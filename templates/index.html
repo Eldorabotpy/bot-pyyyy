@@ -576,44 +576,167 @@
     <style>
         #tela-carregamento {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/carregamento.jpg') center/cover no-repeat;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+
+            background:
+                url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/loguin/carregamento.jpg')
+                center / cover
+                no-repeat;
+
             z-index: 999999;
+
             display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
+            justify-content: center;
             align-items: center;
-            padding-bottom: 60px;
-            transition: opacity 10s ease;
+
+            transition: opacity 0.8s ease;
         }
-        .loading-texto {
-            color: #d4af37; font-family: 'Cinzel', serif; font-size: 1.2em; font-weight: bold;
-            text-shadow: 2px 2px 4px #000; margin-bottom: 12px; letter-spacing: 1px;
-        }
+
+
+        /* ==========================================
+           BARRA DE CARREGAMENTO ELDORA
+           ========================================== */
+
         .loading-barra-container {
-            width: 80%; max-width: 400px; height: 24px; background: rgba(10, 5, 20, 0.9);
-            border: 2px solid #334155; border-radius: 12px; overflow: hidden;
-            position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.8);
+            position: absolute;
+
+            left: 50%;
+            bottom: clamp(24px, 4vh, 55px);
+
+            transform: translateX(-50%);
+
+            width: min(84vw, 660px);
+            aspect-ratio: 2170 / 340;
+
+            pointer-events: none;
         }
-        .loading-barra-preenchimento {
-            width: 0%; height: 100%;
-            background: linear-gradient(90deg, #9b59b6, #d4af37); /* Degradê Lilás e Dourado */
-            transition: width 0.10s ease;
+
+
+        .loading-barra-layer {
+            position: absolute;
+
+            top: 0;
+            left: 0;
+
+            width: 100%;
+            height: 100%;
+
+            object-fit: contain;
+
+            user-select: none;
+            pointer-events: none;
         }
+
+
+        /* Fundo azul da barra */
+        .loading-barra-base {
+            z-index: 1;
+        }
+
+
+        /* Verde que realmente representa o progresso */
+        .loading-barra-fill {
+            z-index: 2;
+
+            /*
+             * Área útil real da imagem:
+             *
+             * início: 5.908%
+             * fim:    95.264%
+             *
+             * Começa totalmente escondida.
+             */
+            clip-path:
+                inset(
+                    0
+                    94.091796875%
+                    0
+                    5.908203125%
+                );
+
+            -webkit-clip-path:
+                inset(
+                    0
+                    94.091796875%
+                    0
+                    5.908203125%
+                );
+
+            transition:
+                clip-path 0.10s linear,
+                -webkit-clip-path 0.10s linear;
+
+            will-change: clip-path;
+        }
+
+
+        /* Moldura transparente que fica sobre o verde */
+        .loading-barra-overlay {
+            z-index: 3;
+        }
+
+
+        /*
+         * Mantemos estes elementos no HTML porque
+         * o sistema atual ainda envia mensagem e porcentagem.
+         * Só não serão exibidos visualmente.
+         */
+        .loading-texto,
         #loading-porcentagem {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: center; color: #fff;
-            font-size: 0.85em; font-weight: 900; font-family: 'Arial', sans-serif;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+            display: none;
         }
     </style>
 
+
     <div id="tela-carregamento">
-        <div class="loading-texto" id="loading-msg">Despertando Herói...</div>
-        <div class="loading-barra-container">
-            <div class="loading-barra-preenchimento" id="loading-barra"></div>
-            <div id="loading-porcentagem">0%</div>
+
+        <div
+            class="loading-texto"
+            id="loading-msg"
+        >
+            Despertando Herói...
         </div>
+
+
+        <div class="loading-barra-container">
+
+            <!-- CAMADA 1: FUNDO AZUL -->
+            <img
+                class="loading-barra-layer loading-barra-base"
+                src="/static/assets/sprites/ui/loading_bar_base.png"
+                alt=""
+                draggable="false"
+            >
+
+
+            <!-- CAMADA 2: PROGRESSO VERDE -->
+            <img
+                id="loading-barra"
+                class="loading-barra-layer loading-barra-fill"
+                src="/static/assets/sprites/ui/loading_bar_fill.png"
+                alt=""
+                draggable="false"
+            >
+
+
+            <!-- CAMADA 3: MOLDURA RECORTADA -->
+            <img
+                class="loading-barra-layer loading-barra-overlay"
+                src="/static/assets/sprites/ui/loading_bar_overlay.png"
+                alt=""
+                draggable="false"
+            >
+
+
+            <div id="loading-porcentagem">
+                0%
+            </div>
+
+        </div>
+
     </div>
 
     <div style="font-family: 'Cinzel', serif; position: absolute; left: -9999px; visibility: hidden;">Carrega a fonte!</div>
@@ -998,10 +1121,70 @@
             const barra = document.getElementById('loading-barra');
             const txtPorcentagem = document.getElementById('loading-porcentagem');
             const msgTexto = document.getElementById('loading-msg');
-            
-            if (barra) barra.style.width = porcentagem + '%';
-            if (txtPorcentagem) txtPorcentagem.innerText = porcentagem + '%';
-            if (msgTexto && mensagem) msgTexto.innerText = mensagem;
+
+            const progresso = Math.max(
+                0,
+                Math.min(
+                    100,
+                    Number(porcentagem) || 0
+                )
+            );
+
+
+            /*
+             * Limites reais do preenchimento verde
+             * dentro da imagem 2048px.
+             *
+             * Esquerda:
+             * 121 / 2048 = 5.908203125%
+             *
+             * Área útil:
+             * 1830 / 2048 = 89.35546875%
+             */
+            const inicio = 5.908203125;
+            const larguraUtil = 89.35546875;
+
+
+            const fimVisivel =
+                inicio +
+                (
+                    larguraUtil *
+                    (progresso / 100)
+                );
+
+
+            const corteDireita =
+                100 - fimVisivel;
+
+
+            if (barra) {
+
+                const recorte =
+                    `inset(0 ${corteDireita}% 0 ${inicio}%)`;
+
+
+                barra.style.clipPath =
+                    recorte;
+
+
+                barra.style.webkitClipPath =
+                    recorte;
+            }
+
+
+            if (txtPorcentagem) {
+                txtPorcentagem.innerText =
+                    Math.floor(progresso) + '%';
+            }
+
+
+            if (
+                msgTexto &&
+                mensagem
+            ) {
+                msgTexto.innerText =
+                    mensagem;
+            }
         };
 
         // O Phaser (Motor do Jogo) vai chamar essa função quando renderizar tudo!
