@@ -276,12 +276,21 @@ window.salvarCustomizacaoPerfil = async function() {
                         }
                     });
 
-                    cena.load.spritesheet(idSkin, urlCompleta, { frameWidth: 48, frameHeight: 48 });
+                    cena.load.spritesheet(idSkin, urlCompleta, {
+                        frameWidth: 128,
+                        frameHeight: 128
+                    });
                     
                     cena.load.once(`filecomplete-spritesheet-${idSkin}`, () => {
                         cena.player.setTexture(idSkin);
                         cena.player.setFrame(1);
-                        if (typeof cena.gerarAnimacoes === 'function') cena.gerarAnimacoes(idSkin);
+
+                        // Mantém o mesmo tamanho visual usado pelo mapa
+                        cena.player.setDisplaySize(48, 48);
+
+                        if (typeof cena.gerarAnimacoes === 'function') {
+                            cena.gerarAnimacoes(idSkin);
+                        }
                         
                         if (typeof window.alertaEldora === 'function') {
                             window.alertaEldora("Novo Visual", "Aparência guardada com sucesso no pergaminho!", "sucesso");
@@ -292,7 +301,11 @@ window.salvarCustomizacaoPerfil = async function() {
                 } else {
                     cena.player.setTexture(idSkin);
                     cena.player.setFrame(1);
-                    if (typeof cena.gerarAnimacoes === 'function') cena.gerarAnimacoes(idSkin);
+                    cena.player.setDisplaySize(48, 48);
+
+                    if (typeof cena.gerarAnimacoes === 'function') {
+                        cena.gerarAnimacoes(idSkin);
+                    }
                     
                     if (typeof window.alertaEldora === 'function') {
                         window.alertaEldora("Novo Visual", "Aparência guardada com sucesso no pergaminho!", "sucesso");
