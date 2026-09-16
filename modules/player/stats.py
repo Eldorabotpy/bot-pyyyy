@@ -1849,12 +1849,6 @@ async def processar_turno_combate(
             xp_final
         )
 
-                    
-        player["xp"] = (
-            player.get("xp", 0) +
-            xp_final
-        )
-
         player["gold"] = (
             player.get("gold", 0) +
             ouro_final
