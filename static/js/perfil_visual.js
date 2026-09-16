@@ -106,13 +106,30 @@ class PerfilVisual {
 
         // 4. Montar Skins de Corpo
         let htmlSkins = '';
+
+        const classeEhInicial =
+            classeDoBanco === 'aprendiz' ||
+            classeDoBanco === 'aventureiro';
+
+        const skinsAventureiro = [
+            'aventureiro_m',
+            'aventureiro_f',
+            'aventureiro_masculino',
+            'aventureiro_feminino'
+        ];
+
         let listaSkinsBruta = [
-            baseAventureiroId, 
-            minhaClasseId, 
+            ...(classeEhInicial ? [baseAventureiroId] : []),
+            minhaClasseId,
             ...(p.unlocked_skins || [])
         ];
 
-        const skinsParaExibir = [...new Set(listaSkinsBruta)].filter(filtroGenero);
+        const skinsParaExibir = [...new Set(listaSkinsBruta)]
+            .filter(filtroGenero)
+            .filter(id =>
+                classeEhInicial ||
+                !skinsAventureiro.includes(id)
+            );
     
         skinsParaExibir.forEach(id => {
             const info = CATALOGO_SISTEMA.skins[id];

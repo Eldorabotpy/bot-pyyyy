@@ -1436,14 +1436,58 @@ def api_equipar_skin():
     try:
         data = request.json
         from modules import player_manager
+
         busca_id = ObjectId(data.get("user_id")) if len(str(data.get("user_id"))) == 24 else int(data.get("user_id"))
         pdata = users_collection.find_one({"_id": busca_id})
+
+        if not pdata:
+            return jsonify({"sucesso": False, "erro": "Herói não encontrado."}), 404
+
         skin_id = data.get("skin_id")
-        if skin_id and skin_id not in pdata.get("unlocked_skins", []): return jsonify({"erro": "Não possui."}), 400
+
+        classe_atual = str(
+            pdata.get("class", "aprendiz")
+        ).lower().strip()
+
+        skins_aventureiro = {
+            "aventureiro",
+            "aventureiro_m",
+            "aventureiro_f",
+            "aventureiro_masculino",
+            "aventureiro_feminino"
+        }
+
+        if (
+            classe_atual not in {"aprendiz", "aventureiro"} and
+            str(skin_id or "").lower() in skins_aventureiro
+        ):
+            return jsonify({
+                "sucesso": False,
+                "erro": "A aparência de Aventureiro não pode mais ser usada após escolher uma classe."
+            }), 400
+
+        if (
+            skin_id and
+            skin_id not in pdata.get("unlocked_skins", [])
+        ):
+            return jsonify({
+                "sucesso": False,
+                "erro": "Você não possui esta aparência."
+            }), 400
+
         pdata["equipped_skin"] = skin_id
-        _run_async(player_manager.save_player_data(data.get("user_id"), pdata))
+
+        _run_async(
+            player_manager.save_player_data(
+                data.get("user_id"),
+                pdata
+            )
+        )
+
         return jsonify({"sucesso": True})
-    except Exception as e: return jsonify({"erro": str(e)}), 500
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 @webapp_bp.route('/api/mapa/objetos/<regiao_id>')
 def api_mapa_objetos(regiao_id):
