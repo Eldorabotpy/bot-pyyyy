@@ -795,25 +795,111 @@
 
         document.addEventListener("DOMContentLoaded", function() {
 
+            const contasSalvas =
+                obterContasSalvas();
+
+
             renderizarContasSalvas();
 
+
+            // ==========================================
+            // NOVO JOGADOR NESTE DISPOSITIVO
+            // ==========================================
+
+            if (
+                !contasSalvas ||
+                contasSalvas.length === 0
+            ) {
+
+                document.getElementById(
+                    "tela-login"
+                ).style.display =
+                    "none";
+
+
+                document.getElementById(
+                    "tela-registro-conta"
+                ).style.display =
+                    "block";
+
+
+                document.getElementById(
+                    "rodape-dinamico"
+                ).style.display =
+                    "none";
+
+
+                document.getElementById(
+                    "titulo-caixa"
+                ).innerText =
+                    "CRIAR SUA CONTA";
+
+
+                return;
+            }
+
+
+            // ==========================================
+            // JOGADOR QUE JÁ POSSUI CONTA SALVA
+            // ==========================================
+
+            document.getElementById(
+                "tela-registro-conta"
+            ).style.display =
+                "none";
+
+
+            document.getElementById(
+                "tela-login"
+            ).style.display =
+                "block";
+
+
+            document.getElementById(
+                "rodape-dinamico"
+            ).style.display =
+                "block";
+
+
+            document.getElementById(
+                "titulo-caixa"
+            ).innerText =
+                "ENTRAR NO REINO";
+
+
             const ultima =
-                localStorage.getItem(CHAVE_ULTIMA_CONTA);
-
-            if (!ultima) return;
-
-            const conta =
-                obterContasSalvas().find(
-                    c => c.username === ultima
+                localStorage.getItem(
+                    CHAVE_ULTIMA_CONTA
                 );
 
-            if (!conta) return;
+
+            if (!ultima) {
+                return;
+            }
+
+
+            const conta =
+                contasSalvas.find(
+                    c =>
+                        c.username ===
+                        ultima
+                );
+
+
+            if (!conta) {
+                return;
+            }
+
 
             const campoUsuario =
-                document.getElementById("login-username");
+                document.getElementById(
+                    "login-username"
+                );
+
 
             if (campoUsuario) {
-                campoUsuario.value = conta.username;
+                campoUsuario.value =
+                    conta.username;
             }
         });
 
