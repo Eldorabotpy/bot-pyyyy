@@ -181,7 +181,10 @@ def has_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
     inv = player_data.get("inventory", {})
     val = inv.get(item_id)
     if val is None: return False
-    if isinstance(val, dict): return quantity == 1
+    if isinstance(val, dict):
+        if "quantity" in val:
+            return int(val.get("quantity", 0) or 0) >= quantity
+        return quantity == 1
     return int(val) >= quantity
 
 def consume_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
