@@ -1,18 +1,40 @@
-#bruxa-pocoes-modal { box-sizing: border-box; width: min(720px, 94vw); max-height: 88dvh; padding: 24px; color: #f3e8ff; background: #1e1529; border: 2px solid #a78bfa; border-radius: 16px; box-shadow: 0 20px 70px #000a; font-family: Arial, sans-serif; overflow-y: auto; }
-#bruxa-pocoes-modal::backdrop { background: #080510ba; }
-#bruxa-pocoes-modal header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-#bruxa-pocoes-modal h2 { margin: 0; font-size: 24px; color: #e9d5ff; }
-#bruxa-pocoes-modal p { line-height: 1.5; }
-#bruxa-pocoes-modal button { padding: 10px 14px; border: 1px solid #c4b5fd; border-radius: 8px; background: #6d28d9; color: white; cursor: pointer; font-weight: bold; min-height: 44px; }
-#bruxa-pocoes-modal button:disabled { background: #3c3346; color: #c6bfce; border-color: #62586c; cursor: default; }
-#bruxa-pocoes-modal button:focus-visible { outline: 3px solid #facc15; outline-offset: 3px; }
-#bruxa-pocoes-modal .bruxa-fechar { background: transparent; }
-#bruxa-pocoes-modal .bruxa-receitas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-#bruxa-pocoes-modal h3 { grid-column: 1 / -1; margin: 8px 0 0; color: #d8b4fe; }
-#bruxa-pocoes-modal article { padding: 16px; background: #2c2039; border: 1px solid #59416b; border-radius: 12px; display: flex; flex-direction: column; }
-#bruxa-pocoes-modal h4 { margin: 0; font-size: 17px; }
-#bruxa-pocoes-modal article p { font-size: 13px; color: #d8cbe3; }
-#bruxa-pocoes-modal ul { padding: 0; list-style: none; line-height: 1.7; font-size: 14px; flex: 1; }
-#bruxa-pocoes-modal .bruxa-tem { color: #a7f3d0; }
-#bruxa-pocoes-modal .bruxa-falta { color: #fda4af; }
-@media (max-width: 520px) { #bruxa-pocoes-modal { padding: 16px; } #bruxa-pocoes-modal .bruxa-receitas { grid-template-columns: 1fr; } #bruxa-pocoes-modal h2 { font-size: 20px; } }
+#bruxa-pocoes-modal {
+    box-sizing: border-box; width: min(640px, 94vw); max-height: 86dvh;
+    margin: auto; padding: 0; color: #e5dac6; background: radial-gradient(ellipse at 15% 0%, #392547 0, transparent 50%), #130f1b;
+    border: 1px solid #887044; border-radius: 18px 4px 18px 4px;
+    box-shadow: 0 0 0 4px #17121de6, 0 24px 80px #000c, inset 0 0 45px #0006;
+    font: 13px/1.45 Arial, sans-serif; text-align: left; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #65513a #17121e;
+}
+#bruxa-pocoes-modal::backdrop { background: #08060dc9; backdrop-filter: blur(3px); }
+#bruxa-pocoes-modal *, #bruxa-pocoes-modal *::before { box-sizing: border-box; }
+#bruxa-pocoes-modal .bruxa-cabecalho { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 22px 10px; background: transparent; border: 0; box-shadow: none; text-align: left; }
+#bruxa-pocoes-modal .bruxa-sobretitulo { color: #b99d6b; font: 9px/1.4 Arial, sans-serif; letter-spacing: 2px; }
+#bruxa-pocoes-modal h2 { margin: 5px 0 0; font: 30px/1.15 Georgia, serif; color: #f2dfb3; text-shadow: 0 2px 14px #d4ab4c24; }
+#bruxa-pocoes-modal p { margin: 0; }
+#bruxa-pocoes-modal .bruxa-intro { margin: 0 22px; color: #b0a0bd; font: italic 13px/1.5 Georgia, serif; }
+#bruxa-pocoes-modal .bruxa-aviso { margin: 14px 22px 0; padding: 9px 0; border-top: 1px solid #8b714432; color: #bcae9c; font-size: 11px; }
+#bruxa-pocoes-modal button { appearance: none; width: auto; margin: 0; padding: 9px 14px; min-height: 40px; border: 1px solid #9c804c; border-radius: 5px; background: linear-gradient(180deg, #6a5130, #3d2e1c); color: #fae8bd; font: bold 12px/1.2 Arial, sans-serif; letter-spacing: .3px; text-shadow: none; box-shadow: inset 0 1px #ffffff12; cursor: pointer; }
+#bruxa-pocoes-modal button:hover:not(:disabled) { border-color: #dfbc75; filter: brightness(1.15); }
+#bruxa-pocoes-modal button:disabled { background: #211b29; color: #978b9d; border-color: #51445e; box-shadow: none; cursor: default; }
+#bruxa-pocoes-modal button:focus-visible { outline: 2px solid #e4c888; outline-offset: 3px; }
+#bruxa-pocoes-modal .bruxa-fechar { flex: 0 0 40px; width: 40px; height: 40px; padding: 0; border: 1px solid #88704466; border-radius: 50%; background: #140e1c88; color: #c8b791; font: 26px/1 Georgia, serif; box-shadow: none; }
+#bruxa-pocoes-modal .bruxa-receitas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 22px 22px; }
+#bruxa-pocoes-modal h3 { display: flex; align-items: center; gap: 12px; grid-column: 1 / -1; margin: 12px 0 3px; color: #c5aa77; font: 11px/1.4 Georgia, serif; letter-spacing: 1px; text-transform: uppercase; }
+#bruxa-pocoes-modal h3::after { content: ''; height: 1px; flex: 1; background: linear-gradient(90deg, #96763d66, transparent); }
+#bruxa-pocoes-modal article { margin: 0; padding: 13px; background: linear-gradient(120deg, #31213b80, #1a1422); border: 1px solid #6f547044; border-radius: 8px; box-shadow: inset 0 1px #ffffff04; display: flex; flex-direction: column; }
+#bruxa-pocoes-modal .bruxa-resumo { display: flex; align-items: center; gap: 11px; }
+#bruxa-pocoes-modal .bruxa-simbolo { display: grid; place-items: center; flex: 0 0 38px; height: 42px; border: 1px solid #99714966; border-radius: 9px 3px; background: radial-gradient(circle, #67437b66, #211727); font-size: 23px; }
+#bruxa-pocoes-modal h4 { margin: 0; font: 16px/1.25 Georgia, serif; color: #eadbc1; }
+#bruxa-pocoes-modal article p { margin-top: 4px; font-size: 11px; color: #a89bb3; line-height: 1.35; }
+#bruxa-pocoes-modal ul { padding: 0; margin: 12px 0; list-style: none; font-size: 11px; flex: 1; }
+#bruxa-pocoes-modal li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #ffffff06; color: #c1b3c9; }
+#bruxa-pocoes-modal li strong { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: normal; }
+#bruxa-pocoes-modal .bruxa-tem strong { color: #9fcba6; }
+#bruxa-pocoes-modal .bruxa-falta strong { color: #df9d89; }
+@media (max-width: 520px) {
+    #bruxa-pocoes-modal .bruxa-receitas { grid-template-columns: 1fr; padding: 0 16px 16px; gap: 8px; }
+    #bruxa-pocoes-modal .bruxa-cabecalho { padding: 18px 16px 8px; }
+    #bruxa-pocoes-modal .bruxa-intro, #bruxa-pocoes-modal .bruxa-aviso { margin-left: 16px; margin-right: 16px; }
+    #bruxa-pocoes-modal article { padding: 12px; }
+    #bruxa-pocoes-modal h2 { font-size: 28px; }
+}

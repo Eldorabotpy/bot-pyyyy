@@ -18,10 +18,10 @@
             scene.anims.create({ key: 'bruxa_caldeirao', frames: scene.anims.generateFrameNumbers('npc_bruxa_pocoes', { start: 0, end: 5 }), frameRate: 6, repeat: -1 });
         }
         const npc = scene.add.sprite(32 * 32, 9 * 32, 'npc_bruxa_pocoes')
-            .setOrigin(0.5, 1).setDisplaySize(128, 128).setDepth(14)
+            .setOrigin(0.5, 1).setDisplaySize(64, 64).setDepth(14)
             .setInteractive({ useHandCursor: true }).play('bruxa_caldeirao');
-        scene.add.text(npc.x, npc.y - 125, 'Bruxa das Poções', {
-            fontSize: '13px', color: '#e9d5ff', backgroundColor: '#23152c', padding: { x: 6, y: 4 }
+        scene.add.text(npc.x, npc.y - 65, 'Bruxa das Poções', {
+            fontSize: '10px', color: '#e9d5ff', stroke: '#120c1c', strokeThickness: 3
         }).setOrigin(0.5, 1).setDepth(15);
         npc.on('pointerdown', (pointer, x, y, event) => {
             event?.stopPropagation();
@@ -44,19 +44,24 @@
         modal = document.createElement('dialog');
         modal.id = 'bruxa-pocoes-modal';
         modal.setAttribute('aria-labelledby', 'bruxa-pocoes-titulo');
-        const cabecalho = document.createElement('header');
-        const titulo = texto('h2', 'Caldeirão da Bruxa');
+        const cabecalho = document.createElement('div');
+        cabecalho.className = 'bruxa-cabecalho';
+        const identidade = document.createElement('div');
+        identidade.append(texto('span', 'FLORESTA SOMBRIA · ALQUIMIA', 'bruxa-sobretitulo'));
+        const titulo = texto('h2', 'O Caldeirão');
         titulo.id = 'bruxa-pocoes-titulo';
-        const sair = texto('button', 'Fechar', 'bruxa-fechar');
+        const sair = texto('button', '×', 'bruxa-fechar');
         sair.type = 'button';
+        sair.setAttribute('aria-label', 'Fechar caldeirão');
         sair.onclick = fechar;
-        cabecalho.append(titulo, sair);
-        aviso = texto('p', '');
+        identidade.append(titulo);
+        cabecalho.append(identidade, sair);
+        aviso = texto('p', '', 'bruxa-aviso');
         aviso.setAttribute('role', 'status');
         aviso.setAttribute('aria-live', 'polite');
         lista = document.createElement('div');
         lista.className = 'bruxa-receitas';
-        modal.append(cabecalho, texto('p', 'Traga seus ingredientes. Cada preparo produz uma poção.'), aviso, lista);
+        modal.append(cabecalho, texto('p', 'Das dádivas da floresta, uma gota de magia.', 'bruxa-intro'), aviso, lista);
         modal.addEventListener('cancel', e => { e.preventDefault(); fechar(); });
         document.body.append(modal);
     }
@@ -94,7 +99,7 @@
             const dados = await requisitar(`/api/bruxa/receitas/${encodeURIComponent(id)}`);
             if (!api.aberta || atual !== versao) return;
             renderizar(dados.receitas);
-            aviso.textContent = mensagem || (ocupado ? 'Preparando poção…' : 'Escolha uma receita.');
+            aviso.textContent = mensagem || (ocupado ? 'Preparando poção…' : 'Cada preparo produz 1 poção.');
         } catch (erro) {
             if (!api.aberta || atual !== versao) return;
             aviso.textContent = mensagem ? `${mensagem} Não foi possível atualizar as receitas: ${erro.message}` : erro.message;
@@ -113,17 +118,27 @@
                 lista.append(texto('h3', grupo));
             }
             const card = document.createElement('article');
-            card.append(texto('h4', `${receita.emoji} ${receita.nome}`));
+            const resumo = document.createElement('div');
+            resumo.className = 'bruxa-resumo';
+            const simbolo = texto('span', receita.emoji, 'bruxa-simbolo');
+            simbolo.setAttribute('aria-hidden', 'true');
+            const detalhes = document.createElement('div');
+            detalhes.append(texto('h4', receita.nome));
+            resumo.append(simbolo, detalhes);
+            card.append(resumo);
             const efeitos = {
                 pocao_cura_leve: 'Recupera 100 HP', pocao_mana_leve: 'Recupera 100 MP',
                 pocao_cura_media: 'Recupera 300 HP', pocao_mana_media: 'Recupera 300 MP',
                 elixir_xp_dobrado_10m: 'XP pessoal de combate em dobro por 10 minutos',
                 elixir_xp_dobrado_30m: 'XP pessoal de combate em dobro por 30 minutos'
             };
-            card.append(texto('p', efeitos[receita.resultado] || ''));
+            detalhes.append(texto('p', efeitos[receita.resultado] || ''));
             const ingredientes = document.createElement('ul');
             for (const item of receita.ingredientes) {
-                ingredientes.append(texto('li', `${item.emoji} ${item.nome}: ${item.possui}/${item.necessario}`, item.possui >= item.necessario ? 'bruxa-tem' : 'bruxa-falta'));
+                const linha = document.createElement('li');
+                linha.className = item.possui >= item.necessario ? 'bruxa-tem' : 'bruxa-falta';
+                linha.append(texto('span', item.nome), texto('strong', `${item.possui} / ${item.necessario}`));
+                ingredientes.append(linha);
             }
             const botao = texto('button', receita.pode_criar ? 'Preparar poção' : 'Faltam ingredientes');
             botao.disabled = ocupado || !receita.pode_criar;
