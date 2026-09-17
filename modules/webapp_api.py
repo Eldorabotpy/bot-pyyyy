@@ -2637,7 +2637,10 @@ def resgatar_passe():
                     encontrou = True
                     break
             if not encontrou:
-                inventario[str(uuid.uuid4())[:8]] = {"base_id": base_id, "quantity": qtd}
+                inventario[base_id] = {
+                    "base_id": base_id,
+                    "quantity": qtd
+                }
             pdata["inventory"] = inventario
 
         elif r_tipo == "banner":

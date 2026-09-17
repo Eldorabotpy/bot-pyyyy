@@ -276,15 +276,50 @@ def remove_item_from_inventory(player_data: dict, item_id: str, quantity: int = 
     player_data["inventory"] = inventory
     return True
 
-def has_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
-    inv = player_data.get("inventory", {})
-    val = inv.get(item_id)
-    if val is None: return False
-    if isinstance(val, dict):
-        if "quantity" in val:
-            return int(val.get("quantity", 0) or 0) >= quantity
-        return quantity == 1
-    return int(val) >= quantity
+def has_item(
+    player_data: dict,
+    item_id: str,
+    quantity: int = 1,
+) -> bool:
+
+    inventory = player_data.get(
+        "inventory",
+        {},
+    ) or {}
+
+    item = inventory.get(
+        item_id
+    )
+
+    if item is None:
+        return False
+
+    if isinstance(
+        item,
+        dict,
+    ):
+
+        quantidade_atual = int(
+            item.get(
+                "quantity",
+                item.get(
+                    "qtd",
+                    1,
+                ),
+            )
+            or 0
+        )
+
+    else:
+
+        quantidade_atual = int(
+            item or 0
+        )
+
+    return (
+        quantidade_atual
+        >= int(quantity)
+    )
 
 def consume_item(player_data: dict, item_id: str, quantity: int = 1) -> bool:
     return remove_item_from_inventory(player_data, item_id, quantity)

@@ -1297,7 +1297,34 @@ window.abrirModalItem = function(idAlvo, origem) {
     let botoesHtml = '';
 
     // 👇 MÁGICA DA DURABILIDADE ENTRA AQUI 👇
-    if (itemData.durability && Array.isArray(itemData.durability)) {
+    if (
+        [
+            'weapon',
+            'armor',
+            'helmet',
+            'boots',
+            'ring',
+            'necklace',
+            'earring',
+            'equipamento',
+            'tool',
+            'arma',
+            'armadura',
+            'lenhador',
+            'minerador',
+            'colhedor',
+            'esfolador',
+            'ferreiro',
+            'armeiro',
+            'alfaiate',
+            'joalheiro',
+            'curtidor'
+        ].includes(t)
+        &&
+        itemData.durability
+        &&
+        Array.isArray(itemData.durability)
+    ) {
         const atual = itemData.durability[0];
         const maximo = itemData.durability[1];
         const porc = (atual / maximo) * 100;
@@ -1322,7 +1349,36 @@ window.abrirModalItem = function(idAlvo, origem) {
     
     // 👇 BOTÃO DE CONSERTAR (Aparece se o item estiver gasto e o jogador tiver o pergaminho) 👇
     const temPergaminho = window.perfilDadosGlobais.inventario.some(i => i.base_id === 'pergaminho_durabilidade' || i.id === 'pergaminho_durabilidade');
-    if (itemData.durability && itemData.durability[0] < itemData.durability[1] && temPergaminho) {
+    if (
+        [
+            'weapon',
+            'armor',
+            'helmet',
+            'boots',
+            'ring',
+            'necklace',
+            'earring',
+            'equipamento',
+            'tool',
+            'arma',
+            'armadura',
+            'lenhador',
+            'minerador',
+            'colhedor',
+            'esfolador',
+            'ferreiro',
+            'armeiro',
+            'alfaiate',
+            'joalheiro',
+            'curtidor'
+        ].includes(t)
+        &&
+        itemData.durability
+        &&
+        itemData.durability[0] < itemData.durability[1]
+        &&
+        temPergaminho
+    ) {
         botoesHtml += `<button onclick="repararFerramentaAPI('${itemData.id}')" style="width: 100%; padding:10px; background: #ca8a04; color:black; border:none; border-radius:4px; font-weight:bold; cursor:pointer; margin-bottom: 8px;">CONSERTAR (1x 📜)</button>`;
     }
     
@@ -1338,8 +1394,55 @@ window.abrirModalItem = function(idAlvo, origem) {
                 <button onclick="equiparPocaoAtalho('${idReal}', 'mp')" style="flex:1; padding:10px; background: linear-gradient(180deg, #2980b9 0%, #1f618d 100%); color:white; border:1px solid #3498db; border-radius:4px; font-weight:bold; cursor:pointer;">Slot 💧</button>
             `;
         }
-        else if (['consumable', 'scroll', 'consumivel', 'chest', 'box', 'reagent', 'especial'].includes(t)) {
-            botoesHtml = `<button onclick="consumirItemDireto('${itemData.id}', '${idReal}')" style="flex:1; padding:10px; background: linear-gradient(180deg, #8e44ad 0%, #732d91 100%); color:white; border:1px solid #9b59b6; border-radius:4px; font-weight:bold; cursor:pointer;">Usar Item</button>`;
+        else if (t === 'reagent') {
+
+            botoesHtml = `
+                <div style="
+                    width:100%;
+                    padding:10px;
+                    margin-bottom:8px;
+                    background:rgba(59,130,246,0.08);
+                    border:1px dashed #3b82f6;
+                    color:#93c5fd;
+                    font-size:0.85em;
+                    border-radius:4px;
+                    font-weight:bold;
+                    text-align:center;
+                ">
+                    🧪 Ingrediente de receita.
+                    Use este item em Alquimia ou fabricação.
+                </div>
+            `;
+
+        }
+        else if (
+            [
+                'consumable',
+                'scroll',
+                'consumivel',
+                'chest',
+                'box',
+                'especial'
+            ].includes(t)
+        ) {
+
+            botoesHtml = `
+                <button
+                    onclick="consumirItemDireto('${itemData.id}', '${idReal}')"
+                    style="
+                        flex:1;
+                        padding:10px;
+                        background:linear-gradient(180deg,#8e44ad 0%,#732d91 100%);
+                        color:white;
+                        border:1px solid #9b59b6;
+                        border-radius:4px;
+                        font-weight:bold;
+                        cursor:pointer;
+                    "
+                >
+                    Usar Item
+                </button>
+            `;
         }
         else {
             botoesHtml = `<div style="width: 100%; padding: 10px; margin-bottom: 8px; background: rgba(241, 196, 15, 0.1); border: 1px dashed #f1c40f; color: #f1c40f; font-size: 0.85em; border-radius: 4px; font-weight: bold; text-align: center;">🛠️ Leve este item a um NPC (Ferreiro, Alquimista...) para utilizá-lo.</div>`;
