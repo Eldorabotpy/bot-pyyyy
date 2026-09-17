@@ -123,19 +123,14 @@
 
 
     const ASSETS = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/';
-    // Artes provisórias do próprio catálogo, até os arquivos específicos serem publicados.
-    const artesAlternativas = {
-        geleia_slime: 'materiais/lodo_toxico', cristal_mana_bruto: 'materiais/cristal_mana',
-        raiz_da_fortuna: 'materiais/raiz_solar', folha_sombria: 'materiais/erva_cura',
-        essencia_purificadora: 'materiais/essencia_vital', po_de_iniciativa: 'materiais/poeira_magica',
-        elixir_xp_dobrado_10m: 'materiais/luz_estelar', elixir_xp_dobrado_30m: 'materiais/essencia_espiritual'
-    };
+    // Apenas o cristal ainda aguarda sua imagem específica no catálogo.
+    const artesAlternativas = { cristal_mana_bruto: 'materiais/cristal_mana' };
     function imagemItem(id, nome, consumivel = false) {
         const img = document.createElement('img');
         img.alt = nome;
         img.draggable = false;
         const pasta = consumivel || id === 'frasco_com_agua' ? 'consumiveis' : 'materiais';
-        const urls = [ASSETS + 'itens/' + pasta + '/' + id + '.png'];
+        const urls = [ASSETS + 'itens/' + pasta + '/' + id + '.png?v=4'];
         if (artesAlternativas[id]) urls.push(ASSETS + 'itens/' + artesAlternativas[id] + '.png');
         urls.push('/static/assets/box.png');
         let indice = 0;
