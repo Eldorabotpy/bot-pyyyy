@@ -17,12 +17,23 @@
         if (!scene.anims.exists('bruxa_caldeirao')) {
             scene.anims.create({ key: 'bruxa_caldeirao', frames: scene.anims.generateFrameNumbers('npc_bruxa_pocoes', { start: 0, end: 5 }), frameRate: 6, repeat: -1 });
         }
-        const npc = scene.add.sprite(32 * 32, 9 * 32, 'npc_bruxa_pocoes')
-            .setOrigin(0.5, 1).setDisplaySize(64, 64).setDepth(14)
-            .setInteractive({ useHandCursor: true }).play('bruxa_caldeirao');
+        const POS_X = (32 * 32) + 6;
+        const POS_Y = (9 * 32) + 28;   // desce a bruxa para frente da árvore
+        const DEPTH_BRUXA = 25;        // acima do player e das camadas altas
+
+        const npc = scene.add.sprite(POS_X, POS_Y, 'npc_bruxa_pocoes')
+            .setOrigin(0.5, 1)
+            .setDisplaySize(64, 64)
+            .setDepth(DEPTH_BRUXA)
+            .setInteractive({ useHandCursor: true })
+            .play('bruxa_caldeirao');
+
         scene.add.text(npc.x, npc.y - 65, 'Bruxa das Poções', {
-            fontSize: '10px', color: '#e9d5ff', stroke: '#120c1c', strokeThickness: 3
-        }).setOrigin(0.5, 1).setDepth(15);
+            fontSize: '10px',
+            color: '#e9d5ff',
+            stroke: '#120c1c',
+            strokeThickness: 3
+        }).setOrigin(0.5, 1).setDepth(DEPTH_BRUXA + 1);
         npc.on('pointerdown', (pointer, x, y, event) => {
             event?.stopPropagation();
             if (scene.isDead || scene.travadoNoPortal || scene.player?.isGathering || api.aberta) return;
