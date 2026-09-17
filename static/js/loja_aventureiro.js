@@ -45,11 +45,21 @@ window.abrirLojaAventureiro = function() {
         `;
     });
 
+    // Esconde o ícone do Passe enquanto a Loja do Merlin estiver aberta
+    document.querySelectorAll('.btn-passe-mapa').forEach(btn => {
+        btn.style.display = 'none';
+    });
+
     menuLoja.style.display = 'block';
 };
 
 window.fecharLojaAventureiro = function() {
     document.getElementById('menu-loja-aventureiro').style.display = 'none';
+
+    // Mostra novamente o ícone do Passe ao fechar a Loja do Merlin
+    document.querySelectorAll('.btn-passe-mapa').forEach(btn => {
+        btn.style.display = 'flex';
+    });
 };
 
 // 👇 A MÁGICA DO ALERTA: Troca o Emoji pela Imagem real na hora de abrir 👇
