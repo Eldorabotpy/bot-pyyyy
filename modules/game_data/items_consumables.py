@@ -71,6 +71,40 @@ CONSUMABLES_DATA = {
         "effects": {"mana": 1000},
         "price": 1000
     },
+        # ==========================================================
+    # ✨ ELIXIRES DE EXPERIÊNCIA — BRUXA DA FLORESTA
+    # ==========================================================
+
+    "elixir_xp_dobrado_10m": {
+        "display_name": "Elixir de Experiência",
+        "emoji": "✨",
+        "type": "consumivel",
+        "category": "consumivel",
+        "description": "Dobra o XP de combate recebido durante 10 minutos.",
+        "stackable": True,
+        "tradable": False,
+        "on_use": {
+            "effect": "xp_boost",
+            "multiplier": 2.0,
+            "duration_seconds": 600
+        }
+    },
+
+    "elixir_xp_dobrado_30m": {
+        "display_name": "Elixir Superior de Experiência",
+        "emoji": "🌟",
+        "type": "consumivel",
+        "category": "consumivel",
+        "description": "Dobra o XP de combate recebido durante 30 minutos.",
+        "stackable": True,
+        "tradable": False,
+        "on_use": {
+            "effect": "xp_boost",
+            "multiplier": 2.0,
+            "duration_seconds": 1800
+        }
+    },
+
     "fragmento_bravura": {
         "display_name": "Fragmento de Bravura", "emoji": "🏅", 
         "type": "especial", "category": "evento", 

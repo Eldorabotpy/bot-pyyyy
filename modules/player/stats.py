@@ -1844,9 +1844,35 @@ async def processar_turno_combate(
             )
 
 
+        # =====================================================
+        # ✨ ELIXIR DE EXPERIÊNCIA
+        # =====================================================
+
+        xp_recebido_personagem = xp_final
+        xp_boost_ativo = False
+
+        try:
+            from modules.alchemy.bruxa_pocoes import (
+                calcular_xp_com_bonus
+            )
+
+            (
+                xp_recebido_personagem,
+                xp_boost_ativo,
+            ) = calcular_xp_com_bonus(
+                player,
+                xp_final,
+            )
+
+        except Exception as e:
+            print(
+                "⚠️ [XP BOOST] "
+                f"Falha ao calcular bônus: {e}"
+            )
+
         player["xp"] = (
-            player.get("xp", 0) +
-            xp_final
+            player.get("xp", 0)
+            + xp_recebido_personagem
         )
 
         player["gold"] = (
@@ -1874,7 +1900,9 @@ async def processar_turno_combate(
             )
         )
 
-        recompensas["xp"] = xp_final
+        recompensas["xp"] = (
+            xp_recebido_personagem
+        )
         recompensas["gold"] = ouro_final
         recompensas["xp_cla"] = xp_cla_ganho
 

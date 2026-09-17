@@ -173,6 +173,9 @@ class MapaScene extends Phaser.Scene {
         this.load.spritesheet('npc_thorek', URL_THOREK, { frameWidth: 48, frameHeight: 48 });
         
         // 👇 1. ADICIONA ISTO AQUI (Os Novos Mestres de Profissão) 👇
+        if (this.regiaoAtual === 'floresta_sombria' && !this.textures.exists('npc_bruxa_pocoes')) {
+            this.load.spritesheet('npc_bruxa_pocoes', 'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/npcs/bruxa_pocoes.png', { frameWidth: 256, frameHeight: 256 });
+        }
         const BASE_NPC = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/npcs/";
         this.load.spritesheet('npc_sylas', BASE_NPC + 'npc_sylas.png', { frameWidth: 48, frameHeight: 48 });
         this.load.spritesheet('npc_grom', BASE_NPC + 'npc_grom.png', { frameWidth: 48, frameHeight: 48 });
@@ -1189,6 +1192,7 @@ class MapaScene extends Phaser.Scene {
                     this.motorNPC.spawnNPCAndante('elara', 'Madame Elara', 'npc_elara', 20 * 32, 30 * 32, 25 * 32, 30 * 32);
                 }
                 else if (this.regiaoAtual === 'floresta_sombria') {
+                    window.BruxaPocoes.criarNPC(this);
                     this.motorNPC.spawnNPCAndante('sylas', 'Guarda-Bosque Sylas', 'npc_sylas', 37 * 32, 14 * 32, 30 * 32, 14 * 32);
                 }
                 else if (this.regiaoAtual === 'pedreira_granito') {
@@ -1268,7 +1272,7 @@ class MapaScene extends Phaser.Scene {
         
         this.input.on('pointerdown', (pointer) => {
 
-            if (this.isDead) return;
+            if (this.isDead || window.BruxaPocoes?.aberta) return;
 
             // ==========================================
             // 🛡️ HUD DE STATUS ABERTO
@@ -2020,6 +2024,11 @@ class MapaScene extends Phaser.Scene {
     }
     
     update() {
+        if (window.BruxaPocoes?.aberta) {
+            this.isMoving = false;
+            this.player?.body?.stop();
+            return;
+        }
         if (!this.graficosProntos) {
             this.graficosProntos = true; // Garante que isso só rode 1 vez
             

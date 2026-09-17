@@ -279,6 +279,40 @@ def dividir_recompensas_grupo(char_id, xp_total, gold_total):
                 str(membro_id)
             )
 
+            # ================================================
+            # ✨ ELIXIR DE EXPERIÊNCIA DO ALIADO
+            # ================================================
+
+            xp_aliado = xp_por_membro
+            xp_boost_ativo = False
+
+            try:
+                from modules.alchemy.bruxa_pocoes import (
+                    calcular_xp_com_bonus
+                )
+
+                membro_data = (
+                    users_collection.find_one({
+                        "_id": membro_oid
+                    })
+                    or {}
+                )
+
+                (
+                    xp_aliado,
+                    xp_boost_ativo,
+                ) = calcular_xp_com_bonus(
+                    membro_data,
+                    xp_por_membro,
+                )
+
+            except Exception as erro_boost:
+                print(
+                    "⚠️ [XP BOOST PARTY] "
+                    f"Falha para {membro_id}: "
+                    f"{erro_boost}"
+                )
+
             resultado_player = (
                 users_collection.update_one(
                     {
@@ -286,12 +320,19 @@ def dividir_recompensas_grupo(char_id, xp_total, gold_total):
                     },
                     {
                         "$inc": {
-                            "xp": xp_por_membro,
+                            "xp": xp_aliado,
                             "gold": gold_por_membro,
                         }
                     },
                 )
             )
+
+            if xp_boost_ativo:
+                print(
+                    "✨ [XP BOOST PARTY] "
+                    f"Jogador {membro_id}: "
+                    f"{xp_por_membro} → {xp_aliado} XP"
+                )
 
             if resultado_player.matched_count != 1:
                 print(

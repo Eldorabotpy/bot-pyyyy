@@ -1746,6 +1746,163 @@ def api_usar_item_direto():
             _run_async(player_manager.save_player_data(str(busca_id), pdata))
             return jsonify({"sucesso": True, "msg": res.get("message", "Itens reparados com sucesso!")})
 
+        # ==================================================
+        # ✨ ELIXIR TEMPORÁRIO DE XP
+        # ==================================================
+
+        efeito_uso = (
+            info_item.get(
+                "on_use",
+                {}
+            )
+            or {}
+        )
+
+        if (
+            efeito_uso.get("effect")
+            == "xp_boost"
+        ):
+
+            from datetime import (
+                datetime,
+                timezone,
+                timedelta,
+            )
+
+            multiplicador = float(
+                efeito_uso.get(
+                    "multiplier",
+                    2.0,
+                )
+            )
+
+            duracao = int(
+                efeito_uso.get(
+                    "duration_seconds",
+                    600,
+                )
+            )
+
+            agora = datetime.now(
+                timezone.utc
+            )
+
+            inicio = agora
+
+            boost_atual = (
+                pdata.get(
+                    "xp_boost"
+                )
+                or {}
+            )
+
+            if isinstance(
+                boost_atual,
+                dict
+            ):
+
+                expiracao_atual = (
+                    boost_atual.get(
+                        "expires_at"
+                    )
+                )
+
+                if expiracao_atual:
+
+                    try:
+
+                        dt_atual = (
+                            datetime
+                            .fromisoformat(
+                                str(
+                                    expiracao_atual
+                                ).replace(
+                                    "Z",
+                                    "+00:00",
+                                )
+                            )
+                        )
+
+                        if dt_atual.tzinfo is None:
+                            dt_atual = (
+                                dt_atual.replace(
+                                    tzinfo=
+                                        timezone.utc
+                                )
+                            )
+
+                        if dt_atual > agora:
+                            inicio = dt_atual
+
+                    except Exception:
+                        pass
+
+            expiracao = (
+                inicio
+                + timedelta(
+                    seconds=duracao
+                )
+            )
+
+            # Gasta exatamente uma unidade.
+            if quantidade > 1:
+
+                if isinstance(
+                    item_obj,
+                    dict
+                ):
+                    inventario[
+                        item_uid
+                    ][
+                        "quantity"
+                    ] -= 1
+
+                else:
+                    inventario[
+                        item_uid
+                    ] -= 1
+
+            else:
+                del inventario[
+                    item_uid
+                ]
+
+            novo_boost = {
+                "multiplier":
+                    multiplicador,
+
+                "expires_at":
+                    expiracao
+                    .isoformat(),
+            }
+
+            users_collection.update_one(
+                {
+                    "_id":
+                        busca_id
+                },
+                {
+                    "$set": {
+                        "inventory":
+                            inventario,
+
+                        "xp_boost":
+                            novo_boost,
+                    }
+                }
+            )
+
+            return jsonify({
+                "sucesso": True,
+                "msg": (
+                    "✨ Experiência dobrada "
+                    f"por {duracao // 60} minutos!"
+                ),
+                "xp_boost":
+                    novo_boost,
+            })
+
+
         # 👇 2. SE FOR OUTRO ITEM (Caixas, Baús, etc):
         msg_sucesso = f"Você usou {info_item.get('display_name', 'o item')}!"
             
@@ -1763,6 +1920,166 @@ def api_usar_item_direto():
         import traceback
         traceback.print_exc()
         return jsonify({"erro": "A magia falhou: " + str(e)}), 500
+
+# ==========================================================
+# 🧙‍♀️ BRUXA DA FLORESTA — ALQUIMIA
+# ==========================================================
+
+@webapp_bp.route(
+    '/api/bruxa/receitas/<user_id>',
+    methods=['GET']
+)
+def api_bruxa_receitas(user_id):
+
+    try:
+        from bson.objectid import ObjectId
+
+        from modules.player.core import (
+            users_collection
+        )
+
+        from modules.alchemy.bruxa_pocoes import (
+            listar_receitas
+        )
+
+        busca_id = (
+            ObjectId(user_id)
+            if len(str(user_id)) == 24
+            else int(user_id)
+        )
+
+        pdata = users_collection.find_one({
+            "_id": busca_id
+        })
+
+        if not pdata:
+            return jsonify({
+                "success": False,
+                "error": "Herói não encontrado."
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "receitas": listar_receitas(
+                pdata
+            )
+        })
+
+    except Exception as e:
+
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@webapp_bp.route(
+    '/api/bruxa/fabricar',
+    methods=['POST']
+)
+def api_bruxa_fabricar():
+
+    try:
+        from bson.objectid import ObjectId
+
+        from modules.player.core import (
+            users_collection
+        )
+
+        from modules.alchemy.bruxa_pocoes import (
+            fabricar
+        )
+
+        dados = request.json or {}
+
+        user_id = dados.get(
+            "user_id"
+        )
+
+        receita_id = dados.get(
+            "receita_id"
+        )
+
+        if not user_id or not receita_id:
+            return jsonify({
+                "success": False,
+                "error": "Dados incompletos."
+            }), 400
+
+        busca_id = (
+            ObjectId(user_id)
+            if len(str(user_id)) == 24
+            else int(user_id)
+        )
+
+        pdata = users_collection.find_one({
+            "_id": busca_id
+        })
+
+        if not pdata:
+            return jsonify({
+                "success": False,
+                "error": "Herói não encontrado."
+            }), 404
+
+        resultado = fabricar(
+            pdata,
+            receita_id
+        )
+
+        if not resultado.get(
+            "success"
+        ):
+            return jsonify(
+                resultado
+            ), 400
+
+        users_collection.update_one(
+            {
+                "_id": busca_id
+            },
+            {
+                "$set": {
+                    "inventory":
+                        pdata.get(
+                            "inventory",
+                            {}
+                        )
+                }
+            }
+        )
+
+        try:
+            from modules.player.core import (
+                clear_player_cache
+            )
+
+            _run_async(
+                clear_player_cache(
+                    busca_id
+                )
+            )
+
+        except Exception:
+            pass
+
+        return jsonify(
+            resultado
+        )
+
+    except Exception as e:
+
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 
 @webapp_bp.route('/api/mercado/criar_anuncio', methods=['POST'])
 def api_criar_anuncio():

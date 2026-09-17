@@ -145,6 +145,77 @@ MATERIALS_DATA = {
         "icon_url": "",
     },
     # --- DROPS DE MONSTROS ---
+
+    # ==========================================================
+    # 🧪 REAGENTES DOS SLIMES — ALQUIMIA INICIAL
+    # ==========================================================
+
+    "geleia_slime": {
+        "display_name": "Geleia de Slime",
+        "emoji": "🟢",
+        "type": "material_monstro",
+        "category": "cacada",
+        "description": "Substância gelatinosa com propriedades regenerativas.",
+        "stackable": True,
+        "media_key": "item_geleia_slime",
+        "icon_url": "",
+    },
+
+    "cristal_mana_bruto": {
+        "display_name": "Cristal de Mana Bruto",
+        "emoji": "💎",
+        "type": "material_monstro",
+        "category": "cacada",
+        "description": "Cristal instável impregnado com energia mágica.",
+        "stackable": True,
+        "media_key": "item_cristal_mana_bruto",
+        "icon_url": "",
+    },
+
+    "raiz_da_fortuna": {
+        "display_name": "Raiz da Fortuna",
+        "emoji": "🍀",
+        "type": "material_monstro",
+        "category": "cacada",
+        "description": "Raiz incomum carregada de energia vital.",
+        "stackable": True,
+        "media_key": "item_raiz_da_fortuna",
+        "icon_url": "",
+    },
+
+    "folha_sombria": {
+        "display_name": "Folha Sombria",
+        "emoji": "🌑",
+        "type": "material_monstro",
+        "category": "cacada",
+        "description": "Folha impregnada com energia das sombras.",
+        "stackable": True,
+        "media_key": "item_folha_sombria",
+        "icon_url": "",
+    },
+
+    "essencia_purificadora": {
+        "display_name": "Essência Purificadora",
+        "emoji": "✨",
+        "type": "material_monstro",
+        "category": "cacada",
+        "description": "Essência mágica capaz de estabilizar misturas alquímicas.",
+        "stackable": True,
+        "media_key": "item_essencia_purificadora",
+        "icon_url": "",
+    },
+
+    "po_de_iniciativa": {
+        "display_name": "Pó de Iniciativa",
+        "emoji": "⚡",
+        "type": "material_monstro",
+        "category": "cacada",
+        "description": "Pó raro encontrado no Rei Slime, carregado de energia concentrada.",
+        "stackable": True,
+        "media_key": "item_po_de_iniciativa",
+        "icon_url": "",
+    },
+
     "pena": {
         "display_name": "Pena", "emoji": "🪶",
         "type": "material_monstro", "category": "coletavel",
