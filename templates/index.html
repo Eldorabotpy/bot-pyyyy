@@ -1279,6 +1279,22 @@
             if (tabId === 'aba-reino') document.getElementById('nav-btn-reino')?.classList.add('active');
             if (tabId === 'aba-perfil') document.getElementById('nav-btn-perfil')?.classList.add('active');
 
+
+            // ==========================================
+            // 🎫 PASSE - SOMENTE NO MAPA
+            // ==========================================
+
+            document.querySelectorAll('.btn-passe-mapa').forEach(btn => {
+
+                if (tabId === 'aba-reino') {
+                    btn.style.display = 'flex';
+                } else {
+                    btn.style.display = 'none';
+                }
+
+            });
+
+
             const btnMissoes = document.getElementById('btn-quest-log') || document.querySelector('[onclick*="toggleDiarioQuests"]');
             if (btnMissoes) {
                 if (tabId === 'aba-reino') {
