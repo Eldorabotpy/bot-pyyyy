@@ -126,19 +126,118 @@ def spend_medalhas_cla(
 
 def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) -> dict:
     inventory = player_data.get("inventory", {})
-    
-    # Se o item já existe como dicionário (item único/equipamento), não empilha
-    if item_id in inventory and isinstance(inventory[item_id], dict):
-        # Gera um novo ID único para evitar sobreposição
-        new_uid = f"{item_id}_{str(uuid.uuid4())[:8]}"
-        return add_item_to_inventory(player_data, new_uid, quantity)
 
-    current_qty = inventory.get(item_id, 0)
-    # Proteção: se por acaso existir um dict onde deveria ser int
-    if isinstance(current_qty, dict): current_qty = 1 
-    
-    inventory[item_id] = int(current_qty) + int(quantity)
+    item_info = game_data.ITEMS_DATA.get(
+        item_id,
+        {},
+    ) or {}
+
+    stackable = bool(
+        item_info.get(
+            "stackable",
+            False,
+        )
+    )
+
+    current = inventory.get(
+        item_id
+    )
+
+    # =========================================================
+    # 📦 ITEM EMPILHÁVEL
+    # =========================================================
+    if stackable:
+
+        if isinstance(current, dict):
+
+            current_qty = int(
+                current.get(
+                    "quantity",
+                    current.get(
+                        "qtd",
+                        0,
+                    ),
+                )
+                or 0
+            )
+
+            current["base_id"] = (
+                current.get(
+                    "base_id"
+                )
+                or item_id
+            )
+
+            current["quantity"] = (
+                current_qty
+                + int(quantity)
+            )
+
+            current.pop(
+                "qtd",
+                None,
+            )
+
+            inventory[item_id] = current
+
+        else:
+
+            current_qty = int(
+                current
+                or 0
+            )
+
+            inventory[item_id] = (
+                current_qty
+                + int(quantity)
+            )
+
+        player_data["inventory"] = inventory
+        return player_data
+
+    # =========================================================
+    # ⚔️ ITEM NÃO EMPILHÁVEL
+    #
+    # Mantém compatibilidade com o comportamento antigo.
+    # Equipamentos reais devem continuar usando add_unique_item.
+    # =========================================================
+    if (
+        item_id in inventory
+        and
+        isinstance(
+            inventory[item_id],
+            dict,
+        )
+    ):
+        new_uid = (
+            f"{item_id}_"
+            f"{str(uuid.uuid4())[:8]}"
+        )
+
+        return add_item_to_inventory(
+            player_data,
+            new_uid,
+            quantity,
+        )
+
+    current_qty = inventory.get(
+        item_id,
+        0,
+    )
+
+    if isinstance(
+        current_qty,
+        dict,
+    ):
+        current_qty = 1
+
+    inventory[item_id] = (
+        int(current_qty)
+        + int(quantity)
+    )
+
     player_data["inventory"] = inventory
+
     return player_data
 
 def remove_item_from_inventory(player_data: dict, item_id: str, quantity: int = 1) -> bool:

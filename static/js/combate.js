@@ -330,11 +330,38 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
 
         // 🛠️ NOVO: O Jogo baixa as suas magias atuais ANTES de entrar na arena!
         try {
-            const resPerfil = await fetch(`/api/personagem/${charId}?t=${new Date().getTime()}`);
-            window.perfilDadosGlobais = await resPerfil.json();
+            const resPerfil = await fetch(
+                `/api/personagem/${charId}?t=${new Date().getTime()}`
+            );
+
+            const perfilCombate =
+                await resPerfil.json();
+
+            const perfilAnterior =
+                window.perfilDadosGlobais || {};
+
+            // =====================================================
+            // 🛡️ NÃO DESTRUIR O ESTADO DA CAMPANHA
+            // =====================================================
+            //
+            // O endpoint usado pelo combate serve principalmente
+            // para atualizar skills e dados de combate.
+            //
+            // Nunca devemos apagar quests que já foram carregadas
+            // pelo perfil oficial.
+            // =====================================================
+
+            window.perfilDadosGlobais = {
+                ...perfilAnterior,
+                ...perfilCombate,
+
+                quests: {
+                    ...(perfilAnterior.quests || {}),
+                    ...(perfilCombate.quests || {})
+                }
+            };
 
             // ✅ Cada batalha começa com as skills prontas no frontend.
-            // Cooldown só deve aparecer depois que a skill for usada nessa batalha.
             if (window.perfilDadosGlobais) {
                 window.perfilDadosGlobais.cooldowns = {};
             }
@@ -3874,11 +3901,28 @@ window.iniciarInterfaceRaid = async function(estadoRaid) {
         const charId = localStorage.getItem("jogadorEldoraID");
 
         if (charId) {
-            const resPerfil = await fetch(`/api/personagem/${charId}?t=${Date.now()}`, {
-                cache: "no-store"
-            });
+            const resPerfil = await fetch(
+                `/api/personagem/${charId}?t=${Date.now()}`,
+                {
+                    cache: "no-store"
+                }
+            );
 
-            window.perfilDadosGlobais = await resPerfil.json();
+            const perfilRaid =
+                await resPerfil.json();
+
+            const perfilAnterior =
+                window.perfilDadosGlobais || {};
+
+            window.perfilDadosGlobais = {
+                ...perfilAnterior,
+                ...perfilRaid,
+
+                quests: {
+                    ...(perfilAnterior.quests || {}),
+                    ...(perfilRaid.quests || {})
+                }
+            };
 
             console.log("🧙 Perfil carregado para Raid:", {
                 skills_equipadas: window.perfilDadosGlobais.skills_equipadas,

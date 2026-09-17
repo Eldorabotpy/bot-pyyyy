@@ -433,11 +433,37 @@ class MotorDeMissoesNPC {
         
         if (data.success) {
             if (typeof window.alertaEldora === 'function') {
-                window.alertaEldora("Missão Aceita!", data.message, "sucesso");
+                window.alertaEldora(
+                    "Missão Aceita!",
+                    data.message,
+                    "sucesso"
+                );
             } else {
                 alert(data.message);
             }
-            this.interagir(npc_id, nome_npc, url_imagem);
+
+            // =====================================================
+            // 🔄 SINCRONIZA A CAMPANHA COM O PERFIL GLOBAL
+            // =====================================================
+            //
+            // A missão acabou de ser criada no MongoDB.
+            // O Diário e os NPCs usam perfilDadosGlobais,
+            // portanto precisamos atualizar essa memória.
+            // =====================================================
+
+            if (
+                typeof window.carregarMeuPerfil
+                === 'function'
+            ) {
+                await window.carregarMeuPerfil();
+            }
+
+            await this.interagir(
+                npc_id,
+                nome_npc,
+                url_imagem
+            );
+
         } else {
             if (typeof window.alertaEldora === 'function') window.alertaEldora("Erro", data.error, "erro");
             else alert(data.error);
