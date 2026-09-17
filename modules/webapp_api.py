@@ -2025,6 +2025,13 @@ def api_bruxa_fabricar():
                 "error": "Herói não encontrado."
             }), 404
 
+        # A gravação só será aceita se ouro e inventário não mudaram.
+        estado_original = {
+            "_id": busca_id,
+            "inventory": copy.deepcopy(pdata.get("inventory", {"$exists": False})),
+            "gold": pdata.get("gold", {"$exists": False}),
+        }
+
         resultado = fabricar(
             pdata,
             receita_id
@@ -2037,20 +2044,16 @@ def api_bruxa_fabricar():
                 resultado
             ), 400
 
-        users_collection.update_one(
-            {
-                "_id": busca_id
-            },
-            {
-                "$set": {
-                    "inventory":
-                        pdata.get(
-                            "inventory",
-                            {}
-                        )
-                }
-            }
+        gravacao = users_collection.update_one(
+            estado_original,
+            {"$set": {"inventory": pdata.get("inventory", {})},
+             "$inc": {"gold": -resultado["custo_ouro"]}},
         )
+        if not gravacao.matched_count:
+            return jsonify({
+                "success": False,
+                "error": "Seu ouro ou inventário mudou. Atualize as receitas e tente novamente.",
+            }), 409
 
         try:
             from modules.player.core import (

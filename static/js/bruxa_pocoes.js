@@ -2,6 +2,7 @@
     'use strict';
     const api = window.BruxaPocoes = { aberta: false, criarNPC };
     let selecionada = null;
+    let entradaAnterior = null;
     let modal, lista, aviso, cena, ocupado = false, versao = 0, focoAnterior;
     const texto = (tag, valor, classe) => {
         const el = document.createElement(tag);
@@ -75,12 +76,19 @@
         lista.className = 'bruxa-receitas';
         modal.append(cabecalho, lista, aviso);
         modal.addEventListener('cancel', e => { e.preventDefault(); fechar(); });
+        // Os eventos do diálogo não devem alcançar os controles globais do mapa.
+        for (const evento of ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'click', 'dblclick', 'touchstart', 'touchmove', 'touchend', 'wheel']) {
+            modal.addEventListener(evento, e => e.stopPropagation());
+        }
         document.body.append(modal);
     }
 
     async function abrir(scene) {
         prepararModal();
         cena = scene;
+        entradaAnterior = { mouse: scene.input?.enabled, teclado: scene.input?.keyboard?.enabled };
+        if (scene.input) scene.input.enabled = false;
+        if (scene.input?.keyboard) scene.input.keyboard.enabled = false;
         api.aberta = true;
         focoAnterior = document.activeElement;
         modal.showModal();
@@ -90,6 +98,14 @@
     function fechar() {
         ++versao;
         api.aberta = false;
+        if (cena?.input && entradaAnterior) {
+            cena.input.enabled = entradaAnterior.mouse;
+            if (cena.input.keyboard) {
+                cena.input.keyboard.resetKeys?.();
+                cena.input.keyboard.enabled = entradaAnterior.teclado;
+            }
+        }
+        entradaAnterior = null;
         cena = null;
         modal?.close();
         focoAnterior?.focus();
@@ -123,15 +139,12 @@
 
 
     const ASSETS = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/';
-    // Apenas o cristal ainda aguarda sua imagem específica no catálogo.
-    const artesAlternativas = { cristal_mana_bruto: 'materiais/cristal_mana' };
     function imagemItem(id, nome, consumivel = false) {
         const img = document.createElement('img');
         img.alt = nome;
         img.draggable = false;
         const pasta = consumivel || id === 'frasco_com_agua' ? 'consumiveis' : 'materiais';
-        const urls = [ASSETS + 'itens/' + pasta + '/' + id + '.png?v=4'];
-        if (artesAlternativas[id]) urls.push(ASSETS + 'itens/' + artesAlternativas[id] + '.png');
+        const urls = [ASSETS + 'itens/' + pasta + '/' + id + '.png?v=5'];
         urls.push('/static/assets/box.png');
         let indice = 0;
         img.onerror = () => {
@@ -197,10 +210,15 @@
             material.append(quadro, texto('span', item.nome));
             ingredientes.append(material);
         }
-        const botao = texto('button', ocupado ? 'PREPARANDO…' : atual.pode_criar ? 'Preparar poção' : 'Faltam ingredientes', 'bruxa-fabricar');
+        const custo = Number(atual.custo_ouro || 0);
+        const saldo = Number(atual.ouro_disponivel || 0);
+        const ouroInsuficiente = saldo < custo;
+        const custoEl = texto('p', custo ? 'Custo: ' + custo.toLocaleString('pt-BR') + ' ouro · Seu ouro: ' + saldo.toLocaleString('pt-BR') : 'Sem custo em ouro', 'bruxa-custo');
+        if (ouroInsuficiente) custoEl.className += ' insuficiente';
+        const botao = texto('button', ocupado ? 'PREPARANDO…' : ouroInsuficiente ? 'Ouro insuficiente' : atual.pode_criar ? 'Preparar poção' : 'Faltam ingredientes', 'bruxa-fabricar');
         botao.disabled = ocupado || !atual.pode_criar;
         botao.onclick = () => fabricar(atual.receita_id);
-        painel.append(ingredientes, botao);
+        painel.append(ingredientes, custoEl, botao);
         lista.append(selecao, painel);
     }
 

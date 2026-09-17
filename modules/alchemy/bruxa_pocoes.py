@@ -44,6 +44,7 @@ RECEITAS_BRUXA = {
     },
 
     "elixir_xp_dobrado_10m": {
+        "gold_cost": 500,
         "display_name": "Elixir de Experiência",
         "emoji": "✨",
         "tier": 1,
@@ -91,6 +92,7 @@ RECEITAS_BRUXA = {
     },
 
     "elixir_xp_dobrado_30m": {
+        "gold_cost": 1000,
         "display_name": "Elixir Superior de Experiência",
         "emoji": "🌟",
         "tier": 2,
@@ -321,7 +323,9 @@ def listar_receitas(
     ):
 
         ingredientes = []
-        pode_criar = True
+        custo_ouro = receita.get("gold_cost", 0)
+        ouro_disponivel = int(player_data.get("gold", 0) or 0)
+        pode_criar = ouro_disponivel >= custo_ouro
 
         for item_id, necessario in (
             receita["inputs"].items()
@@ -386,6 +390,8 @@ def listar_receitas(
             ),
             "ingredientes": ingredientes,
             "pode_criar": pode_criar,
+            "custo_ouro": custo_ouro,
+            "ouro_disponivel": ouro_disponivel,
         })
 
     return resposta
@@ -409,6 +415,11 @@ def fabricar(
             "success": False,
             "error": "Receita desconhecida.",
         }
+
+    custo_ouro = receita.get("gold_cost", 0)
+    ouro_disponivel = int(player_data.get("gold", 0) or 0)
+    if ouro_disponivel < custo_ouro:
+        return {"success": False, "error": f"Ouro insuficiente: você precisa de {custo_ouro} ouro."}
 
     # Primeiro valida tudo.
     faltando = []
@@ -482,8 +493,12 @@ def fabricar(
         quantidade_resultado,
     )
 
+    player_data["gold"] = ouro_disponivel - custo_ouro
+
     return {
         "success": True,
+        "custo_ouro": custo_ouro,
+        "ouro_restante": player_data["gold"],
         "receita_id": receita_id,
         "resultado": resultado_id,
         "quantidade": quantidade_resultado,
