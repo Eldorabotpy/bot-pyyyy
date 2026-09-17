@@ -238,11 +238,67 @@ class NPCsEngine {
                         return;
                     }
 
-                    if (p.level < 20) {
-                        window.mostrarDialogoRPG("Arquimaga Selene", "A energia da sua nova habilidade ainda está se assentando. Treina arduamente e regressa quando fores Nível 20. O destino das Guildas o aguarda.");
-                    } else {
-                        window.mostrarDialogoRPG("Arquimaga Selene", "As estrelas dizem que grandes conflitos se aproximam. As Guildas deverão se erguer em breve.");
+                    // =====================================================
+                    // 🏰 Q7 — O RECONHECIMENTO DA CAPITAL
+                    // =====================================================
+
+                    const q7Guilda =
+                        p.quests["q7_selene_guildas"];
+
+                    if (
+                        !q7Guilda ||
+                        q7Guilda.status !== 'resgatada'
+                    ) {
+
+                        // Ainda não atingiu o nível necessário.
+                        if (p.level < 20) {
+
+                            window.mostrarDialogoRPG(
+                                "Arquimaga Selene",
+                                "O Grimório respondeu ao seu chamado, mas poder recém-desperto é instável. Treine, fortaleça seu corpo e retorne quando alcançar o Nível 20. Então decidirei se está pronto para carregar o nome de Eldora diante da Guilda dos Aventureiros."
+                            );
+
+                            return;
+                        }
+
+                        // =================================================
+                        // 📜 ABRE A MISSÃO OFICIAL Q7
+                        // =================================================
+
+                        if (
+                            window.motorMissoesNPC &&
+                            typeof window.motorMissoesNPC.interagir === 'function'
+                        ) {
+
+                            const rostoSelene =
+                                "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/npcs/npc_selene_rosto.png";
+
+                            window.motorMissoesNPC.interagir(
+                                "selene_arquimaga",
+                                "Arquimaga Selene",
+                                rostoSelene
+                            );
+
+                            return;
+                        }
+
+                        // Fallback caso a interface de missão não esteja carregada.
+                        window.mostrarDialogoRPG(
+                            "Arquimaga Selene",
+                            "Seu treinamento chegou ao momento decisivo. Há uma prova que deve cumprir antes que eu possa recomendá-lo à Guilda dos Aventureiros."
+                        );
+
+                        return;
                     }
+
+                    // =====================================================
+                    // ✅ Q7 JÁ CONCLUÍDA
+                    // =====================================================
+
+                    window.mostrarDialogoRPG(
+                        "Arquimaga Selene",
+                        "Você conquistou meu reconhecimento. A Carta de Recomendação leva meu selo e confirma seu valor perante a Capital. Apresente-se agora à Guilda dos Aventureiros. A partir daqui, sua jornada deixa de ser apenas sobrevivência."
+                    );
                 }
                 // ===============================================
                 // 🧠 LÓGICA INTELIGENTE DOS MESTRES DE GUILDA

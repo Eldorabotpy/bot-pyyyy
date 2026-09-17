@@ -6349,7 +6349,324 @@ def api_clan_atualizar_configuracoes():
 # quests         = história / evolução de classe
 #
 # ============================================================
+# ============================================================
+# 🔐 ACESSO À GUILDA DOS AVENTUREIROS
+# ============================================================
 
+def _status_acesso_guilda(
+    user_id
+):
+    """
+    Fonte oficial de autorização para os contratos
+    da Guilda dos Aventureiros.
+
+    Requisitos:
+    - nível 20 ou superior
+    - q7_selene_guildas concluída
+    """
+
+    try:
+        uid_str = str(
+            user_id
+        )
+
+        busca_id = (
+            ObjectId(uid_str)
+            if len(uid_str) == 24
+            else int(uid_str)
+        )
+
+    except Exception:
+
+        return {
+            "success": False,
+            "liberado": False,
+            "error":
+                "Identidade do aventureiro inválida.",
+        }
+
+
+    jogador = users_collection.find_one(
+        {
+            "_id": busca_id
+        }
+    )
+
+
+    if not jogador:
+
+        return {
+            "success": False,
+            "liberado": False,
+            "error":
+                "Aventureiro não encontrado.",
+        }
+
+
+    try:
+        nivel = int(
+            jogador.get(
+                "level",
+                1
+            ) or 1
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        nivel = 1
+
+
+    quests = (
+        jogador.get(
+            "quests",
+            {}
+        )
+        or {}
+    )
+
+
+    q7 = (
+        quests.get(
+            "q7_selene_guildas",
+            {}
+        )
+        or {}
+    )
+
+
+    q7_concluida = (
+        q7.get("status")
+        == "resgatada"
+    )
+
+
+    liberado = (
+        nivel >= 20
+        and
+        q7_concluida
+    )
+
+
+    # ========================================================
+    # 🔄 AUTOCORREÇÃO DO FLAG DE ACESSO
+    # ========================================================
+
+    if (
+        liberado
+        and
+        not jogador.get(
+            "guild_access_unlocked",
+            False
+        )
+    ):
+
+        users_collection.update_one(
+            {
+                "_id": busca_id
+            },
+            {
+                "$set": {
+                    "guild_access_unlocked":
+                        True
+                }
+            }
+        )
+
+
+    apresentacao_concluida = bool(
+        jogador.get(
+            "guild_intro_seen",
+            False
+        )
+    )
+
+
+    if nivel < 20:
+
+        mensagem = (
+            "A Guilda dos Aventureiros ainda não "
+            "aceita seus contratos. Alcance o Nível 20 "
+            "e prove seu valor perante a Arquimaga Selene."
+        )
+
+    elif not q7_concluida:
+
+        mensagem = (
+            "Seu nível é suficiente, mas falta o "
+            "reconhecimento oficial da Capital. "
+            "Procure a Arquimaga Selene."
+        )
+
+    else:
+
+        mensagem = (
+            "A Carta de Recomendação foi reconhecida. "
+            "Bem-vindo à Guilda dos Aventureiros."
+        )
+
+
+    return {
+        "success": True,
+
+        "liberado":
+            liberado,
+
+        "nivel":
+            nivel,
+
+        "q7_concluida":
+            q7_concluida,
+
+        "guild_access_unlocked":
+            liberado,
+
+        "apresentacao_pendente":
+            (
+                liberado
+                and
+                not apresentacao_concluida
+            ),
+
+        "apresentacao_concluida":
+            apresentacao_concluida,
+
+        "message":
+            mensagem,
+    }
+
+
+# ============================================================
+# 🛡️ CONSULTAR ACESSO À GUILDA
+# ============================================================
+
+@webapp_bp.route(
+    '/api/guild/acesso/<user_id>',
+    methods=['GET']
+)
+def api_guild_acesso(
+    user_id
+):
+
+    resultado = (
+        _status_acesso_guilda(
+            user_id
+        )
+    )
+
+    return jsonify(
+        resultado
+    ), (
+        200
+        if resultado.get("success")
+        else 400
+    )
+
+
+# ============================================================
+# 🏰 CONCLUIR APRESENTAÇÃO NA GUILDA
+# ============================================================
+
+@webapp_bp.route(
+    '/api/guild/apresentacao/concluir',
+    methods=['POST']
+)
+def api_guild_concluir_apresentacao():
+
+    dados = (
+        request.get_json(
+            silent=True
+        )
+        or {}
+    )
+
+
+    user_id = dados.get(
+        "user_id"
+    )
+
+
+    if not user_id:
+
+        return jsonify({
+            "success": False,
+            "error":
+                "ID do aventureiro não informado.",
+        }), 400
+
+
+    acesso = (
+        _status_acesso_guilda(
+            user_id
+        )
+    )
+
+
+    if not acesso.get(
+        "success"
+    ):
+
+        return jsonify(
+            acesso
+        ), 400
+
+
+    if not acesso.get(
+        "liberado"
+    ):
+
+        return jsonify({
+            "success": False,
+            "guild_locked": True,
+            "error":
+                acesso.get(
+                    "message"
+                ),
+        }), 403
+
+
+    try:
+        uid_str = str(
+            user_id
+        )
+
+        busca_id = (
+            ObjectId(uid_str)
+            if len(uid_str) == 24
+            else int(uid_str)
+        )
+
+    except Exception:
+
+        return jsonify({
+            "success": False,
+            "error":
+                "Identidade inválida.",
+        }), 400
+
+
+    users_collection.update_one(
+        {
+            "_id": busca_id
+        },
+        {
+            "$set": {
+                "guild_intro_seen":
+                    True
+            }
+        }
+    )
+
+
+    return jsonify({
+        "success": True,
+
+        "message":
+            "Registro concluído. "
+            "Você agora é reconhecido oficialmente "
+            "pela Guilda dos Aventureiros.",
+    })
 
 # ============================================================
 # 📖 LISTAR MISSÕES
@@ -6361,6 +6678,28 @@ def api_clan_atualizar_configuracoes():
 )
 def api_guild_listar_missoes(user_id):
     try:
+
+        acesso = (
+            _status_acesso_guilda(
+                user_id
+            )
+        )
+
+        if not acesso.get("success"):
+            return jsonify(
+                acesso
+            ), 400
+
+        if not acesso.get("liberado"):
+            return jsonify({
+                "success": False,
+                "guild_locked": True,
+                "error":
+                    acesso.get(
+                        "message"
+                    ),
+            }), 403
+
         from modules.guild_missions import (
             guild_mission_manager
         )
@@ -6421,6 +6760,27 @@ def api_guild_aceitar_missao():
                 "error": "Missão não informada.",
             }), 400
 
+        acesso = (
+            _status_acesso_guilda(
+                user_id
+            )
+        )
+
+        if not acesso.get("success"):
+            return jsonify(
+                acesso
+            ), 400
+
+        if not acesso.get("liberado"):
+            return jsonify({
+                "success": False,
+                "guild_locked": True,
+                "error":
+                    acesso.get(
+                        "message"
+                    ),
+            }), 403
+        
         resultado = (
             guild_mission_manager
             .aceitar_missao(
@@ -6477,6 +6837,27 @@ def api_guild_resgatar_missao():
                 "success": False,
                 "error": "Missão não informada.",
             }), 400
+
+        acesso = (
+            _status_acesso_guilda(
+                user_id
+            )
+        )
+
+        if not acesso.get("success"):
+            return jsonify(
+                acesso
+            ), 400
+
+        if not acesso.get("liberado"):
+            return jsonify({
+                "success": False,
+                "guild_locked": True,
+                "error":
+                    acesso.get(
+                        "message"
+                    ),
+            }), 403
 
         resultado = (
             guild_mission_manager

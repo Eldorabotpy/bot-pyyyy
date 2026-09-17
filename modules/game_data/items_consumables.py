@@ -121,6 +121,33 @@ CONSUMABLES_DATA = {
         "tradable": False # 🔴 BLOQUEADO
     },
 
+    # ============================================================
+    # 📜 ITEM DE HISTÓRIA — GUILDA DOS AVENTUREIROS
+    # ============================================================
+
+    "carta_recomendacao": {
+        "display_name": "Carta de Recomendação",
+        "emoji": "📜",
+
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/carta_recomendacao.png"
+        ),
+
+        "type": "especial",
+        "category": "missao",
+
+        "description": (
+            "Documento oficial emitido pela Arquimaga Selene. "
+            "Reconhece seu portador como alguém digno de se "
+            "apresentar à Guilda dos Aventureiros."
+        ),
+
+        "stackable": True,
+        "tradable": False,
+    },
+
     # --- ESPECIAIS / UTILITÁRIOS ---
     "pedra_de_aprimoramento": {
         "display_name": "Pedra de Aprimoramento",

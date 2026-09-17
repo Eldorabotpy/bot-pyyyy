@@ -602,20 +602,185 @@ class MapaScene extends Phaser.Scene {
                     }
 
 
-                    if (
-                        typeof window.abrirGuildaMissoes
-                        === 'function'
-                    ) {
+                    // ==================================
+                    // 🏰 ACESSO OFICIAL À GUILDA
+                    // ==================================
 
-                        window.abrirGuildaMissoes();
+                    const jogadorId =
+                        localStorage.getItem(
+                            "jogadorEldoraID"
+                        );
 
-                    } else {
+                    if (!jogadorId) {
+
+                        if (
+                            typeof window.mostrarDialogoRPG
+                            === 'function'
+                        ) {
+
+                            window.mostrarDialogoRPG(
+                                "Guilda dos Aventureiros",
+                                "Não consegui reconhecer sua identidade. Entre novamente no reino."
+                            );
+                        }
+
+                        return;
+                    }
+
+
+                    fetch(
+                        `/api/guild/acesso/${encodeURIComponent(
+                            jogadorId
+                        )}?t=${Date.now()}`,
+                        {
+                            cache: 'no-store'
+                        }
+                    )
+                    .then(async resposta => {
+
+                        const dados =
+                            await resposta.json();
+
+                        if (
+                            !resposta.ok ||
+                            !dados ||
+                            !dados.success
+                        ) {
+
+                            throw new Error(
+                                dados?.error ||
+                                "Não foi possível consultar a Guilda."
+                            );
+                        }
+
+                        return dados;
+                    })
+                    .then(dados => {
+
+                        // ==================================
+                        // 🔒 AINDA NÃO É AVENTUREIRO
+                        // ==================================
+
+                        if (!dados.liberado) {
+
+                            if (
+                                typeof window.mostrarDialogoRPG
+                                === 'function'
+                            ) {
+
+                                window.mostrarDialogoRPG(
+                                    "Recepcionista da Guilda",
+                                    dados.message ||
+                                    "Você ainda não possui autorização para receber contratos da Guilda."
+                                );
+                            }
+
+                            return;
+                        }
+
+
+                        // ==================================
+                        // 📜 PRIMEIRA APRESENTAÇÃO
+                        // ==================================
+
+                        if (
+                            dados.apresentacao_pendente
+                        ) {
+
+                            if (
+                                typeof window.mostrarDialogoRPG
+                                === 'function'
+                            ) {
+
+                                window.mostrarDialogoRPG(
+                                    "Recepcionista da Guilda",
+                                    "Espere... este selo pertence à Arquimaga Selene. Então você é o aventureiro de quem ela falou. Sua Carta de Recomendação foi reconhecida. A partir de hoje, seu nome será registrado nos livros da Guilda dos Aventureiros. Volte a falar comigo e o Quadro de Contratos estará disponível."
+                                );
+                            }
+
+
+                            fetch(
+                                '/api/guild/apresentacao/concluir',
+                                {
+                                    method: 'POST',
+
+                                    headers: {
+                                        'Content-Type':
+                                            'application/json'
+                                    },
+
+                                    body: JSON.stringify({
+                                        user_id:
+                                            jogadorId
+                                    })
+                                }
+                            )
+                            .then(async resposta => {
+
+                                const resultado =
+                                    await resposta.json();
+
+                                if (
+                                    !resposta.ok ||
+                                    !resultado.success
+                                ) {
+
+                                    console.error(
+                                        "❌ Falha ao registrar apresentação da Guilda:",
+                                        resultado
+                                    );
+                                }
+                            })
+                            .catch(erro => {
+
+                                console.error(
+                                    "❌ Erro ao registrar apresentação da Guilda:",
+                                    erro
+                                );
+                            });
+
+
+                            return;
+                        }
+
+
+                        // ==================================
+                        // ⚔️ AVENTUREIRO JÁ REGISTRADO
+                        // ==================================
+
+                        if (
+                            typeof window.abrirGuildaMissoes
+                            === 'function'
+                        ) {
+
+                            window.abrirGuildaMissoes();
+
+                        } else {
+
+                            console.error(
+                                "❌ abrirGuildaMissoes() não encontrada. " +
+                                "Verifique guild_missions.js."
+                            );
+                        }
+                    })
+                    .catch(erro => {
 
                         console.error(
-                            "❌ abrirGuildaMissoes() não encontrada. " +
-                            "Verifique guild_missions.js."
+                            "❌ Erro ao consultar acesso à Guilda:",
+                            erro
                         );
-                    }
+
+                        if (
+                            typeof window.mostrarDialogoRPG
+                            === 'function'
+                        ) {
+
+                            window.mostrarDialogoRPG(
+                                "Guilda dos Aventureiros",
+                                "Os registros da Guilda não puderam ser consultados agora. Tente novamente em instantes."
+                            );
+                        }
+                    });
                 }
             );
         }
@@ -1523,7 +1688,18 @@ class MapaScene extends Phaser.Scene {
     
                 let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, gameObject.x, gameObject.y);
                 
-                if (dist < 80) { 
+                if (dist < 80) {
+
+                    // =====================================================
+                    // 🔮 SELENE POSSUI FLUXO PRÓPRIO NO NPCsEngine
+                    // =====================================================
+                    if (
+                        gameObject.texture &&
+                        gameObject.texture.key === 'npc_selene'
+                    ) {
+                        return;
+                    }
+
                     if (typeof window.motorMissoesNPC !== 'undefined') {
                         // Dicionário mágico: Liga a textura da imagem ao ID real do NPC
                         const npcMapeamento = {

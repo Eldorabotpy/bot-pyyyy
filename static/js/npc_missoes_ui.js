@@ -150,15 +150,265 @@ class MotorDeMissoesNPC {
             return;
         }
 
-        // Prioridade 2: Missões novas para aceitar
-        if (status.disponiveis.length > 0) {
-            const m = status.disponiveis[0];
+        // =========================================================
+        // PRIORIDADE 2: MISSÃO EM ANDAMENTO
+        // =========================================================
+
+        const missoesEmAndamento =
+            Array.isArray(status.em_andamento)
+                ? status.em_andamento
+                : [];
+
+        if (missoesEmAndamento.length > 0) {
+
+            const m = missoesEmAndamento[0];
+
+            let htmlProgresso = '';
+
+            // =====================================================
+            // ⚔️ PROGRESSO DE ABATES
+            // =====================================================
+
+            const progressoAbates =
+                m.progresso_abates || {};
+
+            const listaAbates =
+                Object.values(progressoAbates);
+
+            if (listaAbates.length > 0) {
+
+                htmlProgresso += `
+                    <div class="recompensas-box">
+                        <strong>⚔️ PROGRESSO DA PROVAÇÃO</strong>
+                        <br><br>
+                `;
+
+                for (const alvo of listaAbates) {
+
+                    const concluido =
+                        alvo.concluido === true;
+
+                    const icone =
+                        concluido
+                            ? '✅'
+                            : '⚔️';
+
+                    const cor =
+                        concluido
+                            ? '#34d399'
+                            : '#facc15';
+
+                    htmlProgresso += `
+                        <div style="
+                            display:flex;
+                            justify-content:space-between;
+                            align-items:center;
+                            gap:10px;
+                            margin:7px 0;
+                            color:${cor};
+                        ">
+                            <span>
+                                ${icone}
+                                ${alvo.nome}
+                            </span>
+
+                            <strong>
+                                ${alvo.atual}/${alvo.necessario}
+                            </strong>
+                        </div>
+                    `;
+                }
+
+                htmlProgresso += `
+                    </div>
+                `;
+            }
+
+            // =====================================================
+            // 📦 PROGRESSO DE ITENS
+            // =====================================================
+
+            const progressoItens =
+                m.progresso_itens || {};
+
+            const listaItens =
+                Object.entries(progressoItens);
+
+            if (listaItens.length > 0) {
+
+                htmlProgresso += `
+                    <div class="recompensas-box">
+                        <strong>📦 MATERIAIS</strong>
+                        <br><br>
+                `;
+
+                for (const [itemId, item] of listaItens) {
+
+                    const concluido =
+                        item.concluido === true;
+
+                    const nomeBonito =
+                        itemId
+                            .replace(/_/g, ' ')
+                            .replace(/\b\w/g, letra =>
+                                letra.toUpperCase()
+                            );
+
+                    const icone =
+                        concluido
+                            ? '✅'
+                            : '📦';
+
+                    const cor =
+                        concluido
+                            ? '#34d399'
+                            : '#facc15';
+
+                    htmlProgresso += `
+                        <div style="
+                            display:flex;
+                            justify-content:space-between;
+                            align-items:center;
+                            gap:10px;
+                            margin:7px 0;
+                            color:${cor};
+                        ">
+                            <span>
+                                ${icone}
+                                ${nomeBonito}
+                            </span>
+
+                            <strong>
+                                ${item.atual}/${item.necessario}
+                            </strong>
+                        </div>
+                    `;
+                }
+
+                htmlProgresso += `
+                    </div>
+                `;
+            }
+
             conteudo.innerHTML = `
-                <h3 class="missao-titulo">📜 ${m.data.titulo}</h3>
-                <p class="missao-desc">${m.data.objetivo}</p>
-                <button class="btn-missao" onclick="window.motorMissoesNPC.aceitar('${m.id}', '${npc_id}', '${nome_npc}', '${url_imagem}')">ACEITAR MISSÃO</button>
-                <button class="btn-missao btn-fechar-missao" onclick="document.getElementById('modal-missao-npc').style.display='none'">RECUSAR</button>
+                <h3 class="missao-titulo">
+                    ⚔️ ${m.data.titulo}
+                </h3>
+
+                <p class="missao-desc">
+                    ${m.data.objetivo}
+                </p>
+
+                ${m.data.regiao_nome ? `
+                    <div style="
+                        text-align:center;
+                        padding:8px;
+                        margin-bottom:12px;
+                        border:1px solid #475569;
+                        border-radius:6px;
+                        background:rgba(15,23,42,0.7);
+                        color:#93c5fd;
+                        font-family:Arial,sans-serif;
+                        font-size:14px;
+                    ">
+                        🗺️ Destino:
+                        <strong>${m.data.regiao_nome}</strong>
+                    </div>
+                ` : ''}
+
+                ${htmlProgresso}
+
+                <p style="
+                    color:#94a3b8;
+                    font-family:Arial,sans-serif;
+                    font-size:13px;
+                    text-align:center;
+                    line-height:1.4;
+                ">
+                    Complete todos os objetivos e depois retorne.
+                </p>
+
+                <button
+                    class="btn-missao btn-fechar-missao"
+                    onclick="
+                        document
+                            .getElementById('modal-missao-npc')
+                            .style.display='none'
+                    "
+                >
+                    CONTINUAR A JORNADA
+                </button>
             `;
+
+            return;
+        }
+
+        // =========================================================
+        // PRIORIDADE 3: MISSÕES NOVAS PARA ACEITAR
+        // =========================================================
+
+        const missoesDisponiveis =
+            Array.isArray(status.disponiveis)
+                ? status.disponiveis
+                : [];
+
+        if (missoesDisponiveis.length > 0) {
+
+            const m =
+                missoesDisponiveis[0];
+
+            conteudo.innerHTML = `
+                <h3 class="missao-titulo">
+                    📜 ${m.data.titulo}
+                </h3>
+
+                <p class="missao-desc">
+                    ${m.data.objetivo}
+                </p>
+
+                ${m.data.regiao_nome ? `
+                    <div style="
+                        text-align:center;
+                        padding:8px;
+                        margin-bottom:12px;
+                        border:1px solid #475569;
+                        border-radius:6px;
+                        background:rgba(15,23,42,0.7);
+                        color:#93c5fd;
+                        font-family:Arial,sans-serif;
+                        font-size:14px;
+                    ">
+                        🗺️ Destino:
+                        <strong>${m.data.regiao_nome}</strong>
+                    </div>
+                ` : ''}
+
+                <button
+                    class="btn-missao"
+                    onclick="
+                        window.motorMissoesNPC.aceitar(
+                            '${m.id}',
+                            '${npc_id}',
+                            '${nome_npc}',
+                            '${url_imagem}'
+                        )
+                    "
+                >
+                    ACEITAR MISSÃO
+                </button>
+
+                <button
+                    class="btn-missao btn-fechar-missao"
+                    onclick="
+                        document
+                            .getElementById('modal-missao-npc')
+                            .style.display='none'
+                    "
+                >
+                    RECUSAR
+                </button>
+            `;
+
             return;
         }
 
