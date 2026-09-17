@@ -1,3 +1,4 @@
+const mercadoOperacoesPendentes = new Set();
 // ==========================================
 // LÓGICA DO MERCADO DO AVENTUREIRO
 // ==========================================
@@ -822,7 +823,7 @@ function abrirDetalhesMercado(idVenda) {
                     </div>
                     <div style="display:flex; justify-content:space-between;">
                         <span>Preço unitário</span>
-                        <b>${anuncio.preco_unitario || Math.floor(anuncio.preco / Math.max(1, qtd))} ${simbolo}</b>
+                        <b>${Number(anuncio.preco_unitario ?? anuncio.preco / Math.max(1, qtd)).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${simbolo}</b>
                     </div>
                 </div>
             </div>
@@ -1041,6 +1042,7 @@ async function carregarVitrineMercado() {
 }
 
 async function confirmarVenda() {
+    if (window.__mercadoVendendo) return;
     const btnContrato = document.querySelector('#aba-vender button[onclick="confirmarVenda()"]');
 
     let itemSelecionado = document.getElementById('select-item-venda')?.value;
@@ -1055,6 +1057,7 @@ async function confirmarVenda() {
         return;
     }
 
+    window.__mercadoVendendo = true;
     if (btnContrato) {
         btnContrato.disabled = true;
         btnContrato.style.opacity = "0.6";
@@ -1134,6 +1137,7 @@ async function confirmarVenda() {
             window.alertaEldora("Erro", e.message || "Falha ao anunciar item.", "erro");
         }
     } finally {
+        window.__mercadoVendendo = false;
         if (btnContrato) {
             btnContrato.disabled = false;
             btnContrato.style.opacity = "1";
@@ -1144,12 +1148,14 @@ async function confirmarVenda() {
 
 // 🔥 EFETUA A COMPRA DO ITEM 🔥
 async function comprarItemMercado(idVenda, moeda) {
+    if (mercadoOperacoesPendentes.has(idVenda)) return;
     // 1. Confirmação de segurança para evitar clique acidental
     let nomeMoeda = moeda === 'ouro' ? 'Ouro 🪙' : 'Gemas 💎';
     if (!confirm(`O Rei exige certeza absoluta! Deseja comprar este item com ${nomeMoeda}?`)) {
         return;
     }
 
+    mercadoOperacoesPendentes.add(idVenda);
     let charId = localStorage.getItem("jogadorEldoraID");
 
     try {
@@ -1194,16 +1200,20 @@ async function comprarItemMercado(idVenda, moeda) {
         }
     } catch(e) {
         console.error("Falha ao processar compra:", e);
+    } finally {
+        mercadoOperacoesPendentes.delete(idVenda);
     }
 }
 
 // 🔥 EFETUA O CANCELAMENTO DO ITEM 🔥
 async function cancelarVendaMercado(idVenda) {
+    if (mercadoOperacoesPendentes.has(idVenda)) return;
     // 1. Confirmação de segurança para não cancelar sem querer
     if (!confirm("O Rei devolverá este item para a sua mochila. Deseja confirmar o cancelamento?")) {
         return;
     }
 
+    mercadoOperacoesPendentes.add(idVenda);
     let charId = localStorage.getItem("jogadorEldoraID");
 
     try {
@@ -1243,5 +1253,7 @@ async function cancelarVendaMercado(idVenda) {
         }
     } catch(e) {
         console.error("Falha ao processar o cancelamento:", e);
+    } finally {
+        mercadoOperacoesPendentes.delete(idVenda);
     }
 }

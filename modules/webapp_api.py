@@ -2086,84 +2086,21 @@ def api_bruxa_fabricar():
 
 @webapp_bp.route('/api/mercado/criar_anuncio', methods=['POST'])
 def api_criar_anuncio():
-    import re
-    import copy
-    from bson.objectid import ObjectId
-    from modules import market_manager
     from modules.player.core import users_collection
-
-    dados = request.json
-    user_id = dados.get('user_id')
-    item_uuid = dados.get('item_id')
-    preco_total = int(dados.get('preco', 0))
-    moeda = dados.get('moeda', 'ouro')
-    qtd_desejada = int(dados.get('quantidade', 1))
-
-    if preco_total <= 0 or qtd_desejada <= 0:
-        return jsonify({"sucesso": False, "erro": "Defina um preço e quantidade válidos!"})
-
     try:
-        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id)
-        player_data = users_collection.find_one({"_id": busca_id})
-    except Exception as e:
-        return jsonify({"sucesso": False, "erro": f"Erro de ID: {str(e)}"})
-
-    if not player_data:
-        return jsonify({"sucesso": False, "erro": "Jogador não encontrado no reino."})
-
-    inventario = player_data.get("inventory", {})
-    item_para_vender = inventario.get(item_uuid)
-
-    if not item_para_vender:
-        return jsonify({"sucesso": False, "erro": "Esse item não foi encontrado na sua mochila!"})
-
-    if isinstance(item_para_vender, dict):
-        qtd_atual = int(item_para_vender.get('quantity') or item_para_vender.get('qty') or 1)
-        base_id = item_para_vender.get("base_id", item_uuid)
-    else:
-        qtd_atual = int(item_para_vender)
-        base_id = item_uuid
-        item_para_vender = {"base_id": base_id, "quantity": qtd_atual}
-
-    if base_id and re.search(r'_[a-fA-F0-9]{8}$', str(base_id)):
-        base_id = re.sub(r'_[a-fA-F0-9]{8}$', '', str(base_id))
-        item_para_vender["base_id"] = base_id
-        
-    if qtd_desejada > qtd_atual:
-        return jsonify({"sucesso": False, "erro": f"Você possui apenas {qtd_atual} unidades deste item."})
-
-    if item_para_vender.get("tradable") == False or base_id in ["gems", "sigilo_protecao"]:
-         return jsonify({"sucesso": False, "erro": "Este item é sagrado e não pode ser comercializado!"})
-
-    unit_price = max(1, preco_total // qtd_desejada)
-
-    try:
-        if qtd_desejada == qtd_atual:
-            del inventario[item_uuid]
-        else:
-            if isinstance(inventario[item_uuid], dict):
-                inventario[item_uuid]['quantity'] = qtd_atual - qtd_desejada
-            else:
-                inventario[item_uuid] = qtd_atual - qtd_desejada
-        
-        users_collection.update_one({"_id": busca_id}, {"$set": {"inventory": inventario}})
-
-        is_unique = "durability" in item_para_vender or "upgrade_level" in item_para_vender or item_para_vender.get("type") in ["weapon", "armor", "tool"]
-        
-        item_payload = {}
-        if is_unique:
-            item_payload = {"type": "unique", "base_id": base_id, "item": copy.deepcopy(item_para_vender)}
-        else:
-            item_payload = {"type": "stack", "base_id": base_id, "qty": 1}
-
-        market_manager.create_listing(
-            seller_id=str(busca_id),
-            item_payload=item_payload,
-            unit_price=unit_price,
-            quantity=qtd_desejada,
-            seller_name=player_data.get("character_name", "Aventureiro"),
-            currency=moeda
+        dados = request.get_json(silent=True) or {}
+        if not isinstance(dados, dict):
+            return jsonify({"sucesso": False, "erro": "Dados inválidos."}), 400
+        anuncio = market_manager.create_listing(
+            seller_id=dados.get('user_id'), item_id=dados.get('item_id'),
+            total_price=dados.get('preco'), quantity=dados.get('quantidade', 1),
+            currency=dados.get('moeda', 'ouro'),
         )
+        player_data = {"character_name": anuncio['seller_name']}
+        base_id = anuncio['item']['base_id']
+        qtd_desejada = anuncio['quantity']
+        preco_total = anuncio['total_price']
+        moeda = anuncio['currency']
 
         # 👇 NOTIFICAÇÃO 100% BLINDADA 👇
         try:
@@ -2234,6 +2171,15 @@ def api_listar_mercado():
             if quantidade > 1:
                 nome = f"{nome} (x{quantidade})"
                 
+            detalhe = copy.deepcopy(item_payload.get('item', {}))
+            detalhe.update({
+                "base_id": base_id, "nome": nome, "tipo": tipo_item,
+                "raridade": detalhe.get('rarity', info_real.get('rarity', 'comum')),
+                "refino": detalhe.get('upgrade_level', detalhe.get('refino', 0)),
+                "classe": detalhe.get('class_req', info_real.get('class_req', info_real.get('class', 'Livre'))),
+                "descricao": info_real.get('description', detalhe.get('description', '')),
+                "stats": _formatar_stats_item_para_front(detalhe or info_real),
+            })
             card_anuncio = {
                 "id_venda": anuncio['_id'],
                 "vendedor": anuncio.get('seller_name', 'Desconhecido'),
@@ -2241,6 +2187,9 @@ def api_listar_mercado():
                 "item_id": base_id,  
                 "tipo": tipo_item,   
                 "preco": precio_total,
+                "quantidade": quantidade,
+                "preco_unitario": precio_total / max(1, quantidade),
+                "item_details": detalhe,
                 "moeda": anuncio.get('currency', 'ouro'), # market_manager opera por Ouro por padrão
                 "seller_id": str(anuncio.get('seller_id', '')) # Essencial pro botão Cancelar aparecer!
             }
@@ -2250,7 +2199,7 @@ def api_listar_mercado():
             else:
                 lista_gemas.append(card_anuncio)
                 
-        return jsonify({"sucesso": True, "ouro": lista_ouro, "gemas": lista_gemas})
+        return jsonify(_json_seguro_mongo({"sucesso": True, "ouro": lista_ouro, "gemas": lista_gemas}))
     except Exception as e:
         return jsonify({"sucesso": False, "erro": "Erro ao sintonizar a vitrine real."})
 
@@ -2260,7 +2209,9 @@ def api_listar_mercado():
 @webapp_bp.route('/api/mercado/comprar', methods=['POST'])
 def api_comprar_mercado():
     from modules import market_manager # Importe caso precise
-    dados = request.json
+    dados = request.get_json(silent=True) or {}
+    if not isinstance(dados, dict):
+        return jsonify({"sucesso": False, "erro": "Dados inválidos."}), 400
     comprador_id = dados.get('user_id')
     venda_id = dados.get('id_venda')
 
@@ -2272,12 +2223,10 @@ def api_comprar_mercado():
         if not anuncio:
             return jsonify({"sucesso": False, "erro": "Este leilão já foi encerrado ou não existe."})
 
-        qtd_disponivel = anuncio.get("quantity", 0)
-
         _run_async(market_manager.purchase_listing(
             buyer_id=comprador_id,
             listing_id=venda_id,
-            quantity=qtd_disponivel
+            quantity=None
         ))
 
         # 👇 NOTIFICAÇÃO 100% BLINDADA 👇
@@ -2316,68 +2265,15 @@ def api_comprar_mercado():
 # ==========================================
 @webapp_bp.route('/api/mercado/cancelar', methods=['POST'])
 def api_cancelar_mercado():
-    import uuid
-    import copy
-    from modules import market_manager
-    from bson.objectid import ObjectId
     from modules.player.core import users_collection
-    
-    dados = request.json
-    user_id = dados.get('user_id')
-    venda_id = dados.get('id_venda')
-
     try:
-        busca_vendedor_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id)
-        
-        anuncio = market_manager.get_listing(venda_id)
-        if not anuncio or not anuncio.get("active"):
-            return jsonify({"sucesso": False, "erro": "Anúncio não encontrado ou já processado."})
-
-        if str(anuncio.get('seller_id')) != str(user_id):
-            return jsonify({"sucesso": False, "erro": "Você não pode cancelar o item dos outros!"})
-
-        jogador = users_collection.find_one({"_id": busca_vendedor_id})
-        if not jogador:
-            return jsonify({"sucesso": False, "erro": "Herói não encontrado."})
-            
-        inventario = jogador.get("inventory", {})
-        item_payload = anuncio.get('item', {})
-        tipo_anuncio = item_payload.get("type")
-        qtd_anunciada = anuncio.get("quantity", 1)
-        
-        if not tipo_anuncio:
-            if "durability" in item_payload or "upgrade_level" in item_payload:
-                tipo_anuncio = "unique"
-                item_payload = {"item": item_payload}
-            else:
-                tipo_anuncio = "stack"
-                base_antiga = item_payload.get("base_id") if isinstance(item_payload, dict) else item_payload
-                item_payload = {"base_id": base_antiga, "qty": 1}
-
-        if tipo_anuncio == "stack":
-            import re
-            base_id = item_payload.get("base_id")
-            if base_id and re.search(r'_[a-fA-F0-9]{8}$', str(base_id)):
-                base_id = re.sub(r'_[a-fA-F0-9]{8}$', '', str(base_id))
-                
-            qtd_devolvida = qtd_anunciada * item_payload.get("qty", 1)
-            encontrou = False
-            for k, v in inventario.items():
-                if isinstance(v, dict) and v.get("base_id") == base_id:
-                    v['quantity'] = v.get('quantity', 1) + qtd_devolvida
-                    encontrou = True
-                    break
-            if not encontrou:
-                inventario[base_id] = {"base_id": base_id, "quantity": qtd_devolvida}
-                
-        elif tipo_anuncio == "unique":
-            base_item = item_payload.get("item", {})
-            for _ in range(qtd_anunciada):
-                nova_chave = str(uuid.uuid4())
-                inventario[nova_chave] = copy.deepcopy(base_item)
-
-        users_collection.update_one({"_id": busca_vendedor_id}, {"$set": {"inventory": inventario}})
-        market_manager.market_col.update_one({"_id": anuncio["_id"]}, {"$set": {"active": False}})
+        dados = request.get_json(silent=True) or {}
+        if not isinstance(dados, dict):
+            return jsonify({"sucesso": False, "erro": "Dados inválidos."}), 400
+        anuncio = _run_async(market_manager.cancel_listing(
+            dados.get('id_venda'), seller_id=dados.get('user_id')
+        ))
+        jogador = {"character_name": anuncio.get('seller_name', 'Aventureiro')}
 
         # 👇 NOTIFICAÇÃO 100% BLINDADA 👇
         try:
