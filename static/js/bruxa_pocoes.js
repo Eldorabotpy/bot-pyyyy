@@ -1,6 +1,7 @@
 (() => {
     'use strict';
     const api = window.BruxaPocoes = { aberta: false, criarNPC };
+    let selecionada = null;
     let modal, lista, aviso, cena, ocupado = false, versao = 0, focoAnterior;
     const texto = (tag, valor, classe) => {
         const el = document.createElement(tag);
@@ -58,8 +59,8 @@
         const cabecalho = document.createElement('div');
         cabecalho.className = 'bruxa-cabecalho';
         const identidade = document.createElement('div');
-        identidade.append(texto('span', 'FLORESTA SOMBRIA · ALQUIMIA', 'bruxa-sobretitulo'));
-        const titulo = texto('h2', 'O Caldeirão');
+        identidade.append(texto('span', 'BANCADA DE ALQUIMIA', 'bruxa-sobretitulo'));
+        const titulo = texto('h2', 'Bruxa das Poções');
         titulo.id = 'bruxa-pocoes-titulo';
         const sair = texto('button', '×', 'bruxa-fechar');
         sair.type = 'button';
@@ -72,7 +73,7 @@
         aviso.setAttribute('aria-live', 'polite');
         lista = document.createElement('div');
         lista.className = 'bruxa-receitas';
-        modal.append(cabecalho, texto('p', 'Das dádivas da floresta, uma gota de magia.', 'bruxa-intro'), aviso, lista);
+        modal.append(cabecalho, lista, aviso);
         modal.addEventListener('cancel', e => { e.preventDefault(); fechar(); });
         document.body.append(modal);
     }
@@ -120,43 +121,92 @@
         }
     }
 
+
+    const ASSETS = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/';
+    // Artes provisórias do próprio catálogo, até os arquivos específicos serem publicados.
+    const artesAlternativas = {
+        geleia_slime: 'materiais/lodo_toxico', cristal_mana_bruto: 'materiais/cristal_mana',
+        raiz_da_fortuna: 'materiais/raiz_solar', folha_sombria: 'materiais/erva_cura',
+        essencia_purificadora: 'materiais/essencia_vital', po_de_iniciativa: 'materiais/poeira_magica',
+        elixir_xp_dobrado_10m: 'materiais/luz_estelar', elixir_xp_dobrado_30m: 'materiais/essencia_espiritual'
+    };
+    function imagemItem(id, nome, consumivel = false) {
+        const img = document.createElement('img');
+        img.alt = nome;
+        img.draggable = false;
+        const pasta = consumivel || id === 'frasco_com_agua' ? 'consumiveis' : 'materiais';
+        const urls = [ASSETS + 'itens/' + pasta + '/' + id + '.png'];
+        if (artesAlternativas[id]) urls.push(ASSETS + 'itens/' + artesAlternativas[id] + '.png');
+        urls.push('/static/assets/box.png');
+        let indice = 0;
+        img.onerror = () => {
+            indice++;
+            if (indice < urls.length) img.src = urls[indice];
+            else img.onerror = null;
+        };
+        img.src = urls[0];
+        return img;
+    }
+
     function renderizar(receitas) {
         lista.replaceChildren();
-        let grupo;
+        if (!receitas.length) { lista.append(texto('p', 'Nenhuma receita disponível.')); return; }
+        const atual = receitas.find(r => r.receita_id === selecionada) || receitas[0];
+        selecionada = atual.receita_id;
+        const selecao = document.createElement('div');
+        selecao.className = 'bruxa-selecao';
+        selecao.append(texto('h3', 'RECEITUÁRIO'));
+        const slots = document.createElement('div');
+        slots.className = 'bruxa-slots';
         for (const receita of receitas) {
-            if (grupo !== receita.grupo) {
-                grupo = receita.grupo;
-                lista.append(texto('h3', grupo));
-            }
-            const card = document.createElement('article');
-            const resumo = document.createElement('div');
-            resumo.className = 'bruxa-resumo';
-            const simbolo = texto('span', receita.emoji, 'bruxa-simbolo');
-            simbolo.setAttribute('aria-hidden', 'true');
-            const detalhes = document.createElement('div');
-            detalhes.append(texto('h4', receita.nome));
-            resumo.append(simbolo, detalhes);
-            card.append(resumo);
-            const efeitos = {
-                pocao_cura_leve: 'Recupera 100 HP', pocao_mana_leve: 'Recupera 100 MP',
-                pocao_cura_media: 'Recupera 300 HP', pocao_mana_media: 'Recupera 300 MP',
-                elixir_xp_dobrado_10m: 'XP pessoal de combate em dobro por 10 minutos',
-                elixir_xp_dobrado_30m: 'XP pessoal de combate em dobro por 30 minutos'
-            };
-            detalhes.append(texto('p', efeitos[receita.resultado] || ''));
-            const ingredientes = document.createElement('ul');
-            for (const item of receita.ingredientes) {
-                const linha = document.createElement('li');
-                linha.className = item.possui >= item.necessario ? 'bruxa-tem' : 'bruxa-falta';
-                linha.append(texto('span', item.nome), texto('strong', `${item.possui} / ${item.necessario}`));
-                ingredientes.append(linha);
-            }
-            const botao = texto('button', receita.pode_criar ? 'Preparar poção' : 'Faltam ingredientes');
-            botao.disabled = ocupado || !receita.pode_criar;
-            botao.onclick = () => fabricar(receita.receita_id);
-            card.append(ingredientes, botao);
-            lista.append(card);
+            const slot = document.createElement('button');
+            slot.className = 'bruxa-slot' + (receita.receita_id === selecionada ? ' selecionado' : '');
+            slot.type = 'button';
+            slot.setAttribute('aria-label', receita.nome);
+            slot.setAttribute('aria-pressed', String(receita.receita_id === selecionada));
+            slot.disabled = ocupado;
+            slot.append(imagemItem(receita.resultado, receita.nome, true));
+            slot.append(texto('span', receita.tier === 2 ? 'II' : 'I', 'bruxa-tier'));
+            slot.append(texto('small', receita.nome.replace('Poção de ', '').replace('Elixir Superior de Experiência', 'XP · 30 min').replace('Elixir de Experiência', 'XP · 10 min')));
+            slot.onclick = () => { selecionada = receita.receita_id; renderizar(receitas); };
+            slots.append(slot);
         }
+        selecao.append(slots);
+        const painel = document.createElement('div');
+        painel.className = 'bruxa-preparo';
+        const vitrine = document.createElement('div');
+        vitrine.className = 'bruxa-vitrine';
+        const retrato = document.createElement('div');
+        retrato.className = 'bruxa-retrato';
+        retrato.setAttribute('aria-hidden', 'true');
+        const resultado = document.createElement('div');
+        resultado.className = 'bruxa-resultado';
+        resultado.append(imagemItem(atual.resultado, atual.nome, true), texto('span', '×1'));
+        vitrine.append(retrato, texto('span', '✦', 'bruxa-runa'), resultado);
+        const efeitos = {
+            pocao_cura_leve: 'Restaura 100 HP', pocao_mana_leve: 'Restaura 100 MP',
+            pocao_cura_media: 'Restaura 300 HP', pocao_mana_media: 'Restaura 300 MP',
+            elixir_xp_dobrado_10m: 'XP de combate ×2 · 10 minutos',
+            elixir_xp_dobrado_30m: 'XP de combate ×2 · 30 minutos'
+        };
+        painel.append(vitrine, texto('h4', atual.nome), texto('p', efeitos[atual.resultado] || '', 'bruxa-efeito'));
+        painel.append(texto('h3', 'INGREDIENTES'));
+        const ingredientes = document.createElement('div');
+        ingredientes.className = 'bruxa-ingredientes';
+        for (const item of atual.ingredientes) {
+            const material = document.createElement('div');
+            material.className = 'bruxa-material ' + (item.possui >= item.necessario ? 'bruxa-tem' : 'bruxa-falta');
+            const quadro = document.createElement('div');
+            quadro.className = 'bruxa-material-slot';
+            quadro.append(imagemItem(item.item_id, item.nome), texto('strong', item.possui + '/' + item.necessario));
+            material.append(quadro, texto('span', item.nome));
+            ingredientes.append(material);
+        }
+        const botao = texto('button', ocupado ? 'PREPARANDO…' : atual.pode_criar ? 'Preparar poção' : 'Faltam ingredientes', 'bruxa-fabricar');
+        botao.disabled = ocupado || !atual.pode_criar;
+        botao.onclick = () => fabricar(atual.receita_id);
+        painel.append(ingredientes, botao);
+        lista.append(selecao, painel);
     }
 
     async function fabricar(receitaId) {

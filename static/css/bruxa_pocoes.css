@@ -1,40 +1,38 @@
-#bruxa-pocoes-modal {
-    box-sizing: border-box; width: min(640px, 94vw); max-height: 86dvh;
-    margin: auto; padding: 0; color: #e5dac6; background: radial-gradient(ellipse at 15% 0%, #392547 0, transparent 50%), #130f1b;
-    border: 1px solid #887044; border-radius: 18px 4px 18px 4px;
-    box-shadow: 0 0 0 4px #17121de6, 0 24px 80px #000c, inset 0 0 45px #0006;
-    font: 13px/1.45 Arial, sans-serif; text-align: left; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #65513a #17121e;
-}
-#bruxa-pocoes-modal::backdrop { background: #08060dc9; backdrop-filter: blur(3px); }
-#bruxa-pocoes-modal *, #bruxa-pocoes-modal *::before { box-sizing: border-box; }
-#bruxa-pocoes-modal .bruxa-cabecalho { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 22px 10px; background: transparent; border: 0; box-shadow: none; text-align: left; }
-#bruxa-pocoes-modal .bruxa-sobretitulo { color: #b99d6b; font: 9px/1.4 Arial, sans-serif; letter-spacing: 2px; }
-#bruxa-pocoes-modal h2 { margin: 5px 0 0; font: 30px/1.15 Georgia, serif; color: #f2dfb3; text-shadow: 0 2px 14px #d4ab4c24; }
-#bruxa-pocoes-modal p { margin: 0; }
-#bruxa-pocoes-modal .bruxa-intro { margin: 0 22px; color: #b0a0bd; font: italic 13px/1.5 Georgia, serif; }
-#bruxa-pocoes-modal .bruxa-aviso { margin: 14px 22px 0; padding: 9px 0; border-top: 1px solid #8b714432; color: #bcae9c; font-size: 11px; }
-#bruxa-pocoes-modal button { appearance: none; width: auto; margin: 0; padding: 9px 14px; min-height: 40px; border: 1px solid #9c804c; border-radius: 5px; background: linear-gradient(180deg, #6a5130, #3d2e1c); color: #fae8bd; font: bold 12px/1.2 Arial, sans-serif; letter-spacing: .3px; text-shadow: none; box-shadow: inset 0 1px #ffffff12; cursor: pointer; }
-#bruxa-pocoes-modal button:hover:not(:disabled) { border-color: #dfbc75; filter: brightness(1.15); }
-#bruxa-pocoes-modal button:disabled { background: #211b29; color: #978b9d; border-color: #51445e; box-shadow: none; cursor: default; }
-#bruxa-pocoes-modal button:focus-visible { outline: 2px solid #e4c888; outline-offset: 3px; }
-#bruxa-pocoes-modal .bruxa-fechar { flex: 0 0 40px; width: 40px; height: 40px; padding: 0; border: 1px solid #88704466; border-radius: 50%; background: #140e1c88; color: #c8b791; font: 26px/1 Georgia, serif; box-shadow: none; }
-#bruxa-pocoes-modal .bruxa-receitas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 22px 22px; }
-#bruxa-pocoes-modal h3 { display: flex; align-items: center; gap: 12px; grid-column: 1 / -1; margin: 12px 0 3px; color: #c5aa77; font: 11px/1.4 Georgia, serif; letter-spacing: 1px; text-transform: uppercase; }
-#bruxa-pocoes-modal h3::after { content: ''; height: 1px; flex: 1; background: linear-gradient(90deg, #96763d66, transparent); }
-#bruxa-pocoes-modal article { margin: 0; padding: 13px; background: linear-gradient(120deg, #31213b80, #1a1422); border: 1px solid #6f547044; border-radius: 8px; box-shadow: inset 0 1px #ffffff04; display: flex; flex-direction: column; }
-#bruxa-pocoes-modal .bruxa-resumo { display: flex; align-items: center; gap: 11px; }
-#bruxa-pocoes-modal .bruxa-simbolo { display: grid; place-items: center; flex: 0 0 38px; height: 42px; border: 1px solid #99714966; border-radius: 9px 3px; background: radial-gradient(circle, #67437b66, #211727); font-size: 23px; }
-#bruxa-pocoes-modal h4 { margin: 0; font: 16px/1.25 Georgia, serif; color: #eadbc1; }
-#bruxa-pocoes-modal article p { margin-top: 4px; font-size: 11px; color: #a89bb3; line-height: 1.35; }
-#bruxa-pocoes-modal ul { padding: 0; margin: 12px 0; list-style: none; font-size: 11px; flex: 1; }
-#bruxa-pocoes-modal li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #ffffff06; color: #c1b3c9; }
-#bruxa-pocoes-modal li strong { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: normal; }
-#bruxa-pocoes-modal .bruxa-tem strong { color: #9fcba6; }
-#bruxa-pocoes-modal .bruxa-falta strong { color: #df9d89; }
-@media (max-width: 520px) {
-    #bruxa-pocoes-modal .bruxa-receitas { grid-template-columns: 1fr; padding: 0 16px 16px; gap: 8px; }
-    #bruxa-pocoes-modal .bruxa-cabecalho { padding: 18px 16px 8px; }
-    #bruxa-pocoes-modal .bruxa-intro, #bruxa-pocoes-modal .bruxa-aviso { margin-left: 16px; margin-right: 16px; }
-    #bruxa-pocoes-modal article { padding: 12px; }
-    #bruxa-pocoes-modal h2 { font-size: 28px; }
-}
+#bruxa-pocoes-modal { box-sizing:border-box; width:min(740px,96vw); max-height:90dvh; margin:auto; padding:0; border:1px solid #b48d43; border-radius:12px; background:#080e19; color:#e2e8f0; box-shadow:0 0 0 3px #181c28,0 20px 80px #000d; font:12px/1.4 Arial,sans-serif; text-align:left; overflow:auto; scrollbar-width:thin; scrollbar-color:#705c35 #080e19; }
+#bruxa-pocoes-modal::backdrop { background:#020617c9; backdrop-filter:blur(4px); }
+#bruxa-pocoes-modal * { box-sizing:border-box; }
+#bruxa-pocoes-modal .bruxa-cabecalho { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; background:linear-gradient(90deg,#172339,#0b1220); border-bottom:1px solid #8c703b; }
+#bruxa-pocoes-modal .bruxa-sobretitulo { color:#94a3b8; font-size:9px; letter-spacing:2px; }
+#bruxa-pocoes-modal h2 { margin:3px 0 0; color:#facc74; font:700 20px/1.2 'Cinzel',Georgia,serif; }
+#bruxa-pocoes-modal button { appearance:none; cursor:pointer; font:700 12px Arial,sans-serif; color:#eadbb8; text-shadow:none; }
+#bruxa-pocoes-modal button:focus-visible { outline:2px solid #fde68a; outline-offset:2px; }
+#bruxa-pocoes-modal .bruxa-fechar { width:36px; height:36px; padding:0; border:1px solid #7b643f; border-radius:6px; color:#decba1; background:#080e19; font-size:25px; }
+#bruxa-pocoes-modal .bruxa-receitas { display:grid; grid-template-columns:220px 1fr; }
+#bruxa-pocoes-modal .bruxa-selecao { padding:16px; background:#0b1220; border-right:1px solid #293448; }
+#bruxa-pocoes-modal h3 { font:700 10px/1.3 'Cinzel',Georgia,serif; letter-spacing:1.6px; color:#a99772; margin:0 0 12px; }
+#bruxa-pocoes-modal .bruxa-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+#bruxa-pocoes-modal .bruxa-slot { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:0; padding:6px 3px; margin:0; min-height:90px; border:1px solid #39455c; border-radius:7px; background:radial-gradient(circle at 50% 30%,#253349,#0c1320 75%); box-shadow:inset 0 0 0 2px #060b14; }
+#bruxa-pocoes-modal .bruxa-slot.selecionado { border-color:#e9b95b; background:radial-gradient(circle at 50% 30%,#625333,#191c22 75%); box-shadow:inset 0 0 0 2px #100e09,0 0 12px #eab30820; }
+#bruxa-pocoes-modal .bruxa-slot img { width:46px; height:46px; object-fit:contain; filter:drop-shadow(0 3px 4px #000); }
+#bruxa-pocoes-modal .bruxa-slot small { margin-top:4px; font:10px/1.2 Arial,sans-serif; color:#d2d9e5; }
+#bruxa-pocoes-modal .bruxa-tier { position:absolute; top:4px; right:6px; color:#caa967; font:9px Georgia,serif; }
+#bruxa-pocoes-modal .bruxa-preparo { padding:16px 22px; text-align:center; background:radial-gradient(ellipse at 50% 0%,#1c31432e,transparent 65%); }
+#bruxa-pocoes-modal .bruxa-vitrine { height:126px; display:flex; align-items:center; justify-content:center; gap:14px; position:relative; border-bottom:1px solid #344335; margin-bottom:12px; background:radial-gradient(ellipse at 35% 70%,#42774622,transparent 65%); }
+#bruxa-pocoes-modal .bruxa-retrato { width:112px; height:112px; flex-shrink:0; background-image:url('https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/npcs/bruxa_pocoes.png'); background-size:672px 112px; background-repeat:no-repeat; filter:drop-shadow(0 0 12px #65a34833); }
+#bruxa-pocoes-modal .bruxa-runa { color:#a1c58a; font-size:22px; text-shadow:0 0 15px #86efac; }
+#bruxa-pocoes-modal .bruxa-resultado { width:78px; height:78px; position:relative; display:grid; place-items:center; border:1px solid #c4a259; border-radius:10px; box-shadow:inset 0 0 0 3px #171c23,0 0 20px #c49b3322; background:radial-gradient(circle,#4b4d35,#131c28 75%); }
+#bruxa-pocoes-modal .bruxa-resultado img { width:62px; height:62px; object-fit:contain; filter:drop-shadow(0 3px 6px #000); }
+#bruxa-pocoes-modal .bruxa-resultado span { position:absolute; bottom:2px; right:5px; color:#ffe6aa; font-weight:bold; }
+#bruxa-pocoes-modal h4 { margin:0; color:#f6d78b; font:700 19px/1.3 'Cinzel',Georgia,serif; }
+#bruxa-pocoes-modal .bruxa-efeito { margin:5px 0 20px; color:#a3cbbb; font-size:12px; }
+#bruxa-pocoes-modal .bruxa-ingredientes { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-bottom:18px; }
+#bruxa-pocoes-modal .bruxa-material { width:72px; font:10px/1.2 Arial,sans-serif; color:#c6cfdd; }
+#bruxa-pocoes-modal .bruxa-material-slot { width:56px; height:56px; margin:0 auto 6px; position:relative; border:1px solid #4e6159; border-radius:5px; background:radial-gradient(circle,#273543,#0a111f); box-shadow:inset 0 0 0 2px #060b12; }
+#bruxa-pocoes-modal .bruxa-material-slot img { width:44px; height:44px; object-fit:contain; margin:3px; filter:drop-shadow(0 2px 3px #000); }
+#bruxa-pocoes-modal .bruxa-material-slot strong { position:absolute; right:-5px; bottom:-3px; padding:1px 5px; border:1px solid #426050; border-radius:3px; background:#07130e; color:#a7efb4; font:700 10px Arial,sans-serif; }
+#bruxa-pocoes-modal .bruxa-falta .bruxa-material-slot { border-color:#794643; }
+#bruxa-pocoes-modal .bruxa-falta strong { color:#ffb5a5; border-color:#844c46; background:#23100e; }
+#bruxa-pocoes-modal .bruxa-fabricar { width:100%; min-height:44px; border:1px solid #c6a04e; border-radius:6px; background:linear-gradient(#81612e,#443017); color:#ffe4a2; box-shadow:inset 0 1px #eecb7455,0 3px 10px #0005; text-transform:uppercase; letter-spacing:1px; }
+#bruxa-pocoes-modal .bruxa-fabricar:disabled { background:linear-gradient(#283143,#171f2e); border-color:#435068; color:#91a0b5; box-shadow:none; cursor:default; }
+#bruxa-pocoes-modal .bruxa-aviso { margin:0; padding:9px 16px; border-top:1px solid #273146; background:#060b13; text-align:center; font-size:10px; color:#94a3b8; }
+@media(max-width:560px) { #bruxa-pocoes-modal .bruxa-receitas { display:block; } #bruxa-pocoes-modal .bruxa-selecao { padding:10px 14px; border-right:0; border-bottom:1px solid #293448; } #bruxa-pocoes-modal .bruxa-slots { grid-template-columns:repeat(6,minmax(0,1fr)); gap:5px; } #bruxa-pocoes-modal .bruxa-slot { min-height:62px; padding:3px 1px; } #bruxa-pocoes-modal .bruxa-slot img { width:33px; height:33px; } #bruxa-pocoes-modal .bruxa-slot small { font-size:8px; } #bruxa-pocoes-modal .bruxa-tier { right:3px; font-size:8px; } #bruxa-pocoes-modal .bruxa-selecao h3 { margin-bottom:7px; font-size:9px; } #bruxa-pocoes-modal .bruxa-preparo { padding:8px 14px 14px; } #bruxa-pocoes-modal .bruxa-vitrine { height:100px; margin-bottom:8px; } #bruxa-pocoes-modal .bruxa-retrato { width:96px; height:96px; background-size:576px 96px; } #bruxa-pocoes-modal .bruxa-efeito { margin-bottom:14px; } #bruxa-pocoes-modal .bruxa-ingredientes { gap:7px; margin-bottom:14px; } #bruxa-pocoes-modal .bruxa-material { width:66px; } #bruxa-pocoes-modal h4 { font-size:17px; } }
