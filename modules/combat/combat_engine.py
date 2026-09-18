@@ -162,7 +162,7 @@ async def processar_acao_combate(
     if not skill_id:
         num_attacks = 1
         ini = attacker_stats_modified.get("initiative", 0)
-        chance = (ini * 0.25) + attacker_stats_modified.get("double_attack_chance_flat", 0)
+        chance = min(50.0, max(0.0, (ini * 0.25) + attacker_stats_modified.get("double_attack_chance_flat", 0)))
         if (random.random() * 100.0) < chance:
             num_attacks = 2
             log_messages.append("⚡ 𝐀𝐓𝐀𝐐𝐔𝐄 𝐃𝐔𝐏𝐋𝐎!")
@@ -196,7 +196,7 @@ async def processar_acao_combate(
         roll_opts["cannot_be_dodged"] = True
 
     if bonus_crit > 0:
-        roll_opts["bonus_crit_chance"] = float(bonus_crit)
+        roll_opts["bonus_crit_chance"] = float(roll_opts.get("bonus_crit_chance", 0.0)) + float(bonus_crit)
     
     if damage_def and bool(damage_def.get("cannot_dodge", False)):
         roll_opts["cannot_be_dodged"] = True

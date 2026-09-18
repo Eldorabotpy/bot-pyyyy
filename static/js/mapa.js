@@ -1437,7 +1437,7 @@ class MapaScene extends Phaser.Scene {
         
         this.input.on('pointerdown', (pointer) => {
 
-            if (this.isDead || window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta) return;
+            if (this.isDead || window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa) return;
 
             // ==========================================
             // 🛡️ HUD DE STATUS ABERTO
@@ -2139,7 +2139,7 @@ class MapaScene extends Phaser.Scene {
         };
 
         const liberarTecladoMapa = () => {
-            if (window.__mercadoAberto || window.BruxaPocoes?.aberta || window.__guildaAberta) return;
+            if (window.__mercadoAberto || window.BruxaPocoes?.aberta || window.__guildaAberta || window.combateAbertoBloqueandoMapa) return;
             try {
                 const ativo = document.activeElement;
 
@@ -2201,7 +2201,7 @@ class MapaScene extends Phaser.Scene {
     }
     
     update() {
-        if (window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta) {
+        if (window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa) {
             this.isMoving = false;
             this.player?.body?.stop();
             return;

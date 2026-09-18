@@ -91,7 +91,7 @@ def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) 
     # ==========================
     # ESQUIVA DO ALVO (TARGET EVADE)
     # ==========================
-    cannot_be_dodged = bool(options.get("cannot_be_dodged", False))
+    cannot_be_dodged = bool(options.get("cannot_be_dodged", False) or attacker_stats.get("cannot_be_dodged", False))
 
     if not cannot_be_dodged:
         target_ini = float(
@@ -172,7 +172,8 @@ def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) 
 
     final_chance = float(params.get("chance", 0.0)) + bonus_chance_skill + passive_flat
 
-    is_crit = (r <= final_chance)
+    final_chance = max(0.0, min(100.0, final_chance - float(target_stats.get("crit_resistance_flat", 0.0)) * 100.0))
+    is_crit = not target_stats.get("crit_immune", False) and (r < final_chance)
     crit_mult, is_mega = 1.0, False
 
     if is_crit:
@@ -199,4 +200,7 @@ def roll_damage(attacker_stats: dict, target_stats: dict, options: dict = None) 
         # Ataque Físico normal bate de frente com a armadura do monstro
         final_damage = max(int(params.get("min_damage", 1)), int(boosted_attack - target_defense))
 
+    tipo_dano = 'magic' if is_magic or options.get('damage_type') == 'magic' else 'physical'
+    resistencia = float((target_stats.get('resistance') or {}).get(tipo_dano, 0.0))
+    final_damage = max(0, math.ceil(final_damage * (1.0 - _clamp(resistencia, 0.0, 1.0))))
     return int(final_damage), is_crit, is_mega

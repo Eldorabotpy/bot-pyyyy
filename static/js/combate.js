@@ -80,7 +80,26 @@ function instalarTravaCliqueCombate() {
     });
 }
 
+let entradaAntesCombate = null;
 function travarMapaDuranteCombate(ativo) {
+    const cena = window.jogoEldora?.scene?.getScene('MapaScene');
+    if (ativo && !entradaAntesCombate && cena?.input) {
+        entradaAntesCombate = {cena, mouse:cena.input.enabled, teclado:cena.input.keyboard?.enabled};
+        cena.input.enabled = false;
+        if (cena.input.keyboard) { cena.input.keyboard.resetKeys?.(); cena.input.keyboard.enabled = false; }
+        cena.isMoving = false;
+        cena.player?.body?.stop();
+    } else if (!ativo && entradaAntesCombate) {
+        const anterior = entradaAntesCombate;
+        entradaAntesCombate = null;
+        anterior.cena.input.enabled = anterior.mouse;
+        if (anterior.cena.input.keyboard) { anterior.cena.input.keyboard.resetKeys?.(); anterior.cena.input.keyboard.enabled = anterior.teclado; }
+    }
+    const tela = document.getElementById('tela-combate-global');
+    if (tela && !tela.dataset.eventosIsolados) {
+        tela.dataset.eventosIsolados = '1';
+        for (const evento of ['click','dblclick','pointerdown','pointerup','pointermove','mousedown','mouseup','touchstart','touchend','touchmove','wheel','keydown','keyup']) tela.addEventListener(evento, e => e.stopPropagation());
+    }
     const elementosMapa = [
         document.getElementById('game-container'),
         document.getElementById('phaser-game'),
@@ -1869,9 +1888,9 @@ function abrirSeletorAlvoGrupo(skillId, nomeMagia) {
         const nome = h.nome || h.character_name || "Herói";
         const souEu = idHeroi === meuId;
 
-        const hpAtual = Number(h.current_hp || h.hp || 0);
+        const hpAtual = Number(h.current_hp ?? h.hp ?? 0);
         const hpMax = Number(h.max_hp || 100);
-        const mpAtual = Number(h.current_mp || h.mp || 0);
+        const mpAtual = Number(h.current_mp ?? h.mp ?? 0);
         const mpMax = Number(h.max_mana || h.max_mp || 50);
 
         const pctHp = hpMax > 0 ? Math.max(0, Math.min(100, (hpAtual / hpMax) * 100)) : 0;
@@ -1957,9 +1976,9 @@ function sincronizarMeuHudPelaSala(sala) {
 
     if (!eu) return;
 
-    const hpAtual = Number(eu.current_hp || eu.hp || 0);
+    const hpAtual = Number(eu.current_hp ?? eu.hp ?? 0);
     const hpMax = Number(eu.max_hp || window.dadosCombateAtual.playerHpMax || 100);
-    const mpAtual = Number(eu.current_mp || eu.mp || 0);
+    const mpAtual = Number(eu.current_mp ?? eu.mp ?? 0);
     const mpMax = Number(eu.max_mana || eu.max_mp || window.dadosCombateAtual.playerMpMax || 50);
 
     window.dadosCombateAtual.playerHpAtual = hpAtual;
@@ -2222,7 +2241,14 @@ function atualizarControleTurnoGrupo(sala) {
     const botoes = menu.querySelectorAll('button');
     const meuId = String(localStorage.getItem("jogadorEldoraID") || "");
     
-    if (sala && sala.estado && sala.estado !== "em_andamento") {
+    if (sala && ['vitoria','derrota','cancelada'].includes(sala.estado)) {
+        window.bloqueioDeTurno = true;
+        menu.style.display = 'none';
+        botoes.forEach(btn => { btn.disabled = true; });
+        atualizarBotaoRetornoGrupo();
+        return;
+    }
+    if (sala && sala.estado === "aguardando") {
         window.bloqueioDeTurno = true;
  
         menu.style.display = 'grid';
@@ -2335,9 +2361,9 @@ function renderizarGrupoCombate(sala) {
 
         const nomeCurto = nome.length > 8 ? nome.slice(0, 8) + '…' : nome;
 
-        const hpAtual = Number(h.current_hp || h.hp || 0);
+        const hpAtual = Number(h.current_hp ?? h.hp ?? 0);
         const hpMax = Number(h.max_hp || 100);
-        const mpAtual = Number(h.current_mp || h.mp || 0);
+        const mpAtual = Number(h.current_mp ?? h.mp ?? 0);
         const mpMax = Number(h.max_mana || h.max_mp || 50);
 
         const pctHp = hpMax > 0 ? Math.max(0, Math.min(100, (hpAtual / hpMax) * 100)) : 0;
@@ -2458,9 +2484,9 @@ function sincronizarMeuHudPelaSala(sala) {
 
     if (!eu) return;
 
-    const hpAtual = Number(eu.current_hp || eu.hp || 0);
+    const hpAtual = Number(eu.current_hp ?? eu.hp ?? 0);
     const hpMax = Number(eu.max_hp || window.dadosCombateAtual.playerHpMax || 100);
-    const mpAtual = Number(eu.current_mp || eu.mp || 0);
+    const mpAtual = Number(eu.current_mp ?? eu.mp ?? 0);
     const mpMax = Number(eu.max_mana || eu.max_mp || window.dadosCombateAtual.playerMpMax || 50);
 
     window.dadosCombateAtual.playerHpAtual = hpAtual;
@@ -2529,7 +2555,7 @@ function aplicarEstadoCombateGrupo(dados, origem = "socket") {
     const finalizado = !!dados.finalizado || estado === "vitoria" || estado === "derrota";
 
     if (finalizado) {
-        window.bloqueioDeTurno = false;
+        window.bloqueioDeTurno = true;
 
         if (estado === "vitoria" && window.dadosCombateAtual) {
             window.dadosCombateAtual.mobHpAtual = 0;

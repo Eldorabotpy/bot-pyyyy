@@ -299,3 +299,20 @@
     display: none; /* Esconde completamente a linha 2 para garantir a limpeza */
 }
 
+/* Combate: arena flexível e painel legível em telas pequenas. */
+body.combate-aberto #btn-painel-gm { display:none !important; pointer-events:none !important; }
+#tela-combate-global { overscroll-behavior:contain; isolation:isolate; }
+#combate-arena { min-height:0; overflow:hidden; }
+#tela-combate-global #arena-box { flex:1 1 auto; min-height:180px; height:auto !important; max-height:60dvh; border:0 !important; border-radius:0 !important; }
+#tela-combate-global .combate-painel { flex:0 1 auto; min-height:0; overflow-y:auto; padding:12px !important; gap:10px !important; border:0 !important; border-top:1px solid #ffffff15 !important; background:linear-gradient(160deg,#152033,#090f1d) !important; }
+#tela-combate-global #combat-log-box { padding:12px !important; min-height:64px !important; background:#080f1dcc !important; border:1px solid #334155 !important; border-radius:12px !important; box-shadow:none; }
+#tela-combate-global #log-texto-1 { font:600 14px/1.4 'Segoe UI',Arial,sans-serif; letter-spacing:0; }
+#tela-combate-global #log-texto-2 { display:block; font:12px/1.5 'Segoe UI',Arial,sans-serif; }
+#tela-combate-global .modern-btn { min-height:44px; border:1px solid #3b4961; border-radius:10px; font:600 13px 'Segoe UI',Arial,sans-serif; box-shadow:0 2px 5px #0003; }
+#tela-combate-global .modern-btn:disabled { opacity:.6; cursor:default; }
+#tela-combate-global #botoes-fim-batalha .modern-btn { background:#b8944a20 !important; color:#edd8a6; border-color:#ad8b49; padding:11px; }
+#tela-combate-global #boss-bar-container { width:76% !important; padding:8px; border:1px solid #ffffff16; border-radius:10px; background:#0a1123bd; }
+#tela-combate-global #val-hp-mob { font-size:10px !important; }
+#tela-combate-global #hud-jogador { border-radius:12px !important; background:#0a1123e8 !important; padding:8px !important; }
+#tela-combate-global button:focus-visible { outline:2px solid #ebcb83; outline-offset:2px; }
+@media(max-height:500px) { #tela-combate-global #arena-box { min-height:130px; } #tela-combate-global .combate-painel { padding:7px !important; gap:6px !important; } #tela-combate-global .modern-btn { min-height:36px; } }

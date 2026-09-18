@@ -148,6 +148,11 @@ SPECIAL_COMBAT_FLOAT_KEYS = {
     "crit_damage_mult",
     "double_attack_chance_flat",
     "dodge_chance_flat",
+    "crit_resistance_flat",
+    "hp_regen_percent",
+    "mp_regen_percent",
+    "lifesteal",
+    "lifesteal_flat",
 }
 
 # ========================================
@@ -529,6 +534,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
 
     try:
         _apply_passive_skill_bonuses(player_data, total)
+        _apply_party_aura_bonuses(player_data, total)
         if ally_user_ids:
             my_id_str = str(player_data.get("user_id") or player_data.get("_id") or "")
             for ally_id in ally_user_ids:
@@ -539,8 +545,14 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
         rune_bonuses = player_manager.get_rune_bonuses(player_data)
         for stat, value in rune_bonuses.items():
             k_rune = _map_stat_name(stat) or stat
-            if k_rune in total: total[k_rune] += int(value)
-            elif k_rune == "magic_attack": total["magic_attack"] += int(value)
+            if k_rune == "crit_damage_mult":
+                total[k_rune] = total.get(k_rune, 0.0) + float(value) / 100.0
+            elif k_rune in SPECIAL_COMBAT_FLOAT_KEYS:
+                total[k_rune] = total.get(k_rune, 0.0) + float(value)
+            elif k_rune in total:
+                total[k_rune] += int(value)
+            elif stat == "defesa_fisica":
+                total["defense"] += int(value)
     except: pass
 
     # ----------------------------------------------------
@@ -659,15 +671,14 @@ async def sync_player_stats_to_db(user_id: str, player_data: dict) -> None:
 async def get_player_dodge_chance(player_data: dict, ally_user_ids: list = None) -> float:
     total_stats = await get_player_total_stats(player_data, ally_user_ids)
     initiative = total_stats.get('initiative', 0)
-    dodge_chance = (initiative * 0.4) / 100.0
+    dodge_chance = min(0.25, (initiative * 0.25) / 100.0)
     dodge_chance += total_stats.get('dodge_chance_flat', 0)
-    if total_stats.get("cannot_be_dodged", False): return 0.0 
     return min(dodge_chance, 0.75)
 
 async def get_player_double_attack_chance(player_data: dict, ally_user_ids: list = None) -> float:
     total_stats = await get_player_total_stats(player_data, ally_user_ids)
     initiative = total_stats.get('initiative', 0)
-    double_attack_chance = (initiative * 0.25) / 100.0
+    double_attack_chance = (initiative * 0.25 + total_stats.get("double_attack_chance_flat", 0)) / 100.0
     return min(double_attack_chance, 0.50)
 
 # ========================================
@@ -870,12 +881,22 @@ def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
         if stat_bonuses:
             for stat, multiplier in stat_bonuses.items():
                 target = _map_stat_name(stat) or stat
-                if target in total_stats:
+                if target in SPECIAL_COMBAT_FLOAT_KEYS:
+                    amount = float(multiplier)
+                    if target == "crit_chance_flat" and 0 < amount <= 1:
+                        amount *= 100.0
+                    total_stats[target] = total_stats.get(target, 0.0) + amount
+                elif target in total_stats:
                     bonus_valor = total_stats[target] * float(multiplier)
                     total_stats[target] += int(bonus_valor)
                 elif target == "magic_attack": 
                     if "magic_attack" not in total_stats: total_stats["magic_attack"] = total_stats.get("attack", 0)
                     total_stats["magic_attack"] += int(total_stats.get("magic_attack", 0) * float(multiplier))
+
+        for key in ("crit_resistance_flat", "double_attack_chance_flat", "hp_regen_percent", "mp_regen_percent", "lifesteal_flat"):
+            total_stats[key] = total_stats.get(key, 0.0) + float(effects.get(key, 0.0) or 0.0)
+        if effects.get("cannot_be_dodged"):
+            total_stats["cannot_be_dodged"] = True
 
         res_bonuses = effects.get("resistance_mult", {})
         if res_bonuses:
@@ -912,17 +933,40 @@ def _apply_party_aura_bonuses(ally_data: dict, target_stats: dict):
         if stat_bonuses:
             for stat, multiplier in stat_bonuses.items():
                 target = _map_stat_name(stat) or stat
-                if target in target_stats:
+                if target in SPECIAL_COMBAT_FLOAT_KEYS:
+                    amount = float(multiplier)
+                    if target == "crit_chance_flat" and 0 < amount <= 1:
+                        amount *= 100.0
+                    target_stats[target] = target_stats.get(target, 0.0) + amount
+                elif target in target_stats:
                     bonus_valor = target_stats[target] * float(multiplier)
                     target_stats[target] += int(bonus_valor)
                 else:
                     target_stats[target] = target_stats.get(target, 0.0) + float(multiplier)
+        for kind, amount in aura_bonuses.get("resistance_mult", {}).items():
+            resistances = target_stats.setdefault("resistance", {})
+            resistances[kind] = resistances.get(kind, 0.0) + float(amount)
         if aura_bonuses.get("cannot_be_dodged", False): target_stats["cannot_be_dodged"] = True
         if "hp_regen_percent" in aura_bonuses:
              target_stats["hp_regen_percent"] = target_stats.get("hp_regen_percent", 0.0) + float(aura_bonuses["hp_regen_percent"])
         if "mp_regen_percent" in aura_bonuses:
              target_stats["mp_regen_percent"] = target_stats.get("mp_regen_percent", 0.0) + float(aura_bonuses["mp_regen_percent"])
 
+
+
+def _recuperar_recursos_combate(stats, hp, mp, dano_real=0, regenerar=False):
+    """Regenera por turno ou rouba vida do dano efetivo, sem ressuscitar."""
+    if hp <= 0:
+        return hp, mp
+    max_hp = int(stats.get("max_hp", hp))
+    max_mp = int(stats.get("max_mana", mp))
+    taxa = min(1.0, max(0.0, float(stats.get("lifesteal", 0)) / 100.0 + float(stats.get("lifesteal_flat", 0))))
+    cura = int(max(0, dano_real) * taxa)
+    mana = 0
+    if regenerar:
+        cura += int(max_hp * min(1.0, max(0.0, float(stats.get("hp_regen_percent", 0)))))
+        mana = int(max_mp * min(1.0, max(0.0, float(stats.get("mp_regen_percent", 0)))))
+    return hp + min(max(0, max_hp - hp), cura), mp + min(max(0, max_mp - mp), mana)
 
 
 def _get_skill_data_mesclada(pdata: dict, skill_id: str) -> dict | None:
@@ -1272,7 +1316,13 @@ async def processar_turno_combate(
         if not sala_grupo:
             sala_grupo = gcm.obter_sala_por_spawn(regiao_atual, spawn_id)
 
+        if sala_id and not sala_grupo:
+            return {'erro': 'A sala do grupo não está mais disponível.'}
         if sala_grupo:
+            if str(user_id) not in list(map(str, sala_grupo.get('membros_ids', []))):
+                return {'erro': 'Você não participa desta caçada.'}
+            if str(gcm.pegar_combatente_atual(sala_grupo['sala_id'])) != str(user_id) and sala_grupo.get('estado') == gcm.ESTADO_EM_ANDAMENTO:
+                return {'erro': 'Aguarde sua vez de agir.', 'sala': gcm.pacote_estado_sala(sala_grupo['sala_id'])}
             sala_id_real = sala_grupo["sala_id"]
             sala_retorno = gcm.pacote_estado_sala(sala_id_real)
 
@@ -1288,13 +1338,19 @@ async def processar_turno_combate(
             
     except Exception as e:
         print("Erro ao validar turno de grupo:", e)
+        return {"erro": "Não foi possível validar o turno. Tente novamente."}
 
+    if int(player.get('current_hp', 0) or 0) <= 0:
+        return {'erro': 'Seu herói está derrotado e não pode agir.'}
+    if mob_hp <= 0:
+        return {'erro': 'Este monstro já foi derrotado.'}
     # Cooldowns só passam depois que confirmou que era a vez do jogador.
     player, msgs_cooldown = iniciar_turno(player)
 
-    player_stats = await get_player_total_stats(player)
-    player_hp = int(player.get("current_hp", 50) or 50)
-    player_mp = int(player.get("current_mp", 50) or 50)
+    aliados_ids = sala_grupo.get('membros_ids', []) if sala_grupo else None
+    player_stats = await get_player_total_stats(player, aliados_ids)
+    player_hp = int(player.get("current_hp", 50) or 0)
+    player_mp = int(player.get("current_mp", 50) or 0)
     inventory = player.get("inventory", {}) or {}
 
     monster_id_real = mob_vivo.get("monster_id")
@@ -1558,7 +1614,7 @@ async def processar_turno_combate(
         )
 
         dano_heroi = int(resultado.get("total_damage", 0) or 0)
-        player_mp = int(resultado.get("attacker_mp_left", player_mp) or player_mp)
+        player_mp = int(resultado.get("attacker_mp_left", player_mp))
 
         for msg in resultado.get("log_messages", []):
             log_turno.append({
@@ -1569,6 +1625,10 @@ async def processar_turno_combate(
                 "tipo_skill": resultado.get("tipo_skill", ""),
             })
 
+        hp_antes_cura = player_hp
+        player_hp, player_mp = _recuperar_recursos_combate(player_stats, player_hp, player_mp, min(mob_hp, dano_heroi))
+        if player_hp > hp_antes_cura:
+            log_turno.append({"autor": "sistema", "texto": f"Roubo de vida: +{player_hp - hp_antes_cura} HP", "dano": 0})
         mob_hp = max(0, mob_hp - dano_heroi)
         mob_vivo["hp_atual"] = mob_hp
 
@@ -1584,9 +1644,15 @@ async def processar_turno_combate(
     dano_mob = 0
 
     if mob_hp > 0 and not acao_suporte_grupo:
-        dano_mob = max(1, int(mob_status_luta.get("attack", 5)) - (int(player_stats.get("defense", 0)) // 2))
-        player_hp -= dano_mob
-        log_turno.append({"autor": "mob", "texto": f"💥 O monstro atacou: -{dano_mob} HP", "dano": dano_mob})
+        from modules.combat.criticals import roll_damage
+        defesa_alvo = dict(player_stats)
+        # Preserva o peso da defesa usado pelas caçadas, aplicando também esquiva e resistências.
+        defesa_alvo['defense'] = int(player_stats.get('defense', 0)) // 2
+        atacante_mob = {**mob_status_luta, 'monster_name': mob_status_luta.get('name', 'Monstro')}
+        dano_mob, critico_mob, mega_mob = roll_damage(atacante_mob, defesa_alvo)
+        player_hp = max(0, player_hp - dano_mob)
+        texto_mob = 'Você esquivou do ataque!' if dano_mob == 0 else f"{'Crítico! ' if critico_mob else ''}O monstro atacou: -{dano_mob} HP"
+        log_turno.append({'autor': 'mob', 'texto': texto_mob, 'dano': dano_mob})
 
         if player_hp <= 0:
             is_derrota = True
@@ -2050,6 +2116,11 @@ async def processar_turno_combate(
     # =============================================================
     # 7. SALVA JOGADOR
     # =============================================================
+    if player_hp > 0 and mob_hp > 0:
+        hp_antes_regen, mp_antes_regen = player_hp, player_mp
+        player_hp, player_mp = _recuperar_recursos_combate(player_stats, player_hp, player_mp, regenerar=True)
+        if (player_hp, player_mp) != (hp_antes_regen, mp_antes_regen):
+            log_turno.append({"autor": "sistema", "texto": f"Regeneração: +{player_hp - hp_antes_regen} HP / +{player_mp - mp_antes_regen} MP", "dano": 0})
     hp_banco = max(0, int(player_hp))
     mp_banco = int(player_mp)
 
