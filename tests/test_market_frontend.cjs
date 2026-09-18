@@ -38,6 +38,21 @@ el('select-item-venda').value='pocao_cura_leve';el('input-qtd').value='3';el('in
  const pending=ctx.confirmarVenda();await ctx.confirmarVenda();assert.equal(posts,1);
  assert.equal(body.quantidade,3);assert.equal(body.preco,150);assert.equal(body.item_id,'pocao_cura_leve');
  release();await pending;assert.equal(ctx.window.__mercadoVendendo,false);assert.equal(el('submit').disabled,false);
+ let profiles=0, vitrines=0;
+ ctx.window.carregarMeuPerfil=async()=>{profiles++;};ctx.carregarVitrineMercado=async()=>{vitrines++;};
+ const events=new Map(), socket={on:(k,f)=>events.set(k,f),off:(k,f)=>{if(events.get(k)===f)events.delete(k);}};
+ ctx.window.configurarOuvintesMercado(socket);ctx.window.configurarOuvintesMercado(socket);
+ assert.equal(events.size,2);
+ ctx.window.__mercadoAberto=false;
+ await events.get('mercadoAtualizado')({jogadores:['player','buyer']});
+ assert.equal(profiles,1);assert.equal(vitrines,0);
+ await events.get('mercadoAtualizado')({jogadores:['other']});assert.equal(profiles,1);
+ ctx.window.__mercadoAberto=true;el('input-preco').value='777';
+ await events.get('mercadoAtualizado')({jogadores:['player']});
+ assert.equal(profiles,2);assert.equal(vitrines,1);assert.equal(el('input-preco').value,'777');
+ await events.get('connect')();assert.equal(profiles,3);assert.equal(vitrines,2);
+ const replacement={on(){},off(){}};ctx.window.configurarOuvintesMercado(replacement);assert.equal(events.size,0);
+ console.log('PASS: seller refresh with market closed/open, unrelated users, reconnect, listener cleanup, preserved form');
  console.log('PASS: potion classification, integer validation, input isolation, scene restore, stock limit, tax, sale payload and double submit');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 

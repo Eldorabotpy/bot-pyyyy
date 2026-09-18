@@ -545,6 +545,8 @@ class MotorMultiplayer {
             chamarConexaoSegura(); // Usa a versão blindada!
         });
 
+        window.configurarOuvintesMercado?.(this.socket);
+
         if (typeof window.configurarOuvintesLojaReino === 'function') {
             window.configurarOuvintesLojaReino(this.socket);
         }

@@ -2086,6 +2086,21 @@ def api_bruxa_fabricar():
         }), 500
 
 
+def _avisar_atualizacao_mercado(anuncio, *jogadores):
+    # Emitir apenas depois do commit; falha no aviso não desfaz a compra.
+    try:
+        from flask import current_app
+        sio = current_app.extensions.get('socketio')
+        if sio:
+            sio.emit('mercadoAtualizado', {
+                'id_venda': str(anuncio.get('_id', anuncio.get('id', ''))),
+                'jogadores': list(dict.fromkeys(str(uid) for uid in jogadores if uid)),
+            })
+    except Exception:
+        from flask import current_app
+        current_app.logger.exception('Falha ao avisar atualização do mercado')
+
+
 @webapp_bp.route('/api/mercado/criar_anuncio', methods=['POST'])
 def api_criar_anuncio():
     from modules.player.core import users_collection
@@ -2098,6 +2113,7 @@ def api_criar_anuncio():
             total_price=dados.get('preco'), quantity=dados.get('quantidade', 1),
             currency=dados.get('moeda', 'ouro'),
         )
+        _avisar_atualizacao_mercado(anuncio, anuncio['seller_id'])
         player_data = {"character_name": anuncio['seller_name']}
         base_id = anuncio['item']['base_id']
         qtd_desejada = anuncio['quantity']
@@ -2225,11 +2241,12 @@ def api_comprar_mercado():
         if not anuncio:
             return jsonify({"sucesso": False, "erro": "Este leilão já foi encerrado ou não existe."})
 
-        _run_async(market_manager.purchase_listing(
+        anuncio_confirmado, _ = _run_async(market_manager.purchase_listing(
             buyer_id=comprador_id,
             listing_id=venda_id,
             quantity=None
         ))
+        _avisar_atualizacao_mercado(anuncio_confirmado, comprador_id, anuncio_confirmado['seller_id'])
 
         # 👇 NOTIFICAÇÃO 100% BLINDADA 👇
         try:
@@ -2275,6 +2292,7 @@ def api_cancelar_mercado():
         anuncio = _run_async(market_manager.cancel_listing(
             dados.get('id_venda'), seller_id=dados.get('user_id')
         ))
+        _avisar_atualizacao_mercado(anuncio, anuncio['seller_id'])
         jogador = {"character_name": anuncio.get('seller_name', 'Aventureiro')}
 
         # 👇 NOTIFICAÇÃO 100% BLINDADA 👇

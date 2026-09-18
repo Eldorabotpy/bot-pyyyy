@@ -1,3 +1,45 @@
+// Atualizações remotas preservam o formulário de venda em preenchimento.
+let mercadoSocketAtual = null;
+let mercadoSincronizando = false;
+let mercadoPerfilPendente = false;
+let mercadoVitrinePendente = false;
+async function sincronizarMercadoRemoto(atualizarPerfil = false) {
+    mercadoPerfilPendente ||= atualizarPerfil;
+    mercadoVitrinePendente ||= !!window.__mercadoAberto;
+    if (mercadoSincronizando) return;
+    mercadoSincronizando = true;
+    try {
+        while (mercadoPerfilPendente || mercadoVitrinePendente) {
+            const perfil = mercadoPerfilPendente, vitrine = mercadoVitrinePendente;
+            mercadoPerfilPendente = mercadoVitrinePendente = false;
+            const tarefas = [];
+            if (perfil && typeof window.carregarMeuPerfil === 'function') tarefas.push(window.carregarMeuPerfil());
+            if (vitrine && window.__mercadoAberto) tarefas.push(carregarVitrineMercado());
+            await Promise.allSettled(tarefas);
+        }
+    } finally { mercadoSincronizando = false; }
+}
+function receberAtualizacaoMercado(dados) {
+    const meuId = String(localStorage.getItem('jogadorEldoraID') || '');
+    const afetado = Array.isArray(dados?.jogadores) && dados.jogadores.some(id => String(id) === meuId);
+    return sincronizarMercadoRemoto(afetado);
+}
+function reconectarMercado() { return sincronizarMercadoRemoto(true); }
+window.configurarOuvintesMercado = function(socket) {
+    if (!socket || socket === mercadoSocketAtual) return;
+    if (mercadoSocketAtual) {
+        mercadoSocketAtual.off('mercadoAtualizado', receberAtualizacaoMercado);
+        mercadoSocketAtual.off('connect', reconectarMercado);
+    }
+    mercadoSocketAtual = socket;
+    socket.on('mercadoAtualizado', receberAtualizacaoMercado);
+    socket.on('connect', reconectarMercado);
+};
+if (window.eldoraSocket) window.configurarOuvintesMercado(window.eldoraSocket);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && mercadoSocketAtual) reconectarMercado();
+});
+
 const mercadoOperacoesPendentes = new Set();
 // ==========================================
 // LÓGICA DO MERCADO DO AVENTUREIRO
@@ -922,10 +964,13 @@ function abrirDetalhesMercado(idVenda) {
 }
 
 // 🔥 MÁGICA DA VITRINE DO MERCADO (COM VISUAL PREMIUM) 🔥
+let mercadoVersaoVitrine = 0;
 async function carregarVitrineMercado() {
     try {
-        const res = await fetch('/api/mercado/listar');
+        const versao = ++mercadoVersaoVitrine;
+        const res = await fetch('/api/mercado/listar', { cache: 'no-store' });
         const data = await res.json();
+        if (versao !== mercadoVersaoVitrine) return;
 
         if (!data.sucesso) {
             if (window.alertaEldora) window.alertaEldora("Mercado", data.erro || "Erro ao carregar mercado.", "erro");
