@@ -145,7 +145,7 @@ def create_listing(*, seller_id, item_id, total_price, quantity=1, currency='our
         if base in EVOLUTION_ITEMS_DATA:
             raise InvalidListing('Venda itens de evolução no Comércio de Relíquias.')
         item['base_id'] = base
-        unique = info.get('stackable') is False or info.get('type') in {'weapon','armor','helmet','boots','ring','necklace','earring','tool'} or any(k in item for k in ('durability','upgrade_level','enchantments'))
+        unique = info.get('stackable') is False or info.get('type') in {'weapon','armor','helmet','boots','ring','necklace','earring','tool'} or (info.get('stackable') is not True and bool(item.get('durability') or item.get('upgrade_level') or item.get('enchantments')))
         if unique:
             if quantity != 1 or amount != 1: raise InvalidListing('Anuncie um equipamento por vez.')
             payload = {'type': 'unique', 'base_id': base, 'item': item}

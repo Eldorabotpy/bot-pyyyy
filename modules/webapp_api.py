@@ -938,7 +938,7 @@ def obter_perfil(user_id):
         inventario_formatado = []
         for item_id, qtd_ou_dict in inventario_cru.items():
             obj_item = qtd_ou_dict if isinstance(qtd_ou_dict, dict) else {}
-            qtd = obj_item.get("quantity", 1) if obj_item else qtd_ou_dict
+            qtd = obj_item.get("quantity", obj_item.get("qty", obj_item.get("qtd", 1))) if isinstance(qtd_ou_dict, dict) else qtd_ou_dict
             if qtd > 0:
                 base_id = obj_item.get("base_id", item_id) if obj_item else item_id
                 info_item = items_data.ITEMS_DATA.get(base_id, {})
@@ -948,6 +948,8 @@ def obter_perfil(user_id):
                     "nome": info_item.get("display_name", base_id.replace("_", " ").title()), 
                     "emoji": info_item.get("emoji", "📦"),
                     "qtd": qtd,
+                    "stackable": info_item.get("stackable"),
+                    "tradable": info_item.get("tradable", True) and obj_item.get("tradable", True),
                     "tipo": info_item.get("type", obj_item.get("type", "material")),
                     "desc": info_item.get("description", "Um item de Eldora."),
                     "raridade": obj_item.get("rarity", info_item.get("rarity", "comum")),

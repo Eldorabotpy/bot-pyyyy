@@ -3,7 +3,40 @@ const mercadoOperacoesPendentes = new Set();
 // LÓGICA DO MERCADO DO AVENTUREIRO
 // ==========================================
 
+let mercadoEntradaAnterior = null;
+function mercadoIsolarEventos(modal) {
+    if (!modal || modal.dataset.entradaIsolada) return;
+    modal.dataset.entradaIsolada = '1';
+    for (const evento of ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'wheel', 'keydown', 'keyup', 'click', 'dblclick']) {
+        modal.addEventListener(evento, e => {
+            // Preserva foco, digitação, seleção e rolagem nativos.
+            if (evento === 'click') {
+                const lista = document.getElementById('lista-dropdown-venda');
+                const botao = document.getElementById('btn-dropdown-venda');
+                if (lista && !lista.contains(e.target) && !botao?.contains(e.target)) lista.style.display = 'none';
+            }
+            e.stopPropagation();
+        });
+    }
+}
+
 function abrirMercado() {
+    if (!window.__mercadoAberto) {
+        const cena = window.jogoEldora?.scene?.getScene('MapaScene');
+        mercadoEntradaAnterior = cena ? { cena, mouse: cena.input?.enabled, teclado: cena.input?.keyboard?.enabled } : null;
+        if (cena) {
+            cena.motorCacada?.pararAutoCacada?.('mercado', false);
+            cena.isMoving = false;
+            cena.player?.body?.stop();
+            if (cena.input) cena.input.enabled = false;
+            if (cena.input?.keyboard) {
+                cena.input.keyboard.resetKeys?.();
+                cena.input.keyboard.enabled = false;
+            }
+        }
+    }
+    window.__mercadoAberto = true;
+    mercadoIsolarEventos(document.getElementById('ui-mercado'));
     if (typeof window.ocultarMenuGlobalEldora === "function") {
         window.ocultarMenuGlobalEldora();
     }
@@ -18,6 +51,19 @@ function abrirMercado() {
 }
 
 function fecharMercado() {
+    document.activeElement?.blur?.();
+    window.__mercadoAberto = false;
+    const anterior = mercadoEntradaAnterior;
+    mercadoEntradaAnterior = null;
+    if (anterior?.cena?.input) {
+        anterior.cena.input.enabled = anterior.mouse;
+        if (anterior.cena.input.keyboard) {
+            anterior.cena.input.keyboard.resetKeys?.();
+            anterior.cena.input.keyboard.enabled = anterior.teclado;
+        }
+    }
+    const detalhes = document.getElementById('modal-detalhes-mercado');
+    if (detalhes) detalhes.style.display = 'none';
     document.getElementById('ui-mercado').style.display = 'none';
 
     if (typeof window.mostrarMenuGlobalEldora === "function") {
@@ -57,17 +103,16 @@ function mercadoItemEstaEquipado(item) {
 }
 
 function mercadoItemEhUnico(item) {
-    const tipo = String(item?.tipo || item?.type || "").toLowerCase();
+    const tipo = String(item?.tipo || item?.type || '').toLowerCase();
+    if (item?.stackable === false || ['weapon','armor','helmet','boots','ring','necklace','earring','tool','equipamento','arma','armadura','ferramenta'].includes(tipo)) return true;
+    if (item?.stackable === true || ['potion','pocao','consumable','consumivel','material','reagent'].includes(tipo)) return false;
+    return !!(item?.durability || Number(item?.upgrade_level || item?.refino || 0) > 0 || Object.keys(item?.enchantments || {}).length);
+}
 
-    return !!(
-        item?.durability ||
-        item?.upgrade_level ||
-        item?.refino ||
-        item?.stats ||
-        item?.attributes ||
-        item?.enchantments ||
-        ["weapon", "armor", "helmet", "boots", "ring", "necklace", "earring", "tool", "equipamento", "arma", "armadura", "ferramenta"].includes(tipo)
-    );
+function mercadoInteiroPositivo(valor) {
+    const texto = String(valor ?? '').trim();
+    const numero = Number(texto);
+    return /^\d+$/.test(texto) && Number.isSafeInteger(numero) && numero > 0 ? numero : 0;
 }
 
 function mercadoObterPastaItem(item) {
@@ -151,6 +196,13 @@ function carregarInventarioNoMercado() {
     // Reseta o formulário visualmente ao carregar a tela
     listaDropdown.innerHTML = '';
     inputEscondido.value = '';
+    listaDropdown.style.display = 'none';
+    const preview = document.getElementById('preview-item-venda-mercado');
+    if (preview) preview.style.display = 'none';
+    const quantidade = document.getElementById('input-qtd');
+    quantidade.disabled = false;
+    quantidade.value = '1';
+    quantidade.removeAttribute('max');
     displaySelecionado.innerHTML = '<span style="font-size: 1.2em; opacity: 0.3;">📦</span> <span style="color: #cbd5e1;">Selecionar item...</span>';
     btnDropdown.style.borderColor = '#475569';
     btnDropdown.style.boxShadow = '0 4px 6px rgba(0,0,0,0.4)';
@@ -206,7 +258,7 @@ function carregarInventarioNoMercado() {
             <div style="width: 38px; height: 38px; background: #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 2px solid ${corBordaItem}; box-shadow: inset 0 0 10px rgba(0,0,0,0.8);">
                 <img data-img-mercado-venda="1" src="/static/assets/box.png" style="max-width: 28px; max-height: 28px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
             </div>
-            <div style="color: #f8fafc; font-size: 0.95em; font-weight: bold; flex: 1;">${nomeItem}</div>
+            <div style="color: #f8fafc; font-size: 0.95em; font-weight: bold; flex: 1;">${mercadoEscapeHtml(nomeItem)}</div>
             <div>${textoQuantidade}</div>
         `;
 
@@ -485,7 +537,7 @@ function filtrarMercado() {
 
 // 🔥 CÁLCULO DA TAXA DO REINO (10%) 🔥
 function calcularTaxaReino() {
-    let precoInput = document.getElementById('input-preco').value;
+    let precoInput = mercadoInteiroPositivo(document.getElementById('input-preco').value);
     let moeda = document.getElementById('select-moeda').value;
     
     if (!precoInput || precoInput <= 0) {
@@ -496,7 +548,7 @@ function calcularTaxaReino() {
     }
 
     let precoBruto = parseInt(precoInput);
-    let taxa = Math.floor(precoBruto * 0.10); 
+    let taxa = Math.floor(precoBruto / 10); 
     let precoLiquido = precoBruto - taxa;
 
     let simbolo = (moeda === 'ouro') ? '🪙' : '💎';
@@ -671,6 +723,7 @@ function abrirDetalhesMercado(idVenda) {
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "modal-detalhes-mercado";
+        mercadoIsolarEventos(modal);
         modal.style.cssText = `
             display:none;
             position:fixed;
@@ -1051,9 +1104,9 @@ async function confirmarVenda() {
     const btnContrato = document.querySelector('#aba-vender button[onclick="confirmarVenda()"]');
 
     let itemSelecionado = document.getElementById('select-item-venda')?.value;
-    let preco = parseInt(document.getElementById('input-preco')?.value || "0", 10);
+    let preco = mercadoInteiroPositivo(document.getElementById('input-preco')?.value);
     let moeda = document.getElementById('select-moeda')?.value || "ouro";
-    let qtd = parseInt(document.getElementById('input-qtd')?.value || "0", 10);
+    let qtd = mercadoInteiroPositivo(document.getElementById('input-qtd')?.value);
 
     if (!itemSelecionado || !preco || preco <= 0 || !qtd || qtd <= 0) {
         if (window.alertaEldora) {
@@ -1062,6 +1115,11 @@ async function confirmarVenda() {
         return;
     }
 
+    const limite = Number(document.getElementById('input-qtd').max);
+    if (limite > 0 && qtd > limite) {
+        window.alertaEldora?.('Quantidade inválida', `Você possui apenas ${limite} unidades desse item.`, 'erro');
+        return;
+    }
     window.__mercadoVendendo = true;
     if (btnContrato) {
         btnContrato.disabled = true;

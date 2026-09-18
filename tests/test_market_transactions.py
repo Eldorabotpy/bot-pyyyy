@@ -55,6 +55,23 @@ class MarketTests(unittest.TestCase):
  def sell(self,**kw):return self.m.create_listing(seller_id=str(self.seller),item_id=kw.pop('item_id','herb'),total_price=kw.pop('price',100),quantity=kw.pop('qty',3),**kw)
  def buy(self,l,**kw):return asyncio.run(self.m.purchase_listing(buyer_id=str(self.buyer),listing_id=l['_id'],**kw))
  def cancel(self,l,uid=None):return asyncio.run(self.m.cancel_listing(l['_id'],seller_id=str(uid or self.seller)))
+ def test_potion_stack_with_default_equipment_fields(self):
+  self.m.ITEMS_DATA['potion']={'type':'consumivel','stackable':True}
+  for field in ['quantity','qty','qtd']:
+   with self.subTest(field=field):
+    self.db['users'].docs[0]['inventory']={'potion':{'base_id':'potion',field:10,'upgrade_level':0,'durability':None,'enchantments':{}}}
+    l=self.sell(item_id='potion',qty=3,price=150)
+    self.assertEqual(l['item']['type'],'stack')
+    self.assertEqual(self.m._quantity(self.db['users'].docs[0]['inventory']['potion']),7)
+    self.cancel(l)
+    self.assertEqual(self.m._quantity(self.db['users'].docs[0]['inventory']['potion']),10)
+ def test_potion_stack_purchase(self):
+  self.m.ITEMS_DATA['potion']={'type':'consumivel','stackable':True}
+  self.db['users'].docs[0]['inventory']={'potion':{'base_id':'potion','quantity':10,'upgrade_level':0,'enchantments':{}}}
+  l=self.sell(item_id='potion',qty=3,price=150);self.buy(l)
+  self.assertEqual(self.db['users'].docs[1]['inventory']['potion']['quantity'],3)
+  self.assertEqual(self.db['users'].docs[1]['gold'],850)
+  self.assertEqual(self.db['users'].docs[0]['gold'],145)
  def test_exact_total_and_tax(self):
   l=self.sell();self.assertEqual(self.m.listing_total(l),100);self.buy(l)
   self.assertEqual(self.db['users'].find_one({'_id':self.buyer})['gold'],900)
