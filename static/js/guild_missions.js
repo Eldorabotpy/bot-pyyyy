@@ -86,7 +86,29 @@
     }
 
 
+    let entradaGuilda = null;
     function bloquearMenuGlobal() {
+        if (!window.__guildaAberta) {
+            const cena = window.jogoEldora?.scene?.getScene('MapaScene');
+            entradaGuilda = cena ? {cena, mouse:cena.input?.enabled, teclado:cena.input?.keyboard?.enabled} : null;
+            if (cena?.input) {
+                cena.input.enabled = false;
+                if (cena.input.keyboard) { cena.input.keyboard.resetKeys?.(); cena.input.keyboard.enabled = false; }
+                cena.motorCacada?.pararAutoCacada?.('guilda', false);
+                cena.player?.body?.stop();
+            }
+        }
+        window.__guildaAberta = true;
+        const modal = document.getElementById('guild-missions-container');
+        if (modal && !modal.dataset.eventosIsolados) {
+            modal.dataset.eventosIsolados = '1';
+            for (const evento of ['click','pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','wheel','keydown','keyup']) {
+                modal.addEventListener(evento, e => {
+                    e.stopPropagation();
+                    if (evento === 'click' && e.target === modal) window.fecharGuildaMissoes();
+                });
+            }
+        }
         if (
             typeof window.ocultarMenuGlobalEldora
             === "function"
@@ -101,6 +123,15 @@
 
 
     function liberarMenuGlobal() {
+        window.__guildaAberta = false;
+        if (entradaGuilda?.cena?.input) {
+            entradaGuilda.cena.input.enabled = entradaGuilda.mouse;
+            if (entradaGuilda.cena.input.keyboard) {
+                entradaGuilda.cena.input.keyboard.resetKeys?.();
+                entradaGuilda.cena.input.keyboard.enabled = entradaGuilda.teclado;
+            }
+        }
+        entradaGuilda = null;
         if (
             typeof window.mostrarMenuGlobalEldora
             === "function"
@@ -162,6 +193,7 @@
         bloquearMenuGlobal();
 
         container.style.display = "flex";
+        iniciarAtualizacaoGuilda();
 
         estadoGuilda.aba = "disponiveis";
         estadoGuilda.filtro = "todos";
@@ -171,7 +203,7 @@
         atualizarEscopoGuilda();
 
         configurarModoInterface();
-        tualizarSecaoGuilda();
+        atualizarSecaoGuilda();
         falarLyria(
             "Saudações, aventureiro. Estou verificando os contratos disponíveis."
         );
@@ -210,6 +242,7 @@
         bloquearMenuGlobal();
 
         container.style.display = "flex";
+        iniciarAtualizacaoGuilda();
 
         configurarModoInterface();
         atualizarSecaoGuilda();
@@ -309,6 +342,11 @@
     }
 
     window.fecharGuildaMissoes = function() {
+        clearInterval(timerGuilda);
+        ++versaoGuilda;
+        consultaGuilda?.abort();
+        consultaGuilda = null;
+        estadoGuilda.carregando = false;
 
         const container = document.getElementById(
             "guild-missions-container"
@@ -326,6 +364,8 @@
     // ========================================================
 
     function atualizarSecaoGuilda() {
+        const destino = estadoGuilda.secao === 'loja' ? 'loja' : estadoGuilda.escopo;
+        document.querySelectorAll('[data-guild-destino]').forEach(btn => btn.classList.toggle('ativa', btn.dataset.guildDestino === destino));
 
         const secaoArea =
             document.getElementById(
@@ -505,276 +545,70 @@
             }
 
 
-            // Voltou para Contratos.
-            if (estadoGuilda.dados) {
-
-                atualizarPontos();
-
-                renderizarGuildaMissoes();
-
-                atualizarFalaLyria();
-
-            } else {
-
-                await carregarGuildaMissoes();
-            }
+            await carregarGuildaMissoes();
         };
     // ========================================================
     // 📡 CARREGAR DADOS
     // ========================================================
 
-    async function carregarGuildaMissoes() {
-
-        if (estadoGuilda.carregando) {
-            return;
-        }
-
+    let consultaGuilda = null, versaoGuilda = 0, timerGuilda = null;
+    let operacaoGuilda = false;
+    function guildaVisivel() {
+        return document.getElementById('guild-missions-container')?.style.display === 'flex';
+    }
+    async function carregarPainelGuilda(loja = false, silencioso = false) {
         const userId = obterUserId();
-
-        if (!userId) {
-            mostrarErro(
-                "Não consegui identificar seu herói."
-            );
-            return;
-        }
-
+        if (!userId) { mostrarErro('Não consegui identificar seu herói.'); return; }
+        const versao = ++versaoGuilda;
+        consultaGuilda?.abort();
+        const controle = new AbortController();
+        consultaGuilda = controle;
+        const tempo = setTimeout(() => controle.abort(), 12000);
+        const escopo = estadoGuilda.escopo;
+        const lista = document.getElementById('guild-missoes-lista');
         estadoGuilda.carregando = true;
-
-        const lista = document.getElementById(
-            "guild-missoes-lista"
-        );
-
-        if (lista) {
-            lista.innerHTML = `
-                <div class="guild-carregando">
-                    📜 Lyria está consultando os contratos...
-                </div>
-            `;
-        }
-
+        if (!silencioso && lista) lista.innerHTML = '<div class="guild-carregando">Consultando a Guilda…</div>';
+        const endpoint = loja ? '/api/guild/loja/' : escopo === 'coletivo' ? '/api/guild/cla/missoes/' : '/api/guild/missoes/';
         try {
-
-            const endpoint =
-                estadoGuilda.escopo ===
-                    "coletivo"
-
-                    ? (
-                        "/api/guild/cla/missoes/"
-                        +
-                        encodeURIComponent(userId)
-                    )
-
-                    : (
-                        "/api/guild/missoes/"
-                        +
-                        encodeURIComponent(userId)
-                    );
-
-
-            const resposta = await fetch(
-                `${endpoint}?t=${Date.now()}`,
-                {
-                    method: "GET",
-                    cache: "no-store"
-                }
-            );
-
-            const dados =
-                await resposta.json();
-
-            if (!dados.success) {
-                throw new Error(
-                    dados.error ||
-                    "Não foi possível carregar as missões."
-                );
-            }
-
-            estadoGuilda.dados = dados;
-
-            const possuiMissaoPronta =
-                Array.isArray(dados.ativas)
-                &&
-                dados.ativas.some(
-                    missao =>
-                        missao.status ===
-                        "pronta_entrega"
-                );
-
-            if (
-                estadoGuilda.modo === "atendente"
-                &&
-                estadoGuilda.secao !== "loja"
-                &&
-                estadoGuilda.escopo === "individual"
-                &&
-                possuiMissaoPronta
-            ) {
-                estadoGuilda.aba = "ativas";
-                atualizarAbas();
-            }
-
+            const resposta = await fetch(endpoint + encodeURIComponent(userId), {cache:'no-store', signal:controle.signal});
+            const dados = await resposta.json();
+            if (versao !== versaoGuilda) return;
+            if (!resposta.ok || !dados.success) throw new Error(dados.error || 'Não foi possível consultar a Guilda.');
+            const anterior = loja ? estadoGuilda.lojaDados : estadoGuilda.dados;
+            if (silencioso && JSON.stringify(anterior) === JSON.stringify(dados)) return;
+            const rolagem = lista?.scrollTop || 0;
+            if (loja) estadoGuilda.lojaDados = dados;
+            else estadoGuilda.dados = dados;
             atualizarPontos();
-
-            renderizarGuildaMissoes();
-
-            atualizarFalaLyria();
-
+            if (loja) renderizarLojaGuilda();
+            else { atualizarAbas(); renderizarGuildaMissoes(); if (!silencioso) atualizarFalaLyria(); }
+            if (silencioso && lista) lista.scrollTop = rolagem;
         } catch (erro) {
-
-            console.error(
-                "❌ [GUILDA] Erro ao carregar:",
-                erro
-            );
-
-            if (lista) {
-                lista.innerHTML = `
-                    <div class="guild-vazio">
-                        ❌ ${escaparHTML(
-                            erro.message ||
-                            "Não foi possível consultar os contratos."
-                        )}
-                    </div>
-                `;
-            }
-
-            falarLyria(
-                erro.message ||
-                "Parece que os registros da Guilda estão indisponíveis no momento."
-            );
-
+            if (versao !== versaoGuilda) return;
+            const mensagem = erro.name === 'AbortError' ? 'A consulta demorou demais. Tente atualizar.' : erro.message;
+            if (!silencioso && lista) lista.innerHTML = `<div class="guild-vazio">${escaparHTML(mensagem)}<br><button class="guild-aba" onclick="window.atualizarPainelGuilda()">Tentar novamente</button></div>`;
+            falarLyria(mensagem);
         } finally {
-            estadoGuilda.carregando = false;
+            clearTimeout(tempo);
+            if (versao === versaoGuilda) { consultaGuilda = null; estadoGuilda.carregando = false; }
         }
     }
-
-
-    window.recarregarGuildaMissoes =
-        carregarGuildaMissoes;
-
-    // ========================================================
-    // 🏪 CARREGAR LOJA DA GUILDA
-    // ========================================================
-
-    async function carregarLojaGuilda() {
-
-        if (
-            estadoGuilda.lojaCarregando
-        ) {
-            return;
-        }
-
-
-        const userId =
-            obterUserId();
-
-
-        if (!userId) {
-
-            mostrarErro(
-                "Não consegui identificar seu herói."
-            );
-
-            return;
-        }
-
-
-        const lista =
-            document.getElementById(
-                "guild-missoes-lista"
-            );
-
-
-        estadoGuilda.lojaCarregando =
-            true;
-
-
-        if (lista) {
-
-            lista.innerHTML = `
-                <div class="guild-carregando">
-                    🏪 Lyria está organizando
-                    o catálogo da Guilda...
-                </div>
-            `;
-        }
-
-
-        try {
-
-            const resposta =
-                await fetch(
-                    "/api/guild/loja/"
-                    +
-                    encodeURIComponent(
-                        userId
-                    )
-                    +
-                    "?t="
-                    +
-                    Date.now(),
-                    {
-                        method: "GET",
-                        cache: "no-store"
-                    }
-                );
-
-
-            const dados =
-                await resposta.json();
-
-
-            if (!dados.success) {
- 
-                throw new Error(
-                    dados.error ||
-                    "Não foi possível carregar a Loja da Guilda."
-                );
-            }
-
-
-            estadoGuilda.lojaDados =
-                dados;
-
-
-            atualizarPontos();
-  
-            renderizarLojaGuilda();
-
-
-        } catch (erro) {
-
-            console.error(
-                "❌ [LOJA GUILDA]",
-                erro
-            );
-
-
-            if (lista) {
-
-                lista.innerHTML = `
-                    <div class="guild-vazio">
-                        ❌ ${escaparHTML(
-                            erro.message ||
-                            "Loja indisponível."
-                        )}
-                    </div>
-                `;
-            }
-
-
-            falarLyria(
-                erro.message ||
-                "O catálogo da Guilda está indisponível."
-            );
-
-
-        } finally {
-
-            estadoGuilda.lojaCarregando =
-                false;
-        }
+    async function carregarGuildaMissoes(silencioso = false) {
+        return carregarPainelGuilda(estadoGuilda.secao === 'loja', silencioso);
     }
-
+    async function carregarLojaGuilda() { return carregarPainelGuilda(true); }
+    window.recarregarGuildaMissoes = carregarGuildaMissoes;
+    window.recarregarLojaGuilda = carregarLojaGuilda;
+    window.atualizarPainelGuilda = () => { if (!operacaoGuilda) return carregarGuildaMissoes(); };
+    function iniciarAtualizacaoGuilda() {
+        clearInterval(timerGuilda);
+        timerGuilda = setInterval(() => {
+            if (guildaVisivel() && document.visibilityState !== 'hidden' && !consultaGuilda && !operacaoGuilda) carregarGuildaMissoes(true);
+        }, 5000);
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && guildaVisivel() && !operacaoGuilda) carregarGuildaMissoes(true);
+    });
 
     function renderizarLojaGuilda() {
 
@@ -1231,452 +1065,21 @@
     // ========================================================
 
     function atualizarPontos() {
-
-        const area =
-            document.getElementById(
-                "guild-pontos-area"
-            );
-
-
-        if (!area) {
+        const area = document.getElementById('guild-pontos-area');
+        if (!area) return;
+        const dados = estadoGuilda.secao === 'loja' ? estadoGuilda.lojaDados : estadoGuilda.dados;
+        if (!dados) { area.innerHTML = '<span class="guild-muted">Consultando saldo e reputação…</span>'; return; }
+        if (estadoGuilda.secao !== 'loja' && estadoGuilda.escopo === 'coletivo') {
+            area.innerHTML = `<span>Tesouro do clã</span><strong>${Number(dados.pontos_cla || 0).toLocaleString('pt-BR')} pontos</strong>`;
             return;
         }
-
-
-        const dados =
-            estadoGuilda.secao ===
-                "loja"
-                ? (
-                    estadoGuilda.lojaDados ||
-                    {}
-                )
-                : (
-                    estadoGuilda.dados ||
-                    {}
-                );
-
-        // ====================================================
-        // 🏰 PONTOS COLETIVOS DO CLÃ
-        // ====================================================
-
-        if (
-            estadoGuilda.secao !==
-                "loja"
-            &&
-            estadoGuilda.escopo ===
-            "coletivo"
-        ) {
-
-            const pontosCla =
-                Number(
-                    dados.pontos_cla ||
-                    0
-                );
-
-
-            area.innerHTML = `
-                <div
-                    style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 6px;
-                    "
-                >
-                    <span>
-                        🏰 Pontos do clã:
-                    </span>
-
-                    <strong>
-                        ${pontosCla.toLocaleString(
-                            "pt-BR"
-                        )}
-                    </strong>
-                </div>
-            `;
-
-            return;
-        }
-
-
-        // ====================================================
-        // 🏅 PROGRESSÃO INDIVIDUAL DA GUILDA
-        // ====================================================
-
-        const saldo =
-            Number(
-                dados.pontos_guilda ||
-                0
-            );
-
-
-        const reputacao =
-            Number(
-                dados.reputacao_total ??
-                dados.pontos_guilda_total ??
-                saldo
-            );
-
-
-        const rank =
-            (
-                dados.rank_guilda &&
-                typeof dados.rank_guilda ===
-                    "object"
-            )
-                ? dados.rank_guilda
-                : {};
-
-
-        const rankNome =
-            String(
-                rank.nome ||
-                "Novato"
-            );
-
-
-        const proximoRank =
-            (
-                rank.proximo_rank &&
-                typeof rank.proximo_rank ===
-                    "object"
-            )
-                ? rank.proximo_rank
-                : null;
-
-
-        const progresso =
-            Math.max(
-                0,
-                Math.min(
-                    100,
-                    Number(
-                        rank
-                            .progresso_percentual ||
-                        0
-                    )
-                )
-            );
-
-
-        const faltam =
-            Math.max(
-                0,
-                Number(
-                    rank
-                        .reputacao_faltante ||
-                    0
-                )
-            );
-
-
-        const nivelMaximo =
-            Boolean(
-                rank.nivel_maximo
-            );
-
-
-        area.innerHTML = `
-            <div
-                style="
-                    width: 100%;
-                    max-width: 350px;
-
-                    margin:
-                        4px auto 8px;
-
-                    padding:
-                        10px 12px;
-
-                    background:
-                        linear-gradient(
-                            145deg,
-                            rgba(
-                                216,
-                                184,
-                                90,
-                                0.10
-                            ),
-                            rgba(
-                                14,
-                                22,
-                                36,
-                                0.85
-                            )
-                        );
-
-                    border:
-                        1px solid
-                        rgba(
-                            216,
-                            184,
-                            90,
-                            0.28
-                        );
-
-                    border-radius:
-                        11px;
-                "
-            >
-
-                <!-- TOPO -->
-                <div
-                    style="
-                        display: flex;
-                        align-items: center;
-                        justify-content:
-                            space-between;
-
-                        gap: 10px;
-                    "
-                >
-
-                    <div
-                        style="
-                            text-align: left;
-                        "
-                    >
-                        <div
-                            style="
-                                color: #8f9bad;
-                                font-size: 0.61rem;
-                                font-weight: 700;
-                                text-transform:
-                                    uppercase;
-                            "
-                        >
-                            Rank da Guilda
-                        </div>
-
-                        <div
-                            style="
-                                margin-top: 2px;
-
-                                color: #f4dc91;
-
-                                font-family:
-                                    Cinzel,
-                                    serif;
-
-                                font-size:
-                                    0.88rem;
-
-                                font-weight:
-                                    900;
-                            "
-                        >
-                            🏅 ${escaparHTML(
-                                rankNome
-                            )}
-                        </div>
-                    </div>
-
-
-                    <div
-                        style="
-                            text-align: right;
-                        "
-                    >
-                        <div
-                            style="
-                                color: #8f9bad;
-                                font-size: 0.61rem;
-                                font-weight: 700;
-                                text-transform:
-                                    uppercase;
-                            "
-                        >
-                            Saldo
-                        </div>
-
-                        <strong
-                            style="
-                                display: block;
-                                margin-top: 2px;
-                                color: #ffffff;
-                                font-size: 0.85rem;
-                            "
-                        >
-                            ${saldo.toLocaleString(
-                                "pt-BR"
-                            )}
-                            pts
-                        </strong>
-                    </div>
-
-                </div>
-
-
-                <!-- REPUTAÇÃO -->
-                <div
-                    style="
-                        display: flex;
-                        align-items: center;
-                        justify-content:
-                            space-between;
-
-                        gap: 8px;
-
-                        margin-top:
-                            9px;
-
-                        color:
-                            #b9c3d0;
-
-                        font-size:
-                            0.66rem;
-                    "
-                >
-
-                    <span>
-                        Reputação:
-                        <strong
-                            style="
-                                color: #eef2f7;
-                            "
-                        >
-                            ${reputacao.toLocaleString(
-                                "pt-BR"
-                            )}
-                        </strong>
-                    </span>
-
-
-                    ${
-                        nivelMaximo
-                            ? `
-                                <span
-                                    style="
-                                        color:
-                                            #f4dc91;
-
-                                        font-weight:
-                                            800;
-                                    "
-                                >
-                                    Rank máximo
-                                </span>
-                            `
-                            : `
-                                <span>
-                                    Próximo:
-                                    <strong
-                                        style="
-                                            color:
-                                                #f4dc91;
-                                        "
-                                    >
-                                        ${escaparHTML(
-                                            proximoRank
-                                                ?.nome ||
-                                            ""
-                                        )}
-                                    </strong>
-                                </span>
-                            `
-                    }
-
-                </div>
-
-
-                <!-- BARRA -->
-                <div
-                    style="
-                        height: 7px;
-
-                        margin-top:
-                            7px;
-
-                        overflow:
-                            hidden;
-
-                        background:
-                            #070d17;
-
-                        border:
-                            1px solid
-                            rgba(
-                                216,
-                                184,
-                                90,
-                                0.18
-                            );
-
-                        border-radius:
-                            999px;
-                    "
-                >
-
-                    <div
-                        style="
-                            width:
-                                ${progresso}%;
-
-                            height:
-                                100%;
-
-                            background:
-                                linear-gradient(
-                                    90deg,
-                                    #8b6c24,
-                                    #e7c75f
-                                );
-
-                            border-radius:
-                                999px;
-                        "
-                    ></div>
-
-                </div>
-
-
-                <!-- RODAPÉ -->
-                <div
-                    style="
-                        margin-top:
-                            5px;
-
-                        color:
-                            #8491a3;
-
-                        font-size:
-                            0.61rem;
-
-                        text-align:
-                            right;
-                    "
-                >
-                    ${
-                        nivelMaximo
-                            ? `
-                                Progressão máxima
-                                alcançada
-                            `
-                            : `
-                                Faltam
-                                <strong
-                                    style="
-                                        color:
-                                            #cbd5e1;
-                                    "
-                                >
-                                    ${faltam.toLocaleString(
-                                        "pt-BR"
-                                    )}
-                                </strong>
-                                pontos de reputação
-                            `
-                    }
-                </div>
-
-            </div>
-        `;
+        const rank = dados.rank_guilda || {};
+        const saldo = Number(dados.pontos_guilda || 0).toLocaleString('pt-BR');
+        const reputacao = Number(dados.reputacao_total ?? dados.pontos_guilda_total ?? dados.pontos_guilda ?? 0).toLocaleString('pt-BR');
+        area.innerHTML = `<div class="guild-rank-line"><span>🏅 ${escaparHTML(rank.nome || 'Novato')}</span><strong>${saldo} <small>pontos</small></strong></div>
+            <details class="guild-rank-details"><summary>Reputação: ${reputacao} · ver progresso</summary><div>${rank.nivel_maximo ? 'Rank máximo alcançado' : rank.proximo_rank ? `Próximo: ${escaparHTML(rank.proximo_rank.nome)} · faltam ${Number(rank.reputacao_faltante || 0).toLocaleString('pt-BR')}` : 'Complete contratos para subir de rank.'}</div>
+            <progress max="100" value="${Math.max(0,Math.min(100,Number(rank.progresso_percentual || 0)))}"></progress></details>`;
     }
-
-     
-    // ========================================================
-    // 🏰 ESCOPO - PERSONAGEM / CLÃ
-    // ========================================================
 
     window.mudarEscopoGuilda =
         async function(escopo) {
@@ -1829,6 +1232,9 @@
                         document.getElementById(id);
 
                     if (!btn) return;
+                    const nomes = {disponiveis:'Disponíveis', ativas:'Em andamento', concluidas:'Histórico'};
+                    const quantidade = estadoGuilda.dados?.[aba]?.length;
+                    btn.textContent = nomes[aba] + (quantidade === undefined ? '' : ` (${quantidade})`);
 
                     btn.classList.toggle(
                         "ativa",
@@ -1880,6 +1286,8 @@
 
 
     function atualizarFiltros() {
+        const select = document.getElementById('guild-filtro-select');
+        if (select) select.value = estadoGuilda.filtro;
 
         document
             .querySelectorAll(
@@ -3191,6 +2599,8 @@
                 falarLyria(texto);
 
 
+                await carregarGuildaMissoes();
+
                 // Atualiza perfil/HUD se
                 // a função existir.
                 try {
@@ -3210,9 +2620,6 @@
                         e
                     );
                 }
-
-
-                await carregarGuildaMissoes();
 
 
                 // Depois da entrega mostra
@@ -3276,4 +2683,26 @@
         "🏰 Guilda dos Aventureiros carregada."
     );
 
+    window.navegarGuilda = async function(destino) {
+        if (operacaoGuilda || estadoGuilda.modo === 'diario') return;
+        estadoGuilda.secao = destino === 'loja' ? 'loja' : 'contratos';
+        estadoGuilda.escopo = destino === 'coletivo' ? 'coletivo' : 'individual';
+        estadoGuilda.dados = null;
+        estadoGuilda.lojaDados = null;
+        estadoGuilda.aba = 'disponiveis';
+        estadoGuilda.filtro = 'todos';
+        atualizarSecaoGuilda(); atualizarAbas(); atualizarFiltros();
+        document.querySelectorAll('[data-guild-destino]').forEach(btn => btn.classList.toggle('ativa', btn.dataset.guildDestino === destino));
+        await carregarGuildaMissoes();
+    };
+    // Um único envio por vez, inclusive em toques rápidos antes do refresh.
+    for (const nome of ['aceitarMissaoGuilda','resgatarMissaoGuilda','comprarReceitaGuilda']) {
+        const executar = window[nome];
+        window[nome] = async (...args) => {
+            if (operacaoGuilda) return;
+            operacaoGuilda = true;
+            try { return await executar(...args); }
+            finally { operacaoGuilda = false; }
+        };
+    }
 })();

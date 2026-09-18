@@ -2054,18 +2054,6 @@ def registrar_abate(
         if resultado.modified_count != 1:
             continue
 
-        jogador_novo = (
-            users_collection
-            .find_one(
-                {
-                    "_id": player_id
-                },
-                {
-                    campo: 1
-                },
-            )
-        )
-
         # Pela projeção aninhada do Mongo,
         # é mais seguro buscar o estado completo
         # quando precisarmos confirmar conclusão.
@@ -2101,19 +2089,6 @@ def registrar_abate(
                     0,
                 ) or 0
             ),
-        )
-
-        # Nunca deixa passar do total visualmente.
-        users_collection.update_one(
-            {
-                "_id": player_id
-            },
-            {
-                "$set": {
-                    f"{campo}.progresso":
-                        progresso
-                }
-            },
         )
 
         pronta = (

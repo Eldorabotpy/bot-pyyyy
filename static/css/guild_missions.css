@@ -1425,3 +1425,40 @@
             8px;
     }
 }
+/* Painel compacto: navegação fixa, área de contratos com rolagem própria. */
+#guild-missions-container .guild-modal { width:min(100%,760px); height:min(96dvh,820px); border:1px solid #8e7547; border-radius:16px; font-family:'Segoe UI',Arial,sans-serif; }
+#guild-missions-container .guild-modal > * { flex-shrink:0; }
+#guild-missions-container .guild-titulo { padding:15px 48px 8px 16px; margin:0; text-align:left; font-size:15px; color:#f2ddb0; }
+#guild-missions-container .guild-atendente-area { min-height:0; height:auto; padding:0 16px 8px; align-items:center; gap:10px; background:none; border:0; }
+#guild-missions-container .guild-atendente-img { width:36px; height:48px; align-self:center; }
+#guild-missions-container .guild-dialogo { padding:0; margin:0; background:none; border:0; border-radius:0; box-shadow:none; color:#aab8c9; font:11px/1.4 'Segoe UI',Arial,sans-serif; }
+#guild-missions-container .guild-dialogo::before, #guild-missions-container .guild-dialogo::after { display:none; }
+#guild-missions-container .guild-dialogo-nome { color:#c8ab71; font-size:9px; margin-bottom:2px; }
+#guild-missions-container #guild-dialogo-texto { max-height:32px; overflow:auto; }
+#guild-missions-container .guild-pontos { margin:0 14px 8px; padding:9px 11px; background:#ffffff06; border:1px solid #ffffff10; border-radius:9px; text-align:left; font-size:12px; }
+#guild-missions-container .guild-rank-line { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+#guild-missions-container .guild-rank-line strong { color:#f1d48e; font-size:16px; }
+#guild-missions-container .guild-rank-line small { font-size:10px; font-weight:400; }
+#guild-missions-container .guild-rank-details { font-size:10px; color:#9fadc0; margin-top:4px; }
+#guild-missions-container .guild-rank-details summary { cursor:pointer; }
+#guild-missions-container progress { width:100%; height:5px; accent-color:#c9aa62; }
+#guild-missions-container .guild-abas { margin:0; padding:0 14px 7px; gap:5px; grid-template-columns:repeat(3,minmax(0,1fr)); }
+#guild-missions-container .guild-aba { min-height:33px; padding:7px 4px; border-radius:8px; font:600 11px 'Segoe UI',Arial,sans-serif; }
+#guild-missions-container #guild-abas-area .guild-aba { background:transparent; border-color:transparent; color:#9daabe; }
+#guild-missions-container #guild-abas-area .guild-aba.ativa { color:#f2ddb0; border-bottom:2px solid #c4a157; border-radius:0; }
+#guild-missions-container .guild-toolbar { display:flex; justify-content:space-between; align-items:center; padding:0 14px 8px; gap:8px; min-height:30px; }
+#guild-missions-container #guild-filtros-area { padding:0; margin:0; gap:6px; align-items:center; color:#8fa0b8; font-size:10px; }
+#guild-missions-container select { background:#101b2b; color:#cbd6e5; border:1px solid #354155; border-radius:6px; padding:5px; max-width:170px; font-size:11px; }
+#guild-missions-container .guild-refresh { margin-left:auto; border:0; background:none; color:#cdb681; font-size:11px; cursor:pointer; }
+#guild-missions-container .guild-missoes-lista { flex:1 1 0; min-height:0; overflow-y:auto; padding:4px 14px 16px; overscroll-behavior:contain; }
+#guild-missions-container button:focus-visible, #guild-missions-container select:focus-visible { outline:2px solid #dec58e; outline-offset:2px; }
+#guild-missions-container #guild-dialogo-texto { color:#aab8c9; }
+#guild-missions-container .guild-card { padding:10px; margin-bottom:10px; border-radius:12px; }
+#guild-missions-container .guild-card-descricao { font:11px/1.4 'Segoe UI',Arial,sans-serif; margin:6px 0; }
+#guild-missions-container .guild-tags { margin:5px 0; gap:4px; }
+#guild-missions-container .guild-tag { padding:3px 6px; font:10px 'Segoe UI',Arial,sans-serif; }
+#guild-missions-container .guild-objetivo { padding:7px; margin:6px 0; font:11px/1.4 'Segoe UI',Arial,sans-serif; }
+#guild-missions-container .guild-recompensas { margin-top:7px; }
+#guild-missions-container .guild-recompensas-titulo { font-size:10px; margin-bottom:4px; }
+#guild-missions-container .guild-card-acoes { margin-top:8px; }
+#guild-missions-container .guild-btn { min-height:32px; padding:7px 12px; font:600 11px 'Segoe UI',Arial,sans-serif; }
