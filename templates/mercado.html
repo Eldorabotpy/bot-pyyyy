@@ -1,98 +1,40 @@
-<link rel="stylesheet" href="/static/css/mercado.css">
-<div id="ui-mercado" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.9); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
-    
-    <div style="background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); width: 92%; max-width: 480px; border: 2px solid #ca8a04; border-radius: 16px; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; box-shadow: 0px 15px 40px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; position: relative;">
-        
-        <div style="background: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/backgrounds/textura_pedra.png'), linear-gradient(90deg, #451a03, #78350f, #451a03); background-blend-mode: multiply; padding: 18px; text-align: center; border-bottom: 2px solid #ca8a04; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.6);">
-            <h2 style="margin: 0; font-family: 'Cinzel', serif; color: #fef08a; font-size: 1.5em; text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 15px rgba(250, 204, 21, 0.4); text-transform: uppercase; letter-spacing: 1px;">⚖️ Mercado Central</h2>
-            
-            <button onclick="fecharMercado()" style="position: absolute; right: 15px; top: 15px; background: #7f1d1d; color: #fca5a5; border: 2px solid #ef4444; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.6); transition: all 0.2s;" onmouseover="this.style.background='#991b1b'; this.style.color='#fff'; this.style.transform='scale(1.1)';" onmouseout="this.style.background='#7f1d1d'; this.style.color='#fca5a5'; this.style.transform='scale(1)';">✕</button>
+<link rel="stylesheet" href="/static/css/mercado.css?v=2">
+<div id="ui-mercado" style="display:none;">
+    <div class="mercado-shell" role="dialog" aria-modal="true" aria-labelledby="mercado-titulo">
+        <div class="mercado-header">
+            <div class="mercado-emblema" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v17M5 20h14M4 7h16M6 7l-4 7h8L6 7Zm12 0-4 7h8l-4-7Z"/><path d="M2 14c1 4 7 4 8 0m4 0c1 4 7 4 8 0"/></svg></div>
+            <div><span class="mercado-eyebrow">COMÉRCIO ENTRE AVENTUREIROS</span><h2 id="mercado-titulo">Mercado Central</h2></div>
+            <button class="mercado-close" aria-label="Fechar mercado" onclick="fecharMercado()">×</button>
         </div>
-
-        <div style="display: flex; background: #020617; border-bottom: 1px solid #334155; padding: 0 10px;">
-            <button class="tab-mercado" data-aba="aba-comprar-ouro" onclick="mudarAbaMercado('aba-comprar-ouro', this)" style="flex: 1; padding: 14px 5px; cursor: pointer; background: #1e293b; color: #facc15; border: none; font-weight: bold; font-size: 0.9em; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-top: 8px; transition: background 0.3s; border-bottom: 3px solid #facc15; text-transform: uppercase; letter-spacing: 0.5px;">🪙 Ouro</button>
-            <button class="tab-mercado" data-aba="aba-comprar-gemas" onclick="mudarAbaMercado('aba-comprar-gemas', this)" style="flex: 1; padding: 14px 5px; cursor: pointer; background: transparent; color: #94a3b8; border: none; font-weight: bold; font-size: 0.9em; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-top: 8px; transition: background 0.3s; border-bottom: 3px solid transparent; text-transform: uppercase; letter-spacing: 0.5px;">💎 Gemas</button>
-            <button class="tab-mercado" data-aba="aba-vender" onclick="mudarAbaMercado('aba-vender', this)" style="flex: 1; padding: 14px 5px; cursor: pointer; background: transparent; color: #94a3b8; border: none; font-weight: bold; font-size: 0.9em; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-top: 8px; transition: background 0.3s; border-bottom: 3px solid transparent; text-transform: uppercase; letter-spacing: 0.5px;">📦 Vender</button>
+        <div class="mercado-tabs" role="tablist" aria-label="Seções do mercado">
+            <button class="tab-mercado" role="tab" aria-controls="aba-comprar-ouro" data-aba="aba-comprar-ouro" onclick="mudarAbaMercado('aba-comprar-ouro', this)">Ouro <span class="mercado-tab-dot ouro"></span></button>
+            <button class="tab-mercado" role="tab" aria-controls="aba-comprar-gemas" data-aba="aba-comprar-gemas" onclick="mudarAbaMercado('aba-comprar-gemas', this)">Gemas <span class="mercado-tab-dot gemas"></span></button>
+            <button class="tab-mercado" role="tab" aria-controls="aba-vender" data-aba="aba-vender" onclick="mudarAbaMercado('aba-vender', this)">＋ Anunciar</button>
         </div>
-
-        <div style="padding: 20px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: #ca8a04 #0f172a;">
-            
-            <div id="aba-comprar-ouro" class="conteudo-mercado">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px;">
-                    <h3 style="color: #facc15; margin: 0; font-size: 1.1em; text-transform: uppercase; letter-spacing: 1px;">Leilões por Ouro</h3>
-                </div>
-                <div id="lista-ouro" style="display: flex; flex-direction: column; gap: 12px;"></div>
-            </div>
-
-            <div id="aba-comprar-gemas" class="conteudo-mercado" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 15px;">
-                    <h3 style="color: #60a5fa; margin: 0; font-size: 1.1em; text-transform: uppercase; letter-spacing: 1px;">Leilões Premium</h3>
-                </div>
-                <div id="lista-gemas" style="display: flex; flex-direction: column; gap: 12px;"></div>
-            </div>
-
-            <div id="aba-vender" class="conteudo-mercado" style="display: none; padding-top: 10px;">
-                
-                <div style="position: relative; margin-bottom: 20px;">
-                    <label style="font-size: 0.75em; color: #94a3b8; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block;">O que deseja anunciar?</label>
-                    
+        <div class="mercado-body">
+            <div id="mercado-busca-area" class="mercado-busca-area"><label for="mercado-busca">Encontre seu próximo item</label><input id="mercado-busca" type="search" placeholder="Buscar item ou vendedor…" oninput="filtrarMercado()" autocomplete="off"></div>
+            <div id="aba-comprar-ouro" class="conteudo-mercado" role="tabpanel"><div class="mercado-section"><h3>Ofertas em ouro</h3><span>Preço por lote</span></div><div id="lista-ouro" class="mercado-lista"></div><p class="mercado-sem-resultados" hidden>Nenhuma oferta corresponde à busca.</p></div>
+            <div id="aba-comprar-gemas" class="conteudo-mercado" role="tabpanel" style="display:none;"><div class="mercado-section"><h3>Ofertas em gemas</h3><span>Preço por lote</span></div><div id="lista-gemas" class="mercado-lista"></div><p class="mercado-sem-resultados" hidden>Nenhuma oferta corresponde à busca.</p></div>
+            <div id="aba-vender" class="conteudo-mercado" role="tabpanel" style="display:none;">
+                <div class="mercado-section"><h3>Crie seu anúncio</h3><span>Da mochila para o mercado</span></div>
+                <div class="mercado-item-field">
+                    <label for="btn-dropdown-venda">Item da mochila</label>
                     <input type="hidden" id="select-item-venda" value="">
-
-                    <div id="btn-dropdown-venda" onclick="toggleDropdownVenda()" style="width: 100%; padding: 10px 15px; background: linear-gradient(180deg, #1e293b, #0f172a); color: white; border: 1px solid #334155; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; transition: all 0.2s; box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 4px 6px rgba(0,0,0,0.4);">
-                        
-                        <div id="dropdown-venda-selecionado" style="display: flex; align-items: center; gap: 12px; width: 90%; overflow: hidden;">
-                            <div style="width: 38px; height: 38px; background: #020617; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1px dashed #475569;">
-                                <span style="font-size: 1.2em; opacity: 0.3;">📦</span>
-                            </div>
-                            <span style="color: #64748b; font-weight: bold;">Selecionar item...</span>
-                        </div>
-
-                        <span style="color: #94a3b8; font-size: 0.9em; pointer-events: none;">▼</span>
-                    </div>
-
-                    <div id="lista-dropdown-venda" style="display: none; position: absolute; top: 85px; left: 0; right: 0; background: #0f172a; border: 1px solid #3b82f6; border-radius: 10px; max-height: 220px; overflow-y: auto; z-index: 1000; box-shadow: 0 15px 35px rgba(0,0,0,0.95); scrollbar-width: thin; scrollbar-color: #3b82f6 #0f172a;">
-                        </div>
+                    <button type="button" id="btn-dropdown-venda" onclick="toggleDropdownVenda()"><span id="dropdown-venda-selecionado">Selecionar item…</span><span aria-hidden="true">⌄</span></button>
+                    <div id="lista-dropdown-venda" style="display:none;"></div>
                 </div>
-
-                <div style="display: grid; grid-template-columns: 0.8fr 1.2fr 1.5fr; gap: 10px; margin-bottom: 25px;">
-                    <div>
-                        <label style="font-size: 0.7em; color: #94a3b8; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 6px; text-align: center;">Qtd.</label>
-                        <input type="number" id="input-qtd" min="1" value="1" style="width: 100%; padding: 12px 5px; background: #020617; color: #fff; border: 1px solid #334155; border-radius: 8px; outline: none; font-weight: bold; font-size: 1em; text-align: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);">
-                    </div>
-                    <div>
-                        <label style="font-size: 0.7em; color: #94a3b8; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 6px; text-align: center;">Moeda</label>
-                        <div style="position: relative;">
-                            <select id="select-moeda" onchange="calcularTaxaReino()" style="width: 100%; padding: 12px 10px; background: #020617; color: white; border: 1px solid #334155; border-radius: 8px; outline: none; cursor: pointer; font-size: 0.9em; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6); appearance: none; -webkit-appearance: none;">
-                                <option value="ouro">🪙 Ouro</option>
-                                <option value="gema">💎 Gemas</option>
-                            </select>
-                            <span style="position: absolute; right: 10px; top: 12px; pointer-events: none; font-size: 0.8em; color: #64748b;">▼</span>
-                        </div>
-                    </div>
-                    <div>
-                        <label style="font-size: 0.7em; color: #94a3b8; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 6px; text-align: center;">Preço Total</label>
-                        <input type="number" id="input-preco" oninput="calcularTaxaReino()" min="1" placeholder="Ex: 150" style="width: 100%; padding: 12px 10px; background: #020617; color: #facc15; border: 1px solid #ca8a04; border-radius: 8px; box-sizing: border-box; outline: none; font-weight: bold; font-size: 1em; text-align: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);">
-                    </div>
+                <div class="mercado-fields">
+                    <div><label for="input-qtd">Quantidade</label><input type="number" inputmode="numeric" id="input-qtd" min="1" step="1" value="1"></div>
+                    <div><label for="select-moeda">Receber em</label><select id="select-moeda" onchange="calcularTaxaReino()"><option value="ouro">Ouro</option><option value="gema">Gemas</option></select></div>
+                    <div class="mercado-price-field"><label for="input-preco">Preço total do lote</label><input type="number" inputmode="numeric" id="input-preco" oninput="calcularTaxaReino()" min="1" step="1" placeholder="Ex.: 150"></div><small class="mercado-price-help">Valor por todos os itens, não por unidade.</small>
                 </div>
-
-                <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 10px; border: 1px dashed #334155;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: #9ca3af; margin-bottom: 8px;">
-                        <span>Valor Base:</span> <span id="res-bruto" style="color: white; font-weight: bold;">0</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: #ef4444; margin-bottom: 12px;">
-                        <span>🛡️ Taxa da Coroa (10%):</span> <span id="res-taxa" style="font-weight: bold;">-0</span>
-                    </div>
-                    <div style="border-top: 1px solid #334155; padding-top: 12px; display: flex; justify-content: space-between; font-size: 1.1em; color: #22c55e; font-weight: 900;">
-                        <span>Recebimento Líquido:</span> <span id="res-liquido">0</span>
-                    </div>
+                <div class="mercado-resumo" aria-live="polite">
+                    <div><span>Preço anunciado</span><strong id="res-bruto">0</strong></div>
+                    <div class="mercado-tax"><span>Taxa da Coroa <span class="mercado-tax-badge">10%</span></span><strong id="res-taxa">−0</strong></div>
+                    <div class="mercado-recebe"><span>Você recebe <small>quando o lote for vendido</small></span><strong id="res-liquido">0</strong></div>
                 </div>
-
-                <button onclick="confirmarVenda()" style="width: 100%; padding: 15px; margin-top: 20px; background: linear-gradient(180deg, #16a34a, #14532d); color: white; border: 1px solid #22c55e; font-weight: 900; cursor: pointer; border-radius: 8px; font-size: 1.05em; font-family: 'Cinzel', serif; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: all 0.2s;" onmouseover="this.style.filter='brightness(1.2)';" onmouseout="this.style.filter='brightness(1)';">
-                    Assinar Contrato
-                </button>
+                <div class="mercado-action"><button onclick="confirmarVenda()" class="mercado-publicar">Publicar anúncio <span aria-hidden="true">→</span></button><small>O item fica reservado no mercado até vender ou cancelar.</small></div>
             </div>
-            </div>
-
         </div>
     </div>
 </div>

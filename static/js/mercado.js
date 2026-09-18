@@ -452,32 +452,34 @@ document.addEventListener('click', function(event) {
     }
 });
 
-function mudarAbaMercado(abaId, botaoClicado = null) {
-    const conteudos = document.getElementsByClassName('conteudo-mercado');
-    for (let i = 0; i < conteudos.length; i++) {
-        conteudos[i].style.display = 'none';
-    }
+function mudarAbaMercado(abaId) {
+    document.querySelectorAll('#ui-mercado .conteudo-mercado').forEach(aba => {
+        aba.style.display = aba.id === abaId ? 'block' : 'none';
+    });
+    document.querySelectorAll('#ui-mercado .tab-mercado').forEach(btn => {
+        btn.setAttribute('aria-selected', String(btn.dataset.aba === abaId));
+    });
+    const busca = document.getElementById('mercado-busca-area');
+    if (busca) busca.hidden = abaId === 'aba-vender';
+    const dropdown = document.getElementById('lista-dropdown-venda');
+    if (dropdown) dropdown.style.display = 'none';
+    filtrarMercado();
+}
 
-    const botoes = document.getElementsByClassName('tab-mercado');
-    for (let i = 0; i < botoes.length; i++) {
-        botoes[i].style.background = 'transparent';
-        botoes[i].style.color = '#94a3b8';
-        botoes[i].style.borderBottom = '3px solid transparent';
-    }
-
-    const aba = document.getElementById(abaId);
-    if (aba) aba.style.display = 'block';
-
-    if (!botaoClicado) {
-        botaoClicado = document.querySelector(`.tab-mercado[data-aba="${abaId}"]`);
-    }
-
-    if (botaoClicado) {
-        botaoClicado.style.background = '#1e293b';
-        botaoClicado.style.color = abaId === 'aba-comprar-gemas' ? '#60a5fa' : '#facc15';
-        botaoClicado.style.borderBottom = abaId === 'aba-comprar-gemas'
-            ? '3px solid #60a5fa'
-            : '3px solid #facc15';
+function filtrarMercado() {
+    const normalizar = valor => String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const busca = normalizar(document.getElementById('mercado-busca')?.value);
+    for (const id of ['lista-ouro', 'lista-gemas']) {
+        const lista = document.getElementById(id);
+        if (!lista) continue;
+        const cards = lista.querySelectorAll('.mercado-card');
+        let visiveis = 0;
+        cards.forEach(card => {
+            card.hidden = !normalizar(card.dataset.busca).includes(busca);
+            if (!card.hidden) visiveis++;
+        });
+        const vazio = lista.parentElement.querySelector('.mercado-sem-resultados');
+        if (vazio) vazio.hidden = !busca || !cards.length || visiveis > 0;
     }
 }
 
@@ -896,6 +898,8 @@ async function carregarVitrineMercado() {
             const qtd = Number(anuncio.quantidade || 1);
 
             const card = document.createElement('div');
+            card.className = 'mercado-card';
+            card.dataset.busca = [anuncio.nome_item, anuncio.vendedor, anuncio.item_id].join(' ');
             card.style.cssText = `
                 position:relative;
                 background:linear-gradient(180deg, rgba(15,23,42,.96), rgba(2,6,23,.96));
@@ -1035,6 +1039,7 @@ async function carregarVitrineMercado() {
             data.gemas.forEach(a => listaGemas.appendChild(criarCard(a, '💎')));
         }
 
+        filtrarMercado();
     } catch(e) {
         console.error(e);
         if (window.alertaEldora) window.alertaEldora("Mercado", "Falha ao carregar a vitrine.", "erro");
@@ -1061,7 +1066,7 @@ async function confirmarVenda() {
     if (btnContrato) {
         btnContrato.disabled = true;
         btnContrato.style.opacity = "0.6";
-        btnContrato.innerText = "ASSINANDO...";
+        btnContrato.innerText = "Publicando…";
     }
 
     const charId = localStorage.getItem("jogadorEldoraID");
@@ -1141,7 +1146,7 @@ async function confirmarVenda() {
         if (btnContrato) {
             btnContrato.disabled = false;
             btnContrato.style.opacity = "1";
-            btnContrato.innerText = "ASSINAR CONTRATO";
+            btnContrato.innerText = "Publicar anúncio →";
         }
     }
 }
