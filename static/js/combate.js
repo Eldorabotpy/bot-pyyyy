@@ -1,3 +1,23 @@
+const salasGrupoDevolvidas = new Set();
+let retornoGrupoPendente = false;
+function atualizarBotaoRetornoGrupo() {
+    const botao = document.querySelector('#botoes-fim-batalha button');
+    if (!botao) return;
+    const sala = window.estadoCombateGrupoAtual;
+    const grupo = !!window.salaCombateGrupoAtual && sala?.tipo === 'cacada';
+    const lider = String(sala?.lider_id) === String(localStorage.getItem('jogadorEldoraID'));
+    botao.disabled = grupo && (!lider || retornoGrupoPendente);
+    botao.textContent = grupo ? (lider ? 'Voltar com o grupo ao mapa' : 'Aguardando o líder voltar ao mapa…') : '⬅️ Voltar ao Mapa';
+}
+function receberRetornoGrupo(sala) {
+    const id = String(sala?.sala_id || '');
+    if (!id || id !== String(window.salaCombateGrupoAtual || '')) return;
+    salasGrupoDevolvidas.add(id);
+    if (salasGrupoDevolvidas.size > 50) salasGrupoDevolvidas.delete(salasGrupoDevolvidas.values().next().value);
+    retornoGrupoPendente = false;
+    sairDaArena(true);
+}
+
 // /static/js/combate.js - VERSÃO DEFINITIVA COM TRADUTOR DE SKIN ATUALIZADO
 
 // ==========================================
@@ -387,7 +407,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
 
         if (dados.erro) {
             alert("AVISO DO SERVIDOR: " + dados.erro);
-            if(typeof sairDaArena === 'function') sairDaArena();
+            if(typeof sairDaArena === 'function') sairDaArena(true);
             return;
         }
 
@@ -558,7 +578,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
     } catch(e) {
 
         alert("🚨 CRASH NO JAVASCRIPT: " + e.message);
-        if(typeof sairDaArena === 'function') sairDaArena();
+        if(typeof sairDaArena === 'function') sairDaArena(true);
     }
 }
 
@@ -841,6 +861,7 @@ window.iniciarAutoCombateCacada = function() {
 };
 
 window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = null, targetId = null) {
+    const salaDaAcao = window.salaCombateGrupoAtual;
 
     // Segurança extra: em combate de grupo, só deixa agir se for sua vez
     if (window.estadoCombateGrupoAtual && window.estadoCombateGrupoAtual.turno_atual) {
@@ -903,6 +924,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         if (!res.ok) throw new Error(`Crash no Servidor (Status ${res.status})`);
 
         const turno = await res.json();
+        if (salaDaAcao && (String(window.salaCombateGrupoAtual) !== String(salaDaAcao) || salasGrupoDevolvidas.has(String(salaDaAcao)))) return;
 
         if (turno.erro) {
             window.bloqueioDeTurno = false;
@@ -926,7 +948,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
 
             setTimeout(() => {
                 window.bloqueioDeTurno = false;
-                sairDaArena();
+                sairDaArena(true);
             }, 1500);
 
             return;
@@ -937,8 +959,9 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
     } catch(e) {
         window.bloqueioDeTurno = false;
         console.error(e);
+        if (salaDaAcao && String(window.salaCombateGrupoAtual) !== String(salaDaAcao)) return;
         alert("🚨 Erro Crítico de Conexão: " + e.message);
-        sairDaArena();
+        sairDaArena(true);
     }
 }
 
@@ -1071,7 +1094,9 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
         atualizarVisualBarra('bar-mp-player', db.playerMpAtual, db.playerMpMax, true);
     }
 
+    const salaDaAnimacao = window.salaCombateGrupoAtual;
     function lerProximoLog() {
+        if (salaDaAnimacao && (String(window.salaCombateGrupoAtual) !== String(salaDaAnimacao) || salasGrupoDevolvidas.has(String(salaDaAnimacao)))) return;
         if (indexAcao >= turnoInfo.log.length) {
             window.bloqueioDeTurno = false;
 
@@ -1353,6 +1378,9 @@ function rodarAnimacaoLevelUp(novoNivel) {
 }
 
 function finalizarAnimacaoCombate(dados) {
+    if (window.salaCombateGrupoAtual && window.estadoCombateGrupoAtual) {
+        window.estadoCombateGrupoAtual.estado = dados.vitoria ? 'vitoria' : 'derrota';
+    }
     const log1 = document.getElementById('log-texto-1');
     const log2 = document.getElementById('log-texto-2');
 
@@ -1391,6 +1419,7 @@ function finalizarAnimacaoCombate(dados) {
     
     document.getElementById('menu-botoes').style.display = "none";
     document.getElementById('botoes-fim-batalha').style.display = "flex";
+    atualizarBotaoRetornoGrupo();
 
     // 🤖 AUTO FARM
     // Se a batalha veio da Auto Caçada, volta ao mapa sozinho.
@@ -1456,7 +1485,26 @@ function tremerArena() {
     setTimeout(() => arena.classList.remove('shake-animation'), 300);
 }
 
-function sairDaArena() {
+function sairDaArena(retornoConfirmado = false) {
+    const sala = window.estadoCombateGrupoAtual;
+    if (!retornoConfirmado && window.salaCombateGrupoAtual && sala?.tipo === 'cacada') {
+        if (String(sala.lider_id) !== String(localStorage.getItem('jogadorEldoraID')) || retornoGrupoPendente) return;
+        const socket = window.eldoraSocket || window.socket;
+        if (!socket?.connected) { window.alertaEldora?.('Grupo', 'Aguarde a conexão voltar para retornar com o grupo.', 'erro'); return; }
+        const salaId = window.salaCombateGrupoAtual;
+        retornoGrupoPendente = true;
+        atualizarBotaoRetornoGrupo();
+        socket.timeout(8000).emit('retornarGrupoMapa', {sala_id:salaId}, (erro, resposta) => {
+            if (String(window.salaCombateGrupoAtual) !== String(salaId)) return;
+            retornoGrupoPendente = false;
+            if (!erro && resposta?.success) receberRetornoGrupo(resposta.sala);
+            else {
+                atualizarBotaoRetornoGrupo();
+                window.alertaEldora?.('Grupo', resposta?.error || 'Não foi possível confirmar o retorno. Tente novamente.', 'erro');
+            }
+        });
+        return;
+    }
     fecharSeletorAlvoGrupo();
     if (window.AudioManager) {
         window.AudioManager.pararTudo();
@@ -2389,7 +2437,7 @@ function normalizarIdCombateGrupo(valor) {
 function extrairSalaPayloadGrupo(dados) {
     if (!dados) return null;
     if (dados.sala) return dados.sala;
-    if (dados.sala_id && dados.turno_atual) return dados;
+    if (dados.sala_id && dados.membros_ids) return dados;
     return null;
 }
 
@@ -2433,7 +2481,11 @@ function aplicarEstadoCombateGrupo(dados, origem = "socket") {
         dados.sala_id || dados.salaId || (sala && sala.sala_id) || window.salaCombateGrupoAtual
     );
 
-    if (!salaIdPayload) return false;
+    if (!salaIdPayload || salasGrupoDevolvidas.has(salaIdPayload)) return false;
+    if (!window.salaCombateGrupoAtual) return false;
+    if (sala?.retorno_mapa && salaIdPayload === String(window.salaCombateGrupoAtual)) {
+        receberRetornoGrupo(sala); return true;
+    }
 
     if (
         window.salaCombateGrupoAtual &&
@@ -2487,6 +2539,9 @@ function aplicarEstadoCombateGrupo(dados, origem = "socket") {
             }
         }
 
+        const fimVisivel = document.getElementById('botoes-fim-batalha')?.style.display === 'flex';
+        atualizarBotaoRetornoGrupo();
+        if (fimVisivel && !dados.recompensas) return true;
         finalizarAnimacaoCombate({
             vitoria: estado === "vitoria" || (window.dadosCombateAtual && window.dadosCombateAtual.mobHpAtual <= 0),
             derrota: estado === "derrota",
@@ -2517,6 +2572,14 @@ function registrarSocketCombateGrupo(tentativa = 0) {
     if (socketCombateGrupo.__combateGrupoRegistrado) return;
     socketCombateGrupo.__combateGrupoRegistrado = true;
 
+    socketCombateGrupo.on('grupoRetornouMapa', receberRetornoGrupo);
+    const recuperarRetorno = () => {
+        if (window.salaCombateGrupoAtual && socketCombateGrupo.connected && ['vitoria','derrota','cancelada'].includes(window.estadoCombateGrupoAtual?.estado)) {
+            socketCombateGrupo.emit('solicitarEstadoSala', {sala_id:window.salaCombateGrupoAtual});
+        }
+    };
+    socketCombateGrupo.on('connect', recuperarRetorno);
+    setInterval(recuperarRetorno, 3000);
     socketCombateGrupo.off('convocarCombateGrupo');
     socketCombateGrupo.on('convocarCombateGrupo', async function(dados) {
         console.log("🤝 Convocado para combate em grupo:", dados);
@@ -2526,6 +2589,13 @@ function registrarSocketCombateGrupo(tentativa = 0) {
             return;
         }
 
+        if (salasGrupoDevolvidas.has(String(dados.sala_id))) return;
+        const anterior = window.estadoCombateGrupoAtual;
+        if (window.salaCombateGrupoAtual && String(window.salaCombateGrupoAtual) !== String(dados.sala_id)) {
+            if (!['vitoria','derrota','cancelada'].includes(anterior?.estado)) return;
+            salasGrupoDevolvidas.add(String(window.salaCombateGrupoAtual));
+            sairDaArena(true);
+        }
         window.salaCombateGrupoAtual = normalizarIdCombateGrupo(dados.sala_id);
         window.estadoCombateGrupoAtual = dados.sala || null;
 

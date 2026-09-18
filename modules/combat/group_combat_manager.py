@@ -472,6 +472,7 @@ def pacote_estado_sala(sala_id: str) -> Optional[Dict[str, Any]]:
         "tipo": sala["tipo"],
         "estado": sala["estado"],
         "grupo_id": sala.get("grupo_id"),
+        "retorno_mapa": bool(sala.get("retorno_mapa")),
         "lider_id": sala.get("lider_id"),
         "membros_ids": sala.get("membros_ids", []),
         "membros_prontos": sala.get("membros_prontos", {}),
@@ -565,6 +566,19 @@ def encerrar_sala(sala_id: str, estado: str = ESTADO_CANCELADA, remover: bool = 
     if remover:
         return batalhas_grupo_ativas.pop(sala_id, None)
     return sala
+
+
+def retornar_grupo_ao_mapa(sala_id: str, solicitante_id: str):
+    sala = obter_sala(sala_id)
+    if not sala or sala.get('tipo') != TIPO_CACADA:
+        raise ValueError('Caçada em grupo não encontrada.')
+    if str(solicitante_id) != str(sala.get('lider_id')):
+        raise ValueError('Apenas o líder pode levar o grupo de volta ao mapa.')
+    if sala.get('estado') not in (ESTADO_VITORIA, ESTADO_DERROTA, ESTADO_CANCELADA):
+        raise ValueError('Aguarde o fim do combate para voltar ao mapa.')
+    sala['retorno_mapa'] = True
+    sala['atualizado_em'] = _agora()
+    return pacote_estado_sala(sala_id)
 
 
 def limpar_salas_antigas(max_idade_segundos: int = 60 * 60) -> int:

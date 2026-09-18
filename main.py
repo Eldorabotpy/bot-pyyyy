@@ -433,6 +433,16 @@ def iniciar_combate():
     try:
         data = request.json
         user_id = data.get('user_id')
+        if data.get('sala_id'):
+            sala_convocada = gcm.obter_sala(data['sala_id'])
+            if (not sala_convocada or sala_convocada.get('retorno_mapa') or
+                    str(user_id) not in list(map(str, sala_convocada.get('membros_ids', [])))):
+                return jsonify({'erro': 'Convocação expirada ou jogador fora desta caçada.'}), 403
+        else:
+            sala_em_curso = gcm.obter_sala_do_jogador(str(user_id))
+            if sala_em_curso and sala_em_curso.get('spawn_id') != data.get('spawn_id'):
+                return jsonify({'erro': 'Seu grupo já está em outra caçada.'}), 409
+
         spawn_id = data.get('spawn_id')
 
         # 🔍 Busca o jogador no banco de dados
@@ -981,21 +991,25 @@ def handle_aceitar_grupo(dados):
     else:
         emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': f'⚠️ {msg}', 'tipo': 'erro'}, room=sid)
 
+@socketio.on('retornarGrupoMapa')
+def retornar_grupo_mapa(data):
+    jogador = jogadores_online.get(request.sid) or {}
+    try:
+        pacote = gcm.retornar_grupo_ao_mapa((data or {}).get('sala_id'), jogador.get('char_id'))
+    except ValueError as erro:
+        return {'success': False, 'error': str(erro)}
+    gcm.emitir_para_membros(socketio, pacote['sala_id'], 'grupoRetornouMapa', pacote, jogadores_online)
+    return {'success': True, 'sala': pacote}
+
+
 @socketio.on('solicitarEstadoSala')
 def solicitar_estado_sala(data):
-
-    sala_id = data.get("sala_id")
-
+    sala_id = (data or {}).get('sala_id')
     sala = gcm.obter_sala(sala_id)
-
-    if not sala:
+    jogador = jogadores_online.get(request.sid) or {}
+    if not sala or str(jogador.get('char_id')) not in list(map(str, sala.get('membros_ids', []))):
         return
-
-    emit(
-        "estadoSalaGrupo",
-        gcm.pacote_estado_sala(sala_id),
-        to=request.sid
-    )                     
+    emit('estadoSalaGrupo', gcm.pacote_estado_sala(sala_id), to=request.sid)
 
 @socketio.on('sairGrupo')
 def handle_sair_grupo(dados):
