@@ -1739,8 +1739,7 @@
             htmlPronta = `
                 <div class="guild-pronta-aviso">
                     ✅ Contrato concluído!
-                    Fale com Lyria para receber
-                    sua recompensa.
+                    ${coletiva && !podeGerenciarCla ? 'Aguarde um líder ou oficial com permissão entregar o contrato à Lyria. As medalhas serão creditadas aos participantes que atingiram o mínimo.' : 'Fale com Lyria para entregar o contrato e receber as recompensas.'}
                 </div>
             `;
         }
@@ -1868,7 +1867,7 @@
                             "
                             disabled
                         >
-                            👑 AGUARDANDO ENTREGA
+                            👑 AGUARDANDO LÍDER / OFICIAL
                         </button>
                     `;
                 }

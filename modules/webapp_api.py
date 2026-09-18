@@ -1734,6 +1734,8 @@ def api_usar_item_direto():
             
         item_obj = inventario[item_uid]
         base_id = item_obj.get("base_id", item_uid) if isinstance(item_obj, dict) else item_uid
+        if base_id == 'carta_recomendacao':
+            return jsonify({'erro': 'Apresente esta carta à recepcionista da Guilda. Ela será recolhida no seu registro.'}), 400
         quantidade = item_obj.get("quantity", item_obj) if isinstance(item_obj, dict) else item_obj
         info_item = items_data.ITEMS_DATA.get(base_id, {})
         
@@ -6272,6 +6274,29 @@ def api_clan_atualizar_configuracoes():
 # 🔐 ACESSO À GUILDA DOS AVENTUREIROS
 # ============================================================
 
+def _recolher_carta_guilda(player_id, concluir=False):
+    jogador = users_collection.find_one({'_id': player_id}, {'inventory': 1, 'guild_intro_seen': 1})
+    if not jogador or (not concluir and not jogador.get('guild_intro_seen')):
+        return False
+    cartas = [chave for chave, item in (jogador.get('inventory') or {}).items()
+              if chave == 'carta_recomendacao' or
+              (isinstance(item, dict) and item.get('base_id') == 'carta_recomendacao')]
+    if not cartas and not concluir:
+        return False
+    atualizacao = {'$set': {'guild_intro_seen': True}}
+    if cartas:
+        atualizacao['$unset'] = {f'inventory.{chave}': '' for chave in cartas}
+    filtro = {'_id': player_id}
+    if not concluir:
+        filtro['guild_intro_seen'] = True
+    resultado = users_collection.update_one(filtro, atualizacao)
+    if resultado.matched_count != 1:
+        raise ValueError('Não foi possível registrar a apresentação na Guilda.')
+    from modules.player.core import clear_player_cache
+    _run_async(clear_player_cache(player_id))
+    return bool(cartas)
+
+
 def _status_acesso_guilda(
     user_id
 ):
@@ -6402,6 +6427,8 @@ def _status_acesso_guilda(
     )
 
 
+    carta_recolhida = _recolher_carta_guilda(busca_id) if liberado and apresentacao_concluida else False
+
     if nivel < 20:
 
         mensagem = (
@@ -6447,6 +6474,8 @@ def _status_acesso_guilda(
                 and
                 not apresentacao_concluida
             ),
+
+        "carta_recolhida": carta_recolhida,
 
         "apresentacao_concluida":
             apresentacao_concluida,
@@ -6565,21 +6594,11 @@ def api_guild_concluir_apresentacao():
         }), 400
 
 
-    users_collection.update_one(
-        {
-            "_id": busca_id
-        },
-        {
-            "$set": {
-                "guild_intro_seen":
-                    True
-            }
-        }
-    )
-
+    carta_recolhida = _recolher_carta_guilda(busca_id, concluir=True)
 
     return jsonify({
         "success": True,
+        "carta_recolhida": carta_recolhida,
 
         "message":
             "Registro concluído. "

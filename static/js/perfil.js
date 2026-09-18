@@ -1394,6 +1394,9 @@ window.abrirModalItem = function(idAlvo, origem) {
                 <button onclick="equiparPocaoAtalho('${idReal}', 'mp')" style="flex:1; padding:10px; background: linear-gradient(180deg, #2980b9 0%, #1f618d 100%); color:white; border:1px solid #3498db; border-radius:4px; font-weight:bold; cursor:pointer;">Slot 💧</button>
             `;
         }
+        else if (idReal === 'carta_recomendacao') {
+            botoesHtml = '<div style="padding:12px;color:#e6d2a6;">📜 Apresente esta carta à recepcionista da Guilda dos Aventureiros. Ela será recolhida automaticamente no seu registro.</div>';
+        }
         else if (t === 'reagent') {
 
             botoesHtml = `

@@ -656,6 +656,7 @@ class MapaScene extends Phaser.Scene {
                         return dados;
                     })
                     .then(dados => {
+                        if (dados.carta_recolhida) window.carregarMeuPerfil?.();
 
                         // ==================================
                         // 🔒 AINDA NÃO É AVENTUREIRO
@@ -725,11 +726,9 @@ class MapaScene extends Phaser.Scene {
                                     !resultado.success
                                 ) {
 
-                                    console.error(
-                                        "❌ Falha ao registrar apresentação da Guilda:",
-                                        resultado
-                                    );
+                                    throw new Error(resultado.error || 'Não foi possível registrar a carta. Fale novamente com a recepcionista.');
                                 }
+                                await window.carregarMeuPerfil?.();
                             })
                             .catch(erro => {
 
@@ -737,6 +736,7 @@ class MapaScene extends Phaser.Scene {
                                     "❌ Erro ao registrar apresentação da Guilda:",
                                     erro
                                 );
+                                window.alertaEldora?.('Registro da Guilda', 'Não foi possível concluir o registro. Fale novamente com a recepcionista.', 'erro');
                             });
 
 
