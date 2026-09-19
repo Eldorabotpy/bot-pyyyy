@@ -313,6 +313,10 @@ def dividir_recompensas_grupo(char_id, xp_total, gold_total):
                     f"{erro_boost}"
                 )
 
+            from modules.rune_workshop import reward_bonus
+            dados_runas = users_collection.find_one({"_id": membro_oid}) or {}
+            xp_aliado, gold_aliado = reward_bonus(dados_runas, xp_aliado, gold_por_membro)
+
             resultado_player = (
                 users_collection.update_one(
                     {
@@ -321,7 +325,7 @@ def dividir_recompensas_grupo(char_id, xp_total, gold_total):
                     {
                         "$inc": {
                             "xp": xp_aliado,
-                            "gold": gold_por_membro,
+                            "gold": gold_aliado,
                         }
                     },
                 )

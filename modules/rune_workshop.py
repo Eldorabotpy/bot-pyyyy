@@ -10,7 +10,7 @@ def rarity(value):
 
 
 def equipment_item(item, info):
-    return isinstance(item, dict) and not info.get('stackable', False) and info.get('type') not in ('runa', 'material', 'material_runico', 'consumable') and any(k in item for k in ('durability', 'attributes', 'enchantments', 'sockets', 'upgrade_level'))
+    return isinstance(item, dict) and not info.get('stackable', False) and info.get('type', 'equipamento') in ('equipamento', 'equipment', 'weapon', 'armor', 'arma', 'armadura') and any(k in item for k in ('durability', 'attributes', 'enchantments', 'sockets', 'upgrade_level'))
 
 
 def sockets(item):
@@ -96,6 +96,11 @@ def apply_operation(player, data, items):
         for material,count in recipe.items():
             if material!='gold': consume(inv,material,count)
         grant(inv,rune['next_id'],1)
+    elif action=='forjar':
+        import secrets
+        consume(inv,'fragmento_runa_ancestral',7)
+        choices=[rid for rid,r in RUNES_DB.items() if r['tier']==1]
+        grant(inv,secrets.choice(choices),1)
     elif action=='dissolver':
         if not rune: raise ValueError('Runa desconhecida.')
         consume(inv,rid,1);grant(inv,'po_runico',DUST_YIELD[rune['tier']])
@@ -112,3 +117,21 @@ def save_operation(collection, player, data, items):
         query[key]=player[key] if key in player else {'$exists':False}
     result=collection.update_one(query,{'$set':{'inventory':inv,'gold':gold},'$inc':{'rune_revision':1}})
     if result.modified_count!=1: raise ValueError('A mochila mudou durante a operação. Atualize antes de tentar novamente.')
+
+
+def equipped_bonuses(player):
+    from modules.combat.durability import is_item_broken
+    result={}
+    for uid in set((player.get('equipment') or {}).values()):
+        item=(player.get('inventory') or {}).get(uid)
+        if not isinstance(item,dict) or is_item_broken(item): continue
+        for rid in item.get('sockets') or []:
+            rune=RUNES_DB.get(rid)
+            if rune:
+                key=rune['stat_key'];result[key]=result.get(key,0)+rune['value']
+    return result
+
+
+def reward_bonus(player, xp, gold):
+    bonuses=equipped_bonuses(player)
+    return int(xp*(1+bonuses.get('xp_multiplier',0)/100)), int(gold*(1+bonuses.get('gold_multiplier',0)/100))

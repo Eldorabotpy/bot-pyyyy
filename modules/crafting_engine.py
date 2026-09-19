@@ -329,8 +329,18 @@ async def start_craft(user_id: str, recipe_id: str):
 
 
     # 1. Validação de Profissão Inteligente
-    req_prof = rec.get("profession")
-    req_lvl = int(rec.get("level_req", 1))
+    req_prof = (
+        rec.get("profession")
+        or rec.get("profession_req")
+        or rec.get("required_tool_type")
+    )
+
+    req_lvl = int(
+        rec.get(
+            "level_req",
+            1
+        )
+    )
     
     learned = pdata.get("learned_professions", {})
     my_lvl = 0
@@ -345,7 +355,11 @@ async def start_craft(user_id: str, recipe_id: str):
         return f"Requer {str(req_prof).capitalize()} Nível {req_lvl}."
     
     # 2. Validação de Materiais
-    inputs = _as_dict(rec.get("inputs"))
+    inputs = _as_dict(
+        rec.get("inputs")
+        or rec.get("materials")
+        or rec.get("ingredients")
+    )
     if not _has_materials(pdata, inputs):
         return "Materiais insuficientes."
 
@@ -534,6 +548,87 @@ def _secondary_attr_pool(recipe: dict, player_class: str | None) -> List[str]:
         out = ["hp", "defense", "initiative", "luck"]
 
     return out
+
+def _tool_attribute_pool(tool_type: str | None) -> List[str]:
+    """
+    Pool própria para ferramentas de profissão.
+    Esses atributos NÃO são atributos de combate.
+    """
+    return [
+        "velocidade_trabalho",
+        "sorte_oficio",
+        "maestria",
+        "resistencia_ferramenta",
+    ]
+
+
+def _pick_attribute_keys_for_tool(
+    rarity: str,
+    tool_type: str | None
+) -> List[str]:
+    """
+    Ferramentas usam a mesma quantidade de atributos por raridade
+    dos outros equipamentos.
+
+    Comum      = 1
+    Bom        = 2
+    Raro       = 3
+    Épico      = 4
+    Lendário   = 5
+
+    Velocidade de Trabalho é o atributo-base da ferramenta.
+    """
+    target = max(
+        1,
+        _rarity_target_attr_count(rarity)
+    )
+
+    pool = _tool_attribute_pool(
+        tool_type
+    )
+
+    out: List[str] = [
+        "velocidade_trabalho"
+    ]
+
+    if target <= 1:
+        return out
+
+    while len(out) < target:
+
+        deve_repetir = (
+            random.random()
+            < REPEAT_ATTR_CHANCE
+        )
+
+        if deve_repetir and out:
+            out.append(
+                random.choice(out)
+            )
+            continue
+
+        usados = set(out)
+
+        disponiveis = [
+            attr
+            for attr in pool
+            if attr not in usados
+        ]
+
+        if disponiveis:
+            escolhido = random.choice(
+                disponiveis
+            )
+        else:
+            escolhido = random.choice(
+                out
+            )
+
+        out.append(
+            escolhido
+        )
+
+    return out[:target]
 
 def _pick_attribute_keys_for_item(rarity: str, primary_key: str, recipe: dict, player_class: str | None) -> List[str]:
     """
@@ -739,6 +834,55 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     info = _get_item_info(base_id)
     slot = (info.get("slot") or "").lower()
 
+    item_type = str(
+        info.get("type")
+        or ""
+    ).strip().lower()
+
+    is_tool = (
+        item_type in {
+            "tool",
+            "ferramenta"
+        }
+        or slot == "tool"
+    )
+
+    if is_tool:
+
+        dur_atual, dur_max = _as_tuple_2(
+            info.get("durability"),
+            (20, 20)
+        )
+
+        new_item["durability"] = [
+            dur_atual,
+            dur_max
+        ]
+
+        # Ferramentas não recebem sockets de runa.
+        new_item["sockets"] = []
+
+        new_item["type"] = "tool"
+
+        new_item["tool_type"] = str(
+            info.get("tool_type")
+            or recipe.get("profession")
+            or recipe.get("profession_req")
+            or recipe.get("required_tool_type")
+            or ""
+        ).strip().lower()
+
+        new_item["tier"] = max(
+            1,
+            int(
+                info.get(
+                    "tier",
+                    1
+                )
+                or 1
+            )
+        )
+
     if isinstance(recipe.get("class_req"), (list, tuple)) and recipe["class_req"]:
         target_class = str(recipe["class_req"][0]).strip().lower()
     else:
@@ -757,7 +901,12 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
         "curandeiro": "fe" # ou "inteligencia" dependendo do seu sistema
     }
 
-    if _is_weapon_slot(slot):
+    if is_tool:
+
+        primary_attr = "velocidade_trabalho"
+        mirror_dmg = False
+
+    elif _is_weapon_slot(slot):
         primary_attr = CLASS_VISIBLE_PRIMARY_ATTR.get((target_class or ""), "forca")
         mirror_dmg = True # Permite que o atributo dmg seja espelhado
 
@@ -790,7 +939,21 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
             
         mirror_dmg = False
 
-    attr_keys = _pick_attribute_keys_for_item(final_rarity, primary_attr, recipe, target_class)
+    if is_tool:
+
+        attr_keys = _pick_attribute_keys_for_tool(
+            final_rarity,
+            new_item.get("tool_type")
+        )
+
+    else:
+
+        attr_keys = _pick_attribute_keys_for_item(
+            final_rarity,
+            primary_attr,
+            recipe,
+            target_class
+        )
 
     # REMOÇÃO DA LÓGICA DE FORÇAR DMG: 
     # O atributo da classe (Letalidade/Furia) agora é o primeiro encantamento (idx=0).

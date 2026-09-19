@@ -881,6 +881,7 @@ function abrirDetalhesMercado(idVenda) {
                     justify-content:center;
                 ">
                     ${mercadoStatsHtml(d.stats || {})}
+                    ${window.renderRuneDetails?.(d) || ''}
                 </div>
 
                 ${d.durability ? `

@@ -657,6 +657,7 @@ def iniciar_combate():
                             "sala_id": sala["sala_id"],
                             "sala": gcm.pacote_estado_sala(sala["sala_id"])
                         })
+        users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"rune_hunt_active": {"regiao": regiao_atual, "spawn_id": spawn_id}}})
         return jsonify({"estado": estado, "grupo": False})
 
     except Exception:

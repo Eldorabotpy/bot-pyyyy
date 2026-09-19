@@ -451,6 +451,9 @@ def acao_combate_migrada():
         skill_id = data.get('skill_id')
 
         if acao == 'fugir':
+            from modules.player.core import users_collection
+            from bson import ObjectId
+            users_collection.update_one({'_id':ObjectId(user_id)}, {'$unset':{'rune_hunt_active':''}})
             return jsonify({"fugiu": True, "log": [{"autor": "player", "texto": "Fugiste da batalha!"}]})
 
         try:

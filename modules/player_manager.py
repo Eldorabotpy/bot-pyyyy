@@ -332,21 +332,5 @@ except ImportError:
 
 
 def get_rune_bonuses(player_data: dict) -> dict:
-    bonuses = {}
-    if not runes_data:
-        return bonuses
-    equipped = player_data.get("equipment", {})
-    inv = player_data.get("inventory", {})
-    for uid in equipped.values():
-        if not uid:
-            continue
-        item = inv.get(uid)
-        if isinstance(item, dict):
-            for rid in item.get("sockets", []):
-                if not rid:
-                    continue
-                info = runes_data.get_rune_info(rid)
-                if info and "stat_key" in info:
-                    k = info["stat_key"]
-                    bonuses[k] = bonuses.get(k, 0) + info.get("value", 0)
-    return bonuses
+    from modules.rune_workshop import equipped_bonuses
+    return equipped_bonuses(player_data)

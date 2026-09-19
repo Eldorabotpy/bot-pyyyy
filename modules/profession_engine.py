@@ -294,6 +294,177 @@ def get_equipped_tool_for_speed(player_data: dict, profession_key: str):
     return None, None, None
 
 
+def _tool_attribute_total(tool_inst: dict, stat_key: str) -> int:
+    """
+    Soma um atributo especial da ferramenta equipada.
+
+    Compatível com:
+    - enchantments
+    - attributes
+    - stats
+    - atributos repetidos: sorte_oficio_2, maestria_3, etc.
+    """
+    if not isinstance(tool_inst, dict):
+        return 0
+
+    wanted = str(stat_key or "").strip().lower()
+
+    if not wanted:
+        return 0
+
+    for field in ("enchantments", "attributes", "stats"):
+
+        block = tool_inst.get(field)
+
+        if not isinstance(block, dict):
+            continue
+
+        total = 0
+
+        for entry_key, entry_data in block.items():
+
+            real_key = str(
+                entry_key or ""
+            ).strip().lower()
+
+            value = entry_data
+
+            if isinstance(entry_data, dict):
+
+                real_key = str(
+                    entry_data.get("stat")
+                    or entry_key
+                    or ""
+                ).strip().lower()
+
+                value = entry_data.get(
+                    "value",
+                    entry_data.get(
+                        "valor",
+                        0
+                    )
+                )
+
+            if "_" in real_key:
+
+                base, suffix = real_key.rsplit(
+                    "_",
+                    1
+                )
+
+                if suffix.isdigit():
+                    real_key = base
+
+            if real_key != wanted:
+                continue
+
+            try:
+                total += int(
+                    float(
+                        value or 0
+                    )
+                )
+            except Exception:
+                continue
+
+        if total > 0:
+            return total
+
+    return 0
+
+
+def calculate_crafting_quality_bonus(
+    player_data: dict,
+    profession_key: str
+) -> dict:
+    """
+    Calcula quantos pontos percentuais de qualidade
+    podem ser deslocados de Comum para raridades superiores.
+
+    Fontes:
+    - profissão: +0.20 ponto por nível, máximo +10
+    - Sorte de Ofício: +0.25 ponto por atributo, máximo +5
+    - Maestria: +0.15 ponto por atributo, máximo +3
+    - bônus total: máximo +15 pontos
+    """
+    prof_key = _norm_prof_speed_key(
+        profession_key
+    )
+
+    prof_level = get_profession_level_for_speed(
+        player_data,
+        prof_key
+    )
+
+    tool_uid, tool_inst, _ = (
+        get_equipped_tool_for_speed(
+            player_data,
+            prof_key
+        )
+    )
+
+    sorte_pontos = _tool_attribute_total(
+        tool_inst,
+        "sorte_oficio"
+    )
+
+    maestria_pontos = _tool_attribute_total(
+        tool_inst,
+        "maestria"
+    )
+
+    bonus_profissao = min(
+        10.0,
+        prof_level * 0.20
+    )
+
+    bonus_sorte = min(
+        5.0,
+        sorte_pontos * 0.25
+    )
+
+    bonus_maestria = min(
+        3.0,
+        maestria_pontos * 0.15
+    )
+
+    bonus_total = min(
+        15.0,
+        bonus_profissao
+        + bonus_sorte
+        + bonus_maestria
+    )
+
+    return {
+        "profession_key": prof_key,
+        "profession_level": prof_level,
+        "tool_uid": tool_uid,
+
+        "sorte_oficio": sorte_pontos,
+        "maestria": maestria_pontos,
+
+        "bonus_profissao": round(
+            bonus_profissao,
+            3
+        ),
+
+        "bonus_sorte": round(
+            bonus_sorte,
+            3
+        ),
+
+        "bonus_maestria": round(
+            bonus_maestria,
+            3
+        ),
+
+        "quality_bonus_points": round(
+            bonus_total,
+            3
+        ),
+    }
+
+
 def get_profession_key_from_recipe_for_speed(recipe: dict, fallback: str = "ferreiro") -> str:
     if not isinstance(recipe, dict):
         return _norm_prof_speed_key(fallback)
@@ -364,8 +535,12 @@ def calculate_profession_work_duration(
 
     tool_tier = 1
     tool_upgrade = 0
+
     tier_bonus = 0.0
     upgrade_bonus = 0.0
+
+    velocidade_pontos = 0
+    velocidade_bonus = 0.0
 
     if isinstance(tool_info, dict) and isinstance(tool_inst, dict):
         try:
@@ -382,9 +557,30 @@ def calculate_profession_work_duration(
         tier_bonus = min(0.20, max(0, tool_tier - 1) * 0.05)
 
         # +1% por melhoria, máximo 10%
-        upgrade_bonus = min(0.10, tool_upgrade * 0.01)
+        upgrade_bonus = min(
+            0.10,
+            tool_upgrade * 0.01
+        )
 
-    total_reduction = min(0.50, profession_bonus + tier_bonus + upgrade_bonus)
+        # Atributo especial da ferramenta:
+        # +0.5% de velocidade por ponto, máximo 10%.
+        velocidade_pontos = _tool_attribute_total(
+            tool_inst,
+            "velocidade_trabalho"
+        )
+
+        velocidade_bonus = min(
+            0.10,
+            velocidade_pontos * 0.005
+        )
+
+    total_reduction = min(
+        0.50,
+        profession_bonus
+        + tier_bonus
+        + upgrade_bonus
+        + velocidade_bonus
+    )
 
     after_reduction = max(1, int(base_seconds * (1.0 - total_reduction)))
 
@@ -416,7 +612,17 @@ def calculate_profession_work_duration(
         "tool_upgrade": tool_upgrade,
         "tier_bonus": round(tier_bonus, 4),
         "upgrade_bonus": round(upgrade_bonus, 4),
-        "total_reduction": round(total_reduction, 4),
+
+        "velocidade_pontos": velocidade_pontos,
+        "velocidade_bonus": round(
+            velocidade_bonus,
+            4
+        ),
+
+        "total_reduction": round(
+            total_reduction,
+            4
+        ),
         "perk_multiplier": round(perk_multiplier, 4)
     }
 
@@ -543,18 +749,72 @@ def validate_and_consume_profession_tool(
             "error": "Sua ferramenta está quebrada."
         }
 
-    tool_broke = not _consume_tool_durability(tool_inst, durability_cost)
+    resistencia_pontos = _tool_attribute_total(
+        tool_inst,
+        "resistencia_ferramenta"
+    )
+
+    # +1% por ponto.
+    # Máximo de 25% de chance
+    # de preservar a durabilidade.
+    resistencia_chance = min(
+        0.25,
+        resistencia_pontos * 0.01
+    )
+
+    durability_saved = (
+        resistencia_chance > 0
+        and random.random()
+        < resistencia_chance
+    )
+
+    if durability_saved:
+
+        tool_broke = False
+
+    else:
+
+        tool_broke = not _consume_tool_durability(
+            tool_inst,
+            durability_cost
+        )
 
     msg = ""
-    if tool_broke:
-        msg = " Sua ferramenta quebrou."
+
+    if durability_saved:
+
+        msg = (
+            " A resistência da ferramenta "
+            "preservou a durabilidade."
+        )
+
+    elif tool_broke:
+
+        msg = (
+            " Sua ferramenta quebrou."
+        )
 
     return {
         "ok": True,
+
         "tool_uid": uid,
         "tool_type": required_tool_type,
         "tool_tier": tool_tier,
+
         "tool_broke": tool_broke,
+
+        "durability_saved":
+            durability_saved,
+
+        "resistencia_pontos":
+            resistencia_pontos,
+
+        "resistencia_chance":
+            round(
+                resistencia_chance,
+                4
+            ),
+
         "message": msg
     }
 

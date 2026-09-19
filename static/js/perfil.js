@@ -65,6 +65,8 @@ window.getCaminhosImagemItemEldora = function(item) {
 window.aplicarImagemItemEldora = function(imgEl, item) {
     if (!imgEl) return;
 
+    const runeFamily = String(item?.base_id || item?.id || '').match(/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_/);
+    if (runeFamily) { imgEl.src = `/static/assets/runas/${runeFamily[1]}.svg`; return; }
     const caminhos = window.getCaminhosImagemItemEldora(item);
     let index = 0;
 
@@ -620,6 +622,7 @@ async function carregarMeuPerfil() {
                             border-radius: 8px; display: flex; justify-content: center; align-items: center; 
                             cursor: ${eq.vazio ? 'default' : 'pointer'}; box-shadow: 0 4px 8px rgba(0,0,0,0.6);">
                     ${visualItem}
+                    ${window.renderRuneSockets?.(eq) || ''}
                 </div>`;
         });
 
@@ -1100,6 +1103,7 @@ window.filtrarMochila = function(filtro) {
                     x${item.qtd || item.quantidade || 1}
                 </div>
                 
+                ${window.renderRuneSockets?.(item) || ''}
                 ${item.refino > 0 ? `<div style="position: absolute; top: -5px; left: -5px; background: #eab308; color: #000; font-size: 0.65em; font-weight: bold; padding: 2px 4px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">+${item.refino}</div>` : ''}
             </div>
         `;
@@ -1456,7 +1460,16 @@ window.abrirModalItem = function(idAlvo, origem) {
     
     botoesHtml += `<button onclick="fecharModalItem()" style="flex:1; padding:10px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); color:white; border:1px solid #475569; border-radius:4px; font-weight:bold; cursor:pointer;">Fechar</button>`;
     
+    if (itemData.rune_slots?.length) {
+        document.getElementById('modal-item-stats').insertAdjacentHTML('beforeend', window.renderRuneDetails(itemData));
+    }
     document.getElementById('modal-item-acoes').innerHTML = botoesHtml;
+    if (itemData.rune_slots?.length) {
+        const manage = document.createElement('button');
+        manage.className = 'rune-manage'; manage.textContent = 'Gerenciar runas na Forja';
+        manage.onclick = () => window.abrirOficinaRunas(itemData.uid || itemData.id);
+        document.getElementById('modal-item-acoes').appendChild(manage);
+    }
     document.getElementById('modal-item').style.display = 'flex';
 }
 

@@ -958,7 +958,8 @@ def obter_perfil(user_id):
                     "attributes": obj_item.get("attributes", {}),
                     "enchantments": obj_item.get("enchantments", {}),
                     "damage": obj_item.get("damage", {}),
-                    "durability": obj_item.get("durability")
+                    "durability": obj_item.get("durability"),
+                    **_rune_item_view(obj_item, info_item)
                 })
         inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 
@@ -1073,7 +1074,8 @@ def obter_perfil(user_id):
                     "enchantments": obj_item.get("enchantments", {}),
                     "damage": obj_item.get("damage", {}),
                     "desc": info_item.get("description", obj_item.get("description", "Um item de Eldora.")),
-                    "durability": obj_item.get("durability")
+                    "durability": obj_item.get("durability"),
+                    **_rune_item_view(obj_item, info_item)
                 })
             else:
                 equip_formatado.append(_slot_vazio(slot, SLOT_EMOJI.get(slot, "🔲"), "Vazio"))
@@ -1147,6 +1149,7 @@ def obter_perfil(user_id):
                     "damage": obj_item.get("damage", {}),
                     "desc": info_item.get("description", obj_item.get("description", nome_slot)),
                     "durability": obj_item.get("durability"),
+                    **_rune_item_view(obj_item, info_item),
                     "tool_type": prof_key,
                     "tier": info_item.get("tier", obj_item.get("tier", 1)),
                     "tool_tier": info_item.get("tier", obj_item.get("tier", 1))
@@ -2199,6 +2202,7 @@ def api_listar_mercado():
                 "classe": detalhe.get('class_req', info_real.get('class_req', info_real.get('class', 'Livre'))),
                 "descricao": info_real.get('description', detalhe.get('description', '')),
                 "stats": _formatar_stats_item_para_front(detalhe or info_real),
+                **_rune_item_view(detalhe, info_real),
             })
             card_anuncio = {
                 "id_venda": anuncio['_id'],
@@ -7207,12 +7211,19 @@ def api_guild_cla_resgatar_missao():
         }), 500
 
 # --- Oficina de runas ---
-from modules.rune_workshop import item_view as _rune_item_view
+from modules.rune_workshop import item_view, equipment_item
+
+def _rune_item_view(item, info=None):
+    return item_view(item) if equipment_item(item, info or {}) else {}
 
 @webapp_bp.route('/api/runas/<user_id>', methods=['GET'])
 def api_runas_estado(user_id):
     from modules.rune_workshop import state_view
-    player = users_collection.find_one({'_id': _forja_parse_user_id(user_id)})
+    try:
+        uid = _forja_parse_user_id(user_id)
+    except (ValueError, TypeError):
+        return jsonify({'success':False,'error':'Personagem inválido.'}),400
+    player = users_collection.find_one({'_id':uid})
     if not player:
         return jsonify({'success':False,'error':'Herói não encontrado.'}),404
     return jsonify({'success':True, **state_view(player,items_data.ITEMS_DATA)})
@@ -7228,7 +7239,12 @@ def api_runas_operar():
         player=users_collection.find_one({'_id':uid})
         if not player: return jsonify({'success':False,'error':'Herói não encontrado.'}),404
         room=gcm.obter_sala_do_jogador(str(uid))
-        if player.get('rune_hunt_active') or (room and room.get('estado') in ('aguardando','em_andamento')):
+        from flask import current_app
+        hunt=player.get('rune_hunt_active') or {}
+        world=current_app.config.get('SISTEMA_CACADA')
+        mob=(world.mobs_vivos.get(hunt.get('regiao'),{}).get(hunt.get('spawn_id'),{}) if world and hunt else {})
+        solo_active=bool(hunt and (not world or int(mob.get('hp_atual',0))>0) and int(player.get('current_hp',0))>0)
+        if solo_active or (room and room.get('estado') in ('aguardando','em_andamento')):
             raise ValueError('Volte ao mapa antes de alterar runas.')
         save_operation(users_collection,player,data,items_data.ITEMS_DATA)
         _run_async(player_manager.clear_player_cache(str(uid)))

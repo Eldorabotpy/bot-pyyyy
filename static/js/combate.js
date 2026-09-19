@@ -306,6 +306,7 @@ async function avisarProntoCombateGrupo() {
 // INICIAR COMBATE (DOM MANIPULATION) 
 // ==========================================
 window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
+    await window.fecharOficinaRunasParaCombate?.();
     // ==========================================
     // 🛡️ TRAVA ANTI-CLIQUE FANTASMA 🛡️
     // ==========================================

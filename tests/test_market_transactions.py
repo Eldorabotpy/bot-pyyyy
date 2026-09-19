@@ -120,7 +120,7 @@ class MarketTests(unittest.TestCase):
    with self.assertRaises(self.m.InvalidListing):self.sell(item_id=base,qty=1)
    self.assertEqual(before,self.db.data)
  def test_unique_data_preserved(self):
-  item={'base_id':'sword','upgrade_level':7,'rarity':'epico','durability':[20,50],'attributes':{'attack':90}}
+  item={'base_id':'sword','upgrade_level':7,'rarity':'epico','durability':[20,50],'attributes':{'attack':90},'sockets':['runa_vampiro_menor',None]}
   self.db['users'].docs[0]['inventory']['uuid']=copy.deepcopy(item)
   l=self.sell(item_id='uuid',qty=1);self.buy(l)
   self.assertIn(item,self.db['users'].docs[1]['inventory'].values())
@@ -150,15 +150,17 @@ class MarketTests(unittest.TestCase):
   self.assertEqual(before,self.db.data)
  def test_listing_api_details(self):
   import ast
-  item={'base_id':'sword','upgrade_level':7,'rarity':'epico','durability':[20,50],'attributes':{'attack':90}}
+  item={'base_id':'sword','upgrade_level':7,'rarity':'epico','durability':[20,50],'attributes':{'attack':90},'sockets':['runa_vampiro_menor',None]}
   self.db['users'].docs[0]['inventory']['uuid']=copy.deepcopy(item)
   listing=self.sell(item_id='uuid',qty=1)
   fake_manager=types.SimpleNamespace(list_active=lambda **kw:[copy.deepcopy(listing)],listing_total=self.m.listing_total)
   tree=ast.parse((ROOT/'modules/webapp_api.py').read_text(encoding='utf-8-sig'))
-  names={'api_listar_mercado','_formatar_stats_item_para_front','_json_seguro_mongo'}
+  names={'api_listar_mercado','_formatar_stats_item_para_front','_json_seguro_mongo','_rune_item_view'}
   nodes=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in names]
   for n in nodes:n.decorator_list=[]
   ns={'copy':copy,'ObjectId':ObjectId,'market_manager':fake_manager,'items_data':types.SimpleNamespace(ITEMS_DATA={'sword':{'type':'weapon','display_name':'Espada','description':'Teste'}}),'jsonify':lambda x:x}
+  from modules.rune_workshop import item_view,equipment_item
+  ns.update(item_view=item_view,equipment_item=equipment_item)
   exec(compile(ast.Module(body=nodes,type_ignores=[]),'<api-list>','exec'),ns)
   response=ns['api_listar_mercado']();card=response['ouro'][0]
   self.assertEqual(card['quantidade'],1);self.assertEqual(card['preco'],100)
@@ -166,4 +168,8 @@ class MarketTests(unittest.TestCase):
   self.assertEqual(card['item_details']['refino'],7)
   self.assertEqual(card['item_details']['descricao'],'Teste')
   self.assertEqual(card['item_details']['durability'],[20,50])
+  self.assertEqual(card['item_details']['rune_slots'][0]['id'],'runa_vampiro_menor')
+  self.buy(listing)
+  purchased=next(v for v in self.db['users'].docs[1]['inventory'].values() if isinstance(v,dict) and v.get('base_id')=='sword')
+  self.assertEqual(purchased['sockets'],['runa_vampiro_menor',None])
 if __name__=='__main__': unittest.main(verbosity=2)

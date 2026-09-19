@@ -17,22 +17,22 @@ _RECIPES: Dict[str, Dict[str, Any]] = {}
 
 RARITY_ORDER = ("comum", "bom", "raro", "epico", "lendario")
 
-# Padrão Hardcore para Receitas Tier 1
+# Chances base para Receitas Tier 1
 DEFAULT_RARITY_T1 = {
-    "comum": 0.95,      # 95% de chance (Lixo)
-    "bom": 0.049,       # 4.9% de chance
-    "raro": 0.0009,     # 0.09% (Aprox. 1 em 1.100)
-    "epico": 0.00009,   # 0.009% (Aprox. 1 em 11.000)
-    "lendario": 0.00001 # 0.001% (Aprox. 1 em 100.000)
+    "comum": 0.70,
+    "bom": 0.20,
+    "raro": 0.07,
+    "epico": 0.025,
+    "lendario": 0.005,
 }
 
-# Padrão Hardcore para Receitas Tier 2
+# Chances base para Receitas Tier 2
 DEFAULT_RARITY_T2 = {
-    "comum": 0.95,
-    "bom": 0.049,
-    "raro": 0.0009,
-    "epico": 0.00009,
-    "lendario": 0.00001
+    "comum": 0.60,
+    "bom": 0.25,
+    "raro": 0.10,
+    "epico": 0.04,
+    "lendario": 0.01,
 }
 
 def _guess_tier_from_level(level_req: int | None) -> int:

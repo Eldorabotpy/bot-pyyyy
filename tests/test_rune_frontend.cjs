@@ -1,0 +1,10 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync(require('path').join(__dirname,'../static/js/runas.js'),'utf8');
+const ctx={window:{},console};vm.createContext(ctx);vm.runInContext(src,ctx);
+assert.equal(ctx.window.renderRuneSockets({}), '');
+const item={rune_slots:[{name:'Vampiro',icon:'/static/assets/runas/vampiro.svg',desc:'1% de roubo de vida'},null,null]};
+assert.match(ctx.window.renderRuneSockets(item),/Runas 1 de 3/);
+assert.match(ctx.window.renderRuneSockets(item),/vampiro.svg/);
+assert.match(ctx.window.renderRuneDetails(item),/Espaço 2 vazio/);
+assert.doesNotMatch(ctx.window.renderRuneDetails({rune_slots:[{name:'<script>bad</script>',desc:'<img onerror=bad>'}]}),/<script>|<img onerror/);
+console.log('PASS rune slot display, empty slots, images, escaped descriptions');

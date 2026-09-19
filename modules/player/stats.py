@@ -1978,6 +1978,8 @@ async def processar_turno_combate(
         # ✨ ELIXIR DE EXPERIÊNCIA
         # =====================================================
 
+        from modules.rune_workshop import reward_bonus
+        xp_final, ouro_final = reward_bonus(player, xp_final, ouro_final)
         xp_recebido_personagem = xp_final
         xp_boost_ativo = False
 
@@ -2199,6 +2201,7 @@ async def processar_turno_combate(
         {"_id": ObjectId(user_id)},
         {"$set": {
             "current_hp": hp_banco,
+            "rune_hunt_active": None if luta_encerrada else player.get("rune_hunt_active"),
             "current_mp": mp_banco,
             "inventory": inventory,
             "xp": player.get("xp", 0),

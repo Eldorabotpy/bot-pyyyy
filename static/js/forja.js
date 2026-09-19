@@ -907,6 +907,11 @@ const ForjaUI = {
             btn.onclick = () => ForjaEngine.mudarAba(prof);
             container.appendChild(btn);
         });
+        const runasBtn = document.createElement('button');
+        runasBtn.className = 'aba-forja-btn';
+        runasBtn.textContent = '◇ RUNAS';
+        runasBtn.onclick = () => window.abrirOficinaRunas();
+        container.appendChild(runasBtn);
         this.ativarScrollAbas(container);
     },
     
