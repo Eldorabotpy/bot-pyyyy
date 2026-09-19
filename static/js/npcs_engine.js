@@ -493,7 +493,7 @@ window.interagirComNPC = async function(idMissao, nomeNPC, falaInicial, falaInco
                 } else if (typeof window.abrirAba === 'function') {
                     window.abrirAba('profissoes'); // Substitua 'profissoes' pelo ID da sua aba se for diferente
                 } else {
-                    alert("Acesso Liberado! O menu de Profissões do Thorek precisa ser criado/conectado.");
+                    window.avisoEldora("Acesso Liberado! O menu de Profissões do Thorek precisa ser criado/conectado.");
                 }
             } 
            // 🔮 CORREÇÃO DA SELENE (Grimório do Nível 17)
@@ -950,7 +950,7 @@ window.executarEscolhaClasse = async function(classeId, nomeDaClasse) {
 
         } else {
 
-            alert(
+            window.avisoEldora(
                 "A Arquimaga Selene encontrou uma distorção: "
                 + (dados.erro || "Erro desconhecido.")
             );
@@ -963,7 +963,7 @@ window.executarEscolhaClasse = async function(classeId, nomeDaClasse) {
             e
         );
 
-        alert(
+        window.avisoEldora(
             "Erro de conexão ao canalizar a magia."
         );
     }

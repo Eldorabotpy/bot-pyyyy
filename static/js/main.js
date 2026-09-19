@@ -217,8 +217,8 @@ async function abrirArenaDefesa() {
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px;">
-                    <button id="btn-atacar-reino" onclick="alert('Implementaremos o Ataque na Fase 2!')" style="background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%); color: white; border: 1px solid #ef4444; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;">💥 ATACAR</button>
-                    <button onclick="alert('Implementaremos as Magias na Fase 2!')" style="background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); color: white; border: 1px solid #3b82f6; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;">✨ MAGIAS</button>
+                    <button id="btn-atacar-reino" onclick="window.avisoEldora('Implementaremos o Ataque na Fase 2!')" style="background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%); color: white; border: 1px solid #ef4444; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;">💥 ATACAR</button>
+                    <button onclick="window.avisoEldora('Implementaremos as Magias na Fase 2!')" style="background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%); color: white; border: 1px solid #3b82f6; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;">✨ MAGIAS</button>
                 </div>
 
                 <div id="log-defesa" style="background: #020617; padding: 15px; border-radius: 8px; margin-top: 25px; font-family: monospace; color: #a3e635; height: 120px; overflow-y: auto; border-left: 3px solid #65a30d;">

@@ -230,6 +230,7 @@ async def processar_acao_combate(
 
     # --- 7. LOOP DE DANO E LOGS ---
     total_damage = 0
+    hits = []
 
     for i in range(int(num_attacks)):
         dmg_raw, is_crit, is_mega = criticals.roll_damage(
@@ -256,7 +257,10 @@ async def processar_acao_combate(
         else:
             log_messages.append(hit_msg)
 
+        hits.append({"damage": final_hit, "critical": is_crit, "hit_number": i + 1, "log_index": len(log_messages) - 1})
+
     return {
+        "hits": hits,
         "total_damage": total_damage,
         "log_messages": log_messages,
         "num_hits": int(num_attacks),

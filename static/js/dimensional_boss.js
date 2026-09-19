@@ -1473,7 +1473,7 @@
         const perfil = await carregarPerfilDimensionalSePreciso();
 
         if (!perfil) {
-            alert("Não foi possível carregar suas skills.");
+            window.avisoEldora("Não foi possível carregar suas skills.");
             return;
         }
 
@@ -1643,12 +1643,12 @@
 
         if (!ehSuporte) {
             if (!alvo) {
-                alert("Nenhum alvo válido.");
+                window.avisoEldora("Nenhum alvo válido.");
                 return;
             }
 
             if (alvo.tipo === "boss" && bossProtegidoDimensional(evento)) {
-                alert("O Arauto está protegido. Derrote os lacaios primeiro.");
+                window.avisoEldora("O Arauto está protegido. Derrote os lacaios primeiro.");
                 return;
             }
         }
@@ -1667,7 +1667,7 @@
 
         if (!userId) {
             window.bloqueioTurnoDimensional = false;
-            alert("ID do jogador não encontrado.");
+            window.avisoEldora("ID do jogador não encontrado.");
             return;
         }
 
@@ -1689,7 +1689,7 @@
 
             if (!dados.success) {
                 window.bloqueioTurnoDimensional = false;
-                alert(dados.error || "Não foi possível usar a skill.");
+                window.avisoEldora(dados.error || "Não foi possível usar a skill.");
                 return;
             }
 
@@ -1737,7 +1737,7 @@
 
         } catch (e) {
             window.bloqueioTurnoDimensional = false;
-            alert("Erro ao usar skill: " + e.message);
+            window.avisoEldora("Erro ao usar skill: " + e.message);
         }
     };
 
@@ -1746,12 +1746,12 @@
         const alvo = dimensionalAlvoAtual(evento);
 
         if (!alvo) {
-            alert("Nenhum alvo válido.");
+            window.avisoEldora("Nenhum alvo válido.");
             return;
         }
 
         if (alvo.tipo === "boss" && bossProtegidoDimensional(evento)) {
-            alert("O Arauto está protegido. Derrote os lacaios primeiro.");
+            window.avisoEldora("O Arauto está protegido. Derrote os lacaios primeiro.");
             return;
         }
 
@@ -2851,7 +2851,7 @@
         const tela = document.getElementById("tela-dimensional-boss");
 
         if (!tela) {
-            alert("Tela dimensional não encontrada. Verifique o include dimensional_boss.html.");
+            window.avisoEldora("Tela dimensional não encontrada. Verifique o include dimensional_boss.html.");
             return;
         }
 
@@ -3203,7 +3203,7 @@
         const userId = getMeuCharId();
 
         if (!userId) {
-            alert("ID do jogador não encontrado.");
+            window.avisoEldora("ID do jogador não encontrado.");
             return;
         }
 
@@ -3217,7 +3217,7 @@
             const dados = await res.json();
 
             if (!dados.success) {
-                alert(dados.error || "Não foi possível entrar na Fenda.");
+                window.avisoEldora(dados.error || "Não foi possível entrar na Fenda.");
                 return;
             }
 
@@ -3229,7 +3229,7 @@
             }
 
         } catch (e) {
-            alert("Erro ao entrar na Fenda: " + e.message);
+            window.avisoEldora("Erro ao entrar na Fenda: " + e.message);
         }
     };
 
@@ -3272,7 +3272,7 @@
                     "⏳"
                 );
             } else {
-                alert(`A batalha começa automaticamente em ${formatarTempo(tempoRestante)} ou ao completar ${maxJogadores}/${maxJogadores} heróis.`);
+                window.avisoEldora(`A batalha começa automaticamente em ${formatarTempo(tempoRestante)} ou ao completar ${maxJogadores}/${maxJogadores} heróis.`);
             }
 
             return;
@@ -3292,7 +3292,7 @@
 
         if (!userId) {
             window.bloqueioTurnoDimensional = false;
-            alert("ID do jogador não encontrado.");
+            window.avisoEldora("ID do jogador não encontrado.");
             return;
         }
 
@@ -3313,7 +3313,7 @@
 
             if (!dados.success) {
                 window.bloqueioTurnoDimensional = false;
-                alert(dados.error || "Não foi possível atacar.");
+                window.avisoEldora(dados.error || "Não foi possível atacar.");
                 return;
             }
 
@@ -3358,7 +3358,7 @@
 
         } catch (e) {
             window.bloqueioTurnoDimensional = false;
-            alert("Erro ao atacar: " + e.message);
+            window.avisoEldora("Erro ao atacar: " + e.message);
         }
     };
     window.criarBossDimensionalDebug = async function (mapa = null) {

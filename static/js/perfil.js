@@ -877,7 +877,7 @@ window.equiparNovaSkin = async function(skinId) {
             await carregarMeuPerfil(); 
             setTimeout(() => alternarAbaPerfil('skins'), 200);
         } else {
-            alert("Erro: " + data.erro);
+            window.avisoEldora("Erro: " + data.erro);
         }
     } catch (e) { console.error(e); }
 }
@@ -1025,7 +1025,7 @@ window.equiparSkillPerfil = async function(skillId, slotNum) {
         });
         const data = await res.json();
         if (data.sucesso) { carregarMenuMagias(); } 
-        else { alert("Erro: " + data.erro); }
+        else { window.avisoEldora("Erro: " + data.erro); }
     } catch(e) {}
 }
 // ==========================================
@@ -1485,7 +1485,7 @@ window.distribuirPonto = async function(stat) {
         if (!res.ok || !data.sucesso) {
             const msg = data.erro || "Erro ao distribuir ponto.";
             if (window.alertaEldora) window.alertaEldora("Atributos", msg, "erro");
-            else alert("Aviso: " + msg);
+            else window.avisoEldora("Aviso: " + msg);
             return;
         }
 
@@ -1508,7 +1508,7 @@ window.distribuirPonto = async function(stat) {
 
     } catch(e) {
         if (window.alertaEldora) window.alertaEldora("Erro", e.message, "erro");
-        else alert("⚠️ ERRO: " + e.message);
+        else window.avisoEldora("⚠️ ERRO: " + e.message);
     } finally {
         window.__distribuindoPontoPerfil = false;
     }
@@ -1529,8 +1529,8 @@ window.desequiparItem = async function(slot) {
             if (window.carregarDadosDoHUD && document.getElementById('hud-status-flutuante').style.display === 'block') {
                 window.carregarDadosDoHUD();
             }
-        } else { alert("Aviso: " + data.erro); }
-    } catch(e) { alert("⚠️ ERRO: " + e.message); }
+        } else { window.avisoEldora("Aviso: " + data.erro); }
+    } catch(e) { window.avisoEldora("⚠️ ERRO: " + e.message); }
 }
 
 // 👉 ROTA ANTIGA (APENAS PARA ESPADAS E ARMADURAS)
@@ -1549,48 +1549,14 @@ window.usarOuEquiparItem = async function(itemId) {
             if (window.carregarDadosDoHUD && document.getElementById('hud-status-flutuante').style.display === 'block') {
                 window.carregarDadosDoHUD();
             }
-        } else { alert("Aviso: " + data.erro); }
-    } catch(e) { alert("⚠️ ERRO: " + e.message); }
+        } else { window.avisoEldora("Aviso: " + data.erro); }
+    } catch(e) { window.avisoEldora("⚠️ ERRO: " + e.message); }
 }
 
 // ==========================================
 // ALERTA ÉPICO CUSTOMIZADO
 // ==========================================
-window.alertaEldora = function(titulo, mensagem, tipo = 'sucesso') {
-    let modal = document.getElementById('modal-alerta-eldora');
-    if (!modal) {
-        const html = `
-            <div id="modal-alerta-eldora" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:20000; justify-content:center; align-items:center; backdrop-filter: blur(4px);">
-                <div id="alerta-eldora-box" style="background: linear-gradient(135deg, #1a120b, #0a0704); width: 85%; max-width: 320px; border-radius: 12px; border: 2px solid #b8860b; padding: 25px 20px; text-align: center; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.9);">
-                    <div id="alerta-eldora-icone" style="font-size: 3.5em; margin-bottom: 10px;">✨</div>
-                    <h3 id="alerta-eldora-titulo" style="margin: 0 0 10px 0; color: #2ecc71; font-size: 1.4em; font-family: 'Cinzel', serif; text-transform: uppercase;">Sucesso</h3>
-                    <p id="alerta-eldora-msg" style="color: #b0a084; font-size: 0.95em; margin-bottom: 25px; line-height: 1.4;">Mensagem</p>
-                    <button onclick="document.getElementById('modal-alerta-eldora').style.display='none'" style="width: 100%; padding: 12px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); color: white; border: 1px solid #475569; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase;">Entendido</button>
-                </div>
-            </div>`;
-        document.body.insertAdjacentHTML('beforeend', html);
-        modal = document.getElementById('modal-alerta-eldora');
-    }
-
-    const iconeEl = document.getElementById('alerta-eldora-icone');
-    const tituloEl = document.getElementById('alerta-eldora-titulo');
-    const boxEl = document.getElementById('alerta-eldora-box');
-    
-    document.getElementById('alerta-eldora-msg').innerText = mensagem;
-    tituloEl.innerText = titulo;
-
-    if (tipo === 'sucesso') {
-        iconeEl.innerText = '✨'; iconeEl.style.textShadow = '0 0 15px rgba(46, 204, 113, 0.6)';
-        tituloEl.style.color = '#2ecc71'; boxEl.style.borderColor = '#2ecc71';
-    } else if (tipo === 'erro') {
-        iconeEl.innerText = '❌'; iconeEl.style.textShadow = '0 0 15px rgba(231, 76, 60, 0.6)';
-        tituloEl.style.color = '#e74c3c'; boxEl.style.borderColor = '#e74c3c';
-    } else if (tipo === 'pocao') {
-        iconeEl.innerText = '🧪'; iconeEl.style.textShadow = '0 0 15px rgba(52, 152, 219, 0.6)';
-        tituloEl.style.color = '#3498db'; boxEl.style.borderColor = '#3498db';
-    }
-    modal.style.display = 'flex';
-};
+// Os diálogos compartilhados são carregados por dialogos_eldora.js.
 // 👉 FUNÇÃO PARA USAR PERGAMINHOS E CAIXAS
 window.consumirItemDireto = async function(itemId, baseId) {
     fecharModalItem();
@@ -1640,7 +1606,7 @@ window.usarPocaoRapida = async function(tipoSlot) {
             if (typeof atualizarHudCircular === 'function') atualizarHudCircular();
         } else {
             if (window.alertaEldora) window.alertaEldora("Cinto de Poções", data.erro, "erro");
-            else alert(data.erro);
+            else window.avisoEldora(data.erro);
         }
     } catch(e) { console.error("Erro ao beber poção:", e); }
 }
@@ -1848,13 +1814,13 @@ window.repararFerramentaAPI = async function(itemUuid) {
             if (window.alertaEldora) {
                 window.alertaEldora("Reparo Concluído!", data.msg, "sucesso");
             } else {
-                alert(data.msg);
+                window.avisoEldora(data.msg);
             }
         } else {
             if (window.alertaEldora) {
                 window.alertaEldora("Falha no Reparo", data.error, "erro");
             } else {
-                alert(data.error);
+                window.avisoEldora(data.error);
             }
             btn.innerText = textoOriginal;
             btn.disabled = false;

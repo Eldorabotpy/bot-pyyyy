@@ -969,6 +969,38 @@ def _recuperar_recursos_combate(stats, hp, mp, dano_real=0, regenerar=False):
     return hp + min(max(0, max_hp - hp), cura), mp + min(max(0, max_mp - mp), mana)
 
 
+def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
+    """Aplica dano e roubo de vida por golpe, na ordem apresentada ao jogador."""
+    logs = []
+    hits = resultado.get("hits", [])
+    por_log = {hit["log_index"]: hit for hit in hits}
+    for index, texto in enumerate(resultado.get("log_messages", [])):
+        hit = por_log.get(index)
+        if hit is None:
+            logs.append({"autor": "player", "texto": texto, "dano": 0})
+            continue
+        if mob_hp <= 0:
+            break
+        dano = min(mob_hp, max(0, int(hit["damage"])))
+        hp_antes = hp
+        hp, mp = _recuperar_recursos_combate(stats, hp, mp, dano)
+        mob_hp -= dano
+        cura = hp - hp_antes
+        numero = hit["hit_number"]
+        mensagem = f"Ataque {numero}: {dano} de dano. Roubou {cura} de vida."
+        if hit.get("critical"):
+            mensagem = f"Crítico! {mensagem}"
+        logs.append({
+            "autor": "player", "texto": mensagem, "dano": dano,
+            "golpe": numero, "critico": bool(hit.get("critical")),
+            "roubo_vida": cura, "player_hp_apos_golpe": hp,
+            "mob_hp_apos_golpe": mob_hp,
+            "anim_effect": resultado.get("anim_effect", ""),
+            "tipo_skill": resultado.get("tipo_skill", ""),
+        })
+    return hp, mp, mob_hp, logs
+
+
 def _get_skill_data_mesclada(pdata: dict, skill_id: str) -> dict | None:
     """Retorna a skill já mesclada com os dados da raridade do jogador."""
     if not skill_id:
@@ -1616,20 +1648,12 @@ async def processar_turno_combate(
         dano_heroi = int(resultado.get("total_damage", 0) or 0)
         player_mp = int(resultado.get("attacker_mp_left", player_mp))
 
-        for msg in resultado.get("log_messages", []):
-            log_turno.append({
-                "autor": "player",
-                "texto": msg,
-                "dano": dano_heroi if msg == resultado.get("log_messages", [""])[-1] else 0,
-                "anim_effect": resultado.get("anim_effect", ""),
-                "tipo_skill": resultado.get("tipo_skill", ""),
-            })
-
-        hp_antes_cura = player_hp
-        player_hp, player_mp = _recuperar_recursos_combate(player_stats, player_hp, player_mp, min(mob_hp, dano_heroi))
-        if player_hp > hp_antes_cura:
-            log_turno.append({"autor": "sistema", "texto": f"Roubo de vida: +{player_hp - hp_antes_cura} HP", "dano": 0})
-        mob_hp = max(0, mob_hp - dano_heroi)
+        hp_mob_antes = mob_hp
+        player_hp, player_mp, mob_hp, logs_golpes = _aplicar_golpes_combate(
+            resultado, player_stats, player_hp, player_mp, mob_hp
+        )
+        log_turno.extend(logs_golpes)
+        dano_heroi = hp_mob_antes - mob_hp
         mob_vivo["hp_atual"] = mob_hp
 
     recompensas = {"gold": 0, "xp": 0, "itens": []}

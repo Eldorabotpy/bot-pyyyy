@@ -498,6 +498,8 @@
         }
 
     </style>
+    <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
+    <script src="/static/js/dialogos_eldora.js?v=1"></script>
 </head>
 <body>
 
@@ -1067,20 +1069,20 @@
     
     <script>
         // FUNÇÃO DE SEGURANÇA PARA O RESET GLOBAL
-        function resetarServidorInteiro() {
+        async function resetarServidorInteiro() {
             // Trava 1: Alerta visual
-            if(confirm("🚨 ALERTA VERMELHO! 🚨\n\nTens a certeza absoluta de que queres zerar o Passe de TODOS OS JOGADORES do servidor? Esta ação não pode ser desfeita!")) {
+            if(await window.confirmarEldora("🚨 ALERTA VERMELHO! 🚨\n\nTens a certeza absoluta de que queres zerar o Passe de TODOS OS JOGADORES do servidor? Esta ação não pode ser desfeita!")) {
                 
                 // Trava 2: Digitar palavra de confirmação
-                let pass = prompt("Para confirmar o apocalipse, escreve a palavra: RESET");
+                let pass = await window.solicitarTextoEldora("Para confirmar o apocalipse, escreve a palavra: RESET");
                 
                 if (pass === "RESET") {
                     fetch('/admin/reset_global_passe')
                         .then(r => r.json())
-                        .then(data => alert(data.msg))
-                        .catch(e => alert("Erro crítico na comunicação com a base de dados!"));
+                        .then(data => window.avisoEldora(data.msg))
+                        .catch(e => window.avisoEldora("Erro crítico na comunicação com a base de dados!"));
                 } else {
-                    alert("Ação cancelada. A palavra não confere.");
+                    window.avisoEldora("Ação cancelada. A palavra não confere.");
                 }
             }
         }
@@ -1090,7 +1092,7 @@
             const nomeHeroi = document.getElementById('player_name').value.trim();
             
             if (!nomeHeroi) {
-                alert("Por favor, digite o nome do personagem!");
+                window.avisoEldora("Por favor, digite o nome do personagem!");
                 return;
             }
 
@@ -1103,8 +1105,8 @@
             
             fetch(url)
                 .then(r => r.json())
-                .then(data => alert(data.msg))
-                .catch(e => alert("Erro ao conectar com o servidor!"));
+                .then(data => window.avisoEldora(data.msg))
+                .catch(e => window.avisoEldora("Erro ao conectar com o servidor!"));
         }
 
         // ============================================================
@@ -1955,7 +1957,7 @@
                 }
 
 
-                alert(
+                window.avisoEldora(
                     `${dados.message}\n\nSaldo atual: ${dados.novo_saldo_gemas} Gemas`
                 );
 
@@ -1967,7 +1969,7 @@
 
             } catch (erro) {
 
-                alert(
+                window.avisoEldora(
                     `Erro: ${erro.message}`
                 );
             }
@@ -2047,7 +2049,7 @@
                 }
 
 
-                alert(
+                window.avisoEldora(
                     dados.message
                 );
 
@@ -2059,7 +2061,7 @@
 
             } catch (erro) {
 
-                alert(
+                window.avisoEldora(
                     `Erro: ${erro.message}`
                 );
             }
@@ -2285,7 +2287,7 @@
                 erro
             ) {
 
-                alert(
+                window.avisoEldora(
                     "Erro: "
                     + erro.message
                 );
@@ -2296,7 +2298,7 @@
         async function voltarCalendarioRealGuerraGM() {
 
             if (
-                !confirm(
+                !await window.confirmarEldora(
                     "Voltar a Guerra para o calendário real?"
                 )
             ) {
@@ -2342,7 +2344,7 @@
                 erro
             ) {
 
-                alert(
+                window.avisoEldora(
                     "Erro: "
                     + erro.message
                 );
@@ -2353,7 +2355,7 @@
         async function destravarEscalacoesGuerraGM() {
 
             if (
-                !confirm(
+                !await window.confirmarEldora(
                     "Destravar todas as escalações "
                     + "da semana atual?\n\n"
                     + "Os inscritos serão preservados."
@@ -2393,7 +2395,7 @@
                 }
 
 
-                alert(
+                window.avisoEldora(
                     dados.message
                 );
 
@@ -2405,7 +2407,7 @@
                 erro
             ) {
 
-                alert(
+                window.avisoEldora(
                     "Erro: "
                     + erro.message
                 );
@@ -2433,7 +2435,7 @@
 
             if (!nome) {
 
-                alert(
+                window.avisoEldora(
                     "Informe um personagem "
                     + "titular da frente."
                 );
@@ -2443,7 +2445,7 @@
 
 
             const confirmar =
-                confirm(
+                await window.confirmarEldora(
                     "Reiniciar a batalha da frente "
                     + "onde "
                     + nome
@@ -2504,7 +2506,7 @@
                 }
 
 
-                alert(
+                window.avisoEldora(
                     "✅ "
                     + dados.message
                 );
@@ -2523,7 +2525,7 @@
                 );
 
 
-                alert(
+                window.avisoEldora(
                     "Erro:\n"
                     + erro.message
                 );
@@ -2537,7 +2539,7 @@
         async function executarPareamentoGuerraGM() {
 
             const confirmar =
-                confirm(
+                await window.confirmarEldora(
                     "Executar agora o pareamento "
                     + "dos clãs com escalação confirmada?\n\n"
                     + "Somente clãs da mesma categoria "
@@ -2732,7 +2734,7 @@
                 }
 
 
-                alert(
+                window.avisoEldora(
                     texto
                 );
 
@@ -2750,7 +2752,7 @@
                 );
 
 
-                alert(
+                window.avisoEldora(
                     "Erro no pareamento:\n"
                     + erro.message
                 );
@@ -2805,7 +2807,7 @@
 
         async function iniciarInvasaoGM() {
 
-            const confirmar = confirm(
+            const confirmar = await window.confirmarEldora(
                 "⚔️ Iniciar a Invasão do Reino agora?\n\n"
                 + "O evento será disparado manualmente."
             );
@@ -2859,7 +2861,7 @@
 
         async function limparPartiesGM() {
 
-            const confirmar = confirm(
+            const confirmar = await window.confirmarEldora(
                 "🧹 Limpar TODAS as parties existentes?\n\n"        
                 + "Use somente para manutenção ou testes."
             );

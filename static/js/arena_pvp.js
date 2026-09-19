@@ -169,13 +169,13 @@ window.executarAcaoPvP = function(tipoAcao, skillId = null, skillNome = null) {
             skill_id: skillId
         });
     } else {
-        alert("Erro Crítico: Conexão com o servidor perdida!");
+        window.avisoEldora("Erro Crítico: Conexão com o servidor perdida!");
         sairDaArenaPvP();
     }
 };
 
-window.renderSePvP = function() {
-    if(confirm("Tem certeza que deseja se render e perder o duelo?")) {
+window.renderSePvP = async function() {
+    if(await window.confirmarEldora("Tem certeza que deseja se render e perder o duelo?")) {
         executarAcaoPvP('render_se');
     }
 };

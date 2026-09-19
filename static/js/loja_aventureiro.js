@@ -75,13 +75,13 @@ window.mostrarDescricaoMerlin = function(nomeItem, descItem, imgUrl) {
             }
         }, 10);
     } else {
-        alert(`${nomeItem}\n\n${descItem}`);
+        window.avisoEldora(`${nomeItem}\n\n${descItem}`);
     }
 };
 
 window.comprarItemAventureiro = async function(itemId, preco) {
     const charId = localStorage.getItem("jogadorEldoraID");
-    if(!charId) return alert("Sessão não encontrada. Faça login novamente.");
+    if(!charId) return window.avisoEldora("Sessão não encontrada. Faça login novamente.");
 
     try {
         const res = await fetch('/api/loja/comprar', {
@@ -94,10 +94,10 @@ window.comprarItemAventureiro = async function(itemId, preco) {
     
         if (dados.erro) {
             if (window.alertaEldora) window.alertaEldora("Fundos Insuficientes", dados.erro, "erro");
-            else alert("❌ " + dados.erro);
+            else window.avisoEldora("❌ " + dados.erro);
         } else {
             if (window.alertaEldora) window.alertaEldora("Compra Realizada!", `Sua compra foi enviada para a mochila.\nOuro restante: ${dados.novo_ouro.toLocaleString('pt-BR')}`, "sucesso");
-            else alert("✅ Compra realizada!");
+            else window.avisoEldora("✅ Compra realizada!");
             
             if (typeof carregarMeuPerfil === 'function') carregarMeuPerfil();
         }

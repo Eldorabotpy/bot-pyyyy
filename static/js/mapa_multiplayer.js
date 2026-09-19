@@ -78,8 +78,8 @@ window.toggleListaGrupo = function() {
     }
 };
 
-window.sairDoGrupoEldora = function() {
-    if (confirm("Tem certeza que deseja abandonar seus aliados?")) {
+window.sairDoGrupoEldora = async function() {
+    if (await window.confirmarEldora("Tem certeza que deseja abandonar seus aliados?", "Sair do grupo?")) {
         if (window.eldoraSocket) window.eldoraSocket.emit('sairGrupo', {});
         let hud = document.getElementById('eldora-party-hud');
         if (hud) hud.remove();
@@ -557,7 +557,7 @@ class MotorMultiplayer {
             chamarConexaoSegura(); // Usa a versão blindada!
         });
 
-        this.socket.on('desconectarDuplicado', () => { alert("🚨 A tua conta foi conectada noutro dispositivo!"); window.location.reload(); });
+        this.socket.on('desconectarDuplicado', async () => { await window.avisoEldora("🚨 A tua conta foi conectada noutro dispositivo!"); window.location.reload(); });
         this.socket.on('forcarTeletransporte', (dados) => { if (dados.player_id === localStorage.getItem("jogadorEldoraID")) this.scene.scene.restart({ regiao: dados.nova_regiao, skin: this.scene.skinAtiva, isRespawn: dados.is_respawn }); });
         
         // ==========================================
@@ -994,12 +994,12 @@ class MotorMultiplayer {
             chatBox.scrollTop = chatBox.scrollHeight; 
         });
 
-        this.socket.on('receberConviteAmizade', (dados) => { 
+        this.socket.on('receberConviteAmizade', async (dados) => {
             if (typeof window.exibirConviteAmizadeCustom === 'function') {
                 window.exibirConviteAmizadeCustom(dados);
             } else {
                 // Fallback de segurança se der algum problema de carregamento
-                if (confirm(`🤝 O jogador [${dados.remetente_nome}] enviou um pedido de amizade!\n\nAceitar?`)) { 
+                if (await window.confirmarEldora(`🤝 O jogador [${dados.remetente_nome}] enviou um pedido de amizade!\n\nAceitar?`)) {
                     this.socket.emit('aceitarAmizade', { amigo_id: dados.remetente_id, amigo_nome: dados.remetente_nome }); 
                 }
             }
@@ -1113,14 +1113,14 @@ class MotorMultiplayer {
             }
         };
         // 👇 1. OUVINTE: Quando alguém te desafia 👇
-        window.eldoraSocket.on('receberConviteDuelo', function(dados) {
+        window.eldoraSocket.on('receberConviteDuelo', async function(dados) {
             
             // Usamos o novo Modal Bonito!
             if (typeof window.exibirConviteDueloCustom === 'function') {
                 window.exibirConviteDueloCustom(dados);
             } else {
                 // Se der algum erro e a função não carregar, usa o feio como segurança para não quebrar o jogo
-                const aceitou = confirm(`⚔️ DESAFIO! O herói ${dados.remetente_nome} te desafiou para um Duelo 1v1!\n\nVocê aceita?`);
+                const aceitou = await window.confirmarEldora(`⚔️ DESAFIO! O herói ${dados.remetente_nome} te desafiou para um Duelo 1v1!\n\nVocê aceita?`);
                 if (aceitou) {
                     window.eldoraSocket.emit('aceitarDuelo', { desafiante_id: dados.remetente_id });
                 } else {
@@ -1501,7 +1501,7 @@ window.acaoInspecao = function(acao) {
         else if (acao === 'desafiar') {
             if (window.eldoraSocket) {
                 window.eldoraSocket.emit('enviarConviteDuelo', { alvo_id: alvoId });
-                // 👇 AQUI ESTÁ A MÁGICA: Tchau alert(), olá Toast!
+                // 👇 AQUI ESTÁ A MÁGICA: Tchau window.avisoEldora(), olá Toast!
                 window.mostrarNotificacaoRPG(`Convite de duelo enviado para ${alvoNome}!`, '⚔️');
             }
         }
@@ -1516,7 +1516,7 @@ window.abrirPerfilJogador = async function(charId) {
     let modal = document.getElementById('modal-ver-perfil');
     let conteudo = document.getElementById('conteudo-ver-perfil');
     
-    if(!modal || !conteudo) { alert("Erro no modal de perfil!"); return; }
+    if(!modal || !conteudo) { window.avisoEldora("Erro no modal de perfil!"); return; }
 
     modal.style.display = 'flex';
     Array.from(modal.querySelectorAll('*')).forEach(el => {

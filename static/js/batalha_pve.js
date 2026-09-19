@@ -159,7 +159,7 @@ function abrirMenuMagiasPvE() {
     
     let meusDados = pveBatalhaAtual.jogadores[meuId];
     if (!meusDados || !meusDados.skills) {
-        alert("Nenhuma magia encontrada.");
+        window.avisoEldora("Nenhuma magia encontrada.");
         return;
     }
     
@@ -193,7 +193,7 @@ function abrirMenuMagiasPvE() {
 }
 
 function abrirMenuItensPvE() {
-    alert("Função de inventário na batalha chegará em breve!");
+    window.avisoEldora("Função de inventário na batalha chegará em breve!");
 }
 
 function sairDaArenaPvE() {

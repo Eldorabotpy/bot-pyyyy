@@ -573,7 +573,7 @@ class MotorCacada {
         if (typeof window.alertaEldora === "function") {
             window.alertaEldora(titulo, mensagem, tipo);
         } else {
-            alert(`${titulo}\n${mensagem}`);
+            window.avisoEldora(`${titulo}\n${mensagem}`);
         }
     }
 
@@ -726,7 +726,7 @@ class MotorCacada {
 
             this.scene.load.once('loaderror', (fileObj) => {
                 if(fileObj.key === textureKey) {
-                    alert("❌ Link não encontrado no GitHub:\n" + fileObj.url);
+                    window.avisoEldora("❌ Link não encontrado no GitHub:\n" + fileObj.url);
                 }
             });
 

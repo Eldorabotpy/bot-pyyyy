@@ -64,7 +64,7 @@ function instalarTravaCliqueCombate() {
                 tela.style.display !== 'none' &&
                 getComputedStyle(tela).display !== 'none';
 
-            if (!combateAberto) return;
+            if (!combateAberto || evt.target.closest?.('.eldora-dialog')) return;
 
             const clicouDentroCombate = tela.contains(evt.target);
 
@@ -323,7 +323,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         }
 
         if (!telaGlobal) {
-            alert("ERRO HTML: A tela 'tela-combate-global' sumiu do index.html!");
+            window.avisoEldora("ERRO HTML: A tela 'tela-combate-global' sumiu do index.html!");
             return;
         }
         
@@ -363,7 +363,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         
         const charId = localStorage.getItem("jogadorEldoraID");
         if (!charId) {
-            alert("ERRO: ID do jogador não encontrado na memória!");
+            window.avisoEldora("ERRO: ID do jogador não encontrado na memória!");
             return;
         }
 
@@ -425,7 +425,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         const dados = await res.json();
 
         if (dados.erro) {
-            alert("AVISO DO SERVIDOR: " + dados.erro);
+            window.avisoEldora("AVISO DO SERVIDOR: " + dados.erro);
             if(typeof sairDaArena === 'function') sairDaArena(true);
             return;
         }
@@ -596,7 +596,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
 
     } catch(e) {
 
-        alert("🚨 CRASH NO JAVASCRIPT: " + e.message);
+        window.avisoEldora("🚨 CRASH NO JAVASCRIPT: " + e.message);
         if(typeof sairDaArena === 'function') sairDaArena(true);
     }
 }
@@ -985,7 +985,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         window.bloqueioDeTurno = false;
         console.error(e);
         if (salaDaAcao && String(window.salaCombateGrupoAtual) !== String(salaDaAcao)) return;
-        alert("🚨 Erro Crítico de Conexão: " + e.message);
+        window.avisoEldora("🚨 Erro Crítico de Conexão: " + e.message);
         sairDaArena(true);
     }
 }
@@ -1237,11 +1237,11 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             let txtAcao = (acao.texto || "").toUpperCase();
             let ehFalha = (txtAcao.includes("MANA") && txtAcao.includes("INSUFICIENTE")) || txtAcao.includes("FALHOU") || txtAcao.includes("ESQUIVOU");
             let ehCura = txtAcao.includes("USOU") || txtAcao.includes("CUROU") || txtAcao.includes("🧪");
-            let ehCritico = txtAcao.includes("CRÍTICO");
+            let ehCritico = !!acao.critico || txtAcao.includes("CRÍTICO");
 
             let danoCausado = Number(acao.dano) || Number(acao.valor) || 0;
             
-            if (!ehFalha && !ehCura && danoCausado === 0 && acao.texto) {
+            if (acao.dano == null && !ehFalha && !ehCura && danoCausado === 0 && acao.texto) {
                 // 👇 CORREÇÃO: Só pega o número DEPOIS da palavra DANO ou CRÍTICO
                 let matchRegex = acao.texto.match(/(?:DANO|CRÍTICO)\D*(\d+)/i);
                 if (matchRegex && matchRegex[1]) {
@@ -1252,7 +1252,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             danoCausado = Math.max(0, danoCausado); 
 
             // 👇 A MÁGICA: Filtra textos do servidor para não gerar ataques falsos! 👇
-            if (danoCausado === 0 && !ehFalha && !ehCura) {
+            if (danoCausado === 0 && !ehFalha && !ehCura && !acao.golpe) {
                 elemLog1.innerHTML = `<span style="color:#facc15; font-style:italic;">${acao.texto}</span>`;
                 elemLog2.innerText = "";
                 indexAcao++;
@@ -1274,6 +1274,9 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 logPlayerVisual = `<span style="color:#ffffff;">${prefixo} <span style="color:#ef4444; font-weight:bold;">${danoCausado}</span> de dano!</span>`;
             }
             
+            if (acao.golpe) {
+                logPlayerVisual = `<span style="color:#fff;">${ehCritico ? '💥 Crítico! ' : ''}Ataque ${Number(acao.golpe)}: <b style="color:#f87171;">${danoCausado} de dano</b> · <b style="color:#4ade80;">roubou ${Number(acao.roubo_vida || 0)} de vida</b></span>`;
+            }
             elemLog1.innerHTML = logPlayerVisual; // Mostra na tela na hora da animação
             elemLog2.innerText = "";
             
@@ -1322,6 +1325,11 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
                 } else {
                     animarEfeitoVisual('sprite-mob', tipoVisual, corEfeito);
+                }
+                if (acao.player_hp_apos_golpe !== undefined) {
+                    db.playerHpAtual = Number(acao.player_hp_apos_golpe);
+                    atualizarVisualBarra('bar-hp-player', db.playerHpAtual, db.playerHpMax);
+                    if (Number(acao.roubo_vida) > 0) mostrarNumeroDano('sprite-player', `+${acao.roubo_vida} HP`, false);
                 }
                 db.mobHpAtual = Math.max(0, db.mobHpAtual - danoCausado);
                 atualizarVisualBarra('bar-hp-mob', db.mobHpAtual, db.mobHpMax);
@@ -4086,7 +4094,7 @@ window.executarAcaoRaid = function(acao, skillId = null) {
     raidRenderizar();
 
     if (!window.eldoraSocket) {
-        alert("Erro: socket da raid não encontrado.");
+        window.avisoEldora("Erro: socket da raid não encontrado.");
         window.bloqueioTurnoRaid = false;
         raidRenderizar();
         return;

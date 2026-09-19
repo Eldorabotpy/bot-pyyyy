@@ -271,7 +271,7 @@ window.salvarCustomizacaoPerfil = async function() {
                             if (typeof window.alertaEldora === 'function') {
                                 window.alertaEldora("Imagem Não Encontrada", `O GitHub falhou ao carregar a skin.\n\nLink buscado:\n${urlCompleta}\n\nVerifique se o nome do arquivo lá é exatamente "${idSkin}.png".`, "erro");
                             } else {
-                                alert(`Imagem não encontrada no GitHub:\n${urlCompleta}`);
+                                window.avisoEldora(`Imagem não encontrada no GitHub:\n${urlCompleta}`);
                             }
                         }
                     });

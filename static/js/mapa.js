@@ -112,7 +112,7 @@ class MapaScene extends Phaser.Scene {
         
         this.load.once('loaderror', (fileObj) => {
             if (fileObj.key === this.skinAtiva) {
-                alert(`🚨 ALERTA DO MAPA 🚨\n\nA skin não carregou porque o arquivo não foi encontrado no GitHub!\n\nO mapa tentou baixar:\n${fileObj.url}\n\nVerifique se o nome do arquivo lá é exatamente esse.`);
+                window.avisoEldora(`🚨 ALERTA DO MAPA 🚨\n\nA skin não carregou porque o arquivo não foi encontrado no GitHub!\n\nO mapa tentou baixar:\n${fileObj.url}\n\nVerifique se o nome do arquivo lá é exatamente esse.`);
             }
         });
 
@@ -1437,7 +1437,7 @@ class MapaScene extends Phaser.Scene {
         
         this.input.on('pointerdown', (pointer) => {
 
-            if (this.isDead || window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa) return;
+            if (this.isDead || window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa || window.__eldoraDialogAberto) return;
 
             // ==========================================
             // 🛡️ HUD DE STATUS ABERTO
@@ -1580,7 +1580,7 @@ class MapaScene extends Phaser.Scene {
                     if (typeof window.abrirLojaReino === 'function') {
                         window.abrirLojaReino();
                     } else {
-                        alert("A Lojista Flora está arrumando o estoque! (Verifique o F12)");
+                        window.avisoEldora("A Lojista Flora está arrumando o estoque! (Verifique o F12)");
                     }
                 } else { 
                     let aviso = this.add.text(this.player.x, this.player.y - 50, "Preciso chegar mais perto da Flora...", {
@@ -1624,7 +1624,7 @@ class MapaScene extends Phaser.Scene {
                     if (typeof window.abrirUIForja === 'function') {
                         window.abrirUIForja();
                     } else {
-                        alert("Atenção: A interface não abriu! Verifique se adicionou o <script src='/static/js/forja.js'></script> no seu index.html");
+                        window.avisoEldora("Atenção: A interface não abriu! Verifique se adicionou o <script src='/static/js/forja.js'></script> no seu index.html");
                         console.error("Função window.abrirUIForja não encontrada.");
                     }
                 }
@@ -1666,7 +1666,7 @@ class MapaScene extends Phaser.Scene {
                     if (typeof window.abrirUIRefinaria === 'function') {
                         window.abrirUIRefinaria();
                     } else {
-                        alert("Atenção: A interface não abriu! Verifique se adicionou o <script src='/static/js/refinaria.js'></script> no seu index.html");
+                        window.avisoEldora("Atenção: A interface não abriu! Verifique se adicionou o <script src='/static/js/refinaria.js'></script> no seu index.html");
                     }
                 }
             });
@@ -2139,7 +2139,7 @@ class MapaScene extends Phaser.Scene {
         };
 
         const liberarTecladoMapa = () => {
-            if (window.__mercadoAberto || window.BruxaPocoes?.aberta || window.__guildaAberta || window.combateAbertoBloqueandoMapa) return;
+            if (window.__mercadoAberto || window.BruxaPocoes?.aberta || window.__guildaAberta || window.combateAbertoBloqueandoMapa || window.__eldoraDialogAberto) return;
             try {
                 const ativo = document.activeElement;
 
@@ -2201,7 +2201,7 @@ class MapaScene extends Phaser.Scene {
     }
     
     update() {
-        if (window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa) {
+        if (window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa || window.__eldoraDialogAberto) {
             this.isMoving = false;
             this.player?.body?.stop();
             return;
@@ -2911,7 +2911,7 @@ window.usarPocaoRapida = async function(tipoSlot) {
             if (window.alertaEldora) {
                 window.alertaEldora("Aviso de Cinto", data.erro, "erro");
             } else {
-                alert(data.erro);
+                window.avisoEldora(data.erro);
             }
         }
     } catch(e) {

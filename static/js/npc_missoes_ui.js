@@ -439,7 +439,7 @@ class MotorDeMissoesNPC {
                     "sucesso"
                 );
             } else {
-                alert(data.message);
+                window.avisoEldora(data.message);
             }
 
             // =====================================================
@@ -466,7 +466,7 @@ class MotorDeMissoesNPC {
 
         } else {
             if (typeof window.alertaEldora === 'function') window.alertaEldora("Erro", data.error, "erro");
-            else alert(data.error);
+            else window.avisoEldora(data.error);
         }
     }
 
@@ -486,7 +486,7 @@ class MotorDeMissoesNPC {
             if (typeof window.alertaEldora === 'function') {
                 window.alertaEldora("Sucesso!", data.message, "sucesso");
             } else {
-                alert(data.message);
+                window.avisoEldora(data.message);
             }
             
             if (typeof window.carregarMeuPerfil === 'function') {
@@ -498,7 +498,7 @@ class MotorDeMissoesNPC {
             if (typeof window.alertaEldora === 'function') {
                 window.alertaEldora("Aviso", data.error, "erro");
             } else {
-                alert(data.error);
+                window.avisoEldora(data.error);
             }
             botoes.forEach(b => b.style.pointerEvents = 'auto');
         }
@@ -527,7 +527,7 @@ class MotorDeMissoesNPC {
                 });
             }
         } else {
-            alert("Falha mágica: " + data.error);
+            window.avisoEldora("Falha mágica: " + data.error);
         }
     }
 }

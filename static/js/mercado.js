@@ -1259,7 +1259,7 @@ async function comprarItemMercado(idVenda, moeda) {
     if (mercadoOperacoesPendentes.has(idVenda)) return;
     // 1. Confirmação de segurança para evitar clique acidental
     let nomeMoeda = moeda === 'ouro' ? 'Ouro 🪙' : 'Gemas 💎';
-    if (!confirm(`O Rei exige certeza absoluta! Deseja comprar este item com ${nomeMoeda}?`)) {
+    if (!await window.confirmarEldora(`O Rei exige certeza absoluta! Deseja comprar este item com ${nomeMoeda}?`)) {
         return;
     }
 
@@ -1283,7 +1283,7 @@ async function comprarItemMercado(idVenda, moeda) {
             if (window.alertaEldora) {
                 window.alertaEldora("Transação Concluída", data.mensagem, "sucesso");
             } else {
-                alert(data.mensagem);
+                window.avisoEldora(data.mensagem);
             }
             
             // Toca um som de moedas (opcional)
@@ -1303,7 +1303,7 @@ async function comprarItemMercado(idVenda, moeda) {
             if (window.alertaEldora) {
                 window.alertaEldora("Aviso Real", data.erro, "erro");
             } else {
-                alert("Erro: " + data.erro);
+                window.avisoEldora("Erro: " + data.erro);
             }
         }
     } catch(e) {
@@ -1317,7 +1317,7 @@ async function comprarItemMercado(idVenda, moeda) {
 async function cancelarVendaMercado(idVenda) {
     if (mercadoOperacoesPendentes.has(idVenda)) return;
     // 1. Confirmação de segurança para não cancelar sem querer
-    if (!confirm("O Rei devolverá este item para a sua mochila. Deseja confirmar o cancelamento?")) {
+    if (!await window.confirmarEldora("O Rei devolverá este item para a sua mochila. Deseja confirmar o cancelamento?")) {
         return;
     }
 
@@ -1340,7 +1340,7 @@ async function cancelarVendaMercado(idVenda) {
             if (window.alertaEldora) {
                 window.alertaEldora("Sucesso", "Anúncio cancelado! O item voltou para a sua mochila.", "sucesso");
             } else {
-                alert("Anúncio cancelado! O item voltou para a sua mochila.");
+                window.avisoEldora("Anúncio cancelado! O item voltou para a sua mochila.");
             }
             
             // 2. Atualiza a tela (O item some da loja na hora)
@@ -1356,7 +1356,7 @@ async function cancelarVendaMercado(idVenda) {
             if (window.alertaEldora) {
                 window.alertaEldora("Aviso Real", data.erro, "erro");
             } else {
-                alert("Erro: " + data.erro);
+                window.avisoEldora("Erro: " + data.erro);
             }
         }
     } catch(e) {

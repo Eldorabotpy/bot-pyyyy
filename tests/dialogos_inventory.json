@@ -1,0 +1,66 @@
+{
+  "total": 101,
+  "types": {
+    "alert": 87,
+    "confirm": 13,
+    "prompt": 1
+  },
+  "files": {
+    "static\\js\\arena_pvp.js": {
+      "alert": 1,
+      "confirm": 1
+    },
+    "static\\js\\batalha_pve.js": {
+      "alert": 2
+    },
+    "static\\js\\combate.js": {
+      "alert": 6
+    },
+    "static\\js\\dimensional_boss.js": {
+      "alert": 16
+    },
+    "static\\js\\loja_aventureiro.js": {
+      "alert": 4
+    },
+    "static\\js\\loja_reino.js": {
+      "alert": 3
+    },
+    "static\\js\\main.js": {
+      "alert": 2
+    },
+    "static\\js\\mapa.js": {
+      "alert": 5
+    },
+    "static\\js\\mapa_cacada.js": {
+      "alert": 2
+    },
+    "static\\js\\mapa_multiplayer.js": {
+      "confirm": 3,
+      "alert": 2
+    },
+    "static\\js\\mercado.js": {
+      "confirm": 2,
+      "alert": 4
+    },
+    "static\\js\\npcs_engine.js": {
+      "alert": 3
+    },
+    "static\\js\\npc_missoes_ui.js": {
+      "alert": 5
+    },
+    "static\\js\\perfil.js": {
+      "alert": 11
+    },
+    "static\\js\\perfil_visual.js": {
+      "alert": 1
+    },
+    "templates\\admin_panel.html": {
+      "confirm": 7,
+      "prompt": 1,
+      "alert": 19
+    },
+    "templates\\login.html": {
+      "alert": 1
+    }
+  }
+}

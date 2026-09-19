@@ -25,6 +25,20 @@ vm.runInContext(source.slice(source.indexOf('window.animarMagiaSpriteGrid ='),so
  await advance(5000);assert.equal(el('sprite-mob').style.opacity,'1');assert.equal(ctx.window.dadosCombateAtual.mobHpAtual,20);assert.equal(victories,0);
  finishSkill(true);for(let i=0;i<5;i++)await Promise.resolve();assert.equal(ctx.window.dadosCombateAtual.mobHpAtual,0);
  await advance(1201);assert.equal(el('sprite-mob').style.opacity,'0');await advance(1001);assert.equal(victories,1);
+ // Each hit advances its own damage, healing and label before the next hit.
+ ctx.window.dadosCombateAtual={mobHpAtual:100,mobHpMax:100,playerHpAtual:50,playerHpMax:100};
+ ctx.animarAcoesDaRodada({log:[
+  {autor:'player',texto:'Ataque 1',golpe:1,dano:30,roubo_vida:3,player_hp_apos_golpe:53},
+  {autor:'player',texto:'Ataque 2',golpe:2,dano:50,roubo_vida:5,player_hp_apos_golpe:58}
+ ],vitoria:true,mob_hp_atual:0},'atacar');
+ assert.equal(ctx.window.dadosCombateAtual.playerHpAtual,53);
+ assert.equal(ctx.window.dadosCombateAtual.mobHpAtual,70);
+ assert.match(el('log-texto-1').innerHTML,/Ataque 1/);
+ await advance(1201);
+ assert.equal(ctx.window.dadosCombateAtual.playerHpAtual,58);
+ assert.equal(ctx.window.dadosCombateAtual.mobHpAtual,20);
+ assert.match(el('log-texto-1').innerHTML,/Ataque 2/);
+ await advance(2201);
  // A group victory arriving before HTTP must not hide the target.
  Object.assign(ctx,{extrairSalaPayloadGrupo:d=>d.sala,normalizarIdCombateGrupo:v=>String(v||'')});
  ctx.window.salaCombateGrupoAtual='room';ctx.window.dadosCombateAtual.rodadaVisualPendente=true;
@@ -32,6 +46,6 @@ vm.runInContext(source.slice(source.indexOf('window.animarMagiaSpriteGrid ='),so
  const packet={sala:{sala_id:'room',estado:'vitoria'}};
  assert.equal(ctx.aplicarEstadoCombateGrupo(packet),true);
  assert.equal(ctx.window.dadosCombateAtual.estadoGrupoAposAnimacao.dados,packet);
- assert.equal(victories,1);
+ assert.equal(victories,2);
  console.log('PASS delayed skill precedes damage/death; missing/timeout assets resolve; stale load cancelled');
 })().catch(e=>{console.error(e);process.exitCode=1;});

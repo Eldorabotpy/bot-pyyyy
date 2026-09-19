@@ -16,7 +16,7 @@ window.comprarItemGema = function(itemId) {
     if (window.eldoraSocket) {
         window.eldoraSocket.emit('comprar_item_gema', { item: itemId });
     } else {
-        alert("O reino está sem conexão no momento!");
+        window.avisoEldora("O reino está sem conexão no momento!");
     }
 };
 
@@ -28,11 +28,11 @@ window.configurarOuvintesLojaReino = function(socket) {
     
     socket.on('respostaCompraGema', (dados) => {
         if (dados.sucesso) {
-            alert("👑 SUCESSO: " + dados.mensagem);
+            window.avisoEldora("👑 SUCESSO: " + dados.mensagem);
             // Atualiza a tela de perfil se ela estiver aberta pra mostrar as gemas sumindo
             if (typeof carregarMeuPerfil === 'function') carregarMeuPerfil(); 
         } else {
-            alert("❌ ERRO: " + dados.mensagem);
+            window.avisoEldora("❌ ERRO: " + dados.mensagem);
         }
     });
 };
