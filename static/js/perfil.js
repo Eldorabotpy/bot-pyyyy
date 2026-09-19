@@ -1241,15 +1241,61 @@ window.abrirModalItem = function(idAlvo, origem) {
 
     if (!document.getElementById('modal-item')) {
         const modalHtml = `
-            <div id="modal-item" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; justify-content:center; align-items:center; backdrop-filter: blur(4px);">
-                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); width: 85%; max-width: 320px; border-radius: 12px; border: 2px solid #3b82f6; padding: 20px; text-align: center; position: relative;">
+            <div id="modal-item" style="
+                display:none;
+                position:fixed;
+                top:0;
+                left:0;
+                width:100%;
+                height:100vh;
+                height:100dvh;
+                padding:12px;
+                box-sizing:border-box;
+                background:rgba(0,0,0,0.85);
+                z-index:99999;
+                justify-content:center;
+                align-items:center;
+                backdrop-filter:blur(4px);
+            ">
+                <div style="
+                    background:linear-gradient(135deg, #1e293b, #0f172a);
+                    width:100%;
+                    max-width:320px;
+                    max-height:calc(100dvh - 24px);
+                    overflow-y:auto;
+                    overscroll-behavior:contain;
+                    box-sizing:border-box;
+                    border-radius:12px;
+                    border:2px solid #3b82f6;
+                    padding:15px;
+                    text-align:center;
+                    position:relative;
+                ">
                     <span onclick="fecharModalItem()" style="position: absolute; top: 10px; right: 15px; font-size: 1.5em; color: #ef4444; cursor: pointer; font-weight:bold;">&times;</span>
-                    <div id="modal-item-icon" style="margin-bottom: 10px; min-height: 64px; display:flex; justify-content:center; align-items:center;"></div>
+                    <div id="modal-item-icon" style="
+                        width:110px;
+                        height:110px;
+                        margin:0 auto 8px auto;
+                        display:flex;
+                        justify-content:center;
+                        align-items:center;
+                    "></div>
+
                     <h3 id="modal-item-nome" style="margin: 0 0 5px 0; color: #fff; font-size: 1.2em; font-family:'Cinzel',serif;">Nome</h3>
                     <div id="modal-item-raridade" style="font-size: 0.8em; font-weight: bold; margin-bottom: 10px; text-transform: uppercase;"></div>
                     <p id="modal-item-desc" style="color: #94a3b8; font-size: 0.85em; margin: 10px 0; border-top: 1px solid #334155; padding-top: 10px;">Descrição</p>
                     <div id="modal-item-stats" style="display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-bottom: 15px;"></div>
-                    <div id="modal-item-acoes" style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;"></div>
+                    <div id="modal-item-acoes" style="
+                        display:flex;
+                        gap:8px;
+                        justify-content:center;
+                        flex-wrap:wrap;
+                        position:sticky;
+                        bottom:-15px;
+                        z-index:5;
+                        background:linear-gradient(180deg, rgba(15,23,42,0), #0f172a 30%);
+                        padding:14px 0 4px 0;
+                    "></div>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
@@ -1271,7 +1317,15 @@ window.abrirModalItem = function(idAlvo, origem) {
     const imgUrl = "/static/assets/box.png";
 
     document.getElementById('modal-item-icon').innerHTML = `
-        <img id="modal-img-item-real" src="${imgUrl}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" style="max-width: 90%; max-height: 90%; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.9));">
+        <img id="modal-img-item-real"
+             src="${imgUrl}"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+             style="
+                width:100%;
+                height:100%;
+                object-fit:contain;
+                filter:drop-shadow(0 4px 10px rgba(0,0,0,0.9));
+             ">
         <span style="display:none; font-size: 2.5em; text-shadow: 0 0 10px rgba(255,255,255,0.2);">${itemData.emoji || itemData.icon || '📦'}</span>
     `;
 
